@@ -3,10 +3,10 @@ info:
   contact:
     email: felixtj.dietrich@tum.de
     name: Felix T.J. Dietrich
-  description: API documentation for Hephaestus. Changed practice-review bigint ids
-    and monetary amounts are decimal strings. Monetary fields are USD; clients read
-    server-computed totals and budget decisions. Existing provider mirror ids retain
-    their numeric contract. Required nullable response fields are present with null.
+  description: API documentation for Hephaestus. Practice review bigint ids and monetary
+    amounts are decimal strings. Monetary fields are USD; clients read server-computed
+    totals and budget decisions. Provider mirror ids retain their numeric contract.
+    Required nullable response fields are present with null.
   license:
     name: MIT License
     url: https://github.com/hephaestus-build/Hephaestus/blob/main/LICENSE
@@ -49,14 +49,12 @@ tags:
   name: Instance Settings
 - description: Session lifecycle
   name: Auth
-- description: |-
-    Workspace registry endpoints under /workspaces that operate outside of a specific workspace slug;
-     slugged routes use <code>@WorkspaceScopedController</code> at the integration boundary.
-  name: workspace-registry-controller
 - description: Workspace-scoped practice-review policy
   name: Practice Review Settings
 - description: Instance-admin-only read-only access to users
   name: User view
+- description: Review catalog changes before they affect a workspace
+  name: Practice Catalog
 - description: Workspace integration connection management
   name: Connections
 - description: Up/down votes on mentor assistant messages
@@ -115,8 +113,6 @@ tags:
     GitLab-specific REST endpoints used during the workspace creation wizard. Gated on the
      <code>GITLAB_WORKSPACE_CREATION</code> feature flag.
   name: git-lab-preflight-controller
-- description: Review catalogue changes before they affect a workspace
-  name: Practice Catalog
 - description: Instance-admin LLM connection and settings management
   name: Admin LLM
 - description: Public JWK set for verifying Hephaestus session JWTs
@@ -1076,7 +1072,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ReorderPracticeGroupsRequest"
+              $ref: "#/components/schemas/ReorderRequest"
         required: true
       responses:
         "200":
@@ -1122,7 +1118,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CatalogGroupInput"
+              $ref: "#/components/schemas/CatalogGroupUpdate"
         required: true
       responses:
         "200":
@@ -1257,7 +1253,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ReorderPracticesRequest"
+              $ref: "#/components/schemas/ReorderRequest"
         required: true
       responses:
         "200":
@@ -1303,7 +1299,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CatalogPracticeInput"
+              $ref: "#/components/schemas/CatalogPracticeUpdate"
         required: true
       responses:
         "200":
@@ -1390,28 +1386,6 @@ paths:
       tags:
       - catalog-admin
   /admin/practice-catalog/practices/{slug}/release:
-    delete:
-      operationId: declineCatalogPracticeRelease
-      parameters:
-      - in: path
-        name: slug
-        required: true
-        schema:
-          type: string
-      - in: header
-        name: If-Match
-        required: false
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CatalogPractice"
-          description: OK
-      tags:
-      - catalog-admin
     get:
       operationId: getCatalogPracticeRelease
       parameters:
@@ -1425,7 +1399,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CatalogPracticeReleaseProposal"
+                $ref: "#/components/schemas/PracticeReleaseProposal"
           description: OK
       tags:
       - catalog-admin
@@ -3247,6 +3221,197 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
           description: "Workspace, contributor, team or repository not found"
       summary: List the contributors without a membership whom an admin hid from activity
+      tags:
+      - Activity
+  /workspaces/{workspaceSlug}/activity/me:
+    get:
+      operationId: getOwnActivity
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          maxLength: 51
+          minLength: 3
+          pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
+      - description: Activity range
+        in: query
+        name: range
+        required: false
+        schema:
+          type: string
+          enum:
+          - 30d
+          - 90d
+          - 1y
+          - all
+          - custom
+      - in: query
+        name: from
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: to
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: team
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: repo
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+          uniqueItems: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivityPersonDetail"
+          description: Your activity returned
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: A request parameter is not valid
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The caller is not a member of the workspace
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "Workspace, contributor, team or repository not found"
+      summary: Read your activity in this workspace
+      tags:
+      - Activity
+  /workspaces/{workspaceSlug}/activity/me/work:
+    get:
+      operationId: getOwnActivityWork
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          maxLength: 51
+          minLength: 3
+          pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
+      - description: Activity range
+        in: query
+        name: range
+        required: false
+        schema:
+          type: string
+          enum:
+          - 30d
+          - 90d
+          - 1y
+          - all
+          - custom
+      - in: query
+        name: from
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: to
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: team
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: repo
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+          uniqueItems: true
+      - description: Kinds of activity to list (repeatable); omit for every kind
+        in: query
+        name: kinds
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - PULL_REQUEST_OPENED
+            - PULL_REQUEST_MERGED
+            - PULL_REQUEST_CLOSED
+            - REVIEW_APPROVED
+            - REVIEW_CHANGES_REQUESTED
+            - REVIEW_COMMENTED
+            - COMMENTED
+            - CODE_COMMENTED
+            - ISSUE_OPENED
+            - ISSUE_CLOSED
+          uniqueItems: true
+      - description: The previous page's nextCursor; omit for the first page
+        in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+      - description: Page size from 1 to 100; defaults to 30
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivityWorkPage"
+          description: Your work listed
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: A request parameter is not valid
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The caller is not a member of the workspace
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "Workspace, contributor, team or repository not found"
+      summary: List the work on which your activity happened
       tags:
       - Activity
   /workspaces/{workspaceSlug}/activity/members/{login}/open-work:
@@ -5994,7 +6159,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ReorderPracticeGroupsRequest"
+              $ref: "#/components/schemas/ReorderRequest"
         required: true
       responses:
         "200":
@@ -7047,7 +7212,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ReorderPracticesRequest"
+              $ref: "#/components/schemas/ReorderRequest"
         required: true
       responses:
         "200":
@@ -10542,7 +10707,7 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/TeamInfo"
-          description: list of teams with their members and permissions
+          description: OK
       summary: List teams
       tags:
       - Teams
@@ -10560,15 +10725,13 @@ paths:
           maxLength: 51
           minLength: 3
           pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
-      - description: the team ID
-        in: path
+      - in: path
         name: id
         required: true
         schema:
           type: integer
           format: int64
-      - description: "whether to hide the team (query parameter, fallback)"
-        in: query
+      - in: query
         name: hidden
         required: false
         schema:
@@ -10578,10 +10741,9 @@ paths:
           application/json:
             schema:
               type: boolean
-        description: "whether to hide the team (body parameter, preferred)"
       responses:
         "200":
-          description: "200 OK on success, 404 if team not found"
+          description: OK
       summary: Update team visibility
       tags:
       - Teams
@@ -10714,8 +10876,7 @@ paths:
           maxLength: 51
           minLength: 3
           pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
-      - description: the team ID
-        in: path
+      - in: path
         name: teamId
         required: true
         schema:
@@ -10744,8 +10905,7 @@ paths:
           maxLength: 51
           minLength: 3
           pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
-      - description: the team ID
-        in: path
+      - in: path
         name: teamId
         required: true
         schema:
@@ -10756,7 +10916,6 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/UpdateTeamSettingsRequest"
-        description: the update request containing the hidden flag
         required: true
       responses:
         "200":
@@ -10788,8 +10947,7 @@ paths:
           maxLength: 51
           minLength: 3
           pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
-      - description: the team ID
-        in: path
+      - in: path
         name: teamId
         required: true
         schema:
@@ -10821,15 +10979,13 @@ paths:
           maxLength: 51
           minLength: 3
           pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
-      - description: the team ID
-        in: path
+      - in: path
         name: teamId
         required: true
         schema:
           type: integer
           format: int64
-      - description: the label ID to remove as filter
-        in: path
+      - in: path
         name: labelId
         required: true
         schema:
@@ -10856,15 +11012,13 @@ paths:
           maxLength: 51
           minLength: 3
           pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
-      - description: the team ID
-        in: path
+      - in: path
         name: teamId
         required: true
         schema:
           type: integer
           format: int64
-      - description: the label ID to add as filter
-        in: path
+      - in: path
         name: labelId
         required: true
         schema:
@@ -10893,15 +11047,13 @@ paths:
           maxLength: 51
           minLength: 3
           pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
-      - description: the team ID
-        in: path
+      - in: path
         name: teamId
         required: true
         schema:
           type: integer
           format: int64
-      - description: the repository ID
-        in: path
+      - in: path
         name: repositoryId
         required: true
         schema:
@@ -10931,15 +11083,13 @@ paths:
           maxLength: 51
           minLength: 3
           pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
-      - description: the team ID
-        in: path
+      - in: path
         name: teamId
         required: true
         schema:
           type: integer
           format: int64
-      - description: the repository ID
-        in: path
+      - in: path
         name: repositoryId
         required: true
         schema:
@@ -10950,7 +11100,6 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/UpdateRepositorySettingsRequest"
-        description: the update request containing the hiddenFromContributions flag
         required: true
       responses:
         "200":
@@ -11105,9 +11254,12 @@ components:
       type: object
       properties:
         choices:
-          type: array
-          items:
-            $ref: "#/components/schemas/Choice"
+          type: object
+          additionalProperties:
+            type: string
+            enum:
+            - CURRENT
+            - OFFERED
       required:
       - choices
     AccountAiChoice:
@@ -12149,7 +12301,7 @@ components:
           format: int32
         shipped:
           anyOf:
-          - $ref: "#/components/schemas/CatalogGroupDefinition"
+          - $ref: "#/components/schemas/GroupDefinition"
           - type: "null"
         slug:
           type: string
@@ -12211,28 +12363,6 @@ components:
       required:
       - added
       - moved
-    CatalogGroupDefinition:
-      type: object
-      properties:
-        color:
-          type:
-          - string
-          - "null"
-        description:
-          type:
-          - string
-          - "null"
-        icon:
-          type:
-          - string
-          - "null"
-        name:
-          type: string
-      required:
-      - color
-      - description
-      - icon
-      - name
     CatalogGroupInput:
       type: object
       properties:
@@ -12291,6 +12421,43 @@ components:
       required:
       - action
       - slug
+    CatalogGroupUpdate:
+      type: object
+      properties:
+        color:
+          type:
+          - string
+          - "null"
+          maxLength: 32
+          minLength: 0
+        description:
+          type:
+          - string
+          - "null"
+          maxLength: 2000
+          minLength: 0
+        icon:
+          type:
+          - string
+          - "null"
+          maxLength: 64
+          minLength: 0
+        name:
+          type: string
+          maxLength: 128
+          minLength: 0
+        position:
+          type:
+          - "null"
+          - integer
+          format: int32
+          minimum: 0
+      required:
+      - color
+      - description
+      - icon
+      - name
+      - position
     CatalogOrigin:
       type: object
       properties:
@@ -12388,7 +12555,7 @@ components:
       type: object
       properties:
         definition:
-          $ref: "#/components/schemas/PracticeDefinition"
+          $ref: "#/components/schemas/PracticeDefinitionInput"
         groupSlug:
           type:
           - string
@@ -12440,35 +12607,6 @@ components:
           type: string
         slug:
           type: string
-    CatalogPracticeReleaseProposal:
-      type: object
-      properties:
-        base:
-          anyOf:
-          - $ref: "#/components/schemas/PracticeDefinition"
-          - type: "null"
-        current:
-          $ref: "#/components/schemas/PracticeDefinition"
-        etag:
-          type: string
-        fields:
-          type: array
-          items:
-            $ref: "#/components/schemas/PracticeReleaseField"
-        offered:
-          $ref: "#/components/schemas/PracticeDefinition"
-        offeredDigest:
-          type: string
-        practiceSlug:
-          type: string
-      required:
-      - base
-      - current
-      - etag
-      - fields
-      - offered
-      - offeredDigest
-      - practiceSlug
     CatalogPracticeSummary:
       type: object
       properties:
@@ -12492,6 +12630,29 @@ components:
           type: string
         whyItMatters:
           type: string
+    CatalogPracticeUpdate:
+      type: object
+      properties:
+        definition:
+          $ref: "#/components/schemas/PracticeDefinitionInput"
+        groupSlug:
+          type:
+          - string
+          - "null"
+        kind:
+          type: string
+          pattern: "[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*"
+        position:
+          type:
+          - "null"
+          - integer
+          format: int32
+          minimum: 0
+      required:
+      - definition
+      - groupSlug
+      - kind
+      - position
     ChatMessage:
       type: object
       description: Mentor chat message in AI SDK UIMessage shape.
@@ -12571,31 +12732,6 @@ components:
       required:
       - createdAt
       - id
-    Choice:
-      type: object
-      properties:
-        field:
-          type: string
-          enum:
-          - NAME
-          - REVIEW_ON
-          - APPLIES_WHEN
-          - ABOUT
-          - READS
-          - REVIEWED_BY
-          - CRITERIA
-          - SCRIPT
-          - SCAN
-          - LINE_NOTES
-          - GUIDANCE
-        source:
-          type: string
-          enum:
-          - CURRENT
-          - OFFERED
-      required:
-      - field
-      - source
     CitationCapabilities:
       type: object
       properties:
@@ -13452,7 +13588,7 @@ components:
       type: object
       properties:
         definition:
-          $ref: "#/components/schemas/PracticeDefinition"
+          $ref: "#/components/schemas/PracticeDefinitionInput"
         groupSlug:
           type:
           - string
@@ -15405,6 +15541,7 @@ components:
           - MODEL_UNAVAILABLE
           - BUDGET_EXHAUSTED
           - ITEM_NOT_VISIBLE
+          - VERSION_SUPERSEDED
           - PENDING_DEADLINE_EXCEEDED
           - ITEM_GONE
           - null
@@ -17686,6 +17823,60 @@ components:
       - reviewedBy
       - scan
       - script
+    PracticeDefinitionInput:
+      type: object
+      additionalProperties: false
+      properties:
+        about:
+          type:
+          - string
+          - "null"
+          enum:
+          - AUTHOR
+          - REVIEWER
+          - ASSIGNEE
+          - MERGER
+          - null
+        appliesWhen:
+          anyOf:
+          - $ref: "#/components/schemas/AppliesWhen"
+          - type: "null"
+        criteria:
+          type: string
+          minLength: 1
+        guidance:
+          $ref: "#/components/schemas/PracticeGuidance"
+        lineNotes:
+          type: boolean
+        name:
+          type: string
+          minLength: 1
+        reads:
+          $ref: "#/components/schemas/PracticeReads"
+        reviewOn:
+          $ref: "#/components/schemas/ReviewOn"
+        reviewedBy:
+          $ref: "#/components/schemas/ReviewedByInput"
+        scan:
+          anyOf:
+          - $ref: "#/components/schemas/ScanDefinition"
+          - type: "null"
+        script:
+          type:
+          - string
+          - "null"
+      required:
+      - about
+      - appliesWhen
+      - criteria
+      - guidance
+      - lineNotes
+      - name
+      - reads
+      - reviewOn
+      - reviewedBy
+      - scan
+      - script
     PracticeDefinitionOptions:
       type: object
       properties:
@@ -18165,7 +18356,9 @@ components:
         current:
           $ref: "#/components/schemas/PracticeDefinition"
         currentVersionId:
-          type: string
+          type:
+          - string
+          - "null"
           pattern: "^[1-9][0-9]*$"
         etag:
           type: string
@@ -19797,16 +19990,7 @@ components:
           pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
       required:
       - newSlug
-    ReorderPracticeGroupsRequest:
-      type: object
-      properties:
-        slugs:
-          type: array
-          items:
-            type: string
-      required:
-      - slugs
-    ReorderPracticesRequest:
+    ReorderRequest:
       type: object
       properties:
         slugs:
@@ -21285,6 +21469,22 @@ components:
       required:
       - code
       - description
+    ReviewLimitInput:
+      type: object
+      additionalProperties: false
+      properties:
+        code:
+          type:
+          - string
+          - "null"
+          maxLength: 64
+          minLength: 0
+        description:
+          type: string
+          maxLength: 2000
+          minLength: 0
+      required:
+      - description
     ReviewLineage:
       type: object
       properties:
@@ -21892,13 +22092,10 @@ components:
           - MODEL_UNAVAILABLE
           - BUDGET_EXHAUSTED
           - ITEM_NOT_VISIBLE
+          - VERSION_SUPERSEDED
           - PENDING_DEADLINE_EXCEEDED
           - ITEM_GONE
           - null
-        reasonDescription:
-          type:
-          - string
-          - "null"
         reviewId:
           type:
           - string
@@ -21911,7 +22108,6 @@ components:
           - REFUSED
       required:
       - reason
-      - reasonDescription
       - reviewId
       - status
     ReviewResult:
@@ -22682,6 +22878,30 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ReviewLimit"
+      required:
+      - by
+      - humanReason
+      - limits
+    ReviewedByInput:
+      type: object
+      additionalProperties: false
+      properties:
+        by:
+          type: string
+          enum:
+          - HEPHAESTUS
+          - PEOPLE
+          - NOBODY
+        humanReason:
+          anyOf:
+          - $ref: "#/components/schemas/ReviewLimitInput"
+          - type: "null"
+        limits:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewLimitInput"
+          maxItems: 100
+          minItems: 0
       required:
       - by
       - humanReason
@@ -23625,7 +23845,6 @@ components:
       properties:
         budgetUsd:
           type: string
-          pattern: "(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,4})?"
         expectedVersion:
           type:
           - string
@@ -24565,7 +24784,7 @@ components:
       type: object
       properties:
         definition:
-          $ref: "#/components/schemas/PracticeDefinition"
+          $ref: "#/components/schemas/PracticeDefinitionInput"
         expectedVersionId:
           type: string
           pattern: "[1-9][0-9]*"

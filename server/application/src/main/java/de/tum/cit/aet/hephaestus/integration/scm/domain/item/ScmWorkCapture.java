@@ -44,7 +44,7 @@ public class ScmWorkCapture {
             return ScmCaptureContributions.combine(contributions);
         } catch (RuntimeException failure) {
             try {
-                ScmCaptureContributions.closeAll(contributions);
+                CaptureContribution.closeAll(contributions);
             } catch (Exception cleanupFailure) {
                 if (cleanupFailure != failure) failure.addSuppressed(cleanupFailure);
             }

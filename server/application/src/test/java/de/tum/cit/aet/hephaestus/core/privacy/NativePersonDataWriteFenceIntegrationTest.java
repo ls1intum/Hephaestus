@@ -108,8 +108,12 @@ class NativePersonDataWriteFenceIntegrationTest extends BaseIntegrationTest {
                 new IdentityProvider(IdentityProviderType.GITLAB, "https://late-alias.example.test:8443"));
         var otherType = providers.saveAndFlush(
                 new IdentityProvider(IdentityProviderType.GITHUB, "https://late-alias.example.test"));
-        var target = users.saveAndFlush(TestUserFactory.createUser(42L, "same-display", alias));
-        var other = users.saveAndFlush(TestUserFactory.createUser(84L, "same-display", alias));
+        var targetActor = TestUserFactory.createUser(42L, "target-login", alias);
+        targetActor.setName("Same display");
+        var target = users.saveAndFlush(targetActor);
+        var otherActor = TestUserFactory.createUser(84L, "other-login", alias);
+        otherActor.setName("Same display");
+        var other = users.saveAndFlush(otherActor);
         long targetAccountId = accountId(target);
         long otherAccountId = accountId(other);
         assertThat(suppression.isSuppressed(Objects.requireNonNull(alias.getId()), "42", null))

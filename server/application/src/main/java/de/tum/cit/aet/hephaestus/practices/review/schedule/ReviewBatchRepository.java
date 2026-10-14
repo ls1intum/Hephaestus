@@ -12,6 +12,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ReviewBatchRepository extends JpaRepository<ReviewBatch, UUID> {
+    boolean existsByWorkspaceIdAndScheduleId(long workspaceId, UUID scheduleId);
+
     Page<ReviewBatch> findByWorkspaceId(long workspaceId, Pageable pageable);
 
     Optional<ReviewBatch> findByIdAndWorkspaceId(UUID id, long workspaceId);

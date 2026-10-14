@@ -148,10 +148,10 @@ export function normalizeCitation(
 		notes.push(`${which}path ${given} read as ${read}, its path inside the checkout`);
 	});
 	const declaredSide = nullish(fields.side) ? null : trimmedText(fields.side).toUpperCase();
-	const revision = nullish(fields.revision) ? null : trimmedText(fields.revision);
-	if (revision !== null && (revision.length === 0 || revision.length > 1024)) {
+	const commit = nullish(fields.commit) ? null : trimmedText(fields.commit);
+	if (commit !== null && (commit.length === 0 || commit.length > 1024)) {
 		throw new Error(
-			`${which}revision must be an opaque nonempty version of at most 1024 characters, received ${JSON.stringify(fields.revision)}`,
+			`${which}commit must be an opaque nonempty version of at most 1024 characters, received ${JSON.stringify(fields.commit)}`,
 		);
 	}
 	const startLine = citedLine(fields.startLine);
@@ -226,7 +226,7 @@ export function normalizeCitation(
 		sourcePath,
 		path,
 		...(side === null ? {} : { side }),
-		...(revision === null ? {} : { revision }),
+		...(commit === null ? {} : { commit }),
 		startLine,
 		endLine,
 		quote,

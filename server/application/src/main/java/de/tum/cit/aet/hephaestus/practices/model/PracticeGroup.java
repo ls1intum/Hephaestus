@@ -24,8 +24,10 @@ import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.CurrentTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.SourceType;
+import org.hibernate.generator.EventType;
 import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 
@@ -95,7 +97,7 @@ public class PracticeGroup {
     @ColumnDefault("CURRENT_TIMESTAMP")
     private Instant createdAt;
 
-    @UpdateTimestamp
+    @CurrentTimestamp(event = EventType.UPDATE, source = SourceType.VM)
     @Column(name = "updated_at")
     private @Nullable Instant updatedAt;
 }

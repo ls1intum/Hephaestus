@@ -23,12 +23,7 @@
 			"description": "SHA-256 digest of the exact source catalog used by the runtime."
 		},
 		"artifactKind": {
-			"enum": [
-				"scm.pull_request",
-				"scm.issue",
-				"chat.conversation_thread",
-				"docs.document"
-			],
+			"enum": ["scm.pull_request", "scm.issue", "chat.conversation_thread", "docs.document"],
 			"description": "Kind of work this invocation reviewed, which fixes the evidence sources that apply."
 		},
 		"manifestCapturedAt": {
@@ -55,13 +50,7 @@
 		"decision": {
 			"type": "object",
 			"additionalProperties": false,
-			"required": [
-				"practiceSlug",
-				"decidedAt",
-				"ready",
-				"reasonCodes",
-				"sourceChecks"
-			],
+			"required": ["practiceSlug", "decidedAt", "ready", "reasonCodes", "sourceChecks"],
 			"properties": {
 				"practiceSlug": {
 					"type": "string",
@@ -92,9 +81,7 @@
 										"type": "string"
 									}
 								},
-								"required": [
-									"sourceKind"
-								]
+								"required": ["sourceKind"]
 							},
 							"minContains": 0,
 							"maxContains": 1
@@ -108,9 +95,7 @@
 										"type": "string"
 									}
 								},
-								"required": [
-									"sourceKind"
-								]
+								"required": ["sourceKind"]
 							},
 							"minContains": 0,
 							"maxContains": 1
@@ -124,9 +109,7 @@
 										"type": "string"
 									}
 								},
-								"required": [
-									"sourceKind"
-								]
+								"required": ["sourceKind"]
 							},
 							"minContains": 0,
 							"maxContains": 1
@@ -140,9 +123,7 @@
 										"type": "string"
 									}
 								},
-								"required": [
-									"sourceKind"
-								]
+								"required": ["sourceKind"]
 							},
 							"minContains": 0,
 							"maxContains": 1
@@ -156,9 +137,7 @@
 										"type": "string"
 									}
 								},
-								"required": [
-									"sourceKind"
-								]
+								"required": ["sourceKind"]
 							},
 							"minContains": 0,
 							"maxContains": 1
@@ -172,9 +151,7 @@
 										"type": "string"
 									}
 								},
-								"required": [
-									"sourceKind"
-								]
+								"required": ["sourceKind"]
 							},
 							"minContains": 0,
 							"maxContains": 1
@@ -188,9 +165,7 @@
 										"type": "string"
 									}
 								},
-								"required": [
-									"sourceKind"
-								]
+								"required": ["sourceKind"]
 							},
 							"minContains": 0,
 							"maxContains": 1
@@ -204,9 +179,7 @@
 										"type": "string"
 									}
 								},
-								"required": [
-									"sourceKind"
-								]
+								"required": ["sourceKind"]
 							},
 							"minContains": 0,
 							"maxContains": 1
@@ -220,9 +193,7 @@
 										"type": "string"
 									}
 								},
-								"required": [
-									"sourceKind"
-								]
+								"required": ["sourceKind"]
 							},
 							"minContains": 0,
 							"maxContains": 1
@@ -236,9 +207,7 @@
 										"type": "string"
 									}
 								},
-								"required": [
-									"sourceKind"
-								]
+								"required": ["sourceKind"]
 							},
 							"minContains": 0,
 							"maxContains": 1
@@ -252,9 +221,7 @@
 										"type": "string"
 									}
 								},
-								"required": [
-									"sourceKind"
-								]
+								"required": ["sourceKind"]
 							},
 							"minContains": 0,
 							"maxContains": 1
@@ -268,9 +235,7 @@
 										"type": "string"
 									}
 								},
-								"required": [
-									"sourceKind"
-								]
+								"required": ["sourceKind"]
 							},
 							"minContains": 0,
 							"maxContains": 1
@@ -282,10 +247,7 @@
 					"type": "array",
 					"uniqueItems": true,
 					"items": {
-						"enum": [
-							"NO_AUTOMATED_REVIEW",
-							"DECLARED_EVIDENCE_INSUFFICIENT"
-						]
+						"enum": ["NO_AUTOMATED_REVIEW", "DECLARED_EVIDENCE_INSUFFICIENT"]
 					},
 					"description": "Non-source reasons the practice must be skipped."
 				}
@@ -299,9 +261,7 @@
 								"const": true
 							}
 						},
-						"required": [
-							"ready"
-						]
+						"required": ["ready"]
 					},
 					"then": {
 						"properties": {
@@ -347,9 +307,7 @@
 													"const": false
 												}
 											},
-											"required": [
-												"meetsRequirements"
-											]
+											"required": ["meetsRequirements"]
 										}
 									}
 								}
@@ -364,9 +322,7 @@
 								"const": true
 							}
 						},
-						"required": [
-							"ready"
-						]
+						"required": ["ready"]
 					},
 					"then": {
 						"properties": {
@@ -378,7 +334,7 @@
 					}
 				}
 			],
-			"description": "Readiness decision for one exact practice revision."
+			"description": "Readiness decision for one exact practice commit."
 		},
 		"sourceCheck": {
 			"type": "object",
@@ -434,10 +390,7 @@
 					"type": "array",
 					"uniqueItems": true,
 					"items": {
-						"enum": [
-							"SOURCE_NOT_AVAILABLE",
-							"SOURCE_INCOMPLETE"
-						]
+						"enum": ["SOURCE_NOT_AVAILABLE", "SOURCE_INCOMPLETE"]
 					},
 					"description": "Stable reasons this required source did not pass."
 				}
@@ -451,9 +404,7 @@
 								"const": true
 							}
 						},
-						"required": [
-							"meetsRequirements"
-						]
+						"required": ["meetsRequirements"]
 					},
 					"then": {
 						"properties": {
@@ -485,9 +436,7 @@
 						"const": "scm.pull_request"
 					}
 				},
-				"required": [
-					"artifactKind"
-				]
+				"required": ["artifactKind"]
 			},
 			"then": {
 				"type": "object",
@@ -528,9 +477,7 @@
 																]
 															}
 														},
-														"required": [
-															"sourceKind"
-														]
+														"required": ["sourceKind"]
 													}
 												]
 											}
@@ -551,9 +498,7 @@
 						"const": "scm.issue"
 					}
 				},
-				"required": [
-					"artifactKind"
-				]
+				"required": ["artifactKind"]
 			},
 			"then": {
 				"type": "object",
@@ -589,9 +534,7 @@
 																]
 															}
 														},
-														"required": [
-															"sourceKind"
-														]
+														"required": ["sourceKind"]
 													}
 												]
 											}
@@ -612,9 +555,7 @@
 						"const": "chat.conversation_thread"
 					}
 				},
-				"required": [
-					"artifactKind"
-				]
+				"required": ["artifactKind"]
 			},
 			"then": {
 				"type": "object",
@@ -648,9 +589,7 @@
 																]
 															}
 														},
-														"required": [
-															"sourceKind"
-														]
+														"required": ["sourceKind"]
 													}
 												]
 											}
@@ -671,9 +610,7 @@
 						"const": "docs.document"
 					}
 				},
-				"required": [
-					"artifactKind"
-				]
+				"required": ["artifactKind"]
 			},
 			"then": {
 				"type": "object",
@@ -706,9 +643,7 @@
 																]
 															}
 														},
-														"required": [
-															"sourceKind"
-														]
+														"required": ["sourceKind"]
 													}
 												]
 											}

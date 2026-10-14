@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.scm.context.WorkspaceScmProjection;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import java.util.ArrayList;
@@ -70,14 +71,6 @@ public class GeneralReviewCommentContentSource {
         this.deliveredCommentLookup = deliveredCommentLookup;
     }
 
-    public boolean supports(ScmCaptureContext request) {
-        return request.pullRequest();
-    }
-
-    public boolean required() {
-        return false;
-    }
-
     /**
      * Derives completeness/emptiness from the payload itself rather than the default: the file is
      * always written, even with zero comments, so the default's file-presence check would report
@@ -85,9 +78,7 @@ public class GeneralReviewCommentContentSource {
      */
     public CaptureContribution capture(ScmCaptureContext request, Set<SourceKind> selectedKinds) {
         if (!selectedKinds.contains(KIND) || !request.pullRequest()) {
-            return new CaptureContribution(
-                    Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), null, Map.of(),
-                    List.of(), List.of(), List.of());
+            return CaptureContribution.empty();
         }
         var metadata = request.work();
         // A missing key is a malformed job; failing loud avoids silently telling the model there
@@ -125,7 +116,7 @@ public class GeneralReviewCommentContentSource {
     private ObjectNode collect(long workspaceId, long pullRequestId) {
         try {
             Set<Long> postedComments = deliveredCommentLookup
-                    .findForPullRequest(workspaceId, pullRequestId)
+                    .findForPullRequest(workspaceId, pullRequestId, ScmItemEvents.PULL_REQUEST)
                     .general();
             List<IssueComment> comments = new ArrayList<>(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(
                     pullRequestId, WorkspaceScmProjection.HEPHAESTUS_MARKER, Pageable.unpaged()));

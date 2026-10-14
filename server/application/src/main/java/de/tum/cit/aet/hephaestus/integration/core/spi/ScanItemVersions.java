@@ -8,4 +8,7 @@ public interface ScanItemVersions {
     Set<ItemKind> kinds();
 
     ItemVersion compose(ItemRef item, ItemVersion containerVersion, List<String> context);
+
+    /** Returns the exact context inventory only after verifying the assigned version at its pinned container. */
+    List<String> contextPaths(ItemRef item, ItemVersion assignedVersion, List<String> context);
 }

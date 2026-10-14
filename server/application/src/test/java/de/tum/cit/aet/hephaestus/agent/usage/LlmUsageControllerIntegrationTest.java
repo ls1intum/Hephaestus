@@ -79,7 +79,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     private void seedEvent(Workspace workspace, String type, String cost, YearMonth month, int day) {
         LlmUsageEvent event = new LlmUsageEvent();
         event.setId(UUID.randomUUID());
-        event.setWorkspace(workspace);
+        event.setWorkspaceId(workspace.getId());
         event.setJobType(type);
         event.setSourceType(sourceType(type));
         event.setSourceId(UUID.randomUUID());
@@ -101,7 +101,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     private void seedByoEvent(Workspace workspace, String type, String cost, YearMonth month, int day) {
         LlmUsageEvent event = new LlmUsageEvent();
         event.setId(UUID.randomUUID());
-        event.setWorkspace(workspace);
+        event.setWorkspaceId(workspace.getId());
         event.setJobType(type);
         event.setSourceType(sourceType(type));
         event.setSourceId(UUID.randomUUID());
@@ -117,7 +117,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     private void seedUnpricedEvent(Workspace workspace, String type, YearMonth month, int day) {
         LlmUsageEvent event = new LlmUsageEvent();
         event.setId(UUID.randomUUID());
-        event.setWorkspace(workspace);
+        event.setWorkspaceId(workspace.getId());
         event.setJobType(type);
         event.setSourceType(sourceType(type));
         event.setSourceId(UUID.randomUUID());
@@ -133,7 +133,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     private void seedUnpricedByoEvent(Workspace workspace, String type, YearMonth month, int day) {
         LlmUsageEvent event = new LlmUsageEvent();
         event.setId(UUID.randomUUID());
-        event.setWorkspace(workspace);
+        event.setWorkspaceId(workspace.getId());
         event.setJobType(type);
         event.setSourceType(sourceType(type));
         event.setSourceId(UUID.randomUUID());

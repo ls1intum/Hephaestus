@@ -28,7 +28,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.transaction.support.TransactionTemplate;
 
-// Renames must update monitors and NATS filters as well as mirror rows; stale filters discard subsequent repository events.
+// Renames must update monitors and NATS filters as well as mirror rows; stale filters discard subsequent repository
+// events.
 class GitHubRepositoryMessageHandlerRenameTest extends BaseUnitTest {
 
     private static final long NATIVE_ID = 1087937297L;

@@ -4,9 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.testconfig.PostgreSQLTestContainer.TestDatabase;
+import java.security.MessageDigest;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.HexFormat;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Tag;
@@ -76,10 +78,10 @@ class PracticeV1DefinitionMigrationTest {
                 assertThat(PracticeMigrationFixture.column(
                                 database,
                                 "SELECT encode(sha256(convert_to(v.definition->>'script','UTF8')),'hex') || '|' ||"
-                                    + " v.number FROM practice p JOIN practice_version v ON v.id=p.current_version_id"
-                                    + " WHERE p.id="
+                                        + " v.number FROM practice p JOIN practice_version v ON v.id=p.current_version_id"
+                                        + " WHERE p.id="
                                         + (1000000L + index)))
-                        .containsExactly(program.path("targetSha256").asString() + "|2");
+                        .containsExactly(shippedProgramSha(program) + "|2");
                 index++;
             }
         }
@@ -105,7 +107,7 @@ class PracticeV1DefinitionMigrationTest {
                             "SELECT encode(sha256(convert_to(v.definition->>'script','UTF8')),'hex') || '|' ||"
                                     + " v.number || '|' || (v.definition->'reads'->>'contract') FROM practice p"
                                     + " JOIN practice_version v ON v.id=p.current_version_id WHERE p.id=992121"))
-                    .containsExactly(program.path("targetSha256").asString() + "|3|2.0.0");
+                    .containsExactly(shippedProgramSha(program) + "|3|2.0.0");
             assertThat(PracticeMigrationFixture.column(
                             database,
                             "SELECT practice_version_id::text FROM result WHERE"
@@ -378,6 +380,17 @@ class PracticeV1DefinitionMigrationTest {
             statement.setLong(1, versionId);
             statement.setLong(2, practiceId);
             statement.executeUpdate();
+        }
+    }
+
+    private String shippedProgramSha(JsonNode program) throws Exception {
+        try (var input = Objects.requireNonNull(getClass()
+                .getResourceAsStream(
+                        "/practices/scripts/" + program.path("slug").asString() + ".ts"))) {
+            String digest = HexFormat.of()
+                    .formatHex(MessageDigest.getInstance("SHA-256").digest(input.readAllBytes()));
+            assertThat(program.path("targetSha256").asString()).isEqualTo(digest);
+            return digest;
         }
     }
 }

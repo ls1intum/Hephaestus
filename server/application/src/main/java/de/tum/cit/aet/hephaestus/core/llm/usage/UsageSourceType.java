@@ -2,7 +2,9 @@ package de.tum.cit.aet.hephaestus.core.llm.usage;
 
 import java.util.EnumSet;
 import java.util.Set;
+import org.springframework.modulith.NamedInterface;
 
+@NamedInterface("llm-usage")
 public enum UsageSourceType {
     REVIEW_JOB,
     MENTOR_TURN,

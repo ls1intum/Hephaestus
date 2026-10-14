@@ -196,17 +196,18 @@ VALUES ('7d5e0c3a-1b2c-4d3e-8f40-000000000001', 923101, 20, 923101, 'QUEUED', NU
 ON CONFLICT (review_id, practice_id) DO UPDATE SET status = EXCLUDED.status, reason = EXCLUDED.reason;
 
 INSERT INTO review_job (id, review_id, workspace_id, status, attempt, processing_status, available_at, trace_id, input,
-  config_snapshot, started_at, completed_at)
+  config_snapshot, submitted_at, started_at, completed_at)
 SELECT j.id, j.review_id, 20, j.status, j.attempt, j.processing, j.available_at, replace(j.id::text, '-', ''),
   jsonb_build_object('itemId', 920110, 'assignments',
     jsonb_build_array(jsonb_build_object('reviewId', j.review_id, 'practiceId', 923101, 'itemId', 920110))),
-  '{}'::jsonb, j.started_at, j.completed_at
+  '{}'::jsonb, r.created_at, j.started_at, j.completed_at
 FROM (VALUES
   ('7d5e0c3a-1b2c-4d3e-8f41-000000000001'::uuid, '7d5e0c3a-1b2c-4d3e-8f40-000000000001'::uuid, 'QUEUED', 0, 'NONE',
    now() + interval '7 days', NULL::timestamptz, NULL::timestamptz),
   ('7d5e0c3a-1b2c-4d3e-8f41-000000000002'::uuid, '7d5e0c3a-1b2c-4d3e-8f40-000000000002'::uuid, 'COMPLETED', 1, 'FAILED',
    now() - interval '2 hours', now() - interval '2 hours', now() - interval '110 minutes')
 ) AS j(id, review_id, status, attempt, processing, available_at, started_at, completed_at)
+JOIN review r ON r.id = j.review_id
 ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, processing_status = EXCLUDED.processing_status,
   available_at = EXCLUDED.available_at, completed_at = EXCLUDED.completed_at, cancellation_reason = NULL;
 
@@ -265,12 +266,12 @@ BEGIN
       'COMPLETE', fixture_time, fixture_time, fixture_time, fixture_time + interval '1 minute')
     ON CONFLICT (id) DO NOTHING;
     INSERT INTO review_job (id, review_id, workspace_id, status, attempt, processing_status, available_at, trace_id,
-      input, config_snapshot, started_at, completed_at)
+      input, config_snapshot, submitted_at, started_at, completed_at)
     VALUES (this_job, this_review, 20, 'COMPLETED', 1, 'DONE', fixture_time, replace(this_job::text, '-', ''),
       jsonb_build_object('itemId', target.item_id, 'assignments', (SELECT jsonb_agg(jsonb_build_object(
         'reviewId', this_review, 'practiceId', p, 'itemId', target.item_id) ORDER BY p)
         FROM unnest(ARRAY[923101, 923102, 923103]) AS p)),
-      '{"syntheticFixture":true}'::jsonb, fixture_time, fixture_time + interval '1 minute')
+      '{"syntheticFixture":true}'::jsonb, fixture_time, fixture_time, fixture_time + interval '1 minute')
     ON CONFLICT (id) DO NOTHING;
 
     FOR f IN SELECT * FROM (VALUES (1, 'NOT_MET'), (2, 'MET'), (3, 'MET')) AS results(ordinal, outcome) LOOP

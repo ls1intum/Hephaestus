@@ -16,6 +16,8 @@ import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspace
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -129,6 +131,13 @@ public class ScanController {
 
     @GetMapping(value = "/{scanId}/report/sarif", produces = "application/sarif+json")
     @Operation(operationId = "exportScanSarif", summary = "Export a scan report as SARIF")
+    @ApiResponse(
+            responseCode = "200",
+            description = "SARIF report",
+            content =
+                    @Content(
+                            mediaType = "application/sarif+json",
+                            schema = @Schema(type = "string", format = "binary")))
     public ResponseEntity<byte[]> exportScanSarif(WorkspaceContext context, @PathVariable UUID scanId) {
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType("application/sarif+json"))

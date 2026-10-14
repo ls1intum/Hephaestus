@@ -71,26 +71,16 @@ public class ReviewThreadContentSource {
         this.reviewRepository = reviewRepository;
     }
 
-    public boolean supports(ScmCaptureContext request) {
-        return request.pullRequest();
-    }
-
-    public boolean required() {
-        return false;
-    }
-
     private ObjectNode collect(long pullRequestId, ScmCapturedWork metadata) {
         try {
             List<Long> threadIds =
                     new ArrayList<>(threadRepository.findRecentIdsByPullRequestId(pullRequestId, Pageable.unpaged()));
-            boolean threadsTruncated = false;
             List<PullRequestReviewThread> threads =
                     threadIds.isEmpty() ? List.of() : threadRepository.findAllByIdWithResolvedBy(threadIds);
             List<PullRequestReview> reviews = new ArrayList<>(reviewRepository.findRecentByPullRequestIdWithAuthor(
                     pullRequestId,
                     Set.of(PullRequestReview.State.PENDING, PullRequestReview.State.UNKNOWN),
                     Pageable.unpaged()));
-            boolean decisionsTruncated = false;
             reviews.sort(Comparator.comparing(
                     PullRequestReview::getSubmittedAt, Comparator.nullsLast(Comparator.naturalOrder())));
 
@@ -143,7 +133,7 @@ public class ReviewThreadContentSource {
             root.set("reviewDecisions", decisionArray);
             // A withdrawn or replaced decision may be gone, so this list is no event history.
             root.put("decisionHistoryComplete", false);
-            root.put("truncated", threadsTruncated || decisionsTruncated);
+            root.put("truncated", false);
 
             log.info(
                     "ReviewThreads: prId={} threads={} decisions={}",
@@ -158,18 +148,10 @@ public class ReviewThreadContentSource {
 
     public CaptureContribution capture(ScmCaptureContext request, Set<SourceKind> selectedKinds) {
         if (!selectedKinds.contains(KIND) || !request.pullRequest()) {
-            return new CaptureContribution(
-                    Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), null, Map.of(),
-                    List.of(), List.of(), List.of());
+            return CaptureContribution.empty();
         }
         var metadata = request.work();
-        // Missing metadata is a malformed job, not a PR with no review threads — the two must not
-        // collapse into the same "collection found nothing" fact.
-        Long pullRequestId = metadata.sourceId();
-        if (pullRequestId == null) {
-            throw new ItemCaptureException(
-                    ItemCaptureCode.CAPTURE_FAILED, "Review-thread collection has no pull_request_id");
-        }
+        long pullRequestId = metadata.sourceId();
         var pullRequest = pullRequestRepository.findById(pullRequestId).orElse(null);
         if (pullRequest == null || pullRequest.getDeletedAt() != null) {
             return CaptureContribution.unavailable(selectedKinds, SourceAbsenceReason.NOT_FOUND);
@@ -177,14 +159,13 @@ public class ReviewThreadContentSource {
         ObjectNode root = collect(pullRequestId, metadata);
         boolean empty =
                 root.path("threads").isEmpty() && root.path("reviewDecisions").isEmpty();
-        boolean truncated = root.path("truncated").asBoolean();
         Map<String, byte[]> files = new LinkedHashMap<>();
         files.put(
                 OUTPUT_PREFIX + FILE_NAME,
                 objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(root));
         return new CaptureContribution(
                 files,
-                Map.of(KIND, truncated ? SourceCompleteness.PARTIAL : SourceCompleteness.COMPLETE),
+                Map.of(KIND, SourceCompleteness.COMPLETE),
                 Map.of(),
                 Map.of(),
                 Map.of(),

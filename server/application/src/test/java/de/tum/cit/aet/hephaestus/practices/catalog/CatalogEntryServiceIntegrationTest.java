@@ -329,11 +329,17 @@ class CatalogEntryServiceIntegrationTest extends AbstractWorkspaceIntegrationTes
                 .orElseThrow();
         var shipped = Objects.requireNonNull(original.shipped());
         var local = DefinitionTestFixtures.rename(shipped.definition(), "Local name");
+        var older = DefinitionTestFixtures.rename(shipped.definition(), "Previously shipped name");
+        var row = new CatalogEntry(CatalogEntryType.PRACTICE, original.slug());
+        row.setKind(shipped.kind());
+        row.setDefinition(mapper.valueToTree(shipped.content()));
+        row.setBase(mapper.valueToTree(new CatalogPracticeDocument(shipped.kind(), shipped.groupSlug(), older)));
+        entries.saveAndFlush(row);
         var changed = customization.updatePractice(
                 original.slug(),
                 new CatalogPracticeUpdateDTO(
                         shipped.kind().value(), shipped.groupSlug(), DefinitionTestFixtures.authoring(local), 4),
-                tag(original.etag()));
+                tag(catalog.practice(original.slug()).etag()));
         var result = customization.applyRelease(
                 original.slug(),
                 Map.of(PracticeDefinitionField.NAME, PracticeReleaseChoice.OFFERED),
@@ -366,6 +372,7 @@ class CatalogEntryServiceIntegrationTest extends AbstractWorkspaceIntegrationTes
                 .containsExactlyInAnyOrder("slug", "definitionDigest", "baseDigest", "position", "excluded");
         assertThat(after.path("position").asInt()).isEqualTo(4);
         assertThat(after.path("excluded").asBoolean()).isFalse();
+        assertThat(before.toString()).doesNotContain(local.criteria());
         assertThat(after.toString()).doesNotContain(local.criteria());
     }
 

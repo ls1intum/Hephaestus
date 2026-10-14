@@ -80,7 +80,6 @@ const SUBMITTED: ReviewRequestOutcome = {
 	status: "SUBMITTED",
 	reviewId: TRACE.review.id,
 	reason: null,
-	reasonDescription: null,
 };
 
 /** A worker's view of one GitHub pull request, with a store that can hold a read mid-way. */
@@ -255,12 +254,11 @@ describe("one pending action, confirmed once", () => {
 			status: "REFUSED",
 			reviewId: null,
 			reason: "COOLDOWN_ACTIVE",
-			reasonDescription: "This work was reviewed a moment ago.",
 		});
 		await expect(confirmAction(h.env, h.deps, id, WINDOW_TAB)).resolves.toStrictEqual({
 			kind: "request-review",
 			status: "REFUSED",
-			reasonDescription: "This work was reviewed a moment ago.",
+			reasonDescription: "The work was reviewed recently, so it waits before another review.",
 		});
 	});
 
@@ -271,7 +269,6 @@ describe("one pending action, confirmed once", () => {
 			status: "REFUSED",
 			reviewId: null,
 			reason: null,
-			reasonDescription: null,
 		});
 		await expect(confirmAction(h.env, h.deps, id, WINDOW_TAB)).resolves.toStrictEqual({
 			kind: "request-review",

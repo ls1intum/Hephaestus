@@ -103,7 +103,7 @@ public class ReviewBatchDriver {
         }
         for (long itemId : ids) {
             try {
-                switch (submitter.offer(batch, itemId)) {
+                switch (submitter.offer(batch, itemId, remaining.remainingUsd())) {
                     case ReviewBatchSubmitter.SubmissionOutcome.Submitted ignored ->
                         batch.setSubmittedCount(batch.getSubmittedCount() + 1);
                     case ReviewBatchSubmitter.SubmissionOutcome.Skipped ignored ->

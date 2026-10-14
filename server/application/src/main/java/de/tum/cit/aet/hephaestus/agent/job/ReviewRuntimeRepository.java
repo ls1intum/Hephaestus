@@ -6,141 +6,108 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewUsageAttempt;
 import java.math.BigDecimal;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.jdbc.support.SqlArrayValue;
-import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.Repository;
+import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
-@Repository
 @ConditionalOnCaptureRole
-@RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class ReviewRuntimeRepository {
-    private final JdbcClient jdbc;
+public interface ReviewRuntimeRepository extends Repository<ReviewJob, UUID> {
+    @Query(value = """
+        SELECT id FROM review_job WHERE workspace_id=:workspaceId AND review_id=:reviewId
+          AND status NOT IN ('QUEUED','RUNNING') AND processing_status IN ('NONE','PENDING')
+        """, nativeQuery = true)
+    Set<UUID> unsettledJobIds(@Param("workspaceId") long workspaceId, @Param("reviewId") UUID reviewId);
 
-    public Set<UUID> unsettledJobIds(long workspaceId, UUID reviewId) {
-        return Set.copyOf(
-                jdbc.sql("SELECT id FROM review_job WHERE workspace_id=:ws AND review_id=:review AND status NOT IN"
-                                + " ('QUEUED','RUNNING') AND processing_status IN ('NONE','PENDING')")
-                        .param("ws", workspaceId)
-                        .param("review", reviewId)
-                        .query(UUID.class)
-                        .list());
+    default List<ReviewUsageAttempt> usage(long workspaceId, UUID reviewId) {
+        return usageRows(workspaceId, reviewId).stream()
+                .map(row -> new ReviewUsageAttempt(
+                        row.sourceId(),
+                        row.sourceAttempt(),
+                        row.calls(),
+                        row.inputTokens(),
+                        row.outputTokens(),
+                        row.reasoningTokens(),
+                        row.cacheReadTokens(),
+                        row.cacheWriteTokens(),
+                        row.costUsd(),
+                        UsagePricingState.valueOf(row.pricingState())))
+                .toList();
     }
 
-    public List<ReviewUsageAttempt> usage(long workspaceId, UUID reviewId) {
-        return jdbc.sql("""
-            SELECT source_id,source_attempt,SUM(total_calls) calls,SUM(input_tokens) input_tokens,
-              SUM(output_tokens) output_tokens,SUM(reasoning_tokens) reasoning_tokens,
-              SUM(cache_read_tokens) cache_read_tokens,SUM(cache_write_tokens) cache_write_tokens,
-              CASE WHEN bool_and(cost_usd IS NOT NULL AND pricing_state<>'UNPRICED') THEN SUM(cost_usd) END cost_usd,
-              CASE WHEN bool_or(cost_usd IS NULL OR pricing_state='UNPRICED') THEN 'UNPRICED'
-                   WHEN bool_and(pricing_state='NO_CHARGE') THEN 'NO_CHARGE' ELSE 'PRICED' END pricing_state
-            FROM llm_usage_event WHERE workspace_id=:ws AND review_id=:review
-            GROUP BY source_id,source_attempt ORDER BY source_id,source_attempt
-            """)
-                .param("ws", workspaceId)
-                .param("review", reviewId)
-                .query((rs, n) -> new ReviewUsageAttempt(
-                        Objects.requireNonNull(rs.getObject("source_id", UUID.class)),
-                        rs.getInt("source_attempt"),
-                        rs.getLong("calls"),
-                        rs.getLong("input_tokens"),
-                        rs.getLong("output_tokens"),
-                        rs.getLong("reasoning_tokens"),
-                        rs.getLong("cache_read_tokens"),
-                        rs.getLong("cache_write_tokens"),
-                        rs.getBigDecimal("cost_usd"),
-                        UsagePricingState.valueOf(Objects.requireNonNull(rs.getString("pricing_state")))))
-                .list();
+    @Query(value = """
+        SELECT source_id, source_attempt, CAST(SUM(total_calls) AS bigint), CAST(SUM(input_tokens) AS bigint),
+          CAST(SUM(output_tokens) AS bigint), CAST(SUM(reasoning_tokens) AS bigint),
+          CAST(SUM(cache_read_tokens) AS bigint), CAST(SUM(cache_write_tokens) AS bigint),
+          CASE WHEN bool_and(cost_usd IS NOT NULL AND pricing_state<>'UNPRICED') THEN SUM(cost_usd) END,
+          CASE WHEN bool_or(cost_usd IS NULL OR pricing_state='UNPRICED') THEN 'UNPRICED'
+               WHEN bool_and(pricing_state='NO_CHARGE') THEN 'NO_CHARGE' ELSE 'PRICED' END
+        FROM llm_usage_event WHERE workspace_id=:workspaceId AND review_id=:reviewId
+        GROUP BY source_id,source_attempt ORDER BY source_id,source_attempt
+        """, nativeQuery = true)
+    List<UsageRow> usageRows(@Param("workspaceId") long workspaceId, @Param("reviewId") UUID reviewId);
+
+    default QueueCounts queueCounts(long workspaceId, Instant asOf) {
+        return queueCountsAt(workspaceId, asOf, asOf.minusSeconds(3600), asOf.minusSeconds(86400));
     }
 
-    public QueueCounts queueCounts(long workspaceId, Instant asOf) {
-        return jdbc.sql("""
-            SELECT COUNT(*) FILTER (WHERE status='RUNNING') running,
-              COUNT(*) FILTER (WHERE status='QUEUED' AND hold_reason IS NULL) waiting,
-              MIN(available_at) FILTER (WHERE status='QUEUED' AND hold_reason IS NULL) oldest,
-              COUNT(*) FILTER (WHERE status='QUEUED' AND hold_reason='BUDGET') held,
-              COUNT(*) FILTER (WHERE completed_at>=:hour AND completed_at<=:at) completed_hour,
-              COUNT(*) FILTER (WHERE completed_at>=:day AND completed_at<=:at) completed_day
-            FROM review_job WHERE workspace_id=:ws
-            """)
-                .param("ws", workspaceId)
-                .param("at", asOf.atOffset(ZoneOffset.UTC))
-                .param("hour", asOf.minusSeconds(3600).atOffset(ZoneOffset.UTC))
-                .param("day", asOf.minusSeconds(86400).atOffset(ZoneOffset.UTC))
-                .query((rs, n) -> new QueueCounts(
-                        rs.getLong("running"),
-                        rs.getLong("waiting"),
-                        rs.getTimestamp("oldest") == null
-                                ? null
-                                : Objects.requireNonNull(rs.getTimestamp("oldest"))
-                                        .toInstant(),
-                        rs.getLong("held"),
-                        rs.getLong("completed_hour"),
-                        rs.getLong("completed_day")))
-                .single();
+    @Query("""
+        SELECT new de.tum.cit.aet.hephaestus.agent.job.ReviewRuntimeRepository$QueueCounts(
+          COALESCE(SUM(CASE WHEN j.status='RUNNING' THEN 1L ELSE 0L END),0L),
+          COALESCE(SUM(CASE WHEN j.status='QUEUED' AND j.holdReason IS NULL THEN 1L ELSE 0L END),0L),
+          MIN(CASE WHEN j.status='QUEUED' AND j.holdReason IS NULL THEN j.availableAt ELSE null END),
+          COALESCE(SUM(CASE WHEN j.status='QUEUED' AND j.holdReason='BUDGET' THEN 1L ELSE 0L END),0L),
+          COALESCE(SUM(CASE WHEN j.completedAt>=:hour AND j.completedAt<=:asOf THEN 1L ELSE 0L END),0L),
+          COALESCE(SUM(CASE WHEN j.completedAt>=:day AND j.completedAt<=:asOf THEN 1L ELSE 0L END),0L))
+        FROM ReviewJob j WHERE j.workspaceId=:workspaceId
+        """)
+    QueueCounts queueCountsAt(
+            @Param("workspaceId") long workspaceId,
+            @Param("asOf") Instant asOf,
+            @Param("hour") Instant hour,
+            @Param("day") Instant day);
+
+    default long liveWorkers(Instant asOf) {
+        return countLiveWorkers(asOf.minus(AgentProperties.WORKER_LEASE_TTL));
     }
 
     @WorkspaceAgnostic("Counts the shared worker pool; the registry is not workspace-owned")
-    public long liveWorkers(Instant asOf) {
-        return jdbc.sql("SELECT COUNT(*) FROM worker_registry WHERE last_heartbeat>=:live")
-                .param("live", asOf.minus(AgentProperties.WORKER_LEASE_TTL).atOffset(ZoneOffset.UTC))
-                .query(Long.class)
-                .single();
-    }
+    @Query(value = "SELECT COUNT(*) FROM worker_registry WHERE last_heartbeat>=:live", nativeQuery = true)
+    long countLiveWorkers(@Param("live") Instant live);
 
-    public List<TimingJob> timingJobs(long workspaceId, List<UUID> reviewIds) {
-        var rows = new ArrayList<TimingJob>();
-        for (int offset = 0; offset < reviewIds.size(); offset += 1000) {
-            rows.addAll(jdbc.sql("SELECT"
-                            + " review_id,status,available_at,started_at,execution_started_at,completed_at,hold_reason"
-                            + " FROM review_job WHERE workspace_id=:ws AND review_id=ANY(:ids) ORDER BY"
-                            + " available_at,id")
-                    .param("ws", workspaceId)
-                    .param(
-                            "ids",
-                            new SqlArrayValue(
-                                    "uuid",
-                                    reviewIds
-                                            .subList(offset, Math.min(offset + 1000, reviewIds.size()))
-                                            .toArray()))
-                    .query((rs, n) -> new TimingJob(
-                            Objects.requireNonNull(rs.getObject("review_id", UUID.class)),
-                            ReviewJobStatus.valueOf(Objects.requireNonNull(rs.getString("status"))),
-                            Objects.requireNonNull(instant(rs, "available_at")),
-                            instant(rs, "started_at"),
-                            instant(rs, "execution_started_at"),
-                            instant(rs, "completed_at"),
-                            rs.getString("hold_reason")))
-                    .list());
-        }
-        return rows;
-    }
+    @Query("""
+        SELECT new de.tum.cit.aet.hephaestus.agent.job.ReviewRuntimeRepository$TimingJob(
+          j.reviewId,j.status,j.availableAt,j.startedAt,j.executionStartedAt,j.completedAt,j.holdReason)
+        FROM ReviewJob j WHERE j.workspaceId=:workspaceId AND j.reviewId IN :reviewIds
+        ORDER BY j.availableAt,j.id
+        """)
+    List<TimingJob> timingJobs(@Param("workspaceId") long workspaceId, @Param("reviewIds") List<UUID> reviewIds);
 
-    public Spend spent(long workspaceId, UUID reviewId) {
-        return jdbc.sql("SELECT COALESCE(SUM(cost_usd),0) cost,COALESCE(bool_and(cost_usd IS NOT NULL AND"
-                        + " pricing_state<>'UNPRICED'),true) priced FROM llm_usage_event WHERE workspace_id=:ws"
-                        + " AND review_id=:review")
-                .param("ws", workspaceId)
-                .param("review", reviewId)
-                .query((rs, n) -> new Spend(Objects.requireNonNull(rs.getBigDecimal("cost")), rs.getBoolean("priced")))
-                .single();
-    }
+    @Query(value = """
+        SELECT COALESCE(SUM(cost_usd),0),COALESCE(bool_and(cost_usd IS NOT NULL AND pricing_state<>'UNPRICED'),true)
+        FROM llm_usage_event WHERE workspace_id=:workspaceId AND review_id=:reviewId
+        """, nativeQuery = true)
+    Spend spent(@Param("workspaceId") long workspaceId, @Param("reviewId") UUID reviewId);
 
-    public record TimingJob(
+    record UsageRow(
+            UUID sourceId,
+            int sourceAttempt,
+            long calls,
+            long inputTokens,
+            long outputTokens,
+            long reasoningTokens,
+            long cacheReadTokens,
+            long cacheWriteTokens,
+            @Nullable BigDecimal costUsd,
+            String pricingState) {}
+
+    record TimingJob(
             UUID reviewId,
             ReviewJobStatus status,
             Instant availableAt,
@@ -149,13 +116,7 @@ public class ReviewRuntimeRepository {
             @Nullable Instant completedAt,
             @Nullable String holdReason) {}
 
-    private static @Nullable Instant instant(ResultSet rs, String column) throws SQLException {
-        var value = rs.getObject(column, OffsetDateTime.class);
-        return value == null ? null : value.toInstant();
-    }
+    record QueueCounts(long running, long waiting, @Nullable Instant oldest, long held, long hour, long day) {}
 
-    public record QueueCounts(
-            long running, long waiting, @Nullable Instant oldest, long held, long hour, long day) {}
-
-    public record Spend(BigDecimal cost, boolean priced) {}
+    record Spend(BigDecimal cost, boolean priced) {}
 }

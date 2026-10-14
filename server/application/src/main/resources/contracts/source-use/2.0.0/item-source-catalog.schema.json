@@ -137,12 +137,12 @@
 					"description": "Requirements for the side and version named by a citation to this source.",
 					"type": "object",
 					"additionalProperties": false,
-					"required": ["side", "revision"],
+					"required": ["side", "commit"],
 					"properties": {
 						"side": {
 							"enum": ["REQUIRED", "OPTIONAL", "FORBIDDEN"]
 						},
-						"revision": {
+						"commit": {
 							"enum": ["REQUIRED", "OPTIONAL", "FORBIDDEN"]
 						}
 					}

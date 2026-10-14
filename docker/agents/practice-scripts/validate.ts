@@ -176,7 +176,7 @@ try {
 			sourceKindOf: () => undefined,
 		};
 		const files: JobFiles | null =
-			head === null ? null : { head: { revision: head }, change: captured };
+			head === null ? null : { head: { commit: head }, change: captured };
 		const receipts = noReceipts();
 		outcome = await runPracticeProgram(
 			program,

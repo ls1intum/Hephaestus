@@ -120,7 +120,7 @@ class FeedbackPreparationReceiptIntegrationTest extends AbstractFeedbackDelivery
                         feedbackId))
                 .containsExactly("Add a focused regression test.");
         assertThat(jdbc.queryForList(
-                        "SELECT result_id FROM feedback_basis WHERE workspace_id=? AND feedback_id=?",
+                        "SELECT result_id FROM feedback_basis WHERE workspace_id=? AND" + " feedback_id=?",
                         UUID.class,
                         workspace.getId(),
                         feedbackId))
@@ -130,7 +130,7 @@ class FeedbackPreparationReceiptIntegrationTest extends AbstractFeedbackDelivery
                 .containsExactlyElementsOf(
                         proposal.copies().stream().map(FeedbackCopyInput::id).toList());
         assertThat(jdbc.queryForList(
-                        "SELECT action || '|' || state FROM feedback_send WHERE workspace_id=? AND feedback_id=?",
+                        "SELECT action || '|' || state FROM feedback_send WHERE" + " workspace_id=? AND feedback_id=?",
                         String.class,
                         workspace.getId(),
                         feedbackId))
@@ -141,8 +141,9 @@ class FeedbackPreparationReceiptIntegrationTest extends AbstractFeedbackDelivery
     void shouldRetainThePublicCompletionAndOtherChecksWhenRecordingPreparation() {
         var publicAt = AT.plusSeconds(60);
         jdbc.update(
-                "UPDATE review SET public_review_at=?,checks=jsonb_build_object('cancellationRequested',false) WHERE"
-                        + " workspace_id=? AND id=?",
+                "UPDATE review SET"
+                        + " public_review_at=?,checks=jsonb_build_object('cancellationRequested',false)"
+                        + " WHERE workspace_id=? AND id=?",
                 Timestamp.from(publicAt),
                 workspace.getId(),
                 reviewId);
@@ -164,12 +165,12 @@ class FeedbackPreparationReceiptIntegrationTest extends AbstractFeedbackDelivery
         store.prepareAll(workspace.getId(), reviewId, List.of(draft(false)));
         assertThat(current().getState()).isEqualTo(FeedbackState.AWAITING_APPROVAL);
         assertThat(children()).hasSize(1);
-        assertThat(jdbc.queryForList(
-                        "SELECT id FROM feedback_send WHERE workspace_id=? AND feedback_id=?",
-                        UUID.class,
+        assertThat(jdbc.queryForObject(
+                        "SELECT count(*) FROM feedback_send WHERE workspace_id=? AND" + " feedback_id=?",
+                        Long.class,
                         workspace.getId(),
                         feedbackId))
-                .isEmpty();
+                .isZero();
     }
 
     private FeedbackDraft conversation(long developer) {

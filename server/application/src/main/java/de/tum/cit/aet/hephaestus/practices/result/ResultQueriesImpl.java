@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.practices.result;
 
-import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.model.Problem;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultSort;
-import java.sql.Timestamp;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -13,21 +13,24 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import lombok.RequiredArgsConstructor;
+import org.hibernate.Session;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
-@Service
-@ConditionalOnCaptureRole
-@RequiredArgsConstructor
-public class ResultReadQuery {
-    private final JdbcClient jdbc;
-    private final ResultRepository results;
-    private final ProblemRepository problems;
+@Repository
+@Transactional(readOnly = true)
+public class ResultQueriesImpl implements ResultQueries {
+    @PersistenceContext
+    private @Nullable EntityManager entityManager;
+
+    private Session session() {
+        return Objects.requireNonNull(entityManager).unwrap(Session.class);
+    }
+
     private static final String JOIN =
             " FROM result r JOIN practice p ON p.id=r.practice_id AND p.workspace_id=r.workspace_id LEFT JOIN"
                     + " practice_group g ON g.id=p.group_id AND g.workspace_id=p.workspace_id JOIN item i ON"
@@ -42,15 +45,16 @@ public class ResultReadQuery {
                     + " m.kind='ACCEPTED' AND m.removed_at IS NULL)";
     private static final String DISAGREED =
             "EXISTS(SELECT 1 FROM feedback_basis b JOIN feedback_response s ON s.feedback_id=b.feedback_id AND"
-                    + " s.workspace_id=b.workspace_id WHERE b.workspace_id=r.workspace_id AND b.result_id=r.id AND"
-                    + " s.resolution='DISAGREE' AND s.id=(SELECT latest.id FROM feedback_response latest WHERE"
-                    + " latest.workspace_id=s.workspace_id AND latest.feedback_id=s.feedback_id ORDER BY latest.created_at"
-                    + " DESC,latest.id::text DESC LIMIT 1))";
+                + " s.workspace_id=b.workspace_id WHERE b.workspace_id=r.workspace_id AND b.result_id=r.id AND"
+                + " s.resolution='DISAGREE' AND s.id=(SELECT latest.id FROM feedback_response latest WHERE"
+                + " latest.workspace_id=s.workspace_id AND latest.feedback_id=s.feedback_id ORDER BY latest.created_at"
+                + " DESC,latest.id::text DESC LIMIT 1))";
     private static final String CURRENTNESS =
             "CASE WHEN r.ended_at IS NOT NULL THEN 'STALE' WHEN r.evidence_version=0 OR v.id IS NULL OR r.summary IS"
-                    + " NULL OR r.explanation IS NULL OR r.evidence IS NULL OR r.coverage IS NULL THEN 'UNVERIFIABLE' WHEN"
-                    + " v.review_digest=cv.review_digest THEN 'CURRENT' ELSE 'STALE' END";
+                + " NULL OR r.explanation IS NULL OR r.evidence IS NULL OR r.coverage IS NULL THEN 'UNVERIFIABLE' WHEN"
+                + " v.review_digest=cv.review_digest THEN 'CURRENT' ELSE 'STALE' END";
 
+    @Override
     public Page<Result> list(
             long workspaceId, ResultQueryFilter filter, ResultSort sort, boolean displayableOnly, Pageable page) {
         var selection = selection(workspaceId, filter);
@@ -59,21 +63,23 @@ public class ResultReadQuery {
                 ? "CASE r.severity WHEN 'CRITICAL' THEN 0 WHEN 'MAJOR' THEN 1 WHEN 'MINOR' THEN 2 WHEN 'TRIVIAL' THEN"
                         + " 3 ELSE 4 END, "
                 : "";
-        long total = jdbc.sql("SELECT count(*)" + JOIN + where)
-                .params(selection.params())
-                .query((rs, n) -> rs.getLong(1))
-                .single();
-        var params = new LinkedHashMap<>(selection.params());
-        params.put("limit", page.getPageSize());
-        params.put("offset", page.getOffset());
-        List<UUID> ids = jdbc.sql("SELECT r.id" + JOIN + where + " ORDER BY " + order
-                        + "r.recorded_at DESC,r.id::text DESC LIMIT :limit OFFSET :offset")
-                .params(params)
-                .query((rs, n) -> Objects.requireNonNull(rs.getObject(1, UUID.class)))
-                .list();
-        return new PageImpl<>(ordered(workspaceId, ids), page, total);
+        long total = session()
+                .createNativeQuery("SELECT count(*)" + JOIN + where, Long.class)
+                .setProperties(selection.params())
+                .getSingleResult();
+        var rows = session()
+                .createNativeQuery(
+                        "SELECT r.*" + JOIN + where + " ORDER BY " + order
+                                + "r.recorded_at DESC,r.id::text DESC LIMIT :limit OFFSET :offset",
+                        Result.class)
+                .setProperties(selection.params())
+                .setParameter("limit", page.getPageSize())
+                .setParameter("offset", page.getOffset())
+                .getResultList();
+        return new PageImpl<>(rows, page, total);
     }
 
+    @Override
     public Page<Problem> problems(long workspaceId, ResultQueryFilter filter, ProblemQueryFilter child, Pageable page) {
         var s = selection(workspaceId, filter);
         var where = new StringBuilder(s.where());
@@ -97,41 +103,49 @@ public class ResultReadQuery {
             where.append(
                     " AND r.ended_at IS NULL AND r.outcome='NOT_MET' AND NOT " + INCORRECT + " AND NOT " + ACCEPTED);
         String joined = JOIN + " JOIN problem child ON child.result_id=r.id AND child.workspace_id=r.workspace_id ";
-        long total = jdbc.sql("SELECT count(*)" + joined + where)
-                .params(params)
-                .query((rs, n) -> rs.getLong(1))
-                .single();
-        params.put("limit", page.getPageSize());
-        params.put("offset", page.getOffset());
-        var ids = jdbc.sql("SELECT child.id" + joined + where
-                        + " ORDER BY r.recorded_at DESC,r.id::text DESC,child.position ASC LIMIT :limit OFFSET :offset")
-                .params(params)
-                .query((rs, n) -> Objects.requireNonNull(rs.getObject(1, UUID.class)))
-                .list();
-        Map<UUID, Problem> loaded = problems.findByWorkspaceIdAndIdIn(workspaceId, ids).stream()
-                .collect(Collectors.toMap(Problem::getId, p -> p));
-        return new PageImpl<>(
-                ids.stream().map(loaded::get).filter(Objects::nonNull).toList(), page, total);
+        long total = session()
+                .createNativeQuery("SELECT count(*)" + joined + where, Long.class)
+                .setProperties(params)
+                .getSingleResult();
+        var rows = session()
+                .createNativeQuery(
+                        "SELECT child.*" + joined + where
+                                + " ORDER BY r.recorded_at DESC,r.id::text DESC,child.position ASC LIMIT :limit OFFSET"
+                                + " :offset",
+                        Problem.class)
+                .setProperties(params)
+                .setParameter("limit", page.getPageSize())
+                .setParameter("offset", page.getOffset())
+                .getResultList();
+        return new PageImpl<>(rows, page, total);
     }
 
+    @Override
     public List<Result> forDevelopersSince(
             long workspaceId, Collection<Long> developers, Instant since, boolean currentOnly) {
         if (developers.isEmpty()) return List.of();
-        var ids = jdbc.sql("SELECT r.id" + JOIN
-                        + " WHERE r.workspace_id=:ws AND r.developer_id IN (:developers) AND r.recorded_at>=:since"
-                        + (currentOnly ? " AND r.ended_at IS NULL AND NOT " + INCORRECT : "")
-                        + " ORDER BY r.recorded_at DESC,r.id::text DESC")
-                .param("ws", workspaceId)
-                .param("developers", developers)
-                .param("since", Timestamp.from(since))
-                .query((rs, n) -> Objects.requireNonNull(rs.getObject(1, UUID.class)))
-                .list();
-        return ordered(workspaceId, ids);
+        return session()
+                .createNativeQuery(
+                        "SELECT r.*" + JOIN
+                                + " WHERE r.workspace_id=:ws AND r.developer_id IN (:developers) AND"
+                                + " r.recorded_at>=:since"
+                                + (currentOnly ? " AND r.ended_at IS NULL AND NOT " + INCORRECT : "")
+                                + " ORDER BY r.recorded_at DESC,r.id::text DESC",
+                        Result.class)
+                .setParameter("ws", workspaceId)
+                .setParameterList("developers", developers)
+                .setParameter("since", since)
+                .getResultList();
     }
 
+    @Override
     public List<Result> ordered(long workspaceId, List<UUID> ids) {
         if (ids.isEmpty()) return List.of();
-        var loaded = results.findByWorkspaceIdAndIdIn(workspaceId, ids).stream()
+        var loaded = session()
+                .createNativeQuery("SELECT * FROM result WHERE workspace_id=:ws AND id IN (:ids)", Result.class)
+                .setParameter("ws", workspaceId)
+                .setParameterList("ids", ids)
+                .getResultStream()
                 .collect(Collectors.toMap(Result::getId, r -> r));
         return ids.stream().map(loaded::get).filter(Objects::nonNull).toList();
     }
@@ -180,7 +194,7 @@ public class ResultReadQuery {
             StringBuilder where, Map<String, Object> params, String clause, String name, @Nullable Object value) {
         if (value != null) {
             where.append(" AND " + clause);
-            params.put(name, value instanceof Instant at ? Timestamp.from(at) : value);
+            params.put(name, value);
         }
     }
 

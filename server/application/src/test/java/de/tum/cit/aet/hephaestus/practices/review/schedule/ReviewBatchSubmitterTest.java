@@ -32,15 +32,14 @@ import org.mockito.ArgumentMatchers;
 class ReviewBatchSubmitterTest extends BaseUnitTest {
     final ProductItemQuery items = mock(ProductItemQuery.class);
     final ReviewService reviews = mock(ReviewService.class);
-    final ReviewBatchSpend spend = mock(ReviewBatchSpend.class);
     final ReviewRepository ledger = mock(ReviewRepository.class);
-    final ReviewBatchSubmitter submitter = new ReviewBatchSubmitter(items, reviews, ledger, spend);
+    final ReviewBatchSubmitter submitter = new ReviewBatchSubmitter(items, reviews, ledger);
 
     @Test
     void missingItemIsSkipped() {
         var batch = batch();
         when(items.find(1, 7)).thenReturn(Optional.empty());
-        assertThat(submitter.offer(batch, 7)).isEqualTo(new ReviewBatchSubmitter.SubmissionOutcome.Skipped());
+        assertThat(submitter.offer(batch, 7, null)).isEqualTo(new ReviewBatchSubmitter.SubmissionOutcome.Skipped());
         verifyNoInteractions(reviews);
     }
 
@@ -82,10 +81,10 @@ class ReviewBatchSubmitterTest extends BaseUnitTest {
                         .build())
                 .build();
         when(items.current(ref)).thenReturn(Optional.of(snapshot));
-        when(spend.remaining(batch)).thenReturn(new ReviewBatchSpend.Snapshot(reserved, true));
         var id = UUID.randomUUID();
         when(reviews.request(ArgumentMatchers.any())).thenReturn(id);
-        assertThat(submitter.offer(batch, 7)).isEqualTo(new ReviewBatchSubmitter.SubmissionOutcome.Submitted());
+        assertThat(submitter.offer(batch, 7, reserved))
+                .isEqualTo(new ReviewBatchSubmitter.SubmissionOutcome.Submitted());
         var capture = ArgumentCaptor.forClass(ReviewRequest.class);
         verify(reviews).request(capture.capture());
         var request = capture.getValue();
@@ -136,8 +135,7 @@ class ReviewBatchSubmitterTest extends BaseUnitTest {
                                 .integration(IntegrationKind.GITHUB)
                                 .build())
                         .build()));
-        when(spend.remaining(batch)).thenReturn(new ReviewBatchSpend.Snapshot(null, true));
         when(reviews.request(ArgumentMatchers.any())).thenThrow(new ReviewRequestRejected(reason, "Unavailable"));
-        return submitter.offer(batch, 7);
+        return submitter.offer(batch, 7, null);
     }
 }

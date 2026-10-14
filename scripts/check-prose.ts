@@ -40,8 +40,14 @@ export function parsePaths(source: string): readonly string[] {
 	return paths;
 }
 
-export function assertGrowth(before: readonly string[], after: readonly string[]): void {
-	const lost = before.filter((file) => !after.includes(file));
+export function assertGrowth(
+	before: readonly string[],
+	after: readonly string[],
+	renames: ReadonlyMap<string, string> = new Map(),
+): void {
+	const lost = before.filter(
+		(file) => !after.includes(file) && !after.includes(renames.get(file) ?? file),
+	);
 	if (lost.length > 0) {
 		throw new Error(
 			`STE enforcement lost paths: ${lost.join(", ")}. Restore them; get maintainer review for an explicit rename or deletion.`,
@@ -72,9 +78,37 @@ export function checkRatchet(
 		options,
 	).trim();
 	if (files !== "") {
+		const fields = execFileSync(
+			"git",
+			[
+				"diff",
+				"--name-status",
+				"-z",
+				"--find-renames=40%",
+				"-l0",
+				"--diff-filter=R",
+				revision,
+				"HEAD",
+			],
+			options,
+		).split("\0");
+		const renames = new Map<string, string>();
+		for (let index = 0; index + 1 < fields.length; index += 3) {
+			const [status, previous, current] = fields.slice(index, index + 3);
+			if (
+				status === undefined ||
+				!/^R\d{3}$/u.test(status) ||
+				previous === undefined ||
+				current === undefined
+			) {
+				throw new Error("Git returned an incomplete rename record.");
+			}
+			renames.set(previous, current);
+		}
 		assertGrowth(
 			parsePaths(execFileSync("git", ["show", `${revision}:${enforcedList}`], options)),
 			paths,
+			renames,
 		);
 	}
 	for (const file of paths) {

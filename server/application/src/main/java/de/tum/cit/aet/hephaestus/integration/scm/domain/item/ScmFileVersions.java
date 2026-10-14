@@ -41,13 +41,7 @@ public class ScmFileVersions {
         requireObjectId(blobId);
         requireObjectId(repositoryVersion);
         List<String> context = globs.stream().distinct().sorted().toList();
-        var matcher = new AntPathMatcher("/");
-        context.forEach(ScmFileVersions::validateGlob);
-        List<Entry> entries = inventory.stream()
-                .filter(e -> !e.path().equals(assignedPath))
-                .filter(e -> context.stream().anyMatch(glob -> matcher.match(glob, e.path())))
-                .sorted(Comparator.comparing(Entry::path))
-                .toList();
+        List<Entry> entries = contextEntries(assignedPath, context, inventory);
         // The wire contract fixes this key order; ObjectNode preserves the insertion order.
         var canonical = mapper.createObjectNode();
         canonical.put("scheme", "scm.file:v1");
@@ -63,6 +57,16 @@ public class ScmFileVersions {
         }
         byte[] bytes = mapper.writeValueAsString(canonical).getBytes(StandardCharsets.UTF_8);
         return new ItemVersion("scm.file:v1:" + blobId + ":" + ScmVersion.contentHash(bytes), repositoryVersion);
+    }
+
+    static List<Entry> contextEntries(String assignedPath, List<String> globs, List<Entry> inventory) {
+        globs.forEach(ScmFileVersions::validateGlob);
+        var matcher = new AntPathMatcher("/");
+        return inventory.stream()
+                .filter(entry -> !entry.path().equals(assignedPath))
+                .filter(entry -> globs.stream().anyMatch(glob -> matcher.match(glob, entry.path())))
+                .sorted(Comparator.comparing(Entry::path))
+                .toList();
     }
 
     private static void requireObjectId(String value) {

@@ -161,8 +161,7 @@ class DocumentCaptureSourceTest extends BaseUnitTest {
                 .thenReturn(List.of(
                         docWithCollectionName(
                                 "engineering", "Engineering Docs", "onboarding-guide", "Onboarding Guide", "Welcome."),
-                        doc("product", "roadmap", "Roadmap", "Q3 plans.") 
-                        ));
+                        doc("product", "roadmap", "Roadmap", "Q3 plans.")));
 
         Map<String, byte[]> files = new LinkedHashMap<>();
         provider.contribute(mentorRequest(), files);
@@ -185,8 +184,7 @@ class DocumentCaptureSourceTest extends BaseUnitTest {
                                 "Welcome.",
                                 "Ada Lovelace",
                                 555L),
-                        authoredDoc("Product", "roadmap", "Roadmap", "Q3 plans.", "Grace Hopper", null) 
-                        ));
+                        authoredDoc("Product", "roadmap", "Roadmap", "Q3 plans.", "Grace Hopper", null)));
 
         Map<String, byte[]> files = new LinkedHashMap<>();
         provider.contribute(mentorRequest(), files);
@@ -217,8 +215,7 @@ class DocumentCaptureSourceTest extends BaseUnitTest {
                                 List.of(
                                         new ProjectedDocument.Collaborator("0aa1bb2c-user", "Ada Lovelace", 555L),
                                         new ProjectedDocument.Collaborator("7cc9dd0e-user", null, null))),
-                        doc("Product", "roadmap", "Roadmap", "Q3 plans.") 
-                        ));
+                        doc("Product", "roadmap", "Roadmap", "Q3 plans.")));
 
         Map<String, byte[]> files = new LinkedHashMap<>();
         provider.contribute(mentorRequest(), files);

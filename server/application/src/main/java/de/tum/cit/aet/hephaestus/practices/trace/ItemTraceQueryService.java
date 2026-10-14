@@ -3,8 +3,6 @@ package de.tum.cit.aet.hephaestus.practices.trace;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FoundBy;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
@@ -18,7 +16,6 @@ import de.tum.cit.aet.hephaestus.practices.review.dto.ItemEventDTO;
 import de.tum.cit.aet.hephaestus.practices.review.dto.ItemRefDTO;
 import de.tum.cit.aet.hephaestus.practices.review.feedbackmode.FeedbackModeResolver;
 import de.tum.cit.aet.hephaestus.practices.review.model.Review;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestReason;
 import de.tum.cit.aet.hephaestus.practices.trace.dto.ItemTraceDTO;
 import java.util.List;
 import java.util.Map;
@@ -124,11 +121,9 @@ public class ItemTraceQueryService {
                         row.getName(),
                         row.getItemVersion(),
                         row.getOccurredAt(),
-                        FoundBy.valueOf(row.getFoundBy()),
-                        ItemEventState.valueOf(row.getState()),
-                        row.getReason() == null
-                                ? null
-                                : ReviewRequestReason.valueOf(Objects.requireNonNull(row.getReason())),
+                        row.getFoundBy(),
+                        row.getState(),
+                        row.getReason(),
                         row.getDecidedAt(),
                         row.getReviewId()));
     }

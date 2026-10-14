@@ -14,6 +14,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -138,7 +139,8 @@ class PullRequestRevisionPairIntegrationTest extends BaseIntegrationTest {
     }
 
     private Fixture createFixture(IdentityProviderType providerType) {
-        IdentityProvider provider = providers.save(new IdentityProvider(providerType, "https://scm.example"));
+        IdentityProvider provider = providers.save(
+                new IdentityProvider(providerType, "https://scm-" + UUID.randomUUID() + ".example.test"));
         var author = users.save(TestUserFactory.createUser(1001L, "developer", provider));
         Repository repository = new Repository();
         repository.setNativeId(2001L);

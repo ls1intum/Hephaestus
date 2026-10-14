@@ -3,23 +3,23 @@ package de.tum.cit.aet.hephaestus.practices.review.schedule;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.MonitoredRepositoryQuery;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewCoverageService;
+import de.tum.cit.aet.hephaestus.practices.review.ProductItemRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
-import java.sql.Timestamp;
 import java.time.Instant;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 @Component
 @ConditionalOnServerRole
 @RequiredArgsConstructor
 public class ReviewBatchScopeQuery {
-    private final JdbcClient jdbc;
+    private final ProductItemRepository items;
+    private final ReviewBatchTargetRepository targets;
     private final PracticeReviewCoverageService coverage;
     private final WorkspaceRepository workspaces;
     private final MonitoredRepositoryQuery monitored;
@@ -33,33 +33,18 @@ public class ReviewBatchScopeQuery {
                     .limit(limit)
                     .toList();
         }
-        String window = from == null
-                ? ""
-                : " AND EXISTS(SELECT 1 FROM item_event e WHERE e.workspace_id=i.workspace_id AND e.item_id=i.id AND"
-                        + " e.occurred_at>=:from AND e.occurred_at<:to)";
-        var params = new LinkedHashMap<String, Object>();
-        params.put("ws", ws);
-        params.put("kind", kind);
-        params.put("limit", limit);
-        if (from != null) {
-            params.put("from", Timestamp.from(from));
-            params.put("to", Timestamp.from(Objects.requireNonNull(to)));
-        }
-        return jdbc.sql("SELECT i.id FROM item i WHERE i.workspace_id=:ws AND i.kind=:kind AND i.removed_at IS NULL"
-                        + window + " ORDER BY i.id LIMIT :limit")
-                .params(params)
-                .query((rs, n) -> rs.getLong(1))
-                .list();
+        var page = PageRequest.of(0, limit);
+        return from == null
+                ? items.scopeItems(ws, kind, page)
+                : items.scopeItemsInWindow(ws, kind, from, Objects.requireNonNull(to), page);
     }
 
     public List<Long> next(long ws, UUID batch, @Nullable Long cursor, int limit) {
-        return jdbc.sql("SELECT item_id FROM review_batch_target WHERE workspace_id=:ws AND batch_id=:batch AND"
-                        + " item_id>:cursor ORDER BY item_id LIMIT :limit")
-                .param("ws", ws)
-                .param("batch", batch)
-                .param("cursor", cursor == null ? 0 : cursor)
-                .param("limit", limit)
-                .query((rs, n) -> rs.getLong(1))
-                .list();
+        return targets
+                .findByWorkspaceIdAndBatchIdAndItemIdGreaterThanOrderByItemIdAsc(
+                        ws, batch, cursor == null ? 0 : cursor, PageRequest.of(0, limit))
+                .stream()
+                .map(ReviewBatchTarget::getItemId)
+                .toList();
     }
 }

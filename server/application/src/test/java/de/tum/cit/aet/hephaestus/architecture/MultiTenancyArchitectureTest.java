@@ -689,12 +689,10 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                     methodName.contains("ForUser"); // User in workspace context
 
                             boolean hasWorkspaceParam = method.getRawParameterTypes().stream()
-                                    .anyMatch(
-                                            p -> p.getSimpleName().contains("WorkspaceContext")
-                                                    || p.getSimpleName().contains("Workspace")
-                                                    || p.isEquivalentTo(Long.class)
-                                                    || p.isEquivalentTo(long.class) 
-                                            );
+                                    .anyMatch(p -> p.getSimpleName().contains("WorkspaceContext")
+                                            || p.getSimpleName().contains("Workspace")
+                                            || p.isEquivalentTo(Long.class)
+                                            || p.isEquivalentTo(long.class));
 
                             if (!isWorkspaceAware && !hasWorkspaceParam) {
                                 // This is informational - services may have internal methods

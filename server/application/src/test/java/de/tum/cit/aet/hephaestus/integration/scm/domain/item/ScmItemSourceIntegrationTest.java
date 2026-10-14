@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.MonitoredRepositoryQuery;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RoleHolder;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.IssueContentSource;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.LinkedWorkItemContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.PullRequestContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.RepositoryTreeContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.Commit;
@@ -44,6 +45,7 @@ import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -182,7 +184,7 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
     void shouldKeepKindsParentsAndProviderIdentitiesDistinct(IdentityProviderType type) {
         var fixture = fixture(type);
         var issue = new Issue();
-        issue.setNativeId(401L);
+        issue.setNativeId(ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE));
         issue.setProvider(fixture.provider());
         issue.setRepository(fixture.repository());
         issue.setNumber(7);
@@ -195,7 +197,7 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
         issue.setUpdatedAt(Instant.now());
         issue = issues.saveAndFlush(issue);
         var pull = new PullRequest();
-        pull.setNativeId(402L);
+        pull.setNativeId(ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE));
         pull.setProvider(fixture.provider());
         pull.setRepository(fixture.repository());
         pull.setNumber(7);
@@ -216,6 +218,7 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
                 fixture.provider()));
         pull.getAssignees().add(fixture.author());
         pull.getAssignees().add(secondAssignee);
+        pull.replaceClosingIssues(Set.of(issue));
         pull = pulls.saveAndFlush(pull);
         ItemRef holder = writer.upsert(new ItemRegistration(
                 fixture.workspace().getId(),
@@ -271,14 +274,27 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
                             .isEqualTo(ScmVersion.contentHash(
                                     Objects.requireNonNull(captured.files().get(text.stagedPath())))));
         }
+        var linked = sources.capture(
+                pullSnapshot,
+                new CaptureRequest(
+                        UUID.randomUUID(), UUID.randomUUID(), 1, Set.of(LinkedWorkItemContentSource.KIND), "2.0.0", 3));
+        var linkedWords = Objects.requireNonNull(linked.files().get("context/linked_work_items/7.md"));
+        assertThat(new String(linkedWords, StandardCharsets.UTF_8)).contains("An issue", "Issue body");
+        assertThat(linked.citableTexts())
+                .filteredOn(text -> text.path().equals("context/linked_work_items/7.md"))
+                .singleElement()
+                .satisfies(text -> {
+                    assertThat(text.source()).isEqualTo(LinkedWorkItemContentSource.KIND.value());
+                    assertThat(linked.files().get(text.stagedPath())).isEqualTo(linkedWords);
+                    assertThat(text.sha256()).isEqualTo(ScmVersion.contentHash(linkedWords));
+                });
         var wrongKind = writer.upsert(
                 new ItemRegistration(holder.workspaceId(), ScmItemEvents.ISSUE, pull.getId(), holder.itemId(), null));
         assertThatThrownBy(() -> sources.pin(wrongKind, null))
                 .isInstanceOfSatisfying(
-                        ItemCaptureException.class,
-                        e -> assertThat(e.code()).isEqualTo(ItemCaptureCode.ITEM_NOT_VISIBLE));
+                        ItemCaptureException.class, e -> assertThat(e.code()).isEqualTo(ItemCaptureCode.ITEM_REMOVED));
         var review = new PullRequestReview();
-        review.setNativeId(403L);
+        review.setNativeId(ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE));
         review.setProvider(fixture.provider());
         review.setPullRequest(pull);
         review.setAuthor(fixture.author());
@@ -455,7 +471,7 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
     void shouldKeepTheItemWithoutAnEventUntilItsProviderVersionCanBeProved(IdentityProviderType type) {
         var fixture = fixture(type);
         var pull = new PullRequest();
-        pull.setNativeId(402L);
+        pull.setNativeId(ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE));
         pull.setProvider(fixture.provider());
         pull.setRepository(fixture.repository());
         pull.setNumber(7);

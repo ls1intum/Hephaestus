@@ -139,11 +139,14 @@ function pagedWork(record: (request: Request) => void) {
 		"page-2": { content: [workItem(2), workItem(3)], nextCursor: "page-3" },
 		"page-3": { content: [workItem(4)] },
 	};
-	return http.get(/\/workspaces\/[^/]+\/activity\/(?:people\/\d+\/)?work/u, ({ request }) => {
-		record(request);
-		const cursor = new URL(request.url).searchParams.get("cursor") ?? "first";
-		return HttpResponse.json(pages[cursor]);
-	});
+	return http.get(
+		/\/workspaces\/[^/]+\/activity\/(?:(?:people\/\d+|me)\/)?work/u,
+		({ request }) => {
+			record(request);
+			const cursor = new URL(request.url).searchParams.get("cursor") ?? "first";
+			return HttpResponse.json(pages[cursor]);
+		},
+	);
 }
 
 function adaMembership(
@@ -153,7 +156,7 @@ function adaMembership(
 	],
 ): Wire<WorkspaceMembership> {
 	return {
-		account: { id: "7", status: "ACTIVE", displayName: "Ada", avatarUrl: null, identities },
+		account: { id: "70", status: "ACTIVE", displayName: "Ada", avatarUrl: null, identities },
 		role,
 		joinedAt: "2026-01-01T00:00:00Z",
 		leftAt: null,
@@ -185,7 +188,7 @@ describe("Activity", () => {
 				record(request);
 				return HttpResponse.json(people);
 			}),
-			http.get("*/workspaces/:workspaceSlug/activity/people/:userId", ({ request }) => {
+			http.get("*/workspaces/:workspaceSlug/activity/me", ({ request }) => {
 				record(request);
 				return HttpResponse.json(personDetail);
 			}),
@@ -193,7 +196,7 @@ describe("Activity", () => {
 				record(request);
 				return HttpResponse.json(workPage);
 			}),
-			http.get("*/workspaces/:workspaceSlug/activity/people/:userId/work", ({ request }) => {
+			http.get("*/workspaces/:workspaceSlug/activity/me/work", ({ request }) => {
 				record(request);
 				return HttpResponse.json(workPage);
 			}),
@@ -210,12 +213,11 @@ describe("Activity", () => {
 		renderRouteAtWithRouter("/w/acme/activity");
 
 		await screen.findByRole("heading", { name: "Needs you" }, ROUTE_RENDER_WAIT);
-		await waitFor(() => expect(readsOf("/activity/people/7").length).toBeGreaterThan(0));
-		expect(readsOf("/activity/people/7").every((url) => !url.searchParams.has("login"))).toBe(true);
+		await waitFor(() => expect(readsOf("/activity/me").length).toBeGreaterThan(0));
+		expect(readsOf("/activity/me").every((url) => !url.searchParams.has("login"))).toBe(true);
 		expect(readsOf("/activity/people")).toStrictEqual([]);
-		expect(readsOf("/activity/people/7").every((url) => !url.searchParams.has("membersOnly"))).toBe(
-			true,
-		);
+		expect(reads.filter((url) => url.pathname.includes("/activity/people/"))).toStrictEqual([]);
+		expect(readsOf("/activity/me").every((url) => !url.searchParams.has("membersOnly"))).toBe(true);
 		expect(readsOf("/open-work").map((url) => url.pathname)).toContain(
 			"/workspaces/acme/activity/members/ada-lrz/open-work",
 		);
@@ -232,17 +234,17 @@ describe("Activity", () => {
 		);
 
 		await waitFor(() =>
-			expect(
-				readsOf("/activity/people/7/work").map((url) => url.searchParams.get("cursor")),
-			).toContain("page-2"),
+			expect(readsOf("/activity/me/work").map((url) => url.searchParams.get("cursor"))).toContain(
+				"page-2",
+			),
 		);
 		// A preset is the server's to resolve, so no read names a start or an end of its own.
-		for (const url of readsOf("/activity/people/7/work")) {
+		for (const url of readsOf("/activity/me/work")) {
 			expect(url.searchParams.get("range")).toBe("90d");
 			expect(url.searchParams.has("from")).toBe(false);
 		}
 		// The one read with days of its own is the period before, which ends where this one begins.
-		const earlier = readsOf("/activity/people/7").filter((url) => url.searchParams.has("to"));
+		const earlier = readsOf("/activity/me").filter((url) => url.searchParams.has("to"));
 		expect(earlier.map((url) => url.searchParams.get("to"))).toStrictEqual([
 			"2026-09-01T00:00:00.000Z",
 		]);
@@ -252,10 +254,10 @@ describe("Activity", () => {
 		renderRouteAtWithRouter("/w/acme/activity?from=2026-03-01&to=2026-03-31");
 
 		await waitFor(
-			() => expect(readsOf("/activity/people/7").length).toBeGreaterThan(0),
+			() => expect(readsOf("/activity/me").length).toBeGreaterThan(0),
 			ROUTE_RENDER_WAIT,
 		);
-		const [first] = readsOf("/activity/people/7");
+		const [first] = readsOf("/activity/me");
 		assert(first);
 		expect(first.searchParams.get("range")).toBe("custom");
 		expect(new Date(String(first.searchParams.get("from")))).toStrictEqual(new Date(2026, 2, 1));
@@ -268,13 +270,11 @@ describe("Activity", () => {
 		await waitFor(
 			() =>
 				expect(
-					readsOf("/activity/people/7/work").some(
-						(url) => url.searchParams.getAll("kinds").length > 0,
-					),
+					readsOf("/activity/me/work").some((url) => url.searchParams.getAll("kinds").length > 0),
 				).toBe(true),
 			ROUTE_RENDER_WAIT,
 		);
-		const filtered = readsOf("/activity/people/7/work").find(
+		const filtered = readsOf("/activity/me/work").find(
 			(url) => url.searchParams.getAll("kinds").length > 0,
 		);
 		expect(filtered?.searchParams.getAll("kinds")).toStrictEqual([
@@ -295,7 +295,7 @@ describe("Activity", () => {
 
 		await screen.findByText("Copied 4 items as Markdown", undefined, ROUTE_RENDER_WAIT);
 		expect(
-			readsOf("/activity/people/7/work")
+			readsOf("/activity/me/work")
 				.filter((url) => url.searchParams.get("size") === "100")
 				.map((url) => url.searchParams.get("cursor")),
 		).toStrictEqual(["page-2", "page-3"]);
@@ -323,7 +323,7 @@ describe("Activity", () => {
 		expect(screen.getByRole("link", { name: "Connect an account" }).getAttribute("href")).toBe(
 			"/settings#linked-accounts-heading",
 		);
-		expect(readsOf("/activity/people/7")).toStrictEqual([]);
+		expect(readsOf("/activity/me")).toStrictEqual([]);
 	});
 
 	it("reads nobody's activity when the membership cannot be read, and says so", async () => {
@@ -348,15 +348,13 @@ describe("Activity", () => {
 		await waitFor(
 			() =>
 				expect(
-					readsOf("/activity/people/7/work").some(
-						(url) => url.searchParams.getAll("kinds").length > 0,
-					),
+					readsOf("/activity/me/work").some((url) => url.searchParams.getAll("kinds").length > 0),
 				).toBe(true),
 			ROUTE_RENDER_WAIT,
 		);
 		await expect(screen.findAllByRole("dialog")).resolves.toHaveLength(1);
 		expect(
-			readsOf("/activity/people/7/work").flatMap((url) => url.searchParams.getAll("kinds")),
+			readsOf("/activity/me/work").flatMap((url) => url.searchParams.getAll("kinds")),
 		).not.toContain("ISSUE_OPENED");
 	});
 
@@ -510,7 +508,7 @@ describe("Workspace activity", () => {
 				record(request);
 				return HttpResponse.json(personDetail);
 			}),
-			http.get(/\/workspaces\/[^/]+\/activity\/(?:people\/\d+\/)?work/u, ({ request }) => {
+			http.get(/\/workspaces\/[^/]+\/activity\/(?:(?:people\/\d+|me)\/)?work/u, ({ request }) => {
 				record(request);
 				return HttpResponse.json(workPage);
 			}),
@@ -865,7 +863,7 @@ describe("Workspace activity", () => {
 				await held.promise;
 				return HttpResponse.json(people);
 			}),
-			http.get(/\/workspaces\/[^/]+\/activity\/(?:people\/\d+\/)?work/u, () =>
+			http.get(/\/workspaces\/[^/]+\/activity\/(?:(?:people\/\d+|me)\/)?work/u, () =>
 				HttpResponse.json({ content: [workItem(1)] }),
 			),
 		);

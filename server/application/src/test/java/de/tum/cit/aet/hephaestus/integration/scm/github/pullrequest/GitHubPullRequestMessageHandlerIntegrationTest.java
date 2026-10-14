@@ -496,7 +496,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             assertThat(requestedTeamIds()).isEmpty();
         }
 
-    // Reviewer requests can arrive within one second; snapshot ordering needs the read time.
+        // Reviewer requests can arrive within one second; snapshot ordering needs the read time.
         @Test
         void shouldStoreTheLaterReviewRequestWhenItArrivesWithinTheSameSecond() throws Exception {
             Team team = team(FIXTURE_TEAM_ID, "hephaetus");

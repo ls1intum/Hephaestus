@@ -425,7 +425,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
             case "suppressed person" -> {
                 keepOriginalInputs(jobId, 0, "READY", "COMPLETE", fresh);
                 jdbc.update(
-                        "INSERT INTO person_suppression(id,provider_id,subject,team_key) VALUES (?,?,?,'')",
+                        "INSERT INTO identity_restriction(id,provider_id,provider_user_key,team_key,kind) VALUES (?,?,?,'','ERASED')",
                         UUID.randomUUID(),
                         requireNonNull(developer.getProvider()).getId(),
                         "100");

@@ -140,7 +140,7 @@ function LoadedCatalogGroupEditor({
 			onDone();
 		},
 		onError: (error) => {
-			if (problemStatusOf(error) === 409) {
+			if (problemStatusOf(error) === 412) {
 				setConflict(true);
 				return;
 			}
@@ -162,7 +162,7 @@ function LoadedCatalogGroupEditor({
 			);
 		},
 		onError: (error) => {
-			if (problemStatusOf(error) === 409) {
+			if (problemStatusOf(error) === 412) {
 				toast.error(
 					"The catalog changed before this action was saved. Reopen the group to see the latest version.",
 				);
@@ -189,7 +189,7 @@ function LoadedCatalogGroupEditor({
 			);
 		},
 		onError: (error) => {
-			if (problemStatusOf(error) === 409) {
+			if (problemStatusOf(error) === 412) {
 				toast.error(
 					"The catalog changed before this action was saved. Reopen the group to see the latest version.",
 				);
@@ -229,7 +229,7 @@ function LoadedCatalogGroupEditor({
 					headers: { "If-Match": `"${baseGroup.etag}"` },
 				});
 			}}
-			onSubmit={(group) => {
+			onSubmit={({ slug: _slug, ...group }) => {
 				setConflict(false);
 				updateGroup.mutate({
 					path: { slug: groupSlug },

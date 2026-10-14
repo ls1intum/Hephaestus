@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.practices.review.report.ScanReportService;
 import de.tum.cit.aet.hephaestus.practices.spi.BoundModelSlot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewBudget;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewCancellationRequested;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewCompleted;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewCompletion;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewItemState;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
@@ -35,7 +36,6 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
-import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -45,7 +45,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
@@ -68,7 +67,7 @@ public class ReviewServiceImpl implements ReviewService {
     private final ReviewModelBindings bindings;
     private final ReviewBudget budget;
     private final ReviewRuntimeQuery runtime;
-    private final JdbcClient jdbc;
+    private final ProductItemRepository itemRows;
     private final JsonMapper json;
     private final Clock clock;
     private final ApplicationEventPublisher events;
@@ -122,21 +121,12 @@ public class ReviewServiceImpl implements ReviewService {
         Instant ordered = now;
         ItemEventName event = null;
         if (request.eventId() != null) {
-            var fact = jdbc.sql("SELECT name,occurred_at,item_version FROM item_event WHERE workspace_id=:ws AND"
-                            + " item_id=:item AND id=:id")
-                    .param("ws", request.workspaceId())
-                    .param("item", request.itemId())
-                    .param("id", request.eventId())
-                    .query((rs, n) -> new EventFact(
-                            new ItemEventName(rs.getString("name")),
-                            rs.getObject("occurred_at", OffsetDateTime.class).toInstant(),
-                            rs.getString("item_version")))
-                    .single();
-            if (!pinned.version().value().equals(fact.version()))
+            var fact = itemRows.event(request.workspaceId(), request.itemId(), request.eventId());
+            if (!pinned.version().value().equals(fact.getItemVersion()))
                 throw new ReviewRequestRejected(
                         ReviewRequestRejected.Reason.REQUEST_CONFLICT, "The event version does not match the review.");
-            event = fact.name();
-            ordered = fact.at();
+            event = new ItemEventName(fact.getName());
+            ordered = fact.getOccurredAt();
         }
         List<Practice> selected;
         if (request.kind() == ReviewKind.SCAN) {
@@ -203,10 +193,7 @@ public class ReviewServiceImpl implements ReviewService {
                         == null)
             throw new ReviewRequestRejected(
                     ReviewRequestRejected.Reason.MODEL_UNAVAILABLE, "The review model is unavailable.");
-        var digest = jdbc.sql("SELECT review_model_digest(CAST(:models AS jsonb))")
-                .param("models", json.writeValueAsString(models))
-                .query(String.class)
-                .single();
+        var digest = reviews.modelDigest(json.writeValueAsString(models));
         var method = new ReviewMethod(1, digest, models);
         ObjectNode checks = json.createObjectNode();
         checks.put("reuse", request.reuse());
@@ -385,12 +372,8 @@ public class ReviewServiceImpl implements ReviewService {
                                         .findByWorkspaceIdAndReviewIdOrderByPracticeIdAsc(workspaceId, reviewId)
                                         .stream()
                                         .anyMatch(p -> !Boolean.TRUE.equals(p.getListingComplete()))))
-                || jdbc.sql("SELECT EXISTS(SELECT 1 FROM review_item WHERE workspace_id=:ws AND review_id=:id AND"
-                                + " state IN ('WITHHELD','LISTED'))")
-                        .param("ws", workspaceId)
-                        .param("id", reviewId)
-                        .query(Boolean.class)
-                        .single();
+                || memberships.existsByWorkspaceIdAndReviewIdAndStateIn(
+                        workspaceId, reviewId, List.of(ReviewItemState.WITHHELD, ReviewItemState.LISTED));
         var status = review.getChecks().path("cancellationRequested").asBoolean()
                 ? ReviewStatus.CANCELLED
                 : completion.status() == ReviewStatus.COMPLETE && incomplete
@@ -411,6 +394,10 @@ public class ReviewServiceImpl implements ReviewService {
                     && assignment.getStatus() != ReviewPracticeStatus.FAILED)
                 assignment.setStatus(ReviewPracticeStatus.DONE);
         if (review.getKind() == ReviewKind.SCAN) reports.freeze(workspaceId, reviewId);
+        if ((status == ReviewStatus.COMPLETE || status == ReviewStatus.PARTIAL)
+                && memberships.existsByWorkspaceIdAndReviewIdAndStateInAndResultIdIsNotNull(
+                        workspaceId, reviewId, List.of(ReviewItemState.JUDGED, ReviewItemState.REUSED)))
+            events.publishEvent(new ReviewCompleted(reviewId, workspaceId));
     }
 
     @Override
@@ -455,7 +442,4 @@ public class ReviewServiceImpl implements ReviewService {
                 && (r.requestKey() == null || r.requestDigest() == null))
             throw new IllegalArgumentException("A scan requires its request key and digest.");
     }
-
-    private record EventFact(
-            ItemEventName name, Instant at, @Nullable String version) {}
 }

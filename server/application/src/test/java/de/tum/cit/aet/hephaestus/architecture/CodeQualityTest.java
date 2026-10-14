@@ -125,9 +125,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     // Activity writes carry the event identity and its context through the SPI.
                     "ActivityEventService.record",
                     "ActivityRecorder.record",
-                    "FeedbackStore.decide",
-                    "FeedbackStoreService.decide",
-                    "FeedbackDecisionService.decide",
                     // @Bean factory wiring Spring dependencies — not business logic complexity
                     "DockerSandboxConfiguration.dockerSandboxAdapter",
                     "DockerSandboxConfiguration.dockerInteractiveSandboxAdapter");
@@ -422,7 +419,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     "AccountPurger", // PersonDataService's registry includes CoreAccountPersonDataCatalog, which
                     // depends on this purger; resolve the erasure coordinator after initialization.
                     "MembershipService", // Reads exist on every role; PeopleRegistryService is server-only.
-                    "ExactPersonIdentityResolver", 
+                    "ExactPersonIdentityResolver",
                     "OutlinePersonSourceIdentityContributor", // Permission reads suppression, whose registry includes
                     // this source.
                     "WorkspaceActivationService",

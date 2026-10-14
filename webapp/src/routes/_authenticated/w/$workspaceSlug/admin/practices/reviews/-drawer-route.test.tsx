@@ -365,7 +365,6 @@ describe("a new review from a row of the Reviews table", () => {
 					status: "SUBMITTED",
 					reviewId: "0f2b7c1e-9a3d-4c5b-8e1f-2d6a7b8c9d01",
 					reason: null,
-					reasonDescription: null,
 				});
 			}),
 		);

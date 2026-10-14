@@ -1716,13 +1716,14 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         workspaceMembershipService.updateMemberVisibility(
                 workspace.getId(), workspaceMembershipService.accountIdForUser(caller.getId()), true);
         assertThat(members(uri -> uri)).extracting(row -> row.person().id()).doesNotContain(caller.getId());
-        var detail = Objects.requireNonNull(get("/people/" + caller.getId(), uri -> uri)
+        var detail = Objects.requireNonNull(get("/me", uri -> uri)
                 .isOk()
                 .expectBody(ActivityPersonDetailDTO.class)
                 .returnResult()
                 .getResponseBody());
+        assertThat(detail.person().id()).isEqualTo(caller.getId());
         assertThat(detail.counts().contributions()).isEqualTo(1);
-        get("/people/" + caller.getId() + "/work", uri -> uri)
+        get("/me/work", uri -> uri)
                 .isOk()
                 .expectBody(ActivityWorkPageDTO.class)
                 .value(page -> assertThat(page.content()).hasSize(1));
@@ -1749,13 +1750,10 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .orElseThrow();
         workspaceMembershipService.updateMemberVisibility(
                 workspace.getId(), workspaceMembershipService.accountIdForUser(caller.getId()), true);
-        get("/people/" + caller.getId(), uri -> uri)
-                .isOk()
-                .expectBody(ActivityPersonDetailDTO.class)
-                .value(detail -> {
-                    assertThat(detail.counts().contributions()).isZero();
-                    assertThat(detail.weeks()).isEmpty();
-                });
+        get("/me", uri -> uri).isOk().expectBody(ActivityPersonDetailDTO.class).value(detail -> {
+            assertThat(detail.counts().contributions()).isZero();
+            assertThat(detail.weeks()).isEmpty();
+        });
     }
 
     @Test

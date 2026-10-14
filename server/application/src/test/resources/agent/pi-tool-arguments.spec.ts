@@ -17,7 +17,7 @@ const treeCitation = {
 	sourceKind: "scm.repository.tree",
 	sourcePath: "repos/reviewed/.git/HEAD",
 	path: "src/Checked.java",
-	revision: "a".repeat(40),
+	commit: "a".repeat(40),
 	startLine: 2,
 	endLine: 2,
 	quote: "checked(token);",
@@ -176,7 +176,7 @@ void test("an open question without a citation is kept as it is", () => {
 	);
 });
 
-void test("a side, revision or quote that is not text is refused, wherever the citation is", () => {
+void test("a side, commit or quote that is not text is refused, wherever the citation is", () => {
 	const places = {
 		citation: (cited: object) => ({ ...result, citations: [cited] }),
 		"problem citation": (cited: object) => ({
@@ -194,14 +194,14 @@ void test("a side, revision or quote that is not text is refused, wherever the c
 		"evidence citation": (cited: object) => ({ ...result, evidence: { citations: [cited] } }),
 	};
 	for (const [where, place] of Object.entries(places)) {
-		for (const field of ["side", "revision", "quote"]) {
+		for (const field of ["side", "commit", "quote"]) {
 			assert.throws(
 				() => prepareResultArguments(place({ ...changeCitation, [field]: 42 })),
 				new RegExp(`^Error: ${where} ${field} must be a string or null$`, "u"),
 				`${where} ${field}`,
 			);
 		}
-		for (const field of ["side", "revision"]) {
+		for (const field of ["side", "commit"]) {
 			assert.throws(
 				() => prepareResultArguments(place({ ...changeCitation, [field]: " " })),
 				new RegExp(`^Error: ${where} ${field} must be nonempty or null$`, "u"),

@@ -35,31 +35,13 @@ public class RepositoryTreeContentSource {
 
     public static final SourceKind KIND = new SourceKind("scm.repository.tree");
 
-    public Set<SourceKind> sourceKinds() {
-        return Set.of(KIND);
-    }
-
-    public SourceKind sourceKindFor(String path) {
-        return KIND;
-    }
-
     private final GitRepositoryManager gitRepositoryManager;
     private final ReviewRepositoryPreparer repositoryPreparer;
     private final PersonDataCopyRecorder personCopies;
 
-    public boolean supports(ScmCaptureContext request) {
-        return request.pullRequest();
-    }
-
-    public boolean ownsPath(String path) {
-        return path.startsWith("repos/reviewed/");
-    }
-
     public CaptureContribution capture(ScmCaptureContext request, Set<SourceKind> selectedKinds) {
         if (!selectedKinds.contains(KIND)) {
-            return new CaptureContribution(
-                    Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), null, Map.of(),
-                    List.of(), List.of(), List.of());
+            return CaptureContribution.empty();
         }
         if (gitRepositoryManager.isEnabled() && request.pullRequest())
             request.preparation().prepare(repositoryPreparer, request);

@@ -10,7 +10,7 @@ await test("the full folder remains citable when a primary readiness source is a
 		sources: [
 			{
 				kind: "outline.documents",
-				citation: { side: "FORBIDDEN", revision: "FORBIDDEN" },
+				citation: { side: "FORBIDDEN", commit: "FORBIDDEN" },
 				state: { availability: "UNAVAILABLE" },
 			},
 		],
@@ -73,7 +73,7 @@ await test("logical captured texts preserve their digest, staged path and opaque
 		source: "custom.text",
 		path: "thread/message",
 		side: "NEW",
-		revision: "opaque:v1",
+		commit: "opaque:v1",
 		stagedPath: "context/message.txt",
 		sha256: "a".repeat(64),
 	};

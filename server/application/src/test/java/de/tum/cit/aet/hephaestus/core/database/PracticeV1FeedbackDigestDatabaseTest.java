@@ -54,8 +54,13 @@ class PracticeV1FeedbackDigestDatabaseTest {
     void shouldKeepShownChatWordsSeparateFromThePreparedBrief(String context) throws Exception {
         var database = NativePracticeFixture.feedbackParent(context);
         var prepared = PracticeMigrationFixture.column(database, "SELECT feedback_content_digest('" + CHAT + "')");
-        PracticeMigrationFixture.execute(
-                database, "UPDATE feedback_copy SET body='Actual shown words.' WHERE feedback_id='" + CHAT + "'");
+        PracticeMigrationFixture.execute(database, """
+            UPDATE feedback_copy SET state='WRITE_STARTED',write_started_at=now(),
+                chat_message_id='00000000-0000-0000-0000-000000978052'
+            WHERE id='00000000-0000-0000-0000-000000978045';
+            UPDATE feedback_copy SET state='POSTED',posted_at=now(),body='Actual shown words.'
+            WHERE id='00000000-0000-0000-0000-000000978045';
+            """);
         assertThat(PracticeMigrationFixture.column(database, "SELECT feedback_content_digest('" + CHAT + "')"))
                 .isEqualTo(prepared);
         PracticeMigrationFixture.execute(

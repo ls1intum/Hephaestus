@@ -80,6 +80,7 @@ export const ITEM_EVENT_REASON_SENTENCES: Record<ItemEventReason, string> = {
 	MODEL_UNAVAILABLE: "The assigned AI model was unavailable.",
 	BUDGET_EXHAUSTED: "The workspace’s review budget is used up.",
 	ITEM_NOT_VISIBLE: "Hephaestus can no longer see the work.",
+	VERSION_SUPERSEDED: "The work changed before this version could be reviewed.",
 	PENDING_DEADLINE_EXCEEDED: "The review did not start before its deadline.",
 	ITEM_GONE: "The work no longer exists.",
 };

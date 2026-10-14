@@ -11,8 +11,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSource;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemService;
 import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheck;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheckStage;
@@ -37,7 +37,7 @@ class FeedbackGateIntegrationTest extends AbstractFeedbackIntegrationTest {
     FeedbackGate gate;
 
     @MockitoBean(name = "scmItemService", enforceOverride = true)
-    ItemSource source;
+    ScmItemService source;
 
     @MockitoBean
     EvidenceAuthorization authorization;
@@ -53,7 +53,7 @@ class FeedbackGateIntegrationTest extends AbstractFeedbackIntegrationTest {
     @BeforeEach
     void admitPolicyRevision() {
         jdbc.update(
-                "UPDATE workspace SET practices_enabled=true,practice_rollout_revision=4 WHERE id=?",
+                "UPDATE workspace SET practices_enabled=true,practice_rollout_revision=4 WHERE" + " id=?",
                 workspace.getId());
         jdbc.update("UPDATE review SET rollout_revision=4 WHERE workspace_id=? AND id=?", workspace.getId(), reviewId);
         piece = piece(FeedbackDestination.PRACTICE_PAGE, FeedbackState.READY, null);
@@ -102,13 +102,16 @@ class FeedbackGateIntegrationTest extends AbstractFeedbackIntegrationTest {
         supportOnWorkFeedback();
         assertThat(check().allowed()).isTrue();
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
-            Long next =
-                    jdbc.queryForObject("SELECT nextval(pg_get_serial_sequence('practice_version','id'))", Long.class);
+            Long next = jdbc.queryForObject(
+                    "SELECT" + " nextval(pg_get_serial_sequence('practice_version','id'))", Long.class);
             jdbc.update(
-                    "INSERT INTO practice_version(id,workspace_id,practice_id,number,definition) SELECT"
-                            + " ?,workspace_id,practice_id,number+1,jsonb_set(definition,'{criteria}','\"A changed"
-                            + " standard.\"'::jsonb) FROM practice_version WHERE id=(SELECT current_version_id FROM"
-                            + " practice WHERE id=?)",
+                    "INSERT INTO"
+                            + " practice_version(id,workspace_id,practice_id,number,definition)"
+                            + " SELECT"
+                            + " ?,workspace_id,practice_id,number+1,jsonb_set(definition,'{criteria}','\"A"
+                            + " changed standard.\"'::jsonb) FROM practice_version"
+                            + " WHERE id=(SELECT current_version_id FROM practice WHERE"
+                            + " id=?)",
                     next,
                     supportedPracticeId);
             jdbc.update("UPDATE practice SET current_version_id=? WHERE id=?", next, supportedPracticeId);

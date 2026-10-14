@@ -13,16 +13,18 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.modulith.NamedInterface;
 
+@NamedInterface("llm-usage")
 public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UUID> {
-    @Query("SELECT e FROM LlmUsageEvent e WHERE e.workspace.id = :workspaceId AND e.sourceType ="
+    @Query("SELECT e FROM LlmUsageEvent e WHERE e.workspaceId = :workspaceId AND e.sourceType ="
             + " :sourceType AND e.sourceId = :sourceId ORDER BY e.sourceAttempt")
     List<LlmUsageEvent> findByWorkspaceIdAndSourceTypeAndSourceIdOrderBySourceAttemptAsc(
             @Param("workspaceId") Long workspaceId,
             @Param("sourceType") UsageSourceType sourceType,
             @Param("sourceId") UUID sourceId);
 
-    @Query("SELECT e FROM LlmUsageEvent e WHERE e.workspace.id = :workspaceId AND e.sourceType IN"
+    @Query("SELECT e FROM LlmUsageEvent e WHERE e.workspaceId = :workspaceId AND e.sourceType IN"
             + " :sourceTypes AND e.sourceId = :sourceId ORDER BY e.sourceAttempt, e.occurredAt")
     List<LlmUsageEvent> findByWorkspaceIdAndSourceTypeInAndSourceIdOrderBySourceAttemptAsc(
             @Param("workspaceId") Long workspaceId,
@@ -158,7 +160,7 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
      * because one catalogue gap can leave a month's worth of rows behind it.
      */
     @WorkspaceAgnostic("Repricing pass enumerates the instance's unpriced spend across all tenants")
-    @Query("SELECT new de.tum.cit.aet.hephaestus.core.llm.usage.UnpricedLedgerRow(e.id, e.workspace.id, e.model,"
+    @Query("SELECT new de.tum.cit.aet.hephaestus.core.llm.usage.UnpricedLedgerRow(e.id, e.workspaceId, e.model,"
             + " e.fundingSource, e.inputTokens, e.outputTokens, e.cacheReadTokens, e.cacheWriteTokens, e.searchUnits,"
             + " e.appliedPriceId, e.appliedWorkspaceModelId, e.measurementVerification) FROM LlmUsageEvent e WHERE"
             + " e.occurredAt >= :from AND e.occurredAt < :to AND e.pricingState ="

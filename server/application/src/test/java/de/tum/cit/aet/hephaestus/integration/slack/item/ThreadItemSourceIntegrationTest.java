@@ -31,6 +31,12 @@ import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelR
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackParticipantConsentRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThread;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
+import de.tum.cit.aet.hephaestus.practices.review.model.Review;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewCompleted;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Membership;
@@ -43,8 +49,12 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.util.AopTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
 @Transactional
@@ -154,6 +164,11 @@ class ThreadItemSourceIntegrationTest extends BaseIntegrationTest {
         var fixture = fixture();
         var pinned = source.pin(fixture.item(), null);
         var workspace = workspaces.findById(fixture.item().workspaceId()).orElseThrow();
+        var original = connections
+                .findById(Objects.requireNonNull(pinned.integration().connectionId()))
+                .orElseThrow();
+        original.setState(IntegrationState.SUSPENDED);
+        connections.saveAndFlush(original);
         String otherTeam = "other-" + UUID.randomUUID();
         var other = new Connection(
                 workspace,
@@ -164,9 +179,66 @@ class ThreadItemSourceIntegrationTest extends BaseIntegrationTest {
         connections.saveAndFlush(other);
 
         assertThat(source.permits(fixture.item(), SourceUsePurpose.CONVERSATIONAL_MENTORING))
-                .isTrue();
-        assertThat(source.pin(fixture.item(), null).integration()).isEqualTo(pinned.integration());
-        assertThat(source.capture(pinned, request()).files()).containsKey(ThreadCaptureSource.OUTPUT_KEY);
+                .isFalse();
+        assertThat(source.current(fixture.item())).isEmpty();
+        assertThat(source.capture(pinned, request()).files()).doesNotContainKey(ThreadCaptureSource.OUTPUT_KEY);
+    }
+
+    @Autowired
+    private SlackThreadEventScheduler scheduler;
+
+    @Autowired
+    private ReviewRepository reviews;
+
+    @Autowired
+    private JdbcTemplate jdbc;
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void shouldAdvanceOnlyTheCompletedThreadVersionAndNeverRewind(boolean newerTurn) {
+        var fixture = fixture();
+        var pinned = source.pin(fixture.item(), null);
+        long workspaceId = fixture.item().workspaceId();
+        long threadId = Objects.requireNonNull(fixture.item().sourceId());
+        Instant at = Instant.now();
+        var review = reviews.saveAndFlush(Review.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(workspaceId)
+                .itemId(fixture.item().itemId())
+                .kind(ReviewKind.ITEM)
+                .itemVersion(pinned.version().value())
+                .origin(ReviewOrigin.EVENT)
+                .status(ReviewStatus.COMPLETE)
+                .orderedAt(at)
+                .createdAt(at)
+                .admittedAt(at)
+                .completedAt(at)
+                .build());
+        if (newerTurn) {
+            jdbc.update(
+                    "UPDATE slack_thread SET last_ts='1700000002.000000', message_count=3 WHERE workspace_id=? AND id=?",
+                    workspaceId,
+                    threadId);
+        }
+        SlackThreadEventScheduler listener = AopTestUtils.getUltimateTargetObject(scheduler);
+        listener.onReviewCompleted(new ReviewCompleted(review.getId(), workspaceId));
+        String watermark = jdbc.queryForObject(
+                "SELECT last_reviewed_ts FROM slack_thread WHERE workspace_id=? AND id=?",
+                String.class,
+                workspaceId,
+                threadId);
+        if (newerTurn) assertThat(watermark).isNull();
+        else {
+            assertThat(watermark).isEqualTo("1700000001.000000");
+            assertThat(threads.advanceReviewWatermark(workspaceId, threadId, "1700000000.000000"))
+                    .isZero();
+            assertThat(jdbc.queryForObject(
+                            "SELECT last_reviewed_ts FROM slack_thread WHERE workspace_id=? AND id=?",
+                            String.class,
+                            workspaceId,
+                            threadId))
+                    .isEqualTo("1700000001.000000");
+        }
     }
 
     private Fixture fixture() {

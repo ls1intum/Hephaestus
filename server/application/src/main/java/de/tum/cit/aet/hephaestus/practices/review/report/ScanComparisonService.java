@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.practices.result.ProblemRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ResultProofMapper;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewItemRepository;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
 import de.tum.cit.aet.hephaestus.practices.review.model.Review;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmittedProblemSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.Comparison;
@@ -32,7 +33,7 @@ public class ScanComparisonService {
     private final ResultRepository results;
     private final ResultProofMapper proof;
     private final ProblemComparison comparison;
-    private final ScanMembershipQuery queries;
+    private final ReviewRepository queries;
     private final ScanEvidencePolicy eligibility;
     private final ProblemRepository problems;
 

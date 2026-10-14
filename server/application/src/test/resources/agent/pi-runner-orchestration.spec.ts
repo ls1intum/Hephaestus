@@ -958,10 +958,9 @@ if (scenario !== undefined && scenario !== "") {
 			];
 		}
 
-		// The page's decision per practice; these scenarios exercise composition, so it admits unless a mode refuses.
-		const inAppDecision = new Map([
-			["cooldown", "RECENTLY_SURFACED"],
-			["inline", "UNCORROBORATED"],
+		const pageAdmission = new Map([
+			["cooldown", { decision: "RECENTLY_SURFACED", stopReason: "NOTHING_NEW" }],
+			["inline", { decision: "UNCORROBORATED", stopReason: "UNCORROBORATED" }],
 		]).get(supportMode ?? "");
 		const complete = {
 			state: "COMPLETE",
@@ -976,9 +975,9 @@ if (scenario !== undefined && scenario !== "") {
 						}),
 				),
 			].map((practiceSlug) =>
-				inAppDecision === undefined
-					? { practiceSlug, decision: "ADMIT", occurrences: selected }
-					: { practiceSlug, decision: inAppDecision, occurrences: [] },
+				pageAdmission === undefined
+					? { practiceSlug, decision: "ADMIT", stopReason: null, occurrences: selected }
+					: { practiceSlug, ...pageAdmission, occurrences: [] },
 			),
 		};
 		const chatRouting =
@@ -995,12 +994,21 @@ if (scenario !== undefined && scenario !== "") {
 								supportMode === "inline" ||
 								(supportMode === "first-inline" && row.practiceSlug === "test-practice");
 							let decision = "ADMIT";
+							let stopReason: string | null = null;
 							if (supportMode === "mentor-unavailable") {
 								decision = "MENTOR_UNAVAILABLE";
+								stopReason = "RECIPIENT_UNAVAILABLE";
 							} else if (inline) {
 								decision = "HAS_INLINE_ANCHOR";
+								stopReason = "NOTHING_NEW";
 							}
-							return [{ resultId: row.resultId, decision }];
+							return [
+								{
+									resultId: row.resultId,
+									decision,
+									stopReason,
+								},
+							];
 						}),
 					};
 		let support: unknown = complete;
@@ -1019,6 +1027,7 @@ if (scenario !== undefined && scenario !== "") {
 					{
 						practiceSlug: "test-practice",
 						decision: "ADMIT",
+						stopReason: null,
 						occurrences: [{ ...supportOccurrence("scm.issue", 1), practiceVersionId: "unknown" }],
 					},
 				],
@@ -1181,7 +1190,7 @@ if (scenario !== undefined && scenario !== "") {
 						const slug = sessionNumber === 1 ? "test-practice" : "second-practice";
 						const batchCorrection = scenario === "scope-native-batch-correction";
 						const readCorrection = scenario === "scope-native-read-correction";
-						const refusedRevision = scenario === "scope-native-revision" || readCorrection;
+						const refusedRevision = scenario === "scope-native-commit" || readCorrection;
 
 						const content: Awaited<ReturnType<NativeStream["result"]>>["content"] = [];
 						if (requests === 1) {
@@ -1203,13 +1212,13 @@ if (scenario !== undefined && scenario !== "") {
 								),
 							);
 							if (sessionNumber === 1) {
-								content.push(submitCall("revision", notMet("Revised within the batch")));
+								content.push(submitCall("commit", notMet("Revised within the batch")));
 							} else if (batchCorrection) {
 								content.push(submitCall("same-batch-correction", notMet(`Corrected ${slug}`)));
 							} else if (refusedRevision) {
 								content.push(
 									submitCall(
-										"bad-revision",
+										"bad-commit",
 										notMet("Unverified correction", {
 											...changeCitation,
 											quote: "+ notCaptured();",
@@ -1633,7 +1642,7 @@ if (scenario !== undefined && scenario !== "") {
 									// A whole review is refused, and then the response ends while its auto-compaction
 									// remains busy until the deadline: no final review is ever stored.
 									const refused = await review
-										.execute("r-d", {})
+										.execute("r-d", { decisions: [] })
 										.catch((error: unknown) =>
 											error instanceof Error ? error.message : String(error),
 										);
@@ -1713,7 +1722,7 @@ if (scenario !== undefined && scenario !== "") {
 										decisions: [{ resultId: "result-1", disposition: "RAISE" }],
 										summary: { body: REVIEW_SUMMARY, basedOn: ["result-1"] },
 									};
-									const decidesNothing = {};
+									const decidesNothing = { decisions: [] };
 									record(`invalid-report:${await native("report_review", "r-1", decidesNothing)}`);
 									const before = steered.length;
 									record(`invalid-again:${await native("report_review", "r-1b", decidesNothing)}`);
@@ -1724,7 +1733,7 @@ if (scenario !== undefined && scenario !== "") {
 								}
 								if (scenario === "compose-recover") {
 									// A whole review is refused and the response ends without a final one.
-									record(`recover-refused:${await attempt("r-r", {})}`);
+									record(`recover-refused:${await attempt("r-r", { decisions: [] })}`);
 									return;
 								}
 								if (scenario === "compose-qualify" && reviewCompacted) {
@@ -1791,7 +1800,7 @@ if (scenario !== undefined && scenario !== "") {
 										summary: { body: REVIEW_SUMMARY, basedOn: ["result-1"] },
 									};
 									await this.steer();
-									record(`reselect-incomplete:${await attempt("r-0", {})}`);
+									record(`reselect-incomplete:${await attempt("r-0", { decisions: [] })}`);
 									record(`reselect-before-final:${JSON.stringify(await this.agent.finishTurn())}`);
 									record(`reselect-retained:${this.pendingMessageCount}`);
 									record(
@@ -1973,7 +1982,7 @@ if (scenario !== undefined && scenario !== "") {
 									}
 									return;
 								}
-								if (scenario === "draft-revision") {
+								if (scenario === "draft-commit") {
 									assert.ok(!options.customTools.some((item) => item.name === "submit_result"));
 									assert.ok(measuredTool);
 									const before = [stateText(), notesText()];
@@ -2410,7 +2419,7 @@ if (scenario !== undefined && scenario !== "") {
 								return;
 							}
 							if (
-								(scenario === "batch" || scenario === "draft-revision") &&
+								(scenario === "batch" || scenario === "draft-commit") &&
 								currentSlug === "second-practice"
 							) {
 								await report.execute(
@@ -2525,17 +2534,17 @@ if (scenario !== undefined && scenario !== "") {
 								record("citation:refused");
 								await cite("src/Auth.java", "insecure();");
 								record("citation:stored");
-								// A citation at a revision in the history is read through .git; a wrong line is
-								// corrected there too, and an unknown revision is refused.
+								// A citation at a commit in the history is read through .git; a wrong line is
+								// corrected there too, and an unknown commit is refused.
 								const historySha = readFileSync(nodePath.join(cwd, "history-sha"), "utf8");
-								const atRevision = async (revision: string, startLine: number) =>
+								const atRevision = async (commit: string, startLine: number) =>
 									report.execute(
 										"o-2",
-										notMet(`Cited at revision line ${startLine}`, {
+										notMet(`Cited at commit line ${startLine}`, {
 											sourceKind: "scm.repository.tree",
 											sourcePath: "repos/primary/.git/HEAD",
 											path: "src/Auth.java",
-											revision,
+											commit,
 											startLine,
 											quote: "insecure();",
 										}),
@@ -2544,7 +2553,7 @@ if (scenario !== undefined && scenario !== "") {
 								record(
 									`citation:history:${typeof relocated === "object" && relocated !== null && "details" in relocated && typeof relocated.details === "object" && relocated.details !== null && "revised" in relocated.details ? String(relocated.details.revised) : "?"}`,
 								);
-								await assert.rejects(atRevision("b".repeat(40), 2), /no such file at revision/u);
+								await assert.rejects(atRevision("b".repeat(40), 2), /no such file at commit/u);
 								record("citation:history-refused");
 								await assert.rejects(cite("src/Auth.java", "", "Cited by line alone"), /quote/u);
 								record("citation:no-quote-refused");
@@ -2612,7 +2621,7 @@ if (scenario !== undefined && scenario !== "") {
 								const nullableCitation = {
 									...changeCitation,
 									side: null,
-									revision: null,
+									commit: null,
 									endLine: null,
 									quote: null,
 								};
@@ -2651,7 +2660,7 @@ if (scenario !== undefined && scenario !== "") {
 								assert.equal(reply.details.refused, 0);
 								return;
 							}
-							if (scenario === "draft-revision") {
+							if (scenario === "draft-commit") {
 								const positive = met("Authentication call goes through the helper");
 								const negative = notMet("Authentication call is insecure");
 								await assert.rejects(
@@ -2861,7 +2870,7 @@ if (scenario !== undefined && scenario !== "") {
 										sourcePath: "evidence/metadata.json",
 										path: "evidence/metadata.json",
 										side: "NEW",
-										revision: "c".repeat(40),
+										commit: "c".repeat(40),
 										startLine: 1,
 										quote: '"title": "Add login"',
 									}),
@@ -2924,7 +2933,7 @@ if (scenario !== undefined && scenario !== "") {
 } else {
 	for (const fixture of [
 		"scope-native-completion",
-		"scope-native-revision",
+		"scope-native-commit",
 		"scope-native-batch-correction",
 		"scope-native-read-correction",
 		"scope-cut-off",
@@ -2958,7 +2967,7 @@ if (scenario !== undefined && scenario !== "") {
 		"batch",
 		"replacement-witness",
 		"comment-undecided",
-		"draft-revision",
+		"draft-commit",
 		"argument-repairs",
 		"finish",
 		"natural-stop",
@@ -3062,12 +3071,12 @@ if (scenario !== undefined && scenario !== "") {
 			{
 				"scope-native-completion":
 					"native mixed report and read ends each recorded practice before another model request",
-				"scope-native-revision":
-					"native refused revision stays open until corrected while same-batch valid revision settles",
+				"scope-native-commit":
+					"native refused commit stays open until corrected while same-batch valid commit settles",
 				"scope-native-batch-correction":
 					"native same-batch correction closes after the final successful report",
 				"scope-native-read-correction":
-					"native refused revision stays unresolved through a read-only turn until corrected",
+					"native refused commit stays unresolved through a read-only turn until corrected",
 				"scope-cut-off":
 					"a truncated response in a prior practice does not consume the next session's correction chance",
 				"scope-recording-guard":
@@ -3119,7 +3128,7 @@ if (scenario !== undefined && scenario !== "") {
 					"repairs result transport without accepting a false quote or an overlong range",
 				batch:
 					"normalizes corrections, refuses a non-root result and binds a result naming another practice to the session's own",
-				"draft-revision":
+				"draft-commit":
 					"replaces a draft only with a later valid complete submission, and refuses a submission after measurement closed",
 				"replacement-witness": "refuses a replacement that relies on its superseded diff witness",
 				"comment-undecided":
@@ -3287,7 +3296,7 @@ if (scenario !== undefined && scenario !== "") {
 						symlinkSync(LIB, nodePath.join(cwd, nodePath.dirname(PRACTICES_DIR), "lib"));
 						writeFileSync(nodePath.join(cwd, PRACTICES_DIR, "test-practice.ts"), LEADS_PROGRAM);
 					}
-					if (stage.startsWith("compose") || stage === "draft-revision") {
+					if (stage.startsWith("compose") || stage === "draft-commit") {
 						const onWorkCopyForms = stage === "compose-continuation" ? [] : ["FILE_NOTE"];
 						if (stage === "compose" || stage === "compose-foreign-provider") {
 							onWorkCopyForms.push("LINE_NOTE");
@@ -3330,7 +3339,7 @@ if (scenario !== undefined && scenario !== "") {
 						);
 					}
 					if (stage === "tree-citation") {
-						// A real checkout with one commit in its history, so a citation at a revision is read
+						// A real checkout with one commit in its history, so a citation at a commit is read
 						// through .git like admission reads it.
 						mkdirSync(nodePath.join(cwd, "repos/primary/src"), { recursive: true });
 						writeFileSync(
@@ -3392,19 +3401,19 @@ if (scenario !== undefined && scenario !== "") {
 							sources: [
 								{
 									kind: "scm.pull-request.core",
-									citation: { side: "FORBIDDEN", revision: "FORBIDDEN" },
+									citation: { side: "FORBIDDEN", commit: "FORBIDDEN" },
 									state: { availability: "AVAILABLE" },
 									files: [{ path: "evidence/metadata.json" }],
 								},
 								{
 									kind: "scm.pull-request.diff",
-									citation: { side: "REQUIRED", revision: "OPTIONAL" },
+									citation: { side: "REQUIRED", commit: "OPTIONAL" },
 									state: { availability: "AVAILABLE" },
 									files: [{ path: "evidence/change.json" }],
 								},
 								{
 									kind: "scm.repository.tree",
-									citation: { side: "FORBIDDEN", revision: "OPTIONAL" },
+									citation: { side: "FORBIDDEN", commit: "OPTIONAL" },
 									state: { availability: "AVAILABLE" },
 									files: [
 										{ path: "repos/primary/.git/HEAD" },
@@ -3426,7 +3435,7 @@ if (scenario !== undefined && scenario !== "") {
 						stage === "settle-safety" ||
 						stage === "session-init" ||
 						stage === "batch" ||
-						stage === "draft-revision" ||
+						stage === "draft-commit" ||
 						stage === "compose-fold" ||
 						stage === "compose-already-said" ||
 						stage === "compose-qualify" ||
@@ -3773,7 +3782,7 @@ if (scenario !== undefined && scenario !== "") {
 					}
 					switch (stage) {
 						case "scope-native-completion":
-						case "scope-native-revision":
+						case "scope-native-commit":
 						case "scope-native-batch-correction":
 						case "scope-native-read-correction": {
 							assert.equal(child.status, 0, child.stderr);
@@ -3782,7 +3791,7 @@ if (scenario !== undefined && scenario !== "") {
 								[
 									"native-request:1:1",
 									"native-request:2:1",
-									...(stage === "scope-native-revision" || stage === "scope-native-read-correction"
+									...(stage === "scope-native-commit" || stage === "scope-native-read-correction"
 										? ["native-request:2:2"]
 										: []),
 									...(stage === "scope-native-read-correction" ? ["native-request:2:3"] : []),
@@ -4260,7 +4269,7 @@ for (const item of [
 }
 // Nullable absence is valid for every outcome, including a provider that requires all declared fields.
 const absent = { search: null, inapplicability: null, openQuestions: null };
-const withoutQuote = { ...citation, side: null, revision: null, endLine: null, quote: null };
+const withoutQuote = { ...citation, side: null, commit: null, endLine: null, quote: null };
 const nulls = { problems: null, example: null };
 const nullableCases = [
   { ...base, example: null, problems: [{ ...problem, key: null, nextStep: null, citations: [withoutQuote] }], evidence: absent },
@@ -4281,7 +4290,7 @@ for (const value of ["", false, true, 0, []]) {
   }
 }
 for (const [field, invalid] of [
-  ["side", ["", false]], ["revision", ["", false]], ["endLine", ["", false]], ["quote", [false, 0]],
+  ["side", ["", false]], ["commit", ["", false]], ["endLine", ["", false]], ["quote", [false, 0]],
 ]) {
   for (const value of invalid) {
     assert.throws(() => validate({ ...base, problems: [{ ...problem, citations: [{ ...citation, [field]: value }] }] }));
@@ -4340,7 +4349,7 @@ for (const item of nullableCases) {
 							reached({ "test-practice": "EVALUATED" });
 							break;
 						}
-						case "draft-revision": {
+						case "draft-commit": {
 							assert.equal(child.status, 0, child.stderr);
 							assert.match(
 								events.find((event) => event.startsWith("draft-first:")) ?? "",
@@ -4768,7 +4777,7 @@ for (const item of nullableCases) {
 									sourceKind: "scm.repository.tree",
 									sourcePath: "repos/primary/.git/HEAD",
 									path: "src/Auth.java",
-									revision: readFileSync(nodePath.join(cwd, "history-sha"), "utf8"),
+									commit: readFileSync(nodePath.join(cwd, "history-sha"), "utf8"),
 									startLine: 2,
 									endLine: 2,
 									quote: "insecure();",

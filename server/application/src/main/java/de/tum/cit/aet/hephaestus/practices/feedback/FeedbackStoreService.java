@@ -13,8 +13,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheckStage;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCompositionContext;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyState;
-import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDecisionAction;
-import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDecisionReason;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDecisionInput;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDraft;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackResolution;
@@ -163,15 +162,8 @@ public class FeedbackStoreService implements FeedbackStore {
     }
 
     @Override
-    public void decide(
-            long workspaceId,
-            UUID feedbackId,
-            long actorId,
-            FeedbackDecisionAction action,
-            @Nullable FeedbackDecisionReason reason,
-            @Nullable String note,
-            @Nullable String contentDigest) {
-        decisions.decide(workspaceId, feedbackId, actorId, action, reason, note, contentDigest);
+    public void decide(long workspaceId, UUID feedbackId, long actorId, FeedbackDecisionInput input) {
+        decisions.decide(workspaceId, feedbackId, actorId, input);
     }
 
     @Override

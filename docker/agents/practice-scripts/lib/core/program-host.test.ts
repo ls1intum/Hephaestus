@@ -157,7 +157,7 @@ async function run(ws: Workspace, slug: string, options: RunOptions = {}) {
 			slug,
 			inputs: read.inputs,
 			files: {
-				head: { revision: HEAD },
+				head: { commit: HEAD },
 				change: { base: BASE, head: HEAD, files: new Map(CHANGE) },
 			},
 			now: "2026-01-01T00:00:00Z",

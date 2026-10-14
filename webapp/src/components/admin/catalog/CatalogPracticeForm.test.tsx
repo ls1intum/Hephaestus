@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { CatalogPractice } from "@/api/types.gen";
-import type { PracticeDefinitionValue } from "@/components/admin/practice-editor/PracticeDefinitionForm";
+import type { PracticeDefinitionSubmission } from "@/components/admin/practice-editor/PracticeDefinitionForm";
 import { buttonVariants } from "@/components/ui/button";
 import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
 import { renderWithRouter } from "@/test/router-harness";
@@ -22,7 +22,7 @@ async function renderForm(
 	practice: CatalogPractice,
 	props: { conflict?: boolean; releaseReview?: ReactNode } = {},
 ) {
-	const onSubmit = vi.fn<(value: PracticeDefinitionValue) => void>();
+	const onSubmit = vi.fn<(value: PracticeDefinitionSubmission) => void>();
 	const onUseHephaestusVersion = vi.fn<() => void>();
 	await renderWithRouter(
 		<CatalogPracticeForm

@@ -687,9 +687,9 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
         if (identities.isEmpty()) return List.of();
         return controls.query(
                 """
-                SELECT DISTINCT p.type,p.server_url,s.subject,NULLIF(s.team_key,'')
-                FROM person_suppression s JOIN identity_provider p ON p.id=s.provider_id
-                WHERE s.subject=ANY(?)
+                SELECT DISTINCT p.type,p.server_url,s.provider_user_key,NULLIF(s.team_key,'')
+                FROM identity_restriction s JOIN identity_provider p ON p.id=s.provider_id
+                WHERE s.kind='ERASED' AND s.provider_user_key=ANY(?)
                 """,
                 (rs, row) -> new PersonCopyIdentity(
                         Objects.requireNonNull(rs.getString(1)), Objects.requireNonNull(rs.getString(2)),

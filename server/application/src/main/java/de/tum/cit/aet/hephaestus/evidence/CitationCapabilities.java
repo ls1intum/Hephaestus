@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.evidence;
 
 import java.util.Objects;
 
-public record CitationCapabilities(CitationRequirement side, CitationRequirement revision) {
+public record CitationCapabilities(CitationRequirement side, CitationRequirement commit) {
     public CitationCapabilities {
         Objects.requireNonNull(side, "side");
-        Objects.requireNonNull(revision, "revision");
+        Objects.requireNonNull(commit, "commit");
     }
 }

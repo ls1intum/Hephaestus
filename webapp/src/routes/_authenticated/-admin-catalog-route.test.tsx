@@ -6,7 +6,7 @@ import type {
 	CatalogGroup,
 	CatalogPractice,
 	CatalogPracticeInput,
-	CatalogPracticeReleaseProposal,
+	PracticeReleaseProposal,
 } from "@/api/types.gen";
 import {
 	catalogGroup,
@@ -28,7 +28,8 @@ const delivery = catalogGroup({ slug: "delivery", position: 1, name: "Delivery" 
 const definition = catalogPracticeDefinition({ criteria: "Our own criteria" });
 const savedPractice = catalogPractice({ groupSlug: "packaging", definition });
 
-const release: CatalogPracticeReleaseProposal = {
+const release: PracticeReleaseProposal = {
+	currentVersionId: null,
 	practiceSlug: savedPractice.slug,
 	base: { ...definition, criteria: "Earlier criteria" },
 	current: definition,
@@ -163,7 +164,6 @@ describe("instance catalog routes", () => {
 		await waitFor(() => expect(body).toBeDefined());
 		expect(ifMatch).toBe('"tag-1"');
 		expect(body).toStrictEqual({
-			slug: guided.slug,
 			kind: guided.kind,
 			groupSlug: "packaging",
 			position: null,
@@ -554,7 +554,7 @@ describe("instance catalog routes", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Accept selected fields" }));
 
 		await waitFor(() => expect(ifMatch).toBe('"release-tag"'));
-		expect(body).toStrictEqual({ choices: [{ field: "CRITERIA", source: "OFFERED" }] });
+		expect(body).toStrictEqual({ choices: { CRITERIA: "OFFERED" } });
 	});
 
 	it("refreshes the practice when a release decision is stale", async () => {
@@ -570,7 +570,7 @@ describe("instance catalog routes", () => {
 					),
 					http.get(`${PRACTICE_PATH}/release`, () => new HttpResponse(null, { status: 404 })),
 				);
-				return HttpResponse.json({ status: 409, title: "Stale" }, { status: 409 });
+				return HttpResponse.json({ status: 412, title: "Stale" }, { status: 412 });
 			}),
 		);
 		renderRouteAt("/admin/catalog?detail=practice-edit:describe-what-and-why");
@@ -600,7 +600,7 @@ describe("instance catalog routes", () => {
 		let ifMatch: string | null = null;
 		server.use(
 			http.get(`${PRACTICE_PATH}/release`, () => HttpResponse.json(release)),
-			http.delete(`${PRACTICE_PATH}/release`, ({ request }) => {
+			http.put(`${PRACTICE_PATH}/override/acknowledgement`, ({ request }) => {
 				ifMatch = request.headers.get("if-match");
 				return HttpResponse.json({ ...savedPractice, state: "EDITED_HERE", etag: "tag-2" });
 			}),
@@ -654,7 +654,7 @@ describe("instance catalog routes", () => {
 				({ request }) => {
 					lastIfMatch = request.headers.get("if-match");
 					currentEtag = "tag-2";
-					return HttpResponse.json({ status: 409, title: "Stale" }, { status: 409 });
+					return HttpResponse.json({ status: 412, title: "Stale" }, { status: 412 });
 				},
 				{ once: true },
 			),

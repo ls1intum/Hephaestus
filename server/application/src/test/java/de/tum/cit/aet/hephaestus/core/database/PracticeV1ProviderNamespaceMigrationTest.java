@@ -1,7 +1,9 @@
 package de.tum.cit.aet.hephaestus.core.database;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.sql.SQLException;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -50,5 +52,69 @@ class PracticeV1ProviderNamespaceMigrationTest {
                 .containsExactly(
                         "https://docs.namespace.example|person-1||ERASED",
                         "https://docs.namespace.example:443/|person-1||ERASED");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"dev", "prod"})
+    void shouldRemoveGuessedGitLabApprovalHeadsAndRetainGitHubApprovedCommits(String context) throws Exception {
+        var database = PracticeMigrationFixture.releasedDatabase(context);
+        PracticeMigrationFixture.execute(database, """
+            INSERT INTO identity_provider(id,type,server_url)
+            VALUES(999920,'GITLAB','https://gitlab.approval.example');
+            INSERT INTO repository(id,native_id,provider_id,name,name_with_owner,is_archived,is_disabled,is_private,has_discussions_enabled)
+            VALUES(999921,421,999920,'project','approval/project',false,false,false,false);
+            INSERT INTO issue(id,native_id,provider_id,issue_type,number,repository_id,title,comments_count,is_locked,created_at)
+            VALUES(999922,422,999920,'PULL_REQUEST',1,999921,'Explain approval',0,false,'2026-01-01');
+            INSERT INTO pull_request_review(id,native_id,provider_id,pull_request_id,state,is_dismissed,commit_id,body,submitted_at)
+            VALUES(999923,423,999920,999922,'APPROVED',false,repeat('a',40),'Reviewed the change.','2026-01-02'),
+                  (999924,424,992102,992109,'APPROVED',false,repeat('b',40),'Reviewed the change.','2026-01-02');
+            """);
+        String facts = "SELECT (to_jsonb(r)-'commit_id')::text FROM pull_request_review r"
+                + " WHERE id IN (999923,999924) ORDER BY id";
+        var before = PracticeMigrationFixture.column(database, facts);
+        PracticeMigrationFixture.upgrade(database, context);
+        assertThat(PracticeMigrationFixture.column(database, facts)).isEqualTo(before);
+        assertThat(PracticeMigrationFixture.column(database, """
+            SELECT id || '|' || coalesce(commit_id,'unknown') FROM pull_request_review
+            WHERE id IN (999923,999924) ORDER BY id
+            """))
+                .containsExactly("999923|unknown", "999924|" + "b".repeat(40));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"dev", "prod"})
+    void shouldPreserveReleasedProtocolsAndPermitAllCurrentLlmWireProtocols(String context) throws Exception {
+        var database = PracticeMigrationFixture.releasedDatabase(context);
+        PracticeMigrationFixture.execute(database, """
+            INSERT INTO llm_connection(id,slug,display_name,base_url,api_protocol,created_at)
+            VALUES(999931,'released-chat','Released chat','https://llm.example','openai-completions','2026-01-01'),
+                  (999932,'released-responses','Released responses','https://llm.example','openai-responses','2026-01-01');
+            """);
+        String facts = "SELECT to_jsonb(c)::text FROM llm_connection c WHERE id IN (999931,999932) ORDER BY id";
+        var before = PracticeMigrationFixture.column(database, facts);
+        PracticeMigrationFixture.upgrade(database, context);
+        assertThat(PracticeMigrationFixture.column(database, facts)).isEqualTo(before);
+        PracticeMigrationFixture.execute(database, """
+            INSERT INTO llm_connection(id,slug,display_name,base_url,api_protocol,created_at)
+            VALUES(999933,'native-decisions','Decisions','https://llm.example','openai-decisions',now()),
+                  (999934,'native-embeddings','Embeddings','https://llm.example','openai-embeddings',now()),
+                  (999935,'native-rerank','Rerank','https://llm.example','cohere-rerank',now());
+            """);
+        assertThat(PracticeMigrationFixture.column(database, """
+            SELECT api_protocol FROM llm_connection WHERE id BETWEEN 999931 AND 999935 ORDER BY id
+            """))
+                .containsExactly(
+                        "openai-completions",
+                        "openai-responses",
+                        "openai-decisions",
+                        "openai-embeddings",
+                        "cohere-rerank");
+        assertThatThrownBy(() -> PracticeMigrationFixture.execute(database, """
+            UPDATE llm_connection SET api_protocol='unsupported' WHERE id=999933
+            """))
+                .rootCause()
+                .isInstanceOfSatisfying(
+                        SQLException.class,
+                        exception -> assertThat(exception.getSQLState()).isEqualTo("23514"));
     }
 }

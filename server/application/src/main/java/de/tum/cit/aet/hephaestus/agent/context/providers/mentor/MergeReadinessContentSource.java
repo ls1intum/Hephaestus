@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.context.WorkspaceScmProjection;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.CheckState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
@@ -428,7 +429,7 @@ public class MergeReadinessContentSource implements ContentSource {
             BiPredicate<T, Boolean> visitor) {
         for (int read = 0; read < SCAN_BUDGET; read += SCAN_PAGE) {
             List<T> rows = page.apply(PageRequest.of(read / SCAN_PAGE, SCAN_PAGE));
-            var receipts = deliveredComments.findForPullRequest(workspaceId, pullRequestId);
+            var receipts = deliveredComments.findForPullRequest(workspaceId, pullRequestId, ScmItemEvents.PULL_REQUEST);
             var posted = inline ? receipts.inline() : receipts.general();
             for (T row : rows) {
                 if (!visitor.test(row, posted.contains(nativeId.apply(row)))) {

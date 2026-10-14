@@ -68,7 +68,7 @@ final class CandidateWireMapper {
             @JsonProperty(required = true) String sourcePath,
             @JsonProperty(required = true) String path,
             @Nullable CitationSide side,
-            @Nullable String revision,
+            @Nullable String commit,
             @JsonProperty(required = true) int startLine,
             @JsonProperty(required = true) int endLine,
             @JsonProperty(required = true) String quote,

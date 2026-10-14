@@ -17,7 +17,6 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,7 +29,7 @@ public class ReviewScheduleService {
     private final ProductReferenceQuery references;
     private final ConfigAuditPort audit;
     private final Clock clock;
-    private final JdbcClient jdbc;
+    private final ReviewBatchRepository batchRows;
 
     public ReviewSchedule require(long ws, UUID id) {
         return schedules
@@ -110,12 +109,7 @@ public class ReviewScheduleService {
     public void delete(WorkspaceContext ws, UUID id, @Nullable EntityTagPrecondition precondition) {
         var s = require(ws.id(), id);
         ReviewBatchService.checkVersion(s.getVersion(), precondition);
-        if (jdbc.sql("SELECT count(*) FROM review_batch WHERE workspace_id=:ws AND schedule_id=:id")
-                        .param("ws", ws.id())
-                        .param("id", id)
-                        .query((rs, n) -> rs.getLong(1))
-                        .single()
-                > 0)
+        if (batchRows.existsByWorkspaceIdAndScheduleId(ws.id(), id))
             throw new ReviewScheduleConflictException(
                     "This schedule has review history. Disable it to stop new reviews.");
         audit.record(ConfigAuditEntry.deleted(

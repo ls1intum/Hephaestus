@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionRepository;
@@ -19,6 +18,7 @@ import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageProvenance;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
@@ -80,6 +80,9 @@ class ReviewJobStaleReapIntegrationTest extends BaseIntegrationTest {
     private ReviewJobRepository jobRepository;
 
     @Autowired
+    private ReviewRuntimeRepository runtime;
+
+    @Autowired
     private LlmUsageEventRepository usageEventRepository;
 
     @Autowired
@@ -119,6 +122,62 @@ class ReviewJobStaleReapIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void runtimeReadsKeepReviewWorkspaceAndPricingBoundaries() {
+        UUID id = staleRunningJob(readableSnapshot(), withProxyUsage());
+        var job = jobRepository.findById(id).orElseThrow();
+        var other = workspaceRepository.save(TestEntities.activeWorkspace("other-runtime-ws"));
+        var now = Instant.now();
+        assertThat(runtime.queueCounts(workspace.getId(), now).running()).isEqualTo(1);
+        assertThat(runtime.queueCounts(other.getId(), now).running()).isZero();
+        assertThat(runtime.timingJobs(workspace.getId(), List.of(job.getReviewId())))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.reviewId()).isEqualTo(job.getReviewId());
+                    assertThat(row.status()).isEqualTo(ReviewJobStatus.RUNNING);
+                    assertThat(row.completedAt()).isNull();
+                });
+        assertThat(runtime.timingJobs(other.getId(), List.of(job.getReviewId())))
+                .isEmpty();
+        assertThat(runtime.spent(workspace.getId(), job.getReviewId()))
+                .isEqualTo(new ReviewRuntimeRepository.Spend(BigDecimal.ZERO, true));
+        sweeper.reapStaleRunningJobs();
+        assertThat(runtime.unsettledJobIds(workspace.getId(), job.getReviewId()))
+                .containsExactly(id);
+        assertThat(runtime.unsettledJobIds(other.getId(), job.getReviewId())).isEmpty();
+        assertThat(runtime.usage(workspace.getId(), job.getReviewId()))
+                .singleElement()
+                .satisfies(usage -> {
+                    assertThat(usage.jobId()).isEqualTo(id);
+                    assertThat(usage.calls()).isEqualTo(3);
+                    assertThat(usage.inputTokens()).isEqualTo(900);
+                    assertThat(usage.outputTokens()).isEqualTo(400);
+                    assertThat(usage.costUsd()).isEqualByComparingTo(BigDecimal.ZERO);
+                    assertThat(usage.pricingState()).isEqualTo(UsagePricingState.NO_CHARGE);
+                });
+        assertThat(runtime.usage(other.getId(), job.getReviewId())).isEmpty();
+    }
+
+    @Test
+    void captureWritesRequireTheWorkspaceWorkerAndCurrentRunningAttempt() {
+        UUID id = staleRunningJob(readableSnapshot(), withProxyUsage());
+        var job = jobRepository.findById(id).orElseThrow();
+        var stamp = objectMapper.createObjectNode().put("inputsDigest", "a".repeat(64));
+        var other = workspaceRepository.save(TestEntities.activeWorkspace("other-capture-ws"));
+        transactionTemplate.executeWithoutResult(status -> {
+            assertThat(jobRepository.updateCapture(id, other.getId(), job.getWorkerId(), job.getAttempt(), stamp))
+                    .isZero();
+            assertThat(jobRepository.updateCapture(id, workspace.getId(), "another-worker", job.getAttempt(), stamp))
+                    .isZero();
+            assertThat(jobRepository.updateCapture(
+                            id, workspace.getId(), job.getWorkerId(), job.getAttempt() + 1, stamp))
+                    .isZero();
+            assertThat(jobRepository.updateCapture(id, workspace.getId(), job.getWorkerId(), job.getAttempt(), stamp))
+                    .isEqualTo(1);
+        });
+        assertThat(jobRepository.findById(id).orElseThrow().getCapture()).isEqualTo(stamp);
+    }
+
+    @Test
     @DisplayName("a genuinely stale RUNNING job reaches TIMED_OUT and its ledger event is committed with it")
     void staleRunningJobIsTimedOutAndBilled() {
         // Past the work timeout, upload grace, and stale-job safety buffer.
@@ -133,7 +192,7 @@ class ReviewJobStaleReapIntegrationTest extends BaseIntegrationTest {
         LlmUsageEvent event = onlyUsageEvent(jobId);
         assertThat(event.getSourceId()).isEqualTo(jobId);
         assertThat(event.getSourceType()).isEqualTo(UsageSourceType.REVIEW_JOB);
-        assertThat(event.getWorkspace().getId()).isEqualTo(workspace.getId());
+        assertThat(event.getWorkspaceId()).isEqualTo(workspace.getId());
         assertThat(event.getInputTokens()).isEqualTo(900L);
         assertThat(event.getOutputTokens()).isEqualTo(400L);
         assertThat(event.getTotalCalls()).isEqualTo(3);

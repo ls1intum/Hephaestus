@@ -331,6 +331,8 @@ They check text from variables, prompts, diagrams, and user-facing server messag
 4. Run `vp run gate:prose` and the scoped checks for that tree.
 
 The gate compares the list with the base branch and rejects removal.
+The gate follows Git-detected renames with at least 40% content similarity when the new path remains enforced.
+A deletion or a rename to a path outside the list still fails.
 
 A UI file needs no entry, because the lint configuration of each tree covers it.
 Run `vp -C webapp lint <path>` or `vp -C extension lint <path>` with a path relative to that tree.

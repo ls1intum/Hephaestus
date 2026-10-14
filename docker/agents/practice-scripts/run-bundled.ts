@@ -308,7 +308,7 @@ export async function runBundledProgram(slug: string, inputs: RunInputs = {}): P
 				files:
 					parsed.kind === "scm.pull_request" || parsed.kind === "scm.file"
 						? {
-								head: { revision: COMMIT },
+								head: { commit: COMMIT },
 								change:
 									change === null
 										? null

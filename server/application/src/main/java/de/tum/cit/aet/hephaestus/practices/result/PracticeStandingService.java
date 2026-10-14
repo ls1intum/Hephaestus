@@ -33,7 +33,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
@@ -50,10 +49,9 @@ public class PracticeStandingService {
 
     private static final int MAX_STRENGTHS_PER_PRACTICE = 3;
 
-    private final ResultReadQuery resultReadQuery;
     private final ResultViewQuery resultViewQuery;
     private final JsonMapper json;
-    private final JdbcClient jdbc;
+    private final ResultRepository results;
     private final CurrentDeveloperLookup currentDeveloperLookup;
     private final ResultVisibilityPolicy visibilityPolicy;
     private final PracticeRepository practiceRepository;
@@ -87,7 +85,7 @@ public class PracticeStandingService {
         Instant until = Collections.max(edges);
         // Verdictless results distinguish NO_OPPORTUNITY from NOT_OBSERVED.
         List<ResultView> window = resultViewQuery
-                .views(workspaceId, resultReadQuery.forDevelopersSince(workspaceId, List.of(developerId), since, false))
+                .views(workspaceId, results.forDevelopersSince(workspaceId, List.of(developerId), since, false))
                 .stream()
                 .filter(v -> !v.result().getRecordedAt().isAfter(until))
                 .toList();
@@ -370,21 +368,9 @@ public class PracticeStandingService {
     // Practice-page feedback covers several items and cannot describe guidance for one result.
     private Map<UUID, String> deliveredGuidanceByResult(Long ws, Set<UUID> ids) {
         if (ids.isEmpty()) return Map.of();
-        return jdbc
-                .sql("""
-                    SELECT DISTINCT ON (b.result_id) b.result_id,f.body FROM feedback_basis b JOIN feedback f
-                      ON f.id=b.feedback_id AND f.workspace_id=b.workspace_id
-                    WHERE b.workspace_id=:ws AND b.result_id IN (:ids) AND f.state='DELIVERED'
-                      AND f.destination IN ('ON_WORK','CONVERSATION') AND f.body IS NOT NULL
-                      AND NOT COALESCE((SELECT d.action='WITHDRAW' FROM feedback_decision d WHERE d.workspace_id=f.workspace_id AND d.feedback_id=f.id AND d.action IN ('WITHDRAW','RESTORE') ORDER BY d.decided_at DESC,d.id::text DESC LIMIT 1),false)
-                    ORDER BY b.result_id,f.delivered_at DESC,f.id::text DESC
-                    """)
-                .param("ws", ws)
-                .param("ids", ids)
-                .query((rs, n) -> Map.entry(rs.getObject(1, UUID.class), rs.getString(2)))
-                .list()
-                .stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        return results.deliveredGuidance(ws, ids).stream()
+                .collect(Collectors.toMap(
+                        ResultRepository.DeliveredGuidance::getResultId, ResultRepository.DeliveredGuidance::getBody));
     }
 
     private static final int UNRANKED = Integer.MAX_VALUE;

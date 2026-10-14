@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -15,6 +16,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.DeliveredPullRequestCommentLookup;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -55,7 +57,7 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         lenient()
-                .when(deliveredCommentLookup.findForPullRequest(anyLong(), anyLong()))
+                .when(deliveredCommentLookup.findForPullRequest(anyLong(), anyLong(), eq(ScmItemEvents.PULL_REQUEST)))
                 .thenReturn(new DeliveredPullRequestCommentLookup.CommentIds(Set.of(), Set.of()));
         lenient()
                 .when(pullRequestRepository.existsByIdAndDeletedAtIsNull(PR_ID))
@@ -98,7 +100,7 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
         IssueComment human = comment("reviewer", advice, Instant.parse("2025-06-01T10:00:00Z"));
         human.setNativeId(82L);
         IssueComment unknownId = comment("other-reviewer", advice, Instant.parse("2025-06-01T11:00:00Z"));
-        when(deliveredCommentLookup.findForPullRequest(99L, PR_ID))
+        when(deliveredCommentLookup.findForPullRequest(99L, PR_ID, ScmItemEvents.PULL_REQUEST))
                 .thenReturn(new DeliveredPullRequestCommentLookup.CommentIds(Set.of(81L), Set.of(82L)));
         when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any()))
                 .thenReturn(List.of(own, human, unknownId));
@@ -118,7 +120,7 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
         IssueComment own =
                 comment("provider-bot", "Explain how to try the timer.", Instant.parse("2025-06-01T09:00:00Z"));
         own.setNativeId(81L);
-        when(deliveredCommentLookup.findForPullRequest(99L, PR_ID))
+        when(deliveredCommentLookup.findForPullRequest(99L, PR_ID, ScmItemEvents.PULL_REQUEST))
                 .thenReturn(new DeliveredPullRequestCommentLookup.CommentIds(Set.of(81L), Set.of()));
         when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any()))
                 .thenReturn(List.of(own));
@@ -358,11 +360,6 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
         JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
         assertThat(out.get("comments")).hasSize(1);
         assertThat(out.get("comments").get(0).get("author").asString()).isEqualTo("reviewer-a");
-    }
-
-    @Test
-    void required_isFalse_bestEffort() {
-        assertThat(provider.required()).isFalse();
     }
 
     @Test

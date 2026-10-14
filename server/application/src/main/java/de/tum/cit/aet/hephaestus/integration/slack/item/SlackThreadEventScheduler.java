@@ -10,7 +10,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.integration.slack.conversation.SlackConversationCandidateSource;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackTs;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequested;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewCompleted;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
 import java.time.Clock;
 import java.time.Duration;
@@ -100,18 +100,18 @@ public class SlackThreadEventScheduler {
     }
 
     @ApplicationModuleListener
-    public void onReviewRequested(ReviewRequested event) {
+    public void onReviewCompleted(ReviewCompleted event) {
         reviews.find(event.workspaceId(), event.reviewId()).ifPresent(review -> {
             if (!ThreadEvents.THREAD.equals(review.item().kind()) || review.version() == null) return;
             Long sourceId = review.item().sourceId();
             if (sourceId == null) return;
-            source.current(review.item())
-                    .filter(current -> current.version().equals(review.version()))
-                    .ifPresent(current -> threads.findByWorkspaceIdAndId(event.workspaceId(), sourceId)
-                            .ifPresent(thread -> {
-                                String lastTs = thread.getLastTs();
-                                if (lastTs != null) candidates.markReviewed(event.workspaceId(), sourceId, lastTs);
-                            }));
+            threads.findByWorkspaceIdAndId(event.workspaceId(), sourceId).ifPresent(thread -> {
+                String reviewedThrough = thread.getLastTs();
+                if (reviewedThrough == null) return;
+                source.current(review.item())
+                        .filter(current -> current.version().equals(review.version()))
+                        .ifPresent(current -> candidates.markReviewed(event.workspaceId(), sourceId, reviewedThrough));
+            });
         });
     }
 }

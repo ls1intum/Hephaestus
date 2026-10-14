@@ -68,7 +68,7 @@ function PracticeReleaseInbox() {
 		},
 		onError: (error, variables) => {
 			// A stale offer is refused whole; the inbox reloads with the comparison as it now stands.
-			if (problemStatusOf(error) === 409) {
+			if (problemStatusOf(error) === 412) {
 				void refresh(variables.path.slug);
 			}
 			toast.error("We could not accept the update", { description: problemDetailOf(error) });
@@ -82,7 +82,7 @@ function PracticeReleaseInbox() {
 		},
 		onError: (error, variables) => {
 			// A stale offer is refused whole; the inbox reloads with the comparison as it now stands.
-			if (problemStatusOf(error) === 409) {
+			if (problemStatusOf(error) === 412) {
 				void refresh(variables.path.slug);
 			}
 			toast.error("We could not decline the update", { description: problemDetailOf(error) });

@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSourceAccess;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.review.ProductItemQuery;
+import de.tum.cit.aet.hephaestus.practices.review.ProductItemRepository;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewItemRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustody;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustodyQuery;
@@ -23,7 +24,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
@@ -43,7 +43,7 @@ public class ResultSourceAuthorization implements ResultProofAccess {
     private final AccountIdentityQuery identities;
     private final AccountDirectory accounts;
     private final ProblemRepository problems;
-    private final JdbcClient jdbc;
+    private final ProductItemRepository itemRows;
     private final List<ItemSourceAccess> access;
 
     public HistoryCustody custody(Result result) {
@@ -92,12 +92,7 @@ public class ResultSourceAuthorization implements ResultProofAccess {
                     || account.orElseThrow().aiChoice() == AiChoice.NO_AI) return false;
         }
         for (var repositoryId : facts.repositoryIds()) {
-            var repositories = jdbc.sql("SELECT id FROM item WHERE workspace_id=:ws AND kind='scm.repository' AND"
-                            + " source_id=:source AND removed_at IS NULL")
-                    .param("ws", result.getWorkspaceId())
-                    .param("source", repositoryId)
-                    .query((rs, n) -> rs.getLong(1))
-                    .list();
+            var repositories = itemRows.activeRepositoryIds(result.getWorkspaceId(), repositoryId);
             if (repositories.size() != 1
                     || !source(items.require(result.getWorkspaceId(), repositories.getFirst()), purpose)) return false;
         }

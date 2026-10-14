@@ -19,25 +19,23 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class DeliveredCommentLookupService implements DeliveredIssueCommentLookup, DeliveredPullRequestCommentLookup {
-    private static final ItemKind ISSUE = new ItemKind("scm.issue");
-    private static final ItemKind PULL_REQUEST = new ItemKind("scm.pull_request");
     private static final List<String> CONFIRMED_STATES =
             List.of(FeedbackCopyState.POSTED.name(), FeedbackCopyState.RETRACTED.name());
     private final FeedbackQueryRepository queries;
 
     @Override
     @WorkspaceAgnostic("Provider-ingest provenance for the same native issue across its monitoring workspaces")
-    public List<DeliveredComment> findForIssue(long issueId) {
-        return queries.issueReceipts(issueId, ISSUE.value(), FeedbackCopyKind.SUMMARY.name(), CONFIRMED_STATES).stream()
+    public List<DeliveredComment> findForIssue(long issueId, ItemKind kind) {
+        return queries.issueReceipts(issueId, kind.value(), FeedbackCopyKind.SUMMARY.name(), CONFIRMED_STATES).stream()
                 .map(DeliveredCommentLookupService::comment)
                 .toList();
     }
 
     @Override
-    public Map<Long, List<DeliveredComment>> findForRepository(long workspaceId, long repositoryId) {
+    public Map<Long, List<DeliveredComment>> findForRepository(long workspaceId, long repositoryId, ItemKind kind) {
         return queries
                 .repositoryReceipts(
-                        workspaceId, repositoryId, ISSUE.value(), FeedbackCopyKind.SUMMARY.name(), CONFIRMED_STATES)
+                        workspaceId, repositoryId, kind.value(), FeedbackCopyKind.SUMMARY.name(), CONFIRMED_STATES)
                 .stream()
                 .collect(Collectors.groupingBy(
                         FeedbackQueryRepository.IssueReceipt::getIssueId,
@@ -45,11 +43,10 @@ public class DeliveredCommentLookupService implements DeliveredIssueCommentLooku
     }
 
     @Override
-    public CommentIds findForPullRequest(long workspaceId, long pullRequestId) {
+    public CommentIds findForPullRequest(long workspaceId, long pullRequestId, ItemKind kind) {
         var regular = new HashSet<Long>();
         var inline = new HashSet<Long>();
-        for (var receipt :
-                queries.pullRequestReceipts(workspaceId, pullRequestId, PULL_REQUEST.value(), CONFIRMED_STATES))
+        for (var receipt : queries.pullRequestReceipts(workspaceId, pullRequestId, kind.value(), CONFIRMED_STATES))
             (receipt.getInline() ? inline : regular).add(receipt.getNativeId());
         return new CommentIds(Set.copyOf(regular), Set.copyOf(inline));
     }

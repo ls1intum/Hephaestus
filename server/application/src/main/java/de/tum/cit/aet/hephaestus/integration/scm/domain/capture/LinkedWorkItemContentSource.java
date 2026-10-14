@@ -69,7 +69,8 @@ public class LinkedWorkItemContentSource {
     static final String ITEMS_PREFIX = OUTPUT_PREFIX + "linked_work_items/";
 
     private static final String BODY_PROVENANCE =
-            "The body below is the issue's text as mirrored when this was captured; these dates are the issue's, not when any line of it was written.";
+            "The body below is the issue's text as mirrored when this was captured; these dates are the issue's, not"
+                    + " when any line of it was written.";
 
     // Unqualified #N references belong to this repository; qualified names, colors, and versions must not match.
     private static final Pattern NUMBER_REF = Pattern.compile("(?<![\\w/.-])#(\\d+)(?![\\w]|\\.[0-9])");
@@ -100,19 +101,9 @@ public class LinkedWorkItemContentSource {
         this.consent = consent;
     }
 
-    public boolean supports(ScmCaptureContext request) {
-        return request.pullRequest();
-    }
-
-    public boolean required() {
-        return false;
-    }
-
     public CaptureContribution capture(ScmCaptureContext request, Set<SourceKind> selectedKinds) {
         if (!selectedKinds.contains(KIND) || !request.pullRequest()) {
-            return new CaptureContribution(
-                    Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), null, Map.of(),
-                    List.of(), List.of(), List.of());
+            return CaptureContribution.empty();
         }
         try {
             ScmCaptureContext capture = request;
@@ -180,7 +171,8 @@ public class LinkedWorkItemContentSource {
             files.put(OUTPUT_FILE, objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(root));
             log.info("Linked work items: wrote {} item(s), unresolved={}", items.size(), unresolved.size());
             return new CaptureContribution(
-                    files, // Number references cannot prove that all linked work was found.
+                    files,
+                    // Number references cannot prove that all linked work was found.
                     Map.of(KIND, SourceCompleteness.PARTIAL),
                     Map.of(),
                     Map.of(),

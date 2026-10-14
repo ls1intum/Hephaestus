@@ -315,13 +315,12 @@ public class JobEvidenceFiles implements SandboxResultListener {
                 throw new IllegalArgumentException("The host read has no authenticated source witness");
             }
             var contract = catalogs.requireSource(receipt.sourceKind());
-            String revision =
-                    contract.citation().revision() == CitationRequirement.FORBIDDEN ? null : receipt.version();
+            String commit = contract.citation().commit() == CitationRequirement.FORBIDDEN ? null : receipt.version();
             var existing = texts.stream()
                     .filter(text -> text.source().equals(receipt.sourceKind().value())
                             && text.path().equals(receipt.path())
                             && text.side() == CitationSide.NEW
-                            && Objects.equals(text.revision(), revision))
+                            && Objects.equals(text.commit(), commit))
                     .toList();
             String stagedPath;
             if (existing.size() == 1) stagedPath = existing.getFirst().stagedPath();
@@ -343,7 +342,7 @@ public class JobEvidenceFiles implements SandboxResultListener {
                 throw new IllegalArgumentException("The host read content is unavailable");
             if (existing.isEmpty())
                 texts.add(new CitableText(
-                        receipt.sourceKind().value(), receipt.path(), CitationSide.NEW, revision, stagedPath, digest));
+                        receipt.sourceKind().value(), receipt.path(), CitationSide.NEW, commit, stagedPath, digest));
             else if (!existing.getFirst().sha256().equals(digest))
                 throw new IllegalArgumentException("The host read digest differs from its captured text");
         }

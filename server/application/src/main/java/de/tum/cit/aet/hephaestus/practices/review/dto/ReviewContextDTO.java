@@ -16,5 +16,7 @@ public record ReviewContextDTO(
 
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean requestAllowed,
 
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean canInspectReviewDetails,
+
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
         String reasonDescription) {}

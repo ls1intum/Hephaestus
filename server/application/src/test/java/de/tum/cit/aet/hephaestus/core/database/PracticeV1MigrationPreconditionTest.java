@@ -18,8 +18,8 @@ class PracticeV1MigrationPreconditionTest {
         var cases = new Corruption[] {
             new Corruption(
                     "UPDATE feedback_dispatch SET"
-                        + " state='CLAIMED',lease_owner='released-worker',lease_expires_at=now()+interval '1 minute'"
-                        + " WHERE id='00000000-0000-0000-0000-000000992241'",
+                            + " state='CLAIMED',lease_owner='released-worker',lease_expires_at=now()+interval '1 minute'"
+                            + " WHERE id='00000000-0000-0000-0000-000000992241'",
                     "SQL Precondition failed",
                     "UPDATE feedback_dispatch SET state='PENDING',lease_owner=NULL,lease_expires_at=NULL WHERE"
                             + " id='00000000-0000-0000-0000-000000992241'"),
@@ -45,7 +45,13 @@ class PracticeV1MigrationPreconditionTest {
                             + " id='00000000-0000-0000-0000-000000992141'",
                     "invalid released citations",
                     "UPDATE observation SET evidence=jsonb_set(evidence,'{citations}','[]'::jsonb) WHERE"
-                            + " id='00000000-0000-0000-0000-000000992141'")
+                            + " id='00000000-0000-0000-0000-000000992141'"),
+            new Corruption(
+                    "UPDATE observation SET evidence=jsonb_set(evidence,'{citations,0,commit}',to_jsonb(repeat('b',40)))"
+                            + " WHERE id='00000000-0000-0000-0000-000000992141'",
+                    "legacy citation commits conflict",
+                    "UPDATE observation SET evidence=evidence #- '{citations,0,commit}'"
+                            + " WHERE id='00000000-0000-0000-0000-000000992141'")
         };
         return Stream.of("prod", "dev")
                 .flatMap(context -> Arrays.stream(cases).map(corruption -> Arguments.of(context, corruption)));

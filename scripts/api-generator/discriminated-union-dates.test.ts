@@ -31,9 +31,9 @@ await test("generated scan alternatives convert nested dates and preserve nullab
 				},
 			],
 		});
-		const source = stripTypeScriptTypes(
-			await readFile(path.join(directory, "transformers.gen.ts"), "utf8"),
-		);
+		const emitted = await readFile(path.join(directory, "transformers.gen.ts"), "utf8");
+		assert.doesNotMatch(emitted, /value: any/u);
+		const source = stripTypeScriptTypes(emitted);
 		const generated: unknown = await import(
 			`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`
 		);

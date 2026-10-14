@@ -1,15 +1,16 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestReason;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
-import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ReviewRequestPolicy {
     private final WorkspaceRepository workspaces;
-    private final JdbcClient jdbc;
+    private final ReviewRepository reviews;
     private final PracticeReviewProperties properties;
     private final PracticeReviewCoverageService coverage;
     private final Clock clock;
@@ -35,29 +36,17 @@ public class ReviewRequestPolicy {
         var now = clock.instant();
         int quota = properties.maxRequestsPerRequesterPerHour();
         if (quota > 0
-                && jdbc.sql("SELECT COUNT(*) FROM review WHERE workspace_id=:ws AND"
-                                        + " requested_by_id=:account AND origin='REQUEST' AND created_at>=:since")
-                                .param("ws", workspaceId)
-                                .param("account", accountId)
-                                .param("since", Timestamp.from(now.minus(Duration.ofHours(1))))
-                                .query((rs, n) -> rs.getLong(1))
-                                .single()
+                && reviews.countByWorkspaceIdAndRequestedByIdAndOriginAndCreatedAtGreaterThanEqual(
+                                workspaceId, accountId, ReviewOrigin.REQUEST, now.minus(Duration.ofHours(1)))
                         >= quota) return Optional.of(ReviewRequestReason.REQUESTER_QUOTA_EXHAUSTED);
         int cooldown = workspace.getReviewSettings().resolveCooldownMinutes(properties.cooldownMinutes());
         if (cooldown > 0
-                && jdbc.sql("SELECT EXISTS(SELECT 1 FROM review WHERE workspace_id=:ws AND item_id=:item AND"
-                                + " origin='REQUEST' AND created_at>=:since)")
-                        .param("ws", workspaceId)
-                        .param("item", itemId)
-                        .param("since", Timestamp.from(now.minus(Duration.ofMinutes(cooldown))))
-                        .query(Boolean.class)
-                        .single()) return Optional.of(ReviewRequestReason.REQUEST_COOLDOWN_ACTIVE);
-        if (jdbc.sql("SELECT EXISTS(SELECT 1 FROM review WHERE workspace_id=:ws AND item_id=:item AND status IN"
-                        + " ('QUEUED','RUNNING'))")
-                .param("ws", workspaceId)
-                .param("item", itemId)
-                .query(Boolean.class)
-                .single()) return Optional.of(ReviewRequestReason.CONCURRENT_DUPLICATE);
+                && reviews.existsByWorkspaceIdAndItemIdAndOriginAndCreatedAtGreaterThanEqual(
+                        workspaceId, itemId, ReviewOrigin.REQUEST, now.minus(Duration.ofMinutes(cooldown))))
+            return Optional.of(ReviewRequestReason.REQUEST_COOLDOWN_ACTIVE);
+        if (reviews.existsByWorkspaceIdAndItemIdAndStatusIn(
+                workspaceId, itemId, List.of(ReviewStatus.QUEUED, ReviewStatus.RUNNING)))
+            return Optional.of(ReviewRequestReason.CONCURRENT_DUPLICATE);
         return Optional.empty();
     }
 }

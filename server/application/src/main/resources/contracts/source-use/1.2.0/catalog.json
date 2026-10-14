@@ -6,9 +6,7 @@
 			"displayName": "Pull request details",
 			"description": "The pull request record: its fields as the provider holds them.",
 			"selectionScope": "One pull request selected by the job, with its mirrored fields: number, title, description, branches, state, draft flag, author and the provider's change counts. Its commits are not projected: the review reads them from the captured repository over the pinned range.",
-			"artifactKinds": [
-				"scm.pull_request"
-			],
+			"artifactKinds": ["scm.pull_request"],
 			"defaultRequirement": true,
 			"authority": "SYNCHRONIZED_MIRROR",
 			"identity": {
@@ -29,21 +27,14 @@
 				"use-scm-pull-request-core-mentor-context",
 				"use-scm-pull-request-core-operator-review"
 			],
-			"supportedAbsenceStates": [
-				"NOT_COLLECTED",
-				"UNAVAILABLE",
-				"REDACTED",
-				"COLLECTION_ERROR"
-			]
+			"supportedAbsenceStates": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"]
 		},
 		{
 			"kind": "scm.pull-request.diff",
 			"displayName": "Code changes",
 			"description": "The change the pull request introduces: the pinned base and head commits, from which the review derives the diff.",
 			"selectionScope": "The base and head commit of one pull request, both pinned, both present in the captured repository. GitLab records the review diff base; providers that record the target tip require its merge base with the reviewed head. The diff itself, its statistics, the changed paths and the commits are derived inside the review from the captured repository with git, so nothing about the change is truncated or rendered before the review reads it. A quote of the change names a side of that range and a repository path; it is verified against the blob at that side's commit and refused when the path is not one the change touches. A pinned range with no changes is complete and empty. A range that cannot be pinned is a collection error.",
-			"artifactKinds": [
-				"scm.pull_request"
-			],
+			"artifactKinds": ["scm.pull_request"],
 			"defaultRequirement": true,
 			"authority": "DETERMINISTIC_DERIVATION",
 			"identity": {
@@ -64,21 +55,14 @@
 				"use-scm-pull-request-diff-mentor-context",
 				"use-scm-pull-request-diff-operator-review"
 			],
-			"supportedAbsenceStates": [
-				"NOT_COLLECTED",
-				"UNAVAILABLE",
-				"REDACTED",
-				"COLLECTION_ERROR"
-			]
+			"supportedAbsenceStates": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"]
 		},
 		{
 			"kind": "scm.pull-request.comments",
 			"displayName": "Inline review comments",
 			"description": "Review comments left on specific lines of the pull request.",
 			"selectionScope": "Up to the 500 most recent inline comments on one pull request, most recent first. Beyond that limit the capture is reported as PARTIAL.",
-			"artifactKinds": [
-				"scm.pull_request"
-			],
+			"artifactKinds": ["scm.pull_request"],
 			"defaultRequirement": true,
 			"authority": "SYNCHRONIZED_MIRROR",
 			"identity": {
@@ -99,21 +83,14 @@
 				"use-scm-pull-request-comments-mentor-context",
 				"use-scm-pull-request-comments-operator-review"
 			],
-			"supportedAbsenceStates": [
-				"NOT_COLLECTED",
-				"UNAVAILABLE",
-				"REDACTED",
-				"COLLECTION_ERROR"
-			]
+			"supportedAbsenceStates": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"]
 		},
 		{
 			"kind": "scm.repository.tree",
 			"displayName": "Repository files and history",
 			"description": "Repository files and reachable Git history, supplied as context for reading the change. Not reviewed on their own.",
-			"selectionScope": "All regular, executable, and symbolic-link Git blobs at the reviewed commit, without file-count, total-size, per-file-size, or binary-content exclusions. A self-contained Git repository includes objects reachable from that commit and the local clone's captured branch, tag, and remote-tracking refs, with detached HEAD at the reviewed commit. Upstream configuration, credentials, hooks, replacement refs, and unreachable objects are not exported. Repository text citations identify a repository-relative path and line range, using the captured .git/HEAD artifact as their repository witness. An omitted revision selects the pinned HEAD; historical text identifies a full commit SHA. The manifest records the HEAD and captured-ref witnesses, not one artifact per repository file. Trusted admission verifies reachability from captured refs and the exact quoted location; arbitrary command output is not evidence. Symbolic-link blobs are materialized as regular text files containing the link target and are never followed. Submodules, unsupported file modes, and unsafe paths are excluded from the worktree and reported as PARTIAL. Git LFS pointer files are captured as committed; external LFS objects are not fetched. Shallow clones cannot satisfy this capture.",
-			"artifactKinds": [
-				"scm.pull_request"
-			],
+			"selectionScope": "All regular, executable, and symbolic-link Git blobs at the reviewed commit, without file-count, total-size, per-file-size, or binary-content exclusions. A self-contained Git repository includes objects reachable from that commit and the local clone's captured branch, tag, and remote-tracking refs, with detached HEAD at the reviewed commit. Upstream configuration, credentials, hooks, replacement refs, and unreachable objects are not exported. Repository text citations identify a repository-relative path and line range, using the captured .git/HEAD artifact as their repository witness. An omitted commit selects the pinned HEAD; historical text identifies a full commit SHA. The manifest records the HEAD and captured-ref witnesses, not one artifact per repository file. Trusted admission verifies reachability from captured refs and the exact quoted location; arbitrary command output is not evidence. Symbolic-link blobs are materialized as regular text files containing the link target and are never followed. Submodules, unsupported file modes, and unsafe paths are excluded from the worktree and reported as PARTIAL. Git LFS pointer files are captured as committed; external LFS objects are not fetched. Shallow clones cannot satisfy this capture.",
+			"artifactKinds": ["scm.pull_request"],
 			"defaultRequirement": false,
 			"authority": "UPSTREAM_SNAPSHOT",
 			"identity": {
@@ -134,21 +111,14 @@
 				"use-scm-repository-tree-mentor-context",
 				"use-scm-repository-tree-operator-review"
 			],
-			"supportedAbsenceStates": [
-				"NOT_COLLECTED",
-				"UNAVAILABLE",
-				"REDACTED",
-				"COLLECTION_ERROR"
-			]
+			"supportedAbsenceStates": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"]
 		},
 		{
 			"kind": "scm.issue.core",
 			"displayName": "Issue details",
 			"description": "The issue record: title, description, author, state, labels, and assignees.",
 			"selectionScope": "One issue, selected by the job, with its own fields and its description as the provider holds it.",
-			"artifactKinds": [
-				"scm.issue"
-			],
+			"artifactKinds": ["scm.issue"],
 			"defaultRequirement": true,
 			"authority": "SYNCHRONIZED_MIRROR",
 			"identity": {
@@ -169,21 +139,14 @@
 				"use-scm-issue-core-mentor-context",
 				"use-scm-issue-core-operator-review"
 			],
-			"supportedAbsenceStates": [
-				"NOT_COLLECTED",
-				"UNAVAILABLE",
-				"REDACTED",
-				"COLLECTION_ERROR"
-			]
+			"supportedAbsenceStates": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"]
 		},
 		{
 			"kind": "scm.issue.comments",
 			"displayName": "Issue comments",
 			"description": "The discussion recorded on the issue.",
 			"selectionScope": "Up to the 200 most recent comments on one issue, most recent first. Beyond that limit the capture is reported as PARTIAL.",
-			"artifactKinds": [
-				"scm.issue"
-			],
+			"artifactKinds": ["scm.issue"],
 			"defaultRequirement": true,
 			"authority": "SYNCHRONIZED_MIRROR",
 			"identity": {
@@ -204,21 +167,14 @@
 				"use-scm-issue-comments-mentor-context",
 				"use-scm-issue-comments-operator-review"
 			],
-			"supportedAbsenceStates": [
-				"NOT_COLLECTED",
-				"UNAVAILABLE",
-				"REDACTED",
-				"COLLECTION_ERROR"
-			]
+			"supportedAbsenceStates": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"]
 		},
 		{
 			"kind": "docs.document.core",
 			"displayName": "Document under review",
 			"description": "The written document a review is about: its prose, title, collection, author, and upstream timestamps.",
 			"selectionScope": "One mirrored document, selected by the job: its body as the wiki holds it, and its title, collection, authors and timestamps beside it. A document removed upstream or evicted from the local mirror is reported as UNAVAILABLE rather than as a document that said nothing.",
-			"artifactKinds": [
-				"docs.document"
-			],
+			"artifactKinds": ["docs.document"],
 			"defaultRequirement": true,
 			"authority": "SYNCHRONIZED_MIRROR",
 			"identity": {
@@ -239,21 +195,14 @@
 				"use-docs-document-core-mentor-context",
 				"use-docs-document-core-operator-review"
 			],
-			"supportedAbsenceStates": [
-				"NOT_COLLECTED",
-				"UNAVAILABLE",
-				"REDACTED",
-				"COLLECTION_ERROR"
-			]
+			"supportedAbsenceStates": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"]
 		},
 		{
 			"kind": "slack.conversation.thread",
 			"displayName": "Slack thread",
 			"description": "One Slack thread in chronological order, read only from channels whose consent is active.",
 			"selectionScope": "One thread, selected by the job, with system and bot messages excluded. A thread whose channel consent is not active, or which no longer exists, is reported as REDACTED or UNAVAILABLE rather than as an empty conversation.",
-			"artifactKinds": [
-				"chat.conversation_thread"
-			],
+			"artifactKinds": ["chat.conversation_thread"],
 			"defaultRequirement": true,
 			"authority": "SYNCHRONIZED_MIRROR",
 			"identity": {
@@ -274,21 +223,14 @@
 				"use-slack-conversation-thread-mentor-context",
 				"use-slack-conversation-thread-operator-review"
 			],
-			"supportedAbsenceStates": [
-				"NOT_COLLECTED",
-				"UNAVAILABLE",
-				"REDACTED",
-				"COLLECTION_ERROR"
-			]
+			"supportedAbsenceStates": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"]
 		},
 		{
 			"kind": "scm.linked-work-items",
 			"displayName": "Linked work items",
 			"description": "Issues the pull request refers to by number in its description, branch name or commit subjects, as this repository stores them.",
 			"selectionScope": "Issues whose number appears in the description, the branch name, or the commit subjects of the pinned range, with each issue's title, state, body, labels and sub-issue counts. How a reference is worded is not recorded; the review reads that from the same description, branch and commits. A number scan cannot establish that it found every link the work actually has, so this source is never reported as COMPLETE. References to work outside this repository are reported as unresolved rather than as incomplete evidence.",
-			"artifactKinds": [
-				"scm.pull_request"
-			],
+			"artifactKinds": ["scm.pull_request"],
 			"defaultRequirement": false,
 			"authority": "LOSSY_DERIVATION",
 			"identity": {
@@ -309,21 +251,14 @@
 				"use-scm-linked-work-items-mentor-context",
 				"use-scm-linked-work-items-operator-review"
 			],
-			"supportedAbsenceStates": [
-				"NOT_COLLECTED",
-				"UNAVAILABLE",
-				"REDACTED",
-				"COLLECTION_ERROR"
-			]
+			"supportedAbsenceStates": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"]
 		},
 		{
 			"kind": "scm.review-threads",
 			"displayName": "Review threads and decisions",
 			"description": "Review conversations on the pull request, whether each was resolved, and each reviewer's decision.",
 			"selectionScope": "Every review thread and review decision for one pull request.",
-			"artifactKinds": [
-				"scm.pull_request"
-			],
+			"artifactKinds": ["scm.pull_request"],
 			"defaultRequirement": false,
 			"authority": "SYNCHRONIZED_MIRROR",
 			"identity": {
@@ -344,21 +279,14 @@
 				"use-scm-review-threads-mentor-context",
 				"use-scm-review-threads-operator-review"
 			],
-			"supportedAbsenceStates": [
-				"NOT_COLLECTED",
-				"UNAVAILABLE",
-				"REDACTED",
-				"COLLECTION_ERROR"
-			]
+			"supportedAbsenceStates": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"]
 		},
 		{
 			"kind": "scm.general-review-comments",
 			"displayName": "General review comments",
 			"description": "Review comments addressing the pull request as a whole rather than a specific line.",
 			"selectionScope": "Every general review comment on one pull request.",
-			"artifactKinds": [
-				"scm.pull_request"
-			],
+			"artifactKinds": ["scm.pull_request"],
 			"defaultRequirement": false,
 			"authority": "SYNCHRONIZED_MIRROR",
 			"identity": {
@@ -379,23 +307,14 @@
 				"use-scm-general-review-comments-mentor-context",
 				"use-scm-general-review-comments-operator-review"
 			],
-			"supportedAbsenceStates": [
-				"NOT_COLLECTED",
-				"UNAVAILABLE",
-				"REDACTED",
-				"COLLECTION_ERROR"
-			]
+			"supportedAbsenceStates": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"]
 		},
 		{
 			"kind": "workspace.project-inventory",
 			"displayName": "Related workspace work",
 			"description": "Other work items in the same workspace, supplied so a change can be read against related work.",
 			"selectionScope": "Up to 200 issues and 200 pull requests across at most 25 visible repositories, the work item under review among them. Beyond any of those limits the capture is reported as PARTIAL.",
-			"artifactKinds": [
-				"scm.pull_request",
-				"scm.issue",
-				"chat.conversation_thread"
-			],
+			"artifactKinds": ["scm.pull_request", "scm.issue", "chat.conversation_thread"],
 			"defaultRequirement": false,
 			"authority": "DETERMINISTIC_DERIVATION",
 			"identity": {
@@ -416,22 +335,14 @@
 				"use-workspace-project-inventory-mentor-context",
 				"use-workspace-project-inventory-operator-review"
 			],
-			"supportedAbsenceStates": [
-				"NOT_COLLECTED",
-				"UNAVAILABLE",
-				"REDACTED",
-				"COLLECTION_ERROR"
-			]
+			"supportedAbsenceStates": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"]
 		},
 		{
 			"kind": "outline.documents",
 			"displayName": "Referenced Outline documents",
 			"description": "Outline documents the reviewed work references.",
 			"selectionScope": "Only documents referenced by the reviewed work or matched to it, up to 15. Retrieval cannot establish that it found every relevant document, so this source is never reported as COMPLETE.",
-			"artifactKinds": [
-				"scm.pull_request",
-				"scm.issue"
-			],
+			"artifactKinds": ["scm.pull_request", "scm.issue"],
 			"defaultRequirement": false,
 			"authority": "LOSSY_DERIVATION",
 			"identity": {
@@ -452,12 +363,7 @@
 				"use-outline-documents-mentor-context",
 				"use-outline-documents-operator-review"
 			],
-			"supportedAbsenceStates": [
-				"NOT_COLLECTED",
-				"UNAVAILABLE",
-				"REDACTED",
-				"COLLECTION_ERROR"
-			]
+			"supportedAbsenceStates": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"]
 		},
 		{
 			"kind": "hephaestus.observation-history",
@@ -490,12 +396,7 @@
 				"use-hephaestus-observation-history-mentor-context",
 				"use-hephaestus-observation-history-operator-review"
 			],
-			"supportedAbsenceStates": [
-				"NOT_COLLECTED",
-				"UNAVAILABLE",
-				"REDACTED",
-				"COLLECTION_ERROR"
-			]
+			"supportedAbsenceStates": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"]
 		},
 		{
 			"kind": "hephaestus.feedback-history",
@@ -528,12 +429,7 @@
 				"use-hephaestus-feedback-history-mentor-context",
 				"use-hephaestus-feedback-history-operator-review"
 			],
-			"supportedAbsenceStates": [
-				"NOT_COLLECTED",
-				"UNAVAILABLE",
-				"REDACTED",
-				"COLLECTION_ERROR"
-			]
+			"supportedAbsenceStates": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"]
 		}
 	]
 }

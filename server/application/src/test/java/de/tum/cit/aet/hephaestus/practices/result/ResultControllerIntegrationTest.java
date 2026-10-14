@@ -1,16 +1,24 @@
 package de.tum.cit.aet.hephaestus.practices.result;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData.Scenario;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackIds;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultMarkKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Objects;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 @Import(ReviewIntegrationData.class)
@@ -20,6 +28,15 @@ class ResultControllerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     WebTestClient http;
+
+    @Autowired
+    JdbcClient jdbc;
+
+    @Autowired
+    ResultPresentation presentation;
+
+    @Autowired
+    ResultCommunicationRepository communication;
 
     Scenario scenario;
 
@@ -60,6 +77,104 @@ class ResultControllerIntegrationTest extends BaseIntegrationTest {
                 .isEqualTo(Long.toString(Objects.requireNonNull(r.getPracticeVersionId())))
                 .jsonPath("$.outcome")
                 .isEqualTo("MET");
+    }
+
+    @Test
+    void shouldReadLatestFeedbackFactsAndKeepThemScopedToTheResultOwner() {
+        var at = Instant.now().minusSeconds(30).truncatedTo(ChronoUnit.MICROS);
+        var result = data.result(scenario, ResultOutcome.NOT_MET, at);
+        var feedback = UUID.randomUUID();
+        var copy = FeedbackIds.copy(feedback, FeedbackCopyKind.SUMMARY, 0);
+        long ws = scenario.workspace().getId();
+        var url = "https://github.com/example/project/pull/1#issuecomment-1";
+        jdbc.sql("INSERT INTO"
+            + " feedback(id,workspace_id,review_id,item_id,developer_id,destination,state,body,created_at,delivered_at)"
+            + " VALUES(:id,:ws,:review,:item,:developer,'ON_WORK','DELIVERED','Review this change.',:at,:at)")
+                .param("id", feedback)
+                .param("ws", ws)
+                .param("review", result.getReviewId())
+                .param("item", result.getItemId())
+                .param("developer", scenarioAccountId)
+                .param("at", Timestamp.from(at))
+                .update();
+        jdbc.sql("INSERT INTO feedback_basis(id,workspace_id,feedback_id,result_id,developer_id,ordinal)"
+                        + " VALUES(:id,:ws,:feedback,:result,:developer,0)")
+                .param("id", UUID.randomUUID())
+                .param("ws", ws)
+                .param("feedback", feedback)
+                .param("result", result.getId())
+                .param("developer", scenarioAccountId)
+                .update();
+        jdbc.sql("INSERT INTO feedback_copy(id,workspace_id,feedback_id,kind,position,state,write_key,write_marker,"
+                        + "write_started_at,external_ref,external_url,posted_at,created_at)"
+                        + " VALUES(:id,:ws,:feedback,'SUMMARY',0,'POSTED',:key,:marker,:at,'copy-1',:url,:at,:at)")
+                .param("id", copy)
+                .param("ws", ws)
+                .param("feedback", feedback)
+                .param("key", copy.toString())
+                .param("marker", FeedbackIds.writeMarker(copy))
+                .param("at", Timestamp.from(at))
+                .param("url", url)
+                .update();
+        jdbc.sql("INSERT INTO feedback_response(id,workspace_id,feedback_id,resolution,usefulness,comment,created_at)"
+                        + " VALUES(:id,:ws,:feedback,'DISAGREE','HELPFUL','This is already covered.',:at)")
+                .param("id", UUID.randomUUID())
+                .param("ws", ws)
+                .param("feedback", feedback)
+                .param("at", Timestamp.from(at))
+                .update();
+        jdbc.sql("INSERT INTO feedback_decision(id,workspace_id,feedback_id,action,actor_account_id,note,decided_at)"
+                        + " VALUES(:id,:ws,:feedback,'WITHDRAW',:actor,'Withdraw this note.',:at)")
+                .param("id", UUID.randomUUID())
+                .param("ws", ws)
+                .param("feedback", feedback)
+                .param("actor", scenarioAccountId)
+                .param("at", Timestamp.from(at))
+                .update();
+        assertThat(presentation.boundFeedback(result)).singleElement().satisfies(row -> {
+            assertThat(row.id()).isEqualTo(feedback);
+            assertThat(row.withdrawn()).isTrue();
+            assertThat(row.deliveredAt()).isEqualTo(at);
+        });
+        assertThat(presentation.disagreements(result))
+                .singleElement()
+                .satisfies(row -> assertThat(row.comment()).isEqualTo("This is already covered."));
+        get("/practices/results/" + result.getId())
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.feedback[0].id")
+                .isEqualTo(feedback.toString())
+                .jsonPath("$.feedback[0].response.resolution")
+                .isEqualTo("DISAGREE")
+                .jsonPath("$.feedback[0].response.usefulness")
+                .isEqualTo("HELPFUL")
+                .jsonPath("$.feedback[0].copies[0].kind")
+                .isEqualTo("SUMMARY")
+                .jsonPath("$.feedback[0].copies[0].externalUrl")
+                .isEqualTo(url);
+        var other = data.scenario();
+        assertThat(communication.boundFeedback(other.workspace().getId(), result.getId()))
+                .isEmpty();
+        assertThat(communication.ownFeedback(
+                        ws, Objects.requireNonNull(other.account().getId()), result.getId()))
+                .isEmpty();
+        jdbc.sql("INSERT INTO feedback_response(id,workspace_id,feedback_id,resolution,created_at)"
+                        + " VALUES(:id,:ws,:feedback,'ADDRESSED',:at)")
+                .param("id", UUID.randomUUID())
+                .param("ws", ws)
+                .param("feedback", feedback)
+                .param("at", Timestamp.from(at.plusSeconds(1)))
+                .update();
+        assertThat(presentation.disagreements(result)).isEmpty();
+        get("/practices/results/" + result.getId())
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.feedback[0].response.resolution")
+                .isEqualTo("ADDRESSED")
+                .jsonPath("$.feedback[0].response.comment")
+                .isEmpty();
     }
 
     @Test

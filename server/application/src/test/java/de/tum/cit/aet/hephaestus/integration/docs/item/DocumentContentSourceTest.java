@@ -113,7 +113,7 @@ class DocumentContentSourceTest extends BaseUnitTest {
         for (var candidate : capture.citableTexts()) {
             assertThat(candidate.source()).isEqualTo(DocumentContentSource.SOURCE.value());
             assertThat(candidate.side()).isEqualTo(CitationSide.NEW);
-            assertThat(candidate.revision()).isNull();
+            assertThat(candidate.commit()).isNull();
             byte[] staged = Objects.requireNonNull(capture.files().get(candidate.stagedPath()));
             assertThat(candidate.sha256())
                     .isEqualTo(HexFormat.of()

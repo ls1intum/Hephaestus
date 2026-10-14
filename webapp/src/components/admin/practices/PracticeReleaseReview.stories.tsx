@@ -38,10 +38,10 @@ export const ConflictingUpdate: Story = {
 		);
 		await expect(accept).toBeEnabled();
 		await userEvent.click(accept);
-		await expect(args.onAccept).toHaveBeenCalledWith([
-			{ field: "LINE_NOTES", source: "OFFERED" },
-			{ field: "CRITERIA", source: "OFFERED" },
-		]);
+		await expect(args.onAccept).toHaveBeenCalledWith({
+			LINE_NOTES: "OFFERED",
+			CRITERIA: "OFFERED",
+		});
 	},
 };
 
@@ -73,10 +73,10 @@ export const AdoptedVersionUnknown: Story = {
 		await userEvent.click(lineNotes.getByRole("radio", { name: "Current" }));
 		await expect(accept).toBeEnabled();
 		await userEvent.click(accept);
-		await expect(args.onAccept).toHaveBeenCalledWith([
-			{ field: "CRITERIA", source: "OFFERED" },
-			{ field: "LINE_NOTES", source: "CURRENT" },
-		]);
+		await expect(args.onAccept).toHaveBeenCalledWith({
+			CRITERIA: "OFFERED",
+			LINE_NOTES: "CURRENT",
+		});
 	},
 };
 
@@ -121,10 +121,10 @@ export const UnsavedDraft: Story = {
 		await userEvent.click(
 			within(confirmation).getByRole("button", { name: "Accept selected fields" }),
 		);
-		await expect(args.onAccept).toHaveBeenCalledWith([
-			{ field: "CRITERIA", source: "OFFERED" },
-			{ field: "LINE_NOTES", source: "OFFERED" },
-		]);
+		await expect(args.onAccept).toHaveBeenCalledWith({
+			CRITERIA: "OFFERED",
+			LINE_NOTES: "OFFERED",
+		});
 	},
 };
 
@@ -205,7 +205,7 @@ export const GuidanceUpdate: Story = {
 			),
 		);
 		await userEvent.click(screen.getByRole("button", { name: "Accept selected fields" }));
-		await expect(args.onAccept).toHaveBeenCalledWith([{ field: "GUIDANCE", source: "CURRENT" }]);
+		await expect(args.onAccept).toHaveBeenCalledWith({ GUIDANCE: "CURRENT" });
 	},
 };
 

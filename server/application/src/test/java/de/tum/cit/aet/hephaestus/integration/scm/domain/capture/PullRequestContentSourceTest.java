@@ -22,6 +22,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitDetails;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitFileChange.ChangeType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmVersion;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
@@ -40,8 +41,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.RepositoryKey;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -96,7 +95,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
     void setUp() {
         mirroredPullRequest = pullRequest();
         lenient()
-                .when(deliveredCommentLookup.findForPullRequest(anyLong(), anyLong()))
+                .when(deliveredCommentLookup.findForPullRequest(anyLong(), anyLong(), eq(ScmItemEvents.PULL_REQUEST)))
                 .thenAnswer(invocation -> deliveredComments);
         lenient()
                 .when(pullRequestRepository.findByIdForReviewContext(456L))
@@ -133,10 +132,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
         metadata.put("title", "Fix authentication bug");
         metadata.put("body", "This PR fixes the login issue");
         return metadata;
-    }
-
-    private ScmCaptureContext jobWith(ObjectNode metadata) {
-        return ScmCaptureFixtures.context(metadata, WORKSPACE_ID, false);
     }
 
     private ScmCaptureContext request(ObjectNode metadata) {
@@ -180,15 +175,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
 
     private Map<String, byte[]> captureFiles(ScmCaptureContext request) {
         return provider.capture(request, provider.sourceKinds()).files();
-    }
-
-    @Nested
-    class Supports {
-
-        @Test
-        void supportsPracticeReview() {
-            assertThat(provider.supports(request(sampleMetadata()))).isTrue();
-        }
     }
 
     @Nested
@@ -319,7 +305,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             pr.setReviewDecision(ReviewDecision.APPROVED);
             pr.setLastSyncAt(Instant.parse("2026-04-10T10:00:00Z"));
             mirroredPullRequest = pr;
-            ScmCaptureContext original = jobWith(sampleMetadata());
+            ScmCaptureContext original = request(sampleMetadata());
             ScmCaptureContext job = new ScmCaptureContext(
                     original.pinned(),
                     original.request(),
@@ -637,50 +623,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             } else {
                 assertThat(captured.get(0).path("commit_id").asString()).isEqualTo(expected);
             }
-        }
-
-        @Test
-        void shouldKeepAllCommentsAboveTheFormerCaptureLimit() throws Exception {
-            var comments = new ArrayList<PullRequestReviewComment>();
-            for (int i = 0; i < 10_000 + 100; i++) {
-                PullRequestReviewComment c = new PullRequestReviewComment();
-                c.setPath("file.java");
-                c.setLine(i);
-                c.setBody("Comment " + i);
-                c.setCreatedAt(Instant.EPOCH.plusSeconds(i));
-                comments.add(c);
-            }
-            Collections.reverse(comments);
-
-            stubGit();
-            mirroredComments = comments;
-
-            Map<String, byte[]> files = captureFiles(request(sampleMetadata()));
-
-            JsonNode commentsJson = objectMapper.readTree(files.get("context/comments.json"));
-            assertThat(commentsJson).hasSize(comments.size());
-            assertThat(commentsJson.get(0).get("body").asString()).isEqualTo("Comment 0");
-        }
-
-        @Test
-        void shouldReportCompleteWithoutACommentLimit() {
-            List<PullRequestReviewComment> comments = new ArrayList<>();
-            for (int i = 0; i < 10_000; i++) {
-                PullRequestReviewComment comment = new PullRequestReviewComment();
-                comment.setBody("Comment " + i);
-                comments.add(comment);
-            }
-            mirroredComments = comments;
-            assertThat(provider.capture(request(sampleMetadata()), Set.of(COMMENTS))
-                            .completeness()
-                            .get(COMMENTS))
-                    .isEqualTo(SourceCompleteness.COMPLETE);
-
-            comments.add(new PullRequestReviewComment());
-            assertThat(provider.capture(request(sampleMetadata()), Set.of(COMMENTS))
-                            .completeness()
-                            .get(COMMENTS))
-                    .isEqualTo(SourceCompleteness.COMPLETE);
         }
     }
 

@@ -82,7 +82,7 @@ void test("a citation does not prove a full file read, and repeated reads dedupl
 	assert.equal(reader.readReceipts.length, 1);
 });
 
-void test("source-catalog flags decide side and revision without a provider allowlist", () => {
+void test("source-catalog flags decide side and commit without a provider allowlist", () => {
 	const citation = {
 		sourceKind: "custom.source",
 		sourcePath: "context/a.txt",
@@ -92,20 +92,20 @@ void test("source-catalog flags decide side and revision without a provider allo
 		quote: "first",
 	};
 	assert.match(
-		validateCitationCapabilities(citation, { side: "REQUIRED", revision: "OPTIONAL" }) ?? "",
+		validateCitationCapabilities(citation, { side: "REQUIRED", commit: "OPTIONAL" }) ?? "",
 		/side is required/u,
 	);
 	assert.equal(
 		validateCitationCapabilities(
-			{ ...citation, revision: "opaque:v3" },
-			{ side: "FORBIDDEN", revision: "OPTIONAL" },
+			{ ...citation, commit: "opaque:v3" },
+			{ side: "FORBIDDEN", commit: "OPTIONAL" },
 		),
 		undefined,
 	);
 	assert.match(
 		validateCitationCapabilities(
 			{ ...citation, side: "NEW" },
-			{ side: "FORBIDDEN", revision: "OPTIONAL" },
+			{ side: "FORBIDDEN", commit: "OPTIONAL" },
 		) ?? "",
 		/side is forbidden/u,
 	);
@@ -147,7 +147,7 @@ void test("a claimed MET cannot manufacture the assigned scan file's complete re
 		{
 			slug: "fixture",
 			inputs,
-			files: { head: { revision: "a".repeat(40) }, change: null },
+			files: { head: { commit: "a".repeat(40) }, change: null },
 			now: inputs.review.startedAt,
 			deadline: Date.now() + 10_000,
 		},

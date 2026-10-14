@@ -2,9 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.slack.item;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -20,13 +18,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.integration.slack.conversation.SlackConversationCandidateSource;
-import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThread;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequested;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshot;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.ItemFixtures;
 import java.time.Clock;
@@ -35,7 +28,6 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -101,33 +93,6 @@ class SlackThreadEventSchedulerTest extends BaseUnitTest {
         assertThat(captured.getValue().name()).isEqualTo(ThreadEvents.SETTLED);
         assertThat(captured.getValue().foundBy()).isEqualTo(FoundBy.SYNC);
         assertThat(captured.getValue().requestedById()).isNull();
-        verify(candidates, never()).markReviewed(anyLong(), anyLong(), any());
-        verify(reviews, never()).request(any());
-    }
-
-    @Test
-    void watermarkMovesOnlyAfterAReviewOfTheSameFrozenVersionWasAccepted() {
-        UUID reviewId = UUID.randomUUID();
-        when(reviews.find(7L, reviewId))
-                .thenReturn(Optional.of(new ReviewSnapshot(
-                        reviewId, 7L, item, ReviewKind.ITEM, version, ReviewOrigin.EVENT, 1L, List.of())));
-        when(source.current(item)).thenReturn(Optional.of(snapshot(version)));
-        var thread = new SlackThread();
-        thread.setLastTs("1700000001.000000");
-        when(threads.findByWorkspaceIdAndId(7L, 19L)).thenReturn(Optional.of(thread));
-        scheduler().onReviewRequested(new ReviewRequested(reviewId, 7L));
-        verify(candidates).markReviewed(7L, 19L, "1700000001.000000");
-    }
-
-    @Test
-    void aNewProviderVersionCannotAdvanceTheWatermarkForAnOlderAcceptedReview() {
-        UUID reviewId = UUID.randomUUID();
-        when(reviews.find(7L, reviewId))
-                .thenReturn(Optional.of(new ReviewSnapshot(
-                        reviewId, 7L, item, ReviewKind.ITEM, version, ReviewOrigin.EVENT, 1L, List.of())));
-        when(source.current(item)).thenReturn(Optional.of(snapshot(new ItemVersion("new-version", null))));
-        scheduler().onReviewRequested(new ReviewRequested(reviewId, 7L));
-        verify(candidates, never()).markReviewed(anyLong(), anyLong(), any());
     }
 
     @Test

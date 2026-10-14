@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ExactPersonIdentity
 import de.tum.cit.aet.hephaestus.integration.core.spi.CitationVerifier;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSource;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ScanItemVersions;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -30,6 +31,7 @@ class ScmCaptureRoleContextTest extends BaseUnitTest {
                 .withUserConfiguration(
                         ScmItemService.class,
                         ScmCitationVerifier.class,
+                        ScmFileVersionComposer.class,
                         ScmCaptureConsent.class,
                         ExactPersonIdentityResolver.class)
                 .withBean(ObjectMapper.class, ObjectMapper::new)
@@ -55,6 +57,7 @@ class ScmCaptureRoleContextTest extends BaseUnitTest {
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     assertThat(context.getBeansOfType(ItemSource.class)).hasSize(expected);
+                    assertThat(context.getBeansOfType(ScanItemVersions.class)).hasSize(expected);
                     assertThat(context.getBeansOfType(CitationVerifier.class)).hasSize(expected == 0 ? 0 : 1);
                     assertThat(context.getBeansOfType(ScmCaptureConsent.class)).hasSize(expected == 0 ? 0 : 1);
                     assertThat(context.getBeansOfType(ExactPersonIdentityResolver.class))

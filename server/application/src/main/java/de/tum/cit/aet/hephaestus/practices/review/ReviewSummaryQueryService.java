@@ -2,8 +2,6 @@ package de.tum.cit.aet.hephaestus.practices.review;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FoundBy;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.ReviewFeedbackCountsDTO;
@@ -31,29 +29,23 @@ import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptRunDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewScriptQuery;
+import de.tum.cit.aet.hephaestus.practices.trace.ItemTraceRepository;
 import java.time.Duration;
-import java.time.Instant;
-import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumMap;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
@@ -70,7 +62,8 @@ public class ReviewSummaryQueryService {
     private final ProductReferenceQuery references;
     private final ReviewRuntimeQuery runtime;
     private final ReviewScriptQuery scripts;
-    private final JdbcClient jdbc;
+    private final ReviewItemRepository members;
+    private final ItemTraceRepository events;
     private final JsonMapper json;
 
     public Review require(long ws, UUID id) {
@@ -79,49 +72,7 @@ public class ReviewSummaryQueryService {
     }
 
     public Page<ReviewSummaryDTO> list(long ws, ReviewFilterParams filter, Pageable page) {
-        var where = new StringBuilder(" WHERE q.workspace_id=:ws");
-        var params = new LinkedHashMap<String, Object>();
-        params.put("ws", ws);
-        add(where, params, "q.id=:id", "id", filter.reviewId());
-        add(where, params, "q.item_id=:item", "item", filter.itemId());
-        add(
-                where,
-                params,
-                "q.kind=:kind",
-                "kind",
-                filter.kind() == null ? null : filter.kind().name());
-        add(where, params, "q.created_at>=:from", "from", filter.from());
-        add(where, params, "q.created_at<:to", "to", filter.to());
-        if (filter.status() != null && !filter.status().isEmpty())
-            add(
-                    where,
-                    params,
-                    "q.status IN (:statuses)",
-                    "statuses",
-                    filter.status().stream().map(Enum::name).toList());
-        if (filter.developerId() != null || filter.practiceSlug() != null || filter.groupSlug() != null) {
-            var basis = new StringBuilder("EXISTS(SELECT 1 FROM result r JOIN practice p ON p.id=r.practice_id AND"
-                    + " p.workspace_id=r.workspace_id LEFT JOIN practice_group g ON g.id=p.group_id AND"
-                    + " g.workspace_id=p.workspace_id WHERE r.workspace_id=q.workspace_id AND r.review_id=q.id AND"
-                    + " NOT EXISTS(SELECT 1 FROM result_mark m WHERE m.workspace_id=r.workspace_id AND"
-                    + " m.result_id=r.id AND m.kind='INCORRECT' AND m.removed_at IS NULL)");
-            add(basis, params, "r.developer_id=:developer", "developer", filter.developerId());
-            add(basis, params, "p.slug=:practice", "practice", filter.practiceSlug());
-            add(basis, params, "g.slug=:group", "group", filter.groupSlug());
-            where.append(" AND " + basis + ")");
-        }
-        long total = jdbc.sql("SELECT count(*) FROM review q" + where)
-                .params(params)
-                .query((rs, n) -> rs.getLong(1))
-                .single();
-        params.put("limit", page.getPageSize());
-        params.put("offset", page.getOffset());
-        var ids = jdbc.sql("SELECT q.id FROM review q" + where
-                        + " ORDER BY q.created_at DESC,q.id::text DESC LIMIT :limit OFFSET :offset")
-                .params(params)
-                .query((rs, n) -> Objects.requireNonNull(rs.getObject(1, UUID.class)))
-                .list();
-        return new PageImpl<>(ids.stream().map(id -> summary(require(ws, id))).toList(), page, total);
+        return reviews.search(ws, filter, page).map(this::summary);
     }
 
     public ReviewRefDTO ref(Review review) {
@@ -275,34 +226,30 @@ public class ReviewSummaryQueryService {
         var practicesById = practices.findByWorkspaceId(ws).stream().collect(Collectors.toMap(Practice::getId, p -> p));
         var rows = assignments.findByWorkspaceIdAndReviewIdOrderByPracticeIdAsc(ws, review.getId());
         var versionById = versions
-                .findAllById(rows.stream()
-                        .map(ReviewPractice::getPracticeVersionId)
-                        .filter(Objects::nonNull)
-                        .toList())
+                .findByWorkspaceIdAndIdIn(
+                        ws,
+                        rows.stream()
+                                .map(ReviewPractice::getPracticeVersionId)
+                                .filter(Objects::nonNull)
+                                .toList())
                 .stream()
-                .filter(v -> v.getWorkspaceId() == ws)
                 .collect(Collectors.toMap(PracticeVersion::getId, v -> v));
         var scriptRows = scripts.forReview(ws, review.getId());
+        var countsByPractice = members.practiceCounts(ws, review.getId()).stream()
+                .collect(Collectors.toMap(ReviewItemRepository.PracticeCounts::getPracticeId, Function.identity()));
         return rows.stream()
                 .map(a -> {
                     var p = Objects.requireNonNull(practicesById.get(a.getPracticeId()));
                     var v = versionById.get(a.getPracticeVersionId());
-                    var counts = jdbc.sql(
-                                    "SELECT COUNT(*) AS listed,COUNT(*) FILTER(WHERE state IN ('JUDGED','REUSED')) AS"
-                                            + " reviewed,COUNT(*) FILTER(WHERE state='REUSED') AS reused,COUNT(*)"
-                                            + " FILTER(WHERE state='WITHHELD') AS withheld,COUNT(*) FILTER(WHERE"
-                                            + " state='LISTED') AS pending FROM review_item WHERE workspace_id=:ws AND"
-                                            + " review_id=:review AND practice_id=:practice")
-                            .param("ws", ws)
-                            .param("review", review.getId())
-                            .param("practice", a.getPracticeId())
-                            .query((rs, n) -> new ReviewItemCountsDTO(
-                                    Math.toIntExact(rs.getLong("listed")),
-                                    Math.toIntExact(rs.getLong("reviewed")),
-                                    Math.toIntExact(rs.getLong("reused")),
-                                    Math.toIntExact(rs.getLong("withheld")),
-                                    review.getStatus().isTerminal() ? Math.toIntExact(rs.getLong("pending")) : 0))
-                            .single();
+                    var stored = countsByPractice.get(a.getPracticeId());
+                    var counts = stored == null
+                            ? new ReviewItemCountsDTO(0, 0, 0, 0, 0)
+                            : new ReviewItemCountsDTO(
+                                    Math.toIntExact(stored.getListed()),
+                                    Math.toIntExact(stored.getReviewed()),
+                                    Math.toIntExact(stored.getReused()),
+                                    Math.toIntExact(stored.getWithheld()),
+                                    review.getStatus().isTerminal() ? Math.toIntExact(stored.getPending()) : 0);
                     return new ReviewPracticeDTO(
                             p.getSlug(),
                             v == null || v.getName() == null ? "Unknown practice version" : v.getName(),
@@ -329,49 +276,31 @@ public class ReviewSummaryQueryService {
     }
 
     public @Nullable ItemEventDTO event(Review r) {
-        if (r.getEventId() == null) return null;
-        return jdbc.sql("SELECT * FROM item_event WHERE workspace_id=:ws AND id=:id")
-                .param("ws", r.getWorkspaceId())
-                .param("id", r.getEventId())
-                .query((rs, n) -> new ItemEventDTO(
-                        rs.getObject("id", UUID.class),
-                        Long.toString(rs.getLong("item_id")),
-                        rs.getString("name"),
-                        rs.getString("item_version"),
-                        rs.getObject("occurred_at", OffsetDateTime.class).toInstant(),
-                        FoundBy.valueOf(rs.getString("found_by")),
-                        ItemEventState.valueOf(rs.getString("state")),
-                        rs.getString("reason") == null ? null : ReviewRequestReason.valueOf(rs.getString("reason")),
-                        instant(rs.getObject("decided_at", OffsetDateTime.class)),
-                        rs.getObject("review_id", UUID.class)))
-                .optional()
+        var eventId = r.getEventId();
+        if (eventId == null) return null;
+        return events.event(r.getWorkspaceId(), eventId)
+                .map(row -> new ItemEventDTO(
+                        row.getId(),
+                        Long.toString(row.getItemId()),
+                        row.getName(),
+                        row.getItemVersion(),
+                        row.getOccurredAt(),
+                        row.getFoundBy(),
+                        row.getState(),
+                        row.getReason(),
+                        row.getDecidedAt(),
+                        row.getReviewId()))
                 .orElse(null);
     }
 
     private ReviewResultCountsDTO resultCounts(Review review, @Nullable Long practiceId) {
-        var params = new HashMap<String, Object>();
-        params.put("ws", review.getWorkspaceId());
-        params.put("id", review.getId());
-        String scope = review.getKind() == ReviewKind.SCAN
-                ? "EXISTS(SELECT 1 FROM review_item member WHERE member.workspace_id=r.workspace_id AND"
-                        + " member.review_id=:id AND member.result_id=r.id)"
-                : "r.review_id=:id";
-        if (practiceId != null) {
-            scope += " AND r.practice_id=:practice";
-            params.put("practice", practiceId);
-        }
-        return jdbc.sql("SELECT COUNT(*) FILTER(WHERE outcome='MET') AS met,COUNT(*) FILTER(WHERE outcome='NOT_MET')"
-                        + " AS not_met,COUNT(*) FILTER(WHERE outcome='DOES_NOT_APPLY') AS does_not_apply,COUNT(*)"
-                        + " FILTER(WHERE outcome='COULD_NOT_DETERMINE') AS could_not_determine FROM result r WHERE"
-                        + " r.workspace_id=:ws AND "
-                        + scope)
-                .params(params)
-                .query((rs, n) -> new ReviewResultCountsDTO(
-                        Math.toIntExact(rs.getLong("met")),
-                        Math.toIntExact(rs.getLong("not_met")),
-                        Math.toIntExact(rs.getLong("does_not_apply")),
-                        Math.toIntExact(rs.getLong("could_not_determine"))))
-                .single();
+        var row = reviews.resultCounts(
+                review.getWorkspaceId(), review.getId(), review.getKind() == ReviewKind.SCAN, practiceId);
+        return new ReviewResultCountsDTO(
+                Math.toIntExact(row.getMet()),
+                Math.toIntExact(row.getNotMet()),
+                Math.toIntExact(row.getDoesNotApply()),
+                Math.toIntExact(row.getCouldNotDetermine()));
     }
 
     public static ReviewResultCountsDTO counts(Collection<Result> rows) {
@@ -386,12 +315,7 @@ public class ReviewSummaryQueryService {
 
     public ReviewFeedbackCountsDTO feedbackCounts(long ws, UUID id) {
         var c = new EnumMap<FeedbackState, Integer>(FeedbackState.class);
-        jdbc.sql("SELECT state,count(*) AS n FROM feedback WHERE workspace_id=:ws AND review_id=:id GROUP BY state")
-                .param("ws", ws)
-                .param("id", id)
-                .query((rs, n) -> Map.entry(FeedbackState.valueOf(rs.getString("state")), rs.getInt("n")))
-                .list()
-                .forEach(e -> c.put(e.getKey(), e.getValue()));
+        reviews.feedbackCounts(ws, id).forEach(row -> c.put(row.getState(), Math.toIntExact(row.getCount())));
         return new ReviewFeedbackCountsDTO(
                 c.getOrDefault(FeedbackState.AWAITING_APPROVAL, 0),
                 c.getOrDefault(FeedbackState.READY, 0),
@@ -401,17 +325,5 @@ public class ReviewSummaryQueryService {
                 c.getOrDefault(FeedbackState.REJECTED, 0),
                 c.getOrDefault(FeedbackState.REPLACED, 0),
                 c.getOrDefault(FeedbackState.FAILED, 0));
-    }
-
-    private static @Nullable Instant instant(@Nullable OffsetDateTime value) {
-        return value == null ? null : value.toInstant();
-    }
-
-    private static void add(
-            StringBuilder where, Map<String, Object> params, String sql, String key, @Nullable Object value) {
-        if (value != null) {
-            where.append(" AND " + sql);
-            params.put(key, value);
-        }
     }
 }

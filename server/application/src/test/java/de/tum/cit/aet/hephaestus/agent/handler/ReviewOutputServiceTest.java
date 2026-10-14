@@ -132,8 +132,12 @@ class ReviewOutputServiceTest extends BaseUnitTest {
                 .thenReturn(new AdmissionReceipt(List.of(), List.of()));
         service.prepare(job, submitted).record(job);
         verifyNoInteractions(verifier);
-        verify(membership).withhold(1, RuntimeReviewTestData.assignment(5L, null).id(),
-                CandidateRefusal.COVERAGE_INCONSISTENT, "Host coverage differs from the submitted read receipts");
+        verify(membership)
+                .withhold(
+                        1,
+                        RuntimeReviewTestData.assignment(5L, null).id(),
+                        CandidateRefusal.COVERAGE_INCONSISTENT,
+                        "Host coverage differs from the submitted read receipts");
     }
 
     @Test

@@ -30,7 +30,7 @@
 			"supportedAbsenceStates": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"],
 			"citation": {
 				"side": "FORBIDDEN",
-				"revision": "FORBIDDEN"
+				"commit": "FORBIDDEN"
 			}
 		},
 		{
@@ -62,7 +62,7 @@
 			"supportedAbsenceStates": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"],
 			"citation": {
 				"side": "REQUIRED",
-				"revision": "OPTIONAL"
+				"commit": "OPTIONAL"
 			}
 		},
 		{
@@ -94,7 +94,7 @@
 			"supportedAbsenceStates": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"],
 			"citation": {
 				"side": "FORBIDDEN",
-				"revision": "FORBIDDEN"
+				"commit": "FORBIDDEN"
 			}
 		},
 		{
@@ -126,7 +126,7 @@
 			"supportedAbsenceStates": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"],
 			"citation": {
 				"side": "FORBIDDEN",
-				"revision": "OPTIONAL"
+				"commit": "OPTIONAL"
 			}
 		},
 		{
@@ -158,7 +158,7 @@
 			"supportedAbsenceStates": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"],
 			"citation": {
 				"side": "FORBIDDEN",
-				"revision": "FORBIDDEN"
+				"commit": "FORBIDDEN"
 			}
 		},
 		{
@@ -190,7 +190,7 @@
 			"supportedAbsenceStates": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"],
 			"citation": {
 				"side": "FORBIDDEN",
-				"revision": "FORBIDDEN"
+				"commit": "FORBIDDEN"
 			}
 		},
 		{
@@ -222,7 +222,7 @@
 			"supportedAbsenceStates": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"],
 			"citation": {
 				"side": "FORBIDDEN",
-				"revision": "FORBIDDEN"
+				"commit": "FORBIDDEN"
 			}
 		},
 		{
@@ -254,7 +254,7 @@
 			"supportedAbsenceStates": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"],
 			"citation": {
 				"side": "FORBIDDEN",
-				"revision": "FORBIDDEN"
+				"commit": "FORBIDDEN"
 			}
 		},
 		{
@@ -286,7 +286,7 @@
 			"supportedAbsenceStates": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"],
 			"citation": {
 				"side": "FORBIDDEN",
-				"revision": "FORBIDDEN"
+				"commit": "FORBIDDEN"
 			}
 		},
 		{
@@ -318,7 +318,7 @@
 			"supportedAbsenceStates": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"],
 			"citation": {
 				"side": "FORBIDDEN",
-				"revision": "FORBIDDEN"
+				"commit": "FORBIDDEN"
 			}
 		},
 		{
@@ -350,7 +350,7 @@
 			"supportedAbsenceStates": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"],
 			"citation": {
 				"side": "FORBIDDEN",
-				"revision": "FORBIDDEN"
+				"commit": "FORBIDDEN"
 			}
 		},
 		{
@@ -382,7 +382,7 @@
 			"supportedAbsenceStates": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"],
 			"citation": {
 				"side": "FORBIDDEN",
-				"revision": "FORBIDDEN"
+				"commit": "FORBIDDEN"
 			}
 		},
 		{
@@ -414,7 +414,7 @@
 			"supportedAbsenceStates": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"],
 			"citation": {
 				"side": "FORBIDDEN",
-				"revision": "FORBIDDEN"
+				"commit": "FORBIDDEN"
 			}
 		},
 		{
@@ -452,7 +452,7 @@
 			"supportedAbsenceStates": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"],
 			"citation": {
 				"side": "FORBIDDEN",
-				"revision": "FORBIDDEN"
+				"commit": "FORBIDDEN"
 			}
 		},
 		{
@@ -490,7 +490,7 @@
 			"supportedAbsenceStates": ["NOT_COLLECTED", "UNAVAILABLE", "REDACTED", "COLLECTION_ERROR"],
 			"citation": {
 				"side": "FORBIDDEN",
-				"revision": "FORBIDDEN"
+				"commit": "FORBIDDEN"
 			}
 		}
 	]

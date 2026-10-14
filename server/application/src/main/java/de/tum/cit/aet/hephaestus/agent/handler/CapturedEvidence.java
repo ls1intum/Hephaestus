@@ -73,12 +73,12 @@ final class CapturedEvidence {
         return files.get(path);
     }
 
-    CitableText resolve(SourceKind kind, String path, CitationSide side, @Nullable String revision) {
+    CitableText resolve(SourceKind kind, String path, CitationSide side, @Nullable String commit) {
         var matches = manifest.citableTexts().stream()
                 .filter(text -> text.source().equals(kind.value())
                         && text.path().equals(path)
                         && text.side() == side
-                        && Objects.equals(text.revision(), revision))
+                        && Objects.equals(text.commit(), commit))
                 .toList();
         if (!available.contains(kind) || matches.size() != 1) {
             throw new CandidateEvidenceVerifier.Unverified(

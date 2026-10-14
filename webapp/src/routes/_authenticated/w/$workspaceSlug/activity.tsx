@@ -51,12 +51,11 @@ function Activity() {
 	const openCategory = detailStack.at(-1)?.target;
 
 	const period = periodFromSearch(search);
-	const userId = membership.data === undefined ? undefined : Number(membership.data.account.id);
 	const scope = {
 		workspaceSlug,
 		period,
-		userId,
-		enabled: login !== undefined && userId !== undefined,
+		own: true as const,
+		enabled: login !== undefined,
 	};
 	const category = openCategory?.kind === "activity" ? openCategory.category : undefined;
 	const openWork = useOpenWork({ workspaceSlug, login });

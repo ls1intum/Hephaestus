@@ -7,7 +7,6 @@ import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionField;
 import de.tum.cit.aet.hephaestus.practices.PracticeReleaseChoice;
 import de.tum.cit.aet.hephaestus.practices.dto.AcceptPracticeReleaseRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.CatalogDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogGroupInputDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeInputDTO;
@@ -43,6 +42,9 @@ class CatalogAdminControllerIntegrationTest extends AbstractWorkspaceIntegration
     @Autowired
     JsonMapper mapper;
 
+    @Autowired
+    CatalogEntryRepository entries;
+
     @Test
     @WithAdminUser
     void shouldMoveACatalogPracticeThroughTheGroupRoute() {
@@ -58,7 +60,7 @@ class CatalogAdminControllerIntegrationTest extends AbstractWorkspaceIntegration
                 DefinitionTestFixtures.authoring(DefinitionTestFixtures.definition()),
                 null));
 
-        var response = client.patch()
+        client.patch()
                 .uri("/admin/practice-catalog/practices/{slug}/group", practiceSlug)
                 .headers(TestAuthUtils.withCurrentUser())
                 .header(
@@ -69,16 +71,11 @@ class CatalogAdminControllerIntegrationTest extends AbstractWorkspaceIntegration
                 .exchange()
                 .expectStatus()
                 .isOk()
-                .expectBody(CatalogDTO.class)
-                .returnResult();
+                .expectBody(Void.class);
 
-        var moved = Objects.requireNonNull(response.getResponseBody()).practices().stream()
-                .filter(practice -> practice.slug().equals(practiceSlug))
-                .findFirst()
-                .orElseThrow();
-        assertThat(moved.groupSlug()).isEqualTo(groupSlug);
+        var moved = catalog.practice(practiceSlug);
+        assertThat(moved.effective().groupSlug()).isEqualTo(groupSlug);
         assertThat(moved.position()).isZero();
-        assertThat(catalog.practice(practiceSlug).effective().groupSlug()).isEqualTo(groupSlug);
     }
 
     @Test
@@ -214,7 +211,14 @@ class CatalogAdminControllerIntegrationTest extends AbstractWorkspaceIntegration
                 .filter(entry -> entry.shipped() != null)
                 .findFirst()
                 .orElseThrow();
-        var local = DefinitionTestFixtures.withCriteria(source.effective().definition(), "Locally authored criteria.");
+        var shipped = Objects.requireNonNull(source.shipped());
+        var older = DefinitionTestFixtures.withCriteria(shipped.definition(), "Previously shipped criteria.");
+        var row = new CatalogEntry(CatalogEntryType.PRACTICE, source.slug());
+        row.setKind(shipped.kind());
+        row.setDefinition(mapper.valueToTree(shipped.content()));
+        row.setBase(mapper.valueToTree(new CatalogPracticeDocument(shipped.kind(), shipped.groupSlug(), older)));
+        entries.saveAndFlush(row);
+        var local = DefinitionTestFixtures.withCriteria(shipped.definition(), "Locally authored criteria.");
         var current = customization.updatePractice(
                 source.slug(),
                 new CatalogPracticeUpdateDTO(
@@ -222,7 +226,8 @@ class CatalogAdminControllerIntegrationTest extends AbstractWorkspaceIntegration
                         source.effective().groupSlug(),
                         DefinitionTestFixtures.authoring(local),
                         source.position()),
-                EntityTagPrecondition.parse(EntityTagPrecondition.format(source.etag())));
+                EntityTagPrecondition.parse(EntityTagPrecondition.format(
+                        catalog.practice(source.slug()).etag())));
         client.put()
                 .uri("/admin/practice-catalog/practices/{slug}/release", source.slug())
                 .headers(TestAuthUtils.withCurrentUser())

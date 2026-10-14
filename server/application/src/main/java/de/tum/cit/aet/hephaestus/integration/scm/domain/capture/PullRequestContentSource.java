@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.scm.context.WorkspaceScmProjection;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitDetails;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -102,10 +103,6 @@ public class PullRequestContentSource {
         this.reviewCommentRepository = reviewCommentRepository;
         this.repositoryPreparer = repositoryPreparer;
         this.deliveredCommentLookup = deliveredCommentLookup;
-    }
-
-    public boolean supports(ScmCaptureContext request) {
-        return request.pullRequest();
     }
 
     public CaptureContribution capture(ScmCaptureContext request, Set<SourceKind> selectedKinds) {
@@ -403,7 +400,7 @@ public class PullRequestContentSource {
 
     private CommentCapture loadComments(long workspaceId, long pullRequestId) {
         Set<Long> postedComments = deliveredCommentLookup
-                .findForPullRequest(workspaceId, pullRequestId)
+                .findForPullRequest(workspaceId, pullRequestId, ScmItemEvents.PULL_REQUEST)
                 .inline();
         var comments = new ArrayList<>(reviewCommentRepository.findRecentHumanByPullRequestIdWithAuthor(
                 pullRequestId, WorkspaceScmProjection.HEPHAESTUS_MARKER, Pageable.unpaged()));

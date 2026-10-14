@@ -15,7 +15,7 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWorkerRole;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
-import de.tum.cit.aet.hephaestus.integration.core.itemevent.PracticeReviewRefusalMetrics;
+import de.tum.cit.aet.hephaestus.integration.core.metrics.IntegrationCoreMetrics;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
@@ -55,7 +55,6 @@ public class ReviewJobClaimService {
     private final TransactionTemplate transactionTemplate;
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
-    private final PracticeReviewRefusalMetrics practiceReviewRefusalMetrics;
     private final LlmBudgetService llmBudgetService;
     private final @Nullable LlmAdmissionService llmAdmissionService;
     private final ReviewJobTelemetry jobTelemetry;
@@ -71,7 +70,6 @@ public class ReviewJobClaimService {
             TransactionTemplate transactionTemplate,
             ObjectMapper objectMapper,
             MeterRegistry meterRegistry,
-            PracticeReviewRefusalMetrics refusalMetrics,
             LlmBudgetService llmBudgetService,
             @Nullable LlmAdmissionService llmAdmissionService,
             ReviewJobTelemetry jobTelemetry,
@@ -83,7 +81,6 @@ public class ReviewJobClaimService {
         this.transactionTemplate = transactionTemplate;
         this.objectMapper = objectMapper;
         this.meterRegistry = meterRegistry;
-        this.practiceReviewRefusalMetrics = refusalMetrics;
         this.llmBudgetService = llmBudgetService;
         this.llmAdmissionService = llmAdmissionService;
         this.jobTelemetry = jobTelemetry;
@@ -348,7 +345,9 @@ public class ReviewJobClaimService {
     }
 
     private void recordPracticeReviewRefusal(String reason) {
-        practiceReviewRefusalMetrics.recordExecutionRefusal(reason);
+        meterRegistry
+                .counter(IntegrationCoreMetrics.PRACTICE_REVIEW_REFUSED, "phase", "execution", "reason", reason)
+                .increment();
     }
 
     private @Nullable UsageFundingSource claimedFundingSource(ReviewJob job) {

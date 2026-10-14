@@ -24,6 +24,7 @@ import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
 import de.tum.cit.aet.hephaestus.practices.review.model.Review;
 import de.tum.cit.aet.hephaestus.practices.review.model.ReviewItem;
 import de.tum.cit.aet.hephaestus.practices.review.model.ReviewPractice;
+import de.tum.cit.aet.hephaestus.practices.spi.ClaimedCoverage;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
@@ -179,6 +180,7 @@ public final class SlackConversationTestSupport {
                 .itemVersion("test-version")
                 .developerId(developerId)
                 .outcome(ResultOutcome.MET)
+                .coverage(OM.valueToTree(new ClaimedCoverage(true, null, 1, 1, 1)))
                 .recordedAt(at)
                 .build());
         assignment.setState(ReviewItemState.JUDGED);

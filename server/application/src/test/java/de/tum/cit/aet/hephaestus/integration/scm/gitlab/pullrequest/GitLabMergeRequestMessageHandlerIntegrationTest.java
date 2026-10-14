@@ -462,7 +462,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
             assertThat(reviewerStates()).containsEntry("user1", RequestedReviewer.ReviewState.UNREVIEWED);
         }
 
-    // GitLab before 18.6 omits reviewer state from hooks; only sync can supply that state.
+        // GitLab before 18.6 omits reviewer state from hooks; only sync can supply that state.
         @Test
         void shouldKeepEachStoredStateWhenAHookListsTheReviewersWithoutOne() throws Exception {
             sync(
@@ -495,7 +495,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
             assertThat(reviewerStates()).containsEntry("user1", null);
         }
 
-    // GitLab omits empty reviewers and assignees from hooks.
+        // GitLab omits empty reviewers and assignees from hooks.
         @Test
         void shouldRemoveTheLastReviewersAndAssigneesWhenTheHookLeavesTheListsOut() throws Exception {
             receive(loadPayload("merge_request.update.reviewers.derived"));
@@ -1895,7 +1895,8 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                 .setReviewDecision(decision));
     }
 
-    // GitLab sends an update hook when the last thread resolves, but the hook names no thread; read discussions to resolve it.
+    // GitLab sends an update hook when the last thread resolves, but the hook names no thread; read discussions to
+    // resolve it.
     @Nested
     class DiscussionResolution {
 

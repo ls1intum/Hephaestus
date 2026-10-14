@@ -70,7 +70,7 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
             Workspace workspace, @Nullable String cost, UsageFundingSource funding, UsagePricingState pricing) {
         LlmUsageEvent event = new LlmUsageEvent();
         event.setId(UUID.randomUUID());
-        event.setWorkspace(workspace);
+        event.setWorkspaceId(workspace.getId());
         event.setJobType("PRACTICE_REVIEW");
         event.setSourceType(UsageSourceType.REVIEW_JOB);
         event.setSourceId(UUID.randomUUID());

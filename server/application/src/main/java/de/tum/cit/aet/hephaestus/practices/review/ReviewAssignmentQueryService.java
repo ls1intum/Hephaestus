@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
@@ -31,23 +30,11 @@ public class ReviewAssignmentQueryService implements ReviewAssignmentQuery {
     private final PracticeVersionRepository versions;
     private final ProductItemQuery itemQuery;
     private final JsonMapper json;
-    private final JdbcClient jdbc;
 
     @Override
     public List<ReviewAssignmentId> executable(long workspaceId, UUID reviewId, long itemId) {
-        return jdbc
-                .sql("SELECT m.practice_id FROM review_item m JOIN review r ON r.id=m.review_id AND"
-                        + " r.workspace_id=m.workspace_id JOIN review_practice p ON p.review_id=m.review_id AND"
-                        + " p.workspace_id=m.workspace_id AND p.practice_id=m.practice_id WHERE m.workspace_id=:ws"
-                        + " AND m.review_id=:review AND m.item_id=:item AND m.state='LISTED' AND p.status='READY'"
-                        + " AND r.status IN ('QUEUED','RUNNING') AND NOT"
-                        + " COALESCE((r.checks->>'cancellationRequested')::boolean,false) ORDER BY m.practice_id")
-                .param("ws", workspaceId)
-                .param("review", reviewId)
-                .param("item", itemId)
-                .query((rs, n) -> new ReviewAssignmentId(reviewId, rs.getLong(1), itemId))
-                .list()
-                .stream()
+        return items.executablePracticeIds(workspaceId, reviewId, itemId).stream()
+                .map(practiceId -> new ReviewAssignmentId(reviewId, practiceId, itemId))
                 .filter(id -> find(workspaceId, id).isPresent())
                 .toList();
     }

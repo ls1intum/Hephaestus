@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { requestReviewMutation } from "@/api/@tanstack/react-query.gen";
 import type { CreateReviewRequest, ReviewRequestOutcome } from "@/api/types.gen";
 import { PRACTICE_REVIEW_READS } from "@/components/admin/practice-reviews/review-search";
+import { ITEM_EVENT_REASON_SENTENCES } from "@/components/practice-vocabulary/item-event-defs";
 import { problemDetailOf } from "@/lib/problem-detail";
 import { invalidateWorkspaceReads } from "@/runtime/tanstack-query/invalidate-workspace-reads";
 
@@ -52,7 +53,8 @@ export function useRequestPracticeReview(
 					setRefusal({ itemId: body.itemId, outcome });
 				} else {
 					toast.warning("No review was started", {
-						description: outcome.reasonDescription ?? undefined,
+						description:
+							outcome.reason === null ? undefined : ITEM_EVENT_REASON_SENTENCES[outcome.reason],
 					});
 				}
 				return;

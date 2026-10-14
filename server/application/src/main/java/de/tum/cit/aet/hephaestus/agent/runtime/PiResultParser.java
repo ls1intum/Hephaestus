@@ -339,7 +339,7 @@ public class PiResultParser {
      * not finish" for each would turn a lost file into a claim about the programs. An invalid report never creates a
      * verdict: it only explains execution.
      *
-     * @param admitted the program kind of each admitted practice, by slug: custom when its revision holds a script
+     * @param admitted the program kind of each admitted practice, by slug: custom when its commit holds a script
      */
     public List<PracticeScriptRunReport> parsePracticeScriptReport(
             byte @Nullable [] reportFile, Map<String, ScriptKind> admitted) {

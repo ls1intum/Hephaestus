@@ -14,11 +14,14 @@ import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.practices.result.dto.ResultListDTO;
 import de.tum.cit.aet.hephaestus.practices.review.ProductReferenceQuery;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewItemRepository;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
 import de.tum.cit.aet.hephaestus.practices.review.dto.ItemRefDTO;
 import de.tum.cit.aet.hephaestus.practices.review.model.Review;
 import de.tum.cit.aet.hephaestus.practices.review.model.ReviewItem;
 import de.tum.cit.aet.hephaestus.practices.review.report.ScanEvidencePolicy;
-import de.tum.cit.aet.hephaestus.practices.review.report.ScanMembershipQuery;
+import de.tum.cit.aet.hephaestus.practices.review.report.ScanMembershipQueries;
+import de.tum.cit.aet.hephaestus.practices.review.report.ScanMembershipQueries.ItemFilter;
+import de.tum.cit.aet.hephaestus.practices.review.report.ScanMembershipQueries.ProblemFilter;
 import de.tum.cit.aet.hephaestus.practices.review.report.ScanReportCursor;
 import de.tum.cit.aet.hephaestus.practices.review.report.ScanReportService;
 import de.tum.cit.aet.hephaestus.practices.scan.dto.JudgedScanReportItemDTO;
@@ -33,9 +36,7 @@ import de.tum.cit.aet.hephaestus.practices.scan.dto.ScanReportProblemsPageDTO;
 import de.tum.cit.aet.hephaestus.practices.scan.dto.WithheldScanReportItemDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.Currentness;
 import de.tum.cit.aet.hephaestus.practices.spi.ProblemBaselineState;
-import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewItemState;
-import de.tum.cit.aet.hephaestus.practices.spi.Severity;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -64,7 +65,7 @@ public class ScanReportItemsService {
     private final ProductReferenceQuery references;
     private final ResultPresentation presentation;
     private final ResultRepository results;
-    private final ScanMembershipQuery membershipQuery;
+    private final ReviewRepository membershipQuery;
     private final ReviewItemRepository members;
     private final ResultViewQuery views;
     private final PracticeRepository practices;
@@ -90,7 +91,7 @@ public class ScanReportItemsService {
                 .findByWorkspaceIdAndIdIn(
                         workspaceId,
                         page.stream()
-                                .map(ScanMembershipQuery.ItemKey::resultId)
+                                .map(ScanMembershipQueries.ItemKey::resultId)
                                 .filter(Objects::nonNull)
                                 .distinct()
                                 .toList())
@@ -246,7 +247,8 @@ public class ScanReportItemsService {
                 more);
     }
 
-    List<ProblemRow> problemRows(Review review, ProblemFilter filter, @Nullable ScanReportCursor after, int limit) {
+    public List<ProblemRow> problemRows(
+            Review review, ProblemFilter filter, @Nullable ScanReportCursor after, int limit) {
         var next = after;
         var frozen = reports.recorded(review);
         var pinned = frozen.practices().stream().collect(Collectors.toMap(p -> Long.parseLong(p.practiceId()), p -> p));
@@ -258,7 +260,7 @@ public class ScanReportItemsService {
                     .findByWorkspaceIdAndIdIn(
                             review.getWorkspaceId(),
                             keys.stream()
-                                    .map(ScanMembershipQuery.ProblemKey::resultId)
+                                    .map(ScanMembershipQueries.ProblemKey::resultId)
                                     .distinct()
                                     .toList())
                     .stream()
@@ -333,20 +335,6 @@ public class ScanReportItemsService {
     private record MemberRow(ReviewItem member, ItemRefDTO item, ScanPracticeReportDTO practice, int problemCount) {}
 
     record ProblemRow(ScanReportCursor key, ScanReportProblemDTO dto, Result result) {}
-
-    public record ItemFilter(
-            @Nullable String practiceSlug,
-            @Nullable ResultOutcome outcome,
-            @Nullable String status,
-            @Nullable Boolean reused,
-            @Nullable String path) {}
-
-    public record ProblemFilter(
-            @Nullable String practiceSlug,
-            @Nullable Severity severity,
-            @Nullable String path,
-            @Nullable ProblemBaselineState baselineState,
-            boolean openOnly) {}
 
     private record Key(long practiceId, long itemId) {}
 }

@@ -5,12 +5,14 @@ import { expectNoOverflowingElement } from "@/stories/reflow";
 import { Stateful } from "@/stories/stateful";
 
 import { PracticeReviewedByEditor } from "./PracticeReviewedByEditor";
-import { limitWithText, type ReviewedByDraft } from "./reviewed-by";
+import type { ReviewedByDraft } from "./reviewed-by";
 
 const hephaestus: ReviewedByDraft = {
 	by: "HEPHAESTUS",
-	humanReason: limitWithText(""),
-	limits: [limitWithText("Repository evidence does not establish behavior in a deployed runtime.")],
+	humanReason: { description: "" },
+	limits: [
+		{ description: "Repository evidence does not establish behavior in a deployed runtime." },
+	],
 };
 
 const meta = {
@@ -53,7 +55,7 @@ export const People: Story = {
 		value: {
 			...hephaestus,
 			by: "PEOPLE",
-			humanReason: limitWithText("The trade-off was agreed in a meeting no review can read."),
+			humanReason: { description: "The trade-off was agreed in a meeting no review can read." },
 		},
 	},
 	play: async ({ canvas }) => {

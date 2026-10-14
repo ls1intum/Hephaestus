@@ -21,15 +21,10 @@ import de.tum.cit.aet.hephaestus.practices.review.ProductReferenceQuery;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ResultMarkDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.ClaimBasis;
 import de.tum.cit.aet.hephaestus.practices.spi.Currentness;
-import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
-import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
-import de.tum.cit.aet.hephaestus.practices.spi.FeedbackResolution;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
-import de.tum.cit.aet.hephaestus.practices.spi.FeedbackUsefulness;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultCoverage;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultMarkKind;
 import java.time.Instant;
-import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.EnumMap;
 import java.util.List;
@@ -40,7 +35,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
@@ -52,7 +46,7 @@ public class ResultPresentation {
     private final ResultMarkRepository marks;
     private final ProblemRepository problems;
     private final ProductReferenceQuery references;
-    private final JdbcClient jdbc;
+    private final ResultCommunicationRepository communication;
     private final JsonMapper json;
 
     public String name(ResultView view) {
@@ -214,37 +208,17 @@ public class ResultPresentation {
     }
 
     public List<ReviewBoundFeedbackDTO> boundFeedback(Result r) {
-        return jdbc.sql("""
-            SELECT DISTINCT f.id,f.destination,f.state,f.delivered_at,
-              COALESCE((SELECT d.action='WITHDRAW' FROM feedback_decision d WHERE d.workspace_id=f.workspace_id AND d.feedback_id=f.id AND d.action IN ('WITHDRAW','RESTORE') ORDER BY d.decided_at DESC,d.id::text DESC LIMIT 1),false) AS withdrawn
-            FROM feedback f JOIN feedback_basis b ON b.feedback_id=f.id AND b.workspace_id=f.workspace_id
-            WHERE f.workspace_id=:ws AND b.result_id=:id ORDER BY f.id
-            """)
-                .param("ws", r.getWorkspaceId())
-                .param("id", r.getId())
-                .query((rs, n) -> new ReviewBoundFeedbackDTO(
-                        rs.getObject("id", UUID.class),
-                        FeedbackDestination.valueOf(rs.getString("destination")),
-                        FeedbackState.valueOf(rs.getString("state")),
-                        instant(rs.getObject("delivered_at", OffsetDateTime.class)),
-                        rs.getBoolean("withdrawn")))
-                .list();
+        return communication.boundFeedback(r.getWorkspaceId(), r.getId()).stream()
+                .map(row -> new ReviewBoundFeedbackDTO(
+                        row.getId(), row.getDestination(), row.getState(), row.getDeliveredAt(), row.getWithdrawn()))
+                .toList();
     }
 
     public List<FeedbackDisagreementDTO> disagreements(Result r) {
-        return jdbc.sql("""
-            SELECT DISTINCT f.id,f.destination,s.comment,s.created_at FROM feedback f
-            JOIN feedback_basis b ON b.feedback_id=f.id AND b.workspace_id=f.workspace_id JOIN LATERAL (SELECT r.* FROM feedback_response r WHERE r.feedback_id=f.id AND r.workspace_id=f.workspace_id ORDER BY r.created_at DESC,r.id::text DESC LIMIT 1) s ON true
-            WHERE f.workspace_id=:ws AND b.result_id=:id AND s.resolution='DISAGREE' ORDER BY s.created_at
-            """)
-                .param("ws", r.getWorkspaceId())
-                .param("id", r.getId())
-                .query((rs, n) -> new FeedbackDisagreementDTO(
-                        rs.getObject("id", UUID.class),
-                        FeedbackDestination.valueOf(rs.getString("destination")),
-                        rs.getString("comment"),
-                        rs.getObject("created_at", OffsetDateTime.class).toInstant()))
-                .list();
+        return communication.disagreements(r.getWorkspaceId(), r.getId()).stream()
+                .map(row -> new FeedbackDisagreementDTO(
+                        row.getId(), row.getDestination(), row.getComment(), row.getRespondedAt()))
+                .toList();
     }
 
     public ReviewFeedbackCountsDTO feedbackCounts(Result r) {
@@ -262,54 +236,30 @@ public class ResultPresentation {
     }
 
     public List<OwnFeedbackRefDTO> ownFeedback(Result r) {
-        if (r.getDeveloperId() == null) return List.of();
-        return jdbc.sql("""
-            SELECT DISTINCT f.id,f.destination,f.state,f.delivered_at,s.resolution,s.usefulness,s.comment,s.created_at AS responded_at
-            FROM feedback f JOIN feedback_basis b ON b.feedback_id=f.id AND b.workspace_id=f.workspace_id LEFT JOIN LATERAL (SELECT r.* FROM feedback_response r WHERE r.feedback_id=f.id AND r.workspace_id=f.workspace_id ORDER BY r.created_at DESC,r.id::text DESC LIMIT 1) s ON true
-            WHERE f.workspace_id=:ws AND f.developer_id=:developer AND b.result_id=:id ORDER BY f.id
-            """)
-                .param("ws", r.getWorkspaceId())
-                .param("developer", r.getDeveloperId())
-                .param("id", r.getId())
-                .query((rs, n) -> {
-                    var id = rs.getObject("id", UUID.class);
-                    var responded = rs.getObject("responded_at", OffsetDateTime.class);
+        var developer = r.getDeveloperId();
+        if (developer == null) return List.of();
+        return communication.ownFeedback(r.getWorkspaceId(), developer, r.getId()).stream()
+                .map(row -> {
+                    var responded = row.getRespondedAt();
                     var response = responded == null
                             ? null
                             : new FeedbackResponseDTO(
-                                    rs.getString("resolution") == null
-                                            ? null
-                                            : FeedbackResolution.valueOf(rs.getString("resolution")),
-                                    rs.getString("usefulness") == null
-                                            ? null
-                                            : FeedbackUsefulness.valueOf(rs.getString("usefulness")),
-                                    rs.getString("comment"),
-                                    responded.toInstant());
+                                    row.getResolution(), row.getUsefulness(), row.getComment(), responded);
                     return new OwnFeedbackRefDTO(
-                            id,
-                            FeedbackDestination.valueOf(rs.getString("destination")),
-                            FeedbackState.valueOf(rs.getString("state")),
-                            instant(rs.getObject("delivered_at", OffsetDateTime.class)),
+                            row.getId(),
+                            row.getDestination(),
+                            row.getState(),
+                            row.getDeliveredAt(),
                             response,
-                            ownCopies(r.getWorkspaceId(), id));
+                            ownCopies(r.getWorkspaceId(), row.getId()));
                 })
-                .list();
+                .toList();
     }
 
     private List<OwnFeedbackCopyRefDTO> ownCopies(long ws, UUID feedback) {
-        return jdbc.sql("SELECT id,kind,external_url,posted_at FROM feedback_copy WHERE workspace_id=:ws AND"
-                        + " feedback_id=:id AND posted_at IS NOT NULL ORDER BY position,id")
-                .param("ws", ws)
-                .param("id", feedback)
-                .query((rs, n) -> new OwnFeedbackCopyRefDTO(
-                        rs.getObject("id", UUID.class),
-                        FeedbackCopyKind.valueOf(rs.getString("kind")),
-                        rs.getString("external_url"),
-                        rs.getObject("posted_at", OffsetDateTime.class).toInstant()))
-                .list();
-    }
-
-    private static @Nullable Instant instant(@Nullable OffsetDateTime value) {
-        return value == null ? null : value.toInstant();
+        return communication.ownCopies(ws, feedback).stream()
+                .map(row ->
+                        new OwnFeedbackCopyRefDTO(row.getId(), row.getKind(), row.getExternalUrl(), row.getPostedAt()))
+                .toList();
     }
 }

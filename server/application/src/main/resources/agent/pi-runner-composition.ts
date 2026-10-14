@@ -234,9 +234,10 @@ export interface PracticePageSupportOccurrence {
 
 export const PRACTICE_PAGE_DECISIONS = [
 	"ADMIT",
+	"FEEDBACK_OFF",
+	"GATE_REFUSED",
 	"NO_EVIDENCE",
 	"UNCORROBORATED",
-	"PRACTICE_REQUIRES_APPROVAL",
 	"BACKFILL_HELD",
 	"RECENTLY_SURFACED",
 	"UNATTRIBUTABLE_SUBJECT",
@@ -244,18 +245,60 @@ export const PRACTICE_PAGE_DECISIONS = [
 
 export const CONVERSATION_DECISIONS = [
 	"ADMIT",
+	"FEEDBACK_OFF",
 	"MENTOR_UNAVAILABLE",
-	"NOT_DELIVERABLE",
+	"GATE_REFUSED",
+	"UNATTRIBUTABLE_SUBJECT",
 	"HAS_INLINE_ANCHOR",
 	"ALREADY_DELIVERED_ON_WORK",
 	"REVIEWER_DEFERRED",
-	"PRACTICE_REQUIRES_APPROVAL",
 	"BACKFILL_QUIET",
 ] as const;
+
+const FEEDBACK_STOP_REASONS = [
+	"VOLUME_CAPPED",
+	"COMPOSER_WITHHELD",
+	"NOTHING_NEW",
+	"REPEATS_DELIVERED_NOTE",
+	"REACTED_DISAGREE",
+	"REACTED_NOT_APPLICABLE",
+	"CONVERSATION_EXPIRED",
+	"DELIVERY_UNCONFIRMED",
+	"ITEM_GONE",
+	"ITEM_CLOSED",
+	"ITEM_MERGED",
+	"ITEM_STATE_INELIGIBLE",
+	"ISSUE_SNAPSHOT_CHANGED",
+	"PUBLIC_SUBJECT_INELIGIBLE",
+	"NO_AI",
+	"DELIVERY_OFF",
+	"PERSON_SUPPRESSED",
+	"RECIPIENT_UNAVAILABLE",
+	"EMPTY_AFTER_SANITIZE",
+	"INSTANCE_SILENCED",
+	"FEEDBACK_OFF",
+	"WORKSPACE_DISABLED",
+	"WORKSPACE_DELIVERY_PAUSED",
+	"STALE_ROLLOUT_REVISION",
+	"OUTSIDE_CURRENT_SCOPE",
+	"APPROVAL_STALE",
+	"APPROVAL_NO_LONGER_ELIGIBLE",
+	"PRACTICE_REQUIRES_APPROVAL",
+	"BACKFILL_QUIET",
+	"RESULT_MARKED_INCORRECT",
+	"REVIEWED_VERSION_CHANGED",
+	"REVIEW_CANCELLED",
+	"EVIDENCE_NOT_PERMITTED",
+	"NO_EVIDENCE",
+	"UNCORROBORATED",
+] as const;
+
+type FeedbackStopReason = (typeof FEEDBACK_STOP_REASONS)[number];
 
 export interface PracticePagePracticeSupport {
 	practiceSlug: string;
 	decision: (typeof PRACTICE_PAGE_DECISIONS)[number];
+	stopReason: FeedbackStopReason | null;
 	occurrences: PracticePageSupportOccurrence[];
 }
 
@@ -267,7 +310,11 @@ export type ConversationEligibility =
 	| {
 			state: "COMPLETE";
 			readAt: string;
-			results: { resultId: string; decision: (typeof CONVERSATION_DECISIONS)[number] }[];
+			results: {
+				resultId: string;
+				decision: (typeof CONVERSATION_DECISIONS)[number];
+				stopReason: FeedbackStopReason | null;
+			}[];
 	  }
 	| { state: "UNAVAILABLE" | "REFUSED"; readAt: string };
 
@@ -304,11 +351,17 @@ const pageSupportSchema = z.discriminatedUnion("state", [
 		state: z.literal("COMPLETE"),
 		readAt: instantSchema,
 		practices: z.array(
-			z.strictObject({
-				practiceSlug: z.string(),
-				decision: z.enum(PRACTICE_PAGE_DECISIONS),
-				occurrences: z.array(supportOccurrenceSchema),
-			}),
+			z
+				.strictObject({
+					practiceSlug: z.string(),
+					decision: z.enum(PRACTICE_PAGE_DECISIONS),
+					stopReason: z.enum(FEEDBACK_STOP_REASONS).nullable(),
+					occurrences: z.array(supportOccurrenceSchema),
+				})
+				.refine((value) => value.decision !== "GATE_REFUSED" || value.stopReason !== null, {
+					path: ["stopReason"],
+					message: "a gate refusal requires its recorded reason",
+				}),
 		),
 	}),
 	z.strictObject({
@@ -325,7 +378,16 @@ const conversationEligibilitySchema = z.discriminatedUnion("state", [
 		state: z.literal("COMPLETE"),
 		readAt: instantSchema,
 		results: z.array(
-			z.strictObject({ resultId: z.string(), decision: z.enum(CONVERSATION_DECISIONS) }),
+			z
+				.strictObject({
+					resultId: z.string(),
+					decision: z.enum(CONVERSATION_DECISIONS),
+					stopReason: z.enum(FEEDBACK_STOP_REASONS).nullable(),
+				})
+				.refine((value) => value.decision !== "GATE_REFUSED" || value.stopReason !== null, {
+					path: ["stopReason"],
+					message: "a gate refusal requires its recorded reason",
+				}),
 		),
 	}),
 	z.strictObject({

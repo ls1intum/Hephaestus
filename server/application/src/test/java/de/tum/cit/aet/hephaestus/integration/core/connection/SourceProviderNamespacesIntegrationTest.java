@@ -231,7 +231,7 @@ class SourceProviderNamespacesIntegrationTest extends BaseIntegrationTest {
                 .findByTypeAndServerUrl(IdentityProviderType.OUTLINE, sourceUrl)
                 .orElseThrow();
         var target = document(first, "native-42", "Source-private-canary");
-        var exact = new PersonIdentity(Objects.requireNonNull(provider.getId()), "native-42", null);
+        var exact = new PersonIdentity(Objects.requireNonNull(provider.getId()), "native-42", first.getInstanceKey());
         var scope = resolver.resolve(null, List.of(exact));
         assertThat(scope.accountId()).isNull();
         assertThat(scope.outlineDocumentIds()).containsExactly(target.getId());
@@ -294,8 +294,13 @@ class SourceProviderNamespacesIntegrationTest extends BaseIntegrationTest {
 
     private Connection activate(IntegrationKind kind, ConnectionConfig config) {
         var workspace = workspaces.saveAndFlush(WorkspaceTestFixtures.activeWorkspace("source-" + UUID.randomUUID()));
-        var connection = connections.saveAndFlush(
-                new Connection(workspace, kind, UUID.randomUUID().toString(), config));
+        String instanceKey =
+                switch (config) {
+                    case ConnectionConfig.OutlineConfig ignored -> "outline-team";
+                    case ConnectionConfig.SlackConfig slack -> Objects.requireNonNull(slack.teamId());
+                    default -> UUID.randomUUID().toString();
+                };
+        var connection = connections.saveAndFlush(new Connection(workspace, kind, instanceKey, config));
         return connectionService.transition(
                 connection,
                 new ConnectionService.TransitionRequest(

@@ -24,7 +24,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,7 +36,7 @@ public class PracticeReviewCoverageService {
     private final RepositoryToMonitorRepository monitorRepository;
     private final ReviewScopeRepositoryRepository repositoryTargetRepository;
     private final PersonProcessingSuppression suppression;
-    private final JdbcClient jdbc;
+    private final ProductItemRepository items;
     private final MonitoredRepositoryQuery monitored;
     private final MembershipReviewSelection selections;
 
@@ -80,11 +79,7 @@ public class PracticeReviewCoverageService {
     }
 
     public Set<Long> eligibleAccountIds(long workspaceId) {
-        return jdbc.sql("""
-            SELECT m.account_id FROM membership m JOIN account a ON a.id=m.account_id
-            WHERE m.workspace_id=:ws AND m.left_at IS NULL AND NOT m.hidden
-              AND a.status IN ('ACTIVE','UNCLAIMED') AND (a.ai_choice IS NULL OR a.ai_choice <> 'NO_AI')
-            """).param("ws", workspaceId).query((rs, n) -> rs.getLong(1)).list().stream()
+        return selections.eligibleAccountIds(workspaceId).stream()
                 .filter(id -> !suppression.isAccountSuppressed(id))
                 .collect(Collectors.toUnmodifiableSet());
     }
@@ -98,12 +93,7 @@ public class PracticeReviewCoverageService {
                         Objects.requireNonNull(indexed.get(t.getRepositoryMonitorId())), t.getBaseBranches()))
                 .sorted(Comparator.comparingLong(ReviewRepositoryTarget::repositoryItemId))
                 .toList();
-        List<Long> selected = jdbc.sql(
-                        "SELECT account_id FROM membership WHERE workspace_id=:ws AND review_selected ORDER BY"
-                                + " account_id")
-                .param("ws", workspace.getId())
-                .query((rs, n) -> rs.getLong(1))
-                .list();
+        List<Long> selected = selections.selectedAccountIds(workspace.getId());
         var s = workspace.getReviewSettings();
         return new WorkspaceReviewScope(
                 s.getReviewScopeRepositories(), s.getReviewScopePeople(), repositories, selected);
@@ -213,15 +203,7 @@ public class PracticeReviewCoverageService {
     }
 
     public @Nullable Long repositoryItemId(long workspaceId, long itemId) {
-        return jdbc.sql("WITH RECURSIVE ancestry AS (SELECT id,kind,parent_id FROM item WHERE workspace_id=:ws AND"
-                        + " id=:item UNION SELECT parent.id,parent.kind,parent.parent_id FROM item parent JOIN"
-                        + " ancestry child ON child.parent_id=parent.id WHERE parent.workspace_id=:ws) SELECT id"
-                        + " FROM ancestry WHERE kind='scm.repository'")
-                .param("ws", workspaceId)
-                .param("item", itemId)
-                .query((rs, n) -> rs.getLong(1))
-                .optional()
-                .orElse(null);
+        return items.repositoryItemId(workspaceId, itemId);
     }
 
     @Transactional

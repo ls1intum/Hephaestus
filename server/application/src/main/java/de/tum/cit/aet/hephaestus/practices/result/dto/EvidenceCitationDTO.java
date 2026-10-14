@@ -19,7 +19,7 @@ public record EvidenceCitationDTO(
         CitationSide side,
 
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
-        String revision,
+        String commit,
 
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
         Integer startLine,

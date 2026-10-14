@@ -170,8 +170,7 @@ const ECOSYSTEMS: Ecosystem[] = [
 		isManifest: (b) => b === "project.yml" || b === "project.yaml",
 		lockfiles: ["Package.resolved"],
 		parse: () => null,
-		dependencyLine:
-			/^\s*(?:url|from|exactVersion|majorVersion|minorVersion|branch|revision):\s*\S/u,
+		dependencyLine: /^\s*(?:url|from|exactVersion|majorVersion|minorVersion|branch|commit):\s*\S/u,
 	},
 	{
 		isManifest: (b) => b === "go.mod",

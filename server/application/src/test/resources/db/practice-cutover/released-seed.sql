@@ -23,7 +23,7 @@ VALUES('00000000-0000-0000-0000-000000992111',992101,'PULL_REQUEST_REVIEW','COMP
 ('00000000-0000-0000-0000-000000992113',992101,'PULL_REQUEST_REVIEW','COMPLETED','{}','released-pending',0,'2026-01-03T00:00:00Z','2026-01-03T00:01:00Z','2026-01-03T00:00:00Z',repeat('c',32),'{"pull_request_id":992109,"about_user_id":992103}','PENDING');
 INSERT INTO observation(id,occurrence_key,agent_job_id,workspace_id,practice_id,practice_revision_id,artifact_kind,artifact_id,about_user_id,summary,outcome,severity,evidence,evidence_rationale,observed_at)
 VALUES('00000000-0000-0000-0000-000000992141','released-negative','00000000-0000-0000-0000-000000992111',992101,992121,992131,'scm.pull_request',992109,992103,'Explain the retry','NOT_MET','INFO',
-'{"citations":[{"sourceKind":"scm.pull-request.core","artifactPath":"context/description.md","path":"description.md","startLine":1,"endLine":1,"quote":"Add retry"}]}','The description gives no reason.','2026-01-01T00:00:30Z');
+'{"citations":[{"sourceKind":"scm.pull-request.core","artifactPath":"context/description.md","revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","path":"description.md","startLine":1,"endLine":1,"quote":"Add retry"}]}','The description gives no reason.','2026-01-01T00:00:30Z');
 INSERT INTO observation_invalidation(id,workspace_id,observation_id,reason,invalidated_at,invalidated_by_account_id,provider_copy,provider_copy_retry_at)
 VALUES('00000000-0000-0000-0000-000000992151',992101,'00000000-0000-0000-0000-000000992141','Wrong evidence','2026-01-01T00:02:00Z',992106,'NONE','2026-01-01T00:02:00Z');
 INSERT INTO feedback(id,workspace_id,agent_job_id,recipient_user_id,about_user_id,channel,position,delivery_state,source,body,created_at,delivered_at)

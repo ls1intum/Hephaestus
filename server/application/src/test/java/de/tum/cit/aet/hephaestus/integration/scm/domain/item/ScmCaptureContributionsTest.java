@@ -27,7 +27,7 @@ class ScmCaptureContributionsTest extends BaseUnitTest {
                     throw second;
                 }),
                 contribution(() -> closed.add(3)));
-        assertThatThrownBy(() -> ScmCaptureContributions.closeAll(contributions))
+        assertThatThrownBy(() -> CaptureContribution.closeAll(contributions))
                 .isSameAs(first)
                 .hasSuppressedException(second);
         assertThat(closed).containsExactly(1, 2, 3);
@@ -46,7 +46,7 @@ class ScmCaptureContributionsTest extends BaseUnitTest {
                     closed.add(2);
                     throw failure;
                 }));
-        assertThatThrownBy(() -> ScmCaptureContributions.closeAll(values))
+        assertThatThrownBy(() -> CaptureContribution.closeAll(values))
                 .isSameAs(failure)
                 .hasNoSuppressedExceptions();
         assertThat(closed).containsExactly(1, 2);

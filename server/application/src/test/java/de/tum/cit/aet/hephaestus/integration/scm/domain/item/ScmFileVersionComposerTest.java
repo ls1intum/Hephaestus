@@ -1,9 +1,12 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.item;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -39,13 +42,30 @@ class ScmFileVersionComposerTest extends BaseUnitTest {
         assertThat(composer.kinds()).containsExactly(ScmItemEvents.FILE);
         var original = composer.compose(file, pinned, List.of("src/**"));
         assertThat(original.baseVersion()).isEqualTo(pinned.value());
+        assertThat(composer.contextPaths(file, original, List.of("src/**"))).containsExactly("src/b.ts");
+        assertThatThrownBy(() -> composer.contextPaths(file, original, List.of("README.md")))
+                .isInstanceOfSatisfying(
+                        ItemCaptureException.class,
+                        failure -> assertThat(failure.code()).isEqualTo(ItemCaptureCode.VERSION_UNAVAILABLE));
+        for (var invalid :
+                List.of(new ItemVersion(original.value(), null), new ItemVersion(original.value(), "main"))) {
+            assertThatThrownBy(() -> composer.contextPaths(file, invalid, List.of("src/**")))
+                    .isInstanceOfSatisfying(
+                            ItemCaptureException.class,
+                            failure -> assertThat(failure.code()).isEqualTo(ItemCaptureCode.VERSION_UNAVAILABLE));
+        }
         when(tree.inventory(key, pinned.value()))
                 .thenReturn(List.of(
                         self, context, new ScmFileVersions.Entry(unrelated.path(), unrelated.mode(), "e".repeat(40))));
         assertThat(composer.compose(file, pinned, List.of("src/**"))).isEqualTo(original);
+        assertThat(composer.contextPaths(file, original, List.of("src/**"))).containsExactly("src/b.ts");
         when(tree.inventory(key, pinned.value()))
                 .thenReturn(List.of(
                         self, new ScmFileVersions.Entry(context.path(), context.mode(), "f".repeat(40)), unrelated));
         assertThat(composer.compose(file, pinned, List.of("src/**"))).isNotEqualTo(original);
+        assertThatThrownBy(() -> composer.contextPaths(file, original, List.of("src/**")))
+                .isInstanceOfSatisfying(
+                        ItemCaptureException.class,
+                        failure -> assertThat(failure.code()).isEqualTo(ItemCaptureCode.VERSION_UNAVAILABLE));
     }
 }

@@ -298,18 +298,25 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     @Test
-    void shouldReadTheNormalActivityAsTheSelectedUnclaimedMember() {
+    void shouldReadOwnActivityAsTheSelectedUnclaimedMember() {
         connectActivitySource(workspace, viewed.getProvider());
         recordReview(viewed);
 
-        sessionRequest("/workspaces/acme/activity/work?login=" + viewed.getLogin())
+        sessionRequest("/workspaces/acme/activity/me/work")
                 .exchange()
                 .expectStatus()
                 .isOk()
                 .expectBody()
                 .jsonPath("$.content[0].people[0].id")
                 .isEqualTo(viewed.getId());
-        assertThat(userViewRowsFor(viewed)).isEqualTo(1);
+        sessionRequest("/workspaces/acme/activity/me")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.person.id")
+                .isEqualTo(viewed.getId());
+        assertThat(userViewRowsFor(viewed)).isEqualTo(2);
     }
 
     @Test

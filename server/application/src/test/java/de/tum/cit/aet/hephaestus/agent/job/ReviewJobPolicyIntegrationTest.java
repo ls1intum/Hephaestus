@@ -32,7 +32,6 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonProcessingSuppression;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
-import de.tum.cit.aet.hephaestus.integration.core.itemevent.PracticeReviewRefusalMetrics;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
@@ -130,7 +129,6 @@ class ReviewJobPolicyIntegrationTest extends BaseIntegrationTest {
                 transactions,
                 mapper,
                 metrics,
-                new PracticeReviewRefusalMetrics(metrics),
                 new ReviewJobTelemetry(metrics, Tracer.NOOP),
                 mock(LlmUsageRecorder.class),
                 mock(PracticeScriptRunRecorder.class),
@@ -145,7 +143,6 @@ class ReviewJobPolicyIntegrationTest extends BaseIntegrationTest {
                         transactions,
                         mapper,
                         metrics,
-                        new PracticeReviewRefusalMetrics(metrics),
                         budgets,
                         admission,
                         new ReviewJobTelemetry(metrics, Tracer.NOOP),
@@ -271,6 +268,7 @@ class ReviewJobPolicyIntegrationTest extends BaseIntegrationTest {
         var price = new LlmModelPrice();
         price.setModel(model);
         price.setPricingMode(PricingMode.NO_CHARGE);
+        price.setNote("No charge for the declared test model.");
         price.setEffectiveFrom(Instant.now());
         prices.saveAndFlush(price);
         return model;

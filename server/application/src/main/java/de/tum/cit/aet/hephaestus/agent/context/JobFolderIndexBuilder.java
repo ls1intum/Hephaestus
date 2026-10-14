@@ -93,7 +93,7 @@ public class JobFolderIndexBuilder {
                             text.source(),
                             text.path(),
                             text.side(),
-                            text.revision(),
+                            text.commit(),
                             text.stagedPath().startsWith(root.target())
                                     ? text.stagedPath()
                                     : root.target() + text.stagedPath(),

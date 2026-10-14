@@ -7,12 +7,85 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ReviewItemRepository extends JpaRepository<ReviewItem, ReviewItem.Id> {
+    @Query(value = """
+        SELECT practice_id AS practiceId,COUNT(*) AS listed,
+          COUNT(*) FILTER(WHERE state IN ('JUDGED','REUSED')) AS reviewed,
+          COUNT(*) FILTER(WHERE state='REUSED') AS reused,COUNT(*) FILTER(WHERE state='WITHHELD') AS withheld,
+          COUNT(*) FILTER(WHERE state='LISTED') AS pending FROM review_item
+        WHERE workspace_id=:ws AND review_id=:id GROUP BY practice_id
+        """, nativeQuery = true)
+    List<PracticeCounts> practiceCounts(long ws, UUID id);
+
+    interface PracticeCounts {
+        long getPracticeId();
+
+        long getListed();
+
+        long getReviewed();
+
+        long getReused();
+
+        long getWithheld();
+
+        long getPending();
+    }
+
+    boolean existsByWorkspaceIdAndReviewIdAndStateInAndResultIdIsNotNull(
+            long workspaceId, UUID reviewId, Collection<ReviewItemState> states);
+
+    long countByWorkspaceIdAndReviewIdAndPracticeId(long workspaceId, UUID reviewId, long practiceId);
+
+    @Query(value = """
+        SELECT m.practice_id AS practiceId,m.item_id AS itemId FROM review_item m JOIN item i ON i.id=m.item_id
+        AND i.workspace_id=m.workspace_id WHERE m.workspace_id=:workspaceId AND m.review_id=:reviewId
+        AND m.state='LISTED' AND (m.job_id IS NULL OR m.job_id<>ALL(CAST(:active AS uuid[])))
+        ORDER BY i.path,m.item_id,m.practice_id
+        """, nativeQuery = true)
+    List<PendingAssignment> pending(long workspaceId, UUID reviewId, UUID[] active, Pageable page);
+
+    @Query(value = """
+        SELECT COUNT(*) AS listed,COUNT(*) FILTER(WHERE state='JUDGED') AS judged,
+        COUNT(*) FILTER(WHERE state='REUSED') AS reused,COUNT(*) FILTER(WHERE state='WITHHELD') AS withheld
+        FROM review_item WHERE workspace_id=:workspaceId AND review_id=:reviewId
+        """, nativeQuery = true)
+    StateCounts stateCounts(long workspaceId, UUID reviewId);
+
+    interface PendingAssignment {
+        long getPracticeId();
+
+        long getItemId();
+    }
+
+    interface StateCounts {
+        long getListed();
+
+        long getJudged();
+
+        long getReused();
+
+        long getWithheld();
+    }
+
+    @Query(value = """
+        SELECT m.practice_id FROM review_item m JOIN review r ON r.id=m.review_id AND
+        r.workspace_id=m.workspace_id JOIN review_practice p ON p.review_id=m.review_id AND
+        p.workspace_id=m.workspace_id AND p.practice_id=m.practice_id WHERE m.workspace_id=:workspaceId
+        AND m.review_id=:reviewId AND m.item_id=:itemId AND m.state='LISTED' AND p.status='READY'
+        AND r.status IN ('QUEUED','RUNNING') AND NOT
+        COALESCE((r.checks->>'cancellationRequested')::boolean,false) ORDER BY m.practice_id
+        """, nativeQuery = true)
+    List<Long> executablePracticeIds(long workspaceId, UUID reviewId, long itemId);
+
+    boolean existsByWorkspaceIdAndReviewIdAndStateIn(
+            long workspaceId, UUID reviewId, Collection<ReviewItemState> states);
+
     List<ReviewItem> findByWorkspaceIdAndReviewIdAndItemIdIn(long workspaceId, UUID reviewId, Collection<Long> itemIds);
 
     Optional<ReviewItem> findByWorkspaceIdAndReviewIdAndPracticeIdAndItemId(

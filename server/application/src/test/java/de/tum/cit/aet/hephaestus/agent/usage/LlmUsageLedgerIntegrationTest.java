@@ -186,7 +186,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
      */
     private List<LlmUsageEvent> eventsOf(Workspace workspace) {
         return usageRepository.findAll().stream()
-                .filter(event -> workspace.getId().equals(event.getWorkspace().getId()))
+                .filter(event -> workspace.getId().equals(event.getWorkspaceId()))
                 .toList();
     }
 
@@ -670,7 +670,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         private UnpricedLedgerRow projection(LlmUsageEvent row) {
             return new UnpricedLedgerRow(
                     row.getId(),
-                    row.getWorkspace().getId(),
+                    row.getWorkspaceId(),
                     row.getModel(),
                     row.getFundingSource(),
                     row.getInputTokens(),

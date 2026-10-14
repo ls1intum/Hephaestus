@@ -83,7 +83,7 @@ function primaryCapture(t: { after: (cleanup: () => void) => void }) {
 			},
 			{
 				kind: "scm.pull-request.diff",
-				citation: { side: "REQUIRED", revision: "OPTIONAL" },
+				citation: { side: "REQUIRED", commit: "OPTIONAL" },
 				state: { availability: "AVAILABLE", facts: { immutableIdentity: `${BASE}:${HEAD}` } },
 				files: [{ path: "context/change.json" }],
 			},
@@ -103,7 +103,7 @@ const sha = (bytes: string | Buffer) => createHash("sha256").update(bytes).diges
 function cited(
 	sourceKind: string,
 	path: string,
-	revision: string,
+	commit: string,
 	text: string | Buffer,
 	extra: Record<string, unknown> = {},
 ) {
@@ -113,7 +113,7 @@ function cited(
 		sourcePath:
 			sourceKind === "scm.repository.tree" ? "repos/reviewed/.git/HEAD" : "context/change.json",
 		path,
-		revision,
+		commit,
 		startLine: 1,
 		quote: "x",
 		verification: { status: "VERIFIED", scope: "EXACT_LOCATION", sourceFileSha256: sha(text) },
@@ -139,9 +139,9 @@ function blobs(
 	return {
 		asked,
 		reader: {
-			blob: (revision: string, path: string) => {
-				asked.push(`${revision}:${path}`);
-				return files[`${revision}:${path}`] ?? { kind: "absent" as const };
+			blob: (commit: string, path: string) => {
+				asked.push(`${commit}:${path}`);
+				return files[`${commit}:${path}`] ?? { kind: "absent" as const };
 			},
 			diff: (base: string, head: string) => {
 				asked.push(`diff ${base}..${head}`);
@@ -152,7 +152,7 @@ function blobs(
 	};
 }
 
-void test("cited primary code arrives whole, once per file and revision, with its complete change section", (t) => {
+void test("cited primary code arrives whole, once per file and commit, with its complete change section", (t) => {
 	const { root, index } = primaryCapture(t);
 	const model = "struct Item {}\n";
 	const legacy = "func legacy() {}\n";
@@ -203,7 +203,7 @@ void test("cited primary code arrives whole, once per file and revision, with it
 	// Only the cited files' sections of the pinned diff; the stale derived view and uncited code never appear.
 	assert.ok(!reference.includes("UNCITED-SENTINEL"), reference);
 	assert.ok(!reference.includes("STALE-SENTINEL"), reference);
-	// An explicit repository revision is read as cited; a removed file only from the base; the diff once.
+	// An explicit repository commit is read as cited; a removed file only from the base; the diff once.
 	assert.deepEqual(read.asked, [
 		`${HEAD}:App/Loader.swift`,
 		`diff ${BASE}..${HEAD}`,
@@ -211,7 +211,7 @@ void test("cited primary code arrives whole, once per file and revision, with it
 		`${BASE}:App/Legacy.swift`,
 	]);
 	assert.ok(
-		reference.includes(`\`App/Model.swift\` at \`${EARLIER}\`, the repository revision`),
+		reference.includes(`\`App/Model.swift\` at \`${EARLIER}\`, the repository commit`),
 		reference,
 	);
 	assert.ok(reference.includes(`\`App/Legacy.swift\` at \`${BASE}\`, the OLD side`), reference);
@@ -320,14 +320,14 @@ void test("private, auxiliary, undecided or unverifiable citations never expose 
 		`\`Changed.swift\` at \`${HEAD}\`: its bytes differ from the ones admission verified`,
 		`\`Link.swift\` at \`${HEAD}\`: not a regular file`,
 		`\`Huge.swift\` at \`${HEAD}\`: too large to show here (40 KB)`,
-		`\`Missing.swift\` at \`${HEAD}\`: no such file at this revision`,
-		`\`App/Loader.swift\` at \`${EARLIER}\`: names a revision outside the pinned change`,
+		`\`Missing.swift\` at \`${HEAD}\`: no such file at this commit`,
+		`\`App/Loader.swift\` at \`${EARLIER}\`: names a commit outside the pinned change`,
 	]) {
 		assert.ok(reference.includes(reason), `${reason}\n${reference}`);
 	}
 	assert.ok(reference.includes(`\`Image.png\` at \`${HEAD}\`: binary`), reference);
 
-	// A checkout that is not the captured revision vouches for nothing it holds.
+	// A checkout that is not the captured commit vouches for nothing it holds.
 	const moved = blobs(
 		{ [`${HEAD}:Private.swift`]: { kind: "regular", bytes: Buffer.from(text) } },
 		EARLIER,
@@ -341,7 +341,7 @@ void test("private, auxiliary, undecided or unverifiable citations never expose 
 		moved.reader,
 	);
 	assert.deepEqual(moved.asked, []);
-	assert.match(unpinned, /`Private\.swift` at `a+`: the checkout is not the captured revision/u);
+	assert.match(unpinned, /`Private\.swift` at `a+`: the checkout is not the captured commit/u);
 
 	// Code of the change is read from the checkout, so a change citation also needs the checkout's capture.
 	const withoutTree = {
@@ -783,7 +783,7 @@ void test("an issue uses only its recorded issue core", () => {
 			sources: [
 				{
 					kind: "scm.issue.core",
-					citation: { side: "FORBIDDEN", revision: "FORBIDDEN" },
+					citation: { side: "FORBIDDEN", commit: "FORBIDDEN" },
 					state: { availability: "AVAILABLE", completeness: "COMPLETE" },
 					files: [{ path: "context/metadata.json" }],
 				},
@@ -996,7 +996,7 @@ function discussionIndex(kind: string, file: string, state: Record<string, unkno
 		sources: [
 			{
 				kind: "scm.pull-request.core",
-				citation: { side: "FORBIDDEN", revision: "FORBIDDEN" },
+				citation: { side: "FORBIDDEN", commit: "FORBIDDEN" },
 				state: { availability: "AVAILABLE", completeness: "COMPLETE" },
 				files: [{ path: "context/metadata.json" }],
 			},
@@ -1422,7 +1422,7 @@ void test("unlisted, unavailable, malformed and oversized discussion never becom
 	);
 });
 
-void test("an incomplete work identity, missing code head or unavailable core supplies no revision coordinate", (t) => {
+void test("an incomplete work identity, missing code head or unavailable core supplies no commit coordinate", (t) => {
 	const root = workspace({ "context/metadata.json": discussionMetadata() });
 	t.after(() => rmSync(root, { recursive: true, force: true }));
 	const index = discussionIndex("scm.general-review-comments", GENERAL_PATH);
@@ -1521,7 +1521,7 @@ void test("rendered and total discussion bounds omit whole sources and their wit
 			...generalIndex.sources,
 			{
 				kind: "scm.pull-request.comments",
-				citation: { side: "FORBIDDEN", revision: "FORBIDDEN" },
+				citation: { side: "FORBIDDEN", commit: "FORBIDDEN" },
 				state: { availability: "AVAILABLE", content: "NON_EMPTY", completeness: "COMPLETE" },
 				files: [{ path: inlinePath }],
 			},
@@ -1577,13 +1577,13 @@ void test("an issue discussion uses its own core recipient and stored native com
 		sources: [
 			{
 				kind: "scm.issue.core",
-				citation: { side: "FORBIDDEN", revision: "FORBIDDEN" },
+				citation: { side: "FORBIDDEN", commit: "FORBIDDEN" },
 				state: { availability: "AVAILABLE", completeness: "COMPLETE" },
 				files: [{ path: "context/metadata.json" }],
 			},
 			{
 				kind: "scm.issue.comments",
-				citation: { side: "FORBIDDEN", revision: "FORBIDDEN" },
+				citation: { side: "FORBIDDEN", commit: "FORBIDDEN" },
 				state: { availability: "AVAILABLE", completeness: "COMPLETE" },
 				files: [{ path: "context/comments.json" }],
 			},

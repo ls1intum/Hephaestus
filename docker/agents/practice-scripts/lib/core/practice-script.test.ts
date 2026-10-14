@@ -152,7 +152,7 @@ async function refused(): Promise<never> {
 void describe("the context helpers", () => {
 	void test("a work without a captured change stops the program as unavailable, never as an empty change", () => {
 		const head: FileTree = {
-			revision: "a".repeat(40),
+			commit: "a".repeat(40),
 			read: refused,
 			list: refused,
 			grep: refused,

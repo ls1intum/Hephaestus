@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.decision.FeedbackContentDige
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackBasisInput;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDecisionAction;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDecisionInput;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDraft;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackSendAction;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
@@ -99,10 +100,11 @@ class FeedbackMarkRestorationIntegrationTest extends AbstractFeedbackDeliveryInt
                 workspace.getId(),
                 feedbackId,
                 developerId,
-                FeedbackDecisionAction.REJECT,
-                null,
-                "Do not send this guidance.",
-                digests.current(workspace.getId(), feedbackId));
+                new FeedbackDecisionInput(
+                        FeedbackDecisionAction.REJECT,
+                        null,
+                        "Do not send this guidance.",
+                        digests.current(workspace.getId(), feedbackId)));
         UUID id = mark(supportingResult.getId());
         remove(id);
         assertThat(current().getState()).isEqualTo(FeedbackState.REJECTED);

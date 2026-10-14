@@ -308,10 +308,10 @@ describe("catalog adoption over practice setup", () => {
 				return HttpResponse.json(
 					{
 						title: "Practice adoption preview changed",
-						status: 409,
+						status: 412,
 						detail: "The preview changed.",
 					},
-					{ status: 409 },
+					{ status: 412 },
 				);
 			}),
 		);
@@ -327,7 +327,7 @@ describe("catalog adoption over practice setup", () => {
 		await screen.findByText("Updated review rule that must be reviewed.");
 	});
 
-	it("does not claim the latest preview is shown when refreshing after a 409 fails", async () => {
+	it("does not claim the latest preview is shown when refreshing after a stale precondition fails", async () => {
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption", () =>
 				HttpResponse.json([]),
@@ -337,10 +337,10 @@ describe("catalog adoption over practice setup", () => {
 				HttpResponse.json(
 					{
 						title: "Practice adoption preview changed",
-						status: 409,
+						status: 412,
 						detail: "The preview changed.",
 					},
-					{ status: 409 },
+					{ status: 412 },
 				),
 			),
 		);
@@ -370,10 +370,10 @@ describe("catalog adoption over practice setup", () => {
 					{
 						type: "about:blank",
 						title: "Conflict",
-						status: 409,
+						status: 412,
 						detail: "A workspace practice already uses this slug.",
 					},
-					{ status: 409 },
+					{ status: 412 },
 				),
 			),
 		);

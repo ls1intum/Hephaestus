@@ -51,16 +51,8 @@ class PracticeCriteriaCaseStagingIntegrationTest {
                             candidate.path("slug").asString().equals("handles-errors-instead-of-swallowing-them"))
                     .findFirst()
                     .orElseThrow();
-            assertThat(StreamSupport.stream(
-                                    entry.path("definition")
-                                            .path("reads")
-                                            .path("sources")
-                                            .spliterator(),
-                                    false)
-                            .filter(source ->
-                                    "COMPLETE".equals(source.path("need").asString()))
-                            .map(source -> source.path("source").asString())
-                            .toList())
+            assertThat(entry.path("exhaustiveSources"))
+                    .extracting(JsonNode::asString)
                     .containsExactly("scm.pull-request.diff");
             assertThat(entry.path("readsSources"))
                     .extracting(JsonNode::asString)
@@ -233,7 +225,8 @@ class PracticeCriteriaCaseStagingIntegrationTest {
                 Map.of("scope-one-reviewable-change", "UNDETERMINED"),
                 "files",
                 Map.of("repo/Example.java", "final class Example {}\n")));
-        PracticeCriteriaCaseFixtures.stage(workspace, scenario);
+        var definitions = PracticeCriteriaCaseFixtures.stage(workspace, scenario);
+        LiveRunnerWorkspace.stageFixtureInputs(workspace, "scm.pull_request", definitions);
         var index = mapper.readTree(
                 workspace.resolve(SandboxLayout.PRACTICES_PREFIX + "index.json").toFile());
         assertThat(index).hasSize(1);

@@ -42,6 +42,12 @@ public record CaptureContribution(
         List<EvidenceDirectory> directories,
         List<WorkspaceRefusal> refusals,
         List<CitableText> citableTexts) {
+    public static CaptureContribution empty() {
+        return new CaptureContribution(
+                Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), null, Map.of(),
+                List.of(), List.of(), List.of());
+    }
+
     /** An unavailable source has no files and makes no claim about its content or completeness. */
     public static CaptureContribution unavailable(Set<SourceKind> kinds, SourceAbsenceReason reason) {
         Map<SourceKind, SourceCaptureState> states = new HashMap<>();
@@ -49,6 +55,22 @@ public record CaptureContribution(
         return new CaptureContribution(
                 Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), states, Map.of(), null, Map.of(), List.of(),
                 List.of(), List.of());
+    }
+
+    @SuppressWarnings("ReferenceEquality") // Throwable rejects suppression of the same exception instance.
+    public static void closeAll(List<CaptureContribution> contributions) throws Exception {
+        Exception failure = null;
+        for (var contribution : contributions) {
+            var cleanup = contribution.cleanup();
+            if (cleanup == null) continue;
+            try {
+                cleanup.close();
+            } catch (Exception error) {
+                if (failure == null) failure = error;
+                else if (failure != error) failure.addSuppressed(error);
+            }
+        }
+        if (failure != null) throw failure;
     }
 
     public CaptureContribution {

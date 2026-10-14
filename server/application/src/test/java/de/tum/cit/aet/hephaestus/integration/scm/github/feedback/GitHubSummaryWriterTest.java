@@ -509,10 +509,7 @@ class GitHubSummaryWriterTest extends BaseUnitTest {
         ClientGraphQlResponse newestPage = mockCommentsPageResponse(
                 "repository.pullRequest.comments", List.of(comment("IC_2", "unrelated")), true, "start-cursor-1");
         ClientGraphQlResponse oldestPage = mockCommentsPageResponse(
-                "repository.pullRequest.comments",
-                List.of(comment("IC_1", "also unrelated")),
-                false, 
-                null);
+                "repository.pullRequest.comments", List.of(comment("IC_1", "also unrelated")), false, null);
         when(spec.execute()).thenReturn(Mono.just(newestPage)).thenReturn(Mono.just(oldestPage));
 
         SummaryLookup result = channel.findExistingSummary(PR_TARGET, EXPECTED);
@@ -533,10 +530,7 @@ class GitHubSummaryWriterTest extends BaseUnitTest {
         ClientGraphQlResponse page2 = mockCommentsPageResponse(
                 "repository.pullRequest.comments", List.of(comment("IC_2", "unrelated")), true, "start-cursor-2");
         ClientGraphQlResponse page3 = mockCommentsPageResponse(
-                "repository.pullRequest.comments",
-                List.of(comment("IC_1", "unrelated")),
-                true, 
-                "start-cursor-3");
+                "repository.pullRequest.comments", List.of(comment("IC_1", "unrelated")), true, "start-cursor-3");
         when(spec.execute())
                 .thenReturn(Mono.just(page1))
                 .thenReturn(Mono.just(page2))

@@ -26,7 +26,7 @@ export {
 } from "./records.ts";
 export type { DiffFile } from "./types.ts";
 export interface FileTree {
-	readonly revision: string;
+	readonly commit: string;
 	read: (
 		path: string,
 		options?: { offsetLine?: number; maxLines?: number },
@@ -67,8 +67,8 @@ export function requireChange(files: Files | null): ReadonlyMap<string, DiffFile
 
 export function scm<M extends ModelNeeds>(ctx: PracticeScriptContext<M>) {
 	const { files, port } = domainAccess(ctx);
-	const treeOf = (revision: string): FileTree => ({
-		revision,
+	const treeOf = (commit: string): FileTree => ({
+		commit,
 		read: async (path, options = {}) => port.read({ op: "read", path, ...options }),
 		list: async (glob) => port.read({ op: "list", ...(glob === undefined ? {} : { glob }) }),
 		grep: async (pattern, options = {}) => port.read({ op: "grep", pattern, ...options }),
@@ -85,7 +85,7 @@ export function scm<M extends ModelNeeds>(ctx: PracticeScriptContext<M>) {
 		files === null
 			? null
 			: {
-					head: treeOf(files.head.revision),
+					head: treeOf(files.head.commit),
 					change:
 						files.change === null
 							? null

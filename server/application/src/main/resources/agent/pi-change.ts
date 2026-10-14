@@ -173,7 +173,7 @@ function git(
 	return child.stdout;
 }
 
-/** What a pinned revision holds at a path, read from Git objects and never from the working tree. */
+/** What a pinned commit holds at a path, read from Git objects and never from the working tree. */
 export type PinnedBlob =
 	| { kind: "regular"; bytes: Buffer }
 	| { kind: "tooLarge"; size: number }
@@ -193,16 +193,16 @@ export function safeRepositoryPath(file: string): boolean {
 }
 
 /**
- * The regular file at `file` in `revision`, read whole only when Git's recorded size is within `limit`. A link, a
+ * The regular file at `file` in `commit`, read whole only when Git's recorded size is within `limit`. A link, a
  * submodule or a directory is named as not a regular file; its target is never followed.
  */
 export function readPinnedBlob(
 	repository: string,
-	revision: string,
+	commit: string,
 	file: string,
 	limit: number,
 ): PinnedBlob {
-	if (!isCommitId(revision) || !safeRepositoryPath(file)) {
+	if (!isCommitId(commit) || !safeRepositoryPath(file)) {
 		return { kind: "unsafe" };
 	}
 	let entry: RegExpExecArray | null;
@@ -213,7 +213,7 @@ export function readPinnedBlob(
 			"-l",
 			"-z",
 			"--full-tree",
-			revision,
+			commit,
 			"--",
 			file,
 		]).toString("utf8");

@@ -130,6 +130,13 @@ public final class ScmReviewFixtures {
                     practiceId,
                     workspaceId,
                     versionId);
+            jdbc.update(
+                    "INSERT INTO review_item(workspace_id,review_id,practice_id,item_id,item_version,state) VALUES (?,?,?,?,?,'LISTED')",
+                    workspaceId,
+                    review,
+                    practiceId,
+                    item.itemId(),
+                    version);
             String quote = issue.getBody() == null || issue.getBody().isBlank() ? issue.getTitle() : issue.getBody();
             var citation = mapper.createObjectNode()
                     .put("sourceKind", "scm.issue.core")
@@ -166,6 +173,13 @@ public final class ScmReviewFixtures {
                     result,
                     citations.toString(),
                     "{\"type\":\"state\",\"explanation\":\"The full issue" + " description has no trackable steps.\"}");
+            jdbc.update(
+                    "UPDATE review_item SET state='JUDGED',result_id=? WHERE workspace_id=? AND review_id=? AND practice_id=? AND item_id=?",
+                    result,
+                    workspaceId,
+                    review,
+                    practiceId,
+                    item.itemId());
             return new Recorded(review, result, problem, item.itemId(), developer);
         }));
     }

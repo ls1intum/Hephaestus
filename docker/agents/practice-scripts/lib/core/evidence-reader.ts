@@ -161,18 +161,18 @@ export class EvidenceReader {
 		if (sources.repo === null) {
 			return undefined;
 		}
-		let revision: string | null | undefined;
+		let commit: string | null | undefined;
 		if (citation.sourceKind === TREE_SOURCE && citation.sourcePath === sources.treeSourceFile) {
-			revision = citation.revision ?? sources.headRevision;
+			commit = citation.commit ?? sources.headRevision;
 		} else if (
 			citation.sourceKind === DIFF_SOURCE &&
 			citation.sourcePath === path.posix.join(sources.contextReference, "change.json")
 		) {
-			revision = citation.side === "OLD" ? sources.change?.base : sources.change?.head;
+			commit = citation.side === "OLD" ? sources.change?.base : sources.change?.head;
 		}
-		return revision == null
+		return commit == null
 			? undefined
-			: { source: `${sources.treeSourceFile}:${citation.path}`, version: revision };
+			: { source: `${sources.treeSourceFile}:${citation.path}`, version: commit };
 	}
 
 	/** Answer one read. A read that cannot be answered throws `UnratedError` with its reason. */
@@ -501,7 +501,7 @@ export class EvidenceReader {
 					sourceKind: TREE_SOURCE,
 					sourcePath: this.#sources.treeSourceFile,
 					path: request.path,
-					...(headRevision === null ? {} : { revision: headRevision }),
+					...(headRevision === null ? {} : { commit: headRevision }),
 					startLine: request.startLine,
 					endLine: end,
 					quote: quotedLines(

@@ -295,14 +295,14 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
     @WorkspaceAgnostic("Cross-workspace poll candidates; caller is the @WorkspaceAgnostic job poller")
     @Query(
             value = "SELECT j.id FROM review_job j JOIN workspace w ON w.id = j.workspace_id WHERE j.status = 'QUEUED'"
-                + " AND w.status = 'ACTIVE' AND j.available_at <= now() AND (  (SELECT count(*) FROM review_job r     "
-                + " WHERE r.workspace_id = j.workspace_id AND r.status = 'RUNNING'        AND"
-                + " COALESCE(r.config_snapshot -> 'model' ->> 'dataHandlingTier', 'UNDECLARED')          ="
-                + " COALESCE(j.config_snapshot -> 'model' ->> 'dataHandlingTier', 'UNDECLARED'))   < COALESCE((SELECT"
-                + " b.max_concurrent_jobs FROM workspace_agent_binding b      WHERE b.workspace_id = j.workspace_id"
-                + " AND b.purpose = 'PRACTICE_REVIEW'        AND b.data_handling_tier = COALESCE(j.config_snapshot ->"
-                + " 'model' ->> 'dataHandlingTier', 'UNDECLARED')),      2147483647)) ORDER BY j.available_at ASC,"
-                + " j.id ASC LIMIT :limit",
+                    + " AND w.status = 'ACTIVE' AND j.available_at <= now() AND (  (SELECT count(*) FROM review_job r     "
+                    + " WHERE r.workspace_id = j.workspace_id AND r.status = 'RUNNING'        AND"
+                    + " COALESCE(r.config_snapshot -> 'model' ->> 'dataHandlingTier', 'UNDECLARED')          ="
+                    + " COALESCE(j.config_snapshot -> 'model' ->> 'dataHandlingTier', 'UNDECLARED'))   < COALESCE((SELECT"
+                    + " b.max_concurrent_jobs FROM workspace_agent_binding b      WHERE b.workspace_id = j.workspace_id"
+                    + " AND b.purpose = 'PRACTICE_REVIEW'        AND b.data_handling_tier = COALESCE(j.config_snapshot ->"
+                    + " 'model' ->> 'dataHandlingTier', 'UNDECLARED')),      2147483647)) ORDER BY j.available_at ASC,"
+                    + " j.id ASC LIMIT :limit",
             nativeQuery = true)
     List<UUID> findQueuedIdsOldestFirst(@Param("limit") int limit);
 
@@ -430,9 +430,9 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
     @WorkspaceAgnostic("Fleet-wide queue-health snapshot; caller is @WorkspaceAgnostic health sampler")
     @Query(
             value = "SELECT   COUNT(*) FILTER (WHERE status = 'QUEUED' AND available_at <= :now) AS depth,  "
-                + " MIN(available_at) FILTER (WHERE status = 'QUEUED' AND available_at <= :now) AS oldestAvailableAt, "
-                + "  COUNT(*) FILTER (WHERE status = 'QUEUED' AND hold_reason IS NOT NULL) AS held,   COUNT(*) FILTER"
-                + " (WHERE status = 'RUNNING') AS running FROM review_job WHERE status IN ('QUEUED', 'RUNNING')",
+                    + " MIN(available_at) FILTER (WHERE status = 'QUEUED' AND available_at <= :now) AS oldestAvailableAt, "
+                    + "  COUNT(*) FILTER (WHERE status = 'QUEUED' AND hold_reason IS NOT NULL) AS held,   COUNT(*) FILTER"
+                    + " (WHERE status = 'RUNNING') AS running FROM review_job WHERE status IN ('QUEUED', 'RUNNING')",
             nativeQuery = true)
     QueueHealthSnapshot queueHealthSnapshot(@Param("now") Instant now);
 
@@ -459,10 +459,11 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
     Optional<ReviewJob> findByIdAndWorkspaceIdForUpdate(@Param("id") UUID id, @Param("workspaceId") long workspaceId);
 
     @Modifying(flushAutomatically = true)
-    @Query("UPDATE ReviewJob j SET j.capture = :capture WHERE j.id = :id AND j.workerId = :workerId AND j.attempt ="
-            + " :attempt AND j.status = 'RUNNING'")
+    @Query("UPDATE ReviewJob j SET j.capture = :capture WHERE j.id = :id AND j.workspaceId = :workspaceId"
+            + " AND j.workerId = :workerId AND j.attempt = :attempt AND j.status = 'RUNNING'")
     int updateCapture(
             @Param("id") UUID id,
+            @Param("workspaceId") long workspaceId,
             @Param("workerId") @Nullable String workerId,
             @Param("attempt") int attempt,
             @Param("capture") JsonNode capture);
@@ -484,8 +485,8 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
     @Modifying(flushAutomatically = true)
     @Query(
             value = "UPDATE review_job SET capture = capture #- '{manifest,files}' #- '{manifest,citableTexts}' WHERE"
-                + " id = :jobId AND workspace_id = :workspaceId AND attempt = :attempt AND worker_id = :workerId AND"
-                + " admission_digest IS NOT NULL",
+                    + " id = :jobId AND workspace_id = :workspaceId AND attempt = :attempt AND worker_id = :workerId AND"
+                    + " admission_digest IS NOT NULL",
             nativeQuery = true)
     int expireCaptureInventory(
             @Param("jobId") UUID jobId,

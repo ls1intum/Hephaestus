@@ -56,25 +56,10 @@ final class ScmCaptureContributions {
                 content,
                 states,
                 disk,
-                () -> closeAll(values),
+                () -> CaptureContribution.closeAll(values),
                 limitations,
                 directories,
                 refusals,
                 citable);
-    }
-
-    @SuppressWarnings("ReferenceEquality") // Throwable self-suppression depends on identity, not equals.
-    static void closeAll(List<CaptureContribution> values) throws Exception {
-        Exception failure = null;
-        for (var value : values) {
-            if (value.cleanup() == null) continue;
-            try {
-                value.cleanup().close();
-            } catch (Exception error) {
-                if (failure == null) failure = error;
-                else if (failure != error) failure.addSuppressed(error);
-            }
-        }
-        if (failure != null) throw failure;
     }
 }

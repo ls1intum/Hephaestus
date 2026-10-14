@@ -11,7 +11,7 @@ public record CitableText(
         String source,
         String path,
         CitationSide side,
-        @Nullable String revision,
+        @Nullable String commit,
         String stagedPath,
         String sha256) {
     public CitableText {
@@ -25,7 +25,7 @@ public record CitableText(
                 || !Path.of(stagedPath).normalize().equals(Path.of(stagedPath))
                 || Path.of(stagedPath).startsWith("..")
                 || !sha256.matches("[0-9a-f]{64}")
-                || (revision != null && (revision.isBlank() || revision.length() > 1024))) {
+                || (commit != null && (commit.isBlank() || commit.length() > 1024))) {
             throw new IllegalArgumentException("Invalid citable text");
         }
     }

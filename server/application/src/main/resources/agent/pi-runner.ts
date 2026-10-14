@@ -1231,12 +1231,12 @@ export async function runReviewJob(): Promise<void> {
 				description:
 					"For a quote of the change: sourcePath names the pinned change (change.json), path is the file as named on that side, and the lines are the [L<n>] coordinates of work/change/diff.patch.",
 			},
-			revision: {
+			commit: {
 				type: ["string", "null"],
 				minLength: 1,
 				maxLength: 1024,
 				description:
-					"For repository text: sourcePath names the captured .git/HEAD, path is repository-relative, and revision optionally selects a full commit SHA; omission means the captured HEAD.",
+					"For repository text: sourcePath names the captured .git/HEAD, path is repository-relative, and commit optionally selects a full commit SHA; omission means the captured HEAD.",
 			},
 			startLine: {
 				type: "integer",
@@ -1650,10 +1650,10 @@ export async function runReviewJob(): Promise<void> {
 			(citation): CitationIdentity | undefined => {
 				if (citation.sourceKind === TREE_SOURCE) {
 					const repository = citationRepository(citation);
-					const revision = citation.revision ?? checkedOutCommit(repository);
-					return revision === null
+					const commit = citation.commit ?? checkedOutCommit(repository);
+					return commit === null
 						? undefined
-						: { source: `${repository}:${citation.path}`, version: revision };
+						: { source: `${repository}:${citation.path}`, version: commit };
 				}
 				if (citation.sourceKind === DIFF_SOURCE && change !== null) {
 					return {
@@ -1683,13 +1683,13 @@ export async function runReviewJob(): Promise<void> {
 				entry.source === citation.sourceKind &&
 				entry.path === citation.path &&
 				entry.side === (citation.side ?? "NEW") &&
-				(citation.revision === undefined || entry.revision === citation.revision),
+				(citation.commit === undefined || entry.commit === citation.commit),
 		);
 		if (matches.length === 0) {
 			return null;
 		}
 		if (matches.length !== 1) {
-			throw new Error("citation names ambiguous captured text; specify its revision");
+			throw new Error("citation names ambiguous captured text; specify its commit");
 		}
 		const proof = matches[0];
 		if (proof === undefined) {
@@ -1704,12 +1704,12 @@ export async function runReviewJob(): Promise<void> {
 
 	function citedContent(citation: Citation): string | typeof BINARY | null {
 		if (citation.sourceKind === TREE_SOURCE) {
-			if (citation.revision === undefined) {
+			if (citation.commit === undefined) {
 				return readCheckoutFile(citation.path, citationRepository(citation));
 			}
 			const blob = readPinnedBlob(
 				citationRepository(citation),
-				citation.revision,
+				citation.commit,
 				citation.path,
 				64 * 1024 * 1024,
 			);
@@ -1728,9 +1728,9 @@ export async function runReviewJob(): Promise<void> {
 		if (content === null) {
 			return {
 				mismatch:
-					citation.revision === undefined
+					citation.commit === undefined
 						? "no such file in the checkout"
-						: `no such file at revision ${citation.revision} in the checkout's history`,
+						: `no such file at commit ${citation.commit} in the checkout's history`,
 			};
 		}
 		if (content === BINARY) {
@@ -2363,7 +2363,7 @@ export async function runReviewJob(): Promise<void> {
 		) {
 			return null;
 		}
-		return { head: { revision: head }, change: sources };
+		return { head: { commit: head }, change: sources };
 	}
 
 	function readBoundModels(): BoundModels {
@@ -5209,7 +5209,7 @@ ${finishCompositionText(notMet, request)}`,
 				folderIndex,
 				admittedResults,
 				{
-					blob: (revision, file, limit) => readPinnedBlob(repository, revision, file, limit),
+					blob: (commit, file, limit) => readPinnedBlob(repository, commit, file, limit),
 					diff: (base, head, limit) => pinnedDiff(repository, base, head, limit),
 					checkedOut: () => checkedOutCommit(repository),
 				},

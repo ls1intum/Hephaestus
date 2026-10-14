@@ -6,7 +6,6 @@ import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.ProfileReviewDTO;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.ProfileReviewDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.result.ResultPresentation;
-import de.tum.cit.aet.hephaestus.practices.result.ResultReadQuery;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ResultView;
 import de.tum.cit.aet.hephaestus.practices.result.ResultViewQuery;
@@ -38,7 +37,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class PracticeProfileReviewService {
     private final CurrentDeveloperLookup developer;
-    private final ResultReadQuery read;
     private final ResultRepository results;
     private final ResultViewQuery views;
     private final ResultPresentation presentation;
@@ -55,8 +53,8 @@ public class PracticeProfileReviewService {
             Pageable page) {
         var account = developer.currentDeveloperId();
         if (account.isEmpty()) return Page.empty(page);
-        var rows =
-                read.forDevelopersSince(ws.id(), List.of(account.get()), since == null ? Instant.EPOCH : since, false);
+        var rows = results.forDevelopersSince(
+                ws.id(), List.of(account.get()), since == null ? Instant.EPOCH : since, false);
         var permitted = authorization.permitsAll(ws.id(), rows, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
         var byReview = new LinkedHashMap<UUID, List<ResultView>>();
         views

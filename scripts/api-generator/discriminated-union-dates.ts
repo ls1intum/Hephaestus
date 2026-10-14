@@ -126,9 +126,10 @@ export const discriminatedUnionDates: ExpressionTransformer = ({
 	if (branches.length === 0) {
 		return;
 	}
+	const types = plugin.getPluginOrThrow("@hey-api/typescript");
 	const transform = $.func()
 		.param("value", (parameter) => {
-			parameter.type("any");
+			parameter.type($.type.or(types.api.schemaToType(types, schema)));
 		})
 		.do(...branches, $.return("value"));
 	const converted = $(transform).call(dataExpression);

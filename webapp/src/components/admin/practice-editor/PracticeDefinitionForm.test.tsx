@@ -6,13 +6,16 @@ import { deferred } from "@/test/async";
 import { renderWithRouter } from "@/test/router-harness";
 
 import { mockDefinitionOptions, mockScan, practiceValueOf } from "./fixtures";
-import { PracticeDefinitionForm, type PracticeDefinitionValue } from "./PracticeDefinitionForm";
+import {
+	PracticeDefinitionForm,
+	type PracticeDefinitionSubmission,
+} from "./PracticeDefinitionForm";
 
 vi.mock("@/components/common/CodeEditor", () => ({
 	CodeEditor: () => <div />,
 }));
 
-type Submit = (value: PracticeDefinitionValue) => void | Promise<void>;
+type Submit = (value: PracticeDefinitionSubmission) => void | Promise<void>;
 
 async function renderCreateForm(onSubmit: Submit) {
 	return renderWithRouter(
@@ -43,7 +46,7 @@ async function renderEditForm(onSubmit: Submit, initialData = practiceValueOf())
 	);
 }
 
-function submitted(onSubmit: Mock<Submit>): PracticeDefinitionValue {
+function submitted(onSubmit: Mock<Submit>): PracticeDefinitionSubmission {
 	const [value] = onSubmit.mock.lastCall ?? [];
 	if (value === undefined) {
 		throw new Error("The form submitted nothing");
@@ -153,7 +156,6 @@ describe("Reviewed by", () => {
 		expect(submitted(onSubmit).definition.reviewedBy).toStrictEqual({
 			by: "PEOPLE",
 			humanReason: {
-				code: "THE_DECISION_WAS_MADE_IN_A_MEETING",
 				description: "The decision was made in a meeting.",
 			},
 			limits: [],

@@ -262,7 +262,7 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
     @Modifying
     @Transactional
     @Query(
-            "UPDATE SlackThread t SET t.lastReviewedTs = :lastTs WHERE t.workspaceId = :workspaceId AND t.id = :threadId")
+            "UPDATE SlackThread t SET t.lastReviewedTs = :lastTs WHERE t.workspaceId = :workspaceId AND t.id = :threadId AND (t.lastReviewedTs IS NULL OR t.lastReviewedTs < :lastTs)")
     int advanceReviewWatermark(
             @Param("workspaceId") long workspaceId, @Param("threadId") long threadId, @Param("lastTs") String lastTs);
 
@@ -296,4 +296,21 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
         """, nativeQuery = true)
     List<PersonSourceIdentityRow> findPersonSourceIdentities(
             @Param("workspaceId") long workspaceId, @Param("artifactId") long artifactId);
+
+    @Modifying
+    @Transactional
+    @WorkspaceAgnostic("Verified account absorption moves and deduplicates participants across every workspace")
+    @Query(value = """
+        UPDATE slack_thread SET participant_account_ids=ARRAY(
+            SELECT DISTINCT CASE WHEN account_id=:unclaimed THEN :claimed ELSE account_id END
+            FROM unnest(participant_account_ids) account_id ORDER BY 1)
+        WHERE :unclaimed=ANY(participant_account_ids)
+        """, nativeQuery = true)
+    int absorbParticipantAccount(@Param("claimed") long claimedAccountId, @Param("unclaimed") long unclaimedAccountId);
+
+    @WorkspaceAgnostic("Account absorption verifies source references before removing source memberships")
+    @Query(
+            value = "SELECT EXISTS(SELECT 1 FROM slack_thread WHERE :accountId=ANY(participant_account_ids))",
+            nativeQuery = true)
+    boolean containsAccount(@Param("accountId") long accountId);
 }

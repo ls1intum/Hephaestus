@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.scan;
 
+import de.tum.cit.aet.hephaestus.practices.review.report.ScanMembershipQueries;
 import de.tum.cit.aet.hephaestus.practices.spi.ProblemBaselineState;
 import de.tum.cit.aet.hephaestus.practices.spi.Severity;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -27,7 +28,7 @@ public class ScanReportProblemFilterParams {
     @Schema(defaultValue = "true")
     private boolean openOnly = true;
 
-    ScanReportItemsService.ProblemFilter filter() {
-        return new ScanReportItemsService.ProblemFilter(practiceSlug, severity, path, baselineState, openOnly);
+    ScanMembershipQueries.ProblemFilter filter() {
+        return new ScanMembershipQueries.ProblemFilter(practiceSlug, severity, path, baselineState, openOnly);
     }
 }

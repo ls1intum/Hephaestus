@@ -27,6 +27,7 @@ const REASON_KEYS = {
 	MODEL_UNAVAILABLE: true,
 	BUDGET_EXHAUSTED: true,
 	ITEM_NOT_VISIBLE: true,
+	VERSION_SUPERSEDED: true,
 	PENDING_DEADLINE_EXCEEDED: true,
 	ITEM_GONE: true,
 } satisfies Record<RefusalReason, true>;
@@ -51,7 +52,7 @@ const EXPECTED_HREFS: readonly (readonly [RefusalReason, string])[] = [
 
 /**
  * The whole refusal vocabulary at once, each row named by its reason code: the sentence a reader sees
- * beside the link is the server's, so this developer catalogue has none of its own. Takes the
+ * beside the link comes from the shared vocabulary. Takes the
  * component's own props and overrides only `reason`, so the Controls panel still drives every other
  * input.
  */

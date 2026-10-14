@@ -248,14 +248,17 @@ class PracticeRunnerLiveLlmTest {
                 .buildSandboxSpec(LiveRunnerWorkspace.request(creds.model(), "live-test-job-token", Map.of()));
         LiveRunnerWorkspace.stageSpec(WORKSPACE, spec.inputFiles());
         String kind = "scm.pull_request";
+        Map<String, JsonNode> definitions;
         if (scenario == null) {
             LiveRunnerWorkspace.stageLoginChange(WORKSPACE);
-            LiveRunnerWorkspace.stagePractice(
-                    WORKSPACE,
+            definitions = Map.of(
                     PRACTICE,
-                    "Hardcoded Secrets",
-                    Files.readString(FIXTURE_DIR.resolve("practices/" + PRACTICE + ".md")),
-                    1L);
+                    LiveRunnerWorkspace.stagePractice(
+                            WORKSPACE,
+                            PRACTICE,
+                            "Hardcoded Secrets",
+                            Files.readString(FIXTURE_DIR.resolve("practices/" + PRACTICE + ".md")),
+                            1L));
             LiveRunnerWorkspace.stageTask(
                     WORKSPACE,
                     "Review merge request #1 in test/fixture against " + PRACTICE + ". Follow "
@@ -265,10 +268,10 @@ class PracticeRunnerLiveLlmTest {
                     0,
                     1L);
         } else {
-            PracticeCriteriaCaseFixtures.stage(WORKSPACE, scenario);
+            definitions = PracticeCriteriaCaseFixtures.stage(WORKSPACE, scenario);
             if (scenario.path("workType").asString().equals("issue")) kind = "scm.issue";
         }
-        LiveRunnerWorkspace.stageFixtureInputs(WORKSPACE, kind);
+        LiveRunnerWorkspace.stageFixtureInputs(WORKSPACE, kind, definitions);
         return spec.environment();
     }
 
@@ -403,9 +406,7 @@ class PracticeRunnerLiveLlmTest {
                             false));
                 }
                 ObjectNode evidence = (ObjectNode) candidate.path("evidence").deepCopy();
-                evidence.set(
-                        "citations",
-                        MAPPER.valueToTree(projected(candidate.path("evidence").path("citations"))));
+                evidence.set("citations", MAPPER.valueToTree(projected(candidate.path("citations"))));
                 rows.add(new AdmittedResultDTO(
                         entry.practiceSlug(),
                         entry.itemId(),
@@ -459,7 +460,7 @@ class PracticeRunnerLiveLlmTest {
                         citation.sourcePath(),
                         citation.path(),
                         citation.side(),
-                        citation.revision(),
+                        citation.commit(),
                         citation.startLine(),
                         citation.endLine(),
                         citation.quote(),

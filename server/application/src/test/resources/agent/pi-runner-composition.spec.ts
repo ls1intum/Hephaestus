@@ -139,8 +139,8 @@ void test("the routing read after admission is one decision per NOT_MET result, 
 	];
 	const readAt = "2026-10-12T09:41:07Z";
 	const routes = [
-		{ resultId: "r-1", decision: "ADMIT" },
-		{ resultId: "r-2", decision: "HAS_INLINE_ANCHOR" },
+		{ resultId: "r-1", decision: "ADMIT", stopReason: null },
+		{ resultId: "r-2", decision: "HAS_INLINE_ANCHOR", stopReason: "NOTHING_NEW" },
 	];
 	assert.deepEqual(
 		readConversationEligibility({ state: "COMPLETE", readAt, results: routes }, current),
@@ -162,7 +162,7 @@ void test("the routing read after admission is one decision per NOT_MET result, 
 		{
 			state: "COMPLETE",
 			readAt,
-			results: [...routes, { resultId: "r-3", decision: "ADMIT" }],
+			results: [...routes, { resultId: "r-3", decision: "ADMIT", stopReason: null }],
 		},
 		{ state: "COMPLETE", readAt, results: [...routes, routes[0]] },
 		{
@@ -192,8 +192,13 @@ void test("the routing read after admission is one decision per NOT_MET result, 
 			state: "COMPLETE",
 			readAt,
 			practices: [
-				{ practiceSlug: "one", decision: "ADMIT", occurrences: [occurrence] },
-				{ practiceSlug: "two", decision: "NO_EVIDENCE", occurrences: [] },
+				{ practiceSlug: "one", decision: "ADMIT", stopReason: null, occurrences: [occurrence] },
+				{
+					practiceSlug: "two",
+					decision: "NO_EVIDENCE",
+					stopReason: "NO_EVIDENCE",
+					occurrences: [],
+				},
 			],
 		},
 		current,
@@ -215,11 +220,61 @@ void test("the routing read after admission is one decision per NOT_MET result, 
 					{
 						practiceSlug: "one",
 						decision: "ADMIT",
+						stopReason: null,
 						occurrences: [{ ...legacy, problemId: resultId }],
 					},
-					{ practiceSlug: "two", decision: "NO_EVIDENCE", occurrences: [] },
+					{
+						practiceSlug: "two",
+						decision: "NO_EVIDENCE",
+						stopReason: "NO_EVIDENCE",
+						occurrences: [],
+					},
 				],
 			},
+			current,
+		),
+		null,
+	);
+});
+
+void test("admission reads preserve the gate reason and refuse missing or retired decisions", () => {
+	const current = [{ resultId: "r-1", practiceSlug: "one", outcome: "NOT_MET" }];
+	const envelope = { state: "COMPLETE", readAt: "2026-10-12T09:41:07Z" };
+	const route = { resultId: "r-1", decision: "GATE_REFUSED", stopReason: "NO_AI" };
+	const page = {
+		practiceSlug: "one",
+		decision: "GATE_REFUSED",
+		stopReason: "EVIDENCE_NOT_PERMITTED",
+		occurrences: [],
+	};
+	assert.deepEqual(readConversationEligibility({ ...envelope, results: [route] }, current), {
+		...envelope,
+		results: [route],
+	});
+	assert.deepEqual(readPracticePageSupport({ ...envelope, practices: [page] }, current), {
+		...envelope,
+		practices: [page],
+	});
+	for (const stopReason of [undefined, null, "UNRECOGNIZED"]) {
+		assert.equal(
+			readConversationEligibility({ ...envelope, results: [{ ...route, stopReason }] }, current),
+			null,
+		);
+		assert.equal(
+			readPracticePageSupport({ ...envelope, practices: [{ ...page, stopReason }] }, current),
+			null,
+		);
+	}
+	assert.equal(
+		readConversationEligibility(
+			{ ...envelope, results: [{ ...route, decision: "NOT_DELIVERABLE" }] },
+			current,
+		),
+		null,
+	);
+	assert.equal(
+		readPracticePageSupport(
+			{ ...envelope, practices: [{ ...page, decision: "PRACTICE_REQUIRES_APPROVAL" }] },
 			current,
 		),
 		null,

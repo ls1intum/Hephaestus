@@ -9,8 +9,10 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequest;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
+import java.math.BigDecimal;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,10 +34,9 @@ public class ReviewBatchSubmitter {
     private final ProductItemQuery items;
     private final ReviewService reviews;
     private final ReviewRepository ledger;
-    private final ReviewBatchSpend spend;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public SubmissionOutcome offer(ReviewBatch batch, long itemId) {
+    public SubmissionOutcome offer(ReviewBatch batch, long itemId, @Nullable BigDecimal budgetUsd) {
         var item = items.find(batch.getWorkspaceId(), itemId);
         if (item.isEmpty()) return new SubmissionOutcome.Skipped();
         ReviewKind kind = items.current(item.get())
@@ -44,7 +45,6 @@ public class ReviewBatchSubmitter {
         if (ledger.existsByWorkspaceIdAndBatchIdAndItemIdAndStatusNot(
                 batch.getWorkspaceId(), batch.getId(), itemId, ReviewStatus.CANCELLED))
             return new SubmissionOutcome.Submitted();
-        var remaining = spend.remaining(batch);
         try {
             reviews.request(ReviewRequest.builder()
                     .workspaceId(batch.getWorkspaceId())
@@ -52,7 +52,7 @@ public class ReviewBatchSubmitter {
                     .kind(kind)
                     .origin(ReviewBatchOrigins.origin(batch))
                     .batchId(batch.getId())
-                    .budgetUsd(remaining.remainingUsd())
+                    .budgetUsd(budgetUsd)
                     .practiceIds(List.of())
                     .reuse(true)
                     .build());

@@ -24,6 +24,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheckFacts;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheckStage;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDecisionAction;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDecisionInput;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDecisionReason;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackSendAction;
@@ -96,8 +97,11 @@ class FeedbackDecisionServiceTest {
     @Test
     void shouldRefuseNewDecisionTextDuringActorErasure() {
         when(privacy.holdForAccountWrite(3)).thenReturn(false);
-        assertThatThrownBy(
-                        () -> service.decide(1, id, 3, FeedbackDecisionAction.WITHDRAW, null, "Withdraw this.", null))
+        assertThatThrownBy(() -> service.decide(
+                        1,
+                        id,
+                        3,
+                        new FeedbackDecisionInput(FeedbackDecisionAction.WITHDRAW, null, "Withdraw this.", null)))
                 .isInstanceOf(ResponseStatusException.class);
         verify(decisions, never()).save(any());
     }
@@ -108,7 +112,8 @@ class FeedbackDecisionServiceTest {
 
     @Test
     void shouldAppendApprovalAndQueueTheSamePreparedPiece() {
-        var decision = service.decide(1, id, 3, FeedbackDecisionAction.APPROVE, null, null, digest());
+        var decision = service.decide(
+                1, id, 3, new FeedbackDecisionInput(FeedbackDecisionAction.APPROVE, null, null, digest()));
         assertThat(decision.getAction()).isEqualTo(FeedbackDecisionAction.APPROVE);
         assertThat(decision.getFeedbackId()).isEqualTo(id);
         var capture = ArgumentCaptor.forClass(FeedbackSend.class);
@@ -119,11 +124,19 @@ class FeedbackDecisionServiceTest {
 
     @Test
     void shouldRefuseChangedContentAndAnyExistingCopyFence() {
-        assertThatThrownBy(() -> service.decide(1, id, 3, FeedbackDecisionAction.APPROVE, null, null, "0".repeat(64)))
+        assertThatThrownBy(() -> service.decide(
+                        1,
+                        id,
+                        3,
+                        new FeedbackDecisionInput(FeedbackDecisionAction.APPROVE, null, null, "0".repeat(64))))
                 .isInstanceOf(ResponseStatusException.class);
         when(copies.hasWriteFence(1, id)).thenReturn(true);
         assertThatThrownBy(() -> service.decide(
-                        1, id, 3, FeedbackDecisionAction.REJECT, FeedbackDecisionReason.INCORRECT, null, digest()))
+                        1,
+                        id,
+                        3,
+                        new FeedbackDecisionInput(
+                                FeedbackDecisionAction.REJECT, FeedbackDecisionReason.INCORRECT, null, digest())))
                 .isInstanceOf(ResponseStatusException.class);
     }
 
@@ -135,7 +148,11 @@ class FeedbackDecisionServiceTest {
                         .state(FeedbackCopyState.POSTED)
                         .build()));
         var decision = service.decide(
-                1, id, 3, FeedbackDecisionAction.WITHDRAW, FeedbackDecisionReason.OTHER, "Remove this guidance.", null);
+                1,
+                id,
+                3,
+                new FeedbackDecisionInput(
+                        FeedbackDecisionAction.WITHDRAW, FeedbackDecisionReason.OTHER, "Remove this guidance.", null));
         assertThat(decision.getAction()).isEqualTo(FeedbackDecisionAction.WITHDRAW);
         var capture = ArgumentCaptor.forClass(FeedbackSend.class);
         verify(sends).saveAndFlush(capture.capture());
@@ -152,7 +169,8 @@ class FeedbackDecisionServiceTest {
         when(copies.lockByFeedbackId(1, id))
                 .thenReturn(List.of(
                         FeedbackCopy.builder().state(FeedbackCopyState.POSTED).build()));
-        service.decide(1, id, 3, FeedbackDecisionAction.WITHDRAW, null, "Withdraw it.", null);
+        service.decide(
+                1, id, 3, new FeedbackDecisionInput(FeedbackDecisionAction.WITHDRAW, null, "Withdraw it.", null));
         verify(sends, never()).save(any());
     }
 }

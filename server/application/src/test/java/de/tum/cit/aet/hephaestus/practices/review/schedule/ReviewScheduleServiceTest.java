@@ -20,7 +20,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.web.server.ResponseStatusException;
 
 class ReviewScheduleServiceTest extends BaseUnitTest {
@@ -28,8 +27,8 @@ class ReviewScheduleServiceTest extends BaseUnitTest {
     final ReviewBatchService batches = mock(ReviewBatchService.class);
     final ProductReferenceQuery references = mock(ProductReferenceQuery.class);
     final ConfigAuditPort audit = mock(ConfigAuditPort.class);
-    final ReviewScheduleService service =
-            new ReviewScheduleService(schedules, batches, references, audit, Clock.systemUTC(), mock(JdbcClient.class));
+    final ReviewScheduleService service = new ReviewScheduleService(
+            schedules, batches, references, audit, Clock.systemUTC(), mock(ReviewBatchRepository.class));
     final WorkspaceContext context = new WorkspaceContext(1L, "ws", "Workspace", AccountType.ORG, null, Set.of());
 
     @Test

@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.practices.review.ReviewItemRepository;
 import de.tum.cit.aet.hephaestus.practices.review.model.ReviewItem;
 import de.tum.cit.aet.hephaestus.practices.review.report.ProblemComparison;
 import de.tum.cit.aet.hephaestus.practices.review.report.ScanEvidencePolicy;
+import de.tum.cit.aet.hephaestus.practices.review.report.ScanMembershipQueries;
 import de.tum.cit.aet.hephaestus.practices.review.report.ScanReportCursor;
 import de.tum.cit.aet.hephaestus.practices.review.report.ScanReportService;
 import de.tum.cit.aet.hephaestus.practices.spi.Comparison;
@@ -71,7 +72,7 @@ public class ScanExportService {
         ScanReportCursor after = null;
         while (true) {
             var page = items.problemRows(
-                    review, new ScanReportItemsService.ProblemFilter(null, null, null, null, false), after, 256);
+                    review, new ScanMembershipQueries.ProblemFilter(null, null, null, null, false), after, 256);
             if (page.isEmpty()) break;
             var unmarked = eligibility.unmarked(
                     review,

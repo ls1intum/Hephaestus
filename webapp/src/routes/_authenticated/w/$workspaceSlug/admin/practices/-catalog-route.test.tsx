@@ -103,44 +103,59 @@ describe("resetting a group to the catalog", () => {
 		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull(), ROUTE_RENDER_WAIT);
 	});
 
-	it("refuses a reset when the group changed after the comparison was shown", async () => {
-		const reset = vi.fn();
-		const changed = { ...edited, description: "Someone else's words." };
-		let saved = edited;
-		server.use(
-			http.get("*/workspaces/:workspaceSlug/practice-groups", () => HttpResponse.json([saved])),
-			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption/groups/:slug", () =>
-				HttpResponse.json(offer),
-			),
-			http.get("*/workspaces/:workspaceSlug/practice-groups/:groupSlug", () =>
-				HttpResponse.json(changed, { headers: { ETag: '"newer-basis"' } }),
-			),
-			http.delete(
-				"*/workspaces/:workspaceSlug/practice-groups/:groupSlug/catalog-customization",
-				() => {
-					reset();
-					return HttpResponse.json(edited);
-				},
-			),
-		);
+	it.each([
+		{
+			change: "changes",
+			group: { ...edited, description: "Someone else's words." },
+			description: "Someone else's words.",
+		},
+		{
+			change: "changes and returns to the same text",
+			group: edited,
+			description: "Our own words.",
+		},
+	])(
+		"requires comparison again when the group $change after it was shown",
+		async ({ group: changed, description }) => {
+			const seenIfMatch = vi.fn<(tag: string | null) => void>();
+			let saved = edited;
+			let etag = '"group-reset-basis"';
+			server.use(
+				http.get("*/workspaces/:workspaceSlug/practice-groups", () => HttpResponse.json([saved])),
+				http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption/groups/:slug", () =>
+					HttpResponse.json(offer),
+				),
+				http.get("*/workspaces/:workspaceSlug/practice-groups/:groupSlug", () =>
+					HttpResponse.json(saved, { headers: { ETag: etag } }),
+				),
+				http.delete(
+					"*/workspaces/:workspaceSlug/practice-groups/:groupSlug/catalog-customization",
+					({ request }) => {
+						seenIfMatch(request.headers.get("If-Match"));
+						return HttpResponse.json({ status: 412, title: "Group changed" }, { status: 412 });
+					},
+				),
+			);
 
-		renderRouteAt("/w/acme/admin/practices");
-		fireEvent.click(
-			await screen.findByRole(
-				"button",
-				{ name: "More actions for Review-ready work" },
-				ROUTE_RENDER_WAIT,
-			),
-		);
-		fireEvent.click(await screen.findByRole("menuitem", { name: "Reset to catalog" }));
-		const dialog = await screen.findByRole("alertdialog");
-		await within(dialog).findByText("Our own words.");
-		saved = changed;
-		fireEvent.click(within(dialog).getByRole("button", { name: "Reset to catalog" }));
+			renderRouteAt("/w/acme/admin/practices");
+			fireEvent.click(
+				await screen.findByRole(
+					"button",
+					{ name: "More actions for Review-ready work" },
+					ROUTE_RENDER_WAIT,
+				),
+			);
+			fireEvent.click(await screen.findByRole("menuitem", { name: "Reset to catalog" }));
+			const dialog = await screen.findByRole("alertdialog");
+			await within(dialog).findByText("Our own words.");
+			saved = changed;
+			etag = '"newer-basis"';
+			fireEvent.click(within(dialog).getByRole("button", { name: "Reset to catalog" }));
 
-		const refused = await within(dialog).findByRole("alert", {}, ROUTE_RENDER_WAIT);
-		expect(refused.textContent).toContain("Nothing was reset.");
-		await within(dialog).findByText("Someone else's words.");
-		expect(reset).not.toHaveBeenCalled();
-	});
+			const refused = await within(dialog).findByRole("alert", {}, ROUTE_RENDER_WAIT);
+			expect(refused.textContent).toContain("Nothing was reset.");
+			await within(dialog).findByText(description);
+			expect(seenIfMatch).toHaveBeenCalledExactlyOnceWith('"group-reset-basis"');
+		},
+	);
 });

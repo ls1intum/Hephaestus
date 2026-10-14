@@ -84,14 +84,14 @@ async function quoteOf(
 		}
 		const end = at.endLine ?? at.line;
 		assertCitationRange(at.line, end);
-		if (at.revision !== undefined && !commitIdSchema.safeParse(at.revision).success) {
+		if (at.commit !== undefined && !commitIdSchema.safeParse(at.commit).success) {
 			return undefined;
 		}
-		if (at.revision !== undefined && at.revision !== sources.headRevision) {
+		if (at.commit !== undefined && at.commit !== sources.headRevision) {
 			try {
 				const { stdout } = await git(
 					"git",
-					["-C", sources.repo, "show", "--end-of-options", `${at.revision}:${at.file}`],
+					["-C", sources.repo, "show", "--end-of-options", `${at.commit}:${at.file}`],
 					{
 						env: GIT_ENV,
 						maxBuffer: MAX_READ_BYTES,
@@ -133,7 +133,7 @@ function where(at: EvidenceLocation, contextReference: string): string {
 	}
 	if ("file" in at) {
 		const range = at.endLine === undefined ? `${at.line}` : `${at.line}-${at.endLine}`;
-		return `\`${at.file}:${range}\`${at.revision === undefined ? "" : ` at ${at.revision.slice(0, 12)}`}`;
+		return `\`${at.file}:${range}\`${at.commit === undefined ? "" : ` at ${at.commit.slice(0, 12)}`}`;
 	}
 	const record = path.posix.join(contextReference, at.record);
 	return `\`${record}${at.line === undefined || at.line === 0 ? "" : `:${at.line}`}\``;

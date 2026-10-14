@@ -11,7 +11,6 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.result.ResultPresentation;
-import de.tum.cit.aet.hephaestus.practices.result.ResultReadQuery;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ResultView;
 import de.tum.cit.aet.hephaestus.practices.result.ResultViewQuery;
@@ -42,20 +41,13 @@ import org.springframework.data.domain.PageRequest;
 
 class ProfileReviewPaginationTest extends BaseUnitTest {
     final CurrentDeveloperLookup developer = mock(CurrentDeveloperLookup.class);
-    final ResultReadQuery read = mock(ResultReadQuery.class);
+    final ResultRepository results = mock(ResultRepository.class);
     final ResultViewQuery views = mock(ResultViewQuery.class);
     final ResultPresentation presentation = mock(ResultPresentation.class);
     final ReviewSummaryQueryService reviews = mock(ReviewSummaryQueryService.class);
     final EvidenceAuthorization authorization = mock(EvidenceAuthorization.class);
     final PracticeProfileReviewService service = new PracticeProfileReviewService(
-            developer,
-            read,
-            mock(ResultRepository.class),
-            views,
-            presentation,
-            reviews,
-            mock(OwnItemTraceQueryService.class),
-            authorization);
+            developer, results, views, presentation, reviews, mock(OwnItemTraceQueryService.class), authorization);
 
     @Test
     void hiddenReviewsAreExcludedBeforePageBoundaries() {
@@ -83,7 +75,7 @@ class ProfileReviewPaginationTest extends BaseUnitTest {
     }
 
     void assertPage(int count, Set<Integer> hidden, int number, int size, List<Integer> expected, boolean hasNext) {
-        reset(read, views, presentation, reviews, authorization, developer);
+        reset(results, views, presentation, reviews, authorization, developer);
         var now = Instant.parse("2026-10-14T00:00:00Z");
         var data = IntStream.range(0, count)
                 .mapToObj(i -> ReviewTestData.view(
@@ -98,7 +90,7 @@ class ProfileReviewPaginationTest extends BaseUnitTest {
                 .mapToObj(i -> data.get(i).result().getId())
                 .collect(Collectors.toSet());
         when(developer.currentDeveloperId()).thenReturn(Optional.of(7L));
-        when(read.forDevelopersSince(eq(1L), eq(List.of(7L)), eq(Instant.EPOCH), eq(false)))
+        when(results.forDevelopersSince(eq(1L), eq(List.of(7L)), eq(Instant.EPOCH), eq(false)))
                 .thenReturn(data.stream().map(ResultView::result).toList());
         when(authorization.permitsAll(eq(1L), anyCollection(), any())).thenReturn(visible);
         when(views.views(eq(1L), anyCollection())).thenAnswer(i -> {

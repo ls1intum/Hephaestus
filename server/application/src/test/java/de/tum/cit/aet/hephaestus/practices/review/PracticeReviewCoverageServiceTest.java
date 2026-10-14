@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.practices.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -25,18 +24,17 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.simple.JdbcClient;
 
 class PracticeReviewCoverageServiceTest extends BaseUnitTest {
     final RepositoryToMonitorRepository monitors = mock(RepositoryToMonitorRepository.class);
     final ReviewScopeRepositoryRepository targets = mock(ReviewScopeRepositoryRepository.class);
     final MonitoredRepositoryQuery indexed = mock(MonitoredRepositoryQuery.class);
-    final JdbcClient jdbc = mock(JdbcClient.class, RETURNS_DEEP_STUBS);
+    final ProductItemRepository items = mock(ProductItemRepository.class);
     final PracticeReviewCoverageService service = new PracticeReviewCoverageService(
             monitors,
             targets,
             mock(PersonProcessingSuppression.class),
-            jdbc,
+            items,
             indexed,
             mock(MembershipReviewSelection.class));
     Workspace workspace;

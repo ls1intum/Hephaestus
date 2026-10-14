@@ -14,7 +14,7 @@ const FILES: Record<string, string> = {
 function tree() {
 	const asked: unknown[] = [];
 	const files: FileTree = {
-		revision: "a".repeat(40),
+		commit: "a".repeat(40),
 		read: async (path, options = {}) => {
 			asked.push({ read: path, ...options });
 			if (path === "logo.png") {

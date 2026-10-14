@@ -51,11 +51,11 @@
 									"enum": ["OLD", "NEW", null],
 									"description": "For a quote of the change: sourcePath names the pinned change (change.json), path is the file as named on that side, and the lines are the [L<n>] coordinates of work/change/diff.patch."
 								},
-								"revision": {
+								"commit": {
 									"type": ["string", "null"],
 									"minLength": 1,
 									"maxLength": 1024,
-									"description": "For repository text: sourcePath names the captured .git/HEAD, path is repository-relative, and revision optionally selects a full commit SHA; omission means the captured HEAD."
+									"description": "For repository text: sourcePath names the captured .git/HEAD, path is repository-relative, and commit optionally selects a full commit SHA; omission means the captured HEAD."
 								},
 								"startLine": {
 									"type": "integer",
@@ -134,11 +134,11 @@
 														"enum": ["OLD", "NEW", null],
 														"description": "For a quote of the change: sourcePath names the pinned change (change.json), path is the file as named on that side, and the lines are the [L<n>] coordinates of work/change/diff.patch."
 													},
-													"revision": {
+													"commit": {
 														"type": ["string", "null"],
 														"minLength": 1,
 														"maxLength": 1024,
-														"description": "For repository text: sourcePath names the captured .git/HEAD, path is repository-relative, and revision optionally selects a full commit SHA; omission means the captured HEAD."
+														"description": "For repository text: sourcePath names the captured .git/HEAD, path is repository-relative, and commit optionally selects a full commit SHA; omission means the captured HEAD."
 													},
 													"startLine": {
 														"type": "integer",
@@ -234,11 +234,11 @@
 												"enum": ["OLD", "NEW", null],
 												"description": "For a quote of the change: sourcePath names the pinned change (change.json), path is the file as named on that side, and the lines are the [L<n>] coordinates of work/change/diff.patch."
 											},
-											"revision": {
+											"commit": {
 												"type": ["string", "null"],
 												"minLength": 1,
 												"maxLength": 1024,
-												"description": "For repository text: sourcePath names the captured .git/HEAD, path is repository-relative, and revision optionally selects a full commit SHA; omission means the captured HEAD."
+												"description": "For repository text: sourcePath names the captured .git/HEAD, path is repository-relative, and commit optionally selects a full commit SHA; omission means the captured HEAD."
 											},
 											"startLine": {
 												"type": "integer",
@@ -387,11 +387,11 @@
 																	"enum": ["OLD", "NEW", null],
 																	"description": "For a quote of the change: sourcePath names the pinned change (change.json), path is the file as named on that side, and the lines are the [L<n>] coordinates of work/change/diff.patch."
 																},
-																"revision": {
+																"commit": {
 																	"type": ["string", "null"],
 																	"minLength": 1,
 																	"maxLength": 1024,
-																	"description": "For repository text: sourcePath names the captured .git/HEAD, path is repository-relative, and revision optionally selects a full commit SHA; omission means the captured HEAD."
+																	"description": "For repository text: sourcePath names the captured .git/HEAD, path is repository-relative, and commit optionally selects a full commit SHA; omission means the captured HEAD."
 																},
 																"startLine": {
 																	"type": "integer",

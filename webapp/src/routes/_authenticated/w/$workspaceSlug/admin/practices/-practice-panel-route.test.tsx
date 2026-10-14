@@ -185,8 +185,8 @@ describe("resetting a practice to the catalog after declining its update", () =>
 			),
 			http.delete("*/workspaces/:workspaceSlug/practices/:practiceSlug/catalog-customization", () =>
 				HttpResponse.json(
-					{ title: "Practice release changed", status: 409, detail: "The offer changed." },
-					{ status: 409 },
+					{ title: "Practice release changed", status: 412, detail: "The offer changed." },
+					{ status: 412 },
 				),
 			),
 		);
@@ -258,6 +258,54 @@ describe("editing a workspace practice", () => {
 			expectedVersionId: "701",
 			definition: { ...currentDefinition(practice), name: "Keep each change reviewable" },
 		});
+	});
+
+	it("submits a human reason without a code and displays the saved server definition", async () => {
+		const savedDefinition = definitionOf({
+			reviewedBy: {
+				by: "PEOPLE",
+				humanReason: { code: "SERVER_REASON", description: "Discussed off the work." },
+				limits: [],
+			},
+			reads: { contract: currentDefinition(practice).reads.contract, sources: [] },
+		});
+		const saved = wirePractice({
+			slug: practice.slug,
+			definition: savedDefinition,
+			groupSlug: practice.groupSlug,
+			versionId: "702",
+			versionNumber: 2,
+		});
+		let body: unknown;
+		server.use(
+			http.patch("*/workspaces/:workspaceSlug/practices/:practiceSlug", async ({ request }) => {
+				body = await request.json();
+				server.use(...practicesHandlers([saved]));
+				return HttpResponse.json(saved);
+			}),
+		);
+		renderRouteAt(at("practice-edit", practice.slug));
+		fireEvent.click(await screen.findByRole("radio", { name: /^People/u }, ROUTE_RENDER_WAIT));
+		fireEvent.change(screen.getByRole("textbox", { name: /Why do people review it/u }), {
+			target: { value: "Discussed off the work." },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+		await waitFor(() => expect(body).toBeDefined(), ROUTE_RENDER_WAIT);
+		expect(body).toStrictEqual({
+			expectedVersionId: "701",
+			definition: {
+				...savedDefinition,
+				reviewedBy: {
+					by: "PEOPLE",
+					humanReason: { description: "Discussed off the work." },
+					limits: [],
+				},
+			},
+		});
+		await userEvent.click(
+			await screen.findByRole("link", { name: savedDefinition.name }, ROUTE_RENDER_WAIT),
+		);
+		await screen.findAllByText("Discussed off the work.", {}, ROUTE_RENDER_WAIT);
 	});
 
 	it("refuses a stale save without a new version, keeps the draft, and loads the newest on request", async () => {

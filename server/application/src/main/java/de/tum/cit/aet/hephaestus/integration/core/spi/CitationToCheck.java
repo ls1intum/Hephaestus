@@ -8,7 +8,7 @@ public record CitationToCheck(
         String source,
         String path,
         CitationSide side,
-        @Nullable String revision,
+        @Nullable String commit,
         int startLine,
         int endLine,
         String quote) {}

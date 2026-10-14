@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackCheckDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.ReviewFeedbackDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.ReviewFeedbackDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReasonCountDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDecisionInput;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
@@ -90,7 +91,11 @@ public class FeedbackReviewController {
             @PathVariable UUID feedbackId,
             @Valid @RequestBody CreateFeedbackDecisionRequestDTO request) {
         var decision = decisions.decide(
-                workspace.id(), feedbackId, SecurityUtils.getCurrentAccountId().orElseThrow(), request);
+                workspace.id(),
+                feedbackId,
+                SecurityUtils.getCurrentAccountId().orElseThrow(),
+                new FeedbackDecisionInput(
+                        request.action(), request.reasonCode(), request.note(), request.contentDigest()));
         var saved = reader.decisionHistory(workspace.id(), feedbackId).stream()
                 .filter(row -> row.id().equals(decision.getId()))
                 .findFirst()

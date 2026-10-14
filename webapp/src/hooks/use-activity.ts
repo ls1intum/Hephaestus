@@ -9,6 +9,9 @@ import {
 	getActivityWorkInfiniteOptions,
 	getActivityWorkOptions,
 	getOpenWorkOptions,
+	getOwnActivityOptions,
+	getOwnActivityWorkInfiniteOptions,
+	getOwnActivityWorkOptions,
 } from "@/api/@tanstack/react-query.gen";
 import type { ActivityPeople, ActivityWork } from "@/api/types.gen";
 import type { ActivityOverviewState } from "@/components/activity/activity-buckets";
@@ -120,22 +123,41 @@ export function useActivityFacets({ enabled = true, ...scope }: ActivityRequest)
  */
 export function useActivityPerson({
 	userId,
+	own = false,
 	enabled = true,
 	...scope
-}: ActivityRequest & { userId: number | undefined }): ActivityOverviewState {
+}: ActivityRequest &
+	(
+		| { own: true; userId?: never }
+		| { own?: false; userId: number | undefined }
+	)): ActivityOverviewState {
 	const { workspaceSlug, team, repo, period } = scope;
 	const path = { workspaceSlug, userId: userId ?? 0 };
-	const query = useQuery({
+	const personQuery = useQuery({
 		...getActivityPersonOptions({ path, query: scopeQuery(scope) }),
 		placeholderData: keepSameSubject({ workspaceSlug, userId, team, repo }),
-		enabled: enabled && userId !== undefined,
+		enabled: enabled && !own && userId !== undefined,
 	});
+	const ownQuery = useQuery({
+		...getOwnActivityOptions({ path: { workspaceSlug }, query: scopeQuery(scope) }),
+		placeholderData: keepSameSubject({ workspaceSlug, team, repo }),
+		enabled: enabled && own,
+	});
+	const query = own ? ownQuery : personQuery;
 	const current = query.isPlaceholderData ? undefined : query.data;
 	const before = current && previousPeriod(period, current);
-	const earlier = useQuery({
+	const earlierPerson = useQuery({
 		...getActivityPersonOptions({ path, query: { ...scopeQuery(scope), ...before?.query } }),
-		enabled: enabled && userId !== undefined && before !== undefined,
+		enabled: enabled && !own && userId !== undefined && before !== undefined,
 	});
+	const earlierOwn = useQuery({
+		...getOwnActivityOptions({
+			path: { workspaceSlug },
+			query: { ...scopeQuery(scope), ...before?.query },
+		}),
+		enabled: enabled && own && before !== undefined,
+	});
+	const earlier = own ? earlierOwn : earlierPerson;
 	return panelState(query, (data) =>
 		query.isPlaceholderData
 			? { status: "ready" as const, overview: overviewOf(data), stale: true as const }
@@ -171,19 +193,18 @@ export function useOpenWork({
 	return panelState(query, (openWork) => ({ status: "ready" as const, openWork, login }));
 }
 
-interface ActivityWorkRequest extends ActivityRequest {
-	/** One person's timeline; without one, everyone's in the scope. */
-	userId?: number;
-	kinds?: readonly ActivityKind[];
-	/** How a copy of the timeline reads: its heading's words before the period, and its provider. */
-	copy: {
-		/** Whose work, and of which category: "Reviews · Ada Lovelace". */
-		title: string;
-		providerType: ProviderType;
-		/** Several people's timeline, whose copied lines say whose work each was. */
-		people: boolean;
+type ActivityWorkRequest = ActivityRequest &
+	({ own: true; userId?: never } | { own?: false; userId?: number }) & {
+		kinds?: readonly ActivityKind[];
+		/** How a copy of the timeline reads: its heading's words before the period, and its provider. */
+		copy: {
+			/** Whose work, and of which category: "Reviews · Ada Lovelace". */
+			title: string;
+			providerType: ProviderType;
+			/** Several people's timeline, whose copied lines say whose work each was. */
+			people: boolean;
+		};
 	};
-}
 
 /**
  * The timeline, one piece of work per row, newest first, a page at a time — and a copy of all of
@@ -192,6 +213,7 @@ interface ActivityWorkRequest extends ActivityRequest {
  */
 export function useActivityWork({
 	userId,
+	own = false,
 	kinds,
 	copy,
 	enabled = true,
@@ -200,6 +222,7 @@ export function useActivityWork({
 	const { workspaceSlug, team, repo, period } = scope;
 	const queryClient = useQueryClient();
 	const filter = { ...scopeQuery(scope), kinds: kinds && [...kinds] };
+	const personPath = { workspaceSlug, userId: userId ?? 0 };
 	const workspaceOptions = getActivityWorkInfiniteOptions({
 		path: { workspaceSlug },
 		query: { ...filter, size: WORK_PAGE_SIZE },
@@ -209,10 +232,9 @@ export function useActivityWork({
 		initialPageParam: { path: { workspaceSlug }, query: { cursor: undefined } },
 		getNextPageParam: (last) => last.nextCursor ?? undefined,
 		placeholderData: keepSameSubject({ workspaceSlug, team, repo, kinds }),
-		enabled: enabled && userId === undefined,
+		enabled: enabled && !own && userId === undefined,
 	});
 	useQueryReadRefusal(workspaceOptions.queryKey, workspaceQuery.isError, workspaceQuery.error);
-	const personPath = { workspaceSlug, userId: userId ?? 0 };
 	const personOptions = getActivityPersonWorkInfiniteOptions({
 		path: personPath,
 		query: { ...filter, size: WORK_PAGE_SIZE },
@@ -222,10 +244,23 @@ export function useActivityWork({
 		initialPageParam: { path: personPath, query: { cursor: undefined } },
 		getNextPageParam: (last) => last.nextCursor ?? undefined,
 		placeholderData: keepSameSubject({ workspaceSlug, userId, team, repo, kinds }),
-		enabled: enabled && userId !== undefined,
+		enabled: enabled && !own && userId !== undefined,
 	});
 	useQueryReadRefusal(personOptions.queryKey, personQuery.isError, personQuery.error);
-	const query = userId === undefined ? workspaceQuery : personQuery;
+	const ownOptions = getOwnActivityWorkInfiniteOptions({
+		path: { workspaceSlug },
+		query: { ...filter, size: WORK_PAGE_SIZE },
+	});
+	const ownQuery = useInfiniteQuery({
+		...ownOptions,
+		initialPageParam: { path: { workspaceSlug }, query: { cursor: undefined } },
+		getNextPageParam: (last) => last.nextCursor ?? undefined,
+		placeholderData: keepSameSubject({ workspaceSlug, team, repo, kinds }),
+		enabled: enabled && own,
+	});
+	useQueryReadRefusal(ownOptions.queryKey, ownQuery.isError, ownQuery.error);
+	const scopedQuery = userId === undefined ? workspaceQuery : personQuery;
+	const query = own ? ownQuery : scopedQuery;
 
 	const everything = async (): Promise<ActivityWork[]> => {
 		// A placeholder is the previous period's timeline, so a copy of this period starts over.
@@ -235,14 +270,20 @@ export function useActivityWork({
 		let cursor: string | null | undefined = pages.length === 0 ? null : pages.at(-1)?.nextCursor;
 		while (cursor !== undefined) {
 			const request = { ...filter, cursor: cursor ?? undefined, size: COPY_PAGE_SIZE };
-			const page =
-				userId === undefined
-					? await queryClient.query(
-							getActivityWorkOptions({ path: { workspaceSlug }, query: request }),
-						)
-					: await queryClient.query(
-							getActivityPersonWorkOptions({ path: personPath, query: request }),
-						);
+			let page;
+			if (own) {
+				page = await queryClient.query(
+					getOwnActivityWorkOptions({ path: { workspaceSlug }, query: request }),
+				);
+			} else if (userId === undefined) {
+				page = await queryClient.query(
+					getActivityWorkOptions({ path: { workspaceSlug }, query: request }),
+				);
+			} else {
+				page = await queryClient.query(
+					getActivityPersonWorkOptions({ path: personPath, query: request }),
+				);
+			}
 			items.push(...page.content);
 			cursor = page.nextCursor;
 		}

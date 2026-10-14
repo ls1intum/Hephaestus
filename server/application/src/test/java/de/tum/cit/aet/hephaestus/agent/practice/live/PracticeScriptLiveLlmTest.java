@@ -52,7 +52,8 @@ import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEventRepository;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
-import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.capture.EvidenceDirectory;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
@@ -64,11 +65,15 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
+import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
+import de.tum.cit.aet.hephaestus.practices.PracticeReadSource;
+import de.tum.cit.aet.hephaestus.practices.PracticeReads;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
@@ -81,10 +86,13 @@ import de.tum.cit.aet.hephaestus.practices.spi.ScriptRunStatus;
 import de.tum.cit.aet.hephaestus.testconfig.LiveLlmCredentials;
 import de.tum.cit.aet.hephaestus.testconfig.LiveLlmTest;
 import de.tum.cit.aet.hephaestus.testconfig.PiSdkInstallation;
+import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Membership;
+import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContextHolder;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
@@ -245,6 +253,12 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
     private RepositoryRepository repositories;
 
     @Autowired
+    private RepositoryToMonitorRepository monitors;
+
+    @Autowired
+    private WorkspaceRepository workspaces;
+
+    @Autowired
     private JobEvidenceFiles evidenceFiles;
 
     @Autowired
@@ -367,7 +381,7 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
         root = workDir;
         Practice practice = practice(workspace, Files.readString(EVERY_SLOT));
         LiveRunnerWorkspace.stageCartChange(workDir);
-        ReviewJob job = capture(runningJob(workspace, practice), workDir, developer);
+        ReviewJob job = capture(runningJob(workspace, practice, accountId(developer)), workDir, developer, workspace);
         ConfigSnapshot snapshot = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
         Map<ModelKind, FrozenModel> frozen = snapshot.practiceScriptModels();
         assertThat(frozen.keySet()).isEqualTo(called);
@@ -393,7 +407,7 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
         var assigned = reviewAssignments.load(job);
         var frozenReview = reviewAssignments.review(job);
         var staged = new LinkedHashMap<String, byte[]>();
-        catalogInputs.inject(staged, assigned, ReviewKind.ITEM);
+        catalogInputs.inject(staged, assigned, ReviewKind.ITEM, Map.of());
         for (var assignment : assigned)
             staged.putAll(scriptInputs.stage(
                     frozenReview,
@@ -527,8 +541,11 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
         String slug = "practice-script-live-" + System.nanoTime();
         Workspace workspace = createWorkspace(
                 slug, "Practice script live", slug + "-org", AccountType.ORG, persistUser(slug + "-owner"));
+        workspace.getFeatures().setPracticesEnabled(true);
+        workspace = workspaces.saveAndFlush(workspace);
         ensureAdminMembership(workspace);
-        workspaceMembershipService.createMembership(workspace, developer.getId(), Membership.WorkspaceRole.MEMBER);
+        ensureMembership(workspace, developer, Membership.WorkspaceRole.MEMBER);
+        connectActivitySource(workspace, ensureGitHubProvider());
         return workspace;
     }
 
@@ -573,21 +590,31 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
     }
 
     private Practice practice(Workspace workspace, String program) {
-
+        var base = DefinitionTestFixtures.definition(new ItemKind("scm.pull_request"), "Every slot", CRITERIA, program);
+        var definition = new PracticeDefinition(
+                base.name(),
+                base.reviewOn(),
+                base.appliesWhen(),
+                base.about(),
+                new PracticeReads(
+                        ClasspathSourceCatalogRegistry.CURRENT_VERSION.value(),
+                        List.of(
+                                new PracticeReadSource(new SourceKind("scm.pull-request.core"), ReadNeed.REQUIRED),
+                                new PracticeReadSource(new SourceKind("scm.pull-request.diff"), ReadNeed.COMPLETE),
+                                new PracticeReadSource(new SourceKind("scm.repository.tree"), ReadNeed.OPTIONAL))),
+                base.reviewedBy(),
+                base.criteria(),
+                base.script(),
+                base.scan(),
+                base.lineNotes(),
+                base.guidance());
         Practice practice = runtimePracticeVersions.create(new PracticeVersionService.NewPractice(
-                workspace,
-                SLUG,
-                new ItemKind("scm.pull_request"),
-                DefinitionTestFixtures.definition(new ItemKind("scm.pull_request"), "Every slot", CRITERIA, program),
-                null,
-                0,
-                null));
+                workspace, SLUG, new ItemKind("scm.pull_request"), definition, null, 0, null));
         practice.setFeedbackMode(FeedbackMode.AUTOMATIC);
         return practiceRepository.saveAndFlush(practice);
     }
 
-    private ReviewJob runningJob(Workspace workspace, Practice practice) {
-        long actor = SecurityUtils.getCurrentAccountId().orElseThrow();
+    private ReviewJob runningJob(Workspace workspace, Practice practice, long actor) {
         var binding = runtimeModelRouting
                 .binding(workspace.getId(), AgentPurpose.PRACTICE_REVIEW, actor)
                 .orElseThrow();
@@ -614,7 +641,8 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
         return job;
     }
 
-    private ReviewJob capture(ReviewJob job, Path workDir, User developer) throws IOException, InterruptedException {
+    private ReviewJob capture(ReviewJob job, Path workDir, User developer, Workspace workspace)
+            throws IOException, InterruptedException {
         Path context = workDir.resolve(SandboxLayout.CONTEXT_PREFIX);
         JsonNode change = objectMapper.readTree(context.resolve("change.json").toFile());
         String base = change.path("base_sha").asString();
@@ -626,7 +654,11 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
         repository.setNameWithOwner("test/fixture");
         repository.setHtmlUrl("https://github.com/test/fixture");
         repository.setDefaultBranch("main");
+        repository.setVisibility(Repository.Visibility.PUBLIC);
         repository = repositories.save(repository);
+        var monitor = WorkspaceTestFixtures.repositoryMonitor(workspace, repository.getNameWithOwner());
+        monitor.setNativeId(repository.getNativeId());
+        monitors.saveAndFlush(monitor);
         Instant now = Instant.now();
         pullRequests.upsertCore(
                 System.nanoTime(),
@@ -710,20 +742,22 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
                     .put("side", "NEW")
                     .put("stagedPath", path)
                     .put("sha256", ProvenanceDigest.sha256Hex(Files.readAllBytes(workDir.resolve(path))));
-            if (kind.equals("scm.repository.tree")) text.put("revision", head);
+            if (kind.equals("scm.repository.tree")) text.put("commit", head);
         }
         Files.write(
                 workDir.resolve(SandboxLayout.MANIFEST_PATH),
                 objectMapper.writeValueAsBytes(snapshot.path("manifest")));
 
+        var holder = itemWriter.upsert(new ItemRegistration(
+                job.getWorkspaceId(), new ItemKind("scm.repository"), repository.getId(), null, null));
         var item = itemWriter.upsert(new ItemRegistration(
-                job.getWorkspaceId(), new ItemKind("scm.pull_request"), pullRequestId, null, null));
+                job.getWorkspaceId(), new ItemKind("scm.pull_request"), pullRequestId, holder.itemId(), null));
         var source = itemSources.stream()
                 .filter(candidate -> candidate.supports(item))
                 .findFirst()
                 .orElseThrow();
         var pinned = source.current(item).orElseThrow();
-        long actor = SecurityUtils.getCurrentAccountId().orElseThrow();
+        long actor = accountId(developer);
         var reviewId = reviews.request(new ReviewRequest(
                 job.getWorkspaceId(),
                 item.itemId(),

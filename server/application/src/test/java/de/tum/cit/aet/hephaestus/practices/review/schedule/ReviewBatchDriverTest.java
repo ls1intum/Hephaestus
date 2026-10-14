@@ -89,7 +89,7 @@ class ReviewBatchDriverTest extends BaseUnitTest {
         batch.setPauseReason(ReviewBatchPauseReason.BUDGET_EXHAUSTED);
         batch.setCursorItemId(5L);
         when(scope.next(1, batch.getId(), 5L, 2)).thenReturn(List.of(6L));
-        when(submitter.offer(batch, 6)).thenReturn(new ReviewBatchSubmitter.SubmissionOutcome.Submitted());
+        when(submitter.offer(batch, 6, null)).thenReturn(new ReviewBatchSubmitter.SubmissionOutcome.Submitted());
         driver.advance(batch);
         assertThat(batch.getStatus()).isEqualTo(ReviewBatchStatus.RUNNING);
         assertThat(batch.getPauseReason()).isNull();
@@ -100,8 +100,8 @@ class ReviewBatchDriverTest extends BaseUnitTest {
     @Test
     void oneFailedItemDoesNotStopTheNextTarget() {
         when(scope.next(1, batch.getId(), null, 2)).thenReturn(List.of(1L, 2L));
-        when(submitter.offer(batch, 1)).thenThrow(new IllegalStateException("unavailable"));
-        when(submitter.offer(batch, 2)).thenReturn(new ReviewBatchSubmitter.SubmissionOutcome.Submitted());
+        when(submitter.offer(batch, 1, null)).thenThrow(new IllegalStateException("unavailable"));
+        when(submitter.offer(batch, 2, null)).thenReturn(new ReviewBatchSubmitter.SubmissionOutcome.Submitted());
         driver.advance(batch);
         assertThat(batch.getFailedCount()).isOne();
         assertThat(batch.getSubmittedCount()).isOne();
@@ -147,7 +147,7 @@ class ReviewBatchDriverTest extends BaseUnitTest {
                         ArgumentMatchers.anyCollection()))
                 .thenReturn(false);
         when(scope.next(1, batch.getId(), null, 1)).thenReturn(List.of(6L));
-        when(submitter.offer(batch, 6)).thenReturn(new ReviewBatchSubmitter.SubmissionOutcome.Deferred());
+        when(submitter.offer(batch, 6, null)).thenReturn(new ReviewBatchSubmitter.SubmissionOutcome.Deferred());
         driver.advance(batch);
         assertThat(batch.getCursorItemId()).isNull();
         assertThat(batch.getFailedCount()).isZero();
@@ -159,8 +159,8 @@ class ReviewBatchDriverTest extends BaseUnitTest {
     @Test
     void shouldRetainTheNextItemWhenBudgetIsExhaustedPartwayThroughATick() {
         when(scope.next(1, batch.getId(), null, 2)).thenReturn(List.of(1L, 2L));
-        when(submitter.offer(batch, 1)).thenReturn(new ReviewBatchSubmitter.SubmissionOutcome.Submitted());
-        when(submitter.offer(batch, 2))
+        when(submitter.offer(batch, 1, null)).thenReturn(new ReviewBatchSubmitter.SubmissionOutcome.Submitted());
+        when(submitter.offer(batch, 2, null))
                 .thenReturn(new ReviewBatchSubmitter.SubmissionOutcome.Paused(ReviewBatchPauseReason.BUDGET_EXHAUSTED));
         driver.advance(batch);
         assertThat(batch.getCursorItemId()).isEqualTo(1L);
@@ -201,7 +201,7 @@ class ReviewBatchDriverTest extends BaseUnitTest {
         batch.setKind("scm.repository");
         when(budget.canRequest(1, ReviewKind.SCAN, null)).thenReturn(true);
         when(scope.next(1, batch.getId(), null, 1)).thenReturn(List.of(6L));
-        when(submitter.offer(batch, 6)).thenReturn(new ReviewBatchSubmitter.SubmissionOutcome.Skipped());
+        when(submitter.offer(batch, 6, null)).thenReturn(new ReviewBatchSubmitter.SubmissionOutcome.Skipped());
         driver.advance(batch);
         assertThat(batch.getCursorItemId()).isEqualTo(6L);
         assertThat(batch.getSkippedCount()).isOne();

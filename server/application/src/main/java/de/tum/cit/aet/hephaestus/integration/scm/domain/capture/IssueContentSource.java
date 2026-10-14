@@ -73,10 +73,6 @@ public class IssueContentSource {
         this.revisions = revisions;
     }
 
-    public boolean supports(ScmCaptureContext request) {
-        return !request.pullRequest();
-    }
-
     @Transactional(readOnly = true)
     public CaptureContribution capture(ScmCaptureContext request, Set<SourceKind> selectedKinds) {
         ScmCaptureContext capture = request;

@@ -377,6 +377,11 @@ class OutlineCollectionAdminControllerIntegrationTest extends AbstractWorkspaceI
         seedDocument("doc-live");
         OutlineDocument tombstoned = seedDocument("doc-gone");
         tombstoned.setDeletedAt(Instant.parse("2026-01-01T00:00:00Z"));
+        tombstoned.setBodyMarkdown(null);
+        tombstoned.setContentHash(null);
+        tombstoned.setCreatedBySubject(null);
+        tombstoned.setUpdatedBySubject(null);
+        tombstoned.setCollaboratorSubjects(null);
         documentRepository.save(tombstoned);
 
         ConnectionSyncStatusDTO status = syncStatusRequest()

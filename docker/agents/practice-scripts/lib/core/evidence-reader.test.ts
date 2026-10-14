@@ -152,20 +152,20 @@ void test("a problem and example resolve to the same code across diff and tree c
 	const resolve = (citation: Citation) =>
 		reader.citationIdentity(citation) ?? other.citationIdentity(citation);
 
-	for (const example of [head, { ...head, revision: undefined }]) {
+	for (const example of [head, { ...head, commit: undefined }]) {
 		const parsed = parseCandidate(candidateWithExample(diff, example), resolve);
 		assert.ok(!parsed.ok);
 		assert.equal(parsed.reasonCode, "example_overlaps_problem", parsed.message);
 	}
 	for (const [problem, example] of [
 		[old, headAtTwo],
-		[headAtTwo, { ...headAtTwo, revision: "b".repeat(40) }],
+		[headAtTwo, { ...headAtTwo, commit: "b".repeat(40) }],
 		[diff, elsewhere],
 		[headAtTwo, head],
 	] as const) {
 		assert.equal(parseCandidate(candidateWithExample(problem, example), resolve).ok, true);
 	}
-	const baseTree = { ...headAtTwo, revision: "b".repeat(40), quote: old.quote };
+	const baseTree = { ...headAtTwo, commit: "b".repeat(40), quote: old.quote };
 	const parsed = parseCandidate(candidateWithExample(old, baseTree), resolve);
 	assert.ok(!parsed.ok);
 	assert.equal(parsed.reasonCode, "example_overlaps_problem", parsed.message);
@@ -351,7 +351,7 @@ void describe("citations", () => {
 				sourceKind: TREE_SOURCE,
 				sourcePath: "repos/reviewed/.git/HEAD",
 				path: "src/cart.ts",
-				revision: HEAD,
+				commit: HEAD,
 				startLine: 2,
 				endLine: 3,
 				quote: "  // increment the item count by one\n  count += 1;",

@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import {
@@ -20,10 +20,11 @@ import {
 	movePracticeMutation,
 	previewGroupAdoptionQueryKey,
 	reorderPracticeGroupsMutation,
+	resetGroupToCatalogMutation,
 	resetPracticeToCatalogMutation,
 	updatePracticeGroupMutation,
 } from "@/api/@tanstack/react-query.gen";
-import { getPracticeGroup, resetGroupToCatalog } from "@/api/sdk.gen";
+import { getPracticeGroup } from "@/api/sdk.gen";
 import type { Practice, PracticeGroup } from "@/api/types.gen";
 import {
 	applyPositions,
@@ -45,9 +46,22 @@ import { hasText } from "@/lib/text";
 
 const UNASSIGNED = "__unassigned__";
 
-function groupResetBasis(group: PracticeGroup) {
-	const { name, description, icon, color, catalogOrigin } = group;
-	return JSON.stringify([name, description, icon, color, catalogOrigin.offeredDigest]);
+export function practiceGroupResponseOptions(path: { workspaceSlug: string; groupSlug: string }) {
+	return queryOptions({
+		queryKey: getPracticeGroupQueryKey({ path }),
+		queryFn: async ({ signal }) => {
+			const { data: group, response } = await getPracticeGroup({
+				path,
+				signal,
+				throwOnError: true,
+			});
+			const etag = response.headers.get("ETag");
+			if (etag === null) {
+				throw new Error("The group did not include its current version.");
+			}
+			return { group, etag };
+		},
+	});
 }
 
 export function usePracticeCatalogMutations(workspaceSlug: string) {
@@ -225,43 +239,15 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 
 	/** Reset requires the group read's ETag and the exact catalog version the reader compared. */
 	const resetGroup = useMutation({
-		mutationKey: groupMutationKey,
-		mutationFn: async ({
-			path,
-			shown,
-		}: {
-			path: { workspaceSlug: string; groupSlug: string };
-			shown: PracticeGroup;
-		}) => {
-			const { data: current, response } = await getPracticeGroup({ path, throwOnError: true });
-			const etag = response.headers.get("ETag");
-			if (etag === null || groupResetBasis(current) !== groupResetBasis(shown)) {
-				queryClient.setQueryData<PracticeGroup[]>(groupsQueryKey, (groups = []) =>
-					upsertGroup(groups, current),
-				);
-				const detail = "The group or the catalog changed. Compare again before you reset.";
-				throw Object.assign(new Error(detail), {
-					status: 409,
-					title: "Practice group changed",
-					detail,
-				});
-			}
-			const { data } = await resetGroupToCatalog({
-				path,
-				headers: { "If-Match": etag },
-				throwOnError: true,
-			});
-			return data;
-		},
+		...filedUnder(groupMutationKey, resetGroupToCatalogMutation()),
 		scope: structuralScope,
 		onSuccess: (reset) => {
 			queryClient.setQueryData<PracticeGroup[]>(groupsQueryKey, (groups = []) =>
 				upsertGroup(groups, reset),
 			);
-			queryClient.setQueryData(
-				getPracticeGroupQueryKey({ path: { workspaceSlug, groupSlug: reset.slug } }),
-				reset,
-			);
+			void queryClient.invalidateQueries({
+				queryKey: getPracticeGroupQueryKey({ path: { workspaceSlug, groupSlug: reset.slug } }),
+			});
 			toast.success("Group reset to the catalog");
 		},
 		onSettled: invalidateGroupsAfterLastWrite,

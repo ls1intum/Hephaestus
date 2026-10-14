@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.scan;
 
+import de.tum.cit.aet.hephaestus.practices.review.report.ScanMembershipQueries;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
@@ -24,7 +25,7 @@ public class ScanReportItemFilterParams {
     private @Nullable Boolean reused;
     private @Nullable String path;
 
-    ScanReportItemsService.ItemFilter filter() {
-        return new ScanReportItemsService.ItemFilter(practiceSlug, outcome, status, reused, path);
+    ScanMembershipQueries.ItemFilter filter() {
+        return new ScanMembershipQueries.ItemFilter(practiceSlug, outcome, status, reused, path);
     }
 }

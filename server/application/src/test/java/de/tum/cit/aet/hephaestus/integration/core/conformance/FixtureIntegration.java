@@ -34,7 +34,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-// A kind absent from production proves the framework is provider-neutral; persisted integration kinds still use a shipped value.
+// A kind absent from production proves the framework is provider-neutral; persisted integration kinds still use a
+// shipped value.
 final class FixtureIntegration {
 
     /** Borrowed, not invented — see the class javadoc. */

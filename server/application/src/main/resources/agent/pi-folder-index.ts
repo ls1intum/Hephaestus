@@ -5,7 +5,7 @@ export interface CitableText {
 	source: string;
 	path: string;
 	side: "OLD" | "NEW";
-	revision: string | null;
+	commit: string | null;
 	stagedPath: string;
 	sha256: string;
 }
@@ -27,9 +27,9 @@ export function citableTextIndex(value: unknown): CitableText[] {
 			!entry.path ||
 			entry.path.length > 4096 ||
 			(entry.side !== "OLD" && entry.side !== "NEW") ||
-			(entry.revision !== undefined &&
-				entry.revision !== null &&
-				(typeof entry.revision !== "string" || !entry.revision || entry.revision.length > 1024)) ||
+			(entry.commit !== undefined &&
+				entry.commit !== null &&
+				(typeof entry.commit !== "string" || !entry.commit || entry.commit.length > 1024)) ||
 			typeof entry.stagedPath !== "string" ||
 			!entry.stagedPath ||
 			entry.stagedPath.startsWith("/") ||
@@ -44,7 +44,7 @@ export function citableTextIndex(value: unknown): CitableText[] {
 			source: entry.source,
 			path: entry.path,
 			side: entry.side,
-			revision: entry.revision ?? null,
+			commit: entry.commit ?? null,
 			stagedPath: entry.stagedPath,
 			sha256: entry.sha256,
 		};
@@ -71,13 +71,13 @@ export function folderCitationIndex(value: unknown): {
 		if (
 			!isRecord(flags) ||
 			!["REQUIRED", "OPTIONAL", "FORBIDDEN"].includes(String(flags.side)) ||
-			!["REQUIRED", "OPTIONAL", "FORBIDDEN"].includes(String(flags.revision))
+			!["REQUIRED", "OPTIONAL", "FORBIDDEN"].includes(String(flags.commit))
 		) {
 			throw new Error("Folder index: source catalog citation flags are missing");
 		}
 		citationCapabilities.set(source.kind, {
 			side: requirement(flags.side),
-			revision: requirement(flags.revision),
+			commit: requirement(flags.commit),
 		});
 		if (source.state.availability === "AVAILABLE") {
 			availableSourceKinds.add(source.kind);

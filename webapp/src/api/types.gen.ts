@@ -5,7 +5,9 @@ export type ClientOptions = {
 };
 
 export type AcceptPracticeReleaseRequest = {
-    choices: Array<Choice>;
+    choices: {
+        [key: string]: 'CURRENT' | 'OFFERED';
+    };
 };
 
 /**
@@ -505,7 +507,7 @@ export type CatalogGroup = {
     name: string;
     offered: boolean;
     position: number;
-    shipped: CatalogGroupDefinition | null;
+    shipped: GroupDefinition | null;
     slug: string;
     state: 'FROM_HEPHAESTUS' | 'EDITED_HERE' | 'UPDATE_WAITING' | 'YOURS' | 'NO_LONGER_SHIPPED';
 };
@@ -524,13 +526,6 @@ export type CatalogGroupAdoptionResult = {
     moved: Array<Practice>;
 };
 
-export type CatalogGroupDefinition = {
-    color: string | null;
-    description: string | null;
-    icon: string | null;
-    name: string;
-};
-
 export type CatalogGroupInput = {
     color: string | null;
     description: string | null;
@@ -543,6 +538,14 @@ export type CatalogGroupInput = {
 export type CatalogGroupPracticeAction = {
     action: 'ADD' | 'MOVE_TO_GROUP' | 'KEEP' | 'BLOCKED';
     slug: string;
+};
+
+export type CatalogGroupUpdate = {
+    color: string | null;
+    description: string | null;
+    icon: string | null;
+    name: string;
+    position: null | number;
 };
 
 export type CatalogOrigin = {
@@ -567,7 +570,7 @@ export type CatalogPractice = {
 };
 
 export type CatalogPracticeInput = {
-    definition: PracticeDefinition;
+    definition: PracticeDefinitionInput;
     groupSlug: string | null;
     kind: string;
     position: null | number;
@@ -585,16 +588,6 @@ export type CatalogPracticePreview = {
     slug?: string;
 };
 
-export type CatalogPracticeReleaseProposal = {
-    base: PracticeDefinition | null;
-    current: PracticeDefinition;
-    etag: string;
-    fields: Array<PracticeReleaseField>;
-    offered: PracticeDefinition;
-    offeredDigest: string;
-    practiceSlug: string;
-};
-
 export type CatalogPracticeSummary = {
     availability?: 'AVAILABLE' | 'ADOPTED' | 'SLUG_CONFLICT';
     groupName?: string;
@@ -604,6 +597,13 @@ export type CatalogPracticeSummary = {
     reviewedBy?: ReviewedBy;
     slug?: string;
     whyItMatters?: string;
+};
+
+export type CatalogPracticeUpdate = {
+    definition: PracticeDefinitionInput;
+    groupSlug: string | null;
+    kind: string;
+    position: null | number;
 };
 
 /**
@@ -662,11 +662,6 @@ export type ChatThreadSummary = {
     createdAt: Date;
     id: string;
     title?: string;
-};
-
-export type Choice = {
-    field: 'NAME' | 'REVIEW_ON' | 'APPLIES_WHEN' | 'ABOUT' | 'READS' | 'REVIEWED_BY' | 'CRITERIA' | 'SCRIPT' | 'SCAN' | 'LINE_NOTES' | 'GUIDANCE';
-    source: 'CURRENT' | 'OFFERED';
 };
 
 export type CitationCapabilities = {
@@ -1094,7 +1089,7 @@ export type CreatePracticeGroupRequest = {
 };
 
 export type CreatePracticeRequest = {
-    definition: PracticeDefinition;
+    definition: PracticeDefinitionInput;
     groupSlug: string | null;
     kind: string;
     position: null | number;
@@ -1932,7 +1927,7 @@ export type ItemEvent = {
     itemVersion: string | null;
     name: string;
     occurredAt: Date;
-    reason: 'GATE_WITHHELD' | 'COOLDOWN_ACTIVE' | 'REQUEST_COOLDOWN_ACTIVE' | 'REQUESTER_QUOTA_EXHAUSTED' | 'CONCURRENT_DUPLICATE' | 'COALESCED' | 'OUT_OF_REVIEW_SCOPE' | 'BOT_AUTHOR' | 'BOT_REVIEWER' | 'STALE_ROLLOUT_REVISION' | 'WORKSPACE_INACTIVE' | 'PRACTICES_DISABLED' | 'NO_ACTIVE_PRACTICE' | 'REVIEW_MODEL_UNBOUND' | 'MEMBER_AI_DECLINED' | 'PERSON_DATA_ERASED' | 'FEEDBACK_MODE_OFF' | 'SUBJECT_UNLINKED' | 'MERGE_ACTOR_UNAVAILABLE' | 'MODEL_UNAVAILABLE' | 'BUDGET_EXHAUSTED' | 'ITEM_NOT_VISIBLE' | 'PENDING_DEADLINE_EXCEEDED' | 'ITEM_GONE' | null;
+    reason: 'GATE_WITHHELD' | 'COOLDOWN_ACTIVE' | 'REQUEST_COOLDOWN_ACTIVE' | 'REQUESTER_QUOTA_EXHAUSTED' | 'CONCURRENT_DUPLICATE' | 'COALESCED' | 'OUT_OF_REVIEW_SCOPE' | 'BOT_AUTHOR' | 'BOT_REVIEWER' | 'STALE_ROLLOUT_REVISION' | 'WORKSPACE_INACTIVE' | 'PRACTICES_DISABLED' | 'NO_ACTIVE_PRACTICE' | 'REVIEW_MODEL_UNBOUND' | 'MEMBER_AI_DECLINED' | 'PERSON_DATA_ERASED' | 'FEEDBACK_MODE_OFF' | 'SUBJECT_UNLINKED' | 'MERGE_ACTOR_UNAVAILABLE' | 'MODEL_UNAVAILABLE' | 'BUDGET_EXHAUSTED' | 'ITEM_NOT_VISIBLE' | 'VERSION_SUPERSEDED' | 'PENDING_DEADLINE_EXCEEDED' | 'ITEM_GONE' | null;
     reviewId: string | null;
     state: 'RECORDED' | 'WAITING' | 'STARTED' | 'WITHHELD' | 'BLOCKED' | 'EXPIRED';
 };
@@ -3026,6 +3021,20 @@ export type PracticeDefinition = {
     script: string | null;
 };
 
+export type PracticeDefinitionInput = {
+    about: 'AUTHOR' | 'REVIEWER' | 'ASSIGNEE' | 'MERGER' | null;
+    appliesWhen: AppliesWhen | null;
+    criteria: string;
+    guidance: PracticeGuidance;
+    lineNotes: boolean;
+    name: string;
+    reads: PracticeReads;
+    reviewOn: ReviewOn;
+    reviewedBy: ReviewedByInput;
+    scan: ScanDefinition | null;
+    script: string | null;
+};
+
 export type PracticeDefinitionOptions = {
     itemTypes: Array<PracticeItemTypeOption>;
     sourceContract: string;
@@ -3167,7 +3176,7 @@ export type PracticeReleaseField = {
 export type PracticeReleaseProposal = {
     base: PracticeDefinition | null;
     current: PracticeDefinition;
-    currentVersionId: string;
+    currentVersionId: string | null;
     etag: string;
     fields: Array<PracticeReleaseField>;
     offered: PracticeDefinition;
@@ -3823,11 +3832,7 @@ export type RenameWorkspaceSlugRequest = {
     newSlug: string;
 };
 
-export type ReorderPracticeGroupsRequest = {
-    slugs: Array<string>;
-};
-
-export type ReorderPracticesRequest = {
+export type ReorderRequest = {
     slugs: Array<string>;
 };
 
@@ -4195,6 +4200,11 @@ export type ReviewLimit = {
     description: string;
 };
 
+export type ReviewLimitInput = {
+    code?: string | null;
+    description: string;
+};
+
 export type ReviewLineage = {
     edges: Array<ReviewLineageEdge>;
     nodes: Array<ReviewLineageNode>;
@@ -4348,8 +4358,7 @@ export type ReviewRef = {
 };
 
 export type ReviewRequestOutcome = {
-    reason: 'GATE_WITHHELD' | 'COOLDOWN_ACTIVE' | 'REQUEST_COOLDOWN_ACTIVE' | 'REQUESTER_QUOTA_EXHAUSTED' | 'CONCURRENT_DUPLICATE' | 'COALESCED' | 'OUT_OF_REVIEW_SCOPE' | 'BOT_AUTHOR' | 'BOT_REVIEWER' | 'STALE_ROLLOUT_REVISION' | 'WORKSPACE_INACTIVE' | 'PRACTICES_DISABLED' | 'NO_ACTIVE_PRACTICE' | 'REVIEW_MODEL_UNBOUND' | 'MEMBER_AI_DECLINED' | 'PERSON_DATA_ERASED' | 'FEEDBACK_MODE_OFF' | 'SUBJECT_UNLINKED' | 'MERGE_ACTOR_UNAVAILABLE' | 'MODEL_UNAVAILABLE' | 'BUDGET_EXHAUSTED' | 'ITEM_NOT_VISIBLE' | 'PENDING_DEADLINE_EXCEEDED' | 'ITEM_GONE' | null;
-    reasonDescription: string | null;
+    reason: 'GATE_WITHHELD' | 'COOLDOWN_ACTIVE' | 'REQUEST_COOLDOWN_ACTIVE' | 'REQUESTER_QUOTA_EXHAUSTED' | 'CONCURRENT_DUPLICATE' | 'COALESCED' | 'OUT_OF_REVIEW_SCOPE' | 'BOT_AUTHOR' | 'BOT_REVIEWER' | 'STALE_ROLLOUT_REVISION' | 'WORKSPACE_INACTIVE' | 'PRACTICES_DISABLED' | 'NO_ACTIVE_PRACTICE' | 'REVIEW_MODEL_UNBOUND' | 'MEMBER_AI_DECLINED' | 'PERSON_DATA_ERASED' | 'FEEDBACK_MODE_OFF' | 'SUBJECT_UNLINKED' | 'MERGE_ACTOR_UNAVAILABLE' | 'MODEL_UNAVAILABLE' | 'BUDGET_EXHAUSTED' | 'ITEM_NOT_VISIBLE' | 'VERSION_SUPERSEDED' | 'PENDING_DEADLINE_EXCEEDED' | 'ITEM_GONE' | null;
     reviewId: string | null;
     status: 'SUBMITTED' | 'REFUSED';
 };
@@ -4543,6 +4552,12 @@ export type ReviewedBy = {
     by: 'HEPHAESTUS' | 'PEOPLE' | 'NOBODY';
     humanReason: ReviewLimit | null;
     limits: Array<ReviewLimit>;
+};
+
+export type ReviewedByInput = {
+    by: 'HEPHAESTUS' | 'PEOPLE' | 'NOBODY';
+    humanReason: ReviewLimitInput | null;
+    limits: Array<ReviewLimitInput>;
 };
 
 export type ReviewedPractice = {
@@ -5483,7 +5498,7 @@ export type UpdatePracticeGroupRequest = {
 };
 
 export type UpdatePracticeRequest = {
-    definition: PracticeDefinition;
+    definition: PracticeDefinitionInput;
     expectedVersionId: string;
 };
 
@@ -7106,7 +7121,7 @@ export type CreateCatalogGroupResponses = {
 export type CreateCatalogGroupResponse = CreateCatalogGroupResponses[keyof CreateCatalogGroupResponses];
 
 export type ReorderCatalogGroupsData = {
-    body: ReorderPracticeGroupsRequest;
+    body: ReorderRequest;
     headers?: {
         'If-Match'?: string;
     };
@@ -7143,7 +7158,7 @@ export type GetCatalogGroupResponses = {
 export type GetCatalogGroupResponse = GetCatalogGroupResponses[keyof GetCatalogGroupResponses];
 
 export type UpdateCatalogGroupData = {
-    body: CatalogGroupInput;
+    body: CatalogGroupUpdate;
     headers?: {
         'If-Match'?: string;
     };
@@ -7262,7 +7277,7 @@ export type CreateCatalogPracticeResponses = {
 export type CreateCatalogPracticeResponse = CreateCatalogPracticeResponses[keyof CreateCatalogPracticeResponses];
 
 export type ReorderCatalogPracticesData = {
-    body: ReorderPracticesRequest;
+    body: ReorderRequest;
     headers?: {
         'If-Match'?: string;
     };
@@ -7299,7 +7314,7 @@ export type GetCatalogPracticeResponses = {
 export type GetCatalogPracticeResponse = GetCatalogPracticeResponses[keyof GetCatalogPracticeResponses];
 
 export type UpdateCatalogPracticeData = {
-    body: CatalogPracticeInput;
+    body: CatalogPracticeUpdate;
     headers?: {
         'If-Match'?: string;
     };
@@ -7382,27 +7397,6 @@ export type AcknowledgeCatalogPracticeResponses = {
 
 export type AcknowledgeCatalogPracticeResponse = AcknowledgeCatalogPracticeResponses[keyof AcknowledgeCatalogPracticeResponses];
 
-export type DeclineCatalogPracticeReleaseData = {
-    body?: never;
-    headers?: {
-        'If-Match'?: string;
-    };
-    path: {
-        slug: string;
-    };
-    query?: never;
-    url: '/admin/practice-catalog/practices/{slug}/release';
-};
-
-export type DeclineCatalogPracticeReleaseResponses = {
-    /**
-     * OK
-     */
-    200: CatalogPractice;
-};
-
-export type DeclineCatalogPracticeReleaseResponse = DeclineCatalogPracticeReleaseResponses[keyof DeclineCatalogPracticeReleaseResponses];
-
 export type GetCatalogPracticeReleaseData = {
     body?: never;
     path: {
@@ -7416,7 +7410,7 @@ export type GetCatalogPracticeReleaseResponses = {
     /**
      * OK
      */
-    200: CatalogPracticeReleaseProposal;
+    200: PracticeReleaseProposal;
 };
 
 export type GetCatalogPracticeReleaseResponse = GetCatalogPracticeReleaseResponses[keyof GetCatalogPracticeReleaseResponses];
@@ -8971,6 +8965,112 @@ export type ListHiddenContributorsResponses = {
 };
 
 export type ListHiddenContributorsResponse = ListHiddenContributorsResponses[keyof ListHiddenContributorsResponses];
+
+export type GetOwnActivityData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        /**
+         * Activity range
+         */
+        range?: '30d' | '90d' | '1y' | 'all' | 'custom';
+        from?: Date;
+        to?: Date;
+        team?: string;
+        repo?: Array<string>;
+    };
+    url: '/workspaces/{workspaceSlug}/activity/me';
+};
+
+export type GetOwnActivityErrors = {
+    /**
+     * A request parameter is not valid
+     */
+    400: ProblemDetail;
+    /**
+     * The caller is not a member of the workspace
+     */
+    403: ProblemDetail;
+    /**
+     * Workspace, contributor, team or repository not found
+     */
+    404: ProblemDetail;
+};
+
+export type GetOwnActivityError = GetOwnActivityErrors[keyof GetOwnActivityErrors];
+
+export type GetOwnActivityResponses = {
+    /**
+     * Your activity returned
+     */
+    200: ActivityPersonDetail;
+};
+
+export type GetOwnActivityResponse = GetOwnActivityResponses[keyof GetOwnActivityResponses];
+
+export type GetOwnActivityWorkData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        /**
+         * Activity range
+         */
+        range?: '30d' | '90d' | '1y' | 'all' | 'custom';
+        from?: Date;
+        to?: Date;
+        team?: string;
+        repo?: Array<string>;
+        /**
+         * Kinds of activity to list (repeatable); omit for every kind
+         */
+        kinds?: Array<'PULL_REQUEST_OPENED' | 'PULL_REQUEST_MERGED' | 'PULL_REQUEST_CLOSED' | 'REVIEW_APPROVED' | 'REVIEW_CHANGES_REQUESTED' | 'REVIEW_COMMENTED' | 'COMMENTED' | 'CODE_COMMENTED' | 'ISSUE_OPENED' | 'ISSUE_CLOSED'>;
+        /**
+         * The previous page's nextCursor; omit for the first page
+         */
+        cursor?: string;
+        /**
+         * Page size from 1 to 100; defaults to 30
+         */
+        size?: number;
+    };
+    url: '/workspaces/{workspaceSlug}/activity/me/work';
+};
+
+export type GetOwnActivityWorkErrors = {
+    /**
+     * A request parameter is not valid
+     */
+    400: ProblemDetail;
+    /**
+     * The caller is not a member of the workspace
+     */
+    403: ProblemDetail;
+    /**
+     * Workspace, contributor, team or repository not found
+     */
+    404: ProblemDetail;
+};
+
+export type GetOwnActivityWorkError = GetOwnActivityWorkErrors[keyof GetOwnActivityWorkErrors];
+
+export type GetOwnActivityWorkResponses = {
+    /**
+     * Your work listed
+     */
+    200: ActivityWorkPage;
+};
+
+export type GetOwnActivityWorkResponse = GetOwnActivityWorkResponses[keyof GetOwnActivityWorkResponses];
 
 export type GetOpenWorkData = {
     body?: never;
@@ -11033,7 +11133,7 @@ export type CreatePracticeGroupResponses = {
 export type CreatePracticeGroupResponse = CreatePracticeGroupResponses[keyof CreatePracticeGroupResponses];
 
 export type ReorderPracticeGroupsData = {
-    body: ReorderPracticeGroupsRequest;
+    body: ReorderRequest;
     path: {
         /**
          * Workspace slug
@@ -11809,7 +11909,7 @@ export type AcceptPracticeReleaseResponses = {
 export type AcceptPracticeReleaseResponse = AcceptPracticeReleaseResponses[keyof AcceptPracticeReleaseResponses];
 
 export type ReorderPracticesData = {
-    body: ReorderPracticesRequest;
+    body: ReorderRequest;
     path: {
         /**
          * Workspace slug
@@ -13836,7 +13936,7 @@ export type GetAllTeamsData = {
 
 export type GetAllTeamsResponses = {
     /**
-     * list of teams with their members and permissions
+     * OK
      */
     200: Array<TeamInfo>;
 };
@@ -13844,24 +13944,15 @@ export type GetAllTeamsResponses = {
 export type GetAllTeamsResponse = GetAllTeamsResponses[keyof GetAllTeamsResponses];
 
 export type UpdateTeamVisibilityData = {
-    /**
-     * whether to hide the team (body parameter, preferred)
-     */
     body?: boolean;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        /**
-         * the team ID
-         */
         id: number;
     };
     query?: {
-        /**
-         * whether to hide the team (query parameter, fallback)
-         */
         hidden?: boolean;
     };
     url: '/workspaces/{workspaceSlug}/team/{id}/visibility';
@@ -13869,7 +13960,7 @@ export type UpdateTeamVisibilityData = {
 
 export type UpdateTeamVisibilityResponses = {
     /**
-     * 200 OK on success, 404 if team not found
+     * OK
      */
     200: unknown;
 };
@@ -13951,9 +14042,6 @@ export type GetTeamSettingsData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        /**
-         * the team ID
-         */
         teamId: number;
     };
     query?: never;
@@ -13970,18 +14058,12 @@ export type GetTeamSettingsResponses = {
 export type GetTeamSettingsResponse = GetTeamSettingsResponses[keyof GetTeamSettingsResponses];
 
 export type UpdateTeamSettingsData = {
-    /**
-     * the update request containing the hidden flag
-     */
     body: UpdateTeamSettingsRequest;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        /**
-         * the team ID
-         */
         teamId: number;
     };
     query?: never;
@@ -14013,9 +14095,6 @@ export type GetLabelFiltersData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        /**
-         * the team ID
-         */
         teamId: number;
     };
     query?: never;
@@ -14038,13 +14117,7 @@ export type RemoveLabelFilterData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        /**
-         * the team ID
-         */
         teamId: number;
-        /**
-         * the label ID to remove as filter
-         */
         labelId: number;
     };
     query?: never;
@@ -14074,13 +14147,7 @@ export type AddLabelFilterData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        /**
-         * the team ID
-         */
         teamId: number;
-        /**
-         * the label ID to add as filter
-         */
         labelId: number;
     };
     query?: never;
@@ -14108,13 +14175,7 @@ export type GetRepositorySettingsData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        /**
-         * the team ID
-         */
         teamId: number;
-        /**
-         * the repository ID
-         */
         repositoryId: number;
     };
     query?: never;
@@ -14131,22 +14192,13 @@ export type GetRepositorySettingsResponses = {
 export type GetRepositorySettingsResponse = GetRepositorySettingsResponses[keyof GetRepositorySettingsResponses];
 
 export type UpdateRepositorySettingsData = {
-    /**
-     * the update request containing the hiddenFromContributions flag
-     */
     body: UpdateRepositorySettingsRequest;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        /**
-         * the team ID
-         */
         teamId: number;
-        /**
-         * the repository ID
-         */
         repositoryId: number;
     };
     query?: never;

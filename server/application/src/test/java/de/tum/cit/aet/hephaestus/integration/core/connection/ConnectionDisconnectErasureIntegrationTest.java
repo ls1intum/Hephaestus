@@ -230,7 +230,7 @@ class ConnectionDisconnectErasureIntegrationTest extends AbstractWorkspaceIntegr
     }
 
     private List<ILoggingEvent> captureProviderWarnings(Runnable disconnect) {
-        var logger = (Logger) LoggerFactory.getLogger(ConnectionService.class);
+        var logger = (Logger) LoggerFactory.getLogger(ConnectionLifecycleEffects.class);
         var events = new ListAppender<ILoggingEvent>();
         events.start();
         logger.addAppender(events);

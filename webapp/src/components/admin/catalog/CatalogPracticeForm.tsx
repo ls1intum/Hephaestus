@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { CatalogPractice, PracticeDefinitionOptions } from "@/api/types.gen";
 import {
 	PracticeDefinitionForm,
-	type PracticeDefinitionValue,
+	type PracticeDefinitionSubmission,
 } from "@/components/admin/practice-editor/PracticeDefinitionForm";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -45,14 +45,14 @@ interface CatalogPracticeFormBaseProps {
 interface CatalogPracticeFormCreateProps extends CatalogPracticeFormBaseProps {
 	mode: "create";
 	practice?: never;
-	onSubmit: (value: PracticeDefinitionValue) => void;
+	onSubmit: (value: PracticeDefinitionSubmission) => void;
 }
 
 interface CatalogPracticeFormEditProps extends CatalogPracticeFormBaseProps {
 	mode: "edit";
 	/** The saved entry; the form edits its definition and group, never its kind. */
 	practice: CatalogPractice;
-	onSubmit: (value: PracticeDefinitionValue) => void;
+	onSubmit: (value: PracticeDefinitionSubmission) => void;
 }
 
 export type CatalogPracticeFormProps =

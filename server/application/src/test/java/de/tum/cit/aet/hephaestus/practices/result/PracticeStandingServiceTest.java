@@ -4,9 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyCollection;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -30,35 +28,29 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
-import org.springframework.jdbc.core.RowMapper;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import tools.jackson.databind.json.JsonMapper;
 
 @Tag("unit")
 class PracticeStandingServiceTest {
     private final Instant now = Instant.parse("2026-08-05T10:00:00Z");
-    private final ResultReadQuery read = mock(ResultReadQuery.class);
     private final ResultViewQuery views = mock(ResultViewQuery.class);
     private final CurrentDeveloperLookup developer = mock(CurrentDeveloperLookup.class);
     private final ResultVisibilityPolicy visibility = mock(ResultVisibilityPolicy.class);
     private final PracticeRepository practices = mock(PracticeRepository.class);
-    private final JdbcClient jdbc = mock(JdbcClient.class, RETURNS_DEEP_STUBS);
+    private final ResultRepository results = mock(ResultRepository.class);
     private final List<ResultView> data = new ArrayList<>();
     private final Clock clock = Clock.fixed(now, ZoneOffset.UTC);
     private final PracticeStandingService service = new PracticeStandingService(
-            read,
             views,
             new JsonMapper(),
-            jdbc,
+            results,
             developer,
             visibility,
             practices,
@@ -72,7 +64,7 @@ class PracticeStandingServiceTest {
                 .thenAnswer(i -> data.isEmpty()
                         ? List.of(ReviewTestData.practice(1, 1, "test-practice"))
                         : List.of(data.getFirst().practice()));
-        when(read.forDevelopersSince(eq(1L), anyCollection(), any(Instant.class), anyBoolean()))
+        when(results.forDevelopersSince(eq(1L), anyCollection(), any(Instant.class), anyBoolean()))
                 .thenAnswer(i -> data.stream().map(ResultView::result).toList());
         when(views.views(eq(1L), anyCollection())).thenAnswer(i -> {
             Collection<Result> rows = i.getArgument(1);
@@ -97,12 +89,6 @@ class PracticeStandingServiceTest {
                     Collection<Result> rows = i.getArgument(1);
                     return rows.stream().map(Result::getId).collect(Collectors.toSet());
                 });
-        when(jdbc.sql(anyString())
-                        .param(anyString(), any())
-                        .param(anyString(), any())
-                        .query(ArgumentMatchers.<RowMapper<Map.Entry<UUID, String>>>any())
-                        .list())
-                .thenReturn(List.of());
     }
 
     @Test

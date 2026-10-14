@@ -23,7 +23,7 @@ class PracticeV1PeopleMigrationTest {
               UNION ALL
               SELECT 'constraint|' || c.relname || '|' || k.conname || '|' || pg_get_constraintdef(k.oid)
               FROM pg_constraint k JOIN pg_class c ON c.oid=k.conrelid WHERE c.relnamespace='public'::regnamespace
-                AND c.relname IN ('config_audit_event','connection_audit','project_field') AND k.conname <> 'ck_config_audit_event_entity_type'
+                AND c.relname IN ('config_audit_event','connection_audit','project_field') AND k.conname NOT IN ('ck_config_audit_event_entity_type','ck_config_audit_event_scope')
               UNION ALL
               SELECT 'index|' || tablename || '|' || indexname || '|' || indexdef
               FROM pg_indexes WHERE schemaname='public'
@@ -34,13 +34,12 @@ class PracticeV1PeopleMigrationTest {
         assertThat(before).isNotEmpty();
         PracticeMigrationFixture.upgrade(database, context);
         assertThat(PracticeMigrationFixture.column(database, definition)).isEqualTo(before);
-        assertThat(PracticeMigrationFixture.column(
-                        database,
-                        "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE"
-                                + " conname='ck_config_audit_event_entity_type'"))
-                .containsExactly("""
-                    CHECK (((entity_type)::text = ANY (ARRAY[('PRACTICE_REVIEW_SETTINGS'::character varying)::text, ('AGENT_BINDING'::character varying)::text, ('AGENT_CONFIG'::character varying)::text, ('AI_CONFIG_BINDING'::character varying)::text, ('WORKSPACE_ROLE'::character varying)::text, ('ACTIVITY_AUTOMATION'::character varying)::text, ('WORKSPACE_FEATURES'::character varying)::text, ('WORKSPACE_STATUS'::character varying)::text, ('WORKSPACE_TOKEN'::character varying)::text, ('WORKSPACE_VISIBILITY'::character varying)::text, ('PRACTICE_ACTIVE'::character varying)::text, ('PRACTICE_USAGE'::character varying)::text, ('PRACTICE_DEFINITION'::character varying)::text, ('PRACTICE_GROUP'::character varying)::text, ('PRACTICE_AREA'::character varying)::text, ('CATALOG_PRACTICE'::character varying)::text, ('CATALOG_GROUP'::character varying)::text, ('CURATED_PRACTICE_AREA'::character varying)::text, ('WORKSPACE_INSTANCE_LLM_BUDGET'::character varying)::text, ('WORKSPACE_OWN_PROVIDER_LLM_BUDGET'::character varying)::text, ('WORKSPACE_LLM_BUDGET'::character varying)::text, ('WORKSPACE_BYO_LLM_BUDGET'::character varying)::text, ('REVIEW_BATCH'::character varying)::text, ('REVIEW_SCHEDULE'::character varying)::text, ('WORKSPACE_LLM_CONNECTION'::character varying)::text, ('WORKSPACE_LLM_MODEL'::character varying)::text])))\
-                    """.strip());
+        assertThat(PracticeMigrationFixture.column(database, """
+            SELECT convalidated::text || '|' || confdeltype::text || '|' || pg_get_constraintdef(oid)
+            FROM pg_constraint WHERE conrelid='llm_usage_event'::regclass
+                AND conname='sfk_llm_usage_event_workspace'
+            """))
+                .containsExactly("true|c|FOREIGN KEY (workspace_id) REFERENCES workspace(id) ON DELETE CASCADE");
         assertThat(PracticeMigrationFixture.column(database, """
             SELECT table_name || '|' || column_name || '|' || data_type FROM information_schema.columns
             WHERE table_schema='public' AND (table_name,column_name) IN

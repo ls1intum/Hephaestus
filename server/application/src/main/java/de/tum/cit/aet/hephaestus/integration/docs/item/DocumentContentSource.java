@@ -45,9 +45,7 @@ public class DocumentContentSource {
             @Nullable Instant effectiveAt,
             SourceAbsenceReason absence) {
         if (!request.sources().contains(SOURCE)) {
-            return new CaptureContribution(
-                    Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), null, Map.of(),
-                    List.of(), List.of(), List.of());
+            return CaptureContribution.empty();
         }
         if (body == null) {
             return new CaptureContribution(

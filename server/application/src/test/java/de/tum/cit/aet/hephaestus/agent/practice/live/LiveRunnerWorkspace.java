@@ -16,6 +16,8 @@ import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.sandbox.ImagePullPolicy;
 import de.tum.cit.aet.hephaestus.agent.task.Task;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
@@ -23,9 +25,12 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmVersion;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
+import de.tum.cit.aet.hephaestus.practices.PracticeReadSource;
+import de.tum.cit.aet.hephaestus.practices.PracticeReads;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.practices.spi.PinnedPractice;
+import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
@@ -43,6 +48,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -217,25 +223,45 @@ final class LiveRunnerWorkspace {
         }
     }
 
-    static void stagePractice(Path workspace, String slug, String name, String criteria, long revisionId)
+    static JsonNode stagePractice(Path workspace, String slug, String name, String criteria, long versionId)
             throws IOException {
         Path practices = workspace.resolve(SandboxLayout.PRACTICES_PREFIX);
         Files.createDirectories(practices);
-        var definition = DefinitionTestFixtures.definition(new ItemKind("scm.pull_request"), name, criteria, null);
+        var base = DefinitionTestFixtures.definition(new ItemKind("scm.pull_request"), name, criteria, null);
+        var definition = new PracticeDefinition(
+                base.name(),
+                base.reviewOn(),
+                base.appliesWhen(),
+                base.about(),
+                new PracticeReads(
+                        ClasspathSourceCatalogRegistry.CURRENT_VERSION.value(),
+                        List.of(
+                                new PracticeReadSource(new SourceKind("scm.pull-request.diff"), ReadNeed.COMPLETE),
+                                new PracticeReadSource(new SourceKind("scm.repository.tree"), ReadNeed.OPTIONAL))),
+                base.reviewedBy(),
+                base.criteria(),
+                base.script(),
+                base.scan(),
+                base.lineNotes(),
+                base.guidance());
         var entry = MAPPER.createObjectNode()
                 .put("slug", slug)
                 .put("name", name)
-                .put("practiceId", "1")
-                .put("versionId", Long.toString(revisionId))
-                .put("reviewDigest", "a".repeat(64));
-        entry.set("definition", MAPPER.valueToTree(definition));
+                .put("versionId", Long.toString(versionId));
+        var exhaustive = entry.putArray("exhaustiveSources");
+        entry.putArray("knownLimitations");
         var reads = entry.putArray("readsSources");
-        definition.reads().sources().forEach(source -> reads.add(source.source().value()));
+        definition.reads().sources().forEach(source -> {
+            reads.add(source.source().value());
+            if (source.need() == ReadNeed.COMPLETE)
+                exhaustive.add(source.source().value());
+        });
         Files.write(practices.resolve("index.json"), MAPPER.writeValueAsBytes(List.of(entry)));
         Files.writeString(practices.resolve(slug + ".md"), criteria);
+        return MAPPER.valueToTree(definition);
     }
 
-    static void stageFixtureInputs(Path workspace, String kind) throws IOException {
+    static void stageFixtureInputs(Path workspace, String kind, Map<String, JsonNode> definitions) throws IOException {
         var task = MAPPER.readValue(
                 workspace.resolve(SandboxLayout.TASK_ENVELOPE_FILENAME).toFile(), TaskEnvelope.class);
         var work = MAPPER.readTree(workspace
@@ -255,16 +281,14 @@ final class LiveRunnerWorkspace {
         } else version = ScmVersion.ofContentDigest(work.toString());
         var index = MAPPER.readTree(
                 workspace.resolve(SandboxLayout.PRACTICES_PREFIX + "index.json").toFile());
+        long practiceId = 0;
         for (var entry : index) {
-            var definition = MAPPER.treeToValue(entry.path("definition"), PracticeDefinition.class);
-            long practiceId = Long.parseLong(entry.path("practiceId").asString());
+            practiceId++;
+            var definition =
+                    MAPPER.treeToValue(definitions.get(entry.path("slug").asString()), PracticeDefinition.class);
             long versionId = Long.parseLong(entry.path("versionId").asString());
             var pinned = new PinnedPractice(
-                    practiceId,
-                    versionId,
-                    definition,
-                    entry.path("reviewDigest").asString(),
-                    new ReviewMethod(1, "b".repeat(64), List.of()));
+                    practiceId, versionId, definition, "a".repeat(64), new ReviewMethod(1, "b".repeat(64), List.of()));
             var assignment = new ReviewAssignmentSnapshot(
                     new ReviewAssignmentId(task.reviewId(), practiceId, 1),
                     item,

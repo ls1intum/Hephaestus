@@ -19,7 +19,7 @@ import type { UnratedReason } from "./practice-script.ts";
 
 /** The trees and the change of the reviewed work, as the host pinned them. Null without a captured tree. */
 export interface JobFiles {
-	head: { revision: string };
+	head: { commit: string };
 	change: { base: string; head: string; files: Map<string, DiffFile> } | null;
 }
 

@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.AbstractFeedbackIntegrationT
 import de.tum.cit.aet.hephaestus.practices.feedback.decision.FeedbackDecisionService;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDecisionAction;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDecisionInput;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackSendAction;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
@@ -25,19 +26,13 @@ class ApprovedFeedbackDeliveryIntegrationTest extends AbstractFeedbackIntegratio
                 workspace.getId(),
                 parent.getId(),
                 developerId,
-                FeedbackDecisionAction.WITHDRAW,
-                null,
-                "The context changed.",
-                null);
+                new FeedbackDecisionInput(FeedbackDecisionAction.WITHDRAW, null, "The context changed.", null));
         assertThat(sends.findById(parent.getId()).orElseThrow().getAction()).isEqualTo(FeedbackSendAction.RETRACT);
         decisionService.decide(
                 workspace.getId(),
                 parent.getId(),
                 developerId,
-                FeedbackDecisionAction.RESTORE,
-                null,
-                "The basis is confirmed.",
-                null);
+                new FeedbackDecisionInput(FeedbackDecisionAction.RESTORE, null, "The basis is confirmed.", null));
         assertThat(decisions.findByWorkspaceIdAndFeedbackIdOrderByDecidedAtDescIdDesc(
                         workspace.getId(), parent.getId()))
                 .hasSize(2);

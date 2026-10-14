@@ -66,6 +66,7 @@ public class WorkspaceContextBuilder {
         return files;
     }
 
+    @SuppressWarnings("ReferenceEquality") // Throwable rejects suppression of the same exception instance.
     public PreparedEvidence prepare(ItemSnapshot item, CaptureRequest request) {
         var matching = itemSources.stream()
                 .filter(source -> source.supports(item.item()))
@@ -99,15 +100,11 @@ public class WorkspaceContextBuilder {
             }
             return manifests.build(item.item().kind(), contributions);
         } catch (RuntimeException failure) {
-            contributions.values().forEach(contribution -> {
-                var cleanup = contribution.cleanup();
-                if (cleanup != null)
-                    try {
-                        cleanup.close();
-                    } catch (Exception close) {
-                        failure.addSuppressed(close);
-                    }
-            });
+            try {
+                CaptureContribution.closeAll(List.copyOf(contributions.values()));
+            } catch (Exception cleanupFailure) {
+                if (failure != cleanupFailure) failure.addSuppressed(cleanupFailure);
+            }
             throw failure;
         }
     }

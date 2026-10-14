@@ -16,11 +16,11 @@ class ResultEvidenceDTOTest {
     @Test
     void retainsThePinnedRevisionAndVerifiedLocation() {
         var evidence = json.readValue("""
-            {"citations":[{"sourceKind":"scm.pull-request.diff","sourcePath":"inputs/sources/scm/diff.patch","path":"src/Auth.java","side":"NEW","revision":"commit-1","startLine":10,"endLine":10,"quote":"check();","verification":null}],"search":null,"inapplicability":null,"openQuestions":[]}
+            {"citations":[{"sourceKind":"scm.pull-request.diff","sourcePath":"inputs/sources/scm/diff.patch","path":"src/Auth.java","side":"NEW","commit":"commit-1","startLine":10,"endLine":10,"quote":"check();","verification":null}],"search":null,"inapplicability":null,"openQuestions":[]}
             """, ResultEvidenceDTO.class);
         assertThat(evidence.citations()).singleElement().satisfies(c -> {
             assertThat(c.sourcePath()).isEqualTo("inputs/sources/scm/diff.patch");
-            assertThat(c.revision()).isEqualTo("commit-1");
+            assertThat(c.commit()).isEqualTo("commit-1");
             assertThat(c.side()).isEqualTo(CitationSide.NEW);
         });
     }
@@ -28,7 +28,7 @@ class ResultEvidenceDTOTest {
     @Test
     void preservesAnUnknownArchivedSourceWithoutInventingItsQuote() {
         var evidence = json.readValue("""
-            {"citations":[{"sourceKind":"legacy.source","sourcePath":null,"path":"config.env","side":null,"revision":null,"startLine":3,"endLine":3,"quote":null,"verification":null}],"search":null,"inapplicability":null,"openQuestions":[]}
+            {"citations":[{"sourceKind":"legacy.source","sourcePath":null,"path":"config.env","side":null,"commit":null,"startLine":3,"endLine":3,"quote":null,"verification":null}],"search":null,"inapplicability":null,"openQuestions":[]}
             """, ResultEvidenceDTO.class);
         assertThat(evidence.citations().getFirst().quote()).isNull();
         assertThat(evidence.citations().getFirst().sourceKind()).isEqualTo("legacy.source");

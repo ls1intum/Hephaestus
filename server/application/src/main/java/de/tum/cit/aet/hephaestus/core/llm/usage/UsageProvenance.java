@@ -1,6 +1,9 @@
 package de.tum.cit.aet.hephaestus.core.llm.usage;
 
+import org.springframework.modulith.NamedInterface;
+
 /** Which source supplied the whole token vector; acceptance is recorded separately by {@link MeasurementVerification}. */
+@NamedInterface("llm-usage")
 public enum UsageProvenance {
     /** Every bucket came from the runner's own report, even when the sources were incomparable. */
     RUNNER,

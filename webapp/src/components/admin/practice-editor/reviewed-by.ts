@@ -1,4 +1,4 @@
-import type { ReviewedBy, ReviewLimit } from "@/api/types.gen";
+import type { ReviewedBy, ReviewedByInput, ReviewLimitInput } from "@/api/types.gen";
 import { hasText } from "@/lib/text";
 
 import type { ReviewedByKind } from "./review-settings";
@@ -24,49 +24,22 @@ export const REVIEWED_BY_DESCRIPTIONS: Record<ReviewedByKind, string> = {
 
 export const MAX_REASON_LENGTH = 500;
 
-const LIMIT_CODE = /^[A-Z][A-Z0-9_]{2,63}$/u;
-
-// Codes must be deterministic because the server digests them with the reason text.
-export function limitCodeFor(description: string): string {
-	const slug = description
-		.toUpperCase()
-		.replaceAll(/[^A-Z0-9]+/gu, "_")
-		.replaceAll(/^_+|_+$/gu, "")
-		.slice(0, 63);
-	return LIMIT_CODE.test(slug) ? slug : `LIMIT_${fnv1a(description)}`;
-}
-
-function fnv1a(input: string) {
-	let hash = 0x81_1c_9d_c5;
-	for (let index = 0; index < input.length; index += 1) {
-		// oxlint-disable-next-line unicorn/prefer-code-point -- The code is stored, so the hash stays over UTF-16 units; code points would change it for an astral character.
-		const unit = input.charCodeAt(index);
-		// oxlint-disable-next-line no-bitwise -- FNV-1a is defined over 32-bit integer operations.
-		hash = Math.imul(hash ^ unit, 0x01_00_01_93) >>> 0;
-	}
-	return hash.toString(16).toUpperCase().padStart(8, "0");
-}
-
-export function limitWithText(description: string): ReviewLimit {
-	return { code: limitCodeFor(description), description };
-}
-
 /** Keep reasons and limits across draft choices; discard incompatible fields only on save. */
 export interface ReviewedByDraft {
 	by: ReviewedByKind;
-	humanReason: ReviewLimit;
-	limits: ReviewLimit[];
+	humanReason: ReviewLimitInput;
+	limits: ReviewLimitInput[];
 }
 
 export function reviewedByDraftOf(reviewedBy: ReviewedBy): ReviewedByDraft {
 	return {
 		by: reviewedBy.by,
-		humanReason: reviewedBy.humanReason ?? limitWithText(""),
+		humanReason: reviewedBy.humanReason ?? { description: "" },
 		limits: reviewedBy.limits,
 	};
 }
 
-export function reviewedByOf(draft: ReviewedByDraft): ReviewedBy {
+export function reviewedByOf(draft: ReviewedByDraft): ReviewedByInput {
 	return {
 		by: draft.by,
 		humanReason: draft.by === "PEOPLE" ? trimmed(draft.humanReason) : null,
@@ -74,8 +47,8 @@ export function reviewedByOf(draft: ReviewedByDraft): ReviewedBy {
 	};
 }
 
-function trimmed(limit: ReviewLimit): ReviewLimit {
-	return { code: limit.code, description: limit.description.trim() };
+function trimmed(limit: ReviewLimitInput): ReviewLimitInput {
+	return { ...limit, description: limit.description.trim() };
 }
 
 export const HUMAN_REASON_FIELD_ID = "practice-human-reason";
@@ -104,10 +77,7 @@ export function reviewedByProblem(draft: ReviewedByDraft): ReviewedByProblem | u
 		return undefined;
 	}
 	const invalid = draft.limits.findIndex(
-		(limit) =>
-			!LIMIT_CODE.test(limit.code) ||
-			!hasText(limit.description.trim()) ||
-			limit.description.length > MAX_REASON_LENGTH,
+		(limit) => !hasText(limit.description.trim()) || limit.description.length > MAX_REASON_LENGTH,
 	);
 	if (invalid !== -1) {
 		return {
@@ -115,7 +85,7 @@ export function reviewedByProblem(draft: ReviewedByDraft): ReviewedByProblem | u
 			focusId: limitFieldId(invalid),
 		};
 	}
-	return new Set(draft.limits.map((limit) => limit.code)).size === draft.limits.length
+	return new Set(draft.limits.map((limit) => limit.description.trim())).size === draft.limits.length
 		? undefined
 		: { message: "Describe each limit once.", focusId: REVIEWED_BY_FIELD_ID };
 }

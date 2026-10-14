@@ -5,7 +5,7 @@
 			"role": "AUTHOR"
 		},
 		"practice": {
-			"revisionId": 1
+			"versionId": 1
 		},
 		"scope": {
 			"key": "scm.issue:1:AUTHOR",

@@ -6,7 +6,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.acrossworkspace.dto.PracticeWorkspaceOverviewDTO;
 import de.tum.cit.aet.hephaestus.practices.acrossworkspace.dto.PracticeWorkspaceTileDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.GroupRefDTO;
-import de.tum.cit.aet.hephaestus.practices.result.ResultReadQuery;
+import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ResultViewQuery;
 import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.practices.result.trend.PracticeTrendService;
@@ -31,7 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PracticesAcrossWorkspaceService {
     private final PracticeRepository practices;
     private final PracticeReviewCoverageService scope;
-    private final ResultReadQuery read;
+    private final ResultRepository read;
     private final ResultViewQuery views;
     private final ResultVisibilityPolicy visibility;
     private final Clock clock;

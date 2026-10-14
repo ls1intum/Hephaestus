@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { ITEM_EVENT_REASON_SENTENCES } from "@/components/practice-vocabulary/item-event-defs";
 import type { ReviewRequestOutcome } from "~/api/types.gen";
 import {
 	type ContextApi,
@@ -308,7 +309,8 @@ async function send(
 		: {
 				kind: "request-review",
 				status: "REFUSED",
-				reasonDescription: outcome.reasonDescription ?? undefined,
+				reasonDescription:
+					outcome.reason === null ? undefined : ITEM_EVENT_REASON_SENTENCES[outcome.reason],
 			};
 }
 

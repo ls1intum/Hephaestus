@@ -11,7 +11,7 @@ public record ProjectedCitationDTO(
         @Nullable String sourcePath,
         @Nullable String path,
         @Nullable CitationSide side,
-        @Nullable String revision,
+        @Nullable String commit,
         @Nullable Integer startLine,
         @Nullable Integer endLine,
         @Nullable String quote,

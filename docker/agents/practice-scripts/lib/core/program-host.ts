@@ -282,7 +282,7 @@ export async function runPracticeProgram(
 			!readReceipts.some(
 				(receipt) =>
 					receipt.path === file &&
-					receipt.version === job.files?.head.revision &&
+					receipt.version === job.files?.head.commit &&
 					receipt.status === "COMPLETE",
 			) ||
 			services.receipts.failedReads > 0 ||

@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 
 import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.result.ProblemRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ResultCommunicationRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ResultMarkRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ResultPresentation;
 import de.tum.cit.aet.hephaestus.practices.review.ProductReferenceQuery;
@@ -14,7 +15,6 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import tools.jackson.databind.json.JsonMapper;
 
 class ResultProofPrivacyTest extends BaseUnitTest {
@@ -24,7 +24,7 @@ class ResultProofPrivacyTest extends BaseUnitTest {
                 mock(ResultMarkRepository.class),
                 mock(ProblemRepository.class),
                 mock(ProductReferenceQuery.class),
-                mock(JdbcClient.class),
+                mock(ResultCommunicationRepository.class),
                 new JsonMapper());
         var result =
                 Result.builder().evidence(new JsonMapper().createObjectNode()).build();

@@ -18,7 +18,6 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewScanStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshotQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ScanExecutionSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ScanListedItem;
-import java.sql.Timestamp;
 import java.time.Clock;
 import java.util.Comparator;
 import java.util.List;
@@ -28,8 +27,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.jdbc.support.SqlArrayValue;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,7 +45,7 @@ public class ReviewScanStoreService implements ReviewScanStore {
     private final ReviewAssignmentQuery assignments;
     private final ResultRepository results;
     private final ItemWriter writer;
-    private final JdbcClient jdbc;
+    private final ProductItemRepository itemRows;
     private final JsonMapper json;
     private final Clock clock;
     private final ReviewSnapshotQuery snapshots;
@@ -57,15 +55,7 @@ public class ReviewScanStoreService implements ReviewScanStore {
     @Transactional(readOnly = true)
     public List<ScanExecutionSnapshot> active(int limit) {
         limit(limit);
-        return jdbc
-                .sql("SELECT workspace_id,id FROM review WHERE kind='SCAN' AND status IN ('QUEUED','RUNNING')"
-                        + " ORDER BY created_at,id::text LIMIT :limit")
-                .param("limit", limit)
-                .query((rs, n) -> new ScanId(rs.getLong(1), Objects.requireNonNull(rs.getObject(2, UUID.class))))
-                .list()
-                .stream()
-                .map(id -> reviews.findByIdAndWorkspaceId(id.reviewId(), id.workspaceId())
-                        .orElseThrow())
+        return reviews.activeScans(PageRequest.of(0, limit)).stream()
                 .map(this::snapshot)
                 .toList();
     }
@@ -87,18 +77,8 @@ public class ReviewScanStoreService implements ReviewScanStore {
         if (review.getStatus().isTerminal()
                 || review.getChecks().path("cancellationRequested").asBoolean()) return List.of();
         var activeJobs = runtime.activeJobIds(workspaceId, reviewId);
-        return jdbc
-                .sql("SELECT m.practice_id,m.item_id FROM review_item m JOIN item i ON i.id=m.item_id"
-                        + " AND i.workspace_id=m.workspace_id WHERE m.workspace_id=:ws AND m.review_id=:review"
-                        + " AND m.state='LISTED' AND (m.job_id IS NULL OR m.job_id<>ALL(:active))"
-                        + " ORDER BY i.path,m.item_id,m.practice_id LIMIT :limit")
-                .param("ws", workspaceId)
-                .param("review", reviewId)
-                .param("limit", limit)
-                .param("active", new SqlArrayValue("uuid", activeJobs.toArray()))
-                .query((rs, n) -> new ReviewAssignmentId(reviewId, rs.getLong(1), rs.getLong(2)))
-                .list()
-                .stream()
+        return items.pending(workspaceId, reviewId, activeJobs.toArray(UUID[]::new), PageRequest.of(0, limit)).stream()
+                .map(row -> new ReviewAssignmentId(reviewId, row.getPracticeId(), row.getItemId()))
                 .map(id -> assignments
                         .find(workspaceId, id)
                         .orElseThrow(() -> new IllegalStateException("The pending assignment has no frozen proof.")))
@@ -106,14 +86,7 @@ public class ReviewScanStoreService implements ReviewScanStore {
     }
 
     private ScanExecutionSnapshot snapshot(Review review) {
-        var counts = jdbc.sql("SELECT COUNT(*) AS listed,COUNT(*) FILTER(WHERE state='JUDGED') AS judged,"
-                        + " COUNT(*) FILTER(WHERE state='REUSED') AS reused,"
-                        + " COUNT(*) FILTER(WHERE state='WITHHELD') AS withheld FROM review_item"
-                        + " WHERE workspace_id=:ws AND review_id=:review")
-                .param("ws", review.getWorkspaceId())
-                .param("review", review.getId())
-                .query((rs, n) -> new Counts(rs.getLong(1), rs.getLong(2), rs.getLong(3), rs.getLong(4)))
-                .single();
+        var counts = items.stateCounts(review.getWorkspaceId(), review.getId());
         var listedPractices =
                 practices
                         .findByWorkspaceIdAndReviewIdOrderByPracticeIdAsc(review.getWorkspaceId(), review.getId())
@@ -131,41 +104,24 @@ public class ReviewScanStoreService implements ReviewScanStore {
                 inventory != null,
                 inventory != null && inventory.path("complete").asBoolean(),
                 listedPractices,
-                counts.listed(),
-                counts.judged(),
-                counts.reused(),
-                counts.withheld());
+                counts.getListed(),
+                counts.getJudged(),
+                counts.getReused(),
+                counts.getWithheld());
     }
 
     private static void limit(int limit) {
         if (limit < 1 || limit > 1000) throw new IllegalArgumentException("Use a scan limit from 1 to 1000.");
     }
 
-    private record ScanId(long workspaceId, UUID reviewId) {}
-
-    private record Counts(long listed, long judged, long reused, long withheld) {}
-
     @Override
     @Transactional
     public void inventory(long workspaceId, UUID reviewId, List<Long> presentItemIds, boolean complete) {
         var review = active(workspaceId, reviewId);
         var present = Set.copyOf(presentItemIds);
-        var previous = jdbc.sql(
-                        "SELECT id FROM item WHERE workspace_id=:ws AND parent_id=:parent AND kind='scm.file' AND"
-                                + " removed_at IS NULL AND created_at<:before ORDER BY id FOR UPDATE")
-                .param("ws", workspaceId)
-                .param("parent", review.getItemId())
-                .param("before", Timestamp.from(review.getCreatedAt()))
-                .query((rs, n) -> rs.getLong(1))
-                .list();
+        var previous = itemRows.lockPreviousFiles(workspaceId, review.getItemId(), review.getCreatedAt());
         if (!present.isEmpty()) {
-            var count = jdbc.sql("SELECT COUNT(*) FROM item WHERE workspace_id=:ws AND parent_id=:parent AND"
-                            + " kind='scm.file' AND id=ANY(:ids)")
-                    .param("ws", workspaceId)
-                    .param("parent", review.getItemId())
-                    .param("ids", new SqlArrayValue("bigint", present.toArray()))
-                    .query((rs, n) -> rs.getLong(1))
-                    .single();
+            var count = itemRows.countSelectedFiles(workspaceId, review.getItemId(), present.toArray(Long[]::new));
             if (count != present.size())
                 throw new IllegalArgumentException("The inventory contains another repository's item.");
         }
@@ -228,14 +184,8 @@ public class ReviewScanStoreService implements ReviewScanStore {
                     .detail(json.createObjectNode().putNull("developerId"))
                     .build());
         }
-        practice.setItemsListed(Math.toIntExact(
-                jdbc.sql("SELECT COUNT(*) FROM review_item WHERE workspace_id=:ws AND review_id=:review AND"
-                                + " practice_id=:practice")
-                        .param("ws", workspaceId)
-                        .param("review", reviewId)
-                        .param("practice", practiceId)
-                        .query((rs, n) -> rs.getLong(1))
-                        .single()));
+        practice.setItemsListed(
+                Math.toIntExact(items.countByWorkspaceIdAndReviewIdAndPracticeId(workspaceId, reviewId, practiceId)));
         practice.setListingComplete(complete);
         if (complete && Integer.valueOf(0).equals(practice.getItemsListed()))
             practice.setStatus(ReviewPracticeStatus.DONE);

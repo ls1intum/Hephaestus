@@ -182,7 +182,7 @@ class AgentWorkspacePurgeIntegrationTest extends BaseIntegrationTest {
 
         LlmUsageEvent usage = new LlmUsageEvent();
         usage.setId(UUID.randomUUID());
-        usage.setWorkspace(workspace);
+        usage.setWorkspaceId(workspace.getId());
         usage.setJobType("PULL_REQUEST_REVIEW");
         usage.setSourceType(UsageSourceType.REVIEW_JOB);
         usage.setSourceId(job.getId());

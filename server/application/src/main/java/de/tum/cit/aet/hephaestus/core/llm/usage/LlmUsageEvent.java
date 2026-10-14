@@ -1,15 +1,11 @@
 package de.tum.cit.aet.hephaestus.core.llm.usage;
 
-import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.math.BigDecimal;
@@ -23,10 +19,11 @@ import lombok.ToString;
 import org.hibernate.annotations.ColumnDefault;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.modulith.NamedInterface;
 
 /**
- * One row per LLM-consuming unit of work — the append-only spend ledger the rollup and the monthly
- * budget cap are computed from. Never update a row.
+ * Records the LLM usage of review jobs and mentor turns for spending totals and budget caps.
+ * Source identity and usage stay frozen; an operator can price an unpriced row.
  *
  * <p>{@code sourceId} is a soft reference (no FK) to the originating {@code review_job.id} or
  * {@code chat_message.id}: accounting must survive source-row deletion. Source kind, id, and
@@ -55,6 +52,7 @@ import org.jspecify.annotations.Nullable;
 @NoArgsConstructor
 @ToString
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@NamedInterface("llm-usage")
 public class LlmUsageEvent {
 
     @Id
@@ -62,11 +60,8 @@ public class LlmUsageEvent {
     @Column(nullable = false, updatable = false)
     private UUID id;
 
-    @NonNull
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "workspace_id", nullable = false)
-    @ToString.Exclude
-    private Workspace workspace;
+    @Column(name = "workspace_id", nullable = false)
+    private long workspaceId;
 
     @NonNull
     @Column(name = "job_type", nullable = false, length = 40)

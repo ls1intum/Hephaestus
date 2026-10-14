@@ -14,7 +14,7 @@ import de.tum.cit.aet.hephaestus.practices.profile.dto.ProfileReviewRefDTO;
 import de.tum.cit.aet.hephaestus.practices.result.GoingWellQueryService;
 import de.tum.cit.aet.hephaestus.practices.result.PracticeGroupStandingService;
 import de.tum.cit.aet.hephaestus.practices.result.PracticeStandingService;
-import de.tum.cit.aet.hephaestus.practices.result.ResultReadQuery;
+import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ResultView;
 import de.tum.cit.aet.hephaestus.practices.result.ResultViewQuery;
 import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
@@ -54,7 +54,7 @@ public class PracticeProfileOverviewService {
     private final PracticeStandingService practiceStandingService;
     private final PracticeGroupStandingService practiceGroupStandingService;
     private final PracticeGroupService practiceGroupService;
-    private final ResultReadQuery read;
+    private final ResultRepository read;
     private final ResultViewQuery views;
     private final ResultVisibilityPolicy visibility;
     private final ProductReferenceQuery references;

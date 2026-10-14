@@ -103,7 +103,7 @@ void describe("the leads of a review input", () => {
 			resolveLeads(
 				[
 					{
-						at: { file: ".git/config", line: 1, revision: "b".repeat(40) },
+						at: { file: ".git/config", line: 1, commit: "b".repeat(40) },
 						label: "Git file at base",
 					},
 				],
@@ -149,7 +149,7 @@ void describe("the leads of a review input", () => {
 				facts: { calls: 2 },
 			},
 			{
-				at: { file: "src/cart.ts", line: 2, revision: earlier },
+				at: { file: "src/cart.ts", line: 2, commit: earlier },
 				label: "A line before the change.",
 			},
 			{ at: { record: "comments.json", line: 2 }, label: "A comment." },
@@ -169,15 +169,15 @@ void describe("the leads of a review input", () => {
 		);
 	});
 
-	void test("a revision cannot be an option and a pinned read cannot escape its capture grant", async (t) => {
+	void test("a commit cannot be an option and a pinned read cannot escape its capture grant", async (t) => {
 		const { sources: given, earlier } = await sources(t);
 		const lead = {
-			at: { file: "src/cart.ts", line: 1, revision: "--output=outside" },
-			label: "Untrusted revision.",
+			at: { file: "src/cart.ts", line: 1, commit: "--output=outside" },
+			label: "Untrusted commit.",
 		};
 		await assert.rejects(resolveLeads([lead], given), /points at/u);
 		await assert.rejects(
-			resolveLeads([{ ...lead, at: { ...lead.at, revision: earlier } }], {
+			resolveLeads([{ ...lead, at: { ...lead.at, commit: earlier } }], {
 				...given,
 				permittedPaths: new Set(),
 			}),
@@ -197,7 +197,7 @@ void describe("the leads of a review input", () => {
 			[{ at: { file: "../secret.txt", line: 1 }, label: "Outside." }, /`\.\.\/secret\.txt:1`/u],
 			[
 				{
-					at: { file: "src/cart.ts", line: 1, revision: "f".repeat(40) },
+					at: { file: "src/cart.ts", line: 1, commit: "f".repeat(40) },
 					label: "No such commit.",
 				},
 				/at ffffffffffff/u,
@@ -345,7 +345,7 @@ void describe("the section of a review input", () => {
 					facts: { replies: 0 },
 				},
 				{
-					at: { file: "src/cart.ts", line: 3, endLine: 4, revision: "c".repeat(40) },
+					at: { file: "src/cart.ts", line: 3, endLine: 4, commit: "c".repeat(40) },
 					label: "Code.",
 					quote: "a\nb",
 				},

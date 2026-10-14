@@ -1221,7 +1221,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
                 .as("%s ledger entry", scenario)
                 .singleElement()
                 .satisfies(event -> {
-                    assertThat(event.getWorkspace().getId()).isEqualTo(workspace.getId());
+                    assertThat(event.getWorkspaceId()).isEqualTo(workspace.getId());
                     assertThat(event.getModel()).isEqualTo("test-model");
                     assertThat(event.getInputTokens()).isEqualTo(input);
                     assertThat(event.getOutputTokens()).isEqualTo(output);

@@ -31,7 +31,7 @@ class ReviewJobEvidenceRefusalIntegrationTest extends BaseIntegrationTest {
     private JdbcTemplate jdbc;
 
     @Test
-    void evidenceRefusalSettlesProcessingWithoutModelExecutionOrResults() {
+    void evidenceRefusalFailsOnlyTheOwningAttempt() {
         databaseTestUtils.cleanDatabase();
         var job = new ReviewJob();
         RuntimeJobTestData.initialize(
@@ -48,18 +48,29 @@ class ReviewJobEvidenceRefusalIntegrationTest extends BaseIntegrationTest {
         Integer refused =
                 transactions.execute(status -> jobs.transitionToEvidenceRefused(id, "other", 0, Instant.now(), output));
         assertThat(refused).isZero();
+        Integer stale =
+                transactions.execute(status -> jobs.transitionToEvidenceRefused(id, "owner", 1, Instant.now(), output));
+        assertThat(stale).isZero();
         Integer settled =
                 transactions.execute(status -> jobs.transitionToEvidenceRefused(id, "owner", 0, Instant.now(), output));
         assertThat(settled).isEqualTo(1);
         var saved = jobs.findById(id).orElseThrow();
-        assertThat(saved.getStatus()).isEqualTo(ReviewJobStatus.COMPLETED);
-        assertThat(saved.getProcessingStatus()).isEqualTo(ProcessingStatus.DONE);
+        assertThat(saved.getStatus()).isEqualTo(ReviewJobStatus.FAILED);
+        assertThat(saved.getProcessingStatus()).isEqualTo(ProcessingStatus.NONE);
         assertThat(saved.getCompletedAt()).isNotNull();
         assertThat(saved.getExecutionStartedAt()).isNull();
         assertThat(saved.getOutput()).isEqualTo(output);
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM practice_result WHERE review_job_id = ?", Long.class, id))
-                .isZero();
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM feedback WHERE review_job_id = ?", Long.class, id))
-                .isZero();
+        assertThat(jdbc.queryForObject(
+                        "SELECT EXISTS(SELECT 1 FROM result WHERE workspace_id=? AND review_id=?)",
+                        Boolean.class,
+                        job.getWorkspaceId(),
+                        job.getReviewId()))
+                .isFalse();
+        assertThat(jdbc.queryForObject(
+                        "SELECT EXISTS(SELECT 1 FROM feedback WHERE workspace_id=? AND review_id=?)",
+                        Boolean.class,
+                        job.getWorkspaceId(),
+                        job.getReviewId()))
+                .isFalse();
     }
 }

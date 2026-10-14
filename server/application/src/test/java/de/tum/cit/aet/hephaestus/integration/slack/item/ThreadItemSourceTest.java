@@ -190,7 +190,7 @@ class ThreadItemSourceTest extends BaseUnitTest {
         for (var candidate : captured.citableTexts()) {
             assertThat(candidate.source()).isEqualTo(ThreadCaptureSource.SOURCE.value());
             assertThat(candidate.side()).isEqualTo(CitationSide.NEW);
-            assertThat(candidate.revision()).isNull();
+            assertThat(candidate.commit()).isNull();
             byte[] staged = Objects.requireNonNull(captured.files().get(candidate.stagedPath()));
             assertThat(candidate.sha256())
                     .isEqualTo(HexFormat.of()

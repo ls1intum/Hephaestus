@@ -73,9 +73,9 @@ public class ScmCitationVerifier implements CitationVerifier {
         List<CitationRefusal> refused = new ArrayList<>();
         for (var citation : check.citations()) {
             if (!code(citation)) {
-                if (citation.side() != CitationSide.NEW || citation.revision() != null)
+                if (citation.side() != CitationSide.NEW || citation.commit() != null)
                     refused.add(refusal(
-                            citation.index(), "This SCM record does not support a repository revision or base side"));
+                            citation.index(), "This SCM record does not support a repository commit or base side"));
                 continue;
             }
             if (head == null || !safePath(citation.path())) {
@@ -87,14 +87,13 @@ public class ScmCitationVerifier implements CitationVerifier {
             boolean valid = diff
                     ? change
                             && expected != null
-                            && (citation.revision() == null || expected.equals(citation.revision()))
+                            && (citation.commit() == null || expected.equals(citation.commit()))
                             && capturedRange(check, base, head)
                             && capturedPath(check, citation)
                     : citation.side() == CitationSide.NEW
-                            && (citation.revision() == null
-                                    || citation.revision().matches("[0-9a-f]{40}|[0-9a-f]{64}"))
-                            && (change || citation.revision() == null || head.equals(citation.revision()));
-            if (!valid) refused.add(refusal(citation.index(), "The citation refers to another SCM revision or side"));
+                            && (citation.commit() == null || citation.commit().matches("[0-9a-f]{40}|[0-9a-f]{64}"))
+                            && (change || citation.commit() == null || head.equals(citation.commit()));
+            if (!valid) refused.add(refusal(citation.index(), "The citation refers to another SCM commit or side"));
         }
         for (BasisToCheck basis : check.bases()) {
             CitationToCheck newest = find(check.citations(), basis.headCitation());
@@ -111,7 +110,7 @@ public class ScmCitationVerifier implements CitationVerifier {
                     || (oldest != null && code(oldest) && !basisRevision(oldest, CitationSide.OLD, base))) {
                 refused.add(refusal(
                         basis.headCitation(),
-                        "The problem basis cites another repository revision than the reviewed change"));
+                        "The problem basis cites another repository commit than the reviewed change"));
             }
         }
         return List.copyOf(refused);
@@ -133,13 +132,11 @@ public class ScmCitationVerifier implements CitationVerifier {
         }
     }
 
-    private static boolean basisRevision(
-            CitationToCheck citation, CitationSide expectedSide, @Nullable String revision) {
-        if (revision == null) return false;
+    private static boolean basisRevision(CitationToCheck citation, CitationSide expectedSide, @Nullable String commit) {
+        if (commit == null) return false;
         if (citation.source().equals(PullRequestContentSource.DIFF.value()))
-            return citation.side() == expectedSide
-                    && (citation.revision() == null || revision.equals(citation.revision()));
-        return revision.equals(citation.revision());
+            return citation.side() == expectedSide && (citation.commit() == null || commit.equals(citation.commit()));
+        return commit.equals(citation.commit());
     }
 
     private static boolean code(CitationToCheck citation) {

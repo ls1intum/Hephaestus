@@ -440,7 +440,6 @@ describe("practice profile route", () => {
 				return HttpResponse.json({
 					status: "REFUSED",
 					reason: "REQUEST_COOLDOWN_ACTIVE",
-					reasonDescription: "A review of this was already asked for a moment ago.",
 					reviewId: null,
 				});
 			}),
@@ -453,7 +452,7 @@ describe("practice profile route", () => {
 		);
 
 		await screen.findByText(
-			"A review of this was already asked for a moment ago.",
+			"A review was requested recently, so another request waits.",
 			undefined,
 			ROUTE_RENDER_WAIT,
 		);
@@ -467,7 +466,6 @@ describe("practice profile route", () => {
 				HttpResponse.json({
 					status: "REFUSED",
 					reason: "REQUEST_COOLDOWN_ACTIVE",
-					reasonDescription: "A review of this was already asked for a moment ago.",
 					reviewId: null,
 				}),
 			),

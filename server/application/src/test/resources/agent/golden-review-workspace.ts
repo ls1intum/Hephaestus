@@ -140,13 +140,13 @@ export function stageGoldenWorkspace(
 			sources: [
 				{
 					kind: "scm.pull-request.core",
-					citation: { side: "FORBIDDEN", revision: "FORBIDDEN" },
+					citation: { side: "FORBIDDEN", commit: "FORBIDDEN" },
 					state: { availability: "AVAILABLE" },
 					files: [{ path: "evidence/metadata.json" }],
 				},
 				{
 					kind: "scm.pull-request.diff",
-					citation: { side: "REQUIRED", revision: "OPTIONAL" },
+					citation: { side: "REQUIRED", commit: "OPTIONAL" },
 					state: { availability: "AVAILABLE" },
 					files: [{ path: "evidence/change.json" }],
 				},

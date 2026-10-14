@@ -560,10 +560,7 @@ class GitLabSummaryWriterTest extends BaseUnitTest {
     void findExistingSummary_everyNoteScanned_noMatch_isAbsent() {
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         GraphQlClient.RequestSpec spec = mockRequestChain();
-        ClientGraphQlResponse page = mockMrNotesPage(
-                List.of(note("gid://gitlab/Note/1", "unrelated")),
-                false, 
-                null);
+        ClientGraphQlResponse page = mockMrNotesPage(List.of(note("gid://gitlab/Note/1", "unrelated")), false, null);
         when(spec.execute()).thenReturn(Mono.just(page));
 
         SummaryLookup result = channel.findExistingSummary(gitlabTarget(), EXPECTED);

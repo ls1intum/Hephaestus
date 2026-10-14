@@ -3,10 +3,24 @@ package de.tum.cit.aet.hephaestus.agent.practice.live;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.task.Task;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.integration.chat.item.ThreadItemDescriptor;
+import de.tum.cit.aet.hephaestus.integration.core.framework.ItemDescriptorRegistry;
+import de.tum.cit.aet.hephaestus.integration.docs.item.DocumentItemDescriptor;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.FileItemDescriptor;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.IssueItemDescriptor;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.PullRequestItemDescriptor;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.PullRequestReviewItemDescriptor;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.RepositoryItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
+import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionValidator;
+import de.tum.cit.aet.hephaestus.practices.PracticeItemOptions;
+import de.tum.cit.aet.hephaestus.practices.curated.BundledPracticeCatalog;
+import de.tum.cit.aet.hephaestus.practices.curated.BundledPracticeCatalogLoader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -22,6 +36,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 final class PracticeCriteriaCaseFixtures {
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
+    private static final BundledPracticeCatalog CATALOG = catalog();
     static final Path FIXTURE_DIR =
             Path.of("src/test/resources/agent/live-practice").toAbsolutePath();
 
@@ -54,6 +69,19 @@ final class PracticeCriteriaCaseFixtures {
 
     private PracticeCriteriaCaseFixtures() {}
 
+    private static BundledPracticeCatalog catalog() {
+        var sources = new ClasspathSourceCatalogRegistry(MAPPER, Clock.systemUTC());
+        var items = new PracticeItemOptions(new ItemDescriptorRegistry(List.of(
+                new PullRequestItemDescriptor(),
+                new PullRequestReviewItemDescriptor(),
+                new IssueItemDescriptor(),
+                new FileItemDescriptor(),
+                new RepositoryItemDescriptor(),
+                new ThreadItemDescriptor(),
+                new DocumentItemDescriptor())));
+        return new BundledPracticeCatalogLoader(MAPPER, new PracticeDefinitionValidator(sources, items)).catalog();
+    }
+
     private static String content(Path file) throws IOException {
         String text = Files.readString(file).strip();
         return text.isEmpty() || text.equals("[]") || text.equals("{}") ? "EMPTY" : "NON_EMPTY";
@@ -69,7 +97,7 @@ final class PracticeCriteriaCaseFixtures {
         return file;
     }
 
-    static void stage(Path workspace, JsonNode scenario) throws IOException, InterruptedException {
+    static Map<String, JsonNode> stage(Path workspace, JsonNode scenario) throws IOException, InterruptedException {
         Path repo = workspace.resolve(SandboxLayout.REPO_MOUNT_RELATIVE);
         Files.deleteIfExists(repo);
         Files.createDirectories(repo);
@@ -144,8 +172,6 @@ final class PracticeCriteriaCaseFixtures {
         }
         Files.write(workspace.resolve("context/metadata.json"), LiveWorkRecords.staged(metadata));
 
-        JsonNode catalogue = MAPPER.readTree(
-                Path.of("src/main/resources/practices/default-catalog.json").toFile());
         Path practices = workspace.resolve(SandboxLayout.PRACTICES_PREFIX);
         try (var existing = Files.list(practices)) {
             for (Path file : existing.toList()) {
@@ -153,29 +179,30 @@ final class PracticeCriteriaCaseFixtures {
             }
         }
         ArrayNode index = MAPPER.createArrayNode();
-        for (JsonNode group : catalogue.path("groups")) {
-            for (JsonNode practice : group.path("practices")) {
-                String slug = practice.path("slug").asString();
-                if (!scenario.path("expected").has(slug)) {
-                    continue;
-                }
-
-                var definition = practice.path("definition");
-                long id = index.size() + 1L;
-                ObjectNode entry = index.addObject()
-                        .put("slug", slug)
-                        .put("name", definition.path("name").asString())
-                        .put("practiceId", Long.toString(id))
-                        .put("versionId", Long.toString(id))
-                        .put("reviewDigest", "a".repeat(64));
-                entry.set("definition", definition.deepCopy());
-                var reads = entry.putArray("readsSources");
-                for (var source : definition.path("reads").path("sources"))
-                    reads.add(source.path("source").asString());
-                Files.writeString(
-                        practices.resolve(slug + ".md"),
-                        definition.path("criteria").asString());
+        var definitions = new LinkedHashMap<String, JsonNode>();
+        for (var practice : CATALOG.practices()) {
+            String slug = practice.slug();
+            if (!scenario.path("expected").has(slug)) {
+                continue;
             }
+
+            var definition = MAPPER.valueToTree(practice.definition().definition());
+            definitions.put(slug, definition);
+            long id = index.size() + 1L;
+            ObjectNode entry = index.addObject()
+                    .put("slug", slug)
+                    .put("name", definition.path("name").asString())
+                    .put("versionId", Long.toString(id));
+            entry.putArray("knownLimitations");
+            var exhaustive = entry.putArray("exhaustiveSources");
+            var reads = entry.putArray("readsSources");
+            for (var source : definition.path("reads").path("sources")) {
+                reads.add(source.path("source").asString());
+                if (source.path("need").asString().equals("COMPLETE"))
+                    exhaustive.add(source.path("source").asString());
+            }
+            Files.writeString(
+                    practices.resolve(slug + ".md"), definition.path("criteria").asString());
         }
         Files.write(workspace.resolve(SandboxLayout.PRACTICES_PREFIX + "index.json"), MAPPER.writeValueAsBytes(index));
         TaskEnvelope envelope = TaskEnvelope.of(
@@ -240,6 +267,7 @@ final class PracticeCriteriaCaseFixtures {
                     .put("content", contents.get(source.path("kind").asString()));
         }
         Files.write(workspace.resolve(SandboxLayout.MANIFEST_PATH), MAPPER.writeValueAsBytes(manifest));
+        return definitions;
     }
 
     /**

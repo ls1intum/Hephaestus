@@ -426,7 +426,7 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
                 null);
         LlmUsageEvent event = new LlmUsageEvent();
         event.setId(UUID.randomUUID());
-        event.setWorkspace(workspace);
+        event.setWorkspaceId(workspace.getId());
         event.setJobType("PRACTICE_REVIEW");
         event.setSourceType(UsageSourceType.PRACTICE_SCRIPT_DECISION);
         event.setSourceId(review.getId());
@@ -594,7 +594,7 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
             Instant occurredAt) {
         LlmUsageEvent event = new LlmUsageEvent();
         event.setId(UUID.randomUUID());
-        event.setWorkspace(workspace);
+        event.setWorkspaceId(workspace.getId());
         event.setJobType("PRACTICE_REVIEW");
         event.setSourceType(sourceType);
         event.setSourceId(job.getId());

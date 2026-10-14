@@ -4,7 +4,9 @@ import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
 import org.jspecify.annotations.Nullable;
+import org.springframework.modulith.NamedInterface;
 
+@NamedInterface("llm-usage")
 public record LlmPriceSnapshot(
         UsageFundingSource fundingSource,
         UsagePricingState pricingState,

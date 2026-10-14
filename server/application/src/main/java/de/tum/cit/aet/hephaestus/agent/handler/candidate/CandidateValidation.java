@@ -55,7 +55,7 @@ final class CandidateValidation {
                 .constraint(new SizeDef().min(1).max(PATH_CHARS))
                 .field("path")
                 .constraint(new SizeDef().min(1).max(PATH_CHARS))
-                .field("revision")
+                .field("commit")
                 .constraint(new SizeDef().min(1).max(VERSION_CHARS))
                 .field("startLine")
                 .constraint(new PositiveDef())

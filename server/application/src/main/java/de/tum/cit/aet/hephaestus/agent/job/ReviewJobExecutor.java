@@ -34,7 +34,7 @@ import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
 import de.tum.cit.aet.hephaestus.evidence.capture.EvidenceDirectory;
-import de.tum.cit.aet.hephaestus.integration.core.itemevent.PracticeReviewRefusalMetrics;
+import de.tum.cit.aet.hephaestus.integration.core.metrics.IntegrationCoreMetrics;
 import de.tum.cit.aet.hephaestus.observability.StructuredLogKeys;
 import de.tum.cit.aet.hephaestus.practices.spi.ProcessingStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
@@ -149,7 +149,6 @@ public class ReviewJobExecutor {
     private final TransactionTemplate transactionTemplate;
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
-    private final PracticeReviewRefusalMetrics practiceReviewRefusalMetrics;
     private final LlmUsageRecorder usageRecorder;
     private final PracticeScriptRunRecorder practiceScriptRuns;
     private final @Nullable LlmAdmissionService llmAdmissionService;
@@ -189,7 +188,6 @@ public class ReviewJobExecutor {
             TransactionTemplate transactionTemplate,
             ObjectMapper objectMapper,
             MeterRegistry meterRegistry,
-            PracticeReviewRefusalMetrics practiceReviewRefusalMetrics,
             ReviewJobTelemetry jobTelemetry,
             LlmUsageRecorder usageRecorder,
             PracticeScriptRunRecorder practiceScriptRuns,
@@ -210,7 +208,6 @@ public class ReviewJobExecutor {
         this.transactionTemplate = transactionTemplate;
         this.objectMapper = objectMapper;
         this.meterRegistry = meterRegistry;
-        this.practiceReviewRefusalMetrics = practiceReviewRefusalMetrics;
         this.jobTelemetry = jobTelemetry;
         this.usageRecorder = usageRecorder;
         this.practiceScriptRuns = practiceScriptRuns;
@@ -681,7 +678,7 @@ public class ReviewJobExecutor {
     private ExecutionOutcome persistEvidenceRefusal(UUID jobId, ReviewJob job, InsufficientEvidenceException e) {
         // This evidence was not staged; no attempt owns its cleanup.
         try (PreparedJobInputs refused = e.preparedInputs()) {
-            persistRefusedEvidence(jobId, job.getAttempt(), refused);
+            persistRefusedEvidence(jobId, job.getWorkspaceId(), job.getAttempt(), refused);
             JsonNode output =
                     objectMapper.valueToTree(new RefusedExecution(RefusalOutcome.INSUFFICIENT_EVIDENCE, null, null));
             Integer updated = transactionTemplate.execute(status -> jobRepository.transitionToEvidenceRefused(
@@ -826,6 +823,7 @@ public class ReviewJobExecutor {
             if (!continuation) {
                 persistProvenanceDigests(
                         jobId,
+                        job.getWorkspaceId(),
                         agentSpec.promptDigest(),
                         sandboxSpec.inputFiles(),
                         preparedInputs.filesOnDisk(),
@@ -840,9 +838,10 @@ public class ReviewJobExecutor {
         }
     }
 
-    private void persistRefusedEvidence(UUID jobId, int attempt, PreparedJobInputs preparedInputs) {
+    private void persistRefusedEvidence(UUID jobId, long workspaceId, int attempt, PreparedJobInputs preparedInputs) {
         persistProvenanceDigests(
                 jobId,
+                workspaceId,
                 null,
                 Map.of(),
                 preparedInputs.filesOnDisk(),
@@ -854,6 +853,7 @@ public class ReviewJobExecutor {
     // Persist provenance before provider execution; results without their original input identity cannot be admitted.
     private void persistProvenanceDigests(
             UUID jobId,
+            long workspaceId,
             @Nullable String promptDigest,
             Map<String, byte[]> inputFiles,
             Map<String, Path> inputPaths,
@@ -869,8 +869,8 @@ public class ReviewJobExecutor {
                 "directories",
                 objectMapper.valueToTree(
                         inputDirectories.stream().map(EvidenceDirectory::target).toList()));
-        Integer updated =
-                transactionTemplate.execute(status -> jobRepository.updateCapture(jobId, workerId, attempt, stamp));
+        Integer updated = transactionTemplate.execute(
+                status -> jobRepository.updateCapture(jobId, workspaceId, workerId, attempt, stamp));
         if (updated == null || updated != 1) {
             throw new IllegalStateException("Provenance digest write matched no job row: jobId=" + jobId);
         }
@@ -1093,7 +1093,9 @@ public class ReviewJobExecutor {
     }
 
     private void recordPracticeReviewRefusal(String reason) {
-        practiceReviewRefusalMetrics.recordExecutionRefusal(reason);
+        meterRegistry
+                .counter(IntegrationCoreMetrics.PRACTICE_REVIEW_REFUSED, "phase", "execution", "reason", reason)
+                .increment();
     }
 
     private void releaseCapacity() {

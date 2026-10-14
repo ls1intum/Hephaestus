@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import {
 	acceptCatalogPracticeReleaseMutation,
 	acknowledgeCatalogPracticeMutation,
-	declineCatalogPracticeReleaseMutation,
 	getCatalogPracticeOptions,
 	getCatalogPracticeQueryKey,
 	getCatalogPracticeReleaseOptions,
@@ -155,7 +154,7 @@ function LoadedCatalogPracticeEditor({
 			toast.success("Selected practice changes accepted");
 		},
 		onError: (error) => {
-			if (problemStatusOf(error) === 409) {
+			if (problemStatusOf(error) === 412) {
 				void continueWithDraft();
 				void queryClient.invalidateQueries({ queryKey: getInstanceCatalogQueryKey() });
 				void releaseQuery.refetch();
@@ -164,7 +163,7 @@ function LoadedCatalogPracticeEditor({
 		},
 	});
 	const declineRelease = useMutation({
-		...declineCatalogPracticeReleaseMutation(),
+		...acknowledgeCatalogPracticeMutation(),
 		onSuccess: (updated) => {
 			queryClient.setQueryData(detailQueryKey, updated);
 			void queryClient.invalidateQueries({ queryKey: getInstanceCatalogQueryKey() });
@@ -172,7 +171,7 @@ function LoadedCatalogPracticeEditor({
 			toast.success("Practice update declined");
 		},
 		onError: (error) => {
-			if (problemStatusOf(error) === 409) {
+			if (problemStatusOf(error) === 412) {
 				void continueWithDraft();
 				void queryClient.invalidateQueries({ queryKey: getInstanceCatalogQueryKey() });
 				void releaseQuery.refetch();
@@ -189,7 +188,7 @@ function LoadedCatalogPracticeEditor({
 			onDone();
 		},
 		onError: (error) => {
-			if (problemStatusOf(error) === 409) {
+			if (problemStatusOf(error) === 412) {
 				setConflict(true);
 				return;
 			}
@@ -211,7 +210,7 @@ function LoadedCatalogPracticeEditor({
 			);
 		},
 		onError: (error) => {
-			if (problemStatusOf(error) === 409) {
+			if (problemStatusOf(error) === 412) {
 				toast.error(
 					"The catalog changed before this action was saved. Reopen the practice to see the latest version.",
 				);
@@ -238,7 +237,7 @@ function LoadedCatalogPracticeEditor({
 			);
 		},
 		onError: (error) => {
-			if (problemStatusOf(error) === 409) {
+			if (problemStatusOf(error) === 412) {
 				toast.error(
 					"The catalog changed before this action was saved. Reopen the practice to see the latest version.",
 				);
@@ -346,7 +345,6 @@ function LoadedCatalogPracticeEditor({
 					path: { slug: practiceSlug },
 					headers: { "If-Match": `"${basePractice.etag}"` },
 					body: {
-						slug: basePractice.slug,
 						kind: basePractice.kind,
 						groupSlug,
 						definition,

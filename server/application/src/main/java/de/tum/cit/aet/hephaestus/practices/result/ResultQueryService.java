@@ -26,7 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class ResultQueryService {
     private final CurrentDeveloperLookup developer;
     private final ResultRepository results;
-    private final ResultReadQuery read;
     private final ResultViewQuery views;
     private final ResultPresentation presentation;
     private final EvidenceAuthorization authorization;
@@ -48,7 +47,7 @@ public class ResultQueryService {
                 null,
                 null,
                 null);
-        var rows = read.list(ws, filter, query.sort(), query.displayableOnly(), page);
+        var rows = results.list(ws, filter, query.sort(), query.displayableOnly(), page);
         var permitted = authorization.permitsAll(ws, rows.getContent(), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
         var projected = presentation.lists(ws, views.views(ws, rows.getContent()), permitted);
         return new PageImpl<>(projected, page, rows.getTotalElements());

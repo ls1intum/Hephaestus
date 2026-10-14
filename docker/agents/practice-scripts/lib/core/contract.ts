@@ -283,7 +283,7 @@ export type Origin = (typeof ORIGINS)[number];
 export type AboutRole = (typeof ABOUT_ROLES)[number];
 export const decimalIdSchema = z.string().regex(/^[1-9][0-9]*$/u);
 const version = z.string().min(1).max(CANDIDATE_LIMITS.versionChars);
-/** A full commit id: the only revision a file location names, so it can never read as a git option. */
+/** A full commit id: the only commit a file location names, so it can never read as a git option. */
 export const commitIdSchema = z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u);
 export const kindSchema = z
 	.string()
@@ -313,7 +313,7 @@ const previousCitationSchema = z.strictObject({
 	startLine: z.int().min(1).max(2_147_483_647),
 	endLine: z.int().min(1).max(2_147_483_647),
 	side: z.enum(["OLD", "NEW"]).optional(),
-	revision: version.optional(),
+	commit: version.optional(),
 });
 const destinationBoundsSchema = z.strictObject({
 	enabled: z.boolean(),
@@ -385,7 +385,7 @@ export const practiceInputsSchema = z
 export type PracticeInputs = z.infer<typeof practiceInputsSchema>;
 export interface CitationCapabilities {
 	side: "REQUIRED" | "OPTIONAL" | "FORBIDDEN";
-	revision: "REQUIRED" | "OPTIONAL" | "FORBIDDEN";
+	commit: "REQUIRED" | "OPTIONAL" | "FORBIDDEN";
 }
 /*
  * The result a practice program returns: one candidate per practice. Admission on the server parses
@@ -508,7 +508,7 @@ const citationShape = z
 		/** Source-catalog flags declare whether a side is required or permitted. */
 		side: z.enum(["OLD", "NEW"]).optional(),
 		/** An opaque version whose syntax and permission the domain source owns. */
-		revision: z.string().min(1).max(CANDIDATE_LIMITS.versionChars).optional(),
+		commit: z.string().min(1).max(CANDIDATE_LIMITS.versionChars).optional(),
 		startLine: lineNumber,
 		endLine: lineNumber,
 		quote: bounded(CANDIDATE_LIMITS.quoteChars),
@@ -709,7 +709,7 @@ function overlaps(a: Citation, b: Citation, resolve?: ResolveCitationIdentity): 
 		a.sourcePath === b.sourcePath &&
 		a.path === b.path &&
 		a.side === b.side &&
-		a.revision === b.revision
+		a.commit === b.commit
 	);
 }
 
@@ -943,7 +943,7 @@ export const evidenceLocationSchema = z.union([
 		file: z.string().min(1),
 		line: lineNumber,
 		endLine: lineNumber.optional(),
-		revision: commitIdSchema.optional(),
+		commit: commitIdSchema.optional(),
 	}),
 	z.strictObject({
 		record: z.string().min(1),
@@ -1088,7 +1088,7 @@ export function validateCitationCapabilities(
 	citation: Citation,
 	capabilities: CitationCapabilities,
 ): string | undefined {
-	for (const field of ["side", "revision"] as const) {
+	for (const field of ["side", "commit"] as const) {
 		const present = citation[field] !== undefined;
 		if (capabilities[field] === "REQUIRED" && !present) {
 			return `${field} is required by the source catalog`;

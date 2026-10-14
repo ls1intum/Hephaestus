@@ -47,7 +47,7 @@ class ResultHistoryIntegrationTest extends BaseIntegrationTest {
     ReviewAdmissionData admissions;
 
     @Autowired
-    ResultReadQuery read;
+    ResultRepository read;
 
     @Autowired
     ResultMarkService marks;

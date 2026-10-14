@@ -384,7 +384,7 @@ public class ResultAdmissionService {
                     citation.sourcePath(),
                     citation.path(),
                     citation.side(),
-                    citation.revision(),
+                    citation.commit(),
                     citation.startLine(),
                     citation.endLine(),
                     citation.quote(),

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 import type {
-	CatalogGroupDefinition,
+	GroupDefinition,
 	PracticeDefinition,
 	PracticeDefinitionOptions,
 } from "@/api/types.gen";
@@ -35,7 +35,7 @@ function textOrNotSet(value: string | null): string {
 	return value === null || value === "" ? "Not set" : value;
 }
 
-export function groupVersionFields(shipped: CatalogGroupDefinition): VersionField[] {
+export function groupVersionFields(shipped: GroupDefinition): VersionField[] {
 	return [
 		{ label: "Name", value: shipped.name },
 		{ label: "Description", value: textOrNotSet(shipped.description) },

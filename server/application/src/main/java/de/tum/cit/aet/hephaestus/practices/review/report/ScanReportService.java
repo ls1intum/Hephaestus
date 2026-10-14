@@ -43,8 +43,6 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.jdbc.support.SqlArrayValue;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -64,8 +62,7 @@ public class ScanReportService {
     private final ProblemComparison comparison;
     private final ScanEvidencePolicy eligibility;
     private final ScanComparisonService pairComparison;
-    private final ScanMembershipQuery queries;
-    private final JdbcClient jdbc;
+    private final ScanReportRepository rows;
     private final JsonMapper json;
     private final Clock clock;
 
@@ -105,17 +102,9 @@ public class ScanReportService {
     }
 
     public Map<String, Long> markedCounts(Review review) {
-        return jdbc
-                .sql("SELECT mark.kind,COUNT(DISTINCT mark.result_id) AS count FROM result_mark mark JOIN"
-                        + " review_item member ON member.result_id=mark.result_id AND"
-                        + " member.workspace_id=mark.workspace_id WHERE member.workspace_id=:ws AND"
-                        + " member.review_id=:scan AND mark.removed_at IS NULL GROUP BY mark.kind")
-                .param("ws", review.getWorkspaceId())
-                .param("scan", review.getId())
-                .query((rs, n) -> Map.entry(rs.getString("kind"), rs.getLong("count")))
-                .list()
-                .stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        return rows.markedCounts(review.getWorkspaceId(), review.getId()).stream()
+                .collect(Collectors.toMap(
+                        ScanReportRepository.KindCount::getKind, ScanReportRepository.KindCount::getCount));
     }
 
     public ScanCountsDTO currentCounts(Review review) {
@@ -131,20 +120,14 @@ public class ScanReportService {
         var open = new HashMap<UUID, Integer>();
         UUID after = null;
         while (!reviewIds.isEmpty()) {
-            var ids = queries.proofIds(workspaceId, reviewIds, after, READ_BATCH, null, true);
+            var ids = reviews.proofIds(workspaceId, reviewIds, after, READ_BATCH, null, true);
             if (ids.isEmpty()) break;
             var rows = results.findByWorkspaceIdAndIdIn(workspaceId, ids);
             var allowed = eligibility.permitted(workspaceId, rows);
             if (!allowed.isEmpty()) {
-                jdbc.sql("SELECT m.review_id,count(*) AS count FROM review_item m JOIN problem p ON"
-                                + " p.workspace_id=m.workspace_id AND p.result_id=m.result_id WHERE m.workspace_id=:ws"
-                                + " AND m.review_id=ANY(:scans) AND m.result_id=ANY(:results) GROUP BY m.review_id")
-                        .param("ws", workspaceId)
-                        .param("scans", new SqlArrayValue("uuid", reviewIds.toArray()))
-                        .param("results", new SqlArrayValue("uuid", allowed.toArray()))
-                        .query((rs, n) -> Map.entry(rs.getObject("review_id", UUID.class), rs.getInt("count")))
-                        .list()
-                        .forEach(e -> open.merge(e.getKey(), e.getValue(), Math::addExact));
+                this.rows
+                        .openCounts(workspaceId, reviewIds, allowed)
+                        .forEach(row -> open.merge(row.getReviewId(), Math.toIntExact(row.getCount()), Math::addExact));
             }
             rows.forEach(this::detach);
             if (ids.size() < READ_BATCH) break;
@@ -197,14 +180,8 @@ public class ScanReportService {
         eachProof(review, practiceId, true, rows -> {
             var allowed = eligibility.permitted(review, rows);
             if (allowed.isEmpty()) return;
-            count[0] = Math.addExact(
-                    count[0],
-                    Math.toIntExact(
-                            jdbc.sql("SELECT COUNT(*) FROM problem WHERE workspace_id=:ws AND result_id=ANY(:ids)")
-                                    .param("ws", review.getWorkspaceId())
-                                    .param("ids", new SqlArrayValue("uuid", allowed.toArray()))
-                                    .query((rs, n) -> rs.getLong(1))
-                                    .single()));
+            count[0] =
+                    Math.addExact(count[0], Math.toIntExact(this.rows.problemCount(review.getWorkspaceId(), allowed)));
         });
         return count[0];
     }
@@ -224,7 +201,8 @@ public class ScanReportService {
     private void eachProof(Review review, @Nullable Long practiceId, boolean openOnly, Consumer<List<Result>> read) {
         UUID after = null;
         while (true) {
-            var ids = queries.proofIds(review, after, READ_BATCH, practiceId, openOnly);
+            var ids = reviews.proofIds(
+                    review.getWorkspaceId(), List.of(review.getId()), after, READ_BATCH, practiceId, openOnly);
             if (ids.isEmpty()) return;
             var rows = results.findByWorkspaceIdAndIdIn(review.getWorkspaceId(), ids);
             read.accept(rows);
@@ -235,46 +213,21 @@ public class ScanReportService {
     }
 
     private ScanCountsDTO counts(Review review, @Nullable Long practiceId, boolean complete) {
-        String selected = practiceId == null ? "" : " AND m.practice_id=:practice";
-        var params = new HashMap<String, Object>();
-        params.put("ws", review.getWorkspaceId());
-        params.put("scan", review.getId());
-        if (practiceId != null) params.put("practice", practiceId);
-        var count = jdbc.sql("""
-            SELECT COUNT(DISTINCT m.item_id) AS files,COUNT(*) AS pairs,
-             COUNT(*) FILTER(WHERE m.state IN ('JUDGED','REUSED')) AS reviewed,
-             COUNT(*) FILTER(WHERE m.state='REUSED') AS reused,
-             COUNT(*) FILTER(WHERE r.outcome='MET') AS met,
-             COUNT(*) FILTER(WHERE r.outcome='NOT_MET') AS not_met,
-             COUNT(*) FILTER(WHERE r.outcome='DOES_NOT_APPLY') AS does_not_apply,
-             COUNT(*) FILTER(WHERE r.outcome='COULD_NOT_DETERMINE') AS could_not_determine,
-             COUNT(*) FILTER(WHERE m.state='WITHHELD') AS withheld,
-             COUNT(*) FILTER(WHERE m.state='LISTED') AS pending
-            FROM review_item m LEFT JOIN result r ON r.id=m.result_id AND r.workspace_id=m.workspace_id
-            WHERE m.workspace_id=:ws AND m.review_id=:scan
-            """ + selected)
-                .params(params)
-                .query((rs, n) -> new ScanCountsDTO(
-                        complete ? Math.toIntExact(rs.getLong("files")) : null,
-                        complete ? Math.toIntExact(rs.getLong("pairs")) : null,
-                        Math.toIntExact(rs.getLong("reviewed")),
-                        Math.toIntExact(rs.getLong("reused")),
-                        Math.toIntExact(rs.getLong("met")),
-                        Math.toIntExact(rs.getLong("not_met")),
-                        Math.toIntExact(rs.getLong("does_not_apply")),
-                        Math.toIntExact(rs.getLong("could_not_determine")),
-                        0,
-                        0,
-                        Math.toIntExact(rs.getLong("withheld")),
-                        review.getStatus().isTerminal() ? Math.toIntExact(rs.getLong("pending")) : 0))
-                .single();
-        int children = Math.toIntExact(
-                jdbc.sql("SELECT COUNT(*) FROM review_item m JOIN problem p ON p.result_id=m.result_id AND"
-                                + " p.workspace_id=m.workspace_id WHERE m.workspace_id=:ws AND m.review_id=:scan"
-                                + selected)
-                        .params(params)
-                        .query((rs, n) -> rs.getLong(1))
-                        .single());
+        var values = rows.counts(review.getWorkspaceId(), review.getId(), practiceId);
+        var count = new ScanCountsDTO(
+                complete ? Math.toIntExact(values.getFiles()) : null,
+                complete ? Math.toIntExact(values.getPairs()) : null,
+                Math.toIntExact(values.getReviewed()),
+                Math.toIntExact(values.getReused()),
+                Math.toIntExact(values.getMet()),
+                Math.toIntExact(values.getNotMet()),
+                Math.toIntExact(values.getDoesNotApply()),
+                Math.toIntExact(values.getCouldNotDetermine()),
+                0,
+                0,
+                Math.toIntExact(values.getWithheld()),
+                review.getStatus().isTerminal() ? Math.toIntExact(values.getPending()) : 0);
+        int children = Math.toIntExact(rows.childCount(review.getWorkspaceId(), review.getId(), practiceId));
         return new ScanCountsDTO(
                 count.files(),
                 count.practiceItemPairs(),
@@ -406,22 +359,20 @@ public class ScanReportService {
     }
 
     private List<ReasonCountDTO> reasons(Review review, ReviewItemState state) {
-        return jdbc.sql("SELECT COALESCE(reason,:fallback) AS reason,COUNT(*) AS count FROM review_item WHERE"
-                        + " workspace_id=:ws AND review_id=:scan AND state=:state GROUP BY"
-                        + " 1 ORDER BY 1")
-                .param("ws", review.getWorkspaceId())
-                .param("scan", review.getId())
-                .param("state", state.name())
-                .param(
-                        "fallback",
+        return rows
+                .reasons(
+                        review.getWorkspaceId(),
+                        review.getId(),
+                        state.name(),
                         review.getStopReason() == null
                                 ? "EXECUTION_INCOMPLETE"
                                 : review.getStopReason().name())
-                .query((rs, n) -> new ReasonCountDTO(
-                        rs.getString("reason"),
-                        rs.getString("reason").replace('_', ' ').toLowerCase(Locale.ROOT),
-                        Math.toIntExact(rs.getLong("count"))))
-                .list();
+                .stream()
+                .map(row -> new ReasonCountDTO(
+                        row.getReason(),
+                        row.getReason().replace('_', ' ').toLowerCase(Locale.ROOT),
+                        Math.toIntExact(row.getCount())))
+                .toList();
     }
 
     public static ReviewMethodDTO method(ReviewMethod method) {
@@ -455,10 +406,7 @@ public class ScanReportService {
                 .orElseThrow();
         if (!expired(review)) throw new IllegalStateException("The raw proof is still retained.");
         var frozen = recorded(review);
-        int count = jdbc.sql("DELETE FROM review_item WHERE workspace_id=:ws AND review_id=:scan")
-                .param("ws", workspaceId)
-                .param("scan", reviewId)
-                .update();
+        int count = rows.deleteReviewMembers(workspaceId, reviewId);
         review.setReport(json.valueToTree(new FrozenScanReport(
                 frozen.schemaVersion(),
                 frozen.listingComplete(),
@@ -478,53 +426,36 @@ public class ScanReportService {
     @Transactional
     public int eraseResultReferences(long workspaceId, Collection<UUID> resultIds) {
         if (resultIds.isEmpty()) return 0;
-        var ids = new SqlArrayValue("uuid", resultIds.toArray());
-        var affected = jdbc.sql("SELECT review_id,COUNT(*) AS count FROM review_item WHERE workspace_id=:ws AND"
-                        + " result_id=ANY(:ids) GROUP BY review_id ORDER BY review_id")
-                .param("ws", workspaceId)
-                .param("ids", ids)
-                .query((rs, n) -> Map.entry(rs.getObject(1, UUID.class), rs.getInt(2)))
-                .list();
+        var ids = resultIds.toArray(UUID[]::new);
+        var affected = rows.affectedReviewCounts(workspaceId, ids);
         var frozen = new HashMap<UUID, FrozenScanReport>();
         for (var entry : affected) {
-            var review =
-                    reviews.lockByIdAndWorkspaceId(entry.getKey(), workspaceId).orElseThrow();
-            if (review.getKind() == ReviewKind.SCAN) frozen.put(entry.getKey(), recorded(review));
+            var review = reviews.lockByIdAndWorkspaceId(entry.getReviewId(), workspaceId)
+                    .orElseThrow();
+            if (review.getKind() == ReviewKind.SCAN) frozen.put(entry.getReviewId(), recorded(review));
         }
-        jdbc.sql("UPDATE review_item m SET detail=jsonb_set(m.detail,'{problemComparison}',COALESCE((SELECT"
-                        + " jsonb_agg(CASE WHEN (c->>'previousProblemId')::uuid IN (SELECT id FROM problem WHERE"
-                        + " workspace_id=:ws AND result_id=ANY(:ids)) THEN c-'previousProblemId' ELSE c END) FROM"
-                        + " jsonb_array_elements(COALESCE(m.detail->'problemComparison','[]'::jsonb)) c WHERE"
-                        + " (c->>'problemId')::uuid NOT IN (SELECT id FROM problem WHERE workspace_id=:ws AND"
-                        + " result_id=ANY(:ids))),'[]'::jsonb)) WHERE m.workspace_id=:ws AND"
-                        + " jsonb_exists(m.detail,'problemComparison')")
-                .param("ws", workspaceId)
-                .param("ids", new SqlArrayValue("uuid", resultIds.toArray()))
-                .update();
-        int deleted = jdbc.sql("DELETE FROM review_item WHERE workspace_id=:ws AND result_id=ANY(:ids)")
-                .param("ws", workspaceId)
-                .param("ids", new SqlArrayValue("uuid", resultIds.toArray()))
-                .update();
-        for (var entry : affected)
-            if (frozen.containsKey(entry.getKey())) {
-                var review = reviews.findByIdAndWorkspaceId(entry.getKey(), workspaceId)
-                        .orElseThrow();
-                var f = frozen.get(entry.getKey());
-                review.setReport(json.valueToTree(new FrozenScanReport(
-                        f.schemaVersion(),
-                        f.listingComplete(),
-                        f.baselineScanId(),
-                        f.comparison(),
-                        f.recordedCounts(),
-                        f.problemChanges(),
-                        f.practices(),
-                        f.withheldReasons(),
-                        f.notReviewedReasons(),
-                        f.removalGuard(),
-                        f.expired(),
-                        f.expiredProofPairs(),
-                        f.redactedProofPairs() + entry.getValue())));
-            }
+        rows.eraseProblemComparisons(workspaceId, ids);
+        int deleted = rows.deleteResultMembers(workspaceId, ids);
+        for (var entry : affected) {
+            var f = frozen.get(entry.getReviewId());
+            if (f == null) continue;
+            var review = reviews.findByIdAndWorkspaceId(entry.getReviewId(), workspaceId)
+                    .orElseThrow();
+            review.setReport(json.valueToTree(new FrozenScanReport(
+                    f.schemaVersion(),
+                    f.listingComplete(),
+                    f.baselineScanId(),
+                    f.comparison(),
+                    f.recordedCounts(),
+                    f.problemChanges(),
+                    f.practices(),
+                    f.withheldReasons(),
+                    f.notReviewedReasons(),
+                    f.removalGuard(),
+                    f.expired(),
+                    f.expiredProofPairs(),
+                    Math.addExact(f.redactedProofPairs(), Math.toIntExact(entry.getCount())))));
+        }
         return deleted;
     }
 }

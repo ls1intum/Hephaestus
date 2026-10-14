@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.slack.domain;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import jakarta.persistence.QueryHint;
 import java.time.Instant;
 import java.util.Collection;
@@ -297,4 +298,15 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
             @Param("channelId") String channelId,
             @Param("threadTs") String threadTs,
             @Param("watermark") String watermark);
+
+    @Modifying
+    @Transactional
+    @WorkspaceAgnostic("Verified account absorption moves its author references across every workspace")
+    @Query(
+            value = "UPDATE slack_message SET author_account_id=:claimed WHERE author_account_id=:unclaimed",
+            nativeQuery = true)
+    int absorbAuthorAccount(@Param("claimed") long claimedAccountId, @Param("unclaimed") long unclaimedAccountId);
+
+    @WorkspaceAgnostic("Account absorption verifies source references before removing source memberships")
+    boolean existsByAuthorAccountId(Long accountId);
 }

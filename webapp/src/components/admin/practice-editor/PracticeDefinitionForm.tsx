@@ -5,6 +5,7 @@ import { UnsavedPracticeDraft } from "./unsaved-practice-draft";
 
 import type {
 	PracticeDefinition,
+	PracticeDefinitionInput,
 	PracticeDefinitionOptions,
 	PracticeItemTypeOption,
 } from "@/api/types.gen";
@@ -79,7 +80,7 @@ export interface PracticeDefinitionGroupOption {
 }
 
 /**
- * One practice as both editor consoles read and write it: its identity, its group, and the one
+ * One saved practice as both editor consoles read it: its identity, its group, and the one
  * closed definition. Feedback mode and review scope are workspace settings and never enter it.
  */
 export interface PracticeDefinitionValue {
@@ -90,6 +91,10 @@ export interface PracticeDefinitionValue {
 	groupSlug: string | null;
 	definition: PracticeDefinition;
 }
+
+export type PracticeDefinitionSubmission = Omit<PracticeDefinitionValue, "definition"> & {
+	definition: PracticeDefinitionInput;
+};
 
 interface PracticeDefinitionFormBaseProps {
 	groups: readonly PracticeDefinitionGroupOption[];
@@ -105,7 +110,7 @@ interface PracticeDefinitionFormBaseProps {
 	 * from submit until it hears otherwise, so a caller navigating straight after an awaited save is
 	 * not asked to discard what it just saved. Returning nothing leaves the guard as it is.
 	 */
-	onSubmit: (value: PracticeDefinitionValue) => void | Promise<void>;
+	onSubmit: (value: PracticeDefinitionSubmission) => void | Promise<void>;
 	definitionOptions: PracticeDefinitionOptions;
 	/**
 	 * A link to the AI models page, rendered as *AI models* in the practice script's help. Only a

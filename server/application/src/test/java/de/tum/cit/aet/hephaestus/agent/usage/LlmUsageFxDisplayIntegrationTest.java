@@ -144,7 +144,7 @@ class LlmUsageFxDisplayIntegrationTest extends AbstractWorkspaceIntegrationTest 
     private void seedEvent(Workspace workspace, String cost) {
         LlmUsageEvent event = new LlmUsageEvent();
         event.setId(UUID.randomUUID());
-        event.setWorkspace(workspace);
+        event.setWorkspaceId(workspace.getId());
         event.setJobType("PRACTICE_REVIEW");
         event.setSourceType(UsageSourceType.REVIEW_JOB);
         event.setSourceId(UUID.randomUUID());

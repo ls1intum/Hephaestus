@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import type { ReviewRequestOutcome } from "@/api/types.gen";
+import { ITEM_EVENT_REASON_SENTENCES } from "@/components/practice-vocabulary/item-event-defs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export interface TraceRefusalAlertProps {
@@ -24,9 +25,11 @@ export function TraceRefusalAlert({ refusal, fix }: TraceRefusalAlertProps) {
 		<Alert variant="warning">
 			<AlertTitle>No review was started</AlertTitle>
 			<AlertDescription>
-				{/* Verbatim, and the fix link is keyed on the coded reason rather than the prose:
-				    the prose is the server's to change. */}
-				<span>{refusal.reasonDescription ?? "No reason was given."}</span>
+				<span>
+					{refusal.reason === null
+						? "No reason was given."
+						: ITEM_EVENT_REASON_SENTENCES[refusal.reason]}
+				</span>
 				{fix}
 			</AlertDescription>
 		</Alert>

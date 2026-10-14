@@ -18,7 +18,6 @@ import type { ReviewedByKind } from "./review-settings";
 import {
 	HUMAN_REASON_FIELD_ID,
 	limitFieldId,
-	limitWithText,
 	MAX_REASON_LENGTH,
 	REVIEWED_BY_DESCRIPTIONS,
 	REVIEWED_BY_FIELD_ID,
@@ -127,7 +126,7 @@ export function PracticeReviewedByEditor({
 						disabled={disabled}
 						value={value.humanReason.description}
 						onChange={(event) =>
-							onChange({ ...value, humanReason: limitWithText(event.target.value) })
+							onChange({ ...value, humanReason: { description: event.target.value } })
 						}
 						maxLength={MAX_REASON_LENGTH}
 						aria-invalid={reasonInvalid || undefined}
@@ -151,8 +150,6 @@ export function PracticeReviewedByEditor({
 						</p>
 					</div>
 					{value.limits.map((limit, index) => {
-						// The row's position is its identity: the code follows the text and would change
-						// under the caret on every keystroke.
 						const rowId = String(index);
 						return (
 							<div key={rowId} className="grid gap-3 rounded-lg border p-4 sm:grid-cols-[1fr_auto]">
@@ -168,7 +165,7 @@ export function PracticeReviewedByEditor({
 											onChange({
 												...value,
 												limits: value.limits.map((item, itemIndex) =>
-													itemIndex === index ? limitWithText(event.target.value) : item,
+													itemIndex === index ? { description: event.target.value } : item,
 												),
 											})
 										}
@@ -202,7 +199,7 @@ export function PracticeReviewedByEditor({
 						variant="outline"
 						size="sm"
 						onClick={() => {
-							onChange({ ...value, limits: [...value.limits, limitWithText("")] });
+							onChange({ ...value, limits: [...value.limits, { description: "" }] });
 							focusLimit(value.limits.length);
 						}}
 					>

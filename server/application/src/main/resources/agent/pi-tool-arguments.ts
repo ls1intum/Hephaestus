@@ -46,7 +46,7 @@ function citation(value: unknown, where: string): unknown {
 	if (!isRecord(fields) || Array.isArray(fields)) {
 		return value;
 	}
-	for (const field of ["side", "revision", "quote"]) {
+	for (const field of ["side", "commit", "quote"]) {
 		const text = fields[field];
 		if (text != null && typeof text !== "string") {
 			throw new Error(`${where} ${field} must be a string or null`);

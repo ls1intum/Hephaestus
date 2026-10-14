@@ -285,7 +285,7 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
     private void keepCompositionInputs(DerivedConversation derived) {
         jdbc.update(
                 "UPDATE review SET"
-                        + " public_review_at=CURRENT_TIMESTAMP,narrative='PUBLIC-COMPLETION-CANARY'"
+                        + " public_review_at=CURRENT_TIMESTAMP"
                         + " WHERE id=(SELECT review_id FROM review_job WHERE id=?)",
                 derived.jobId());
 
@@ -724,6 +724,7 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
                 providers.saveAndFlush(new IdentityProvider(IdentityProviderType.SLACK, "https://slack.com"));
         User target = users.saveAndFlush(TestUserFactory.createUser(42L, "cached-person", scm));
         Workspace workspace = workspaces.saveAndFlush(WorkspaceTestFixtures.activeWorkspace("cached-person"));
+        membership(workspace, target);
         message(workspace, "TCACHE", "100.1", "100.1", "UCACHE", target, "Captured contribution");
         PersonIdentity gitlabKey = new PersonIdentity(Objects.requireNonNull(scm.getId()), "42", null);
         PersonIdentity slackKey = new PersonIdentity(Objects.requireNonNull(slack.getId()), "UCACHE", "TCACHE");
@@ -837,20 +838,25 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
         assertThat(export.path("stores").path("feedback")).isEmpty();
         assertThat(export.path("stores").path("feedback_copy")).isEmpty();
         assertThat(export.path("stores").path("chat_message_feedback_copy")).isEmpty();
-        assertThat(export.path("stores").path("person_evidence_copy")).hasSize(2);
+        assertThat(export.path("stores").path("person_evidence_copy"))
+                .extracting(row -> row.path("jobId").asString())
+                .containsExactlyInAnyOrderElementsOf(
+                        copiedJobs.stream().map(UUID::toString).toList());
         Map<String, Long> counts = mapper.readValue(preview.request().getCountsJson(), new TypeReference<>() {});
         assertThat(counts.get("person_evidence_copy")).isEqualTo(2L);
         assertThat(counts.get("review_composition_basis")).isEqualTo(2L);
         assertThat(counts.get("review")).isNotNull();
-        assertThat(export.path("stores").path("review").toString()).doesNotContain("PUBLIC-COMPLETION-CANARY");
         assertThat(export.path("stores").path("review_composition_basis").toString())
                 .doesNotContain("ORIGINAL-BASIS-CANARY");
-        assertThat(export.path("stores").path("review_job")).isEmpty();
-        assertThat(export.path("stores").path("person_evidence_copy")).isEmpty();
+        assertThat(export.path("stores").path("review_job"))
+                .extracting(row -> row.path("id").asString())
+                .containsExactlyInAnyOrderElementsOf(
+                        copiedJobs.stream().map(UUID::toString).toList());
+        assertThat(export.path("stores").path("review_job"))
+                .allSatisfy(row -> assertThat(row.has("capture")).isFalse());
         assertThat(export.path("stores").path("chat_thread_runtime_journal")).isEmpty();
         assertThat(export.toString())
                 .doesNotContain(
-                        "PUBLIC-COMPLETION-CANARY",
                         "OTHER-PROFILE-CANARY",
                         "credential-canary",
                         "Practice guidance for developer",
@@ -996,8 +1002,14 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
     }
 
     private ConversationFeedbackCopy seedFeedbackCopy(DerivedConversation target, DerivedConversation other) {
-        var thread =
-                chatMessageRepository.findById(other.messageId()).orElseThrow().getThread();
+        var threadId = chatMessageRepository
+                .findById(other.messageId())
+                .orElseThrow()
+                .getThread()
+                .getId();
+        var thread = chatThreadRepository
+                .findByIdAndWorkspaceId(threadId, other.workspaceId())
+                .orElseThrow();
         ChatMessage copied = new ChatMessage();
         copied.setId(UUID.randomUUID());
         copied.setThread(thread);

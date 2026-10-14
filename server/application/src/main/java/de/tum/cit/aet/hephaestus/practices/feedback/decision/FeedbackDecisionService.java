@@ -10,11 +10,11 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackGate;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSendQueue;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSendRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.decision.dto.CreateFeedbackDecisionRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheckStage;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackChecks;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDecisionAction;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDecisionInput;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDecisionReason;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackSendAction;
@@ -53,30 +53,9 @@ public class FeedbackDecisionService {
 
     @Transactional
     public FeedbackDecision decide(
-            long workspaceId, UUID feedbackId, long actorAccountId, CreateFeedbackDecisionRequestDTO request) {
-        return recordDecision(workspaceId, feedbackId, actorAccountId, request);
-    }
-
-    @Transactional
-    public FeedbackDecision decide(
-            long workspaceId,
-            UUID feedbackId,
-            long actorAccountId,
-            FeedbackDecisionAction action,
-            @Nullable FeedbackDecisionReason reason,
-            @Nullable String note,
-            @Nullable String contentDigest) {
-        return recordDecision(
-                workspaceId,
-                feedbackId,
-                actorAccountId,
-                new CreateFeedbackDecisionRequestDTO(action, reason, note, contentDigest));
-    }
-
-    private FeedbackDecision recordDecision(
-            long workspaceId, UUID feedbackId, long actorAccountId, CreateFeedbackDecisionRequestDTO request) {
+            long workspaceId, UUID feedbackId, long actorAccountId, FeedbackDecisionInput request) {
         var action = request.action();
-        var reason = request.reasonCode();
+        var reason = request.reason();
         var note = request.note();
         var contentDigest = request.contentDigest();
         if (actorAccountId <= 0) throw new IllegalArgumentException("A decision requires an authenticated account.");

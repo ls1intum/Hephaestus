@@ -295,7 +295,8 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
     }
 
-    // A person's request for changes comes from their system note; detailed_merge_status describes the whole merge request.
+    // A person's request for changes comes from their system note; detailed_merge_status describes the whole merge
+    // request.
     @Nested
     class ReviewDecisions {
 

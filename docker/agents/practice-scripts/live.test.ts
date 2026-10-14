@@ -111,12 +111,18 @@ async function warmUp(): Promise<void> {
 	await Promise.all(
 		calls.map(async ([operation, body]) => {
 			const { url, key } = upstream("chat", operation);
-			await fetch(url, {
-				method: "POST",
-				headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
-				body: JSON.stringify(body),
-				signal: AbortSignal.timeout(170_000),
-			});
+			try {
+				const response = await fetch(url, {
+					method: "POST",
+					headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
+					body: JSON.stringify(body),
+					signal: AbortSignal.timeout(170_000),
+				});
+				assert.ok(response.ok, `Live ${operation} warm-up returned HTTP ${response.status}`);
+				await response.arrayBuffer();
+			} catch (error) {
+				throw new Error(`Live ${operation} warm-up failed`, { cause: error });
+			}
 		}),
 	);
 }
@@ -174,6 +180,10 @@ async function runLive(slug: string, source: string, bound: BoundModels): Promis
 	});
 	try {
 		const { root, practices } = await stagePracticeScripts({ [slug]: source }, {});
+		await cp(
+			path.join(import.meta.dirname, "fixtures/comment-kinds.ts"),
+			path.join(practices, "comment-kinds.ts"),
+		);
 		roots.push(root);
 		const repo = path.join(root, "repo");
 		await mkdir(path.join(repo, "lib"), { recursive: true });
@@ -206,7 +216,7 @@ async function runLive(slug: string, source: string, bound: BoundModels): Promis
 			{
 				slug,
 				inputs,
-				files: { head: { revision: COMMIT }, change },
+				files: { head: { commit: COMMIT }, change },
 				now: new Date().toISOString(),
 				deadline: Date.now() + PROGRAM_MS,
 			},

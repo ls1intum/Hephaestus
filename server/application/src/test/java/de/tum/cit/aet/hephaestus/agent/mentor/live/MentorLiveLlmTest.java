@@ -31,8 +31,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -72,6 +74,7 @@ class MentorLiveLlmTest {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private static final Duration TURN_TIMEOUT = Duration.ofSeconds(90);
+    private static final Pattern HTTP_ERROR_STATUS = Pattern.compile("\\b[45]\\d{2}\\b");
 
     private static final Path RUNNER =
             Path.of("src", "main", "resources", "agent", "pi-mentor-runner.ts").toAbsolutePath();
@@ -340,11 +343,18 @@ class MentorLiveLlmTest {
         TranslatorState state = new TranslatorState(assistantMessageId);
         List<UIMessageChunk> chunks = new ArrayList<>();
         var done = new CompletableFuture<Void>();
+        var events = new ConcurrentLinkedQueue<String>();
         sandbox.subscribe(
                 frame -> {
                     if (!isThreadEvent(frame, threadId)) return;
                     JsonNode event = frame.path("params").path("event");
-                    chunks.addAll(translator.translate(event, state));
+                    events.add(eventLabel(event));
+                    try {
+                        chunks.addAll(translator.translate(event, state));
+                    } catch (RuntimeException error) {
+                        done.completeExceptionally(error);
+                        return;
+                    }
                     if ("agent_end".equals(event.path("type").asString())) {
                         done.complete(null);
                     }
@@ -355,7 +365,7 @@ class MentorLiveLlmTest {
                 threadId,
                 "Use fetch_context with path inputs/context/recent_authored_work.json, then tell me the PR number and"
                         + " title. You MUST use fetch_context. Do NOT guess.");
-        done.get(TURN_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+        awaitTurn(done, events);
 
         // At least one tool was invoked.
         List<UIMessageChunk.ToolInputStart> toolStarts = chunks.stream()
@@ -363,7 +373,9 @@ class MentorLiveLlmTest {
                 .map(UIMessageChunk.ToolInputStart.class::cast)
                 .toList();
         assertThat(toolStarts)
-                .as("Heph must invoke fetch_context to answer the question")
+                .as(
+                        "Heph must invoke fetch_context to answer the question; terminal messages: %s",
+                        terminalEvents(events))
                 .isNotEmpty();
 
         List<String> toolNames =
@@ -481,13 +493,20 @@ class MentorLiveLlmTest {
         TranslatorState state = new TranslatorState(UUID.randomUUID());
         List<UIMessageChunk> chunks = new ArrayList<>();
         var done = new CompletableFuture<Void>();
+        var events = new ConcurrentLinkedQueue<String>();
         // Use a per-turn subscription so collected chunks are scoped to this turn only.
         var unsubscribe = activeSandbox()
                 .subscribe(
                         frame -> {
                             if (!isThreadEvent(frame, threadId)) return;
                             JsonNode event = frame.path("params").path("event");
-                            chunks.addAll(translator.translate(event, state));
+                            events.add(eventLabel(event));
+                            try {
+                                chunks.addAll(translator.translate(event, state));
+                            } catch (RuntimeException error) {
+                                done.completeExceptionally(error);
+                                return;
+                            }
                             if ("agent_end".equals(event.path("type").asString())) {
                                 done.complete(null);
                             }
@@ -495,14 +514,53 @@ class MentorLiveLlmTest {
                         () -> {});
         try {
             driver.prompt(threadId, prompt);
-            done.get(TURN_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
-            return chunks.stream()
+            awaitTurn(done, events);
+            String text = chunks.stream()
                     .filter(UIMessageChunk.TextDelta.class::isInstance)
                     .map(UIMessageChunk.TextDelta.class::cast)
                     .map(UIMessageChunk.TextDelta::delta)
                     .reduce("", String::concat);
+            assertThat(text)
+                    .as("mentor turn produced text; terminal messages: %s", terminalEvents(events))
+                    .isNotBlank();
+            return text;
         } finally {
             unsubscribe.dispose();
+        }
+    }
+
+    private static List<String> terminalEvents(ConcurrentLinkedQueue<String> events) {
+        return events.stream().filter(event -> event.startsWith("message_end:")).toList();
+    }
+
+    private static String eventLabel(JsonNode event) {
+        var message = event.path("message");
+        String error = message.path("errorMessage").asString("");
+        return event.path("type").asString() + ":"
+                + event.path("assistantMessageEvent").path("type").asString("")
+                + ":role=" + message.path("role").asString("")
+                + ":stop=" + message.path("stopReason").asString("")
+                + ":errorChars=" + error.length()
+                + ":errorStatuses="
+                + HTTP_ERROR_STATUS
+                        .matcher(error)
+                        .results()
+                        .map(match -> match.group())
+                        .limit(3)
+                        .toList();
+    }
+
+    private void awaitTurn(CompletableFuture<Void> done, ConcurrentLinkedQueue<String> events) throws Exception {
+        try {
+            done.get(TURN_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+        } catch (TimeoutException timeout) {
+            throw new AssertionError(
+                    "No terminal mentor event within " + TURN_TIMEOUT + "; runnerAlive="
+                            + activeSandbox().process().isAlive() + "; lastEvents="
+                            + events.stream()
+                                    .skip(Math.max(0, events.size() - 12))
+                                    .toList(),
+                    timeout);
         }
     }
 

@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheckStage;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDecisionAction;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDecisionInput;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackIds;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackResolution;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackSendState;
@@ -44,10 +45,8 @@ class FeedbackDecisionErasureIntegrationTest extends AbstractFeedbackDeliveryInt
                 workspace.getId(),
                 feedbackId,
                 developerId,
-                FeedbackDecisionAction.APPROVE,
-                null,
-                null,
-                digests.current(workspace.getId(), feedbackId));
+                new FeedbackDecisionInput(
+                        FeedbackDecisionAction.APPROVE, null, null, digests.current(workspace.getId(), feedbackId)));
         sender.send(workspace.getId(), feedbackId);
         assertThat(current().getState()).isEqualTo(FeedbackState.DELIVERED);
         assertThat(provider.summaryCreates).isEqualTo(1);
@@ -66,7 +65,10 @@ class FeedbackDecisionErasureIntegrationTest extends AbstractFeedbackDeliveryInt
         prepare(true);
         var approvedDigest = digests.current(workspace.getId(), feedbackId);
         decisionService.decide(
-                workspace.getId(), feedbackId, developerId, FeedbackDecisionAction.APPROVE, null, null, approvedDigest);
+                workspace.getId(),
+                feedbackId,
+                developerId,
+                new FeedbackDecisionInput(FeedbackDecisionAction.APPROVE, null, null, approvedDigest));
         provider.fallback = true;
         sender.send(workspace.getId(), feedbackId);
         assertThat(current().getState()).isEqualTo(FeedbackState.DELIVERED);
@@ -96,10 +98,11 @@ class FeedbackDecisionErasureIntegrationTest extends AbstractFeedbackDeliveryInt
                         workspace.getId(),
                         feedbackId,
                         developerId,
-                        FeedbackDecisionAction.REJECT,
-                        null,
-                        "Remove this guidance.",
-                        digests.current(workspace.getId(), feedbackId)))
+                        new FeedbackDecisionInput(
+                                FeedbackDecisionAction.REJECT,
+                                null,
+                                "Remove this guidance.",
+                                digests.current(workspace.getId(), feedbackId))))
                 .isInstanceOf(ResponseStatusException.class);
         assertThatThrownBy(() -> custody.requireAcknowledged(workspace.getId(), List.of(feedbackId)))
                 .isInstanceOf(ResponseStatusException.class);
@@ -132,10 +135,7 @@ class FeedbackDecisionErasureIntegrationTest extends AbstractFeedbackDeliveryInt
                 workspace.getId(),
                 feedbackId,
                 developerId,
-                FeedbackDecisionAction.WITHDRAW,
-                null,
-                "The context needs review.",
-                null);
+                new FeedbackDecisionInput(FeedbackDecisionAction.WITHDRAW, null, "The context needs review.", null));
         assertThat(transactions.fence(
                         workspace.getId(),
                         feedbackId,
@@ -162,10 +162,7 @@ class FeedbackDecisionErasureIntegrationTest extends AbstractFeedbackDeliveryInt
                 workspace.getId(),
                 feedbackId,
                 developerId,
-                FeedbackDecisionAction.RESTORE,
-                null,
-                "The context is confirmed.",
-                null);
+                new FeedbackDecisionInput(FeedbackDecisionAction.RESTORE, null, "The context is confirmed.", null));
         assertThat(sends.findById(feedbackId).orElseThrow().getState()).isEqualTo(FeedbackSendState.PENDING);
         sender.send(workspace.getId(), feedbackId);
         assertThat(current().getState()).isEqualTo(FeedbackState.DELIVERED);
@@ -181,20 +178,14 @@ class FeedbackDecisionErasureIntegrationTest extends AbstractFeedbackDeliveryInt
                 workspace.getId(),
                 feedbackId,
                 developerId,
-                FeedbackDecisionAction.WITHDRAW,
-                null,
-                "The context needs review.",
-                null);
+                new FeedbackDecisionInput(FeedbackDecisionAction.WITHDRAW, null, "The context needs review.", null));
         newSender().send(workspace.getId(), feedbackId);
         assertThat(provider.physical.get(copy.getId())).isEqualTo("This feedback was withdrawn.");
         decisionService.decide(
                 workspace.getId(),
                 feedbackId,
                 developerId,
-                FeedbackDecisionAction.RESTORE,
-                null,
-                "The basis is confirmed.",
-                null);
+                new FeedbackDecisionInput(FeedbackDecisionAction.RESTORE, null, "The basis is confirmed.", null));
         newSender().send(workspace.getId(), feedbackId);
         assertThat(provider.physical.get(copy.getId())).isEqualTo(current().getBody());
         assertThat(provider.summaryCreates).isEqualTo(1);

@@ -24,6 +24,11 @@ BEGIN
   WHERE (c.state='POSTED' OR c.write_started_at IS NOT NULL) AND s.action='POST' AND s.state='PENDING') THEN
   RAISE EXCEPTION 'Existing or uncertain copy is queued for a repeat POST';
  END IF;
+ IF EXISTS (SELECT FROM feedback WHERE id='00000000-0000-0000-0000-000000992161')
+ AND NOT EXISTS (SELECT FROM feedback_copy WHERE id='00000000-0000-0000-0000-000000992171'
+  AND state='POSTED' AND external_ref='provider:123') THEN
+  RAISE EXCEPTION 'Delivered source receipt was not preserved';
+ END IF;
  IF EXISTS (SELECT FROM chat_message cm JOIN chat_thread t ON t.id=cm.thread_id WHERE cm.workspace_id IS DISTINCT FROM t.workspace_id) THEN
   RAISE EXCEPTION 'Message changed workspace';
  END IF;

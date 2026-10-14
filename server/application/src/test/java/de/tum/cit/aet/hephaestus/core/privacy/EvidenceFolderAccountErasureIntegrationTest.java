@@ -65,6 +65,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -85,6 +86,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 class EvidenceFolderAccountErasureIntegrationTest extends BaseIntegrationTest {
+    private final AtomicLong sourceIds = new AtomicLong();
+
     @Autowired
     private PracticeModelTestFixtures modelFixtures;
 
@@ -850,7 +853,10 @@ class EvidenceFolderAccountErasureIntegrationTest extends BaseIntegrationTest {
 
     private ReviewJob jobIn(Workspace workspace) {
         var work = modelFixtures.work(
-                workspace, "copy-custody-" + UUID.randomUUID().toString().substring(0, 8), "chat.thread", 1L);
+                workspace,
+                "copy-custody-" + UUID.randomUUID().toString().substring(0, 8),
+                "chat.thread",
+                sourceIds.incrementAndGet());
         var job = work.job();
         job.setStatus(ReviewJobStatus.RUNNING);
         job.setWorkerId("worker-native-id");

@@ -116,8 +116,8 @@ class CandidateEvidenceVerifier {
                         citation);
             }
             capability(contract.citation().side(), citation.side() != null, "side");
-            capability(contract.citation().revision(), citation.revision() != null, "revision");
-            if (verifier == null && (citation.side() != null || citation.revision() != null)) {
+            capability(contract.citation().commit(), citation.commit() != null, "commit");
+            if (verifier == null && (citation.side() != null || citation.commit() != null)) {
                 throw new Unverified(
                         CandidateRefusal.BASIS_REVISION_UNSUPPORTED,
                         "No item verifier supports this citation reference",
@@ -135,8 +135,8 @@ class CandidateEvidenceVerifier {
             }
             String path = citation.path();
             CitationSide side = citation.side() != null ? citation.side() : CitationSide.NEW;
-            String revision = citation.revision() != null ? citation.revision() : null;
-            var proof = captured.resolve(source, path, side, revision);
+            String commit = citation.commit() != null ? citation.commit() : null;
+            var proof = captured.resolve(source, path, side, commit);
             String quote = citation.quote();
             var text = files.readText(job, proof.stagedPath(), proof.sha256())
                     .orElseThrow(() -> new Unverified(
@@ -157,7 +157,7 @@ class CandidateEvidenceVerifier {
                     sourcePath,
                     path,
                     citation.side(),
-                    revision,
+                    commit,
                     firstLine,
                     lastLine,
                     quote,
@@ -166,8 +166,8 @@ class CandidateEvidenceVerifier {
                             proof.sha256(),
                             ProvenanceDigest.sha256Hex(quote.getBytes(StandardCharsets.UTF_8))));
             verified.put(citation, annotated);
-            locations.put(citation, new QuoteLocation(proof.stagedPath(), side, revision, firstLine, lastLine));
-            checks.add(new CitationToCheck(i, source.value(), path, side, revision, firstLine, lastLine, quote));
+            locations.put(citation, new QuoteLocation(proof.stagedPath(), side, commit, firstLine, lastLine));
+            checks.add(new CitationToCheck(i, source.value(), path, side, commit, firstLine, lastLine, quote));
         }
         var example = candidate.example();
         if (example != null) {
@@ -250,11 +250,11 @@ class CandidateEvidenceVerifier {
     }
 
     private record QuoteLocation(
-            String stagedPath, CitationSide side, @Nullable String revision, int startLine, int endLine) {
+            String stagedPath, CitationSide side, @Nullable String commit, int startLine, int endLine) {
         boolean overlaps(QuoteLocation other) {
             return stagedPath.equals(other.stagedPath)
                     && side == other.side
-                    && Objects.equals(revision, other.revision)
+                    && Objects.equals(commit, other.commit)
                     && startLine <= other.endLine
                     && other.startLine <= endLine;
         }

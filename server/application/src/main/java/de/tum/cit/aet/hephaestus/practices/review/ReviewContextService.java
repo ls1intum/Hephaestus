@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.core.security.UserViewContextHolder;
 import de.tum.cit.aet.hephaestus.practices.review.dto.ReviewContextDTO;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import de.tum.cit.aet.hephaestus.workspace.authorization.WorkspaceAccessService;
 import java.net.URI;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,7 @@ public class ReviewContextService {
     private final ProductReferenceQuery references;
     private final ReviewRequestService requests;
     private final WorkspaceRepository workspaces;
+    private final WorkspaceAccessService access;
 
     public ReviewContextDTO resolve(long workspaceId, String url) {
         URI uri;
@@ -37,13 +39,14 @@ public class ReviewContextService {
         var item =
                 items.atUrl(workspaceId, canonical).orElseThrow(() -> new EntityNotFoundException(NO_WORK_AT_ADDRESS));
         var account = SecurityUtils.getCurrentAccountId().orElseThrow();
-        boolean allowed =
-                UserViewContextHolder.get() == null && requests.mayRequest(workspaceId, items.pin(item, null), account);
+        boolean activeUserView = UserViewContextHolder.get() != null;
+        boolean allowed = !activeUserView && requests.mayRequest(workspaceId, items.pin(item, null), account);
         return new ReviewContextDTO(
                 Long.toString(workspaceId),
                 workspaces.findById(workspaceId).orElseThrow().getWorkspaceSlug(),
                 references.items(workspaceId, List.of(item.itemId())).get(item.itemId()),
                 allowed,
+                !activeUserView && access.isAdmin(),
                 allowed ? null : "Only the author or an assignee, or a workspace admin, can request this review.");
     }
 }

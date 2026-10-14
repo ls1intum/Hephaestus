@@ -276,33 +276,6 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    void contribute_moreDecisionsThanCap_keepsLatestApprove() throws Exception {
-        List<PullRequestReview> newestFirst = new ArrayList<>();
-        newestFirst.add(review(PullRequestReview.State.APPROVED, "reviewer-a", Instant.parse("2025-06-30T23:59:00Z")));
-        // Followed by MAX_DECISIONS + 5 older CHANGES_REQUESTED rows (descending timestamps).
-        for (int i = 0; i < 10_000 + 5; i++) {
-            newestFirst.add(review(
-                    PullRequestReview.State.CHANGES_REQUESTED,
-                    "reviewer-a",
-                    Instant.parse("2025-06-01T10:00:00Z").minusSeconds(i)));
-        }
-        when(reviewRepository.findRecentByPullRequestIdWithAuthor(any(), any(), any()))
-                .thenReturn(newestFirst);
-
-        Map<String, byte[]> files = new HashMap<>();
-        files.putAll(provider.capture(request(metadataWithPr()), provider.sourceKinds())
-                .files());
-
-        JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
-        JsonNode decisions = out.get("reviewDecisions");
-        assertThat(decisions).hasSize(newestFirst.size());
-        JsonNode last = decisions.get(decisions.size() - 1);
-        assertThat(last.get("state").asString()).isEqualTo("APPROVED");
-        assertThat(last.get("submittedAt").asString()).isEqualTo("2025-06-30T23:59:00Z");
-        assertThat(out.get("truncated").asBoolean()).isFalse();
-    }
-
-    @Test
     void shouldMarkADecisionBotWhenTheAdapterStoredItsAuthorAsOne() throws Exception {
         User token = user("project_7_bot_a1b2");
         token.setType(User.Type.BOT);
@@ -464,23 +437,6 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    void contribute_moreThreadsThanCap_marksTheBoundedCaptureTruncated() throws Exception {
-        List<PullRequestReviewThread> many = new ArrayList<>();
-        int total = 10_000 + 7;
-        for (int i = 0; i < total; i++) {
-            many.add(thread(PullRequestReviewThread.State.UNRESOLVED, "src/File" + i + ".swift", i, null));
-        }
-        stubThreads(many);
-
-        var captured = provider.capture(request(metadataWithPr()), provider.sourceKinds());
-
-        JsonNode out = objectMapper.readTree(captured.files().get(FILE_KEY));
-        assertThat(out.get("threads")).hasSize(total);
-        assertThat(out.get("truncated").asBoolean()).isFalse();
-        assertThat(captured.completeness()).containsValue(SourceCompleteness.COMPLETE);
-    }
-
-    @Test
     void shouldPropagateProgrammingFailuresWithoutRecordingCaptureRefusals() {
         var failure = new NullPointerException("Invalid review mapping");
         when(reviewRepository.findRecentByPullRequestIdWithAuthor(any(), any(), any()))
@@ -492,11 +448,6 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
                         .files()))
                 .isSameAs(failure);
         assertThat(files).doesNotContainKey(FILE_KEY);
-    }
-
-    @Test
-    void required_isFalse_bestEffort() {
-        assertThat(provider.required()).isFalse();
     }
 
     @ParameterizedTest

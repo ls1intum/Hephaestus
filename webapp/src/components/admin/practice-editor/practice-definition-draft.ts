@@ -1,5 +1,5 @@
 import type {
-	PracticeDefinition,
+	PracticeDefinitionInput,
 	PracticeDefinitionOptions,
 	PracticeGuide,
 	PracticeItemTypeOption,
@@ -21,7 +21,10 @@ import {
 	NO_VISUAL,
 	svgProblem,
 } from "./practice-guidance-draft";
-import type { PracticeDefinitionValue } from "./PracticeDefinitionForm";
+import type {
+	PracticeDefinitionSubmission,
+	PracticeDefinitionValue,
+} from "./PracticeDefinitionForm";
 import type { ReviewSettings } from "./PracticeReviewSettingsEditor";
 import type { ScanSettings } from "./PracticeScanSettingsEditor";
 import {
@@ -182,9 +185,9 @@ export function definitionOfDraft(
 	draft: PracticeDefinitionDraft,
 	itemType: PracticeItemTypeOption | undefined,
 	sourceContract: string,
-): PracticeDefinitionValue {
+): PracticeDefinitionSubmission {
 	const automated = draft.reviewedBy.by === "HEPHAESTUS";
-	const definition: PracticeDefinition = {
+	const definition: PracticeDefinitionInput = {
 		name: draft.name.trim(),
 		reviewOn: normalizeReviewOn(draft.settings.reviewOn),
 		appliesWhen: parseAppliesWhen(draft.appliesWhen, itemType).value,

@@ -5,18 +5,21 @@ import { Button } from "@/components/ui/button";
 import { expectNoOverflowingElement } from "@/stories/reflow";
 
 import { mockDefinitionOptions, mockScan, practiceValueOf } from "./fixtures";
-import { PracticeDefinitionForm, type PracticeDefinitionValue } from "./PracticeDefinitionForm";
+import {
+	PracticeDefinitionForm,
+	type PracticeDefinitionSubmission,
+} from "./PracticeDefinitionForm";
 
 const groups = [
 	{ slug: "review-ready-work", name: "Review-ready work" },
 	{ slug: "code-quality", name: "Code quality" },
 ];
 
-type Submit = (value: PracticeDefinitionValue) => void | Promise<void>;
+type Submit = (value: PracticeDefinitionSubmission) => void | Promise<void>;
 
 const submit = fn<Submit>();
 
-function lastSaved(): PracticeDefinitionValue | undefined {
+function lastSaved(): PracticeDefinitionSubmission | undefined {
 	return submit.mock.lastCall?.[0];
 }
 

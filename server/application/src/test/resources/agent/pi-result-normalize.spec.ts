@@ -540,23 +540,23 @@ void test("a checkout file named by its workspace path is read at its path insid
 	]);
 });
 
-void test("historical citations preserve a full revision for trusted admission", () => {
+void test("historical citations preserve a full commit for trusted admission", () => {
 	const citation = {
 		sourceKind: "scm.repository.tree",
 		sourcePath: "repos/repo/.git/HEAD",
 		path: "deleted.ts",
-		revision: "a".repeat(40),
+		commit: "a".repeat(40),
 		startLine: 3,
 		quote: "historical text",
 	};
-	assert.equal(normalizeCitation(citation, "").revision, citation.revision);
+	assert.equal(normalizeCitation(citation, "").commit, citation.commit);
 	assert.throws(
-		() => normalizeCitation({ ...citation, revision: "x".repeat(1025) }, "citation 1: "),
-		/^Error: citation 1: revision must be an opaque nonempty version/u,
+		() => normalizeCitation({ ...citation, commit: "x".repeat(1025) }, "citation 1: "),
+		/^Error: citation 1: commit must be an opaque nonempty version/u,
 	);
 	assert.equal(
-		normalizeCitation({ ...citation, sourceKind: "scm.issue.core" }, "").revision,
-		citation.revision,
+		normalizeCitation({ ...citation, sourceKind: "scm.issue.core" }, "").commit,
+		citation.commit,
 	);
 });
 

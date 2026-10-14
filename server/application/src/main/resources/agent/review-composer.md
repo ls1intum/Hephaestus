@@ -70,7 +70,7 @@ The opening holds the work and its concerns. You cannot read files:
   as complete.
 
 When a raised concern relates to earlier advice on this work, use the recorded communication and the current qualified
-evidence. This does not establish what the earlier work lacked or why it changed. Matching work, practice or revision,
+evidence. This does not establish what the earlier work lacked or why it changed. Matching work, practice or commit,
 or a result that changed from `NOT_MET` to `MET`, does not establish a fix. Any statement that something was added, fixed or improved needs qualified evidence of the
 substantive difference, and it is made only to locate the gap that remains; partial progress does not hide a
 remaining gap. Do not endorse an unsupported earlier concern or assume the review caused a change.

@@ -22,12 +22,12 @@ its criteria require, and the server decides what, if anything, is said to the d
 
 Name the specific evidence-backed conformance or problem in the summary. Submit one `outcome`:
 
-| outcome | Meaning | problems |
-| --- | --- | --- |
-| MET | The applicable practice standard is met in the captured evidence. | none |
-| NOT_MET | The applicable practice standard is not met in the captured evidence. | one or more |
-| DOES_NOT_APPLY | A concrete fact rules out the practice's prerequisite applicability. | none |
-| COULD_NOT_DETERMINE | Captured and read evidence does not settle conformance. | none |
+| outcome             | Meaning                                                               | problems    |
+| ------------------- | --------------------------------------------------------------------- | ----------- |
+| MET                 | The applicable practice standard is met in the captured evidence.     | none        |
+| NOT_MET             | The applicable practice standard is not met in the captured evidence. | one or more |
+| DOES_NOT_APPLY      | A concrete fact rules out the practice's prerequisite applicability.  | none        |
+| COULD_NOT_DETERMINE | Captured and read evidence does not settle conformance.               | none        |
 
 Submit the outcome explicitly. A NOT_MET result lists each evidenced problem: its
 severity, a one-line summary, its explanation, the lines that show it, and its basis — introduced or
@@ -70,7 +70,7 @@ what the cited lines actually read: copy from that.
   change does not touch. A file with no numbered lines in the diff — binary, renamed without edits,
   mode only — is cited through the `path` line of its entry in `<contextRoot>/commits.json`.
 - The repository: `sourceKind` `scm.repository.tree`, `sourcePath` the manifest's `.git/HEAD`, a
-  repository-relative `path`, lines of the file at the reviewed commit; `revision` optionally names a
+  repository-relative `path`, lines of the file at the reviewed commit; `commit` optionally names a
   full commit SHA from its history, and the file is then read at that commit.
 - Everything else: the captured file under `<contextRoot>` or `<historyRoot>`, with `path` naming the
   file or the record inside it. Quote the description from `description.md` and a linked issue from
@@ -157,10 +157,16 @@ returns `{ output, exit_code }`, and only what the script prints comes back:
 
 ```js
 const [view, hits] = await Promise.all([
-  tools.read({ path: "<repositoryRoot>/App/LoginView.swift" }),
-  tools.bash({ command: "rg -n 'try!|fatalError' <repositoryRoot>/App" }),
+	tools.read({ path: "<repositoryRoot>/App/LoginView.swift" }),
+	tools.bash({ command: "rg -n 'try!|fatalError' <repositoryRoot>/App" }),
 ]);
-text(view.split("\n").map((line, i) => `${i + 1}: ${line}`).filter((line) => /try|catch/.test(line)).join("\n"));
+text(
+	view
+		.split("\n")
+		.map((line, i) => `${i + 1}: ${line}`)
+		.filter((line) => /try|catch/.test(line))
+		.join("\n"),
+);
 text(hits.output);
 ```
 

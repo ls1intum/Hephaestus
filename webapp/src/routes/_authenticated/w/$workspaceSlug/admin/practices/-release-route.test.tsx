@@ -81,7 +81,7 @@ it("accepts a workspace update with explicit field choice and the reviewed versi
 	fireEvent.click(screen.getByRole("button", { name: "Accept selected fields" }));
 
 	await waitFor(() => expect(receivedTag).toBe('"reviewed-offer"'));
-	expect(receivedBody).toStrictEqual({ choices: [{ field: "CRITERIA", source: "OFFERED" }] });
+	expect(receivedBody).toStrictEqual({ choices: { CRITERIA: "OFFERED" } });
 	await screen.findByText("No updates to review", undefined, ROUTE_RENDER_WAIT);
 	await expect(queryClient.query(guidanceOptions)).resolves.toMatchObject({
 		guide: { markdown: "Adopted guide" },

@@ -11,7 +11,6 @@ import de.tum.cit.aet.hephaestus.practices.result.ProblemRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ResultMarkService;
 import de.tum.cit.aet.hephaestus.practices.result.ResultPresentation;
 import de.tum.cit.aet.hephaestus.practices.result.ResultQueryFilter;
-import de.tum.cit.aet.hephaestus.practices.result.ResultReadQuery;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ResultView;
 import de.tum.cit.aet.hephaestus.practices.result.ResultViewQuery;
@@ -43,7 +42,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class ReviewResultQueryService {
     private final ResultRepository results;
     private final ProblemRepository problems;
-    private final ResultReadQuery read;
     private final ResultViewQuery views;
     private final ResultPresentation presentation;
     private final ProductReferenceQuery references;
@@ -51,7 +49,7 @@ public class ReviewResultQueryService {
     private final ResultMarkService marks;
 
     public Page<ReviewResultDTO> list(long ws, ResultQueryFilter filter, ResultSort sort, Pageable page) {
-        var rows = read.list(ws, filter, sort, false, page);
+        var rows = results.list(ws, filter, sort, false, page);
         var permitted = authorization.permitsAll(ws, rows.getContent(), SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW);
         return new PageImpl<>(
                 views.views(ws, rows.getContent()).stream()
@@ -125,7 +123,7 @@ public class ReviewResultQueryService {
 
     public Page<ReviewProblemDTO> listProblems(
             long ws, ResultQueryFilter filter, ProblemQueryFilter child, Pageable page) {
-        var rows = read.problems(ws, filter, child, page);
+        var rows = results.problems(ws, filter, child, page);
         return rows.map(p -> problemRow(ws, p));
     }
 

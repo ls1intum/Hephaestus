@@ -240,8 +240,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
                 headRefOid,
                 baseRefOid,
                 mergedBy != null ? mergedBy.getId() : null,
-                null 
-                );
+                null);
 
         // Fetch the PR to get a managed entity and handle relationships
         PullRequest pr = pullRequestRepository

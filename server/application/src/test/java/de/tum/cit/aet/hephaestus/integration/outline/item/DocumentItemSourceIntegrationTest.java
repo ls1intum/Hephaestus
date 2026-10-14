@@ -29,6 +29,7 @@ import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocument;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineTestFixtures;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Membership;
@@ -217,7 +218,7 @@ class DocumentItemSourceIntegrationTest extends BaseIntegrationTest {
                 .isTrue();
         var collaborator = accounts.findById(fixture.collaboratorId()).orElseThrow();
         collaborator.setAiChoice(AiChoice.NO_AI);
-        collaborator.setAiChoiceAt(null);
+        collaborator.setAiChoiceAt(Instant.now());
         accounts.saveAndFlush(collaborator);
 
         assertThat(resolver.permits(fixture.item(), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
@@ -259,14 +260,17 @@ class DocumentItemSourceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void shouldNameADocumentsCollectionByItsNameAndNeverByItsUrlId() {
-        long workspaceId = workspaces
-                .save(WorkspaceTestFixtures.activeWorkspace("document-identity"))
-                .getId();
-        collection(workspaceId, "col-named", "Engineering", "hK3pQ9xZ2a");
-        collection(workspaceId, "col-unnamed", null, "Zq81mNw3Lk");
-        OutlineDocument named = document(workspaceId, "doc-named", "col-named", "hK3pQ9xZ2a", "Deployment runbook");
-        OutlineDocument unnamed = document(workspaceId, "doc-unnamed", "col-unnamed", "Zq81mNw3Lk", " ");
-        OutlineDocument orphaned = document(workspaceId, "doc-orphaned", "col-gone", "Pp09aaBbCc", "Old notes");
+        var workspace = workspaces.save(WorkspaceTestFixtures.activeWorkspace("document-identity"));
+        long workspaceId = workspace.getId();
+        long connectionId =
+                OutlineTestFixtures.connection(connections, workspace).getId();
+        collection(workspaceId, connectionId, "col-named", "Engineering", "hK3pQ9xZ2a");
+        collection(workspaceId, connectionId, "col-unnamed", null, "Zq81mNw3Lk");
+        OutlineDocument named =
+                document(workspaceId, connectionId, "doc-named", "col-named", "hK3pQ9xZ2a", "Deployment runbook");
+        OutlineDocument unnamed = document(workspaceId, connectionId, "doc-unnamed", "col-unnamed", "Zq81mNw3Lk", " ");
+        OutlineDocument orphaned =
+                document(workspaceId, connectionId, "doc-orphaned", "col-gone", "Pp09aaBbCc", "Old notes");
 
         Map<Long, ItemLabel> resolved = resolver.labels(
                 workspaceId,
@@ -291,10 +295,11 @@ class DocumentItemSourceIntegrationTest extends BaseIntegrationTest {
         return new ItemRef(workspaceId, document.getId(), DocumentEvents.DOCUMENT, document.getId(), null, null);
     }
 
-    private void collection(long workspaceId, String collectionId, @Nullable String name, String urlId) {
+    private void collection(
+            long workspaceId, long connectionId, String collectionId, @Nullable String name, String urlId) {
         OutlineCollection collection = new OutlineCollection();
         collection.setWorkspaceId(workspaceId);
-        collection.setConnectionId(1L);
+        collection.setConnectionId(connectionId);
         collection.setCollectionId(collectionId);
         collection.setName(name);
         collection.setUrlId(urlId);
@@ -302,10 +307,15 @@ class DocumentItemSourceIntegrationTest extends BaseIntegrationTest {
     }
 
     private OutlineDocument document(
-            long workspaceId, String documentId, String collectionId, String collectionSlug, String title) {
+            long workspaceId,
+            long connectionId,
+            String documentId,
+            String collectionId,
+            String collectionSlug,
+            String title) {
         OutlineDocument doc = new OutlineDocument();
         doc.setWorkspaceId(workspaceId);
-        doc.setConnectionId(1L);
+        doc.setConnectionId(connectionId);
         doc.setDocumentId(documentId);
         doc.setCollectionId(collectionId);
         doc.setCollectionSlug(collectionSlug);

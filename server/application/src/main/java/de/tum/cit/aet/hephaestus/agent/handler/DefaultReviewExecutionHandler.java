@@ -25,8 +25,10 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCatalog;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSource;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ScanItemVersions;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewCaptureDecision;
@@ -60,6 +62,7 @@ public class DefaultReviewExecutionHandler {
     private final ReviewHistoryContentSource history;
     private final ReviewAssignmentStore capture;
     private final ItemCatalog items;
+    private final List<ScanItemVersions> scanVersions;
     private final ObjectMapper mapper;
     private final Clock clock;
 
@@ -90,6 +93,26 @@ public class DefaultReviewExecutionHandler {
                         .sources().stream())
                 .map(read -> read.source())
                 .collect(Collectors.toSet());
+        var grantedContext = new LinkedHashMap<ReviewAssignmentId, List<String>>();
+        if (review.kind() == ReviewKind.SCAN) {
+            var composers = scanVersions.stream()
+                    .filter(v -> v.kinds().contains(item.kind()))
+                    .toList();
+            if (composers.size() != 1)
+                throw new IllegalStateException("The scan item needs exactly one version composer");
+            var composer = composers.getFirst();
+            for (var assignment : pinned)
+                grantedContext.put(
+                        assignment.id(),
+                        composer.contextPaths(
+                                assignment.item(),
+                                assignment.version(),
+                                Objects.requireNonNull(assignment
+                                                .practice()
+                                                .definition()
+                                                .scan())
+                                        .context()));
+        }
         var snapshot = source.pin(item, pinned.getFirst().version());
         files.beginPersonCapture(job);
         try {
@@ -140,7 +163,7 @@ public class DefaultReviewExecutionHandler {
                         .filter(a -> decisions.stream()
                                 .anyMatch(d -> d.practiceSlug().equals(a.practiceSlug()) && d.ready()))
                         .toList();
-                catalog.inject(staged, ready, review.kind());
+                catalog.inject(staged, ready, review.kind(), grantedContext);
                 if (!ready.isEmpty()) {
                     var record = source.record(snapshot, evidence.files());
                     for (var assignment : ready) {
@@ -223,7 +246,7 @@ public class DefaultReviewExecutionHandler {
                     source.path("startLine").asInt(),
                     source.path("endLine").asInt(),
                     source.hasNonNull("side") ? source.path("side").asString() : null,
-                    source.hasNonNull("revision") ? source.path("revision").asString() : null));
+                    source.hasNonNull("commit") ? source.path("commit").asString() : null));
         }
         return mapper.valueToTree(citations);
     }
@@ -236,7 +259,7 @@ public class DefaultReviewExecutionHandler {
             int startLine,
             int endLine,
             @Nullable String side,
-            @Nullable String revision) {}
+            @Nullable String commit) {}
 
     private AutomatedReviewReadinessDecision readiness(
             ReviewAssignmentSnapshot assignment, JobFolderIndex manifest, Instant now, ReviewKind scope) {

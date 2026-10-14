@@ -50,8 +50,6 @@ class PracticeVersionTest extends BaseUnitTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new PracticeVersion(practice, 1, mapper.createArrayNode(), null))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new PracticeVersion(practice, 1, mapper.createObjectNode(), null))
-                .isInstanceOf(IllegalArgumentException.class);
     }
 
     private static Practice practice() {

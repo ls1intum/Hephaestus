@@ -11,7 +11,7 @@ public record EvidenceCitation(
         String sourcePath,
         String path,
         @Nullable CitationSide side,
-        @Nullable String revision,
+        @Nullable String commit,
         int startLine,
         int endLine,
         String quote,

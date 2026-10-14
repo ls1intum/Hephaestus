@@ -193,8 +193,7 @@ public class GitHubMilestoneProcessor {
      * @return a deterministic negative Long ID
      */
     private Long generateDeterministicId(Long repositoryId, int milestoneNumber) {
-        // Keep negative fallback IDs separate from GitHub's positive database IDs.
-        // Multiplication by 31 collides across repositories; packing two 32-bit components avoids it.
+        // Multiplication by 31 can give different repository/milestone pairs the same fallback ID.
         long combined = (repositoryId << 32) | (milestoneNumber & 0xFFFFFFFFL);
         return -combined;
     }

@@ -119,7 +119,7 @@ function AdminCatalogPage() {
 			queryClient.removeQueries({ queryKey: detailKey("practice", slug), exact: true });
 			invalidateCatalog();
 			toast.error(
-				problemStatusOf(error) === 409
+				problemStatusOf(error) === 412
 					? "The catalog changed before this action was saved. We reloaded the practice."
 					: "We could not update the practice",
 				{ description: problemDetailOf(error) },
@@ -136,7 +136,7 @@ function AdminCatalogPage() {
 			queryClient.removeQueries({ queryKey: detailKey("group", slug), exact: true });
 			invalidateCatalog();
 			toast.error(
-				problemStatusOf(error) === 409
+				problemStatusOf(error) === 412
 					? "The catalog changed before this action was saved. We reloaded the group."
 					: "We could not update the group",
 				{ description: problemDetailOf(error) },

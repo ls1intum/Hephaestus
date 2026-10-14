@@ -115,13 +115,15 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
                         + " workspace_id=?",
                 otherWorkspace);
         jdbc.update("UPDATE slack_monitored_channel SET slack_team_id='T2' WHERE workspace_id=?", otherWorkspace);
-        jdbc.update("UPDATE connection SET instance_key='T2' WHERE workspace_id=? AND kind='SLACK'", otherWorkspace);
+        jdbc.update(
+                "UPDATE connection SET instance_key='T2', config=jsonb_set(config,'{teamId}','\"T2\"'::jsonb) WHERE workspace_id=? AND kind='SLACK'",
+                otherWorkspace);
         Long providerId = jdbc.queryForObject(
                 "INSERT INTO identity_provider(type,server_url,created_at) VALUES"
                         + " ('SLACK','https://slack.com',CURRENT_TIMESTAMP) ON CONFLICT(type,server_url) DO UPDATE SET"
                         + " server_url=EXCLUDED.server_url RETURNING id",
                 Long.class);
-        databaseTestUtils.erase(Objects.requireNonNull(providerId), "UPRIVACYTARGET", "");
+        databaseTestUtils.erase(Objects.requireNonNull(providerId), "UPRIVACYTARGET", "T1");
         var captured = new ArrayList<ObjectNode>();
         projector.forEachWorkspaceMessage(workspace, captured::add);
         assertThat(captured)

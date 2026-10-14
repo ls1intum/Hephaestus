@@ -52,6 +52,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAttemptGuard;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewBudget;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewCaptureDecision;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewCompleted;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewCompletion;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
@@ -71,6 +72,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.Severity;
 import de.tum.cit.aet.hephaestus.practices.spi.WithheldItem;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.ItemFixtures;
+import de.tum.cit.aet.hephaestus.workspace.Membership;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -89,13 +91,23 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
+import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.node.JsonNodeFactory;
 
+@RecordApplicationEvents
 @Import({ReviewIntegrationData.class, ReviewAdmissionData.class})
 class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
+    @Autowired
+    ApplicationEvents applicationEvents;
+
+    @Autowired
+    WebTestClient http;
+
     @Autowired
     ItemEventLedgerProperties eventProperties;
 
@@ -744,5 +756,99 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
         assertThat(decision.getReason()).isEqualTo(ReviewRequestReason.VERSION_SUPERSEDED);
         assertThat(decision.getRetryAt()).isNull();
         assertThat(reviews.findByWorkspaceIdAndEventId(input.workspaceId(), id)).isEmpty();
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = ReviewStatus.class,
+            names = {"COMPLETE", "PARTIAL", "FAILED", "CANCELLED"})
+    void shouldPublishCompletionOnlyForCompletedReviewOutcomesWithAdmittedResults(ReviewStatus status) {
+        var pending = admissions.pending(scenario, Instant.now(), scenarioAccountId);
+        admit(pending, ResultOutcome.MET);
+        settle(pending);
+        var completion = new ReviewCompletion(
+                status, null, Instant.now(), pending.review().getOrderedAt());
+        service.complete(scenario.workspace().getId(), pending.review().getId(), completion);
+        service.complete(scenario.workspace().getId(), pending.review().getId(), completion);
+        assertThat(reviews.findByIdAndWorkspaceId(
+                                pending.review().getId(), scenario.workspace().getId())
+                        .orElseThrow()
+                        .getStatus())
+                .isEqualTo(status);
+        assertThat(applicationEvents.stream(ReviewCompleted.class).toList())
+                .containsExactlyElementsOf(
+                        status == ReviewStatus.COMPLETE || status == ReviewStatus.PARTIAL
+                                ? List.of(new ReviewCompleted(
+                                        pending.review().getId(),
+                                        scenario.workspace().getId()))
+                                : List.of());
+    }
+
+    @Test
+    void shouldNotPublishCompletionWhenNoResultWasAdmitted() {
+        var pending = admissions.pending(scenario, Instant.now(), scenarioAccountId);
+        running(pending, 1);
+        settle(pending);
+        service.complete(
+                scenario.workspace().getId(),
+                pending.review().getId(),
+                new ReviewCompletion(
+                        ReviewStatus.PARTIAL,
+                        ReviewStopReason.EXECUTION_INCOMPLETE,
+                        Instant.now(),
+                        pending.review().getOrderedAt()));
+        assertThat(applicationEvents.stream(ReviewCompleted.class)).isEmpty();
+    }
+
+    private void settle(ReviewAdmissionData.Pending pending) {
+        assertThat(jdbc.sql("UPDATE review_job SET status=:status,processing_status='DONE',completed_at=now()"
+                                + " WHERE workspace_id=:ws AND id=:id")
+                        .param("status", ReviewJobStatus.COMPLETED.name())
+                        .param("ws", scenario.workspace().getId())
+                        .param("id", pending.jobId())
+                        .update())
+                .isOne();
+        when(runtime.activeJobIds(scenario.workspace().getId(), pending.review().getId()))
+                .thenReturn(Set.of());
+        when(runtime.unsettledJobIds(
+                        scenario.workspace().getId(), pending.review().getId()))
+                .thenReturn(Set.of());
+    }
+
+    @ParameterizedTest
+    @EnumSource(Membership.WorkspaceRole.class)
+    void shouldReportTheServerReviewDetailsPermissionForTheEffectiveWorkspaceRole(Membership.WorkspaceRole role) {
+        long workspaceId = scenario.workspace().getId();
+        var ref = productItems.require(workspaceId, scenario.item().getId());
+        var url = "https://github.com/example/project/pull/1";
+        doReturn(Optional.of(ref)).when(productItems).atUrl(workspaceId, url);
+        doReturn(ItemFixtures.snapshot(ref, Map.of()).build())
+                .when(productItems)
+                .pin(eq(ref), isNull());
+        assertThat(jdbc.sql("UPDATE membership SET role=:role WHERE workspace_id=:ws AND account_id=:account")
+                        .param("role", role.name())
+                        .param("ws", workspaceId)
+                        .param("account", scenarioAccountId)
+                        .update())
+                .isOne();
+        var root = "/workspaces/" + scenario.workspace().getWorkspaceSlug();
+        var bearer = ReviewIntegrationData.memberToken(scenario);
+        boolean canInspect = role != Membership.WorkspaceRole.MEMBER;
+        http.get()
+                .uri(b -> b.path(root + "/practices/review-context")
+                        .queryParam("url", url)
+                        .build())
+                .headers(h -> h.setBearerAuth(bearer))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.canInspectReviewDetails")
+                .isEqualTo(canInspect);
+        var response = http.get()
+                .uri(root + "/practices/reviews")
+                .headers(h -> h.setBearerAuth(bearer))
+                .exchange();
+        response.expectStatus().isEqualTo(canInspect ? 200 : 403).expectBody(Void.class);
     }
 }

@@ -217,16 +217,6 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
                 .toList();
     }
 
-    @Test
-    void supportsPracticeReviewOnly() {
-        assertThat(provider.supports(request(sampleMetadata()))).isTrue();
-    }
-
-    @Test
-    void isBestEffort() {
-        assertThat(provider.required()).isFalse();
-    }
-
     @Nested
     class Payload {
 
@@ -584,18 +574,6 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldKeepReferencesBeyondTheFormerCaptureCap() throws Exception {
-            StringBuilder body = new StringBuilder();
-            for (int i = 1; i <= 10_001; i++) body.append('#').append(i).append(' ');
-            pullRequestWithBody(body.toString());
-            when(issueRepository.findByRepositoryIdAndNumber(eq(REPO_ID), anyInt()))
-                    .thenAnswer(inv -> Optional.of(issue(inv.getArgument(1), "Issue", "")));
-            JsonNode root = payload(sampleMetadata());
-            assertThat(itemNumbers(root)).hasSize(10_001);
-            assertThat(root.get("truncated").asBoolean()).isFalse();
-        }
-
-        @Test
         void shouldKeepAllProviderClosingIssues() throws Exception {
             var pr = new PullRequest();
             pr.setId(PR_ID);
@@ -605,22 +583,6 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
                             .mapToObj(number -> issue(number, "Issue", ""))
                             .toList());
             assertThat(itemNumbers(payload(sampleMetadata()))).hasSize(10_001);
-        }
-
-        @Test
-        void shouldKeepCommitReferencesBeyondTheFormerCap() throws Exception {
-            int max = 10_000;
-            pullRequestWithBody("Related to #" + (max + 1));
-            StringBuilder history = new StringBuilder();
-            for (int i = 1; i <= max; i++) history.append('#').append(i).append(' ');
-            commitMessages(history.toString());
-            when(issueRepository.findByRepositoryIdAndNumber(eq(REPO_ID), anyInt()))
-                    .thenAnswer(inv -> Optional.of(issue(inv.getArgument(1), "Issue", "")));
-
-            JsonNode root = payload(sampleMetadata());
-
-            assertThat(root.get("truncated").asBoolean()).isFalse();
-            assertThat(itemNumbers(root)).hasSize(max + 1).first().isEqualTo(max + 1);
         }
     }
 

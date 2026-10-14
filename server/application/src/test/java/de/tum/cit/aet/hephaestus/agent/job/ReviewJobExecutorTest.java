@@ -24,7 +24,6 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetDecision;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
-import de.tum.cit.aet.hephaestus.integration.core.itemevent.PracticeReviewRefusalMetrics;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
@@ -79,7 +78,6 @@ class ReviewJobExecutorTest extends BaseUnitTest {
                 transactions,
                 new JsonMapper(),
                 meters,
-                new PracticeReviewRefusalMetrics(meters),
                 telemetry,
                 mock(LlmUsageRecorder.class),
                 mock(PracticeScriptRunRecorder.class),
@@ -94,7 +92,6 @@ class ReviewJobExecutorTest extends BaseUnitTest {
                         transactions,
                         new JsonMapper(),
                         meters,
-                        new PracticeReviewRefusalMetrics(meters),
                         budgets,
                         null,
                         telemetry,

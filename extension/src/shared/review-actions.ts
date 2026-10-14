@@ -19,10 +19,10 @@ export interface ActionPreview {
 	item: ItemRef;
 }
 
-/** What became of a confirmed action, in the server's words. */
+/** What became of a confirmed action, based on the server's answer. */
 export interface ActionOutcome {
 	kind: "request-review";
 	status: "SUBMITTED" | "REFUSED";
-	/** The server's own sentence for why nothing started; shown verbatim. */
+	/** The shared explanation for the server's refusal code. */
 	reasonDescription?: string;
 }

@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewHistoryContentSou
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobAssignments;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCapture;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureFacts;
@@ -30,6 +31,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSource;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ScanItemVersions;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeReadSource;
 import de.tum.cit.aet.hephaestus.practices.PracticeReads;
@@ -51,6 +53,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -89,6 +92,7 @@ class DefaultReviewExecutionHandlerTest extends BaseUnitTest {
             history,
             members,
             items,
+            List.of(),
             mapper,
             Clock.fixed(NOW, ZoneOffset.UTC));
 
@@ -182,8 +186,47 @@ class DefaultReviewExecutionHandlerTest extends BaseUnitTest {
             assertThat(prepared.folderIndex()).isNotNull();
         }
         verify(files).beginPersonCapture(job);
-        verify(catalog).inject(any(), any(), eq(ReviewKind.ITEM));
+        verify(catalog).inject(any(), any(), eq(ReviewKind.ITEM), eq(Map.of()));
         assertDecision(job, ReviewPracticeStatus.READY);
+    }
+
+    @Test
+    void scanStagesTheVersionBoundGrantInsteadOfExpandingCapturedFiles() {
+        var job = prepare(true);
+        var assignment = PracticeCatalogInjectorTest.scanAssignment();
+        when(assignments.load(job)).thenReturn(List.of(assignment));
+        when(assignments.review(job)).thenReturn(RuntimeReviewTestData.review(ReviewKind.SCAN, assignment));
+        var composer = mock(ScanItemVersions.class);
+        when(composer.kinds()).thenReturn(Set.of(assignment.item().kind()));
+        when(composer.contextPaths(assignment.item(), assignment.version(), List.of("docs/*.md")))
+                .thenReturn(List.of("docs/rules.md"));
+        var scanHandler = new DefaultReviewExecutionHandler(
+                assignments,
+                List.of(source),
+                context,
+                files,
+                new PracticeCatalogInjector(mapper),
+                new PracticeScriptInputs(mapper),
+                history,
+                members,
+                items,
+                List.of(composer),
+                mapper,
+                Clock.fixed(NOW, ZoneOffset.UTC));
+        try (var prepared = scanHandler.prepareInputs(job)) {
+            assertThat(prepared.folderIndex()).isNotNull();
+        }
+        ArgumentCaptor<PreparedEvidence> captured = ArgumentCaptor.captor();
+        verify(files).prepare(eq(job), captured.capture(), any());
+        var staged = captured.getValue().files();
+        var index = mapper.readTree(staged.get(SandboxLayout.PRACTICES_PREFIX + "index.json"))
+                .get(0);
+        assertThat(index.path("contextPaths")).isEqualTo(mapper.valueToTree(List.of("docs/rules.md")));
+        var script =
+                mapper.readTree(staged.get(SandboxLayout.PRACTICE_SCRIPT_PRACTICES_PREFIX + "clear-names.inputs.json"));
+        assertThat(script.path("scope").path("version").asString())
+                .isEqualTo(assignment.version().value());
+        assertThat(script.path("about").isNull()).isTrue();
     }
 
     @Test

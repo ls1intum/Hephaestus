@@ -12,6 +12,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 @Tag("unit")
 class ProxyStandInAdmissionTest {
@@ -28,7 +29,7 @@ class ProxyStandInAdmissionTest {
         return "{\"practiceSlug\":\"" + slug + "\",\"itemId\":\"1\",\"itemVersion\":\"fixture:1\",\"readReceipts\":[],"
                 + "\"candidate\":{\"outcome\":\"" + outcome
                 + "\",\"summary\":\"Handles errors\",\"explanation\":\"The handler records the failure.\","
-                + "\"evidence\":{\"citations\":[],\"openQuestions\":[]},\"coverage\":{\"source\":\"host\",\"complete\":true,\"reads\":0,\"truncatedReads\":0,\"failedReads\":0,\"receipts\":[]}}}";
+                + "\"citations\":[],\"evidence\":{\"openQuestions\":[]},\"coverage\":{\"source\":\"host\",\"complete\":true,\"reads\":0,\"truncatedReads\":0,\"failedReads\":0,\"receipts\":[]}}}";
     }
 
     @ParameterizedTest
@@ -52,6 +53,33 @@ class ProxyStandInAdmissionTest {
         assertThat(answer.has("schemaVersion")).isFalse();
         assertThat(answer.path("admitted").get(0).has("severity")).isFalse();
         assertThat(request).isEqualTo(original);
+    }
+
+    @Test
+    void shouldPreserveCandidateCitationsInTheAdmittedEvidence() {
+        var request = request(entry("handles-errors", "MET"));
+        var candidate = (ObjectNode) request.path("results").get(0).path("candidate");
+        candidate
+                .putArray("citations")
+                .addObject()
+                .put("sourceKind", "scm.pull-request.core")
+                .put("sourcePath", "context/metadata.json")
+                .put("path", "title")
+                .put("startLine", 1)
+                .put("endLine", 1)
+                .put("quote", "Handles errors");
+
+        var answer = PracticeRunnerLiveLlmTest.ProxyStandIn.admit(request);
+        var citation = answer.path("admitted")
+                .get(0)
+                .path("evidence")
+                .path("citations")
+                .get(0);
+
+        assertThat(citation.path("sourceKind").asString()).isEqualTo("scm.pull-request.core");
+        assertThat(citation.path("sourcePath").asString()).isEqualTo("context/metadata.json");
+        assertThat(citation.path("quote").asString()).isEqualTo("Handles errors");
+        assertThat(citation.path("index").asInt()).isZero();
     }
 
     @Test

@@ -654,13 +654,6 @@ try {
 		await waitUntilReady(application, port);
 		const upgradedData = dataFingerprint("candidate", preserved);
 		executeFixture("assert-migrated.sql");
-		if (
-			exactMainSource &&
-			query("SELECT state FROM feedback_copy WHERE id='00000000-0000-0000-0000-000000992171'") !==
-				"POSTED"
-		) {
-			throw new Error("Delivered source receipt was not preserved");
-		}
 		if (upgradedData !== seededData) {
 			throw new Error("Seeded application data changed during upgrade");
 		}

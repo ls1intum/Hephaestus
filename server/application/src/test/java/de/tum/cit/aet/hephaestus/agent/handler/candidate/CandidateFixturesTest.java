@@ -143,7 +143,7 @@ class CandidateFixturesTest extends BaseUnitTest {
         firstCitation(bounded)
                 .put("sourcePath", "x".repeat(4096))
                 .put("path", "y".repeat(4096))
-                .put("revision", "r".repeat(1024));
+                .put("commit", "r".repeat(1024));
         assertThat(CandidateParser.parse(bounded)).isInstanceOf(MetCandidate.class);
         var longSourcePath = bounded.deepCopy();
         firstCitation(longSourcePath).put("sourcePath", "x".repeat(4097));
@@ -152,7 +152,7 @@ class CandidateFixturesTest extends BaseUnitTest {
         firstCitation(longPath).put("path", "y".repeat(4097));
         assertRefused(longPath, CandidateRefusal.MALFORMED_CANDIDATE);
         var longRevision = bounded.deepCopy();
-        firstCitation(longRevision).put("revision", "r".repeat(1025));
+        firstCitation(longRevision).put("commit", "r".repeat(1025));
         assertRefused(longRevision, CandidateRefusal.MALFORMED_CANDIDATE);
     }
 
@@ -273,7 +273,7 @@ class CandidateFixturesTest extends BaseUnitTest {
     @Test
     void shouldRefuseExplicitNullAndForgedProofWhenOptionalCitationKeysArePresent() throws IOException {
         ObjectNode nullRevision = fixture("candidate-met-with-example.json");
-        firstCitation(nullRevision).putNull("revision");
+        firstCitation(nullRevision).putNull("commit");
         assertRefused(nullRevision, CandidateRefusal.MALFORMED_CANDIDATE);
 
         ObjectNode forgedProof = fixture("candidate-met-with-example.json");

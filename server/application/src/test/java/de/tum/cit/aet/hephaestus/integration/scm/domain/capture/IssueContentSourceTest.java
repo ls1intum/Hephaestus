@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.capture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -22,6 +23,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommen
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository.StoredComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuetype.IssueType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.item.IssueEvidenceVersion;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmVersion;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
@@ -164,7 +166,9 @@ class IssueContentSourceTest extends BaseUnitTest {
 
     private static DeliveredIssueCommentLookup deliveries(List<DeliveredIssueCommentLookup.DeliveredComment> notes) {
         DeliveredIssueCommentLookup deliveries = mock(DeliveredIssueCommentLookup.class);
-        lenient().when(deliveries.findForIssue(anyLong())).thenReturn(notes);
+        lenient()
+                .when(deliveries.findForIssue(anyLong(), eq(ScmItemEvents.ISSUE)))
+                .thenReturn(notes);
         return deliveries;
     }
 
@@ -327,15 +331,6 @@ class IssueContentSourceTest extends BaseUnitTest {
         issue.setAssignees(new LinkedHashSet<>(List.of(user("bob"), user("alice"))));
 
         return issue;
-    }
-
-    @Nested
-    class Supports {
-
-        @Test
-        void supportsIssueReviewRequest() {
-            assertThat(provider.supports(request(sampleMetadata(), null))).isTrue();
-        }
     }
 
     @Nested
@@ -534,51 +529,6 @@ class IssueContentSourceTest extends BaseUnitTest {
             JsonNode comments = objectMapper.readTree(files.get(COMMENTS_KEY));
             assertThat(comments).hasSize(1);
             assertThat(comments.get(0).get("author").isNull()).isTrue();
-        }
-
-        @Test
-        void shouldKeepAllCommentsAboveTheFormerCaptureLimit() throws Exception {
-            Issue issue = richIssue();
-            var thread = new ArrayList<StoredComment>();
-            int overflow = 10_000 + 50;
-            Instant base = Instant.parse("2025-01-01T00:00:00Z");
-            for (int i = 0; i < overflow; i++) {
-                thread.add(comment("u" + i, "Comment " + i, base.plusSeconds(i)));
-            }
-            stubComments(thread);
-            when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
-
-            Map<String, byte[]> files = new LinkedHashMap<>();
-            files.putAll(provider.capture(request(sampleMetadata(), issue), provider.sourceKinds())
-                    .files());
-
-            JsonNode comments = objectMapper.readTree(files.get(COMMENTS_KEY));
-            assertThat(comments).hasSize(overflow);
-            assertThat(comments.get(0).get("body").asString()).isEqualTo("Comment 0");
-            assertThat(comments.get(comments.size() - 1).get("body").asString()).isEqualTo("Comment " + (overflow - 1));
-        }
-
-        @Test
-        void shouldReportCompleteWithoutACommentLimit() {
-            Issue issue = richIssue();
-            when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
-            Instant base = Instant.parse("2025-01-01T00:00:00Z");
-            List<StoredComment> comments = new ArrayList<>();
-            for (int i = 0; i < 10_000; i++) {
-                comments.add(comment("u" + i, "Comment " + i, base.plusSeconds(i)));
-            }
-            stubComments(comments);
-            assertThat(provider.capture(request(sampleMetadata(), issue), Set.of(COMMENTS))
-                            .completeness()
-                            .get(COMMENTS))
-                    .isEqualTo(SourceCompleteness.COMPLETE);
-
-            comments.add(comment("overflow", "Overflow", base.plusSeconds(comments.size())));
-            stubComments(comments);
-            assertThat(provider.capture(request(sampleMetadata(), issue), Set.of(COMMENTS))
-                            .completeness()
-                            .get(COMMENTS))
-                    .isEqualTo(SourceCompleteness.COMPLETE);
         }
     }
 

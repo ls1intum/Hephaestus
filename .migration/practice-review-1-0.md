@@ -4,16 +4,21 @@ This release changes practice definitions, people, reviews, results and feedback
 Old and new runtime roles cannot use the database together.
 There is no rolling upgrade or compatibility period.
 
+Before the outage, test this release's migration on a verified database restore.
+Prepare any script changes with the procedure under **Custom practice scripts**.
+Repeat the test on a fresh restore until the migration completes.
+
 Before the upgrade:
 
 1. Quiesce new review submission and provider input.
-2. Drain active server and worker operations through the normal role drain procedure.
-3. Let active worker reviews finish.
-4. Stop every worker role after its drain completes.
-5. Stop the server and webhook roles.
-6. Make a database backup.
-7. Restore the backup to a test database and verify the restore.
-8. Record the release lock and configuration of the previous release.
+2. Apply the script changes tested during the rehearsal through the previous release's server.
+3. Drain active worker operations through the [role drain procedure](https://docs.hephaestus.build/admin/runtime-roles#graceful-drain).
+4. Let active worker reviews finish.
+5. Stop every worker role after its drain completes.
+6. Drain and stop the server and webhook roles.
+7. Make a database backup.
+8. Restore the backup to a test database and verify the restore.
+9. Record the release lock and configuration of the previous release.
 
 A provider can lose events that arrive while the webhook role is stopped.
 After restart, normal source sync repairs only the events that its adapter can recover.
@@ -25,12 +30,13 @@ Upgrade:
 2. Use this release's verified agent image.
 3. If HEPHAESTUS_IMAGE_AGENT_PI is overridden, update it to the matching agent-pi image.
 4. Start the server and wait for the migration to complete.
-5. Start the worker and webhook roles.
-6. Deploy the matching webapp.
-7. Ask developers to update the browser extension.
-8. Update custom API clients before they use practice resources.
-9. Verify one item review and one repository scan in the operator interface.
-10. Check results, withheld reasons and provider-copy receipts.
+5. Deploy the matching webapp.
+6. Restore saved custom definitions with tested version 3 scripts.
+7. Start the worker and webhook roles.
+8. Ask developers to update the browser extension.
+9. Update custom API clients before they use practice resources.
+10. Verify one item review and one repository scan in the operator interface.
+11. Check results, withheld reasons and provider-copy receipts.
 
 The migration preserves retained result IDs and feedback relationships.
 It does not post migrated feedback again.
@@ -64,8 +70,25 @@ A script is a default export of definePracticeScript with meta and run(ctx).
 run returns one candidate result for the supplied item. The script contract is version 3.
 
 A null script uses the built-in script. A changed invalid script does not.
-Unchanged bundled copies receive the matching bundled script through the audited catalog update.
-Changed copies keep their text until a workspace admin accepts the update or rewrites it.
+The migration transforms only exact audited bundled scripts.
+An unsupported script stops the migration, including a script retained in a catalog comparison base.
+Rewriting a custom script before upgrade does not add its source to the audited map.
+The refusal names the practice ID or catalog slug and identifies a comparison base when it applies.
+
+Prepare these changes on the restored database with the previous release:
+
+1. Save complete custom definitions and scripts outside the database, with their workspace and catalog identifiers.
+2. For affected bundled instance entries, select **Restore Hephaestus default**.
+3. For remaining custom instance entries, clear **Static analysis script** and save the definition.
+4. If an affected catalog entry is absent, recreate it from the saved workspace definition. Use its original slug and no script.
+5. Accept affected workspace catalog updates to advance their comparison bases to the prepared definitions.
+6. For remaining custom workspace practices, clear **Static analysis script** and save the definition.
+7. Test the migration again on a fresh restore with these changes.
+
+A reset removes local customization. Save that content before the reset.
+These changes create new active definitions. Do not edit pinned historical definitions or migration checksums.
+Keep new review submission quiesced when you apply the tested changes to production.
+Resume reviews for those practices only after you restore their custom content with tested version 3 scripts.
 
 The old positional function and leads-only output do not run.
 Remove meta.version, meta.kinds and meta.tokens from preview scripts. Use the core entry point and the kit for the item’s domain.

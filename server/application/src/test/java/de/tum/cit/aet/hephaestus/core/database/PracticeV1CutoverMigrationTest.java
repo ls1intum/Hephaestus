@@ -41,6 +41,17 @@ class PracticeV1CutoverMigrationTest {
                                 + " NULL) FROM problem p JOIN result r ON r.id=p.result_id WHERE r.id='"
                                 + RESULT + "'"))
                 .containsExactly("true|true|true");
+        assertThat(column(database, """
+            SELECT (citation->>'commit') || '|' || (citation ? 'revision') || '|' || (citation->>'quote')
+            FROM (
+                SELECT evidence->'citations'->0 AS citation FROM result
+                WHERE id='00000000-0000-0000-0000-000000992141'
+                UNION ALL
+                SELECT citations->0 FROM problem
+                WHERE result_id='00000000-0000-0000-0000-000000992141'
+            ) retained
+            """))
+                .containsExactly("a".repeat(40) + "|false|Add retry", "a".repeat(40) + "|false|Add retry");
         assertThat(column(
                         database,
                         "SELECT count(*)::text FROM result r LEFT JOIN item i ON"
@@ -163,8 +174,8 @@ class PracticeV1CutoverMigrationTest {
                         column(
                                 database,
                                 "SELECT count(*)::text FROM information_schema.tables WHERE table_schema='public' AND"
-                                    + " table_name IN"
-                                    + " ('observation','practice_result','practice_observation','agent_job','artifact_signal','identity_link','workspace_membership')"))
+                                        + " table_name IN"
+                                        + " ('observation','practice_result','practice_observation','agent_job','artifact_signal','identity_link','workspace_membership')"))
                 .containsExactly("0");
     }
 
@@ -181,10 +192,10 @@ class PracticeV1CutoverMigrationTest {
         assertThatThrownBy(() -> execute(
                         database,
                         "INSERT INTO"
-                            + " result(id,workspace_id,review_id,practice_id,practice_version_id,item_id,item_version,developer_id,outcome,summary,evidence_version,recorded_at)"
-                            + " SELECT"
-                            + " gen_random_uuid(),workspace_id,review_id,practice_id,practice_version_id,item_id,item_version,developer_id,outcome,summary,0,recorded_at"
-                            + " FROM result WHERE id='"
+                                + " result(id,workspace_id,review_id,practice_id,practice_version_id,item_id,item_version,developer_id,outcome,summary,evidence_version,recorded_at)"
+                                + " SELECT"
+                                + " gen_random_uuid(),workspace_id,review_id,practice_id,practice_version_id,item_id,item_version,developer_id,outcome,summary,0,recorded_at"
+                                + " FROM result WHERE id='"
                                 + RESULT + "'"))
                 .hasRootCauseInstanceOf(SQLException.class)
                 .hasMessageContaining("evidence version 1");
@@ -225,8 +236,8 @@ class PracticeV1CutoverMigrationTest {
         var beforeReplay = column(
                 database,
                 "SELECT (SELECT count(*) FROM result WHERE workspace_id=992101)::text || '|' || (SELECT count(*) FROM"
-                    + " feedback_copy WHERE workspace_id=992101) || '|' || (SELECT count(*) FROM feedback_send WHERE"
-                    + " workspace_id=992101)");
+                        + " feedback_copy WHERE workspace_id=992101) || '|' || (SELECT count(*) FROM feedback_send WHERE"
+                        + " workspace_id=992101)");
         upgrade(database, context);
         assertThat(column(
                         database,
@@ -264,9 +275,9 @@ class PracticeV1CutoverMigrationTest {
         assertThat(column(
                         database,
                         "SELECT feedback_id::text || '|' || action || '|' || state || '|' || attempts FROM"
-                            + " feedback_send WHERE feedback_id IN"
-                            + " ('00000000-0000-0000-0000-000000992161','00000000-0000-0000-0000-000000992231','00000000-0000-0000-0000-000000992232')"
-                            + " ORDER BY feedback_id"))
+                                + " feedback_send WHERE feedback_id IN"
+                                + " ('00000000-0000-0000-0000-000000992161','00000000-0000-0000-0000-000000992231','00000000-0000-0000-0000-000000992232')"
+                                + " ORDER BY feedback_id"))
                 .containsExactly(
                         "00000000-0000-0000-0000-000000992161|POST|DONE|2",
                         "00000000-0000-0000-0000-000000992231|POST|DONE|3",

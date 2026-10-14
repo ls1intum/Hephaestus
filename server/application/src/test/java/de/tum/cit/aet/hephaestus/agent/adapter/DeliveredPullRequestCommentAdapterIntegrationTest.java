@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewComment;
@@ -118,11 +119,11 @@ class DeliveredPullRequestCommentAdapterIntegrationTest extends AbstractWorkspac
                 null);
         copy(save(elsewhere, work, FeedbackState.DELIVERED), FeedbackCopyKind.LINE_NOTE, "gid://gitlab/Note/209", null);
 
-        assertThat(lookup.findForPullRequest(workspace.getId(), work.getId()))
+        assertThat(lookup.findForPullRequest(workspace.getId(), work.getId(), ScmItemEvents.PULL_REQUEST))
                 .isEqualTo(new CommentIds(Set.of(101L, 102L, 103L, 104L), Set.of(201L, 202L)));
-        assertThat(lookup.findForPullRequest(elsewhere.getId(), work.getId()))
+        assertThat(lookup.findForPullRequest(elsewhere.getId(), work.getId(), ScmItemEvents.PULL_REQUEST))
                 .isEqualTo(new CommentIds(Set.of(), Set.of(209L)));
-        assertThat(lookup.findForPullRequest(workspace.getId(), otherWork.getId()))
+        assertThat(lookup.findForPullRequest(workspace.getId(), otherWork.getId(), ScmItemEvents.PULL_REQUEST))
                 .isEqualTo(new CommentIds(Set.of(), Set.of()));
     }
 
@@ -150,7 +151,7 @@ class DeliveredPullRequestCommentAdapterIntegrationTest extends AbstractWorkspac
         copy(save(workspace, work, FeedbackState.DELIVERED), FeedbackCopyKind.SUMMARY, "gid://gitlab/Note/7001", null);
         copy(save(workspace, work, FeedbackState.DELIVERED), FeedbackCopyKind.SUMMARY, "IC_kwDOunmapped", null);
 
-        assertThat(lookup.findForPullRequest(workspace.getId(), work.getId()))
+        assertThat(lookup.findForPullRequest(workspace.getId(), work.getId(), ScmItemEvents.PULL_REQUEST))
                 .isEqualTo(new CommentIds(Set.of(5_001L), Set.of(6_001L)));
     }
 

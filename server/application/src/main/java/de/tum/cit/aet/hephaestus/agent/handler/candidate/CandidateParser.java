@@ -292,7 +292,7 @@ public final class CandidateParser {
     private static boolean overlaps(EvidenceCitation a, EvidenceCitation b) {
         return a.sourceKind().equals(b.sourceKind())
                 && a.sourcePath().equals(b.sourcePath())
-                && Objects.equals(a.revision(), b.revision())
+                && Objects.equals(a.commit(), b.commit())
                 && a.path().equals(b.path())
                 && a.side() == b.side()
                 && a.startLine() <= b.endLine()

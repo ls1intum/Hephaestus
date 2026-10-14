@@ -388,7 +388,6 @@ describe("the report's calls", () => {
 			status: "REFUSED",
 			reviewId: null,
 			reason: "COOLDOWN_ACTIVE",
-			reasonDescription: "Too soon.",
 		};
 		const { built, requests } = await api(async () => json(refusal));
 		await expect(built.requestReview("team", "16")).resolves.toStrictEqual(refusal);

@@ -124,7 +124,7 @@ public class GitHubLineNoteWriter implements LineNoteWriter {
         for (LineNote item : feedbackItems) {
             String key = item.writeKey();
             if (key != null && !processedKeys.add(key)) {
-                continue; 
+                continue;
             }
             FeedbackAnchor diff = item.anchor();
             if (item.body().isBlank() || (diff.endLine() != null && diff.side() == null)) {
@@ -468,7 +468,7 @@ public class GitHubLineNoteWriter implements LineNoteWriter {
         }
         String key = ScmFeedbackFormatter.lastDeliveryKey(body);
         if (key == null) {
-            return; 
+            return;
         }
         LineNote item = expected.get(key);
         boolean verified = item != null && sameCopy(thread, firstComment, body, item, commitOid);

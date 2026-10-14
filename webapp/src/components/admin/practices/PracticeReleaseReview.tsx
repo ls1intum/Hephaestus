@@ -1,7 +1,11 @@
 import { use, useId, useState } from "react";
 import { UnsavedPracticeDraft } from "@/components/admin/practice-editor/unsaved-practice-draft";
 
-import type { CatalogPracticeReleaseProposal, Choice, PracticeDefinition } from "@/api/types.gen";
+import type {
+	AcceptPracticeReleaseRequest,
+	PracticeDefinition,
+	PracticeReleaseProposal,
+} from "@/api/types.gen";
 import {
 	PRACTICE_DEFINITION_FIELDS,
 	type PracticeDefinitionField,
@@ -31,12 +35,13 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 
-type Source = Choice["source"];
+type Choices = AcceptPracticeReleaseRequest["choices"];
+type Source = Choices[string];
 
 export interface PracticeReleaseReviewProps {
-	proposal: CatalogPracticeReleaseProposal;
+	proposal: PracticeReleaseProposal;
 	pending: "accept" | "decline" | null;
-	onAccept: (choices: Choice[]) => void;
+	onAccept: (choices: Choices) => void;
 	onDecline: () => void;
 }
 
@@ -61,7 +66,7 @@ export function PracticeReleaseReview({
 	const ready = proposal.fields.every((field) => !field.offeredChanged || choices.has(field.field));
 	const unsavedDraft = use(UnsavedPracticeDraft);
 	const [confirmingAccept, setConfirmingAccept] = useState(false);
-	const accept = () => onAccept(Array.from(choices, ([field, source]) => ({ field, source })));
+	const accept = () => onAccept(Object.fromEntries(choices));
 	const submit = () => {
 		if (!ready) {
 			return;

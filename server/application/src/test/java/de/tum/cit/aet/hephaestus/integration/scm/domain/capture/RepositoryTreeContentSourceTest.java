@@ -72,7 +72,7 @@ class RepositoryTreeContentSourceTest extends BaseUnitTest {
                         true,
                         Set.of()));
 
-        var contribution = source.capture(job, source.sourceKinds());
+        var contribution = source.capture(job, Set.of(RepositoryTreeContentSource.KIND));
         if (contribution.cleanup() != null) cleanups.add(contribution.cleanup());
 
         assertThat(contribution.files()).isEmpty();
@@ -103,7 +103,7 @@ class RepositoryTreeContentSourceTest extends BaseUnitTest {
                                 GitRepositoryManager.TREE_LIMITATION_UNSAFE_PATH,
                                 GitRepositoryManager.TREE_LIMITATION_SUBMODULE)));
 
-        var contribution = source.capture(job, source.sourceKinds());
+        var contribution = source.capture(job, Set.of(RepositoryTreeContentSource.KIND));
         if (contribution.cleanup() != null) cleanups.add(contribution.cleanup());
 
         // COMPLETE here would license a practice to say "this does not exist anywhere in the
@@ -121,7 +121,7 @@ class RepositoryTreeContentSourceTest extends BaseUnitTest {
         when(gitRepositoryManager.isEnabled()).thenReturn(true);
         when(gitRepositoryManager.isRepositoryCloned(new RepositoryKey(99L, 17L)))
                 .thenReturn(true);
-        assertThatThrownBy(() -> source.capture(job(17L, null), source.sourceKinds()))
+        assertThatThrownBy(() -> source.capture(job(17L, null), Set.of(RepositoryTreeContentSource.KIND)))
                 .isInstanceOf(ItemCaptureException.class)
                 .hasMessageContaining("commit_sha");
     }
@@ -136,7 +136,7 @@ class RepositoryTreeContentSourceTest extends BaseUnitTest {
                         new RepositoryKey(99L, 17L), "0123456789012345678901234567890123456789"))
                 .thenThrow(new GitRepositoryManager.GitOperationException("unreadable commit", new IOException()));
 
-        assertThatThrownBy(() -> source.capture(job, source.sourceKinds()))
+        assertThatThrownBy(() -> source.capture(job, Set.of(RepositoryTreeContentSource.KIND)))
                 .isInstanceOf(ItemCaptureException.class)
                 .hasMessageContaining("Could not capture repository tree");
     }
@@ -146,7 +146,7 @@ class RepositoryTreeContentSourceTest extends BaseUnitTest {
         ScmCaptureContext job = job(17L, "0123456789012345678901234567890123456789");
         when(gitRepositoryManager.isEnabled()).thenReturn(false);
 
-        var contribution = source.capture(job, source.sourceKinds());
+        var contribution = source.capture(job, Set.of(RepositoryTreeContentSource.KIND));
         if (contribution.cleanup() != null) cleanups.add(contribution.cleanup());
 
         assertThat(contribution.files()).isEmpty();
@@ -163,7 +163,7 @@ class RepositoryTreeContentSourceTest extends BaseUnitTest {
         when(gitRepositoryManager.isRepositoryCloned(new RepositoryKey(99L, 17L)))
                 .thenReturn(false);
 
-        var contribution = source.capture(job, source.sourceKinds());
+        var contribution = source.capture(job, Set.of(RepositoryTreeContentSource.KIND));
         if (contribution.cleanup() != null) cleanups.add(contribution.cleanup());
 
         assertThat(contribution.files()).isEmpty();

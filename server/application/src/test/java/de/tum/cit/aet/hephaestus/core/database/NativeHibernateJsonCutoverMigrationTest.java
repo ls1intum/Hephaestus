@@ -169,8 +169,8 @@ class NativeHibernateJsonCutoverMigrationTest {
                         query(
                                 database,
                                 "SELECT count(*)::text FROM information_schema.columns WHERE table_schema='public' AND"
-                                    + " data_type='text' AND (table_name,column_name) IN"
-                                    + " (('auth_event','details'),('config_audit_event','old_value'),('config_audit_event','new_value'),('project_field','options'),('connection_audit','detail'))"))
+                                        + " data_type='text' AND (table_name,column_name) IN"
+                                        + " (('auth_event','details'),('config_audit_event','old_value'),('config_audit_event','new_value'),('project_field','options'),('connection_audit','detail'))"))
                 .containsExactly("5");
         List<@Nullable String> history =
                 query(database, "SELECT id || ':' || md5sum FROM databasechangelog ORDER BY orderexecuted");
@@ -298,8 +298,8 @@ class NativeHibernateJsonCutoverMigrationTest {
                 "INSERT INTO connection(id,workspace_id,kind,instance_key,config)"
                         + " VALUES(995101,995101,'GITHUB','cutover','{\"type\":\"GITHUB_PAT\",\"enabledStreams\":[]}')",
                 "INSERT INTO project(id,native_id,provider_id,owner_type,owner_id,number,template,closed,is_public)"
-                    + " SELECT 995102,995102,id,'ORGANIZATION',995101,1,false,false,false FROM identity_provider WHERE"
-                    + " type='GITHUB' AND server_url='https://github.com'",
+                        + " SELECT 995102,995102,id,'ORGANIZATION',995101,1,false,false,false FROM identity_provider WHERE"
+                        + " type='GITHUB' AND server_url='https://github.com'",
                 "SELECT partman.create_partition_time('public.auth_event', ARRAY['2020-01-01'::timestamptz])",
                 "INSERT INTO auth_event(id,occurred_at,event_type,result,details)"
                         + " VALUES(995300,'2020-01-02','LOGIN','SUCCESS','\"Retained old prose\"')");
@@ -311,8 +311,8 @@ class NativeHibernateJsonCutoverMigrationTest {
                                 + (i == 0 ? "'2100-01-02'" : "now()")
                                 + ",'LOGIN','SUCCESS',?::jsonb,'192.0.2.1','cutover fixture')",
                         "INSERT INTO"
-                            + " config_audit_event(id,occurred_at,actor_kind,entity_type,entity_id,action,changed_keys,old_value,new_value)"
-                            + " VALUES(?,"
+                                + " config_audit_event(id,occurred_at,actor_kind,entity_type,entity_id,action,changed_keys,old_value,new_value)"
+                                + " VALUES(?,"
                                 + (i == 0 ? "now()-interval '366 days'" : "now()")
                                 + ",'SYSTEM','CURATED_PRACTICE','hash:sha256:abc','UPDATED',ARRAY['hash'],?::jsonb,?::jsonb)",
                         "INSERT INTO project_field(id,project_id,name,data_type,options,created_at,updated_at)"

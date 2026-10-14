@@ -59,14 +59,16 @@ class ScmCitableTextsTest extends BaseUnitTest {
                     new ReviewRepositoryPreparer.PreparedReview(new RepositoryKey(1, 2), head.name(), base.name()),
                     files);
             assertThat(texts).hasSize(4);
-            assertThat(texts.stream().filter(text -> text.revision() != null).toList())
+            assertThat(texts.stream().filter(text -> text.commit() != null).toList())
                     .hasSize(2)
                     .allSatisfy(text -> {
                         String expected = text.side() == CitationSide.OLD ? "before\n" : "after\n";
                         assertThat(files.get(text.stagedPath())).isEqualTo(expected.getBytes(StandardCharsets.UTF_8));
                         assertThat(text.sha256())
                                 .isEqualTo(
-                                        ScmVersion.contentHash(Objects.requireNonNull(files.get(text.stagedPath()))));
+                                        text.side() == CitationSide.OLD
+                                                ? "9160d4be34c8695bd172a76c7c7966587ea5a4d991ad22c87b2b91af54aa9ebb"
+                                                : "7b9a72466d3960eb2aacccfc848939453490db0678bd4725def3f789b891c919");
                         assertThat(text.path()).isEqualTo("a.ts");
                     });
         }
@@ -102,7 +104,7 @@ class ScmCitableTextsTest extends BaseUnitTest {
                     assertThat(text.sha256()).isEqualTo(ScmVersion.contentHash(words.getBytes(StandardCharsets.UTF_8)));
                     assertThat(text.source()).isEqualTo(PullRequestContentSource.CORE.value());
                     assertThat(text.side()).isEqualTo(CitationSide.NEW);
-                    assertThat(text.revision()).isNull();
+                    assertThat(text.commit()).isNull();
                 });
         assertThat(texts).anySatisfy(text -> assertThat(text.path()).isEqualTo("context/metadata.json#/nested/a~1b~0"));
     }
@@ -140,7 +142,7 @@ class ScmCitableTextsTest extends BaseUnitTest {
                     manager,
                     new ReviewRepositoryPreparer.PreparedReview(new RepositoryKey(1, 2), head.name(), base.name()),
                     files);
-            assertThat(texts.stream().filter(text -> text.revision() != null).toList())
+            assertThat(texts.stream().filter(text -> text.commit() != null).toList())
                     .extracting(text -> text.side() + ":" + text.path())
                     .containsExactlyInAnyOrder("OLD:deleted.ts", "OLD:before.ts", "NEW:added.json", "NEW:after.ts");
             assertThat(texts)
