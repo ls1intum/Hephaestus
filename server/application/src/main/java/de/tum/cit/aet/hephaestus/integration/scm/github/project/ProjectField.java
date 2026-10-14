@@ -19,8 +19,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -111,8 +109,8 @@ public class ProjectField {
      * For SINGLE_SELECT: array of {id, name, color, description}.
      * For ITERATION: array of {id, title, startDate, duration}.
      */
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "jsonb")
+    @Column(columnDefinition = "text")
+    @Nullable
     @ToString.Exclude
     private String options;
 

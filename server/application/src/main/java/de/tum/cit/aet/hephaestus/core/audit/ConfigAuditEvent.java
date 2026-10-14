@@ -97,13 +97,11 @@ public class ConfigAuditEvent {
     @Column(name = "changed_keys", nullable = false, columnDefinition = "text[]")
     private String[] changedKeys;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "old_value", columnDefinition = "jsonb")
+    @Column(name = "old_value", columnDefinition = "text")
     @Nullable
     private String oldValue;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "new_value", columnDefinition = "jsonb")
+    @Column(name = "new_value", columnDefinition = "text")
     @Nullable
     private String newValue;
 

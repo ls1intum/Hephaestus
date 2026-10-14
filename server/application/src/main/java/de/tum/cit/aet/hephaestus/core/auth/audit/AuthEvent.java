@@ -97,8 +97,7 @@ public class AuthEvent {
     @Nullable
     private String userAgent;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "details", columnDefinition = "jsonb")
+    @Column(name = "details", columnDefinition = "text")
     @Nullable
     private String details;
 

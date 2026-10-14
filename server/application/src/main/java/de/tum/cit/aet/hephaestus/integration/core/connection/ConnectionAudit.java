@@ -14,8 +14,6 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.Objects;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -77,8 +75,7 @@ public class ConnectionAudit {
     @Nullable
     private String correlationId;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "detail", columnDefinition = "jsonb")
+    @Column(name = "detail", columnDefinition = "text")
     @Nullable
     private String detail;
 
