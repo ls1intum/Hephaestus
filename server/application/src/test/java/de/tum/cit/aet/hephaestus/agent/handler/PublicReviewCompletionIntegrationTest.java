@@ -34,6 +34,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
+import de.tum.cit.aet.hephaestus.agent.job.DeliveryStatus;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewCompositionBasis;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewCompositionBasisRepository;
 import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
@@ -116,10 +117,12 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.util.AopTestUtils;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -214,6 +217,9 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
 
     @Autowired
     private FeedbackDeliveryService feedbackDeliveryService;
+
+    @Autowired
+    private PracticeFeedbackDispatchRecovery dispatchRecovery;
 
     @Autowired
     private ReviewCompositionBasisRepository bases;
@@ -851,6 +857,115 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
         assertNoPrivatePreparation();
     }
 
+    @ParameterizedTest
+    @CsvSource({"0,false", "3,false", "0,true"})
+    void shouldReconcileAnAlreadyProjectedPublicReceiptAfterTheRunBecomesTerminal(
+            int attempts, boolean privateFailure) {
+        PublicReviewCompletion accepted = acceptAndPostWhileRunning();
+        UUID deliveredFeedbackId =
+                rows(FeedbackDeliveryState.DELIVERED).getFirst().getId();
+        pendingTerminalOutput(privateFailure);
+        if (attempts == 3) {
+            // Persist the exhausted terminal boundary; this test does not execute the capped reaper.
+            AgentJob exhausted = reload();
+            exhausted.setDeliveryStatus(DeliveryStatus.FAILED);
+            exhausted.setDeliveryAttempts((short) attempts);
+            agentJobRepository.saveAndFlush(exhausted);
+        }
+
+        recoverDispatches();
+
+        assertPostedPublicReviewUnchanged(accepted, deliveredFeedbackId);
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            AgentJob prepared = reload();
+            assertThat(prepared.getInAppPreparedAt()).isNotNull();
+            assertThat(prepared.getInChatPreparedAt()).isNotNull();
+        });
+        AgentJob recovered = reload();
+        assertThat(recovered.getStatus()).isEqualTo(AgentJobStatus.COMPLETED);
+        assertThat(recovered.getDeliveryAttempts()).isEqualTo((short) attempts);
+        assertThat(recovered.getDeliveryStatus())
+                .isEqualTo(privateFailure ? DeliveryStatus.FAILED : DeliveryStatus.DELIVERED);
+        assertThat(recovered.getDeliveryCommentId()).isEqualTo("early-comment");
+    }
+
+    @Test
+    void shouldNotCertifyAnAlreadyPostedPublicReviewWhenTerminalCompositionOutputIsAbsent() {
+        PublicReviewCompletion accepted = acceptAndPostWhileRunning();
+        UUID deliveredFeedbackId =
+                rows(FeedbackDeliveryState.DELIVERED).getFirst().getId();
+        pendingTerminalOutput(false);
+        jdbc.update("UPDATE agent_job SET output=NULL WHERE id=? AND workspace_id=?", job.getId(), workspace.getId());
+
+        recoverDispatches();
+
+        assertPostedPublicReviewUnchanged(accepted, deliveredFeedbackId);
+        AgentJob kept = reload();
+        assertThat(kept.getStatus()).isEqualTo(AgentJobStatus.COMPLETED);
+        assertThat(kept.getOutput()).isNull();
+        assertThat(kept.getDeliveryStatus()).isEqualTo(DeliveryStatus.PENDING);
+        assertThat(kept.getDeliveryCommentId()).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"MISSING", "MISMATCH", "REFUSED", "CANCELLED"})
+    void shouldNotCertifyAnUnqualifiedTerminalOutputFromAnAlreadyPostedReceipt(String guard) {
+        PublicReviewCompletion accepted = acceptAndPostWhileRunning();
+        UUID deliveredFeedbackId =
+                rows(FeedbackDeliveryState.DELIVERED).getFirst().getId();
+        pendingTerminalOutput(false);
+        AgentJob ended = reload();
+        ObjectNode output =
+                (ObjectNode) Objects.requireNonNull(ended.getOutput()).deepCopy();
+        ObjectNode feedback = (ObjectNode) output.path("feedback");
+        if (guard.equals("MISSING")) feedback.remove("compositionFailures");
+        if (guard.equals("MISMATCH")) feedback.put("admissionDigest", "d".repeat(64));
+        ended.setOutput(output);
+        if (guard.equals("REFUSED")) {
+            ObjectNode metadata =
+                    (ObjectNode) Objects.requireNonNull(ended.getMetadata()).deepCopy();
+            metadata.putObject(ObservationAdmissionService.REFUSAL_METADATA_KEY)
+                    .put("reasonCode", "inadmissible_observations");
+            ended.setMetadata(metadata);
+        }
+        if (guard.equals("CANCELLED")) ended.setStatus(AgentJobStatus.CANCELLED);
+        agentJobRepository.saveAndFlush(ended);
+
+        recoverDispatches();
+
+        assertPostedPublicReviewUnchanged(accepted, deliveredFeedbackId);
+        assertThat(reload().getDeliveryStatus()).isEqualTo(DeliveryStatus.PENDING);
+        assertThat(reload().getDeliveryCommentId()).isNull();
+        assertThat(dispatchRepository.findProjectedAutomaticPackagesNeedingReconciliation(PageRequest.of(0, 50)))
+                .extracting(FeedbackDispatch::getId)
+                .doesNotContain(automaticPackage().getId());
+    }
+
+    @Test
+    void shouldReconcileAProjectedSuppressedReceiptWithoutPostingIt() {
+        admit(BOTH_OBSERVATIONS);
+        instanceSettings.updateSilentMode(
+                true,
+                null,
+                null,
+                EntityTagPrecondition.parse("\"" + instanceSettings.get().getVersion() + "\""));
+        assertThat(completionService
+                        .complete(identity(), ADMISSION_DIGEST, summaryOn(SUMMARY, all()))
+                        .accepted())
+                .isTrue();
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            assertThat(automaticPackage().getState()).isEqualTo(FeedbackDispatchState.SUPPRESSED);
+            assertThat(automaticPackage().getProjectedAt()).isNotNull();
+        });
+        pendingTerminalOutput(false);
+
+        recoverDispatches();
+
+        assertThat(reload().getDeliveryStatus()).isEqualTo(DeliveryStatus.DELIVERED);
+        assertThat(automaticPackage().getState()).isEqualTo(FeedbackDispatchState.SUPPRESSED);
+        verify(commentPoster, never()).post(any());
+    }
+
     @Test
     void shouldAcknowledgeAnIdenticalRepeatAndRefuseAChangedReviewWithoutASecondPackage() {
         admit(BOTH_OBSERVATIONS);
@@ -1296,6 +1411,62 @@ class PublicReviewCompletionIntegrationTest extends AbstractWorkspaceIntegration
         admitted.setMetadata(metadata);
         job = agentJobRepository.saveAndFlush(admitted);
         keepOriginalInputs();
+    }
+
+    private void recoverDispatches() {
+        // A manual pass must run the owner, not be skipped by another pass's retained scheduler lease.
+        PracticeFeedbackDispatchRecovery target = AopTestUtils.getUltimateTargetObject(dispatchRecovery);
+        target.recover();
+    }
+
+    private PublicReviewCompletion acceptAndPostWhileRunning() {
+        admit(BOTH_OBSERVATIONS);
+        var outcome = completionService.complete(identity(), ADMISSION_DIGEST, summaryOn(SUMMARY, all()));
+        assertThat(outcome.accepted()).isTrue();
+        FeedbackDispatch dispatch = automaticPackage();
+        assertThat(dispatch.getState()).isEqualTo(FeedbackDispatchState.SENT);
+        assertThat(dispatch.getDeliveredExternalRef()).isEqualTo("early-comment");
+        assertThat(dispatch.getProjectedAt()).isNotNull();
+        assertThat(rows(FeedbackDeliveryState.DELIVERED)).singleElement().satisfies(row -> {
+            assertThat(row.getChannel()).isEqualTo(FeedbackChannel.IN_CONTEXT);
+            assertThat(row.getDeliveredAt()).isNotNull();
+            assertThat(row.getBody()).contains(SUMMARY);
+        });
+        verify(commentPoster, times(1)).post(any());
+        assertThat(reload().getStatus()).isEqualTo(AgentJobStatus.RUNNING);
+        assertThat(reload().getDeliveryStatus()).isNull();
+        return completion();
+    }
+
+    private void assertPostedPublicReviewUnchanged(PublicReviewCompletion accepted, UUID deliveredFeedbackId) {
+        assertThat(completion().getReviewDigest()).isEqualTo(accepted.getReviewDigest());
+        assertThat(completion().getReview()).isEqualTo(accepted.getReview());
+        FeedbackDispatch dispatch = automaticPackage();
+        assertThat(dispatch.getState()).isEqualTo(FeedbackDispatchState.SENT);
+        assertThat(dispatch.getDeliveredExternalRef()).isEqualTo("early-comment");
+        assertThat(dispatch.getProjectedAt()).isNotNull();
+        assertThat(rows(FeedbackDeliveryState.DELIVERED))
+                .extracting(Feedback::getId)
+                .containsExactly(deliveredFeedbackId);
+        verify(commentPoster, times(1)).post(any());
+    }
+
+    /** Fixture metadata for the crash after terminal persistence; this does not execute the worker. */
+    private void pendingTerminalOutput(boolean privateFailure) {
+        AgentJob ended = endWithOutput(summaryOn(SUMMARY, all()));
+        if (privateFailure) {
+            ObjectNode output =
+                    (ObjectNode) Objects.requireNonNull(ended.getOutput()).deepCopy();
+            ((ObjectNode) output.path("feedback"))
+                    .putArray("compositionFailures")
+                    .addObject()
+                    .put("phase", "PRIVATE_FEEDBACK")
+                    .put("reason", "MODEL_ERROR");
+            ended.setOutput(output);
+        }
+        ended.setDeliveryStatus(DeliveryStatus.PENDING);
+        ended.setCompletedAt(Instant.now().minus(Duration.ofMinutes(20)));
+        agentJobRepository.saveAndFlush(ended);
     }
 
     /** The job ended with a terminal output that composed {@code review} against its admitted observations. */

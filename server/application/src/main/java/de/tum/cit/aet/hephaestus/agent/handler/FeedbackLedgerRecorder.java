@@ -400,18 +400,18 @@ public class FeedbackLedgerRecorder {
      * checked at the mentor turn by {@code ConversationalDeliveryReconciler}.
      */
     private void publishFeedbackLaneTrigger(AgentJob job) {
-        // The lanes read the job's final output and record that they ran even when it holds nothing. Only a review on
-        // the work accepted while its job still runs reaches the ledger before that output exists; the terminal
-        // delivery wakes the lanes once it does.
-        if (job.getStatus() == AgentJobStatus.RUNNING) {
-            return;
-        }
         try {
-            eventPublisher.publishEvent(new PracticeFeedbackPreparationRequestedEvent(
-                    job.getId(), job.getWorkspace().getId()));
+            publishPreparationRequest(job);
         } catch (RuntimeException e) {
             log.warn("Feedback-lane trigger publish failed (delivery unaffected): jobId={}", job.getId(), e);
         }
+    }
+
+    private void publishPreparationRequest(AgentJob job) {
+        // An accepted review can reach its ledger while still RUNNING, before private output exists.
+        if (job.getStatus() == AgentJobStatus.RUNNING) return;
+        eventPublisher.publishEvent(new PracticeFeedbackPreparationRequestedEvent(
+                job.getId(), job.getWorkspace().getId()));
     }
 
     /**
@@ -420,7 +420,7 @@ public class FeedbackLedgerRecorder {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void requestPreparation(AgentJob job) {
-        publishFeedbackLaneTrigger(job);
+        publishPreparationRequest(job);
     }
 
     /**

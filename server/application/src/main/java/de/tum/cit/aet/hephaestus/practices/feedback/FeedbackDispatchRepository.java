@@ -280,6 +280,25 @@ public interface FeedbackDispatchRepository extends JpaRepository<FeedbackDispat
         """)
     List<FeedbackDispatch> findUnprojectedTerminal(@Param("now") Instant now, Pageable pageable);
 
+    /** Already projected public receipts whose completed job still needs its processing status or reference. */
+    @Query(value = """
+        SELECT d.* FROM feedback_dispatch d
+        JOIN agent_job j ON j.id = d.agent_job_id AND j.workspace_id = d.workspace_id
+        WHERE d.destination = 'AUTOMATIC_REVIEW_PACKAGE' AND d.projected_at IS NOT NULL
+          AND d.state IN ('SENT', 'SUPPRESSED', 'FAILED')
+          AND j.status = 'COMPLETED' AND j.delivery_status IN ('PENDING', 'FAILED')
+          AND jsonb_exists(j.output -> 'feedback', 'compositionFailures')
+          AND COALESCE(j.metadata #>> '{observation_admission_refusal,reasonCode}', '') = ''
+          AND NULLIF(btrim(j.metadata ->> 'observation_admission_digest'), '') IS NOT NULL
+          AND j.output #>> '{feedback,admissionDigest}' = j.metadata ->> 'observation_admission_digest'
+          AND (j.delivery_status = 'PENDING'
+            OR j.delivery_comment_id IS DISTINCT FROM d.delivered_external_ref
+            OR (j.delivery_status = 'FAILED' AND d.state IN ('SENT', 'SUPPRESSED')
+              AND j.output #> '{feedback,compositionFailures}' = '[]'::jsonb))
+        ORDER BY d.projected_at, d.id
+        """, nativeQuery = true)
+    List<FeedbackDispatch> findProjectedAutomaticPackagesNeedingReconciliation(Pageable pageable);
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
         UPDATE feedback_dispatch

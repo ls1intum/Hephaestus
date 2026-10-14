@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.ReviewResultParser.DiffNote;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.agent.job.DeliveryStatus;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel.DeliveredSignal;
@@ -32,16 +33,21 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
@@ -369,6 +375,61 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
         verify(ledgerRecorder).record(job, delivery, ArtifactKinds.PULL_REQUEST, List.of(), "summary-1", null);
         assertThat(job.getDeliveryCommentId()).isEqualTo("summary-1");
+    }
+
+    @ParameterizedTest
+    @CsvSource({"SENT,false,DELIVERED", "SUPPRESSED,false,DELIVERED", "FAILED,false,FAILED", "SENT,true,FAILED"})
+    void shouldRepairOnlyProcessingMetadataFromAProjectedTerminalReceipt(
+            FeedbackDispatchState receiptState, boolean privateFailure, DeliveryStatus expected) {
+        AgentJob current = completedReceiptJob();
+        if (privateFailure) {
+            var failures = new ObjectMapper().createArrayNode();
+            failures.addObject().put("phase", "PRIVATE_FEEDBACK").put("reason", "MODEL_ERROR");
+            ((ObjectNode) Objects.requireNonNull(current.getOutput()).path("feedback"))
+                    .set("compositionFailures", failures);
+        }
+        FeedbackDispatch receipt = mock(FeedbackDispatch.class);
+        UUID receiptId = UUID.randomUUID();
+        when(receipt.getId()).thenReturn(receiptId);
+        when(receipt.getProjectedAt()).thenReturn(Instant.now());
+        when(receipt.getState()).thenReturn(receiptState);
+        when(receipt.getDeliveredExternalRef()).thenReturn("posted-ref");
+        when(jobRepository.findByIdWithWorkspaceForUpdate(current.getId())).thenReturn(Optional.of(current));
+        when(dispatchService.findAutomaticPackage(current)).thenReturn(Optional.of(receipt));
+
+        service.reconcileProjectedAutomaticPackage(current.getId(), WORKSPACE_ID, receiptId, 0, (short) 0);
+
+        assertThat(current.getDeliveryStatus()).isEqualTo(expected);
+        assertThat(current.getDeliveryCommentId()).isEqualTo("posted-ref");
+        verify(dispatchService, never()).recover(any(), any());
+        verifyNoInteractions(ledgerRecorder);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"99,1,0", "99,0,1", "100,0,0"})
+    void shouldNotRepairAnotherTenantOrAChangedCurrentAttempt(long workspaceId, int retry, short deliveryAttempt) {
+        AgentJob current = completedReceiptJob();
+        when(jobRepository.findByIdWithWorkspaceForUpdate(current.getId())).thenReturn(Optional.of(current));
+
+        service.reconcileProjectedAutomaticPackage(
+                current.getId(), workspaceId, UUID.randomUUID(), retry, deliveryAttempt);
+
+        assertThat(current.getDeliveryStatus()).isEqualTo(DeliveryStatus.PENDING);
+        assertThat(current.getDeliveryCommentId()).isNull();
+        verifyNoInteractions(dispatchService, ledgerRecorder);
+    }
+
+    private AgentJob completedReceiptJob() {
+        AgentJob current = job();
+        current.setStatus(AgentJobStatus.COMPLETED);
+        current.setDeliveryStatus(DeliveryStatus.PENDING);
+        current.setMetadata(
+                new ObjectMapper().createObjectNode().put(ObservationAdmissionService.DIGEST_METADATA_KEY, "digest"));
+        var output = new ObjectMapper().createObjectNode();
+        var feedback = output.putObject("feedback").put("admissionDigest", "digest");
+        feedback.putArray("compositionFailures");
+        current.setOutput(output);
+        return current;
     }
 
     private void stubDisclosure() {

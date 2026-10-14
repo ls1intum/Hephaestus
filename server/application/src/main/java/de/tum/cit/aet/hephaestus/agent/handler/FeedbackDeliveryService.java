@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobService;
+import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.agent.job.DeliveryStatus;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel.DeliveredSignal;
@@ -18,10 +19,12 @@ import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.transaction.annotation.Transactional;
 
 class FeedbackDeliveryService {
 
@@ -293,6 +296,43 @@ class FeedbackDeliveryService {
                 dispatch.getWorkspaceId(),
                 effectiveStatus,
                 dispatch.getDeliveredExternalRef());
+    }
+
+    static boolean canReconcileProjectedReceipt(AgentJob job) {
+        if (job.getStatus() != AgentJobStatus.COMPLETED
+                || (job.getDeliveryStatus() != DeliveryStatus.PENDING
+                        && job.getDeliveryStatus() != DeliveryStatus.FAILED)
+                || FeedbackCompositionResultParser.compositionStatus(job.getOutput())
+                        == FeedbackCompositionResultParser.CompositionStatus.LEGACY_UNKNOWN
+                || ObservationAdmissionService.observationsWereRefused(job)) return false;
+        ObservationAdmissionService.requireMatchingCompositionDigest(job);
+        return true;
+    }
+
+    /** Repairs only job metadata from a current projected receipt; delivery and ledger projection are not replayed. */
+    @Transactional
+    public void reconcileProjectedAutomaticPackage(
+            UUID jobId, Long workspaceId, UUID receiptId, int expectedRetryCount, short expectedDeliveryAttempts) {
+        AgentJob current =
+                agentJobRepository.findByIdWithWorkspaceForUpdate(jobId).orElse(null);
+        if (current == null
+                || !workspaceId.equals(current.getWorkspace().getId())
+                || current.getRetryCount() != expectedRetryCount
+                || current.getDeliveryAttempts() != expectedDeliveryAttempts
+                || !canReconcileProjectedReceipt(current)) return;
+        FeedbackDispatch receipt = dispatchService.findAutomaticPackage(current).orElse(null);
+        if (receipt == null
+                || !receiptId.equals(receipt.getId())
+                || receipt.getProjectedAt() == null
+                || !isTerminal(receipt.getState())) return;
+        // The managed row remains locked through commit: status, output and both attempt counters stay current.
+        DeliveryStatus status = receipt.getState() == FeedbackDispatchState.FAILED
+                        || FeedbackCompositionResultParser.compositionStatus(current.getOutput())
+                                .failed()
+                ? DeliveryStatus.FAILED
+                : DeliveryStatus.DELIVERED;
+        current.setDeliveryStatus(status);
+        current.setDeliveryCommentId(receipt.getDeliveredExternalRef());
     }
 
     /**
