@@ -195,17 +195,16 @@ public class GitHubWorkspaceDataSyncTrigger implements WorkspaceDataSyncTrigger 
                             SyncJobType.INITIAL,
                             SyncJobTrigger.LIFECYCLE,
                             null),
-                    // The job handle is NOT threaded into syncSyncTarget: a single sync-target
-                    // refresh is a
-                    // short, indivisible GraphQL unit, so cooperative cancel/progress (which only
-                    // make sense
-                    // across the multi-repo loop of a full sync) add nothing here. When a broader
-                    // sync is
-                    // already running on this connection, the SyncJobConflictException below
-                    // intentionally
-                    // absorbs this single-target resync, since the in-flight full sync already
-                    // covers it.
-                    handle -> dataSyncServiceProvider.getObject().syncSyncTarget(target));
+                    // The job handle is NOT threaded into syncSyncTarget: a single sync-target refresh is a
+                    // short, indivisible GraphQL unit, so cooperative cancel/progress (which only make sense
+                    // across the multi-repo loop of a full sync) add nothing here. When a broader sync is
+                    // already running on this connection, the SyncJobConflictException below intentionally
+                    // absorbs this single-target resync, since the in-flight full sync already covers it.
+                    handle -> {
+                        if (!dataSyncServiceProvider.getObject().syncSyncTarget(target)) {
+                            handle.reportWarnings();
+                        }
+                    });
         } catch (SyncJobConflictException e) {
             log.info(
                     "Skipped single-target sync: reason=activeJobAlready, workspaceId={},"

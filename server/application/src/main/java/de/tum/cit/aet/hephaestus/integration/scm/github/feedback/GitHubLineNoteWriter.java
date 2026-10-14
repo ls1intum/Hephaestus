@@ -699,11 +699,11 @@ public class GitHubLineNoteWriter implements LineNoteWriter {
                         .document(
                                 fileCopy
                                         ? "mutation"
-                                              + " CorrectPracticeFile($id:ID!,$body:String!){updateIssueComment(input:{id:$id,body:$body}){issueComment{id"
-                                              + " url}}}"
+                                                + " CorrectPracticeFile($id:ID!,$body:String!){updateIssueComment(input:{id:$id,body:$body}){issueComment{id"
+                                                + " url}}}"
                                         : "mutation"
-                                              + " CorrectPracticeLine($id:ID!,$body:String!){updatePullRequestReviewComment(input:{pullRequestReviewCommentId:$id,body:$body}){pullRequestReviewComment{id"
-                                              + " url}}}")
+                                                + " CorrectPracticeLine($id:ID!,$body:String!){updatePullRequestReviewComment(input:{pullRequestReviewCommentId:$id,body:$body}){pullRequestReviewComment{id"
+                                                + " url}}}")
                         .variable("id", externalRef)
                         .variable("body", ScmFeedbackFormatter.withdrawnCopyBody(original))
                         .execute()

@@ -10,7 +10,7 @@ type BudgetVerdict = WorkspaceLlmUsageReport["ownProviderBudgetVerdict"];
 
 /** `own` is the cap the workspace sets on its own provider; `shared` is the host's budget. */
 type CapScope = "shared" | "own";
-type PauseReason = "CAP_REACHED" | "NO_PRICE";
+type PauseReason = "CAP_REACHED" | "UNVERIFIABLE";
 
 /** The two caps pause independently and are never merged into one banner. */
 const PAUSE_COPY: Record<
@@ -23,10 +23,10 @@ const PAUSE_COPY: Record<
 			body: ({ resetDay }) =>
 				`Paused until ${resetDay} (UTC), or until you raise or remove the cap.`,
 		},
-		NO_PRICE: {
+		UNVERIFIABLE: {
 			title: "Your provider cap cannot be enforced",
-			body: ({ subject }) =>
-				`${subject} no price, so the cap cannot be checked and your provider is paused. Add a price to resume, or remove the cap.`,
+			body: () =>
+				"Your provider is paused because some usage has no confirmed cost. Rates may be missing or measurements unverified. Adding rates repairs only verified usage; removing the cap also resumes calls.",
 		},
 	},
 	shared: {
@@ -35,17 +35,16 @@ const PAUSE_COPY: Record<
 			body: ({ resetDay }) =>
 				`Paused until ${resetDay} (UTC), or until an instance admin raises the budget. Practice reviews and Heph can keep running on your own models.`,
 		},
-		NO_PRICE: {
+		UNVERIFIABLE: {
 			title: "Shared-model spend cannot be verified",
-			body: ({ subject }) =>
-				`${subject} no price, so the budget cannot be checked and shared models are paused. Only an instance admin can price them.`,
+			body: () =>
+				"Shared models are paused because some usage has no confirmed cost. Rates may be missing or measurements unverified. Only an instance admin can add shared-model rates, and only verified usage can be repriced.",
 		},
 	},
 };
 
 interface PauseCopyParts {
 	resetDay: string;
-	subject: string;
 }
 
 interface BudgetExhaustedAlertProps {
@@ -53,7 +52,6 @@ interface BudgetExhaustedAlertProps {
 	verdict: BudgetVerdict;
 	/** ISO `yyyy-MM`; defaults to the current UTC month, the only month a live pause can be in. */
 	month?: string;
-	unpricedEventCount?: number;
 	/** Selects the action offered, never a word of the sentence. */
 	context: "usage" | "models";
 	workspaceSlug: string;
@@ -64,13 +62,12 @@ export function BudgetExhaustedAlert({
 	scope,
 	verdict,
 	month = currentMonthUtc(),
-	unpricedEventCount,
 	context,
 	workspaceSlug,
 	onEditOwnProviderCap,
 }: BudgetExhaustedAlertProps) {
-	const noPriceSet = verdict === "UNVERIFIABLE";
-	const copy = PAUSE_COPY[scope][noPriceSet ? "NO_PRICE" : "CAP_REACHED"];
+	const unverifiable = verdict === "UNVERIFIABLE";
+	const copy = PAUSE_COPY[scope][unverifiable ? "UNVERIFIABLE" : "CAP_REACHED"];
 	return (
 		<Alert variant={scope === "own" ? "destructive" : "warning"} role="alert">
 			<TriangleAlert aria-hidden />
@@ -79,12 +76,11 @@ export function BudgetExhaustedAlert({
 				<p>
 					{copy.body({
 						resetDay: budgetResetDayLabel(month),
-						subject: unpricedRunsSubject(scope, unpricedEventCount),
 					})}
 				</p>
 				<PauseAction
 					scope={scope}
-					noPriceSet={noPriceSet}
+					unverifiable={unverifiable}
 					context={context}
 					workspaceSlug={workspaceSlug}
 					onEditOwnProviderCap={onEditOwnProviderCap}
@@ -94,23 +90,9 @@ export function BudgetExhaustedAlert({
 	);
 }
 
-/**
- * The count is the month's runs with no price on both purses, so a counted subject names no purse.
- * Without a count, the verdict alone says that some of this purse's runs have no price.
- */
-function unpricedRunsSubject(scope: CapScope, count: number | undefined): string {
-	if (count === 1) {
-		return "1 run has";
-	}
-	if (count != null && count > 1) {
-		return `${count.toLocaleString()} runs have`;
-	}
-	return scope === "own" ? "Some runs on your models have" : "Some shared-model runs have";
-}
-
 interface PauseActionProps {
 	scope: CapScope;
-	noPriceSet: boolean;
+	unverifiable: boolean;
 	context: "usage" | "models";
 	workspaceSlug: string;
 	onEditOwnProviderCap?: () => void;
@@ -119,7 +101,7 @@ interface PauseActionProps {
 /** Caps are edited on AI usage and prices on AI models, so each page links out for the other. */
 function PauseAction({
 	scope,
-	noPriceSet,
+	unverifiable,
 	context,
 	workspaceSlug,
 	onEditOwnProviderCap,
@@ -138,7 +120,7 @@ function PauseAction({
 		}
 		return (
 			<div className="mt-2 flex flex-wrap gap-2">
-				{noPriceSet && (
+				{unverifiable && (
 					<Link
 						to="/w/$workspaceSlug/admin/models"
 						params={{ workspaceSlug }}
@@ -155,7 +137,7 @@ function PauseAction({
 	}
 	// Only the host can price a shared model, and on the models page the purposes to switch are
 	// already below the banner.
-	if (noPriceSet || context === "models") {
+	if (unverifiable || context === "models") {
 		return null;
 	}
 	return (

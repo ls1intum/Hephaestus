@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentResult.LlmUsage;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.core.llm.usage.MeasurementVerification;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageProvenance;
@@ -293,24 +294,11 @@ class TerminalUsageTest extends BaseUnitTest {
                 null);
 
         static Stream<Arguments> billable() {
-            return Stream.of(
-                    Arguments.argumentSet("observed tokens at a price", observed(), pricedInstance()),
-                    Arguments.argumentSet(
-                            "no tokens at no charge",
-                            TerminalUsage.none(),
-                            new LlmPriceSnapshot(
-                                    UsageFundingSource.INSTANCE,
-                                    UsagePricingState.NO_CHARGE,
-                                    null,
-                                    null,
-                                    null,
-                                    null,
-                                    null,
-                                    null)));
+            return Stream.of(Arguments.argumentSet("observed tokens at a price", observed(), pricedInstance()));
         }
 
         @ParameterizedTest
-        @CsvSource({"40,1,PRICED,false", "0,2,PRICED,true", "0,0,PRICED,false", "40,1,NO_CHARGE,true"})
+        @CsvSource({"40,1,PRICED,false", "0,2,PRICED,true", "0,0,PRICED,false", "40,1,NO_CHARGE,false"})
         void shouldChooseTheLedgerStateFromCompletenessWhenDirectModelCallsFinish(
                 long tokens, long reportedCalls, UsagePricingState pricingState, boolean billable) {
             UUID jobId = UUID.randomUUID();
@@ -347,15 +335,13 @@ class TerminalUsageTest extends BaseUnitTest {
 
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            if (billable) {
-                verify(recorder).record(eq(7L), sample.capture());
-            } else {
-                verify(recorder, times(2)).recordUnverifiable(eq(7L), sample.capture());
-            }
+            verify(recorder, times(2)).record(eq(7L), sample.capture());
             var embedding = sample.getValue();
             assertThat(embedding.sourceType()).isEqualTo(UsageSourceType.PRACTICE_SCRIPT_EMBEDDING);
             assertThat(embedding.totalCalls()).isEqualTo(2);
             assertThat(embedding.inputTokens()).isEqualTo(tokens);
+            assertThat(embedding.measurementVerification())
+                    .isEqualTo(billable ? MeasurementVerification.VERIFIED : MeasurementVerification.UNVERIFIABLE);
         }
 
         @Test
@@ -370,12 +356,24 @@ class TerminalUsageTest extends BaseUnitTest {
             assertThat(billed).isFalse();
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(recorder).recordUnverifiable(eq(7L), sample.capture());
+            verify(recorder).record(eq(7L), sample.capture());
             assertThat(sample.getValue().inputTokens()).isEqualTo(40);
         }
 
         static Stream<Arguments> unbillable() {
             return Stream.of(
+                    Arguments.argumentSet(
+                            "no tokens at no charge",
+                            TerminalUsage.none(),
+                            new LlmPriceSnapshot(
+                                    UsageFundingSource.INSTANCE,
+                                    UsagePricingState.NO_CHARGE,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null)),
                     Arguments.argumentSet(
                             "observed tokens without a price", observed(), LlmPriceSnapshot.unpricedInstance()),
                     Arguments.argumentSet("no tokens at a price", TerminalUsage.none(), pricedInstance()),
@@ -405,7 +403,7 @@ class TerminalUsageTest extends BaseUnitTest {
 
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(recorder).recordUnverifiable(eq(7L), sample.capture());
+            verify(recorder).record(eq(7L), sample.capture());
             assertThat(sample.getValue().sourceType()).isEqualTo(UsageSourceType.REVIEW_JOB);
             assertThat(sample.getValue().model()).isEqualTo("gpt-5");
             // An unpriced row's tokens are still the evidence somebody will reconcile once a price exists.
@@ -445,7 +443,8 @@ class TerminalUsageTest extends BaseUnitTest {
             assertThat(billed).isFalse();
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(recorder).recordUnverifiable(eq(7L), sample.capture());
+            verify(recorder).record(eq(7L), sample.capture());
+            assertThat(sample.getValue().measurementVerification()).isEqualTo(MeasurementVerification.UNVERIFIABLE);
             assertThat(sample.getValue().inputTokens()).isEqualTo(8_000);
             assertThat(sample.getValue().outputTokens()).isEqualTo(200);
             assertThat(sample.getValue().price()).isSameAs(price);
@@ -466,7 +465,8 @@ class TerminalUsageTest extends BaseUnitTest {
 
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(recorder).recordUnverifiable(eq(7L), sample.capture());
+            verify(recorder).record(eq(7L), sample.capture());
+            assertThat(sample.getValue().measurementVerification()).isEqualTo(MeasurementVerification.VERIFIED);
             assertThat(sample.getValue().inputTokens()).isEqualTo(900);
             assertThat(sample.getValue().totalCalls()).isEqualTo(4);
         }
@@ -484,7 +484,7 @@ class TerminalUsageTest extends BaseUnitTest {
 
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(recorder, times(2)).recordUnverifiable(eq(7L), sample.capture());
+            verify(recorder, times(2)).record(eq(7L), sample.capture());
             LlmUsageRecorder.LlmUsageSample decision = sample.getAllValues().get(1);
             assertThat(decision.sourceType()).isEqualTo(UsageSourceType.PRACTICE_SCRIPT_DECISION);
             assertThat(decision.sourceAttempt()).isEqualTo(1);

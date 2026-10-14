@@ -169,6 +169,31 @@ You cannot edit that cap from the past month.
 
 ---
 
+## Rule 9 — Measurement verification is independent of price
+
+`MeasurementVerification` records the source-selection decision for one whole token vector:
+
+- `VERIFIED`: source selection accepted the vector. It does not certify that every provider call was observed.
+- `UNVERIFIABLE`: source selection could not accept a measurement for the whole operation.
+  Observed positive buckets and their provenance remain available, but cost is null and pricing state is `UNPRICED`.
+  Incomparable runner and proxy totals have this status.
+  Their buckets are never fused.
+- `UNKNOWN`: no source-selection decision was recorded for historical or imported usage.
+  Existing tokens, rates, and costs are retained. New recorder appends must supply one of the other two decisions.
+
+A verified vector can still be `UNPRICED` when a required rate is missing.
+The unverifiable-measurement metric counts measurement status, not missing prices.
+Repricing requires `VERIFIED`, `UNPRICED`, and positive billable tokens in both enumeration and the atomic update.
+A rate, including a free-model declaration, cannot establish measurement verification.
+
+Historical `UNKNOWN` unpriced records stay excluded from repricing and continue to block capped purses.
+Historical priced amounts remain in spend totals without gaining a verification claim.
+Do not repair verification decisions with manual database edits.
+This distinction does not recover late provider usage or establish complete call coverage.
+
+`unpricedEventCount` counts ledger usage records across both purses, not runs or provider calls.
+It is not a per-purse count and must not be used as one in budget banners.
+
 ## Where the words are enforced
 
 | Concern | Owner |
@@ -176,4 +201,5 @@ You cannot edit that cap from the past month.
 | Price wording (rules 1, 4) | `webapp/src/lib/llm-pricing.ts` |
 | USD rendering (rules 1, 5) | `webapp/src/lib/money.ts` |
 | Which purse, and whether it pauses (rules 2, 4) | `LlmBudgetVerdict`, `FundingSource`, `LlmBudgetService` |
+| Measurement acceptance and repair eligibility (rule 9) | `MeasurementVerification`, `LlmUsageRecorder`, `LlmUsageRepricer`, `LlmUsageEventRepository` |
 | The in-flight bound behind rule 7's "within a minute" | [ADR 0026](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0026-per-purpose-agent-bindings-and-llm-governance.md) |

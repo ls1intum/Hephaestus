@@ -792,8 +792,8 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         void shouldNotDismissRequiredAiOnboardingWhenAnsweringThePublicStep() {
             jdbc.update(
                     "INSERT INTO"
-                        + " workspace_onboarding_settings(workspace_id,enabled,ai_choice_required,revision,required_connection_ids)"
-                        + " VALUES (?,true,true,0,'[]'::jsonb)",
+                            + " workspace_onboarding_settings(workspace_id,enabled,ai_choice_required,revision,required_connection_ids)"
+                            + " VALUES (?,true,true,0,'[]'::jsonb)",
                     workspace.getId());
             webTestClient
                     .put()

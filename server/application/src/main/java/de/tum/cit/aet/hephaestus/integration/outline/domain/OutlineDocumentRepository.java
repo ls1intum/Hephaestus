@@ -135,8 +135,8 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
             @Param("workspaceId") long workspaceId, @Param("documentId") long documentId);
 
     @Query("SELECT new"
-        + " de.tum.cit.aet.hephaestus.integration.outline.documentation.OutlineDocumentAccess(d.workspaceId,d.id,d.connectionId,d.createdBySubject,d.updatedBySubject,d.collaboratorSubjects,d.deletedAt)"
-        + " FROM OutlineDocument d WHERE d.workspaceId=:workspaceId AND d.id=:documentId")
+            + " de.tum.cit.aet.hephaestus.integration.outline.documentation.OutlineDocumentAccess(d.workspaceId,d.id,d.connectionId,d.createdBySubject,d.updatedBySubject,d.collaboratorSubjects,d.deletedAt)"
+            + " FROM OutlineDocument d WHERE d.workspaceId=:workspaceId AND d.id=:documentId")
     Optional<OutlineDocumentAccess> findAccess(
             @Param("workspaceId") long workspaceId, @Param("documentId") long documentId);
 

@@ -78,7 +78,7 @@ describe("traceVerdict by state group", () => {
 				"This review waits in the queue and has observed nothing yet.",
 			);
 			expect(verdictOf("on-hold").sentence).toBe(
-				"This review is on hold (over the AI budget) and has observed nothing yet.",
+				"This review is on hold (AI budget pause) and has observed nothing yet.",
 			);
 			expect(verdictOf("running").end).toMatchObject({ kind: "open", label: "Open" });
 			expect(verdictOf("completed").sentence).toBe(

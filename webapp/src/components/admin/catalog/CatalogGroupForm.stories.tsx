@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen } from "storybook/test";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 
 import { DetailDrawerStack } from "@/components/layout/detail-drawer/DetailDrawerStack";
 import { LevelCancel } from "@/components/layout/detail-drawer/LevelCancel";
@@ -78,6 +79,27 @@ export const HephaestusUpdateAvailable: Story = {
 			},
 		}),
 		onUseHephaestusVersion: fn(),
+	},
+};
+
+/** A read behind the form failed to refresh. The draft stays open beside the retry. */
+export const RefreshFailed: Story = {
+	args: {
+		mode: "edit",
+		group,
+		refreshAlert: (
+			<QueryErrorAlert
+				error={{ status: 503 }}
+				title="We could not refresh the group"
+				onRetry={fn()}
+			/>
+		),
+	},
+	play: async () => {
+		await expectPanelContentInset(await settledDrawerPanel());
+		await expect(screen.getByText("We could not refresh the group")).toBeVisible();
+		await expect(screen.getByRole("button", { name: "Retry" })).toBeEnabled();
+		await expect(screen.getByRole("textbox", { name: /Name/u })).toHaveValue(group.name);
 	},
 };
 

@@ -107,7 +107,7 @@ class DeterministicGroupGuidanceComposerTest {
     @Test
     void shouldKeepLongCatalogGuidanceCompactAndOnOneLine() {
         String longExemplar = ("Explain the motivation, constraints, rollout, alternatives, and expected outcome in"
-            + " language that lets a reviewer understand the decision without reconstructing it from code.\n")
+                        + " language that lets a reviewer understand the decision without reconstructing it from code.\n")
                 .repeat(3);
         PracticeStandingDTO gap =
                 card("pr-descriptions", "PR Descriptions", null, longExemplar, List.of(item()), List.of());

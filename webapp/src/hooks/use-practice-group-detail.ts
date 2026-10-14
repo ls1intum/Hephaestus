@@ -1,4 +1,5 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 import {
 	getPracticeGuidanceOptions,
@@ -75,14 +76,16 @@ export function usePracticeGroupDetail({
 	const feedGroupSlug = groupSlug ?? practice?.groupSlug ?? undefined;
 	const practiceOpen = practiceSlug !== undefined && feedGroupSlug !== undefined;
 
+	const activityOptions = listOwnGroupReviewsInfiniteOptions({
+		path: { workspaceSlug, groupSlug: feedGroupSlug ?? "" },
+		query: { size: REVIEW_PAGE_SIZE },
+	});
 	const activityQuery = useInfiniteQuery({
-		...listOwnGroupReviewsInfiniteOptions({
-			path: { workspaceSlug, groupSlug: feedGroupSlug ?? "" },
-			query: { size: REVIEW_PAGE_SIZE },
-		}),
+		...activityOptions,
 		...pagedModelParams,
 		enabled: practiceOpen,
 	});
+	useQueryReadRefusal(activityOptions.queryKey, activityQuery.isError, activityQuery.error);
 	// Its own request, so the words the standing carries show while the picture is on its way. It
 	// keeps the app's staleTime: the server answers a refetch of an unchanged guidance with a 304.
 	const guidanceQuery = useQuery({

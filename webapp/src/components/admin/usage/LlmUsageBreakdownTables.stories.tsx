@@ -122,12 +122,12 @@ export const ByJobType: Story = {
 	},
 };
 
-/** Every run priced: no column of zeros under *No price set*. */
+/** Every run priced: no column of zeros under *Unavailable cost*. */
 export const AllRunsPriced: Story = {
 	args: { report: report({ byJobType: [pullRequestReviewRow] }) },
 	play: async ({ canvas }) => {
 		const table = within(await canvas.findByRole("table", { name: "AI spend by run type" }));
-		await expect(table.queryByRole("columnheader", { name: "No price set" })).toBeNull();
+		await expect(table.queryByRole("columnheader", { name: "Unavailable cost" })).toBeNull();
 		await expect(table.queryByRole("row", { name: /^Total/u })).toBeNull();
 	},
 };

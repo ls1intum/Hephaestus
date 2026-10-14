@@ -10,7 +10,10 @@ export type JobWait = { kind: "backoff" };
  * `null` for a job that is simply claimable: `availableAt` is in the past for almost every job, so a
  * "due …" line on every queued row would be noise.
  */
-export function jobWait(job: Pick<ReviewJob, "status" | "availableAt">, now: number): JobWait | null {
+export function jobWait(
+	job: Pick<ReviewJob, "status" | "availableAt">,
+	now: number,
+): JobWait | null {
 	if (job.status !== "QUEUED") {
 		return null;
 	}

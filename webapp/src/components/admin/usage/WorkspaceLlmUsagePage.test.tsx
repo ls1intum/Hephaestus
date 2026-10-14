@@ -66,14 +66,14 @@ describe("WorkspaceLlmUsagePage", () => {
 		const byJobType = screen.getByRole("table", { name: "AI spend by run type" });
 		within(byJobType).getByRole("columnheader", { name: "Shared models" });
 		within(byJobType).getByRole("columnheader", { name: "Own provider" });
-		within(byJobType).getByRole("columnheader", { name: "No price set" });
+		within(byJobType).getByRole("columnheader", { name: "Unavailable cost" });
 		within(byJobType).getByText("$8.20");
 		within(byJobType).getByText("$1.92");
 
 		const byDay = screen.getByRole("table", { name: "AI spend by day" });
 		within(byDay).getByRole("columnheader", { name: "Shared models" });
 		within(byDay).getByRole("columnheader", { name: "Own provider" });
-		within(byDay).getByRole("columnheader", { name: "No price set" });
+		within(byDay).getByRole("columnheader", { name: "Unavailable cost" });
 		within(byDay).getByText("$5.63");
 		within(byDay).getByText("$1.92");
 	});
@@ -84,7 +84,7 @@ describe("WorkspaceLlmUsagePage", () => {
 		for (const name of ["AI spend by run type", "AI spend by day"]) {
 			const table = screen.getByRole("table", { name });
 			expect(within(table).queryByRole("columnheader", { name: "Own provider" })).toBeNull();
-			expect(within(table).queryByRole("columnheader", { name: "No price set" })).toBeNull();
+			expect(within(table).queryByRole("columnheader", { name: "Unavailable cost" })).toBeNull();
 		}
 		// The tile stays: it is where a workspace learns it can bring its own provider. While that
 		// provider is not in use, there is no provider cap to set from here.
@@ -102,9 +102,9 @@ describe("WorkspaceLlmUsagePage", () => {
 	it("gives the right pricing owner an actionable no-price-set warning", async () => {
 		await renderPage();
 
-		screen.getByText("2 runs have no price");
+		screen.getByText("2 runs have unavailable cost");
 		screen.getByText(
-			/Add prices for your own models in .*\. For shared models, ask an instance admin\./u,
+			/Adding rates repairs only verified usage\. Set rates for your own models in .*\. For shared models, ask an instance admin\./u,
 		);
 	});
 
@@ -140,7 +140,7 @@ describe("WorkspaceLlmUsagePage", () => {
 				"an unenforceable provider cap",
 				{ ownProviderPaused: true, ownProviderBudgetVerdict: "UNVERIFIABLE" },
 				"Your provider cap cannot be enforced",
-				"2 runs have no price, so the cap cannot be checked and your provider is paused. Add a price to resume, or remove the cap.",
+				"Your provider is paused because some usage has no confirmed cost. Rates may be missing or measurements unverified. Adding rates repairs only verified usage; removing the cap also resumes calls.",
 				"/w/acme/admin/models",
 			],
 			[
@@ -154,7 +154,7 @@ describe("WorkspaceLlmUsagePage", () => {
 				"an unverifiable shared budget",
 				{ instancePaused: true, instanceBudgetVerdict: "UNVERIFIABLE" },
 				"Shared-model spend cannot be verified",
-				"2 runs have no price, so the budget cannot be checked and shared models are paused. Only an instance admin can price them.",
+				"Shared models are paused because some usage has no confirmed cost. Rates may be missing or measurements unverified. Only an instance admin can add shared-model rates, and only verified usage can be repriced.",
 				null,
 			],
 		])(

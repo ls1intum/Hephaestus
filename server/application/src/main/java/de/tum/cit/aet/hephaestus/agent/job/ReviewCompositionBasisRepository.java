@@ -19,8 +19,8 @@ public interface ReviewCompositionBasisRepository extends Repository<ReviewCompo
     record OriginalCopy(UUID copyId, int admissionAttempt, Instant expiresAt) {}
 
     @Query("SELECT new"
-        + " de.tum.cit.aet.hephaestus.agent.job.ReviewCompositionBasisRepository$OriginalCopy(b.copyId,b.admissionAttempt,b.expiresAt)"
-        + " FROM ReviewCompositionBasis b WHERE b.workspaceId=:workspaceId AND b.jobId=:jobId")
+            + " de.tum.cit.aet.hephaestus.agent.job.ReviewCompositionBasisRepository$OriginalCopy(b.copyId,b.admissionAttempt,b.expiresAt)"
+            + " FROM ReviewCompositionBasis b WHERE b.workspaceId=:workspaceId AND b.jobId=:jobId")
     Optional<OriginalCopy> findOriginalCopy(@Param("workspaceId") long workspaceId, @Param("jobId") UUID jobId);
 
     @Modifying

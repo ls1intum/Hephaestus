@@ -79,8 +79,8 @@ class PracticeV1DefinitionMigrationTest {
                 assertThat(PracticeV1CutoverMigrationTest.column(
                                 database,
                                 "SELECT encode(sha256(convert_to(v.definition->>'script','UTF8')),'hex') || '|' ||"
-                                    + " v.number FROM practice p JOIN practice_version v ON v.id=p.current_version_id"
-                                    + " WHERE p.id="
+                                        + " v.number FROM practice p JOIN practice_version v ON v.id=p.current_version_id"
+                                        + " WHERE p.id="
                                         + (1000000L + index)))
                         .containsExactly(program.path("targetSha256").asString() + "|2");
                 index++;

@@ -2,9 +2,9 @@ import { Pencil, Plug, Plus, Trash2 } from "lucide-react";
 import { useId, useState } from "react";
 
 import type { LlmConnection } from "@/api/types.gen";
-import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {

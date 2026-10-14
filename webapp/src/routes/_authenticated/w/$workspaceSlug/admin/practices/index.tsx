@@ -1,4 +1,10 @@
-import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+	type QueryKey,
+	useMutation,
+	useQueries,
+	useQuery,
+	useQueryClient,
+} from "@tanstack/react-query";
 import { createFileRoute, Link, retainSearchParams } from "@tanstack/react-router";
 import { Inbox, ListChecks } from "lucide-react";
 import { type ReactNode, useState } from "react";
@@ -68,9 +74,16 @@ import {
 	type WorkspacePracticeState,
 } from "@/components/admin/practices/WorkspacePracticePanel";
 import { panelState } from "@/components/common/panel-state";
-import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
-import { detailStackKey, parseDetailStack } from "@/components/layout/detail-drawer/detail-stack";
-import { DetailDrawerStack } from "@/components/layout/detail-drawer/DetailDrawerStack";
+import { QueryErrorAlert, queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
+import {
+	type DetailStackEntry,
+	detailStackKey,
+	parseDetailStack,
+} from "@/components/layout/detail-drawer/detail-stack";
+import {
+	type DetailDrawerLevel,
+	DetailDrawerStack,
+} from "@/components/layout/detail-drawer/DetailDrawerStack";
 import { levelPathAt } from "@/components/layout/detail-drawer/level-path";
 import { LevelCancel } from "@/components/layout/detail-drawer/LevelCancel";
 import { useDetailStack } from "@/components/layout/detail-drawer/use-detail-stack";
@@ -98,6 +111,9 @@ import { workspaceAdminHead } from "@/lib/page-title";
 import { problemStatusOf } from "@/lib/problem-detail";
 import { queryOperationId } from "@/lib/query-operation-id";
 import { useSearchState } from "@/lib/search-params";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
+
+type LevelEntry = DetailStackEntry<(typeof DETAIL_LEVEL_KINDS)[number]>;
 
 /** A level's payload, tagged by the kind of entry that produced it; a level not yet created has none. */
 type LevelPayload =
@@ -105,6 +121,34 @@ type LevelPayload =
 	| { kind: "catalog-practice"; data: CatalogPracticePreview }
 	| { kind: "practice"; data: Practice };
 type LevelQuery = { data: LevelPayload | null | undefined } | undefined;
+
+/**
+ * The read behind one level, keyed by that level's slug. `useQueries` cannot correlate a result with
+ * the entry that produced it, so each payload is tagged: without it every read is a union, and a
+ * mis-ordered stack is a runtime `undefined.name` rather than a type error.
+ */
+function levelQueryOptions(workspaceSlug: string, entry: LevelEntry) {
+	if (entry.kind === "catalog-group") {
+		return {
+			...previewGroupAdoptionOptions({ path: { workspaceSlug, slug: entry.id } }),
+			select: (data: CatalogGroupAdoptionPreview) => ({ kind: "catalog-group", data }) as const,
+		};
+	}
+	if (entry.kind === "catalog-practice") {
+		return {
+			...previewPracticeAdoptionOptions({ path: { workspaceSlug, slug: entry.id } }),
+			select: (data: CatalogPracticePreview) => ({ kind: "catalog-practice", data }) as const,
+		};
+	}
+	if (entry.kind === "practice-new") {
+		// oxlint-disable-next-line hephaestus/no-manual-query-key -- A practice that does not exist yet has nothing on the server to key against; this placeholder only keeps `levelQueries` the same length as the stack.
+		return { queryKey: ["practice-new", entry.id], queryFn: () => null, staleTime: Infinity };
+	}
+	return {
+		...getPracticeOptions({ path: { workspaceSlug, practiceSlug: entry.id } }),
+		select: (data: Practice) => ({ kind: "practice", data }) as const,
+	};
+}
 
 /**
  * Reads a level's payload only when it is the kind the caller is rendering. One reader per kind
@@ -147,6 +191,51 @@ function adoptionAction(stale: boolean, adding: boolean) {
 	return adding ? "adding" : "idle";
 }
 
+/** The slice of a query result that decides what a region shows when the read fails. */
+interface ReadResult {
+	isError: boolean;
+	error: unknown;
+	isFetching: boolean;
+	refetch: () => unknown;
+}
+
+/**
+ * The failure a region shows for the reads it needs: a refusal before any other, so it is never
+ * hidden behind a failure that a retry could clear. Retry repeats only the reads that failed.
+ */
+function readFailure(reads: readonly (ReadResult | undefined)[]) {
+	const failed = reads.filter((read): read is ReadResult => read?.isError === true);
+	const shown = failed.find((read) => !queryErrorIsRetryable(read.error)) ?? failed[0];
+	if (shown === undefined) {
+		return;
+	}
+	return {
+		error: shown.error,
+		refused: !queryErrorIsRetryable(shown.error),
+		pending: failed.some((read) => read.isFetching),
+		retry: () => {
+			for (const read of failed) {
+				void read.refetch();
+			}
+		},
+	};
+}
+
+interface PracticeSetupLevelProps {
+	queryKey: QueryKey;
+	query: { isError: boolean; error: unknown } | undefined;
+	children: ReactNode;
+}
+
+/**
+ * A drawer level over its own read. Each level the URL opens needs its own component, because the
+ * read is one of `useQueries`' results and a hook cannot run inside the stack's render callback.
+ */
+function PracticeSetupLevel({ queryKey, query, children }: PracticeSetupLevelProps): ReactNode {
+	useQueryReadRefusal(queryKey, query?.isError === true, query?.error);
+	return children;
+}
+
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/")({
 	head: workspaceAdminHead("Practices"),
 	validateSearch: practiceSetupSearchSchema,
@@ -177,18 +266,22 @@ function PracticeCatalogRoute() {
 	const detailStack = parseDetailStack(detail, DETAIL_LEVEL_KINDS);
 	const stackControls = useDetailStack();
 
-	const groupsQuery = useQuery({
-		...listPracticeGroupsOptions({ path: { workspaceSlug } }),
-	});
-	const practicesQuery = useQuery({
-		...listPracticesOptions({ path: { workspaceSlug } }),
-	});
+	const groupsOptions = listPracticeGroupsOptions({ path: { workspaceSlug } });
+	const practicesOptions = listPracticesOptions({ path: { workspaceSlug } });
+	const definitionOptionsOptions = getPracticeDefinitionOptionsOptions({ path: { workspaceSlug } });
+	const groupsQuery = useQuery(groupsOptions);
+	const practicesQuery = useQuery(practicesOptions);
 	const releasesQuery = useQuery({
 		...listPracticeReleasesOptions({ path: { workspaceSlug } }),
 	});
-	const definitionOptionsQuery = useQuery({
-		...getPracticeDefinitionOptionsOptions({ path: { workspaceSlug } }),
-	});
+	const definitionOptionsQuery = useQuery(definitionOptionsOptions);
+	useQueryReadRefusal(groupsOptions.queryKey, groupsQuery.isError, groupsQuery.error);
+	useQueryReadRefusal(practicesOptions.queryKey, practicesQuery.isError, practicesQuery.error);
+	useQueryReadRefusal(
+		definitionOptionsOptions.queryKey,
+		definitionOptionsQuery.isError,
+		definitionOptionsQuery.error,
+	);
 	const catalogQuery = useQuery({
 		...listAdoptablePracticesOptions({ path: { workspaceSlug } }),
 		enabled: library === true,
@@ -202,28 +295,7 @@ function PracticeCatalogRoute() {
 	// tagged: without it every read is a union, and a mis-ordered stack is a runtime `undefined.name`
 	// rather than a type error.
 	const levelQueries = useQueries({
-		queries: detailStack.map((entry) => {
-			if (entry.kind === "catalog-group") {
-				return {
-					...previewGroupAdoptionOptions({ path: { workspaceSlug, slug: entry.id } }),
-					select: (data: CatalogGroupAdoptionPreview) => ({ kind: "catalog-group", data }) as const,
-				};
-			}
-			if (entry.kind === "catalog-practice") {
-				return {
-					...previewPracticeAdoptionOptions({ path: { workspaceSlug, slug: entry.id } }),
-					select: (data: CatalogPracticePreview) => ({ kind: "catalog-practice", data }) as const,
-				};
-			}
-			if (entry.kind === "practice-new") {
-				// oxlint-disable-next-line hephaestus/no-manual-query-key -- A practice that does not exist yet has nothing on the server to key against; this placeholder only keeps `levelQueries` the same length as the stack.
-				return { queryKey: ["practice-new", entry.id], queryFn: () => null, staleTime: Infinity };
-			}
-			return {
-				...getPracticeOptions({ path: { workspaceSlug, practiceSlug: entry.id } }),
-				select: (data: Practice) => ({ kind: "practice", data }) as const,
-			};
-		}),
+		queries: detailStack.map((entry) => levelQueryOptions(workspaceSlug, entry)),
 	});
 
 	// A level behind is named by what it shows once that has loaded, and by its kind until then.
@@ -266,6 +338,9 @@ function PracticeCatalogRoute() {
 		libraryState = { status: "ready", practices: catalogQuery.data };
 	}
 
+	const groups = groupsQuery.data;
+	const practices = practicesQuery.data;
+	const definitionOptions = definitionOptionsQuery.data;
 	/** The groups the editor offers. A hidden group still holds practices but is not a destination. */
 	const editableGroups = groupsQuery.data?.filter((group) => group.shownToDevelopers);
 
@@ -324,7 +399,7 @@ function PracticeCatalogRoute() {
 	};
 	/** A refused reset shows the comparison as it now stands; it never retries on its own. */
 	const resetRefused = async (error: unknown) => {
-		if (problemStatusOf(error) !== 409 && problemStatusOf(error) !== 412) {
+		if (problemStatusOf(error) !== 409 && problemStatusOf(error) !== 409) {
 			toast.error("We could not reset to the catalog. Nothing was changed. Try again.");
 			return;
 		}
@@ -449,22 +524,11 @@ function PracticeCatalogRoute() {
 		}
 	};
 
+	// A refusal hides the tree even over cached data. Any other failure leaves the loaded tree, and a
+	// group being named in it, on screen beside the retry.
+	const treeFailure = readFailure([groupsQuery, practicesQuery]);
 	let catalogTree: ReactNode;
-	if (groupsQuery.isPending || practicesQuery.isPending) {
-		catalogTree = <PracticeTreeSkeleton groups={3} practicesPerGroup={3} />;
-	} else if (groupsQuery.isError || practicesQuery.isError) {
-		catalogTree = (
-			<QueryErrorAlert
-				error={groupsQuery.error ?? practicesQuery.error}
-				title="We could not load practices"
-				onRetry={() => {
-					void groupsQuery.refetch();
-					void practicesQuery.refetch();
-				}}
-			/>
-		);
-	} else {
-		const groups = groupsQuery.data;
+	if (treeFailure?.refused !== true && groups !== undefined && practices !== undefined) {
 		const updateGroup = async (groupSlug: string, patch: Partial<UpdatePracticeGroupRequest>) => {
 			const group = groups.find(({ slug }) => slug === groupSlug);
 			return group
@@ -475,83 +539,349 @@ function PracticeCatalogRoute() {
 				: Promise.reject(new Error(`No group ${groupSlug}`));
 		};
 		catalogTree = (
-			<PracticeCatalog
-				workspaceSlug={workspaceSlug}
-				groups={groups}
-				practices={practicesQuery.data}
-				pending={{
-					groupSlugs: catalog.pendingGroupSlugs,
-					practiceSlugs: catalog.pendingPracticeSlugs,
-					groupStructure: catalog.groupStructurePending,
-					blockedMoveDestinationSlugs: catalog.blockedMoveDestinationSlugs,
-					blockedPracticeOrderBuckets: catalog.blockedPracticeOrderBuckets,
-					creatingGroup: catalog.createGroup.isPending,
-				}}
-				focusFilter={focus ?? "ALL"}
-				library={{
-					open: library === true,
-					onOpenChange: (open) => {
-						void setSearch((previous) => ({ ...previous, library: open || undefined }));
-					},
-					state: libraryState,
-				}}
-				onFocusFilterChange={(next: FocusFilter) => {
-					void setSearch((previous) => ({
-						...previous,
-						focus: next === "ALL" ? undefined : next,
-					}));
-				}}
-				onCreateGroup={async ({ name, icon, color }) => {
-					try {
-						await catalog.createGroup.mutateAsync({
-							path: { workspaceSlug },
-							// A null icon or colour means "not chosen": the server seeds the chip from the slug.
-							body: {
-								slug: generateSlug(name),
-								name,
-								description: null,
-								icon,
-								color,
-								position: null,
-								shownToDevelopers: true,
-							},
-						});
-						return true;
-					} catch {
-						return false;
+			<>
+				{treeFailure !== undefined && (
+					<QueryErrorAlert
+						error={treeFailure.error}
+						title="We could not refresh practices"
+						pending={treeFailure.pending}
+						onRetry={treeFailure.retry}
+					/>
+				)}
+				<PracticeCatalog
+					workspaceSlug={workspaceSlug}
+					groups={groups}
+					practices={practices}
+					pending={{
+						groupSlugs: catalog.pendingGroupSlugs,
+						practiceSlugs: catalog.pendingPracticeSlugs,
+						groupStructure: catalog.groupStructurePending,
+						blockedMoveDestinationSlugs: catalog.blockedMoveDestinationSlugs,
+						blockedPracticeOrderBuckets: catalog.blockedPracticeOrderBuckets,
+						creatingGroup: catalog.createGroup.isPending,
+					}}
+					focusFilter={focus ?? "ALL"}
+					library={{
+						open: library === true,
+						onOpenChange: (open) => {
+							void setSearch((previous) => ({ ...previous, library: open || undefined }));
+						},
+						state: libraryState,
+					}}
+					onFocusFilterChange={(next: FocusFilter) => {
+						void setSearch((previous) => ({
+							...previous,
+							focus: next === "ALL" ? undefined : next,
+						}));
+					}}
+					onCreateGroup={async ({ name, icon, color }) => {
+						try {
+							await catalog.createGroup.mutateAsync({
+								path: { workspaceSlug },
+								// A null icon or colour means "not chosen": the server seeds the chip from the slug.
+								body: {
+									slug: generateSlug(name),
+									name,
+									description: null,
+									icon,
+									color,
+									position: null,
+									shownToDevelopers: true,
+								},
+							});
+							return true;
+						} catch {
+							return false;
+						}
+					}}
+					onUpdateGroup={async (groupSlug, details) => {
+						try {
+							await updateGroup(groupSlug, details);
+							return true;
+						} catch {
+							return false;
+						}
+					}}
+					onSetGroupShownToDevelopers={(groupSlug, shownToDevelopers) => {
+						void updateGroup(groupSlug, { shownToDevelopers }).catch(() => undefined);
+					}}
+					onDeleteGroup={(groupSlug) =>
+						setDeletingGroup(groups.find((group) => group.slug === groupSlug) ?? null)
 					}
-				}}
-				onUpdateGroup={async (groupSlug, details) => {
-					try {
-						await updateGroup(groupSlug, details);
-						return true;
-					} catch {
-						return false;
+					onResetGroup={(groupSlug) => openReset({ kind: "group", slug: groupSlug })}
+					onReorderGroups={(slugs) =>
+						catalog.reorderGroups.mutate({ path: { workspaceSlug }, body: { slugs } })
 					}
-				}}
-				onSetGroupShownToDevelopers={(groupSlug, shownToDevelopers) => {
-					void updateGroup(groupSlug, { shownToDevelopers }).catch(() => undefined);
-				}}
-				onDeleteGroup={(groupSlug) =>
-					setDeletingGroup(groups.find((group) => group.slug === groupSlug) ?? null)
-				}
-				onResetGroup={(groupSlug) => openReset({ kind: "group", slug: groupSlug })}
-				onReorderGroups={(slugs) =>
-					catalog.reorderGroups.mutate({ path: { workspaceSlug }, body: { slugs } })
-				}
-				onSetGroupVisual={(groupSlug, patch) => {
-					void updateGroup(groupSlug, patch).catch(() => undefined);
-				}}
-				onDeletePractice={setDeletingPractice}
-				onMovePractice={(practiceSlug, groupSlug, position) =>
-					catalog.movePractice.mutate({
-						path: { workspaceSlug, practiceSlug },
-						body: { groupSlug, position },
-					})
-				}
+					onSetGroupVisual={(groupSlug, patch) => {
+						void updateGroup(groupSlug, patch).catch(() => undefined);
+					}}
+					onDeletePractice={setDeletingPractice}
+					onMovePractice={(practiceSlug, groupSlug, position) =>
+						catalog.movePractice.mutate({
+							path: { workspaceSlug, practiceSlug },
+							body: { groupSlug, position },
+						})
+					}
+				/>
+			</>
+		);
+	} else if (treeFailure === undefined) {
+		catalogTree = <PracticeTreeSkeleton groups={3} practicesPerGroup={3} />;
+	} else {
+		catalogTree = (
+			<QueryErrorAlert
+				error={treeFailure.error}
+				title="We could not load practices"
+				pending={treeFailure.pending}
+				onRetry={treeFailure.retry}
 			/>
 		);
 	}
+
+	const renderLevel = (entry: LevelEntry, level: DetailDrawerLevel): ReactNode => {
+		// `levelQueries` is derived from the same stack this callback walks, so index and depth
+		// agree. A level read before its query exists is a frame between two states rather than a
+		// state of its own, and it reads as loading.
+		const query = levelQueries[level.depth];
+		const levelPending = query === undefined || query.isPending;
+		if (entry.kind === "catalog-group") {
+			const groupPreview = groupAdoptionAt(query);
+			const adoptGroup = async () => {
+				const preview = groupAdoptionAt(query);
+				if (!query || !preview) {
+					return;
+				}
+				setStaleLevelKey(null);
+				try {
+					await adoptCatalogGroup.mutateAsync({
+						path: { workspaceSlug, slug: entry.id },
+						headers: { "If-Match": preview.etag },
+					});
+				} catch (error) {
+					// Same failure as a practice's, so the same recovery: refresh in place.
+					if (problemStatusOf(error) !== 409) {
+						return;
+					}
+					const refreshed = await query.refetch();
+					if (refreshed.isSuccess) {
+						setStaleLevelKey(detailStackKey(entry));
+					} else {
+						toast.error(
+							"The catalog changed and the group plan could not reload. Reopen the group to try again.",
+						);
+					}
+				}
+			};
+			const failure = readFailure([query]);
+			let state: GroupAdoptionState;
+			if (failure !== undefined) {
+				state = { status: "error", error: failure.error, onRetry: failure.retry };
+			} else if (groupPreview === undefined || levelPending) {
+				state = { status: "loading" };
+			} else {
+				state = {
+					status: "ready",
+					preview: groupPreview,
+					action: adoptionAction(
+						staleLevelKey === detailStackKey(entry),
+						adoptCatalogGroup.isPending,
+					),
+				};
+			}
+			return (
+				<GroupAdoptionPanel
+					nested={level.nested}
+					path={pathAt(level.depth)}
+					state={state}
+					onOpenPractice={(catalogSlug) =>
+						stackControls.open({ kind: "catalog-practice", id: catalogSlug })
+					}
+					onConfirm={() => {
+						void adoptGroup();
+					}}
+				/>
+			);
+		}
+		if (entry.kind === "practice") {
+			const workspacePractice = workspacePracticeAt(query);
+			const failure = readFailure([query, definitionOptionsQuery]);
+			let state: WorkspacePracticeState;
+			if (failure !== undefined) {
+				state = { status: "error", error: failure.error, onRetry: failure.retry };
+			} else if (
+				workspacePractice === undefined ||
+				levelPending ||
+				definitionOptions === undefined
+			) {
+				state = { status: "loading" };
+			} else {
+				state = {
+					status: "ready",
+					practice: workspacePractice,
+					definitionOptions,
+					groupName: groups?.find((group) => group.slug === workspacePractice.groupSlug)?.name,
+				};
+			}
+			return (
+				<WorkspacePracticePanel
+					workspaceSlug={workspaceSlug}
+					nested={level.nested}
+					path={pathAt(level.depth)}
+					state={state}
+					practiceScript={practiceScriptNeedsOf(entry.id)}
+					onResetToCatalog={() => openReset({ kind: "practice", slug: entry.id })}
+				/>
+			);
+		}
+		if (entry.kind === "practice-edit" || entry.kind === "practice-new") {
+			const creating = entry.kind === "practice-new";
+			const editing = creating ? undefined : workspacePracticeAt(query);
+			// The form saves and then leaves. It must reject on failure, or the unsaved-changes
+			// guard lifts and the draft goes with the level.
+			const saved = async (work: Promise<unknown>) => {
+				await work;
+				stackControls.close(level.depth);
+			};
+			const conflict =
+				!creating && conflictSlug === entry.id && editing !== undefined ? (
+					<Alert variant="warning" role="alert">
+						<AlertTitle>Someone saved a newer version</AlertTitle>
+						<AlertDescription>
+							<p>
+								Nothing was saved. Your changes are still here, so copy what you want to keep.
+								Loading version {editing.currentVersion.number} replaces them.
+							</p>
+							<Button
+								size="sm"
+								variant="outline"
+								className="mt-2"
+								onClick={() => {
+									setConflictSlug(null);
+									setEditorGeneration((generation) => generation + 1);
+								}}
+							>
+								Load version {editing.currentVersion.number}
+							</Button>
+						</AlertDescription>
+					</Alert>
+				) : undefined;
+			const update = async (
+				practice: Practice,
+				request: UpdatePracticeRequest,
+				groupSlug: string | null,
+			) => {
+				try {
+					await editor.update(practice, request, groupSlug);
+				} catch (error) {
+					if (problemStatusOf(error) === 409) {
+						setConflictSlug(practice.slug);
+						void query?.refetch();
+					}
+					throw error;
+				}
+				// A changed script makes the needs on record stale.
+				void queryClient.invalidateQueries({
+					queryKey: listPracticeScriptNeedsQueryKey({ path: { workspaceSlug } }),
+				});
+			};
+			// A refusal hides the form even over cached data. Any other failure leaves a loaded draft
+			// open beside the retry.
+			const failure = readFailure([groupsQuery, definitionOptionsQuery, query]);
+			let body: ReactNode;
+			if (
+				failure?.refused !== true &&
+				editableGroups !== undefined &&
+				definitionOptions !== undefined &&
+				(creating || editing !== undefined)
+			) {
+				body = (
+					// Split on the loaded practice rather than on `creating`: the guard above has already
+					// sent every other way of having none elsewhere, so no practice here means this level is
+					// writing a new one.
+					<PracticeForm
+						key={`${entry.id}:${editorGeneration}`}
+						{...(editing === undefined
+							? {
+									mode: "create" as const,
+									onSubmit: async (request) => saved(editor.create(request)),
+								}
+							: {
+									mode: "edit" as const,
+									initialData: editing,
+									notice: conflict,
+									onSubmit: async (request, groupSlug) =>
+										saved(update(editing, request, groupSlug)),
+								})}
+						workspaceSlug={workspaceSlug}
+						groups={editableGroups}
+						definitionOptions={definitionOptions}
+						isPending={editor.isPending}
+						cancel={<LevelCancel />}
+						refreshAlert={
+							failure === undefined ? undefined : (
+								<QueryErrorAlert
+									error={failure.error}
+									title="We could not refresh the practice editor"
+									pending={failure.pending}
+									onRetry={failure.retry}
+								/>
+							)
+						}
+					/>
+				);
+			} else if (failure === undefined) {
+				body = (
+					<DrawerBody>
+						<PracticeDefinitionSkeleton />
+					</DrawerBody>
+				);
+			} else {
+				body = (
+					<DrawerBody>
+						<QueryErrorAlert
+							error={failure.error}
+							title="We could not load the practice editor"
+							pending={failure.pending}
+							onRetry={failure.retry}
+						/>
+					</DrawerBody>
+				);
+			}
+			return (
+				<PracticeFormLevel nested={level.nested} path={pathAt(level.depth)} creating={creating}>
+					{body}
+				</PracticeFormLevel>
+			);
+		}
+		const catalogPreview = practiceAdoptionAt(query);
+		const failure = readFailure([query, definitionOptionsQuery]);
+		let state: PracticeAdoptionState;
+		if (failure !== undefined) {
+			state = { status: "error", error: failure.error, onRetry: failure.retry };
+		} else if (catalogPreview === undefined || levelPending || definitionOptions === undefined) {
+			state = { status: "loading" };
+		} else {
+			state = {
+				status: "ready",
+				preview: catalogPreview,
+				definitionOptions,
+				action: adoptionAction(
+					staleLevelKey === detailStackKey(entry),
+					adoptCatalogPractice.isPending,
+				),
+			};
+		}
+		return (
+			<PracticeAdoptionPanel
+				nested={level.nested}
+				path={pathAt(level.depth)}
+				state={state}
+				onAdopt={() => {
+					void adoptReviewedPractice(level.depth);
+				}}
+			/>
+		);
+	};
 
 	return (
 		<PageLayout>
@@ -592,238 +922,14 @@ function PracticeCatalogRoute() {
 				guardedKinds={GUARDED_LEVEL_KINDS}
 				onClose={stackControls.close}
 			>
-				{(entry, level) => {
-					// `levelQueries` is derived from the same stack this callback walks, so index and depth
-					// agree. A level read before its query exists is a frame between two states rather than a
-					// state of its own, and it reads as loading.
-					const query = levelQueries[level.depth];
-					const levelPending = query === undefined || query.isPending;
-					const levelError = query?.isError === true ? query.error : undefined;
-					const refetchLevel = () => {
-						void query?.refetch();
-					};
-					if (entry.kind === "catalog-group") {
-						const groupPreview = groupAdoptionAt(query);
-						const adoptGroup = async () => {
-							const preview = groupAdoptionAt(query);
-							if (!query || !preview) {
-								return;
-							}
-							setStaleLevelKey(null);
-							try {
-								await adoptCatalogGroup.mutateAsync({
-									path: { workspaceSlug, slug: entry.id },
-									headers: { "If-Match": preview.etag },
-								});
-							} catch (error) {
-								// Same failure as a practice's, so the same recovery: refresh in place.
-								if (problemStatusOf(error) !== 409) {
-									return;
-								}
-								const refreshed = await query.refetch();
-								if (refreshed.isSuccess) {
-									setStaleLevelKey(detailStackKey(entry));
-								} else {
-									toast.error(
-										"The catalog changed and the group plan could not reload. Reopen the group to try again.",
-									);
-								}
-							}
-						};
-						let state: GroupAdoptionState;
-						if (groupPreview === undefined || levelPending) {
-							state = { status: "loading" };
-						} else if (levelError) {
-							state = { status: "error", error: levelError, onRetry: refetchLevel };
-						} else {
-							state = {
-								status: "ready",
-								preview: groupPreview,
-								action: adoptionAction(
-									staleLevelKey === detailStackKey(entry),
-									adoptCatalogGroup.isPending,
-								),
-							};
-						}
-						return (
-							<GroupAdoptionPanel
-								nested={level.nested}
-								path={pathAt(level.depth)}
-								state={state}
-								onOpenPractice={(catalogSlug) =>
-									stackControls.open({ kind: "catalog-practice", id: catalogSlug })
-								}
-								onConfirm={() => {
-									void adoptGroup();
-								}}
-							/>
-						);
-					}
-					if (entry.kind === "practice") {
-						const workspacePractice = workspacePracticeAt(query);
-						let state: WorkspacePracticeState;
-						if (
-							workspacePractice === undefined ||
-							levelPending ||
-							definitionOptionsQuery.isPending
-						) {
-							state = { status: "loading" };
-						} else if (levelError !== undefined || definitionOptionsQuery.isError) {
-							state = {
-								status: "error",
-								error: levelError ?? definitionOptionsQuery.error,
-								onRetry: () => {
-									refetchLevel();
-									void definitionOptionsQuery.refetch();
-								},
-							};
-						} else {
-							state = {
-								status: "ready",
-								practice: workspacePractice,
-								definitionOptions: definitionOptionsQuery.data,
-								groupName: groupsQuery.data?.find(
-									(group) => group.slug === workspacePractice.groupSlug,
-								)?.name,
-							};
-						}
-						return (
-							<WorkspacePracticePanel
-								workspaceSlug={workspaceSlug}
-								nested={level.nested}
-								path={pathAt(level.depth)}
-								state={state}
-								practiceScript={practiceScriptNeedsOf(entry.id)}
-								onResetToCatalog={() => openReset({ kind: "practice", slug: entry.id })}
-							/>
-						);
-					}
-					if (entry.kind === "practice-edit" || entry.kind === "practice-new") {
-						const creating = entry.kind === "practice-new";
-						const editing = creating ? undefined : workspacePracticeAt(query);
-						// The form saves and then leaves. It must reject on failure, or the unsaved-changes
-						// guard lifts and the draft goes with the level.
-						const saved = async (work: Promise<unknown>) => {
-							await work;
-							stackControls.close(level.depth);
-						};
-						const conflict =
-							!creating && conflictSlug === entry.id && editing !== undefined ? (
-								<Alert variant="warning" role="alert">
-									<AlertTitle>Someone saved a newer version</AlertTitle>
-									<AlertDescription>
-										<p>
-											Nothing was saved. Your changes are still here, so copy what you want to keep.
-											Loading version {editing.currentVersion.number} replaces them.
-										</p>
-										<Button
-											size="sm"
-											variant="outline"
-											className="mt-2"
-											onClick={() => {
-												setConflictSlug(null);
-												setEditorGeneration((generation) => generation + 1);
-											}}
-										>
-											Load version {editing.currentVersion.number}
-										</Button>
-									</AlertDescription>
-								</Alert>
-							) : undefined;
-						const update = async (
-							practice: Practice,
-							request: UpdatePracticeRequest,
-							groupSlug: string | null,
-						) => {
-							try {
-								await editor.update(practice, request, groupSlug);
-							} catch (error) {
-								if (problemStatusOf(error) === 409) {
-									setConflictSlug(practice.slug);
-									void query?.refetch();
-								}
-								throw error;
-							}
-							// A changed script makes the needs on record stale.
-							void queryClient.invalidateQueries({
-								queryKey: listPracticeScriptNeedsQueryKey({ path: { workspaceSlug } }),
-							});
-						};
-						return (
-							<PracticeFormLevel
-								nested={level.nested}
-								path={pathAt(level.depth)}
-								creating={creating}
-							>
-								{editableGroups === undefined ||
-								definitionOptionsQuery.data === undefined ||
-								(!creating && editing === undefined) ? (
-									<DrawerBody>
-										<PracticeDefinitionSkeleton />
-									</DrawerBody>
-								) : (
-									// Split on the loaded practice rather than on `creating`: the guard above has
-									// already sent every other way of having none to the skeleton, so no practice
-									// here means this level is writing a new one.
-									<PracticeForm
-										key={`${entry.id}:${editorGeneration}`}
-										{...(editing === undefined
-											? {
-													mode: "create" as const,
-													onSubmit: async (request) => saved(editor.create(request)),
-												}
-											: {
-													mode: "edit" as const,
-													initialData: editing,
-													notice: conflict,
-													onSubmit: async (request, groupSlug) =>
-														saved(update(editing, request, groupSlug)),
-												})}
-										workspaceSlug={workspaceSlug}
-										groups={editableGroups}
-										definitionOptions={definitionOptionsQuery.data}
-										isPending={editor.isPending}
-										cancel={<LevelCancel />}
-									/>
-								)}
-							</PracticeFormLevel>
-						);
-					}
-					const catalogPreview = practiceAdoptionAt(query);
-					let state: PracticeAdoptionState;
-					if (catalogPreview === undefined || levelPending || definitionOptionsQuery.isPending) {
-						state = { status: "loading" };
-					} else if (levelError !== undefined || definitionOptionsQuery.isError) {
-						state = {
-							status: "error",
-							error: levelError ?? definitionOptionsQuery.error,
-							onRetry: () => {
-								refetchLevel();
-								void definitionOptionsQuery.refetch();
-							},
-						};
-					} else {
-						state = {
-							status: "ready",
-							preview: catalogPreview,
-							definitionOptions: definitionOptionsQuery.data,
-							action: adoptionAction(
-								staleLevelKey === detailStackKey(entry),
-								adoptCatalogPractice.isPending,
-							),
-						};
-					}
-					return (
-						<PracticeAdoptionPanel
-							nested={level.nested}
-							path={pathAt(level.depth)}
-							state={state}
-							onAdopt={() => {
-								void adoptReviewedPractice(level.depth);
-							}}
-						/>
-					);
-				}}
+				{(entry, level) => (
+					<PracticeSetupLevel
+						queryKey={levelQueryOptions(workspaceSlug, entry).queryKey}
+						query={levelQueries[level.depth]}
+					>
+						{renderLevel(entry, level)}
+					</PracticeSetupLevel>
+				)}
 			</DetailDrawerStack>
 
 			<AlertDialog

@@ -12,7 +12,6 @@ import static com.slack.api.model.block.element.BlockElements.button;
 import com.slack.api.model.block.LayoutBlock;
 import com.slack.api.model.block.composition.ConfirmationDialogObject;
 import com.slack.api.model.view.View;
-import de.tum.cit.aet.hephaestus.practices.spi.MentorReadinessQuery;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorRefusal;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorTurnRunner;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery;
@@ -25,6 +24,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackParticipantConsen
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackWorkspaceResolver;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
+import de.tum.cit.aet.hephaestus.practices.spi.MentorReadinessQuery;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -206,8 +206,8 @@ public class SlackAppHomeService {
     List<LayoutBlock> channelMessageBlocks(boolean allowed) {
         String status = allowed
                 ? "*Channel-message context is allowed.* Hephaestus may use the new messages that you send in"
-                      + " monitored channels to personalize how it mentors you in private. If you turn this off,"
-                      + " Hephaestus stops future use and deletes the channel-message data that it collected from you."
+                        + " monitored channels to personalize how it mentors you in private. If you turn this off,"
+                        + " Hephaestus stops future use and deletes the channel-message data that it collected from you."
                 : "*Channel-message context is not allowed.* Hephaestus does not use your messages in monitored"
                         + " channels.";
         return List.of(

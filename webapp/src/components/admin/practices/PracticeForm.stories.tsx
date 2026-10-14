@@ -1,12 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent, waitFor } from "storybook/test";
 
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DetailDrawerStack } from "@/components/layout/detail-drawer/DetailDrawerStack";
 import { LevelCancel } from "@/components/layout/detail-drawer/LevelCancel";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { withPageBehind } from "@/stories/decorators";
 import { settledDrawerPanel } from "@/stories/overlay";
-import { expectNoPanelOverflow } from "@/stories/reflow";
+import { expectNoPanelOverflow, expectPanelContentInset } from "@/stories/reflow";
 import { Stateful } from "@/stories/stateful";
 
 import { mockDefinitionOptions } from "@/components/admin/practice-editor/fixtures";
@@ -134,6 +135,30 @@ export const EditConflict: Story = {
 	play: async () => {
 		await settledDrawerPanel();
 		await expect(screen.getByRole("alert")).toHaveTextContent(/Nothing was saved/u);
+	},
+};
+
+/** A read behind the form failed to refresh. The draft stays open beside the retry. */
+export const RefreshFailed: Story = {
+	args: {
+		mode: "edit",
+		initialData: mockScriptedPractice,
+		onSubmit: fn(),
+		refreshAlert: (
+			<QueryErrorAlert
+				error={{ status: 503 }}
+				title="We could not refresh the practice editor"
+				onRetry={fn()}
+			/>
+		),
+	},
+	play: async () => {
+		await expectPanelContentInset(await settledDrawerPanel());
+		await expect(screen.getByText("We could not refresh the practice editor")).toBeVisible();
+		await expect(screen.getByRole("button", { name: "Retry" })).toBeEnabled();
+		await expect(screen.getByRole("textbox", { name: /Name/u })).toHaveValue(
+			mockScriptedPractice.currentVersion.definition?.name,
+		);
 	},
 };
 

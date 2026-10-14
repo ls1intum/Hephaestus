@@ -23,6 +23,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
@@ -101,8 +102,7 @@ public class WebhookIngestPipeline {
         if (verifier == null) {
             // No verifier wired — kind is allow-listed but not yet implemented.
             log.warn("No WebhookSignatureVerifier registered for kind={}; rejecting", kind);
-            return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
-                    .body(Map.of("error", "no verifier wired for " + kind));
+            return problem(HttpStatus.NOT_IMPLEMENTED, "no verifier wired for " + kind);
         }
 
         WebhookRequest request = new WebhookRequest(body, headers);
@@ -111,7 +111,7 @@ public class WebhookIngestPipeline {
             result = verifier.verify(request);
         } catch (RuntimeException e) {
             log.warn("Verifier {} threw for kind={}: {}", verifier.getClass().getSimpleName(), kind, e.toString());
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "invalid"));
+            return problem(HttpStatus.UNAUTHORIZED, "invalid");
         }
 
         return switch (result) {
@@ -119,14 +119,13 @@ public class WebhookIngestPipeline {
             case VerificationResult.RespondImmediately r -> respondImmediately(r);
             case VerificationResult.StaleTimestamp s -> {
                 log.debug("Webhook rejected for kind={}: stale timestamp drift={}s", kind, s.driftSeconds());
-                yield ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "stale-timestamp"));
+                yield problem(HttpStatus.UNAUTHORIZED, "stale-timestamp");
             }
             case VerificationResult.Invalid i -> {
                 log.warn("Webhook rejected for kind={}: {}", kind, i.reason());
-                yield ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "invalid"));
+                yield problem(HttpStatus.UNAUTHORIZED, "invalid");
             }
-            case VerificationResult.MissingSignature() ->
-                ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "missing-signature"));
+            case VerificationResult.MissingSignature() -> problem(HttpStatus.UNAUTHORIZED, "missing-signature");
         };
     }
 
@@ -154,22 +153,21 @@ public class WebhookIngestPipeline {
             // 503 is the right surface here: the verification succeeded, but the downstream
             // pipe is intentionally not wired on this pod.
             log.warn("WebhookIngestPipeline: verified {} webhook but no JetStreamPublisher bean — replying 503", kind);
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of("error", "publisher not wired"));
+            return problem(HttpStatus.SERVICE_UNAVAILABLE, "publisher not wired");
         }
         SubjectKeyDeriver deriver = deriversByKind.get(kind);
         if (deriver == null) {
             // Kind has a verifier but no derivation — surface as NOT_IMPLEMENTED so the
             // operator notices the gap rather than silently dropping into a default subject.
             log.warn("WebhookIngestPipeline: no SubjectKeyDeriver wired for kind={}", kind);
-            return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
-                    .body(Map.of("error", "no subject deriver for " + kind));
+            return problem(HttpStatus.NOT_IMPLEMENTED, "no subject deriver for " + kind);
         }
 
         JsonNode payload;
         try {
             payload = objectMapper.readTree(body);
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "invalid-json"));
+            return problem(HttpStatus.BAD_REQUEST, "invalid-json");
         }
 
         WebhookPublishGate gate = publishGatesByKind.get(kind);
@@ -209,7 +207,7 @@ public class WebhookIngestPipeline {
                     kind,
                     sanitizeForLog(subject),
                     e.getMessage());
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of("error", "publish-failed"));
+            return problem(HttpStatus.SERVICE_UNAVAILABLE, "publish-failed");
         }
         log.info(
                 "Published {} webhook to NATS: subject={} dedupId={}",
@@ -217,6 +215,10 @@ public class WebhookIngestPipeline {
                 sanitizeForLog(subject),
                 sanitizeForLog(dedupId));
         return ResponseEntity.accepted().body(Map.of("status", "ok"));
+    }
+
+    public static ResponseEntity<ProblemDetail> problem(HttpStatus status, String detail) {
+        return ResponseEntity.status(status).body(ProblemDetail.forStatusAndDetail(status, detail));
     }
 
     private static void passthroughHeader(Map<String, String> out, Map<String, String> in, String name) {

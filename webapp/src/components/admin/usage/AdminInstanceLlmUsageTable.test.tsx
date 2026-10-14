@@ -196,7 +196,7 @@ describe("AdminInstanceLlmUsageTable", () => {
 
 		const shared = within(capCellOf("Shared-model budget used by Example Workspace"));
 		shared.getByText("Paused");
-		shared.getByText("No price set");
+		shared.getByText("Unavailable cost");
 	});
 
 	it("marks runs with no price on a purse with no budget, rather than reading as $0.00", () => {
@@ -212,7 +212,7 @@ describe("AdminInstanceLlmUsageTable", () => {
 		// Spend, then the budget column: no budget, and the state of the spend beside it.
 		const cells = within(firstDataRow()).getAllByRole("cell");
 		expect(cells[1]?.textContent).toBe("$0.00");
-		expect(cells[2]?.textContent).toBe("—No price set");
+		expect(cells[2]?.textContent).toBe("—Unavailable cost");
 		expect(screen.queryByRole("progressbar", { name: /^Shared-model budget/u })).toBeNull();
 	});
 

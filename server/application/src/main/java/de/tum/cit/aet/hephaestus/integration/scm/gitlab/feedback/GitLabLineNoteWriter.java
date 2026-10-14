@@ -576,8 +576,8 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
                 ClientGraphQlResponse response = gitLabProvider
                         .forScope(workspaceId)
                         .document("mutation"
-                                      + " CorrectPracticeNote($id:NoteID!,$body:String!){updateNote(input:{id:$id,body:$body}){note{id"
-                                      + " url} errors}}")
+                                + " CorrectPracticeNote($id:NoteID!,$body:String!){updateNote(input:{id:$id,body:$body}){note{id"
+                                + " url} errors}}")
                         .variable("id", externalRef)
                         .variable("body", ScmFeedbackFormatter.withdrawnCopyBody(original))
                         .execute()

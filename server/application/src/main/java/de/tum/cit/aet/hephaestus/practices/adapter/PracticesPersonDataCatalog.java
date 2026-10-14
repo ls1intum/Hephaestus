@@ -40,9 +40,9 @@ import tools.jackson.databind.ObjectMapper;
 public class PracticesPersonDataCatalog implements PersonDataCatalog, PersonConversationCopySource {
     private static final String RESULT_IDS =
             "SELECT id FROM result WHERE developer_id=:account OR id IN(SELECT result_id FROM review_item WHERE"
-                + " result_id IS NOT NULL AND (job_id=ANY(:derivedJobs) OR EXISTS(SELECT 1 FROM"
-                + " jsonb_array_elements_text(COALESCE(detail->'custody'->'sourceJobIds','[]'::jsonb)) source(value)"
-                + " WHERE source.value::uuid=ANY(:derivedJobs))))";
+                    + " result_id IS NOT NULL AND (job_id=ANY(:derivedJobs) OR EXISTS(SELECT 1 FROM"
+                    + " jsonb_array_elements_text(COALESCE(detail->'custody'->'sourceJobIds','[]'::jsonb)) source(value)"
+                    + " WHERE source.value::uuid=ANY(:derivedJobs))))";
     private static final String FEEDBACK_IDS =
             "SELECT id FROM feedback WHERE developer_id=:account OR id IN(SELECT feedback_id FROM feedback_basis WHERE"
                     + " result_id IN(" + RESULT_IDS + "))";

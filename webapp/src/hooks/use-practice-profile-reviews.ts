@@ -1,5 +1,6 @@
 import { skipToken, useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 import {
 	getOwnReviewOptions,
@@ -58,20 +59,22 @@ export function usePracticeProfileReviews({
 	since,
 }: ProfileReviewsRequest) {
 	const now = useNow();
+	const listOptions = listOwnReviewsInfiniteOptions({
+		path: { workspaceSlug },
+		query: {
+			size: PROFILE_REVIEWS_PAGE_SIZE,
+			itemKind,
+			since: since === undefined ? undefined : reviewRangeStart(now, since),
+		},
+	});
 	const reviewsQuery = useInfiniteQuery({
-		...listOwnReviewsInfiniteOptions({
-			path: { workspaceSlug },
-			query: {
-				size: PROFILE_REVIEWS_PAGE_SIZE,
-				itemKind,
-				since: since === undefined ? undefined : reviewRangeStart(now, since),
-			},
-		}),
+		...listOptions,
 		...pagedModelParams,
 		enabled: listOpen,
 		// A review is listed once it records something about the reader, which no ask here announces.
 		refetchInterval: PRACTICE_PROFILE_POLL_MS,
 	});
+	useQueryReadRefusal(listOptions.queryKey, reviewsQuery.isError, reviewsQuery.error);
 	const reviewOptions = getOwnReviewOptions({
 		path: { workspaceSlug, reviewId: reviewId ?? "" },
 	});

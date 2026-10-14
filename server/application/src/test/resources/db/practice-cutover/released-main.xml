@@ -43,6 +43,6 @@
     <include file="db/changelog/1791488096611_changelog.xml" logicalFilePath="db/changelog/1791488096611_changelog.xml"/>
     <include file="db/changelog/1791557968341_changelog.xml" logicalFilePath="db/changelog/1791557968341_changelog.xml"/>
     <include file="db/changelog/1791888649698_changelog.xml" logicalFilePath="db/changelog/1791888649698_changelog.xml"/>
-    <include file="db/practice-cutover/1791931753089_changelog.xml" logicalFilePath="db/changelog/1791931753089_changelog.xml"/>
-    <include file="db/practice-cutover/1791941746633_changelog.xml" logicalFilePath="db/changelog/1791941746633_changelog.xml"/>
+    <include file="db/changelog/1791931753089_changelog.xml" logicalFilePath="db/changelog/1791931753089_changelog.xml"/>
+    <include file="db/changelog/1791941746633_changelog.xml" logicalFilePath="db/changelog/1791941746633_changelog.xml"/>
 </databaseChangeLog>

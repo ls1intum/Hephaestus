@@ -22,10 +22,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Stream;
 import org.assertj.core.groups.Tuple;
 import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.internal.storage.file.GC;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -34,10 +40,20 @@ import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.TreeFormatter;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.util.SystemReader;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.junit.jupiter.api.parallel.Isolated;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.test.util.ReflectionTestUtils;
 
+@Isolated("JGit's GC executor and inherited configuration are process-wide")
+@Execution(ExecutionMode.SAME_THREAD)
 class GitRepositoryManagerTest extends BaseUnitTest {
     private static final long LIMIT = 8L * 1024 * 1024 * 1024;
     private static final RepositoryKey KEY = new RepositoryKey(100L, 1L);
@@ -374,6 +390,106 @@ class GitRepositoryManagerTest extends BaseUnitTest {
             assertThatThrownBy(() -> manager(true, 63).readOriginalSnapshot(KEY, original, List.of(base)))
                     .isInstanceOf(GitRepositoryManager.GitOperationException.class)
                     .hasMessage("Repository snapshot exceeds hephaestus.git.max-snapshot-bytes");
+            assertThat(stagingDirectories()).isEmpty();
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void shouldOwnTheOriginalCheckoutWithoutDeferredGcWhileMirrorFetchStillSchedulesGc(boolean original)
+            throws Exception {
+        try (Git git = repository()) {
+            var sourceConfig = git.getRepository().getConfig();
+            sourceConfig.setBoolean("fetch", null, "autoGC", true);
+            sourceConfig.save();
+            String base = head(git);
+            Files.writeString(source.resolve("README.md"), "Reviewed\n");
+            String sha = commit(git, "Reviewed content");
+            String treeSha;
+            try (var walk = new RevWalk(git.getRepository())) {
+                treeSha = walk.parseCommit(ObjectId.fromString(sha)).getTree().name();
+            }
+            Files.writeString(source.resolve("README.md"), "Later\n");
+            String later = commit(git, "Later content");
+
+            // New repositories inherit this in-memory config; no user config file is written.
+            var inherited = SystemReader.getInstance().getUserConfig();
+            String inheritedBefore = inherited.toText();
+            try {
+                inherited.setBoolean("fetch", null, "autoGC", true);
+                inherited.setBoolean("gc", null, "autoDetach", false);
+                prepare();
+                Path mirror = fabric.resolve("mirrors/100/1.git");
+                try (Git mirrorGit = Git.open(mirror.toFile())) {
+                    var mirrorConfig = mirrorGit.getRepository().getConfig();
+                    mirrorConfig.setBoolean("fetch", null, "autoGC", true);
+                    mirrorConfig.setBoolean("gc", null, "autoDetach", true);
+                    mirrorConfig.save();
+                }
+                byte[] sourceConfigBefore = Files.readAllBytes(source.resolve(".git/config"));
+                byte[] mirrorConfigBefore = Files.readAllBytes(mirror.resolve("config"));
+                inherited.setBoolean("gc", null, "autoDetach", true);
+
+                @Nullable
+                ExecutorService previousExecutor = (ExecutorService) ReflectionTestUtils.getField(GC.class, "executor");
+                var deferredGc = new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
+                var started = new CountDownLatch(1);
+                var release = new CountDownLatch(1);
+                var blocker = deferredGc.submit(() -> {
+                    started.countDown();
+                    release.await();
+                    return null;
+                });
+                GitRepositoryManager.@Nullable GitTreeSnapshot snapshot = null;
+                try {
+                    assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
+                    GC.setExecutor(deferredGc);
+                    snapshot = original
+                            ? manager.readOriginalSnapshot(KEY, sha, List.of(base, sha))
+                            : manager.readTreeSnapshot(KEY, sha);
+                    Path staging = snapshot.stagingDir();
+                    assertThat(snapshot.commitSha()).isEqualTo(sha);
+                    assertThat(snapshot.treeSha()).isEqualTo(treeSha);
+                    assertThat(snapshot.complete()).isTrue();
+                    assertThat(snapshot.limitations()).isEmpty();
+                    assertThat(Files.readString(staging.resolve("README.md"))).isEqualTo("Reviewed\n");
+                    try (Git checkout = Git.open(staging.toFile())) {
+                        assertThat(head(checkout)).isEqualTo(sha);
+                        assertThat(checkout.getRepository().getObjectDatabase().has(ObjectId.fromString(base)))
+                                .isTrue();
+                        assertThat(checkout.getRepository().getObjectDatabase().has(ObjectId.fromString(later)))
+                                .isEqualTo(!original);
+                    }
+                    assertThat(Files.readAllBytes(source.resolve(".git/config")))
+                            .isEqualTo(sourceConfigBefore);
+                    assertThat(Files.readAllBytes(mirror.resolve("config"))).isEqualTo(mirrorConfigBefore);
+                    assertThat(staging.resolve(".git/gc.log.lock")).doesNotExist();
+                    assertThat(deferredGc.getQueue()).isEmpty();
+
+                    prepare();
+
+                    assertThat(manager.resolveBranchHead(KEY, "main")).isEqualTo(later);
+                    assertThat(mirror.resolve("gc.log.lock")).isRegularFile();
+                    assertThat(deferredGc.getQueue()).hasSize(1);
+                    assertThat(Files.readAllBytes(source.resolve(".git/config")))
+                            .isEqualTo(sourceConfigBefore);
+                    assertThat(Files.readAllBytes(mirror.resolve("config"))).isEqualTo(mirrorConfigBefore);
+                } finally {
+                    // Native GC takes its log lock before submission; drain it before deleting its repository.
+                    release.countDown();
+                    deferredGc.shutdown();
+                    try {
+                        blocker.get(5, TimeUnit.SECONDS);
+                        assertThat(deferredGc.awaitTermination(5, TimeUnit.SECONDS))
+                                .isTrue();
+                        if (snapshot != null) snapshot.close();
+                    } finally {
+                        GC.setExecutor(previousExecutor);
+                    }
+                }
+            } finally {
+                inherited.fromText(inheritedBefore);
+            }
             assertThat(stagingDirectories()).isEmpty();
         }
     }

@@ -49,6 +49,8 @@ interface CatalogGroupFormBaseProps {
 	onUseHephaestusVersion?: () => void;
 	onKeepCurrentDefinition?: () => void;
 	onSubmit: (value: CatalogGroupFormValue) => void;
+	/** The host’s alert for a failed refresh while the draft stays open. */
+	refreshAlert?: React.ReactNode;
 	/** What "leave without saving" does. The host owns it, because only the host knows where back is. */
 	cancel: React.ReactNode;
 }
@@ -84,6 +86,7 @@ export function CatalogGroupForm(props: CatalogGroupFormProps) {
 		group,
 		onKeepCurrentDefinition,
 		onSubmit,
+		refreshAlert,
 	} = props;
 	const [resetOpen, setResetOpen] = useState(false);
 	const [form, setForm] = useState<FormState>(() => initialState(group));
@@ -180,6 +183,7 @@ export function CatalogGroupForm(props: CatalogGroupFormProps) {
 
 			<form onSubmit={submit} className="flex min-h-0 flex-1 flex-col" noValidate>
 				<DrawerBody className="flex flex-col gap-8">
+					{refreshAlert}
 					<FormErrorSummary key={refusals} errors={refusals > 0 ? errorSummary : []} />
 
 					{mode === "edit" && (

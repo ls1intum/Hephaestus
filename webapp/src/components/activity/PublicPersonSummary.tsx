@@ -13,8 +13,8 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { ITEM_KIND, itemKindNoun } from "@/lib/item-kinds";
 import { formatCalendarDate } from "@/lib/dates";
+import { ITEM_KIND, itemKindNoun } from "@/lib/item-kinds";
 import type { ProviderType } from "@/lib/provider/provider-terms";
 import { capitalise } from "@/lib/text";
 import {

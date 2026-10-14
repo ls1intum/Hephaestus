@@ -853,3 +853,29 @@ export const Dark: Story = {
 	},
 	globals: { theme: "dark" },
 };
+
+export const RefreshFailed: Story = {
+	args: {
+		bindings: partiallyCovered,
+		refreshFailure: { error: { status: 503 }, pending: false, onRetry: fn() },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("We could not refresh AI models")).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Retry" })).toBeEnabled();
+		const inHouse = row(await openPurpose(canvas, "Practice reviews"), "In-house");
+		await expect(inHouse.getByRole("combobox", { name: /In-house/u })).toHaveTextContent(
+			"Local Llama",
+		);
+		await expect(inHouse.getByRole("button", { name: /^Save assignment/u })).toBeEnabled();
+	},
+};
+
+export const RefreshRetrying: Story = {
+	args: {
+		bindings: partiallyCovered,
+		refreshFailure: { error: { status: 503 }, pending: true, onRetry: fn() },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "Retrying…" })).toBeDisabled();
+	},
+};

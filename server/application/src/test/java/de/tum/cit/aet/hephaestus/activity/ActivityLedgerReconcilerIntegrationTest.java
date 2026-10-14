@@ -9,15 +9,15 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.config.SpringAsyncConfig;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataWriteFence;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
@@ -123,7 +123,8 @@ class ActivityLedgerReconcilerIntegrationTest extends BaseIntegrationTest {
         authorId = author(2, "author");
         actorSelector = mock(WorkspaceActorSelector.class);
         when(actorSelector.connectedProviderId(workspaceId)).thenReturn(Optional.of(providerId));
-        reconciler = new ActivityLedgerReconciler(ledgerRepository, new ActivityPersonWriteAdmission(users, fence), transactions, actorSelector);
+        reconciler = new ActivityLedgerReconciler(
+                ledgerRepository, new ActivityPersonWriteAdmission(users, fence), transactions, actorSelector);
     }
 
     private long author(long nativeId, String login) {
@@ -315,7 +316,8 @@ class ActivityLedgerReconcilerIntegrationTest extends BaseIntegrationTest {
             writerPid.set(Objects.requireNonNull(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class)));
             return fence.holdForWrite(invocation.getArgument(0));
         });
-        reconciler = new ActivityLedgerReconciler(ledgerRepository, new ActivityPersonWriteAdmission(users, observedFence), transactions, actorSelector);
+        reconciler = new ActivityLedgerReconciler(
+                ledgerRepository, new ActivityPersonWriteAdmission(users, observedFence), transactions, actorSelector);
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             var eraser = executor.submit(() -> new TransactionTemplate(transactions).executeWithoutResult(status -> {
                 fence.holdForErasure(List.of(new PersonIdentity(providerId, "2", null)));

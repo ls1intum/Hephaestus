@@ -78,8 +78,7 @@ class WorkspaceAlertEmailListenerTest extends BaseUnitTest {
                 .thenReturn(Optional.of("token"));
         when(contacts.activeVerifiedPrimaryEmail(42L)).thenReturn(Optional.of("admin@example.org"));
         when(memberships.membershipsForAccount(42L))
-                .thenReturn(List.of(new AccountMembershipQuery.MembershipView(
-                        8L, "other", "Other", "ADMIN", 501L)));
+                .thenReturn(List.of(new AccountMembershipQuery.MembershipView(8L, "other", "Other", "ADMIN", 501L)));
         listener.on(new WorkspaceAlertEmailRequested(change, 42L));
         verify(metrics).record(EmailKind.WORKSPACE_ALERT, EmailDeliveryResult.Outcome.NO_RECIPIENT);
         verifyNoInteractions(gateway);
@@ -92,8 +91,7 @@ class WorkspaceAlertEmailListenerTest extends BaseUnitTest {
                 .thenReturn(Optional.of("token"));
         when(contacts.activeVerifiedPrimaryEmail(42L)).thenReturn(Optional.of("admin@example.org"));
         when(memberships.membershipsForAccount(42L))
-                .thenReturn(List.of(new AccountMembershipQuery.MembershipView(
-                        7L, "owned", "Owned", "OWNER", 501L)));
+                .thenReturn(List.of(new AccountMembershipQuery.MembershipView(7L, "owned", "Owned", "OWNER", 501L)));
         when(links.url("token")).thenReturn("https://example.org/unsubscribe/token");
         when(links.confirmationUrl("token")).thenReturn("https://example.org/unsubscribe/token/confirm");
         when(gateway.configured()).thenReturn(true);
@@ -124,8 +122,7 @@ class WorkspaceAlertEmailListenerTest extends BaseUnitTest {
                 .thenReturn(Optional.of("token"));
         when(contacts.activeVerifiedPrimaryEmail(42L)).thenReturn(Optional.of("admin@example.org"));
         when(memberships.membershipsForAccount(42L))
-                .thenReturn(List.of(new AccountMembershipQuery.MembershipView(
-                        7L, "owned", "Owned", "ADMIN", 501L)));
+                .thenReturn(List.of(new AccountMembershipQuery.MembershipView(7L, "owned", "Owned", "ADMIN", 501L)));
         when(links.url("token")).thenReturn("https://example.org/unsubscribe/token");
         when(links.confirmationUrl("token")).thenReturn("https://example.org/unsubscribe/token/confirm");
         when(gateway.configured()).thenReturn(true);

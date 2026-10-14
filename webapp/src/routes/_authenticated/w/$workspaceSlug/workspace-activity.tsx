@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
 
 import {
@@ -7,9 +7,13 @@ import {
 	getUsersWithTeamsOptions,
 	listHiddenContributorsQueryKey,
 	updateActivityAutomationMutation,
-	updatePublicActivityObjectionMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type { ActivityPerson, ActivityTeam } from "@/api/types.gen";
+import { type Options, updatePublicActivityObjection } from "@/api/sdk.gen";
+import type {
+	ActivityPerson,
+	ActivityTeam,
+	UpdatePublicActivityObjectionData,
+} from "@/api/types.gen";
 import { ACTIVITY_CATEGORY_DEFS } from "@/components/activity/activity-kind-defs";
 import {
 	type ActivityPeriod,
@@ -32,6 +36,7 @@ import { HidePersonAction } from "@/components/activity/HidePersonAction";
 import { teamPaths } from "@/components/activity/team-paths";
 import { workLogTitle } from "@/components/activity/work-log-markdown";
 import { WorkspaceActivityPage } from "@/components/activity/WorkspaceActivityPage";
+import { stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
 import { useDetailStack } from "@/components/layout/detail-drawer/use-detail-stack";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -42,6 +47,7 @@ import {
 	useActivityPerson,
 	useActivityWork,
 } from "@/hooks/use-activity";
+import { filedUnder, pathNumber, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import { pageHead } from "@/lib/page-title";
 import { problemDetailOf } from "@/lib/problem-detail";
 import { toScmProviderType } from "@/lib/provider/provider-terms";
@@ -54,8 +60,20 @@ import { invalidateWorkspaceReads } from "@/runtime/tanstack-query/invalidate-wo
 /** The reads that list an account among the people or the automation. */
 const ACTIVITY_READS = new Set(["getActivityPeople", "getActivityPerson"]);
 
+/** Where an account's classification is filed while it saves; the workspace follows it. */
+const AUTOMATION_MUTATION_KEY = ["activity-automation"] as const;
+
 /** Hiding takes a person out of the timeline as well. */
 const HIDING_READS = new Set([...ACTIVITY_READS, "getActivityWork"]);
+
+/**
+ * One hide, or its Undo, with the person it is about as the level named them. The person is for
+ * the screen only and never sent: the reply can arrive after the admin has opened someone else.
+ */
+interface VisibilityChange {
+	request: Options<UpdatePublicActivityObjectionData>;
+	subject: { login: string; name: string };
+}
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/workspace-activity")({
 	component: WorkspaceActivity,
@@ -75,6 +93,7 @@ function WorkspaceActivity() {
 	const search = Route.useSearch();
 	const setSearch = useSearchState();
 	const queryClient = useQueryClient();
+	const router = useRouter();
 	const { workspaces } = useActiveWorkspaceSlug();
 	const workspace = workspaces.find((candidate) => candidate.workspaceSlug === workspaceSlug);
 	const providerType = toScmProviderType(workspace?.providerType);
@@ -132,24 +151,42 @@ function WorkspaceActivity() {
 		enabled: personScope.enabled && category !== undefined,
 	});
 
+	// Filed under this workspace, so a change keeps its own workspace and account when the admin
+	// moves on, and each account here is busy only while a change of its own is out.
+	const automationKey = [...AUTOMATION_MUTATION_KEY, workspaceSlug];
 	const automation = useMutation({
-		...updateActivityAutomationMutation(),
-		onSuccess: async (_data, { query }) => {
-			toast.success(query.treatAsAutomation ? "Treated as automation" : "Counted as a person");
-			await invalidateWorkspaceReads(queryClient, workspaceSlug, ACTIVITY_READS);
+		...filedUnder(automationKey, updateActivityAutomationMutation()),
+		// Runs as the change is submitted, so the name is the account's as the page listed it then.
+		onMutate: ({ path: { userId } }) => ({
+			name: ready
+				? [...ready.people, ...ready.automation].find((candidate) => candidate.person.id === userId)
+						?.person.name
+				: undefined,
+		}),
+		onSuccess: async (_data, { path, query }, subject) => {
+			const name = subject.name ?? "The account";
+			toast.success(
+				query.treatAsAutomation ? `${name} is treated as automation` : `${name} counts as a person`,
+				{ description: inWorkspace(path.workspaceSlug) },
+			);
+			await invalidateWorkspaceReads(queryClient, path.workspaceSlug, ACTIVITY_READS);
 		},
-		onError: (error) =>
-			toast.error("We could not change how this account counts", {
-				description: problemDetailOf(error),
+		onError: (error, { path }, subject) =>
+			toast.error(`We could not change how ${subject?.name ?? "this account"} counts`, {
+				description: `${problemDetailOf(error)} ${inWorkspace(path.workspaceSlug)}`,
 			}),
 	});
+	const automating = usePendingMutationIds(automationKey, (variables) =>
+		pathNumber(variables, "userId"),
+	);
+	const automationPending = person !== undefined && automating.has(person.person.id);
 	// A provider's bot account is automation whatever an admin says, so it has no action.
 	const automationAction =
 		isAdmin && person && person.kind !== "BOT" ? (
 			<Button
 				variant="outline"
 				size="sm"
-				disabled={automation.isPending}
+				disabled={automationPending}
 				focusableWhenDisabled
 				onClick={() =>
 					automation.mutate({
@@ -158,39 +195,63 @@ function WorkspaceActivity() {
 					})
 				}
 			>
-				{automation.isPending && <Spinner />}
-				{automationLabel(person.kind, automation.isPending)}
+				{automationPending && <Spinner />}
+				{automationLabel(person.kind, automationPending)}
 			</Button>
 		) : undefined;
 
+	// Every outcome belongs to the workspace and person it was submitted for, not to the page the
+	// admin is on when the reply arrives.
 	const hiding = useMutation({
-		...updatePublicActivityObjectionMutation(),
-		onSuccess: async (_data, { path, query }) => {
-			await invalidateWorkspaceReads(queryClient, workspaceSlug, HIDING_READS);
+		mutationFn: async ({ request }: VisibilityChange) => {
+			await updatePublicActivityObjection({ ...request, throwOnError: true });
+		},
+		onSuccess: async (_data, { request, subject }) => {
+			const submitted = { path: { workspaceSlug: request.path.workspaceSlug } };
+			await invalidateWorkspaceReads(queryClient, submitted.path.workspaceSlug, HIDING_READS);
 			void queryClient.invalidateQueries({
-				queryKey: getPublicActivityHiddenCountQueryKey({ path: { workspaceSlug } }),
+				queryKey: getPublicActivityHiddenCountQueryKey(submitted),
 			});
-			void queryClient.invalidateQueries({
-				queryKey: listHiddenContributorsQueryKey({ path: { workspaceSlug } }),
-			});
-			if (query.hidden) {
-				// The person has left the list this level opened from.
-				stackControls.close(0);
-				toast.success(`${personName ?? "The person"} is hidden from activity`, {
+			void queryClient.invalidateQueries({ queryKey: listHiddenContributorsQueryKey(submitted) });
+			const description = inWorkspace(submitted.path.workspaceSlug);
+			if (request.query.hidden) {
+				// The person has left the list their level opened from. Read after the reads above, since
+				// the admin may have moved on meanwhile: only that person's level, on this page, closes.
+				if (showsPerson(submitted.path.workspaceSlug, subject.login)) {
+					stackControls.close(0);
+				}
+				toast.success(`${subject.name} is hidden from activity`, {
+					description,
 					action: {
 						label: "Undo",
-						onClick: () => hiding.mutate({ path, query: { hidden: false } }),
+						onClick: () =>
+							hiding.mutate({ request: { ...request, query: { hidden: false } }, subject }),
 					},
 				});
 			} else {
-				toast.success("Shown in activity again");
+				toast.success(`${subject.name} is shown in activity again`, { description });
 			}
 		},
-		onError: (error) =>
-			toast.error("We could not change who shows in activity", {
-				description: problemDetailOf(error),
-			}),
+		onError: (error, { request, subject }) =>
+			toast.error(
+				request.query.hidden
+					? `We could not hide ${subject.name} from activity`
+					: `We could not show ${subject.name} in activity again`,
+				{
+					description: `${problemDetailOf(error)} ${inWorkspace(request.path.workspaceSlug)}`,
+				},
+			),
 	});
+	/** Whether the address shows this person's level on this page of that workspace right now. */
+	const showsPerson = (submittedWorkspace: string, submittedLogin: string) =>
+		router.state.matches.some(
+			(match) =>
+				match.routeId === Route.id &&
+				match.params.workspaceSlug === submittedWorkspace &&
+				parseActivityStack(stackInSearch(match.search.detail), WORKSPACE_ACTIVITY_LEVEL_KINDS).some(
+					({ target }) => target.kind === "person" && target.login === submittedLogin,
+				),
+		);
 	// Members are hidden and shown again under Members. This is for a person with no membership, who
 	// has no account here to hide themselves with, so the members have to be known first. A provider's
 	// bot and an account counted as automation never show on a page, so there is nothing to hide.
@@ -204,11 +265,19 @@ function WorkspaceActivity() {
 		members.data?.some((member) => member.id === person.person.id) === false ? (
 			<HidePersonAction
 				name={person.person.name}
-				pending={hiding.isPending}
+				// Busy only for this person here: a change for someone else does not hold their action.
+				pending={
+					hiding.isPending &&
+					hiding.variables.request.path.workspaceSlug === workspaceSlug &&
+					hiding.variables.request.path.userId === person.person.id
+				}
 				onConfirm={() =>
 					hiding.mutate({
-						path: { workspaceSlug, userId: person.person.id },
-						query: { hidden: true },
+						request: {
+							path: { workspaceSlug, userId: person.person.id },
+							query: { hidden: true },
+						},
+						subject: { login: person.person.login, name: person.person.name },
 					})
 				}
 			/>
@@ -273,6 +342,11 @@ function workspaceWorkTitle(
 ): string {
 	const teamName = teamPaths(teams ?? []).find(({ key }) => key === team)?.label;
 	return workLogTitle(teamName ?? team ?? workspaceName ?? "Activity");
+}
+
+/** Which workspace a notification is about, since the admin may be looking at another one by then. */
+function inWorkspace(workspaceSlug: string): string {
+	return `In workspace ${workspaceSlug}.`;
 }
 
 function automationLabel(kind: ActivityPerson["kind"], pending: boolean): string {

@@ -17,9 +17,10 @@ public record LlmUsageByJobTypeDTO(
 
         @NonNull
         @Schema(
-                description = "Runs of this job type with at least one ledger row whose price is not yet known. A "
-                        + "practice script row counts toward the run of its review. Those rows are excluded from both "
-                        + "totals above.")
+                description =
+                        "Runs of this job type with at least one ledger row whose cost is unavailable because a rate is missing or the measurement is unverified. A "
+                                + "practice script row counts toward the run of its review. Those rows are excluded from both "
+                                + "totals above.")
         Long unpricedEventCount,
 
         @NonNull Long inputTokens,

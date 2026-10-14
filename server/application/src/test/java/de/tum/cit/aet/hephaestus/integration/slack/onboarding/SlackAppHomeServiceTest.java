@@ -15,7 +15,6 @@ import static org.mockito.Mockito.when;
 
 import com.slack.api.model.block.LayoutBlock;
 import com.slack.api.model.view.View;
-import de.tum.cit.aet.hephaestus.practices.spi.MentorReadinessQuery;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorRefusal;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorTurnRunner;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery;
@@ -26,6 +25,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackParticipantConsen
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackWorkspaceResolver;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
+import de.tum.cit.aet.hephaestus.practices.spi.MentorReadinessQuery;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Optional;

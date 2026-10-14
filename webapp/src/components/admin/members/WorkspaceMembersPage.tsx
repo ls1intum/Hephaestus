@@ -21,6 +21,9 @@ interface WorkspaceMembersPageProps {
 	onToggleHidden?: (accountId: string, hidden: boolean) => void;
 	onRoleChange?: (accountId: string, role: WorkspaceRole) => void;
 	pendingRoleAccountId?: string;
+	teamsError?: unknown;
+	teamsRetrying?: boolean;
+	onRetryTeams?: () => void;
 	view: WorkspaceMembersTableView;
 	onViewChange: (patch: Partial<WorkspaceMembersTableView>) => void;
 	renderPageLink: (page: number, props: ComponentProps<"a">) => ReactElement;
@@ -32,6 +35,9 @@ export function WorkspaceMembersPage({
 	isLoading,
 	error,
 	onRetry,
+	teamsError,
+	teamsRetrying = false,
+	onRetryTeams,
 	onToggleHidden,
 	onRoleChange,
 	pendingRoleAccountId,
@@ -47,17 +53,27 @@ export function WorkspaceMembersPage({
 				description="Browse workspace members, filter by team, and change their roles."
 			/>
 			{error == null ? (
-				<WorkspaceMembersTable
-					members={members}
-					teams={teams}
-					isLoading={isLoading}
-					onToggleHidden={onToggleHidden}
-					onRoleChange={onRoleChange}
-					pendingRoleAccountId={pendingRoleAccountId}
-					view={view}
-					onViewChange={onViewChange}
-					renderPageLink={renderPageLink}
-				/>
+				<div className="space-y-4">
+					{teamsError != null && (
+						<QueryErrorAlert
+							error={teamsError}
+							title="We could not load teams"
+							onRetry={onRetryTeams}
+							pending={teamsRetrying}
+						/>
+					)}
+					<WorkspaceMembersTable
+						members={members}
+						teams={teams}
+						isLoading={isLoading}
+						onToggleHidden={onToggleHidden}
+						onRoleChange={onRoleChange}
+						pendingRoleAccountId={pendingRoleAccountId}
+						view={view}
+						onViewChange={onViewChange}
+						renderPageLink={renderPageLink}
+					/>
+				</div>
 			) : (
 				<QueryErrorAlert error={error} title="We could not load members" onRetry={onRetry} />
 			)}

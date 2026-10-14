@@ -1611,7 +1611,7 @@ class MentorChatServiceTest extends BaseUnitTest {
 
         assertThat(emitter.recordedTypes()).contains("error");
         assertThat(String.join("\n", emitter.rawData))
-                .contains("Some usage has no price, so the server cannot check it against the budget")
+                .contains("Some usage has no confirmed cost, so the server cannot check it against the budget")
                 .doesNotContain("has reached its monthly");
         verify(persistence, never()).persistInFlight(any(), any(), any(), any(), any());
         try {

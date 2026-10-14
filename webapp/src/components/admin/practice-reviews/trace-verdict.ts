@@ -659,7 +659,7 @@ function reviewVerdict(
 		case "QUEUED": {
 			const hold = review.holdReason;
 			if (hold !== undefined && hold.length > 0) {
-				const label = lowerFirst(holdReasonCopy(hold).label);
+				const { label } = holdReasonCopy(hold);
 				return {
 					sentence: `This review is on hold (${label}) and has observed nothing yet.`,
 					end: end("open", `the review is on hold: ${label}`, { since: review.createdAt }),

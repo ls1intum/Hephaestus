@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelPrice;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelPriceRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.PricingMode;
+import de.tum.cit.aet.hephaestus.agent.handler.RuntimePracticeTestData;
 import de.tum.cit.aet.hephaestus.agent.job.PracticeScriptCallUsage;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
@@ -18,12 +19,16 @@ import de.tum.cit.aet.hephaestus.agent.job.ScriptUsage;
 import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEvent;
 import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEventRepository;
+import de.tum.cit.aet.hephaestus.core.llm.usage.MeasurementVerification;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UnpricedLedgerRow;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageProvenance;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
@@ -39,6 +44,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import org.assertj.core.api.SoftAssertions;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -46,8 +52,10 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
@@ -76,6 +84,9 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
     private ReviewJobRepository jobRepository;
 
     @Autowired
+    private JdbcTemplate jdbc;
+
+    @Autowired
     private LlmConnectionRepository llmConnectionRepository;
 
     @Autowired
@@ -86,6 +97,12 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
     private LlmUsageRepricer repricer;
+
+    @Autowired
+    private PracticeVersionService practiceVersions;
+
+    @Autowired
+    private PracticeRepository practices;
 
     @Autowired
     private LlmUsageService llmUsageService;
@@ -123,6 +140,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 1,
                 price,
                 UsageProvenance.RUNNER,
+                MeasurementVerification.VERIFIED,
                 Instant.now());
     }
 
@@ -132,12 +150,34 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 "PRACTICE_REVIEW", UsageSourceType.REVIEW_JOB, sourceId, sourceAttempt, "gpt-5", inputTokens, 0, price);
     }
 
-    private void record(Long workspaceId, LlmUsageRecorder.LlmUsageSample sample) {
-        transactionTemplate.executeWithoutResult(status -> recorder.record(workspaceId, sample));
+    private LlmUsageRecorder.LlmUsageSample agentSample(
+            UUID sourceId,
+            int sourceAttempt,
+            long inputTokens,
+            LlmPriceSnapshot price,
+            MeasurementVerification verification) {
+        return new LlmUsageRecorder.LlmUsageSample(
+                null,
+                "PRACTICE_REVIEW",
+                UsageSourceType.REVIEW_JOB,
+                sourceId,
+                sourceAttempt,
+                "gpt-5",
+                inputTokens,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                price,
+                UsageProvenance.RUNNER,
+                verification,
+                Instant.now());
     }
 
-    private void recordUnverifiable(Long workspaceId, LlmUsageRecorder.LlmUsageSample sample) {
-        transactionTemplate.executeWithoutResult(status -> recorder.recordUnverifiable(workspaceId, sample));
+    private void record(Long workspaceId, LlmUsageRecorder.LlmUsageSample sample) {
+        transactionTemplate.executeWithoutResult(status -> recorder.record(workspaceId, sample));
     }
 
     /**
@@ -373,7 +413,14 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         workspace.setMonthlyLlmBudgetUsd(new BigDecimal("100.00"));
         workspaceRepository.save(workspace);
         // An unpriced INSTANCE-funded event: it makes the host's month unverifiable, nothing more.
-        recordUnverifiable(workspace.getId(), agentSample(UUID.randomUUID(), 0, 1000, pricedInstance("3.00", "9.00")));
+        record(
+                workspace.getId(),
+                agentSample(
+                        UUID.randomUUID(),
+                        0,
+                        1000,
+                        pricedInstance("3.00", "9.00"),
+                        MeasurementVerification.UNVERIFIABLE));
 
         LlmBudgetDecision decision = budgetService.decide(workspace.getId());
 
@@ -386,7 +433,10 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         Workspace workspace = setupWorkspace("ledger-uncosted");
         double uncostedBefore = meterRegistry.counter("llm.usage.uncosted").count();
 
-        recordUnverifiable(workspace.getId(), agentSample(UUID.randomUUID(), 3, 0, pricedInstance("3.00", "9.00")));
+        record(
+                workspace.getId(),
+                agentSample(
+                        UUID.randomUUID(), 3, 0, pricedInstance("3.00", "9.00"), MeasurementVerification.UNVERIFIABLE));
 
         var event = eventsOf(workspace).getFirst();
         assertThat(event.getCostUsd()).isNull();
@@ -515,17 +565,34 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
     class ApplyResolvedPrice {
 
         private void accumulate(ReviewJob job, PracticeScriptCallUsage call) {
-            transactionTemplate.executeWithoutResult(
-                    status -> jobRepository.accumulatePracticeScriptUsage(job.getId(), job.getAttempt(), call));
+            transactionTemplate.executeWithoutResult(status -> {
+                if (practices
+                        .findByWorkspaceIdAndSlug(job.getWorkspaceId(), call.practiceSlug())
+                        .isEmpty()) {
+                    var workspace =
+                            workspaceRepository.findById(job.getWorkspaceId()).orElseThrow();
+                    var kind = new ItemKind("scm.pull_request");
+                    practiceVersions.create(new PracticeVersionService.NewPractice(
+                            workspace,
+                            call.practiceSlug(),
+                            kind,
+                            RuntimePracticeTestData.definition(kind, call.practiceSlug(), "Explain the change.", null),
+                            null,
+                            0,
+                            null));
+                }
+                jobRepository.accumulatePracticeScriptUsage(job.getId(), job.getAttempt(), call);
+            });
         }
 
-        private LlmUsageEvent scriptRow(Workspace workspace, ReviewJob job, ModelKind kind) {
+        private LlmUsageEvent scriptRow(
+                Workspace workspace, ReviewJob job, ModelKind kind, MeasurementVerification verification) {
             LlmModelPrice price = new LlmModelPrice();
             price.setModel(instanceModel(workspace.getWorkspaceSlug()));
             price.setPricingMode(PricingMode.UNPRICED);
             price.setEffectiveFrom(Instant.now().minusSeconds(60));
             price = priceRepository.saveAndFlush(price);
-            recordUnverifiable(
+            record(
                     workspace.getId(),
                     new LlmUsageRecorder.LlmUsageSample(
                             null,
@@ -551,6 +618,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
                                     null,
                                     null),
                             UsageProvenance.PROXY,
+                            verification,
                             Instant.now()));
             price.setPricingMode(PricingMode.PRICED);
             price.setPer1mInputUsd(new BigDecimal("3.00"));
@@ -571,7 +639,8 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     row.getCacheWriteTokens(),
                     row.getSearchUnits(),
                     row.getAppliedPriceId(),
-                    row.getAppliedWorkspaceModelId());
+                    row.getAppliedWorkspaceModelId(),
+                    row.getMeasurementVerification());
         }
 
         @ParameterizedTest
@@ -584,7 +653,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
             jobRepository.saveAndFlush(job);
             accumulate(job, new PracticeScriptCallUsage(kind, "known", null, 1_000_000, 0, 0, 0, 0));
             accumulate(job, new PracticeScriptCallUsage(kind, "unknown", null, 0, 0, 0, 0, 0, false));
-            LlmUsageEvent row = scriptRow(workspace, job, kind);
+            LlmUsageEvent row = scriptRow(workspace, job, kind, MeasurementVerification.UNVERIFIABLE);
 
             assertThat(row.getUnreportedCalls()).isEqualTo(1);
             assertThat(usageRepository.findUnpricedInWindow(
@@ -609,7 +678,8 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
                             PageRequest.of(0, LlmUsageRepricingSweeper.MAX_ROWS_PER_PASS)))
                     .extracting(UnpricedLedgerRow::id)
                     .doesNotContain(row.getId());
-            assertThat(repricer.reprice(projection(row))).isEqualTo(LlmUsageRepricer.ResultOutcome.STILL_UNPRICEABLE);
+            assertThat(repricer.reprice(projection(row)))
+                    .isEqualTo(LlmUsageRepricer.ResultOutcome.UNVERIFIED_MEASUREMENT);
             LlmUsageEvent unchanged = reload(row.getId());
             assertThat(unchanged.getPricingState()).isEqualTo(UsagePricingState.UNPRICED);
             assertThat(unchanged.getCostUsd()).isNull();
@@ -632,7 +702,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
             accumulate(job, new PracticeScriptCallUsage(kind, "reported-zero", null, 0, 0, 0, 0, 0));
             ModelKind other = kind == ModelKind.CHAT ? ModelKind.EMBEDDING : ModelKind.CHAT;
             accumulate(job, new PracticeScriptCallUsage(other, "unknown", null, 0, 0, 0, 0, 0, false));
-            LlmUsageEvent row = scriptRow(workspace, job, kind);
+            LlmUsageEvent row = scriptRow(workspace, job, kind, MeasurementVerification.VERIFIED);
 
             assertThat(row.getUnreportedCalls()).isZero();
             assertThat(usageRepository.findUnpricedInWindow(
@@ -650,8 +720,21 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         private LlmUsageEvent unpricedRow(String slug) {
             Workspace workspace = setupWorkspace(slug);
-            recordUnverifiable(
-                    workspace.getId(), agentSample(UUID.randomUUID(), 1, 1_000_000, pricedInstance("3.00", "9.00")));
+            record(
+                    workspace.getId(),
+                    agentSample(
+                            UUID.randomUUID(),
+                            1,
+                            1_000_000,
+                            new LlmPriceSnapshot(
+                                    UsageFundingSource.INSTANCE,
+                                    UsagePricingState.PRICED,
+                                    42L,
+                                    null,
+                                    null,
+                                    new BigDecimal("9.00"),
+                                    BigDecimal.ZERO,
+                                    BigDecimal.ZERO)));
             LlmUsageEvent row = eventsOf(workspace).getFirst();
             assertThat(row.getPricingState()).isEqualTo(UsagePricingState.UNPRICED);
             return row;
@@ -729,11 +812,137 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         @Test
+        @DisplayName("an unverified positive measurement is neither selected nor repriced")
+        void shouldNeitherSelectNorRepriceWhenPositiveMeasurementIsUnverified() {
+            Workspace workspace = setupWorkspace("reprice-unverified-positive");
+            UUID sourceId = UUID.randomUUID();
+            var sample = agentSample(
+                    sourceId, 1, 1_000_000, pricedInstance("3.00", "9.00"), MeasurementVerification.UNVERIFIABLE);
+            record(workspace.getId(), sample);
+            LlmUsageEvent row = eventsOf(workspace).getFirst();
+
+            assertThat(row.getSourceId()).isEqualTo(sourceId);
+            assertThat(row.getSourceType()).isEqualTo(UsageSourceType.REVIEW_JOB);
+            assertThat(row.getSourceAttempt()).isEqualTo(1);
+            assertThat(row.getFundingSource()).isEqualTo(UsageFundingSource.INSTANCE);
+            assertThat(row.getInputTokens()).isEqualTo(1_000_000L);
+            assertThat(row.getMeasurementVerification()).isEqualTo(MeasurementVerification.UNVERIFIABLE);
+            assertThat(row.getPricingState()).isEqualTo(UsagePricingState.UNPRICED);
+            assertThat(row.getCostUsd()).isNull();
+            assertThat(row.getAppliedPriceId()).isEqualTo(42L);
+            assertThat(row.getAppliedPer1mInputUsd()).isEqualByComparingTo("3.00");
+            assertThat(row.getAppliedPer1mOutputUsd()).isEqualByComparingTo("9.00");
+
+            List<UnpricedLedgerRow> worklist = usageRepository.findUnpricedInWindow(
+                    sample.occurredAt().minus(Duration.ofHours(1)),
+                    sample.occurredAt().plus(Duration.ofHours(1)),
+                    PageRequest.of(0, LlmUsageRepricingSweeper.MAX_ROWS_PER_PASS));
+            int updated = reprice(
+                    row.getId(),
+                    new BigDecimal("1.110000"),
+                    new LlmPriceSnapshot(
+                            UsageFundingSource.INSTANCE,
+                            UsagePricingState.PRICED,
+                            42L,
+                            84L,
+                            new BigDecimal("1.11"),
+                            new BigDecimal("2.22"),
+                            new BigDecimal("3.33"),
+                            new BigDecimal("4.44")));
+            LlmUsageEvent after = reload(row.getId());
+
+            SoftAssertions.assertSoftly(softly -> {
+                softly.assertThat(worklist)
+                        .as("repricing worklist")
+                        .extracting(UnpricedLedgerRow::id)
+                        .doesNotContain(row.getId());
+                softly.assertThat(updated).as("atomic repricing update count").isZero();
+                softly.assertThat(after.getPricingState()).isEqualTo(UsagePricingState.UNPRICED);
+                softly.assertThat(after.getCostUsd()).isNull();
+            });
+        }
+
+        @ParameterizedTest(name = "historical UNKNOWN, priced={0}")
+        @ValueSource(booleans = {false, true})
+        void shouldPreserveHistoricalCostAndBudgetBasisWhenVerificationIsUnknown(boolean priced) {
+            Workspace workspace = setupWorkspace("reprice-historical-unknown-" + priced);
+            workspace.setMonthlyLlmBudgetUsd(new BigDecimal("100.00"));
+            workspaceRepository.saveAndFlush(workspace);
+            UUID sourceId = UUID.randomUUID();
+            LlmPriceSnapshot admitted = new LlmPriceSnapshot(
+                    UsageFundingSource.INSTANCE,
+                    UsagePricingState.PRICED,
+                    42L,
+                    null,
+                    priced ? new BigDecimal("3.00") : null,
+                    new BigDecimal("9.00"),
+                    BigDecimal.ZERO,
+                    BigDecimal.ZERO);
+            var sample = agentSample(sourceId, 2, 1_000_000, admitted);
+            record(workspace.getId(), sample);
+            LlmUsageEvent original = eventsOf(workspace).getFirst();
+            assertThat(original.getMeasurementVerification()).isEqualTo(MeasurementVerification.VERIFIED);
+            transactionTemplate.executeWithoutResult(status -> assertThat(jdbc.update(
+                            "UPDATE llm_usage_event SET measurement_verification = 'UNKNOWN' WHERE id = ?",
+                            original.getId()))
+                    .isEqualTo(1));
+            LlmUsageEvent historical = reload(original.getId());
+            assertThat(historical.getMeasurementVerification()).isEqualTo(MeasurementVerification.UNKNOWN);
+
+            List<UnpricedLedgerRow> worklist = usageRepository.findUnpricedInWindow(
+                    sample.occurredAt().minus(Duration.ofHours(1)),
+                    sample.occurredAt().plus(Duration.ofHours(1)),
+                    PageRequest.of(0, LlmUsageRepricingSweeper.MAX_ROWS_PER_PASS));
+            int updated = reprice(
+                    original.getId(),
+                    new BigDecimal("1.110000"),
+                    new LlmPriceSnapshot(
+                            UsageFundingSource.INSTANCE,
+                            UsagePricingState.PRICED,
+                            43L,
+                            84L,
+                            new BigDecimal("1.11"),
+                            new BigDecimal("2.22"),
+                            new BigDecimal("3.33"),
+                            new BigDecimal("4.44")));
+            LlmUsageEvent after = reload(original.getId());
+            var headroom = budgetService.headroom(workspace.getId());
+
+            SoftAssertions.assertSoftly(softly -> {
+                softly.assertThat(worklist).extracting(UnpricedLedgerRow::id).doesNotContain(original.getId());
+                softly.assertThat(updated).isZero();
+                softly.assertThat(after.getMeasurementVerification()).isEqualTo(MeasurementVerification.UNKNOWN);
+                softly.assertThat(after.getPricingState()).isEqualTo(original.getPricingState());
+                softly.assertThat(after.getCostUsd()).isEqualTo(original.getCostUsd());
+                softly.assertThat(after.getInputTokens()).isEqualTo(1_000_000L);
+                softly.assertThat(after.getOutputTokens()).isZero();
+                softly.assertThat(after.getCacheReadTokens()).isZero();
+                softly.assertThat(after.getCacheWriteTokens()).isZero();
+                softly.assertThat(after.getAppliedPriceId()).isEqualTo(42L);
+                softly.assertThat(after.getAppliedWorkspaceModelId()).isNull();
+                softly.assertThat(after.getAppliedPer1mInputUsd()).isEqualTo(original.getAppliedPer1mInputUsd());
+                softly.assertThat(after.getAppliedPer1mOutputUsd()).isEqualByComparingTo("9.00");
+                softly.assertThat(after.getAppliedPer1mCacheReadUsd()).isEqualByComparingTo("0");
+                softly.assertThat(after.getAppliedPer1mCacheWriteUsd()).isEqualByComparingTo("0");
+                softly.assertThat(after.getUsageProvenance()).isEqualTo(original.getUsageProvenance());
+                softly.assertThat(after.getSourceId()).isEqualTo(sourceId);
+                softly.assertThat(after.getSourceAttempt()).isEqualTo(2);
+                softly.assertThat(after.getFundingSource()).isEqualTo(UsageFundingSource.INSTANCE);
+                softly.assertThat(after.getOccurredAt()).isEqualTo(original.getOccurredAt());
+                softly.assertThat(headroom.instanceSpentUsd()).isEqualByComparingTo(priced ? "3.00" : "0");
+                softly.assertThat(headroom.instanceHasUnpricedSpend()).isEqualTo(!priced);
+                softly.assertThat(headroom.decide().instanceFunded())
+                        .isEqualTo(priced ? LlmBudgetBlockReason.NONE : LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED);
+                softly.assertThat(headroom.decide().workspaceFunded()).isEqualTo(LlmBudgetBlockReason.NONE);
+            });
+        }
+
+        @Test
         @DisplayName("a row with no measured token is never selected or settled, even at a free model")
         void aRowWithNoTokenEvidenceStaysUnknown() {
             Workspace workspace = setupWorkspace("reprice-no-evidence");
             Instant occurredAt = Instant.now();
-            recordUnverifiable(
+            record(
                     workspace.getId(),
                     new LlmUsageRecorder.LlmUsageSample(
                             null,
@@ -751,6 +960,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
                             2,
                             pricedInstance("3.00", "9.00"),
                             UsageProvenance.NONE,
+                            MeasurementVerification.UNVERIFIABLE,
                             occurredAt));
             LlmUsageEvent unmeasured = eventsOf(workspace).getFirst();
             LlmUsageEvent measured = unpricedRow("reprice-measured-beside");

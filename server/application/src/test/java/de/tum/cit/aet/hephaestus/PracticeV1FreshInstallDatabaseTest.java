@@ -30,8 +30,8 @@ class PracticeV1FreshInstallDatabaseTest {
                         PracticeV1CutoverMigrationTest.column(
                                 database,
                                 "SELECT count(*)::text FROM information_schema.tables WHERE table_schema='public' AND"
-                                    + " table_name IN"
-                                    + " ('item','item_event','review','review_practice','review_item','review_job','result','problem','result_mark','membership','identity','identity_restriction','feedback','feedback_basis','feedback_copy','feedback_send','feedback_decision','feedback_response','practice_version','catalog_entry')"))
+                                        + " table_name IN"
+                                        + " ('item','item_event','review','review_practice','review_item','review_job','result','problem','result_mark','membership','identity','identity_restriction','feedback','feedback_basis','feedback_copy','feedback_send','feedback_decision','feedback_response','practice_version','catalog_entry')"))
                 .containsExactly("20");
         assertThat(PracticeV1CutoverMigrationTest.column(
                         database,

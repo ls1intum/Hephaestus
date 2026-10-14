@@ -101,7 +101,10 @@ const problemOf = (resultId: string, position: number, severity: ProblemSummary[
 
 /** Three results: one not met behind the feedback, one met, one that does not apply. */
 const threeResults = (overrides: Partial<ReviewBoundResult> = {}): LineageResultSpec[] => [
-	stateResult(RESULT_A, overrides, [problemOf(RESULT_A, 0, "MAJOR"), problemOf(RESULT_A, 1, "MINOR")]),
+	stateResult(RESULT_A, overrides, [
+		problemOf(RESULT_A, 0, "MAJOR"),
+		problemOf(RESULT_A, 1, "MINOR"),
+	]),
 	stateResult(RESULT_B, {
 		practiceSlug: "thin-controllers",
 		outcome: "MET",
@@ -160,11 +163,19 @@ interface ChainSpec {
 }
 
 /** A graph asked for by its review, or by its item once the review's record is gone. */
-function chain({ item = reviewItem, review = {}, results, feedback }: ChainSpec = {}): ReviewLineage {
+function chain({
+	item = reviewItem,
+	review = {},
+	results,
+	feedback,
+}: ChainSpec = {}): ReviewLineage {
 	const ref = review === null ? null : { ...baseReview, item, ...review };
 	const resultsOf = (results ?? threeResults()).map((entry) => ({
 		...entry,
-		result: { ...entry.result, item: entry.result.item.id === reviewItem.id ? item : entry.result.item },
+		result: {
+			...entry.result,
+			item: entry.result.item.id === reviewItem.id ? item : entry.result.item,
+		},
 	}));
 	return storyLineage({
 		root: ref === null ? { kind: "ITEM", id: item.id } : { kind: "REVIEW", id: ref.id },
@@ -245,7 +256,11 @@ const reviewCases: LineageStateCase[] = [
 	withCase(
 		"cancelled",
 		"Canceled by an admin",
-		chain({ review: { status: "CANCELLED", completedAt: at("13:36:00") }, results: [], feedback: [] }),
+		chain({
+			review: { status: "CANCELLED", completedAt: at("13:36:00") },
+			results: [],
+			feedback: [],
+		}),
 		(lineage) => detailOf(lineage, { stopReason: "CANCELLED_BY_ADMIN" }),
 	),
 	withCase(
@@ -258,7 +273,9 @@ const reviewCases: LineageStateCase[] = [
 	withCase(
 		"expired-runtime",
 		"Execution details expired",
-		chain({ review: { completedAt: dayAt("05-02", "13:44:00"), createdAt: dayAt("05-02", "13:35:00") } }),
+		chain({
+			review: { completedAt: dayAt("05-02", "13:44:00"), createdAt: dayAt("05-02", "13:35:00") },
+		}),
 		(lineage) => detailOf(lineage, { runtime: null, stageTiming: [] }),
 	),
 	{
@@ -300,8 +317,7 @@ const originCases: LineageStateCase[] = [
 		"origin-request",
 		"Requested by an admin",
 		chain({ review: { origin: "REQUEST" } }),
-		(lineage) =>
-			detailOf(lineage, { startedBy: null, requestedBy: reviewAccounts.grace }),
+		(lineage) => detailOf(lineage, { startedBy: null, requestedBy: reviewAccounts.grace }),
 	),
 	withCase(
 		"origin-schedule",
@@ -312,7 +328,10 @@ const originCases: LineageStateCase[] = [
 	withCase(
 		"origin-backfill",
 		"One of a batch over past work",
-		chain({ review: { origin: "BACKFILL" }, feedback: [oneComment({ state: "WITHHELD", deliveredAt: null })] }),
+		chain({
+			review: { origin: "BACKFILL" },
+			feedback: [oneComment({ state: "WITHHELD", deliveredAt: null })],
+		}),
 		(lineage) =>
 			detailOf(lineage, { startedBy: null, batchId: "0b0b0b0b-1111-4111-8111-111111111111" }),
 	),
@@ -348,7 +367,9 @@ const itemCases: LineageStateCase[] = [
 					summary: "Each comment says what to change and why",
 				}),
 			],
-			feedback: [oneComment({ destination: "PRACTICE_PAGE", state: "WITHHELD", deliveredAt: null })],
+			feedback: [
+				oneComment({ destination: "PRACTICE_PAGE", state: "WITHHELD", deliveredAt: null }),
+			],
 		}),
 	),
 ];
@@ -454,15 +475,13 @@ const resultCases: LineageStateCase[] = [
 		"Not met, its evidence withheld from admins",
 		chain({
 			results: [
-				stateResult(RESULT_A, {}, [{ id: problemOf(RESULT_A, 0, "MAJOR").id, severity: "MAJOR", summary: "Evidence hidden" }]),
+				stateResult(RESULT_A, {}, [
+					{ id: problemOf(RESULT_A, 0, "MAJOR").id, severity: "MAJOR", summary: "Evidence hidden" },
+				]),
 			],
 		}),
 	),
-	withCase(
-		"not-met-silent",
-		"Not met, and no feedback written from it",
-		chain({ feedback: [] }),
-	),
+	withCase("not-met-silent", "Not met, and no feedback written from it", chain({ feedback: [] })),
 	withCase("empty", "Complete with no result", chain({ results: [], feedback: [] })),
 	withCase(
 		"many-results",
@@ -581,7 +600,9 @@ const volumeCases: LineageStateCase[] = [
 			feedback: Array.from({ length: 10 }, (_, index) =>
 				stateFeedback(
 					id(10, index + 1),
-					index % 3 === 0 ? [RESULT_A, RESULT_B] : [[RESULT_A, RESULT_B, RESULT_C][index % 3] ?? RESULT_A],
+					index % 3 === 0
+						? [RESULT_A, RESULT_B]
+						: [[RESULT_A, RESULT_B, RESULT_C][index % 3] ?? RESULT_A],
 					{
 						destination: index % 2 === 0 ? "ON_WORK" : "PRACTICE_PAGE",
 						deliveredAt: at(`13:4${index}:40`),

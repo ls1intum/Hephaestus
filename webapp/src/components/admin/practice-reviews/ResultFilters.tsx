@@ -51,8 +51,7 @@ export function disagreementFacet(
 		"Disagreement",
 		DISAGREEMENT_OPTIONS,
 		disagreementSelection(search.disagreed),
-		(values) =>
-			onPatch({ disagreed: values.length === 1 ? values[0] === "DISAGREED" : undefined }),
+		(values) => onPatch({ disagreed: values.length === 1 ? values[0] === "DISAGREED" : undefined }),
 	);
 }
 
@@ -149,7 +148,9 @@ export interface PracticeFacetOption extends FacetOption {
 }
 
 export function practiceFacetOptions(
-	practices: readonly Pick<Practice, "slug" | "groupSlug" | "currentVersion" | "feedbackMode">[] | undefined,
+	practices:
+		| readonly Pick<Practice, "slug" | "groupSlug" | "currentVersion" | "feedbackMode">[]
+		| undefined,
 	groups: readonly NamedGroup[] | undefined,
 ): PracticeFacetOption[] {
 	return (practices ?? []).map((practice) => ({

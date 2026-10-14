@@ -2710,7 +2710,7 @@ BEGIN
  AND (to_jsonb(NEW)-'account_id'-'acting_account_id'-'viewed_account_id'-'viewed_actor_id'-'identity_id'-'provider_id'-'workspace_id'-'ip_inet'-'user_agent'-'details')
  IS NOT DISTINCT FROM (to_jsonb(OLD)-'account_id'-'acting_account_id'-'viewed_account_id'-'viewed_actor_id'-'identity_id'-'provider_id'-'workspace_id'-'ip_inet'-'user_agent'-'details') THEN
   RETURN NEW; END IF;
- RAISE EXCEPTION 'auth_event permits only nulling private attribution and content';
+ RAISE EXCEPTION 'auth_event is append-only: permits only nulling private attribution and content';
 END $$;$auth_definition$;
  END IF;
 END $auth_function$;

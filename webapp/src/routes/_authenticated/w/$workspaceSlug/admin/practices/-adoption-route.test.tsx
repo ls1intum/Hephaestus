@@ -1,6 +1,13 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+	getPracticeQueryKey,
+	getPracticeDefinitionOptionsQueryKey,
+	listPracticeGroupsQueryKey,
+	listPracticesQueryKey,
+} from "@/api/@tanstack/react-query.gen";
+import { mockDefinitionOptions } from "@/components/admin/practice-editor/fixtures";
 
 import { getPracticeGuidanceOptions } from "@/api/@tanstack/react-query.gen";
 import type { CatalogPracticePreview, CatalogPracticeSummary } from "@/api/types.gen";
@@ -105,6 +112,63 @@ const workspacePractice = wirePractice({
 	slug: "already-mine",
 	definition: definitionOf({ name: "Already mine" }),
 });
+
+const PRACTICE_PATH = `*/workspaces/acme/practices/${workspacePractice.slug}`;
+const DEFINITION_OPTIONS_PATH = "*/workspaces/acme/practices/definition-options";
+const GROUPS_PATH = "*/workspaces/acme/practice-groups";
+const PRACTICES_PATH = "*/workspaces/acme/practices";
+const practiceKey = getPracticeQueryKey({
+	path: { workspaceSlug: "acme", practiceSlug: workspacePractice.slug },
+});
+
+const unavailable = () =>
+	HttpResponse.json({ status: 503, title: "Service Unavailable" }, { status: 503 });
+
+/** Serves every read the practice editor waits for, and names each one answered in `reads`. */
+function serveEditorReads() {
+	const reads: string[] = [];
+	server.use(
+		// Before `:practiceSlug`, which would otherwise answer these paths. MSW takes the first match.
+		http.get(DEFINITION_OPTIONS_PATH, () => {
+			reads.push("definition options");
+			return HttpResponse.json(mockDefinitionOptions);
+		}),
+		http.get("*/workspaces/:workspaceSlug/practices/releases", () => HttpResponse.json([])),
+		http.get(GROUPS_PATH, () => {
+			reads.push("groups");
+			return HttpResponse.json([]);
+		}),
+		http.get(PRACTICES_PATH, () => {
+			reads.push("practices");
+			return HttpResponse.json([]);
+		}),
+		http.get(PRACTICE_PATH, () => {
+			reads.push("practice");
+			return HttpResponse.json(workspacePractice);
+		}),
+	);
+	return reads;
+}
+
+async function openEditor(level: string, title: string) {
+	const rendered = renderRouteAtWithRouter(`/w/acme/admin/practices?detail=${level}`);
+	const dialog = await screen.findByRole("dialog", { name: title }, ROUTE_RENDER_WAIT);
+	return { ...rendered, dialog };
+}
+
+async function typeDraft(dialog: HTMLElement) {
+	fireEvent.change(
+		await within(dialog).findByRole("textbox", { name: /^Name/u }, ROUTE_RENDER_WAIT),
+		{ target: { value: "Unsaved draft name" } },
+	);
+}
+
+function groupDraftName() {
+	return within(screen.getByRole("dialog", { name: "Create group" })).getByRole<HTMLInputElement>(
+		"textbox",
+		{ name: "Name" },
+	).value;
+}
 
 describe("catalog adoption over practice setup", () => {
 	beforeEach(() => {
@@ -419,5 +483,185 @@ describe("catalog adoption over practice setup", () => {
 			ROUTE_RENDER_WAIT,
 		);
 		expect(screen.queryByRole("alertdialog")).toBeNull();
+	});
+
+	describe("the editor's reads", () => {
+		it.each([
+			[
+				"practice editor",
+				"practice",
+				`practice-edit:${workspacePractice.slug}`,
+				"Edit practice",
+				PRACTICE_PATH,
+				practiceKey,
+			],
+			[
+				"practice editor",
+				"definition options",
+				`practice-edit:${workspacePractice.slug}`,
+				"Edit practice",
+				DEFINITION_OPTIONS_PATH,
+				getPracticeDefinitionOptionsQueryKey({ path: { workspaceSlug: "acme" } }),
+			],
+			[
+				"new practice",
+				"groups",
+				"practice-new:draft",
+				"Create practice",
+				GROUPS_PATH,
+				listPracticeGroupsQueryKey({ path: { workspaceSlug: "acme" } }),
+			],
+		] as const)(
+			"%s keeps the draft when its %s refresh fails, and Retry reads only that again",
+			async (_editor, failingRead, level, title, failingPath, queryKey) => {
+				const reads = serveEditorReads();
+				const { queryClient, router, dialog } = await openEditor(level, title);
+				await typeDraft(dialog);
+				const draftName = () =>
+					within(dialog).getByRole<HTMLInputElement>("textbox", { name: /^Name/u }).value;
+
+				server.use(http.get(failingPath, unavailable, { once: true }));
+				await act(async () => {
+					await queryClient.invalidateQueries({ queryKey, exact: true });
+				});
+				const retry = await within(dialog).findByRole("button", { name: "Retry" });
+				expect(draftName()).toBe("Unsaved draft name");
+
+				const readsBeforeRetry = reads.length;
+				fireEvent.click(retry);
+				await waitFor(() =>
+					expect(within(dialog).queryByRole("button", { name: /^Retry/u })).toBeNull(),
+				);
+				expect(draftName()).toBe("Unsaved draft name");
+				expect(reads.slice(readsBeforeRetry)).toStrictEqual([failingRead]);
+				expect(stackInSearch(router.state.location.search.detail)).toStrictEqual([level]);
+			},
+		);
+
+		it("hides a refused practice until an authorized read returns", async () => {
+			serveEditorReads();
+			const served: number[] = [];
+			const { queryClient, dialog } = await openEditor(
+				`practice-edit:${workspacePractice.slug}`,
+				"Edit practice",
+			);
+			await typeDraft(dialog);
+			server.use(
+				http.get(
+					PRACTICE_PATH,
+					() => {
+						served.push(403);
+						return HttpResponse.json({ status: 403, title: "Forbidden" }, { status: 403 });
+					},
+					{ once: true },
+				),
+				http.get(
+					PRACTICE_PATH,
+					() => {
+						served.push(503);
+						return unavailable();
+					},
+					{ once: true },
+				),
+				http.get(PRACTICE_PATH, () => {
+					served.push(200);
+					return HttpResponse.json({ ...workspacePractice, name: "Renamed elsewhere" });
+				}),
+			);
+			const refreshPractice = async () => {
+				await act(async () => {
+					await queryClient.invalidateQueries({ queryKey: practiceKey, exact: true });
+				});
+			};
+
+			await refreshPractice();
+			await within(dialog).findByText(/Ask a workspace admin or instance admin for access/u);
+			expect(within(dialog).queryByRole("textbox", { name: /^Name/u })).toBeNull();
+			expect(within(dialog).queryByRole("button", { name: "Save changes" })).toBeNull();
+			expect(within(dialog).queryByRole("button", { name: "Retry" })).toBeNull();
+			await waitFor(() => expect(queryClient.getQueryData(practiceKey)).toBeUndefined());
+
+			await refreshPractice();
+			const retry = await within(dialog).findByRole("button", { name: "Retry" });
+			expect(within(dialog).queryByRole("textbox", { name: /^Name/u })).toBeNull();
+			expect(within(dialog).queryByRole("button", { name: "Save changes" })).toBeNull();
+
+			fireEvent.click(retry);
+			const name = await within(dialog).findByRole<HTMLInputElement>("textbox", {
+				name: /^Name/u,
+			});
+			expect(name.value).toBe("Renamed elsewhere");
+			expect(served).toStrictEqual([403, 503, 200]);
+		});
+
+		it("keeps a new group's name through a failed practices refresh and the read after it", async () => {
+			const reads = serveEditorReads();
+			const queryClient = renderRouteAt("/w/acme/admin/practices");
+			fireEvent.click(
+				await screen.findByRole("button", { name: "Create group" }, ROUTE_RENDER_WAIT),
+			);
+			const dialog = await screen.findByRole("dialog", { name: "Create group" });
+			fireEvent.change(within(dialog).getByRole("textbox", { name: "Name" }), {
+				target: { value: "Unsaved group name" },
+			});
+			const refreshPractices = async () => {
+				await act(async () => {
+					await queryClient.invalidateQueries({
+						queryKey: listPracticesQueryKey({ path: { workspaceSlug: "acme" } }),
+						exact: true,
+					});
+				});
+			};
+
+			server.use(http.get(PRACTICES_PATH, unavailable, { once: true }));
+			await refreshPractices();
+			expect(groupDraftName()).toBe("Unsaved group name");
+
+			const readsBeforeRefresh = reads.length;
+			await refreshPractices();
+			expect(groupDraftName()).toBe("Unsaved group name");
+			expect(reads.slice(readsBeforeRefresh)).toStrictEqual(["practices"]);
+		});
+
+		it.each([
+			[
+				"practice editor",
+				"practice",
+				`practice-edit:${workspacePractice.slug}`,
+				"Edit practice",
+				PRACTICE_PATH,
+			],
+			[
+				"new practice",
+				"definition options",
+				"practice-new:draft",
+				"Create practice",
+				DEFINITION_OPTIONS_PATH,
+			],
+		] as const)(
+			"%s offers Retry when its first %s read fails",
+			async (_editor, _failingRead, level, title, failingPath) => {
+				serveEditorReads();
+				const failed: number[] = [];
+				server.use(
+					http.get(
+						failingPath,
+						() => {
+							failed.push(503);
+							return unavailable();
+						},
+						{ once: true },
+					),
+				);
+				const { dialog } = await openEditor(level, title);
+				await waitFor(() => expect(failed).toStrictEqual([503]), ROUTE_RENDER_WAIT);
+
+				const retry = await within(dialog).findByRole("button", { name: "Retry" });
+				expect(within(dialog).queryByRole("textbox", { name: /^Name/u })).toBeNull();
+
+				fireEvent.click(retry);
+				await within(dialog).findByRole("textbox", { name: /^Name/u });
+			},
+		);
 	});
 });

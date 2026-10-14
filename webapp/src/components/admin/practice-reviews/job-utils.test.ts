@@ -136,7 +136,7 @@ describe("jobPhases", () => {
 
 describe("holdReasonCopy", () => {
 	it("names the reason it knows in words an operator can act on", () => {
-		expect(holdReasonCopy("BUDGET").label).toBe("Over the AI budget");
+		expect(holdReasonCopy("BUDGET").label).toBe("AI budget pause");
 		expect(holdReasonCopy("BUDGET").detail).toMatch(/continues on its own/u);
 	});
 

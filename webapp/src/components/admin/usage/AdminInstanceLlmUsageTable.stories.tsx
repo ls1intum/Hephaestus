@@ -243,10 +243,10 @@ export const AllCapCombinationsInUsd: Story = {
 		await expect(canvas.queryByText(FX_DISCLOSURE)).toBeNull();
 		const launchpad = within(sharedBudgetCellOf(canvas, "Launchpad"));
 		await expect(launchpad.getByText("Paused")).toBeVisible();
-		await expect(launchpad.getByText("No price set")).toBeVisible();
+		await expect(launchpad.getByText("Unavailable cost")).toBeVisible();
 		const workbench = sharedBudgetCellOf(canvas, "Workbench");
-		await expect(workbench.textContent).toBe("—No price set");
-		await expect(within(workbench).getByText("No price set")).toBeVisible();
+		await expect(workbench.textContent).toBe("—Unavailable cost");
+		await expect(within(workbench).getByText("Unavailable cost")).toBeVisible();
 		await expect(canvas.queryByRole("columnheader", { name: "Status" })).toBeNull();
 	},
 };
@@ -627,7 +627,7 @@ export const Dark: Story = {
 			within(sharedBudgetCellOf(canvas, "Example Workspace")).getByText("Paused"),
 		).toBeVisible();
 		await expect(
-			within(sharedBudgetCellOf(canvas, "Launchpad")).getByText("No price set"),
+			within(sharedBudgetCellOf(canvas, "Launchpad")).getByText("Unavailable cost"),
 		).toBeVisible();
 		await expect(
 			within(
@@ -637,7 +637,7 @@ export const Dark: Story = {
 			).getByText("Near the cap"),
 		).toBeVisible();
 		await expect(
-			within(sharedBudgetCellOf(canvas, "Workbench")).getByText("No price set"),
+			within(sharedBudgetCellOf(canvas, "Workbench")).getByText("Unavailable cost"),
 		).toBeVisible();
 	},
 };

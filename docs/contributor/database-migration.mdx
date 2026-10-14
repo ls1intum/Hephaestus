@@ -280,3 +280,29 @@ Old binaries cannot use the migrated database.
 A developer database that applied an earlier push of this unreleased changelog requires `vp run dev:reset`.
 This deletes local database data.
 Released installations use the forward migration and backup procedure, not a reset.
+
+## Native Hibernate JSON cutover
+
+Five semantic String columns use TEXT: `auth_event.details`, `config_audit_event.old_value`,
+`config_audit_event.new_value`, `project_field.options`, and `connection_audit.detail`.
+Typed JSONB fields use Hibernate 7.4.5.Final's native `Jackson3JsonFormatMapper` with Spring's configured `JsonMapper`.
+
+The forward migration converts each old JSONB value once.
+SQL null and JSON null become SQL null.
+A JSONB String becomes its decoded text, including whitespace, Unicode, and backslashes.
+The JSONB String `"null"` stays the literal text `null`.
+Other JSON values become canonical JSON text.
+
+The conversion does not decode serialized JSON inside a String again.
+It preserves row metadata and embedded payload hashes.
+Checksums over the old storage representation can change.
+
+The parent authentication table alteration includes existing and default partitions.
+The migration resolves the pg_partman template from its native configuration and alters that template too.
+Unexpected source types or partition/template states stop the migration.
+The migration does not issue row updates or disable append-only guards.
+Populated PostgreSQL tests cover conversion, guards, retention, future partitions, export shape, and reruns.
+
+Authentication and configuration HTTP and CSV fields remain Strings.
+Direct person-data exports of previously structured values now contain JSON-text Strings.
+The [operator procedure](../admin/native-hibernate-json-cutover) owns shutdown, backup, upgrade, export checks, and recovery.

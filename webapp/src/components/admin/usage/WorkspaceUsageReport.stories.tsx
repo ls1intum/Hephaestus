@@ -220,7 +220,7 @@ export const ProviderCapUnenforceable: Story = {
 		canvas.getByText("Your provider cap cannot be enforced");
 		const own = within(await tileOf(canvas, "Own provider"));
 		own.getByText("Paused");
-		own.getByText("No price set");
+		own.getByText("Unavailable cost");
 	},
 };
 
@@ -234,6 +234,30 @@ export const SharedBudgetUnverifiable: Story = {
 	},
 	play: async ({ canvas }) => {
 		canvas.getByText("Shared-model spend cannot be verified");
+	},
+};
+
+export const BothCapsUnverifiable: Story = {
+	args: {
+		report: {
+			...withMonthTotals(capped, { unpricedEventCount: 7 }),
+			instanceBudgetVerdict: "UNVERIFIABLE",
+			instancePaused: true,
+			ownProviderBudgetVerdict: "UNVERIFIABLE",
+			ownProviderPaused: true,
+			unpricedEventCount: 7,
+		},
+	},
+	play: async ({ canvas }) => {
+		canvas.getByText("Your provider cap cannot be enforced");
+		canvas.getByText("Shared-model spend cannot be verified");
+		canvas.getByText("7 runs have unavailable cost");
+		const banners = canvas.getAllByRole("alert");
+		await expect(banners).toHaveLength(2);
+		for (const banner of banners) {
+			await expect(banner).not.toHaveTextContent(/\b7\b/u);
+			await expect(banner).toHaveTextContent("Rates may be missing or measurements unverified.");
+		}
 	},
 };
 
@@ -297,21 +321,21 @@ export const ZeroProviderCapNotInUse: Story = {
 	},
 };
 
-export const RunsWithNoPriceSet: Story = {
+export const RunsWithUnavailableCost: Story = {
 	args: {
 		report: withMonthTotals(capped, { unpricedEventCount: 42 }),
 	},
 	play: async ({ canvas }) => {
-		canvas.getByText("42 runs have no price");
+		canvas.getByText("42 runs have unavailable cost");
 	},
 };
 
-export const SingleRunWithNoPriceSet: Story = {
+export const SingleRunWithUnavailableCost: Story = {
 	args: {
 		report: withMonthTotals(capped, { unpricedEventCount: 1 }),
 	},
 	play: async ({ canvas }) => {
-		canvas.getByText("1 run has no price");
+		canvas.getByText("1 run has unavailable cost");
 	},
 };
 
@@ -427,6 +451,6 @@ export const Dark: Story = {
 		await expect(within(await tileOf(canvas, "Shared models")).getByText("Paused")).toBeVisible();
 		const own = within(await tileOf(canvas, "Own provider"));
 		await expect(own.getByText("Paused")).toBeVisible();
-		await expect(own.getByText("No price set")).toBeVisible();
+		await expect(own.getByText("Unavailable cost")).toBeVisible();
 	},
 };

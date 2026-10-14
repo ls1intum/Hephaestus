@@ -6,9 +6,6 @@ import { type ItemKindIcon, itemKindIcon, type ItemProvider } from "@/lib/item-k
  * kind's. Beside the work's label (`#1423`, `!88`) a kind glyph would say the same thing twice and
  * leave the reader no way to tell a GitHub request from a GitLab one.
  */
-export function reviewedWorkIcon(
-	kind: string | undefined,
-	provider?: ItemProvider,
-): ItemKindIcon {
+export function reviewedWorkIcon(kind: string | undefined, provider?: ItemProvider): ItemKindIcon {
 	return provider ? PROVIDER_ICONS[provider] : itemKindIcon(kind);
 }

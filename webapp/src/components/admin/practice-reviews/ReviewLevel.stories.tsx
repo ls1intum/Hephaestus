@@ -622,3 +622,19 @@ export const ProgramLines: Story = {
 		await expect(practices.queryByRole("link", { name: /^Details/u })).not.toBeInTheDocument();
 	},
 };
+
+export const NoPracticeResultsRecordedYet: Story = {
+	args: {
+		...Running.args,
+		trace: {
+			status: "ready",
+			trace: { ...reviewTraceOf(mockJobRunning), practices: [], signals: [] },
+		},
+		summary: undefined,
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		panel.getByText("No practice results have been recorded yet.");
+		await expect(panel.queryByRole("list", { name: "Every practice in this review" })).toBeNull();
+	},
+};

@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder.LlmUsageSample;
 import de.tum.cit.aet.hephaestus.core.exception.DataIntegrityViolationConstraints;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.core.llm.usage.MeasurementVerification;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageProvenance;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessage;
@@ -316,6 +317,8 @@ public class MentorTurnPersistence {
             }
             if (metadata.costUsd() != null) {
                 meta.put("costUsd", metadata.costUsd());
+            } else {
+                meta.remove("costUsd");
             }
         }
         meta.put(
@@ -358,7 +361,13 @@ public class MentorTurnPersistence {
                 Math.toIntExact(usage.cacheWriteTokens()),
                 Math.toIntExact(total));
         return new UIMessageChunk.Finish(
-                finish.finishReason(), new UIMessageChunk.MessageMetadata(model, wireUsage, costUsd(state, usage)));
+                finish.finishReason(),
+                new UIMessageChunk.MessageMetadata(
+                        model,
+                        wireUsage,
+                        turn.measurementVerification() == MeasurementVerification.VERIFIED
+                                ? costUsd(state, usage)
+                                : null));
     }
 
     /** {@code null} when the model is unpriced; cost coverage metrics expose a missing price. */
@@ -404,27 +413,29 @@ public class MentorTurnPersistence {
                 0L,
                 Math.max(1, turn.calls()),
                 cookie.priceSnapshot(),
-                // Neither record had tokens, so the row names no source rather than crediting one that saw
-                // nothing — the same distinction the UNVERIFIABLE append below makes about the amount.
+                // Neither record had tokens, so the row names no source rather than crediting one that saw nothing.
                 isEmpty(usage) ? UsageProvenance.NONE : turn.provenance(),
+                turn.measurementVerification(),
                 Instant.now());
-        if (isEmpty(usage))
-            usageRecorder.recordUnverifiable(thread.getWorkspace().getId(), sample);
-        else usageRecorder.record(thread.getWorkspace().getId(), sample);
+        usageRecorder.record(thread.getWorkspace().getId(), sample);
     }
 
     /**
      * The one account of a turn's calls that its row, its cost and its ledger entry all use. The runner's report
      * and the proxy's per-call meter are two views of the SAME calls, so exactly one is used, never their sum. The
-     * runner's is used unless it cannot be complete: when it reported nothing, compacted or retried. Pi reports
-     * summary calls as one total and retries as separate continuations; the proxy records every reported call.
+     * proxy is preferred when the runner reported nothing, compacted or retried. On ordinary turns, the proxy
+     * replaces the runner only when its normalized prompt and output totals are both no smaller and one is larger.
+     * Pi reports summary calls as one total and retries as separate continuations; the proxy records every reported call.
      * Read only after the turn's terminal status is flushed.
      */
     private TurnUsage turnUsage(UUID assistantId, TranslatorState state) {
         UsageBreakdown runner = extractUsageFromState(state);
-        if (state.compactionAttempted() || state.retryAttempted() || isEmpty(runner)) {
-            MentorTurnLlmUsage viaProxy =
-                    chatMessageRepository.findLlmUsageById(assistantId).orElse(MentorTurnLlmUsage.NONE);
+        MentorTurnLlmUsage viaProxy =
+                chatMessageRepository.findLlmUsageById(assistantId).orElse(MentorTurnLlmUsage.NONE);
+        if (state.compactionAttempted()
+                || state.retryAttempted()
+                || isEmpty(runner)
+                || proxyStrictlyDominates(runner, viaProxy)) {
             if (viaProxy.hasBillableUsage()) {
                 return new TurnUsage(
                         new UsageBreakdown(
@@ -435,7 +446,8 @@ public class MentorTurnPersistence {
                                 viaProxy.cacheWriteTokens()),
                         viaProxy.totalCalls(),
                         viaProxy.reasoningTokens(),
-                        UsageProvenance.PROXY);
+                        UsageProvenance.PROXY,
+                        MeasurementVerification.VERIFIED);
             }
             if (state.retryAttempted()) {
                 // The final retry report cannot establish the turn's total without its per-call account.
@@ -443,10 +455,34 @@ public class MentorTurnPersistence {
                         new UsageBreakdown(runner.model(), 0, 0, 0, 0),
                         state.observedCallCount(),
                         0,
-                        UsageProvenance.NONE);
+                        UsageProvenance.NONE,
+                        MeasurementVerification.UNVERIFIABLE);
             }
         }
-        return new TurnUsage(runner, state.observedCallCount(), 0, UsageProvenance.RUNNER);
+        boolean verifiable = !isEmpty(runner)
+                && !state.compactionAttempted()
+                && !state.retryAttempted()
+                && runnerCoversProxy(runner, viaProxy);
+        return new TurnUsage(
+                runner,
+                state.observedCallCount(),
+                0,
+                UsageProvenance.RUNNER,
+                verifiable ? MeasurementVerification.VERIFIED : MeasurementVerification.UNVERIFIABLE);
+    }
+
+    private static boolean runnerCoversProxy(UsageBreakdown runner, MentorTurnLlmUsage proxy) {
+        long runnerPrompt = runner.inputTokens() + runner.cacheReadTokens() + runner.cacheWriteTokens();
+        long proxyPrompt = proxy.inputTokens() + proxy.cacheReadTokens() + proxy.cacheWriteTokens();
+        return runnerPrompt >= proxyPrompt && runner.outputTokens() >= proxy.outputTokens();
+    }
+
+    private static boolean proxyStrictlyDominates(UsageBreakdown runner, MentorTurnLlmUsage proxy) {
+        long runnerPrompt = runner.inputTokens() + runner.cacheReadTokens() + runner.cacheWriteTokens();
+        long proxyPrompt = proxy.inputTokens() + proxy.cacheReadTokens() + proxy.cacheWriteTokens();
+        return proxyPrompt >= runnerPrompt
+                && proxy.outputTokens() >= runner.outputTokens()
+                && (proxyPrompt > runnerPrompt || proxy.outputTokens() > runner.outputTokens());
     }
 
     private static boolean isEmpty(UsageBreakdown usage) {
@@ -572,5 +608,10 @@ public class MentorTurnPersistence {
     record UsageBreakdown(
             @Nullable String model, long inputTokens, long outputTokens, long cacheReadTokens, long cacheWriteTokens) {}
 
-    record TurnUsage(UsageBreakdown usage, int calls, long reasoningTokens, UsageProvenance provenance) {}
+    record TurnUsage(
+            UsageBreakdown usage,
+            int calls,
+            long reasoningTokens,
+            UsageProvenance provenance,
+            MeasurementVerification measurementVerification) {}
 }

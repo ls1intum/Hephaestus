@@ -47,9 +47,10 @@ interface PracticeFormEditProps {
 	notice?: ReactNode;
 }
 
-/** What "leave without saving" does. The host owns it, because only the host knows where back is. */
 interface PracticeFormHostProps {
 	cancel: ReactNode;
+	/** The host’s alert for a failed refresh while the draft stays open. */
+	refreshAlert?: ReactNode;
 }
 
 export type PracticeFormProps = (PracticeFormCreateProps | PracticeFormEditProps) &
@@ -69,9 +70,11 @@ export function PracticeForm(props: PracticeFormProps) {
 	if (props.mode === "edit") {
 		return <EditPracticeForm {...props} />;
 	}
-	const { workspaceSlug, groups, isPending, definitionOptions, cancel, onSubmit } = props;
+	const { workspaceSlug, groups, isPending, definitionOptions, cancel, refreshAlert, onSubmit } =
+		props;
 	return (
 		<PracticeDefinitionForm
+			beforeFields={refreshAlert}
 			mode="create"
 			groups={groups}
 			isPending={isPending}
@@ -98,6 +101,7 @@ function EditPracticeForm({
 	isPending,
 	definitionOptions,
 	cancel,
+	refreshAlert,
 	initialData: practice,
 	onSubmit,
 	notice,
@@ -113,7 +117,12 @@ function EditPracticeForm({
 			isPending={isPending}
 			definitionOptions={definitionOptions}
 			cancelAction={cancel}
-			beforeFields={notice}
+			beforeFields={
+				<>
+					{refreshAlert}
+					{notice}
+				</>
+			}
 			afterFields={
 				<>
 					<Separator />

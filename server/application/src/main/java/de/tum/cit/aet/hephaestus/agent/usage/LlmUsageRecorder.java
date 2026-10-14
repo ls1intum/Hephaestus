@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.core.TransactionCallbacks;
 import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEventRepository;
 import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageInsert;
+import de.tum.cit.aet.hephaestus.core.llm.usage.MeasurementVerification;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageProvenance;
@@ -60,16 +61,16 @@ public class LlmUsageRecorder {
             int totalCalls,
             LlmPriceSnapshot price,
             UsageProvenance provenance,
+            MeasurementVerification measurementVerification,
             Instant occurredAt) {}
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void record(Long workspaceId, LlmUsageSample sample) {
-        persist(workspaceId, sample, sample.price());
-    }
-
-    @Transactional(propagation = Propagation.MANDATORY)
-    public void recordUnverifiable(Long workspaceId, LlmUsageSample sample) {
-        if (persist(workspaceId, sample, asUnpriced(sample.price()))) {
+        if (sample.measurementVerification() == MeasurementVerification.UNKNOWN) {
+            throw new IllegalArgumentException("New LLM usage requires a measurement verification decision");
+        }
+        boolean unverifiable = sample.measurementVerification() == MeasurementVerification.UNVERIFIABLE;
+        if (persist(workspaceId, sample, unverifiable ? asUnpriced(sample.price()) : sample.price()) && unverifiable) {
             meterRegistry.counter(AgentMetrics.LLM_USAGE_UNVERIFIABLE).increment();
         }
     }
@@ -142,7 +143,8 @@ public class LlmUsageRecorder {
                 price.per1mCacheWriteUsd(),
                 sample.provenance().name(),
                 Math.max(0, sample.searchUnits()),
-                Math.toIntExact(unreportedCalls)));
+                Math.toIntExact(unreportedCalls),
+                sample.measurementVerification().name()));
         if (inserted == 0) {
             log.debug(
                     "LLM usage already recorded for sourceType={}, sourceId={}, sourceAttempt={}",

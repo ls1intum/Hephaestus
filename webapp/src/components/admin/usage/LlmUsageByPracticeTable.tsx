@@ -5,11 +5,11 @@ import { useMemo, useState } from "react";
 
 import { cn } from "cn";
 import type { LlmUsageByPractice, LlmUsagePracticeScriptTotal } from "@/api/types.gen";
-import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
 import { practiceSetupLevel } from "@/components/admin/practices/practice-search";
 import { type DataTableFeatures, dataTableFeatures } from "@/components/common/data-table";
 import { DataTableHeader } from "@/components/common/DataTableHeader";
 import { InlineLink } from "@/components/common/InlineLink";
+import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
 import { detailSearch } from "@/components/layout/detail-drawer/detail-stack";
 import { isPracticeScriptPurpose } from "@/components/practice-vocabulary/agent-purpose-defs";
 import { ModelKindMark } from "@/components/practice-vocabulary/ModelKindMark";

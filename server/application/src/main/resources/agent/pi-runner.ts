@@ -708,6 +708,7 @@ const usageTotals: UsageTotals = {
 	totalCalls: 0,
 };
 interface TurnTrace {
+	phase: SessionPhase;
 	modelError: boolean;
 	/** Failed or aborted model calls of this turn, by the adapter's own closed kind; no provider text is kept. */
 	modelFailures: Partial<Record<ModelFailureKind, number>>;
@@ -4327,10 +4328,16 @@ function resetSessionGuards(): void {
 	sessionGuards = { cutOff: 0, recordingCalls: 0, stored: 0 };
 }
 
-function openTurnTrace(label: string, budget: Work, demand: TurnDemand): TurnTrace {
+function openTurnTrace(
+	phase: SessionPhase,
+	label: string,
+	budget: Work,
+	demand: TurnDemand,
+): TurnTrace {
 	resetSessionGuards();
 	lastEventAt = Date.now();
 	currentTurn = {
+		phase,
 		modelError: false,
 		modelFailures: {},
 		lastModelFailureAt: null,
@@ -4687,6 +4694,7 @@ function incompleteCompositionReason(
 /** Retry undecided composition once, under its own work budget and the run's safety line. */
 async function askComposerOnceMore(
 	session: AgentSession,
+	phase: SessionPhase,
 	notMet: readonly string[],
 	undecided: () => readonly string[],
 	request: CompositionRequest,
@@ -4696,7 +4704,7 @@ async function askComposerOnceMore(
 	console.error(
 		`[pi-runner] composition left ${notMet.length} NOT_MET practice(s) undecided — asking once more`,
 	);
-	const trace = openTurnTrace("composition once more", compositionBudget(notMet.length), {
+	const trace = openTurnTrace(phase, "composition once more", compositionBudget(notMet.length), {
 		owed: () => undecided().length,
 		nudge: COMPOSITION_NUDGE,
 		endsWhenPaid: true,
@@ -5030,7 +5038,7 @@ async function main() {
 		openingInContext = false;
 		lastEventAt = Date.now();
 		activeSession = fresh;
-		return { session: fresh, unsubscribe: subscribeSession(fresh) };
+		return { session: fresh, phase, unsubscribe: subscribeSession(fresh) };
 	}
 
 	/** Keep settlement events subscribed until the native session stops before another scope starts. */
@@ -5106,7 +5114,8 @@ async function main() {
 		console.error(
 			`[pi-runner] ${label}: ${slugs.length} practice(s), up to ${budget.modelCalls} calls and ${budget.outputTokens} output tokens (${tokensPerProblem} tokens per result so far)`,
 		);
-		const trace = openTurnTrace(label, budget, {
+		const phase: SessionPhase = "practice";
+		const trace = openTurnTrace(phase, label, budget, {
 			owed: () => owedPractices(slugs).length,
 			nudge: RECORD_NUDGE,
 		});
@@ -5746,6 +5755,7 @@ async function main() {
 			state.reviewContext = "RESTORING";
 			return text;
 		};
+		const phase: SessionPhase = "public-review";
 		const { session: reviewSession } = await createAgentSession({
 			cwd: CWD,
 			agentDir: AGENT_DIR,
@@ -5759,7 +5769,7 @@ async function main() {
 					restore,
 				),
 			],
-			sessionManager: nativeSessionManager("public-review", null),
+			sessionManager: nativeSessionManager(phase, null),
 			settingsManager,
 			resourceLoader: reviewLoader,
 			modelRuntime,
@@ -5826,7 +5836,7 @@ async function main() {
 		const budget = compositionBudget(owed());
 		let started = false;
 		const wasStarted = () => started;
-		const trace = openTurnTrace("review composition", budget, { owed, nudge: REVIEW_NUDGE });
+		const trace = openTurnTrace(phase, "review composition", budget, { owed, nudge: REVIEW_NUDGE });
 		let finalTrace = trace;
 		try {
 			try {
@@ -5878,7 +5888,7 @@ async function main() {
 						? `[pi-runner] the review left ${left.length} NOT_MET result(s) undecided — asking once more`
 						: "[pi-runner] the review is not final — asking once more",
 				);
-				const retry = openTurnTrace("review composition once more", budget, {
+				const retry = openTurnTrace(phase, "review composition once more", budget, {
 					owed,
 					nudge: REVIEW_NUDGE,
 					endsWhenPaid: true,
@@ -5981,7 +5991,7 @@ async function main() {
 			const { session } = opened;
 			let finalTrace: TurnTrace;
 			try {
-				finalTrace = await composeInto(session);
+				finalTrace = await composeInto(session, opened.phase);
 			} finally {
 				await closeSession(opened);
 			}
@@ -5993,14 +6003,19 @@ async function main() {
 			}
 		}
 
-		async function composeInto(session: AgentSession): Promise<TurnTrace> {
+		async function composeInto(session: AgentSession, phase: SessionPhase): Promise<TurnTrace> {
 			const undecided = undecidedPrivatePractices;
 			let started = false;
 			const wasStarted = () => started;
-			const trace = openTurnTrace("composition", compositionBudget(privatelyComposable().length), {
-				owed: () => undecided().length,
-				nudge: COMPOSITION_NUDGE,
-			});
+			const trace = openTurnTrace(
+				phase,
+				"composition",
+				compositionBudget(privatelyComposable().length),
+				{
+					owed: () => undecided().length,
+					nudge: COMPOSITION_NUDGE,
+				},
+			);
 			let finalTrace = trace;
 			try {
 				if (safety.expired()) {
@@ -6053,6 +6068,7 @@ async function main() {
 			) {
 				finalTrace = await askComposerOnceMore(
 					session,
+					phase,
 					left,
 					undecided,
 					request,

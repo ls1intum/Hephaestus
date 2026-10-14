@@ -1,10 +1,10 @@
 import { UsersIcon } from "lucide-react";
 
 import type { UserViewAccount } from "@/api/types.gen";
-import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
 import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { TablePagination } from "@/components/common/TablePagination";
+import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
 import { Button } from "@/components/ui/button";
 import {
 	Empty,

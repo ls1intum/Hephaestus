@@ -2,10 +2,10 @@ import { FileSearchIcon, PlusIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import type { ScanSummary } from "@/api/types.gen";
-import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
 import { EmptyState } from "@/components/common/EmptyState";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { TablePagination } from "@/components/common/TablePagination";
+import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
 import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PageLayout } from "@/components/layout/PageLayout";

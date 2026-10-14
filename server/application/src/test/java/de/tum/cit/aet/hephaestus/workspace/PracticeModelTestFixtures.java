@@ -219,8 +219,8 @@ public class PracticeModelTestFixtures {
         if (existing != 0) work = forkReview(work);
         jdbc.update(
                 "INSERT INTO"
-                    + " membership(workspace_id,account_id,role,hidden,review_selected,public_activity_seen,joined_at)"
-                    + " VALUES (?,?,'MEMBER',false,false,false,CURRENT_TIMESTAMP) ON CONFLICT DO NOTHING",
+                        + " membership(workspace_id,account_id,role,hidden,review_selected,public_activity_seen,joined_at)"
+                        + " VALUES (?,?,'MEMBER',false,false,false,CURRENT_TIMESTAMP) ON CONFLICT DO NOTHING",
                 work.review().getWorkspaceId(),
                 developerId);
         var at = Instant.now();

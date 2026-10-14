@@ -1,13 +1,19 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http, type PathParams } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { getWorkspacePublicActivitySettingsQueryKey } from "@/api/@tanstack/react-query.gen";
 import type { UpdateWorkspacePublicActivityRequest } from "@/api/types.gen";
 import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
 import { deferred } from "@/test/async";
-import { ROUTE_RENDER_WAIT, renderRouteAt, testQueryClient } from "@/test/router-harness";
+import {
+	ROUTE_RENDER_WAIT,
+	renderRouteAt,
+	renderRouteAtWithRouter,
+	testQueryClient,
+} from "@/test/router-harness";
 
 // Mounting the real route pulls in the whole admin layout and its lazy modules; the timeout is a
 // deadlock backstop, not a budget these renders were meant to fit inside.
@@ -76,22 +82,41 @@ describe("the public activity page setting", () => {
 
 	it("asks first, and turns the page on only once the admin has read what becomes public", async () => {
 		const user = userEvent.setup();
+		const listed = deferred<Response>();
 		renderSettingsRoute(false);
 
 		await user.click(
 			await screen.findByRole("switch", { name: "Publish the page" }, ROUTE_RENDER_WAIT),
 		);
 		const dialog = await screen.findByRole("alertdialog");
-		within(dialog).getByText(/Anyone can see the page, without signing in/u);
+		within(dialog).getByText(/^When the page is public, anyone can see it without signing in\./u);
 		expect(changes).toStrictEqual([]);
+		// The workspace list, which says whether the page is public, is read again after the save.
+		server.use(http.get("*/workspaces", async () => listed.promise));
 		await user.click(within(dialog).getByRole("button", { name: "Make public" }));
 
 		await waitFor(() =>
 			expect(changes).toStrictEqual([{ publicActivityEnabled: true, allowSearchEngines: false }]),
 		);
-		// Search engines stay off until the admin turns them on, and the count of hidden people shows.
-		await screen.findByRole("switch", { name: "Allow search engines" });
-		await screen.findByText("3");
+		try {
+			// The save is acknowledged at once; the address waits for the list to confirm the page.
+			await screen.findByText("Public activity settings saved");
+			screen.getByText("In workspace acme.");
+			const page = within(screen.getByRole("region", { name: "Public activity page" }));
+			page.getByText("On for this workspace.");
+			expect(page.queryByText(/Anyone can see it/u)).toBeNull();
+			// Search engines stay off until the admin turns them on, and the count of hidden people shows.
+			await screen.findByRole("switch", { name: "Allow search engines" });
+			await screen.findByText("3");
+
+			listed.resolve(
+				HttpResponse.json([workspaceListItem("acme", { publishesPublicActivity: true })]),
+			);
+			await page.findByText("On. Anyone can see it at https://hephaestus.build/w/acme.");
+			expect(page.queryByText(/Public availability is not confirmed/u)).toBeNull();
+		} finally {
+			listed.resolve(HttpResponse.json([workspaceListItem("acme")]));
+		}
 	});
 
 	it("turns the page off at once, and publishing again starts with search engines off", async () => {
@@ -132,16 +157,24 @@ describe("the public activity page setting", () => {
 		);
 	});
 
-	it("says nothing is public while the instance does not allow public pages", async () => {
-		settings = { enabled: true, allowSearchEngines: false };
-		renderSettingsRoute(false);
-
-		await screen.findByText(
-			/An instance administrator has not allowed/u,
-			undefined,
-			ROUTE_RENDER_WAIT,
-		);
-	});
+	it.each([false, true])(
+		"does not claim public availability from a saved On preference (search allowed: %s)",
+		async (allowSearchEngines) => {
+			settings = { enabled: true, allowSearchEngines };
+			renderSettingsRoute(false);
+			const page = within(
+				await screen.findByRole("region", { name: "Public activity page" }, ROUTE_RENDER_WAIT),
+			);
+			const publish = await page.findByRole("switch", { name: "Publish the page" });
+			await waitFor(() => expect(publish.getAttribute("aria-checked")).toBe("true"));
+			expect(page.queryByText(/^On\. Anyone can see it at/u)).toBeNull();
+			expect(page.queryByText(/An instance administrator has not allowed/u)).toBeNull();
+			await page.findByText(/Public availability is not confirmed/u);
+			expect(
+				page.getByRole("switch", { name: "Allow search engines" }).getAttribute("aria-checked"),
+			).toBe(String(allowSearchEngines));
+		},
+	);
 
 	it("waits for hidden contributors without saying there are none, and reads them again on retry", async () => {
 		const user = userEvent.setup();
@@ -214,5 +247,270 @@ describe("the public activity page setting", () => {
 		await user.click(await screen.findByRole("button", { name: "Show again" }, ROUTE_RENDER_WAIT));
 
 		await waitFor(() => expect(shown).toStrictEqual(["?hidden=false"]));
+	});
+});
+
+/** One hidden contributor, as the settings list them. */
+const HIDDEN_ADA = {
+	id: 11,
+	login: "ada",
+	name: "Ada Lovelace",
+	avatarUrl: "",
+	htmlUrl: "",
+	email: "",
+};
+
+/**
+ * Two workspaces an admin moves between with the normal switcher shortcut: Ctrl+1 is acme, Ctrl+2
+ * is beta. Each case adds the reads and writes it holds.
+ */
+function renderTwoWorkspaces() {
+	server.use(
+		http.get("*/workspaces", () =>
+			HttpResponse.json([workspaceListItem("acme"), workspaceListItem("beta", { id: 2 })]),
+		),
+		http.get("*/workspaces/:workspaceSlug/members/me", () =>
+			HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
+		),
+		http.get("*/workspaces/:workspaceSlug/connections/catalog", () => HttpResponse.json([])),
+		http.get("*/workspaces/:workspaceSlug/activity/public-hidden-count", () =>
+			HttpResponse.json({ hiddenPeople: 0 }),
+		),
+	);
+	return renderRouteAtWithRouter("/w/acme/admin/settings");
+}
+
+function publishSwitch(): HTMLElement {
+	return screen.getByRole("switch", { name: "Publish the page" });
+}
+
+describe("workspace settings lifetime", () => {
+	it("keeps a completed public-page write with its workspace after switching to another", async () => {
+		const user = userEvent.setup();
+		const response = deferred<Response>();
+		const requests: string[] = [];
+		const betaSettings = { enabled: true, allowSearchEngines: true };
+		let acmeSettings = { enabled: true, allowSearchEngines: false };
+		server.use(
+			http.get("*/workspaces/acme/public-activity", () => HttpResponse.json(acmeSettings)),
+			http.get("*/workspaces/beta/public-activity", () => HttpResponse.json(betaSettings)),
+			http.get("*/workspaces/:workspaceSlug/activity/hidden-contributors", () =>
+				HttpResponse.json([]),
+			),
+			http.patch("*/workspaces/acme/public-activity", async ({ request }) => {
+				requests.push(new URL(request.url).pathname);
+				return response.promise;
+			}),
+		);
+		const { router, queryClient } = renderTwoWorkspaces();
+		try {
+			await user.click(
+				await screen.findByRole("switch", { name: "Publish the page" }, ROUTE_RENDER_WAIT),
+			);
+			await waitFor(() => expect(requests).toStrictEqual(["/workspaces/acme/public-activity"]));
+			// The normal workspace-switcher shortcut keeps this portable settings route.
+			await user.keyboard("{Control>}2{/Control}");
+			await waitFor(() => expect(router.state.location.pathname).toBe("/w/beta/admin/settings"));
+			await screen.findByRole("switch", { name: "Allow search engines" }, ROUTE_RENDER_WAIT);
+			expect(publishSwitch().getAttribute("aria-checked")).toBe("true");
+			// The server accepts acme's change, so acme reads it from now on.
+			acmeSettings = { enabled: false, allowSearchEngines: false };
+			await act(async () => {
+				response.resolve(HttpResponse.json(acmeSettings));
+			});
+			await waitFor(() => expect(queryClient.isMutating()).toBe(0));
+			// Seen on beta, the notification names the workspace whose page it turned off.
+			await screen.findByText("The public activity page is off");
+			screen.getByText(
+				"In workspace acme. Visitors see the change when they load the page again, at most about a minute later.",
+			);
+			expect(screen.queryByText(/In workspace beta/u)).toBeNull();
+			expect(router.state.location.pathname).toBe("/w/beta/admin/settings");
+			expect(publishSwitch().getAttribute("aria-checked")).toBe("true");
+			expect(
+				queryClient.getQueryData(
+					getWorkspacePublicActivitySettingsQueryKey({ path: { workspaceSlug: "beta" } }),
+				),
+			).toStrictEqual(betaSettings);
+			await user.keyboard("{Control>}1{/Control}");
+			await waitFor(() => expect(router.state.location.pathname).toBe("/w/acme/admin/settings"));
+			await waitFor(() => expect(publishSwitch().getAttribute("aria-checked")).toBe("false"));
+			expect(requests).toStrictEqual(["/workspaces/acme/public-activity"]);
+		} finally {
+			response.resolve(HttpResponse.json({ enabled: false, allowSearchEngines: false }));
+		}
+	});
+
+	it("says a failed public-page write once, and leaves the next workspace's switches free", async () => {
+		const user = userEvent.setup();
+		const response = deferred<Response>();
+		const betaSettings = { enabled: false, allowSearchEngines: false };
+		server.use(
+			http.get("*/workspaces/acme/public-activity", () =>
+				HttpResponse.json({ enabled: true, allowSearchEngines: false }),
+			),
+			http.get("*/workspaces/beta/public-activity", () => HttpResponse.json(betaSettings)),
+			http.get("*/workspaces/:workspaceSlug/activity/hidden-contributors", () =>
+				HttpResponse.json([]),
+			),
+			http.patch("*/workspaces/acme/public-activity", async () => response.promise),
+		);
+		const { router, queryClient } = renderTwoWorkspaces();
+		try {
+			await user.click(
+				await screen.findByRole("switch", { name: "Allow search engines" }, ROUTE_RENDER_WAIT),
+			);
+			await waitFor(() =>
+				expect(
+					screen
+						.getByRole("switch", { name: "Allow search engines" })
+						.getAttribute("aria-readonly"),
+				).toBe("true"),
+			);
+
+			await user.keyboard("{Control>}2{/Control}");
+			await waitFor(() => expect(router.state.location.pathname).toBe("/w/beta/admin/settings"));
+			await waitFor(() => expect(publishSwitch().getAttribute("aria-checked")).toBe("false"));
+			expect(publishSwitch().getAttribute("aria-readonly")).not.toBe("true");
+
+			await act(async () => {
+				response.resolve(HttpResponse.json({ status: 500 }, { status: 500 }));
+			});
+			await screen.findByText("We could not change the public activity page. Try again.");
+			screen.getByText("In workspace acme.");
+			await waitFor(() => expect(queryClient.isMutating()).toBe(0));
+			expect(publishSwitch().getAttribute("aria-checked")).toBe("false");
+			expect(
+				queryClient.getQueryData(
+					getWorkspacePublicActivitySettingsQueryKey({ path: { workspaceSlug: "beta" } }),
+				),
+			).toStrictEqual(betaSettings);
+
+			await user.keyboard("{Control>}1{/Control}");
+			await waitFor(() => expect(router.state.location.pathname).toBe("/w/acme/admin/settings"));
+			const searchEngines = await screen.findByRole("switch", { name: "Allow search engines" });
+			expect(searchEngines.getAttribute("aria-checked")).toBe("false");
+			expect(publishSwitch().getAttribute("aria-checked")).toBe("true");
+		} finally {
+			response.resolve(HttpResponse.json({ status: 500 }, { status: 500 }));
+		}
+	});
+
+	it.each([
+		{
+			outcome: "succeeds",
+			reply: () => new HttpResponse(null, { status: 204 }),
+			notification: "Shown in activity again",
+			acmeHiddenAfter: [],
+		},
+		{
+			outcome: "fails",
+			reply: () => HttpResponse.json({ status: 500 }, { status: 500 }),
+			notification: "We could not show this person again. Try again.",
+			acmeHiddenAfter: [HIDDEN_ADA],
+		},
+	])(
+		"keeps Show again with the workspace it was asked for when it $outcome",
+		async ({ reply, notification, acmeHiddenAfter }) => {
+			const user = userEvent.setup();
+			const response = deferred<Response>();
+			const shown: string[] = [];
+			let acmeHidden = [HIDDEN_ADA];
+			server.use(
+				http.get("*/workspaces/:workspaceSlug/public-activity", () =>
+					HttpResponse.json({ enabled: true, allowSearchEngines: false }),
+				),
+				http.get("*/workspaces/acme/activity/hidden-contributors", () =>
+					HttpResponse.json(acmeHidden),
+				),
+				http.get("*/workspaces/beta/activity/hidden-contributors", () =>
+					HttpResponse.json([HIDDEN_ADA]),
+				),
+				http.patch(
+					"*/workspaces/:workspaceSlug/activity/people/11/public-visibility",
+					async ({ request }) => {
+						shown.push(new URL(request.url).pathname);
+						return response.promise;
+					},
+				),
+			);
+			const { router } = renderTwoWorkspaces();
+			try {
+				await user.click(
+					await screen.findByRole("button", { name: "Show again" }, ROUTE_RENDER_WAIT),
+				);
+				await waitFor(() =>
+					expect(shown).toStrictEqual(["/workspaces/acme/activity/people/11/public-visibility"]),
+				);
+				// Focusable while it waits, so the press is refused through aria-disabled.
+				await waitFor(() =>
+					expect(
+						screen.getByRole("button", { name: "Show again" }).getAttribute("aria-disabled"),
+					).toBe("true"),
+				);
+
+				await user.keyboard("{Control>}2{/Control}");
+				await waitFor(() => expect(router.state.location.pathname).toBe("/w/beta/admin/settings"));
+				const betaShowAgain = await screen.findByRole(
+					"button",
+					{ name: "Show again" },
+					ROUTE_RENDER_WAIT,
+				);
+				expect(betaShowAgain.getAttribute("aria-disabled")).not.toBe("true");
+
+				acmeHidden = acmeHiddenAfter;
+				await act(async () => {
+					response.resolve(reply());
+				});
+				await screen.findByText(notification);
+				screen.getByText("In workspace acme.");
+				expect(screen.queryByText(/In workspace beta/u)).toBeNull();
+				expect(
+					screen.getByRole("button", { name: "Show again" }).getAttribute("aria-disabled"),
+				).not.toBe("true");
+
+				await user.keyboard("{Control>}1{/Control}");
+				await waitFor(() => expect(router.state.location.pathname).toBe("/w/acme/admin/settings"));
+				await waitFor(() =>
+					expect(screen.queryAllByRole("button", { name: "Show again" })).toHaveLength(
+						acmeHiddenAfter.length,
+					),
+				);
+				for (const button of screen.queryAllByRole("button", { name: "Show again" })) {
+					expect(button.getAttribute("aria-disabled")).not.toBe("true");
+				}
+				expect(shown).toStrictEqual(["/workspaces/acme/activity/people/11/public-visibility"]);
+			} finally {
+				response.resolve(reply());
+			}
+		},
+	);
+
+	it("does not carry an open publishing confirmation to the next workspace", async () => {
+		const user = userEvent.setup();
+		const changes: string[] = [];
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/public-activity", () =>
+				HttpResponse.json({ enabled: false, allowSearchEngines: false }),
+			),
+			http.get("*/workspaces/:workspaceSlug/activity/hidden-contributors", () =>
+				HttpResponse.json([]),
+			),
+			http.patch("*/workspaces/:workspaceSlug/public-activity", ({ request }) => {
+				changes.push(new URL(request.url).pathname);
+				return HttpResponse.json({ enabled: true, allowSearchEngines: false });
+			}),
+		);
+		const { router } = renderTwoWorkspaces();
+
+		await user.click(
+			await screen.findByRole("switch", { name: "Publish the page" }, ROUTE_RENDER_WAIT),
+		);
+		await screen.findByRole("alertdialog");
+		await user.keyboard("{Control>}2{/Control}");
+		await waitFor(() => expect(router.state.location.pathname).toBe("/w/beta/admin/settings"));
+		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+		await screen.findByRole("switch", { name: "Publish the page" }, ROUTE_RENDER_WAIT);
+		expect(changes).toStrictEqual([]);
 	});
 });

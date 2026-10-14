@@ -8,21 +8,37 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { Chat } from "@/components/mentor/Chat";
 import { ChatSkeleton } from "@/components/mentor/ChatSkeleton";
 import { Button } from "@/components/ui/button";
-import { mentorThreadOptions, useMentorChat } from "@/hooks/use-mentor-chat";
+import {
+	type MentorChatSession,
+	mentorThreadOptions,
+	useMentorChat,
+	useMentorChatSession,
+} from "@/hooks/use-mentor-chat";
 import { parseThreadMessages } from "@/lib/chat-validation";
 import { copyToClipboard } from "@/lib/clipboard";
 import { mentorPreferenceReason } from "@/lib/mentor-preference";
 import type { ChatMessage } from "@/lib/types";
 import { useAuth } from "@/runtime/auth/AuthContext";
+import { useLiveMentorChat } from "@/runtime/mentor/MentorChatProvider";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/mentor/$threadId")({
 	remountDeps: ({ params }) => params,
 	component: ThreadContainer,
 });
 
-/** The conversation is read before the chat mounts, so it opens on its saved messages. */
 function ThreadContainer() {
 	const { threadId, workspaceSlug } = Route.useParams();
+	const live = useLiveMentorChat(workspaceSlug);
+	// The panel's conversation is taken over as it stands, reply still streaming or not: what the
+	// server has saved of it is behind what the panel holds.
+	if (live?.chat.id === threadId) {
+		return <ThreadChat threadId={threadId} workspaceSlug={workspaceSlug} session={live} />;
+	}
+	return <SavedThread threadId={threadId} workspaceSlug={workspaceSlug} />;
+}
+
+/** The conversation is read before the chat mounts, so it opens on its saved messages. */
+function SavedThread({ threadId, workspaceSlug }: { threadId: string; workspaceSlug: string }) {
 	const thread = useQuery({
 		...mentorThreadOptions(workspaceSlug, threadId),
 		select: (detail) => parseThreadMessages(detail.messages) ?? null,
@@ -34,7 +50,7 @@ function ThreadContainer() {
 	}
 
 	if (opened) {
-		return <ThreadChat threadId={threadId} workspaceSlug={workspaceSlug} messages={opened} />;
+		return <SavedThreadChat threadId={threadId} workspaceSlug={workspaceSlug} messages={opened} />;
 	}
 	if (thread.isPending) {
 		return (
@@ -65,7 +81,7 @@ function ThreadContainer() {
 	);
 }
 
-function ThreadChat({
+function SavedThreadChat({
 	threadId,
 	workspaceSlug,
 	messages,
@@ -73,6 +89,23 @@ function ThreadChat({
 	threadId: string;
 	workspaceSlug: string;
 	messages: ChatMessage[];
+}) {
+	const session = useMentorChatSession({
+		workspaceSlug,
+		threadId,
+		initialMessages: messages,
+	});
+	return <ThreadChat threadId={threadId} workspaceSlug={workspaceSlug} session={session} />;
+}
+
+function ThreadChat({
+	threadId,
+	workspaceSlug,
+	session,
+}: {
+	threadId: string;
+	workspaceSlug: string;
+	session: MentorChatSession;
 }) {
 	const viewing = useAuth().userView !== undefined;
 	// The saved AI choice belongs to the signed-in account, so a user view never asks for it.
@@ -82,7 +115,7 @@ function ThreadChat({
 	});
 	const readonly = viewing || !preference.data || Boolean(mentorPreferenceReason(preference.data));
 
-	const mentorChat = useMentorChat({ threadId, initialMessages: messages });
+	const mentorChat = useMentorChat(session, { threadId });
 
 	return (
 		<div className="flex min-h-0 flex-1 flex-col">

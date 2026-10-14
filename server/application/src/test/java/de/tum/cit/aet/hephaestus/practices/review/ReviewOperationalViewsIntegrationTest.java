@@ -133,9 +133,9 @@ class ReviewOperationalViewsIntegrationTest extends BaseIntegrationTest {
     private void feedback(Result result, FeedbackState state) {
         var id = UUID.randomUUID();
         jdbc.sql("INSERT INTO"
-            + " feedback(id,workspace_id,review_id,item_id,developer_id,destination,state,body,created_at,delivered_at,stop_reason)"
-            + " VALUES(:id,:ws,:review,:item,:developer,'PRACTICE_PAGE',:state,'Confirmed practice"
-            + " feedback.',:at,:delivered,:stop)")
+                        + " feedback(id,workspace_id,review_id,item_id,developer_id,destination,state,body,created_at,delivered_at,stop_reason)"
+                        + " VALUES(:id,:ws,:review,:item,:developer,'PRACTICE_PAGE',:state,'Confirmed practice"
+                        + " feedback.',:at,:delivered,:stop)")
                 .param("id", id)
                 .param("ws", result.getWorkspaceId())
                 .param("review", result.getReviewId())

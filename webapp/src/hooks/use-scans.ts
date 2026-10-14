@@ -67,7 +67,9 @@ export function useScanList(
  */
 function scanPracticeOption(practice: Practice): ScanPracticeOption | undefined {
 	const { definition } = practice.currentVersion;
-	return definition !== null && definition.scan !== null && definition.reviewedBy.by === "HEPHAESTUS"
+	return definition !== null &&
+		definition.scan !== null &&
+		definition.reviewedBy.by === "HEPHAESTUS"
 		? { slug: practice.slug, name: definition.name }
 		: undefined;
 }

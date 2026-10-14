@@ -1,9 +1,9 @@
 package de.tum.cit.aet.hephaestus.integration.slack.events;
 
 import com.slack.api.model.assistant.SuggestedPrompt;
-import de.tum.cit.aet.hephaestus.practices.spi.MentorReadinessQuery;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
+import de.tum.cit.aet.hephaestus.practices.spi.MentorReadinessQuery;
 import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;

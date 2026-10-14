@@ -26,6 +26,7 @@ import type { PracticeFacetOption } from "./ResultFilters";
 import { clearedScope, hasAppliedScope, readScope } from "./review-scope";
 import { listsWorkWithoutReview, REVIEW_PAGE_SIZE, type RunsSearch } from "./review-search";
 import { ReviewListEnd } from "./ReviewListEnd";
+import { ReviewListRefresh } from "./ReviewListRefresh";
 import type { ReviewPeople } from "./ReviewPersonFacet";
 import { ReviewResultsSkeleton } from "./ReviewResultsSkeleton";
 import { ReviewRowList } from "./ReviewRow";
@@ -219,6 +220,7 @@ export function ReviewRunsPage({
 	} else {
 		results = (
 			<>
+				<ReviewListRefresh failure={reviews.refreshFailure} noun="reviews" />
 				<ReviewRunDayTable
 					aria-label={LIST_LABEL}
 					timeLabel={TIME_LABEL}
@@ -336,23 +338,27 @@ function UnreviewedWorkResults({ search, work, actions }: UnreviewedWorkResultsP
 		results = <ReviewResultsSkeleton label="Loading work" rows={REVIEW_PAGE_SIZE} />;
 	} else if (rows.length === 0) {
 		results = (
-			<Empty variant="outlined">
-				<EmptyHeader>
-					<EmptyMedia variant="icon">
-						<RadarIcon />
-					</EmptyMedia>
-					<EmptyTitle>
-						{hasFilter ? "A review started on all of this work" : "A review started on all work"}
-					</EmptyTitle>
-					<EmptyDescription>
-						Work appears here when moments were recorded on it and none of them started a review.
-					</EmptyDescription>
-				</EmptyHeader>
-			</Empty>
+			<>
+				<ReviewListRefresh failure={work.refreshFailure} noun="pieces of work" />
+				<Empty variant="outlined">
+					<EmptyHeader>
+						<EmptyMedia variant="icon">
+							<RadarIcon />
+						</EmptyMedia>
+						<EmptyTitle>
+							{hasFilter ? "No work matches these filters" : "No work without a review"}
+						</EmptyTitle>
+						<EmptyDescription>
+							Work appears here when moments were recorded on it and none of them started a review.
+						</EmptyDescription>
+					</EmptyHeader>
+				</Empty>
+			</>
 		);
 	} else {
 		results = (
 			<>
+				<ReviewListRefresh failure={work.refreshFailure} noun="pieces of work" />
 				<ReviewRowList label={UNREVIEWED_LABEL}>
 					{rows.map((row) => (
 						<UnreviewedWorkRow

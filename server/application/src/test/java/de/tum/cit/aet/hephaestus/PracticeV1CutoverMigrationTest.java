@@ -150,8 +150,8 @@ class PracticeV1CutoverMigrationTest {
                         column(
                                 database,
                                 "SELECT count(*)::text FROM information_schema.tables WHERE table_schema='public' AND"
-                                    + " table_name IN"
-                                    + " ('observation','practice_result','practice_observation','agent_job','artifact_signal','identity_link','workspace_membership')"))
+                                        + " table_name IN"
+                                        + " ('observation','practice_result','practice_observation','agent_job','artifact_signal','identity_link','workspace_membership')"))
                 .containsExactly("0");
         assertThatThrownBy(() ->
                         execute(database, "DELETE FROM membership WHERE workspace_id=992101 AND account_id=992106"))
@@ -159,10 +159,10 @@ class PracticeV1CutoverMigrationTest {
         assertThatThrownBy(() -> execute(
                         database,
                         "INSERT INTO"
-                            + " result(id,workspace_id,review_id,practice_id,practice_version_id,item_id,item_version,developer_id,outcome,summary,evidence_version,recorded_at)"
-                            + " SELECT"
-                            + " gen_random_uuid(),workspace_id,review_id,practice_id,practice_version_id,item_id,item_version,developer_id,outcome,summary,0,recorded_at"
-                            + " FROM result WHERE id='"
+                                + " result(id,workspace_id,review_id,practice_id,practice_version_id,item_id,item_version,developer_id,outcome,summary,evidence_version,recorded_at)"
+                                + " SELECT"
+                                + " gen_random_uuid(),workspace_id,review_id,practice_id,practice_version_id,item_id,item_version,developer_id,outcome,summary,0,recorded_at"
+                                + " FROM result WHERE id='"
                                 + RESULT + "'"))
                 .isInstanceOf(SQLException.class)
                 .hasMessageContaining("evidence version 1");
@@ -188,8 +188,8 @@ class PracticeV1CutoverMigrationTest {
         var beforeReplay = column(
                 database,
                 "SELECT (SELECT count(*) FROM result WHERE workspace_id=992101)::text || '|' || (SELECT count(*) FROM"
-                    + " feedback_copy WHERE workspace_id=992101) || '|' || (SELECT count(*) FROM feedback_send WHERE"
-                    + " workspace_id=992101)");
+                        + " feedback_copy WHERE workspace_id=992101) || '|' || (SELECT count(*) FROM feedback_send WHERE"
+                        + " workspace_id=992101)");
         upgrade(database, context);
         assertThat(column(
                         database,

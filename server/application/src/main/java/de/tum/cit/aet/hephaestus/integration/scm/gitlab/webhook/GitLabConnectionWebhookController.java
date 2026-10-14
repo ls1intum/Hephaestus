@@ -60,13 +60,13 @@ public class GitLabConnectionWebhookController {
                 credential.verify(header(headers, "x-gitlab-token"), connectionId, keyId, routeId);
         if (route.isEmpty()) {
             log.warn("Rejected GitLab connection webhook: reason=invalidCredential, connectionId={}", connectionId);
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "invalid"));
+            return WebhookIngestPipeline.problem(HttpStatus.UNAUTHORIZED, "invalid");
         }
         String instance = header(headers, "x-gitlab-instance");
         if (instance != null
                 && !ScmOrigin.of(instance).equals(Optional.of(route.get().providerOrigin()))) {
             log.warn("Rejected GitLab connection webhook: reason=instanceMismatch, connectionId={}", connectionId);
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "invalid"));
+            return WebhookIngestPipeline.problem(HttpStatus.UNAUTHORIZED, "invalid");
         }
         return pipeline.publishAuthenticated(
                 IntegrationKind.GITLAB,

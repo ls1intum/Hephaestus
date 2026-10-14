@@ -143,12 +143,12 @@ public class ReviewJobLifecycleService {
         ConfigSnapshot snap = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
         LlmPriceSnapshot price =
                 snap.priceSnapshot() != null ? snap.priceSnapshot() : LlmPriceSnapshot.unpricedInstance();
-        // A cancel from the API cannot see what the attempt consumed; the executor path that observes
-        // the cancellation bills the proxy-attributed tokens, so the review's own row carries none. A
-        // practice script call waits for the job row and is dropped once the transition above ends the
-        // attempt, so the practice script rows are complete here.
-        boolean billed =
-                TerminalUsage.none().appendTo(usageRecorder, agentJobRepository, workspaceId, job, snap, price);
+        // The terminal update holds the row lock and prevents further proxy accumulations.
+        // Read its committed counters directly; the entity can predate a proxy response.
+        // No token evidence stays unknown.
+        boolean billed = TerminalUsage.fromProxy(
+                        agentJobRepository.findLlmUsageById(job.getId()).orElse(null))
+                .appendTo(usageRecorder, agentJobRepository, workspaceId, job, snap, price);
         log.info(
                 "Recorded {} usage ledger entry (user-cancel): jobId={}",
                 billed ? "a confirmed" : "an UNPRICED",

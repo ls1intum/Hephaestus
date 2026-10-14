@@ -27,15 +27,19 @@ public class ActivityPersonWriteAdmission {
     public List<Long> holdActors(List<Long> actorIds) {
         if (actorIds.isEmpty()) return List.of();
         var actors = users.findAllById(actorIds);
-        var identities = actors.stream().map(ActivityPersonWriteAdmission::identity).toList();
+        var identities =
+                actors.stream().map(ActivityPersonWriteAdmission::identity).toList();
         if (identities.isEmpty()) return List.of();
         // Acquire the whole ordered lock set before filtering. Re-entry cannot invert the lock order.
-        if (fence.holdForWrite(identities)) return actors.stream().map(User::getId).toList();
+        if (fence.holdForWrite(identities))
+            return actors.stream().map(User::getId).toList();
         return actors.stream().filter(this::hold).map(User::getId).toList();
     }
 
     private static PersonIdentity identity(User actor) {
-        return new PersonIdentity(Objects.requireNonNull(actor.getProvider().getId()),
-                actor.getNativeId().toString(), null);
+        return new PersonIdentity(
+                Objects.requireNonNull(actor.getProvider().getId()),
+                actor.getNativeId().toString(),
+                null);
     }
 }

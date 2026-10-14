@@ -86,9 +86,11 @@ import { WorkProviderContext } from "@/lib/work-provider-context";
 import { type AuthContextType, useAuth } from "@/runtime/auth/AuthContext";
 import { safeReturnTo } from "@/runtime/auth/return-to";
 import { FeatureFlagDevTools } from "@/runtime/feature-flags/FeatureFlagDevTools";
+import { MentorChatProvider } from "@/runtime/mentor/MentorChatProvider";
 import { useProviderColors } from "@/runtime/theme/provider-colors";
 import { exitUserView } from "@/runtime/user-view/session";
 import { workspaceAddressConfig, publicHref } from "@/runtime/workspace-address";
+
 import { isCopilotExcludedRoute } from "./-copilot-route";
 
 const GlobalCopilot = lazy(async () => import("./-GlobalCopilot"));
@@ -136,7 +138,7 @@ function RootLayout() {
 	}
 
 	return (
-		<>
+		<MentorChatProvider>
 			<HeadContent />
 			<SkipToContent />
 			{loginOpen !== true && <CookieConsentBanner />}
@@ -189,7 +191,7 @@ function RootLayout() {
 				</ErrorBoundary>
 			)}
 			{!userView && <FeatureFlagDevTools />}
-		</>
+		</MentorChatProvider>
 	);
 }
 

@@ -221,3 +221,19 @@ export const Testing: Story = {
 		).toBeEnabled();
 	},
 };
+
+export const RefreshFailed: Story = {
+	args: {
+		state: {
+			status: "ready",
+			connections: [openAi],
+			models: [gpt],
+			refreshFailure: { error: { status: 503 }, pending: false, onRetry: fn() },
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("We could not refresh your AI providers")).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Retry" })).toBeEnabled();
+		await expect(canvas.getByRole("table", { name: "Models on My OpenAI account" })).toBeVisible();
+	},
+};

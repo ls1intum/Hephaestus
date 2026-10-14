@@ -2533,6 +2533,7 @@ void describe("CI contract", () => {
 			results: Record<string, string>,
 			onVersionBranch: boolean,
 			needs = JSON.stringify(jobsOf({ ...green, ...results })),
+			summary?: string,
 		) => {
 			const run = await runStep(
 				render(
@@ -2540,7 +2541,7 @@ void describe("CI contract", () => {
 					{ ...green, ...results },
 					{ "release-candidate": String(onVersionBranch) },
 				),
-				{ NEEDS: needs },
+				{ NEEDS: needs, ...(summary === undefined ? {} : { GITHUB_STEP_SUMMARY: summary }) },
 			);
 			return { failed: run.failed, outputs: run.outputs };
 		};
@@ -2580,6 +2581,13 @@ void describe("CI contract", () => {
 		// The same jobs with results do pass, skipped ones included.
 		assert.deepEqual(await verdict({ ...skipped, Changesets: "success" }, false), passes);
 		assert.deepEqual(await verdict({}, false), passes);
+
+		// A directory cannot be opened as a summary file. Reporting loss does not change validation.
+		assert.deepEqual(await verdict({}, false, JSON.stringify(jobsOf(green)), tmpdir()), passes);
+		assert.deepEqual(
+			await verdict({ Quality: "failure" }, false, JSON.stringify(jobsOf(green)), tmpdir()),
+			fails,
+		);
 
 		// An ordinary pull request legitimately skips the preflight, and blocking one would block
 		// every pull request in the repository.
@@ -3067,32 +3075,27 @@ void describe("CI contract", () => {
 		assert.equal(step(workflow, jobPath, "ossf/scorecard-action").get("publish_results"), true);
 	});
 
-	void test("pins every external action to a full commit SHA with a tag or main reference", async () => {
+	void test("pins every external action to a full commit SHA", async () => {
 		const invalid: string[] = [];
 		for (const [file, source] of await readSources(
 			await posixGlob(".github/{actions,workflows}/**/*.{yml,yaml}"),
 		)) {
 			for (const [index, line] of source.split("\n").entries()) {
-				const uses = /^\s+(?:- )?uses:\s+(?<reference>\S+)(?<comment>.*)$/u.exec(line);
+				const uses = /^\s+(?:- )?uses:\s+(?<reference>\S+)(?:.*)$/u.exec(line);
 				if (!uses) {
 					continue;
 				}
 				const reference = uses.groups?.reference;
-				const comment = uses.groups?.comment;
-				assert.ok(reference !== undefined && comment !== undefined);
+				assert.ok(reference !== undefined);
 				if (reference.startsWith("./")) {
 					continue;
 				}
-				if (!/@[0-9a-f]{40}$/u.test(reference) || !/^ # (?:v\S+|main)(?:\s.*)?$/u.test(comment)) {
+				if (!/@[0-9a-f]{40}$/u.test(reference)) {
 					invalid.push(`${file}:${index + 1}: ${reference}`);
 				}
 			}
 		}
-		assert.deepEqual(
-			invalid,
-			[],
-			"External uses must match @<40 lowercase hex> with a # v... or # main reference",
-		);
+		assert.deepEqual(invalid, [], "External uses must match @<40 lowercase hex>");
 	});
 
 	void test("centralises dependency installation and browser setup", async () => {

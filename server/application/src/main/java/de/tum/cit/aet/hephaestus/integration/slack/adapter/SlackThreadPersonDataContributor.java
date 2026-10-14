@@ -36,9 +36,9 @@ final class SlackThreadPersonDataContributor implements PersonDataContributor {
     public PersonDataSelection select(PersonScope person) {
         return new PersonDataSelection(jdbc.query(
                 "SELECT t.id, to_jsonb(ARRAY(SELECT account_id FROM unnest(t.participant_account_ids) account_id WHERE"
-                    + " account_id = :account))::text FROM slack_thread t WHERE t.id = ANY(:conversations) OR"
-                    + " EXISTS(SELECT 1 FROM unnest(t.participant_account_ids) account_id WHERE account_id = :account)"
-                    + " ORDER BY t.id",
+                        + " account_id = :account))::text FROM slack_thread t WHERE t.id = ANY(:conversations) OR"
+                        + " EXISTS(SELECT 1 FROM unnest(t.participant_account_ids) account_id WHERE account_id = :account)"
+                        + " ORDER BY t.id",
                 JdbcPersonDataStore.parameters(person, mapper),
                 (rs, row) -> new PersonDataSelection.RowKey(Map.of(
                         "id", Long.toString(rs.getLong(1)), "participants", Objects.requireNonNull(rs.getString(2))))));
@@ -50,8 +50,8 @@ final class SlackThreadPersonDataContributor implements PersonDataContributor {
         for (var key : selection.rows())
             rows.addAll(jdbc.query(
                     "SELECT"
-                        + " jsonb_build_object('id',id,'workspaceId',workspace_id,'slackChannelId',slack_channel_id,'slackThreadTs',slack_thread_ts,'participantAccountIds',CAST(:participants"
-                        + " AS jsonb))::text FROM slack_thread WHERE id=:id",
+                            + " jsonb_build_object('id',id,'workspaceId',workspace_id,'slackChannelId',slack_channel_id,'slackThreadTs',slack_thread_ts,'participantAccountIds',CAST(:participants"
+                            + " AS jsonb))::text FROM slack_thread WHERE id=:id",
                     Map.of(
                             "id",
                             Long.valueOf(key.columns().get("id")),
@@ -67,17 +67,17 @@ final class SlackThreadPersonDataContributor implements PersonDataContributor {
         for (var key : selection.rows()) {
             int affected = jdbc.update(
                     "UPDATE slack_thread t SET message_count=(SELECT count(*) FROM slack_message m WHERE"
-                        + " m.workspace_id=t.workspace_id AND m.slack_channel_id=t.slack_channel_id AND"
-                        + " COALESCE(m.slack_thread_ts,m.slack_ts)=t.slack_thread_ts AND m.deleted_at IS"
-                        + " NULL),first_ts=(SELECT min(m.slack_ts) FROM slack_message m WHERE"
-                        + " m.workspace_id=t.workspace_id AND m.slack_channel_id=t.slack_channel_id AND"
-                        + " COALESCE(m.slack_thread_ts,m.slack_ts)=t.slack_thread_ts AND m.deleted_at IS"
-                        + " NULL),last_ts=(SELECT max(m.slack_ts) FROM slack_message m WHERE"
-                        + " m.workspace_id=t.workspace_id AND m.slack_channel_id=t.slack_channel_id AND"
-                        + " COALESCE(m.slack_thread_ts,m.slack_ts)=t.slack_thread_ts AND m.deleted_at IS"
-                        + " NULL),last_reviewed_ts=NULL,participant_account_ids=ARRAY(SELECT account_id FROM"
-                        + " unnest(participant_account_ids) account_id WHERE account_id NOT IN (SELECT value::bigint"
-                        + " FROM jsonb_array_elements_text(CAST(:participants AS jsonb)))) WHERE id=:id",
+                            + " m.workspace_id=t.workspace_id AND m.slack_channel_id=t.slack_channel_id AND"
+                            + " COALESCE(m.slack_thread_ts,m.slack_ts)=t.slack_thread_ts AND m.deleted_at IS"
+                            + " NULL),first_ts=(SELECT min(m.slack_ts) FROM slack_message m WHERE"
+                            + " m.workspace_id=t.workspace_id AND m.slack_channel_id=t.slack_channel_id AND"
+                            + " COALESCE(m.slack_thread_ts,m.slack_ts)=t.slack_thread_ts AND m.deleted_at IS"
+                            + " NULL),last_ts=(SELECT max(m.slack_ts) FROM slack_message m WHERE"
+                            + " m.workspace_id=t.workspace_id AND m.slack_channel_id=t.slack_channel_id AND"
+                            + " COALESCE(m.slack_thread_ts,m.slack_ts)=t.slack_thread_ts AND m.deleted_at IS"
+                            + " NULL),last_reviewed_ts=NULL,participant_account_ids=ARRAY(SELECT account_id FROM"
+                            + " unnest(participant_account_ids) account_id WHERE account_id NOT IN (SELECT value::bigint"
+                            + " FROM jsonb_array_elements_text(CAST(:participants AS jsonb)))) WHERE id=:id",
                     Map.of(
                             "id",
                             Long.valueOf(key.columns().get("id")),

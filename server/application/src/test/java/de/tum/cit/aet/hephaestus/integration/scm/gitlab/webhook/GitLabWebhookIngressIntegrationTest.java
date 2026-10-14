@@ -3,7 +3,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.webhook;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -68,8 +70,13 @@ class GitLabWebhookIngressIntegrationTest extends BaseIntegrationTest {
         String timestamp = now();
         String signature = "v1," + sign("msg_valid", timestamp, BODY);
 
-        assertThat(post(BODY, headers -> signed(headers, "msg_valid", timestamp, signature)))
-                .isEqualTo(HttpStatus.ACCEPTED);
+        postResponse(BODY, headers -> signed(headers, "msg_valid", timestamp, signature))
+                .expectStatus()
+                .isAccepted()
+                .expectHeader()
+                .contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                .expectBody(String.class)
+                .isEqualTo("{\"status\":\"ok\"}");
 
         ArgumentCaptor<PublishRequest> published = ArgumentCaptor.forClass(PublishRequest.class);
         verify(publisher).publish(published.capture());
@@ -86,8 +93,10 @@ class GitLabWebhookIngressIntegrationTest extends BaseIntegrationTest {
                 .replace("Grüße", "Grüsse")
                 .getBytes(StandardCharsets.UTF_8);
 
-        assertThat(post(tampered, headers -> signed(headers, "msg_tampered", timestamp, signature)))
-                .isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertProblem(
+                postResponse(tampered, headers -> signed(headers, "msg_tampered", timestamp, signature)),
+                HttpStatus.UNAUTHORIZED,
+                "invalid");
         verify(publisher, never()).publish(any());
     }
 
@@ -119,15 +128,19 @@ class GitLabWebhookIngressIntegrationTest extends BaseIntegrationTest {
     void shouldPublishOnTheConnectionSubjectOnlyWhatTheCredentialProves() {
         GitLabRouteCredential.Issued issued = routeCredential.issue(ROUTE);
 
-        assertThat(postToConnection(7L, issued, ROUTED_BODY, headers -> {
+        postToConnectionResponse(7L, issued, ROUTED_BODY, headers -> {
                     headers.set("X-Gitlab-Token", issued.token());
                     headers.set("X-Gitlab-Instance", "https://gitlab.lrz.de");
                     headers.set(GitLabRouteCredential.HEADER_WORKSPACE, "99");
-                }))
-                .isEqualTo(HttpStatus.ACCEPTED);
+                })
+                .expectStatus()
+                .isAccepted()
+                .expectBody(String.class)
+                .isEqualTo("{\"status\":\"ok\"}");
 
         ArgumentCaptor<PublishRequest> published = ArgumentCaptor.forClass(PublishRequest.class);
         verify(publisher).publish(published.capture());
+        assertThat(published.getValue().body()).isEqualTo(ROUTED_BODY);
         assertThat(published.getValue().subject()).isEqualTo("gitlab.?connection.7.issue");
         assertThat(published.getValue().headers())
                 .containsEntry(GitLabRouteCredential.HEADER_WORKSPACE, "3")
@@ -162,9 +175,10 @@ class GitLabWebhookIngressIntegrationTest extends BaseIntegrationTest {
         GitLabRouteCredential.Issued otherRoute = routeCredential.issue(new GitLabRouteCredential.Route(
                 7L, 3L, "https://gitlab.lrz.de", 42L, "hephaestustest/introcourse-renamed"));
 
-        assertThat(postToConnection(8L, issued, ROUTED_BODY, headers -> headers.set("X-Gitlab-Token", token)))
-                .as("another connection's endpoint")
-                .isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertProblem(
+                postToConnectionResponse(8L, issued, ROUTED_BODY, headers -> headers.set("X-Gitlab-Token", token)),
+                HttpStatus.UNAUTHORIZED,
+                "invalid");
         assertThat(postToConnection(7L, otherRoute, ROUTED_BODY, headers -> headers.set("X-Gitlab-Token", token)))
                 .as("the URL of another route of the same connection")
                 .isEqualTo(HttpStatus.UNAUTHORIZED);
@@ -175,12 +189,13 @@ class GitLabWebhookIngressIntegrationTest extends BaseIntegrationTest {
                         headers -> headers.set("X-Gitlab-Token", token)))
                 .as("a key the receiver does not hold")
                 .isEqualTo(HttpStatus.UNAUTHORIZED);
-        assertThat(postToConnection(7L, issued, ROUTED_BODY, headers -> {
+        assertProblem(
+                postToConnectionResponse(7L, issued, ROUTED_BODY, headers -> {
                     headers.set("X-Gitlab-Token", token);
                     headers.set("X-Gitlab-Instance", "https://gitlab.example.com");
-                }))
-                .as("an instance header contradicting the signed origin")
-                .isEqualTo(HttpStatus.UNAUTHORIZED);
+                }),
+                HttpStatus.UNAUTHORIZED,
+                "invalid");
         assertThat(post(ROUTED_BODY, headers -> {
                     headers.set("X-Gitlab-Event", "Issue Hook");
                     headers.set("X-Gitlab-Token", token);
@@ -191,6 +206,50 @@ class GitLabWebhookIngressIntegrationTest extends BaseIntegrationTest {
                 .as("the shared secret on a connection endpoint")
                 .isEqualTo(HttpStatus.UNAUTHORIZED);
         verify(publisher, never()).publish(any());
+    }
+
+    @Test
+    void shouldReturnProblemDetailsWhenSignaturesAreMissingOrStale() {
+        assertProblem(postResponse(BODY, headers -> {}), HttpStatus.UNAUTHORIZED, "missing-signature");
+
+        String timestamp = String.valueOf(Instant.now().minusSeconds(900).getEpochSecond());
+        String signature = "v1," + sign("msg_stale", timestamp, BODY);
+        assertProblem(
+                postResponse(BODY, headers -> signed(headers, "msg_stale", timestamp, signature)),
+                HttpStatus.UNAUTHORIZED,
+                "stale-timestamp");
+        verify(publisher, never()).publish(any());
+    }
+
+    @Test
+    void shouldReturnProblemDetailsWhenAuthenticatedPayloadIsInvalidJson() {
+        byte[] body = "invalid-json-private-payload".getBytes(StandardCharsets.UTF_8);
+        assertProblem(
+                postResponse(body, headers -> headers.set("X-Gitlab-Token", secret)),
+                HttpStatus.BAD_REQUEST,
+                "invalid-json");
+        GitLabRouteCredential.Issued issued = routeCredential.issue(ROUTE);
+        assertProblem(
+                postToConnectionResponse(7L, issued, body, headers -> headers.set("X-Gitlab-Token", issued.token())),
+                HttpStatus.BAD_REQUEST,
+                "invalid-json");
+        verify(publisher, never()).publish(any());
+    }
+
+    @Test
+    void shouldReturnRetryableProblemDetailsWhenPublishFails() {
+        doThrow(new JetStreamPublisher.PublishFailedException("private publish failure", new RuntimeException()))
+                .when(publisher)
+                .publish(any());
+        try {
+            assertProblem(
+                    postResponse(BODY, headers -> headers.set("X-Gitlab-Token", secret)),
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "publish-failed");
+            verify(publisher).publish(any());
+        } finally {
+            reset(publisher);
+        }
     }
 
     @Test
@@ -212,6 +271,13 @@ class GitLabWebhookIngressIntegrationTest extends BaseIntegrationTest {
 
     private HttpStatusCode postToConnection(
             long connectionId, GitLabRouteCredential.Issued route, byte[] body, Consumer<HttpHeaders> headers) {
+        return postToConnectionResponse(connectionId, route, body, headers)
+                .returnResult(Void.class)
+                .getStatus();
+    }
+
+    private WebTestClient.ResponseSpec postToConnectionResponse(
+            long connectionId, GitLabRouteCredential.Issued route, byte[] body, Consumer<HttpHeaders> headers) {
         return webTestClient
                 .post()
                 .uri(GitLabConnectionWebhookController.PATH_PREFIX + connectionId + "/" + route.keyId() + "/"
@@ -219,21 +285,37 @@ class GitLabWebhookIngressIntegrationTest extends BaseIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .headers(headers)
                 .bodyValue(body)
-                .exchange()
-                .returnResult(Void.class)
-                .getStatus();
+                .exchange();
     }
 
     private HttpStatusCode post(byte[] body, Consumer<HttpHeaders> headers) {
+        return postResponse(body, headers).returnResult(Void.class).getStatus();
+    }
+
+    private WebTestClient.ResponseSpec postResponse(byte[] body, Consumer<HttpHeaders> headers) {
         return webTestClient
                 .post()
                 .uri("/webhooks/gitlab")
                 .contentType(MediaType.APPLICATION_JSON)
                 .headers(headers)
                 .bodyValue(body)
-                .exchange()
-                .returnResult(Void.class)
-                .getStatus();
+                .exchange();
+    }
+
+    private static void assertProblem(WebTestClient.ResponseSpec response, HttpStatus status, String detail) {
+        response.expectStatus()
+                .isEqualTo(status)
+                .expectHeader()
+                .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
+                .expectBody()
+                .jsonPath("$.status")
+                .isEqualTo(status.value())
+                .jsonPath("$.detail")
+                .isEqualTo(detail)
+                .jsonPath("$.error")
+                .doesNotExist()
+                .jsonPath("$.cause")
+                .doesNotExist();
     }
 
     private static void signed(HttpHeaders headers, String id, String timestamp, String signature) {

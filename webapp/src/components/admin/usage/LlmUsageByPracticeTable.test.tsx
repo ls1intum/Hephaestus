@@ -81,7 +81,7 @@ describe("models for practice scripts by practice", () => {
 
 	it("shows reviews with no price only while some row has one", () => {
 		const { unmount } = render(<LlmUsageByPracticeTable report={report} purses={["SHARED"]} />);
-		expect(within(table()).queryByRole("columnheader", { name: "No price set" })).toBeNull();
+		expect(within(table()).queryByRole("columnheader", { name: "Unavailable cost" })).toBeNull();
 		unmount();
 
 		render(
@@ -90,7 +90,7 @@ describe("models for practice scripts by practice", () => {
 				purses={["SHARED"]}
 			/>,
 		);
-		within(table()).getByRole("columnheader", { name: "No price set" });
+		within(table()).getByRole("columnheader", { name: "Unavailable cost" });
 		expect(cellsOf(/small-pull-requests/u)[5]).toBe("2");
 	});
 

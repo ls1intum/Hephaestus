@@ -135,35 +135,85 @@ describe("source-control credential recovery", () => {
 		await screen.findByText("The token expiry is not available yet.");
 	});
 
-	it("keeps the draft and the unreadable state when replacement fails", async () => {
-		mockConnection("GITLAB");
+	it("says a readable GitHub token's expiry is unknown instead of implying it is valid", async () => {
+		const { entry } = mockConnection("GITHUB");
+		entry.credentialsUnreadableSince = undefined;
+		renderRouteAt("/w/acme/admin/integrations/scm");
+
+		await screen.findByRole("button", { name: "Sync now" }, ROUTE_RENDER_WAIT);
+		screen.getByText(
+			"The token expiry is not available for this connection. Check the token in GitHub and replace it below if it has expired or been revoked.",
+		);
+		expect(screen.queryByText("The token has no expiry.")).toBeNull();
+		expect(screen.queryByText(/The token expires on/u)).toBeNull();
+		const user = userEvent.setup();
+		await user.type(screen.getByLabelText("New personal access token"), "replacement-token");
+		expect(screen.getByRole("button", { name: "Replace token" })).toHaveProperty("disabled", false);
+	});
+
+	it("keeps GitLab token replacement available when its expiry cannot load", async () => {
+		const { entry, workspace } = mockConnection("GITLAB");
+		entry.credentialsUnreadableSince = undefined;
+		const requests: unknown[] = [];
 		server.use(
-			http.patch("*/workspaces/acme/token", () =>
+			http.get("*/workspaces/:workspaceSlug/connections/7", () =>
 				HttpResponse.json(
-					{
-						status: 409,
-						title: "Conflict",
-						detail: "This connection changed. Reload before replacing its token.",
-					},
-					{ status: 409 },
+					{ status: 503, title: "Service Unavailable", detail: "GitLab is unavailable." },
+					{ status: 503 },
 				),
 			),
+			http.patch("*/workspaces/acme/token", async ({ request }) => {
+				requests.push(await request.json());
+				return HttpResponse.json(workspace);
+			}),
 		);
 		renderRouteAt("/w/acme/admin/integrations/scm");
-		const input = await screen.findByLabelText(
-			"New personal access token",
-			undefined,
-			ROUTE_RENDER_WAIT,
-		);
+
+		await screen.findByText("We could not load the token expiry.", undefined, ROUTE_RENDER_WAIT);
+		expect(screen.queryByText("The token has no expiry.")).toBeNull();
+		expect(screen.queryByText(/The token expires on/u)).toBeNull();
 		const user = userEvent.setup();
+		const input = screen.getByLabelText("New personal access token");
 		await user.type(input, "replacement-token");
 		await user.click(screen.getByRole("button", { name: "Replace token" }));
-
-		await screen.findByText("This connection changed. Reload before replacing its token.");
-		expect(input).toHaveProperty("value", "replacement-token");
-		screen.getByText("The stored token cannot be read");
-		expect(screen.queryByRole("button", { name: "Sync now" })).toBeNull();
+		await waitFor(() =>
+			expect(requests).toStrictEqual([{ personalAccessToken: "replacement-token" }]),
+		);
+		await waitFor(() => expect(input).toHaveProperty("value", ""));
 	});
+
+	it.each(["GITHUB", "GITLAB"] as const)(
+		"keeps the %s draft and the unreadable state when replacement fails",
+		async (kind) => {
+			mockConnection(kind);
+			server.use(
+				http.patch("*/workspaces/acme/token", () =>
+					HttpResponse.json(
+						{
+							status: 409,
+							title: "Conflict",
+							detail: "This connection changed. Reload before replacing its token.",
+						},
+						{ status: 409 },
+					),
+				),
+			);
+			renderRouteAt("/w/acme/admin/integrations/scm");
+			const input = await screen.findByLabelText(
+				"New personal access token",
+				undefined,
+				ROUTE_RENDER_WAIT,
+			);
+			const user = userEvent.setup();
+			await user.type(input, "replacement-token");
+			await user.click(screen.getByRole("button", { name: "Replace token" }));
+
+			await screen.findByText("This connection changed. Reload before replacing its token.");
+			expect(input).toHaveProperty("value", "replacement-token");
+			screen.getByText("The stored token cannot be read");
+			expect(screen.queryByRole("button", { name: "Sync now" })).toBeNull();
+		},
+	);
 
 	it("isolates a pending token replacement when switching workspaces", async () => {
 		const { workspace } = mockConnection("GITHUB");

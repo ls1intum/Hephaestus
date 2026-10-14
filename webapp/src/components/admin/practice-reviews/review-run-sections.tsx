@@ -147,7 +147,7 @@ export function ReviewPractices({
 	if (entries.length > 0) {
 		empty = "No practices match your filters.";
 	} else if (running) {
-		empty = "Practices appear here as the review reaches them.";
+		empty = "No practice results have been recorded yet.";
 	}
 	return (
 		<div className="flex min-w-0 flex-col gap-3">

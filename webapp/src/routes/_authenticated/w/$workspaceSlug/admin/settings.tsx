@@ -17,6 +17,9 @@ import { hasText } from "@/lib/text";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/settings")({
 	head: workspaceAdminHead("Workspace settings"),
+	// A write keeps the workspace it was made in: its callbacks, its pending state and an open
+	// confirmation do not move to the next workspace.
+	remountDeps: ({ params }) => params.workspaceSlug,
 	component: AdminSettings,
 });
 

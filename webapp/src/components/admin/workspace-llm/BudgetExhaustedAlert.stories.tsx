@@ -17,7 +17,7 @@ export const ProviderCapReached: Story = {
 };
 
 export const ProviderCapUnenforceable: Story = {
-	args: { scope: "own", verdict: "UNVERIFIABLE", unpricedEventCount: 3 },
+	args: { scope: "own", verdict: "UNVERIFIABLE" },
 };
 
 export const SharedBudgetReached: Story = {
@@ -25,7 +25,7 @@ export const SharedBudgetReached: Story = {
 };
 
 export const SharedBudgetUnverifiable: Story = {
-	args: { scope: "shared", verdict: "UNVERIFIABLE", unpricedEventCount: 1 },
+	args: { scope: "shared", verdict: "UNVERIFIABLE" },
 };
 
 export const ProviderCapReachedOnUsagePage: Story = {

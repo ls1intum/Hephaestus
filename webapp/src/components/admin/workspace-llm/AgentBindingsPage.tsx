@@ -10,6 +10,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import type { RefreshFailure } from "@/runtime/tanstack-query/infinite-list";
 
 import type {
 	AgentBinding,
@@ -270,6 +271,7 @@ export interface AgentBindingsPageProps {
 	usage?: WorkspaceLlmUsageReport;
 	/** The purpose a link asked for: its row opens and scrolls into view. */
 	focusPurpose?: AgentPurpose;
+	refreshFailure?: RefreshFailure;
 	/** The reader closed the row a link opened, so the link can open it again. */
 	onFocusPurposeClosed?: () => void;
 	/** Rows with a save or clear in flight, keyed by {@link bindingTargetKey}. */
@@ -287,6 +289,7 @@ export function AgentBindingsPage({
 	state,
 	usage,
 	providerPanel,
+	refreshFailure,
 	...ready
 }: AgentBindingsPageProps) {
 	const ownProvider = usage === undefined ? undefined : purseCap(usage, "OWN_PROVIDER");
@@ -305,7 +308,6 @@ export function AgentBindingsPage({
 							<BudgetExhaustedAlert
 								scope="own"
 								verdict={ownProvider.verdict}
-								unpricedEventCount={usage.unpricedEventCount}
 								context="models"
 								workspaceSlug={workspaceSlug}
 							/>
@@ -314,7 +316,6 @@ export function AgentBindingsPage({
 							<BudgetExhaustedAlert
 								scope="shared"
 								verdict={usage.instanceBudgetVerdict}
-								unpricedEventCount={usage.unpricedEventCount}
 								context="models"
 								workspaceSlug={workspaceSlug}
 							/>
@@ -334,6 +335,14 @@ export function AgentBindingsPage({
 				)}
 				{state.status === "ready" && (
 					<>
+						{refreshFailure !== undefined && (
+							<QueryErrorAlert
+								error={refreshFailure.error}
+								title="We could not refresh AI models"
+								pending={refreshFailure.pending}
+								onRetry={refreshFailure.onRetry}
+							/>
+						)}
 						<PurposeGroups workspaceSlug={workspaceSlug} {...ready} />
 						{providerPanel !== undefined && (
 							// Focusable from script only, so the picker's link can move focus here; the panel
@@ -556,7 +565,7 @@ function opensAtMount(view: PurposeView): boolean {
 
 type PurposeGroupsProps = { workspaceSlug: string } & Omit<
 	AgentBindingsPageProps,
-	"workspaceSlug" | "state" | "usage" | "providerPanel"
+	"workspaceSlug" | "state" | "usage" | "providerPanel" | "refreshFailure"
 >;
 
 function PurposeGroups({
@@ -665,6 +674,7 @@ interface PurposeGroupSectionProps {
 	onOpenChange: (next: AgentPurpose[]) => void;
 	workspaceSlug: string;
 	focusPurpose?: AgentPurpose;
+	refreshFailure?: RefreshFailure;
 	rowProps: RowProps;
 }
 

@@ -1,11 +1,11 @@
 import { CircleCheckIcon, SearchXIcon } from "lucide-react";
 
 import type { ProblemChanges } from "@/api/types.gen";
-import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
 import { EmptyState } from "@/components/common/EmptyState";
 import { type FilterOption, FilterToggle } from "@/components/common/FilterToggle";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
 import {
 	baselineDef,
 	PROBLEM_BASELINE_STATES,

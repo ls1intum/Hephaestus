@@ -99,19 +99,19 @@ public class GitLabSubIssueSyncService {
 
         // Track which issues have a parent according to GitLab
         Set<Long> issuesWithParentInGitLab = new HashSet<>();
+        Set<Long> unknownHierarchyIssueIds = new HashSet<>();
         int totalLinked = 0;
 
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
         String cursor = null;
         String previousCursor = null;
         int page = 0;
-        boolean partialView = false;
+        boolean complete = false;
 
         try {
             do {
                 if (page >= GitLabSyncConstants.MAX_PAGINATION_PAGES) {
                     log.warn("Reached max pagination: project={}", safeProjectPath);
-                    partialView = true;
                     break;
                 }
 
@@ -130,51 +130,48 @@ public class GitLabSubIssueSyncService {
                 }
                 if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
                     graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
-                    partialView = true;
+                    break;
+                }
+                if (!Objects.requireNonNull(response).getErrors().isEmpty()
+                        || !responseHandler.isWholePage(response, "project.workItems")) {
                     break;
                 }
 
                 @SuppressWarnings("unchecked")
-                List<Map<String, Object>> nodes = (List<Map<String, Object>>) (List<?>) Objects.requireNonNull(response)
-                        .field("project.workItems.nodes")
-                        .toEntityList(Map.class);
-                if (nodes == null) {
-                    // A response the handler passed but whose nodes field is missing is a page we did
-                    // not read, not an empty project.
-                    partialView = true;
-                    break;
-                }
-                if (nodes.isEmpty()) break;
+                List<Map<String, Object>> nodes = (List<Map<String, Object>>)
+                        (List<?>) response.field("project.workItems.nodes").toEntityList(Map.class);
 
                 for (Map<String, Object> node : nodes) {
-                    int linked = processWorkItemNode(node, issueByIid, issuesWithParentInGitLab, repository);
+                    int linked = processWorkItemNode(
+                            node, issueByIid, issuesWithParentInGitLab, unknownHierarchyIssueIds, repository);
                     totalLinked += linked;
                 }
 
                 // Pagination
-                GitLabPageInfo pageInfo = Objects.requireNonNull(response)
-                        .field("project.workItems.pageInfo")
-                        .toEntity(GitLabPageInfo.class);
-                if (pageInfo == null || !pageInfo.hasNextPage()) break;
+                GitLabPageInfo pageInfo = Objects.requireNonNull(
+                        response.field("project.workItems.pageInfo").toEntity(GitLabPageInfo.class));
+                if (!pageInfo.hasNextPage()) {
+                    complete = true;
+                    break;
+                }
                 cursor = pageInfo.endCursor();
-                if (responseHandler.isPaginationLoop(
-                        cursor, previousCursor, "sub-issues for " + safeProjectPath, log)) {
-                    partialView = true;
+                if (cursor == null
+                        || cursor.isBlank()
+                        || responseHandler.isPaginationLoop(
+                                cursor, previousCursor, "sub-issues for " + safeProjectPath, log)) {
                     break;
                 }
                 previousCursor = cursor;
                 page++;
-            } while (cursor != null);
+            } while (true);
 
-            // Clearing parentIssue for issues GitLab no longer reports a parent for is only safe on a
-            // COMPLETE walk: issuesWithParentInGitLab is built page by page, so after a run that stopped
-            // early every issue whose parent lived on an unfetched page looks parentless and would have
-            // its real link deleted. Anything that can end the loop before the last page therefore has
-            // to set partialView.
-            int staleCleared = partialView ? 0 : clearStaleParents(issues, issuesWithParentInGitLab);
-            if (partialView) {
+            // Unfetched issues may hide real parents. Cleanup requires a whole, error-free final page;
+            // identified issues with unreadable hierarchy remain protected individually.
+            if (!complete) {
                 log.warn("Skipping stale-parent cleanup after an incomplete walk: project={}", safeProjectPath);
+                return SyncResult.abortedError(totalLinked);
             }
+            int staleCleared = clearStaleParents(issues, issuesWithParentInGitLab, unknownHierarchyIssueIds);
 
             if (totalLinked > 0 || staleCleared > 0) {
                 log.info(
@@ -184,10 +181,19 @@ public class GitLabSubIssueSyncService {
                         staleCleared);
             }
 
-            return SyncResult.completed(totalLinked);
+            return unknownHierarchyIssueIds.isEmpty()
+                    ? SyncResult.completed(totalLinked)
+                    : SyncResult.abortedError(totalLinked);
         } catch (Exception e) {
             log.warn("Failed sub-issue sync: project={}", safeProjectPath, e);
-            return SyncResult.abortedError(0);
+            return SyncResult.abortedError(totalLinked);
+        } finally {
+            if (!unknownHierarchyIssueIds.isEmpty()) {
+                log.warn(
+                        "Incomplete sub-issue sync: project={}, unknownHierarchyItems={}, reason=unreadableHierarchy",
+                        safeProjectPath,
+                        unknownHierarchyIssueIds.size());
+            }
         }
     }
 
@@ -196,6 +202,7 @@ public class GitLabSubIssueSyncService {
             Map<String, Object> node,
             Map<Integer, Issue> issueByIid,
             Set<Long> issuesWithParentInGitLab,
+            Set<Long> unknownHierarchyIssueIds,
             Repository repository) {
         String iidStr = node.get("iid") != null ? node.get("iid").toString() : null;
         if (iidStr == null) return 0;
@@ -212,43 +219,58 @@ public class GitLabSubIssueSyncService {
 
         // Extract hierarchy widget
         List<Map<String, Object>> widgets = (List<Map<String, Object>>) node.get("widgets");
-        if (widgets == null) return 0;
+        if (widgets == null) {
+            unknownHierarchyIssueIds.add(issue.getId());
+            return 0;
+        }
 
         Integer parentIid = null;
         String parentNamespacePath = null;
         for (Map<String, Object> widget : widgets) {
             String widgetType = (String) widget.get("type");
             if ("HIERARCHY".equals(widgetType)) {
-                Map<String, Object> parent = (Map<String, Object>) widget.get("parent");
-                if (parent != null) {
-                    parentIid = extractIid(parent);
-                    parentNamespacePath = extractNamespacePath(parent);
+                if (!widget.containsKey("parent")) {
+                    unknownHierarchyIssueIds.add(issue.getId());
+                    return 0;
                 }
+                Map<String, Object> parent = (Map<String, Object>) widget.get("parent");
+                Object hasParent = widget.get("hasParent");
+                if (Boolean.FALSE.equals(hasParent) && parent == null) {
+                    return 0;
+                }
+                if (!Boolean.TRUE.equals(hasParent) || parent == null) {
+                    unknownHierarchyIssueIds.add(issue.getId());
+                    return 0;
+                }
+                parentIid = extractIid(parent);
+                parentNamespacePath = extractNamespacePath(parent);
                 break;
             }
         }
 
-        if (parentIid != null) {
-            issuesWithParentInGitLab.add(issue.getId());
-            Issue parentIssue = issueByIid.get(parentIid);
-            if (parentIssue == null) {
-                // Try same-repo DB lookup first
-                parentIssue = issueRepository
-                        .findByRepositoryIdAndNumber(repository.getId(), parentIid)
-                        .orElse(null);
-            }
-            if (parentIssue == null && parentNamespacePath != null) {
-                // Cross-repo: look up parent in a different monitored repo by namespace path
-                parentIssue = findCrossRepoIssue(parentNamespacePath, parentIid, repository);
-            }
+        if (parentIid == null || parentIid <= 0) {
+            unknownHierarchyIssueIds.add(issue.getId());
+            return 0;
+        }
+        issuesWithParentInGitLab.add(issue.getId());
+        Issue parentIssue = issueByIid.get(parentIid);
+        if (parentIssue == null) {
+            // Try same-repo DB lookup first
+            parentIssue = issueRepository
+                    .findByRepositoryIdAndNumber(repository.getId(), parentIid)
+                    .orElse(null);
+        }
+        if (parentIssue == null && parentNamespacePath != null) {
+            // Cross-repo: look up parent in a different monitored repo by namespace path
+            parentIssue = findCrossRepoIssue(parentNamespacePath, parentIid, repository);
+        }
 
-            if (parentIssue != null && !parentIssue.getId().equals(issue.getId())) {
-                if (issue.getParentIssue() == null
-                        || !issue.getParentIssue().getId().equals(parentIssue.getId())) {
-                    issue.setParentIssue(parentIssue);
-                    issueRepository.save(issue);
-                    return 1;
-                }
+        if (parentIssue != null && !parentIssue.getId().equals(issue.getId())) {
+            if (issue.getParentIssue() == null
+                    || !issue.getParentIssue().getId().equals(parentIssue.getId())) {
+                issue.setParentIssue(parentIssue);
+                issueRepository.save(issue);
+                return 1;
             }
         }
 
@@ -256,12 +278,15 @@ public class GitLabSubIssueSyncService {
     }
 
     /**
-     * Clears parentIssue for issues that had a parent locally but no longer have one in GitLab.
+     * Clears stored parents absent from a complete inventory, except issues with unreadable hierarchy.
      */
-    private int clearStaleParents(List<Issue> issues, Set<Long> issuesWithParentInGitLab) {
+    private int clearStaleParents(
+            List<Issue> issues, Set<Long> issuesWithParentInGitLab, Set<Long> unknownHierarchyIssueIds) {
         int cleared = 0;
         for (Issue issue : issues) {
-            if (issue.getParentIssue() != null && !issuesWithParentInGitLab.contains(issue.getId())) {
+            if (issue.getParentIssue() != null
+                    && !issuesWithParentInGitLab.contains(issue.getId())
+                    && !unknownHierarchyIssueIds.contains(issue.getId())) {
                 issue.setParentIssue(null);
                 issueRepository.save(issue);
                 cleared++;

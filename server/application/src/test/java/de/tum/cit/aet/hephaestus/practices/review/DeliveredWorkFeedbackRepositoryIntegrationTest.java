@@ -91,9 +91,9 @@ class DeliveredWorkFeedbackRepositoryIntegrationTest extends BaseIntegrationTest
     UUID feedback(Result result, String state) {
         var id = UUID.randomUUID();
         jdbc.sql("INSERT INTO"
-            + " feedback(id,workspace_id,review_id,item_id,developer_id,destination,state,stop_reason,body,checks,created_at)"
-            + " VALUES(:id,:ws,:review,:item,:developer,'ON_WORK',:state,'DELIVERY_UNCONFIRMED','Recorded"
-            + " feedback','{}'::jsonb,:at)")
+                        + " feedback(id,workspace_id,review_id,item_id,developer_id,destination,state,stop_reason,body,checks,created_at)"
+                        + " VALUES(:id,:ws,:review,:item,:developer,'ON_WORK',:state,'DELIVERY_UNCONFIRMED','Recorded"
+                        + " feedback','{}'::jsonb,:at)")
                 .param("id", id)
                 .param("ws", result.getWorkspaceId())
                 .param("review", result.getReviewId())
@@ -117,8 +117,8 @@ class DeliveredWorkFeedbackRepositoryIntegrationTest extends BaseIntegrationTest
         var id = UUID.randomUUID();
         jdbc.sql(
                         "INSERT INTO"
-                            + " feedback_copy(id,workspace_id,feedback_id,kind,position,state,write_started_at,write_key,write_marker,external_ref,external_url,created_at,posted_at)"
-                            + " VALUES(:id,:ws,:feedback,'SUMMARY',:position,:state,:at,:key,:marker,:ref,:url,:at,:posted)")
+                                + " feedback_copy(id,workspace_id,feedback_id,kind,position,state,write_started_at,write_key,write_marker,external_ref,external_url,created_at,posted_at)"
+                                + " VALUES(:id,:ws,:feedback,'SUMMARY',:position,:state,:at,:key,:marker,:ref,:url,:at,:posted)")
                 .param("id", id)
                 .param("ws", result.getWorkspaceId())
                 .param("feedback", feedback)

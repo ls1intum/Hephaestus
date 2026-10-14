@@ -621,6 +621,8 @@ public class GitRepositoryManager {
                     // A link in the checkout would let the review read outside it; it is a
                     // file holding the target.
                     config.setBoolean("core", null, "symlinks", false);
+                    // A disposable checkout must not have background writers when it is removed.
+                    config.setBoolean("fetch", null, "autoGC", false);
                     config.save();
                     if (originals.isEmpty()) {
                         git.fetch()

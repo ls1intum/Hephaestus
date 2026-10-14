@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import type {
 	CreateWorkspaceLlmModelRequest,
@@ -32,6 +32,8 @@ export interface WorkspaceLlmModelFormDialogProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	editing: WorkspaceLlmModel | null;
+	/** Shown above the fields, such as a failed refresh of the models the form edits. */
+	notice?: ReactNode;
 	isSubmitting: boolean;
 	onCreate: (body: CreateWorkspaceLlmModelRequest) => void;
 	onUpdate: (id: number, body: UpdateWorkspaceLlmModelRequest) => void;
@@ -76,6 +78,7 @@ type WorkspaceLlmModelFormDialogContentProps = Omit<
 
 function WorkspaceLlmModelFormDialogContent({
 	editing,
+	notice,
 	isSubmitting,
 	onCreate,
 	onUpdate,
@@ -138,6 +141,7 @@ function WorkspaceLlmModelFormDialogContent({
 				{/* This form outgrows a 320 px viewport; without an internal scroll region the popup hangs
 				    off both edges and neither the title nor the submit button can be reached. */}
 				<DialogBody className="space-y-4 py-1">
+					{notice}
 					<LlmModelFields
 						audience="workspace"
 						idPrefix="wm"
