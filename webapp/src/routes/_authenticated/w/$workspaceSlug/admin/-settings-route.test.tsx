@@ -82,22 +82,41 @@ describe("the public activity page setting", () => {
 
 	it("asks first, and turns the page on only once the admin has read what becomes public", async () => {
 		const user = userEvent.setup();
+		const listed = deferred<Response>();
 		renderSettingsRoute(false);
 
 		await user.click(
 			await screen.findByRole("switch", { name: "Publish the page" }, ROUTE_RENDER_WAIT),
 		);
 		const dialog = await screen.findByRole("alertdialog");
-		within(dialog).getByText(/Anyone can see the page, without signing in/u);
+		within(dialog).getByText(/^When the page is public, anyone can see it without signing in\./u);
 		expect(changes).toStrictEqual([]);
+		// The workspace list, which says whether the page is public, is read again after the save.
+		server.use(http.get("*/workspaces", async () => listed.promise));
 		await user.click(within(dialog).getByRole("button", { name: "Make public" }));
 
 		await waitFor(() =>
 			expect(changes).toStrictEqual([{ publicActivityEnabled: true, allowSearchEngines: false }]),
 		);
-		// Search engines stay off until the admin turns them on, and the count of hidden people shows.
-		await screen.findByRole("switch", { name: "Allow search engines" });
-		await screen.findByText("3");
+		try {
+			// The save is acknowledged at once; the address waits for the list to confirm the page.
+			await screen.findByText("Public activity settings saved");
+			screen.getByText("In workspace acme.");
+			const page = within(screen.getByRole("region", { name: "Public activity page" }));
+			page.getByText("On for this workspace.");
+			expect(page.queryByText(/Anyone can see it/u)).toBeNull();
+			// Search engines stay off until the admin turns them on, and the count of hidden people shows.
+			await screen.findByRole("switch", { name: "Allow search engines" });
+			await screen.findByText("3");
+
+			listed.resolve(
+				HttpResponse.json([workspaceListItem("acme", { publishesPublicActivity: true })]),
+			);
+			await page.findByText("On. Anyone can see it at https://hephaestus.build/w/acme.");
+			expect(page.queryByText(/Public availability is not confirmed/u)).toBeNull();
+		} finally {
+			listed.resolve(HttpResponse.json([workspaceListItem("acme")]));
+		}
 	});
 
 	it("turns the page off at once, and publishing again starts with search engines off", async () => {
@@ -138,16 +157,24 @@ describe("the public activity page setting", () => {
 		);
 	});
 
-	it("says nothing is public while the instance does not allow public pages", async () => {
-		settings = { enabled: true, allowSearchEngines: false };
-		renderSettingsRoute(false);
-
-		await screen.findByText(
-			/An instance administrator has not allowed/u,
-			undefined,
-			ROUTE_RENDER_WAIT,
-		);
-	});
+	it.each([false, true])(
+		"does not claim public availability from a saved On preference (search allowed: %s)",
+		async (allowSearchEngines) => {
+			settings = { enabled: true, allowSearchEngines };
+			renderSettingsRoute(false);
+			const page = within(
+				await screen.findByRole("region", { name: "Public activity page" }, ROUTE_RENDER_WAIT),
+			);
+			const publish = await page.findByRole("switch", { name: "Publish the page" });
+			await waitFor(() => expect(publish.getAttribute("aria-checked")).toBe("true"));
+			expect(page.queryByText(/^On\. Anyone can see it at/u)).toBeNull();
+			expect(page.queryByText(/An instance administrator has not allowed/u)).toBeNull();
+			await page.findByText(/Public availability is not confirmed/u);
+			expect(
+				page.getByRole("switch", { name: "Allow search engines" }).getAttribute("aria-checked"),
+			).toBe(String(allowSearchEngines));
+		},
+	);
 
 	it("waits for hidden contributors without saying there are none, and reads them again on retry", async () => {
 		const user = userEvent.setup();

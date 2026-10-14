@@ -19,8 +19,8 @@ import { problemDetailOf } from "@/lib/problem-detail";
 
 /**
  * A workspace's public activity page as its admin settings show it: whether it is on, whether search
- * engines may list it, how many people it leaves out, and the two changes. `live` is what the
- * workspace list says, since only the instance knows whether it allows public pages.
+ * engines may list it, how many people it leaves out, and the two changes. `live` is the
+ * server-computed publication status from the workspace list.
  */
 export function useWorkspacePublicActivity({
 	workspaceSlug,
@@ -67,7 +67,7 @@ export function useWorkspacePublicActivity({
 				getWorkspacePublicActivitySettingsQueryKey({ path: submitted }),
 				data,
 			);
-			// The list says whether the page is live, and the count follows what the page lists.
+			// The list carries the publication status, and the count follows what the page lists.
 			void queryClient.invalidateQueries({ queryKey: listWorkspacesQueryKey() });
 			void queryClient.invalidateQueries({
 				queryKey: getPublicActivityHiddenCountQueryKey({ path: submitted }),
@@ -151,17 +151,13 @@ function inWorkspace(workspaceSlug: string): string {
 	return `In workspace ${workspaceSlug}.`;
 }
 
+/** Says what was saved: whether the page is public is the workspace list's to tell, after this. */
 function announce(
-	{ publicActivityEnabled, allowSearchEngines }: UpdateWorkspacePublicActivityRequest,
+	{ publicActivityEnabled }: UpdateWorkspacePublicActivityRequest,
 	workspaceSlug: string,
 ) {
 	if (publicActivityEnabled) {
-		toast.success(
-			allowSearchEngines
-				? "The public activity page is on, and search engines can list it"
-				: "The public activity page is on",
-			{ description: inWorkspace(workspaceSlug) },
-		);
+		toast.success("Public activity settings saved", { description: inWorkspace(workspaceSlug) });
 		return;
 	}
 	toast.success("The public activity page is off", {
