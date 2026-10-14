@@ -129,6 +129,40 @@ export const NarrowedToNothingSoFar: Story = {
 	},
 };
 
+const retryRefresh = fn();
+
+/** A refresh failed: the reviews already read stay, under a warning that they may be out of date. */
+export const RefreshFailed: Story = {
+	args: {
+		feed: {
+			...readyFeed,
+			refreshFailure: { error: { status: 503 }, pending: false, onRetry: retryRefresh },
+		},
+	},
+	play: async ({ canvas, userEvent }) => {
+		await expect(canvas.getByText("We could not refresh reviews")).toBeVisible();
+		await expect(canvas.getByRole("list", { name: "Reviews" })).toBeVisible();
+		await userEvent.click(canvas.getByRole("button", { name: "Retry" }));
+		await expect(retryRefresh).toHaveBeenCalledOnce();
+	},
+};
+
+/** A refresh failed on a feed that had nothing yet: the warning stays, beside the empty state. */
+export const RefreshFailedWhileEmpty: Story = {
+	args: {
+		feed: {
+			...readyFeed,
+			runs: [],
+			refreshFailure: { error: { status: 503 }, pending: false, onRetry: fn() },
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("We could not refresh reviews")).toBeVisible();
+		await expect(canvas.getByText("No reviews yet")).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Retry" })).toBeEnabled();
+	},
+};
+
 /** The feed could not be read: the error says which feed, and its retry asks for it again. */
 export const Failed: Story = {
 	args: { feed: { status: "error", error: new Error("network"), onRetry: fn() } },

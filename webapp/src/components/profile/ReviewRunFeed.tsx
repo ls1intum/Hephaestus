@@ -66,35 +66,54 @@ export function ReviewRunFeed({
 		return <ReviewRunFeedSkeleton rows={skeletonRows} />;
 	}
 	const shown = runs ?? feed.runs;
+	// The reviews already read stay, and the responses being written on them, under a warning that
+	// they may be out of date. It leads every ready state, so it appearing remounts nothing.
+	const refreshAlert =
+		feed.refreshFailure === undefined ? undefined : (
+			<QueryErrorAlert
+				error={feed.refreshFailure.error}
+				title="We could not refresh reviews"
+				pending={feed.refreshFailure.pending}
+				onRetry={feed.refreshFailure.onRetry}
+				className="mb-4"
+			/>
+		);
 	// A narrowing can leave the pages read so far empty while earlier ones still hold its runs, so
 	// the empty state, which says nothing reached this surface at all, waits for the last page.
 	if (shown.length === 0 && feed.hasMore) {
 		return (
-			<div className="flex flex-col items-start gap-2">
-				<p className="text-sm text-muted-foreground">
-					The latest reviews have no observations here.
-				</p>
-				{emptyAction}
-				<EarlierReviews {...feed} loadingRow={RUN_CARD_SKELETON} />
-			</div>
+			<>
+				{refreshAlert}
+				<div className="flex flex-col items-start gap-2">
+					<p className="text-sm text-muted-foreground">
+						The latest reviews have no observations here.
+					</p>
+					{emptyAction}
+					<EarlierReviews {...feed} loadingRow={RUN_CARD_SKELETON} />
+				</div>
+			</>
 		);
 	}
 	if (shown.length === 0) {
 		return (
-			<Empty>
-				<EmptyHeader>
-					<EmptyMedia variant="icon">
-						<PulseIcon />
-					</EmptyMedia>
-					<EmptyTitle>{emptyTitle}</EmptyTitle>
-					<EmptyDescription>{emptyDescription}</EmptyDescription>
-				</EmptyHeader>
-				{rendersContent(emptyAction) && <EmptyContent>{emptyAction}</EmptyContent>}
-			</Empty>
+			<>
+				{refreshAlert}
+				<Empty>
+					<EmptyHeader>
+						<EmptyMedia variant="icon">
+							<PulseIcon />
+						</EmptyMedia>
+						<EmptyTitle>{emptyTitle}</EmptyTitle>
+						<EmptyDescription>{emptyDescription}</EmptyDescription>
+					</EmptyHeader>
+					{rendersContent(emptyAction) && <EmptyContent>{emptyAction}</EmptyContent>}
+				</Empty>
+			</>
 		);
 	}
 	return (
 		<>
+			{refreshAlert}
 			<ReviewRunTimeline
 				runs={shown}
 				observations={observations}

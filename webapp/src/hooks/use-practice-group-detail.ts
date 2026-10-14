@@ -17,6 +17,7 @@ import {
 	useFeedbackResponseWrite,
 } from "@/hooks/use-feedback-response-write";
 import { slicePageParams } from "@/runtime/tanstack-query/spring-page";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 /** Review runs per page of the feed; also the skeleton's row count while the first page loads. */
 export const REVIEW_RUN_PAGE_SIZE = 10;
@@ -70,14 +71,16 @@ export function usePracticeGroupDetail({
 	const feedGroupSlug = groupSlug ?? practice?.groupSlug;
 	const practiceOpen = practiceSlug !== undefined && feedGroupSlug !== undefined;
 
+	const activityOptions = listPracticeGroupReviewRunsInfiniteOptions({
+		path: { workspaceSlug, groupSlug: feedGroupSlug ?? "" },
+		query: { size: REVIEW_RUN_PAGE_SIZE, practiceSlug },
+	});
 	const activityQuery = useInfiniteQuery({
-		...listPracticeGroupReviewRunsInfiniteOptions({
-			path: { workspaceSlug, groupSlug: feedGroupSlug ?? "" },
-			query: { size: REVIEW_RUN_PAGE_SIZE, practiceSlug },
-		}),
+		...activityOptions,
 		...slicePageParams,
 		enabled: practiceOpen,
 	});
+	useQueryReadRefusal(activityOptions.queryKey, activityQuery.isError, activityQuery.error);
 	// Its own request, so the words the standing carries show while the picture is on its way. It
 	// keeps the app's staleTime: the server answers a refetch of an unchanged guidance with a 304.
 	const guidanceQuery = useQuery({

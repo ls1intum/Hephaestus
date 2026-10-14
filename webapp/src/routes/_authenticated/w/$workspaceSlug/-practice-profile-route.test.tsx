@@ -1,8 +1,12 @@
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+	listPracticeGroupReviewRunsInfiniteQueryKey,
+	listPracticeProfileReviewRunsInfiniteQueryKey,
+} from "@/api/@tanstack/react-query.gen";
 import type {
 	InAppFeedback,
 	ObservationDetail,
@@ -13,8 +17,12 @@ import type {
 } from "@/api/types.gen";
 import { ACTIVE_REVIEW_POLL_MS } from "@/components/admin/practice-reviews/review-search";
 import { stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
-import { reviewRangeStart } from "@/components/practice-profile/practice-profile-search";
+import {
+	PROFILE_REVIEWS_PAGE_SIZE,
+	reviewRangeStart,
+} from "@/components/practice-profile/practice-profile-search";
 import { artifactTrace } from "@/components/practice-trace/fixtures";
+import { REVIEW_RUN_PAGE_SIZE } from "@/hooks/use-practice-group-detail";
 import { formatDayTime, type Wire } from "@/lib/dates";
 import { workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
@@ -960,6 +968,126 @@ describe("practice profile in a user view", () => {
 			observationResponse: 0,
 		});
 	});
+});
+
+/** A review only a later authorized read of the reviews list carries. */
+const laterProfileRun = {
+	...openProfileReviewRun,
+	reviewId: "00000000-0000-0000-0000-000000007777",
+	reviewedWork: { ...openProfileReviewRun.reviewedWork, id: "7777", label: "#7777" },
+} satisfies ProfileReviewRun;
+
+/** An observation only a later authorized read of the practice's feed carries. */
+const laterObservation = {
+	...observation,
+	id: "00000000-0000-0000-0000-000000007778",
+	summary: "A later review found the tests missing",
+} satisfies ObservationDetail;
+const laterRun = {
+	...run,
+	reviewId: "00000000-0000-0000-0000-000000007779",
+	observations: [laterObservation],
+};
+
+const feedPage = (content: readonly unknown[]) =>
+	HttpResponse.json({ content, hasNext: false, page: 0, size: 10 });
+const buttonsNamed = (name: string | RegExp) => screen.queryAllByRole("button", { name });
+
+/** Each feed of reviews the profile reads, by its address, its wire path and its exact query. */
+const REVIEW_FEEDS = [
+	[
+		"the reviews list",
+		`${PAGE}?detail=${encodeURIComponent(JSON.stringify(["reviews:all"]))}`,
+		"*/workspaces/:workspaceSlug/practice-profile/review-runs",
+		() =>
+			listPracticeProfileReviewRunsInfiniteQueryKey({
+				path: { workspaceSlug: "acme" },
+				query: { size: PROFILE_REVIEWS_PAGE_SIZE },
+			}),
+		profileReviewRuns,
+		[laterProfileRun],
+		openReviewRowName,
+		/^Open review of #7777,/u,
+	],
+	[
+		"a practice's observations",
+		`${PRACTICE_PAGE}&practiceTab=observations`,
+		"*/workspaces/:workspaceSlug/practice-groups/:groupSlug/review-runs",
+		() =>
+			listPracticeGroupReviewRunsInfiniteQueryKey({
+				path: { workspaceSlug: "acme", groupSlug: packagingGroup.slug },
+				query: { size: REVIEW_RUN_PAGE_SIZE, practiceSlug: practice.slug },
+			}),
+		[run],
+		[laterRun],
+		new RegExp(observation.summary, "u"),
+		new RegExp(laterObservation.summary, "u"),
+	],
+] as const;
+
+describe("a refused feed of reviews", () => {
+	it.each(REVIEW_FEEDS)(
+		"keeps %s hidden through a later failure, until an authorized read",
+		async (_feed, address, path, queryKeyOf, earlier, later, earlierRow, laterRow) => {
+			const served: number[] = [];
+			server.use(
+				http.get(
+					path,
+					() => {
+						served.push(200);
+						return feedPage(earlier);
+					},
+					{ once: true },
+				),
+				http.get(
+					path,
+					() => {
+						served.push(403);
+						return HttpResponse.json({ status: 403, title: "Forbidden" }, { status: 403 });
+					},
+					{ once: true },
+				),
+				http.get(
+					path,
+					() => {
+						served.push(503);
+						return HttpResponse.json({ status: 503, title: "Unavailable" }, { status: 503 });
+					},
+					{ once: true },
+				),
+				http.get(path, () => {
+					served.push(200);
+					return feedPage(later);
+				}),
+			);
+			const { queryClient } = renderRouteAtWithRouter(address);
+			const refresh = async () => {
+				await act(async () => {
+					await queryClient.invalidateQueries({ queryKey: queryKeyOf(), exact: true });
+				});
+			};
+			const refusal = /Ask a workspace admin or instance admin for access/u;
+			await screen.findAllByRole("button", { name: earlierRow }, ROUTE_RENDER_WAIT);
+			expect(served).toStrictEqual([200]);
+
+			await refresh();
+			expect(served).toStrictEqual([200, 403]);
+			await screen.findByText(refusal);
+			expect(buttonsNamed(earlierRow)).toStrictEqual([]);
+
+			await refresh();
+			expect(served).toStrictEqual([200, 403, 503]);
+			// The query settles before its observers hear of it; the screen has caught up once the
+			// refusal it was showing is gone.
+			await waitFor(() => expect(screen.queryByText(refusal)).toBeNull());
+			expect(buttonsNamed(earlierRow)).toStrictEqual([]);
+
+			await refresh();
+			expect(served).toStrictEqual([200, 403, 503, 200]);
+			await screen.findAllByRole("button", { name: laterRow });
+			expect(buttonsNamed(earlierRow)).toStrictEqual([]);
+		},
+	);
 });
 
 /** A piece of evidence on one pull request, for a card that rests on several. */
