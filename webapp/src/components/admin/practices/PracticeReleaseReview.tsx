@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { use, useId, useState } from "react";
 
 import type {
 	PracticeDefinition,
@@ -13,8 +13,19 @@ import {
 	PracticeGuideVersion,
 	PracticeVisualVersion,
 } from "@/components/admin/practice-editor/practice-guidance-version";
+import { UnsavedPracticeDraft } from "@/components/admin/practice-editor/unsaved-practice-draft";
 import { PRACTICE_DEFINITION_FIELDS } from "@/components/admin/practices/practice-definition-fields";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -99,15 +110,24 @@ export function PracticeReleaseReview({
 			),
 	);
 	const ready = proposal.fields.every((field) => !field.offeredChanged || choices.has(field.field));
-	const submit = () => {
-		if (!ready) {
-			return;
-		}
+	const unsavedDraft = use(UnsavedPracticeDraft);
+	const [confirmingAccept, setConfirmingAccept] = useState(false);
+	const accept = () => {
 		const selected: Record<string, Choice> = {};
 		for (const [field, choice] of choices) {
 			selected[field] = choice;
 		}
 		onAccept(selected);
+	};
+	const submit = () => {
+		if (!ready) {
+			return;
+		}
+		if (unsavedDraft) {
+			setConfirmingAccept(true);
+			return;
+		}
+		accept();
 	};
 
 	return (
@@ -203,6 +223,28 @@ export function PracticeReleaseReview({
 				Declining leaves this practice unchanged. A different catalog version will be proposed
 				again.
 			</p>
+			<AlertDialog open={confirmingAccept} onOpenChange={setConfirmingAccept}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Accept selected fields?</AlertDialogTitle>
+						<AlertDialogDescription>
+							The practice reloads with the fields you chose. Your unsaved changes to the practice
+							are discarded.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							onClick={() => {
+								setConfirmingAccept(false);
+								accept();
+							}}
+						>
+							Accept selected fields
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 		</section>
 	);
 }

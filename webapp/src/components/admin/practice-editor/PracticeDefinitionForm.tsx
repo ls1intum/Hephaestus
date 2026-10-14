@@ -60,6 +60,7 @@ import {
 	recommendedReviewSettings,
 	workTypeOptionsFor,
 } from "@/components/admin/practice-editor/review-settings";
+import { UnsavedPracticeDraft } from "@/components/admin/practice-editor/unsaved-practice-draft";
 import { CodeEditor } from "@/components/common/CodeEditor";
 import { type FormError, FormErrorSummary } from "@/components/common/FormErrorSummary";
 import {
@@ -513,13 +514,11 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 				? ACTOR_ROLE_LABELS[role]
 				: `${ACTOR_ROLE_LABELS[role]} (not available for this work)`,
 	}));
-	const unsavedChanges = useUnsavedChanges({
-		isDirty: !deepEqual(
-			{ ...form, definitionChanges: [] },
-			initialState(definitionOptions, initialData),
-		),
-		disabled: formDisabled,
-	});
+	const isDirty = !deepEqual(
+		{ ...form, definitionChanges: [] },
+		initialState(definitionOptions, initialData),
+	);
+	const unsavedChanges = useUnsavedChanges({ isDirty, disabled: formDisabled });
 
 	const handleNameChange = (name: string) => {
 		setForm((previous) => {
@@ -647,7 +646,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		<form onSubmit={handleSubmit} noValidate className="flex min-h-0 flex-1 flex-col">
 			{unsavedChanges.dialog}
 			<DrawerBody className="flex flex-col gap-8">
-				{beforeFields}
+				<UnsavedPracticeDraft value={isDirty}>{beforeFields}</UnsavedPracticeDraft>
 				<FormErrorSummary key={refusals} errors={shownErrors.summary} />
 				<fieldset disabled={formDisabled} className="contents">
 					{/* The panel is the measure. Capping the controls narrower than the panel they sit in

@@ -23,12 +23,13 @@ import {
 } from "@/components/admin/curated-catalog/CuratedPracticeForm";
 import { PracticeReleaseReview } from "@/components/admin/practices/PracticeReleaseReview";
 import { PracticeDefinitionSkeleton } from "@/components/admin/practices/PracticeSkeletons";
-import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { QueryErrorAlert, queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
 import { LevelCancel } from "@/components/layout/detail-drawer/LevelCancel";
 import { DrawerBody } from "@/components/ui/drawer";
 import { Spinner } from "@/components/ui/spinner";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 export interface CuratedPracticeEditLevelProps {
 	practiceSlug: string;
@@ -44,34 +45,38 @@ export function CuratedPracticeEditLevel({
 	path,
 	onDone,
 }: CuratedPracticeEditLevelProps) {
-	const practiceQuery = useQuery({
-		...adminGetCuratedPracticeOptions({ path: { slug: practiceSlug } }),
-	});
-	const catalogQuery = useQuery({ ...adminGetCuratedCatalogOptions() });
-	const definitionOptionsQuery = useQuery({ ...adminGetPracticeDefinitionOptionsOptions() });
+	const practiceOptions = adminGetCuratedPracticeOptions({ path: { slug: practiceSlug } });
+	const catalogOptions = adminGetCuratedCatalogOptions();
+	const definitionOptionsOptions = adminGetPracticeDefinitionOptionsOptions();
+	const practiceQuery = useQuery(practiceOptions);
+	const catalogQuery = useQuery(catalogOptions);
+	const definitionOptionsQuery = useQuery(definitionOptionsOptions);
+	useQueryReadRefusal(practiceOptions.queryKey, practiceQuery.isError, practiceQuery.error);
+	useQueryReadRefusal(catalogOptions.queryKey, catalogQuery.isError, catalogQuery.error);
+	useQueryReadRefusal(
+		definitionOptionsOptions.queryKey,
+		definitionOptionsQuery.isError,
+		definitionOptionsQuery.error,
+	);
+	const failed = [practiceQuery, catalogQuery, definitionOptionsQuery].filter(
+		(read) => read.isError,
+	);
+	// A refusal hides the editor even over cached data. Any other failure leaves a loaded draft open.
+	const failure = failed.find((read) => !queryErrorIsRetryable(read.error)) ?? failed[0];
+	const refused = failure !== undefined && !queryErrorIsRetryable(failure.error);
+	const retryFailed = () => {
+		for (const read of failed) {
+			void read.refetch();
+		}
+	};
 
 	let body: ReactNode;
-	if (practiceQuery.isPending || catalogQuery.isPending || definitionOptionsQuery.isPending) {
-		body = (
-			<DrawerBody>
-				<PracticeDefinitionSkeleton />
-			</DrawerBody>
-		);
-	} else if (practiceQuery.isError || catalogQuery.isError || definitionOptionsQuery.isError) {
-		body = (
-			<DrawerBody>
-				<QueryErrorAlert
-					error={practiceQuery.error ?? catalogQuery.error ?? definitionOptionsQuery.error}
-					title="We could not load the practice"
-					onRetry={() => {
-						void practiceQuery.refetch();
-						void catalogQuery.refetch();
-						void definitionOptionsQuery.refetch();
-					}}
-				/>
-			</DrawerBody>
-		);
-	} else {
+	if (
+		!refused &&
+		practiceQuery.data !== undefined &&
+		catalogQuery.data !== undefined &&
+		definitionOptionsQuery.data !== undefined
+	) {
 		body = (
 			<LoadedCuratedPracticeEditor
 				key={practiceSlug}
@@ -79,8 +84,34 @@ export function CuratedPracticeEditLevel({
 				initialPractice={practiceQuery.data}
 				groups={catalogQuery.data.groups}
 				definitionOptions={definitionOptionsQuery.data}
+				refreshAlert={
+					failure === undefined ? undefined : (
+						<QueryErrorAlert
+							error={failure.error}
+							title="We could not refresh the practice editor"
+							pending={failed.some((read) => read.isFetching)}
+							onRetry={retryFailed}
+						/>
+					)
+				}
 				onDone={onDone}
 			/>
+		);
+	} else if (failure === undefined) {
+		body = (
+			<DrawerBody>
+				<PracticeDefinitionSkeleton />
+			</DrawerBody>
+		);
+	} else {
+		body = (
+			<DrawerBody>
+				<QueryErrorAlert
+					error={failure.error}
+					title="We could not load the practice"
+					onRetry={retryFailed}
+				/>
+			</DrawerBody>
 		);
 	}
 
@@ -96,6 +127,7 @@ interface LoadedCuratedPracticeEditorProps {
 	initialPractice: CuratedPractice;
 	groups: CuratedGroup[];
 	definitionOptions: PracticeDefinitionOptions;
+	refreshAlert: ReactNode;
 	onDone: () => void;
 }
 
@@ -104,6 +136,7 @@ function LoadedCuratedPracticeEditor({
 	initialPractice,
 	groups,
 	definitionOptions,
+	refreshAlert,
 	onDone,
 }: LoadedCuratedPracticeEditorProps) {
 	const queryClient = useQueryClient();
@@ -298,9 +331,11 @@ function LoadedCuratedPracticeEditor({
 			groups={groups.map((group) => ({ slug: group.slug, name: group.definition.name }))}
 			definitionOptions={definitionOptions}
 			isPending={updatePractice.isPending}
+			disabled={acceptRelease.isPending}
 			isResetPending={deleteOverride.isPending}
 			isKeepPending={keepCurrentDefinition.isPending}
 			releaseReview={releaseReview}
+			refreshAlert={refreshAlert}
 			conflict={conflict}
 			onContinueWithDraft={() => {
 				void continueWithDraft();

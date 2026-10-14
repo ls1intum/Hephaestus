@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent } from "storybook/test";
 
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DetailDrawerStack } from "@/components/layout/detail-drawer/DetailDrawerStack";
 import { LevelCancel } from "@/components/layout/detail-drawer/LevelCancel";
 import {
@@ -153,6 +154,30 @@ export const StaleEdit: Story = {
 		await settledDrawerPanel();
 		await expect(screen.getByText("This practice changed while you were editing")).toBeVisible();
 		await expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+	},
+};
+
+/** A read behind the form failed to refresh. The draft stays open beside the retry. */
+export const RefreshFailed: Story = {
+	args: {
+		mode: "edit",
+		initialData,
+		groups,
+		isPending: false,
+		refreshAlert: (
+			<QueryErrorAlert
+				error={{ status: 503 }}
+				title="We could not refresh the practice editor"
+				onRetry={fn()}
+			/>
+		),
+		onSubmit: fn(),
+	},
+	play: async () => {
+		await expectPanelContentInset(await settledDrawerPanel());
+		await expect(screen.getByText("We could not refresh the practice editor")).toBeVisible();
+		await expect(screen.getByRole("button", { name: "Retry" })).toBeEnabled();
+		await expect(screen.getByRole("textbox", { name: /Name/u })).toHaveValue(initialData.name);
 	},
 };
 

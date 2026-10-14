@@ -1,8 +1,12 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { delay, HttpResponse, http, type PathParams } from "msw";
 import { describe, expect, it, vi } from "vitest";
 
+import {
+	adminGetCuratedCatalogQueryKey,
+	adminGetCuratedGroupQueryKey,
+} from "@/api/@tanstack/react-query.gen";
 import type { CuratedPracticeRequest, PracticeReleaseProposal } from "@/api/types.gen";
 import {
 	mockAuthorDeclaredEvidenceValidation,
@@ -12,6 +16,7 @@ import {
 	mockPullRequestPolicy,
 } from "@/mocks/fixtures/practice";
 import { server } from "@/mocks/server";
+import { deferred } from "@/test/async";
 import { precedes } from "@/test/dom";
 import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
 
@@ -107,6 +112,49 @@ function mockCatalog(overrides: Record<string, unknown> = {}) {
 		),
 	);
 	return catalog;
+}
+
+/** Serves every read the three editors make, and names each one answered in `reads`. */
+function serveEditors() {
+	const catalog = mockCatalog();
+	const reads: string[] = [];
+	server.use(
+		http.get("*/admin/practice-catalog", () => {
+			reads.push("catalog");
+			return HttpResponse.json(catalog);
+		}),
+		http.get("*/admin/practice-catalog/definition-options", () => {
+			reads.push("definition options");
+			return HttpResponse.json(mockPracticeDefinitionOptions);
+		}),
+		http.get("*/admin/practice-catalog/practices/:slug", () => {
+			reads.push("practice");
+			return HttpResponse.json({
+				slug: "describe-what-and-why",
+				definition: practiceDefinition,
+				status: status(),
+			});
+		}),
+		http.get("*/admin/practice-catalog/groups/:slug", () => {
+			reads.push("group");
+			return HttpResponse.json({
+				slug: "packaging",
+				definition: groupDefinition,
+				status: status(),
+			});
+		}),
+	);
+	return { catalog, reads };
+}
+
+async function typeDraft(level: string, title: string) {
+	const queryClient = renderRouteAt(`/admin/catalog?detail=${level}`);
+	const dialog = await screen.findByRole("dialog", { name: title }, ROUTE_RENDER_WAIT);
+	fireEvent.change(
+		await within(dialog).findByRole("textbox", { name: /^Name/u }, ROUTE_RENDER_WAIT),
+		{ target: { value: "Unsaved draft name" } },
+	);
+	return { queryClient, dialog };
 }
 
 describe("instance catalog routes", () => {
@@ -594,6 +642,112 @@ describe("instance catalog routes", () => {
 		).toBeNull();
 	});
 
+	it("asks before accepting an update discards an unsaved draft", async () => {
+		mockCatalog();
+		const accepted: { ifMatch: string | null; body: unknown }[] = [];
+		server.use(
+			http.get("*/admin/practice-catalog/practices/:slug", () =>
+				HttpResponse.json({
+					slug: "describe-what-and-why",
+					definition: practiceDefinition,
+					shipped: { ...practiceDefinition, criteria: "Hephaestus criteria" },
+					status: status({ state: "UPDATE_WAITING", changeKind: "REVIEW" }),
+				}),
+			),
+			http.get("*/admin/practice-catalog/practices/:slug/release", () =>
+				HttpResponse.json(release),
+			),
+			http.put("*/admin/practice-catalog/practices/:slug/release", async ({ request }) => {
+				accepted.push({ ifMatch: request.headers.get("if-match"), body: await request.json() });
+				return HttpResponse.json({
+					slug: "describe-what-and-why",
+					definition: { ...practiceDefinition, criteria: release.offered.criteria },
+					status: status({ state: "EDITED_HERE", etag: "tag-2" }),
+				});
+			}),
+		);
+		renderRouteAt("/admin/catalog?detail=practice-edit:describe-what-and-why");
+		const radioGroup = await screen.findByRole(
+			"radiogroup",
+			{ name: "Use a version for Review criteria" },
+			ROUTE_RENDER_WAIT,
+		);
+		fireEvent.change(screen.getByRole("textbox", { name: /Name/u }), {
+			target: { value: "Unsaved draft name" },
+		});
+		fireEvent.click(within(radioGroup).getByRole("radio", { name: "Proposed" }));
+
+		fireEvent.click(screen.getByRole("button", { name: "Accept selected fields" }));
+		fireEvent.click(
+			within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Cancel" }),
+		);
+		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+		expect(accepted).toHaveLength(0);
+		expect(screen.getByRole<HTMLInputElement>("textbox", { name: /Name/u }).value).toBe(
+			"Unsaved draft name",
+		);
+		expect(
+			within(radioGroup).getByRole("radio", { name: "Proposed" }).getAttribute("aria-checked"),
+		).toBe("true");
+
+		fireEvent.click(screen.getByRole("button", { name: "Accept selected fields" }));
+		fireEvent.click(
+			within(await screen.findByRole("alertdialog")).getByRole("button", { name: /accept/iu }),
+		);
+		await screen.findByText("Customized on this instance", undefined, ROUTE_RENDER_WAIT);
+		expect(accepted).toStrictEqual([
+			{ ifMatch: '"release-tag"', body: { choices: { CRITERIA: "OFFERED" } } },
+		]);
+		expect(screen.getByRole<HTMLInputElement>("textbox", { name: /Name/u }).value).toBe(
+			practiceDefinition.name,
+		);
+	});
+
+	it("holds the form while an accepted update is saved", async () => {
+		mockCatalog();
+		const accepted = deferred<Response>();
+		server.use(
+			http.get("*/admin/practice-catalog/practices/:slug", () =>
+				HttpResponse.json({
+					slug: "describe-what-and-why",
+					definition: practiceDefinition,
+					shipped: { ...practiceDefinition, criteria: "Hephaestus criteria" },
+					status: status({ state: "UPDATE_WAITING", changeKind: "REVIEW" }),
+				}),
+			),
+			http.get("*/admin/practice-catalog/practices/:slug/release", () =>
+				HttpResponse.json(release),
+			),
+			http.put("*/admin/practice-catalog/practices/:slug/release", async () => accepted.promise),
+		);
+		renderRouteAt("/admin/catalog?detail=practice-edit:describe-what-and-why");
+		const radioGroup = await screen.findByRole(
+			"radiogroup",
+			{ name: "Use a version for Review criteria" },
+			ROUTE_RENDER_WAIT,
+		);
+		fireEvent.click(within(radioGroup).getByRole("radio", { name: "Proposed" }));
+		fireEvent.click(screen.getByRole("button", { name: "Accept selected fields" }));
+
+		await screen.findByRole("button", { name: "Accepting selected fields…" });
+		expect(screen.getByRole("textbox", { name: /Name/u }).matches(":disabled")).toBe(true);
+		expect(screen.getByRole("button", { name: "Save changes" }).matches(":disabled")).toBe(true);
+
+		accepted.resolve(
+			HttpResponse.json({
+				slug: "describe-what-and-why",
+				definition: { ...practiceDefinition, criteria: release.offered.criteria },
+				status: status({ state: "EDITED_HERE", etag: "tag-2" }),
+			}),
+		);
+		await screen.findByText("Customized on this instance", undefined, ROUTE_RENDER_WAIT);
+		expect(
+			screen.getByRole<HTMLTextAreaElement>("textbox", { name: /^What to look for/u }).value,
+		).toBe(release.offered.criteria);
+		expect(screen.getByRole("textbox", { name: /Name/u }).matches(":disabled")).toBe(false);
+		expect(screen.getByRole("button", { name: "Save changes" }).matches(":disabled")).toBe(false);
+	});
+
 	it("lets a waiting update be declined, not only taken", async () => {
 		mockCatalog();
 		let ifMatch: string | null = null;
@@ -716,6 +870,130 @@ describe("instance catalog routes", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
 		await waitFor(() => expect(lastIfMatch).toBe('"tag-2"'));
+	});
+
+	describe("a draft during a background read", () => {
+		it.each([
+			[
+				"practice editor",
+				"practice-edit:describe-what-and-why",
+				"Edit practice",
+				"*/admin/practice-catalog",
+				adminGetCuratedCatalogQueryKey(),
+				"catalog",
+			],
+			[
+				"new practice",
+				"practice-new:draft",
+				"Create practice",
+				"*/admin/practice-catalog",
+				adminGetCuratedCatalogQueryKey(),
+				"catalog",
+			],
+			[
+				"group editor",
+				"group-edit:packaging",
+				"Edit group",
+				"*/admin/practice-catalog/groups/:slug",
+				adminGetCuratedGroupQueryKey({ path: { slug: "packaging" } }),
+				"group",
+			],
+		] as const)(
+			"%s keeps the draft through a failed refresh and its retry",
+			async (_label, level, title, failingPath, queryKey, failingRead) => {
+				const { reads } = serveEditors();
+				const { queryClient, dialog } = await typeDraft(level, title);
+				const draftName = () =>
+					within(dialog).getByRole<HTMLInputElement>("textbox", { name: /^Name/u }).value;
+
+				server.use(
+					http.get(
+						failingPath,
+						() => HttpResponse.json({ status: 503, title: "Unavailable" }, { status: 503 }),
+						{ once: true },
+					),
+				);
+				await act(async () => {
+					await queryClient.invalidateQueries({ queryKey, exact: true });
+				});
+				const retry = await within(dialog).findByRole(
+					"button",
+					{ name: "Retry" },
+					ROUTE_RENDER_WAIT,
+				);
+				expect(draftName()).toBe("Unsaved draft name");
+
+				const readsBeforeRetry = reads.length;
+				fireEvent.click(retry);
+				await waitFor(() =>
+					expect(within(dialog).queryByRole("button", { name: /^Retry/u })).toBeNull(),
+				);
+				expect(draftName()).toBe("Unsaved draft name");
+				expect(reads.slice(readsBeforeRetry)).toStrictEqual([failingRead]);
+			},
+		);
+
+		it("keeps a refused editor hidden until an authorized read returns", async () => {
+			const { catalog } = serveEditors();
+			const { queryClient, dialog } = await typeDraft(
+				"practice-edit:describe-what-and-why",
+				"Edit practice",
+			);
+			const served: number[] = [];
+			server.use(
+				http.get(
+					"*/admin/practice-catalog",
+					() => {
+						served.push(403);
+						return HttpResponse.json({ status: 403, title: "Forbidden" }, { status: 403 });
+					},
+					{ once: true },
+				),
+				http.get(
+					"*/admin/practice-catalog",
+					() => {
+						served.push(503);
+						return HttpResponse.json({ status: 503, title: "Unavailable" }, { status: 503 });
+					},
+					{ once: true },
+				),
+				http.get("*/admin/practice-catalog", () => {
+					served.push(200);
+					return HttpResponse.json(catalog);
+				}),
+			);
+			const refreshCatalog = async () => {
+				await act(async () => {
+					await queryClient.invalidateQueries({
+						queryKey: adminGetCuratedCatalogQueryKey(),
+						exact: true,
+					});
+				});
+			};
+
+			await refreshCatalog();
+			await within(dialog).findByText(
+				/Ask a workspace admin or instance admin for access/u,
+				undefined,
+				ROUTE_RENDER_WAIT,
+			);
+			expect(within(dialog).queryByRole("textbox", { name: /^Name/u })).toBeNull();
+			expect(within(dialog).queryByRole("button", { name: "Retry" })).toBeNull();
+
+			await refreshCatalog();
+			const retry = await within(dialog).findByRole("button", { name: "Retry" }, ROUTE_RENDER_WAIT);
+			expect(within(dialog).queryByRole("textbox", { name: /^Name/u })).toBeNull();
+			expect(within(dialog).queryByRole("button", { name: "Save changes" })).toBeNull();
+
+			fireEvent.click(retry);
+			const name = await within(dialog).findByRole<HTMLInputElement>(
+				"textbox",
+				{ name: /^Name/u },
+				ROUTE_RENDER_WAIT,
+			);
+			expect(name.value).toBe(practiceDefinition.name);
+			expect(served).toStrictEqual([403, 503, 200]);
+		});
 	});
 
 	it.each([
