@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyShort;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.lenient;
@@ -19,6 +20,7 @@ import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
+import de.tum.cit.aet.hephaestus.agent.usage.MeasurementVerification;
 import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -157,15 +159,24 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
         ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                 ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
         verify(usageRecorder).record(eq(7L), sample.capture());
-        verify(usageRecorder, never()).recordUnverifiable(any(), any());
+        verify(usageRecorder, never())
+                .record(
+                        any(),
+                        argThat(recorded ->
+                                recorded.measurementVerification() == MeasurementVerification.UNVERIFIABLE));
         return sample.getValue();
     }
 
-    private LlmUsageRecorder.LlmUsageSample captureUnverifiable() {
+    private LlmUsageRecorder.LlmUsageSample captureVerifiedWithoutPrice() {
         ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                 ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-        verify(usageRecorder).recordUnverifiable(eq(7L), sample.capture());
-        verify(usageRecorder, never()).record(any(), any());
+        verify(usageRecorder).record(eq(7L), sample.capture());
+        assertThat(sample.getValue().measurementVerification()).isEqualTo(MeasurementVerification.VERIFIED);
+        verify(usageRecorder, never())
+                .record(
+                        any(),
+                        argThat(recorded ->
+                                recorded.measurementVerification() == MeasurementVerification.UNVERIFIABLE));
         return sample.getValue();
     }
 
@@ -222,7 +233,8 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
                     .isEqualTo(1d);
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(usageRecorder).recordUnverifiable(eq(7L), sample.capture());
+            verify(usageRecorder).record(eq(7L), sample.capture());
+            assertThat(sample.getValue().measurementVerification()).isEqualTo(MeasurementVerification.UNVERIFIABLE);
             assertThat(sample.getValue().sourceId()).isEqualTo(jobId);
             assertThat(sample.getValue().sourceAttempt()).isZero();
         }
@@ -261,7 +273,8 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
 
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(usageRecorder).recordUnverifiable(eq(7L), sample.capture());
+            verify(usageRecorder).record(eq(7L), sample.capture());
+            assertThat(sample.getValue().measurementVerification()).isEqualTo(MeasurementVerification.UNVERIFIABLE);
             assertThat(sample.getValue().price().pricingState()).isEqualTo(PricingState.UNPRICED);
             assertThat(sample.getValue().price().fundingSource()).isEqualTo(FundingSource.INSTANCE);
         }
@@ -282,7 +295,11 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
             verify(jobRepository)
                     .requeueOrphan(eq(jobId), eq(DEAD_WORKER_ID), eq(AGENT_PROPS.maxRetries()), any(), any(), any());
             verify(jobRepository, never()).transitionStatus(any(), any(), any(), any(), any());
-            verify(usageRecorder, never()).recordUnverifiable(any(), any());
+            verify(usageRecorder, never())
+                    .record(
+                            any(),
+                            argThat(recorded ->
+                                    recorded.measurementVerification() == MeasurementVerification.UNVERIFIABLE));
             assertThat(meterRegistry.counter("agent.job.orphan.requeued").count())
                     .isZero();
         }
@@ -317,7 +334,8 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
                             eq(DEAD_WORKER_ID));
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(usageRecorder).recordUnverifiable(eq(7L), sample.capture());
+            verify(usageRecorder).record(eq(7L), sample.capture());
+            assertThat(sample.getValue().measurementVerification()).isEqualTo(MeasurementVerification.UNVERIFIABLE);
             assertThat(sample.getValue().sourceId()).isEqualTo(jobId);
             assertThat(sample.getValue().sourceAttempt()).isEqualTo(5);
         }
@@ -558,7 +576,7 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
                     .transitionStatus(
                             eq(jobId), eq(AgentJobStatus.TIMED_OUT), any(), any(), eq(Set.of(AgentJobStatus.RUNNING)));
             assertThat(meterRegistry.counter("agent.job.zombie.reaped").count()).isEqualTo(1.0);
-            LlmUsageRecorder.LlmUsageSample sample = captureUnverifiable();
+            LlmUsageRecorder.LlmUsageSample sample = captureVerifiedWithoutPrice();
             assertThat(sample.price().pricingState()).isEqualTo(PricingState.UNPRICED);
             assertThat(sample.price().fundingSource()).isEqualTo(FundingSource.INSTANCE);
             assertThat(sample.price().per1mInputUsd()).isNull();

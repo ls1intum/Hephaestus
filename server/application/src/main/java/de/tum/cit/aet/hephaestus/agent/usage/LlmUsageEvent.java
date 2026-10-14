@@ -106,7 +106,7 @@ public class LlmUsageEvent {
     private int totalCalls = 1;
 
     /**
-     * USD cost of this unit of work. Null when the model's price is unknown — the sums exclude such a
+     * USD cost of this unit of work. Null when its measurement or price cannot be verified — the sums exclude such a
      * row rather than counting it as $0. Clamped into range by {@link LlmPriceSnapshot#calculateCost}.
      */
     @Nullable
@@ -173,4 +173,10 @@ public class LlmUsageEvent {
     @Enumerated(EnumType.STRING)
     @Column(name = "usage_provenance", length = 16)
     private UsageProvenance usageProvenance;
+
+    @NonNull
+    @ColumnDefault("'UNKNOWN'")
+    @Enumerated(EnumType.STRING)
+    @Column(name = "measurement_verification", nullable = false, length = 16, updatable = false)
+    private MeasurementVerification measurementVerification = MeasurementVerification.UNKNOWN;
 }

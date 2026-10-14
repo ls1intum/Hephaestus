@@ -194,6 +194,15 @@ describe("AdminInstanceLlmUsageTable", () => {
 		expect(row.queryByText("Paused · shared models")).toBeNull();
 	});
 
+	it("describes unavailable cost without claiming that a price is missing", () => {
+		renderTable([{ ...workspace, instanceBudgetVerdict: "UNVERIFIABLE", instancePaused: true }]);
+
+		const row = within(firstDataRow());
+		row.getByText("Paused · shared models");
+		row.getByText("Some usage has no confirmed cost");
+		expect(row.queryByText("Some runs have no price set")).toBeNull();
+	});
+
 	it("keeps the provider cap read-only — it is the workspace's own money", () => {
 		renderTable([
 			{ ...workspace, ownProviderMonthlyBudgetUsd: 10, ownProviderBudgetVerdict: "WITHIN" },

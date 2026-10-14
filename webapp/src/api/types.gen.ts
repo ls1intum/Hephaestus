@@ -227,11 +227,11 @@ export type AdminLlmUsageReport = {
 export type AdminWorkspaceLlmUsage = {
     displayName: string;
     /**
-     * Ledger events (jobs / mentor turns) this month, either purse
+     * Ledger usage records (job attempts / mentor turns) this month, either purse
      */
     events: number;
     /**
-     * Whether shared-model spend is within the instance cap, has reached it, or cannot be confirmed because some shared-model usage has no price set.
+     * Whether shared-model spend is within the instance cap, has reached it, or cannot be confirmed because shared-model rates are missing or usage measurements are unverified.
      */
     instanceBudgetVerdict: 'WITHIN' | 'EXHAUSTED' | 'UNVERIFIABLE';
     /**
@@ -2802,7 +2802,7 @@ export type LlmUsageByDay = {
      */
     ownProviderTotalCostUsd: number;
     /**
-     * Calls this day whose price is not yet known. Excluded from both totals above.
+     * Ledger usage records this day with unavailable cost because rates are missing or measurements are unverified. Excluded from both totals above.
      */
     unpricedEventCount: number;
 };
@@ -2833,7 +2833,7 @@ export type LlmUsageByJobType = {
      */
     totalCalls: number;
     /**
-     * Calls for this job type whose price is not yet known. Excluded from both totals above.
+     * Ledger usage records for this job type with unavailable cost because rates are missing or measurements are unverified. Excluded from both totals above.
      */
     unpricedEventCount: number;
 };
@@ -8165,7 +8165,7 @@ export type WorkspaceLlmUsageReport = {
      */
     fx?: FxRateInfo;
     /**
-     * Whether host-funded (shared-model) spend is within its cap, has reached it, or cannot be confirmed because some shared-model usage has no price set.
+     * Whether host-funded (shared-model) spend is within its cap, has reached it, or cannot be confirmed because shared-model rates are missing or usage measurements are unverified.
      */
     instanceBudgetVerdict: 'WITHIN' | 'EXHAUSTED' | 'UNVERIFIABLE';
     /**
@@ -8201,7 +8201,7 @@ export type WorkspaceLlmUsageReport = {
      */
     ownProviderTotalCostUsd: number;
     /**
-     * Calls this month (either purse) whose price is not yet known. They are excluded from both totals above, so a non-zero value means the real spend may be higher than shown.
+     * Ledger usage records this month (either purse) with unavailable cost because rates are missing or measurements are unverified. They are excluded from both totals above, so a non-zero value means the real spend may be higher than shown.
      */
     unpricedEventCount: number;
 };

@@ -16,7 +16,9 @@ public record LlmUsageByJobTypeDTO(
         BigDecimal ownProviderTotalCostUsd,
 
         @NonNull
-        @Schema(description = "Calls for this job type whose price is not yet known. Excluded from both totals above.")
+        @Schema(
+                description = "Ledger usage records for this job type with unavailable cost because rates are missing "
+                        + "or measurements are unverified. Excluded from both totals above.")
         Long unpricedEventCount,
 
         @NonNull Long inputTokens,

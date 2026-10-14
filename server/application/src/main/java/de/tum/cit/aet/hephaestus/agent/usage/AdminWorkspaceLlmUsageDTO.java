@@ -37,13 +37,13 @@ public record AdminWorkspaceLlmUsageDTO(
                         + "compared against ownProviderMonthlyBudgetUsd.")
         BigDecimal ownProviderTotalCostUsd,
 
-        @NonNull @Schema(description = "Ledger events (jobs / mentor turns) this month, either purse")
+        @NonNull @Schema(description = "Ledger usage records (job attempts / mentor turns) this month, either purse")
         Long events,
 
         @NonNull
         @Schema(
                 description = "Whether shared-model spend is within the instance cap, has reached it, or cannot be "
-                        + "confirmed because some shared-model usage has no price set.")
+                        + "confirmed because shared-model rates are missing or usage measurements are unverified.")
         LlmBudgetVerdict instanceBudgetVerdict,
 
         @NonNull @Schema(description = "The same verdict for the workspace's own-provider spend against its own cap.")

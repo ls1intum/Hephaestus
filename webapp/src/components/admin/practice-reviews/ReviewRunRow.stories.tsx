@@ -350,7 +350,7 @@ export const OnHold: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("On hold").parentElement).toHaveAttribute(
 			"title",
-			"Over the AI budget",
+			"AI budget pause",
 		);
 	},
 };

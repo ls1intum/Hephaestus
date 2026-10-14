@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyShort;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
@@ -22,6 +23,7 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
+import de.tum.cit.aet.hephaestus.agent.usage.MeasurementVerification;
 import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
@@ -261,7 +263,8 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
 
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(usageRecorder).recordUnverifiable(eq(1L), sample.capture());
+            verify(usageRecorder).record(eq(1L), sample.capture());
+            assertThat(sample.getValue().measurementVerification()).isEqualTo(MeasurementVerification.UNVERIFIABLE);
             assertThat(sample.getValue().sourceId()).isEqualTo(cancelledJob.getId());
             assertThat(sample.getValue().sourceAttempt()).isEqualTo(cancelledJob.getRetryCount());
             assertThat(sample.getValue().inputTokens()).isZero();
@@ -294,7 +297,8 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
             assertThat(result.getStatus()).isEqualTo(AgentJobStatus.CANCELLED);
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(usageRecorder).recordUnverifiable(eq(1L), sample.capture());
+            verify(usageRecorder).record(eq(1L), sample.capture());
+            assertThat(sample.getValue().measurementVerification()).isEqualTo(MeasurementVerification.UNVERIFIABLE);
             assertThat(sample.getValue().price().fundingSource()).isEqualTo(FundingSource.INSTANCE);
             assertThat(sample.getValue().price().pricingState()).isEqualTo(PricingState.UNPRICED);
         }
@@ -314,7 +318,11 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
 
             service.cancel(1L, jobId);
 
-            verify(usageRecorder, never()).recordUnverifiable(any(), any());
+            verify(usageRecorder, never())
+                    .record(
+                            any(),
+                            argThat(recorded ->
+                                    recorded.measurementVerification() == MeasurementVerification.UNVERIFIABLE));
         }
 
         @Test
@@ -335,7 +343,11 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
 
             service.cancel(1L, jobId);
 
-            verify(usageRecorder, never()).recordUnverifiable(any(), any());
+            verify(usageRecorder, never())
+                    .record(
+                            any(),
+                            argThat(recorded ->
+                                    recorded.measurementVerification() == MeasurementVerification.UNVERIFIABLE));
         }
 
         @Test
@@ -348,7 +360,11 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
 
             service.cancel(1L, jobId);
 
-            verify(usageRecorder, never()).recordUnverifiable(any(), any());
+            verify(usageRecorder, never())
+                    .record(
+                            any(),
+                            argThat(recorded ->
+                                    recorded.measurementVerification() == MeasurementVerification.UNVERIFIABLE));
             verify(agentJobRepository, never()).transitionStatus(any(), any(), any(), any(), any());
         }
     }

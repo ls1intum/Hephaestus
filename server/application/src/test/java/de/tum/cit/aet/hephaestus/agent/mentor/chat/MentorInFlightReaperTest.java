@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -11,6 +12,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.config.AgentBindingLimits;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
+import de.tum.cit.aet.hephaestus.agent.usage.MeasurementVerification;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessage;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -66,7 +68,11 @@ class MentorInFlightReaperTest extends BaseUnitTest {
 
         assertThat(accounting.account(finished.getId())).isFalse();
         verify(usageRecorder, never()).record(anyLong(), any());
-        verify(usageRecorder, never()).recordUnverifiable(anyLong(), any());
+        verify(usageRecorder, never())
+                .record(
+                        anyLong(),
+                        argThat(recorded ->
+                                recorded.measurementVerification() == MeasurementVerification.UNVERIFIABLE));
     }
 
     @Test

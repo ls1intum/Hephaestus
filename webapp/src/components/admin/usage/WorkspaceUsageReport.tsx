@@ -88,7 +88,6 @@ export function WorkspaceUsageReport({
 					scope="own"
 					verdict={report.ownProviderBudgetVerdict}
 					month={month}
-					unpricedEventCount={unpricedEventCount}
 					context="usage"
 					workspaceSlug={workspaceSlug}
 					onEditOwnProviderCap={onEditOwnProviderCap}
@@ -99,7 +98,6 @@ export function WorkspaceUsageReport({
 					scope="shared"
 					verdict={report.instanceBudgetVerdict}
 					month={month}
-					unpricedEventCount={unpricedEventCount}
 					context="usage"
 					workspaceSlug={workspaceSlug}
 				/>
@@ -131,14 +129,15 @@ export function WorkspaceUsageReport({
 					<CircleAlert aria-hidden />
 					<AlertTitle>
 						{unpricedEventCount === 1
-							? "1 run is not counted in these totals"
-							: `${unpricedEventCount.toLocaleString()} runs are not counted in these totals`}
+							? "1 usage record is not counted in these totals"
+							: `${unpricedEventCount.toLocaleString()} usage records are not counted in these totals`}
 					</AlertTitle>
 					<AlertDescription>
 						<p>
-							They have no price set, so real spend may be higher. Add prices for your own models in{" "}
-							<AiModelsLink workspaceSlug={workspaceSlug} />. For shared models, ask an instance
-							admin.
+							Cost is unavailable because rates are missing or usage measurements are unverified, so
+							real spend may be higher. Adding rates repairs only verified usage. Set rates for your
+							own models in <AiModelsLink workspaceSlug={workspaceSlug} />. For shared models, ask
+							an instance admin.
 						</p>
 					</AlertDescription>
 				</Alert>

@@ -70,7 +70,7 @@ interface CapUsage {
 	percent?: number;
 	paused: boolean;
 	state: CapState;
-	/** The spend shown is a floor: some of this stream's usage has no price set. */
+	/** The spend shown is a floor: rates are missing or usage measurements are unverified. */
 	hasUnpricedUsage: boolean;
 }
 
@@ -491,9 +491,9 @@ function StatusCell({ shared, provider, isCurrentMonth }: StatusCellProps) {
 				variant: BADGE_VARIANTS[state],
 			})),
 	);
-	const noPriceSet = shared.hasUnpricedUsage || provider.hasUnpricedUsage;
+	const unverifiable = shared.hasUnpricedUsage || provider.hasUnpricedUsage;
 
-	if (badges.length === 0 && !noPriceSet) {
+	if (badges.length === 0 && !unverifiable) {
 		return <span className="text-muted-foreground">—</span>;
 	}
 
@@ -504,7 +504,9 @@ function StatusCell({ shared, provider, isCurrentMonth }: StatusCellProps) {
 					{badge.label}
 				</Badge>
 			))}
-			{noPriceSet && <span className="text-xs text-warning">Some runs have no price set</span>}
+			{unverifiable && (
+				<span className="text-xs text-warning">Some usage has no confirmed cost</span>
+			)}
 		</div>
 	);
 }

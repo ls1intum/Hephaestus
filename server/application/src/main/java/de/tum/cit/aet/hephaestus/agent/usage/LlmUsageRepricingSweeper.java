@@ -19,24 +19,14 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Clears the month's unpriced spend once the operator supplies the missing price.
+ * Retries missing prices for verified usage in the current UTC month.
  *
- * <p><b>The hole this fills.</b> One UNPRICED event funded from a capped purse makes that purse's month
- * UNVERIFIABLE, and an UNVERIFIABLE purse is blocked exactly as hard as an exhausted one — every agent
- * job in the workspace is held. There was no way back. Adding the price to the catalogue did not help,
- * because the ledger row was already written; the three remaining options were to remove the cap, to
- * UPDATE the ledger by hand, or to wait for the first of the month, and none of them is an operation the
- * product offers. This pass makes the obvious action the working one: add the model's price in the admin
- * console, and within a quarter of an hour the block lifts by itself.
+ * <p>The repository owns candidate eligibility, and the per-row repricer repeats the stored guards
+ * atomically. Unknown or unverifiable measurements cannot be repaired by adding rates. Resolving a
+ * price clears a capped purse's pause only when no other unpriced usage remains.
  *
- * <p><b>Scope is the current month only.</b> That is the only window any cap reads, so it is the only
- * window where an unpriced row costs anybody anything. Repricing older months would rewrite settled
- * accounts to no operational end.
- *
- * <p>What it cannot fix is reported rather than hidden: {@code llm.usage.reprice.unresolved} counts rows
- * whose model this instance can no longer identify at all, which no catalogue edit will reach. Those are
- * the only case where removing the cap is still the answer, and the counter is what tells an operator
- * they are in it.
+ * <p>Older months retain their stored amounts. Outcome counters describe selected candidates, not
+ * unknown or unverifiable records excluded from the work list.
  */
 @ConditionalOnServerRole
 @Component
@@ -70,7 +60,7 @@ public class LlmUsageRepricingSweeper {
     }
 
     /**
-     * Reprice everything unpriced in {@code now}'s calendar month. Exposed so tests can put a fixture in
+     * Reprice eligible verified usage in {@code now}'s calendar month. Exposed so tests can put a fixture in
      * a chosen month rather than depend on today's date.
      *
      * @return how many rows each outcome applied to

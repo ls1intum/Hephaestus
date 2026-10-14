@@ -489,7 +489,7 @@ export function reviewHistory(job: AgentJob): SheetEvent[] {
 	return events;
 }
 
-/** "$0.04", or why there is no total: no usage recorded, or an attempt has no price. */
+/** "$0.04", or why there is no total: no usage recorded, or an attempt has no confirmed cost. */
 function costText(usage: PanelState<{ usage: AgentJobUsage }> | undefined): string {
 	if (usage === undefined || usage.status === "error") {
 		return "—";
@@ -507,14 +507,14 @@ function costText(usage: PanelState<{ usage: AgentJobUsage }> | undefined): stri
 			: formatCostUsd(totalCostUsd);
 	}
 	return unpricedAttempts === 1
-		? "Not known: 1 attempt has no price"
-		: `Not known: ${unpricedAttempts} attempts have no price`;
+		? "Not known: 1 attempt has no confirmed cost"
+		: `Not known: ${unpricedAttempts} attempts have no confirmed cost`;
 }
 
-/** One attempt's cost, or that its model had no price when it ran. */
+/** One attempt's recorded cost, or that the cost remains unavailable. */
 function attemptCostText(attempt: AgentJobUsageAttempt): string {
 	if (attempt.costUsd === undefined) {
-		return "no price known";
+		return "no confirmed cost";
 	}
 	return attempt.pricingState === "NO_CHARGE" ? "no charge" : formatCostUsd(attempt.costUsd);
 }

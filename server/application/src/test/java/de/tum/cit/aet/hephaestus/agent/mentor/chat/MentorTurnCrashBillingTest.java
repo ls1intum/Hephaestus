@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -15,6 +16,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
+import de.tum.cit.aet.hephaestus.agent.usage.MeasurementVerification;
 import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessage;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
@@ -126,7 +128,11 @@ class MentorTurnCrashBillingTest extends BaseUnitTest {
         ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                 ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
         verify(usageRecorder).record(eq(WORKSPACE_ID), sample.capture());
-        verify(usageRecorder, never()).recordUnverifiable(any(), any());
+        verify(usageRecorder, never())
+                .record(
+                        any(),
+                        argThat(recorded ->
+                                recorded.measurementVerification() == MeasurementVerification.UNVERIFIABLE));
         assertThat(sample.getValue().sourceType()).isEqualTo(LlmUsageSourceType.MENTOR_TURN);
         assertThat(sample.getValue().sourceId()).isEqualTo(assistantId);
         assertThat(sample.getValue().inputTokens()).isEqualTo(6_000);
@@ -150,10 +156,10 @@ class MentorTurnCrashBillingTest extends BaseUnitTest {
         ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                 ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
         verify(usageRecorder).record(eq(WORKSPACE_ID), sample.capture());
-        verify(usageRecorder, never()).recordUnverifiable(any(), any());
         assertThat(sample.getValue().inputTokens()).isEqualTo(11);
         assertThat(sample.getValue().outputTokens()).isEqualTo(22);
         assertThat(sample.getValue().totalCalls()).isEqualTo(1);
+        assertThat(sample.getValue().measurementVerification()).isEqualTo(MeasurementVerification.VERIFIED);
     }
 
     static Stream<Arguments> nothingToBillFrom() {
@@ -181,8 +187,12 @@ class MentorTurnCrashBillingTest extends BaseUnitTest {
 
         ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                 ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-        verify(usageRecorder).recordUnverifiable(eq(WORKSPACE_ID), sample.capture());
-        verify(usageRecorder, never()).record(any(), any());
+        verify(usageRecorder).record(eq(WORKSPACE_ID), sample.capture());
+        assertThat(sample.getValue().measurementVerification()).isEqualTo(MeasurementVerification.UNVERIFIABLE);
+        verify(usageRecorder, never())
+                .record(
+                        any(),
+                        argThat(recorded -> recorded.measurementVerification() == MeasurementVerification.VERIFIED));
         assertThat(sample.getValue().sourceType()).isEqualTo(LlmUsageSourceType.MENTOR_TURN);
         assertThat(sample.getValue().sourceId()).isEqualTo(assistantId);
         assertThat(sample.getValue().model()).isEqualTo("gpt-x");

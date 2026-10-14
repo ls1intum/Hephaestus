@@ -72,7 +72,7 @@ export function LlmUsageByJobTypeTable({ report, fx }: LlmUsageByJobTypeTablePro
 						Avg per run
 					</TableHead>
 					<TableHead scope="col" className="text-right">
-						No price set
+						Unpriced records
 					</TableHead>
 					<TableHead scope="col" className="text-right">
 						Input tokens
@@ -231,7 +231,7 @@ export function LlmUsageByDayTable({ report, fx }: LlmUsageByDayTableProps) {
 						Your provider
 					</TableHead>
 					<TableHead scope="col" className="text-right">
-						No price set
+						Unpriced records
 					</TableHead>
 					<TableHead scope="col" className="text-right">
 						Runs

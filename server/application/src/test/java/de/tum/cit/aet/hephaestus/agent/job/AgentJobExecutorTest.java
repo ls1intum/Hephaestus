@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.atLeastOnce;
@@ -64,6 +65,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetDecision;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
+import de.tum.cit.aet.hephaestus.agent.usage.MeasurementVerification;
 import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
@@ -680,7 +682,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
             executor.processJob(jobId);
 
             verify(usageRecorder, never()).record(any(), any());
-            verify(usageRecorder, never()).recordUnverifiable(any(), any());
         }
 
         @Test
@@ -780,7 +781,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
             executor.processJob(jobId);
 
             verify(sandboxManager, never()).execute(any());
-            verify(usageRecorder, never()).recordUnverifiable(any(), any());
             verify(usageRecorder, never()).record(any(), any());
         }
 
@@ -837,7 +837,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             verify(jobRepository, never()).markExecutionStarted(any(), any(), any());
             verify(sandboxManager, never()).execute(any());
-            verify(usageRecorder, never()).recordUnverifiable(any(), any());
             verify(usageRecorder, never()).record(any(), any());
             assertThat(meterRegistry
                             .get("practice.review.refused")
@@ -862,7 +861,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
             assertThat(output.getValue().path("details").path("workspaceBytes").asLong())
                     .isEqualTo(513L);
             verify(sandboxManager, never()).execute(any());
-            verify(usageRecorder, never()).recordUnverifiable(any(), any());
+            verify(usageRecorder, never())
+                    .record(
+                            any(),
+                            argThat(recorded ->
+                                    recorded.measurementVerification() == MeasurementVerification.UNVERIFIABLE));
         }
 
         @Test
@@ -1022,7 +1025,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     .isOne();
             assertThat(meterRegistry.find("practice.review.refused").counter()).isNull();
             verify(sandboxManager, never()).execute(any());
-            verify(usageRecorder, never()).recordUnverifiable(any(), any());
+            verify(usageRecorder, never())
+                    .record(
+                            any(),
+                            argThat(recorded ->
+                                    recorded.measurementVerification() == MeasurementVerification.UNVERIFIABLE));
             assertThat(released).isTrue();
         }
 
@@ -1069,7 +1076,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
             verify(sandboxManager, never()).execute(any());
             verify(jobRepository, never()).requeueOrphan(any(), any(), anyInt(), any(), any(), any());
             assertThat(output).doesNotContain("password=secret", "token=eyJ.secret", "jdbc:postgresql://private");
-            verify(usageRecorder, never()).recordUnverifiable(any(), any());
             verify(usageRecorder, never()).record(any(), any());
             // Diagnosis uses types only; no nested cause changes the retry decision or reaches the row.
             verify(jobRepository)
@@ -1137,7 +1143,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
             verify(sandboxManager, never()).execute(any());
             verify(handler, never()).deliver(any());
             if (stage.equals("run_setup")) verify(handler, never()).prepareInputs(any());
-            verify(usageRecorder, never()).recordUnverifiable(any(), any());
+            verify(usageRecorder, never())
+                    .record(
+                            any(),
+                            argThat(recorded ->
+                                    recorded.measurementVerification() == MeasurementVerification.UNVERIFIABLE));
             var message = ArgumentCaptor.forClass(String.class);
             verify(jobRepository)
                     .transitionStatus(eq(jobId), eq(AgentJobStatus.FAILED), any(), message.capture(), any());
@@ -1516,7 +1526,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
             verify(handler, never()).deliver(any());
             verify(jobRepository, never()).saveAndFlush(any());
             verify(usageRecorder, never()).record(any(), any());
-            verify(usageRecorder, never()).recordUnverifiable(any(), any());
         }
 
         @Test
@@ -1748,7 +1757,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
             if (beforeSandbox) {
                 verify(sandboxManager, never()).execute(any());
                 verify(usageRecorder, never()).record(any(), any());
-                verify(usageRecorder, never()).recordUnverifiable(any(), any());
                 verify(jobRepository, never()).markExecutionStarted(any(), any(), any());
             }
 
@@ -2191,14 +2199,19 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(usageRecorder).recordUnverifiable(eq(99L), sample.capture());
+            verify(usageRecorder).record(eq(99L), sample.capture());
+            assertThat(sample.getValue().measurementVerification()).isEqualTo(MeasurementVerification.UNVERIFIABLE);
             // job (the claimed entity) has its own id from prePersist() — distinct from the poll's
             // jobId in this fixture; the ledger sourceId must be the entity's real id.
             assertThat(sample.getValue().sourceId()).isEqualTo(job.getId());
             assertThat(sample.getValue().model()).isEqualTo("claude-sonnet-4");
             assertThat(sample.getValue().inputTokens()).isZero();
             assertThat(sample.getValue().totalCalls()).isZero();
-            verify(usageRecorder, never()).record(any(), any());
+            verify(usageRecorder, never())
+                    .record(
+                            any(),
+                            argThat(recorded ->
+                                    recorded.measurementVerification() == MeasurementVerification.VERIFIED));
         }
 
         @Test
@@ -2239,7 +2252,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
             assertThat(sample.getValue().totalCalls()).isEqualTo(3);
             assertThat(sample.getValue().inputTokens()).isEqualTo(800);
             assertThat(sample.getValue().outputTokens()).isEqualTo(500);
-            verify(usageRecorder, never()).recordUnverifiable(any(), any());
+            verify(usageRecorder, never())
+                    .record(
+                            any(),
+                            argThat(recorded ->
+                                    recorded.measurementVerification() == MeasurementVerification.UNVERIFIABLE));
         }
 
         @Test
@@ -2262,7 +2279,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             executor.processJob(jobId);
 
-            verify(usageRecorder, never()).recordUnverifiable(any(), any());
             verify(usageRecorder, never()).record(any(), any());
         }
 
@@ -2291,10 +2307,15 @@ class AgentJobExecutorTest extends BaseUnitTest {
             verify(sandboxManager).cancel(jobId);
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(usageRecorder).recordUnverifiable(eq(99L), sample.capture());
+            verify(usageRecorder).record(eq(99L), sample.capture());
+            assertThat(sample.getValue().measurementVerification()).isEqualTo(MeasurementVerification.UNVERIFIABLE);
             assertThat(sample.getValue().sourceId()).isEqualTo(job.getId());
             assertThat(sample.getValue().sourceAttempt()).isEqualTo(job.getRetryCount());
-            verify(usageRecorder, never()).record(any(), any());
+            verify(usageRecorder, never())
+                    .record(
+                            any(),
+                            argThat(recorded ->
+                                    recorded.measurementVerification() == MeasurementVerification.VERIFIED));
         }
 
         @Test
@@ -2317,7 +2338,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
             executor.cancelInFlight(AgentJobCancellationReason.DRAIN_GRACEFUL);
 
             verify(sandboxManager).cancel(jobId);
-            verify(usageRecorder, never()).recordUnverifiable(any(), any());
             verify(usageRecorder, never()).record(any(), any());
         }
 
@@ -2346,11 +2366,16 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(usageRecorder).recordUnverifiable(eq(99L), sample.capture());
+            verify(usageRecorder).record(eq(99L), sample.capture());
+            assertThat(sample.getValue().measurementVerification()).isEqualTo(MeasurementVerification.UNVERIFIABLE);
             assertThat(sample.getValue().sourceId()).isEqualTo(freshJob.getId());
             assertThat(sample.getValue().model()).isEqualTo("claude-sonnet-4");
             assertThat(sample.getValue().totalCalls()).isZero();
-            verify(usageRecorder, never()).record(any(), any());
+            verify(usageRecorder, never())
+                    .record(
+                            any(),
+                            argThat(recorded ->
+                                    recorded.measurementVerification() == MeasurementVerification.VERIFIED));
         }
 
         @Test
@@ -2381,13 +2406,18 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(usageRecorder).recordUnverifiable(eq(99L), sample.capture());
+            verify(usageRecorder).record(eq(99L), sample.capture());
+            assertThat(sample.getValue().measurementVerification()).isEqualTo(MeasurementVerification.UNVERIFIABLE);
             assertThat(sample.getValue().sourceId()).isEqualTo(freshJob.getId());
             assertThat(sample.getValue().model()).isEqualTo("claude-sonnet-4");
             assertThat(sample.getValue().inputTokens()).isZero();
             assertThat(sample.getValue().outputTokens()).isZero();
             assertThat(sample.getValue().totalCalls()).isEqualTo(1);
-            verify(usageRecorder, never()).record(any(), any());
+            verify(usageRecorder, never())
+                    .record(
+                            any(),
+                            argThat(recorded ->
+                                    recorded.measurementVerification() == MeasurementVerification.VERIFIED));
         }
 
         @Test
@@ -2415,7 +2445,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
             assertThat(sample.getValue().outputTokens()).isEqualTo(600);
             assertThat(sample.getValue().cacheReadTokens()).isEqualTo(100);
             assertThat(sample.getValue().price().pricingState()).isEqualTo(PricingState.PRICED);
-            verify(usageRecorder, never()).recordUnverifiable(any(), any());
+            verify(usageRecorder, never())
+                    .record(
+                            any(),
+                            argThat(recorded ->
+                                    recorded.measurementVerification() == MeasurementVerification.UNVERIFIABLE));
         }
 
         @Test
@@ -2501,7 +2535,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
             // Each attempt opens with the fenced terminal transition, so counting it counts attempts.
             verify(jobRepository, times(1)).transitionStatus(any(), eq(AgentJobStatus.COMPLETED), any(), any(), any());
             verify(usageRecorder, never()).record(any(), any());
-            verify(usageRecorder, never()).recordUnverifiable(any(), any());
         }
 
         @Test
@@ -3091,7 +3124,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
             verify(jobRepository, never()).transitionToCancelled(any(), any(), any(), any(), any());
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> usage =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(usageRecorder).recordUnverifiable(eq(99L), usage.capture());
+            verify(usageRecorder).record(eq(99L), usage.capture());
+            assertThat(usage.getValue().measurementVerification()).isEqualTo(MeasurementVerification.VERIFIED);
             assertThat(usage.getValue().sourceAttempt()).isEqualTo(2);
             assertThat(usage.getValue().totalCalls()).isEqualTo(3);
             assertThat(usage.getValue().inputTokens()).isEqualTo(800);
@@ -3164,7 +3198,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
             verify(jobRepository)
                     .transitionToCancelledOwnedBy(eq(jobId), any(), any(), any(), any(), eq("draining-worker"));
             verify(sandboxManager, never()).cancel(any());
-            verify(usageRecorder, never()).recordUnverifiable(any(), any());
             verify(usageRecorder, never()).record(any(), any());
         }
 
@@ -3415,7 +3448,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             verify(sandboxManager, never()).execute(any());
             verify(usageRecorder, never()).record(any(), any());
-            verify(usageRecorder, never()).recordUnverifiable(any(), any());
         }
     }
 

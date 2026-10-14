@@ -26,6 +26,8 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 
@@ -76,7 +78,8 @@ class LlmUsageRepricerTest extends BaseUnitTest {
                 0L,
                 0L,
                 appliedPriceId,
-                appliedWorkspaceModelId);
+                appliedWorkspaceModelId,
+                MeasurementVerification.VERIFIED);
     }
 
     private static LlmModelPrice price(PricingMode mode, @Nullable BigDecimal input) {
@@ -118,8 +121,7 @@ class LlmUsageRepricerTest extends BaseUnitTest {
         assertThat(price.getValue().per1mInputUsd()).isEqualByComparingTo("3.00");
     }
 
-    // Every row the ledger backfill created — the ones that actually held a live cap shut — carries no
-    // provenance at all, because historical spend predates it. The model name is the only handle.
+    // A verified measurement without a price reference can still name its model unambiguously.
     @Test
     @DisplayName("a row with no provenance is priced through its model name")
     void repricesThroughTheModelName() {
@@ -194,9 +196,41 @@ class LlmUsageRepricerTest extends BaseUnitTest {
     @DisplayName("a row with no measured token stays unknown even when its model is free")
     void aRowWithNoTokenEvidenceIsNeverPriced() {
         var unmeasured = new UnpricedLedgerRow(
-                EVENT_ID, WORKSPACE_ID, "gpt-5", FundingSource.INSTANCE, 0L, 0L, 0L, 0L, 11L, null);
+                EVENT_ID,
+                WORKSPACE_ID,
+                "gpt-5",
+                FundingSource.INSTANCE,
+                0L,
+                0L,
+                0L,
+                0L,
+                11L,
+                null,
+                MeasurementVerification.VERIFIED);
 
         assertThat(repricer.reprice(unmeasured)).isEqualTo(Outcome.NO_TOKEN_EVIDENCE);
+        verifyNoInteractions(usageRepository, priceRepository, modelRepository, workspaceModelRepository);
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = MeasurementVerification.class,
+            names = {"UNKNOWN", "UNVERIFIABLE"})
+    void shouldRefusePositiveMeasurementsWhenVerificationWasNotAccepted(MeasurementVerification verification) {
+        var row = new UnpricedLedgerRow(
+                EVENT_ID,
+                WORKSPACE_ID,
+                "gpt-5",
+                FundingSource.INSTANCE,
+                1_000_000L,
+                0L,
+                0L,
+                0L,
+                11L,
+                null,
+                verification);
+
+        assertThat(repricer.reprice(row)).isEqualTo(Outcome.UNVERIFIED_MEASUREMENT);
         verifyNoInteractions(usageRepository, priceRepository, modelRepository, workspaceModelRepository);
     }
 

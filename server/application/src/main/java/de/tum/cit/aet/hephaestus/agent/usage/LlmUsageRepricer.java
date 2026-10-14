@@ -21,19 +21,10 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Prices one ledger row that could not be priced when it was written.
  *
- * <p><b>Why this is a repair and not a rewrite of history.</b> When an UNPRICED row has measured
- * tokens but lacked a usable rate, the tokens are the measurement and the missing rate prevents their
- * multiplication. Once the missing rate exists, applying it recovers
- * the number the row was always supposed to carry. Nothing else about the row is touched — never the
- * tokens, never the source key, never {@code occurred_at}. A row with no billable token is unknown spend,
- * not a gap, and no rate repairs it.
- *
- * <p><b>Why it has to exist at all.</b> A single UNPRICED row funded from a capped purse makes the whole
- * month UNVERIFIABLE, and an UNVERIFIABLE purse is blocked exactly like an exhausted one. Before this,
- * an operator whose catalogue had been missing one price had three ways out and no fourth: remove the
- * cap, edit the ledger by hand, or wait for the first of the month. This makes "add the missing price to
- * the model catalogue" the way out — {@link LlmUsageRepricingSweeper} applies it a few minutes later and
- * the block lifts on its own.
+ * <p>Only a VERIFIED measurement with positive billable tokens can have its missing price repaired.
+ * A rate cannot establish measurement verification. UNKNOWN historical decisions and UNVERIFIABLE
+ * vectors remain unpriced; existing priced amounts are never rewritten. Tokens, source, funding and
+ * occurrence time stay frozen.
  *
  * <p>Each row is repriced in its own {@code REQUIRES_NEW} transaction so one unpriceable row cannot roll
  * back the ones already recovered in the same pass.
@@ -72,10 +63,15 @@ public class LlmUsageRepricer {
          * observed. Nothing was written; the row stays unknown.
          */
         NO_TOKEN_EVIDENCE,
+        /** Source selection did not accept this measurement. No price can repair that decision. */
+        UNVERIFIED_MEASUREMENT,
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Outcome reprice(UnpricedLedgerRow row) {
+        if (row.measurementVerification() != MeasurementVerification.VERIFIED) {
+            return Outcome.UNVERIFIED_MEASUREMENT;
+        }
         if (!row.hasTokenEvidence()) {
             return Outcome.NO_TOKEN_EVIDENCE;
         }
@@ -132,8 +128,7 @@ public class LlmUsageRepricer {
      *
      * <p>The provenance ids come first because they are exact: a row that went UNPRICED only because one
      * rate was blank still names the catalogue row it came from. The upstream-model-id lookup is the
-     * fallback for rows that never had a snapshot at all — every row the 1785015307013 ledger backfill
-     * created is one, since historical spend predates provenance entirely. That lookup insists on a
+     * fallback for verified rows without a price snapshot. That lookup insists on a
      * unique match: two connections may expose the same upstream id at different prices, and guessing
      * between them would put a number the operator cannot defend into an append-only ledger.
      */

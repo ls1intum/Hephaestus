@@ -16,7 +16,10 @@ public record LlmUsageByDayDTO(
         @NonNull @Schema(description = "Spend on this workspace's own connected provider(s) for this day, in USD.")
         BigDecimal ownProviderTotalCostUsd,
 
-        @NonNull @Schema(description = "Calls this day whose price is not yet known. Excluded from both totals above.")
+        @NonNull
+        @Schema(
+                description = "Ledger usage records this day with unavailable cost because rates are missing "
+                        + "or measurements are unverified. Excluded from both totals above.")
         Long unpricedEventCount,
 
         @NonNull Long events) {}

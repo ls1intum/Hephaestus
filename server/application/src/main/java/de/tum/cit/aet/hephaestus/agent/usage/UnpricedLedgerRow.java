@@ -21,7 +21,8 @@ public record UnpricedLedgerRow(
         long cacheReadTokens,
         long cacheWriteTokens,
         @Nullable Long appliedPriceId,
-        @Nullable Long appliedWorkspaceModelId) {
+        @Nullable Long appliedWorkspaceModelId,
+        MeasurementVerification measurementVerification) {
 
     /**
      * Whether the row measured a billable token. {@code LlmUsageEventRepository} fences its selection and

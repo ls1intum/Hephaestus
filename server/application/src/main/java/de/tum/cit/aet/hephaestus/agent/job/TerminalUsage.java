@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageJobType;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
+import de.tum.cit.aet.hephaestus.agent.usage.MeasurementVerification;
 import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.agent.usage.UsageProvenance;
 import java.time.Instant;
@@ -67,9 +68,7 @@ record TerminalUsage(
 
     /**
      * Append this ending attempt to the spend ledger — the ONE way an {@code agent_job} becomes a ledger
-     * row. Which of the recorder's two append paths runs is derived here, never chosen by the caller: a
-     * caller picking it itself could write a PRICED row of invented zeros, the exact failure the ledger
-     * exists to prevent.
+     * row. Measurement verification follows source selection, independently of the frozen price.
      *
      * @param workspaceId passed explicitly rather than read off {@code job}: the terminal paths differ
      *     in whether they hold a workspace-scoped id or a job loaded with its workspace
@@ -96,13 +95,10 @@ record TerminalUsage(
                 totalCalls,
                 price,
                 provenance,
+                verifiable ? MeasurementVerification.VERIFIED : MeasurementVerification.UNVERIFIABLE,
                 Instant.now());
-        if (verifiable && price.pricingState() != PricingState.UNPRICED) {
-            recorder.record(workspaceId, sample);
-            return true;
-        }
-        recorder.recordUnverifiable(workspaceId, sample);
-        return false;
+        recorder.record(workspaceId, sample);
+        return verifiable && price.pricingState() != PricingState.UNPRICED;
     }
 
     /** A report is evidence only if it claims a call AND a non-zero token bucket; calls alone cannot be priced. */
