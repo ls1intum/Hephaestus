@@ -12,7 +12,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 class PracticeV1CurrentResultMigrationTest {
     @ParameterizedTest
     @ValueSource(strings = {"prod", "dev"})
-    void shouldRankRetainedOccasionsBeforeLateCompletionAndKeepMarksSeparate(String context) throws Exception {
+    void shouldRankReviewsBeforeLateCompletionAndKeepMarksSeparate(String context) throws Exception {
         var database = PracticeMigrationFixture.releasedDatabase(context);
         PracticeMigrationFixture.execute(database, """
             INSERT INTO agent_job(id,workspace_id,job_type,status,config_snapshot,job_token,retry_count,
@@ -49,7 +49,9 @@ class PracticeV1CurrentResultMigrationTest {
             """);
         PracticeMigrationFixture.upgrade(database, context);
         assertThat(PracticeMigrationFixture.column(
-                        database, "SELECT id::text FROM result WHERE workspace_id=992101 AND ended_at IS NULL"))
+                        database,
+                        "SELECT id::text FROM result WHERE workspace_id=992101 AND practice_id=992121 AND"
+                                + " ended_at IS NULL"))
                 .containsExactly("00000000-0000-0000-0000-000000994214");
         assertThat(PracticeMigrationFixture.column(
                         database, "SELECT end_reason FROM result WHERE id='00000000-0000-0000-0000-000000994213'"))

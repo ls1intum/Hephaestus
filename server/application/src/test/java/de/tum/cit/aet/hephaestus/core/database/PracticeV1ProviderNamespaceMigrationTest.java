@@ -17,8 +17,7 @@ class PracticeV1ProviderNamespaceMigrationTest {
         PracticeMigrationFixture.execute(database, """
             INSERT INTO identity_provider(id,type,server_url)
             VALUES(999901,'OUTLINE','https://docs.namespace.example:443/'),
-                  (999905,'OUTLINE','https://docs.namespace.example'),
-                  (999906,'SLACK','https://slack.com');
+                  (999905,'OUTLINE','https://docs.namespace.example');
             INSERT INTO person_suppression(id,provider_id,subject,team_key)
             VALUES('00000000-0000-0000-0000-000000999902',999901,'person-1',''),
                   ('00000000-0000-0000-0000-000000999907',999905,'person-1','');

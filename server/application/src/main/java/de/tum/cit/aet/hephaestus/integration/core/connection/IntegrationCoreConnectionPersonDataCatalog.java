@@ -47,10 +47,10 @@ public class IntegrationCoreConnectionPersonDataCatalog implements PersonDataCat
                         mapper,
                         "sync_job",
                         "sync_job",
-                        "t.requested_by_id = :account",
-                        "id,workspace_id,connection_id,kind,type,trigger_source,status,cancel_requested,started_at,finished_at,created_at,heartbeat_at,items_processed,items_total,progress,error_summary,requested_by_id",
+                        "t.triggered_by_account_id = :account",
+                        "id,workspace_id,connection_id,kind,type,trigger_source,status,cancel_requested,started_at,finished_at,created_at,heartbeat_at,items_processed,items_total,progress,error_summary,triggered_by_account_id",
                         "id",
-                        "requested_by_id=NULL,progress=NULL,error_summary=NULL",
+                        "triggered_by_account_id=NULL,progress=NULL,error_summary=NULL",
                         400),
                 new JdbcPersonDataStore(
                         jdbc,

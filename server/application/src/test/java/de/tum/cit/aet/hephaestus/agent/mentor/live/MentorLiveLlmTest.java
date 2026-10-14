@@ -367,30 +367,12 @@ class MentorLiveLlmTest {
                         + " title. You MUST use fetch_context. Do NOT guess.");
         awaitTurn(done, events);
 
-        // At least one tool was invoked.
-        List<UIMessageChunk.ToolInputStart> toolStarts = chunks.stream()
-                .filter(UIMessageChunk.ToolInputStart.class::isInstance)
-                .map(UIMessageChunk.ToolInputStart.class::cast)
-                .toList();
-        assertThat(toolStarts)
+        assertThat(driver.servedContextPaths())
                 .as(
-                        "Heph must invoke fetch_context to answer the question; terminal messages: %s",
+                        "the requested context completed through the server callback; terminal messages: %s",
                         terminalEvents(events))
-                .isNotEmpty();
-
-        List<String> toolNames =
-                toolStarts.stream().map(UIMessageChunk.ToolInputStart::toolName).toList();
-        assertThat(toolNames).as("tools used should include fetch_context").contains("fetch_context");
-        System.out.printf("[tool-use] tools invoked: %s%n", toolNames);
-
-        // Tool produced output (not error).
-        List<UIMessageChunk.ToolOutputAvailable> toolOutputs = chunks.stream()
-                .filter(UIMessageChunk.ToolOutputAvailable.class::isInstance)
-                .map(UIMessageChunk.ToolOutputAvailable.class::cast)
-                .toList();
-        assertThat(toolOutputs)
-                .as("at least one tool call completed with output")
-                .isNotEmpty();
+                .contains("inputs/context/recent_authored_work.json");
+        System.out.printf("[tool-use] context served: %s%n", driver.servedContextPaths());
 
         // Heph's reply should reference the planted content.
         String text = chunks.stream()
@@ -683,6 +665,7 @@ class MentorLiveLlmTest {
         private final ConcurrentLinkedQueue<JsonNode> responses = new ConcurrentLinkedQueue<>();
         private final ConcurrentLinkedQueue<JsonNode> readyNotifications = new ConcurrentLinkedQueue<>();
         private final ConcurrentMap<String, JsonNode> contextResponses = new ConcurrentHashMap<>();
+        private final ConcurrentLinkedQueue<String> servedContextPaths = new ConcurrentLinkedQueue<>();
         private final AtomicInteger requestIdCounter = new AtomicInteger();
 
         RunnerDriver(AttachedSandbox sandbox) {
@@ -708,6 +691,10 @@ class MentorLiveLlmTest {
         RunnerDriver withContext(String path, JsonNode content) {
             contextResponses.put(path, content);
             return this;
+        }
+
+        List<String> servedContextPaths() {
+            return List.copyOf(servedContextPaths);
         }
 
         void expectRunnerReady() {
@@ -794,6 +781,7 @@ class MentorLiveLlmTest {
                 result.set("content", content);
             }
             sandbox.send(response);
+            if (content != null) servedContextPaths.add(path);
         }
     }
 }

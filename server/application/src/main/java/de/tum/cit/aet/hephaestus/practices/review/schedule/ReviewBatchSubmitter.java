@@ -39,9 +39,8 @@ public class ReviewBatchSubmitter {
     public SubmissionOutcome offer(ReviewBatch batch, long itemId, @Nullable BigDecimal budgetUsd) {
         var item = items.find(batch.getWorkspaceId(), itemId);
         if (item.isEmpty()) return new SubmissionOutcome.Skipped();
-        ReviewKind kind = items.current(item.get())
-                .map(s -> s.item().kind().value().equals("scm.repository") ? ReviewKind.SCAN : ReviewKind.ITEM)
-                .orElseThrow();
+        ReviewKind kind =
+                item.orElseThrow().kind().value().equals("scm.repository") ? ReviewKind.SCAN : ReviewKind.ITEM;
         if (ledger.existsByWorkspaceIdAndBatchIdAndItemIdAndStatusNot(
                 batch.getWorkspaceId(), batch.getId(), itemId, ReviewStatus.CANCELLED))
             return new SubmissionOutcome.Submitted();

@@ -6,8 +6,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.practices.review.ProductItemQuery;
@@ -19,9 +17,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequest;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import de.tum.cit.aet.hephaestus.testconfig.ItemFixtures;
 import java.math.BigDecimal;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
@@ -69,18 +65,6 @@ class ReviewBatchSubmitterTest extends BaseUnitTest {
         batch.setBudgetUsd(reserved);
         var ref = new ItemRef(1, 7, new ItemKind(kind), 7L, null, null);
         when(items.find(1, 7)).thenReturn(Optional.of(ref));
-        var snapshot = ItemFixtures.snapshot(ref, Map.of("defaultBranch", "main"))
-                .integration(new IntegrationRef(IntegrationKind.GITHUB, 1, "test", null))
-                .label(ItemFixtures.label()
-                        .itemId(7)
-                        .title("Item")
-                        .noun("Item")
-                        .number(1)
-                        .container("Container")
-                        .integration(IntegrationKind.GITHUB)
-                        .build())
-                .build();
-        when(items.current(ref)).thenReturn(Optional.of(snapshot));
         var id = UUID.randomUUID();
         when(reviews.request(ArgumentMatchers.any())).thenReturn(id);
         assertThat(submitter.offer(batch, 7, reserved))
@@ -123,18 +107,6 @@ class ReviewBatchSubmitterTest extends BaseUnitTest {
         var batch = batch();
         var ref = new ItemRef(1, 7, new ItemKind("scm.pull_request"), 7L, null, null);
         when(items.find(1, 7)).thenReturn(Optional.of(ref));
-        when(items.current(ref))
-                .thenReturn(Optional.of(ItemFixtures.snapshot(ref, Map.of())
-                        .integration(new IntegrationRef(IntegrationKind.GITHUB, 1, "test", null))
-                        .label(ItemFixtures.label()
-                                .itemId(7)
-                                .title("Item")
-                                .noun("Item")
-                                .number(1)
-                                .container("Container")
-                                .integration(IntegrationKind.GITHUB)
-                                .build())
-                        .build()));
         when(reviews.request(ArgumentMatchers.any())).thenThrow(new ReviewRequestRejected(reason, "Unavailable"));
         return submitter.offer(batch, 7, null);
     }

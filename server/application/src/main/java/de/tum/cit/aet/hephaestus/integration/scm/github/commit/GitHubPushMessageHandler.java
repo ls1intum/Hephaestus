@@ -2,6 +2,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.commit;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceNamespace;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
@@ -56,6 +59,7 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
     private final GitRepositoryManager gitRepositoryManager;
     private final GitHubAppTokenService tokenService;
     private final RepositoryRepository repositoryRepository;
+    private final IdentityProviderRepository identityProviderRepository;
     private final CommitRepository commitRepository;
     private final CommitDetailsPersister persister;
     private final CommitAuthorResolver authorResolver;
@@ -68,6 +72,7 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
             GitRepositoryManager gitRepositoryManager,
             GitHubAppTokenService tokenService,
             RepositoryRepository repositoryRepository,
+            IdentityProviderRepository identityProviderRepository,
             CommitRepository commitRepository,
             CommitDetailsPersister persister,
             CommitAuthorResolver authorResolver,
@@ -85,6 +90,7 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
         this.gitRepositoryManager = gitRepositoryManager;
         this.tokenService = tokenService;
         this.repositoryRepository = repositoryRepository;
+        this.identityProviderRepository = identityProviderRepository;
         this.commitRepository = commitRepository;
         this.persister = persister;
         this.authorResolver = authorResolver;
@@ -121,16 +127,25 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
                 event.forced(),
                 repoName);
 
-        Long repoId = event.repository() != null ? event.repository().id() : null;
-        if (repoId == null) {
+        Long nativeId = event.repository() != null ? event.repository().id() : null;
+        if (nativeId == null) {
             log.warn("Skipped push event: reason=missingRepositoryId, repoName={}", repoName);
             return;
         }
 
-        Repository repository =
-                repositoryRepository.findByIdWithOrganization(repoId).orElse(null);
+        var providerId = identityProviderRepository
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, PersonSourceNamespace.GITHUB_DEFAULT_URL)
+                .map(IdentityProvider::getId);
+        if (providerId.isEmpty()) {
+            log.warn("Skipped push event: reason=githubProviderNotFound, repoName={}", repoName);
+            return;
+        }
+
+        Repository repository = repositoryRepository
+                .findByNativeIdAndProviderId(nativeId, providerId.get())
+                .orElse(null);
         if (repository == null) {
-            log.debug("Skipped push event: reason=repositoryNotFound, repoId={}, repoName={}", repoId, repoName);
+            log.debug("Skipped push event: reason=repositoryNotFound, nativeId={}, repoName={}", nativeId, repoName);
             return;
         }
 

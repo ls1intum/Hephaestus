@@ -37,12 +37,12 @@ class PracticeV1CutoverMigrationTest {
                 .containsExactly("NOT_MET|TRIVIAL|0|true");
         assertThat(column(
                         database,
-                        "SELECT (p.id<>r.id)::text || '|' || (p.citations->0 ? 'sourcePath') || '|' || (p.basis IS"
+                        "SELECT (p.id<>r.id)::text || '|' || jsonb_exists(p.citations->0,'sourcePath') || '|' || (p.basis IS"
                                 + " NULL) FROM problem p JOIN result r ON r.id=p.result_id WHERE r.id='"
                                 + RESULT + "'"))
                 .containsExactly("true|true|true");
         assertThat(column(database, """
-            SELECT (citation->>'commit') || '|' || (citation ? 'revision') || '|' || (citation->>'quote')
+            SELECT (citation->>'commit') || '|' || jsonb_exists(citation,'revision') || '|' || (citation->>'quote')
             FROM (
                 SELECT evidence->'citations'->0 AS citation FROM result
                 WHERE id='00000000-0000-0000-0000-000000992141'
