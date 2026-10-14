@@ -47,6 +47,7 @@ import {
 	useActivityPerson,
 	useActivityWork,
 } from "@/hooks/use-activity";
+import { filedUnder, pathNumber, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import { pageHead } from "@/lib/page-title";
 import { problemDetailOf } from "@/lib/problem-detail";
 import { toScmProviderType } from "@/lib/provider/provider-terms";
@@ -58,6 +59,9 @@ import { invalidateWorkspaceReads } from "@/runtime/tanstack-query/invalidate-wo
 
 /** The reads that list an account among the people or the automation. */
 const ACTIVITY_READS = new Set(["getActivityPeople", "getActivityPerson"]);
+
+/** Where an account's classification is filed while it saves; the workspace follows it. */
+const AUTOMATION_MUTATION_KEY = ["activity-automation"] as const;
 
 /** Hiding takes a person out of the timeline as well. */
 const HIDING_READS = new Set([...ACTIVITY_READS, "getActivityWork"]);
@@ -147,24 +151,42 @@ function WorkspaceActivity() {
 		enabled: personScope.enabled && category !== undefined,
 	});
 
+	// Filed under this workspace, so a change keeps its own workspace and account when the admin
+	// moves on, and each account here is busy only while a change of its own is out.
+	const automationKey = [...AUTOMATION_MUTATION_KEY, workspaceSlug];
 	const automation = useMutation({
-		...updateActivityAutomationMutation(),
-		onSuccess: async (_data, { query }) => {
-			toast.success(query.treatAsAutomation ? "Treated as automation" : "Counted as a person");
-			await invalidateWorkspaceReads(queryClient, workspaceSlug, ACTIVITY_READS);
+		...filedUnder(automationKey, updateActivityAutomationMutation()),
+		// Runs as the change is submitted, so the name is the account's as the page listed it then.
+		onMutate: ({ path: { userId } }) => ({
+			name: ready
+				? [...ready.people, ...ready.automation].find((candidate) => candidate.person.id === userId)
+						?.person.name
+				: undefined,
+		}),
+		onSuccess: async (_data, { path, query }, subject) => {
+			const name = subject.name ?? "The account";
+			toast.success(
+				query.treatAsAutomation ? `${name} is treated as automation` : `${name} counts as a person`,
+				{ description: inWorkspace(path.workspaceSlug) },
+			);
+			await invalidateWorkspaceReads(queryClient, path.workspaceSlug, ACTIVITY_READS);
 		},
-		onError: (error) =>
-			toast.error("We could not change how this account counts", {
-				description: problemDetailOf(error),
+		onError: (error, { path }, subject) =>
+			toast.error(`We could not change how ${subject?.name ?? "this account"} counts`, {
+				description: `${problemDetailOf(error)} ${inWorkspace(path.workspaceSlug)}`,
 			}),
 	});
+	const automating = usePendingMutationIds(automationKey, (variables) =>
+		pathNumber(variables, "userId"),
+	);
+	const automationPending = person !== undefined && automating.has(person.person.id);
 	// A provider's bot account is automation whatever an admin says, so it has no action.
 	const automationAction =
 		isAdmin && person && person.kind !== "BOT" ? (
 			<Button
 				variant="outline"
 				size="sm"
-				disabled={automation.isPending}
+				disabled={automationPending}
 				focusableWhenDisabled
 				onClick={() =>
 					automation.mutate({
@@ -173,8 +195,8 @@ function WorkspaceActivity() {
 					})
 				}
 			>
-				{automation.isPending && <Spinner />}
-				{automationLabel(person.kind, automation.isPending)}
+				{automationPending && <Spinner />}
+				{automationLabel(person.kind, automationPending)}
 			</Button>
 		) : undefined;
 
