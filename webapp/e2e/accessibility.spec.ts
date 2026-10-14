@@ -28,6 +28,7 @@ const PUBLIC: Surface[] = [
 	{ name: "Privacy", path: "/privacy" },
 	{ name: "Sign in", path: "/login" },
 	{ name: "Workspace sign in", path: "/w/e2e/login" },
+	{ name: "Public workspace activity", path: "/w/e2e-public?range=all" },
 	{ name: "Sign-in problem", path: "/auth/error" },
 	{ name: "Unsubscribe", path: "/unsubscribe" },
 	{ name: "Not found", path: "/no-such-page" },

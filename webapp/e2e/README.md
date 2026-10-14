@@ -5,10 +5,11 @@ These tests drive the SPA against the real backend using the local dev login. Se
 
 ## Run locally
 
-Start the backend:
+Start the backend with the profiles used by the packaged CI suite:
 
 ```bash
-vp run dev:server:e2e
+vp run dev:compose:e2e
+node scripts/run-gradlew.ts :application:bootRun -Pprofiles=e2e,playwright
 ```
 
 Create the test account and seed its workspace:
@@ -43,6 +44,12 @@ colour schemes, a Tab walk, reflow, menus, dialogs and three keyboard-only proce
 leaves to a person with a screen reader.
 
 ## Reading the result
+
+`public-activity.spec.ts` uses the isolated `e2e-public` workspace in `seed.sql`.
+It reads real public activity from the packaged server, including private-repository and hidden-person exclusions.
+It covers drawer history and sign-in return at desktop, plus one touch viewport.
+The seed refreshes repository visibility confirmations; load it before each run.
+It uses synthetic GitHub records and needs no provider token.
 
 The coverage reporter prints actual test outcomes and lists every selected live-provider check and
 skipped test with its skip reason. CI also appends this report to the job summary. A skipped check
