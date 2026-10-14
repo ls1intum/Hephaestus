@@ -460,6 +460,10 @@ export type AgentJob = {
      */
     retryCount: number;
     /**
+     * Safe observed closed-turn diagnostics from retained output; available only on terminal job detail, absent when retained turns cannot be safely read
+     */
+    reviewDiagnostics?: ReviewDiagnostics;
+    /**
      * Why a COMPLETED run produced the observations it did. INSUFFICIENT_EVIDENCE means no model ran because required evidence was missing, unreadable, stale, or unauthorized — so no observations means nothing was assessed, not that nothing was wrong. COALESCED means no model ran because a completed review had already answered every ready practice on exactly the same code — its answers are listed in answeredPractices, and this run assessed nothing anew. SUPERSEDED means the waiting attempt was replaced by an admitted newer review of the same author's current work, named in coveringJobId, which carries this review's practices and may still be waiting or running; the replacement makes no additional assessment, and earlier attempt history remains. REVIEWED means the model ran against sufficient evidence.
      */
     reviewOutcome: 'REVIEWED' | 'INSUFFICIENT_EVIDENCE' | 'COALESCED' | 'SUPERSEDED';
@@ -2855,6 +2859,41 @@ export type LoginProviderView = {
 
 export type MemberAiChoiceRequest = {
     choice: 'NO_AI' | 'IN_HOUSE_ONLY' | 'CLOUD';
+};
+
+export type ModelCallTiming = {
+    /**
+     * Sum of adapter spans in milliseconds; absent when no span was recorded
+     */
+    elapsedMs?: number;
+    /**
+     * Sum of failed or aborted adapter spans in milliseconds; absent when no span was recorded
+     */
+    failedElapsedMs?: number;
+    /**
+     * Largest recorded adapter span in milliseconds; absent when no span was recorded
+     */
+    maxElapsedMs?: number;
+    /**
+     * Timed calls with a recorded valid SDK response time
+     */
+    respondedCalls: number;
+    /**
+     * Sum of request-to-SDK-response times in milliseconds; absent when no response time was recorded
+     */
+    responseMs?: number;
+    /**
+     * Calls with a recorded valid adapter span; does not imply all calls were timed
+     */
+    timedCalls: number;
+};
+
+export type ModelFailureCount = {
+    /**
+     * Observed failed or aborted calls; absent if a supplied count is invalid or its sum overflows
+     */
+    count?: number;
+    kind: 'HTTP_ERROR' | 'CONNECTION_TIMEOUT' | 'CONNECTION_ERROR' | 'STREAM_INCOMPLETE' | 'FINISH_REASON_ERROR' | 'STREAM_ERROR_EVENT' | 'RESPONSE_FAILED' | 'RESPONSE_STATUS_ERROR' | 'TOOL_CALL_INCOMPLETE' | 'ABORTED' | 'UNKNOWN';
 };
 
 export type NotificationPreferences = {
@@ -5262,6 +5301,13 @@ export type ReviewContext = {
     work: ReviewedWorkRef;
 };
 
+/**
+ * Observed closed turns from retained runner output, not live or complete execution telemetry
+ */
+export type ReviewDiagnostics = {
+    phases: Array<ReviewPhaseDiagnostics>;
+};
+
 export type ReviewFeedback = {
     agentJobId: string;
     /**
@@ -5869,6 +5915,37 @@ export type ReviewObservationDetail = {
      * When a later review of the same work superseded this observation; null while current
      */
     supersededAt?: string;
+};
+
+/**
+ * One fixed review phase; UNKNOWN includes legacy turns without an explicit recognized phase
+ */
+export type ReviewPhaseDiagnostics = {
+    /**
+     * Observed assistant/model calls; absent if any count is unknown or the sum exceeds the bound
+     */
+    assistantCalls?: number;
+    /**
+     * Sum of observed closed turn durations in milliseconds; absent if any duration is unknown or the sum overflows
+     */
+    elapsedMs?: number;
+    /**
+     * Safe failure of the last model call in the latest closed turn of this phase; absent after recovery or when unknown
+     */
+    finalModelFailure?: TerminalModelFailure;
+    /**
+     * Adapter span totals; absent if any turn has absent, partial or invalid span totals
+     */
+    modelCallTiming?: ModelCallTiming;
+    /**
+     * Closed failure kinds recorded across these turns; empty means none recorded, absent means a turn has no readable counts
+     */
+    modelFailures?: Array<ModelFailureCount>;
+    phase: 'PRACTICE' | 'PUBLIC_REVIEW' | 'PRIVATE_FEEDBACK' | 'UNKNOWN';
+    /**
+     * Number of retained closed turn records
+     */
+    recordedTurns: number;
 };
 
 /**
@@ -6838,6 +6915,24 @@ export type TeamSummary = {
      * Privacy level of the team (SECRET or VISIBLE)
      */
     privacy?: 'SECRET' | 'VISIBLE';
+};
+
+export type TerminalModelFailure = {
+    /**
+     * Adapter failure time in epoch milliseconds; absent if unknown
+     */
+    at?: number;
+    kind: 'HTTP_ERROR' | 'CONNECTION_TIMEOUT' | 'CONNECTION_ERROR' | 'STREAM_INCOMPLETE' | 'FINISH_REASON_ERROR' | 'STREAM_ERROR_EVENT' | 'RESPONSE_FAILED' | 'RESPONSE_STATUS_ERROR' | 'TOOL_CALL_INCOMPLETE' | 'ABORTED' | 'UNKNOWN';
+    phase?: 'REQUEST' | 'RESPONSE_BODY';
+    /**
+     * Whether the native retry ended unsuccessfully; absent if no valid flag was recorded
+     */
+    retryEndedUnsuccessfully?: boolean;
+    source?: 'ADAPTER' | 'MISSING' | 'INVALID';
+    /**
+     * HTTP status from 400 through 599, for HTTP_ERROR only
+     */
+    status?: number;
 };
 
 /**

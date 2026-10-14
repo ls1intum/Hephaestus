@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, within } from "storybook/test";
 
+import type { AgentJob } from "@/api/types.gen";
 import { withPageBehind } from "@/stories/decorators";
 import { InLevelStack } from "@/stories/level-stack";
 import { settledDrawerPanel } from "@/stories/overlay";
@@ -106,6 +107,9 @@ export const Default: Story = {
 		// Technical is open by default.
 		panel.getByText("Review ID");
 		panel.getByRole("button", { name: "Copy configuration" });
+		// This review's output kept no readable turns, which says nothing about why.
+		panel.getByRole("heading", { name: "Model activity" });
+		panel.getByText("Not available.");
 		// The review alone: no other record's facts, no link to another record.
 		await expect(panel.queryByText(/other moments on this work/u)).toBeNull();
 		await expect(panel.queryByText(/Until the developer read it/u)).toBeNull();
@@ -156,6 +160,7 @@ export const Running: Story = {
 		await expect(panel.queryByText("Review on the work accepted")).toBeNull();
 		panel.getByRole("button", { name: "Cancel review" });
 		await expect(panel.queryByRole("button", { name: "Request another review" })).toBeNull();
+		await expect(panel.queryByRole("heading", { name: "Model activity" })).toBeNull();
 	},
 };
 
@@ -435,6 +440,182 @@ export const CostPerAttempt: Story = {
 		panel.getByText("4bf92f3577b34da6a3ce929d0e0e4736");
 		panel.getByRole("button", { name: "Copy trace id" });
 	},
+};
+
+/** One fact of one phase under Model activity. */
+async function activityFact(phaseLabel: string, label: string) {
+	const panel = within(await settledDrawerPanel());
+	const group = within(panel.getByRole("group", { name: phaseLabel }));
+	return group.getByText(label, { selector: "dt" }).nextElementSibling;
+}
+
+const recordedPhases = {
+	...job,
+	llmTotalCalls: 9,
+	reviewDiagnostics: {
+		phases: [
+			{
+				phase: "PRACTICE",
+				recordedTurns: 4,
+				assistantCalls: 6,
+				elapsedMs: 95_000,
+				modelCallTiming: {
+					timedCalls: 6,
+					respondedCalls: 6,
+					elapsedMs: 61_000,
+					failedElapsedMs: 4000,
+					maxElapsedMs: 22_000,
+					responseMs: 58_000,
+				},
+				modelFailures: [{ kind: "HTTP_ERROR", count: 2 }],
+			},
+			{
+				phase: "PUBLIC_REVIEW",
+				recordedTurns: 1,
+				assistantCalls: 2,
+				elapsedMs: 30_000,
+				modelCallTiming: {
+					timedCalls: 2,
+					respondedCalls: 2,
+					elapsedMs: 18_000,
+					failedElapsedMs: 0,
+					maxElapsedMs: 12_000,
+					responseMs: 17_000,
+				},
+				modelFailures: [],
+			},
+			{
+				phase: "PRIVATE_FEEDBACK",
+				recordedTurns: 1,
+				assistantCalls: 1,
+				elapsedMs: 12_000,
+				modelCallTiming: {
+					timedCalls: 1,
+					respondedCalls: 1,
+					elapsedMs: 8000,
+					failedElapsedMs: 0,
+					maxElapsedMs: 8000,
+					responseMs: 7600,
+				},
+				modelFailures: [],
+			},
+			{ phase: "UNKNOWN", recordedTurns: 0 },
+		],
+	},
+} satisfies AgentJob;
+
+/**
+ * Model activity from the turns a finished review kept, phase by phase. Two calls failed during the
+ * practice checks; the review still finished, and no last-call failure is shown, which is not proof
+ * that a later call recovered.
+ */
+export const ModelActivityByPhase: Story = {
+	args: { job: { status: "ready", job: recordedPhases } },
+	play: async () => {
+		await expect(await activityFact("Practice checks", "Closed turns")).toHaveTextContent(
+			"4 turns, 2 min",
+		);
+		await expect(await activityFact("Practice checks", "Model time")).toHaveTextContent(
+			"1 min over 6 of 6 calls timed, longest 22 s",
+		);
+		await expect(
+			await activityFact("Practice checks", "Request to SDK response"),
+		).toHaveTextContent("58 s over 6 calls");
+		await expect(await activityFact("Practice checks", "Failed calls")).toHaveTextContent(
+			"HTTP error: 2",
+		);
+		await expect(await activityFact("Review on the work", "Failed calls")).toHaveTextContent(
+			"None recorded",
+		);
+		const panel = within(await settledDrawerPanel());
+		panel.getByRole("group", { name: "Private feedback" });
+		await expect(panel.queryByText("Latest turn’s last call")).toBeNull();
+		// A phase with no kept turns has no row, rather than a row of zeros.
+		await expect(panel.queryByRole("group", { name: "Not assigned to a phase" })).toBeNull();
+	},
+};
+
+/**
+ * Turns from before the runner tagged their phase stay unassigned, and a figure that was not
+ * recorded says so rather than reading as zero.
+ */
+export const ModelActivityPartlyRecorded: Story = {
+	args: {
+		job: {
+			status: "ready",
+			job: {
+				...job,
+				reviewDiagnostics: {
+					phases: [
+						{
+							phase: "PRACTICE",
+							recordedTurns: 2,
+							modelCallTiming: { timedCalls: 0, respondedCalls: 0 },
+							modelFailures: [{ kind: "CONNECTION_TIMEOUT" }],
+							finalModelFailure: {
+								kind: "HTTP_ERROR",
+								status: 503,
+								phase: "RESPONSE_BODY",
+								retryEndedUnsuccessfully: true,
+							},
+						},
+						{ phase: "PUBLIC_REVIEW", recordedTurns: 0 },
+						{ phase: "PRIVATE_FEEDBACK", recordedTurns: 0 },
+						{
+							phase: "UNKNOWN",
+							recordedTurns: 3,
+							assistantCalls: 5,
+							elapsedMs: 40_000,
+							modelCallTiming: {
+								timedCalls: 3,
+								respondedCalls: 0,
+								elapsedMs: 9000,
+								failedElapsedMs: 0,
+								maxElapsedMs: 4000,
+							},
+						},
+					],
+				},
+			},
+		},
+	},
+	play: async () => {
+		await expect(await activityFact("Practice checks", "Closed turns")).toHaveTextContent(
+			"2 turns, time not recorded",
+		);
+		await expect(await activityFact("Practice checks", "Calls recorded")).toHaveTextContent(
+			"Not recorded",
+		);
+		await expect(await activityFact("Practice checks", "Model time")).toHaveTextContent(
+			"Not recorded",
+		);
+		await expect(await activityFact("Practice checks", "Failed calls")).toHaveTextContent(
+			"Connection timed out: number not recorded",
+		);
+		await expect(
+			await activityFact("Practice checks", "Latest turn’s last call"),
+		).toHaveTextContent(
+			"Failed: HTTP error 503, while reading the response, after retries ended unsuccessfully",
+		);
+		await expect(await activityFact("Not assigned to a phase", "Model time")).toHaveTextContent(
+			"9 s over 3 of 5 calls timed, longest 4 s",
+		);
+		await expect(await activityFact("Not assigned to a phase", "Failed calls")).toHaveTextContent(
+			"Not recorded",
+		);
+		const panel = within(await settledDrawerPanel());
+		await expect(
+			within(panel.getByRole("group", { name: "Practice checks" })).queryByText(/0 s/u),
+		).toBeNull();
+		await expect(panel.queryByText("Request to SDK response")).toBeNull();
+		await expect(panel.queryByRole("group", { name: "Review on the work" })).toBeNull();
+	},
+};
+
+/** The phases reflow inside the narrow drawer like the rest of Technical. */
+export const ModelActivityReflow: Story = {
+	...Reflow,
+	args: ModelActivityByPhase.args,
 };
 
 /** A model without a price has no cost: it says so rather than $0. */

@@ -3556,6 +3556,37 @@ if (scenario !== undefined && scenario !== "") {
 						},
 					);
 					assert.equal(child.error, undefined);
+					// Read production output from the native orchestration fixtures, including both retry helpers.
+					const expectedPhases = new Map([
+						["scope-native-completion", ["practice"]],
+						["compose", ["practice", "public-review", "private-feedback"]],
+						["compose-recover", ["practice", "public-review", "public-review", "private-feedback"]],
+						[
+							"compose-no-decision",
+							["practice", "public-review", "private-feedback", "private-feedback"],
+						],
+						["compose-recovered-error", ["practice", "public-review", "private-feedback"]],
+						["compose-private-error", ["practice", "public-review", "private-feedback"]],
+					]).get(fixture);
+					if (expectedPhases !== undefined) {
+						const debug: unknown = JSON.parse(
+							readFileSync(nodePath.join(cwd, "out/runner-debug.json"), "utf8"),
+						);
+						assert.ok(isRecord(debug) && Array.isArray(debug.turns));
+						assert.deepEqual(
+							debug.turns.map((turn: unknown) => {
+								assert.ok(isRecord(turn));
+								assert.ok(
+									typeof turn.durationMs === "number" &&
+										Number.isSafeInteger(turn.durationMs) &&
+										turn.durationMs >= 0,
+								);
+								return turn.phase;
+							}),
+							expectedPhases,
+						);
+					}
+
 					const events = readFileSync(nodePath.join(cwd, "events"), "utf8")
 						.trim()
 						.split("\n")
@@ -3746,7 +3777,7 @@ if (scenario !== undefined && scenario !== "") {
 								// The last call failed with a stated native status, before any response.
 								"compose-public-error": [
 									[
-										"review composition",
+										"public-review",
 										{
 											kind: "HTTP_ERROR",
 											source: "ADAPTER",
@@ -3763,7 +3794,7 @@ if (scenario !== undefined && scenario !== "") {
 								// Responses diagnostics are read like chat-completions ones.
 								"compose-recovered-error": [
 									[
-										"review composition",
+										"public-review",
 										null,
 										0,
 										timing(
@@ -3779,7 +3810,7 @@ if (scenario !== undefined && scenario !== "") {
 								// event marks it. A call without a span is not timed, not timed as zero.
 								"compose-private-error": [
 									[
-										"composition",
+										"private-feedback",
 										{
 											kind: "UNKNOWN",
 											source: "INVALID",
@@ -3797,14 +3828,14 @@ if (scenario !== undefined && scenario !== "") {
 							assert.ok(!debugText.includes("sk-orchestration-secret"));
 							const debug: unknown = JSON.parse(debugText);
 							assert.ok(isRecord(debug) && Array.isArray(debug.turns));
-							for (const [label, final, unattributed, callTiming] of failures[stage] ?? []) {
+							for (const [phase, final, unattributed, callTiming] of failures[stage] ?? []) {
 								const turn: unknown = debug.turns.find(
-									(entry: unknown) => isRecord(entry) && entry.label === label,
+									(entry: unknown) => isRecord(entry) && entry.phase === phase,
 								);
-								assert.ok(isRecord(turn), label);
-								assert.deepEqual(turn.finalModelFailure, final, `${stage} ${label}`);
-								assert.equal(turn.unattributedModelFailures, unattributed, `${stage} ${label}`);
-								assert.deepEqual(turn.modelCallTiming, callTiming, `${stage} ${label}`);
+								assert.ok(isRecord(turn), phase);
+								assert.deepEqual(turn.finalModelFailure, final, `${stage} ${phase}`);
+								assert.equal(turn.unattributedModelFailures, unattributed, `${stage} ${phase}`);
+								assert.deepEqual(turn.modelCallTiming, callTiming, `${stage} ${phase}`);
 								assert.ok(isRecord(turn.modelFailures));
 								assert.equal(
 									Object.values(turn.modelFailures).reduce(
