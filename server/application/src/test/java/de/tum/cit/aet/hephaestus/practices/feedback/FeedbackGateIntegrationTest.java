@@ -23,7 +23,9 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Objects;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,7 +43,8 @@ class FeedbackGateIntegrationTest extends AbstractFeedbackIntegrationTest {
     @MockitoBean
     EvidenceAuthorization authorization;
 
-    Feedback supportedFeedback;
+    @Nullable Feedback supportedFeedback;
+
     ItemRef supportedItem;
     long supportedPracticeId;
 
@@ -54,6 +57,7 @@ class FeedbackGateIntegrationTest extends AbstractFeedbackIntegrationTest {
                 workspace.getId());
         jdbc.update("UPDATE review SET rollout_revision=4 WHERE workspace_id=? AND id=?", workspace.getId(), reviewId);
         piece = piece(FeedbackDestination.PRACTICE_PAGE, FeedbackState.READY, null);
+        supportedItem = new ItemRef(workspace.getId(), itemId, new ItemKind("scm.pull_request"), 42L, null, null);
     }
 
     private void supportOnWorkFeedback() {
@@ -64,7 +68,6 @@ class FeedbackGateIntegrationTest extends AbstractFeedbackIntegrationTest {
         bind(supportedFeedback, result);
         supportedPracticeId = result.getPracticeId();
         jdbc.update("UPDATE account SET feedback_delivery_enabled=true WHERE id=?", developerId);
-        supportedItem = new ItemRef(workspace.getId(), itemId, new ItemKind("scm.pull_request"), 42L, null, null);
         when(source.supports(supportedItem)).thenReturn(true);
         when(source.current(supportedItem)).thenReturn(Optional.of(snapshot(supportedItem, "open", "v1")));
         when(authorization.permitsForNewDelivery(
@@ -78,7 +81,7 @@ class FeedbackGateIntegrationTest extends AbstractFeedbackIntegrationTest {
     }
 
     private FeedbackCheck check() {
-        return gate.evaluate(supportedFeedback, FeedbackCheckStage.EGRESS, false);
+        return gate.evaluate(Objects.requireNonNull(supportedFeedback), FeedbackCheckStage.EGRESS, false);
     }
 
     private static ItemSnapshot snapshot(ItemRef item, String state, String version) {
