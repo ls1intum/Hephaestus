@@ -12,6 +12,24 @@ import org.junit.jupiter.params.provider.ValueSource;
 class PracticeV1CurrentResultMigrationTest {
     @ParameterizedTest
     @ValueSource(strings = {"prod", "dev"})
+    void shouldUseTheReleasedJobOccasionBeforeObservationPopulation(String context) throws Exception {
+        var database = PracticeMigrationFixture.migratedDatabase(context);
+        assertThat(PracticeMigrationFixture.column(database, """
+            SELECT right(id::text,6) || '|' || origin || '|' || coalesce(right(event_id::text,6),'none')
+            FROM review WHERE id BETWEEN '00000000-0000-0000-0000-000000992601'::uuid
+                AND '00000000-0000-0000-0000-000000992606'::uuid ORDER BY id
+            """))
+                .containsExactly(
+                        "992601|EVENT|992611",
+                        "992602|REQUEST|none",
+                        "992603|SCHEDULE|none",
+                        "992604|BACKFILL|none",
+                        "992605|EVENT|none",
+                        "992606|REQUEST|none");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"prod", "dev"})
     void shouldRankReviewsBeforeLateCompletionAndKeepMarksSeparate(String context) throws Exception {
         var database = PracticeMigrationFixture.releasedDatabase(context);
         PracticeMigrationFixture.execute(database, """

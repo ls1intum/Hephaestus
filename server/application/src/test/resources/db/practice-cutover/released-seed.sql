@@ -105,12 +105,12 @@ INSERT INTO practice(id,workspace_id,slug,name,criteria,applies_to,subject,signa
     review_when,automated_review_policy,delivery_behavior,created_at)
 SELECT n,workspace_id,'send-practice-'||n,name,criteria,applies_to,subject,signals,evidence_requirements,
     review_when,automated_review_policy,delivery_behavior,created_at
-FROM practice CROSS JOIN generate_series(992401,992406) n WHERE id=992121;
+FROM practice CROSS JOIN generate_series(992401,992408) n WHERE id=992121;
 INSERT INTO practice_revision(id,practice_id,revision_number,slug,name,applies_to,subject,signals,
     evidence_requirements,review_when,criteria,automated_review_policy,delivery_behavior,created_at)
 SELECT id+10,id,1,slug,name,applies_to,subject,signals,evidence_requirements,review_when,criteria,
-    automated_review_policy,delivery_behavior,created_at FROM practice WHERE id BETWEEN 992401 AND 992406;
-UPDATE practice SET current_revision_id=id+10 WHERE id BETWEEN 992401 AND 992406;
+    automated_review_policy,delivery_behavior,created_at FROM practice WHERE id BETWEEN 992401 AND 992408;
+UPDATE practice SET current_revision_id=id+10 WHERE id BETWEEN 992401 AND 992408;
 
 -- Separate unmarked results keep pending sends eligible without borrowing marked history.
 INSERT INTO observation(id,occurrence_key,agent_job_id,workspace_id,practice_id,practice_revision_id,
@@ -118,24 +118,26 @@ INSERT INTO observation(id,occurrence_key,agent_job_id,workspace_id,practice_id,
 SELECT ('00000000-0000-0000-0000-000000'||n)::uuid,'send-case-'||n,
     '00000000-0000-0000-0000-000000992111',992101,n+100,n+110,'scm.pull_request',992109,992103,
     'Explain this change.','NOT_MET','INFO','{"citations":[]}','The purpose is missing.','2026-01-01T00:00:30Z'
-FROM generate_series(992301,992306) n;
+FROM generate_series(992301,992308) n;
 INSERT INTO feedback(id,workspace_id,agent_job_id,recipient_user_id,about_user_id,channel,position,
     delivery_state,source,body,created_at,delivered_at,suppression_reason)
 SELECT ('00000000-0000-0000-0000-000000'||n)::uuid,992101,'00000000-0000-0000-0000-000000992111',
     992103,992103,'IN_CONTEXT',n-992100,state,'AGENT','Explain this change.',
-    '2026-01-01T00:01:00Z',CASE WHEN state IN('DELIVERED','PARTIALLY_FAILED') THEN '2026-01-01T00:01:30Z'::timestamptz END,
+    '2026-01-01T00:01:00Z',CASE WHEN state IN('DELIVERED','PARTIALLY_FAILED','PARTIALLY_DELIVERED') THEN '2026-01-01T00:01:30Z'::timestamptz END,
     CASE WHEN state='SUPPRESSED' THEN 'OUTSIDE_CURRENT_COVERAGE' END
 FROM (VALUES (992311,'PREPARED'),(992312,'UNCONFIRMED'),(992313,'PREPARED'),
-    (992314,'PARTIALLY_FAILED'),(992315,'DELIVERED'),(992316,'SUPPRESSED')) f(n,state);
+    (992314,'PARTIALLY_FAILED'),(992315,'DELIVERED'),(992316,'SUPPRESSED'),
+    (992317,'PARTIALLY_DELIVERED'),(992318,'PARTIALLY_FAILED')) f(n,state);
 INSERT INTO feedback_observation(feedback_id,observation_id,role,ordinal)
 SELECT ('00000000-0000-0000-0000-000000'||n)::uuid,
     ('00000000-0000-0000-0000-000000'||(n-10))::uuid,'PRIMARY',0
-FROM generate_series(992311,992316) n;
+FROM generate_series(992311,992318) n;
 INSERT INTO feedback_placement(id,feedback_id,placement_type,posted_comment_ref,created_at)
 SELECT ('00000000-0000-0000-0000-000000'||(n+20))::uuid,
     ('00000000-0000-0000-0000-000000'||n)::uuid,'SUMMARY',external,
     '2026-01-01T00:01:30Z'
-FROM (VALUES (992312,NULL::text),(992314,'provider:updated'),(992315,'provider:correction')) c(n,external);
+FROM (VALUES (992312,NULL::text),(992314,'provider:updated'),(992315,'provider:correction'),
+    (992317,'provider:partial-uncertain'),(992318,'provider:partial-failed')) c(n,external);
 INSERT INTO feedback_dispatch(id,destination_key,workspace_id,agent_job_id,feedback_id,destination,state,body,
     practice_slugs,package_content,delivered_placements,write_started,inline_write_started,
     delivered_external_ref,next_attempt_at,attempt_count,created_at,updated_at)
@@ -144,10 +146,11 @@ SELECT ('00000000-0000-0000-0000-000000'||(n+40))::uuid,'send-case-'||n,
     'APPROVED_REVIEW_PACKAGE',state,'Explain this change.','["explains-why"]',
     jsonb_build_object('mrNote','Explain this change.','summaryContributors',jsonb_build_array('send-case-'||(n-10)),
         'inlineMarker','<!-- hephaestus-approved-package:00000000-0000-0000-0000-000000'||n||' -->'),
-    '[]',n IN(992312,992314,992315),false,external,'2026-01-01T00:01:30Z',1,'2026-01-01T00:01:00Z','2026-01-01T00:01:30Z'
+    '[]',n IN(992312,992314,992315,992317,992318),false,external,'2026-01-01T00:01:30Z',1,'2026-01-01T00:01:00Z','2026-01-01T00:01:30Z'
 FROM (VALUES (992311,'PENDING',NULL::text),(992312,'PENDING',NULL::text),
     (992313,'UNCERTAIN',NULL::text),(992314,'SENT','provider:updated'),
-    (992315,'SENT','provider:correction'),(992316,'PENDING',NULL::text)) d(n,state,external);
+    (992315,'SENT','provider:correction'),(992316,'PENDING',NULL::text),
+    (992317,'UNCERTAIN','provider:partial-uncertain'),(992318,'FAILED','provider:partial-failed')) d(n,state,external);
 -- A confirmed summary can be corrected after a separate inline note failed before writing.
 UPDATE feedback SET proposed_placements='[{"type":"INLINE","body":"Check the timeout.","path":"src/retry.ts","startLine":1,"endLine":1,"deliveryKey":"approved:00000000-0000-0000-0000-000000992314:0"}]'
 WHERE id='00000000-0000-0000-0000-000000992314';
@@ -211,3 +214,63 @@ SELECT ('00000000-0000-0000-0000-000000'||(n+20))::uuid,'outcome-case-'||n,
 FROM (VALUES (992501,'MET',NULL::text),(992502,'NOT_APPLICABLE',NULL::text),
     (992503,'UNDETERMINED',NULL::text),(992504,'NOT_MET','CRITICAL'),
     (992505,'NOT_MET','MAJOR'),(992506,'NOT_MET','MINOR')) cases(n,outcome,severity);
+
+-- A job's recorded occasion takes precedence over mixed observation populations.
+INSERT INTO agent_job(id,workspace_id,job_type,status,config_snapshot,job_token,retry_count,
+    created_at,completed_at,available_at,trace_id,metadata,delivery_status,practice_trigger_mode)
+SELECT ('00000000-0000-0000-0000-000000'||n)::uuid,992101,'PULL_REQUEST_REVIEW','COMPLETED',
+    '{}','origin-case-'||n,0,'2025-12-01','2025-12-01T00:01:00Z','2025-12-01',repeat('f',32),
+    jsonb_strip_nulls(jsonb_build_object('pull_request_id',992109,'about_user_id',992103,
+        'observation_origin',origin,'signal','scm.pull_request.opened','signal_revision','origin-'||n)),
+    'DELIVERED',CASE WHEN n=992606 THEN 'MANUAL' ELSE 'AUTO' END
+FROM (VALUES (992601,'LIVE'),(992602,'MANUAL'),(992603,'BACKFILL'),(992604,'BACKFILL'),
+    (992605,'LIVE'),(992606,NULL::text)) f(n,origin);
+INSERT INTO artifact_signal(id,workspace_id,artifact_kind,artifact_id,signal_name,revision,occurred_at,
+    discovered_via,state,job_id,state_changed_at,actor_user_id,requested_by_user_id)
+SELECT ('00000000-0000-0000-0000-000000'||(n+10))::uuid,992101,'scm.pull_request',992109,
+    'scm.pull_request.opened','origin-'||n,'2025-12-01',source,'TRIGGERED',
+    ('00000000-0000-0000-0000-000000'||n)::uuid,'2025-12-01',992103,
+    CASE WHEN source='MANUAL' THEN 992103 END
+FROM (VALUES (992601,'EVENT'),(992602,'MANUAL'),(992603,'SWEEP'),(992604,'BACKFILL')) f(n,source);
+INSERT INTO observation(id,occurrence_key,agent_job_id,workspace_id,practice_id,practice_revision_id,
+    artifact_kind,artifact_id,about_user_id,summary,outcome,severity,evidence,evidence_rationale,
+    observed_at,origin,superseded_at)
+SELECT ('00000000-0000-0000-0000-000000'||(n+20))::uuid,'origin-case-'||n,
+    ('00000000-0000-0000-0000-000000'||n)::uuid,992101,992121,992131,'scm.pull_request',992109,
+    992103,'Retain the observation population.','NOT_MET','INFO','{"citations":[]}',
+    'The job occasion is a separate fact.','2025-12-01T00:00:30Z',
+    CASE WHEN n IN(992603,992604) THEN 'LIVE' ELSE 'BACKFILL' END,'2025-12-02'
+FROM generate_series(992601,992606) n;
+
+INSERT INTO observation(id,occurrence_key,agent_job_id,workspace_id,practice_id,practice_revision_id,
+    artifact_kind,artifact_id,about_user_id,summary,outcome,severity,evidence,evidence_rationale,
+    observed_at,origin,superseded_at)
+VALUES('00000000-0000-0000-0000-000000992627','origin-case-live-sibling',
+    '00000000-0000-0000-0000-000000992601',992101,992501,992511,'scm.pull_request',992109,
+    992103,'Retain the live sibling.','MET',NULL,'{"citations":[]}',
+    'This observation shares an event job with a backfilled population.','2025-12-01T00:00:30Z','LIVE','2025-12-02');
+
+-- Both partial sends retain their confirmed summary; only one sibling has a possible-write fence.
+UPDATE feedback f SET proposed_placements=jsonb_build_array(jsonb_build_object(
+    'type','INLINE','body','Check the timeout.','path','src/retry.ts','startLine',1,'endLine',1,
+    'deliveryKey','approved:'||f.id||':0'))
+WHERE id IN('00000000-0000-0000-0000-000000992317','00000000-0000-0000-0000-000000992318');
+UPDATE feedback_dispatch d SET package_content=package_content||jsonb_build_object(
+    'diffNotes',jsonb_build_array(jsonb_build_object('body','Check the timeout.','filePath','src/retry.ts',
+        'startLine',1,'endLine',1,'deliveryKey','approved:'||d.feedback_id||':0'))),
+    delivered_placements=jsonb_build_array(jsonb_build_object('deliveryKey','approved:'||d.feedback_id||':0',
+        'path','src/retry.ts','startLine',1,'endLine',1,'disposition','FAILED',
+        'writeMayHaveStarted',d.state='UNCERTAIN','placement','INLINE'))
+WHERE feedback_id IN('00000000-0000-0000-0000-000000992317','00000000-0000-0000-0000-000000992318');
+
+-- Stopped GitLab projects have no monitor; durable exclusions also block later rediscovery.
+INSERT INTO identity_provider(id,type,server_url) VALUES(992702,'GITLAB','https://gitlab.cutover.example');
+INSERT INTO connection(id,workspace_id,kind,instance_key,state,config)
+VALUES(992701,992201,'GITLAB','released-stops','ACTIVE',
+    '{"type":"GITLAB","serverUrl":"https://gitlab.cutover.example","gitlabGroupId":701,"gitlabWebhookId":702,"signingMode":"PLAINTEXT","enabledStreams":[],"tokenMetadata":null,"projectExclusions":{"nativeIds":[703],"unresolvedPaths":["other/stopped-path"]}}');
+INSERT INTO repository(id,native_id,provider_id,name,name_with_owner,is_archived,is_disabled,is_private,has_discussions_enabled)
+VALUES(992703,703,992702,'stopped-id','other/renamed-stopped-id',false,false,false,false),
+    (992704,704,992702,'stopped-path','other/stopped-path',false,false,false,false),
+    (992705,705,992702,'active','other/active',false,false,false,false);
+INSERT INTO repository_to_monitor(id,workspace_id,native_id,name_with_owner,generated_paths)
+VALUES(992705,992201,705,'other/active','[]');

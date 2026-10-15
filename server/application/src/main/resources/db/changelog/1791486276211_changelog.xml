@@ -2115,20 +2115,24 @@ JOIN _item_map m ON m.workspace_id=s.workspace_id
 LEFT JOIN _person_map p ON p.user_id=s.requested_by_user_id CROSS JOIN _cutover_clock c;
 
 CREATE TEMP TABLE _job_transition ON COMMIT DROP AS
+-- A job occasion is independent of the population on any individual observation.
 WITH origins AS (
- SELECT j.id,CASE
-   WHEN EXISTS(SELECT 1 FROM _cutover_old_observation o WHERE o.agent_job_id=j.id AND o.origin='BACKFILL')
-     OR j.metadata->>'observation_origin'='BACKFILL'
-     THEN CASE WHEN EXISTS(SELECT 1 FROM _cutover_old_artifact_signal s WHERE s.job_id=j.id AND s.discovered_via='SWEEP')
-               THEN 'SCHEDULE' ELSE 'BACKFILL' END
-   WHEN EXISTS(SELECT 1 FROM _cutover_old_observation o WHERE o.agent_job_id=j.id AND o.origin='MANUAL')
-     OR j.metadata->>'observation_origin'='MANUAL' THEN 'REQUEST'
-   WHEN EXISTS(SELECT 1 FROM _cutover_old_observation o WHERE o.agent_job_id=j.id AND o.origin='LIVE') THEN 'EVENT'
-   WHEN EXISTS(SELECT 1 FROM _cutover_old_artifact_signal s WHERE s.job_id=j.id AND s.discovered_via='SWEEP') THEN 'SCHEDULE'
-   WHEN EXISTS(SELECT 1 FROM _cutover_old_artifact_signal s WHERE s.job_id=j.id AND s.discovered_via='BACKFILL') THEN 'BACKFILL'
-   WHEN EXISTS(SELECT 1 FROM _cutover_old_artifact_signal s WHERE s.job_id=j.id AND s.discovered_via='MANUAL')
-     OR j.practice_trigger_mode='MANUAL' THEN 'REQUEST' ELSE 'EVENT' END AS origin
+ SELECT j.id,CASE s.discovered_via
+   WHEN 'SWEEP' THEN 'SCHEDULE' WHEN 'BACKFILL' THEN 'BACKFILL'
+   WHEN 'MANUAL' THEN 'REQUEST' WHEN 'EVENT' THEN 'EVENT' WHEN 'SYNC' THEN 'EVENT'
+   ELSE CASE j.metadata->>'observation_origin'
+     WHEN 'LIVE' THEN 'EVENT' WHEN 'MANUAL' THEN 'REQUEST' WHEN 'BACKFILL' THEN 'BACKFILL'
+     ELSE CASE WHEN j.practice_trigger_mode='MANUAL' THEN 'REQUEST'
+       WHEN EXISTS(SELECT 1 FROM _cutover_old_observation o WHERE o.agent_job_id=j.id AND o.origin='BACKFILL') THEN 'BACKFILL'
+       WHEN EXISTS(SELECT 1 FROM _cutover_old_observation o WHERE o.agent_job_id=j.id AND o.origin='MANUAL') THEN 'REQUEST'
+       ELSE 'EVENT' END END END AS origin
  FROM _cutover_old_agent_job j
+ LEFT JOIN LATERAL(
+  SELECT s.discovered_via FROM _cutover_old_artifact_signal s
+  WHERE s.job_id=j.id AND s.workspace_id=j.workspace_id
+  ORDER BY CASE WHEN s.signal_name=j.metadata->>'signal' AND s.revision=j.metadata->>'signal_revision'
+                THEN 0 ELSE 1 END,s.state_changed_at DESC,s.id LIMIT 1
+ ) s ON true
 ), admission AS (
  SELECT agent_job_id,min(observed_at) AS admitted_at FROM _cutover_old_observation GROUP BY agent_job_id
 )
@@ -2413,11 +2417,12 @@ DO $$ BEGIN
  IF EXISTS(SELECT 1 FROM _cutover_old_feedback_dispatch d JOIN _cutover_old_feedback f ON f.id=d.feedback_id WHERE d.body IS DISTINCT FROM coalesce(f.body,'')) THEN RAISE EXCEPTION 'approved summary text differs from its released proposal'; END IF;
  IF EXISTS(SELECT 1 FROM _cutover_old_feedback_dispatch d WHERE d.package_content->>'inlineMarker' IS NOT NULL AND d.package_content->>'inlineMarker' IS DISTINCT FROM CASE WHEN d.feedback_id IS NOT NULL THEN '<!-- hephaestus-approved-package:'||d.feedback_id||' -->' ELSE '<!-- hephaestus-review-package:'||d.agent_job_id||' -->' END) THEN RAISE EXCEPTION 'sealed marker differs from its released package'; END IF;
 END $$;
+-- Partial appearance retains its receipt without claiming that every copy was delivered.
 INSERT INTO feedback(id,workspace_id,review_id,item_id,developer_id,destination,state,stop_reason,body,checks,replaces_id,created_at,delivered_at)
  SELECT f.id,f.workspace_id,f.agent_job_id,CASE WHEN f.channel='IN_CONTEXT' THEN r.item_id ELSE i.item_id END,p.account_id,
  CASE f.channel WHEN 'IN_CONTEXT' THEN 'ON_WORK' WHEN 'IN_APP' THEN 'PRACTICE_PAGE' WHEN 'IN_CHAT' THEN 'CONVERSATION' END,
- CASE f.delivery_state WHEN 'PREPARED' THEN 'READY' WHEN 'PARTIALLY_DELIVERED' THEN 'DELIVERED' WHEN 'PARTIALLY_FAILED' THEN 'DELIVERED' WHEN 'SUPPRESSED' THEN 'WITHHELD' WHEN 'DISCARDED' THEN 'REJECTED' WHEN 'SUPERSEDED' THEN 'REPLACED' ELSE f.delivery_state END,
- CASE WHEN f.delivery_state='UNCONFIRMED' THEN 'DELIVERY_UNCONFIRMED' ELSE pg_temp.cutover_stop(f.suppression_reason) END,
+ CASE f.delivery_state WHEN 'PREPARED' THEN 'READY' WHEN 'PARTIALLY_DELIVERED' THEN 'UNCONFIRMED' WHEN 'PARTIALLY_FAILED' THEN 'FAILED' WHEN 'SUPPRESSED' THEN 'WITHHELD' WHEN 'DISCARDED' THEN 'REJECTED' WHEN 'SUPERSEDED' THEN 'REPLACED' ELSE f.delivery_state END,
+ CASE WHEN f.delivery_state IN('UNCONFIRMED','PARTIALLY_DELIVERED') THEN 'DELIVERY_UNCONFIRMED' ELSE pg_temp.cutover_stop(f.suppression_reason) END,
  f.body,jsonb_build_object('MIGRATION',jsonb_build_object('deliveryState',f.delivery_state,'stopReason',f.suppression_reason,'reviewedVersion',f.reviewed_revision)),f.replaces_id,f.created_at,
  COALESCE(f.delivered_at,(SELECT min(c.created_at) FROM _cutover_old_feedback_placement c WHERE c.feedback_id=f.id AND (c.posted_comment_ref IS NOT NULL OR c.chat_message_id IS NOT NULL) AND f.delivery_state<>'UNCONFIRMED'),
  (SELECT min(d.updated_at) FROM _cutover_old_feedback_dispatch d JOIN _cutover_send_parent sp ON sp.dispatch_id=d.id WHERE sp.feedback_id=f.id AND d.delivered_external_ref IS NOT NULL))
@@ -3520,7 +3525,7 @@ DO $$ DECLARE checked_row record; BEGIN
  IF EXISTS(SELECT 1 FROM _cutover_old_feedback_approval o LEFT JOIN feedback_decision d ON d.id=o.id WHERE d.id IS NULL OR d.feedback_id<>o.feedback_id OR d.decided_at<>o.decided_at OR d.note IS DISTINCT FROM o.rejection_note) THEN RAISE EXCEPTION 'approval history changed'; END IF;
  IF EXISTS(SELECT 1 FROM _cutover_old_reaction o LEFT JOIN feedback_response r ON r.id=o.id WHERE r.id IS NULL OR r.feedback_id<>o.feedback_id OR r.created_at<>o.created_at OR r.comment IS DISTINCT FROM o.explanation) THEN RAISE EXCEPTION 'response history changed'; END IF;
  IF EXISTS(SELECT 1 FROM feedback_send s JOIN _cutover_send_parent sp ON sp.feedback_id=s.feedback_id JOIN _cutover_old_feedback_dispatch d ON d.id=sp.dispatch_id WHERE d.state IN('SENT','SUPPRESSED','FAILED') AND s.action='POST' AND s.state='PENDING') THEN RAISE EXCEPTION 'terminal delivery was re-enqueued'; END IF;
- IF EXISTS(SELECT 1 FROM _cutover_old_feedback f WHERE f.delivery_state IN('PARTIALLY_DELIVERED','PARTIALLY_FAILED') AND NOT EXISTS(SELECT 1 FROM feedback_copy c WHERE c.feedback_id=f.id AND (c.state='POSTED' OR (c.state='RETRACTED' AND c.external_ref IS NOT NULL AND c.posted_at IS NOT NULL)))) THEN RAISE EXCEPTION 'partial delivery has no confirmed appearance'; END IF;
+ IF EXISTS(SELECT 1 FROM _cutover_old_feedback f WHERE f.delivery_state IN('PARTIALLY_DELIVERED','PARTIALLY_FAILED') AND NOT EXISTS(SELECT 1 FROM feedback_copy c WHERE c.feedback_id=f.id AND (c.posted_at IS NOT NULL AND ((c.state IN('POSTED','RETRACTED') AND c.external_ref IS NOT NULL) OR (c.state='POSTED' AND c.chat_message_id IS NOT NULL))))) THEN RAISE EXCEPTION 'partial delivery has no confirmed appearance'; END IF;
  IF EXISTS(SELECT 1 FROM _cutover_old_agent_job o LEFT JOIN review_job j ON j.id=o.id WHERE NOT EXISTS(SELECT 1 FROM _discarded_job_ids d WHERE d.id=o.id) AND(j.id IS NULL OR j.review_id<>o.id)) THEN RAISE EXCEPTION 'routed job identity changed'; END IF;
  IF EXISTS(SELECT 1 FROM _cutover_old_agent_job o JOIN review_job j ON j.id=o.id WHERE o.status IN('QUEUED','RUNNING') AND(j.status<>'CANCELLED' OR j.processing_status<>'DONE' OR j.cancellation_reason<>'CONTRACT_CHANGED' OR j.worker_id IS NOT NULL)) THEN RAISE EXCEPTION 'old runtime authority survived cutover'; END IF;
  IF EXISTS(SELECT 1 FROM _cutover_old_observation o WHERE o.evidence->'inapplicability' ? 'subject' AND o.evidence->'inapplicability' ? 'prerequisite' AND o.evidence->'inapplicability'->'subject' IS DISTINCT FROM o.evidence->'inapplicability'->'prerequisite') THEN RAISE EXCEPTION 'historical inapplicability keys conflict'; END IF;

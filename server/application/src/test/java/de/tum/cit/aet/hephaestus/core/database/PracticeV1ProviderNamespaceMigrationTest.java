@@ -3,13 +3,46 @@ package de.tum.cit.aet.hephaestus.core.database;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig.GitLabConfig;
 import java.sql.SQLException;
+import java.util.Objects;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import tools.jackson.databind.json.JsonMapper;
 
 @Tag("database")
 class PracticeV1ProviderNamespaceMigrationTest {
+    @ParameterizedTest
+    @ValueSource(strings = {"dev", "prod"})
+    void shouldPreserveReleasedGitLabExclusionsAndStoppedProjects(String context) throws Exception {
+        var database = PracticeMigrationFixture.releasedDatabase(context);
+        String configQuery = "SELECT config::text FROM connection WHERE id=992701";
+        var before = PracticeMigrationFixture.column(database, configQuery);
+        String monitors = """
+            SELECT name_with_owner FROM repository_to_monitor WHERE workspace_id=992201 ORDER BY id
+            """;
+        assertThat(PracticeMigrationFixture.column(database, monitors)).containsExactly("other/active");
+        PracticeMigrationFixture.upgrade(database, context);
+        assertThat(PracticeMigrationFixture.column(database, configQuery)).isEqualTo(before);
+        assertThat(PracticeMigrationFixture.column(database, monitors)).containsExactly("other/active");
+        var config = (GitLabConfig) JsonMapper.builder()
+                .build()
+                .readValue(
+                        Objects.requireNonNull(PracticeMigrationFixture.column(database, configQuery)
+                                .getFirst()),
+                        ConnectionConfig.class);
+        assertThat(config.projectExclusions().nativeIds()).containsExactly(703L);
+        assertThat(config.projectExclusions().unresolvedPaths()).containsExactly("other/stopped-path");
+        // The admission gate uses these same exclusions before discovery, webhook and in-flight writes.
+        assertThat(config.projectExclusions().excludes(703L, "other/renamed-stopped-id"))
+                .isTrue();
+        assertThat(config.projectExclusions().excludes(704L, "Other/Stopped-Path"))
+                .isTrue();
+        assertThat(config.projectExclusions().excludes(705L, "other/active")).isFalse();
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"dev", "prod"})
     void shouldPreserveReleasedProviderControlsAcrossTheirDistinctNamespaces(String context) throws Exception {

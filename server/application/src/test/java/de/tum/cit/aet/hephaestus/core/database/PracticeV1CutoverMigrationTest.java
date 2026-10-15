@@ -24,6 +24,36 @@ class PracticeV1CutoverMigrationTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"prod", "dev"})
+    void shouldRetainPartialFailureAndUncertaintyWithoutRepeatingConfirmedCopies(String context) throws Exception {
+        var database = migratedDatabase(context);
+        assertThat(column(database, """
+            SELECT right(f.id::text,6) || '|' || f.state || '|' ||
+                (f.delivered_at='2026-01-01T00:01:30Z'::timestamptz) || '|' ||
+                coalesce(f.stop_reason,'none') || '|' || s.action || '|' || s.state
+            FROM feedback f JOIN feedback_send s ON s.feedback_id=f.id
+            WHERE f.id IN('00000000-0000-0000-0000-000000992314',
+                '00000000-0000-0000-0000-000000992317','00000000-0000-0000-0000-000000992318')
+            ORDER BY f.id
+            """))
+                .containsExactly(
+                        "992314|FAILED|true|none|POST|DONE",
+                        "992317|UNCONFIRMED|true|DELIVERY_UNCONFIRMED|POST|UNCERTAIN",
+                        "992318|FAILED|true|none|POST|DONE");
+        assertThat(column(database, """
+            SELECT right(feedback_id::text,6) || '|' || kind || '|' || state || '|' ||
+                coalesce(external_ref,'none') || '|' || (posted_at IS NOT NULL)
+            FROM feedback_copy WHERE feedback_id IN('00000000-0000-0000-0000-000000992317',
+                '00000000-0000-0000-0000-000000992318') ORDER BY feedback_id,position
+            """))
+                .containsExactly(
+                        "992317|SUMMARY|POSTED|provider:partial-uncertain|true",
+                        "992317|LINE_NOTE|WRITE_STARTED|none|false",
+                        "992318|SUMMARY|POSTED|provider:partial-failed|true",
+                        "992318|LINE_NOTE|FAILED|none|false");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"prod", "dev"})
     void shouldPreserveReleasedProofAndStopOldExecutionWithoutRepeatingDelivery(String context) throws Exception {
         var database = releasedDatabase(context);
         upgrade(database, context);
@@ -107,7 +137,8 @@ class PracticeV1CutoverMigrationTest {
             SELECT r.id::text || '|' || r.outcome || '|' || coalesce(r.severity,'NONE') || '|'
                 || coalesce(p.severity,'NONE') || '|' || r.practice_version_id || '|' || (r.ended_at IS NULL)
             FROM result r LEFT JOIN problem p ON p.result_id=r.id AND p.workspace_id=r.workspace_id
-            WHERE r.workspace_id=992101 AND r.practice_id BETWEEN 992501 AND 992506 ORDER BY r.id
+            WHERE r.id BETWEEN '00000000-0000-0000-0000-000000992521'::uuid
+                AND '00000000-0000-0000-0000-000000992526'::uuid ORDER BY r.id
             """))
                 .containsExactly(
                         "00000000-0000-0000-0000-000000992521|MET|NONE|NONE|992511|true",
