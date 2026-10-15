@@ -235,6 +235,60 @@ export const LoadError: Story = {
 	},
 };
 
+/** The channel list was refused: it says so, offers no Retry, and shows no channel. */
+export const Refused: Story = {
+	args: { channels: [], isError: true, error: { status: 403 }, onRetry: fn() },
+	play: async ({ canvas }) => {
+		canvas.getByText("You do not have access to the monitored channels");
+		await expect(canvas.queryByRole("button", { name: /^retry$/iu })).not.toBeInTheDocument();
+		await expect(canvas.queryByText(/no channels monitored yet/iu)).not.toBeInTheDocument();
+	},
+};
+
+/** A failed refresh keeps the channels last read, and their actions, under the failure. */
+export const RefreshFailed: Story = {
+	args: {
+		channels: [pending, active],
+		refreshFailure: { error: { status: 503 }, pending: false, onRetry: fn() },
+	},
+	play: async ({ canvas }) => {
+		canvas.getByText("The monitored channels may be out of date");
+		await expect(canvas.getByRole("button", { name: /^retry$/iu })).toBeEnabled();
+		canvas.getByRole("button", { name: /actions for team-standup/iu });
+	},
+};
+
+export const RefreshRetrying: Story = {
+	args: {
+		channels: [pending, active],
+		refreshFailure: { error: { status: 503 }, pending: true, onRetry: fn() },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "Retrying…" })).toBeDisabled();
+		canvas.getByRole("button", { name: /actions for team-standup/iu });
+	},
+};
+
+/**
+ * Slack's channel list could not be read. The monitored channels keep their actions, and the
+ * failure appears in the Add dialog, where a channel is picked.
+ */
+export const CandidatesFailed: Story = {
+	args: {
+		channels: [active],
+		candidatesFailure: { error: { status: 503 }, pending: false, onRetry: fn() },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.queryByRole("alert")).not.toBeInTheDocument();
+		canvas.getByRole("button", { name: /actions for team-standup/iu });
+
+		await userEvent.click(canvas.getByRole("button", { name: /add channel/iu }));
+		const dialog = await screen.findByRole("dialog");
+		within(dialog).getByText("We could not load the channels from Slack");
+		within(dialog).getByLabelText(/paste a channel link or id/iu);
+	},
+};
+
 /** Removing a PENDING channel that never got past setup: no type-to-confirm, accurate copy. */
 export const RemovePendingNothingCollected: Story = {
 	args: { channels: [pending] },

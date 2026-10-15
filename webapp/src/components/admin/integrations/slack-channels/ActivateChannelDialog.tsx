@@ -50,8 +50,18 @@ export function ActivateChannelDialog({
 	}
 
 	return (
-		<Dialog open={channel != null} onOpenChange={onOpenChange}>
-			<DialogContent>
+		<Dialog
+			open={channel != null}
+			onOpenChange={(next, details) => {
+				// A pending activation owns the dialog until its answer.
+				if (!next && submitting) {
+					details.cancel();
+					return;
+				}
+				onOpenChange(next);
+			}}
+		>
+			<DialogContent showCloseButton={!submitting}>
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
 						<MegaphoneIcon className="size-4" aria-hidden />

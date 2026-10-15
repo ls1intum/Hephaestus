@@ -18,10 +18,11 @@ import {
 	EmptyTitle,
 } from "@/components/ui/empty";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import type { RefreshFailure } from "@/runtime/tanstack-query/infinite-list";
 
 import { IntegrationCardHeading } from "./IntegrationCardHeading";
 import { ActivateChannelDialog } from "./slack-channels/ActivateChannelDialog";
-import { AddChannelDialog } from "./slack-channels/AddChannelDialog";
+import { AddChannelDialog, type AddChannelDialogProps } from "./slack-channels/AddChannelDialog";
 import { ChannelHistorySheet } from "./slack-channels/ChannelHistorySheet";
 import type { SlackConsentState } from "./slack-channels/consent-terms";
 import { RemoveChannelAlertDialog } from "./slack-channels/RemoveChannelAlertDialog";
@@ -57,12 +58,18 @@ export interface WorkspaceSlackChannelsSettingsProps {
 	channels: SlackMonitoredChannel[];
 	channelCandidates: readonly SlackChannelCandidate[];
 	isLoading: boolean;
-	/** The channel list query failed — show a retry panel instead of the empty state. */
+	/** The channel list could not be read — show why instead of the empty state. */
 	isError?: boolean;
 	/** The thrown error behind `isError`, when the container has it; feeds the alert's detail. */
 	error?: unknown;
 	/** Re-run the failed channel list query. */
 	onRetry?: () => void;
+	/** Reading the channels again failed; the channels last read stay, with the failure above them. */
+	refreshFailure?: RefreshFailure;
+	/** The channels Slack lists for the picker are still loading. */
+	candidatesLoading?: boolean;
+	/** The channels Slack lists for the picker could not be read; a pasted reference still works. */
+	candidatesFailure?: AddChannelDialogProps["candidatesFailure"];
 	/** Allow-list a new channel (lands PENDING). Resolves on success, rejects to keep the dialog open. */
 	onRegisterChannel: (input: {
 		slackChannelId: string;
@@ -76,6 +83,42 @@ export interface WorkspaceSlackChannelsSettingsProps {
 	}) => Promise<void> | void;
 	/** Terminal revoke + erase. Resolves on success, rejects to keep the dialog open. */
 	onRemoveChannel: (input: { slackChannelId: string; reason?: string }) => Promise<void> | void;
+}
+
+/** One open of a channel dialog. Every open is a new object, even for the same channel. */
+interface ChannelDialogOpen {
+	slackChannelId: string;
+	open: boolean;
+}
+
+/**
+ * A channel dialog's lifetime. The channel is read from the current list: when it leaves the list,
+ * as a refused read clears it, the dialog unmounts at once instead of showing the channel through
+ * an exit, and its draft and pending request go with it. A later read does not reopen it, and a
+ * close from an earlier open, such as that request's answer, cannot close a later one.
+ */
+function useChannelDialog(channels: readonly SlackMonitoredChannel[]) {
+	const [current, setCurrent] = useState<ChannelDialogOpen | null>(null);
+	const channel = channels.find((c) => c.slackChannelId === current?.slackChannelId) ?? null;
+	if (current !== null && channel === null) {
+		setCurrent(null);
+	}
+	const open = (next: SlackMonitoredChannel) => {
+		setCurrent({ slackChannelId: next.slackChannelId, open: true });
+	};
+	const dialog =
+		current === null || channel === null
+			? null
+			: {
+					// A closed dialog stays mounted, so its exit can play.
+					channel: current.open ? channel : null,
+					onOpenChange: (next: boolean) => {
+						if (!next) {
+							setCurrent((latest) => (latest === current ? { ...current, open: false } : latest));
+						}
+					},
+				};
+	return { open, dialog };
 }
 
 /**
@@ -93,14 +136,17 @@ export function WorkspaceSlackChannelsSettings({
 	isError = false,
 	error,
 	onRetry,
+	refreshFailure,
+	candidatesLoading = false,
+	candidatesFailure,
 	onRegisterChannel,
 	onUpdateConsent,
 	onRemoveChannel,
 }: WorkspaceSlackChannelsSettingsProps) {
 	const [addOpen, setAddOpen] = useState(false);
-	const [activateChannel, setActivateChannel] = useState<SlackMonitoredChannel | null>(null);
-	const [removeChannel, setRemoveChannel] = useState<SlackMonitoredChannel | null>(null);
-	const [historyChannel, setHistoryChannel] = useState<SlackMonitoredChannel | null>(null);
+	const activate = useChannelDialog(channels);
+	const remove = useChannelDialog(channels);
+	const history = useChannelDialog(channels);
 
 	return (
 		<>
@@ -139,6 +185,7 @@ export function WorkspaceSlackChannelsSettings({
 						isError={isError}
 						error={error}
 						onRetry={onRetry}
+						refreshFailure={refreshFailure}
 						hasChannels={channels.length > 0}
 						onAddChannel={() => setAddOpen(true)}
 					>
@@ -149,7 +196,7 @@ export function WorkspaceSlackChannelsSettings({
 									<SlackChannelRow
 										key={channel.slackChannelId}
 										channel={channel}
-										onActivate={setActivateChannel}
+										onActivate={activate.open}
 										onPause={(c) =>
 											swallow(
 												onUpdateConsent({
@@ -166,7 +213,7 @@ export function WorkspaceSlackChannelsSettings({
 												}),
 											)
 										}
-										onRemove={setRemoveChannel}
+										onRemove={remove.open}
 										onSetUpAgain={(c) =>
 											swallow(
 												onRegisterChannel({
@@ -175,7 +222,7 @@ export function WorkspaceSlackChannelsSettings({
 												}),
 											)
 										}
-										onViewHistory={setHistoryChannel}
+										onViewHistory={history.open}
 									/>
 								))}
 							</TableBody>
@@ -188,40 +235,36 @@ export function WorkspaceSlackChannelsSettings({
 				open={addOpen}
 				onOpenChange={setAddOpen}
 				candidates={channelCandidates}
+				candidatesLoading={candidatesLoading}
+				candidatesFailure={candidatesFailure}
 				onSubmit={onRegisterChannel}
 			/>
 
-			<ActivateChannelDialog
-				channel={activateChannel}
-				onOpenChange={(open) => {
-					if (!open) {
-						setActivateChannel(null);
+			{activate.dialog && (
+				<ActivateChannelDialog
+					channel={activate.dialog.channel}
+					onOpenChange={activate.dialog.onOpenChange}
+					onConfirm={async (c) =>
+						onUpdateConsent({ slackChannelId: c.slackChannelId, consentState: "ACTIVE" })
 					}
-				}}
-				onConfirm={async (c) =>
-					onUpdateConsent({ slackChannelId: c.slackChannelId, consentState: "ACTIVE" })
-				}
-			/>
+				/>
+			)}
 
-			<RemoveChannelAlertDialog
-				channel={removeChannel}
-				onOpenChange={(open) => {
-					if (!open) {
-						setRemoveChannel(null);
-					}
-				}}
-				onConfirm={onRemoveChannel}
-			/>
+			{remove.dialog && (
+				<RemoveChannelAlertDialog
+					channel={remove.dialog.channel}
+					onOpenChange={remove.dialog.onOpenChange}
+					onConfirm={onRemoveChannel}
+				/>
+			)}
 
-			<ChannelHistorySheet
-				workspaceSlug={workspaceSlug}
-				channel={historyChannel}
-				onOpenChange={(open) => {
-					if (!open) {
-						setHistoryChannel(null);
-					}
-				}}
-			/>
+			{history.dialog && (
+				<ChannelHistorySheet
+					workspaceSlug={workspaceSlug}
+					channel={history.dialog.channel}
+					onOpenChange={history.dialog.onOpenChange}
+				/>
+			)}
 		</>
 	);
 }
@@ -232,12 +275,13 @@ function ChannelsContent({
 	isError,
 	error,
 	onRetry,
+	refreshFailure,
 	hasChannels,
 	onAddChannel,
 	children,
 }: Pick<
 	WorkspaceSlackChannelsSettingsProps,
-	"hasSlackConnection" | "isLoading" | "error" | "onRetry"
+	"hasSlackConnection" | "isLoading" | "error" | "onRetry" | "refreshFailure"
 > & {
 	isError: boolean;
 	hasChannels: boolean;
@@ -277,27 +321,38 @@ function ChannelsContent({
 			/>
 		);
 	}
+	const refreshAlert = refreshFailure !== undefined && (
+		<QueryErrorAlert title="The monitored channels may be out of date" {...refreshFailure} />
+	);
 	if (!hasChannels) {
 		return (
-			<Empty>
-				<EmptyHeader>
-					<EmptyMedia variant="icon">
-						<RadioIcon />
-					</EmptyMedia>
-					<EmptyTitle>No channels monitored yet</EmptyTitle>
-					<EmptyDescription>
-						Add a Slack channel to get AI practice feedback from its conversations. Monitoring
-						begins only when you activate the channel.
-					</EmptyDescription>
-				</EmptyHeader>
-				<EmptyContent>
-					<Button size="sm" onClick={onAddChannel}>
-						<PlusIcon className="size-4" />
-						Add channel
-					</Button>
-				</EmptyContent>
-			</Empty>
+			<>
+				{refreshAlert}
+				<Empty>
+					<EmptyHeader>
+						<EmptyMedia variant="icon">
+							<RadioIcon />
+						</EmptyMedia>
+						<EmptyTitle>No channels monitored yet</EmptyTitle>
+						<EmptyDescription>
+							Add a Slack channel to get AI practice feedback from its conversations. Monitoring
+							begins only when you activate the channel.
+						</EmptyDescription>
+					</EmptyHeader>
+					<EmptyContent>
+						<Button size="sm" onClick={onAddChannel}>
+							<PlusIcon className="size-4" />
+							Add channel
+						</Button>
+					</EmptyContent>
+				</Empty>
+			</>
 		);
 	}
-	return children;
+	return (
+		<>
+			{refreshAlert}
+			{children}
+		</>
+	);
 }

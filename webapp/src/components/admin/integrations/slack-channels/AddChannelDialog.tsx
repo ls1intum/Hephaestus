@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import type { SlackChannelCandidate } from "@/components/admin/integrations/WorkspaceSlackChannelsSettings";
+import { QueryErrorAlert, type QueryErrorAlertProps } from "@/components/common/QueryErrorAlert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { parseSlackChannelReference } from "@/lib/slack-channel-reference";
 import { hasText } from "@/lib/text";
 
@@ -24,6 +26,10 @@ export interface AddChannelDialogProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	candidates: readonly SlackChannelCandidate[];
+	/** The channels Slack lists are still loading. */
+	candidatesLoading?: boolean;
+	/** The channels Slack lists could not be read. The picker says why; a pasted reference still works. */
+	candidatesFailure?: Pick<QueryErrorAlertProps, "error" | "onRetry" | "pending">;
 	onSubmit: (input: { slackChannelId: string; channelName?: string }) => Promise<void> | void;
 }
 
@@ -41,16 +47,25 @@ export function AddChannelDialog({
 	open,
 	onOpenChange,
 	candidates,
+	candidatesLoading = false,
+	candidatesFailure,
 	onSubmit,
 }: AddChannelDialogProps) {
-	const [selectedCandidate, setSelectedCandidate] = useState<SlackChannelCandidate | null>(null);
+	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const [channelReference, setChannelReference] = useState("");
 	const [channelName, setChannelName] = useState("");
-	const [pasteOpen, setPasteOpen] = useState(candidates.length === 0);
+	const [pasteOpen, setPasteOpen] = useState(false);
 	const [submitError, setSubmitError] = useState<string | null>(null);
 	const [submitting, setSubmitting] = useState(false);
 
-	const hasCandidates = candidates.length > 0;
+	const hasCandidates =
+		candidatesFailure === undefined && !candidatesLoading && candidates.length > 0;
+	// The pick is read from the current list, so a list that can no longer be read offers no pick.
+	const selectedCandidate = hasCandidates
+		? (candidates.find((c) => c.slackChannelId === selectedId) ?? null)
+		: null;
+	// Without a list to pick from, pasting is the way in, so it is shown rather than offered.
+	const showPaste = pasteOpen || (!hasCandidates && !candidatesLoading);
 	const parsedReference = parseSlackChannelReference(channelReference);
 	const referenceInvalid = channelReference.trim().length > 0 && parsedReference == null;
 
@@ -69,10 +84,10 @@ export function AddChannelDialog({
 
 	function handleOpenChange(next: boolean) {
 		if (!next) {
-			setSelectedCandidate(null);
+			setSelectedId(null);
 			setChannelReference("");
 			setChannelName("");
-			setPasteOpen(candidates.length === 0);
+			setPasteOpen(false);
 			setSubmitError(null);
 			setSubmitting(false);
 		}
@@ -105,8 +120,19 @@ export function AddChannelDialog({
 	}
 
 	return (
-		<Dialog open={open} onOpenChange={handleOpenChange}>
-			<DialogContent className="sm:max-w-lg">
+		<Dialog
+			open={open}
+			onOpenChange={(next, details) => {
+				// A pending Add owns the dialog until its response: closing now would clear the draft it
+				// is sending, and its answer would then close whatever draft came next.
+				if (!next && submitting) {
+					details.cancel();
+					return;
+				}
+				handleOpenChange(next);
+			}}
+		>
+			<DialogContent className="sm:max-w-lg" showCloseButton={!submitting}>
 				<DialogHeader>
 					<DialogTitle>Add a channel to monitor</DialogTitle>
 					<DialogDescription>
@@ -122,6 +148,15 @@ export function AddChannelDialog({
 					}}
 				>
 					<FieldGroup>
+						{candidatesFailure !== undefined && (
+							<QueryErrorAlert
+								title="We could not load the channels from Slack"
+								{...candidatesFailure}
+							/>
+						)}
+						{candidatesFailure === undefined && candidatesLoading && (
+							<Skeleton className="h-9 w-full" />
+						)}
 						{hasCandidates && (
 							<Field data-invalid={submitError != null}>
 								<FieldLabel htmlFor="add-slack-channel">Channel</FieldLabel>
@@ -144,7 +179,7 @@ export function AddChannelDialog({
 										) : null
 									}
 									onSelect={(candidate) => {
-										setSelectedCandidate(candidate);
+										setSelectedId(candidate.slackChannelId);
 										setChannelReference("");
 										setChannelName("");
 										setSubmitError(null);
@@ -157,7 +192,7 @@ export function AddChannelDialog({
 							</Field>
 						)}
 
-						{pasteOpen ? (
+						{showPaste ? (
 							<SlackChannelPasteField
 								id="add-slack-channel-id"
 								value={channelReference}
@@ -168,7 +203,7 @@ export function AddChannelDialog({
 								}
 								onChange={(value) => {
 									setChannelReference(value);
-									setSelectedCandidate(null);
+									setSelectedId(null);
 									setSubmitError(null);
 								}}
 							/>

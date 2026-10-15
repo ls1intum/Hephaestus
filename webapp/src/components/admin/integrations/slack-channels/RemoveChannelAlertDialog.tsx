@@ -92,7 +92,17 @@ export function RemoveChannelAlertDialog({
 	}
 
 	return (
-		<AlertDialog open={channel != null} onOpenChange={handleOpenChange}>
+		<AlertDialog
+			open={channel != null}
+			onOpenChange={(next, details) => {
+				// A pending removal owns the dialog until its answer, so dismissing cannot clear it.
+				if (!next && submitting) {
+					details.cancel();
+					return;
+				}
+				handleOpenChange(next);
+			}}
+		>
 			<AlertDialogContent>
 				<AlertDialogHeader>
 					<AlertDialogTitle>
