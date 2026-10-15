@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WorkspaceDataSyncTrigger;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobConflictException;
@@ -15,6 +16,7 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.Optional;
 import java.util.function.BooleanSupplier;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -93,13 +95,16 @@ public class GitLabWorkspaceDataSyncTrigger implements WorkspaceDataSyncTrigger 
                             SyncJobTrigger.LIFECYCLE,
                             null),
                     handle -> {
-                        SyncResult result = syncAllRepositoriesBody(workspaceId, () -> {
-                            if (handle.isCancellationRequested()) {
-                                handle.reportCancelled();
-                                return true;
-                            }
-                            return false;
-                        });
+                        SyncResult result = syncAllRepositoriesBody(
+                                workspaceId,
+                                () -> {
+                                    if (handle.isCancellationRequested()) {
+                                        handle.reportCancelled();
+                                        return true;
+                                    }
+                                    return false;
+                                },
+                                handle);
                         if (result.status() != SyncResult.Status.COMPLETED) {
                             handle.reportWarnings();
                         }
@@ -122,13 +127,19 @@ public class GitLabWorkspaceDataSyncTrigger implements WorkspaceDataSyncTrigger 
     }
 
     private SyncResult syncAllRepositoriesBody(long workspaceId, BooleanSupplier cancelled) {
+        return syncAllRepositoriesBody(workspaceId, cancelled, null);
+    }
+
+    private SyncResult syncAllRepositoriesBody(
+            long workspaceId, BooleanSupplier cancelled, @Nullable SyncExecutionHandle handle) {
         Workspace workspace = workspaceRepository.findById(workspaceId).orElse(null);
         if (workspace == null) {
             log.warn("Skipped GitLab data sync: reason=workspaceNotFound, workspaceId={}", workspaceId);
             return SyncResult.abortedError(0);
         }
         return SyncResult.merge(
-                gitLabInitService.initialize(workspace), gitLabInitService.syncFullData(workspace, cancelled));
+                gitLabInitService.initialize(workspace, handle),
+                gitLabInitService.syncFullData(workspace, cancelled, handle));
     }
 
     @Override

@@ -11,6 +11,8 @@ package de.tum.cit.aet.hephaestus.integration.core.spi;
  * <p>Each integration reports only the phases it actually has. Nothing here is mandatory.
  */
 public enum SyncPhase {
+    /** Connection credentials, event consumer and webhook setup. */
+    CONNECTION("connection"),
     /** Organization / group / workspace-level metadata. */
     ORGANIZATION("organization"),
     /** Repository / project enumeration and metadata. */

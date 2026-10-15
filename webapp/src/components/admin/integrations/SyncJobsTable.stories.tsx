@@ -201,6 +201,32 @@ export const ExpandProgressDetail: Story = {
 	},
 };
 
+export const WarningDetail: Story = {
+	args: {
+		jobs: [
+			{
+				...failedJob,
+				status: "SUCCEEDED_WITH_WARNINGS",
+				errorSummary: undefined,
+				progress: {
+					phase: "repositories",
+					currentStep: "Project discovery stopped at the provider rate limit.",
+					currentRepository: "example-team",
+				},
+			},
+		],
+	},
+	play: async ({ canvas }) => {
+		await userEvent.click(canvas.getByRole("button", { name: /show details for job 1/iu }));
+		await expectSettledVisible(
+			await canvas.findByText("Project discovery stopped at the provider rate limit."),
+		);
+		canvas.getByText("Repositories");
+		canvas.getByText("example-team");
+		await expect(canvas.queryByRole("button", { name: /show error/iu })).not.toBeInTheDocument();
+	},
+};
+
 export const Loading: Story = { args: { jobs: [], isLoading: true } };
 export const ErrorState: Story = {
 	args: { jobs: [], isError: true, error: new Error("Network error"), onRetry: fn() },

@@ -179,7 +179,7 @@ public class OutlineDocumentSyncService {
     public void syncWorkspace(long workspaceId, @Nullable SyncExecutionHandle handle, SyncJobType type) {
         SyncContext ctx = resolveContext(workspaceId).orElse(null);
         if (ctx == null) {
-            reportWarning(handle);
+            reportWarning(handle, SyncPhase.CONNECTION, "Connection context is unavailable.", null);
             return;
         }
         Instant now = Instant.now();
@@ -200,7 +200,11 @@ public class OutlineDocumentSyncService {
                 if (!live.containsKey(collection.getCollectionId())) {
                     // Visibility loss ≠ deletion: never tombstone documents we merely cannot see.
                     recordCollectionError(ctx, collection, "Collection is no longer visible to the integration token");
-                    reportWarning(handle);
+                    reportWarning(
+                            handle,
+                            SyncPhase.COLLECTIONS,
+                            "Collection is no longer visible to the integration token.",
+                            collection.getName());
                     done++;
                     reportCollectionDone(handle, done, total, collection.getName());
                     continue;
@@ -208,7 +212,11 @@ public class OutlineDocumentSyncService {
                 if (syncOneCollectionRecordingError(ctx, collection, existing, budget, now, type, cancelled)) {
                     synced++;
                 } else {
-                    reportWarning(handle);
+                    reportWarning(
+                            handle,
+                            SyncPhase.COLLECTIONS,
+                            "Collection synchronization did not complete.",
+                            collection.getName());
                 }
                 done++;
                 reportCollectionDone(handle, done, total, collection.getName());
@@ -227,7 +235,11 @@ public class OutlineDocumentSyncService {
                     stale);
         } catch (OutlineRateLimitedException e) {
             logRateLimited(workspaceId, e);
-            reportWarning(handle);
+            reportWarning(
+                    handle,
+                    SyncPhase.COLLECTIONS,
+                    "Collection synchronization stopped at the provider rate limit.",
+                    null);
         }
     }
 
@@ -248,7 +260,7 @@ public class OutlineDocumentSyncService {
     public void syncPendingCollections(long workspaceId, @Nullable SyncExecutionHandle handle) {
         SyncContext ctx = resolveContext(workspaceId).orElse(null);
         if (ctx == null) {
-            reportWarning(handle);
+            reportWarning(handle, SyncPhase.CONNECTION, "Connection context is unavailable.", null);
             return;
         }
         List<OutlineCollection> pending =
@@ -275,14 +287,22 @@ public class OutlineDocumentSyncService {
                 // itself a RECONCILIATION job, so a clean pass here may sweep.
                 if (!syncOneCollectionRecordingError(
                         ctx, collection, existing, budget, now, SyncJobType.RECONCILIATION, cancelled)) {
-                    reportWarning(handle);
+                    reportWarning(
+                            handle,
+                            SyncPhase.COLLECTIONS,
+                            "Collection synchronization did not complete.",
+                            collection.getName());
                 }
                 done++;
                 reportCollectionDone(handle, done, total, collection.getName());
             }
         } catch (OutlineRateLimitedException e) {
             logRateLimited(workspaceId, e);
-            reportWarning(handle);
+            reportWarning(
+                    handle,
+                    SyncPhase.COLLECTIONS,
+                    "Collection synchronization stopped at the provider rate limit.",
+                    null);
         }
         // The catch-up tick exports bodies too, so it must also enforce the cap — including after a
         // rate-limited abort, since bodies exported before the pause still count against it.
@@ -298,9 +318,10 @@ public class OutlineDocumentSyncService {
     }
 
     /** Marks the enclosing job partially successful; no-op on the unhandled (scheduled/webhook) paths. */
-    private static void reportWarning(@Nullable SyncExecutionHandle handle) {
+    private static void reportWarning(
+            @Nullable SyncExecutionHandle handle, SyncPhase phase, String step, @Nullable String resource) {
         if (handle != null) {
-            handle.reportWarnings();
+            handle.reportWarnings(SyncProgress.ofResource(phase, step, resource, null, null));
         }
     }
 

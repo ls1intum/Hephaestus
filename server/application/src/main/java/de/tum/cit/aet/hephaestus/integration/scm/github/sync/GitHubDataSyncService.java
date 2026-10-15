@@ -673,7 +673,12 @@ public class GitHubDataSyncService {
                 }
                 if (shouldSync(target)) {
                     if (!syncSyncTarget(target) && handle != null) {
-                        handle.reportWarnings();
+                        handle.reportWarnings(SyncProgress.ofResource(
+                                SyncPhase.REPOSITORIES,
+                                "Repository refresh did not complete.",
+                                target.repositoryNameWithOwner(),
+                                null,
+                                null));
                     }
                 }
                 reposProcessed++;

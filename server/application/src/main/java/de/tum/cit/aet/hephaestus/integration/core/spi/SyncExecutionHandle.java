@@ -19,6 +19,12 @@ public interface SyncExecutionHandle {
     void reportWarnings();
 
     /**
+     * Retains the first incomplete operation for the terminal warning details. Later successful
+     * progress must not replace that explanation. This is one observed warning, not a full history.
+     */
+    void reportWarnings(SyncProgress detail);
+
+    /**
      * Reports progress. Both halves are required, and deliberately so.
      *
      * <p>{@link SyncProgress} is the only accepted detail shape rather than a free-form map: when each

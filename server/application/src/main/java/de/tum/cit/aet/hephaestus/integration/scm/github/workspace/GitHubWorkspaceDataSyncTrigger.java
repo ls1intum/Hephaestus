@@ -5,6 +5,8 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncProgress;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WorkspaceDataSyncTrigger;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobConflictException;
@@ -203,7 +205,12 @@ public class GitHubWorkspaceDataSyncTrigger implements WorkspaceDataSyncTrigger 
                     // absorbs this single-target resync, since the in-flight full sync already covers it.
                     handle -> {
                         if (!dataSyncServiceProvider.getObject().syncSyncTarget(target)) {
-                            handle.reportWarnings();
+                            handle.reportWarnings(SyncProgress.ofResource(
+                                    SyncPhase.REPOSITORIES,
+                                    "Repository refresh did not complete.",
+                                    target.repositoryNameWithOwner(),
+                                    null,
+                                    null));
                         }
                     });
         } catch (SyncJobConflictException e) {
