@@ -37,8 +37,8 @@ sequenceDiagram
     R->>R: Create the draft vX.Y.Z release and attach its evidence
     R->>R: Upgrade seeded data from the previous stable release
     R->>R: Qualify supported hosts
-    R->>R: Promote X.Y.Z / X.Y / latest image tags
     R->>R: Publish the release
+    R->>R: Promote X.Y.Z / X.Y / latest image tags
     Note over R: Production moves only through an approved promotion
 ```
 
@@ -70,8 +70,8 @@ sequenceDiagram
    `release.yml` starts only after that run succeeds.
 4. **Merging the Version PR cuts the release.** The workflow resolves release image digests, then runs the evidence gate.
    Only then does it create the draft at the merge commit and attach evidence.
-   After seeded-upgrade and supported-host gates also pass, it promotes CI-built images to `X.Y.Z`, `X.Y`, and `latest`.
-   Then it publishes the release.
+   After seeded-upgrade and supported-host gates also pass, it publishes the release and verifies its immutable state.
+   Then it promotes CI-built images to `X.Y.Z`, `X.Y`, and `latest`.
    Publication deploys nothing. See [Deploys](#deploys).
 
 ### When a release fails
@@ -101,11 +101,20 @@ The draft is not created when these sections are missing, repeated, out of order
 An ordinary merge of an already-published version does not cut a release.
 
 The resume path covers failures *after* draft creation: seeded-upgrade, supported-host, or publication failures.
-A workflow rerun at the same commit reuses the draft, regenerates evidence, and replaces assets.
+While the release is a draft, a workflow rerun at the same commit regenerates evidence and replaces assets.
 A draft pins its version to its commit.
 A later commit refuses to recut over it.
 If a draft can never pass, delete it manually.
 The fixed source must have no pending changesets before it can cut a release.
+
+If image alias promotion fails after publication, select **Re-run failed jobs** on that release workflow run.
+The publication job verifies the published evidence again and compares its host smoke records with the qualified artifacts from that run.
+Missing or different records stop the retry.
+The job keeps the immutable assets and retries image aliases by digest.
+
+Immediately before alias writes, the release planner checks the semantic newest published stable release under the promotion lock.
+An older release cannot move aliases after a newer stable release publishes, regardless of GitHub's latest marker.
+A full workflow rerun still skips an already-published version.
 
 Version-commit reverts are no longer part of recovery, but their exemption remains.
 `verify-changesets` normally freezes `MIGRATION.md` in feature PRs and prevents deletion of pending changesets or migration fragments.

@@ -234,7 +234,7 @@ A wedged broker has these symptoms:
 - The receiver's readiness probe is DOWN.
 - `webhook.stream.poll.age` grows or shows `NaN`.
 - The NATS container logs write errors.
-- `docker compose ps` shows `nats-server` unhealthy but running.
+- `docker compose --env-file .env --env-file release-lock.env ps` shows `nats-server` unhealthy but running.
 
 Docker does not act on a failed healthcheck.
 The container therefore remains in that state indefinitely.
@@ -243,7 +243,7 @@ The container therefore remains in that state indefinitely.
 
    ```bash
    df -h                                    # free space on the JetStream volume
-   docker compose logs --tail=100 nats-server
+   docker compose --env-file .env --env-file release-lock.env logs --tail=100 nats-server
    ```
 
    `no space left on device` on a JetStream write identifies this failure.
@@ -262,13 +262,13 @@ The container therefore remains in that state indefinitely.
 3. **Restart the broker**, which is the step that clears the wedge:
 
    ```bash
-   docker compose restart nats-server
+   docker compose --env-file .env --env-file release-lock.env restart nats-server
    ```
 
 4. **Restart the receiver** so it re-establishes its connection and re-reconciles the streams:
 
    ```bash
-   docker compose restart webhook-server
+   docker compose --env-file .env --env-file release-lock.env restart webhook-server
    ```
 
 5. Before another incident, set `NATS_JS_MAX_FILE_BYTES` below the volume's actual free space.
@@ -338,8 +338,8 @@ Reconciliation covers `MONITORING_TIMEFRAME` days afterward.
 2. For the self-host stack, run from `docker/self-host`:
 
    ```bash
-   docker compose up -d --force-recreate nats-server
-   docker compose exec nats-server cat /etc/nats/nats-server.conf
+   docker compose --env-file .env --env-file release-lock.env up -d --force-recreate nats-server
+   docker compose --env-file .env --env-file release-lock.env exec nats-server cat /etc/nats/nats-server.conf
    ```
 
 3. For the reference stack:
