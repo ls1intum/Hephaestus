@@ -1,6 +1,7 @@
 import { Building2, Users } from "lucide-react";
 
 import type { AdminWorkspaceView } from "@/api/types.gen";
+import { QueryErrorAlert, type QueryErrorAlertProps } from "@/components/common/QueryErrorAlert";
 import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,11 +15,15 @@ import {
 } from "@/components/ui/table";
 import { asDate, formatDate } from "@/lib/dates";
 import { getProviderLabel } from "@/lib/provider/provider-labels";
+import type { RefreshFailure } from "@/runtime/tanstack-query/infinite-list";
 
 export interface AdminWorkspacesTableProps {
 	workspaces: AdminWorkspaceView[];
 	isLoading: boolean;
-	isError: boolean;
+	/** The list could not be read: a refusal, or a first read that failed. No workspace is listed. */
+	loadFailure?: Pick<QueryErrorAlertProps, "error" | "onRetry" | "pending">;
+	/** Reading the list again failed; the workspaces last read stay, with the failure above them. */
+	refreshFailure?: RefreshFailure;
 	hasSearch: boolean;
 	onViewUsers: (workspace: AdminWorkspaceView) => void;
 }
@@ -71,16 +76,13 @@ function WorkspacesTableHeader() {
 export function AdminWorkspacesTable({
 	workspaces,
 	isLoading,
-	isError,
+	loadFailure,
+	refreshFailure,
 	hasSearch,
 	onViewUsers,
 }: AdminWorkspacesTableProps) {
-	if (isError) {
-		return (
-			<p className="py-8 text-center text-sm text-destructive">
-				We could not load workspaces. Reload the page to try again.
-			</p>
-		);
+	if (loadFailure !== undefined) {
+		return <QueryErrorAlert title="We could not load workspaces" {...loadFailure} />;
 	}
 	if (isLoading) {
 		return (
@@ -90,66 +92,77 @@ export function AdminWorkspacesTable({
 			</Table>
 		);
 	}
+	const refreshAlert = refreshFailure !== undefined && (
+		<QueryErrorAlert title="These workspaces may be out of date" {...refreshFailure} />
+	);
 	if (workspaces.length === 0) {
 		return (
-			<div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">
-				<Building2 className="size-8" aria-hidden />
-				<p className="text-sm">
-					{hasSearch ? "No workspaces match your search" : "No workspaces yet"}
-				</p>
-			</div>
+			<>
+				{refreshAlert}
+				<div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">
+					<Building2 className="size-8" aria-hidden />
+					<p className="text-sm">
+						{hasSearch ? "No workspaces match your search" : "No workspaces yet"}
+					</p>
+				</div>
+			</>
 		);
 	}
 
 	return (
-		<Table bordered>
-			<WorkspacesTableHeader />
-			<TableBody>
-				{workspaces.map((ws) => (
-					<TableRow key={ws.id}>
-						<TableCell className="font-medium">{ws.displayName}</TableCell>
-						<TableCell className="font-mono text-xs text-muted-foreground">
-							{ws.workspaceSlug}
-						</TableCell>
-						<TableCell>
-							<Badge variant={statusVariant(ws.status)}>{WORKSPACE_STATUS_LABELS[ws.status]}</Badge>
-						</TableCell>
-						<TableCell>
-							{ws.providerType ? (
-								<Badge variant="outline">
-									{getProviderLabel(ws.providerType, "Another provider")}
+		<>
+			{refreshAlert}
+			<Table bordered>
+				<WorkspacesTableHeader />
+				<TableBody>
+					{workspaces.map((ws) => (
+						<TableRow key={ws.id}>
+							<TableCell className="font-medium">{ws.displayName}</TableCell>
+							<TableCell className="font-mono text-xs text-muted-foreground">
+								{ws.workspaceSlug}
+							</TableCell>
+							<TableCell>
+								<Badge variant={statusVariant(ws.status)}>
+									{WORKSPACE_STATUS_LABELS[ws.status]}
 								</Badge>
-							) : (
-								<span className="text-muted-foreground">—</span>
-							)}
-						</TableCell>
-						<TableCell className="text-muted-foreground">{ws.ownerLogin ?? "—"}</TableCell>
-						<TableCell numeric className="text-right">
-							{ws.memberCount}
-						</TableCell>
-						<TableCell className="text-sm whitespace-nowrap text-muted-foreground">
-							{formatCreatedAt(ws.createdAt)}
-						</TableCell>
-						<TableCell className="text-right">
-							<Button
-								variant="outline"
-								size="sm"
-								aria-label={`View users of ${ws.displayName}`}
-								disabled={ws.status !== "ACTIVE"}
-								onClick={() => onViewUsers(ws)}
-							>
-								<Users aria-hidden />
-								View users
-							</Button>
-							{ws.status !== "ACTIVE" && (
-								<span className="sr-only">
-									This workspace is not active, so its users cannot be viewed.
-								</span>
-							)}
-						</TableCell>
-					</TableRow>
-				))}
-			</TableBody>
-		</Table>
+							</TableCell>
+							<TableCell>
+								{ws.providerType ? (
+									<Badge variant="outline">
+										{getProviderLabel(ws.providerType, "Another provider")}
+									</Badge>
+								) : (
+									<span className="text-muted-foreground">—</span>
+								)}
+							</TableCell>
+							<TableCell className="text-muted-foreground">{ws.ownerLogin ?? "—"}</TableCell>
+							<TableCell numeric className="text-right">
+								{ws.memberCount}
+							</TableCell>
+							<TableCell className="text-sm whitespace-nowrap text-muted-foreground">
+								{formatCreatedAt(ws.createdAt)}
+							</TableCell>
+							<TableCell className="text-right">
+								<Button
+									variant="outline"
+									size="sm"
+									aria-label={`View users of ${ws.displayName}`}
+									disabled={ws.status !== "ACTIVE"}
+									onClick={() => onViewUsers(ws)}
+								>
+									<Users aria-hidden />
+									View users
+								</Button>
+								{ws.status !== "ACTIVE" && (
+									<span className="sr-only">
+										This workspace is not active, so its users cannot be viewed.
+									</span>
+								)}
+							</TableCell>
+						</TableRow>
+					))}
+				</TableBody>
+			</Table>
+		</>
 	);
 }
