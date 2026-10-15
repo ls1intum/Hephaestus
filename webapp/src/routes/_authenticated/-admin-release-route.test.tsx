@@ -1,11 +1,14 @@
-import { screen } from "@testing-library/react";
+import type { QueryClient } from "@tanstack/react-query";
+import { act, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
-import { describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, vi } from "vitest";
 
+import { adminGetReleaseQueryKey } from "@/api/@tanstack/react-query.gen";
 import type { ReleaseStatus } from "@/api/types.gen";
 import type { Wire } from "@/lib/dates";
 import { server } from "@/mocks/server";
+import { deferred } from "@/test/async";
 import { renderRouteAt, ROUTE_RENDER_WAIT } from "@/test/router-harness";
 
 vi.setConfig({ testTimeout: 20_000 });
@@ -30,6 +33,51 @@ const status = {
 		},
 	],
 } satisfies Wire<ReleaseStatus>;
+
+const upgraded = {
+	...status,
+	running: { ...status.running, version: "1.2.4" },
+} satisfies Wire<ReleaseStatus>;
+
+type ReleaseRead = { status: 200; body: Wire<ReleaseStatus> } | { status: 403 | 503 };
+
+/** Answers every release read with the answer the test last chose, held until `hold` settles. */
+function serveReleaseReads() {
+	const reads: { count: number; answer: ReleaseRead; hold: Promise<void> } = {
+		count: 0,
+		answer: { status: 200, body: status },
+		hold: Promise.resolve(),
+	};
+	server.use(
+		http.get("*/admin/release", async () => {
+			reads.count += 1;
+			await reads.hold;
+			const { answer } = reads;
+			return answer.status === 200
+				? HttpResponse.json(answer.body)
+				: HttpResponse.json(
+						{ status: answer.status, title: "Request failed" },
+						{ status: answer.status },
+					);
+		}),
+	);
+	return reads;
+}
+
+/** Reads the release again through its own key, as returning to the page does. */
+async function rereadRelease(queryClient: QueryClient) {
+	await act(async () => {
+		await queryClient.invalidateQueries({ queryKey: adminGetReleaseQueryKey() });
+	});
+}
+
+/** The overview's other cards have no API here and show alerts of their own; this is the release's. */
+async function findReleaseAlert(title: string) {
+	await screen.findByText(title);
+	const alert = screen.getAllByRole("alert").find((node) => node.textContent.includes(title));
+	assert(alert);
+	return alert;
+}
 
 describe("instance overview release card", () => {
 	it("shows the check endpoint's answer and never folds a failure into up to date", async () => {
@@ -67,5 +115,65 @@ describe("instance overview release card", () => {
 		renderRouteAt("/admin");
 		await screen.findByText("Release information is unavailable", {}, ROUTE_RENDER_WAIT);
 		expect(screen.getByText("Delivery")).not.toBeNull();
+	});
+
+	it("keeps the last release with a notice when a refresh fails, then reads it again", async () => {
+		const reads = serveReleaseReads();
+		const user = userEvent.setup();
+		const queryClient = renderRouteAt("/admin");
+		await screen.findByText("v1.2.3", {}, ROUTE_RENDER_WAIT);
+
+		reads.answer = { status: 503 };
+		await rereadRelease(queryClient);
+		expect(reads.count).toBe(2);
+		const notice = await findReleaseAlert("Release information may be out of date");
+		screen.getByText("v1.2.3");
+		screen.getByRole("button", { name: "Check now" });
+
+		const fresh = deferred();
+		reads.answer = { status: 200, body: upgraded };
+		reads.hold = fresh.promise;
+		try {
+			await user.click(within(notice).getByRole("button", { name: "Retry" }));
+			const retrying = await within(notice).findByRole("button", { name: "Retrying…" });
+			expect(retrying.hasAttribute("disabled")).toBe(true);
+		} finally {
+			fresh.resolve();
+		}
+		await screen.findByText("v1.2.4");
+		expect(reads.count).toBe(3);
+		expect(screen.queryByText("v1.2.3")).toBeNull();
+		expect(screen.queryByText("Release information may be out of date")).toBeNull();
+	});
+
+	it("hides a refused release, does not bring it back on an outage, and shows a fresh read", async () => {
+		const reads = serveReleaseReads();
+		const user = userEvent.setup();
+		const queryClient = renderRouteAt("/admin");
+		await screen.findByText("v1.2.3", {}, ROUTE_RENDER_WAIT);
+
+		reads.answer = { status: 403 };
+		await rereadRelease(queryClient);
+		expect(reads.count).toBe(2);
+		const refused = await findReleaseAlert("Release information is unavailable");
+		expect(refused.textContent).toContain("Ask a workspace admin or instance admin for access.");
+		expect(within(refused).queryByRole("button", { name: "Retry" })).toBeNull();
+		expect(screen.queryByText("v1.2.3")).toBeNull();
+		expect(screen.queryByRole("button", { name: "Check now" })).toBeNull();
+
+		reads.answer = { status: 503 };
+		await rereadRelease(queryClient);
+		expect(reads.count).toBe(3);
+		const outage = await findReleaseAlert("Release information is unavailable");
+		await within(outage).findByText(/Try again in a moment\./u);
+		expect(screen.queryByText("v1.2.3")).toBeNull();
+		expect(screen.queryByText("Release information may be out of date")).toBeNull();
+
+		reads.answer = { status: 200, body: upgraded };
+		await user.click(within(outage).getByRole("button", { name: "Retry" }));
+		await screen.findByText("v1.2.4");
+		expect(reads.count).toBe(4);
+		expect(screen.queryByText("v1.2.3")).toBeNull();
+		screen.getByRole("button", { name: "Check now" });
 	});
 });
