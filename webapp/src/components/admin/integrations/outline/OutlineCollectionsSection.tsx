@@ -17,6 +17,7 @@ import {
 	EmptyTitle,
 } from "@/components/ui/empty";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import type { RefreshFailure } from "@/runtime/tanstack-query/infinite-list";
 
 import { AddCollectionDialog } from "./AddCollectionDialog";
 import { OutlineCollectionRow, type OutlineMirrorState } from "./OutlineCollectionRow";
@@ -47,6 +48,8 @@ export interface OutlineCollectionsSectionProps {
 	/** The collection-list query's error, if it failed — surfaced with a retry instead of the empty state. */
 	error?: unknown;
 	onRetry?: () => void;
+	/** Reading the collections again failed; the collections last read stay, with the failure above them. */
+	refreshFailure?: RefreshFailure;
 	/** Register a collection for mirroring (lands ENABLED + PENDING). Resolves on success,
 	 * rejects to keep the add dialog open. */
 	onRegisterCollection: (input: { collectionId: string }) => Promise<void> | void;
@@ -58,6 +61,51 @@ export interface OutlineCollectionsSectionProps {
 	/** Remove the collection and erase its mirrored documents. Resolves on success, rejects to
 	 * keep the confirm dialog open. */
 	onRemoveCollection: (input: { collectionId: string }) => Promise<void> | void;
+}
+
+/**
+ * A listed collection with its Remove confirmation. The confirmation lives as long as the row, so it
+ * names the collection as the current list reads it. When the row leaves the list, as a refused read
+ * clears it, the confirmation and its pending answer go with it, and a later read does not reopen it.
+ */
+function MirroredCollection({
+	collection,
+	onUpdateCollectionState,
+	onRemoveCollection,
+}: Pick<OutlineCollectionsSectionProps, "onUpdateCollectionState" | "onRemoveCollection"> & {
+	collection: OutlineCollection;
+}) {
+	const [removing, setRemoving] = useState(false);
+	return (
+		<>
+			<OutlineCollectionRow
+				collection={collection}
+				onPause={(c) =>
+					swallow(
+						onUpdateCollectionState({
+							collectionId: c.collectionId,
+							state: "PAUSED",
+						}),
+					)
+				}
+				onResume={(c) =>
+					swallow(
+						onUpdateCollectionState({
+							collectionId: c.collectionId,
+							state: "ENABLED",
+						}),
+					)
+				}
+				onRemove={() => setRemoving(true)}
+			/>
+			<RemoveCollectionAlertDialog
+				collection={collection}
+				open={removing}
+				onOpenChange={setRemoving}
+				onConfirm={onRemoveCollection}
+			/>
+		</>
+	);
 }
 
 /**
@@ -75,15 +123,18 @@ export function OutlineCollectionsSection({
 	isLoading,
 	error,
 	onRetry,
+	refreshFailure,
 	onRegisterCollection,
 	onUpdateCollectionState,
 	onRemoveCollection,
 }: OutlineCollectionsSectionProps) {
 	const [addOpen, setAddOpen] = useState(false);
-	const [removeCollection, setRemoveCollection] = useState<OutlineCollection | null>(null);
 
 	const hasCollections = collections.length > 0;
 	const failed = error != null;
+	const refreshAlert = refreshFailure !== undefined && (
+		<QueryErrorAlert title="The mirrored collections may be out of date" {...refreshFailure} />
+	);
 
 	let content: ReactNode;
 	if (isLoading) {
@@ -103,55 +154,46 @@ export function OutlineCollectionsSection({
 		);
 	} else if (hasCollections) {
 		content = (
-			<Table>
-				<CollectionsTableHeader />
-				<TableBody>
-					{collections.map((collection) => (
-						<OutlineCollectionRow
-							key={collection.collectionId}
-							collection={collection}
-							onPause={(c) =>
-								swallow(
-									onUpdateCollectionState({
-										collectionId: c.collectionId,
-										state: "PAUSED",
-									}),
-								)
-							}
-							onResume={(c) =>
-								swallow(
-									onUpdateCollectionState({
-										collectionId: c.collectionId,
-										state: "ENABLED",
-									}),
-								)
-							}
-							onRemove={setRemoveCollection}
-						/>
-					))}
-				</TableBody>
-			</Table>
+			<>
+				{refreshAlert}
+				<Table>
+					<CollectionsTableHeader />
+					<TableBody>
+						{collections.map((collection) => (
+							<MirroredCollection
+								key={collection.collectionId}
+								collection={collection}
+								onUpdateCollectionState={onUpdateCollectionState}
+								onRemoveCollection={onRemoveCollection}
+							/>
+						))}
+					</TableBody>
+				</Table>
+			</>
 		);
 	} else {
 		content = (
-			<Empty>
-				<EmptyHeader>
-					<EmptyMedia variant="icon">
-						<LibraryIcon />
-					</EmptyMedia>
-					<EmptyTitle>No collections mirrored yet</EmptyTitle>
-					<EmptyDescription>
-						Add the Outline collections whose documents should reach practice reviews. Hephaestus
-						reads only the collections you add.
-					</EmptyDescription>
-				</EmptyHeader>
-				<EmptyContent>
-					<Button size="sm" onClick={() => setAddOpen(true)}>
-						<PlusIcon className="size-4" />
-						Add collection
-					</Button>
-				</EmptyContent>
-			</Empty>
+			<>
+				{refreshAlert}
+				<Empty>
+					<EmptyHeader>
+						<EmptyMedia variant="icon">
+							<LibraryIcon />
+						</EmptyMedia>
+						<EmptyTitle>No collections mirrored yet</EmptyTitle>
+						<EmptyDescription>
+							Add the Outline collections whose documents should reach practice reviews. Hephaestus
+							reads only the collections you add.
+						</EmptyDescription>
+					</EmptyHeader>
+					<EmptyContent>
+						<Button size="sm" onClick={() => setAddOpen(true)}>
+							<PlusIcon className="size-4" />
+							Add collection
+						</Button>
+					</EmptyContent>
+				</Empty>
+			</>
 		);
 	}
 
@@ -181,16 +223,6 @@ export function OutlineCollectionsSection({
 				open={addOpen}
 				onOpenChange={setAddOpen}
 				onRegister={onRegisterCollection}
-			/>
-
-			<RemoveCollectionAlertDialog
-				collection={removeCollection}
-				onOpenChange={(open) => {
-					if (!open) {
-						setRemoveCollection(null);
-					}
-				}}
-				onConfirm={onRemoveCollection}
 			/>
 		</div>
 	);

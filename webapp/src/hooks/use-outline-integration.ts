@@ -14,9 +14,11 @@ import {
 import type { OutlineMirrorState } from "@/components/admin/integrations/outline/OutlineCollectionsSection";
 import type { OutlineConnectInput } from "@/components/admin/integrations/outline/OutlineConnectCard";
 import { syncPollInterval } from "@/components/admin/integrations/sync-format";
+import { queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
 import { useConnectionSync } from "@/hooks/use-connection-sync";
 import { useLivePushUnavailable } from "@/hooks/use-sync-liveness";
 import { problemDetailOf } from "@/lib/problem-detail";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 const TOKEN_STATUS_STALE_MS = 5 * 60_000;
 
@@ -61,12 +63,7 @@ export function useOutlineIntegration(workspaceSlug: string) {
 		},
 	});
 
-	const {
-		data: collections,
-		isLoading: isLoadingCollections,
-		error: collectionsError,
-		refetch: refetchCollections,
-	} = useQuery({
+	const collectionsQuery = useQuery({
 		...collectionsQueryOptions,
 		enabled: isConnectionActive,
 		// A collection still PENDING is work in flight, so it drives the same adaptive cadence as
@@ -77,6 +74,19 @@ export function useOutlineIntegration(workspaceSlug: string) {
 				livePushUnavailable,
 			),
 	});
+	useQueryReadRefusal(
+		collectionsQueryOptions.queryKey,
+		collectionsQuery.isError,
+		collectionsQuery.error,
+	);
+	// A retryable failed refresh keeps the collections this key last read, with the failure beside
+	// them. A refusal, or a read that never succeeded, shows none.
+	const collectionsRetained =
+		collectionsQuery.isRefetchError && queryErrorIsRetryable(collectionsQuery.error);
+	const collectionsFailed = collectionsQuery.isError && !collectionsRetained;
+	const retryCollections = () => {
+		void collectionsQuery.refetch();
+	};
 
 	const {
 		data: tokenStatus,
@@ -240,10 +250,17 @@ export function useOutlineIntegration(workspaceSlug: string) {
 		collectionsProps: isConnectionActive
 			? {
 					workspaceSlug,
-					collections: collections ?? [],
-					isLoading: isLoadingCollections,
-					error: collectionsError,
-					onRetry: async () => refetchCollections(),
+					collections: collectionsFailed ? [] : (collectionsQuery.data ?? []),
+					isLoading: collectionsQuery.isLoading,
+					error: collectionsFailed ? collectionsQuery.error : undefined,
+					onRetry: retryCollections,
+					refreshFailure: collectionsRetained
+						? {
+								error: collectionsQuery.error,
+								pending: collectionsQuery.isFetching,
+								onRetry: retryCollections,
+							}
+						: undefined,
 					onRegisterCollection: handleRegisterCollection,
 					onUpdateCollectionState: handleUpdateCollectionState,
 					onRemoveCollection: handleRemoveCollection,
