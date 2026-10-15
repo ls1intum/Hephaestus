@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.productfeedback.FeedbackDTOs.CreateSurveyDTO;
 import de.tum.cit.aet.hephaestus.productfeedback.FeedbackDTOs.QuestionDTO;
@@ -53,9 +52,6 @@ class FeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
     @Autowired
     private AccountRepository accounts;
-
-    @Autowired
-    private IdentityRepository identityLinks;
 
     /** A member account signed in the way production does: a numeric JWT subject wired to a workspace member. */
     private record Member(long accountId, Account.AppRole role, Workspace workspace) {
@@ -787,11 +783,7 @@ class FeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     }
 
     private Member member(String slug, Account.AppRole role, Workspace workspace, User actor) {
-        var providerId = Objects.requireNonNull(ensureGitHubProvider().getId());
-        var link = identityLinks
-                .findActiveByProviderSubject(providerId, actor.getNativeId().toString(), null)
-                .orElseThrow();
-        var account = link.getAccount();
+        var account = accounts.findById(accountId(actor)).orElseThrow();
         account.setDisplayName("Member " + slug);
         account.setAppRole(role);
         account.setStatus(Account.Status.ACTIVE);

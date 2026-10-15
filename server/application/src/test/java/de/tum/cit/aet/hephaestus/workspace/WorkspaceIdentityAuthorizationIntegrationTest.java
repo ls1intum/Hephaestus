@@ -216,7 +216,8 @@ class WorkspaceIdentityAuthorizationIntegrationTest extends AbstractWorkspaceInt
     @Test
     void shouldUseOneAccountMembershipWithoutChangingTheFirstLinkedActor() {
         var olderActor = persistUser("older-http-actor");
-        var firstActor = persistUser("first-http-actor");
+        var firstActor = userRepository.saveAndFlush(
+                TestUserFactory.createUser(991L, "first-http-actor", ensureGitLabProvider()));
         var account = accounts.saveAndFlush(new Account("Multi-identity member"));
         var accountId = account.getId();
         assertNotNull(accountId);
@@ -227,7 +228,8 @@ class WorkspaceIdentityAuthorizationIntegrationTest extends AbstractWorkspaceInt
             link.setProviderUserKey(actor.getNativeId().toString());
             identities.saveAndFlush(link);
         }
-        createWorkspace("identity-http-roles", "Roles", "roles", AccountType.ORG, olderActor);
+        var workspace = createWorkspace("identity-http-roles", "Roles", "roles", AccountType.ORG, olderActor);
+        connectActivitySource(workspace, firstActor.getProvider());
         client.get()
                 .uri("/workspaces/identity-http-roles/members/me")
                 .headers(headers -> headers.setBearerAuth("mock-jwt-user-sub-" + accountId))

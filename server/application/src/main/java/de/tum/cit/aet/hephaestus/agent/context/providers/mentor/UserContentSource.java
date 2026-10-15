@@ -4,6 +4,8 @@ import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.evidence.capture.ContentSource;
 import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
+import de.tum.cit.aet.hephaestus.integration.core.spi.MentorUserCounts;
+import de.tum.cit.aet.hephaestus.integration.core.spi.MentorWorkQuery;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -29,7 +31,7 @@ public class UserContentSource implements ContentSource {
     private static final int OPEN_PR_WARNING_THRESHOLD = 3;
 
     private final AccountSummaryQuery accounts;
-    private final MentorContextQueryRepository queryRepository;
+    private final MentorWorkQuery queryRepository;
     private final ObjectMapper objectMapper;
 
     @Override

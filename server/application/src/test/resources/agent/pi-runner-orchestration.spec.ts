@@ -19,6 +19,7 @@ import { compositionRequestSchema } from "../../../main/resources/agent/work/pra
 
 import type {
 	AgentSession,
+	ExtensionFactory,
 	AgentToolResult,
 	ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
@@ -570,6 +571,7 @@ const nativeSdk =
 	scenario !== undefined && scenario.startsWith("scope-native-")
 		? await import("@earendil-works/pi-coding-agent")
 		: undefined;
+let reviewExtensions: ExtensionFactory[] = [];
 const unavailableContext = process.env.PI_UNAVAILABLE_CONTEXT === "true";
 const counterevidence = process.env.PI_COUNTEREVIDENCE === "true";
 const reviewCompacted = process.env.PI_REVIEW_COMPACTED === "true";
@@ -1042,12 +1044,12 @@ if (scenario !== undefined && scenario !== "") {
 
 		return Response.json({
 			contractVersion: 3,
-			admissionDigest: "admitted-digest",
+			admissionDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			publicReviewed: false,
 			admitted: rows.map(admissionDto),
 			withheld: [],
-			practicePageSupport: support,
-			conversationEligibility: chatRouting,
+			practicePageSupport: support ?? null,
+			conversationEligibility: chatRouting ?? null,
 		});
 	});
 	const manager = {
@@ -1165,6 +1167,7 @@ if (scenario !== undefined && scenario !== "") {
 						noExtensions: true,
 						noSkills: true,
 						noPromptTemplates: true,
+						extensionFactories: reviewExtensions,
 					});
 					await resourceLoader.reload();
 					const opened = await nativeSdk.createAgentSession({
@@ -1190,7 +1193,7 @@ if (scenario !== undefined && scenario !== "") {
 					const makeStream = nativeAi.createAssistantMessageEventStream;
 					let requests = 0;
 
-					opened.session.agent.streamFunction = () => {
+					opened.session.agent.streamFunction = async (streamModel, context, streamOptions) => {
 						requests += 1;
 						record(`native-request:${sessionNumber}:${requests}`);
 						const slug = sessionNumber === 1 ? "test-practice" : "second-practice";
@@ -1199,7 +1202,82 @@ if (scenario !== undefined && scenario !== "") {
 						const refusedRevision = scenario === "scope-native-commit" || readCorrection;
 
 						const content: Awaited<ReturnType<NativeStream["result"]>>["content"] = [];
-						if (requests === 1) {
+						if (
+							scenario === "scope-native-submission-repair" ||
+							scenario === "scope-native-submit-nudge"
+						) {
+							const payload = {
+								model: "test-model",
+								tools: [{ type: "function", function: { name: "submit_result" } }],
+							};
+							const transformed: unknown =
+								(await streamOptions?.onPayload?.(payload, streamModel)) ?? payload;
+							assert.ok(isRecord(transformed));
+							assert.deepEqual(
+								transformed.tool_choice,
+								requests === 1
+									? undefined
+									: { type: "function", function: { name: "submit_result" } },
+							);
+						}
+						if (scenario === "scope-native-submit-nudge") {
+							if (requests === 1) {
+								content.push({ type: "text", text: "The review is complete." });
+							} else {
+								content.push(submitCall("nudged", notMet(`Recorded ${slug}`)));
+							}
+						} else if (
+							scenario === "scope-native-submission-repair" ||
+							scenario === "scope-native-schema-cap"
+						) {
+							const errors = context.messages.filter(
+								(message) => message.role === "toolResult" && message.isError,
+							);
+							for (const error of errors) {
+								record(`native-repair-error:${sessionNumber}:${JSON.stringify(error.content)}`);
+							}
+							const candidate = notMet(
+								scenario === "scope-native-schema-cap"
+									? `Attempt ${requests} for ${slug}`
+									: `Corrected ${slug}`,
+							);
+							if (scenario === "scope-native-schema-cap" || requests === 2) {
+								content.push(
+									submitCall(`flat-${requests}`, {
+										...candidate,
+										evidence: {
+											consulted: ["scm.pull-request.diff"],
+											lookedFor: "insecure call",
+											boundary: "changed lines",
+										},
+									}),
+								);
+							} else if (requests === 1) {
+								content.push(
+									submitCall("wrong-index", {
+										...candidate,
+										problems: candidate.problems.map((problem) => ({
+											...problem,
+											basis: { ...problem.basis, head: 1 },
+										})),
+									}),
+								);
+							} else {
+								assert.ok(
+									errors.some((error) =>
+										JSON.stringify(error.content).includes(
+											"its basis names citation 1, and it has 1",
+										),
+									),
+								);
+								assert.ok(
+									errors.some((error) =>
+										JSON.stringify(error.content).includes("evidence.boundary"),
+									),
+								);
+								content.push(submitCall("repaired", candidate));
+							}
+						} else if (requests === 1) {
 							content.push(
 								{
 									type: "toolCall",
@@ -1267,7 +1345,14 @@ if (scenario !== undefined && scenario !== "") {
 					};
 					let nudged = false;
 					opened.session.subscribe((event) => {
-						if (event.type === "message_end" && event.message.role === "assistant" && !nudged) {
+						if (
+							event.type === "message_end" &&
+							event.message.role === "assistant" &&
+							!nudged &&
+							scenario !== "scope-native-submission-repair" &&
+							scenario !== "scope-native-submit-nudge" &&
+							scenario !== "scope-native-schema-cap"
+						) {
 							nudged = true;
 							void (async () => {
 								await opened.session.steer("Record this practice.");
@@ -2984,6 +3069,7 @@ if (scenario !== undefined && scenario !== "") {
 			},
 		},
 		(options) => {
+			reviewExtensions = options.extensionFactories ?? [];
 			assert.ok(cwd !== "");
 			const first = !existsSync(nodePath.join(cwd, "system-prompt.md"));
 			const privateComposition = options.systemPrompt.includes("Compose from admitted problems.");
@@ -3016,6 +3102,9 @@ if (scenario !== undefined && scenario !== "") {
 		"scope-native-commit",
 		"scope-native-batch-correction",
 		"scope-native-read-correction",
+		"scope-native-submission-repair",
+		"scope-native-submit-nudge",
+		"scope-native-schema-cap",
 		"scope-cut-off",
 		"scope-recording-guard",
 		"scope-repeat",
@@ -3157,6 +3246,12 @@ if (scenario !== undefined && scenario !== "") {
 					"native same-batch correction closes after the final successful report",
 				"scope-native-read-correction":
 					"native refused commit stays unresolved through a read-only turn until corrected",
+				"scope-native-submit-nudge":
+					"native prose-only review is nudged into a required submit_result request",
+				"scope-native-submission-repair":
+					"native review repairs an out-of-range citation and retired evidence fields using the exact tool errors",
+				"scope-native-schema-cap":
+					"native schema refusals stop at the same per-practice limit as candidate refusals",
 				"scope-cut-off":
 					"a truncated response in a prior practice does not consume the next session's correction chance",
 				"scope-recording-guard":
@@ -3411,10 +3506,12 @@ if (scenario !== undefined && scenario !== "") {
 							nodePath.join(cwd, "evidence/composition-continuation.json"),
 							JSON.stringify({
 								contractVersion: 3,
-								admissionDigest: "continued-digest",
+								admissionDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 								publicReviewed: fixture === "compose-continuation-reviewed",
 								admitted: [admissionDto(admittedResult)],
 								withheld: [],
+								practicePageSupport: null,
+								conversationEligibility: null,
 							}),
 						);
 					}
@@ -3623,7 +3720,12 @@ if (scenario !== undefined && scenario !== "") {
 								PI_RUNNER_CWD: cwd,
 								PI_CODING_AGENT_DIR: cwd,
 								AGENT_BUDGET_MS: budgetMs,
-								PI_PRACTICE_MODEL_CALLS: stage === "scope-native-read-correction" ? "4" : "2",
+								PI_PRACTICE_MODEL_CALLS:
+									new Map([
+										["scope-native-schema-cap", "12"],
+										["scope-native-submission-repair", "4"],
+										["scope-native-read-correction", "4"],
+									]).get(stage) ?? "2",
 								PI_PRACTICE_OUTPUT_TOKENS: "8000",
 								PI_DIRECT_MODEL_TOKENS: "1000",
 								LLM_PROXY_URL: "https://unused.invalid",
@@ -3804,7 +3906,10 @@ if (scenario !== undefined && scenario !== "") {
 							};
 							const expected = failuresByStage[stage] ?? [];
 							assert.deepEqual(payload.compositionFailures, expected);
-							assert.equal(payload.admissionDigest, "admitted-digest");
+							assert.equal(
+								payload.admissionDigest,
+								"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+							);
 							assert.equal(child.status, 0, child.stderr);
 							const promptCounts: Record<string, number> = {
 								"compose-no-decision": 4,
@@ -3866,6 +3971,53 @@ if (scenario !== undefined && scenario !== "") {
 						return;
 					}
 					switch (stage) {
+						case "scope-native-submit-nudge": {
+							assert.equal(child.status, 0, child.stderr);
+							assert.deepEqual(
+								events.filter((event) => event.startsWith("native-request:")),
+								[
+									"native-request:1:1",
+									"native-request:1:2",
+									"native-request:2:1",
+									"native-request:2:2",
+								],
+							);
+							const candidates = candidatesIn(nodePath.join(cwd, "out/result.json"));
+							assert.equal(candidates.get("test-practice")?.summary, "Recorded test-practice");
+							assert.equal(candidates.get("second-practice")?.summary, "Recorded second-practice");
+							reached({ "test-practice": "EVALUATED", "second-practice": "EVALUATED" });
+							break;
+						}
+						case "scope-native-submission-repair": {
+							assert.equal(child.status, 0, child.stderr);
+							assert.deepEqual(
+								events.filter((event) => event.startsWith("native-request:")),
+								[
+									"native-request:1:1",
+									"native-request:1:2",
+									"native-request:1:3",
+									"native-request:2:1",
+									"native-request:2:2",
+									"native-request:2:3",
+								],
+							);
+							const candidates = candidatesIn(nodePath.join(cwd, "out/result.json"));
+							assert.equal(candidates.get("test-practice")?.summary, "Corrected test-practice");
+							assert.equal(candidates.get("second-practice")?.summary, "Corrected second-practice");
+							reached({ "test-practice": "EVALUATED", "second-practice": "EVALUATED" });
+							break;
+						}
+						case "scope-native-schema-cap": {
+							assert.equal(child.status, 1, child.stderr);
+							for (const session of [1, 2]) {
+								assert.equal(
+									events.filter((event) => event.startsWith(`native-request:${session}:`)).length,
+									8,
+								);
+							}
+							reached({ "test-practice": "NOT_REACHED", "second-practice": "NOT_REACHED" });
+							break;
+						}
 						case "scope-native-completion":
 						case "scope-native-commit":
 						case "scope-native-batch-correction":
@@ -4878,7 +5030,10 @@ for (const item of nullableCases) {
 							);
 							assert.ok(isRecord(payload) && Array.isArray(payload.feedback));
 							assert.ok(payload.review !== null);
-							assert.equal(payload.admissionDigest, "admitted-digest");
+							assert.equal(
+								payload.admissionDigest,
+								"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+							);
 							assert.deepEqual(
 								JSON.parse(
 									readFileSync(nodePath.join(cwd, "work/composition/results.json"), "utf8"),
@@ -5024,7 +5179,10 @@ for (const item of nullableCases) {
 									readFileSync(nodePath.join(cwd, "history/feedback.json"), "utf8"),
 									STAGED_FEEDBACK_HISTORY,
 								);
-								assert.equal(payload.admissionDigest, "admitted-digest");
+								assert.equal(
+									payload.admissionDigest,
+									"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+								);
 								if (fixture === "compose-history-malformed-json") {
 									assert.equal(events.filter((event) => event === "public-history-read").length, 1);
 								}
@@ -5344,7 +5502,10 @@ for (const item of nullableCases) {
 								readFileSync(nodePath.join(cwd, "out/feedback.json"), "utf8"),
 							);
 							assert.ok(typeof feedback === "object" && feedback !== null);
-							assert.equal(Reflect.get(feedback, "admissionDigest"), "admitted-digest");
+							assert.equal(
+								Reflect.get(feedback, "admissionDigest"),
+								"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+							);
 							assert.equal(Reflect.get(feedback, "contractVersion"), 3);
 							assert.equal(Reflect.get(feedback, "lead"), undefined);
 							const pieces: unknown = Reflect.get(feedback, "feedback");
@@ -5616,7 +5777,10 @@ for (const item of nullableCases) {
 								readFileSync(nodePath.join(cwd, "out/feedback.json"), "utf8"),
 							);
 							assert.ok(isRecord(feedback));
-							assert.equal(feedback.admissionDigest, "admitted-digest");
+							assert.equal(
+								feedback.admissionDigest,
+								"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+							);
 							assert.deepEqual(feedback.review, {
 								summary: {
 									body: REVIEW_SUMMARY,
@@ -5912,7 +6076,10 @@ for (const item of nullableCases) {
 								readFileSync(nodePath.join(cwd, "out/feedback.json"), "utf8"),
 							);
 							assert.ok(isRecord(echoed));
-							assert.equal(echoed.admissionDigest, "admitted-digest");
+							assert.equal(
+								echoed.admissionDigest,
+								"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+							);
 							assert.deepEqual(
 								readFeedbackResults(nodePath.join(cwd, "out/feedback.json")).map(
 									(item) => item.outcome,
@@ -6016,7 +6183,10 @@ for (const item of nullableCases) {
 								readFileSync(nodePath.join(cwd, "out/feedback.json"), "utf8"),
 							);
 							assert.ok(isRecord(feedback));
-							assert.equal(feedback.admissionDigest, "continued-digest");
+							assert.equal(
+								feedback.admissionDigest,
+								"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+							);
 							assert.ok(feedback.review !== null);
 							assert.deepEqual(feedback.feedback, []);
 							// A continuing public writer cannot reconstruct the earlier private context.

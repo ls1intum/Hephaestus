@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WorkspaceProviderAvailability;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubAuthenticatedUserDTO;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Membership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.MembershipRepository;
@@ -474,12 +475,12 @@ public class WorkspaceProvisioningService implements WorkspaceProvisioning {
             return existing.get().getId();
         }
 
-        GitHubUserResponse userInfo = webClient
+        GitHubAuthenticatedUserDTO userInfo = webClient
                 .get()
                 .uri("/users/{login}", accountLogin)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + patToken)
                 .retrieve()
-                .bodyToMono(GitHubUserResponse.class)
+                .bodyToMono(GitHubAuthenticatedUserDTO.class)
                 .block();
 
         if (userInfo == null || userInfo.id() == null) {
@@ -507,13 +508,6 @@ public class WorkspaceProvisioningService implements WorkspaceProvisioning {
                 .map(User::getId)
                 .orElseThrow(() -> new IllegalStateException("User not found after upsert: login=" + login));
     }
-
-    private record GitHubUserResponse(
-            Long id,
-            String login,
-            String name,
-            @JsonProperty("avatar_url") String avatarUrl,
-            @JsonProperty("html_url") String htmlUrl) {}
 
     private record GitLabTokenUserResponse(
             Long id,

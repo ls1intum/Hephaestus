@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Membership;
 import de.tum.cit.aet.hephaestus.workspace.MembershipRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceLifecycleService;
 import java.time.Instant;
 import java.util.Objects;
 import org.junit.jupiter.api.Test;
@@ -39,6 +40,9 @@ class WorkspaceOnboardingLifecycleIntegrationTest extends AbstractWorkspaceInteg
 
     @Autowired
     private PlatformTransactionManager transactions;
+
+    @Autowired
+    private WorkspaceLifecycleService workspaceLifecycle;
 
     @Test
     void shouldExportOnlyOwnChoiceAndEraseOnlyTheRequestedAccountOrWorkspace() {
@@ -76,7 +80,7 @@ class WorkspaceOnboardingLifecycleIntegrationTest extends AbstractWorkspaceInteg
         assertThat(settings.findByWorkspaceId(first.getId())).isPresent();
 
         new TransactionTemplate(transactions)
-                .executeWithoutResult(status -> lifecycle.deleteWorkspaceData(first.getId()));
+                .executeWithoutResult(status -> workspaceLifecycle.purgeWorkspace(first.getWorkspaceSlug()));
         assertThat(settings.findByWorkspaceId(first.getId())).isEmpty();
         assertThat(members.findByWorkspace_IdAndId_AccountId(first.getId(), other))
                 .isEmpty();
@@ -96,7 +100,6 @@ class WorkspaceOnboardingLifecycleIntegrationTest extends AbstractWorkspaceInteg
     private void seen(Workspace workspace, long accountId) {
         var member = new Membership();
         member.setWorkspace(workspace);
-        member.setId(new Membership.Id(workspace.getId(), accountId));
         member.setId(new Membership.Id(workspace.getId(), accountId));
         member.setOnboardingSeenRevision(0L);
 

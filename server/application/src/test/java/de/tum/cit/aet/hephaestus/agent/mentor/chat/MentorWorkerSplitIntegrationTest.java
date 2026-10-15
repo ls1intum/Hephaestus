@@ -21,12 +21,12 @@ import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.usage.AdmittedLlmModel;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService;
-import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
-import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerSessionRegistry;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CapacityReport;
+import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackStreamingMentorChannel;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
@@ -287,7 +287,7 @@ class MentorWorkerSplitIntegrationTest extends AbstractWorkspaceIntegrationTest 
     }
 
     private void assertCompleted(UUID thread) {
-        var created = messages.findContextMessages(workspace.getId(), developer.getId(), thread, null);
+        var created = messages.findContextMessages(workspace.getId(), accountId(developer), thread, null);
         assertThat(created).anySatisfy(message -> {
             assertThat(message.getRole()).isEqualTo(ChatMessage.Role.ASSISTANT);
             assertThat(message.getStatus()).isEqualTo(ChatMessage.Status.completed);

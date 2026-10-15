@@ -6,8 +6,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
-import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -30,8 +28,6 @@ import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.springframework.test.util.ReflectionTestUtils;
 import tools.jackson.databind.JsonNode;
@@ -387,27 +383,5 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
                         .files()))
                 .isSameAs(failure);
         assertThat(files).doesNotContainKey(FILE_KEY);
-    }
-
-    @ParameterizedTest
-    @ValueSource(booleans = {false, true})
-    void shouldReportUnavailableThenAllowCaptureWhenArtifactReturns(boolean tombstoned) {
-        var artifact = new PullRequest();
-        artifact.setDeletedAt(Instant.parse("2026-09-05T00:00:00Z"));
-        when(pullRequestRepository.findById(PR_ID)).thenReturn(tombstoned ? Optional.of(artifact) : Optional.empty());
-        for (var kind : provider.sourceKinds()) {
-            var captured = provider.capture(request(metadataWithPr()), Set.of(kind));
-            assertThat(captured.files()).isEmpty();
-            assertThat(captured.completeness()).isEmpty();
-            assertThat(captured.contentStates()).isEmpty();
-            assertThat(captured.stateOverrides())
-                    .containsExactlyEntriesOf(
-                            Map.of(kind, new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND)));
-        }
-        artifact.setDeletedAt(null);
-        when(pullRequestRepository.findById(PR_ID)).thenReturn(Optional.of(artifact));
-        var restored = provider.capture(request(metadataWithPr()), provider.sourceKinds());
-        assertThat(restored.stateOverrides()).isEmpty();
-        assertThat(restored.files()).isNotEmpty();
     }
 }

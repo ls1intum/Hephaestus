@@ -38,25 +38,24 @@ public final class FeedbackDraftBuilder {
                 historical.stream().collect(Collectors.toMap(ResultHistoryEntry::resultId, Function.identity()));
         var drafts = new ArrayList<FeedbackDraft>();
         for (var piece : composition) {
-            if (!allowedResults.containsAll(piece.resultIds()))
-                throw new ResultAdmissionService.AdmissionConflictException();
+            if (!allowedResults.containsAll(piece.resultIds())) throw new AdmissionConflictException();
             var support = piece.resultIds().stream()
                     .filter(byId::containsKey)
                     .map(id -> Objects.requireNonNull(byId.get(id)))
                     .toList();
-            if (support.isEmpty()) throw new ResultAdmissionService.AdmissionConflictException();
+            if (support.isEmpty()) throw new AdmissionConflictException();
             var prior = piece.resultIds().stream()
                     .filter(id -> !byId.containsKey(id))
                     .map(id -> Objects.requireNonNull(historyById.get(id)))
                     .toList();
             if ((!prior.isEmpty() && piece.destination() != FeedbackDestination.PRACTICE_PAGE)
                     || (!piece.notes().isEmpty() && piece.destination() != FeedbackDestination.ON_WORK))
-                throw new ResultAdmissionService.AdmissionConflictException();
+                throw new AdmissionConflictException();
             Long developer = support.getFirst().candidate().developerId();
             if (developer == null
                     || support.stream()
                             .anyMatch(row -> !developer.equals(row.candidate().developerId()))) {
-                throw new ResultAdmissionService.AdmissionConflictException();
+                throw new AdmissionConflictException();
             }
             if (prior.stream()
                             .anyMatch(row -> !developer.equals(row.developerAccountId())
@@ -66,7 +65,7 @@ public final class FeedbackDraftBuilder {
                             && support.stream()
                                     .anyMatch(row -> row.candidate().practiceId()
                                             != support.getFirst().candidate().practiceId())))
-                throw new ResultAdmissionService.AdmissionConflictException();
+                throw new AdmissionConflictException();
             UUID first = support.getFirst().id();
             UUID id = piece.withheldReason() != null
                     ? FeedbackIds.withheld(
@@ -91,15 +90,14 @@ public final class FeedbackDraftBuilder {
                             .filter(row -> row.problems().stream()
                                     .anyMatch(problem -> problem.id().equals(note.problemId())))
                             .findFirst()
-                            .orElseThrow(ResultAdmissionService.AdmissionConflictException::new);
+                            .orElseThrow(AdmissionConflictException::new);
                     var anchor = anchors.get(note.problemId());
-                    if (anchor == null) throw new ResultAdmissionService.AdmissionConflictException();
+                    if (anchor == null) throw new AdmissionConflictException();
                     basis.add(new FeedbackBasisInput(owner.id(), note.problemId(), basis.size()));
                     copies.add(copy(id, FeedbackCopyKind.LINE_NOTE, copies.size(), note.body(), anchor));
                 }
             }
-            if (drafts.stream().anyMatch(draft -> draft.id().equals(id)))
-                throw new ResultAdmissionService.AdmissionConflictException();
+            if (drafts.stream().anyMatch(draft -> draft.id().equals(id))) throw new AdmissionConflictException();
             drafts.add(new FeedbackDraft(
                     id,
                     job.getWorkspaceId(),

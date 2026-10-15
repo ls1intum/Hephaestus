@@ -4,13 +4,18 @@ import static de.tum.cit.aet.hephaestus.practices.result.ResultTestFixtures.resu
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.tum.cit.aet.hephaestus.integration.core.spi.DeliveredIssueCommentLookup.DeliveredComment;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.practices.adapter.DeliveredCommentLookupService;
 import de.tum.cit.aet.hephaestus.practices.feedback.delivery.PracticePageSupportReader;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackIds;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
+import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -110,56 +115,81 @@ class FeedbackBasisRepositoryIntegrationTest extends AbstractFeedbackIntegration
     @Test
     void shouldRequireTheRequestedWorkspacesNativeRepositoryBeforeReturningReceipts() {
         long repository = 900;
+        var copy = deliveredReceipt(workspace.getId(), developerId, repository);
+        var owner = persistUser("receipt-owner");
+        var other = createWorkspace("receipt-monitor", "Other monitor", "receipt-monitor", AccountType.ORG, owner);
+        var otherCopy = deliveredReceipt(
+                other.getId(),
+                Objects.requireNonNull(ensureAdminMembership(other).getAccountId()),
+                repository);
+        var unmonitored =
+                createWorkspace("receipt-unmonitored", "Not monitored", "receipt-unmonitored", AccountType.ORG, owner);
+        var kind = new ItemKind("scm.pull_request");
+        assertThat(delivered
+                        .findForRepository(workspace.getId(), repository, kind)
+                        .get(43L))
+                .extracting(DeliveredComment::externalRef)
+                .containsExactlyInAnyOrder(copy.getExternalRef(), otherCopy.getExternalRef());
+        assertThat(delivered.findForRepository(unmonitored.getId(), repository, kind))
+                .isEmpty();
+        assertThat(delivered.findForRepository(workspace.getId(), repository + 1, kind))
+                .isEmpty();
+        assertThat(delivered.findForRepository(workspace.getId(), repository, new ItemKind("scm.issue")))
+                .isEmpty();
+    }
+
+    private FeedbackCopy deliveredReceipt(long targetWorkspaceId, long targetDeveloperId, long repositoryId) {
         long parent = Objects.requireNonNull(jdbc.queryForObject(
                 "INSERT INTO item(workspace_id,kind,source_id,created_at) VALUES"
                         + " (?,'scm.repository',?,?) RETURNING id",
                 Long.class,
-                workspace.getId(),
-                repository,
+                targetWorkspaceId,
+                repositoryId,
                 Timestamp.from(AT)));
         long work = Objects.requireNonNull(jdbc.queryForObject(
                 "INSERT INTO item(workspace_id,kind,source_id,parent_id,created_at)"
                         + " VALUES (?,'scm.pull_request',43,?,?) RETURNING id",
                 Long.class,
-                workspace.getId(),
+                targetWorkspaceId,
                 parent,
                 Timestamp.from(AT)));
         var review = UUID.randomUUID();
         jdbc.update(
                 "INSERT INTO"
                         + " review(id,workspace_id,item_id,kind,item_version,origin,status,ordered_at,created_at)"
-                        + " SELECT"
-                        + " ?,workspace_id,?,kind,item_version,origin,status,ordered_at,created_at FROM"
-                        + " review WHERE workspace_id=? AND id=?",
+                        + " VALUES (?,?,?,'ITEM','v1','REQUEST','RUNNING',?,?)",
                 review,
+                targetWorkspaceId,
                 work,
-                workspace.getId(),
-                reviewId);
+                Timestamp.from(AT),
+                Timestamp.from(AT));
         var piece = feedback.saveAndFlush(Feedback.builder()
                 .id(UUID.randomUUID())
-                .workspaceId(workspace.getId())
+                .workspaceId(targetWorkspaceId)
                 .reviewId(review)
                 .itemId(work)
-                .developerId(developerId)
+                .developerId(targetDeveloperId)
                 .destination(FeedbackDestination.ON_WORK)
                 .state(FeedbackState.DELIVERED)
                 .body("Add a focused regression test.")
                 .createdAt(AT)
                 .deliveredAt(AT)
                 .build());
-        var copy = summary(piece, FeedbackCopyState.POSTED);
-        var kind = new ItemKind("scm.pull_request");
-        assertThat(delivered
-                        .findForRepository(workspace.getId(), repository, kind)
-                        .get(43L))
-                .singleElement()
-                .satisfies(receipt -> assertThat(receipt.externalRef()).isEqualTo(copy.getExternalRef()));
-        assertThat(delivered.findForRepository(workspace.getId() + 1, repository, kind))
-                .isEmpty();
-        assertThat(delivered.findForRepository(workspace.getId(), repository + 1, kind))
-                .isEmpty();
-        assertThat(delivered.findForRepository(workspace.getId(), repository, new ItemKind("scm.issue")))
-                .isEmpty();
+        var copyId = FeedbackIds.copy(piece.getId(), FeedbackCopyKind.SUMMARY, 0);
+        return copies.saveAndFlush(FeedbackCopy.builder()
+                .id(copyId)
+                .workspaceId(targetWorkspaceId)
+                .feedbackId(piece.getId())
+                .kind(FeedbackCopyKind.SUMMARY)
+                .position(0)
+                .state(FeedbackCopyState.POSTED)
+                .writeKey(copyId.toString())
+                .writeMarker(FeedbackIds.writeMarker(copyId))
+                .writeStartedAt(AT)
+                .postedAt(AT)
+                .externalRef("copy-" + copyId)
+                .createdAt(AT)
+                .build());
     }
 
     private void currentResultOnNewWork(Result template, Instant recordedAt, int sourceOffset) {

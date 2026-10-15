@@ -9,6 +9,11 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery;
 import de.tum.cit.aet.hephaestus.evidence.capture.ContentSource;
 import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
+import de.tum.cit.aet.hephaestus.integration.core.spi.MentorUserCounts;
+import de.tum.cit.aet.hephaestus.integration.core.spi.MentorWorkQuery;
+import de.tum.cit.aet.hephaestus.integration.scm.context.MentorContextQueryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.context.RecentAuthoredWorkContentSource;
+import de.tum.cit.aet.hephaestus.integration.scm.context.ScmMentorWorkQuery;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -32,7 +37,7 @@ class MentorPersonalContextFreshnessTest extends BaseUnitTest {
     @ParameterizedTest
     @EnumSource(Source.class)
     void shouldReadChangedProfileForTheNextTurnWithoutReusingFormattedPersonalContent(Source kind) throws Exception {
-        var queries = mock(MentorContextQueryRepository.class);
+        var queries = mock(MentorWorkQuery.class);
         var accounts = mock(AccountSummaryQuery.class);
         var mapper = new ObjectMapper();
         ContentSource source =
@@ -48,9 +53,15 @@ class MentorPersonalContextFreshnessTest extends BaseUnitTest {
                         var workspace = new Workspace();
                         workspace.setWorkspaceSlug("context-freshness");
                         when(workspaces.findById(1L)).thenReturn(Optional.of(workspace));
-                        yield new WorkspaceContentSource(accounts, workspaces, queries, mapper);
+                        yield new WorkspaceContentSource(
+                                accounts, workspaces, queries, mock(MentorConversationQueryRepository.class), mapper);
                     }
-                    case AUTHORED_WORK -> new RecentAuthoredWorkContentSource(accounts, queries, mapper);
+                    case AUTHORED_WORK ->
+                        new RecentAuthoredWorkContentSource(
+                                accounts,
+                                mock(MentorContextQueryRepository.class),
+                                mock(ScmMentorWorkQuery.class),
+                                mapper);
                 };
         when(accounts.findAllByIds(List.of(2L)))
                 .thenReturn(Map.of(2L, new AccountSummaryQuery.AccountSummary(2, "PROFILE-BEFORE-ERASURE", null)));

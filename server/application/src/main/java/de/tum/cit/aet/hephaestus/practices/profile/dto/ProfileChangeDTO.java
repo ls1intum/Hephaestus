@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.profile.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import de.tum.cit.aet.hephaestus.practices.review.dto.ItemRefDTO;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemRefDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.ProfileChangeDirection;
 import de.tum.cit.aet.hephaestus.practices.spi.ProfileChangeResolvedBy;
 import de.tum.cit.aet.hephaestus.practices.spi.ProfileChangeType;

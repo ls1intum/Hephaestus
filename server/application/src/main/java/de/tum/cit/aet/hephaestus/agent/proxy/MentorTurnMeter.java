@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
-import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import java.math.BigDecimal;
 import java.util.Objects;
 import java.util.UUID;

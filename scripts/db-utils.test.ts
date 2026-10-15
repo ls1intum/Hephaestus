@@ -1,11 +1,9 @@
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import process from "node:process";
 import { test } from "node:test";
-import { pathToFileURL } from "node:url";
 
 import { appendInclude, parseCommand, promote, promoteDraft, validateDraft } from "./db-utils.ts";
 import { environmentForGitFixture } from "./lib/git-environment.ts";
@@ -132,7 +130,6 @@ void test("--from-draft belongs to draft-changelog and leaves the generated mode
 		command: "draft-changelog",
 		help: false,
 		fromDraft: undefined,
-		externalDatabase: false,
 	});
 	assert.equal(parseCommand(["draft-changelog", "--from-draft", "d.xml"]).fromDraft, "d.xml");
 	assert.throws(
@@ -192,138 +189,3 @@ void test("appending authored SQL preserves PostgreSQL dollar quotes and replace
 	assert.ok(appended.includes(`<sql splitStatements="false">${sql}</sql>`));
 	assert.equal(appended.split("</databaseChangeLog>").length, 2);
 });
-
-void test("--external-database applies to all database commands, including an authored draft", () => {
-	for (const command of ["check-drift", "draft-changelog", "generate-erd"]) {
-		assert.equal(parseCommand([command, "--external-database"]).externalDatabase, true);
-	}
-	assert.deepEqual(
-		parseCommand(["draft-changelog", "--external-database", "--from-draft", "d.xml"]),
-		{ command: "draft-changelog", help: false, fromDraft: "d.xml", externalDatabase: true },
-	);
-	for (const flag of ["--external", "--external-database=false", "--packaged-server"]) {
-		assert.throws(() => parseCommand(["check-drift", flag]));
-	}
-});
-
-void test("CLI help requires a disposable external database", () => {
-	const result = spawnSync(process.execPath, ["scripts/db-utils.ts", "--help"], {
-		encoding: "utf8",
-	});
-	assert.equal(result.status, 0, result.stderr);
-	assert.match(result.stdout, /--external-database.*disposable database/u);
-});
-
-for (const ci of [false, true]) {
-	for (const operation of ["check-drift", "draft-changelog", "from-draft", "generate-erd"]) {
-		void test(`${operation}: external database leaves Compose and data directories untouched with CI=${ci}`, async () => {
-			const directory = await mkdtemp(path.join(tmpdir(), "db-external-"));
-			try {
-				const preload = path.join(directory, "mock.mjs");
-				const command = operation === "from-draft" ? "draft-changelog" : operation;
-				await writeFile(
-					preload,
-					`import assert from "node:assert/strict";
-import * as fs from "node:fs/promises";
-import { mock } from "node:test";
-const calls = [];
-const writes = [];
-const ci = ${ci};
-const operation = ${JSON.stringify(operation)};
-const draftXml = ${JSON.stringify(generated)};
-const nativeXml = ${JSON.stringify(native)};
-const changelog = "server/application/src/main/resources/db/changelog/1700000000000_changelog.xml";
-mock.module("node:fs/promises", { exports: {
-  ...fs,
-  async access(file) {
-    assert.doesNotMatch(String(file), /postgres-data/u);
-  },
-  async readFile(file, ...args) {
-    const name = String(file);
-    if (name.endsWith("server/.env")) return "CI=false\\nPOSTGRES_HOST=file-host\\nPOSTGRES_PORT=5432\\nPOSTGRES_DB=file-db\\nPOSTGRES_USER=file-user\\nPOSTGRES_PASSWORD=file-password\\n";
-    if (name.endsWith("changelog_new.xml")) {
-      if (operation === "check-drift") throw new Error("No drift");
-      return draftXml;
-    }
-    if (name === "d.xml") return nativeXml;
-    if (name.endsWith(changelog)) return "<databaseChangeLog>\\n</databaseChangeLog>\\n";
-    return fs.readFile(file, ...args);
-  },
-  async rename() { throw new Error("External mode must not swap data directories"); },
-  async rm(file, options) {
-    assert.ok(String(file).endsWith("changelog_new.xml"));
-    assert.deepEqual(options, { force: true });
-  },
-  async writeFile(file) {
-    assert.ok(String(file).endsWith(changelog));
-    writes.push(String(file));
-  }
-}});
-mock.module(${JSON.stringify(new URL("lib/process.ts", import.meta.url).href)}, { exports: {
-  async run(executable, args, options) {
-    calls.push({ executable, args });
-    assert.notEqual(executable, "docker");
-    if (args[0].endsWith("run-gradlew.ts")) {
-      assert.equal(args.includes("-PpackagedServer=true"), ci);
-      assert.ok(args.includes("-PpostgresPort=55432"));
-      assert.equal(options.env.POSTGRES_HOST, "127.0.0.1");
-      assert.equal(options.env.POSTGRES_DB, "external-test");
-    } else {
-      assert.equal(args[0], "generate-mermaid-erd.ts");
-      assert.ok(args.includes("jdbc:postgresql://127.0.0.1:55432/external-test"));
-      assert.ok(args.includes("external-user"));
-      assert.equal(options.env.POSTGRES_PASSWORD, "external-password");
-    }
-  },
-  async succeeds(executable, args) {
-    calls.push({ executable, args });
-    assert.equal(executable, "pg_isready");
-    assert.ok(args.includes("--version") || (args.includes("127.0.0.1") && args.includes("55432")));
-    return true;
-  },
-  async output(executable, args) {
-    assert.equal(executable, "git");
-    if (args[0] === "merge-base") return "main-base";
-    return args.includes("HEAD") ? changelog : "";
-  }
-}});
-process.on("beforeExit", () => {
-  assert.ok(calls.some(call => call.executable === "pg_isready" && call.args.includes("-h")));
-  const migrations = calls.filter(call => call.args[0].endsWith("run-gradlew.ts"));
-  assert.equal(migrations.length, operation === "draft-changelog" ? 2 : 1);
-  assert.equal(migrations.some(call => call.args.includes(":application:liquibaseDiff")), operation === "check-drift" || operation === "draft-changelog");
-  assert.equal(calls.some(call => call.args[0] === "generate-mermaid-erd.ts"), operation !== "check-drift");
-  assert.equal(writes.length, operation === "draft-changelog" || operation === "from-draft" ? 1 : 0);
-});
-`,
-				);
-				const result = spawnSync(
-					process.execPath,
-					[
-						"--experimental-test-module-mocks",
-						"--import",
-						pathToFileURL(preload).href,
-						"scripts/db-utils.ts",
-						command,
-						...(ci ? [] : ["--external-database"]),
-						...(operation === "from-draft" ? ["--from-draft", "d.xml"] : []),
-					],
-					{
-						encoding: "utf8",
-						env: environmentForGitFixture({
-							CI: String(ci),
-							POSTGRES_HOST: "127.0.0.1",
-							POSTGRES_PORT: "55432",
-							POSTGRES_DB: "external-test",
-							POSTGRES_USER: "external-user",
-							POSTGRES_PASSWORD: "external-password",
-						}),
-					},
-				);
-				assert.equal(result.status, 0, result.stdout + result.stderr);
-			} finally {
-				await rm(directory, { recursive: true, force: true });
-			}
-		});
-	}
-}

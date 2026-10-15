@@ -11,12 +11,6 @@ import org.springframework.data.repository.query.Param;
 public interface ScmItemSourceQuery extends Repository<Issue, Long> {
     @Query(
             value =
-                    "SELECT workspace_id AS workspaceId, id AS itemId FROM item WHERE kind = :kind AND source_id = :sourceId AND removed_at IS NULL",
-            nativeQuery = true)
-    List<WorkspaceItem> issueItems(@Param("kind") String kind, @Param("sourceId") long sourceId);
-
-    @Query(
-            value =
                     "SELECT workspace_id AS workspaceId,id AS itemId FROM item WHERE kind=:kind AND source_id=:sourceId",
             nativeQuery = true)
     List<WorkspaceItem> deletedItems(@Param("kind") String kind, @Param("sourceId") long sourceId);

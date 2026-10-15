@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmittedResultDTO;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.ProjectedCitationDTO;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentResult;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiResultParser;
+import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
 import de.tum.cit.aet.hephaestus.practices.spi.ClaimBasis;
@@ -430,7 +431,7 @@ class PracticeRunnerLiveLlmTest {
                     submitted.reviewId(),
                     submitted.jobId(),
                     submitted.attempt(),
-                    "live-test",
+                    ProvenanceDigest.sha256Hex(MAPPER.writeValueAsBytes(request)),
                     rows,
                     List.of(),
                     null,

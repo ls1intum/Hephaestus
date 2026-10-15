@@ -4,10 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelPrice;
 import de.tum.cit.aet.hephaestus.agent.catalog.UpdateLlmModelPriceRequestDTO;
-import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEvent;
-import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
-import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
+import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;

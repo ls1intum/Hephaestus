@@ -43,7 +43,7 @@ class WorkspaceAdminControllerIntegrationTest extends AbstractWorkspaceIntegrati
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("seeded workspace not in the admin overview"));
         assertThat(acme.displayName()).isEqualTo("Acme");
-        assertThat(acme.ownerLogin()).isEqualTo("acme-owner");
+        assertThat(acme.ownerLogin()).isEqualTo(owner.getName());
         assertThat(acme.memberCount()).isEqualTo(1L);
         assertThat(acme.status()).isEqualTo(Workspace.WorkspaceStatus.ACTIVE);
     }

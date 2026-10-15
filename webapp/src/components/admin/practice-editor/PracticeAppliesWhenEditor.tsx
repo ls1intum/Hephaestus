@@ -9,7 +9,6 @@ import {
 	FieldLegend,
 	FieldSet,
 } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import {
 	Select,
 	SelectContent,
@@ -37,7 +36,7 @@ const CONDITIONS = {
 	HAS_ITEMS: {
 		label: "A source has items",
 		values: "Source",
-		description: "The source to check, such as scm.review-threads.",
+		description: "Choose the source to check.",
 	},
 } satisfies Record<ApplicabilityClause, { label: string; values: string; description: string }>;
 
@@ -72,7 +71,10 @@ export function PracticeAppliesWhenEditor({
 	disabled = false,
 	error,
 }: PracticeAppliesWhenEditorProps) {
-	const available = itemType?.applicabilityClauses ?? [];
+	const sources = itemType?.applicabilitySources ?? [];
+	const available = (itemType?.applicabilityClauses ?? []).filter(
+		(kind) => kind !== "HAS_ITEMS" || sources.length > 0,
+	);
 	const replace = (index: number, clause: AppliesWhenClause) =>
 		onChange({
 			...value,
@@ -137,14 +139,34 @@ export function PracticeAppliesWhenEditor({
 								{presentation.description}
 							</FieldDescription>
 							{kind === "HAS_ITEMS" ? (
-								<Input
-									id={`${controlId}-values`}
-									value={text}
+								<Select
+									value={hasText(text) ? text : null}
 									disabled={disabled}
-									aria-describedby={`${controlId}-help`}
-									aria-invalid={hasText(error)}
-									onChange={(event) => replace(index, clauseOf(kind, event.target.value))}
-								/>
+									items={sources.map((source) => ({ value: source.source, label: source.label }))}
+									onValueChange={(next) => {
+										if (next !== null) {
+											replace(index, { hasItems: next });
+										}
+									}}
+								>
+									<SelectTrigger
+										id={`${controlId}-values`}
+										className="w-full"
+										aria-describedby={`${controlId}-help`}
+										aria-invalid={hasText(error)}
+									>
+										<SelectValue placeholder="Choose a source" />
+									</SelectTrigger>
+									<SelectContent aria-label={`Source ${index + 1}`}>
+										<SelectGroup>
+											{sources.map((source) => (
+												<SelectItem key={source.source} value={source.source}>
+													{source.label}
+												</SelectItem>
+											))}
+										</SelectGroup>
+									</SelectContent>
+								</Select>
 							) : (
 								<Textarea
 									id={`${controlId}-values`}

@@ -26,3 +26,15 @@ export async function stopSession(session: AgentSession) {
 		session.dispose();
 	}
 }
+
+export function scheduleDeadline(timeoutMs: number, onTimeout: () => void) {
+	// Read timer state through a function so TypeScript does not retain a pre-await narrowing.
+	let expired = false;
+	const { promise: elapsed, resolve: release } = Promise.withResolvers<undefined>();
+	const timer = setTimeout(() => {
+		expired = true;
+		onTimeout();
+		release(undefined);
+	}, timeoutMs);
+	return { elapsed, timer, expired: () => expired };
+}

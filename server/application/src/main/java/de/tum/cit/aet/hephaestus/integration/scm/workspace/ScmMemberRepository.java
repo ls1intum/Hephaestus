@@ -23,8 +23,9 @@ public interface ScmMemberRepository extends Repository<User, Long>, MembershipS
           SELECT i.id FROM Identity i WHERE i.account.id=m.id.accountId AND i.disabledAt IS NULL
             AND i.teamKey='' AND i.providerId=u.provider.id AND i.providerUserKey=CAST(u.nativeId AS string))
         WHERE m.workspace.id=:workspaceId
-          AND (:query IS NULL OR LOCATE(LOWER(:query),LOWER(a.displayName))>0
-            OR LOCATE(LOWER(:query),LOWER(u.login))>0 OR LOCATE(LOWER(:query),LOWER(u.name))>0)
+          AND (CAST(:query AS string) IS NULL OR LOCATE(LOWER(CAST(:query AS string)),LOWER(a.displayName))>0
+            OR LOCATE(LOWER(CAST(:query AS string)),LOWER(u.login))>0
+            OR LOCATE(LOWER(CAST(:query AS string)),LOWER(u.name))>0)
           AND (:teamId IS NULL OR EXISTS (SELECT tm.id FROM TeamMembership tm
             WHERE tm.user.id=u.id AND tm.team.id=:teamId AND tm.team.provider.id=:providerId
               AND LOWER(tm.team.organization)=LOWER(m.workspace.accountLogin)))

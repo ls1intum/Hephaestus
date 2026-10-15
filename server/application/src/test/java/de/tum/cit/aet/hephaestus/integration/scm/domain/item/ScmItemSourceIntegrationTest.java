@@ -46,6 +46,7 @@ import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.nio.charset.StandardCharsets;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -60,6 +61,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.json.JsonMapper;
 
 class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
     @Autowired
@@ -186,7 +188,7 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
     @EnumSource(
             value = IdentityProviderType.class,
             names = {"GITHUB", "GITLAB"})
-    void shouldKeepKindsParentsAndProviderIdentitiesDistinct(IdentityProviderType type) {
+    void shouldKeepKindsParentsAndProviderIdentitiesDistinct(IdentityProviderType type) throws Exception {
         var fixture = fixture(type);
         var issue = new Issue();
         issue.setNativeId(ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE));
@@ -200,7 +202,24 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
         issue.setHtmlUrl(fixture.repository().getHtmlUrl() + "/issues/7");
         issue.setCreatedAt(Instant.now());
         issue.setUpdatedAt(Instant.now());
+        issue.setCommentsCount(2);
         issue = issues.saveAndFlush(issue);
+        jdbc.update(
+                """
+                INSERT INTO issue_comment(native_id,provider_id,issue_id,body,html_url,author_association,created_at,author_id)
+                VALUES (?,?,?,'second','https://example.test/comment/second','MEMBER',?,?),
+                       (?,?,?,'first','https://example.test/comment/first','MEMBER',?,?)
+                """,
+                ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE),
+                fixture.provider().getId(),
+                issue.getId(),
+                Timestamp.from(Instant.parse("2026-10-02T10:00:00Z")),
+                fixture.author().getId(),
+                ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE),
+                fixture.provider().getId(),
+                issue.getId(),
+                Timestamp.from(Instant.parse("2026-10-01T10:00:00Z")),
+                fixture.author().getId());
         var pull = new PullRequest();
         pull.setNativeId(ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE));
         pull.setProvider(fixture.provider());
@@ -238,6 +257,8 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
         var issueSnapshot = sources.pin(issueRef, null);
         var pullSnapshot = sources.pin(pullRef, null);
         assertThat(issueSnapshot.label().noun()).isEqualTo("issue");
+        assertThat(issueSnapshot.label().label()).isEqualTo("#7");
+        assertThat(pullSnapshot.label().label()).isEqualTo(type == IdentityProviderType.GITLAB ? "!7" : "#7");
         assertThat(issueSnapshot.state()).doesNotContainKey("baseBranch");
         assertThat(pullSnapshot.state()).containsEntry("baseBranch", "main");
         assertThat(pullSnapshot.label().noun())
@@ -263,8 +284,17 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
             var core = snapshot.item().kind().equals(ScmItemEvents.ISSUE)
                     ? IssueContentSource.CORE
                     : PullRequestContentSource.CORE;
+            var selected = snapshot.item().kind().equals(ScmItemEvents.ISSUE)
+                    ? Set.of(core, IssueContentSource.COMMENTS)
+                    : Set.of(core);
             var captured = sources.capture(
-                    snapshot, new CaptureRequest(UUID.randomUUID(), UUID.randomUUID(), 1, Set.of(core), "2.0.0", 3));
+                    snapshot, new CaptureRequest(UUID.randomUUID(), UUID.randomUUID(), 1, selected, "2.0.0", 3));
+            if (snapshot.item().kind().equals(ScmItemEvents.ISSUE)) {
+                var discussion = new JsonMapper().readTree(captured.files().get("context/comments.json"));
+                assertThat(discussion).hasSize(2);
+                assertThat(discussion.get(0).path("body").asString()).isEqualTo("first");
+                assertThat(discussion.get(1).path("body").asString()).isEqualTo("second");
+            }
             assertThat(captured.files()).containsKey("context/metadata.json");
             var staged = sources.record(snapshot, captured.files());
             assertThat(staged.path("title").asString())

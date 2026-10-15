@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.adapter.ReviewJobService;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelPrice;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelPriceRepository;
@@ -15,21 +16,32 @@ import de.tum.cit.aet.hephaestus.agent.catalog.PricingMode;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
+import de.tum.cit.aet.hephaestus.agent.runtime.PiResultParser;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageEventRepository;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageSourceType;
+import de.tum.cit.aet.hephaestus.integration.core.spi.CandidateRefusal;
 import de.tum.cit.aet.hephaestus.practices.spi.BoundModelSlot;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewMethod;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshotQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewWriteGuard;
+import de.tum.cit.aet.hephaestus.practices.spi.ScriptRunStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
+import io.micrometer.core.instrument.MeterRegistry;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -90,8 +102,145 @@ class ReviewMethodPersistenceIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private ReviewSnapshotQuery snapshots;
 
+    @Autowired
+    private ReviewAssignmentQuery assignmentQuery;
+
+    @Autowired
+    private ScriptRunRepository scriptRuns;
+
+    @Autowired
+    private LlmUsageRecorder usageRecorder;
+
+    @Autowired
+    private LlmUsageEventRepository usageEvents;
+
+    @Autowired
+    private MeterRegistry meters;
+
     @Test
     void shouldEnqueueTheUnchangedMethodAfterDatabaseJsonPersistence() {
+        var prepared = prepareReview();
+        var jobId = prepared.job().getId();
+        var workspaceId = prepared.job().getWorkspaceId();
+        var reviewId = prepared.job().getReviewId();
+        var queue = prepared.queue();
+        assertThat(jobs.findByIdAndWorkspaceId(jobId, workspaceId))
+                .get()
+                .extracting(ReviewJob::getStatus, ReviewJob::getReviewId)
+                .containsExactly(ReviewJobStatus.QUEUED, reviewId);
+        assertThat(jdbc.queryForObject(
+                        "SELECT job_id FROM review_item WHERE workspace_id=? AND review_id=? AND practice_id=? AND"
+                                + " item_id=?",
+                        UUID.class,
+                        workspaceId,
+                        reviewId,
+                        978004L,
+                        978006L))
+                .isEqualTo(jobId);
+        jdbc.update(
+                "UPDATE review_job SET"
+                        + " status='CANCELLED',completed_at=now(),cancellation_reason='CANCELLED_BY_REQUESTER' WHERE id=?"
+                        + " AND workspace_id=?",
+                jobId,
+                workspaceId);
+        jdbc.update("""
+            WITH changed AS (
+                SELECT workspace_id, review_id, practice_id,
+                       jsonb_set(method,'{models,0,model,options,directModelTokensPerAttempt}','200001'::jsonb) AS method
+                FROM review_practice WHERE workspace_id=? AND review_id=? AND practice_id=?
+            )
+            UPDATE review_practice rp
+            SET method=jsonb_set(changed.method,'{modelDigest}',to_jsonb(review_model_digest(changed.method->'models')))
+            FROM changed WHERE rp.workspace_id=changed.workspace_id AND rp.review_id=changed.review_id
+                         AND rp.practice_id=changed.practice_id
+            """, workspaceId, reviewId, 978004L);
+        assertThatThrownBy(() -> transactions.execute(status -> {
+                    var review = snapshots.find(workspaceId, reviewId).orElseThrow();
+                    return queue.enqueue(review, 978006L, List.of(new ReviewAssignmentId(reviewId, 978004L, 978006L)));
+                }))
+                .isInstanceOf(ReviewJobStateConflictException.class);
+        assertThat(jobs.findByIdAndWorkspaceId(jobId, workspaceId))
+                .get()
+                .extracting(ReviewJob::getStatus)
+                .isEqualTo(ReviewJobStatus.CANCELLED);
+        assertThat(jdbc.queryForObject(
+                        "SELECT count(*) FROM review_job WHERE workspace_id=? AND review_id=?",
+                        Long.class,
+                        workspaceId,
+                        reviewId))
+                .isEqualTo(1L);
+    }
+
+    @Test
+    void shouldRecordScriptRunAndUsageAfterAssignmentIsWithheld() {
+        var prepared = prepareReview();
+        var job = prepared.job();
+        long workspaceId = job.getWorkspaceId();
+        var id = job.getInput().assignments().getFirst();
+        var pinned = assignments.load(job).getFirst();
+        assignmentStore.withhold(
+                workspaceId, id, CandidateRefusal.QUOTE_UNVERIFIED, "The quote could not be verified.");
+
+        assertThat(assignmentQuery.executable(workspaceId, job.getReviewId(), id.itemId()))
+                .isEmpty();
+        assertThatThrownBy(() -> assignmentStore.bind(workspaceId, job.getReviewId(), UUID.randomUUID(), List.of(id)))
+                .isInstanceOf(IllegalStateException.class);
+        byte[] report = """
+            {"schemaVersion":2,"truncated":false,"practices":[
+             {"practiceSlug":"native-practice","program":{"kind":"builtin","digest":null},"models":[],"status":"withheld","stopReason":"refused",
+              "calls":{"review":1,"chat":0,"decision":0,"embedding":0,"reranking":0},"coverageReached":{"reads":1,"truncatedReads":0,"failedReads":0},"durationMs":1}]}
+            """.getBytes(StandardCharsets.UTF_8);
+        var recorder = new PracticeScriptRunRecorder(
+                new PiResultParser(mapper, meters), scriptRuns, meters, mapper, assignments);
+        transactions.executeWithoutResult(status -> {
+            recorder.record(job, report, Map.of(), Instant.now());
+            TerminalUsage.fromProxy(new ReviewJobLlmUsage(1, 120, 30, 0, 0, 0))
+                    .appendTo(usageRecorder, jobs, workspaceId, job, null, LlmPriceSnapshot.unpricedInstance());
+        });
+        assertThat(assignments.load(job)).containsExactly(pinned);
+        assertThat(snapshots.find(workspaceId, job.getReviewId()).orElseThrow().practices())
+                .containsExactly(pinned.practice());
+        assertThat(scriptRuns.findByWorkspaceIdAndJobIdAndAttempt(workspaceId, job.getId(), job.getAttempt()))
+                .singleElement()
+                .satisfies(run -> {
+                    assertThat(run.getId().getPracticeId()).isEqualTo(id.practiceId());
+                    assertThat(run.getPracticeVersionId())
+                            .isEqualTo(pinned.practice().practiceVersionId());
+                    assertThat(run.getStatus()).isEqualTo(ScriptRunStatus.WITHHELD);
+                });
+        assertThat(usageEvents.findByWorkspaceIdAndSourceTypeAndSourceIdOrderBySourceAttemptAsc(
+                        workspaceId, UsageSourceType.REVIEW_JOB, job.getId()))
+                .singleElement()
+                .satisfies(usage -> {
+                    assertThat(usage.getInputTokens()).isEqualTo(120);
+                    assertThat(usage.getOutputTokens()).isEqualTo(30);
+                });
+        assertThat(jdbc.queryForObject(
+                        "SELECT status FROM review_practice WHERE workspace_id=? AND review_id=? AND practice_id=?",
+                        String.class,
+                        workspaceId,
+                        job.getReviewId(),
+                        id.practiceId()))
+                .isEqualTo("WITHHELD");
+        assertThat(jdbc.queryForObject(
+                        "SELECT state FROM review_item WHERE workspace_id=? AND review_id=? AND practice_id=? AND"
+                                + " item_id=?",
+                        String.class,
+                        workspaceId,
+                        job.getReviewId(),
+                        id.practiceId(),
+                        id.itemId()))
+                .isEqualTo("WITHHELD");
+        assertThat(jdbc.queryForObject(
+                        "SELECT count(*) FROM result WHERE workspace_id=? AND review_id=?",
+                        Long.class,
+                        workspaceId,
+                        job.getReviewId()))
+                .isZero();
+    }
+
+    private PreparedReview prepareReview() {
+        databaseTestUtils.cleanDatabase();
         new ResourceDatabasePopulator(new ClassPathResource("db/practice-native/result-parent.sql"))
                 .execute(Objects.requireNonNull(jdbc.getDataSource()));
         jdbc.update("""
@@ -152,50 +301,9 @@ class ReviewMethodPersistenceIntegrationTest extends BaseIntegrationTest {
             var review = snapshots.find(workspace.getId(), reviewId).orElseThrow();
             return queue.enqueue(review, 978006L, List.of(new ReviewAssignmentId(reviewId, 978004L, 978006L)));
         }));
-        assertThat(jobs.findByIdAndWorkspaceId(jobId, workspace.getId()))
-                .get()
-                .extracting(ReviewJob::getStatus, ReviewJob::getReviewId)
-                .containsExactly(ReviewJobStatus.QUEUED, reviewId);
-        assertThat(jdbc.queryForObject(
-                        "SELECT job_id FROM review_item WHERE workspace_id=? AND review_id=? AND practice_id=? AND"
-                                + " item_id=?",
-                        UUID.class,
-                        workspace.getId(),
-                        reviewId,
-                        978004L,
-                        978006L))
-                .isEqualTo(jobId);
-        jdbc.update(
-                "UPDATE review_job SET"
-                    + " status='CANCELLED',completed_at=now(),cancellation_reason='CANCELLED_BY_REQUESTER' WHERE id=?"
-                    + " AND workspace_id=?",
-                jobId,
-                workspace.getId());
-        jdbc.update("""
-            WITH changed AS (
-                SELECT workspace_id, review_id, practice_id,
-                       jsonb_set(method,'{models,0,model,options,directModelTokensPerAttempt}','200001'::jsonb) AS method
-                FROM review_practice WHERE workspace_id=? AND review_id=? AND practice_id=?
-            )
-            UPDATE review_practice rp
-            SET method=jsonb_set(changed.method,'{modelDigest}',to_jsonb(review_model_digest(changed.method->'models')))
-            FROM changed WHERE rp.workspace_id=changed.workspace_id AND rp.review_id=changed.review_id
-                         AND rp.practice_id=changed.practice_id
-            """, workspace.getId(), reviewId, 978004L);
-        assertThatThrownBy(() -> transactions.execute(status -> {
-                    var review = snapshots.find(workspace.getId(), reviewId).orElseThrow();
-                    return queue.enqueue(review, 978006L, List.of(new ReviewAssignmentId(reviewId, 978004L, 978006L)));
-                }))
-                .isInstanceOf(ReviewJobStateConflictException.class);
-        assertThat(jobs.findByIdAndWorkspaceId(jobId, workspace.getId()))
-                .get()
-                .extracting(ReviewJob::getStatus)
-                .isEqualTo(ReviewJobStatus.CANCELLED);
-        assertThat(jdbc.queryForObject(
-                        "SELECT count(*) FROM review_job WHERE workspace_id=? AND review_id=?",
-                        Long.class,
-                        workspace.getId(),
-                        reviewId))
-                .isEqualTo(1L);
+        return new PreparedReview(
+                jobs.findByIdAndWorkspaceId(jobId, workspace.getId()).orElseThrow(), queue);
     }
+
+    private record PreparedReview(ReviewJob job, ReviewJobService queue) {}
 }

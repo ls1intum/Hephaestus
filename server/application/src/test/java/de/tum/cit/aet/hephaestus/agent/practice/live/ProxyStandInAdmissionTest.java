@@ -42,6 +42,7 @@ class ProxyStandInAdmissionTest {
         var response = MAPPER.treeToValue(answer, AdmissionResponseDTO.class);
 
         assertThat(response.contractVersion()).isEqualTo(3);
+        assertThat(response.admissionDigest()).matches("[0-9a-f]{64}");
         assertThat(response.reviewId()).isEqualTo(REVIEW);
         assertThat(response.jobId()).isEqualTo(JOB);
         assertThat(response.admitted()).singleElement().satisfies(result -> {

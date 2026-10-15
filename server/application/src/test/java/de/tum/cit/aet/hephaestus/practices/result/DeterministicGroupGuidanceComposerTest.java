@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.practices.result;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemRefDTO;
 import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingDTO;
 import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingResultDTO;
-import de.tum.cit.aet.hephaestus.practices.review.dto.ItemRefDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeStanding;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;

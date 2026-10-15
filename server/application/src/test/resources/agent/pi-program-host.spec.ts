@@ -273,10 +273,12 @@ void test("a composition continuation derives no change, runs no program and wri
 				nodePath.join(cwd, "evidence/composition-continuation.json"),
 				JSON.stringify({
 					contractVersion: 3,
-					admissionDigest: "digest",
+					admissionDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 					publicReviewed: false,
 					admitted: [],
 					withheld: [],
+					practicePageSupport: null,
+					conversationEligibility: null,
 				}),
 			);
 		},

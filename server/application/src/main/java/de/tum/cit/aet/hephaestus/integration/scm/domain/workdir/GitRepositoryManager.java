@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.workdir;
 
+import de.tum.cit.aet.hephaestus.integration.core.fabric.EvidenceSpool;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitDetails;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitDetails.FileChange;
@@ -17,7 +18,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.UUID;
 import java.util.concurrent.Semaphore;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -63,9 +63,6 @@ public class GitRepositoryManager {
     public static final String TREE_LIMITATION_SUBMODULE = "SUBMODULE_EXCLUDED";
     public static final String TREE_LIMITATION_UNSAFE_PATH = "UNSAFE_PATH_EXCLUDED";
 
-    /** Name prefix of the checkouts this manager stages under the fabric root, so a sweep can tell its leftovers apart. */
-    public static final String GIT_SNAPSHOT_PREFIX = "git-snapshot-";
-
     /** Where a fetched review head lives in the mirror; content-addressed, so a refetch is idempotent. */
     public static final String REVIEW_REFS = "refs/hephaestus/reviews/";
 
@@ -73,7 +70,6 @@ public class GitRepositoryManager {
     public static final String CAPTURED_REFS = "hephaestus-captured-refs";
 
     private static final String MIRRORS = "mirrors";
-    private static final String PROCESS_SPOOL_ID = UUID.randomUUID() + "-";
     private static final Logger log = LoggerFactory.getLogger(GitRepositoryManager.class);
     private static final int PAGE_SIZE = 256;
 
@@ -475,7 +471,7 @@ public class GitRepositoryManager {
                 tree.addTree(commit.getTree());
                 tree.setRecursive(true);
                 Files.createDirectories(layout.root());
-                staging = Files.createTempDirectory(layout.root(), GIT_SNAPSHOT_PREFIX + PROCESS_SPOOL_ID);
+                staging = Files.createTempDirectory(layout.root(), EvidenceSpool.currentPrefix());
                 long bytes = 0, files = 0;
                 Set<String> limitations = new TreeSet<>();
                 while (tree.next()) {
@@ -585,7 +581,7 @@ public class GitRepositoryManager {
                             "Repository snapshot exceeds hephaestus.git.max-snapshot-bytes", new IOException());
                 }
                 Files.createDirectories(layout.root());
-                staging = Files.createTempDirectory(layout.root(), GIT_SNAPSHOT_PREFIX + PROCESS_SPOOL_ID);
+                staging = Files.createTempDirectory(layout.root(), EvidenceSpool.currentPrefix());
                 try (Git git = Git.init().setDirectory(staging.toFile()).call()) {
                     StoredConfig config = git.getRepository().getConfig();
                     // A link in the checkout would let the review read outside it; it is a
@@ -666,11 +662,6 @@ public class GitRepositoryManager {
             }
             return total;
         }
-    }
-
-    /** The fabric root is process-local; only a previous process's checkout may be swept by age. */
-    public static boolean isCurrentProcessSpool(Path path) {
-        return path.getFileName().toString().startsWith(GIT_SNAPSHOT_PREFIX + PROCESS_SPOOL_ID);
     }
 
     /** A read of the mirror's object and ref databases. */

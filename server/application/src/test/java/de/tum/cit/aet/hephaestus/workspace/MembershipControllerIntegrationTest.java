@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
@@ -129,6 +130,48 @@ class MembershipControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
                 .isEqualTo(0);
     }
 
+    @Test
+    @WithAdminUser
+    void shouldSortMemberPagesByTheDisplayedNameIncludingProviderLoginFallback() {
+        var owner = persistUser("display-order-owner");
+        var workspace = createWorkspace("display-order", "Members", "display-order", AccountType.ORG, owner);
+        ensureAdminMembership(workspace);
+        connectActivitySource(workspace, owner.getProvider());
+        var fallback = persistUser("alpha-fallback");
+        fallback.setName(null);
+        userRepository.saveAndFlush(fallback);
+        var first = persistUser("display-order-aaron");
+        var last = persistUser("display-order-bravo");
+        for (var actor : List.of(fallback, first, last)) ensureMembership(workspace, actor, WorkspaceRole.MEMBER);
+        for (var entry : Map.of(fallback, " ", first, "Aaron", last, "Bravo").entrySet()) {
+            var account = accounts.findById(accountId(entry.getKey())).orElseThrow();
+            account.setDisplayName(entry.getValue());
+            accounts.saveAndFlush(account);
+        }
+        var team = memberTeam("display-order", workspace.getAccountLogin(), owner.getProvider(), 900_003);
+        for (var actor : List.of(fallback, first, last))
+            teamMemberships.saveAndFlush(new TeamMembership(team, actor, TeamMembership.Role.MEMBER));
+        webTestClient
+                .get()
+                .uri(
+                        "/workspaces/{slug}/members?team={team}&size=1&page=1&sort=name,asc",
+                        workspace.getWorkspaceSlug(),
+                        team.getId())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.totalElements")
+                .isEqualTo(3)
+                .jsonPath("$.content[0].account.id")
+                .isEqualTo(Long.toString(accountId(fallback)))
+                .jsonPath("$.content[0].account.status")
+                .isEqualTo("UNCLAIMED")
+                .jsonPath("$.content[0].account.identities[0].login")
+                .isEqualTo("alpha-fallback");
+    }
+
     private Team memberTeam(String slug, String organization, IdentityProvider provider, long nativeId) {
         var team = new Team();
         team.setProvider(provider);
@@ -154,7 +197,10 @@ class MembershipControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
             var secondProfile = userRepository.saveAndFlush(
                     TestUserFactory.createUser(900_000 + index, "gitlab-profile-" + index, gitlab));
             var identity = new Identity();
-            identity.setAccount(accounts.findById(accountId(member)).orElseThrow());
+            var account = accounts.findById(accountId(member)).orElseThrow();
+            account.setStatus(Account.Status.ACTIVE);
+            accounts.saveAndFlush(account);
+            identity.setAccount(account);
             identity.setProviderId(Objects.requireNonNull(gitlab.getId()));
             identity.setProviderUserKey(secondProfile.getNativeId().toString());
             identities.saveAndFlush(identity);
@@ -163,18 +209,22 @@ class MembershipControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
         boolean enabled = statistics.isStatisticsEnabled();
         statistics.setStatisticsEnabled(true);
         try {
-            long before = statistics.getPrepareStatementCount();
-            webTestClient
-                    .get()
-                    .uri("/workspaces/{slug}/members?size=50", workspace.getWorkspaceSlug())
-                    .headers(TestAuthUtils.withCurrentUser())
-                    .exchange()
-                    .expectStatus()
-                    .isOk()
-                    .expectBody()
-                    .jsonPath("$.content.length()")
-                    .isEqualTo(50);
-            assertThat(statistics.getPrepareStatementCount() - before).isLessThanOrEqualTo(30);
+            var counts = new ArrayList<Long>();
+            for (int size : List.of(10, 50)) {
+                long before = statistics.getPrepareStatementCount();
+                webTestClient
+                        .get()
+                        .uri("/workspaces/{slug}/members?size={size}", workspace.getWorkspaceSlug(), size)
+                        .headers(TestAuthUtils.withCurrentUser())
+                        .exchange()
+                        .expectStatus()
+                        .isOk()
+                        .expectBody()
+                        .jsonPath("$.content.length()")
+                        .isEqualTo(size);
+                counts.add(statistics.getPrepareStatementCount() - before);
+            }
+            assertThat(counts.getLast() - counts.getFirst()).isLessThanOrEqualTo(2);
         } finally {
             statistics.setStatisticsEnabled(enabled);
         }
@@ -455,7 +505,7 @@ class MembershipControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
                     .isEqualTo(WorkspaceRole.ADMIN);
         }
         assertThat(workspaceMembershipService
-                        .getMembership(workspace.getId(), successor.getId())
+                        .getMembership(workspace.getId(), accountId(successor))
                         .getRole())
                 .isEqualTo(WorkspaceRole.OWNER);
     }

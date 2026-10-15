@@ -4,6 +4,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.tum.cit.aet.hephaestus.integration.core.fabric.EvidenceSpool;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitDetails;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitFileChange.ChangeType;
@@ -235,8 +236,8 @@ class GitRepositoryManagerTest extends BaseUnitTest {
             try (var snapshot = manager.readTreeSnapshot(KEY, sha)) {
                 staging = snapshot.stagingDir();
                 assertThat(staging).startsWith(fabric);
-                assertThat(staging.getFileName().toString()).startsWith(GitRepositoryManager.GIT_SNAPSHOT_PREFIX);
-                assertThat(GitRepositoryManager.isCurrentProcessSpool(staging)).isTrue();
+                assertThat(staging.getFileName().toString()).startsWith(EvidenceSpool.PREFIX);
+                assertThat(EvidenceSpool.isCurrentProcess(staging)).isTrue();
                 assertThat(snapshot.complete()).isTrue();
                 assertThat(snapshot.commitSha()).isEqualTo(sha);
                 assertThat(snapshot.visitedFiles()).isEqualTo(4);
@@ -788,8 +789,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
     private List<Path> stagingDirectories() throws IOException {
         if (!Files.isDirectory(fabric)) return List.of();
         try (Stream<Path> entries = Files.list(fabric)) {
-            return entries.filter(
-                            path -> path.getFileName().toString().startsWith(GitRepositoryManager.GIT_SNAPSHOT_PREFIX))
+            return entries.filter(path -> path.getFileName().toString().startsWith(EvidenceSpool.PREFIX))
                     .toList();
         }
     }

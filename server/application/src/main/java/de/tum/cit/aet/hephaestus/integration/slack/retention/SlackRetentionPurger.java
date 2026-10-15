@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.slack.retention;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackTs;
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Retain whole threads that have any activity after the cutoff.
  */
 @Component
+@ConditionalOnServerRole
 @RequiredArgsConstructor
 public class SlackRetentionPurger {
 

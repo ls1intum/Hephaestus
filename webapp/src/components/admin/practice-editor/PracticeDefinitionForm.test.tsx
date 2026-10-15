@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, type Mock, vi } from "vitest";
 
 import { deferred } from "@/test/async";
@@ -207,14 +208,14 @@ describe("the kind a practice is created for", () => {
 		await renderCreateForm(vi.fn());
 		fireEvent.click(screen.getByRole("radio", { name: /^Pull request review/u }));
 		fireEvent.click(screen.getByRole("button", { name: "Add condition" }));
-		fireEvent.change(screen.getByRole("textbox", { name: "Source 1" }), {
-			target: { value: "scm.review-threads" },
-		});
+		const user = userEvent.setup();
+		await user.click(screen.getByRole("combobox", { name: "Source 1" }));
+		await user.click(await screen.findByRole("option", { name: "Review threads and decisions" }));
 		fireEvent.click(screen.getByRole("radio", { name: /^Pull request\b(?! review)/u }));
-		expect(screen.queryByRole("textbox", { name: "Source 1" })).toBeNull();
+		expect(screen.queryByRole("combobox", { name: "Source 1" })).toBeNull();
 		fireEvent.click(screen.getByRole("radio", { name: /^Pull request review/u }));
-		expect(screen.getByRole<HTMLInputElement>("textbox", { name: "Source 1" }).value).toBe(
-			"scm.review-threads",
+		expect(screen.getByRole("combobox", { name: "Source 1" }).textContent).toContain(
+			"Review threads and decisions",
 		);
 	});
 });

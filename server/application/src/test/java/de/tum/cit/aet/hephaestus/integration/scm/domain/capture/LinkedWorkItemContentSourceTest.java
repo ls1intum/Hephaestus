@@ -19,7 +19,6 @@ import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
@@ -644,28 +643,6 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
                             "JGit failed", new IOException("Unreadable repository")))
                     .when(gitRepositoryManager)
                     .forEachCommitMessage(eq(KEY), eq(BASE), eq(HEAD), any());
-
-            assertThatExceptionOfType(ItemCaptureException.class)
-                    .isThrownBy(() -> provider.capture(request(sampleMetadata()), provider.sourceKinds()));
-        }
-    }
-
-    @Nested
-    class Authorization {
-
-        @Test
-        void shouldOnlyAuthorizeWhenGitIsDisabled() {
-            pullRequestWithBody("Closes #42");
-            when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, 42))
-                    .thenReturn(Optional.of(issue(42, "Known", "")));
-
-            provider.capture(request(sampleMetadata()), Set.of(KIND));
-        }
-
-        @Test
-        void shouldRejectUnauthorizedDatabaseCaptureWhenGitIsDisabled() {
-            var failure = new ItemCaptureException(ItemCaptureCode.ITEM_NOT_VISIBLE, "Unauthorized repository");
-            when(repositoryPreparer.authorize(any())).thenThrow(failure);
 
             assertThatExceptionOfType(ItemCaptureException.class)
                     .isThrownBy(() -> provider.capture(request(sampleMetadata()), provider.sourceKinds()));

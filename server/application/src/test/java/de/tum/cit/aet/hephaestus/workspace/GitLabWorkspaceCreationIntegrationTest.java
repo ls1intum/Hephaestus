@@ -72,7 +72,9 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             Identity link = new Identity();
             link.setAccount(account);
             link.setProviderId(persistedId(gitlab.getId()));
-            link.setProviderUserKey(String.valueOf(subject(account, gitlab)));
+            long nativeId = subject(account, gitlab);
+            TestUserFactory.ensureUser(userRepository, login, nativeId, gitlab);
+            link.setProviderUserKey(String.valueOf(nativeId));
             identityRepository.save(link);
         }
         String token = "mock-jwt-sub-" + persistedId(account.getId());
@@ -278,7 +280,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
                 .findByLoginAndProviderId("mentor", persistedId(instance.getId()))
                 .orElseThrow();
         assertThat(workspaceMembershipRepository.findByWorkspace_IdAndId_AccountId(
-                        workspace.id(), instanceActor.getId()))
+                        workspace.id(), accountId(instanceActor)))
                 .hasValueSatisfying(
                         membership -> assertThat(membership.getRole()).isEqualTo(Membership.WorkspaceRole.OWNER));
     }
@@ -424,11 +426,10 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         WorkspaceDTO workspace = Objects.requireNonNull(created);
 
         var membership = workspaceMembershipRepository
-                .findByWorkspace_IdAndId_AccountId(
-                        workspace.id(), persistedId(caller.scmUser().getId()))
+                .findByWorkspace_IdAndId_AccountId(workspace.id(), accountId(caller.scmUser()))
                 .orElseThrow(() -> new AssertionError("Owner membership not created"));
         assertThat(membership.getRole()).isEqualTo(Membership.WorkspaceRole.OWNER);
-        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndId_AccountId(workspace.id(), namesake.getId()))
+        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndId_AccountId(workspace.id(), accountId(namesake)))
                 .isEmpty();
     }
 

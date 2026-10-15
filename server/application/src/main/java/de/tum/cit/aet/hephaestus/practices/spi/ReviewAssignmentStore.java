@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.spi;
 
+import de.tum.cit.aet.hephaestus.integration.core.spi.CandidateRefusal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;

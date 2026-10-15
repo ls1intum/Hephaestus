@@ -63,9 +63,7 @@ final class PracticeCriteriaCaseFixtures {
             "context/general_comments.json",
             "scm.general-review-comments",
             "context/linked_work_items.json",
-            "scm.linked-work-items",
-            "context/project_inventory.json",
-            "workspace.project-inventory");
+            "scm.linked-work-items");
 
     private PracticeCriteriaCaseFixtures() {}
 

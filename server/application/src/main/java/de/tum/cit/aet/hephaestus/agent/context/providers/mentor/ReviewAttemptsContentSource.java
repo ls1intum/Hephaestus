@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.agent.job.ReviewJobAssignments;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.evidence.capture.ContentSource;
+import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextPaths;
 import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
@@ -57,7 +58,7 @@ public class ReviewAttemptsContentSource implements ContentSource {
                     case "scm.issue" -> "issue";
                     default -> throw new IllegalArgumentException("This item kind has no SCM review resource");
                 };
-        return OUTPUT_PREFIX + "review_attempts/" + segment + "/" + sourceId + ".json";
+        return MentorContextPaths.reviewAttempts(segment, sourceId);
     }
 
     public static Optional<ItemSelection> selectionOf(String key) {

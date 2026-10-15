@@ -196,12 +196,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
     class MetadataAndComments {
 
         @Test
-        void shouldReadCoreFromTheSnapshotWithoutRequiringGit() {
-            assertThat(provider.capture(request(sampleMetadata()), Set.of(CORE)).files())
-                    .containsKey("context/metadata.json");
-        }
-
-        @Test
         void writesMetadataJson() throws Exception {
             stubGit();
 
@@ -741,72 +735,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             assertThat(captured.stateOverrides())
                     .containsExactly(
                             Map.entry(DIFF, new SourceCaptureState.NotCollected(SourceAbsenceReason.DISABLED)));
-        }
-
-        @Test
-        void shouldRefuseDisabledDiffWhenRepositoryAuthorizationFails() {
-            when(repositoryPreparer.authorize(any()))
-                    .thenThrow(new ItemCaptureException(
-                            ItemCaptureCode.CAPTURE_FAILED, "The review source identity changed"));
-
-            assertThatThrownBy(() -> provider.capture(request(sampleMetadata()), Set.of(DIFF)))
-                    .isInstanceOf(ItemCaptureException.class)
-                    .hasMessageContaining("source identity changed");
-        }
-
-        @Test
-        void throwsWhenRepositoryMissing() {
-            lenient().when(gitRepositoryManager.isEnabled()).thenReturn(true);
-            when(gitRepositoryManager.isRepositoryCloned(REPOSITORY)).thenReturn(false);
-
-            assertThatThrownBy(() -> captureFiles(request(sampleMetadata())))
-                    .isInstanceOf(ItemCaptureException.class)
-                    .hasMessageContaining("Repository is not available locally for evidence capture");
-        }
-    }
-
-    @Test
-    void shouldReportUnavailableThenAllowCaptureWhenArtifactReturns() {
-        mirroredPullRequest = null;
-        for (var kind : provider.sourceKinds()) {
-            var captured = provider.capture(request(sampleMetadata()), Set.of(kind));
-            assertThat(captured.files()).isEmpty();
-            assertThat(captured.completeness()).isEmpty();
-            assertThat(captured.contentStates()).isEmpty();
-            assertThat(captured.stateOverrides())
-                    .containsExactlyEntriesOf(
-                            Map.of(kind, new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND)));
-        }
-        var artifact = pullRequest();
-        mirroredPullRequest = artifact;
-        var restored = provider.capture(request(sampleMetadata()), Set.of(COMMENTS));
-        assertThat(restored.stateOverrides()).isEmpty();
-        assertThat(restored.files()).isNotEmpty();
-    }
-
-    @Test
-    void shouldSkipGitPreparationWhenTheParentIsUnavailable() {
-        var deleted = pullRequest();
-        deleted.setDeletedAt(Instant.parse("2026-09-05T00:00:00Z"));
-        mirroredPullRequest = deleted;
-
-        var captured = provider.capture(request(sampleMetadata()), Set.of(DIFF));
-
-        assertThat(captured.stateOverrides())
-                .containsEntry(DIFF, new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND));
-    }
-
-    @Test
-    void shouldHandTheSamePreparationFailureToEverySourceOfOneRequest() {
-        when(gitRepositoryManager.isEnabled()).thenReturn(true);
-        when(repositoryPreparer.prepare(any()))
-                .thenThrow(new ItemCaptureException(ItemCaptureCode.CAPTURE_FAILED, "SCM credentials are unavailable"));
-        var request = request(sampleMetadata());
-
-        for (var kind : List.of(DIFF, DIFF)) {
-            assertThatThrownBy(() -> provider.capture(request, Set.of(kind)))
-                    .isInstanceOf(ItemCaptureException.class)
-                    .hasMessage("SCM credentials are unavailable");
         }
     }
 

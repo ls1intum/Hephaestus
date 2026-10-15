@@ -6,14 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEventRepository;
-import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageInsert;
-import de.tum.cit.aet.hephaestus.core.llm.usage.MeasurementVerification;
-import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
-import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
-import de.tum.cit.aet.hephaestus.core.llm.usage.UsageProvenance;
-import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
+import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.math.BigDecimal;

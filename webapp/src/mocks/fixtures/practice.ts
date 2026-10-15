@@ -74,18 +74,6 @@ function readSource(source: string, label: string): ReadSourceOption {
 	};
 }
 
-// Source fixtures must match catalog.json; practice.test.ts enforces the contract.
-const relatedWorkSource = readSource("workspace.project-inventory", "Related workspace work");
-const outlineDocumentsSource = readSource("outline.documents", "Outline documents");
-const resultHistorySource = readSource(
-	"hephaestus.result-history",
-	"Earlier results about this person",
-);
-const feedbackHistorySource = readSource(
-	"hephaestus.feedback-history",
-	"Feedback already delivered to this person",
-);
-
 const SCM_PROVIDERS = [
 	"GITHUB",
 	"GITLAB",
@@ -165,10 +153,6 @@ export const mockPracticeDefinitionOptions = {
 				},
 				readSource("scm.review-threads", "Review threads and decisions"),
 				readSource("scm.general-review-comments", "General review comments"),
-				relatedWorkSource,
-				outlineDocumentsSource,
-				resultHistorySource,
-				feedbackHistorySource,
 			],
 			reviewOnStateDimensions: [
 				{
@@ -192,6 +176,10 @@ export const mockPracticeDefinitionOptions = {
 			scanSupported: true,
 			scanItemKinds: ["scm.file"],
 			applicabilityClauses: ["CHANGED_PATH", "DIFF_CONTAINS", "HAS_ITEMS"],
+			applicabilitySources: [
+				readSource("scm.review-threads", "Review threads and decisions"),
+				readSource("scm.general-review-comments", "General review comments"),
+			],
 		},
 		{
 			kind: "scm.issue",
@@ -223,10 +211,6 @@ export const mockPracticeDefinitionOptions = {
 			readSources: [
 				readSource("scm.issue.core", "Issue details"),
 				readSource("scm.issue.comments", "Issue comments"),
-				relatedWorkSource,
-				outlineDocumentsSource,
-				resultHistorySource,
-				feedbackHistorySource,
 			],
 			reviewOnStateDimensions: [
 				{
@@ -241,6 +225,7 @@ export const mockPracticeDefinitionOptions = {
 			scanSupported: false,
 			scanItemKinds: [],
 			applicabilityClauses: [],
+			applicabilitySources: [],
 		},
 		{
 			kind: "chat.thread",
@@ -255,16 +240,12 @@ export const mockPracticeDefinitionOptions = {
 				},
 			],
 			aboutRoles: ["AUTHOR"],
-			readSources: [
-				readSource("slack.conversation.thread", "Slack thread"),
-				relatedWorkSource,
-				resultHistorySource,
-				feedbackHistorySource,
-			],
+			readSources: [readSource("slack.conversation.thread", "Slack thread")],
 			reviewOnStateDimensions: [],
 			scanSupported: false,
 			scanItemKinds: [],
 			applicabilityClauses: [],
+			applicabilitySources: [],
 		},
 		{
 			kind: "docs.document",
@@ -293,11 +274,7 @@ export const mockPracticeDefinitionOptions = {
 				},
 			],
 			aboutRoles: ["AUTHOR"],
-			readSources: [
-				readSource("docs.document.core", "Document under review"),
-				resultHistorySource,
-				feedbackHistorySource,
-			],
+			readSources: [readSource("docs.document.core", "Document under review")],
 			reviewOnStateDimensions: [
 				{
 					name: "state",
@@ -311,6 +288,7 @@ export const mockPracticeDefinitionOptions = {
 			scanSupported: false,
 			scanItemKinds: [],
 			applicabilityClauses: [],
+			applicabilitySources: [],
 		},
 	],
 } satisfies PracticeDefinitionOptions;

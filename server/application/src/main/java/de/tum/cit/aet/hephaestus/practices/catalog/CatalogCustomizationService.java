@@ -212,26 +212,17 @@ public class CatalogCustomizationService {
     }
 
     @Transactional
-    public void reorder(CatalogEntryType type, List<String> slugs, @Nullable EntityTagPrecondition precondition) {
+    public void reorderGroups(List<String> slugs, @Nullable EntityTagPrecondition precondition) {
         lock.acquire();
         var catalog = catalogService.effectiveCatalog();
         EntityTagPrecondition.requireExact(precondition, catalog.etag());
-        List<String> existing;
-        if (type == CatalogEntryType.PRACTICE) {
-            if (slugs.isEmpty()) throw new IllegalArgumentException("List every practice in one group once.");
-            String groupSlug = practice(catalog, slugs.getFirst()).effective().groupSlug();
-            existing = catalog.practices().stream()
-                    .filter(offer -> Objects.equals(offer.effective().groupSlug(), groupSlug))
-                    .map(CatalogOffer::slug)
-                    .toList();
-        } else {
-            existing = catalog.groups().stream().map(CatalogOffer::slug).toList();
-        }
-        if (slugs.size() != Set.copyOf(slugs).size() || !Set.copyOf(slugs).equals(Set.copyOf(existing))) {
-            throw new IllegalArgumentException("List every entry in the selected group once in the order.");
+        var existing = catalog.groups().stream().map(CatalogOffer::slug).toList();
+        var requested = Set.copyOf(slugs);
+        if (slugs.size() != requested.size() || !requested.equals(Set.copyOf(existing))) {
+            throw new IllegalArgumentException("List every catalog group once in the order.");
         }
         for (int position = 0; position < slugs.size(); position++) {
-            CatalogEntry entry = row(type, slugs.get(position));
+            CatalogEntry entry = row(CatalogEntryType.GROUP, slugs.get(position));
             entry.setPosition(position);
             entries.save(entry);
         }

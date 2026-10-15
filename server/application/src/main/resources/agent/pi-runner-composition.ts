@@ -1057,7 +1057,7 @@ export const WRITE_CONTRACT =
 	"nothing: the summary is null and there are no line notes.\n\n" +
 	"One result or problem may support notes at several places, and also the summary's overview of them.";
 
-function notMetPractices(reviewable: readonly Record<string, unknown>[]): string[] {
+function publicNotMetPractices(reviewable: readonly Record<string, unknown>[]): string[] {
 	return [
 		...new Set(
 			reviewable
@@ -1080,7 +1080,7 @@ export function notMetReference(
 	history: readonly OwnPriorFeedback[] = [],
 	itemVersion: string | null = null,
 ): string {
-	const concerns = notMetPractices(reviewable).map((slug) => {
+	const concerns = publicNotMetPractices(reviewable).map((slug) => {
 		const results = reviewable.filter(
 			(entry) =>
 				entry.publicEligible === true && entry.outcome === "NOT_MET" && entry.practiceSlug === slug,

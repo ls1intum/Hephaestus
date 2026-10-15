@@ -4,6 +4,7 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.cit.aet.hephaestus.core.WebClientConnectors;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WorkspaceProvisioningHook;
@@ -40,6 +41,7 @@ import org.springframework.web.reactive.function.client.WebClient;
  * and swallowed; the worst case is a stale workspace, which the next startup retry fixes.
  */
 @Service
+@ConditionalOnServerRole
 public class GitHubInstallationReconciler implements WorkspaceProvisioningHook {
 
     @Override

@@ -2,14 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.usage;
 
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.core.TransactionCallbacks;
-import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEventRepository;
-import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageInsert;
-import de.tum.cit.aet.hephaestus.core.llm.usage.MeasurementVerification;
-import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
-import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
-import de.tum.cit.aet.hephaestus.core.llm.usage.UsageProvenance;
-import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
+import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.math.BigDecimal;
 import java.time.Instant;

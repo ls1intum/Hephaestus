@@ -30,12 +30,15 @@ import tools.jackson.databind.ObjectMapper;
     "feedback_decision",
     "feedback",
     "result_mark",
-    "review_item_result_reference",
+    "review_item",
     "problem",
     "result",
     "result_mark_created_actor",
     "result_mark_removed_actor",
-    "feedback_decision_actor"
+    "feedback_decision_actor",
+    "review",
+    "review_batch",
+    "review_schedule"
 })
 public class PracticesPersonDataCatalog implements PersonDataCatalog, PersonConversationCopySource {
     private static final String RESULT_IDS =
@@ -77,6 +80,38 @@ public class PracticesPersonDataCatalog implements PersonDataCatalog, PersonConv
     @Override
     public List<PersonDataContributor> contributors() {
         return List.<PersonDataContributor>of(
+                        new JdbcPersonDataStore(
+                                jdbc,
+                                mapper,
+                                "review",
+                                "review",
+                                "t.requested_by_id=:account",
+                                "id,workspace_id,kind,origin,requested_by_id,created_at,ordered_at,completed_at",
+                                "id,workspace_id",
+                                "requested_by_id=NULL",
+                                -180),
+                        new JdbcPersonDataStore(
+                                jdbc,
+                                mapper,
+                                "review_batch",
+                                "review_batch",
+                                "t.requested_by_account_id=:account OR t.confirmed_by_account_id=:account",
+                                "id,workspace_id,kind,origin,status,requested_by_account_id,confirmed_by_account_id,created_at,started_at,finished_at",
+                                "id,workspace_id",
+                                "version=version+1,requested_by_account_id=CASE WHEN requested_by_account_id=:account"
+                                        + " THEN NULL ELSE requested_by_account_id END,confirmed_by_account_id=CASE WHEN"
+                                        + " confirmed_by_account_id=:account THEN NULL ELSE confirmed_by_account_id END",
+                                -180),
+                        new JdbcPersonDataStore(
+                                jdbc,
+                                mapper,
+                                "review_schedule",
+                                "review_schedule",
+                                "t.created_by_account_id=:account",
+                                "id,workspace_id,kind,cadence,enabled,created_by_account_id,created_at,last_run_at,next_run_at",
+                                "id,workspace_id",
+                                "created_by_account_id=NULL",
+                                -180),
                         new JdbcPersonDataStore(
                                 jdbc,
                                 mapper,
@@ -142,7 +177,7 @@ public class PracticesPersonDataCatalog implements PersonDataCatalog, PersonConv
                                 reports,
                                 jdbc,
                                 mapper,
-                                "review_item_result_reference",
+                                "review_item",
                                 "review_item",
                                 "t.result_id IN(" + RESULT_IDS
                                         + ") OR t.job_id=ANY(:derivedJobs) OR EXISTS(SELECT 1 FROM"

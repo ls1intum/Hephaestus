@@ -25,7 +25,7 @@ import tools.jackson.databind.json.JsonMapper;
 class CapturedEvidenceTest extends BaseUnitTest {
     private final JsonMapper mapper = new JsonMapper();
     private static final SourceKind CONTENT = new SourceKind("docs.document.core");
-    private static final SourceKind COMMENTS = new SourceKind("hephaestus.result-history");
+    private static final SourceKind COMMENTS = new SourceKind("scm.pull-request.comments");
 
     @Test
     void readsOnlyAvailableSourcesAndTheirExactFileProof() {

@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.repository;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
@@ -43,6 +44,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  *      GitHub Repository Webhook Events</a>
  */
 @Component
+@ConditionalOnServerRole
 public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHandler<GitHubRepositoryEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubRepositoryMessageHandler.class);

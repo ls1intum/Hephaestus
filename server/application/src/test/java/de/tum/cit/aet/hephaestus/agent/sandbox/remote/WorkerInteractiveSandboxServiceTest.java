@@ -17,7 +17,7 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.MentorBusyException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.NetworkPolicy;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
-import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerControlWebSocketHandler;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerDisconnectedEvent;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerMentorSessionEvent;

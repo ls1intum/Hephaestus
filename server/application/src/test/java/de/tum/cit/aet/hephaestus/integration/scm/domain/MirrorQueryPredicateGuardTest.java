@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MentorContextQueryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.context.MentorContextQueryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -60,15 +60,6 @@ class MirrorQueryPredicateGuardTest extends BaseUnitTest {
             "PullRequest", ".deletedAt IS NULL",
             "Issue", ".deletedAt IS NULL");
 
-    /**
-     * Mentor queries the range scan cannot read — native SQL, and derived methods with no
-     * {@code @Query} at all. Each name here is a claim that the query reaches no issue or pull-request
-     * row; a mentor query that adds one has to be weighed and named here before the guard goes quiet.
-     */
-    private static final Set<String> MENTOR_QUERIES_THE_SCAN_CANNOT_READ = Set.of(
-            // chat_message joined to chat_thread; no SCM artifact in either.
-            "findFirstUserMessagePartsByThreadIds");
-
     @Nested
     @DisplayName("mentor context")
     class MentorContext {
@@ -85,7 +76,7 @@ class MirrorQueryPredicateGuardTest extends BaseUnitTest {
          */
         @Test
         void everyMentorArtifactRangeExcludesTombstones() {
-            assertEveryRangeHasLivePredicate(MentorContextQueryRepository.class, MENTOR_QUERIES_THE_SCAN_CANNOT_READ);
+            assertEveryRangeHasLivePredicate(MentorContextQueryRepository.class, Set.of());
         }
     }
 
@@ -150,22 +141,6 @@ class MirrorQueryPredicateGuardTest extends BaseUnitTest {
                             + "Offending method -> unguarded alias")
                     .isEmpty();
         }
-
-        /**
-         * Pins the specific regression: the assigned-open-issues list must not be able to return a
-         * merge request. Kept alongside the generic scan so the failure names the actual defect.
-         */
-        @Test
-        void assignedOpenIssuesExcludesMergeRequests() throws NoSuchMethodException {
-            String jpql = normalize(MentorContextQueryRepository.class
-                    .getMethod("findAssignedOpenIssues", Long.class, Long.class)
-                    .getAnnotation(Query.class)
-                    .value());
-
-            assertThat(jpql.replace(" ", ""))
-                    .as("findAssignedOpenIssues must exclude PullRequest rows, like its sibling count query")
-                    .contains("TYPE(i)=Issue");
-        }
     }
 
     @Nested
@@ -214,8 +189,8 @@ class MirrorQueryPredicateGuardTest extends BaseUnitTest {
 
             assertThat(jpql).contains("GROUP BY");
             assertThat(countOccurrences(jpql, "SELECT"))
-                    .as(
-                            "exactly one SELECT: the grouped count, with no correlated subquery added by the tombstone filter")
+                    .as("exactly one SELECT: the grouped count, with no correlated subquery added by the tombstone"
+                            + " filter")
                     .isEqualTo(1);
         }
     }

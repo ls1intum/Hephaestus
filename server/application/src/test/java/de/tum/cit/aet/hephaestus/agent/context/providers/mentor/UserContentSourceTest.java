@@ -9,6 +9,8 @@ import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.UserContentSourc
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery.AccountSummary;
 import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
+import de.tum.cit.aet.hephaestus.integration.core.spi.MentorUserCounts;
+import de.tum.cit.aet.hephaestus.integration.core.spi.MentorWorkQuery;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.HashMap;
@@ -29,7 +31,7 @@ class UserContentSourceTest extends BaseUnitTest {
     AccountSummaryQuery userRepository;
 
     @Mock
-    MentorContextQueryRepository queryRepository;
+    MentorWorkQuery queryRepository;
 
     @Spy
     ObjectMapper objectMapper = new ObjectMapper();

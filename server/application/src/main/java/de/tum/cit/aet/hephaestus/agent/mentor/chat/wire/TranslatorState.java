@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat.wire;
 
-import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.practices.spi.CopyWriteFence;
 import java.util.ArrayList;
 import java.util.HashMap;

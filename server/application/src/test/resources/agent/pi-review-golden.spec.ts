@@ -225,10 +225,12 @@ if (scenario !== undefined && scenario !== "") {
 		}
 		return Response.json({
 			contractVersion: 3,
-			admissionDigest: "golden-digest",
+			admissionDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			publicReviewed: false,
 			admitted: [],
 			withheld: [],
+			practicePageSupport: null,
+			conversationEligibility: null,
 		});
 	});
 	const manager = {

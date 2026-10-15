@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.review.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemRefDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;

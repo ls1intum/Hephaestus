@@ -5,7 +5,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.PinnedPractice;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewPracticeStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshotQuery;
 import java.math.BigDecimal;
@@ -52,10 +51,7 @@ public class ReviewSnapshotQueryService implements ReviewSnapshotQuery {
             if (ref.isEmpty()) return Optional.empty();
             var pinned = new ArrayList<PinnedPractice>();
             for (var assignment : assignments.findByWorkspaceIdAndReviewIdOrderByPracticeIdAsc(workspaceId, reviewId)) {
-                if (assignment.getPracticeVersionId() == null
-                        || assignment.getMethod() == null
-                        || assignment.getStatus() == ReviewPracticeStatus.WITHHELD
-                        || assignment.getStatus() == ReviewPracticeStatus.FAILED) continue;
+                if (assignment.getPracticeVersionId() == null || assignment.getMethod() == null) continue;
                 var version = versions.findByIdAndWorkspaceId(
                                 assignment.getPracticeVersionId(), assignment.getWorkspaceId())
                         .filter(v -> v.getWorkspaceId() == workspaceId

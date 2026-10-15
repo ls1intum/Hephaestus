@@ -386,11 +386,6 @@ public class ResultAdmissionService {
         private static final long serialVersionUID = 1L;
     }
 
-    public static class AdmissionConflictException extends RuntimeException {
-        @Serial
-        private static final long serialVersionUID = 1L;
-    }
-
     public static class PublicHistoryRefusedException extends RuntimeException {
         @Serial
         private static final long serialVersionUID = 1L;

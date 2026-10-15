@@ -53,15 +53,10 @@ await test("composed views are readable but only canonical records are citable",
 		sources: [],
 		files: [
 			{ kind: "review.problems", file: { path: "inputs/history/problems.json" } },
-			{
-				kind: "workspace.project-inventory",
-				file: { path: "context/project_inventory.json" },
-			},
 			{ kind: "review.problems", file: { path: "context/people/42/problems.jsonl" } },
 		],
 	});
 	assert.equal(result.sourceFileSources.has("inputs/history/problems.json"), false);
-	assert.equal(result.sourceFileSources.has("context/project_inventory.json"), false);
 	assert.equal(result.sourceFileSources.has("context/people/42/problems.jsonl"), true);
 });
 

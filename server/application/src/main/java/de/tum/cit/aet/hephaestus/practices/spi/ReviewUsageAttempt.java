@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.spi;
 
-import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
+import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
 import java.math.BigDecimal;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;

@@ -2,8 +2,6 @@ package de.tum.cit.aet.hephaestus.agent.usage;
 
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEventRepository;
-import de.tum.cit.aet.hephaestus.core.llm.usage.UnpricedLedgerRow;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;

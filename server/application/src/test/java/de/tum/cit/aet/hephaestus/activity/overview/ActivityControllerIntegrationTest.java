@@ -459,20 +459,23 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             var second = new Identity();
             second.setAccount(account);
             second.setProviderId(Objects.requireNonNull(otherProvider.getId()));
-            second.setProviderUserKey("purge-subject");
+            second.setProviderUserKey(ada.getNativeId().toString());
             publicIdentities.saveAndFlush(second);
             record(ada, ActivityEventType.ISSUE_CREATED, ActivityTargetType.ISSUE, -1, DAY);
             assertThat(page().people()).extracting(person -> person.login()).containsExactly(ada.getLogin());
             publicationChoice.setVisible(accountId, false);
             accountService.unlinkIdentity(accountId, identity.getId());
-            assertThat(publicIdentities.findById(identity.getId())).isEmpty();
+            assertThat(publicIdentities.findById(identity.getId()))
+                    .hasValueSatisfying(link -> assertThat(link.getDisabledAt()).isNotNull());
+            assertThat(publicIdentities.findActiveByProviderSubject(
+                            identity.getProviderId(), identity.getProviderUserKey(), null))
+                    .isEmpty();
             assertThat(page().people()).isEmpty();
             assertThat(publicObjections.hiddenPeople(workspace.getId())).isEqualTo(1);
             accountService.softDelete(accountId);
             accountPurger.purge(accountId);
             assertThat(publicIdentities.findActiveByAccountId(accountId)).isEmpty();
-            assertThat(page().people()).isEmpty();
-            assertThat(publicObjections.hiddenPeople(workspace.getId())).isEqualTo(1);
+            assertErasedActivityHidden(ada);
         }
 
         @Test
@@ -490,8 +493,7 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             accountService.softDelete(accountId);
             accountPurger.purge(accountId);
             assertThat(publicIdentities.findById(identity.getId())).isEmpty();
-            assertThat(page().people()).isEmpty();
-            assertThat(publicObjections.hiddenPeople(workspace.getId())).isEqualTo(1);
+            assertErasedActivityHidden(ada);
         }
 
         @Test
@@ -761,17 +763,18 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             var account = new Account("Public export person");
             account.setPublicActivityVisible(false);
             var saved = accountRepository.saveAndFlush(account);
-            jdbc.update("""
-                INSERT INTO workspace_member_onboarding(workspace_id,account_id,seen_revision,public_activity_seen,updated_at)
-                VALUES(?,?,0,true,now())
-                """, workspace.getId(), saved.getId());
+            var member = workspaceMembershipService.createMembership(
+                    workspace, Objects.requireNonNull(saved.getId()), WorkspaceRole.MEMBER);
+            member.setOnboardingSeenRevision(0L);
+            member.setPublicActivitySeen(true);
+            workspaceMembershipRepository.saveAndFlush(member);
             var scope = new PersonScope(saved.getId(), List.of(), List.of());
             var accountStore = personDataRegistry.stores().stream()
                     .filter(store -> store.store().equals("account"))
                     .findFirst()
                     .orElseThrow();
-            var onboardingStore = personDataRegistry.stores().stream()
-                    .filter(store -> store.store().equals("workspace_member_onboarding"))
+            var membershipStore = personDataRegistry.stores().stream()
+                    .filter(store -> store.store().equals("membership"))
                     .findFirst()
                     .orElseThrow();
             assertThat(accountStore.export(accountStore.select(scope), scope))
@@ -779,7 +782,7 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                     .satisfies(row -> assertThat(
                                     row.path("public_activity_visible").asBoolean(true))
                             .isFalse());
-            assertThat(onboardingStore.export(onboardingStore.select(scope), scope))
+            assertThat(membershipStore.export(membershipStore.select(scope), scope))
                     .singleElement()
                     .satisfies(
                             row -> assertThat(row.path("public_activity_seen").asBoolean())
@@ -822,6 +825,12 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                     "public-second", "Second", "public-second-org", AccountType.ORG, persistUser("second-owner"));
             second.setPublicActivityEnabled(true);
             workspaceRepository.save(second);
+            var caller = userRepository
+                    .findByLoginAndProviderId(
+                            "mentor",
+                            Objects.requireNonNull(ensureGitHubProvider().getId()))
+                    .orElseThrow();
+            ensureMembership(second, caller, WorkspaceRole.MEMBER);
             webTestClient
                     .get()
                     .uri("/user/public-activity/workspaces/public-second/onboarding")
@@ -1400,10 +1409,7 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                             null)
                     : new ConnectionConfig.GitHubAppConfig(
                             9302L, workspace.getAccountLogin(), provider.getServerUrl(), Set.of());
-            jdbc.update(
-                    "UPDATE connection SET state='UNINSTALLED' WHERE workspace_id=? AND kind<>?",
-                    workspace.getId(),
-                    kind.name());
+            retireScmSources();
             var connection =
                     connections.saveAndFlush(new Connection(workspace, kind, "public-" + provider.getType(), config));
             connectionService.transition(
@@ -1415,6 +1421,18 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                             "public-activity",
                             UUID.randomUUID().toString(),
                             "Source connected"));
+        }
+
+        private void assertErasedActivityHidden(User actor) {
+            assertThat(page().people()).isEmpty();
+            assertThat(publicObjections.hiddenPeople(workspace.getId())).isZero();
+            assertThat(jdbc.queryForObject(
+                            "SELECT EXISTS(SELECT 1 FROM identity_restriction WHERE provider_id=? AND"
+                                    + " provider_user_key=? AND team_key='' AND kind='ERASED')",
+                            Boolean.class,
+                            actor.getProvider().getId(),
+                            actor.getNativeId().toString()))
+                    .isTrue();
         }
 
         private String error(String slug) {
@@ -1967,8 +1985,10 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                             .containsExactly(new ActivityActionDTO(ActivityKind.PULL_REQUEST_OPENED, 1));
                 });
                 assertThat(page.nextCursor()).isNull();
-                assertThat(workspaceMembershipRepository.findByWorkspace_IdAndId_AccountId(
-                                workspace.getId(), workspaceMembershipService.accountIdForUser(contributor.getId())))
+                assertThat(publicIdentities.findActiveByProviderSubject(
+                                Objects.requireNonNull(contributor.getProvider().getId()),
+                                contributor.getNativeId().toString(),
+                                null))
                         .isEmpty();
             }
         }
@@ -3064,11 +3084,14 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                 repository.setHtmlUrl(provider.getServerUrl() + "/" + repository.getNameWithOwner());
                 repositoryRepository.save(repository);
                 work.setProvider(provider);
+                actorOnProvider(Objects.requireNonNull(work.getAuthor()), provider);
                 work.setHtmlUrl(repository.getHtmlUrl() + "/-/merge_requests/" + work.getNumber());
+
                 if (connections
                         .findByWorkspaceIdAndKindAndInstanceKey(
                                 workspace.getId(), IntegrationKind.GITLAB, "activity-gitlab")
                         .isEmpty()) {
+                    retireScmSources();
                     Connection connection = connections.saveAndFlush(new Connection(
                             workspace,
                             IntegrationKind.GITLAB,
@@ -3137,12 +3160,13 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .getResponseBody());
     }
 
-    private static Function<PullRequest, PullRequest> requesting(User reviewer) {
+    private Function<PullRequest, PullRequest> requesting(User reviewer) {
         return requesting(reviewer, null);
     }
 
-    private static Function<PullRequest, PullRequest> requesting(User reviewer, @Nullable ReviewState state) {
+    private Function<PullRequest, PullRequest> requesting(User reviewer, @Nullable ReviewState state) {
         return work -> {
+            actorOnProvider(reviewer, work.getProvider());
             Map<User, @Nullable ReviewState> reviewers = new HashMap<>();
             work.getRequestedReviewers().forEach(listed -> reviewers.put(listed.getUser(), listed.getReviewState()));
             reviewers.put(reviewer, state);
@@ -3432,6 +3456,33 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         return user;
     }
 
+    private void actorOnProvider(User actor, IdentityProvider provider) {
+        if (Objects.requireNonNull(actor.getProvider().getId()).equals(provider.getId())) return;
+        Long accountId = actor.getType() == User.Type.USER ? accountId(actor) : null;
+        actor.setProvider(provider);
+        actor.setHtmlUrl(provider.getServerUrl() + "/" + actor.getLogin());
+        userRepository.saveAndFlush(actor);
+        if (accountId != null) {
+            var identity = new Identity();
+            identity.setAccount(accountRepository.findById(accountId).orElseThrow());
+            identity.setProviderId(Objects.requireNonNull(provider.getId()));
+            identity.setProviderUserKey(actor.getNativeId().toString());
+            identity.setLinkedVia(Identity.LinkedVia.ROSTER);
+            publicIdentities.saveAndFlush(identity);
+        }
+    }
+
+    private void retireScmSources() {
+        var sources = connections.findByWorkspaceId(workspace.getId()).stream()
+                .filter(source ->
+                        source.getKind() == IntegrationKind.GITHUB || source.getKind() == IntegrationKind.GITLAB)
+                .filter(source ->
+                        source.getState() == IntegrationState.ACTIVE || source.getState() == IntegrationState.SUSPENDED)
+                .toList();
+        sources.forEach(source -> source.setState(IntegrationState.UNINSTALLED));
+        connections.saveAllAndFlush(sources);
+    }
+
     private void connectGitHub() {
         Connection connection = connections.saveAndFlush(new Connection(
                 workspace,
@@ -3471,7 +3522,7 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         long nativeId = nativeIds.incrementAndGet();
         PullRequest work = new PullRequest();
         work.setNativeId(nativeId);
-        work.setProvider(ensureGitHubProvider());
+        work.setProvider(repository.getProvider());
         work.setNumber((int) (nativeId % 100_000));
         work.setTitle("Pull request " + nativeId);
         work.setState(Issue.State.OPEN);
@@ -3490,9 +3541,10 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
     private PullRequestReview review(
             PullRequest pullRequest, User author, PullRequestReview.State state, Instant submittedAt) {
+        actorOnProvider(author, pullRequest.getProvider());
         PullRequestReview review = new PullRequestReview();
         review.setNativeId(nativeIds.incrementAndGet());
-        review.setProvider(ensureGitHubProvider());
+        review.setProvider(pullRequest.getProvider());
         review.setState(state);
         review.setPullRequest(pullRequest);
         review.setAuthor(author);

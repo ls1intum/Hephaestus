@@ -119,7 +119,7 @@ class DefaultReviewExecutionHandlerTest extends BaseUnitTest {
                                 ? List.of(
                                         new PracticeReadSource(new SourceKind("docs.document.core"), ReadNeed.REQUIRED),
                                         new PracticeReadSource(
-                                                new SourceKind("hephaestus.result-history"), ReadNeed.OPTIONAL))
+                                                new SourceKind("scm.pull-request.comments"), ReadNeed.OPTIONAL))
                                 : List.of(new PracticeReadSource(new SourceKind("docs.document.core"), need))),
                 d.reviewedBy(),
                 d.criteria(),
@@ -155,9 +155,9 @@ class DefaultReviewExecutionHandlerTest extends BaseUnitTest {
                                 EvidenceSnapshotFixtures.citation(new SourceKind("docs.document.core")),
                                 List.of()),
                         new SourceCapture(
-                                new SourceKind("hephaestus.result-history"),
+                                new SourceKind("scm.pull-request.comments"),
                                 capturedState,
-                                EvidenceSnapshotFixtures.citation(new SourceKind("hephaestus.result-history")),
+                                EvidenceSnapshotFixtures.citation(new SourceKind("scm.pull-request.comments")),
                                 List.of()))
                 : List.of(new SourceCapture(
                         new SourceKind("docs.document.core"),

@@ -4,8 +4,7 @@ import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.evidence.capture.ContentSource;
 import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.core.spi.MentorWorkQuery;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -47,7 +46,8 @@ public class WorkspaceContentSource implements ContentSource {
 
     private final AccountSummaryQuery accounts;
     private final WorkspaceRepository workspaceRepository;
-    private final MentorContextQueryRepository queryRepository;
+    private final MentorWorkQuery queryRepository;
+    private final MentorConversationQueryRepository conversations;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -95,9 +95,9 @@ public class WorkspaceContentSource implements ContentSource {
                 "recentSessions",
                 () -> addRecentSessions(root, workspaceId, developerId),
                 () -> root.putArray("recentSessions"));
-        List<PullRequest> reviewPrs = guardedQuery(
+        List<MentorWorkQuery.RequestedReview> reviewPrs = guardedQuery(
                 "pendingReviewRequests", () -> queryRepository.findPendingReviewRequestPrs(workspaceId, developerId));
-        List<Issue> assigned =
+        List<MentorWorkQuery.AssignedIssue> assigned =
                 guardedQuery("assignedIssues", () -> queryRepository.findAssignedOpenIssues(workspaceId, developerId));
         guarded("assignedIssues", () -> addAssignedIssues(root, assigned), () -> root.putArray("assignedIssues"));
         guarded(
@@ -140,7 +140,7 @@ public class WorkspaceContentSource implements ContentSource {
         // DB-side LIMIT via Pageable: the cap ships as SQL so a power user with hundreds of threads
         // returns at most MAX_RECENT_SESSIONS rows rather than being trimmed in-memory.
         List<ChatThread> threads =
-                queryRepository.findRecentChatThreads(workspaceId, developerId, PageRequest.of(0, MAX_RECENT_SESSIONS));
+                conversations.findRecentChatThreads(workspaceId, developerId, PageRequest.of(0, MAX_RECENT_SESSIONS));
         ArrayNode arr = root.putArray("recentSessions");
         if (threads.isEmpty()) {
             return;
@@ -164,7 +164,7 @@ public class WorkspaceContentSource implements ContentSource {
     private Map<UUID, String> loadFirstUserMessages(Long workspaceId, List<ChatThread> threads) {
         List<UUID> ids = new ArrayList<>(threads.size());
         for (ChatThread t : threads) ids.add(t.getId());
-        List<Object[]> rows = queryRepository.findFirstUserMessagePartsByThreadIds(workspaceId, ids);
+        List<Object[]> rows = conversations.findFirstUserMessagePartsByThreadIds(workspaceId, ids);
         Map<UUID, String> out = new HashMap<>(rows.size() * 2);
         for (Object[] row : rows) {
             UUID threadId = (UUID) row[0];
@@ -211,69 +211,56 @@ public class WorkspaceContentSource implements ContentSource {
         return null;
     }
 
-    private void addAssignedIssues(ObjectNode root, List<Issue> issues) {
+    private void addAssignedIssues(ObjectNode root, List<MentorWorkQuery.AssignedIssue> issues) {
         ArrayNode arr = root.putArray("assignedIssues");
-        for (Issue issue : issues) {
+        for (var issue : issues) {
             ObjectNode node = arr.addObject();
-            node.put("number", issue.getNumber());
-            node.put("title", issue.getTitle());
-            node.put("url", issue.getHtmlUrl());
-            if (issue.getRepository() != null) {
-                node.put("repository", issue.getRepository().getNameWithOwner());
-            }
-            if (issue.getMilestone() != null) {
-                node.put("milestoneTitle", issue.getMilestone().getTitle());
-                if (issue.getMilestone().getDueOn() != null) {
-                    node.put("milestoneDueOn", issue.getMilestone().getDueOn().toString());
-                }
-            }
+            node.put("number", issue.number());
+            node.put("title", issue.title());
+            node.put("url", issue.url());
+            if (issue.repository() != null) node.put("repository", issue.repository());
+            if (issue.milestoneTitle() != null) node.put("milestoneTitle", issue.milestoneTitle());
+            if (issue.milestoneDueOn() != null)
+                node.put("milestoneDueOn", issue.milestoneDueOn().toString());
         }
     }
 
-    private void addPendingReviewRequests(ObjectNode root, List<PullRequest> prs) {
+    private void addPendingReviewRequests(ObjectNode root, List<MentorWorkQuery.RequestedReview> reviews) {
         ArrayNode arr = root.putArray("pendingReviewRequests");
         Instant now = Instant.now();
-        for (PullRequest pr : prs) {
+        for (var review : reviews) {
             ObjectNode node = arr.addObject();
-            node.put("prNumber", pr.getNumber());
-            node.put("prTitle", pr.getTitle());
-            node.put("url", pr.getHtmlUrl());
-            if (pr.getAuthor() != null) {
-                node.put("author", pr.getAuthor().getLogin());
-            }
-            long days = pr.getCreatedAt() != null
-                    ? Duration.between(pr.getCreatedAt(), now).toDays()
-                    : 0;
-            node.put("waitingDays", days);
+            node.put("prNumber", review.number());
+            node.put("prTitle", review.title());
+            node.put("url", review.url());
+            if (review.author() != null) node.put("author", review.author());
+            node.put(
+                    "waitingDays",
+                    review.createdAt() == null
+                            ? 0
+                            : Duration.between(review.createdAt(), now).toDays());
         }
     }
 
-    private void addFocusSuggestions(ObjectNode root, List<Issue> issues, List<PullRequest> reviewPrs) {
-        ArrayNode arr = root.putArray("focusSuggestions");
-        List<String> suggestions = computeFocusSuggestions(issues, reviewPrs);
-        suggestions.forEach(arr::add);
+    private void addFocusSuggestions(
+            ObjectNode root,
+            List<MentorWorkQuery.AssignedIssue> issues,
+            List<MentorWorkQuery.RequestedReview> reviews) {
+        computeFocusSuggestions(issues, reviews).forEach(root.putArray("focusSuggestions")::add);
     }
 
-    /**
-     * Pure function; extracted for unit-testability. Two simple heuristics: stale review
-     * requests + issues with milestone deadlines.
-     */
-    static List<String> computeFocusSuggestions(List<Issue> issues, List<PullRequest> reviewPrs) {
+    static List<String> computeFocusSuggestions(
+            List<MentorWorkQuery.AssignedIssue> issues, List<MentorWorkQuery.RequestedReview> reviews) {
         List<String> out = new ArrayList<>();
         Instant now = Instant.now();
-        long stale = reviewPrs.stream()
-                .filter(p -> p.getCreatedAt() != null)
-                .filter(p -> Duration.between(p.getCreatedAt(), now).toDays() >= REVIEW_WAIT_URGENCY_DAYS)
+        long stale = reviews.stream()
+                .filter(review -> review.createdAt() != null)
+                .filter(review -> Duration.between(review.createdAt(), now).toDays() >= REVIEW_WAIT_URGENCY_DAYS)
                 .count();
-        if (stale > 0) {
-            out.add(stale + " review request(s) waiting " + REVIEW_WAIT_URGENCY_DAYS + "+ days.");
-        }
-        long withDeadlines = issues.stream()
-                .filter(i -> i.getMilestone() != null && i.getMilestone().getDueOn() != null)
-                .count();
-        if (withDeadlines > 0) {
-            out.add(withDeadlines + " assigned issue(s) have milestone deadlines.");
-        }
+        if (stale > 0) out.add(stale + " review request(s) waiting " + REVIEW_WAIT_URGENCY_DAYS + "+ days.");
+        long deadlines =
+                issues.stream().filter(issue -> issue.milestoneDueOn() != null).count();
+        if (deadlines > 0) out.add(deadlines + " assigned issue(s) have milestone deadlines.");
         return out;
     }
 }

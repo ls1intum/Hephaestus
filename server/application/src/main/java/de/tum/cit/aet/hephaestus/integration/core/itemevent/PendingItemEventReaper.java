@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.integration.core.api.ItemEventRecorded;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestReason;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewRequestReason;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.concurrent.TimeUnit;

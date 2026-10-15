@@ -110,7 +110,10 @@ class AccountMembershipQueryIntegrationTest extends BaseIntegrationTest {
         addMember(member.getWorkspace(), visible, Membership.WorkspaceRole.MEMBER, null);
         var foreign = accounts.saveAndFlush(new Account("Different provider origin"));
         addMember(member.getWorkspace(), foreign, Membership.WorkspaceRole.MEMBER, null);
-        var provider = providers.saveAndFlush(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"));
+        var provider = providers
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> providers.saveAndFlush(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
         var alias = providers.saveAndFlush(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com/"));
         var other =
                 providers.saveAndFlush(new IdentityProvider(IdentityProviderType.GITHUB, "https://git.example.org"));
@@ -353,6 +356,7 @@ class AccountMembershipQueryIntegrationTest extends BaseIntegrationTest {
         member.setWorkspace(workspace);
         member.setId(new Membership.Id(workspace.getId(), account.getId()));
         member.setRole(role);
+        if (leftAt != null) member.setJoinedAt(leftAt.minusSeconds(1));
         member.setLeftAt(leftAt);
         memberships.saveAndFlush(member);
     }

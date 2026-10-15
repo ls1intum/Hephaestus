@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.workspace;
 
 import static de.tum.cit.aet.hephaestus.core.TransactionCallbacks.afterCommit;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener;
 import de.tum.cit.aet.hephaestus.integration.scm.github.lifecycle.GitHubLifecycleListener;
@@ -18,6 +19,7 @@ import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Component;
 
 @Component
+@ConditionalOnServerRole
 public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubWorkspaceProvisioningAdapter.class);

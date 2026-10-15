@@ -19,7 +19,7 @@
 			"description": "Source contract used to interpret the referenced manifest and source checks."
 		},
 		"catalogDigest": {
-			"const": "fbc4f61e2609adeee6c4d8138ae38f5b6ab107fa6daa8aec787f93f372e124a5",
+			"const": "da3e46cdff053f2554b5f2c4c667bb6d3fae2146977b547684d693b58098a681",
 			"description": "SHA-256 digest of the exact source catalog used by the runtime."
 		},
 		"itemKind": {
@@ -212,34 +212,6 @@
 							},
 							"minContains": 0,
 							"maxContains": 1
-						},
-						{
-							"contains": {
-								"type": "object",
-								"properties": {
-									"sourceKind": {
-										"const": "workspace.project-inventory",
-										"type": "string"
-									}
-								},
-								"required": ["sourceKind"]
-							},
-							"minContains": 0,
-							"maxContains": 1
-						},
-						{
-							"contains": {
-								"type": "object",
-								"properties": {
-									"sourceKind": {
-										"const": "outline.documents",
-										"type": "string"
-									}
-								},
-								"required": ["sourceKind"]
-							},
-							"minContains": 0,
-							"maxContains": 1
 						}
 					],
 					"description": "Checks for every required source; empty when a non-source prerequisite fails."
@@ -361,11 +333,7 @@
 						"slack.conversation.thread",
 						"scm.linked-work-items",
 						"scm.review-threads",
-						"scm.general-review-comments",
-						"workspace.project-inventory",
-						"outline.documents",
-						"hephaestus.result-history",
-						"hephaestus.feedback-history"
+						"scm.general-review-comments"
 					],
 					"description": "Required logical source being checked."
 				},
@@ -470,11 +438,7 @@
 																	"scm.repository.tree",
 																	"scm.linked-work-items",
 																	"scm.review-threads",
-																	"scm.general-review-comments",
-																	"workspace.project-inventory",
-																	"outline.documents",
-																	"hephaestus.result-history",
-																	"hephaestus.feedback-history"
+																	"scm.general-review-comments"
 																]
 															}
 														},
@@ -525,14 +489,7 @@
 														"type": "object",
 														"properties": {
 															"sourceKind": {
-																"enum": [
-																	"scm.issue.core",
-																	"scm.issue.comments",
-																	"workspace.project-inventory",
-																	"outline.documents",
-																	"hephaestus.result-history",
-																	"hephaestus.feedback-history"
-																]
+																"enum": ["scm.issue.core", "scm.issue.comments"]
 															}
 														},
 														"required": ["sourceKind"]
@@ -582,12 +539,7 @@
 														"type": "object",
 														"properties": {
 															"sourceKind": {
-																"enum": [
-																	"slack.conversation.thread",
-																	"workspace.project-inventory",
-																	"hephaestus.result-history",
-																	"hephaestus.feedback-history"
-																]
+																"enum": ["slack.conversation.thread"]
 															}
 														},
 														"required": ["sourceKind"]
@@ -637,11 +589,7 @@
 														"type": "object",
 														"properties": {
 															"sourceKind": {
-																"enum": [
-																	"docs.document.core",
-																	"hephaestus.result-history",
-																	"hephaestus.feedback-history"
-																]
+																"enum": ["docs.document.core"]
 															}
 														},
 														"required": ["sourceKind"]

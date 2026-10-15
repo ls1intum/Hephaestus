@@ -15,7 +15,8 @@ public record PracticeItemTypeOptionDTO(
         List<StateDimensionDTO> reviewOnStateDimensions,
         boolean scanSupported,
         List<String> scanItemKinds,
-        List<ApplicabilityClauseKind> applicabilityClauses) {
+        List<ApplicabilityClauseKind> applicabilityClauses,
+        List<ReadSourceOptionDTO> applicabilitySources) {
     public PracticeItemTypeOptionDTO {
         events = List.copyOf(events);
         aboutRoles = List.copyOf(aboutRoles);
@@ -23,5 +24,6 @@ public record PracticeItemTypeOptionDTO(
         reviewOnStateDimensions = List.copyOf(reviewOnStateDimensions);
         scanItemKinds = List.copyOf(scanItemKinds);
         applicabilityClauses = List.copyOf(applicabilityClauses);
+        applicabilitySources = List.copyOf(applicabilitySources);
     }
 }

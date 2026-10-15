@@ -110,6 +110,7 @@ public class ThreadItemSource implements ItemSource, ItemSourceAccess {
                             new ItemLabel(
                                     item.itemId(),
                                     "Conversation thread",
+                                    "Conversation thread",
                                     "thread",
                                     null,
                                     threads.findConsentedCandidateRow(workspaceId, sourceId)
@@ -171,6 +172,7 @@ public class ThreadItemSource implements ItemSource, ItemSourceAccess {
                                             roles,
                                             new ItemLabel(
                                                     item.itemId(),
+                                                    "Conversation thread",
                                                     "Conversation thread",
                                                     "thread",
                                                     null,

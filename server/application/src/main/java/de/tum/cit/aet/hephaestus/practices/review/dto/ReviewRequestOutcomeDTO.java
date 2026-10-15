@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.review.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestReason;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewRequestReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.UUID;

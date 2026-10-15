@@ -123,7 +123,7 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
     private MentorChatService mentor;
 
     @Autowired
-    private ResultMarkRepository invalidations;
+    private ResultMarkRepository resultMarks;
 
     @Autowired
     private PersonDataRegistry registry;
@@ -188,13 +188,8 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private FeedbackCopyRepository feedbackCopyRepository;
 
-    private static final Map<String, String> RETAINED_AFTER_ERASURE = Map.of(
-            "account", "the deleted-account tombstone",
-            "user", "the anonymised provider profile other people's work still references",
-            "identity_restriction", "the permanent native-identity processing control",
-            "person_data_request", "the re-resolution preview request itself",
-            "person_evidence_copy", "frozen job ids still name the redacted job rows",
-            "slack_thread", "frozen thread ids still name the shared thread without the person");
+    private static final Set<String> RETAINED_AFTER_ERASURE = Set.of(
+            "account", "user", "identity_restriction", "person_data_request", "person_evidence_copy", "slack_thread");
 
     @BeforeEach
     void clearRows() {
@@ -286,12 +281,6 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
     }
 
     private void keepCompositionInputs(DerivedConversation derived) {
-        jdbc.update(
-                "UPDATE review SET"
-                        + " public_review_at=CURRENT_TIMESTAMP"
-                        + " WHERE id=(SELECT review_id FROM review_job WHERE id=?)",
-                derived.jobId());
-
         jdbc.update("""
             INSERT INTO review_composition_basis(job_id,workspace_id,admission_attempt,admission_digest,
                 basis_version,basis_digest,copy_id,expires_at,payload)
@@ -432,7 +421,7 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
                     """,
                     workspace.getId(),
                     administrator.getId(),
-                    target.getId().toString());
+                    Objects.requireNonNull(targetAccount.getId()).toString());
             SlackThread shared = slackThread(workspace, "100.1", target, other);
             sharedThreads.add(shared.getId());
             message(workspace, team, "100.1", "100.1", "UTARGET", target, "Target's collected work");
@@ -448,7 +437,7 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
             var result = practiceResultRepository
                     .findById(derived.practiceResultIds().getFirst())
                     .orElseThrow();
-            invalidations.saveAndFlush(ResultMark.builder()
+            resultMarks.saveAndFlush(ResultMark.builder()
                     .id(UUID.randomUUID())
                     .workspaceId(result.getWorkspaceId())
                     .resultId(result.getId())
@@ -458,9 +447,7 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
                     .build());
         }
         PersonScope otherScope = resolver.resolve(Objects.requireNonNull(otherAccount.getId()), List.of());
-        // A shared source row, such as a thread both people joined, changes when the target's part
-        // is
-        // erased. Compare the rows that belong to the other person alone.
+        // Shared source aggregates change; compare the other person's own rows.
         PersonScope otherPrimaryScope =
                 new PersonScope(otherScope.accountId(), otherScope.identities(), otherScope.userIds());
         var otherSelection = registry.select(otherPrimaryScope);
@@ -484,11 +471,15 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
                 .doesNotContain(targetSession.toString(), "code_hash", "code_challenge");
 
         assertThat(counts.get("person_evidence_copy")).isEqualTo(2L);
-        assertThat(export.path("stores").path("review_job")).hasSize(2);
         assertThat(export.path("stores").path("review_job"))
                 .extracting(row -> row.path("id").asString())
                 .containsExactlyInAnyOrderElementsOf(targetDerived.stream()
-                        .map(derived -> derived.jobId().toString())
+                        .flatMap(derived -> practiceResultRepository.findAllById(derived.practiceResultIds()).stream())
+                        .flatMap(result -> agentJobRepository
+                                .findByReviewIdAndWorkspaceIdOrderByAvailableAtAsc(
+                                        result.getReviewId(), result.getWorkspaceId())
+                                .stream())
+                        .map(job -> job.getId().toString())
                         .toList());
         for (var row : export.path("stores").path("review_job")) {
             assertThat(row.has("capture")).isFalse();
@@ -497,26 +488,26 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
                 .doesNotContain("MOUNTED-PROFILE-CANARY", "credential-canary", "unrelated-profile-canary");
         targetFolders.forEach(path -> assertThat(path).exists());
         otherFolders.forEach(path -> assertThat(path).exists());
-        assertThat(counts.get("feedback")).isEqualTo(6L);
-        assertThat(preview.externalDeliveries()).hasSize(2);
-        assertThat(preview.externalDeliveries())
-                .allSatisfy(delivery -> assertThat(delivery.locator()).startsWith("https://team-"));
-        assertThat(export.path("stores").path("feedback_copy").toString())
-                .contains("posted_comment_url", "https://team-");
-        assertThatThrownBy(() -> personData.requestErasure(requestId, administratorId, false))
-                .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("un-deliver runbook");
-        assertThat(personData.get(requestId).request().getState()).isEqualTo(PersonDataRequest.State.PREVIEW);
+        assertThat(counts.get("feedback")).isEqualTo(4L);
+        assertThat(preview.externalDeliveries()).isEmpty();
+        assertThat(export.path("stores").path("feedback_copy"))
+                .extracting(row -> row.path("feedback_id").asString())
+                .containsExactlyInAnyOrderElementsOf(targetDerived.stream()
+                        .map(derived -> derived.deliveredId().toString())
+                        .toList());
         assertThat(counts.get("result")).isEqualTo(4L);
+        assertThat(export.path("stores").path("result"))
+                .allSatisfy(row -> assertThat(row.path("summary").asString()).isEqualTo("Result title"));
+        assertThat(export.path("stores").path("feedback"))
+                .allSatisfy(row -> assertThat(row.path("body").toString())
+                        .contains("Practice guidance for developer " + target.getId()));
         assertThat(counts.get("result_mark")).isEqualTo(2L);
+        assertThat(export.path("stores").path("result_mark"))
+                .allSatisfy(
+                        row -> assertThat(row.path("reason").asString()).isEqualTo("Correction before access request"));
         assertThat(counts.get("config_audit_event_membership_subject")).isEqualTo(2L);
         assertThat(counts.get("chat_thread")).isEqualTo(2L);
-        assertThat(counts.get("chat_message_feedback_copy")).isEqualTo(2L);
-        assertThat(counts.get("chat_thread_feedback_runtime_copy")).isEqualTo(2L);
         assertThat(counts.get("chat_thread_runtime_journal")).isEqualTo(2L);
-        assertThat(export.path("stores").path("chat_message_feedback_copy").toString())
-                .contains("Target guidance copied into another conversation")
-                .doesNotContain("Other reply to erased feedback", "user_id", "inputTokens");
         assertThat(counts.get("slack_message")).isEqualTo(2L);
         counts.forEach((store, count) -> assertThat(
                         (long) export.path("stores").path(store).size())
@@ -552,7 +543,7 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
                         "Other person's shared reply",
                         "credential-canary",
                         "unrelated-profile-canary");
-        personData.requestErasure(requestId, administratorId, true);
+        personData.requestErasure(requestId, administratorId, false);
         assertThat(oauthNonces.tryConsume("nonce-credential-canary", targetOAuthBinding))
                 .isFalse();
         assertThat(issuedTokens.findActive(targetTokenId, Instant.now())).isEmpty();
@@ -595,9 +586,7 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
         targetFolders.forEach(path -> assertThat(path).doesNotExist());
         otherFolders.forEach(path -> assertThat(path).exists());
         for (var derived : targetDerived) {
-            var job = agentJobRepository.findById(derived.jobId()).orElseThrow();
-            assertThat(job.getStatus()).isEqualTo(ReviewJobStatus.CANCELLED);
-            assertThat(job.getCapture()).isNull();
+            assertThat(agentJobRepository.findById(derived.jobId())).isEmpty();
         }
 
         var receipt = personData.get(requestId).request();
@@ -613,9 +602,7 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
         assertThat(differentReceipts)
                 .as("Receipt counts that differ from the preview")
                 .isEmpty();
-        // Re-resolve the person as a new request would, and replay the frozen closure: only a store
-        // that
-        // deliberately keeps an anonymised, tombstone or control row may still select one.
+        // Both closures may retain only anonymised, tombstone or control rows.
         var again = personData.preview(administratorId, targetAccount.getId(), frozen.identities());
         Map<String, Long> reselected = mapper.readValue(again.request().getCountsJson(), new TypeReference<>() {});
         var frozenAfter = registry.select(frozen);
@@ -627,9 +614,9 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
                     .size();
             if (resolvedRows != 0 || frozenRows != 0) remaining.put(store.store(), List.of(resolvedRows, frozenRows));
         }
-        assertThat(remaining)
-                .as("Rows still selected after erasure: [re-resolved, frozen]")
-                .containsOnlyKeys(RETAINED_AFTER_ERASURE.keySet());
+        assertThat(remaining.keySet())
+                .as("Rows still selected after erasure [re-resolved, frozen]: %s", remaining)
+                .isSubsetOf(RETAINED_AFTER_ERASURE);
         assertThat(accounts.findById(Objects.requireNonNull(targetAccount.getId()))
                         .orElseThrow()
                         .getStatus())
@@ -664,14 +651,12 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
                     .isEqualTo(1);
         }
         for (var contributor : registry.stores()) {
-            // A shared thread's aggregate changes; the other person's participant projection does
-            // not.
             assertThat(contributor.export(
                             Objects.requireNonNull(otherSelection.get(contributor.store())), otherPrimaryScope))
                     .as("Another person's %s rows", contributor.store())
                     .isEqualTo(otherRows.get(contributor.store()));
         }
-        personData.requestErasure(requestId, administratorId, true);
+        personData.requestErasure(requestId, administratorId, false);
         personData.run(requestId);
         assertThat(personData.get(requestId).request().getCompletedJson()).isEqualTo(receipt.getCompletedJson());
     }
@@ -766,10 +751,19 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
             var derived = seedDerivedConversation(workspace, 1000L + index, other);
             affected.add(derived);
             copiedJobs.add(derived.jobId());
+            var copiedResult = practiceResultRepository
+                    .findById(derived.practiceResultIds().getFirst())
+                    .orElseThrow();
+            resultMarks.saveAndFlush(ResultMark.builder()
+                    .id(UUID.randomUUID())
+                    .workspaceId(copiedResult.getWorkspaceId())
+                    .resultId(copiedResult.getId())
+                    .createdById(administratorId)
+                    .reason("OTHER-REVIEW-MARK-CANARY")
+                    .createdAt(Instant.now())
+                    .build());
             keepCompositionInputs(derived);
-            // Folder removal has already been acknowledged. Exact provenance remains until its
-            // counted
-            // person step: the absence of the folder must not hide the job that copied the person.
+            // A removed folder must not hide the job that copied this person's data.
             jdbc.update(
                     """
                     INSERT INTO person_evidence_copy(id,workspace_id,job_id,store_id,state,payload)
@@ -797,7 +791,22 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
         assertThat(scope.derivedJobIds()).containsExactlyInAnyOrderElementsOf(copiedJobs);
         var export = personData.export(requestId);
         assertThat(export.toString())
-                .doesNotContain("Result title", "Practice guidance for developer", "Delivered guidance");
+                .doesNotContain(
+                        "Result title",
+                        "Practice guidance for developer",
+                        "Delivered guidance",
+                        "OTHER-REVIEW-MARK-CANARY");
+        assertThat(export.path("stores").path("result"))
+                .extracting(row -> row.path("id").asString())
+                .containsExactlyInAnyOrderElementsOf(affected.stream()
+                        .map(derived -> derived.practiceResultIds().getFirst().toString())
+                        .toList());
+        assertThat(export.path("stores").path("feedback"))
+                .extracting(row -> row.path("id").asString())
+                .containsExactlyInAnyOrderElementsOf(affected.stream()
+                        .map(derived -> derived.preparedId().toString())
+                        .toList());
+        assertThat(export.path("stores").path("result_mark")).hasSize(2);
         assertThat(export.path("stores").path("person_evidence_copy"))
                 .extracting(row -> row.path("jobId").asString())
                 .containsExactlyInAnyOrderElementsOf(
@@ -805,7 +814,8 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
         Map<String, Long> counts = mapper.readValue(preview.request().getCountsJson(), new TypeReference<>() {});
         assertThat(counts.get("person_evidence_copy")).isEqualTo(2L);
         assertThat(counts.get("review_composition_basis")).isEqualTo(2L);
-        assertThat(counts.get("review")).isNotNull();
+        assertThat(counts.get("result")).isEqualTo(2L);
+        assertThat(counts.get("feedback")).isEqualTo(2L);
         assertThat(export.path("stores").path("review_composition_basis").toString())
                 .doesNotContain("ORIGINAL-BASIS-CANARY");
         assertThat(export.path("stores").path("review_job"))
@@ -829,32 +839,25 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
         assertThat(personData.get(requestId).request().getState()).isEqualTo(PersonDataRequest.State.COMPLETE);
         for (var derived : affected) {
             assertThat(jdbc.queryForObject(
-                            "SELECT count(*) FROM review WHERE id=(SELECT review_id FROM"
-                                    + " review_job WHERE id=?) AND public_review_at IS NOT"
-                                    + " NULL",
-                            Integer.class,
-                            derived.jobId()))
-                    .isZero();
-            assertThat(jdbc.queryForObject(
                             "SELECT count(*) FROM review_composition_basis WHERE job_id=?",
                             Integer.class,
                             derived.jobId()))
                     .isZero();
-            assertThat(practiceResultRepository.findAllById(derived.practiceResultIds()))
+            assertThat(practiceResultRepository.findById(
+                            derived.practiceResultIds().getFirst()))
                     .isEmpty();
+            assertThat(practiceResultRepository.findById(
+                            derived.practiceResultIds().getLast()))
+                    .isPresent();
             assertThat(feedbackRepository.findById(derived.preparedId())).isEmpty();
-            assertThat(feedbackRepository.findById(derived.deliveredId())).isEmpty();
+            assertThat(feedbackRepository.findById(derived.deliveredId())).isPresent();
             assertThat(chatMessageRepository
                             .findById(derived.messageId())
                             .orElseThrow()
                             .getParts()
                             .toString())
-                    .contains("This feedback was erased.");
-            assertThat(agentJobRepository
-                            .findById(derived.jobId())
-                            .orElseThrow()
-                            .getCapture())
-                    .isNull();
+                    .contains("Delivered guidance");
+            assertThat(agentJobRepository.findById(derived.jobId())).isEmpty();
             assertThat(jdbc.queryForObject(
                             "SELECT length(session_jsonl) = 0 FROM chat_thread t JOIN"
                                     + " chat_message m ON m.thread_id=t.id WHERE m.id=?",

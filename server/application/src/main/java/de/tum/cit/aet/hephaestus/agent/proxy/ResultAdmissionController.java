@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
+import de.tum.cit.aet.hephaestus.agent.handler.AdmissionConflictException;
 import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmissionRequestDTO;
@@ -9,7 +10,8 @@ import de.tum.cit.aet.hephaestus.agent.proxy.dto.PrepareFeedbackResponseDTO;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.PublicFeedbackHistoryDTO;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWorkerRole;
-import io.swagger.v3.oas.annotations.Hidden;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import java.util.function.Supplier;
 import org.springframework.http.HttpStatus;
@@ -23,7 +25,6 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @ConditionalOnWorkerRole
 @RequestMapping("/internal/llm")
-@Hidden
 public class ResultAdmissionController {
     private final ResultAdmissionService admission;
 
@@ -31,6 +32,13 @@ public class ResultAdmissionController {
         this.admission = admission;
     }
 
+    @Operation(
+            operationId = "admitResults",
+            summary = "Admit results for the current review attempt",
+            description = "Requires the private worker connector and a proxy-scoped worker credential bound to the"
+                    + " workspace, job and attempt. Browser cookies and app-admin authority do not authorize this"
+                    + " request.",
+            security = @SecurityRequirement(name = "workerBearer"))
     @PostMapping("/admit-results")
     @WorkspaceAgnostic("The worker credential supplies the workspace and exact job attempt")
     public AdmissionResponseDTO admitResults(
@@ -39,6 +47,13 @@ public class ResultAdmissionController {
         return checked(() -> admission.admit(identity, request));
     }
 
+    @Operation(
+            operationId = "prepareFeedback",
+            summary = "Prepare feedback for an admitted item review",
+            description =
+                    "Requires the same fenced worker credential and admitted ITEM review. Preparation persists the"
+                            + " package before a provider write.",
+            security = @SecurityRequirement(name = "workerBearer"))
     @PostMapping("/prepare-feedback")
     @WorkspaceAgnostic("The worker credential supplies the workspace and exact job attempt")
     public PrepareFeedbackResponseDTO prepareFeedback(
@@ -47,6 +62,13 @@ public class ResultAdmissionController {
         return checked(() -> admission.prepareFeedback(identity, request));
     }
 
+    @Operation(
+            operationId = "readPublicFeedbackHistory",
+            summary = "Read authorized feedback receipts for the current item review",
+            description =
+                    "Requires the same fenced worker credential and admitted ITEM review. Returns confirmed same-item,"
+                            + " same-developer copy history; a refused read is not an empty history.",
+            security = @SecurityRequirement(name = "workerBearer"))
     @PostMapping("/public-feedback-history")
     @WorkspaceAgnostic("The worker credential supplies the workspace and exact job attempt")
     public PublicFeedbackHistoryDTO readPublicFeedbackHistory(Authentication authentication) {
@@ -57,8 +79,7 @@ public class ResultAdmissionController {
     private static <T> T checked(Supplier<T> operation) {
         try {
             return operation.get();
-        } catch (ResultAdmissionService.StaleAttemptException
-                | ResultAdmissionService.AdmissionConflictException conflict) {
+        } catch (ResultAdmissionService.StaleAttemptException | AdmissionConflictException conflict) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT, "The review attempt or admitted payload changed", conflict);
         } catch (JobDeliveryException | ResultAdmissionService.PublicHistoryRefusedException refused) {

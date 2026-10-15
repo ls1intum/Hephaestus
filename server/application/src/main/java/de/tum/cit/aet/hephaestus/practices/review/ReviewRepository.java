@@ -98,6 +98,7 @@ public interface ReviewRepository extends JpaRepository<Review, UUID>, ReviewQue
 
     boolean existsByWorkspaceIdAndItemIdAndStatusIn(long workspaceId, long itemId, Collection<ReviewStatus> statuses);
 
+    @WorkspaceAgnostic("Hashes the supplied model snapshot without reading tenant rows")
     @Query(value = "SELECT review_model_digest(CAST(:models AS jsonb))", nativeQuery = true)
     String modelDigest(@Param("models") String models);
 

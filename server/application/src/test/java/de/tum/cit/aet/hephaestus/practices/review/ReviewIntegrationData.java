@@ -80,6 +80,11 @@ public class ReviewIntegrationData {
 
     @Transactional
     public Scenario scenario(PracticeDefinition definition) {
+        return scenario(new ItemKind("scm.pull_request"), definition);
+    }
+
+    @Transactional
+    public Scenario scenario(ItemKind kind, PracticeDefinition definition) {
         var workspace = WorkspaceTestFixtures.activeWorkspace("s5-" + UUID.randomUUID());
         workspace.getFeatures().setPracticesEnabled(true);
         workspaces.saveAndFlush(workspace);
@@ -91,7 +96,7 @@ public class ReviewIntegrationData {
         memberships.saveAndFlush(membership);
         var item = new Item();
         item.setWorkspaceId(workspace.getId());
-        item.setKind(new ItemKind("scm.pull_request"));
+        item.setKind(kind);
         item.setSourceId(ThreadLocalRandom.current().nextLong(1000000000000L, Long.MAX_VALUE));
         item.setCreatedAt(Instant.now().minusSeconds(3600));
         items.saveAndFlush(item);
@@ -120,6 +125,11 @@ public class ReviewIntegrationData {
 
     @Transactional
     public Result result(Scenario s, ResultOutcome outcome, Instant at) {
+        return result(s, outcome, at, at);
+    }
+
+    @Transactional
+    public Result result(Scenario s, ResultOutcome outcome, Instant orderedAt, Instant recordedAt) {
         var review = Review.builder()
                 .id(UUID.randomUUID())
                 .workspaceId(s.workspace().getId())
@@ -129,10 +139,10 @@ public class ReviewIntegrationData {
                 .requestedById(s.account().getId())
                 .status(ReviewStatus.COMPLETE)
                 .itemVersion("version-" + UUID.randomUUID())
-                .orderedAt(at)
-                .createdAt(at)
-                .admittedAt(at)
-                .completedAt(at)
+                .orderedAt(orderedAt)
+                .createdAt(orderedAt)
+                .admittedAt(recordedAt)
+                .completedAt(recordedAt)
                 .build();
         reviews.saveAndFlush(review);
         var slots = List.of(
@@ -201,7 +211,7 @@ public class ReviewIntegrationData {
                 .severity(outcome == ResultOutcome.NOT_MET ? Severity.MAJOR : null)
                 .evidence(evidence)
                 .coverage(json.valueToTree(new HostCoverage(true, List.of(), 1, 0, 0, List.of())))
-                .recordedAt(at)
+                .recordedAt(recordedAt)
                 .build();
         results.saveAndFlush(result);
         if (outcome == ResultOutcome.NOT_MET)
@@ -220,7 +230,7 @@ public class ReviewIntegrationData {
                     .build());
         member.setState(ReviewItemState.JUDGED);
         member.setResultId(result.getId());
-        member.setAttemptedAt(at);
+        member.setAttemptedAt(recordedAt);
         reviewItems.saveAndFlush(member);
         return result;
     }

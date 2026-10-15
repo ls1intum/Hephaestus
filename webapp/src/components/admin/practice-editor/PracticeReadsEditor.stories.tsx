@@ -56,7 +56,7 @@ export const SourcesAreGrouped: Story = {
 
 		await expect(canvas.getByText("The work itself")).toBeVisible();
 		await expect(canvas.getByText("Around the work")).toBeVisible();
-		await expect(canvas.getByText("This developer’s history")).toBeVisible();
+		await expect(canvas.queryByText("This developer’s history")).toBeNull();
 	},
 };
 

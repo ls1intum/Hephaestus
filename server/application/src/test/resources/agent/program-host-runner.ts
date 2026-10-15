@@ -12,6 +12,8 @@ import {
 import nodePath from "node:path";
 import { mock } from "node:test";
 
+import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
+
 import {
 	AUTHENTICATION_PRACTICE,
 	GOLDEN_INPUTS,
@@ -38,7 +40,7 @@ export function codingAgentExports(
 	onResourceLoad?: (options: {
 		systemPrompt: string;
 		agentsFilesOverride?: () => unknown;
-		extensionFactories?: unknown[];
+		extensionFactories?: ExtensionFactory[];
 	}) => void,
 	beforeRuntime?: () => void,
 ) {
@@ -51,7 +53,7 @@ export function codingAgentExports(
 			constructor(options: {
 				systemPrompt: string;
 				agentsFilesOverride?: () => unknown;
-				extensionFactories?: unknown[];
+				extensionFactories?: ExtensionFactory[];
 			}) {
 				onResourceLoad?.(options);
 			}
@@ -307,10 +309,12 @@ if (scenario !== undefined && scenario !== "") {
 		});
 		return Response.json({
 			contractVersion: 3,
-			admissionDigest: "digest",
+			admissionDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			publicReviewed: false,
 			admitted: [],
 			withheld: [],
+			practicePageSupport: null,
+			conversationEligibility: null,
 		});
 	});
 

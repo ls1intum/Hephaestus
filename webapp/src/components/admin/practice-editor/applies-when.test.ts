@@ -28,7 +28,7 @@ describe("parseAppliesWhen", () => {
 		});
 	});
 
-	it.each([{ changedPath: [" "] }, { diffContains: [] }, { hasItems: "" }])(
+	it.each([{ changedPath: [" "] }, { diffContains: [] }])(
 		"requires a value for each condition: %j",
 		(clause) => {
 			expect(parseAppliesWhen(draft([clause]), undefined).clausesError).toBe(
@@ -36,6 +36,12 @@ describe("parseAppliesWhen", () => {
 			);
 		},
 	);
+
+	it("requires choosing a source for a source condition", () => {
+		expect(parseAppliesWhen(draft([{ hasItems: "" }]), mockPullRequestItemType).clausesError).toBe(
+			"Choose a source.",
+		);
+	});
 
 	it("refuses a changed path that leaves the repository", () => {
 		expect(parseAppliesWhen(draft([{ changedPath: ["../secrets"] }]), undefined).clausesError).toBe(

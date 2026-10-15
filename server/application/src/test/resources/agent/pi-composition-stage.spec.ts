@@ -3,8 +3,10 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import nodePath from "node:path";
 import { test } from "node:test";
+import { parseAdmission } from "../../../main/resources/agent/pi-admitted-results.ts";
 import {
 	createReviewRecorder,
+	closeUnroutedPrivateDestinations,
 	persistComposedFeedback,
 	type ComposedFeedback,
 	type PublicReviewState,
@@ -72,4 +74,49 @@ void test("a review becomes final only after its complete envelope is written", 
 	} finally {
 		rmSync(cwd, { recursive: true, force: true });
 	}
+});
+
+void test("missing private routing closes only that destination and records its own failure", () => {
+	const response: unknown = JSON.parse(
+		readFileSync(new URL("admission-response.json", import.meta.url), "utf8"),
+	);
+	const admission = parseAdmission(response);
+	admission.practicePageSupport = null;
+	admission.conversationEligibility = {
+		state: "COMPLETE",
+		readAt: "2026-10-14T00:00:00Z",
+		results: admission.results.map((result) => ({
+			resultId: result.resultId,
+			decision: "ADMIT",
+			stopReason: null,
+		})),
+	};
+	const request = {
+		contractVersion: 3 as const,
+		destinations: {
+			ON_WORK: { maxPieces: 1 },
+			PRACTICE_PAGE: { maxPieces: 1 },
+			CONVERSATION: { maxPieces: 1 },
+		},
+		minDistinctItems: 2,
+		onWorkCopyForms: [],
+	};
+	const feedback: ComposedFeedback = {
+		compositionFailures: [],
+		contractVersion: 3,
+		admissionDigest: admission.digest,
+		results: [],
+		preparedTargets: [],
+		feedback: [],
+		review: null,
+		preparation: null,
+	};
+	const routes = closeUnroutedPrivateDestinations(request, admission, feedback);
+	assert.equal("PRACTICE_PAGE" in request.destinations, false);
+	assert.deepEqual(request.destinations.CONVERSATION, { maxPieces: 1 });
+	assert.deepEqual(request.destinations.ON_WORK, { maxPieces: 1 });
+	assert.deepEqual(routes.get("handles-errors"), ["CONVERSATION"]);
+	assert.deepEqual(feedback.compositionFailures, [
+		{ phase: "PRIVATE_FEEDBACK", reason: "RUNTIME_ERROR" },
+	]);
 });

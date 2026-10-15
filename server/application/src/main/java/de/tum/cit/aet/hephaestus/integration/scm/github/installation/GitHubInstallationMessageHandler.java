@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.installation;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
@@ -29,6 +30,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Handles GitHub installation webhook events and provisions scopes.
  */
 @Component
+@ConditionalOnServerRole
 public class GitHubInstallationMessageHandler extends AbstractIntegrationMessageHandler<GitHubInstallationEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubInstallationMessageHandler.class);

@@ -1,12 +1,12 @@
 package de.tum.cit.aet.hephaestus.practices.result;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
-import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewCoverageService;
 import de.tum.cit.aet.hephaestus.practices.review.model.Review;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustody;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustodyQuery;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import de.tum.cit.aet.hephaestus.workspace.spi.MembershipReviewSelection;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -19,7 +19,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class ResultAdmissionPolicy {
     private final WorkspaceRepository workspaces;
-    private final PracticeReviewCoverageService scope;
+    private final MembershipReviewSelection selections;
     private final HistoryCustodyQuery custody;
 
     public Assessment assess(long workspaceId, Review review, UUID jobId) {
@@ -34,7 +34,7 @@ public class ResultAdmissionPolicy {
                 authority,
                 !authority.complete() || !authority.sourceJobIds().contains(jobId),
                 scopeReason,
-                scope.eligibleAccountIds(workspaceId));
+                selections.eligibleAccountIds(workspaceId));
     }
 
     public record Assessment(

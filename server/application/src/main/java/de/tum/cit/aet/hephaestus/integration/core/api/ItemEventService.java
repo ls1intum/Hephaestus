@@ -6,7 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.core.itemevent.ItemEventRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventInput;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventName;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestReason;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewRequestReason;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
@@ -32,7 +32,10 @@ public class ItemEventService {
         return repository
                 .findByIdAndWorkspaceId(eventId, workspaceId)
                 .map(event -> new ItemEventView(
-                        new ItemEventName(event.getName()), event.getItemVersion(), event.getState()));
+                        new ItemEventName(event.getName()),
+                        event.getItemVersion(),
+                        event.getState(),
+                        event.getOccurredAt()));
     }
 
     public UUID record(ItemEventInput input) {

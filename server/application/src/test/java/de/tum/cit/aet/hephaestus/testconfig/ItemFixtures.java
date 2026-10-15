@@ -35,19 +35,20 @@ public final class ItemFixtures {
                 state,
                 roles == null ? List.of() : roles,
                 label == null
-                        ? new ItemLabel(item.itemId(), "Work", "item", null, null, null, provider.kind())
+                        ? new ItemLabel(item.itemId(), "Work", "Work", "item", null, null, null, provider.kind())
                         : label);
     }
 
     @Builder(builderMethodName = "label")
     private static ItemLabel buildLabel(
             long itemId,
+            @Nullable String label,
             String title,
             String noun,
             @Nullable Integer number,
             @Nullable String container,
             @Nullable String url,
             @Nullable IntegrationKind integration) {
-        return new ItemLabel(itemId, title, noun, number, container, url, integration);
+        return new ItemLabel(itemId, label == null ? title : label, title, noun, number, container, url, integration);
     }
 }

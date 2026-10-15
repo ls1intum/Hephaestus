@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.core.itemevent;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.FoundBy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestReason;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewRequestReason;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

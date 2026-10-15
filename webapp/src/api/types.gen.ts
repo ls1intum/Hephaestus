@@ -286,6 +286,56 @@ export type AdminWorkspaceView = {
     workspaceSlug: string;
 };
 
+export type AdmissionRequest = {
+    attempt?: number;
+    contractVersion?: number;
+    jobId?: string;
+    results?: Array<SubmittedResult>;
+    reviewId?: string;
+};
+
+export type AdmissionResponse = {
+    admissionDigest: string;
+    admitted: Array<AdmittedResult>;
+    attempt: number;
+    contractVersion: number;
+    conversationEligibility: ConversationEligibility | null;
+    jobId: string;
+    practicePageSupport: PracticePageSupport | null;
+    publicReviewed: boolean;
+    reviewId: string;
+    withheld: Array<Withheld>;
+};
+
+export type AdmittedProblem = {
+    basis: DutyBasis | IntroducedBasis | StateBasis | WorsenedBasis | null;
+    citations: Array<ProjectedCitation>;
+    explanation: string | null;
+    id: string;
+    key: string | null;
+    nextStep: string | null;
+    position: number;
+    publicEligible: boolean;
+    resultId: string;
+    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'TRIVIAL';
+    summary: string;
+};
+
+export type AdmittedResult = {
+    coverage: ClaimedCoverage | HostCoverage;
+    evidence: JsonNode;
+    example: JsonNode | null;
+    explanation: string | null;
+    itemId: string;
+    outcome: 'MET' | 'NOT_MET' | 'DOES_NOT_APPLY' | 'COULD_NOT_DETERMINE';
+    practiceSlug: string;
+    problems: Array<AdmittedProblem>;
+    publicEligible: boolean;
+    resultId: string;
+    summary: string | null;
+    summaryOnly: boolean;
+};
+
 /**
  * A workspace's agent binding for one purpose
  */
@@ -470,6 +520,13 @@ export type BackfillSummary = {
      * Integration-defined backfill state string
      */
     state: string;
+};
+
+export type Basis = {
+    outcome: 'MET' | 'NOT_MET' | 'DOES_NOT_APPLY' | 'COULD_NOT_DETERMINE';
+    practiceSlug: string;
+    practiceVersionId: string | null;
+    resultId: string;
 };
 
 export type BindPracticeGroupRequest = {
@@ -670,6 +727,12 @@ export type CitationCapabilities = {
 };
 
 export type CitationProof = {
+    itemSha256?: string;
+    quoteSha256?: string;
+    status?: 'VERIFIED';
+};
+
+export type CitationProofDto = {
     itemSha256: string;
     quoteSha256: string;
     status: 'VERIFIED';
@@ -708,6 +771,26 @@ export type ClientTokenRequest = {
     code: string;
     codeVerifier: string;
     redirectUri: string;
+};
+
+export type ClosedPracticePageSupport = {
+    readAt: Date;
+    refusal: string | null;
+    state: 'UNAVAILABLE' | 'REFUSED';
+};
+
+export type CompletePracticePageSupport = {
+    practices: Array<PracticeSupport>;
+    readAt: Date;
+    state: 'COMPLETE';
+};
+
+export type ComposedFeedback = {
+    destination?: 'ON_WORK' | 'PRACTICE_PAGE' | 'CONVERSATION';
+    notes?: Array<Note>;
+    resultIds?: Array<string>;
+    summary?: string;
+    withheldReason?: 'VOLUME_CAPPED' | 'COMPOSER_WITHHELD' | 'NOTHING_NEW' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISAGREE' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'DELIVERY_UNCONFIRMED' | 'ITEM_GONE' | 'ITEM_CLOSED' | 'ITEM_MERGED' | 'ITEM_STATE_INELIGIBLE' | 'ISSUE_SNAPSHOT_CHANGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'NO_AI' | 'DELIVERY_OFF' | 'PERSON_SUPPRESSED' | 'RECIPIENT_UNAVAILABLE' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'FEEDBACK_OFF' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_SCOPE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'RESULT_MARKED_INCORRECT' | 'REVIEWED_VERSION_CHANGED' | 'REVIEW_CANCELLED' | 'EVIDENCE_NOT_PERMITTED' | 'NO_EVIDENCE' | 'UNCORROBORATED';
 };
 
 /**
@@ -953,6 +1036,26 @@ export type Contributor = {
      * Display name of the contributor
      */
     name: string;
+};
+
+export type ConversationEligibility = {
+    readAt: Date;
+    results: Array<ResultDecision>;
+    state: 'COMPLETE' | 'UNAVAILABLE' | 'REFUSED';
+};
+
+export type Copy = {
+    body: string | null;
+    endLine: null | number;
+    externalRef: string | null;
+    externalUrl: string | null;
+    id: string;
+    kind: 'SUMMARY' | 'LINE_NOTE' | 'FILE_NOTE' | 'CHAT_TURN';
+    path: string | null;
+    postedAt: Date;
+    side: 'OLD' | 'NEW' | null;
+    startLine: null | number;
+    state: 'PLANNED' | 'WRITE_STARTED' | 'POSTED' | 'FAILED' | 'WITHHELD' | 'RETRACTED';
 };
 
 export type CoverageOmission = {
@@ -1349,6 +1452,20 @@ export type EmailTestResponse = {
     to?: string;
 };
 
+export type Entry = {
+    basedOn: Array<Basis>;
+    body: string | null;
+    bodyUnavailable: boolean;
+    copies: Array<Copy>;
+    currentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
+    deliveredAt: Date;
+    destination: 'ON_WORK' | 'PRACTICE_PAGE' | 'CONVERSATION';
+    id: string;
+    itemVersion: string | null;
+    state: 'AWAITING_APPROVAL' | 'READY' | 'DELIVERED' | 'UNCONFIRMED' | 'WITHHELD' | 'REJECTED' | 'REPLACED' | 'FAILED';
+    withdrawn: boolean;
+};
+
 export type ErasureRequest = {
     externalCopiesRemoved: boolean;
 };
@@ -1362,7 +1479,7 @@ export type EvidenceCitation = {
     sourceKind: string;
     sourcePath: string | null;
     startLine: null | number;
-    verification: CitationProof | null;
+    verification: CitationProofDto | null;
 };
 
 /**
@@ -1757,6 +1874,11 @@ export type GroupRef = {
     icon: string | null;
     name: string;
     slug: string;
+};
+
+export type History = {
+    feedback?: Array<Entry>;
+    item?: ItemRef;
 };
 
 export type HostCoverage = Omit<ResultCoverage, 'source'> & {
@@ -2410,6 +2532,11 @@ export type NotReviewedScanReportItem = {
     practiceSlug: string;
     reason: string | null;
     status: 'NOT_REVIEWED';
+};
+
+export type Note = {
+    body?: string;
+    problemId?: string;
 };
 
 export type NotificationPreferences = {
@@ -3087,6 +3214,7 @@ export type PracticeGuide = {
 export type PracticeItemTypeOption = {
     aboutRoles: Array<'AUTHOR' | 'REVIEWER' | 'ASSIGNEE' | 'MERGER'>;
     applicabilityClauses: Array<'CHANGED_PATH' | 'DIFF_CONTAINS' | 'HAS_ITEMS'>;
+    applicabilitySources: Array<ReadSourceOption>;
     events: Array<ItemEventOption>;
     kind: string;
     label: string;
@@ -3132,6 +3260,12 @@ export type PracticePageFeedback = {
     whyItMatters: string | null;
     withdrawn: boolean;
 };
+
+export type PracticePageSupport = ({
+    state: 'COMPLETE';
+} & CompletePracticePageSupport) | ({
+    state: 'REFUSED' | 'UNAVAILABLE';
+} & ClosedPracticePageSupport);
 
 export type PracticeProfileOverview = {
     changes: Array<ProfileChange>;
@@ -3334,6 +3468,13 @@ export type PracticeStandingResult = {
     title: string;
 };
 
+export type PracticeSupport = {
+    decision: 'ADMIT' | 'FEEDBACK_OFF' | 'GATE_REFUSED' | 'NO_EVIDENCE' | 'UNCORROBORATED' | 'BACKFILL_HELD' | 'RECENTLY_SURFACED' | 'UNATTRIBUTABLE_SUBJECT';
+    occurrences: Array<SupportOccurrence>;
+    practiceSlug: string;
+    stopReason: 'VOLUME_CAPPED' | 'COMPOSER_WITHHELD' | 'NOTHING_NEW' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISAGREE' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'DELIVERY_UNCONFIRMED' | 'ITEM_GONE' | 'ITEM_CLOSED' | 'ITEM_MERGED' | 'ITEM_STATE_INELIGIBLE' | 'ISSUE_SNAPSHOT_CHANGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'NO_AI' | 'DELIVERY_OFF' | 'PERSON_SUPPRESSED' | 'RECIPIENT_UNAVAILABLE' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'FEEDBACK_OFF' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_SCOPE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'RESULT_MARKED_INCORRECT' | 'REVIEWED_VERSION_CHANGED' | 'REVIEW_CANCELLED' | 'EVIDENCE_NOT_PERMITTED' | 'NO_EVIDENCE' | 'UNCORROBORATED' | null;
+};
+
 export type PracticeTraceEntry = {
     about: 'AUTHOR' | 'REVIEWER' | 'ASSIGNEE' | 'MERGER' | null;
     feedbackMode: 'OFF' | 'APPROVE_FIRST' | 'AUTOMATIC';
@@ -3381,6 +3522,21 @@ export type PracticeWorkspaceTile = {
     outcomes: OutcomeVector;
     practiceName: string;
     practiceSlug: string;
+};
+
+export type PrepareFeedbackRequest = {
+    attempt: number;
+    basisResultIds: Array<string>;
+    composition: Array<ComposedFeedback>;
+    jobId: string;
+    publicComposition: boolean;
+    reviewId: string;
+};
+
+export type PrepareFeedbackResponse = {
+    contentDigest: string;
+    feedbackIds: Array<string>;
+    preparedAt: Date;
 };
 
 export type PreviewRequest = {
@@ -3482,6 +3638,20 @@ export type ProfileReviewRef = {
     item: ItemRef;
     reviewId: string;
     status: 'QUEUED' | 'RUNNING' | 'COMPLETE' | 'PARTIAL' | 'FAILED' | 'CANCELLED' | null;
+};
+
+export type ProjectedCitation = {
+    anchorable: boolean;
+    commit: string | null;
+    endLine: null | number;
+    index: number;
+    path: string | null;
+    quote: string | null;
+    side: 'OLD' | 'NEW' | null;
+    sourceKind: string;
+    sourcePath: string | null;
+    startLine: null | number;
+    verification: CitationProof | null;
 };
 
 export type ProviderIdentityRef = {
@@ -3628,6 +3798,12 @@ export type PublicActivityWorkSummary = {
 export type PublicActivityWorkspaceSettings = {
     allowSearchEngines: boolean;
     enabled: boolean;
+};
+
+export type PublicFeedbackHistory = {
+    contractVersion: number;
+    history: History;
+    readAt: Date;
 };
 
 export type Question = {
@@ -3886,6 +4062,12 @@ export type ResourceCounts = {
 
 export type ResultCoverage = {
     source: string;
+};
+
+export type ResultDecision = {
+    decision: 'ADMIT' | 'FEEDBACK_OFF' | 'MENTOR_UNAVAILABLE' | 'GATE_REFUSED' | 'UNATTRIBUTABLE_SUBJECT' | 'HAS_INLINE_ANCHOR' | 'ALREADY_DELIVERED_ON_WORK' | 'REVIEWER_DEFERRED' | 'BACKFILL_QUIET';
+    resultId: string;
+    stopReason: 'VOLUME_CAPPED' | 'COMPOSER_WITHHELD' | 'NOTHING_NEW' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISAGREE' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'DELIVERY_UNCONFIRMED' | 'ITEM_GONE' | 'ITEM_CLOSED' | 'ITEM_MERGED' | 'ITEM_STATE_INELIGIBLE' | 'ISSUE_SNAPSHOT_CHANGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'NO_AI' | 'DELIVERY_OFF' | 'PERSON_SUPPRESSED' | 'RECIPIENT_UNAVAILABLE' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'FEEDBACK_OFF' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_SCOPE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'RESULT_MARKED_INCORRECT' | 'REVIEWED_VERSION_CHANGED' | 'REVIEW_CANCELLED' | 'EVIDENCE_NOT_PERMITTED' | 'NO_EVIDENCE' | 'UNCORROBORATED' | null;
 };
 
 export type ResultDetail = {
@@ -4929,6 +5111,27 @@ export type SubmitSurvey = {
     answers: Array<Answer>;
 };
 
+export type SubmittedResult = {
+    candidate?: JsonNode;
+    itemId?: string;
+    itemVersion?: string;
+    practiceSlug?: string;
+    readReceipts?: Array<ReadReceipt>;
+};
+
+export type SupportOccurrence = {
+    evidence: JsonNode | null;
+    explanation: string | null;
+    itemId: string;
+    itemKind: string;
+    origin: 'EVENT' | 'REQUEST' | 'SCHEDULE' | 'BACKFILL';
+    outcome: 'MET' | 'NOT_MET' | 'DOES_NOT_APPLY' | 'COULD_NOT_DETERMINE';
+    practiceVersionId: string | null;
+    recordedAt: Date;
+    resultId: string;
+    summary: string;
+};
+
 export type Survey = {
     active: boolean;
     createdAt: Date;
@@ -5775,6 +5978,12 @@ export type UserViewAccount = {
 export type Value = {
     label?: string;
     value?: string;
+};
+
+export type Withheld = {
+    itemId?: string;
+    practiceSlug?: string;
+    reason?: string;
 };
 
 export type WithheldScanReportItem = {
@@ -7260,25 +7469,6 @@ export type CreateCatalogPracticeResponses = {
 
 export type CreateCatalogPracticeResponse = CreateCatalogPracticeResponses[keyof CreateCatalogPracticeResponses];
 
-export type ReorderCatalogPracticesData = {
-    body: ReorderRequest;
-    headers?: {
-        'If-Match'?: string;
-    };
-    path?: never;
-    query?: never;
-    url: '/admin/practice-catalog/practices/reorder';
-};
-
-export type ReorderCatalogPracticesResponses = {
-    /**
-     * OK
-     */
-    200: Catalog;
-};
-
-export type ReorderCatalogPracticesResponse = ReorderCatalogPracticesResponses[keyof ReorderCatalogPracticesResponses];
-
 export type GetCatalogPracticeData = {
     body?: never;
     path: {
@@ -8120,6 +8310,54 @@ export type ListIdentityProvidersResponses = {
 };
 
 export type ListIdentityProvidersResponse = ListIdentityProvidersResponses[keyof ListIdentityProvidersResponses];
+
+export type AdmitResultsData = {
+    body: AdmissionRequest;
+    path?: never;
+    query?: never;
+    url: '/internal/llm/admit-results';
+};
+
+export type AdmitResultsResponses = {
+    /**
+     * OK
+     */
+    200: AdmissionResponse;
+};
+
+export type AdmitResultsResponse = AdmitResultsResponses[keyof AdmitResultsResponses];
+
+export type PrepareFeedbackData = {
+    body: PrepareFeedbackRequest;
+    path?: never;
+    query?: never;
+    url: '/internal/llm/prepare-feedback';
+};
+
+export type PrepareFeedbackResponses = {
+    /**
+     * OK
+     */
+    200: PrepareFeedbackResponse;
+};
+
+export type PrepareFeedbackResponse2 = PrepareFeedbackResponses[keyof PrepareFeedbackResponses];
+
+export type ReadPublicFeedbackHistoryData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/internal/llm/public-feedback-history';
+};
+
+export type ReadPublicFeedbackHistoryResponses = {
+    /**
+     * OK
+     */
+    200: PublicFeedbackHistory;
+};
+
+export type ReadPublicFeedbackHistoryResponse = ReadPublicFeedbackHistoryResponses[keyof ReadPublicFeedbackHistoryResponses];
 
 export type UnsubscribeEmailData = {
     body?: {

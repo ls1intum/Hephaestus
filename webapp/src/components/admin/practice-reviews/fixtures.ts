@@ -200,10 +200,6 @@ export const outlineDocument = itemRef({
 	url: "https://docs.example.com/doc/runbook-restore",
 });
 
-/**
- * No review in the fixture reaches an issue, but `scm.issue` is a kind this build has copy and a
- * glyph for, so something has to render it.
- */
 export const trackerIssue = itemRef({
 	id: "204",
 	kind: ITEM_KIND.issue,
@@ -2725,10 +2721,6 @@ export function manyResults(count: number): ReviewResult[] {
 	return rows.sort((a, b) => b.recordedAt.getTime() - a.recordedAt.getTime());
 }
 
-/**
- * A workspace large enough that the person facet, which filters one fetched page in the browser
- * because the endpoint takes no name, cannot reach everybody.
- */
 export function manyMembers(count: number): WorkspaceMembership[] {
 	return Array.from({ length: count }, (_, index) => {
 		const source = cycled(workspaceMembers, index);
@@ -2859,7 +2851,6 @@ function overviewBuckets(perDay: Record<keyof typeof PER_DAY, readonly number[]>
 
 const NOTHING_PER_DAY = Array.from({ length: OVERVIEW_DAYS }, () => 0);
 
-/** Thirty days of a busy workspace, day by day, as `GET …/practices/reviews/overview` returns it. */
 export const practiceReviewOverview: ReviewOverview = {
 	from: OVERVIEW_FROM,
 	to: new Date(STORY_NOW),
@@ -2889,13 +2880,11 @@ export const deliveredByLocationCounts: ReasonCount[] = [
 	{ reason: "PRACTICE_PAGES", description: FEEDBACK_LOCATION_DEFS.PRACTICE_PAGES.label, count: 4 },
 ];
 
-/** The overview's 3 withheld pieces by reason: 2 as the work was merged, 1 over the limit. */
 export const withheldByReasonCounts: ReasonCount[] = [
 	{ reason: "VOLUME_CAPPED", description: withholdingReasonSentence("VOLUME_CAPPED"), count: 1 },
 	{ reason: "ITEM_MERGED", description: withholdingReasonSentence("ITEM_MERGED"), count: 2 },
 ];
 
-/** Thirty days in which nothing was reviewed: every bucket present, and every one of them zero. */
 export const quietPracticeReviewOverview: ReviewOverview = {
 	...practiceReviewOverview,
 	buckets: overviewBuckets({
@@ -2971,7 +2960,6 @@ const queueItem = (
 	since: minutesBefore(minutes),
 });
 
-/** The busy queue's head, by name, for a story to rearrange. */
 export const reviewQueueHead = {
 	runningLong: queueItem(1, "running", reviewItem, ada, 3),
 	runningShort: queueItem(2, "running", gitlabMergeRequest, grace, 1),
@@ -2981,7 +2969,6 @@ export const reviewQueueHead = {
 	scanJob: queueItem(6, "held", scannedRepository, null, 1),
 };
 
-/** Nothing waits or runs; twelve reviews finished in the last hour. */
 export const idleReviewQueue: ReviewQueue = {
 	asOf: new Date(STORY_NOW),
 	running: 0,

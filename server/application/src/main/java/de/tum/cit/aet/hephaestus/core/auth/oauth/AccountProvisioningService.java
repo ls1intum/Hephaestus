@@ -199,7 +199,7 @@ public class AccountProvisioningService {
                 "auth.success: resolved accountId={} via provider={} emailVerified={}",
                 created.getId(),
                 registrationId,
-                resolvedEmail.verified());
+                created.getPrimaryEmailVerifiedAt() != null);
         String login = loginOf(principal);
         Account result = promoteIfBootstrapAdmin(created, registrationId, subject, login);
         if (result.getAppRole() != Account.AppRole.APP_ADMIN && adminBootstrapPolicy.isConfigured()) {

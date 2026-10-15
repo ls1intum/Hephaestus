@@ -9,8 +9,11 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.jdbc.support.SqlArrayValue;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -44,7 +47,63 @@ final class CapturedPersonDataContributor implements PersonDataContributor {
 
     @Override
     public List<JsonNode> export(PersonDataSelection selection, PersonScope frozenScope) {
-        return store.export(selection, frozenScope);
+        var rows = store.export(selection, frozenScope);
+        String ownerTable =
+                switch (store.store()) {
+                    case "result", "problem", "result_mark", "review_item" -> "result";
+                    case "feedback",
+                            "feedback_basis",
+                            "feedback_send",
+                            "feedback_response",
+                            "feedback_copy",
+                            "feedback_decision" -> "feedback";
+                    default -> "";
+                };
+        if (ownerTable.isEmpty() || rows.isEmpty()) return rows;
+        String ownerColumn = store.store().equals(ownerTable) ? "developer_id" : ownerTable + "_id";
+        Long accountId = frozenScope.accountId();
+        Set<UUID> owned = accountId == null || ownerColumn.equals("developer_id")
+                ? Set.of()
+                : ownedReferences(rows, ownerTable, ownerColumn, accountId);
+        var keys = selection.rows().getFirst().columns().keySet();
+        return rows.stream()
+                .map(row -> {
+                    var reference = row.path(ownerColumn);
+                    boolean own = accountId != null
+                            && (ownerColumn.equals("developer_id")
+                                    ? reference.asLong() == accountId
+                                    : reference.isString() && owned.contains(UUID.fromString(reference.asString())));
+                    if (own) return row;
+                    var metadata = mapper.createObjectNode();
+                    keys.forEach(key -> metadata.set(key, row.path(key)));
+                    return metadata;
+                })
+                .toList();
+    }
+
+    private Set<UUID> ownedReferences(List<JsonNode> rows, String table, String column, long accountId) {
+        var ids = rows.stream()
+                .map(row -> row.path(column))
+                .filter(JsonNode::isString)
+                .map(row -> UUID.fromString(row.asString()))
+                .collect(Collectors.toSet());
+        if (ids.isEmpty()) return Set.of();
+        return Set.copyOf(jdbc.query(
+                "SELECT id FROM " + table
+                        + " WHERE developer_id=:account AND id=ANY(:ids) AND workspace_id=ANY(:workspaces)",
+                Map.of(
+                        "account",
+                        accountId,
+                        "ids",
+                        new SqlArrayValue("uuid", ids.toArray()),
+                        "workspaces",
+                        new SqlArrayValue(
+                                "bigint",
+                                rows.stream()
+                                        .map(row -> row.path("workspace_id").asLong())
+                                        .distinct()
+                                        .toArray())),
+                (row, index) -> Objects.requireNonNull(row.getObject("id", UUID.class))));
     }
 
     @Override

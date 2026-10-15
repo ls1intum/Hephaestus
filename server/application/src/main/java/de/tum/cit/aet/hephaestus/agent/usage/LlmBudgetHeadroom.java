@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.usage;
 
-import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import java.math.BigDecimal;
 import org.jspecify.annotations.Nullable;
 

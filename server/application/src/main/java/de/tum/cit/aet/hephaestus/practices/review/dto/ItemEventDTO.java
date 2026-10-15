@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.review.dto;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FoundBy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestReason;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewRequestReason;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.UUID;

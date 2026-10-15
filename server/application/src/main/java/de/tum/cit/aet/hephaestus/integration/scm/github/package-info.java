@@ -8,6 +8,7 @@
             "core::auth-spi",
             "evidence",
             "integration.core",
+            "integration.core::framework",
             "integration.core::events",
             "integration.core::spi",
             "integration.core::handler",

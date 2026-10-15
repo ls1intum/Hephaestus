@@ -2,10 +2,10 @@ package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MergeReadinessContentSource;
-import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.RecentAuthoredWorkContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.ResultHistoryContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.ReviewAttemptsContentSource;
+import de.tum.cit.aet.hephaestus.integration.scm.context.MergeReadinessContentSource;
+import de.tum.cit.aet.hephaestus.integration.scm.context.RecentAuthoredWorkContentSource;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;

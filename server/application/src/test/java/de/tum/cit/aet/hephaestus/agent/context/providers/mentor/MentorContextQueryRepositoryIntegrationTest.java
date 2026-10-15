@@ -4,6 +4,8 @@ import static de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures.admitt
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorTurnPersistence;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
@@ -13,7 +15,9 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRep
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import de.tum.cit.aet.hephaestus.integration.core.spi.MentorWorkQuery;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.RequestedReviewer;
@@ -39,6 +43,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
@@ -63,7 +68,13 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
     private ConnectionService connectionService;
 
     @Autowired
-    private MentorContextQueryRepository queryRepository;
+    private MentorConversationQueryRepository conversations;
+
+    @Autowired
+    private MentorWorkQuery work;
+
+    @Autowired
+    private AccountRepository accounts;
 
     @Autowired
     private MentorTurnPersistence persistence;
@@ -85,6 +96,9 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private PullRequestRepository pullRequestRepository;
+
+    @Autowired
+    private IssueRepository issueRepository;
 
     @Autowired
     private PullRequestReviewRepository reviewRepository;
@@ -148,8 +162,8 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
         ChatThread t1 = seedThreadWithUserMessage("how do I structure my PR description?");
         ChatThread t2 = seedThreadWithUserMessage("what makes a good test?");
 
-        List<Object[]> rows = queryRepository.findFirstUserMessagePartsByThreadIds(
-                workspace.getId(), List.of(t1.getId(), t2.getId()));
+        List<Object[]> rows =
+                conversations.findFirstUserMessagePartsByThreadIds(workspace.getId(), List.of(t1.getId(), t2.getId()));
 
         Map<UUID, String> byThread = new HashMap<>();
         for (Object[] row : rows) {
@@ -176,7 +190,7 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
                 other.getId(), UUID.randomUUID(), memberships.accountIdForUser(user.getId()), "foreign prompt");
         persistence.persistInFlight(foreign, "foreign prompt", UUID.randomUUID(), null, admittedMentorConfig());
 
-        List<Object[]> rows = queryRepository.findFirstUserMessagePartsByThreadIds(
+        List<Object[]> rows = conversations.findFirstUserMessagePartsByThreadIds(
                 workspace.getId(), List.of(mine.getId(), foreign.getId()));
 
         assertThat(rows).hasSize(1);
@@ -256,6 +270,55 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
+        void shouldResolveAccountIdentitiesInsteadOfTreatingAccountIdsAsProviderActors() {
+            var unlinked = accounts.saveAndFlush(new Account("No provider identity"));
+            long unlinkedId = Objects.requireNonNull(unlinked.getId());
+            PullRequest requested = asking(gitLab, ReviewState.UNREVIEWED);
+            long accountId = memberships.accountIdForUser(gitLab.reader().getId());
+            assertThat(work.findPendingReviewRequestPrs(gitLab.scope().getId(), accountId))
+                    .extracting(MentorWorkQuery.RequestedReview::id)
+                    .contains(requested.getId());
+            assertThat(work.findPendingReviewRequestPrs(gitLab.scope().getId(), unlinkedId))
+                    .isEmpty();
+            assertThat(work.findPendingReviewRequestPrs(gitHub.scope().getId(), accountId))
+                    .isEmpty();
+            var now = Instant.now();
+            assertThat(work.fetchUserCounts(
+                                    gitLab.scope().getId(),
+                                    unlinkedId,
+                                    now.minus(Duration.ofDays(14)),
+                                    now.minus(Duration.ofDays(7)),
+                                    now)
+                            .pendingReviewRequests())
+                    .isZero();
+        }
+
+        @Test
+        void shouldListAssignedIssuesWithoutIncludingAssignedMergeRequests() {
+            var issue = new Issue();
+            long nativeId = nativeIds.incrementAndGet();
+            issue.setNativeId(nativeId);
+            issue.setProvider(gitLab.repository().getProvider());
+            issue.setNumber((int) (nativeId % 100_000));
+            issue.setTitle("Resolve the assigned issue");
+            issue.setState(Issue.State.OPEN);
+            issue.setRepository(gitLab.repository());
+            issue.setAuthor(gitLab.author());
+            issue.getAssignees().add(gitLab.reader());
+            issue.setCreatedAt(Instant.now());
+            issueRepository.saveAndFlush(issue);
+            var mergeRequest = asking(gitLab, ReviewState.UNREVIEWED);
+            mergeRequest.getAssignees().add(gitLab.reader());
+            pullRequestRepository.saveAndFlush(mergeRequest);
+            long accountId = memberships.accountIdForUser(gitLab.reader().getId());
+            assertThat(work.findAssignedOpenIssues(gitLab.scope().getId(), accountId))
+                    .extracting(MentorWorkQuery.AssignedIssue::title)
+                    .containsExactly("Resolve the assigned issue");
+            assertThat(work.findAssignedOpenIssues(gitHub.scope().getId(), accountId))
+                    .isEmpty();
+        }
+
+        @Test
         void shouldLeaveOutADraftWhenItAsksForAReview() {
             PullRequest ready = asking(gitLab, ReviewState.UNREVIEWED);
             PullRequest drafted = asking(gitLab, ReviewState.UNREVIEWED);
@@ -266,20 +329,17 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
         }
 
         private void assertPending(Side side, Set<PullRequest> pending, Set<PullRequest> notPending) {
-            Long readerId = side.reader().getId();
-            Set<Long> listed = queryRepository
-                    .findPendingReviewRequestPrs(side.scope().getId(), readerId)
-                    .stream()
-                    .map(PullRequest::getId)
+            long accountId = memberships.accountIdForUser(side.reader().getId());
+            Set<Long> listed = work.findPendingReviewRequestPrs(side.scope().getId(), accountId).stream()
+                    .map(row -> row.id())
                     .collect(Collectors.toSet());
             assertThat(listed)
                     .containsAll(pending.stream().map(PullRequest::getId).toList());
             assertThat(notPending).extracting(PullRequest::getId).noneMatch(listed::contains);
             Instant now = Instant.now();
-            assertThat(queryRepository
-                            .fetchUserCounts(
+            assertThat(work.fetchUserCounts(
                                     side.scope().getId(),
-                                    readerId,
+                                    accountId,
                                     now.minus(Duration.ofDays(14)),
                                     now.minus(Duration.ofDays(7)),
                                     now)

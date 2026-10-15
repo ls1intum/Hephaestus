@@ -102,6 +102,7 @@ public class DocumentItemSource implements ItemSource, ItemSourceAccess {
                         new ItemLabel(
                                 item.itemId(),
                                 title == null || title.isBlank() ? "Document" : title,
+                                title == null || title.isBlank() ? "Document" : title,
                                 "document",
                                 null,
                                 label.getCollectionName(),
@@ -155,6 +156,7 @@ public class DocumentItemSource implements ItemSource, ItemSourceAccess {
                 roles,
                 new ItemLabel(
                         item.itemId(),
+                        title == null || title.isBlank() ? "Document" : title,
                         title == null || title.isBlank() ? "Document" : title,
                         "document",
                         null,

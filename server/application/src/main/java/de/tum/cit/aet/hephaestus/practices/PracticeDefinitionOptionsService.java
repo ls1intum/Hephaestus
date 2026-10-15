@@ -30,6 +30,16 @@ public class PracticeDefinitionOptionsService {
 
     private PracticeItemTypeOptionDTO options(ItemDescriptor item, @Nullable Long workspaceId) {
         var capabilities = item.reviewCapabilities();
+        var readSources = sources.current().sources().stream()
+                .filter(source -> source.appliesTo(item.kind().value()))
+                .map(source -> new ReadSourceOptionDTO(
+                        source.kind().value(),
+                        source.displayName(),
+                        source.completenessPolicy().supportsComplete()
+                                ? List.of(ReadNeed.REQUIRED, ReadNeed.COMPLETE, ReadNeed.OPTIONAL)
+                                : List.of(ReadNeed.REQUIRED, ReadNeed.OPTIONAL),
+                        source.citation()))
+                .toList();
         return new PracticeItemTypeOptionDTO(
                 item.kind().value(),
                 item.displayName(),
@@ -47,16 +57,7 @@ public class PracticeDefinitionOptionsService {
                                         .toList()))
                         .toList(),
                 item.roles().stream().sorted().toList(),
-                sources.current().sources().stream()
-                        .filter(source -> source.appliesTo(item.kind().value()))
-                        .map(source -> new ReadSourceOptionDTO(
-                                source.kind().value(),
-                                source.displayName(),
-                                source.completenessPolicy().supportsComplete()
-                                        ? List.of(ReadNeed.REQUIRED, ReadNeed.COMPLETE, ReadNeed.OPTIONAL)
-                                        : List.of(ReadNeed.REQUIRED, ReadNeed.OPTIONAL),
-                                source.citation()))
-                        .toList(),
+                readSources,
                 capabilities.reviewOnStateDimensions().stream()
                         .map(dimension -> new StateDimensionDTO(
                                 dimension.key(),
@@ -73,6 +74,10 @@ public class PracticeDefinitionOptionsService {
                 capabilities.appliesWhenSupportedAspects().stream()
                         .sorted()
                         .map(ApplicabilityClauseKind::valueOf)
+                        .toList(),
+                readSources.stream()
+                        .filter(source ->
+                                capabilities.appliesWhenEvidenceCollections().contains(source.source()))
                         .toList());
     }
 }

@@ -45,7 +45,13 @@ public class IssueItemDescriptor implements ItemDescriptor {
                         "Closed",
                         Set.of(ScmEventSources.GITHUB_ISSUES, ScmEventSources.GITLAB_ISSUE),
                         false,
-                        true));
+                        true),
+                ScmEventSources.declare(
+                        ScmItemEvents.ISSUE_DELETED,
+                        "Deleted",
+                        Set.of(ScmEventSources.GITHUB_ISSUES, ScmEventSources.GITLAB_ISSUE),
+                        false,
+                        false));
     }
 
     @Override

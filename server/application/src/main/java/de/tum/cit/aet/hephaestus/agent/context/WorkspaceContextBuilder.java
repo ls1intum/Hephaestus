@@ -15,11 +15,13 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.JsonNode;
 
 @Service
 public class WorkspaceContextBuilder {
@@ -40,6 +42,15 @@ public class WorkspaceContextBuilder {
         this.itemSources = List.copyOf(itemSources);
         this.catalogs = catalogs;
         this.manifests = manifests;
+    }
+
+    public Optional<JsonNode> read(long workspaceId, long accountId, String path) {
+        var values = mentorSources.stream()
+                .map(source -> source.read(workspaceId, accountId, path))
+                .flatMap(Optional::stream)
+                .toList();
+        if (values.size() > 1) throw new IllegalStateException("A mentor resource has multiple owners");
+        return values.stream().findFirst();
     }
 
     public Map<String, byte[]> build(MentorContextRequest request) {

@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { delay, HttpResponse, http, type PathParams } from "msw";
 import { assert, describe, expect, it, vi } from "vitest";
 
@@ -108,6 +109,26 @@ describe("instance catalog routes", () => {
 		fireEvent.change(screen.getByRole("textbox", { name: /^What to look for/u }), {
 			target: { value: "The description says why the change is needed." },
 		});
+		const user = userEvent.setup();
+		await user.click(screen.getByRole("button", { name: "Add condition" }));
+		await user.click(screen.getByRole("combobox", { name: "Condition 1" }));
+		await user.click(await screen.findByRole("option", { name: "A source has items" }));
+		await user.click(screen.getByRole("combobox", { name: "Source 1" }));
+		const sourceOptions = await screen.findByRole("listbox", { name: "Source 1" });
+		expect(
+			within(sourceOptions)
+				.getAllByRole("option")
+				.map((option) => option.textContent),
+		).toStrictEqual(["Review threads and decisions", "General review comments"]);
+		await user.click(
+			within(sourceOptions).getByRole("option", { name: "General review comments" }),
+		);
+		expect(screen.getByRole("combobox", { name: "Source 1" }).textContent).toContain(
+			"General review comments",
+		);
+		fireEvent.change(screen.getByRole("textbox", { name: /^Otherwise/u }), {
+			target: { value: "There are no review comments to check." },
+		});
 		fireEvent.click(screen.getByRole("button", { name: "Choose sources" }));
 		fireEvent.click(
 			within(
@@ -130,6 +151,10 @@ describe("instance catalog routes", () => {
 		expect(body.definition).toMatchObject({
 			name: "Explain the change",
 			criteria: "The description says why the change is needed.",
+		});
+		expect(body.definition.appliesWhen).toStrictEqual({
+			anyOf: [{ hasItems: "scm.general-review-comments" }],
+			otherwise: "There are no review comments to check.",
 		});
 		expect(body.definition).not.toHaveProperty("groupSlug");
 		expect(body.definition).not.toHaveProperty("kind");

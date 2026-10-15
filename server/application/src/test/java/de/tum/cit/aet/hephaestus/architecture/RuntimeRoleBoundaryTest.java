@@ -44,6 +44,9 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
      */
     private static final Map<String, String> EXPECTED_GATES = Map.ofEntries(
             Map.entry(
+                    "de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController",
+                    RuntimeRole.SERVER_PROPERTY),
+            Map.entry(
                     "de.tum.cit.aet.hephaestus.integration.core.webhook.WebhookConfiguration",
                     RuntimeRole.WEBHOOK_PROPERTY),
             Map.entry("de.tum.cit.aet.hephaestus.core.runtime.ServerSchedulingConfig", RuntimeRole.SERVER_PROPERTY),
@@ -136,6 +139,39 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
             // never sample. Gate the bean, not just the tick.
             Map.entry("de.tum.cit.aet.hephaestus.agent.job.AgentQueueHealthSampler", RuntimeRole.SERVER_PROPERTY),
             Map.entry("de.tum.cit.aet.hephaestus.agent.job.ReviewJobRetentionService", RuntimeRole.SERVER_PROPERTY),
+            Map.entry(
+                    "de.tum.cit.aet.hephaestus.integration.scm.github.lifecycle.GitHubLifecycleListener",
+                    RuntimeRole.SERVER_PROPERTY),
+            Map.entry(
+                    "de.tum.cit.aet.hephaestus.integration.scm.github.workspace.GitHubWorkspaceProvisioningAdapter",
+                    RuntimeRole.SERVER_PROPERTY),
+            Map.entry(
+                    "de.tum.cit.aet.hephaestus.integration.scm.github.workspace.GitHubInstallationReconciler",
+                    RuntimeRole.SERVER_PROPERTY),
+            Map.entry(
+                    "de.tum.cit.aet.hephaestus.integration.slack.retention.SlackWorkspaceContentEraser",
+                    RuntimeRole.SERVER_PROPERTY),
+            Map.entry(
+                    "de.tum.cit.aet.hephaestus.integration.slack.retention.SlackRetentionPurger",
+                    RuntimeRole.SERVER_PROPERTY),
+            Map.entry(
+                    "de.tum.cit.aet.hephaestus.integration.slack.retention.SlackWorkspacePurgeAdapter",
+                    RuntimeRole.SERVER_PROPERTY),
+            Map.entry(
+                    "de.tum.cit.aet.hephaestus.integration.scm.github.installation.GitHubInstallationTargetMessageHandler",
+                    RuntimeRole.SERVER_PROPERTY),
+            Map.entry(
+                    "de.tum.cit.aet.hephaestus.integration.scm.github.installation.GitHubInstallationRepositoriesMessageHandler",
+                    RuntimeRole.SERVER_PROPERTY),
+            Map.entry(
+                    "de.tum.cit.aet.hephaestus.integration.scm.github.installation.GitHubInstallationMessageHandler",
+                    RuntimeRole.SERVER_PROPERTY),
+            Map.entry(
+                    "de.tum.cit.aet.hephaestus.integration.scm.github.repository.GitHubRepositoryMessageHandler",
+                    RuntimeRole.SERVER_PROPERTY),
+            Map.entry(
+                    "de.tum.cit.aet.hephaestus.practices.review.PracticeReviewCoverageService",
+                    RuntimeRole.SERVER_PROPERTY),
             // Product feedback is a member- and admin-facing web surface, and SurveyService reads research
             // consent through a port only the server role implements.
             Map.entry("de.tum.cit.aet.hephaestus.productfeedback.FeedbackController", RuntimeRole.SERVER_PROPERTY),
@@ -311,7 +347,7 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
 
     /**
      * Every ungated bean that injects a server-gated bean crash-loops the worker and webhook pods at
-     * context refresh — a failure no test tier can see, because none boots with
+     * context refresh. Full role-context tests must resolve those dependencies with
      * {@code hephaestus.runtime.server.enabled=false}. {@link java.time.Clock} is injected by beans that
      * must load on every role — the config-audit recorder among them — so gating its provider breaks both
      * pods with the whole suite green.

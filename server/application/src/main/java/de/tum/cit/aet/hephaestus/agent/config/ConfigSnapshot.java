@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.config;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
 import de.tum.cit.aet.hephaestus.agent.catalog.ModelBindingSource;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticePiAdapter;
-import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import java.util.Map;
 import java.util.Objects;

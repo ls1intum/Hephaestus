@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
-import de.tum.cit.aet.hephaestus.integration.chat.item.ConversationSourceLiveness;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConversationSourceLiveness;
 import java.util.Collection;
 import java.util.Set;
 import org.springframework.stereotype.Component;

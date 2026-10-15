@@ -6,7 +6,6 @@ import static org.awaitility.Awaitility.await;
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.settings.InstanceSettingsService;
 import de.tum.cit.aet.hephaestus.notification.SurveyEmailRequested;
 import de.tum.cit.aet.hephaestus.notification.SurveyEndedSummaryRequested;
@@ -74,9 +73,6 @@ class SurveyEmailInvitationIntegrationTest extends AbstractWorkspaceIntegrationT
 
     @Autowired
     private AccountRepository accounts;
-
-    @Autowired
-    private IdentityRepository identities;
 
     @Autowired
     private NotificationSubscriptionService subscriptions;
@@ -841,11 +837,7 @@ class SurveyEmailInvitationIntegrationTest extends AbstractWorkspaceIntegrationT
         var actor = persistUser(slug);
         Workspace workspace = createWorkspace(slug, "Survey workspace", slug, AccountType.ORG, actor);
         ensureMembership(workspace, actor, Membership.WorkspaceRole.MEMBER);
-        var providerId = Objects.requireNonNull(ensureGitHubProvider().getId());
-        var link = identities
-                .findActiveByProviderSubject(providerId, actor.getNativeId().toString(), null)
-                .orElseThrow();
-        var account = link.getAccount();
+        var account = accounts.findById(accountId(actor)).orElseThrow();
         account.setDisplayName("Survey recipient");
         account.setStatus(Account.Status.ACTIVE);
         account.setPrimaryEmail(UUID.randomUUID() + "@hephaestus.test");

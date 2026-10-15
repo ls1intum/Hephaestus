@@ -289,10 +289,10 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
                     AND t.slack_channel_id=m.slack_channel_id
                     AND t.slack_thread_ts=COALESCE(m.slack_thread_ts,m.slack_ts)
                 JOIN identity_provider p ON p.type='SLACK' AND p.server_url='https://slack.com'
-                 WHERE t.workspace_id=:workspaceId AND t.id=:artifactId AND m.author_slack_user_id IS NOT NULL AND m.author_slack_user_id<>''
+                 WHERE t.workspace_id=:workspaceId AND t.id=:threadId AND m.author_slack_user_id IS NOT NULL AND m.author_slack_user_id<>''
         """, nativeQuery = true)
     List<PersonSourceIdentityRow> findPersonSourceIdentities(
-            @Param("workspaceId") long workspaceId, @Param("artifactId") long artifactId);
+            @Param("workspaceId") long workspaceId, @Param("threadId") long threadId);
 
     @Modifying
     @Transactional

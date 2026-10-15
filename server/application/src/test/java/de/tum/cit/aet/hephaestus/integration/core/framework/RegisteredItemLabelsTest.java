@@ -42,7 +42,7 @@ class RegisteredItemLabelsTest extends BaseUnitTest {
         ItemSource source = mock(ItemSource.class);
         ItemSourceRegistry sources = registry(source);
         when(source.labels(eq(1L), anyCollection()))
-                .thenReturn(Map.of(99L, new ItemLabel(99, "Other", "issue", null, null, null, null)));
+                .thenReturn(Map.of(99L, new ItemLabel(99, "Other", "Other", "issue", null, null, null, null)));
         assertThatThrownBy(() -> new RegisteredItemLabels(sources).labels(1, List.of(ITEM)))
                 .isInstanceOf(IllegalStateException.class);
     }

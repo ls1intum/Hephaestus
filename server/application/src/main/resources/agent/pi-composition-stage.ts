@@ -1,24 +1,62 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { defineTool, type AgentToolResult } from "@earendil-works/pi-coding-agent";
-import { type LeanResult, type AdmittedResult, resultsById } from "./pi-admitted-results.ts";
+import nodePath from "node:path";
+import {
+	DefaultResourceLoader,
+	defineTool,
+	type AgentToolResult,
+	createCodemodeExtension,
+	type AgentSession,
+	type createAgentSession,
+	type SettingsManager,
+} from "@earendil-works/pi-coding-agent";
+
+import {
+	type Admission,
+	type LeanResult,
+	type AdmittedResult,
+	resultsById,
+} from "./pi-admitted-results.ts";
+import {
+	PUBLIC_REVIEW_RESOURCE_LOADER_OPTIONS,
+	PUBLIC_REVIEW_TOOLS,
+	SANDBOX_RESOURCE_LOADER_OPTIONS,
+} from "./pi-agent-sandbox.ts";
+import { checkedOutCommit, readPinnedBlob, pinnedDiff } from "./pi-change.ts";
+import { errorText } from "./pi-error-text.ts";
 import {
 	prepareFeedback,
 	type FeedbackComposition,
 	type FeedbackPreparationReceipt,
 } from "./pi-feedback-preparation.ts";
+import { trimmedText } from "./pi-result-normalize.ts";
+import {
+	buildPublicReviewHistory,
+	buildPrimarySourceReference,
+	buildSameWorkContext,
+} from "./pi-review-brief.ts";
+import type { Work } from "./pi-review-turns.ts";
 import {
 	REVIEW_TOOL_DESCRIPTION,
 	readReview,
 	prepareReviewArguments,
 	reviewToolParameters,
-	type priorAdviceWitnesses,
 	type ReviewedResult,
 	ACTIONS,
 	PRIVATE_DESTINATIONS,
+	publicResults,
+	DESTINATIONS,
 	PRIOR_ADVICE_REASONS,
 	WITHHOLD_REASONS,
 	evidenceRefs,
 	namedEvidence,
+	notReachedNote,
+	type ReviewPractice,
+	buildReviewTurn,
+	decidedByReview,
+	priorAdviceWitnesses,
+	priorPublicFeedback,
+	publicQualifications,
+	qualificationEvidence,
 	undeliverableFeedback,
 	validateFeedbackEvidence,
 	type ComposedFeedbackEnvelope,
@@ -30,13 +68,21 @@ import {
 	type PrivateDestination,
 	type FeedbackAction,
 } from "./pi-runner-composition.ts";
+import { scheduleDeadline, type SessionPhase } from "./pi-session-lifecycle.ts";
+import type { taskPaths } from "./pi-task-paths.ts";
 import { hasText, isBlank } from "./pi-text.ts";
+import { prepareTurnText } from "./pi-turn-context.ts";
 import {
 	compositionRequestSchema,
 	type Outcome,
 } from "./work/practice-scripts/lib/core/contract.ts";
-import { optionalString, isJsonObject as isRecord } from "./work/practice-scripts/lib/core/json.ts";
+import {
+	jsonArray,
+	optionalString,
+	isJsonObject as isRecord,
+} from "./work/practice-scripts/lib/core/json.ts";
 import { z } from "./work/practice-scripts/lib/core/practice-script.ts";
+import type { practiceIndexSchema } from "./work/practice-scripts/lib/core/runtime-inputs.ts";
 
 export type CompositionRequest = z.infer<typeof compositionRequestSchema>;
 
@@ -801,4 +847,1230 @@ export function createReviewRecorder(
 			terminate: true,
 		};
 	};
+}
+
+export interface CompositionFiles {
+	requestPath: string;
+	feedbackPath: string;
+	preparedPath: string;
+	supportPath: string;
+	criteriaPathOf: (slug: string) => string;
+}
+
+function coordinatesOf(citation: unknown): unknown {
+	if (!isRecord(citation)) {
+		return citation;
+	}
+	const { quote: _quote, verification: _verification, ...coordinates } = citation;
+	return coordinates;
+}
+
+const COMPOSITION_BLOCK_LIMIT = 32_000;
+
+function stagedBlock(label: string, file: string, limit = COMPOSITION_BLOCK_LIMIT): string {
+	if (!existsSync(file)) {
+		return "";
+	}
+	const text = readFileSync(file, "utf8").trim();
+	return text.length > limit
+		? `### ${label} — too large to show here; read \`${file}\`\n`
+		: `### ${label}\n\`\`\`json\n${text}\n\`\`\`\n`;
+}
+
+export function routedTo(
+	admission: Admission,
+	destination: PrivateDestination,
+	practiceSlug: string,
+): boolean {
+	if (destination === "PRACTICE_PAGE") {
+		return (
+			admission.practicePageSupport?.state === "COMPLETE" &&
+			admission.practicePageSupport.practices.some(
+				(practice) => practice.practiceSlug === practiceSlug && practice.decision === "ADMIT",
+			)
+		);
+	}
+	if (admission.conversationEligibility?.state !== "COMPLETE") {
+		return false;
+	}
+	const admitted = new Set(
+		admission.conversationEligibility.results
+			.filter((route) => route.decision === "ADMIT")
+			.map((route) => route.resultId),
+	);
+	return admission.results.some(
+		(result) =>
+			result.practiceSlug === practiceSlug &&
+			result.outcome === "NOT_MET" &&
+			admitted.has(result.resultId),
+	);
+}
+
+export function destinationRefusal(
+	admission: Admission,
+	destination: PrivateDestination,
+	practiceSlug: string,
+): string {
+	if (destination === "PRACTICE_PAGE") {
+		const decision =
+			admission.practicePageSupport?.state === "COMPLETE"
+				? admission.practicePageSupport.practices.find(
+						(practice) => practice.practiceSlug === practiceSlug,
+					)?.decision
+				: undefined;
+		return decision ?? "not routed";
+	}
+	const ids = new Set(
+		admission.results
+			.filter((result) => result.practiceSlug === practiceSlug)
+			.map((result) => result.resultId),
+	);
+	const decisions =
+		admission.conversationEligibility?.state === "COMPLETE"
+			? admission.conversationEligibility.results
+					.filter((route) => ids.has(route.resultId))
+					.map((route) => route.decision)
+			: [];
+	return decisions.length > 0 ? [...new Set(decisions)].join(", ") : "not routed";
+}
+
+// Enforce snapshot-dependent constraints here for fast model correction; Java rechecks them.
+export function negativePiecesOfWork(admission: Admission, practiceSlug: string): number {
+	if (admission.practicePageSupport?.state !== "COMPLETE") {
+		return 0;
+	}
+	const support = admission.practicePageSupport.practices.find(
+		(practice) => practice.practiceSlug === practiceSlug,
+	);
+	return new Set(
+		(support?.occurrences ?? []).map((occurrence) => `${occurrence.itemKind}:${occurrence.itemId}`),
+	).size;
+}
+
+export function composerView(result: AdmittedResult): Record<string, unknown> {
+	const citations = result.citations.map(coordinatesOf);
+	if (result.outcome !== "NOT_MET" && result.outcome !== "MET") {
+		const { resultId, practiceSlug, outcome } = result;
+		return {
+			resultId,
+			practiceSlug,
+			outcome,
+			evidence: qualificationEvidence(result),
+			citations,
+		};
+	}
+	// MET counterevidence keeps the same qualifications as NOT_MET.
+	const { citations: _admitted, example, problems, ...rest } = result;
+	return {
+		...rest,
+		evidence: isRecord(result.evidence) ? { ...result.evidence, citations } : result.evidence,
+		...(isRecord(example)
+			? { example: { ...example, citation: coordinatesOf(example.citation) } }
+			: {}),
+		citations,
+		problems: problems.map((problem) => ({
+			...problem,
+			citations: problem.citations.map(coordinatesOf),
+		})),
+	};
+}
+
+// Composition receives criteria, but not measuring leads or source directions that could initiate another assessment.
+function notMetCriteria(
+	results: readonly AdmittedResult[],
+	criteriaPathOf: (slug: string) => string,
+	limit = COMPOSITION_BLOCK_LIMIT,
+): string {
+	return notMetPractices(results)
+		.map((slug) => {
+			const file = criteriaPathOf(slug);
+			if (!existsSync(file)) {
+				return `### Criteria of \`${slug}\` — not staged for this review; nothing is known about them here\n`;
+			}
+			let text: string;
+			try {
+				text = readFileSync(file, "utf8").trim();
+			} catch {
+				return `### Criteria of \`${slug}\` — \`${file}\` could not be read; nothing is known about them here\n`;
+			}
+			if (text.length === 0) {
+				return `### Criteria of \`${slug}\` — \`${file}\` is empty; no standard is available here\n`;
+			}
+			if (text.length > limit) {
+				return `### Criteria of \`${slug}\` — too large to show here; read \`${file}\`\n`;
+			}
+			const longestRun = Math.max(
+				0,
+				...[...text.matchAll(/`+/gu)].map((backticks) => backticks[0].length),
+			);
+			const fence = "`".repeat(Math.max(3, longestRun + 1));
+			return `### Criteria of \`${slug}\`\n${fence}markdown\n${text}\n${fence}\n`;
+		})
+		.join("\n");
+}
+
+// The producer owns body eligibility; consume only bodies it staged.
+function priorFeedbackFacts(label: string, file: string, key: "feedback" | "prepared"): string {
+	if (!existsSync(file)) {
+		return "";
+	}
+	const pointer = `### ${label} — read \`${file}\` for the recorded history; its contents are not shown here\n`;
+	let history: unknown;
+	try {
+		history = JSON.parse(readFileSync(file, "utf8"));
+	} catch {
+		return pointer;
+	}
+	if (!isRecord(history) || !Array.isArray(history[key])) {
+		return pointer;
+	}
+	const entries: unknown[] = history[key];
+	if (
+		entries.some(
+			(entry) => !isRecord(entry) || (entry.body != null && typeof entry.body !== "string"),
+		)
+	) {
+		return pointer;
+	}
+	const projected = entries.map((entry, index) => {
+		if (!isRecord(entry)) {
+			return entry;
+		}
+		const { body, ...facts } = entry;
+		return {
+			...facts,
+			...(typeof body === "string"
+				? { bodyAt: `${file} → ${key}[${index}].body (${body.length} characters)` }
+				: {}),
+		};
+	});
+	const text = JSON.stringify({ ...history, [key]: projected }, null, 1);
+	return text.length > COMPOSITION_BLOCK_LIMIT
+		? pointer
+		: `### ${label} — bodies remain at their \`bodyAt\` in the unchanged file; read them when earlier wording matters\n\`\`\`json\n${text}\n\`\`\`\n`;
+}
+
+// A planned public decision proves neither delivery nor prior private advice.
+function plannedReviewFacts(composedFeedback: ComposedFeedback, FEEDBACK_PATH: string): string {
+	const { review } = composedFeedback;
+	if (!review) {
+		return "";
+	}
+	const stored = existsSync(FEEDBACK_PATH);
+	const bodyAt = (field: string) =>
+		stored ? { bodyAt: `${FEEDBACK_PATH} → review.${field}` } : {};
+	const facts = {
+		summary: review.summary ? { basedOn: review.summary.basedOn, ...bodyAt("summary.body") } : null,
+		inline: review.inline.map(({ body: _body, ...note }, index) => ({
+			...note,
+			...bodyAt(`inline[${index}].body`),
+		})),
+		withheld: review.withheld,
+	};
+	return `### The review composed for this work\nThis decision is not a receipt of provider delivery. It may have entered public handling, whose final gates can still withhold it. Only delivered-history records establish prior communication. Private destinations remain independently useful and may make the same supported point. ${stored ? "Read the located bodies if their wording matters." : "Its wording is not available as a staged file here."}\n\`\`\`json\n${JSON.stringify(facts, null, 1)}\n\`\`\`\n`;
+}
+
+export function buildCompositionTurn(
+	request: CompositionRequest,
+	admission: Admission,
+	composedFeedback: ComposedFeedback,
+	routedDestinations: ReadonlyMap<string, readonly PrivateDestination[]> | null,
+	files: CompositionFiles,
+	notReached: readonly string[] = [],
+): string {
+	const {
+		requestPath: COMPOSITION_REQUEST_PATH,
+		feedbackPath: FEEDBACK_PATH,
+		preparedPath: PREPARED_FEEDBACK_PATH,
+		supportPath: PRACTICE_PAGE_SUPPORT_PATH,
+		criteriaPathOf,
+	} = files;
+	const { results } = admission;
+	const openDestinations = PRIVATE_DESTINATIONS.filter(
+		(destination) => request.destinations[destination] !== undefined,
+	)
+		.map(
+			(destination) =>
+				`${destination} (at most ${request.destinations[destination]?.maxPieces ?? 0})`,
+		)
+		.join(", ");
+	const closed = PRIVATE_DESTINATIONS.filter(
+		(destination) => request.destinations[destination] === undefined,
+	);
+	const closedNote =
+		closed.length > 0 ? ` Closed this turn, so write nothing for them: ${closed.join(", ")}.` : "";
+	const coverageNote = notReachedNote(notReached);
+	const routing = PRIVATE_DESTINATIONS.filter(
+		(destination) => request.destinations[destination] !== undefined,
+	)
+		.map(
+			(destination) =>
+				`${destination}: ${privatelyComposable(admission, routedDestinations)
+					.filter((slug) => routedDestinations?.get(slug)?.includes(destination) === true)
+					.join(", ")}`,
+		)
+		.join("; ");
+	const admitted = JSON.stringify({ results: results.map(composerView) }, null, 1);
+	const onTheWork = plannedReviewFacts(composedFeedback, FEEDBACK_PATH);
+	const historyRoot = nodePath.dirname(PREPARED_FEEDBACK_PATH);
+	const context = [
+		stagedBlock(
+			"The composition request (destinations, limits, copy forms)",
+			COMPOSITION_REQUEST_PATH,
+		),
+		stagedBlock("What earlier reviews recorded about this person", `${historyRoot}/problems.json`),
+		request.destinations.PRACTICE_PAGE === undefined
+			? ""
+			: stagedBlock(
+					"PRACTICE_PAGE support: occurrences a new card may cite at this read",
+					PRACTICE_PAGE_SUPPORT_PATH,
+				),
+		priorFeedbackFacts("Recorded delivered feedback", `${historyRoot}/feedback.json`, "feedback"),
+		priorFeedbackFacts(
+			"Prepared feedback (not delivered; supersession targets)",
+			PREPARED_FEEDBACK_PATH,
+			"prepared",
+		),
+	]
+		.filter((block) => block !== "")
+		.join("\n");
+	return `## This turn
+The review just finished. The criteria its NOT_MET practices were assessed against come first, as staged; its ${results.length} admitted result(s) follow them, one per practice. The MET and NOT_MET ones carry their rationale and their citations by coordinates; each NOT_MET one also carries its problems, the located problems it found, each with its own citations. The abstentions carry the limit they recorded, an open question or why the practice did not apply, and their citations by coordinates. The full record, quoted lines included, is \`work/composition/results.json\`. The history follows them.
+
+${notMetCriteria(results, criteriaPathOf)}
+\`\`\`json
+${admitted}
+\`\`\`
+
+${context}
+${onTheWork}
+Destinations open this turn: ${openDestinations}.${closedNote}
+The practices each open destination may carry: ${routing}. Write no piece, not even a WITHHOLD, for a practice on a destination that does not list it.
+A pattern claim needs at least ${request.minDistinctItems} distinct pieces of work.
+
+${coverageNote}Persist the feedback with report_feedback — every piece you have in one call. Writing nothing on a destination is a correct and common outcome; say in one line why, and stop.`;
+}
+
+// Private composition requires a complete server routing read; missing routing closes the destination.
+export function closeUnroutedPrivateDestinations(
+	request: CompositionRequest,
+	admission: Admission,
+	feedback: ComposedFeedback,
+): ReadonlyMap<string, readonly PrivateDestination[]> {
+	const notMet = notMetPractices(admission.results);
+	for (const destination of PRIVATE_DESTINATIONS) {
+		if (request.destinations[destination] === undefined || notMet.length === 0) {
+			continue;
+		}
+		const read =
+			destination === "PRACTICE_PAGE"
+				? admission.practicePageSupport
+				: admission.conversationEligibility;
+		if (read?.state !== "COMPLETE") {
+			if (destination === "PRACTICE_PAGE") {
+				delete request.destinations.PRACTICE_PAGE;
+			} else {
+				delete request.destinations.CONVERSATION;
+			}
+			console.error(
+				`[pi-runner] ${destination} closed for this run: ${destination === "PRACTICE_PAGE" ? "support context" : "routing"} ${read === null ? "missing or malformed" : read.state}`,
+			);
+			if (read?.state !== "REFUSED") {
+				recordCompositionFailure(feedback, "PRIVATE_FEEDBACK", "RUNTIME_ERROR");
+			}
+		} else if (!notMet.some((slug) => routedTo(admission, destination, slug))) {
+			if (destination === "PRACTICE_PAGE") {
+				delete request.destinations.PRACTICE_PAGE;
+			} else {
+				delete request.destinations.CONVERSATION;
+			}
+			console.error(`[pi-runner] ${destination} closed for this run: no practice is routed to it`);
+		}
+	}
+	return new Map(
+		notMet.map((slug) => [
+			slug,
+			PRIVATE_DESTINATIONS.filter(
+				(destination) =>
+					request.destinations[destination] !== undefined && routedTo(admission, destination, slug),
+			),
+		]),
+	);
+}
+
+export function privatelyComposable(
+	admission: Admission,
+	routedDestinations: ReadonlyMap<string, readonly PrivateDestination[]> | null,
+): string[] {
+	const notMet = notMetPractices(admission.results);
+	const routed = routedDestinations;
+	return routed === null ? notMet : notMet.filter((slug) => (routed.get(slug) ?? []).length > 0);
+}
+
+export function undecidedPrivatePractices(
+	admission: Admission,
+	composedFeedback: ComposedFeedback,
+	routes: ReadonlyMap<string, readonly PrivateDestination[]> | null,
+): string[] {
+	const practiceOf = new Map(
+		admission.results.map((result) => [result.resultId, result.practiceSlug]),
+	);
+	const decided = new Set(
+		composedFeedback.feedback.flatMap((piece) => [
+			piece.practiceSlug,
+			...piece.basedOn.flatMap((ref) => practiceOf.get(ref.resultId) ?? []),
+		]),
+	);
+	return privatelyComposable(admission, routes).filter((slug) => !decided.has(slug));
+}
+
+export function recordCompositionFailure(
+	composedFeedback: ComposedFeedback,
+	phase: CompositionPhase,
+	reason: CompositionFailureReason,
+): void {
+	if (!composedFeedback.compositionFailures.some((failure) => failure.phase === phase)) {
+		composedFeedback.compositionFailures.push({ phase, reason });
+	}
+}
+
+export function finishCompositionText(
+	notMet: readonly string[],
+	request: CompositionRequest,
+	composedFeedback: ComposedFeedback,
+): string {
+	const room = PRIVATE_DESTINATIONS.filter(
+		(destination) => request.destinations[destination] !== undefined,
+	)
+		.map((destination) => {
+			const maxPieces = request.destinations[destination]?.maxPieces ?? 0;
+			const used = composedFeedback.feedback.filter(
+				(piece) => piece.destination === destination && piece.action !== "WITHHOLD",
+			).length;
+			return `${destination} ${Math.max(0, maxPieces - used)} of ${maxPieces}`;
+		})
+		.join(", ");
+	return (
+		`## Undecided\nThe turn ended with no piece and no WITHHOLD for these practices, each with a ` +
+		`NOT_MET result: ${notMet.join(", ")}. For each, persist the piece you decided on, or a ` +
+		`WITHHOLD with its reason (NO_MATERIAL_CHANGE, ALREADY_SAID, BELOW_BAR), in one report_feedback ` +
+		`call. Room left for new items: ${room}; a destination with none left takes only a WITHHOLD. The ` +
+		`admitted results and their problems are in \`work/composition/results.json\`. Use tools only from this ` +
+		`point onward; no prose.`
+	);
+}
+
+export interface CompositionTrace {
+	modelError: boolean;
+	runtimeError: boolean;
+	stoppedBy: "budget" | "safety" | "stall" | "loop" | null;
+}
+interface CompositionDeadline {
+	expired: () => boolean;
+	elapsed: Promise<undefined>;
+}
+type SessionOptions = NonNullable<Parameters<typeof createAgentSession>[0]>;
+interface CompositionSession {
+	session: AgentSession;
+	phase: SessionPhase;
+	unsubscribe: () => void;
+}
+interface CompositionRuntime<TTrace extends CompositionTrace> extends Pick<
+	FeedbackToolRuntime,
+	"paid" | "documentedShape" | "listSchema" | "submittedList" | "refusal" | "onStored" | "persist"
+> {
+	openSession: (
+		phase: SessionPhase,
+		tools: string[],
+		customTools: SessionOptions["customTools"],
+		resourceLoader?: SessionOptions["resourceLoader"],
+	) => Promise<CompositionSession>;
+	closeSession: (opened: CompositionSession) => Promise<void>;
+	openTurnTrace: (
+		phase: SessionPhase,
+		label: string,
+		budget: Work,
+		demand: { owed: () => number; nudge: string; endsWhenPaid?: true },
+	) => TTrace;
+	closeTurnTrace: (trace: TTrace) => void;
+	settleSession: (session: AgentSession, label: string) => Promise<boolean>;
+	opening: () => string;
+	hasOpening: () => boolean;
+	openedContext: () => void;
+	readPublicFeedbackHistory: () => Promise<{ readAt: string; history: { feedback: unknown[] } }>;
+	recordHistory: (history: {
+		readAt: string;
+		workCapturedAt: string | null;
+		entries: {
+			id: unknown;
+			deliveredAt: unknown;
+			eligibleForAlreadySaid: boolean;
+			eligibleForPriorAdvice: boolean;
+		}[];
+		omissions: { oversizedEntries: number; budgetEntries: number };
+	}) => void;
+	compositionNudge: string;
+	reviewNudge: string;
+}
+interface CompositionOptions {
+	admission: Admission;
+	feedback: ComposedFeedback;
+	routes: ReadonlyMap<string, readonly PrivateDestination[]> | null;
+	files: CompositionFiles;
+	cwd: string;
+	agentDir: string;
+	paths: ReturnType<typeof taskPaths>;
+	folderIndex: unknown;
+	task: { repositoryFullName: unknown; pullRequestNumber: unknown };
+	practiceIndex: z.infer<typeof practiceIndexSchema>;
+	settingsManager: SettingsManager;
+	stylePath: string;
+	reviewPromptPath: string;
+	privatePromptPath: string;
+	practiceTools: string[];
+	thisWork: string | undefined;
+	budget: (practices: number) => Work;
+}
+
+// Supersession is limited to unread thread keys present in this snapshot.
+function stagedPreparedTargets(PREPARED_FEEDBACK_PATH: string): PreparedFeedbackTarget[] {
+	try {
+		if (!existsSync(PREPARED_FEEDBACK_PATH)) {
+			return [];
+		}
+		const prepared: unknown = JSON.parse(readFileSync(PREPARED_FEEDBACK_PATH, "utf8"));
+		const entries = isRecord(prepared) ? jsonArray(prepared.prepared) : [];
+		return entries.flatMap((entry) => {
+			if (!isRecord(entry)) {
+				return [];
+			}
+			const { threadKey, destination, practiceSlug } = entry;
+			return typeof threadKey === "string" &&
+				threadKey.trim() &&
+				isDestination(destination) &&
+				typeof practiceSlug === "string" &&
+				practiceSlug.trim()
+				? [{ threadKey, destination, practiceSlug }]
+				: [];
+		});
+	} catch (error) {
+		console.error(`[pi-runner] prepared feedback unreadable for composition: ${errorText(error)}`);
+		return [];
+	}
+}
+
+// Prepared or unreadable feedback cannot establish prior communication. Only current delivered words count.
+function stagedDeliveredPractices(PREPARED_FEEDBACK_PATH: string): Set<string> {
+	const file = `${nodePath.dirname(PREPARED_FEEDBACK_PATH)}/feedback.json`;
+	try {
+		if (!existsSync(file)) {
+			return new Set();
+		}
+		const history: unknown = JSON.parse(readFileSync(file, "utf8"));
+		if (
+			!isRecord(history) ||
+			history.recordRole !== "RECORDED_DELIVERY" ||
+			!Array.isArray(history.feedback)
+		) {
+			return new Set();
+		}
+		return new Set(
+			history.feedback.flatMap((entry: unknown) => {
+				if (!isRecord(entry)) {
+					return [];
+				}
+				const { destination, recordedClaimCurrentness, withdrawn, body, deliveredAt } = entry;
+				if (
+					(destination !== "PRACTICE_PAGE" && destination !== "CONVERSATION") ||
+					recordedClaimCurrentness !== "CURRENT" ||
+					(withdrawn !== undefined && withdrawn !== false) ||
+					typeof body !== "string" ||
+					body.trim() === "" ||
+					typeof deliveredAt !== "string" ||
+					!Number.isFinite(Date.parse(deliveredAt))
+				) {
+					return [];
+				}
+				return jsonArray(entry.basedOn).flatMap((support) =>
+					isRecord(support) && support.outcome === "NOT_MET"
+						? [`${destination}:${trimmedText(support.practiceSlug)}`]
+						: [],
+				);
+			}),
+		);
+	} catch (error) {
+		console.error(`[pi-runner] delivered feedback unreadable for composition: ${errorText(error)}`);
+		return new Set();
+	}
+}
+
+function reviewableById(
+	reviewable: readonly Record<string, unknown>[],
+): Map<string, ReviewedResult> {
+	return new Map(
+		reviewable.map((result) => [
+			String(result.resultId),
+			{
+				practiceSlug: String(result.practiceSlug),
+				summaryOnly: result.summaryOnly === true,
+				outcome: result.outcome,
+				problems: jsonArray(result.problems)
+					.filter(isRecord)
+					.map((problem) => ({
+						problemId: String(problem.problemId),
+						citations: jsonArray(problem.citations).filter(isRecord),
+					})),
+			},
+		]),
+	);
+}
+
+function undecidedByReview(
+	composedFeedback: ComposedFeedback,
+	reviewable: readonly Record<string, unknown>[],
+): string[] {
+	const decided = decidedByReview(composedFeedback.review);
+	return reviewable
+		.filter((result) => result.outcome === "NOT_MET")
+		.map((result) => String(result.resultId))
+		.filter((id) => !decided.has(id));
+}
+
+function practiceContext(
+	practiceIndex: CompositionOptions["practiceIndex"],
+	results: readonly Record<string, unknown>[],
+): ReviewPractice[] {
+	const slugs = new Set(results.map((result) => String(result.practiceSlug)));
+	return practiceIndex
+		.filter((practice) => slugs.has(practice.slug))
+		.map((practice) => ({
+			slug: practice.slug,
+			name: practice.name,
+			...(practice.whyItMatters === undefined ? {} : { whyItMatters: practice.whyItMatters }),
+			knownLimitations: practice.knownLimitations,
+			...(practice.versionId === undefined ? {} : { versionId: practice.versionId }),
+		}));
+}
+
+// The composer references admitted results and problems; it cannot author verdicts, citations, or locations.
+function finishReviewText(undecided: readonly string[]): string {
+	const owed =
+		undecided.length > 0
+			? `## Undecided\nThe review leaves these NOT_MET results undecided: ${undecided.join(", ")}.`
+			: "## Unfinished\nThe review on this work is not final yet.";
+	return `${owed}\nStore the final review with one report_review call. A review that says nothing is still one final report_review call. No prose outside the calls.`;
+}
+
+export function incompleteCompositionReason(
+	trace: CompositionTrace,
+	safetyExpired: boolean,
+): CompositionFailureReason {
+	const stops = { budget: "BUDGET", stall: "STALL", safety: "SAFETY", loop: "LOOP" } as const;
+	if (trace.stoppedBy !== null) {
+		return stops[trace.stoppedBy];
+	}
+	if (safetyExpired) {
+		return "SAFETY";
+	}
+	if (trace.modelError) {
+		return "MODEL_ERROR";
+	}
+	if (trace.runtimeError) {
+		return "RUNTIME_ERROR";
+	}
+	return "NO_DECISION";
+}
+
+export function createCompositionStage<TTrace extends CompositionTrace>(
+	options: CompositionOptions & { runtime: CompositionRuntime<TTrace> },
+) {
+	const {
+		admission,
+		feedback: composedFeedback,
+		routes: routedDestinations,
+		files,
+		cwd: CWD,
+		agentDir: AGENT_DIR,
+		paths,
+		folderIndex,
+		task,
+		practiceIndex,
+		settingsManager,
+		stylePath: FEEDBACK_STYLE_PATH,
+		reviewPromptPath: REVIEW_COMPOSER_PROMPT_PATH,
+		privatePromptPath: COMPOSER_PROMPT_PATH,
+		practiceTools: PRACTICE_TOOLS,
+		thisWork: THIS_WORK,
+		budget: compositionBudget,
+		runtime,
+	} = options;
+	const PREPARED_FEEDBACK_PATH = files.preparedPath;
+	const {
+		openSession,
+		closeSession,
+		openTurnTrace,
+		closeTurnTrace,
+		settleSession,
+		opening,
+		hasOpening,
+		openedContext,
+		readPublicFeedbackHistory,
+		recordHistory,
+		onStored,
+		paid,
+		documentedShape,
+		listSchema,
+		submittedList,
+		refusal,
+		persist: persistFeedback,
+		compositionNudge: COMPOSITION_NUDGE,
+		reviewNudge: REVIEW_NUDGE,
+	} = runtime;
+
+	async function askComposerOnceMore(
+		session: AgentSession,
+		phase: SessionPhase,
+		notMet: readonly string[],
+		undecided: () => readonly string[],
+		request: CompositionRequest,
+		buildText: () => string,
+		safety: CompositionDeadline,
+	): Promise<TTrace> {
+		console.error(
+			`[pi-runner] composition left ${notMet.length} NOT_MET practice(s) undecided — asking once more`,
+		);
+		const trace = openTurnTrace(phase, "composition once more", compositionBudget(notMet.length), {
+			owed: () => undecided().length,
+			nudge: COMPOSITION_NUDGE,
+			endsWhenPaid: true,
+		});
+		try {
+			if (!(await settleSession(session, "composition"))) {
+				throw new Error("the session was still busy when the composition was asked once more");
+			}
+			if (!safety.expired()) {
+				await Promise.race([
+					(async () => {
+						const prepared = await prepareTurnText(
+							session,
+							() => `${buildText()}
+
+${finishCompositionText(notMet, request, composedFeedback)}`,
+						);
+						if (safety.expired()) {
+							return;
+						}
+						if (prepared === null) {
+							throw new Error("essential composition input exceeds the context window");
+						}
+						await session.prompt(prepared, {
+							preflightResult: (disposition) => {
+								if (disposition === "started") {
+									openedContext();
+								}
+							},
+						});
+					})(),
+					safety.elapsed,
+				]);
+			}
+		} catch (error) {
+			trace.runtimeError = trace.stoppedBy === null && !safety.expired();
+			console.error(`[pi-runner] composition failed: ${errorText(error)}`);
+		} finally {
+			if (trace.stoppedBy !== null) {
+				await settleSession(session, "composition");
+			}
+			closeTurnTrace(trace);
+		}
+		return trace;
+	}
+
+	// Public composition receives admitted public results in a fresh session without private history.
+	async function composeReview(
+		request: CompositionRequest,
+		reviewable: readonly Record<string, unknown>[],
+		notReachedSlugs: readonly string[],
+		safety: CompositionDeadline,
+	): Promise<void> {
+		const lineNotes = request.onWorkCopyForms.includes("LINE_NOTE");
+		const reviewLoader = new DefaultResourceLoader({
+			cwd: CWD,
+			agentDir: AGENT_DIR,
+			settingsManager,
+			...PUBLIC_REVIEW_RESOURCE_LOADER_OPTIONS,
+			systemPrompt: `${readFileSync(FEEDBACK_STYLE_PATH, "utf8")}\n\n${readFileSync(REVIEW_COMPOSER_PROMPT_PATH, "utf8")}`,
+			agentsFilesOverride: () => ({ agentsFiles: [] }),
+			extensionFactories: [],
+		});
+		await reviewLoader.reload();
+		// Read now, not at capture: feedback delivered while this review ran was said here too. A failed read writes no
+		// review rather than one that could repeat what was just delivered.
+		let read: Awaited<ReturnType<typeof readPublicFeedbackHistory>>;
+		try {
+			read = await readPublicFeedbackHistory();
+		} catch (error) {
+			console.error(`[pi-runner] The review on the work was not composed: ${errorText(error)}`);
+			recordCompositionFailure(
+				composedFeedback,
+				"PUBLIC_REVIEW",
+				safety.expired() ? "SAFETY" : "RUNTIME_ERROR",
+			);
+			return;
+		}
+		const framing = task;
+		const captured = buildPublicReviewHistory(CWD, paths.contextRoot, folderIndex, framing);
+		const alreadySaid = priorPublicFeedback(
+			read.history,
+			THIS_WORK,
+			captured.capturedAt,
+			undefined,
+			read.readAt,
+		);
+		recordHistory({
+			readAt: read.readAt,
+			workCapturedAt: captured.capturedAt,
+			entries: alreadySaid.feedback.map(
+				({ id, deliveredAt, eligibleForAlreadySaid, eligibleForPriorAdvice }) => ({
+					id,
+					deliveredAt,
+					eligibleForAlreadySaid,
+					eligibleForPriorAdvice,
+				}),
+			),
+			omissions: alreadySaid.omissions,
+		});
+		const restable = reviewableById(reviewable);
+		const state: PublicReviewState = { final: false, reviewContext: "LOST" };
+		const practices = practiceContext(practiceIndex, reviewable);
+		const restore = () => {
+			state.reviewContext = "RESTORING";
+			return text;
+		};
+		const phase: SessionPhase = "public-review";
+		const opened = await openSession(
+			phase,
+			[...PUBLIC_REVIEW_TOOLS],
+			[
+				buildReviewTool(
+					lineNotes,
+					restable,
+					priorAdviceWitnesses(alreadySaid.feedback, captured.statements),
+					state,
+					restore,
+					{
+						admitted: () => true,
+						feedback: composedFeedback,
+						persist: persistFeedback,
+						refusal,
+						onStored,
+					},
+				),
+			],
+			reviewLoader,
+		);
+		const reviewSession = opened.session;
+		// Pi requires every tool to terminate a mixed batch, then AgentSession drains queued nudges.
+		// Preserve its boundary; a persisted final review also ends this isolated session's internal queue.
+		const { finishTurn } = reviewSession.agent;
+		reviewSession.agent.finishTurn = async (turn, signal) => {
+			const decision = await finishTurn?.(turn, signal);
+			if (state.final) {
+				reviewSession.clearQueue();
+				return { action: "end" };
+			}
+			return decision ?? undefined;
+		};
+		const unsubscribeContext = reviewSession.subscribe((event) => {
+			if (event.type === "compaction_end" && !event.aborted && !hasText(event.errorMessage)) {
+				state.reviewContext = "LOST";
+			} else if (event.type === "turn_start" && state.reviewContext === "RESTORING") {
+				state.reviewContext = "HELD";
+			}
+		});
+		// Admission's own rows: the projection the review rests on drops the digests a source is checked against.
+		const repository = nodePath.resolve(CWD, paths.repositoryRoot);
+		const primarySource = buildPrimarySourceReference(
+			CWD,
+			paths.contextRoot,
+			paths.repositoryRoot,
+			folderIndex,
+			admission.results,
+			{
+				blob: (commit, file, limit) => readPinnedBlob(repository, commit, file, limit),
+				diff: (base, head, limit) => pinnedDiff(repository, base, head, limit),
+				checkedOut: () => checkedOutCommit(repository),
+			},
+		);
+		const text = buildReviewTurn({
+			sameWork: [buildSameWorkContext(CWD, paths.contextRoot, folderIndex, framing), primarySource]
+				.filter((part) => part !== "")
+				.join("\n\n"),
+			results: reviewable,
+			qualifications: publicQualifications(admission.results),
+			alreadySaid: alreadySaid.feedback,
+			ownHistoryOmissions: alreadySaid.omissions,
+			ownHistoryReadAt: read.readAt,
+			captured,
+			practices,
+			notReached: notReachedSlugs,
+			lineNotes,
+			stagedCriteria: (slug) => {
+				const file = files.criteriaPathOf(slug);
+				return existsSync(file) ? readFileSync(file, "utf8") : null;
+			},
+		});
+		const owed = () =>
+			state.final ? 0 : Math.max(1, undecidedByReview(composedFeedback, reviewable).length);
+		const budget = compositionBudget(owed());
+		let started = false;
+		const wasStarted = () => started;
+		const trace = openTurnTrace(phase, "review composition", budget, {
+			owed,
+			nudge: REVIEW_NUDGE,
+		});
+		let finalTrace = trace;
+		try {
+			try {
+				if (safety.expired()) {
+					trace.stoppedBy = "safety";
+					throw new Error("the run reached its safety ceiling before the review was due");
+				}
+				await Promise.race([
+					(async () => {
+						const prepared = await prepareTurnText(reviewSession, () => text);
+						if (safety.expired()) {
+							return;
+						}
+						if (prepared === null) {
+							throw new Error("essential review input exceeds the context window");
+						}
+						await reviewSession.prompt(prepared, {
+							preflightResult: (disposition) => {
+								if (disposition === "started") {
+									started = true;
+									state.reviewContext = "HELD";
+								}
+							},
+						});
+					})(),
+					safety.elapsed,
+				]);
+			} catch (error) {
+				trace.runtimeError = trace.stoppedBy === null && !safety.expired();
+				console.error(`[pi-runner] review composition failed: ${errorText(error)}`);
+			} finally {
+				if (trace.stoppedBy !== null) {
+					await settleSession(reviewSession, "review composition");
+				}
+				closeTurnTrace(trace);
+			}
+			const left = undecidedByReview(composedFeedback, reviewable);
+			if (
+				wasStarted() &&
+				!trace.modelError &&
+				!trace.runtimeError &&
+				(trace.stoppedBy === null || trace.stoppedBy === "loop") &&
+				!state.final &&
+				(await settleSession(reviewSession, "review composition")) &&
+				!safety.expired()
+			) {
+				console.error(
+					left.length > 0
+						? `[pi-runner] the review left ${left.length} NOT_MET result(s) undecided — asking once more`
+						: "[pi-runner] the review is not final — asking once more",
+				);
+				const retry = openTurnTrace(phase, "review composition once more", budget, {
+					owed,
+					nudge: REVIEW_NUDGE,
+					endsWhenPaid: true,
+				});
+				finalTrace = retry;
+				try {
+					await Promise.race([
+						(async () => {
+							const prepared = await prepareTurnText(
+								reviewSession,
+								() =>
+									`${state.reviewContext === "HELD" ? "" : `${text}\n\n`}${finishReviewText(left)}`,
+							);
+							if (safety.expired()) {
+								return;
+							}
+							if (prepared === null) {
+								throw new Error("essential review input exceeds the context window");
+							}
+							await reviewSession.prompt(prepared, {
+								preflightResult: (disposition) => {
+									if (disposition === "started") {
+										state.reviewContext = "HELD";
+									}
+								},
+							});
+						})(),
+						safety.elapsed,
+					]);
+				} catch (error) {
+					retry.runtimeError = retry.stoppedBy === null && !safety.expired();
+					console.error(`[pi-runner] review composition failed: ${errorText(error)}`);
+				} finally {
+					if (retry.stoppedBy !== null) {
+						await settleSession(reviewSession, "review composition");
+					}
+					closeTurnTrace(retry);
+				}
+			}
+		} finally {
+			try {
+				await closeSession(opened);
+				if (!state.final) {
+					recordCompositionFailure(
+						composedFeedback,
+						"PUBLIC_REVIEW",
+						incompleteCompositionReason(finalTrace, safety.expired()),
+					);
+				}
+				persistFeedback();
+			} finally {
+				unsubscribeContext();
+			}
+		}
+	}
+
+	// Private composition starts after measurement in a fresh session with server-routed support.
+	async function composePrivately(
+		request: CompositionRequest,
+		safety: CompositionDeadline,
+		notReachedSlugs: readonly string[],
+	): Promise<void> {
+		if (
+			!PRIVATE_DESTINATIONS.some((destination) => request.destinations[destination] !== undefined)
+		) {
+			return;
+		}
+		const feedbackTool = buildFeedbackTool(
+			practiceIndex.map((practice) => practice.slug).toSorted(),
+			request,
+			admission.results,
+			stagedPreparedTargets(PREPARED_FEEDBACK_PATH),
+			stagedDeliveredPractices(PREPARED_FEEDBACK_PATH),
+			{
+				feedback: composedFeedback,
+				admitted: () => true,
+				routes: (slug) => routedDestinations?.get(slug),
+				destinationRefusal: (destination, slug) => destinationRefusal(admission, destination, slug),
+				negativeItems: (slug) => negativePiecesOfWork(admission, slug),
+				documentedShape,
+				listSchema,
+				submittedList,
+				refusal,
+				persist: persistFeedback,
+				paid,
+				onStored,
+			},
+		);
+		const privateLoader = new DefaultResourceLoader({
+			cwd: CWD,
+			agentDir: AGENT_DIR,
+			settingsManager,
+			...SANDBOX_RESOURCE_LOADER_OPTIONS,
+			systemPrompt: `${readFileSync(FEEDBACK_STYLE_PATH, "utf8")}\n\n${readFileSync(COMPOSER_PROMPT_PATH, "utf8")}`,
+			agentsFilesOverride: () => ({ agentsFiles: [] }),
+			extensionFactories: [createCodemodeExtension({ mode: "on", models: false })],
+		});
+		await privateLoader.reload();
+		{
+			const opened = await openSession(
+				"private-feedback",
+				[...PRACTICE_TOOLS, "report_feedback"],
+				[feedbackTool],
+				privateLoader,
+			);
+			const { session } = opened;
+			let finalTrace: TTrace;
+			try {
+				finalTrace = await composeInto(session, opened.phase);
+			} finally {
+				await closeSession(opened);
+			}
+			if (undecidedPrivatePractices(admission, composedFeedback, routedDestinations).length > 0) {
+				recordCompositionFailure(
+					composedFeedback,
+					"PRIVATE_FEEDBACK",
+					incompleteCompositionReason(finalTrace, safety.expired()),
+				);
+			}
+		}
+
+		async function composeInto(session: AgentSession, phase: SessionPhase): Promise<TTrace> {
+			const undecided = () =>
+				undecidedPrivatePractices(admission, composedFeedback, routedDestinations);
+			let started = false;
+			const wasStarted = () => started;
+			const trace = openTurnTrace(
+				phase,
+				"composition",
+				compositionBudget(privatelyComposable(admission, routedDestinations).length),
+				{
+					owed: () => undecided().length,
+					nudge: COMPOSITION_NUDGE,
+				},
+			);
+			let finalTrace = trace;
+			try {
+				if (safety.expired()) {
+					trace.stoppedBy = "safety";
+					throw new Error("the run reached its safety ceiling before composition was due");
+				}
+				const compositionTurn = buildCompositionTurn(
+					request,
+					admission,
+					composedFeedback,
+					routedDestinations,
+					files,
+					notReachedSlugs,
+				);
+				await Promise.race([
+					(async () => {
+						const compositionText = await prepareTurnText(
+							session,
+							() => `${opening()}${compositionTurn}`,
+						);
+						if (safety.expired()) {
+							return;
+						}
+						if (compositionText === null) {
+							throw new Error("essential composition input exceeds the context window");
+						}
+						await session.prompt(compositionText, {
+							preflightResult: (disposition) => {
+								if (disposition === "started") {
+									openedContext();
+									started = true;
+								}
+							},
+						});
+					})(),
+					safety.elapsed,
+				]);
+			} catch (error) {
+				trace.runtimeError = trace.stoppedBy === null && !safety.expired();
+				console.error(`[pi-runner] composition failed: ${errorText(error)}`);
+			} finally {
+				if (trace.stoppedBy !== null) {
+					await settleSession(session, "composition");
+				}
+				closeTurnTrace(trace);
+			}
+			// A composer that ended on its own, or was cut off by a loop guard, is asked once more for the
+			// NOT_MET practices it left undecided; otherwise they have no composed next step.
+			const left = undecided();
+			if (
+				wasStarted() &&
+				!trace.modelError &&
+				!trace.runtimeError &&
+				(trace.stoppedBy === null || trace.stoppedBy === "loop") &&
+				left.length > 0 &&
+				!safety.expired()
+			) {
+				finalTrace = await askComposerOnceMore(
+					session,
+					phase,
+					left,
+					undecided,
+					request,
+					() =>
+						hasOpening()
+							? ""
+							: `${opening()}${buildCompositionTurn(request, admission, composedFeedback, routedDestinations, files, notReachedSlugs)}`,
+					safety,
+				);
+			}
+			return finalTrace;
+		}
+	}
+	return { composeReview, composePrivately };
+}
+
+function isDestination(value: unknown): value is Destination {
+	return DESTINATIONS.some((destination) => destination === value);
+}
+
+export async function composeAdmittedFeedback(options: {
+	request: CompositionRequest;
+	admission: Admission;
+	feedback: ComposedFeedback;
+	routes: ReadonlyMap<string, readonly PrivateDestination[]> | null;
+	stage: ReturnType<typeof createCompositionStage>;
+	notReached: readonly string[];
+	remainingMs: number;
+	onDeadline: () => void;
+	prepare: (safety: ReturnType<typeof scheduleDeadline>) => Promise<void>;
+	persist: () => void;
+	after: () => void;
+}): Promise<void> {
+	const {
+		request,
+		admission,
+		feedback,
+		routes,
+		stage,
+		notReached,
+		remainingMs,
+		onDeadline,
+		prepare,
+		persist,
+		after,
+	} = options;
+	if (admission.results.length === 0) {
+		return;
+	}
+	const markRemaining = (reason: CompositionFailureReason) => {
+		if (
+			!admission.publicReviewed &&
+			request.destinations.ON_WORK !== undefined &&
+			publicResults(admission.results).length > 0 &&
+			feedback.review === null
+		) {
+			recordCompositionFailure(feedback, "PUBLIC_REVIEW", reason);
+		}
+		if (
+			PRIVATE_DESTINATIONS.some((destination) => request.destinations[destination] !== undefined) &&
+			undecidedPrivatePractices(admission, feedback, routes).length > 0
+		) {
+			recordCompositionFailure(feedback, "PRIVATE_FEEDBACK", reason);
+		}
+	};
+	if (remainingMs <= 0) {
+		markRemaining("SAFETY");
+		console.error(
+			"[pi-runner] The run reached its safety ceiling before composition — preserving admitted results",
+		);
+		return;
+	}
+	const safety = scheduleDeadline(remainingMs, onDeadline);
+	try {
+		const reviewable = publicResults(admission.results);
+		if (
+			!admission.publicReviewed &&
+			request.destinations.ON_WORK !== undefined &&
+			reviewable.length > 0
+		) {
+			await stage.composeReview(request, reviewable, notReached, safety);
+		}
+		if (privatelyComposable(admission, routes).length > 0 && !safety.expired()) {
+			await stage.composePrivately(request, safety, notReached);
+		}
+		await prepare(safety);
+	} catch (error) {
+		markRemaining(safety.expired() ? "SAFETY" : "RUNTIME_ERROR");
+		throw error;
+	} finally {
+		if (safety.expired()) {
+			markRemaining("SAFETY");
+		}
+		clearTimeout(safety.timer);
+		persist();
+		after();
+	}
 }

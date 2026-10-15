@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.core.auth.spi.PeopleRegistry;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceNamespace;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -50,6 +51,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Suspension and resumption use the status helpers, not installation lifecycle SPI events.
  */
 @Component
+@ConditionalOnServerRole
 public class GitHubLifecycleListener implements IntegrationLifecycleListener {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubLifecycleListener.class);
@@ -66,11 +68,6 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
     private final MembershipService workspaceMembershipService;
     private final PeopleRegistry people;
 
-    /**
-     * Absent when {@code hephaestus.runtime.server.enabled=false} (e.g., the webhook-server pod)
-     * because {@link IntegrationNatsConsumer} is gated by {@code SERVER_PROPERTY}. The webhook
-     * profile never invokes the methods that consume this; it boots dead-code but doesn't crash.
-     */
     private final ObjectProvider<IntegrationNatsConsumer> natsConsumerService;
 
     private final GitHubAppTokenService gitHubAppTokenService;

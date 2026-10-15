@@ -32,6 +32,7 @@ import io.micrometer.tracing.Tracer;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -51,6 +52,7 @@ class ReviewJobExecutorTest extends BaseUnitTest {
     private final SandboxManager sandbox = mock(SandboxManager.class);
     private final LlmBudgetService budgets = mock(LlmBudgetService.class);
     private Optional<WorkerCapacityState> capacity = Optional.empty();
+    private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
 
     private ReviewJobExecutor executor(AsyncTaskExecutor pool) {
         var transactions = mock(TransactionTemplate.class);
@@ -58,7 +60,6 @@ class ReviewJobExecutorTest extends BaseUnitTest {
             TransactionCallback<?> callback = invocation.getArgument(0);
             return callback.doInTransaction(mock(TransactionStatus.class));
         });
-        var meters = new SimpleMeterRegistry();
         var telemetry = new ReviewJobTelemetry(meters, Tracer.NOOP);
         return new ReviewJobExecutor(
                 new AgentProperties(
@@ -129,6 +130,11 @@ class ReviewJobExecutorTest extends BaseUnitTest {
                 .isEqualTo(ReviewJobExecutor.StartOutcome.SKIPPED);
         assertThat(job.getStatus()).isEqualTo(ReviewJobStatus.CANCELLED);
         assertThat(job.getCancellationReason()).isEqualTo(ReviewJobCancellationReason.PERSON_DATA_ERASED);
+        var refused = Objects.requireNonNull(meters.find("practice.review.refused")
+                .tag("phase", "execution")
+                .tag("reason", "person_data_erased")
+                .counter());
+        assertThat(refused.count()).isEqualTo(1);
         verifyNoInteractions(handler, sandbox);
     }
 

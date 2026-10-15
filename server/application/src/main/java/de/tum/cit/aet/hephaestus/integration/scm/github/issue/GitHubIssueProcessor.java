@@ -424,9 +424,9 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
                         issueDto.number())
                 .ifPresent(issue -> {
                     Long syntheticId = issue.getId();
-                    issueRepository.delete(issue);
                     eventPublisher.publishEvent(
                             new ScmDomainEvent.IssueDeleted(syntheticId, EventContext.from(context)));
+                    issueRepository.delete(issue);
                     log.info("Deleted issue: issueId={}, number={}", syntheticId, issueDto.number());
                 });
     }

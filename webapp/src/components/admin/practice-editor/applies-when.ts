@@ -59,7 +59,7 @@ export function parseAppliesWhen(
 		} else {
 			const source = clause.hasItems;
 			if (source === undefined || !hasText(source.trim())) {
-				return { value: null, clausesError: "Enter a value for each condition." };
+				return { value: null, clausesError: "Choose a source." };
 			}
 			anyOf.push({ hasItems: source });
 		}

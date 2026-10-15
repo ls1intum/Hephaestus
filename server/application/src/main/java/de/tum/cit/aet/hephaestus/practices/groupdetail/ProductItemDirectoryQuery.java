@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.practices.groupdetail;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemRefDTO;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.practices.review.ProductItemRepository;
 import de.tum.cit.aet.hephaestus.practices.review.ProductReferenceQuery;
-import de.tum.cit.aet.hephaestus.practices.review.dto.ItemRefDTO;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;

@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentityResolver;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
 import de.tum.cit.aet.hephaestus.integration.core.item.Item;
 import de.tum.cit.aet.hephaestus.integration.core.item.ItemRepository;
+import de.tum.cit.aet.hephaestus.integration.core.spi.CandidateRefusal;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.practices.adapter.PracticesPersonDataCatalog;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
@@ -26,7 +27,6 @@ import de.tum.cit.aet.hephaestus.practices.review.model.ReviewItem;
 import de.tum.cit.aet.hephaestus.practices.review.report.ScanMembershipQueries;
 import de.tum.cit.aet.hephaestus.practices.review.report.ScanReportService;
 import de.tum.cit.aet.hephaestus.practices.scan.dto.ReusedScanReportItemDTO;
-import de.tum.cit.aet.hephaestus.practices.spi.CandidateRefusal;
 import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustody;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustodyQuery;
@@ -471,7 +471,7 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
                 .param("job", job)
                 .update();
         var capturedStore = personData.contributors().stream()
-                .filter(c -> c.store().equals("review_item_result_reference"))
+                .filter(c -> c.store().equals("review_item"))
                 .findFirst()
                 .orElseThrow();
         var capturedRows = capturedStore

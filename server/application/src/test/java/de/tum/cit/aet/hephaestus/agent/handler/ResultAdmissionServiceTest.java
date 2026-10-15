@@ -157,8 +157,7 @@ class ResultAdmissionServiceTest extends BaseUnitTest {
         service.admit(identity(), request);
         assertThat(writes.get()).isEqualTo(1);
         job.setAdmissionDigest("another-payload");
-        assertThatThrownBy(() -> service.admit(identity(), request))
-                .isInstanceOf(ResultAdmissionService.AdmissionConflictException.class);
+        assertThatThrownBy(() -> service.admit(identity(), request)).isInstanceOf(AdmissionConflictException.class);
     }
 
     @Test

@@ -23,7 +23,6 @@ import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.MemberAiRoutingAdapter;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
-import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MergeReadinessContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.ResultHistoryContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.ReviewAttemptsContentSource;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorLlmConfig;
@@ -52,16 +51,16 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetBlockReason;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetDecision;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery.AccountSummary;
-import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
-import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
-import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonProcessingSuppression;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import de.tum.cit.aet.hephaestus.mentor.MentorTurnAccount;
@@ -291,9 +290,6 @@ class MentorChatServiceTest extends BaseUnitTest {
     LlmAdmissionService llmAdmissionService;
 
     @Mock
-    MergeReadinessContentSource mergeReadiness;
-
-    @Mock
     ResultHistoryContentSource practiceResultHistory;
 
     @Mock
@@ -438,7 +434,6 @@ class MentorChatServiceTest extends BaseUnitTest {
                 memberAiRouting,
                 personSuppression,
                 (workspaceId, developerId) -> aiDecision,
-                mergeReadiness,
                 practiceResultHistory,
                 reviewAttempts,
                 resultsHistory,
@@ -1280,7 +1275,8 @@ class MentorChatServiceTest extends BaseUnitTest {
         when(workspaceContextBuilder.build(any())).thenReturn(context);
         ObjectNode inspected = mapper.createObjectNode();
         inspected.putArray("pullRequests").addObject().put("number", 6);
-        when(mergeReadiness.inspect(WORKSPACE_ID, USER_ID, 42L)).thenReturn(inspected);
+        when(workspaceContextBuilder.read(WORKSPACE_ID, USER_ID, "inputs/context/merge_readiness/42.json"))
+                .thenReturn(Optional.of(inspected));
         UUID resultId = UUID.fromString("0b7e1c9a-3f5d-4a8e-9c21-6d4f8e2a1b3c");
         ObjectNode practiceResult = mapper.createObjectNode();
         practiceResult.putObject("result").put("resultId", resultId.toString());

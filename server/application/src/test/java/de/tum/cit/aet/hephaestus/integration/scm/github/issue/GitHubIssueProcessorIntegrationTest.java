@@ -4,14 +4,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuetype.IssueType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuetype.IssueTypeRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.IssueEvidenceVersion;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
@@ -23,6 +27,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.GitHubIssueDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.GitHubIssueTypeDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.label.dto.GitHubLabelDTO;
@@ -36,6 +41,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -46,6 +52,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionTemplate;
 
 class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
 
@@ -93,6 +100,15 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private RecordingScmEventListener eventListener;
+
+    @Autowired
+    private ItemIndexService items;
+
+    @Autowired
+    private IssueEvidenceVersion issueVersions;
+
+    @Autowired
+    private TransactionTemplate transactions;
 
     private Repository testRepository;
     private Workspace testWorkspace;
@@ -283,9 +299,37 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                             issue -> assertThat(issue.getDeletedAt()).isNull());
             assertThat(eventListener.ofType(ScmDomainEvent.IssueDeleted.class)).isEmpty();
 
+            var issue = issueRepository
+                    .findByRepositoryIdAndNumber(testRepository.getId(), 42)
+                    .orElseThrow();
+            var holder = items.upsert(new ItemRegistration(
+                    testWorkspace.getId(), ScmItemEvents.REPOSITORY, testRepository.getId(), null, null));
+            var item = items.upsert(new ItemRegistration(
+                    testWorkspace.getId(), ScmItemEvents.ISSUE, issue.getId(), holder.itemId(), null));
+            jdbc.update("""
+                    INSERT INTO issue_comment(native_id,provider_id,issue_id,body,html_url,author_association,created_at)
+                    VALUES (9104,?,?,'Discussion before deletion','https://github.com/comment/9104','MEMBER',now())
+                    """, githubProvider.getId(), issue.getId());
+            var version = Objects.requireNonNull(
+                    transactions.execute(ignored -> issueVersions.of(ScmEventPayload.IssueData.from(issueRepository
+                            .findByIdWithRepository(issue.getId())
+                            .orElseThrow()))));
+
             processor.processDeleted(createBasicIssueDto(9102L, 42), createContext());
             assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 42))
                     .isEmpty();
+            assertThat(jdbc.queryForObject(
+                            "SELECT removed_at IS NOT NULL FROM item WHERE workspace_id=? AND id=?",
+                            Boolean.class,
+                            item.workspaceId(),
+                            item.itemId()))
+                    .isTrue();
+            assertThat(jdbc.queryForList(
+                            "SELECT item_version FROM item_event WHERE workspace_id=? AND item_id=? AND name='scm.issue.deleted'",
+                            String.class,
+                            item.workspaceId(),
+                            item.itemId()))
+                    .containsExactly(version.value());
             assertThat(eventListener.ofType(ScmDomainEvent.IssueDeleted.class)).hasSize(1);
         }
     }

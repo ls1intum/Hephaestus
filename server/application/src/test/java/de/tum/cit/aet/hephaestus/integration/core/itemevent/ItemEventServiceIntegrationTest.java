@@ -18,9 +18,9 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventName;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewRequestReason;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestReason;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
@@ -141,7 +141,8 @@ class ItemEventServiceIntegrationTest extends BaseIntegrationTest {
             assertThat(event.getItemVersion()).isEqualTo(input.itemVersion());
             assertThat(event.getRetryAt()).isEqualTo(event.getDecidedAt().plus(properties.pendingRetryAfter()));
             assertThat(service.find(input.workspaceId(), id))
-                    .contains(new ItemEventView(input.name(), input.itemVersion(), ItemEventState.WAITING));
+                    .contains(new ItemEventView(
+                            input.name(), input.itemVersion(), ItemEventState.WAITING, input.occurredAt()));
         });
     }
 

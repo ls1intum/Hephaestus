@@ -32,8 +32,14 @@ public class AccountJitCreator {
         people.claim(key);
         if (unclaimed) {
             saved.setDisplayName(account.getDisplayName());
-            saved.setPrimaryEmail(account.getPrimaryEmail());
-            saved.setPrimaryEmailVerifiedAt(account.getPrimaryEmailVerifiedAt());
+            String email = account.getPrimaryEmail();
+            if (email != null) {
+                accountRepository.lockContactEmail(email);
+                if (!accountRepository.existsByPrimaryEmailIgnoreCase(email)) {
+                    saved.setPrimaryEmail(email);
+                    saved.setPrimaryEmailVerifiedAt(account.getPrimaryEmailVerifiedAt());
+                }
+            }
         }
         return accountRepository.saveAndFlush(saved);
     }

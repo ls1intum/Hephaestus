@@ -40,7 +40,6 @@ import {
 
 export interface LineageStateCase {
 	key: string;
-	/** What the case shows, as its heading in the matrix. */
 	title: string;
 	lineage: ReviewLineage;
 	review?: ReviewDetail;
@@ -584,7 +583,6 @@ export const LINEAGE_STATE_GROUP_TITLES: Record<LineageStateGroup, string> = {
 	volume: "Many records",
 };
 
-/** One case by key, for the route tests. */
 export function lineageStateCase(key: string): LineageStateCase {
 	for (const cases of Object.values(LINEAGE_STATE_CASES)) {
 		const found = cases.find((entry) => entry.key === key);

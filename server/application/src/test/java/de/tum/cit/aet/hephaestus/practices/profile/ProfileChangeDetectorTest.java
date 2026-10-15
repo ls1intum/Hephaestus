@@ -3,12 +3,12 @@ package de.tum.cit.aet.hephaestus.practices.profile;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemRefDTO;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.ProfileChangeDTO;
 import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeGroupStandingDTO;
 import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingDTO;
 import de.tum.cit.aet.hephaestus.practices.result.trend.WorkResolution.Work;
-import de.tum.cit.aet.hephaestus.practices.review.dto.ItemRefDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeStanding;
 import de.tum.cit.aet.hephaestus.practices.spi.ProfileChangeDirection;
 import de.tum.cit.aet.hephaestus.practices.spi.ProfileChangeType;

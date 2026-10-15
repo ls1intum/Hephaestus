@@ -5,10 +5,12 @@ import de.tum.cit.aet.hephaestus.integration.core.api.ItemEventRecorded;
 import de.tum.cit.aet.hephaestus.integration.core.api.ItemEventService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewRequestReason;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequest;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
@@ -26,6 +28,7 @@ public class ItemEventReviewListener {
     private final ProductItemQuery items;
     private final WorkspaceRepository workspaces;
     private final ReviewService reviews;
+    private final ResultStore results;
 
     @ApplicationModuleListener
     public void on(ItemEventRecorded recorded) {
@@ -35,6 +38,13 @@ public class ItemEventReviewListener {
         var state = event.state();
         if (state.isTerminal()) return;
         var item = items.find(recorded.workspaceId(), recorded.itemId());
+        if (state == ItemEventState.RECORDED && event.name().value().startsWith("scm.")) {
+            results.endCurrent(
+                    recorded.workspaceId(),
+                    recorded.itemId(),
+                    item.isEmpty() ? ResultEndReason.REMOVED : ResultEndReason.WORK_CHANGED,
+                    event.occurredAt());
+        }
         if (item.isEmpty()) {
             decide(recorded, state, ItemEventState.WITHHELD, ReviewRequestReason.ITEM_GONE);
             return;

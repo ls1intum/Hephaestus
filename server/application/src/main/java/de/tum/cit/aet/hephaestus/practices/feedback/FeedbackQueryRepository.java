@@ -165,6 +165,8 @@ public interface FeedbackQueryRepository extends Repository<Feedback, UUID> {
             @Param("summaryKind") String summaryKind,
             @Param("states") List<String> states);
 
+    @WorkspaceAgnostic("Provider-ingest provenance for a repository's issues across its monitoring workspaces;"
+            + " the caller's workspace must monitor the repository")
     @Query(value = ISSUE_RECEIPTS + """
         AND parent.source_id=:repositoryId
         AND EXISTS (

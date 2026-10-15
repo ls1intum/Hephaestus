@@ -12,10 +12,11 @@ import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerProperties;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetBlockReason;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWorkerRole;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
+import de.tum.cit.aet.hephaestus.integration.core.metrics.ReviewRefusalRecorder;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
@@ -347,9 +348,7 @@ public class ReviewJobClaimService {
     }
 
     private void recordPracticeReviewRefusal(String reason) {
-        meterRegistry
-                .counter(AgentMetrics.AGENT_REVIEW_REFUSED, "phase", "execution", "reason", reason)
-                .increment();
+        ReviewRefusalRecorder.record(meterRegistry, "execution", reason);
     }
 
     private @Nullable UsageFundingSource claimedFundingSource(ReviewJob job) {

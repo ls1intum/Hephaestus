@@ -13,7 +13,7 @@
 		},
 		"version": {
 			"description": "Version of the bundled practice catalog format.",
-			"const": "2.0.0"
+			"const": "2.0.1"
 		},
 		"criteriaPreambles": {
 			"description": "Named text that the catalog loader adds before practice criteria.",

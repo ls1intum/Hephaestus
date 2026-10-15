@@ -1,9 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
-import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MergeReadinessContentSource;
-import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.RecentAuthoredWorkContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.ResultHistoryContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.ReviewAttemptsContentSource;
+import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextPaths;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -80,7 +79,7 @@ final class MentorTurnEvidence {
         receipt.put("providerFreshness", "UNKNOWN");
         List<String> readinessLists = List.of("pullRequests", "notLoaded");
         ObjectNode readiness =
-                source(mapper, inputs, MergeReadinessContentSource.OUTPUT_KEY, readinessLists, READINESS_FIELDS);
+                source(mapper, inputs, MentorContextPaths.MERGE_READINESS, readinessLists, READINESS_FIELDS);
         receipt.set("mergeReadiness", readiness);
 
         List<String> practiceResultLists = List.of("recentResults", "abstentions", "earlierResults");
@@ -89,8 +88,7 @@ final class MentorTurnEvidence {
         receipt.set("results", practiceResults);
 
         List<String> workLists = List.of("pullRequests", "issues");
-        ObjectNode authored =
-                source(mapper, inputs, RecentAuthoredWorkContentSource.OUTPUT_KEY, workLists, WORK_FIELDS);
+        ObjectNode authored = source(mapper, inputs, MentorContextPaths.RECENT_AUTHORED_WORK, workLists, WORK_FIELDS);
         authored.put("use", "ARTIFACT_INDEX_NOT_CURRENT_READINESS");
         receipt.set("authoredWorkIndex", authored);
 

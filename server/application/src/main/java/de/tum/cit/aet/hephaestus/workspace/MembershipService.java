@@ -26,6 +26,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.JpaSort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -221,20 +222,21 @@ public class MembershipService {
     @Transactional(readOnly = true)
     public Page<Membership> listMembers(
             long workspaceId, @Nullable String query, @Nullable Long teamId, Pageable pageable) {
-        var orders = pageable.getSort().stream()
-                .map(order -> order.withProperty(
-                        switch (order.getProperty()) {
-                            case "name" -> "a.displayName";
-                            case "username" -> "u.login";
-                            default ->
-                                PropertyPath.from(order.getProperty(), Membership.class)
-                                        .toDotPath();
-                        }))
-                .toList();
-        var page = PageRequest.of(
-                pageable.getPageNumber(),
-                pageable.getPageSize(),
-                Sort.by(orders).and(Sort.by("id.accountId")));
+        Sort sort = Sort.unsorted();
+        for (var order : pageable.getSort()) {
+            sort = sort.and(
+                    switch (order.getProperty()) {
+                        case "name" ->
+                            JpaSort.unsafe(
+                                    order.getDirection(),
+                                    "LOWER(COALESCE(NULLIF(TRIM(a.displayName),''),NULLIF(TRIM(u.name),''),NULLIF(TRIM(u.login),''),'Unnamed account'))");
+                        case "username" -> Sort.by(order.withProperty("u.login"));
+                        default ->
+                            Sort.by(order.withProperty(PropertyPath.from(order.getProperty(), Membership.class)
+                                    .toDotPath()));
+                    });
+        }
+        var page = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort.and(Sort.by("id.accountId")));
         return memberSearch.findMembers(
                 workspaceId,
                 actors.connectedProviderId(workspaceId).orElse(null),

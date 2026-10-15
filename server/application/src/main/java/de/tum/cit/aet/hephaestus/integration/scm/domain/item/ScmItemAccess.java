@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -85,6 +86,11 @@ public class ScmItemAccess {
                     row.getId(),
                     new ItemLabel(
                             row.getId(),
+                            nativeLabel(
+                                    IntegrationKind.valueOf(row.getProviderType()),
+                                    row.getNoun(),
+                                    row.getNumber(),
+                                    row.getTitle()),
                             row.getTitle(),
                             row.getNoun(),
                             row.getNumber(),
@@ -93,5 +99,11 @@ public class ScmItemAccess {
                             IntegrationKind.valueOf(row.getProviderType())));
         }
         return Map.copyOf(labels);
+    }
+
+    static String nativeLabel(IntegrationKind provider, String noun, @Nullable Integer number, String title) {
+        if (number == null) return title;
+        String prefix = provider == IntegrationKind.GITLAB && !noun.equals("issue") ? "!" : "#";
+        return (noun.equals("review") ? "Review of " : "") + prefix + number;
     }
 }

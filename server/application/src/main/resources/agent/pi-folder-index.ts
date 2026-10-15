@@ -71,10 +71,7 @@ export function folderCitationIndex(value: unknown): {
 			throw new Error("Folder index: duplicate sourceFile path");
 		}
 		// Composed views have no per-record identity; cite their canonical source files instead.
-		if (
-			entry.file.path.startsWith("inputs/history/") ||
-			entry.file.path === "context/project_inventory.json"
-		) {
+		if (entry.file.path.startsWith("inputs/history/")) {
 			continue;
 		}
 		sourceFileSources.set(entry.file.path, entry.kind);

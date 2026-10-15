@@ -5,7 +5,6 @@ import de.tum.cit.aet.hephaestus.agent.config.MemberAiRoutingAdapter;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MentorContextKeys;
-import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MergeReadinessContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.ResultHistoryContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.ReviewAttemptsContentSource;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorAgentRequest;
@@ -32,11 +31,11 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetBlockReason;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetExhaustedException;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUnpricedUsageBlockedException;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery.AccountSummary;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonProcessingSuppression;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
@@ -112,7 +111,6 @@ public class MentorChatService implements MentorTurnRunner {
     private final MemberAiRoutingAdapter memberAiRouting;
     private final PersonProcessingSuppression personSuppression;
     private final MemberAiPreferences memberAiPreferences;
-    private final MergeReadinessContentSource mergeReadiness;
     private final ResultHistoryContentSource practiceResultHistory;
     private final ReviewAttemptsContentSource reviewAttempts;
     private final ResultHistoryQuery resultsHistory;
@@ -988,10 +986,8 @@ public class MentorChatService implements MentorTurnRunner {
             long workspaceId,
             long developerId) {
         String path = req.path();
-        Optional<Long> mergeRequest = MergeReadinessContentSource.pullRequestIdOf(path);
-        if (mergeRequest.isPresent()) {
-            return mergeReadiness.inspect(workspaceId, developerId, mergeRequest.get());
-        }
+        var supplied = workspaceContextBuilder.read(workspaceId, developerId, path);
+        if (supplied.isPresent()) return supplied.get();
         Optional<UUID> practiceResult = ResultHistoryContentSource.resultIdOf(path);
         if (practiceResult.isPresent()) {
             return practiceResultHistory.inspect(workspaceId, developerId, practiceResult.get());

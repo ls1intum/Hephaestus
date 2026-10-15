@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.profile.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemRefDTO;
 import de.tum.cit.aet.hephaestus.practices.result.dto.GoingWellPracticeDTO;
-import de.tum.cit.aet.hephaestus.practices.review.dto.ItemRefDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import org.jspecify.annotations.Nullable;

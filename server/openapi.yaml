@@ -1240,32 +1240,6 @@ paths:
           description: OK
       tags:
       - catalog-admin
-  /admin/practice-catalog/practices/reorder:
-    patch:
-      description: "Supply every practice slug in one group, or every unassigned practice\
-        \ slug, in the new order."
-      operationId: reorderCatalogPractices
-      parameters:
-      - in: header
-        name: If-Match
-        required: false
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ReorderRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Catalog"
-          description: OK
-      tags:
-      - catalog-admin
   /admin/practice-catalog/practices/{slug}:
     get:
       operationId: getCatalogPractice
@@ -2229,6 +2203,71 @@ paths:
       summary: List available identity providers
       tags:
       - Auth discovery
+  /internal/llm/admit-results:
+    post:
+      description: "Requires the private worker connector and a proxy-scoped worker\
+        \ credential bound to the workspace, job and attempt. Browser cookies and\
+        \ app-admin authority do not authorize this request."
+      operationId: admitResults
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdmissionRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdmissionResponse"
+          description: OK
+      security:
+      - workerBearer: []
+      summary: Admit results for the current review attempt
+      tags:
+      - result-admission
+  /internal/llm/prepare-feedback:
+    post:
+      description: Requires the same fenced worker credential and admitted ITEM review.
+        Preparation persists the package before a provider write.
+      operationId: prepareFeedback
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PrepareFeedbackRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrepareFeedbackResponse"
+          description: OK
+      security:
+      - workerBearer: []
+      summary: Prepare feedback for an admitted item review
+      tags:
+      - result-admission
+  /internal/llm/public-feedback-history:
+    post:
+      description: "Requires the same fenced worker credential and admitted ITEM review.\
+        \ Returns confirmed same-item, same-developer copy history; a refused read\
+        \ is not an empty history."
+      operationId: readPublicFeedbackHistory
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicFeedbackHistory"
+          description: OK
+      security:
+      - workerBearer: []
+      summary: Read authorized feedback receipts for the current item review
+      tags:
+      - result-admission
   /notifications/unsubscribe/{token}:
     post:
       operationId: unsubscribeEmail
@@ -11848,6 +11887,186 @@ components:
       - memberCount
       - status
       - workspaceSlug
+    AdmissionRequest:
+      type: object
+      properties:
+        attempt:
+          type: integer
+          format: int32
+        contractVersion:
+          type: integer
+          format: int32
+        jobId:
+          type: string
+          format: uuid
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/SubmittedResult"
+        reviewId:
+          type: string
+          format: uuid
+    AdmissionResponse:
+      type: object
+      properties:
+        admissionDigest:
+          type: string
+        admitted:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdmittedResult"
+        attempt:
+          type: integer
+          format: int32
+        contractVersion:
+          type: integer
+          format: int32
+        conversationEligibility:
+          anyOf:
+          - $ref: "#/components/schemas/ConversationEligibility"
+          - type: "null"
+        jobId:
+          type: string
+          format: uuid
+        practicePageSupport:
+          anyOf:
+          - $ref: "#/components/schemas/PracticePageSupport"
+          - type: "null"
+        publicReviewed:
+          type: boolean
+        reviewId:
+          type: string
+          format: uuid
+        withheld:
+          type: array
+          items:
+            $ref: "#/components/schemas/Withheld"
+      required:
+      - admissionDigest
+      - admitted
+      - attempt
+      - contractVersion
+      - conversationEligibility
+      - jobId
+      - practicePageSupport
+      - publicReviewed
+      - reviewId
+      - withheld
+    AdmittedProblem:
+      type: object
+      properties:
+        basis:
+          anyOf:
+          - oneOf:
+            - $ref: "#/components/schemas/DutyBasis"
+            - $ref: "#/components/schemas/IntroducedBasis"
+            - $ref: "#/components/schemas/StateBasis"
+            - $ref: "#/components/schemas/WorsenedBasis"
+          - type: "null"
+        citations:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectedCitation"
+        explanation:
+          type:
+          - string
+          - "null"
+        id:
+          type: string
+          format: uuid
+        key:
+          type:
+          - string
+          - "null"
+        nextStep:
+          type:
+          - string
+          - "null"
+        position:
+          type: integer
+          format: int32
+        publicEligible:
+          type: boolean
+        resultId:
+          type: string
+          format: uuid
+        severity:
+          type: string
+          enum:
+          - CRITICAL
+          - MAJOR
+          - MINOR
+          - TRIVIAL
+        summary:
+          type: string
+      required:
+      - basis
+      - citations
+      - explanation
+      - id
+      - key
+      - nextStep
+      - position
+      - publicEligible
+      - resultId
+      - severity
+      - summary
+    AdmittedResult:
+      type: object
+      properties:
+        coverage:
+          oneOf:
+          - $ref: "#/components/schemas/ClaimedCoverage"
+          - $ref: "#/components/schemas/HostCoverage"
+        evidence:
+          $ref: "#/components/schemas/JsonNode"
+        example:
+          anyOf:
+          - $ref: "#/components/schemas/JsonNode"
+          - type: "null"
+        explanation:
+          type:
+          - string
+          - "null"
+        itemId:
+          type: string
+        outcome:
+          type: string
+          enum:
+          - MET
+          - NOT_MET
+          - DOES_NOT_APPLY
+          - COULD_NOT_DETERMINE
+        practiceSlug:
+          type: string
+        problems:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdmittedProblem"
+        publicEligible:
+          type: boolean
+        resultId:
+          type: string
+          format: uuid
+        summary:
+          type:
+          - string
+          - "null"
+        summaryOnly:
+          type: boolean
+      required:
+      - coverage
+      - evidence
+      - example
+      - explanation
+      - itemId
+      - outcome
+      - practiceSlug
+      - problems
+      - publicEligible
+      - resultId
+      - summary
+      - summaryOnly
     AgentBinding:
       type: object
       description: A workspace's agent binding for one purpose
@@ -12187,6 +12406,30 @@ components:
           description: Integration-defined backfill state string
       required:
       - state
+    Basis:
+      type: object
+      properties:
+        outcome:
+          type: string
+          enum:
+          - MET
+          - NOT_MET
+          - DOES_NOT_APPLY
+          - COULD_NOT_DETERMINE
+        practiceSlug:
+          type: string
+        practiceVersionId:
+          type:
+          - string
+          - "null"
+        resultId:
+          type: string
+          format: uuid
+      required:
+      - outcome
+      - practiceSlug
+      - practiceVersionId
+      - resultId
     BindPracticeGroupRequest:
       type: object
       properties:
@@ -12744,6 +12987,17 @@ components:
           type: string
           enum:
           - VERIFIED
+    CitationProofDTO:
+      type: object
+      properties:
+        itemSha256:
+          type: string
+        quoteSha256:
+          type: string
+        status:
+          type: string
+          enum:
+          - VERIFIED
       required:
       - itemSha256
       - quoteSha256
@@ -12830,6 +13084,101 @@ components:
       - code
       - codeVerifier
       - redirectUri
+    ClosedPracticePageSupport:
+      type: object
+      properties:
+        readAt:
+          type: string
+          format: date-time
+        refusal:
+          type:
+          - string
+          - "null"
+        state:
+          type: string
+          enum:
+          - UNAVAILABLE
+          - REFUSED
+      required:
+      - readAt
+      - refusal
+      - state
+    CompletePracticePageSupport:
+      type: object
+      properties:
+        practices:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeSupport"
+        readAt:
+          type: string
+          format: date-time
+        state:
+          type: string
+          enum:
+          - COMPLETE
+      required:
+      - practices
+      - readAt
+      - state
+    ComposedFeedback:
+      type: object
+      properties:
+        destination:
+          type: string
+          enum:
+          - ON_WORK
+          - PRACTICE_PAGE
+          - CONVERSATION
+        notes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Note"
+        resultIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        summary:
+          type: string
+        withheldReason:
+          type: string
+          enum:
+          - VOLUME_CAPPED
+          - COMPOSER_WITHHELD
+          - NOTHING_NEW
+          - REPEATS_DELIVERED_NOTE
+          - REACTED_DISAGREE
+          - REACTED_NOT_APPLICABLE
+          - CONVERSATION_EXPIRED
+          - DELIVERY_UNCONFIRMED
+          - ITEM_GONE
+          - ITEM_CLOSED
+          - ITEM_MERGED
+          - ITEM_STATE_INELIGIBLE
+          - ISSUE_SNAPSHOT_CHANGED
+          - PUBLIC_SUBJECT_INELIGIBLE
+          - NO_AI
+          - DELIVERY_OFF
+          - PERSON_SUPPRESSED
+          - RECIPIENT_UNAVAILABLE
+          - EMPTY_AFTER_SANITIZE
+          - INSTANCE_SILENCED
+          - FEEDBACK_OFF
+          - WORKSPACE_DISABLED
+          - WORKSPACE_DELIVERY_PAUSED
+          - STALE_ROLLOUT_REVISION
+          - OUTSIDE_CURRENT_SCOPE
+          - APPROVAL_STALE
+          - APPROVAL_NO_LONGER_ELIGIBLE
+          - PRACTICE_REQUIRES_APPROVAL
+          - BACKFILL_QUIET
+          - RESULT_MARKED_INCORRECT
+          - REVIEWED_VERSION_CHANGED
+          - REVIEW_CANCELLED
+          - EVIDENCE_NOT_PERMITTED
+          - NO_EVIDENCE
+          - UNCORROBORATED
     ConfigAuditActorRef:
       type: object
       description: |-
@@ -13293,6 +13642,97 @@ components:
       - id
       - login
       - name
+    ConversationEligibility:
+      type: object
+      properties:
+        readAt:
+          type: string
+          format: date-time
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/ResultDecision"
+        state:
+          type: string
+          enum:
+          - COMPLETE
+          - UNAVAILABLE
+          - REFUSED
+      required:
+      - readAt
+      - results
+      - state
+    Copy:
+      type: object
+      properties:
+        body:
+          type:
+          - string
+          - "null"
+        endLine:
+          type:
+          - "null"
+          - integer
+          format: int32
+        externalRef:
+          type:
+          - string
+          - "null"
+        externalUrl:
+          type:
+          - string
+          - "null"
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - SUMMARY
+          - LINE_NOTE
+          - FILE_NOTE
+          - CHAT_TURN
+        path:
+          type:
+          - string
+          - "null"
+        postedAt:
+          type: string
+          format: date-time
+        side:
+          type:
+          - string
+          - "null"
+          enum:
+          - OLD
+          - NEW
+          - null
+        startLine:
+          type:
+          - "null"
+          - integer
+          format: int32
+        state:
+          type: string
+          enum:
+          - PLANNED
+          - WRITE_STARTED
+          - POSTED
+          - FAILED
+          - WITHHELD
+          - RETRACTED
+      required:
+      - body
+      - endLine
+      - externalRef
+      - externalUrl
+      - id
+      - kind
+      - path
+      - postedAt
+      - side
+      - startLine
+      - state
     CoverageOmission:
       type: object
       properties:
@@ -14113,6 +14553,70 @@ components:
             \ no recipient to resolve"
       required:
       - outcome
+    Entry:
+      type: object
+      properties:
+        basedOn:
+          type: array
+          items:
+            $ref: "#/components/schemas/Basis"
+        body:
+          type:
+          - string
+          - "null"
+        bodyUnavailable:
+          type: boolean
+        copies:
+          type: array
+          items:
+            $ref: "#/components/schemas/Copy"
+        currentness:
+          type: string
+          enum:
+          - CURRENT
+          - STALE
+          - UNVERIFIABLE
+        deliveredAt:
+          type: string
+          format: date-time
+        destination:
+          type: string
+          enum:
+          - ON_WORK
+          - PRACTICE_PAGE
+          - CONVERSATION
+        id:
+          type: string
+          format: uuid
+        itemVersion:
+          type:
+          - string
+          - "null"
+        state:
+          type: string
+          enum:
+          - AWAITING_APPROVAL
+          - READY
+          - DELIVERED
+          - UNCONFIRMED
+          - WITHHELD
+          - REJECTED
+          - REPLACED
+          - FAILED
+        withdrawn:
+          type: boolean
+      required:
+      - basedOn
+      - body
+      - bodyUnavailable
+      - copies
+      - currentness
+      - deliveredAt
+      - destination
+      - id
+      - itemVersion
+      - state
+      - withdrawn
     ErasureRequest:
       type: object
       properties:
@@ -14161,7 +14665,7 @@ components:
           format: int32
         verification:
           anyOf:
-          - $ref: "#/components/schemas/CitationProof"
+          - $ref: "#/components/schemas/CitationProofDTO"
           - type: "null"
       required:
       - commit
@@ -15154,6 +15658,15 @@ components:
       - icon
       - name
       - slug
+    History:
+      type: object
+      properties:
+        feedback:
+          type: array
+          items:
+            $ref: "#/components/schemas/Entry"
+        item:
+          $ref: "#/components/schemas/ItemRef"
     HostCoverage:
       allOf:
       - $ref: "#/components/schemas/ResultCoverage"
@@ -16386,6 +16899,14 @@ components:
       - practiceSlug
       - reason
       - status
+    Note:
+      type: object
+      properties:
+        body:
+          type: string
+        problemId:
+          type: string
+          format: uuid
     NotificationPreferences:
       type: object
       properties:
@@ -17998,6 +18519,10 @@ components:
             - CHANGED_PATH
             - DIFF_CONTAINS
             - HAS_ITEMS
+        applicabilitySources:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReadSourceOption"
         events:
           type: array
           items:
@@ -18023,6 +18548,7 @@ components:
       required:
       - aboutRoles
       - applicabilityClauses
+      - applicabilitySources
       - events
       - kind
       - label
@@ -18168,6 +18694,16 @@ components:
       - whatGoodLooksLike
       - whyItMatters
       - withdrawn
+    PracticePageSupport:
+      discriminator:
+        mapping:
+          COMPLETE: "#/components/schemas/CompletePracticePageSupport"
+          REFUSED: "#/components/schemas/ClosedPracticePageSupport"
+          UNAVAILABLE: "#/components/schemas/ClosedPracticePageSupport"
+        propertyName: state
+      oneOf:
+      - $ref: "#/components/schemas/CompletePracticePageSupport"
+      - $ref: "#/components/schemas/ClosedPracticePageSupport"
     PracticeProfileOverview:
       type: object
       properties:
@@ -18717,6 +19253,72 @@ components:
       - resultId
       - severity
       - title
+    PracticeSupport:
+      type: object
+      properties:
+        decision:
+          type: string
+          enum:
+          - ADMIT
+          - FEEDBACK_OFF
+          - GATE_REFUSED
+          - NO_EVIDENCE
+          - UNCORROBORATED
+          - BACKFILL_HELD
+          - RECENTLY_SURFACED
+          - UNATTRIBUTABLE_SUBJECT
+        occurrences:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportOccurrence"
+        practiceSlug:
+          type: string
+        stopReason:
+          type:
+          - string
+          - "null"
+          enum:
+          - VOLUME_CAPPED
+          - COMPOSER_WITHHELD
+          - NOTHING_NEW
+          - REPEATS_DELIVERED_NOTE
+          - REACTED_DISAGREE
+          - REACTED_NOT_APPLICABLE
+          - CONVERSATION_EXPIRED
+          - DELIVERY_UNCONFIRMED
+          - ITEM_GONE
+          - ITEM_CLOSED
+          - ITEM_MERGED
+          - ITEM_STATE_INELIGIBLE
+          - ISSUE_SNAPSHOT_CHANGED
+          - PUBLIC_SUBJECT_INELIGIBLE
+          - NO_AI
+          - DELIVERY_OFF
+          - PERSON_SUPPRESSED
+          - RECIPIENT_UNAVAILABLE
+          - EMPTY_AFTER_SANITIZE
+          - INSTANCE_SILENCED
+          - FEEDBACK_OFF
+          - WORKSPACE_DISABLED
+          - WORKSPACE_DELIVERY_PAUSED
+          - STALE_ROLLOUT_REVISION
+          - OUTSIDE_CURRENT_SCOPE
+          - APPROVAL_STALE
+          - APPROVAL_NO_LONGER_ELIGIBLE
+          - PRACTICE_REQUIRES_APPROVAL
+          - BACKFILL_QUIET
+          - RESULT_MARKED_INCORRECT
+          - REVIEWED_VERSION_CHANGED
+          - REVIEW_CANCELLED
+          - EVIDENCE_NOT_PERMITTED
+          - NO_EVIDENCE
+          - UNCORROBORATED
+          - null
+      required:
+      - decision
+      - occurrences
+      - practiceSlug
+      - stopReason
     PracticeTraceEntry:
       type: object
       properties:
@@ -18864,6 +19466,53 @@ components:
       - outcomes
       - practiceName
       - practiceSlug
+    PrepareFeedbackRequest:
+      type: object
+      properties:
+        attempt:
+          type: integer
+          format: int32
+        basisResultIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        composition:
+          type: array
+          items:
+            $ref: "#/components/schemas/ComposedFeedback"
+        jobId:
+          type: string
+          format: uuid
+        publicComposition:
+          type: boolean
+        reviewId:
+          type: string
+          format: uuid
+      required:
+      - attempt
+      - basisResultIds
+      - composition
+      - jobId
+      - publicComposition
+      - reviewId
+    PrepareFeedbackResponse:
+      type: object
+      properties:
+        contentDigest:
+          type: string
+        feedbackIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        preparedAt:
+          type: string
+          format: date-time
+      required:
+      - contentDigest
+      - feedbackIds
+      - preparedAt
     PreviewRequest:
       type: object
       properties:
@@ -19173,6 +19822,66 @@ components:
       - item
       - reviewId
       - status
+    ProjectedCitation:
+      type: object
+      properties:
+        anchorable:
+          type: boolean
+        commit:
+          type:
+          - string
+          - "null"
+        endLine:
+          type:
+          - "null"
+          - integer
+          format: int32
+        index:
+          type: integer
+          format: int32
+        path:
+          type:
+          - string
+          - "null"
+        quote:
+          type:
+          - string
+          - "null"
+        side:
+          type:
+          - string
+          - "null"
+          enum:
+          - OLD
+          - NEW
+          - null
+        sourceKind:
+          type: string
+        sourcePath:
+          type:
+          - string
+          - "null"
+        startLine:
+          type:
+          - "null"
+          - integer
+          format: int32
+        verification:
+          anyOf:
+          - $ref: "#/components/schemas/CitationProof"
+          - type: "null"
+      required:
+      - anchorable
+      - commit
+      - endLine
+      - index
+      - path
+      - quote
+      - side
+      - sourceKind
+      - sourcePath
+      - startLine
+      - verification
     ProviderIdentityRef:
       type: object
       properties:
@@ -19553,6 +20262,21 @@ components:
       required:
       - allowSearchEngines
       - enabled
+    PublicFeedbackHistory:
+      type: object
+      properties:
+        contractVersion:
+          type: integer
+          format: int32
+        history:
+          $ref: "#/components/schemas/History"
+        readAt:
+          type: string
+          format: date-time
+      required:
+      - contractVersion
+      - history
+      - readAt
     Question:
       type: object
       properties:
@@ -19986,6 +20710,69 @@ components:
           type: string
       required:
       - source
+    ResultDecision:
+      type: object
+      properties:
+        decision:
+          type: string
+          enum:
+          - ADMIT
+          - FEEDBACK_OFF
+          - MENTOR_UNAVAILABLE
+          - GATE_REFUSED
+          - UNATTRIBUTABLE_SUBJECT
+          - HAS_INLINE_ANCHOR
+          - ALREADY_DELIVERED_ON_WORK
+          - REVIEWER_DEFERRED
+          - BACKFILL_QUIET
+        resultId:
+          type: string
+          format: uuid
+        stopReason:
+          type:
+          - string
+          - "null"
+          enum:
+          - VOLUME_CAPPED
+          - COMPOSER_WITHHELD
+          - NOTHING_NEW
+          - REPEATS_DELIVERED_NOTE
+          - REACTED_DISAGREE
+          - REACTED_NOT_APPLICABLE
+          - CONVERSATION_EXPIRED
+          - DELIVERY_UNCONFIRMED
+          - ITEM_GONE
+          - ITEM_CLOSED
+          - ITEM_MERGED
+          - ITEM_STATE_INELIGIBLE
+          - ISSUE_SNAPSHOT_CHANGED
+          - PUBLIC_SUBJECT_INELIGIBLE
+          - NO_AI
+          - DELIVERY_OFF
+          - PERSON_SUPPRESSED
+          - RECIPIENT_UNAVAILABLE
+          - EMPTY_AFTER_SANITIZE
+          - INSTANCE_SILENCED
+          - FEEDBACK_OFF
+          - WORKSPACE_DISABLED
+          - WORKSPACE_DELIVERY_PAUSED
+          - STALE_ROLLOUT_REVISION
+          - OUTSIDE_CURRENT_SCOPE
+          - APPROVAL_STALE
+          - APPROVAL_NO_LONGER_ELIGIBLE
+          - PRACTICE_REQUIRES_APPROVAL
+          - BACKFILL_QUIET
+          - RESULT_MARKED_INCORRECT
+          - REVIEWED_VERSION_CHANGED
+          - REVIEW_CANCELLED
+          - EVIDENCE_NOT_PERMITTED
+          - NO_EVIDENCE
+          - UNCORROBORATED
+          - null
+      required:
+      - decision
+      - resultId
+      - stopReason
     ResultDetail:
       type: object
       properties:
@@ -23817,6 +24604,73 @@ components:
           minItems: 0
       required:
       - answers
+    SubmittedResult:
+      type: object
+      properties:
+        candidate:
+          $ref: "#/components/schemas/JsonNode"
+        itemId:
+          type: string
+        itemVersion:
+          type: string
+        practiceSlug:
+          type: string
+        readReceipts:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReadReceipt"
+    SupportOccurrence:
+      type: object
+      properties:
+        evidence:
+          anyOf:
+          - $ref: "#/components/schemas/JsonNode"
+          - type: "null"
+        explanation:
+          type:
+          - string
+          - "null"
+        itemId:
+          type: string
+        itemKind:
+          type: string
+        origin:
+          type: string
+          enum:
+          - EVENT
+          - REQUEST
+          - SCHEDULE
+          - BACKFILL
+        outcome:
+          type: string
+          enum:
+          - MET
+          - NOT_MET
+          - DOES_NOT_APPLY
+          - COULD_NOT_DETERMINE
+        practiceVersionId:
+          type:
+          - string
+          - "null"
+        recordedAt:
+          type: string
+          format: date-time
+        resultId:
+          type: string
+          format: uuid
+        summary:
+          type: string
+      required:
+      - evidence
+      - explanation
+      - itemId
+      - itemKind
+      - origin
+      - outcome
+      - practiceVersionId
+      - recordedAt
+      - resultId
+      - summary
     Survey:
       type: object
       properties:
@@ -25102,6 +25956,15 @@ components:
           type: string
         value:
           type: string
+    Withheld:
+      type: object
+      properties:
+        itemId:
+          type: string
+        practiceSlug:
+          type: string
+        reason:
+          type: string
     WithheldScanReportItem:
       allOf:
       - type: object
@@ -26061,5 +26924,12 @@ components:
       description: Hephaestus-native JWT bearer authentication. The SPA normally authenticates
         through the `__Host-HEPHAESTUS_AT` session cookie. This scheme documents the
         equivalent bearer token.
+      scheme: bearer
+      type: http
+    workerBearer:
+      bearerFormat: JWT
+      description: "Worker credential on the private sandbox gateway connector. Bound\
+        \ to the worker, workspace, job and attempt, with the required proxy scope.\
+        \ Browser cookies and app-admin authority do not authorize it."
       scheme: bearer
       type: http

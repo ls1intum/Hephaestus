@@ -105,6 +105,12 @@ hephaestus:
             enabled: true
             default-server-url: https://gitlab.lrz.de
     webhook:
+        # Test brokers share the runner's disk with application and image builds.
+        stream:
+            max-bytes: 128MB
+            max-bytes-by-stream:
+                github: 128MB
+            storage-budget: 512MB
         # A GitLab signing token's whsec_ form, so signed GitLab webhooks verify end to end.
         secret: whsec_dGVzdC1naXRsYWItc2lnbmluZy1rZXktbm90LXJlYWw=
         external-url: http://localhost:8080

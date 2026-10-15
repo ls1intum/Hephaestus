@@ -100,6 +100,17 @@ class ResultRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void shouldKeepResultEndTimeAtOrAfterRecordingWhenTheChangeEventArrivesLate() {
+        var at = Instant.now();
+        var result = data.result(scenario, ResultOutcome.MET, at.minusSeconds(2), at);
+        results.endCurrent(
+                result.getWorkspaceId(), result.getItemId(), ResultEndReason.WORK_CHANGED, at.minusSeconds(1));
+        var ended = results.findById(result.getId()).orElseThrow();
+        assertThat(ended.getEndedAt()).isEqualTo(ended.getRecordedAt());
+        assertThat(ended.getEndReason()).isEqualTo(ResultEndReason.WORK_CHANGED);
+    }
+
+    @Test
     void endIsIdempotentAndHistoryRemains() {
         var at = Instant.now();
         var r = data.result(scenario, ResultOutcome.MET, at);

@@ -16,7 +16,6 @@ import de.tum.cit.aet.hephaestus.practices.dto.CatalogGroupUpdateDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeInputDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeUpdateDTO;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -197,7 +196,7 @@ class CatalogEntryServiceIntegrationTest extends AbstractWorkspaceIntegrationTes
     }
 
     @Test
-    void shouldUseGroupPositionsForCreationReorderingAndMovingAndResetOnlyOverrides() {
+    void shouldUseGroupPositionsForCreationAndMovingAndResetOnlyOverrides() {
         String groupSlug = "move-" + UUID.randomUUID();
         String otherGroup = "other-" + UUID.randomUUID();
         customization.createGroup(
@@ -217,18 +216,6 @@ class CatalogEntryServiceIntegrationTest extends AbstractWorkspaceIntegrationTes
         assertThat(catalog.practice(firstSlug).position()).isZero();
         assertThat(catalog.practice(secondSlug).position()).isEqualTo(1);
         assertThat(catalog.practice(otherSlug).position()).isZero();
-        customization.reorder(
-                CatalogEntryType.PRACTICE,
-                List.of(secondSlug, firstSlug),
-                tag(catalog.effectiveCatalog().etag()));
-        assertThat(catalog.practice(secondSlug).position()).isZero();
-        assertThat(catalog.practice(firstSlug).position()).isEqualTo(1);
-        assertThat(catalog.practice(otherSlug).position()).isZero();
-        assertThatThrownBy(() -> customization.reorder(
-                        CatalogEntryType.PRACTICE,
-                        List.of(firstSlug, otherSlug),
-                        tag(catalog.effectiveCatalog().etag())))
-                .isInstanceOf(IllegalArgumentException.class);
         customization.move(
                 firstSlug, otherGroup, 0, tag(catalog.effectiveCatalog().etag()));
         assertThat(catalog.practice(firstSlug).position()).isZero();

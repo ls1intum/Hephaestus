@@ -20,7 +20,7 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.NetworkPolicy;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxIdentity;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
-import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.MentorSessionCommand;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.MentorSessionEvent;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;

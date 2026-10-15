@@ -64,3 +64,31 @@ export const DifferentCondition: Story = {
 		await expectNoOverflowingElement(canvas.getByRole("group", { name: "Applies when" }));
 	},
 };
+
+export const SourceChoices: Story = {
+	args: { value: { clauses: [{ hasItems: "" }], otherwise: "There are no comments to check." } },
+	play: async ({ canvas, userEvent }) => {
+		const source = canvas.getByRole("combobox", { name: "Source 1" });
+		await expect(source).toHaveTextContent("Choose a source");
+		await userEvent.click(source);
+		const options = within(await screen.findByRole("listbox", { name: "Source 1" }));
+		await expect(options.getAllByRole("option")).toHaveLength(2);
+		await userEvent.click(options.getByRole("option", { name: "General review comments" }));
+		await expect(source).toHaveTextContent("General review comments");
+		await expect(canvas.queryByRole("textbox", { name: "Source 1" })).toBeNull();
+		await expectNoOverflowingElement(canvas.getByRole("group", { name: "Applies when" }));
+	},
+};
+
+export const NoSources: Story = {
+	args: {
+		itemType: { ...mockPullRequestItemType, applicabilitySources: [] },
+	},
+	play: async ({ canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("combobox", { name: "Condition 1" }));
+		const options = within(await screen.findByRole("listbox", { name: "Condition 1" }));
+		await expect(options.queryByRole("option", { name: "A source has items" })).toBeNull();
+		await expect(options.getByRole("option", { name: "A file changed" })).toBeVisible();
+		await userEvent.keyboard("{Escape}");
+	},
+};

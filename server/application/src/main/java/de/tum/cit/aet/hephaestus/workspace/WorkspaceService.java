@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.core.security.ScmOrigin;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
@@ -23,10 +24,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @WorkspaceAgnostic("Manages workspaces themselves - the tenant root, not data within workspaces")
@@ -146,13 +149,16 @@ public class WorkspaceService {
         if (SecurityUtils.getCurrentAccountId().isEmpty()) {
             ownerUserId = request.ownerUserId();
         } else if (isGitLab) {
-            ownerUserId = currentAccountUsers.resolve().stream()
+            var owners = currentAccountUsers.resolve().stream()
                     .filter(actor -> actor.providerType().equals(IdentityProviderType.GITLAB.name())
-                            && actor.serverUrl().equals(serverUrl))
+                            && ScmOrigin.of(actor.serverUrl()).equals(ScmOrigin.of(serverUrl)))
                     .map(actor -> actor.actorId())
-                    .findFirst()
-                    .orElseThrow(() -> new AccessForbiddenException(
-                            "Connect your GitLab account before you create" + " a GitLab workspace."));
+                    .toList();
+            if (owners.size() != 1)
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Connect exactly one GitLab account on this instance before creating a workspace.");
+            ownerUserId = owners.getFirst();
         } else {
             ownerUserId = currentAccountUsers.resolve().stream()
                     .filter(user -> user.providerType().equals(IdentityProviderType.GITHUB.name()))

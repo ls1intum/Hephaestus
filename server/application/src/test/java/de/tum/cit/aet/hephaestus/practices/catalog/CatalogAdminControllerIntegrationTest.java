@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.catalog;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
@@ -14,10 +15,14 @@ import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeInputDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeUpdateDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.MovePracticeRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.PracticeDefinitionOptionsDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.ReadSourceOptionDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.ReorderRequestDTO;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -49,6 +54,99 @@ class CatalogAdminControllerIntegrationTest extends AbstractWorkspaceIntegration
 
     @Autowired
     CatalogEntryRepository entries;
+
+    @Test
+    @WithAdminUser
+    void shouldAdvertiseNamedRegisteredApplicabilityCollections() {
+        persistUser("admin");
+        client.get()
+                .uri("/admin/practice-catalog/definition-options")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(PracticeDefinitionOptionsDTO.class)
+                .value(options -> {
+                    assertThat(options.itemTypes())
+                            .filteredOn(item -> item.kind().equals("scm.pull_request"))
+                            .singleElement()
+                            .satisfies(item -> assertThat(item.applicabilitySources())
+                                    .extracting(ReadSourceOptionDTO::source, ReadSourceOptionDTO::label)
+                                    .containsExactly(
+                                            tuple("scm.review-threads", "Review threads and decisions"),
+                                            tuple("scm.general-review-comments", "General review comments")));
+                    assertThat(options.itemTypes())
+                            .filteredOn(item -> item.kind().equals("scm.issue"))
+                            .singleElement()
+                            .satisfies(item ->
+                                    assertThat(item.applicabilitySources()).isEmpty());
+                });
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldReorderCatalogGroupsWithoutChangingPracticePositions() {
+        persistUser("admin");
+        String suffix = UUID.randomUUID().toString();
+        String first = "first-group-" + suffix;
+        String second = "second-group-" + suffix;
+        String practice = "ordered-practice-" + suffix;
+        customization.createGroup(
+                new CatalogGroupInputDTO(first, new CatalogGroupUpdateDTO("First", null, null, null, null)));
+        customization.createGroup(
+                new CatalogGroupInputDTO(second, new CatalogGroupUpdateDTO("Second", null, null, null, null)));
+        customization.createPractice(new CatalogPracticeInputDTO(
+                practice,
+                new CatalogPracticeUpdateDTO(
+                        "scm.pull_request",
+                        first,
+                        DefinitionTestFixtures.authoring(DefinitionTestFixtures.definition()),
+                        7)));
+        var before = catalog.effectiveCatalog();
+        String tag = EntityTagPrecondition.format(before.etag());
+
+        client.patch()
+                .uri("/admin/practice-catalog/groups/reorder")
+                .headers(TestAuthUtils.withCurrentUser())
+                .header("If-Match", tag)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new ReorderRequestDTO(List.of(first)))
+                .exchange()
+                .expectStatus()
+                .isBadRequest()
+                .expectBody(Void.class);
+        assertThat(catalog.effectiveCatalog().etag()).isEqualTo(before.etag());
+        var order = Stream.concat(
+                        Stream.of(second, first),
+                        before.groups().stream()
+                                .map(CatalogOffer::slug)
+                                .filter(slug -> !slug.equals(first) && !slug.equals(second)))
+                .toList();
+        client.patch()
+                .uri("/admin/practice-catalog/groups/reorder")
+                .headers(TestAuthUtils.withCurrentUser())
+                .header("If-Match", tag)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new ReorderRequestDTO(order))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(Void.class);
+
+        assertThat(entries.findById(new CatalogEntry.Id(CatalogEntryType.GROUP, second))
+                        .orElseThrow()
+                        .getPosition())
+                .isZero();
+        assertThat(entries.findById(new CatalogEntry.Id(CatalogEntryType.GROUP, first))
+                        .orElseThrow()
+                        .getPosition())
+                .isEqualTo(1);
+        assertThat(entries.findById(new CatalogEntry.Id(CatalogEntryType.PRACTICE, practice))
+                        .orElseThrow()
+                        .getPosition())
+                .isEqualTo(7);
+        assertThat(catalog.practice(practice).effective().groupSlug()).isEqualTo(first);
+    }
 
     @Test
     @WithAdminUser

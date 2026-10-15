@@ -77,6 +77,15 @@ import org.springframework.data.web.PagedModel;
         bearerFormat = "JWT",
         description = "Hephaestus-native JWT bearer authentication. The SPA normally authenticates through the "
                 + "`__Host-HEPHAESTUS_AT` session cookie. This scheme documents the equivalent bearer token.")
+@SecurityScheme(
+        name = "workerBearer",
+        type = SecuritySchemeType.HTTP,
+        scheme = "bearer",
+        bearerFormat = "JWT",
+        description =
+                "Worker credential on the private sandbox gateway connector. Bound to the worker, workspace, job and"
+                        + " attempt, with the required proxy scope. Browser cookies and app-admin authority do not"
+                        + " authorize it.")
 public class OpenAPIConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(OpenAPIConfiguration.class);

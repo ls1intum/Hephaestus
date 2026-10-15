@@ -168,7 +168,12 @@ export function logprobDecisionModel(model: LanguageModelV4): Experimental_Decis
 				.filter((entry) => entry.type === "text")
 				.map((entry) => entry.text)
 				.join("");
-			const completion = logprobs.data.map((entry) => entry.token).join("");
+			let tokenEnd = logprobs.data.length;
+			while (tokenEnd > 0 && /^<\|[^|>]+\|>$/u.test(logprobs.data[tokenEnd - 1]?.token ?? "")) {
+				tokenEnd -= 1;
+			}
+			const completionTokens = logprobs.data.slice(0, tokenEnd);
+			const completion = completionTokens.map((entry) => entry.token).join("");
 			if (answer === "" || !completion.endsWith(answer)) {
 				throw new InvalidResponseDataError({
 					data: undefined,
@@ -180,7 +185,7 @@ export function logprobDecisionModel(model: LanguageModelV4): Experimental_Decis
 			const byAlias = new Map(asked.map((q) => [q.alias, q]));
 			const answers: Record<string, Experimental_DecisionModelV4Answer> = {};
 			let line = "";
-			for (const { token: fullToken, top_logprobs: top } of logprobs.data) {
+			for (const { token: fullToken, top_logprobs: top } of completionTokens) {
 				const token = fullToken.slice(Math.max(0, answerStart - offset));
 				offset += fullToken.length;
 				if (token === "") {

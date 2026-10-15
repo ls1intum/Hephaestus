@@ -18,9 +18,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.team.membership.TeamMemb
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.PracticePageFeedbackBody;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
@@ -55,9 +52,6 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
 
     @Autowired
     private ResultRepository practiceResultRepository;
-
-    @Autowired
-    private FeedbackRepository feedbackRepository;
 
     @Autowired
     private ChatThreadRepository chatThreadRepository;
@@ -208,8 +202,8 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
                     .expectBody()
                     .jsonPath("$.content.length()")
                     .isEqualTo(1)
-                    .jsonPath("$.content[0].summary")
-                    .isEqualTo("Result in tenant-a");
+                    .jsonPath("$.content[0].id")
+                    .isEqualTo(tenantA.practiceResultId().toString());
         }
 
         @Test
@@ -265,79 +259,11 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         @WithMentorUser
         void reactionsAreScopedToWorkspace() {
             expectDetailStatus("/practices/feedback/{key}/response", tenantA.feedbackId())
-                    .isNoContent();
+                    .isOk();
             expectDetailStatus("/practices/feedback/{key}/response", tenantB.feedbackId())
                     .isNotFound()
                     .expectBody(Void.class);
         }
-    }
-
-    @Nested
-    @DisplayName("In-app feedback (the developer's own practice pages)")
-    class PracticePageFeedback {
-
-        @Test
-        @WithMentorUser
-        void readsOnlyTheMessagesPreparedInThisWorkspace() {
-            seedPracticePageFeedback(workspaceA, "A way of working measured in tenant A");
-            seedPracticePageFeedback(workspaceB, "A way of working measured in tenant B");
-
-            webTestClient
-                    .get()
-                    .uri("/workspaces/{slug}/practices/feedback/practice-page", workspaceA.getWorkspaceSlug())
-                    .headers(TestAuthUtils.withCurrentUser())
-                    .exchange()
-                    .expectStatus()
-                    .isOk()
-                    .expectBody()
-                    .jsonPath("$.length()")
-                    .isEqualTo(1)
-                    .jsonPath("$[0].headline")
-                    .isEqualTo("A way of working measured in tenant A");
-        }
-
-        @Test
-        @WithMentorUser
-        void neverRetiresACardQueuedInAnotherTenant() {
-            Feedback inA = seedPracticePageFeedback(workspaceA, "A way of working measured in tenant A");
-            Feedback inB = seedPracticePageFeedback(workspaceB, "A way of working measured in tenant B");
-            assertThat(feedbackRepository.findByIdAndWorkspaceId(inA.getId(), workspaceA.getId()))
-                    .isPresent();
-            assertThat(feedbackRepository.findByIdAndWorkspaceId(inB.getId(), workspaceA.getId()))
-                    .isEmpty();
-            assertThat(feedbackRepository.findByIdAndWorkspaceId(inB.getId(), workspaceB.getId()))
-                    .isPresent();
-        }
-
-        @Test
-        @WithMentorUser
-        void namesOnlyThisTenantsPracticeForAQueuedCard() {
-            Feedback inA = seedPracticePageFeedback(workspaceA, "A way of working measured in tenant A");
-            Feedback inB = seedPracticePageFeedback(workspaceB, "A way of working measured in tenant B");
-
-            assertThat(feedbackRepository.findByWorkspaceIdAndReviewIdOrderByCreatedAtAscIdAsc(
-                            workspaceA.getId(), inA.getReviewId()))
-                    .extracting(Feedback::getId)
-                    .containsExactly(inA.getId())
-                    .doesNotContain(inB.getId());
-        }
-    }
-
-    private Feedback seedPracticePageFeedback(Workspace ws, String headline) {
-        var work = modelFixtures.work(
-                ws,
-                "practice-page-"
-                        + ws.getWorkspaceSlug()
-                        + "-"
-                        + UUID.randomUUID().toString().substring(0, 8),
-                "scm.pull_request",
-                2L);
-        var result = modelFixtures.result(work, accountId(overlapUser), "Evidence in " + ws.getWorkspaceSlug());
-        return modelFixtures.feedback(
-                result,
-                FeedbackDestination.PRACTICE_PAGE,
-                FeedbackState.READY,
-                PracticePageFeedbackBody.render(headline, "The feedback.", "The way of working to try."));
     }
 
     @Nested
@@ -424,6 +350,10 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
     @Nested
     @DisplayName("Member activity")
     class MemberActivity {
+        @BeforeEach
+        void connectActivitySource() {
+            CrossTenantIsolationIntegrationTest.this.connectActivitySource(workspaceA, ensureGitHubProvider());
+        }
 
         @Test
         @WithMentorUser

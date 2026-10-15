@@ -222,3 +222,85 @@ void test("a question answered only in reasoning remains unanswered", async () =
 		(error) => InvalidResponseDataError.isInstance(error),
 	);
 });
+
+for (const [count, stopToken, reasoning] of [
+	[4, "<|return|>", true],
+	[5, "<|return|>", true],
+	[4, "<|im_end|>", false],
+	[5, "<|im_end|>", false],
+] as const) {
+	void test(`${count} visible decision answers retain their probabilities before a ${reasoning ? "reasoning" : "non-reasoning"} provider stop token`, async () => {
+		const questions = Object.fromEntries(
+			Array.from({ length: count }, (_, index) => [
+				`item${index}`,
+				{ type: "boolean" as const, instructions: "Is this criterion met?" },
+			]),
+		);
+		const lines = Array.from(
+			{ length: count },
+			(_, index) => `q${index + 1}: ${index % 2 === 0 ? "A" : "B"}`,
+		);
+		const tokens = lines.flatMap((_, index) => [
+			{ token: "q", top_logprobs: [] },
+			{ token: String(index + 1), top_logprobs: [] },
+			{ token: ":", top_logprobs: [] },
+			{
+				token: index % 2 === 0 ? " A" : " B",
+				top_logprobs: [
+					{ token: " A", logprob: Math.log(index % 2 === 0 ? 0.8 : 0.2) },
+					{ token: " B", logprob: Math.log(index % 2 === 0 ? 0.2 : 0.8) },
+				],
+			},
+			...(index < count - 1 ? [{ token: "\n", top_logprobs: [] }] : []),
+		]);
+		const base = answering(" A", []);
+		const { answers } = await experimental_decide({
+			model: logprobDecisionModel(
+				new MockLanguageModelV4({
+					doGenerate: {
+						...base,
+						content: [
+							...(reasoning ? [{ type: "reasoning" as const, text: "q1: B (preview)" }] : []),
+							{ type: "text", text: lines.join("\n") },
+						],
+						providerMetadata: {
+							openai: {
+								logprobs: [
+									...(reasoning ? [{ token: "q1: B (preview)", top_logprobs: [] }] : []),
+									...tokens,
+									{ token: stopToken, top_logprobs: [] },
+								],
+							},
+						},
+					},
+				}),
+			),
+			state: "current work",
+			questions,
+		});
+		for (const [index, answer] of Object.values(answers).entries()) {
+			assert.ok(Math.abs(answer.probability - (index % 2 === 0 ? 0.8 : 0.2)) < 1e-9);
+		}
+	});
+}
+
+void test("ordinary trailing text cannot be mistaken for protocol termination", async () => {
+	const result = answering(" A", [{ token: " A", logprob: 0 }]);
+	await assert.rejects(
+		decideKind({
+			...result,
+			providerMetadata: {
+				openai: {
+					logprobs: [
+						{ token: "q1", top_logprobs: [] },
+						{ token: ":", top_logprobs: [] },
+						{ token: " A", top_logprobs: [{ token: " A", logprob: 0 }] },
+						{ token: " unrelated answer", top_logprobs: [] },
+						{ token: "<|im_end|>", top_logprobs: [] },
+					],
+				},
+			},
+		}),
+		(error) => InvalidResponseDataError.isInstance(error),
+	);
+});

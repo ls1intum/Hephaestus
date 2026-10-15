@@ -49,12 +49,11 @@ public class FeedbackCompositionService {
         var drafts = FeedbackDraftBuilder.build(
                 job, Set.copyOf(request.basisResultIds()), rows, context.support(), request.composition(), anchors);
         boolean hasPublic = drafts.stream().anyMatch(draft -> draft.destination() == FeedbackDestination.ON_WORK);
-        if (hasPublic && !request.publicComposition()) throw new ResultAdmissionService.AdmissionConflictException();
-        if (publicAlreadyAccepted && job.getPublicReviewDigest() == null)
-            throw new ResultAdmissionService.AdmissionConflictException();
+        if (hasPublic && !request.publicComposition()) throw new AdmissionConflictException();
+        if (publicAlreadyAccepted && job.getPublicReviewDigest() == null) throw new AdmissionConflictException();
         var prepared = feedback.prepareAll(job.getWorkspaceId(), job.getReviewId(), drafts);
         if (publicAlreadyAccepted && !prepared.packageDigest().equals(job.getPublicReviewDigest()))
-            throw new ResultAdmissionService.AdmissionConflictException();
+            throw new AdmissionConflictException();
         if (request.publicComposition()) {
             members.publicReviewed(
                     job.getWorkspaceId(), job.getReviewId(), job.getId(), job.getAttempt(), prepared.preparedAt());
@@ -146,6 +145,7 @@ public class FeedbackCompositionService {
                         .map(practice -> new PracticePageSupportDTO.PracticeSupportDTO(
                                 practice.practiceSlug(),
                                 practice.decision(),
+                                practice.stopReason(),
                                 practice.occurrences().stream()
                                         .map(row -> new PracticePageSupportDTO.SupportOccurrenceDTO(
                                                 row.resultId(),
@@ -171,7 +171,7 @@ public class FeedbackCompositionService {
                         eligibility.readAt(),
                         eligibility.results().stream()
                                 .map(row -> new ConversationEligibilityDTO.ResultDecisionDTO(
-                                        row.resultId(), row.decision()))
+                                        row.resultId(), row.decision(), row.stopReason()))
                                 .toList());
     }
 

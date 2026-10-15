@@ -16,6 +16,9 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
+import de.tum.cit.aet.hephaestus.integration.scm.context.MentorContextQueryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.context.MergeReadinessContentSource;
+import de.tum.cit.aet.hephaestus.integration.scm.context.ScmMentorWorkQuery;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -91,6 +94,9 @@ class MergeReadinessContentSourceIntegrationTest extends AbstractWorkspaceIntegr
 
     @Autowired
     private MergeReadinessContentSource source;
+
+    @Autowired
+    private ScmMentorWorkQuery work;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -434,6 +440,7 @@ class MergeReadinessContentSourceIntegrationTest extends AbstractWorkspaceIntegr
         ProxyFactory transactional = new ProxyFactory(new MergeReadinessContentSource(
                 actorSelector,
                 reopenBeforeSecondPage,
+                work,
                 reviewRepository,
                 commentRepository,
                 objectMapper,
@@ -446,7 +453,8 @@ class MergeReadinessContentSourceIntegrationTest extends AbstractWorkspaceIntegr
 
         ((MergeReadinessContentSource) transactional.getProxy())
                 .contribute(
-                        new MentorContextRequest(workspace.getId(), student.getId(), UUID.randomUUID(), null), files);
+                        new MentorContextRequest(workspace.getId(), accountId(student), UUID.randomUUID(), null),
+                        files);
 
         assertThat(pages.get()).isEqualTo(2);
         JsonNode entry = objectMapper
@@ -507,7 +515,7 @@ class MergeReadinessContentSourceIntegrationTest extends AbstractWorkspaceIntegr
                         .map(pr -> pr.path("number").asInt()))
                 .containsExactly(20);
         assertThat(payload.path("notLoadedTruncated").asBoolean()).isFalse();
-        JsonNode inspected = source.inspect(workspace.getId(), student.getId(), oldest.getId());
+        JsonNode inspected = source.inspect(workspace.getId(), accountId(student), oldest.getId());
         assertThat(inspected.path("pullRequests").get(0).path("number").asInt()).isEqualTo(20);
         assertThat(inspected.path("pullRequests").get(0).path("checks").asString())
                 .isEqualTo("SUCCESS");
@@ -568,17 +576,17 @@ class MergeReadinessContentSourceIntegrationTest extends AbstractWorkspaceIntegr
                         .map(pr -> pr.path("number").asInt()))
                 .containsExactly(4);
         for (PullRequest hidden : List.of(elsewhere, notMonitored, deleted)) {
-            assertThat(source.inspect(workspace.getId(), student.getId(), hidden.getId())
+            assertThat(source.inspect(workspace.getId(), accountId(student), hidden.getId())
                             .path("status")
                             .asString())
                     .as("MR !%d", hidden.getNumber())
                     .isEqualTo("NOT_FOUND");
         }
-        assertThat(source.inspect(workspace.getId(), tutor.getId(), ours.getId())
+        assertThat(source.inspect(workspace.getId(), accountId(tutor), ours.getId())
                         .path("status")
                         .asString())
                 .isEqualTo("NOT_FOUND");
-        assertThat(source.inspect(other.getId(), student.getId(), ours.getId())
+        assertThat(source.inspect(other.getId(), accountId(student), ours.getId())
                         .path("status")
                         .asString())
                 .isEqualTo("NOT_FOUND");
@@ -727,7 +735,7 @@ class MergeReadinessContentSourceIntegrationTest extends AbstractWorkspaceIntegr
         comment.setCommitId("b".repeat(40));
         reviewRepository.save(comment);
 
-        JsonNode entry = source.inspect(team.getId(), author.getId(), pr.getId())
+        JsonNode entry = source.inspect(team.getId(), accountId(author), pr.getId())
                 .path("pullRequests")
                 .get(0);
 
@@ -858,12 +866,15 @@ class MergeReadinessContentSourceIntegrationTest extends AbstractWorkspaceIntegr
 
     private JsonNode payload(long workspaceId, long developerId) {
         Map<String, byte[]> files = new HashMap<>();
-        source.contribute(new MentorContextRequest(workspaceId, developerId, UUID.randomUUID(), null), files);
+        source.contribute(
+                new MentorContextRequest(
+                        workspaceId, workspaceMembershipService.accountIdForUser(developerId), UUID.randomUUID(), null),
+                files);
         return objectMapper.readTree(Objects.requireNonNull(files.get(MergeReadinessContentSource.OUTPUT_KEY)));
     }
 
     private JsonNode inspect(PullRequest pr) {
-        return source.inspect(workspace.getId(), student.getId(), pr.getId())
+        return source.inspect(workspace.getId(), accountId(student), pr.getId())
                 .path("pullRequests")
                 .get(0);
     }

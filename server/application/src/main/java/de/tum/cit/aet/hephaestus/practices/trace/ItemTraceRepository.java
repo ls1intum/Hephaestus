@@ -2,8 +2,8 @@ package de.tum.cit.aet.hephaestus.practices.trace;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.FoundBy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewRequestReason;
 import de.tum.cit.aet.hephaestus.practices.review.model.Review;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestReason;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;

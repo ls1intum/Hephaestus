@@ -83,6 +83,8 @@ class PersonalDataMapArchTest {
             "practice",
             "practice_version",
             "review_batch_target",
+            // Frozen practice/model configuration and typed readiness flags contain no person or captured words.
+            "review_practice",
             "catalog_entry",
             "practice_group",
             "review_scope_repository",

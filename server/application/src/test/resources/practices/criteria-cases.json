@@ -539,8 +539,7 @@
 		},
 		"files": {
 			"context/metadata.json": "{\"state\": \"MERGED\", \"is_merged\": true, \"merged_at\": \"2026-10-05T12:00:00Z\", \"merged_by\": \"author\", \"author\": \"author\", \"assignees\": []}\n",
-			"context/review_threads.json": "{\"threads\": [], \"reviewDecisions\": [{\"state\": \"APPROVED\", \"author\": \"automation\", \"bot\": true, \"submittedAt\": \"2026-10-05T10:00:00Z\"}], \"decisionHistoryComplete\": false, \"truncated\": false}\n",
-			"context/project_inventory.json": "{\"contributors\": [\"author\", \"reviewer\"]}\n"
+			"context/review_threads.json": "{\"threads\": [], \"reviewDecisions\": [{\"state\": \"APPROVED\", \"author\": \"automation\", \"bot\": true, \"submittedAt\": \"2026-10-05T10:00:00Z\"}], \"decisionHistoryComplete\": false, \"truncated\": false}\n"
 		},
 		"reason": "A current bot-only snapshot does not rule out a human approval that stood at merge and was withdrawn afterward.",
 		"workType": "pull_request"
@@ -552,8 +551,7 @@
 		},
 		"files": {
 			"context/metadata.json": "{\"state\": \"MERGED\", \"is_merged\": true, \"merged_at\": \"2026-10-05T12:00:00Z\", \"merged_by\": \"author\", \"author\": \"author\", \"assignees\": []}\n",
-			"context/review_threads.json": "{\"threads\": [], \"reviewDecisions\": [{\"state\": \"APPROVED\", \"author\": \"reviewer\"}], \"decisionHistoryComplete\": false, \"truncated\": false}\n",
-			"context/project_inventory.json": "{\"contributors\": [\"author\", \"reviewer\"]}\n"
+			"context/review_threads.json": "{\"threads\": [], \"reviewDecisions\": [{\"state\": \"APPROVED\", \"author\": \"reviewer\"}], \"decisionHistoryComplete\": false, \"truncated\": false}\n"
 		},
 		"reason": "An undated retained approval after unavailable native reads cannot prove that it stood when the work merged.",
 		"workType": "pull_request"
@@ -565,24 +563,20 @@
 		},
 		"files": {
 			"context/metadata.json": "{\"state\": \"MERGED\", \"is_merged\": true, \"merged_at\": \"2026-10-05T12:00:00Z\", \"merged_by\": \"author\", \"author\": \"author\", \"assignees\": []}\n",
-			"context/review_threads.json": "{\"threads\": [], \"reviewDecisions\": [{\"state\": \"APPROVED\", \"author\": \"reviewer\", \"submittedAt\": \"2026-10-05T10:00:00Z\"}], \"decisionHistoryComplete\": false, \"truncated\": false}\n",
-			"context/project_inventory.json": "{\"contributors\": [\"author\", \"reviewer\"]}\n"
+			"context/review_threads.json": "{\"threads\": [], \"reviewDecisions\": [{\"state\": \"APPROVED\", \"author\": \"reviewer\", \"submittedAt\": \"2026-10-05T10:00:00Z\"}], \"decisionHistoryComplete\": false, \"truncated\": false}\n"
 		},
 		"reason": "A native date recovered from a standing approval after merge is a historical positive witness even if current readiness later becomes unknown.",
 		"workType": "pull_request"
 	},
 	{
 		"id": "issue-link-in-body-without-commit-capture",
-		"omit": [
-			"context/commits.json"
-		],
+		"omit": ["context/commits.json"],
 		"expected": {
 			"links-the-change-to-its-issue": "MET"
 		},
 		"files": {
 			"context/metadata.json": "{\"author\": \"author\", \"title\": \"Add search\", \"body\": \"Closes #12\", \"source_branch\": \"add-search\", \"state\": \"OPEN\", \"is_merged\": false}\n",
 			"context/description.md": "Closes #12\n",
-			"context/project_inventory.json": "{\"issues\":[{\"number\":12,\"title\":\"Search saved items\",\"state\":\"OPEN\"}]}\n",
 			"context/linked_work_items.json": "[{\"number\":12,\"title\":\"Search saved items\",\"state\":\"OPEN\",\"how\":\"closesOnMerge\"}]\n"
 		},
 		"reason": "A provider closing reference settles the link without needing commit history.",
@@ -596,7 +590,6 @@
 		"files": {
 			"context/metadata.json": "{\"author\": \"author\", \"title\": \"Add the date filter to search\", \"body\": \"Related to #12. Adds the date filter; the tag filter follows in a later change.\", \"source_branch\": \"date-filter\", \"state\": \"OPEN\", \"is_merged\": false}\n",
 			"context/description.md": "Related to #12. Adds the date filter; the tag filter follows in a later change.\n",
-			"context/project_inventory.json": "{\"issues\":[{\"number\":12,\"title\":\"Filter search results\",\"state\":\"OPEN\"}]}\n",
 			"context/linked_work_items.json": "{\"workItems\":[{\"number\":12,\"title\":\"Filter search results\",\"state\":\"OPEN\",\"how\":\"mentions\",\"body\":\"Add a date filter and a tag filter to search.\",\"url\":\"https://example.org/team/project/issues/12\",\"labels\":[]}],\"unresolvedReferences\":[],\"truncated\":false}\n",
 			"context/commits.json": "{\"commits\":[]}\n"
 		},
@@ -604,25 +597,22 @@
 		"workType": "pull_request"
 	},
 	{
-		"id": "product-work-without-issue-reference",
+		"id": "product-work-with-unrelated-issue-reference",
 		"expected": {
 			"links-the-change-to-its-issue": "NOT_MET"
 		},
 		"files": {
-			"context/metadata.json": "{\"author\": \"author\", \"title\": \"Add the date filter to search\", \"body\": \"Adds the date filter to search.\", \"source_branch\": \"date-filter\", \"state\": \"OPEN\", \"is_merged\": false}\n",
-			"context/description.md": "Adds the date filter to search.\n",
-			"context/project_inventory.json": "{\"issues\":[{\"number\":12,\"title\":\"Filter search results\",\"state\":\"OPEN\"}]}\n",
-			"context/linked_work_items.json": "{\"workItems\":[],\"unresolvedReferences\":[],\"truncated\":false}\n",
+			"context/metadata.json": "{\"author\": \"author\", \"title\": \"Add the date filter to search\", \"body\": \"Closes #12. Adds the date filter to search.\", \"source_branch\": \"date-filter\", \"state\": \"OPEN\", \"is_merged\": false}\n",
+			"context/description.md": "Closes #12. Adds the date filter to search.\n",
+			"context/linked_work_items.json": "{\"workItems\": [{\"number\": 12, \"title\": \"Upload a profile avatar\", \"body\": \"Let users upload and crop a profile avatar. This issue does not change search filters.\", \"state\": \"OPEN\", \"how\": \"closesOnMerge\", \"url\": \"https://example.org/team/project/issues/12\"}], \"unresolvedReferences\": [], \"truncated\": false}\n",
 			"context/commits.json": "{\"commits\":[]}\n"
 		},
-		"reason": "Product work in a project that tracks issues names no issue on any captured surface.",
+		"reason": "The change claims to implement issue #12, but the captured target describes unrelated avatar work. The contradiction is captured; no exhaustive repository absence is inferred.",
 		"workType": "pull_request"
 	},
 	{
 		"id": "resolved-review-request-without-commit-capture",
-		"omit": [
-			"context/commits.json"
-		],
+		"omit": ["context/commits.json"],
 		"expected": {
 			"engaging-with-inline-review-comments": "MET"
 		},
@@ -1150,8 +1140,7 @@
 		"files": {
 			"context/metadata.json": "{\"title\": \"CSV audit download, service-status banner and XML archive\", \"state\": \"OPEN\", \"state_reason\": null, \"labels\": [\"type::Task\"], \"body\": \"Current scope decision: this work is withdrawn. No CSV audit download, service-status banner or XML archive is requested. The earlier proposal below is retained as history.\\n\\n## Earlier proposal retained for history\\n\\nAdd a CSV audit download, a rotating service-status banner and an XML archive. Each can ship independently.\\n\\n## Earlier checks\\n\\nThe CSV download opens with column headers. The banner rotates through published service notices. The XML archive opens as XML.\\n\"}\n",
 			"context/description.md": "Current scope decision: this work is withdrawn. No CSV audit download, service-status banner or XML archive is requested. The earlier proposal below is retained as history.\n\n## Earlier proposal retained for history\n\nAdd a CSV audit download, a rotating service-status banner and an XML archive. Each can ship independently.\n\n## Earlier checks\n\nThe CSV download opens with column headers. The banner rotates through published service notices. The XML archive opens as XML.\n",
-			"context/comments.json": "[]\n",
-			"context/project_inventory.json": "{\"synced_at\": null, \"truncated\": false, \"issues\": [], \"pullRequests\": []}\n"
+			"context/comments.json": "[]\n"
 		},
 		"reason": "Explicit withdrawal leaves no requested export work; retained historical deliverables do not become an active decomposition or scope lapse.",
 		"workType": "issue"
@@ -1167,8 +1156,7 @@
 		"files": {
 			"context/metadata.json": "{\"title\": \"CSV audit download, service-status banner and XML archive\", \"state\": \"OPEN\", \"state_reason\": null, \"labels\": [\"type::Task\"], \"body\": \"Current scope decision: deliver the CSV audit download and the rotating service-status banner. Drop the XML archive. The remaining outputs can ship and be assigned independently.\\n\\n## Current checks\\n\\nThe CSV download contains column headers and one row per audit record. The service-status banner rotates through published service notices. Neither output depends on the other.\\n\\n## Earlier proposal retained for history\\n\\nAdd a CSV audit download, a rotating service-status banner and an XML archive. Each can ship independently.\\n\\n## Earlier checks\\n\\nThe CSV download opens with column headers. The banner rotates through published service notices. The XML archive opens as XML.\\n\"}\n",
 			"context/description.md": "Current scope decision: deliver the CSV audit download and the rotating service-status banner. Drop the XML archive. The remaining outputs can ship and be assigned independently.\n\n## Current checks\n\nThe CSV download contains column headers and one row per audit record. The service-status banner rotates through published service notices. Neither output depends on the other.\n\n## Earlier proposal retained for history\n\nAdd a CSV audit download, a rotating service-status banner and an XML archive. Each can ship independently.\n\n## Earlier checks\n\nThe CSV download opens with column headers. The banner rotates through published service notices. The XML archive opens as XML.\n",
-			"context/comments.json": "[]\n",
-			"context/project_inventory.json": "{\"synced_at\": null, \"truncated\": false, \"issues\": [], \"pullRequests\": []}\n"
+			"context/comments.json": "[]\n"
 		},
 		"reason": "Dropping one output preserves two concrete independent requests and leaves unrelated combined scope assessable. Unknown child tracking cannot establish a missing breakdown; the withdrawn output stays historical.",
 		"workType": "issue",
@@ -1185,8 +1173,7 @@
 		"files": {
 			"context/metadata.json": "{\"title\": \"CSV audit download, service-status banner and XML archive\", \"state\": \"OPEN\", \"state_reason\": null, \"labels\": [\"type::Task\"], \"body\": \"## Current scope decision\\n\\nNo CSV audit download, service-status banner or XML archive is requested. This work is withdrawn.\\n\\n## Current delivery requirement\\n\\nDeliver the CSV audit download, service-status banner and XML archive. All three remain requested.\\n\\n## Earlier proposal retained for history\\n\\nAdd a CSV audit download, a rotating service-status banner and an XML archive. Each can ship independently.\\n\\n## Earlier checks\\n\\nThe CSV download opens with column headers. The banner rotates through published service notices. The XML archive opens as XML.\\n\"}\n",
 			"context/description.md": "## Current scope decision\n\nNo CSV audit download, service-status banner or XML archive is requested. This work is withdrawn.\n\n## Current delivery requirement\n\nDeliver the CSV audit download, service-status banner and XML archive. All three remain requested.\n\n## Earlier proposal retained for history\n\nAdd a CSV audit download, a rotating service-status banner and an XML archive. Each can ship independently.\n\n## Earlier checks\n\nThe CSV download opens with column headers. The banner rotates through published service notices. The XML archive opens as XML.\n",
-			"context/comments.json": "[]\n",
-			"context/project_inventory.json": "{\"synced_at\": null, \"truncated\": false, \"issues\": [], \"pullRequests\": []}\n"
+			"context/comments.json": "[]\n"
 		},
 		"reason": "Two explicit current statements contradict one another without a resolving decision; their order alone cannot decide the request.",
 		"workType": "issue"
@@ -1282,8 +1269,7 @@
 		},
 		"files": {
 			"context/metadata.json": "{\"state\": \"MERGED\", \"is_merged\": true, \"merged_at\": \"2026-10-05T12:00:00Z\", \"merged_by\": \"author\", \"author\": \"author\", \"assignees\": [], \"pr_url\": \"https://gitlab.example.org/course/app/-/merge_requests/7\"}\n",
-			"context/review_threads.json": "{\"threads\": [], \"reviewDecisions\": [{\"state\": \"CHANGES_REQUESTED\", \"author\": \"reviewer-a\", \"submittedAt\": \"2026-10-04T09:00:00Z\"}, {\"state\": \"CHANGES_REQUESTED\", \"author\": \"reviewer-a\", \"submittedAt\": \"2026-10-04T15:00:00Z\"}, {\"state\": \"APPROVED\", \"author\": \"reviewer-a\", \"submittedAt\": \"2026-10-05T10:00:00Z\"}, {\"state\": \"DISMISSED\", \"dismissed\": true, \"author\": \"reviewer-b\"}], \"decisionHistoryComplete\": false, \"truncated\": false}\n",
-			"context/project_inventory.json": "{\"contributors\": [\"author\", \"reviewer-a\", \"reviewer-b\"]}\n"
+			"context/review_threads.json": "{\"threads\": [], \"reviewDecisions\": [{\"state\": \"CHANGES_REQUESTED\", \"author\": \"reviewer-a\", \"submittedAt\": \"2026-10-04T09:00:00Z\"}, {\"state\": \"CHANGES_REQUESTED\", \"author\": \"reviewer-a\", \"submittedAt\": \"2026-10-04T15:00:00Z\"}, {\"state\": \"APPROVED\", \"author\": \"reviewer-a\", \"submittedAt\": \"2026-10-05T10:00:00Z\"}, {\"state\": \"DISMISSED\", \"dismissed\": true, \"author\": \"reviewer-b\"}], \"decisionHistoryComplete\": false, \"truncated\": false}\n"
 		},
 		"reason": "Reviewer A's dated approval replaced their own earlier requests and stood at merge. On GitLab the other reviewer's dismissed row is a withdrawn approval, which cannot unsettle A's approval.",
 		"workType": "pull_request"
@@ -1295,8 +1281,7 @@
 		},
 		"files": {
 			"context/metadata.json": "{\"state\": \"MERGED\", \"is_merged\": true, \"merged_at\": \"2026-10-05T12:00:00Z\", \"merged_by\": \"author\", \"author\": \"author\", \"assignees\": [], \"pr_url\": \"https://github.com/course/app/pull/7\"}\n",
-			"context/review_threads.json": "{\"threads\": [], \"reviewDecisions\": [{\"state\": \"APPROVED\", \"author\": \"reviewer-a\", \"submittedAt\": \"2026-10-05T10:00:00Z\"}, {\"state\": \"CHANGES_REQUESTED\", \"author\": \"reviewer-b\"}], \"decisionHistoryComplete\": false, \"truncated\": false}\n",
-			"context/project_inventory.json": "{\"contributors\": [\"author\", \"reviewer-a\", \"reviewer-b\"]}\n"
+			"context/review_threads.json": "{\"threads\": [], \"reviewDecisions\": [{\"state\": \"APPROVED\", \"author\": \"reviewer-a\", \"submittedAt\": \"2026-10-05T10:00:00Z\"}, {\"state\": \"CHANGES_REQUESTED\", \"author\": \"reviewer-b\"}], \"decisionHistoryComplete\": false, \"truncated\": false}\n"
 		},
 		"reason": "Reviewer A's approval stood at merge, but reviewer B's undated request for changes may also have stood then; the record cannot settle it.",
 		"workType": "pull_request"
@@ -1311,8 +1296,7 @@
 		},
 		"files": {
 			"context/metadata.json": "{\"state\": \"MERGED\", \"is_merged\": true, \"merged_at\": \"2026-10-05T12:00:00Z\", \"merged_by\": \"author\", \"author\": \"author\", \"assignees\": [], \"pr_url\": \"https://github.com/course/app/pull/7\"}\n",
-			"context/review_threads.json": "{\"threads\": [], \"reviewDecisions\": [{\"state\": \"APPROVED\", \"author\": \"reviewer-a\", \"submittedAt\": \"2026-10-05T10:00:00Z\"}, {\"state\": \"CHANGES_REQUESTED\", \"author\": \"reviewer-b\", \"submittedAt\": \"2026-10-05T11:00:00Z\"}], \"decisionHistoryComplete\": false, \"truncated\": false}\n",
-			"context/project_inventory.json": "{\"contributors\": [\"author\", \"reviewer-a\", \"reviewer-b\"]}\n"
+			"context/review_threads.json": "{\"threads\": [], \"reviewDecisions\": [{\"state\": \"APPROVED\", \"author\": \"reviewer-a\", \"submittedAt\": \"2026-10-05T10:00:00Z\"}, {\"state\": \"CHANGES_REQUESTED\", \"author\": \"reviewer-b\", \"submittedAt\": \"2026-10-05T11:00:00Z\"}], \"decisionHistoryComplete\": false, \"truncated\": false}\n"
 		},
 		"reason": "Reviewer B's dated request for changes came before the merge and nothing B recorded replaced it, so the merge went over a standing request despite A's approval.",
 		"workType": "pull_request"
@@ -1324,8 +1308,7 @@
 		},
 		"files": {
 			"context/metadata.json": "{\"state\": \"MERGED\", \"is_merged\": true, \"merged_at\": \"2026-10-05T12:00:00Z\", \"merged_by\": \"author\", \"author\": \"author\", \"assignees\": [], \"pr_url\": \"https://github.com/course/app/pull/7\"}\n",
-			"context/review_threads.json": "{\"threads\": [], \"reviewDecisions\": [{\"state\": \"APPROVED\", \"author\": \"reviewer-a\", \"submittedAt\": \"2026-10-05T10:00:00Z\"}, {\"state\": \"DISMISSED\", \"dismissed\": true, \"author\": \"reviewer-b\"}], \"decisionHistoryComplete\": false, \"truncated\": false}\n",
-			"context/project_inventory.json": "{\"contributors\": [\"author\", \"reviewer-a\", \"reviewer-b\"]}\n"
+			"context/review_threads.json": "{\"threads\": [], \"reviewDecisions\": [{\"state\": \"APPROVED\", \"author\": \"reviewer-a\", \"submittedAt\": \"2026-10-05T10:00:00Z\"}, {\"state\": \"DISMISSED\", \"dismissed\": true, \"author\": \"reviewer-b\"}], \"decisionHistoryComplete\": false, \"truncated\": false}\n"
 		},
 		"reason": "On GitHub a dismissed state without its original state may have been a request for changes, and its dismissal time is unknown, so it may have stood at merge beside A's approval.",
 		"workType": "pull_request"
@@ -1521,35 +1504,35 @@
 		"reason": "Reviewer A's dated request is settled only by an approval and a resolution that carry no dates, so the record cannot place either before the merge.",
 		"workType": "pull_request"
 	},
-{
-  "id": "loop-same-reviewer-approval-retains-explicit-hold",
-  "expected": {
-    "merged-past-unresolved-review-threads": "NOT_MET"
-  },
-  "files": {
-    "context/metadata.json": "{\"author\": \"author\", \"state\": \"MERGED\", \"is_merged\": true, \"merged_at\": \"2026-10-05T12:00:00Z\", \"merged_by\": \"author\", \"pr_url\": \"https://gitlab.example.org/course/app/-/merge_requests/7\"}\n",
-    "context/comments.json": "[]\n",
-    "context/review_threads.json": "{\"threads\": [], \"reviewDecisions\": [{\"state\": \"CHANGES_REQUESTED\", \"author\": \"reviewer-a\", \"submittedAt\": \"2026-10-04T09:00:00Z\"}, {\"state\": \"APPROVED\", \"author\": \"reviewer-a\", \"submittedAt\": \"2026-10-05T10:00:00Z\"}], \"decisionHistoryComplete\": false, \"truncated\": false}\n",
-    "context/general_comments.json": "[{\"id\": 41, \"author\": \"reviewer-a\", \"body\": \"Code approved. Do not merge until the staged data migration has completed; it is still running. I will confirm when it finishes.\", \"created_at\": \"2026-10-05T10:00:00Z\"}, {\"id\": 42, \"author\": \"author\", \"body\": \"The migration is still running. I am merging the code now to keep the release moving.\", \"created_at\": \"2026-10-05T11:50:00Z\"}]\n"
-  },
-  "reason": "The dated approval supersedes the same reviewer’s formal change-request decision, but the reviewer explicitly retains a separate migration hold. The dated reply confirms that condition still stands immediately before merge, with no captured lift.",
-  "workType": "pull_request"
-},
-{
-  "id": "loop-undated-approval-without-captured-gate",
-  "expected": {
-    "merged-past-unresolved-review-threads": "MET"
-  },
-  "files": {
-    "context/metadata.json": "{\"author\": \"author\", \"state\": \"MERGED\", \"is_merged\": true, \"merged_at\": \"2026-10-05T12:00:00Z\", \"merged_by\": \"author\", \"pr_url\": \"https://gitlab.example.org/course/app/-/merge_requests/7\"}\n",
-    "context/comments.json": "[]\n",
-    "context/review_threads.json": "{\"threads\": [], \"reviewDecisions\": [{\"state\": \"APPROVED\", \"author\": \"reviewer-a\"}], \"decisionHistoryComplete\": false, \"truncated\": false}\n",
-    "context/general_comments.json": "[{\"id\": 51, \"author\": \"reviewer-a\", \"body\": \"For a future change, consider showing a search hint. This is optional and does not need to hold this merge.\", \"created_at\": \"2026-10-05T09:00:00Z\"}]\n"
-  },
-  "reason": "The complete captured sources show no formal change-request, thread or explicit merge hold. The dated comment is optional future advice. Approval timing does not decide whether any captured gate stood at merge, so its missing date does not make loop closure unknown.",
-  "workType": "pull_request"
-},
-{
+	{
+		"id": "loop-same-reviewer-approval-retains-explicit-hold",
+		"expected": {
+			"merged-past-unresolved-review-threads": "NOT_MET"
+		},
+		"files": {
+			"context/metadata.json": "{\"author\": \"author\", \"state\": \"MERGED\", \"is_merged\": true, \"merged_at\": \"2026-10-05T12:00:00Z\", \"merged_by\": \"author\", \"pr_url\": \"https://gitlab.example.org/course/app/-/merge_requests/7\"}\n",
+			"context/comments.json": "[]\n",
+			"context/review_threads.json": "{\"threads\": [], \"reviewDecisions\": [{\"state\": \"CHANGES_REQUESTED\", \"author\": \"reviewer-a\", \"submittedAt\": \"2026-10-04T09:00:00Z\"}, {\"state\": \"APPROVED\", \"author\": \"reviewer-a\", \"submittedAt\": \"2026-10-05T10:00:00Z\"}], \"decisionHistoryComplete\": false, \"truncated\": false}\n",
+			"context/general_comments.json": "[{\"id\": 41, \"author\": \"reviewer-a\", \"body\": \"Code approved. Do not merge until the staged data migration has completed; it is still running. I will confirm when it finishes.\", \"created_at\": \"2026-10-05T10:00:00Z\"}, {\"id\": 42, \"author\": \"author\", \"body\": \"The migration is still running. I am merging the code now to keep the release moving.\", \"created_at\": \"2026-10-05T11:50:00Z\"}]\n"
+		},
+		"reason": "The dated approval supersedes the same reviewer’s formal change-request decision, but the reviewer explicitly retains a separate migration hold. The dated reply confirms that condition still stands immediately before merge, with no captured lift.",
+		"workType": "pull_request"
+	},
+	{
+		"id": "loop-undated-approval-without-captured-gate",
+		"expected": {
+			"merged-past-unresolved-review-threads": "MET"
+		},
+		"files": {
+			"context/metadata.json": "{\"author\": \"author\", \"state\": \"MERGED\", \"is_merged\": true, \"merged_at\": \"2026-10-05T12:00:00Z\", \"merged_by\": \"author\", \"pr_url\": \"https://gitlab.example.org/course/app/-/merge_requests/7\"}\n",
+			"context/comments.json": "[]\n",
+			"context/review_threads.json": "{\"threads\": [], \"reviewDecisions\": [{\"state\": \"APPROVED\", \"author\": \"reviewer-a\"}], \"decisionHistoryComplete\": false, \"truncated\": false}\n",
+			"context/general_comments.json": "[{\"id\": 51, \"author\": \"reviewer-a\", \"body\": \"For a future change, consider showing a search hint. This is optional and does not need to hold this merge.\", \"created_at\": \"2026-10-05T09:00:00Z\"}]\n"
+		},
+		"reason": "The complete captured sources show no formal change-request, thread or explicit merge hold. The dated comment is optional future advice. Approval timing does not decide whether any captured gate stood at merge, so its missing date does not make loop closure unknown.",
+		"workType": "pull_request"
+	},
+	{
 		"id": "outcome-delivery-bullets-with-unticked-issue",
 		"expected": {
 			"merge-confirms-the-linked-issue-outcome": "MET"
@@ -1564,7 +1547,7 @@
 		"reason": "The authored account names both adopted outcome items. The issue can stay open and its boxes unticked; no closing formula or code inference is needed.",
 		"workType": "pull_request"
 	},
-{
+	{
 		"id": "outcome-partial-handoff-silent-remainder",
 		"expected": {
 			"merge-confirms-the-linked-issue-outcome": "NOT_MET"
@@ -1579,7 +1562,7 @@
 		"reason": "The change closes the issue and so adopts both outcome items, but the handoff reports only one as delivered and neither names nor defers the other.",
 		"workType": "pull_request"
 	},
-{
+	{
 		"id": "outcome-generic-template-with-bare-closing-reference",
 		"expected": {
 			"merge-confirms-the-linked-issue-outcome": "NOT_MET"
@@ -1657,6 +1640,39 @@
 			"repo/Endpoint.swift": "import Foundation\nlet apiKey = \"unclassified-service-value\"\nlet endpoint = URL(string: \"https://service.example/api/\\(apiKey)/items\")\n"
 		},
 		"reason": "The code names a candidate value, but the captured evidence does not establish its authorization or intended audience.",
+		"workType": "pull_request"
+	},
+	{
+		"id": "literal-password-used-for-authentication",
+		"expected": {
+			"avoids-insecure-defaults-and-over-broad-permissions": "NOT_MET"
+		},
+		"files": {
+			"repo/Sources/LoginService.swift": "import Foundation\n\nfinal class LoginService {\n    private let password = \"admin123!\"\n\n    func authenticate(user: String, password: String) -> Bool {\n        return user == \"root\" && password == self.password\n    }\n}\n"
+		},
+		"reason": "The recorded live fixture accepts a committed password literal for root. The authentication comparison proves credential authority without a live deployment or account lookup.",
+		"workType": "pull_request"
+	},
+	{
+		"id": "placeholder-looking-password-accepted-at-runtime",
+		"expected": {
+			"avoids-insecure-defaults-and-over-broad-permissions": "NOT_MET"
+		},
+		"files": {
+			"repo/Sources/LoginService.swift": "import Foundation\n\nfinal class LoginService {\n    private let password = \"YOUR_PASSWORD_HERE\"\n\n    func authenticate(user: String, password: String) -> Bool {\n        return user == \"root\" && password == self.password\n    }\n}\n"
+		},
+		"reason": "A placeholder-looking literal is still an accepted credential when the shipped authentication comparison grants access for it.",
+		"workType": "pull_request"
+	},
+	{
+		"id": "credential-comparison-confined-to-test-fixture",
+		"expected": {
+			"avoids-insecure-defaults-and-over-broad-permissions": "DOES_NOT_APPLY"
+		},
+		"files": {
+			"repo/Tests/LoginFixtureTests.swift": "import XCTest\n\nfinal class LoginFixtureTests: XCTestCase {\n    func testFixture() {\n        let authenticateFixture: (String) -> Bool = { $0 == \"fixture-only\" }\n        XCTAssertTrue(authenticateFixture(\"fixture-only\"))\n    }\n}\n"
+		},
+		"reason": "The captured XCTest case confines its synthetic credential comparison to a test fixture; it adds no shipped authentication setting.",
 		"workType": "pull_request"
 	},
 	{

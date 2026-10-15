@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.capture;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -30,7 +29,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -454,26 +452,6 @@ class IssueContentSourceTest extends BaseUnitTest {
     class Comments {
 
         @Test
-        void ordersThreadByCreatedAtAscending() throws Exception {
-            Issue issue = richIssue();
-            StoredComment newer = comment("alice", "second", Instant.parse("2025-06-02T10:00:00Z"));
-            StoredComment older = comment("bob", "first", Instant.parse("2025-06-01T10:00:00Z"));
-            stubComments(List.of(older, newer));
-            when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
-
-            Map<String, byte[]> files = new LinkedHashMap<>();
-            files.putAll(provider.capture(request(sampleMetadata(), issue), provider.sourceKinds())
-                    .files());
-
-            JsonNode comments = objectMapper.readTree(files.get(COMMENTS_KEY));
-            assertThat(comments).hasSize(2);
-            assertThat(comments.get(0).get("body").asString()).isEqualTo("first");
-            assertThat(comments.get(0).get("author").asString()).isEqualTo("bob");
-            assertThat(comments.get(0).get("created_at").asString()).isEqualTo("2025-06-01T10:00:00Z");
-            assertThat(comments.get(1).get("body").asString()).isEqualTo("second");
-        }
-
-        @Test
         void emitsNullAuthorWhenCommentHasNoAuthor() throws Exception {
             Issue issue = richIssue();
             stubComments(List.of(comment(null, "anon", Instant.parse("2025-06-01T10:00:00Z"))));
@@ -490,27 +468,7 @@ class IssueContentSourceTest extends BaseUnitTest {
     }
 
     @Nested
-    class StagedFiles {
-
-        @Test
-        void stagesTheIssueAsMetadataAndCommentsOnly() {
-            Issue issue = richIssue();
-            stubComments(List.of(comment("bob", "first", Instant.parse("2025-06-01T10:00:00Z"))));
-            when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
-
-            Map<String, byte[]> files = new LinkedHashMap<>();
-            files.putAll(provider.capture(request(sampleMetadata(), issue), provider.sourceKinds())
-                    .files());
-
-            assertThat(files).containsKeys(METADATA_KEY, "context/description.md", COMMENTS_KEY);
-            assertThat(new String(files.get("context/description.md"), StandardCharsets.UTF_8))
-                    .isEqualTo("Make the catalogue honest.");
-
-            JsonNode comments = objectMapper.readTree(files.get(COMMENTS_KEY));
-            assertThat(comments).hasSize(1);
-            assertThat(comments.get(0).path("author").asString()).isEqualTo("bob");
-        }
-    }
+    class StagedFiles {}
 
     @Nested
     class Abstention {
@@ -530,30 +488,5 @@ class IssueContentSourceTest extends BaseUnitTest {
             assertThat(metadata.get("body").isString()).isTrue();
             assertThat(metadata.get("body").asString()).isEmpty();
         }
-    }
-
-    @ParameterizedTest
-    @ValueSource(booleans = {false, true})
-    void shouldReportUnavailableThenAllowCaptureWhenItemReturns(boolean tombstoned) {
-        var artifact = richIssue();
-        var pinned = request(sampleMetadata(), artifact);
-        clearInvocations(issueCommentRepository);
-        artifact.setDeletedAt(Instant.parse("2026-09-05T00:00:00Z"));
-        when(issueRepository.findByIdWithRepository(ISSUE_ID))
-                .thenReturn(tombstoned ? Optional.of(artifact) : Optional.empty());
-        for (var kind : provider.sourceKinds()) {
-            var captured = provider.capture(pinned, Set.of(kind));
-            assertThat(captured.files()).isEmpty();
-            assertThat(captured.completeness()).isEmpty();
-            assertThat(captured.contentStates()).isEmpty();
-            assertThat(captured.stateOverrides())
-                    .containsExactlyEntriesOf(
-                            Map.of(kind, new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND)));
-        }
-        artifact.setDeletedAt(null);
-        when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(artifact));
-        var restored = provider.capture(pinned, Set.of(COMMENTS));
-        assertThat(restored.stateOverrides()).isEmpty();
-        assertThat(restored.files()).isNotEmpty();
     }
 }

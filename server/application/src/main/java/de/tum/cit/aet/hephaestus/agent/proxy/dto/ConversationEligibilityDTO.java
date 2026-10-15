@@ -3,9 +3,11 @@ package de.tum.cit.aet.hephaestus.agent.proxy.dto;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationDecision;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationEligibility;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 @JsonInclude(JsonInclude.Include.ALWAYS)
 public record ConversationEligibilityDTO(
@@ -16,5 +18,9 @@ public record ConversationEligibilityDTO(
             throw new IllegalArgumentException("Unavailable conversation routing cannot authorize results");
     }
 
-    public record ResultDecisionDTO(UUID resultId, ConversationDecision decision) {}
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record ResultDecisionDTO(
+            UUID resultId,
+            ConversationDecision decision,
+            @Nullable FeedbackStopReason stopReason) {}
 }

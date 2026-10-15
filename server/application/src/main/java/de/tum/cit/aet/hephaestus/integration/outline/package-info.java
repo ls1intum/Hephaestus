@@ -8,6 +8,7 @@
             "core::person-data",
             // Connection registry + SPI ports (credential provider, manifest, lifecycle listener, connect strategy).
             "integration.core",
+            "integration.core::framework",
             "integration.core::spi",
             "integration.core::items",
             // OutlineWebhookMessageHandler rides the JetStream consumer lane (ADR 0023 §3).

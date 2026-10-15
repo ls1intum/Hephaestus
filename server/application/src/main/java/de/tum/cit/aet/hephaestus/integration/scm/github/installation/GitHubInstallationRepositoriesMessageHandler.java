@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.installation;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -22,6 +23,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * this handler notifies the consuming module via SPI to update monitored repositories.
  */
 @Component
+@ConditionalOnServerRole
 public class GitHubInstallationRepositoriesMessageHandler
         extends AbstractIntegrationMessageHandler<GitHubInstallationRepositoriesEventDTO> {
 

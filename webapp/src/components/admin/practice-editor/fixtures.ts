@@ -11,12 +11,17 @@ import type { PracticeDefinitionValue } from "./PracticeDefinitionForm";
 
 export const MOCK_SOURCE_CONTRACT = "2.0.0";
 
-function readSource(source: string, label: string, complete = true): ReadSourceOption {
+function readSource(
+	source: string,
+	label: string,
+	complete = true,
+	citation?: ReadSourceOption["citation"],
+): ReadSourceOption {
 	return {
 		source,
 		label,
 		needs: complete ? ["REQUIRED", "COMPLETE", "OPTIONAL"] : ["REQUIRED", "OPTIONAL"],
-		citation: {},
+		citation: citation ?? { side: "FORBIDDEN", commit: "FORBIDDEN" },
 	};
 }
 
@@ -24,26 +29,27 @@ function event(name: string, label: string, recommended: boolean): ItemEventOpti
 	return { name, label, recommended, connected: true, raisedBy: ["GITHUB", "GITLAB"] };
 }
 
-const resultHistory = readSource("hephaestus.result-history", "Earlier results about this person");
-const feedbackHistory = readSource(
-	"hephaestus.feedback-history",
-	"Feedback already delivered to this person",
-);
-const relatedWork = readSource("workspace.project-inventory", "Related workspace work");
-const repositoryTree = readSource("scm.repository.tree", "Repository files and history");
+const repositoryTree = readSource("scm.repository.tree", "Repository files and history", true, {
+	side: "FORBIDDEN",
+	commit: "OPTIONAL",
+});
 
 const pullRequestSources = [
 	readSource("scm.pull-request.core", "Pull request details"),
-	readSource("scm.pull-request.diff", "Code changes"),
+	readSource("scm.pull-request.diff", "Code changes", true, {
+		side: "REQUIRED",
+		commit: "OPTIONAL",
+	}),
 	readSource("scm.pull-request.comments", "Inline review comments"),
 	readSource("scm.review-threads", "Review threads and decisions"),
 	readSource("scm.general-review-comments", "General review comments"),
 	repositoryTree,
 	readSource("scm.linked-work-items", "Linked work items", false),
-	relatedWork,
-	resultHistory,
-	feedbackHistory,
 ];
+
+const applicabilitySources = pullRequestSources.filter(
+	({ source }) => source === "scm.review-threads" || source === "scm.general-review-comments",
+);
 
 export const mockPullRequestItemType = {
 	kind: "scm.pull_request",
@@ -69,6 +75,7 @@ export const mockPullRequestItemType = {
 		},
 	],
 	applicabilityClauses: ["CHANGED_PATH", "DIFF_CONTAINS", "HAS_ITEMS"],
+	applicabilitySources,
 	scanSupported: true,
 	scanItemKinds: ["scm.file"],
 } satisfies PracticeItemTypeOption;
@@ -81,6 +88,7 @@ export const mockPullRequestReviewItemType = {
 	readSources: pullRequestSources,
 	reviewOnStateDimensions: [],
 	applicabilityClauses: ["HAS_ITEMS"],
+	applicabilitySources,
 	scanSupported: false,
 	scanItemKinds: [],
 } satisfies PracticeItemTypeOption;
@@ -97,9 +105,6 @@ export const mockIssueItemType = {
 	readSources: [
 		readSource("scm.issue.core", "Issue details"),
 		readSource("scm.issue.comments", "Issue comments"),
-		relatedWork,
-		resultHistory,
-		feedbackHistory,
 	],
 	reviewOnStateDimensions: [
 		{
@@ -112,6 +117,7 @@ export const mockIssueItemType = {
 		},
 	],
 	applicabilityClauses: [],
+	applicabilitySources: [],
 	scanSupported: false,
 	scanItemKinds: [],
 } satisfies PracticeItemTypeOption;
@@ -121,14 +127,10 @@ export const mockThreadItemType = {
 	label: "Conversation",
 	events: [event("chat.thread.settled", "Discussion settled", true)],
 	aboutRoles: ["AUTHOR"],
-	readSources: [
-		readSource("slack.conversation.thread", "Slack thread"),
-		relatedWork,
-		resultHistory,
-		feedbackHistory,
-	],
+	readSources: [readSource("slack.conversation.thread", "Slack thread")],
 	reviewOnStateDimensions: [],
 	applicabilityClauses: [],
+	applicabilitySources: [],
 	scanSupported: false,
 	scanItemKinds: [],
 } satisfies PracticeItemTypeOption;
@@ -142,13 +144,10 @@ export const mockDocumentItemType = {
 		event("docs.document.archived", "Archived", false),
 	],
 	aboutRoles: ["AUTHOR"],
-	readSources: [
-		readSource("docs.document.core", "Document under review"),
-		resultHistory,
-		feedbackHistory,
-	],
+	readSources: [readSource("docs.document.core", "Document under review")],
 	reviewOnStateDimensions: [],
 	applicabilityClauses: [],
+	applicabilitySources: [],
 	scanSupported: false,
 	scanItemKinds: [],
 } satisfies PracticeItemTypeOption;
@@ -161,6 +160,7 @@ export const mockFileItemType = {
 	readSources: [repositoryTree],
 	reviewOnStateDimensions: [],
 	applicabilityClauses: [],
+	applicabilitySources: [],
 	scanSupported: false,
 	scanItemKinds: [],
 } satisfies PracticeItemTypeOption;

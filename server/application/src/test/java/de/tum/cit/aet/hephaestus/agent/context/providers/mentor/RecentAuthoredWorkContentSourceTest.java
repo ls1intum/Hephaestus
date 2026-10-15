@@ -7,6 +7,10 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.integration.scm.context.MentorContextQueryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.context.MergeReadinessContentSource;
+import de.tum.cit.aet.hephaestus.integration.scm.context.RecentAuthoredWorkContentSource;
+import de.tum.cit.aet.hephaestus.integration.scm.context.ScmMentorWorkQuery;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -28,6 +32,9 @@ class RecentAuthoredWorkContentSourceTest extends BaseUnitTest {
     @Mock
     MentorContextQueryRepository queryRepository;
 
+    @Mock
+    ScmMentorWorkQuery work;
+
     @Spy
     ObjectMapper objectMapper = new ObjectMapper();
 
@@ -38,19 +45,20 @@ class RecentAuthoredWorkContentSourceTest extends BaseUnitTest {
     void shouldPublishMergedPullRequestResourcesUsingItsSourceId() {
         when(accounts.findAllByIds(List.of(2L)))
                 .thenReturn(Map.of(2L, new AccountSummaryQuery.AccountSummary(2, "Student", null)));
+        when(work.actorIds(1L, 2L)).thenReturn(List.of(200L));
         PullRequest merged = new PullRequest();
         merged.setId(4009553323L);
         merged.setNumber(9);
         merged.setTitle("Add the simulator note");
         merged.setState(Issue.State.MERGED);
-        when(queryRepository.findRecentAuthoredPullRequests(eq(1L), eq(2L), any(Pageable.class)))
+        when(queryRepository.findRecentAuthoredPullRequests(eq(1L), eq(List.of(200L)), any(Pageable.class)))
                 .thenReturn(List.of(merged));
         Issue issue = new Issue();
         issue.setId(77L);
         issue.setNumber(14);
         issue.setTitle("Follow up on the runtime check");
         issue.setState(Issue.State.OPEN);
-        when(queryRepository.findRecentAuthoredIssues(eq(1L), eq(2L), any(Pageable.class)))
+        when(queryRepository.findRecentAuthoredIssues(eq(1L), eq(List.of(200L)), any(Pageable.class)))
                 .thenReturn(List.of(issue));
 
         JsonNode payload = source.buildPayload(1L, 2L);

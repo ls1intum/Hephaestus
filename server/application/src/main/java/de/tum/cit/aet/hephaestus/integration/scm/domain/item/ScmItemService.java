@@ -176,6 +176,7 @@ public class ScmItemService implements ItemSource {
         if (review != null) noun = "review";
         ItemLabel label = new ItemLabel(
                 item.itemId(),
+                ScmItemAccess.nativeLabel(integration.kind(), noun, work.getNumber(), work.getTitle()),
                 review == null ? work.getTitle() : "Review of " + work.getTitle(),
                 noun,
                 work.getNumber(),
@@ -205,6 +206,7 @@ public class ScmItemService implements ItemSource {
                 List.of(),
                 new ItemLabel(
                         item.itemId(),
+                        repository.getNameWithOwner(),
                         repository.getNameWithOwner(),
                         "repository",
                         null,
@@ -253,6 +255,7 @@ public class ScmItemService implements ItemSource {
                 List.of(),
                 new ItemLabel(
                         item.itemId(),
+                        file.path(),
                         file.path(),
                         "file",
                         null,

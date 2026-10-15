@@ -11,15 +11,19 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.api.ItemEventRecorded;
 import de.tum.cit.aet.hephaestus.integration.core.api.ItemEventService;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.itemevent.ItemEventLedgerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.itemevent.ItemEventRepository;
+import de.tum.cit.aet.hephaestus.integration.core.spi.CandidateRefusal;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FoundBy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventInput;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventName;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewRequestReason;
 import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
@@ -33,7 +37,6 @@ import de.tum.cit.aet.hephaestus.practices.spi.AdmissionReceipt;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.BoundModelSlot;
-import de.tum.cit.aet.hephaestus.practices.spi.CandidateRefusal;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
 import de.tum.cit.aet.hephaestus.practices.spi.FrozenModel;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustody;
@@ -62,7 +65,6 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewModelBindings;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewPracticeStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequest;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
@@ -121,6 +123,9 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     ItemEventRepository eventRows;
+
+    @Autowired
+    ItemIndexService itemIndex;
 
     @Autowired
     ApplicationEventPublisher publishedEvents;
@@ -669,6 +674,95 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void shouldEndCurrentResultsWhenAnScmChangeEventIsRecordedWithoutEndingLaterResultsOnReplay() {
+        var input = eventInput();
+        var at = input.occurredAt().truncatedTo(ChronoUnit.MICROS);
+        var current = data.result(scenario, ResultOutcome.NOT_MET, at.minusSeconds(30));
+        var other = data.scenario();
+        var untouched = data.result(other, ResultOutcome.MET, at.minusSeconds(30));
+        var changed = new ItemEventInput(
+                input.workspaceId(),
+                input.itemId(),
+                new ItemEventName("scm.pull_request.edited"),
+                input.itemVersion(),
+                at,
+                input.foundBy(),
+                input.actorUserId(),
+                input.requestedById());
+        var eventId = itemIndex.record(changed);
+        var ended = results.findById(current.getId()).orElseThrow();
+        assertThat(ended.getEndReason()).isEqualTo(ResultEndReason.WORK_CHANGED);
+        assertThat(ended.getEndedAt()).isEqualTo(at);
+        assertThat(results.findById(untouched.getId()).orElseThrow().getEndedAt())
+                .isNull();
+        var later = data.result(scenario, ResultOutcome.MET, at.plusSeconds(1));
+        new TransactionTemplate(transactions)
+                .executeWithoutResult(ignored -> publishedEvents.publishEvent(
+                        new ItemEventRecorded(changed.workspaceId(), eventId, changed.itemId())));
+        assertThat(results.findById(later.getId()).orElseThrow().getEndedAt()).isNull();
+        assertThat(results.findById(current.getId()).orElseThrow().getEndedAt()).isEqualTo(at);
+    }
+
+    @Test
+    void shouldKeepANewerResultCurrentWhenAnOlderRecordedScmEventIsDelivered() {
+        var input = eventInput();
+        var current =
+                data.result(scenario, ResultOutcome.MET, input.occurredAt().plusSeconds(1));
+        var eventId = UUID.randomUUID();
+        new TransactionTemplate(transactions).executeWithoutResult(ignored -> {
+            eventRows.insertIfAbsent(
+                    eventId,
+                    input.workspaceId(),
+                    input.itemId(),
+                    input.name().value(),
+                    input.itemVersion(),
+                    input.occurredAt(),
+                    input.foundBy().name(),
+                    input.actorUserId(),
+                    input.requestedById(),
+                    Instant.now());
+            publishedEvents.publishEvent(new ItemEventRecorded(input.workspaceId(), eventId, input.itemId()));
+        });
+        assertThat(eventRows
+                        .findByIdAndWorkspaceId(eventId, input.workspaceId())
+                        .orElseThrow()
+                        .getState())
+                .isEqualTo(ItemEventState.STARTED);
+        assertThat(results.findById(current.getId()).orElseThrow().getEndedAt()).isNull();
+    }
+
+    @Test
+    void shouldEndCurrentResultsAsRemovedWhenAnScmDeletionIsRecorded() {
+        var kind = new ItemKind("scm.issue");
+        scenario = data.scenario(
+                kind,
+                DefinitionTestFixtures.definition(kind, "Explain the issue", "Explain the requested work.", null));
+        var at = Instant.now().truncatedTo(ChronoUnit.MICROS);
+        var current = data.result(scenario, ResultOutcome.MET, at.minusSeconds(30));
+        var workspace = scenario.workspace().getId();
+        var item = scenario.item().getId();
+        var eventId = Objects.requireNonNull(new TransactionTemplate(transactions).execute(ignored -> {
+            itemIndex.remove(workspace, item, at);
+            return itemIndex.record(new ItemEventInput(
+                    workspace,
+                    item,
+                    new ItemEventName("scm.issue.deleted"),
+                    Objects.requireNonNull(current.getItemVersion()),
+                    at,
+                    FoundBy.WEBHOOK,
+                    null,
+                    null));
+        }));
+        var ended = results.findById(current.getId()).orElseThrow();
+        assertThat(ended.getEndReason()).isEqualTo(ResultEndReason.REMOVED);
+        assertThat(ended.getEndedAt()).isEqualTo(at);
+        var event = eventRows.findByIdAndWorkspaceId(eventId, workspace).orElseThrow();
+        assertThat(event.getState()).isEqualTo(ItemEventState.WITHHELD);
+        assertThat(event.getReason()).isEqualTo(ReviewRequestReason.ITEM_GONE);
+        assertThat(reviews.findByWorkspaceIdAndEventId(workspace, eventId)).isEmpty();
+    }
+
+    @Test
     void shouldStartExactlyOneEventReviewWhenAnItemEventIsRecordedAndReplayed() {
         var input = eventInput();
         var workspace = input.workspaceId();
@@ -744,6 +838,7 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
                         offeredAt.plus(eventProperties.pendingRetryAfter()).minusSeconds(1),
                         Instant.now().plus(eventProperties.pendingRetryAfter()).plusSeconds(1));
         assertThat(reviews.findByWorkspaceIdAndEventId(input.workspaceId(), id)).isEmpty();
+        var later = data.result(scenario, ResultOutcome.MET, Instant.now());
         when(budget.canRequest(input.workspaceId(), ReviewKind.ITEM, null)).thenReturn(true);
         new TransactionTemplate(transactions)
                 .executeWithoutResult(ignored ->
@@ -757,6 +852,7 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
                         .orElseThrow()
                         .getOrigin())
                 .isEqualTo(ReviewOrigin.EVENT);
+        assertThat(results.findById(later.getId()).orElseThrow().getEndedAt()).isNull();
     }
 
     @Test

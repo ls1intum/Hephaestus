@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.workspace.context;
 import static java.lang.annotation.ElementType.TYPE;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
@@ -10,7 +11,7 @@ import org.springframework.core.annotation.AliasFor;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Meta-annotation that marks a controller as workspace-scoped.
+ * Marks a workspace-scoped controller on the server runtime.
  *
  * <p>Controllers annotated with {@code @WorkspaceScopedController} automatically receive the
  * {@code /workspaces/{workspaceSlug}} prefix via {@link WorkspaceScopedWebMvcConfiguration} so each
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Retention(RUNTIME)
 @Documented
 @RestController
+@ConditionalOnServerRole
 public @interface WorkspaceScopedController {
     /**
      * Optional component name alias inherited from {@link RestController}.

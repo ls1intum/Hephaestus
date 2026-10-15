@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { mockDefinitionOptions } from "@/components/admin/practice-editor/fixtures";
+
 import { mockPracticeDefinitionOptions } from "./practice";
 
 const citationRequirement = z.enum(["REQUIRED", "OPTIONAL", "FORBIDDEN"]);
@@ -33,7 +35,10 @@ const needsOf = (supportsComplete: boolean | undefined) =>
 
 describe("practice definition options fixture", () => {
 	it("matches its declared source contract for every offered read source", () => {
-		for (const itemType of mockPracticeDefinitionOptions.itemTypes) {
+		for (const itemType of [
+			...mockPracticeDefinitionOptions.itemTypes,
+			...mockDefinitionOptions.itemTypes,
+		]) {
 			for (const option of itemType.readSources) {
 				const source = catalog.sources.find((candidate) => candidate.kind === option.source);
 				expect(source, option.source).toBeDefined();

@@ -17,6 +17,7 @@ import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaField;
 import com.tngtech.archunit.core.domain.JavaModifier;
+import com.tngtech.archunit.core.domain.JavaParameterizedType;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
@@ -24,6 +25,8 @@ import com.tngtech.archunit.lang.SimpleConditionEvent;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountAbsorptionContributor;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountErasureContributor;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCopyFence;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
@@ -481,24 +484,35 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     // (BYO gate check) which load on every runtime role
                     );
 
-            ArchCondition<JavaField> beInKnownClass = new ArchCondition<>("be in a known cycle-breaking class") {
-                @Override
-                public void check(JavaField field, ConditionEvents events) {
-                    String ownerName = field.getOwner().getSimpleName();
-                    if (!knownCycleBreakers.contains(ownerName)) {
-                        events.add(SimpleConditionEvent.violated(
-                                field,
-                                String.format(
-                                        "NEW ObjectProvider usage in %s - add to knownCycleBreakers if intentional",
-                                        field.getFullName())));
-                    }
-                }
-            };
+            ArchCondition<JavaField> beJustifiedProvider =
+                    new ArchCondition<>("resolve an optional role dependency or a documented cycle") {
+                        @Override
+                        public void check(JavaField field, ConditionEvents events) {
+                            String ownerName = field.getOwner().getSimpleName();
+                            // Capture beans run on workers too; server-only rendering is optional there.
+                            boolean optionalServerDependency =
+                                    field.getOwner().isAnnotatedWith(ConditionalOnCaptureRole.class)
+                                            && field.getType() instanceof JavaParameterizedType provider
+                                            && provider.getActualTypeArguments().size() == 1
+                                            && provider.getActualTypeArguments()
+                                                    .getFirst()
+                                                    .toErasure()
+                                                    .isAnnotatedWith(ConditionalOnServerRole.class);
+                            if (!knownCycleBreakers.contains(ownerName) && !optionalServerDependency) {
+                                events.add(SimpleConditionEvent.violated(
+                                        field,
+                                        String.format(
+                                                "ObjectProvider usage in %s has neither an optional role dependency"
+                                                        + " nor a documented cycle",
+                                                field.getFullName())));
+                            }
+                        }
+                    };
 
             ArchRule rule = fields().that()
                     .haveRawType(ObjectProvider.class)
-                    .should(beInKnownClass)
-                    .because("ObjectProvider usage should be limited to documented cycle-breaking cases");
+                    .should(beJustifiedProvider)
+                    .because("ObjectProvider resolves optional role dependencies and documented dependency cycles");
 
             rule.check(classes);
         }

@@ -15,6 +15,7 @@ public interface PersonDataContributor extends Ordered {
 
     PersonDataSelection select(PersonScope person);
 
+    /** Export the subject's data; affected proof about others contributes only cleanup ids and counts. */
     List<JsonNode> export(PersonDataSelection selection, PersonScope frozenScope);
 
     long erase(PersonDataSelection selection, PersonScope frozenScope);

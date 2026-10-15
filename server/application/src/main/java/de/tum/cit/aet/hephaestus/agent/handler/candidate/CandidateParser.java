@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.handler.candidate;
 
 import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.CANDIDATE_BYTES;
 
-import de.tum.cit.aet.hephaestus.practices.spi.CandidateRefusal;
+import de.tum.cit.aet.hephaestus.integration.core.spi.CandidateRefusal;
 import de.tum.cit.aet.hephaestus.practices.spi.ClaimBasis;
 import de.tum.cit.aet.hephaestus.practices.spi.ClaimedCoverage;
 import de.tum.cit.aet.hephaestus.practices.spi.DutyBasis;
@@ -54,8 +54,9 @@ public final class CandidateParser {
         }
         CandidateDocument sent;
         try {
+            rejectExplicitNulls(value);
             sent = READER.readValue(value);
-        } catch (JacksonException malformed) {
+        } catch (JacksonException | IllegalArgumentException malformed) {
             throw new CandidateRefusedException(
                     CandidateRefusal.MALFORMED_CANDIDATE,
                     "The candidate does not match the result contract",
@@ -286,6 +287,20 @@ public final class CandidateParser {
             case DutyBasis duty -> List.of(duty.event());
             case StateBasis state -> List.of();
         };
+    }
+
+    // Jackson creator binding represents both missing optionals and explicit null as Java null.
+    // The wire contract permits JSON null only for claimed coverage's required total.
+    private static void rejectExplicitNulls(JsonNode value) {
+        if (value.isNull()) throw new IllegalArgumentException("Explicit null is not permitted");
+        if (value.isObject()) {
+            for (Map.Entry<String, JsonNode> property : value.properties()) {
+                if (!property.getKey().equals("total") || !property.getValue().isNull())
+                    rejectExplicitNulls(property.getValue());
+            }
+        } else if (value.isArray()) {
+            for (JsonNode item : value) rejectExplicitNulls(item);
+        }
     }
 
     private static CandidateRefusedException refuse(CandidateRefusal refusal, @Nullable String message) {

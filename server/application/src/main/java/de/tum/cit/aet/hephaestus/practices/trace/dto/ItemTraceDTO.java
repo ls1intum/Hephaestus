@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.trace.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemRefDTO;
 import de.tum.cit.aet.hephaestus.practices.review.dto.ItemEventDTO;
-import de.tum.cit.aet.hephaestus.practices.review.dto.ItemRefDTO;
 import de.tum.cit.aet.hephaestus.practices.review.dto.ReviewRefDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;

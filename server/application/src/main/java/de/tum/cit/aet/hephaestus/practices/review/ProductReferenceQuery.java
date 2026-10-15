@@ -3,12 +3,12 @@ package de.tum.cit.aet.hephaestus.practices.review;
 import de.tum.cit.aet.hephaestus.core.auth.AccountReferenceService;
 import de.tum.cit.aet.hephaestus.core.auth.dto.AccountRefDTO;
 import de.tum.cit.aet.hephaestus.core.auth.dto.ProviderIdentityRefDTO;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemRefDTO;
 import de.tum.cit.aet.hephaestus.integration.core.framework.ItemDescriptorRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.framework.RegisteredItemLabels;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
-import de.tum.cit.aet.hephaestus.practices.review.dto.ItemRefDTO;
 import de.tum.cit.aet.hephaestus.practices.review.dto.ReviewDeveloperDTO;
 import java.time.Instant;
 import java.util.Collection;
@@ -18,6 +18,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,7 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProductReferenceQuery {
 
     private final ProductItemRepository rows;
-    private final @Nullable AccountReferenceService accountReferences;
+    private final ObjectProvider<AccountReferenceService> accountReferences;
     private final RegisteredItemLabels labels;
     private final ItemDescriptorRegistry catalog;
 
@@ -52,7 +53,7 @@ public class ProductReferenceQuery {
                     ref.kind().value(),
                     ref.parentId() == null ? null : Long.toString(ref.parentId()),
                     label == null ? null : label.integration(),
-                    label == null ? fallback : label.title(),
+                    label == null ? fallback : label.label(),
                     label == null ? null : label.title(),
                     label == null ? null : label.url(),
                     label == null ? null : label.container(),
@@ -83,7 +84,6 @@ public class ProductReferenceQuery {
 
     public Map<Long, AccountRefDTO> accounts(long workspaceId, Collection<Long> ids) {
         if (ids.isEmpty()) return Map.of();
-        return Objects.requireNonNull(accountReferences, "Account references require the server role.")
-                .references(workspaceId, ids);
+        return accountReferences.getObject().references(workspaceId, ids);
     }
 }

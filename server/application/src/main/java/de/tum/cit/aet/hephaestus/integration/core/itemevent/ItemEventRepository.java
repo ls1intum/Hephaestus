@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.core.itemevent;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestReason;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewRequestReason;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;

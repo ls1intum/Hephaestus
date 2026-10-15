@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.CitationVerification;
 import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.result.ResultCitations;
 import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
@@ -18,6 +19,7 @@ import tools.jackson.databind.node.JsonNodeFactory;
 
 /** Delivery checks retained proof and live visibility without requiring a retained runtime job. */
 @Component
+@ConditionalOnCaptureRole
 @RequiredArgsConstructor
 public class EvidenceDeliveryAuthorization implements EvidenceAuthorization {
     private final ClasspathSourceCatalogRegistry sourceCatalogs;

@@ -19,6 +19,11 @@ import {
 	INVALID_META_PROGRAM,
 } from "./program-host-runner.ts";
 
+import {
+	admissionResponseSchema,
+	parseAdmission,
+} from "../../../main/resources/agent/pi-admitted-results.ts";
+
 const OUTPUT = nodePath.join(import.meta.dirname, "../practice-results/runner-output");
 const UPDATE = process.env.UPDATE_RUNNER_OUTPUT === "1";
 
@@ -170,4 +175,17 @@ void test("the runner reads the assigned practice index", () => {
 		readFileSync(new URL("practice-index.json", import.meta.url), "utf8"),
 	);
 	assert.deepEqual(practiceIndexSchema.parse(index), index);
+});
+
+void test("the runner reads the server's admission envelope and recorded routing refusals", () => {
+	const response: unknown = JSON.parse(
+		readFileSync(new URL("admission-response.json", import.meta.url), "utf8"),
+	);
+	const admission = parseAdmission(response);
+	assert.equal(admission.results[0]?.practiceSlug, "handles-errors");
+	assert.ok(admissionResponseSchema.safeParse(response).success);
+	assert.ok(admission.practicePageSupport?.state === "COMPLETE");
+	assert.ok(admission.conversationEligibility?.state === "COMPLETE");
+	assert.equal(admission.practicePageSupport.practices[0]?.stopReason, "NO_AI");
+	assert.equal(admission.conversationEligibility.results[0]?.stopReason, "NO_AI");
 });

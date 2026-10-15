@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.scan.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemRefDTO;
 import de.tum.cit.aet.hephaestus.practices.result.dto.ProblemDTO;
-import de.tum.cit.aet.hephaestus.practices.review.dto.ItemRefDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.ProblemBaselineState;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.UUID;

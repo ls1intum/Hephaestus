@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.agent.usage;
 
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
 import de.tum.cit.aet.hephaestus.agent.catalog.ResolvedLlmModel;
-import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
 
 /** Authoritative runtime model and price resolved together at admission. */
 public record AdmittedLlmModel(

@@ -156,38 +156,6 @@ async function runLive(slug: string, source: string, bound: BoundModels): Promis
 		if (!response.ok) {
 			log.push(JSON.stringify({ slot: request.slot, status: response.status }));
 		}
-		const first: unknown =
-			isJsonObject(body) && Array.isArray(body.choices) ? body.choices[0] : undefined;
-		if (isJsonObject(first)) {
-			const message = isJsonObject(first.message) ? first.message : {};
-			const probabilities = isJsonObject(first.logprobs) ? first.logprobs.content : undefined;
-			const tokens = Array.isArray(probabilities)
-				? probabilities.flatMap((entry: unknown) =>
-						isJsonObject(entry) && typeof entry.token === "string" ? [entry.token] : [],
-					)
-				: [];
-			const content = typeof message.content === "string" ? message.content : "";
-			const completion = tokens.join("");
-			const answerAt = content === "" ? -1 : completion.lastIndexOf(content);
-			log.push(
-				JSON.stringify({
-					slot: request.slot,
-					status: response.status,
-					finishReason: first.finish_reason,
-					contentChars: typeof message.content === "string" ? message.content.length : 0,
-					reasoningChars: Math.max(
-						...[message.reasoning_content, message.reasoning].map((value) =>
-							typeof value === "string" ? value.length : 0,
-						),
-					),
-					logprobTokens: Array.isArray(probabilities) ? probabilities.length : 0,
-					answerInLogprobs: answerAt !== -1,
-					answerAtEnd: content !== "" && completion.endsWith(content),
-					charsAfterAnswer: answerAt === -1 ? null : completion.length - answerAt - content.length,
-					lastTokenIsSpecial: /^<\|[^|>]+\|>$/u.test(tokens.at(-1) ?? ""),
-				}),
-			);
-		}
 		return response.ok ? body : { status: response.status, body };
 	});
 	try {

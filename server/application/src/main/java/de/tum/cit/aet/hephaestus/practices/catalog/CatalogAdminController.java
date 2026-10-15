@@ -193,26 +193,13 @@ public class CatalogAdminController {
         return catalog.groupView(catalog.group(slug));
     }
 
-    @PatchMapping("/practices/reorder")
-    @AuditExempt(reason = "Order changes presentation only")
-    @Operation(
-            operationId = "reorderCatalogPractices",
-            description =
-                    "Supply every practice slug in one group, or every unassigned practice slug, in the new order.")
-    public CatalogDTO reorderPractices(
-            @RequestBody @Valid ReorderRequestDTO input,
-            @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
-        customization.reorder(CatalogEntryType.PRACTICE, input.slugs(), precondition(ifMatch));
-        return catalog.view();
-    }
-
     @PatchMapping("/groups/reorder")
     @AuditExempt(reason = "Order changes presentation only")
     @Operation(operationId = "reorderCatalogGroups")
     public CatalogDTO reorderGroups(
             @RequestBody @Valid ReorderRequestDTO input,
             @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
-        customization.reorder(CatalogEntryType.GROUP, input.slugs(), precondition(ifMatch));
+        customization.reorderGroups(input.slugs(), precondition(ifMatch));
         return catalog.view();
     }
 

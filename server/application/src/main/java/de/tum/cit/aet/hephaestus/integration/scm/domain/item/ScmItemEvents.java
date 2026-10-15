@@ -24,6 +24,7 @@ public final class ScmItemEvents {
     public static final ItemEventName ISSUE_OPENED = new ItemEventName("scm.issue.opened");
     public static final ItemEventName ISSUE_UPDATED = new ItemEventName("scm.issue.updated");
     public static final ItemEventName ISSUE_CLOSED = new ItemEventName("scm.issue.closed");
+    public static final ItemEventName ISSUE_DELETED = new ItemEventName("scm.issue.deleted");
     public static final String ISSUE_DISCUSSION_FIELD = "discussion";
     public static final String CLOSING_ISSUES_FIELD = "closingIssues";
     public static final Set<String> REVIEWABLE_ISSUE_FIELDS = Set.of(

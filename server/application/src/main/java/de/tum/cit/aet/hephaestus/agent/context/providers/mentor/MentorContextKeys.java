@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
+import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextPaths;
 import java.util.Set;
 
 /**
@@ -16,8 +17,8 @@ public final class MentorContextKeys {
             PracticeCatalogContentSource.OUTPUT_KEY,
             ResultHistoryContentSource.OUTPUT_KEY,
             DeliveredFeedbackContentSource.OUTPUT_KEY,
-            RecentAuthoredWorkContentSource.OUTPUT_KEY,
-            MergeReadinessContentSource.OUTPUT_KEY,
+            MentorContextPaths.RECENT_AUTHORED_WORK,
+            MentorContextPaths.MERGE_READINESS,
             ReviewAttemptsContentSource.OUTPUT_KEY,
             "inputs/context/slack_conversations.json",
             PreparedConversationFeedbackContentSource.OUTPUT_KEY,
@@ -29,7 +30,7 @@ public final class MentorContextKeys {
      * UTF-16 units of compact JSON, and Jackson escapes no character more tersely than {@code JSON.stringify}, so a
      * document whose {@code writeValueAsString} fits reaches the model whole.
      */
-    public static final int FETCH_CONTEXT_MAX_CHARS = 200_000;
+    public static final int FETCH_CONTEXT_MAX_CHARS = MentorContextPaths.MAX_CHARS;
 
     private MentorContextKeys() {}
 }

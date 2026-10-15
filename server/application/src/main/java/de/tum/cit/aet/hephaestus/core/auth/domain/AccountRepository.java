@@ -81,6 +81,15 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
      */
     Optional<Account> findByPrimaryEmail(String primaryEmail);
 
+    boolean existsByPrimaryEmailIgnoreCase(String primaryEmail);
+
+    /** An unassigned contact email has no row to lock. */
+    @Query(
+            value =
+                    "SELECT count(pg_advisory_xact_lock(hashtextextended('account-contact-email:' || lower(CAST(:email AS text)),0)))",
+            nativeQuery = true)
+    long lockContactEmail(@Param("email") String email);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT a FROM Account a WHERE a.id = :id")
     Optional<Account> findByIdForUpdate(@Param("id") Long id);

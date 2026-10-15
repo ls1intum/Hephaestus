@@ -18,8 +18,8 @@ import de.tum.cit.aet.hephaestus.evidence.CitationSide;
 import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.capture.CitableText;
 import de.tum.cit.aet.hephaestus.evidence.capture.EvidenceDirectory;
+import de.tum.cit.aet.hephaestus.integration.core.fabric.EvidenceSpool;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.practices.spi.ReadReceipt;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import java.io.IOException;
@@ -875,8 +875,8 @@ public class JobEvidenceFiles implements SandboxResultListener {
         try (var entries = Files.list(layout.root())) {
             for (Path entry : entries.toList()) {
                 String name = entry.getFileName().toString();
-                if (!name.startsWith(GitRepositoryManager.GIT_SNAPSHOT_PREFIX)) continue;
-                if (GitRepositoryManager.isCurrentProcessSpool(entry)) continue;
+                if (!name.startsWith(EvidenceSpool.PREFIX)) continue;
+                if (EvidenceSpool.isCurrentProcess(entry)) continue;
                 try {
                     if (Files.getLastModifiedTime(entry, LinkOption.NOFOLLOW_LINKS)
                             .toInstant()

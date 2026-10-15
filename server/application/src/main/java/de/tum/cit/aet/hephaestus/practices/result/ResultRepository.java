@@ -79,8 +79,11 @@ public interface ResultRepository extends JpaRepository<Result, UUID>, ResultQue
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
-        UPDATE Result r SET r.endedAt = :at, r.endReason = :reason
+        UPDATE Result r SET r.endedAt = CASE WHEN r.recordedAt > :at THEN r.recordedAt ELSE :at END,
+            r.endReason = :reason
         WHERE r.workspaceId = :workspaceId AND r.itemId = :itemId AND r.endedAt IS NULL
+          AND EXISTS (SELECT 1 FROM Review source WHERE source.id = r.reviewId
+              AND source.workspaceId = r.workspaceId AND source.orderedAt <= :at)
         """)
     int endCurrent(
             @Param("workspaceId") long workspaceId,

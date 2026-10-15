@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.slack.retention;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorSlackThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /** Erase raw and derived data in the caller's transaction, using {@link ConversationFeedbackErasure} across the module boundary. */
 @Component
+@ConditionalOnServerRole
 @RequiredArgsConstructor
 public class SlackWorkspaceContentEraser {
 

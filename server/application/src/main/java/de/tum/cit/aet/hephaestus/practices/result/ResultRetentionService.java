@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.result;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
 import de.tum.cit.aet.hephaestus.practices.review.report.ScanReportService;
@@ -27,6 +28,7 @@ public class ResultRetentionService {
 
     @Scheduled(cron = "0 0 3 * * *")
     @SchedulerLock(name = "result-retention", lockAtMostFor = "PT30M")
+    @WorkspaceAgnostic("Enumerates workspaces before each workspace's scoped proof-retention transaction")
     public void purge() {
         var cutoff = clock.instant().minus(Duration.ofDays(400));
         var workspaces = reviews.workspacesWithExpiredProof(cutoff);

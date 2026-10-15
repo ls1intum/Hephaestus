@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
-import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEvent;
-import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageEvent;
+import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.util.List;

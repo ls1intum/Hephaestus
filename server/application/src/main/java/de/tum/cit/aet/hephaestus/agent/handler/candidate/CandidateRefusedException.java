@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler.candidate;
 
-import de.tum.cit.aet.hephaestus.practices.spi.CandidateRefusal;
+import de.tum.cit.aet.hephaestus.integration.core.spi.CandidateRefusal;
 import java.io.Serial;
 
 /** A candidate that breaks the contract. Its message names the rule; it never quotes the candidate's text. */

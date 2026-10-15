@@ -14,6 +14,9 @@ import de.tum.cit.aet.hephaestus.testconfig.RealAuthIntegrationTest;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.assertj.core.api.Assertions;
 import org.jspecify.annotations.Nullable;
@@ -91,9 +94,10 @@ class AccountProvisioningIntegrationTest extends RealAuthIntegrationTest {
 
         // Two distinct accounts: the shared email did NOT fold the second identity into the first.
         assertThat(persistedId(viaGitlab.getId())).isNotEqualTo(persistedId(viaGithub.getId()));
-        // Both store the email as contact metadata (proving it WAS seen, just never used as a key).
+        // A contact email is unique; it never grants the second identity the first account.
         assertThat(viaGithub.getPrimaryEmail()).isEqualTo(sharedEmail);
-        assertThat(viaGitlab.getPrimaryEmail()).isEqualTo(sharedEmail);
+        assertThat(viaGitlab.getPrimaryEmail()).isNull();
+        assertThat(viaGitlab.getPrimaryEmailVerifiedAt()).isNull();
         // Each account owns exactly its own identity link, on its own provider+subject.
         assertThat(identityRepository.findActiveByAccountId(persistedId(viaGithub.getId())))
                 .extracting(Identity::getProviderUserKey)
@@ -123,6 +127,51 @@ class AccountProvisioningIntegrationTest extends RealAuthIntegrationTest {
 
         // Even within ONE provider, the subject is the key — a shared email never merges subjects.
         assertThat(persistedId(second.getId())).isNotEqualTo(persistedId(first.getId()));
+    }
+
+    @Test
+    void shouldCreateSeparateAccountsWhenIdentitiesReportTheSameEmailConcurrently() throws Exception {
+        seedProvider("github-contact-race", LoginProvider.ProviderType.GITHUB);
+        var start = new CyclicBarrier(2);
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            var first = executor.submit(() -> {
+                start.await(10, TimeUnit.SECONDS);
+                return service.resolveOrProvision(
+                                "github-contact-race",
+                                "contact-one",
+                                principal("contact-one", "shared-contact@example.test", true, "First"),
+                                AuthIntentCookie.Intent.login(null, null))
+                        .account();
+            });
+            var second = executor.submit(() -> {
+                start.await(10, TimeUnit.SECONDS);
+                return service.resolveOrProvision(
+                                "github-contact-race",
+                                "contact-two",
+                                principal("contact-two", "SHARED-CONTACT@example.test", true, "Second"),
+                                AuthIntentCookie.Intent.login(null, null))
+                        .account();
+            });
+            var accounts = List.of(first.get(30, TimeUnit.SECONDS), second.get(30, TimeUnit.SECONDS));
+            assertThat(accounts).extracting(Account::getId).doesNotHaveDuplicates();
+            assertThat(accounts.stream()
+                            .filter(account -> account.getPrimaryEmail() != null)
+                            .toList())
+                    .hasSize(1);
+            assertThat(accounts.stream()
+                            .filter(account -> account.getPrimaryEmail() == null)
+                            .toList())
+                    .singleElement()
+                    .satisfies(account ->
+                            assertThat(account.getPrimaryEmailVerifiedAt()).isNull());
+            assertThat(accounts)
+                    .allSatisfy(account -> assertThat(
+                                    identityRepository.findActiveByAccountId(persistedId(account.getId())))
+                            .hasSize(1));
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     @Test

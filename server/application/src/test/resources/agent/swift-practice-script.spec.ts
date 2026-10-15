@@ -325,28 +325,13 @@ void test("each state declaration is a lead with its enclosing type, and a plain
 	assert.match(none.directions?.[0] ?? "", /^Scanned 1 added lines in 1 files .*none matched\./u);
 });
 
-void test("a change with no reference anywhere says what it scanned and what the inventory holds", async () => {
+void test("a change with no reference anywhere reports the authored search boundary and the absent linked capture", async () => {
 	const slug = "links-the-change-to-its-issue";
-	const context = {
-		"project_inventory.json": {
-			issues: [
-				{
-					repository: "team/project",
-					repository_id: 1,
-					provider_id: 1,
-					number: 4,
-					title: "Add the event map",
-					state: "opened",
-				},
-			],
-		},
-	};
 	const reviewed = { repository_id: 1, provider_id: 1 };
 	const run = async (item: { title: string; body: string; source_branch: string }) =>
 		runBundled(slug, {
 			item: { ...reviewed, ...item },
 			context: {
-				...context,
 				"metadata.json": { ...reviewed, ...item },
 				"description.md": item.body,
 			},
@@ -357,7 +342,6 @@ void test("a change with no reference anywhere says what it scanned and what the
 		source_branch: "map",
 	});
 	assert.equal(result.facts?.referencesFound, 0);
-	assert.equal(result.facts.inventoryOpenIssues, 1);
 	assert.equal(result.facts.linkedWorkItems, -1);
 	const referenced = await run({
 		title: "Add the map",

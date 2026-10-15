@@ -22,6 +22,7 @@ import de.tum.cit.aet.hephaestus.agent.job.RuntimeJobTestData;
 import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
 import de.tum.cit.aet.hephaestus.core.runtime.ServerSchedulingConfig;
 import de.tum.cit.aet.hephaestus.evidence.capture.EvidenceDirectory;
+import de.tum.cit.aet.hephaestus.integration.core.fabric.EvidenceSpool;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryLockManager;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
@@ -395,8 +396,7 @@ class JobEvidenceFilesTest extends BaseUnitTest {
         }
         assertThat(staging).doesNotExist();
         try (var entries = Files.list(root)) {
-            assertThat(entries.filter(entry ->
-                            entry.getFileName().toString().startsWith(GitRepositoryManager.GIT_SNAPSHOT_PREFIX)))
+            assertThat(entries.filter(entry -> entry.getFileName().toString().startsWith(EvidenceSpool.PREFIX)))
                     .isEmpty();
         }
     }

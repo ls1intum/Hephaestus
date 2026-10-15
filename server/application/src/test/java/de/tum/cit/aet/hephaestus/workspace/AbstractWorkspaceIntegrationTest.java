@@ -86,8 +86,8 @@ public abstract class AbstractWorkspaceIntegrationTest extends BaseIntegrationTe
                 };
         IntegrationKind kind =
                 provider.getType() == IdentityProviderType.GITLAB ? IntegrationKind.GITLAB : IntegrationKind.GITHUB;
-        Connection connection =
-                activityConnections.saveAndFlush(new Connection(workspace, kind, "activity-fixture", config));
+        Connection connection = activityConnections.saveAndFlush(
+                new Connection(workspace, kind, Long.toString(workspace.getId()), config));
         activityConnectionService.transition(
                 connection,
                 new ConnectionService.TransitionRequest(

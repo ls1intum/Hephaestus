@@ -38,6 +38,22 @@ Upgrade:
 10. Verify one item review and one repository scan in the operator interface.
 11. Check results, withheld reasons and provider-copy receipts.
 
+**If the migration stops at a precondition.**
+Stop all remaining containers from the previous release before you retry.
+A precondition failure leaves the database unchanged.
+
+A recorded delivery lease or projection owner can remain after a container stops.
+Keep new reviews and provider input paused.
+Run the previous release's server until its delivery recovery settles those records.
+Drain and stop it, then retry this release's server.
+Do not clear delivery ownership or provider receipts by hand: the provider can already have accepted the feedback.
+
+If the migration reports another data precondition, keep the previous release and verified backup.
+This includes unsupported job purposes.
+Correct the reported source records before you retry.
+
+See [Removed settings and redundant data](https://docs.hephaestus.build/contributor/database-migration#removed-settings-and-redundant-data) for the data the cutover removes.
+
 The migration preserves retained result IDs and feedback relationships.
 It does not post migrated feedback again.
 Historical unknown visibility stays Unconfirmed. A confirmed sibling copy keeps its delivery time.

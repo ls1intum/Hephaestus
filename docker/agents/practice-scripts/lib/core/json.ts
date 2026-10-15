@@ -44,3 +44,7 @@ export function recordArrayEntries(source: string, field: string) {
 	});
 	return entries.every((entry) => isJsonObject(entry.value)) ? entries : null;
 }
+
+export function jsonArray(value: unknown): unknown[] {
+	return Array.isArray(value) ? value : [];
+}

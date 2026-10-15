@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.item;
 
 import de.tum.cit.aet.hephaestus.evidence.CitationSide;
 import de.tum.cit.aet.hephaestus.integration.core.spi.BasisToCheck;
+import de.tum.cit.aet.hephaestus.integration.core.spi.CandidateRefusal;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CitationCheck;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CitationRefusal;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CitationToCheck;
@@ -10,7 +11,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.PullRequestContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.RepositoryTreeContentSource;
-import de.tum.cit.aet.hephaestus.practices.spi.CandidateRefusal;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
