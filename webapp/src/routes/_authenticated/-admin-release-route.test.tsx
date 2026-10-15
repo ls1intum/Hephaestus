@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { act, screen, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { assert, describe, expect, it, vi } from "vitest";
@@ -82,18 +82,21 @@ async function findReleaseAlert(title: string) {
 describe("instance overview release card", () => {
 	it("shows the check endpoint's answer and never folds a failure into up to date", async () => {
 		let checks = 0;
+		// The server keeps what a check found, so a later read returns it.
+		let current: Wire<ReleaseStatus> = status;
 		server.use(
-			http.get("*/admin/release", () => HttpResponse.json(status)),
+			http.get("*/admin/release", () => HttpResponse.json(current)),
 			http.post("*/admin/release/checks", () => {
 				checks += 1;
-				return HttpResponse.json({
+				current = {
 					...status,
 					status: "FAILED",
 					failure: "RATE_LIMITED",
 					lastAttempt: "2026-09-08T00:00:00Z",
 					nextCheck: "2999-01-01T00:00:00Z",
 					retryUntil: "2999-01-01T00:00:00Z",
-				});
+				};
+				return HttpResponse.json(current);
 			}),
 		);
 		const user = userEvent.setup();
@@ -175,5 +178,49 @@ describe("instance overview release card", () => {
 		expect(reads.count).toBe(4);
 		expect(screen.queryByText("v1.2.3")).toBeNull();
 		screen.getByRole("button", { name: "Check now" });
+	});
+
+	it("does not show a check's answer once reading the release is refused", async () => {
+		const reads = serveReleaseReads();
+		const checked = deferred();
+		server.use(
+			http.post("*/admin/release/checks", async () => {
+				await checked.promise;
+				return HttpResponse.json({
+					...status,
+					status: "CURRENT",
+					lastAttempt: "2026-09-08T00:00:00Z",
+					lastSuccess: "2026-09-08T00:00:00Z",
+				});
+			}),
+		);
+		const user = userEvent.setup();
+		const queryClient = renderRouteAt("/admin");
+		try {
+			await user.click(await screen.findByRole("button", { name: "Check now" }, ROUTE_RENDER_WAIT));
+			await screen.findByRole("button", { name: "Checking…" });
+
+			reads.answer = { status: 403 };
+			await rereadRelease(queryClient);
+			await findReleaseAlert("Release information is unavailable");
+			expect(screen.queryByText("v1.2.3")).toBeNull();
+
+			checked.resolve();
+			await waitFor(() => expect(queryClient.isMutating()).toBe(0));
+			reads.answer = { status: 503 };
+			await rereadRelease(queryClient);
+			const outage = await findReleaseAlert("Release information is unavailable");
+			await within(outage).findByText(/Try again in a moment\./u);
+			expect(screen.queryByText("v1.2.3")).toBeNull();
+			expect(screen.queryByText("Up to date")).toBeNull();
+
+			reads.answer = { status: 200, body: upgraded };
+			await user.click(within(outage).getByRole("button", { name: "Retry" }));
+			await screen.findByText("v1.2.4");
+			expect(reads.count).toBe(5);
+			expect(screen.queryByText("Up to date")).toBeNull();
+		} finally {
+			checked.resolve();
+		}
 	});
 });

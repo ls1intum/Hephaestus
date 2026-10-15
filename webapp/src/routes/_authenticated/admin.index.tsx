@@ -62,9 +62,11 @@ function AdminOverviewPage() {
 	const releaseOptions = adminGetReleaseOptions();
 	const releaseQuery = useQuery(releaseOptions);
 	useQueryReadRefusal(releaseOptions.queryKey, releaseQuery.isError, releaseQuery.error);
+	// A check's answer reaches the card only through a fresh read, so a read that is refused by
+	// the time the check returns stays refused.
 	const releaseCheck = useMutation({
 		...adminCheckReleaseMutation(),
-		onSuccess: (data) => queryClient.setQueryData(adminGetReleaseQueryKey(), data),
+		onSuccess: async () => queryClient.invalidateQueries({ queryKey: adminGetReleaseQueryKey() }),
 	});
 	const readinessOptions = adminGetConfigurationReadinessOptions();
 	const readinessQuery = useQuery(readinessOptions);
