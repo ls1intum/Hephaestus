@@ -135,6 +135,80 @@ void describe("the practice script primitives", () => {
 		assert.deepEqual(outcome, { unrated: "budget" });
 		assert.equal(model.doGenerateCalls.length, 2);
 	});
+	for (const modelId of ["claude-opus-5-5", "anthropic/claude-sonnet-5.5"]) {
+		void test(`${modelId} uses auto and can submit after a text-only turn`, async () => {
+			let calls = 0;
+			const model = new MockLanguageModelV4({
+				modelId,
+				doGenerate: async () => {
+					calls += 1;
+					return {
+						content:
+							calls === 1
+								? [{ type: "text", text: "The declaration is in parser.ts." }]
+								: [
+										{
+											type: "tool-call",
+											toolCallId: "submit-1",
+											toolName: "submit",
+											input: '{"file":"parser.ts"}',
+										},
+									],
+						finishReason: { unified: calls === 1 ? "stop" : "tool-calls", raw: "end_turn" },
+						usage: {
+							inputTokens: { total: 10, noCache: 10, cacheRead: undefined, cacheWrite: undefined },
+							outputTokens: { total: 5, text: 5, reasoning: undefined },
+						},
+						warnings: [],
+					};
+				},
+			});
+			const result = await agent({
+				model,
+				tools: {},
+				instructions: "Locate the declaration.",
+				prompt: "Where is parseDiff?",
+				schema: z.object({ file: z.string() }),
+				maxSteps: 3,
+			});
+			assert.deepEqual(result, { output: { file: "parser.ts" }, steps: 2 });
+			assert.ok(model.doGenerateCalls.every((call) => call.toolChoice?.type === "auto"));
+			const continuation = model.doGenerateCalls[1];
+			assert.ok(continuation);
+			assert.ok(continuation.prompt.some((message) => message.role === "assistant"));
+			assert.match(JSON.stringify(continuation.prompt), /answer has not been submitted/u);
+		});
+	}
+
+	void test("auto tool choice has only two reminders and spends one shared step budget", async () => {
+		const model = new MockLanguageModelV4({
+			modelId: "claude-opus-5-5",
+			doGenerate: async () => ({
+				content: [{ type: "text", text: "No submission." }],
+				finishReason: { unified: "stop", raw: "end_turn" },
+				usage: {
+					inputTokens: { total: 10, noCache: 10, cacheRead: undefined, cacheWrite: undefined },
+					outputTokens: { total: 5, text: 5, reasoning: undefined },
+				},
+				warnings: [],
+			}),
+		});
+		for (const maxSteps of [2, 8]) {
+			const before = model.doGenerateCalls.length;
+			await assert.rejects(
+				agent({
+					model,
+					tools: {},
+					instructions: "Submit.",
+					prompt: "Answer.",
+					schema: z.object({ file: z.string() }),
+					maxSteps,
+				}),
+				{ reason: "budget" },
+			);
+			assert.equal(model.doGenerateCalls.length - before, Math.min(maxSteps, 3));
+		}
+	});
 });
 
 const answered = (statusCode: number) =>

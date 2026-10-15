@@ -42,6 +42,7 @@ export interface ComposedFeedbackPiece {
 
 export interface PreparedFeedbackTarget {
 	threadKey: string;
+	feedbackId: string;
 	destination: Destination;
 	practiceSlug: string;
 }
@@ -75,6 +76,7 @@ export interface ReviewInlineNote {
 export interface ReviewWithheld {
 	basedOn: EvidenceRef[];
 	reason: WithholdReason;
+	witnessIds: string[];
 }
 
 /**
@@ -192,6 +194,9 @@ export function validateFeedbackEvidence(
 		})
 	) {
 		return `At least one basedOn id must name the NOT_MET result of the primary practice '${primaryPractice}' or one of its problems; skipped.`;
+	}
+	if (basedOn.some((id) => named.get(id)?.result.outcome !== "NOT_MET")) {
+		return "Every supporting result must be NOT_MET for private feedback; skipped.";
 	}
 	return null;
 }
@@ -791,7 +796,16 @@ export function readReview(
 		...coverageProblems(decisions.decided, decisions.named, spokenOf(input, named), results),
 	);
 	const withheld: ReviewWithheld[] = [...decisions.decided].flatMap(([id, disposition]) =>
-		disposition === "RAISE" ? [] : [{ basedOn: [{ resultId: id }], reason: disposition }],
+		disposition === "RAISE"
+			? []
+			: [
+					{
+						basedOn: [{ resultId: id }],
+						reason: disposition,
+						witnessIds:
+							input.decisions.find((decision) => decision.resultId === id)?.witnessIds ?? [],
+					},
+				],
 	);
 	return errors.length > 0 ? { errors } : { review: { summary, inline, withheld } };
 }

@@ -22,7 +22,7 @@ class ProxyStandInAdmissionTest {
 
     private static JsonNode request(String... entries) {
         return MAPPER.readTree("{\"contractVersion\":3,\"reviewId\":\"" + REVIEW + "\",\"jobId\":\"" + JOB
-                + "\",\"attempt\":0,\"results\":[" + String.join(",", entries) + "]}");
+                + "\",\"attempt\":0,\"nonResults\":[],\"results\":[" + String.join(",", entries) + "]}");
     }
 
     private static String entry(String slug, String outcome) {

@@ -828,7 +828,7 @@ void test("the brief shows each captured file under its workspace path, the chan
 		"work/change/diff.patch": "diff --git a/a.ts b/a.ts\n@@ -1 +1 @@\n[L1] -x\n[L1] +y\n",
 	});
 	try {
-		const brief = buildBrief(root, paths);
+		const { text: brief } = buildBrief(root, paths);
 		const order = [
 			"### `INDEX.md`",
 			"### `context/metadata.json`",
@@ -866,7 +866,7 @@ void test("each linked issue's text file follows the linked-items record, in num
 		"context/linked_work_items/7.md": "# Seven\n\n- [x] done\n",
 	});
 	try {
-		const brief = buildBrief(root, paths);
+		const { text: brief } = buildBrief(root, paths);
 		const order = [
 			"### `context/linked_work_items.json`",
 			"### `context/linked_work_items/7.md`",
@@ -893,7 +893,7 @@ void test("a file over its bound is named with its size instead of shown, and an
 		"work/change/diff.patch": `${"+".repeat(100)}\n`.repeat(600),
 	});
 	try {
-		const brief = buildBrief(root, paths, {
+		const { text: brief } = buildBrief(root, paths, {
 			filePerChars: 1000,
 			diffChars: 2000,
 			totalChars: 10_000,
@@ -921,7 +921,7 @@ void test("the brief as a whole stays under its total bound", () => {
 		"context/review_threads.json": "z".repeat(900),
 	});
 	try {
-		const brief = buildBrief(root, paths, {
+		const { text: brief } = buildBrief(root, paths, {
 			filePerChars: 1000,
 			diffChars: 1000,
 			totalChars: 2000,
@@ -938,7 +938,7 @@ void test("the brief as a whole stays under its total bound", () => {
 void test("a backtick run inside a file cannot close its fence early", () => {
 	const root = workspace({ "context/document.md": "text with ``` inside\n" });
 	try {
-		assert.match(buildBrief(root, paths), /````markdown\n\[L1\] text with ``` inside\n````/u);
+		assert.match(buildBrief(root, paths).text, /````markdown\n\[L1\] text with ``` inside\n````/u);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
@@ -947,7 +947,7 @@ void test("a backtick run inside a file cannot close its fence early", () => {
 void test("nothing captured is an empty brief", () => {
 	const root = workspace({});
 	try {
-		assert.equal(buildBrief(root, paths), "");
+		assert.equal(buildBrief(root, paths).text, "");
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
@@ -960,7 +960,7 @@ for (const [name, content] of [
 	void test(`the file bound includes ${name}`, () => {
 		const root = workspace({ "context/document.md": content });
 		try {
-			const brief = buildBrief(root, paths, {
+			const { text: brief } = buildBrief(root, paths, {
 				filePerChars: 2000,
 				diffChars: 2000,
 				totalChars: 4000,
@@ -977,7 +977,11 @@ for (const [name, content] of [
 void test("an oversized capture index gives a complete fallback instruction within the bound", () => {
 	const root = workspace({ "context/document.md": "x".repeat(1000) });
 	try {
-		const brief = buildBrief(root, paths, { filePerChars: 100, diffChars: 100, totalChars: 128 });
+		const { text: brief } = buildBrief(root, paths, {
+			filePerChars: 100,
+			diffChars: 100,
+			totalChars: 128,
+		});
 		assert.ok(brief.length <= 128);
 		assert.match(brief, /capture index exceeds the brief limit/u);
 		assert.match(brief, /Read the capture manifest and context files/u);
@@ -1665,4 +1669,32 @@ void test("public discussion keeps the work author as its addressee even when th
 			[true, false],
 		);
 	}
+});
+
+void test("brief coverage names supplied, empty, and omitted sources after rendering limits", (t) => {
+	const root = workspace({
+		"context/metadata.json": '{"title":"Add login"}',
+		"context/comments.json": "",
+		"work/change/diff.patch": "x".repeat(1000),
+	});
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+	const brief = buildBrief(root, paths, {
+		filePerChars: 1000,
+		diffChars: 100,
+		totalChars: 5000,
+	});
+	assert.deepEqual(brief.sources, [
+		{ path: "context/metadata.json", supplied: true, lines: 1 },
+		{ path: "context/comments.json", supplied: true, lines: 1 },
+		{ path: "work/change/diff.patch", supplied: false },
+	]);
+	assert.match(brief.text, /Captured and empty/u);
+	assert.match(brief.text, /Too large to show here/u);
+	const unavailable = buildBrief(root, paths, {
+		filePerChars: 1000,
+		diffChars: 100,
+		totalChars: 1,
+	});
+	assert.equal(unavailable.text, "");
+	assert.ok(unavailable.sources.every((source) => !source.supplied));
 });

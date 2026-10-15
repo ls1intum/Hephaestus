@@ -191,7 +191,7 @@ class ScanAdmissionTest extends BaseUnitTest {
         var assigned = assignment();
         var entry = new SubmittedResultDTO(
                 assigned.practiceSlug(), "2", assigned.version().value(), candidate, receipts);
-        service.prepare(job, new AdmissionRequestDTO(3, job.getReviewId(), job.getId(), 0, List.of(entry)))
+        service.prepare(job, new AdmissionRequestDTO(3, job.getReviewId(), job.getId(), 0, List.of(entry), List.of()))
                 .record(job);
     }
 

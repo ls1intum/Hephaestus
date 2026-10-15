@@ -19,6 +19,8 @@ const payload = {
 			summary: null,
 			notes: [],
 			withheldReason: "COMPOSER_WITHHELD" as const,
+			trace: { copies: [], withheld: [], replacesId: null, primaryResultId: null },
+			page: null,
 		},
 	],
 };

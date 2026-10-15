@@ -146,6 +146,10 @@ added line matches `^\[L[0-9]+\] \+`, never `^\+`. The runner maintains
 `work/notes/review.md`. Do not write or edit workspace files. Tool output is bounded: follow pagination,
 and for an absence claim search with
 `rg --hidden --no-ignore` over the relevant paths.
+The host counts relevant records shown in the brief as supplied. Read omitted records with `read` until
+continuous coverage reaches EOF. A tail slice does not clear an unread middle. Shell access has unknown
+coverage because commands can hide gaps and cuts. It cannot establish complete coverage for MET.
+Use the brief and native `read` for a practice that they can fully decide.
 
 When a criterion needs more than one read or search, use `codemode` to call those tools together.
 Print bounded relevant context needed to decide the practice, including evidence that could change

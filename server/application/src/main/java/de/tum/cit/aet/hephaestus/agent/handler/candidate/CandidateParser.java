@@ -259,8 +259,8 @@ public final class CandidateParser {
             case HostCoverage host -> {
                 complete = host.complete();
                 omits = host.omitted() != null && !host.omitted().isEmpty();
-                if (complete != (host.truncatedReads() == 0 && host.failedReads() == 0))
-                    return "host coverage is complete exactly when no read was truncated or failed";
+                if (complete && (host.truncatedReads() > 0 || host.failedReads() > 0))
+                    return "complete host coverage cannot have truncated or failed reads";
             }
             case ClaimedCoverage claimed -> {
                 complete = claimed.complete();

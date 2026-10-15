@@ -4,22 +4,17 @@ import de.tum.cit.aet.hephaestus.integration.core.framework.ItemDescriptorRegist
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyCapability;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
-import de.tum.cit.aet.hephaestus.practices.result.ProblemRepository;
-import de.tum.cit.aet.hephaestus.practices.result.ResultCitations;
-import de.tum.cit.aet.hephaestus.practices.spi.EvidenceCitation;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewInlineAnchorQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshot;
-import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import tools.jackson.databind.ObjectMapper;
 
 @Service
 @RequiredArgsConstructor
 @ConditionalOnCaptureRole
 public class FeedbackAnchorEligibility {
-    private final ProblemRepository problems;
     private final ItemDescriptorRegistry catalog;
-    private final ObjectMapper json;
+    private final ReviewInlineAnchorQuery anchors;
 
     public boolean hasInlineAnchor(ReviewSnapshot review, Result result) {
         if (review.practices().stream()
@@ -28,14 +23,6 @@ public class FeedbackAnchorEligibility {
                 || catalog.descriptorFor(review.item().kind())
                         .filter(d -> d.copyCapabilities().contains(CopyCapability.LINE_NOTE))
                         .isEmpty()) return false;
-        var problemRows = problems.findByWorkspaceIdAndResultIdOrderByPositionAsc(review.workspaceId(), result.getId());
-        return Stream.concat(
-                        ResultCitations.all(result).stream(),
-                        problemRows.stream()
-                                .flatMap(problem -> problem.getCitations().valueStream()))
-                .distinct()
-                .map(citation -> json.treeToValue(citation, EvidenceCitation.class))
-                .anyMatch(citation ->
-                        citation.verification() != null && citation.side() != null && citation.startLine() > 0);
+        return anchors.hasInlineAnchor(review.workspaceId(), review.id(), result.getId());
     }
 }

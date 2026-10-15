@@ -19,6 +19,7 @@ import {
 } from "./contract.ts";
 import type { ReadRequest, ReadValues } from "./ipc.ts";
 import { UnratedError } from "./practice-script.ts";
+import { ReadRanges } from "./read-ranges.ts";
 
 export const MAX_READ_BYTES = 2 * 1024 * 1024;
 const MAX_RECORD_BYTES = 16 * 1024 * 1024;
@@ -139,7 +140,7 @@ export class EvidenceReader {
 	readonly #sources: EvidenceSources;
 	readonly #receipts: Receipts;
 	readonly #readReceipts = new Map<string, ReadReceipt>();
-	readonly #ranges = new Map<string, { last: number; extents: { start: number; end: number }[] }>();
+	readonly #ranges = new ReadRanges();
 
 	constructor(sources: EvidenceSources, receipts: Receipts) {
 		this.#sources = sources;
@@ -225,32 +226,14 @@ export class EvidenceReader {
 			this.#receipts.truncatedReads += 1;
 			return;
 		}
-		const ranges = this.#ranges.get(identity) ?? { last, extents: [] };
-		const wasComplete = ranges.extents.some(
-			(range) => range.start === 1 && range.end >= ranges.last,
-		);
-		if (receipt.startLine !== undefined && receipt.endLine !== undefined) {
-			ranges.extents.push({ start: receipt.startLine, end: receipt.endLine });
-		}
-		ranges.extents.sort((a, b) => a.start - b.start);
-		const merged: { start: number; end: number }[] = [];
-		for (const range of ranges.extents) {
-			const previous = merged.at(-1);
-			if (previous !== undefined && range.start <= previous.end + 1) {
-				previous.end = Math.max(previous.end, range.end);
-			} else {
-				merged.push({ ...range });
-			}
-		}
-		const first = merged[0];
-		const complete = first !== undefined && first.start === 1 && first.end >= last;
-		if (!this.#ranges.has(identity) && !complete) {
+		const wasIncomplete = this.#ranges.incomplete.includes(identity);
+		this.#ranges.add(identity, receipt.startLine ?? 0, receipt.endLine ?? 0, last);
+		const complete = this.#ranges.complete(identity);
+		if (!wasIncomplete && !complete) {
 			this.#receipts.truncatedReads += 1;
-		} else if (!wasComplete && complete && this.#ranges.has(identity)) {
+		} else if (wasIncomplete && complete) {
 			this.#receipts.truncatedReads -= 1;
 		}
-		ranges.extents = merged;
-		this.#ranges.set(identity, ranges);
 		if (complete && receipt.contentDigest !== undefined) {
 			const settled: ReadReceipt = { ...receipt, status: "COMPLETE", startLine: 1, endLine: last };
 			const settledKey = JSON.stringify(settled);

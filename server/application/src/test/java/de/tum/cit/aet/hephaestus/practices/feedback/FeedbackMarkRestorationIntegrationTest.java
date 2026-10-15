@@ -77,7 +77,9 @@ class FeedbackMarkRestorationIntegrationTest extends AbstractFeedbackDeliveryInt
                         draft.body(),
                         List.of(draft.basis().getFirst(), new FeedbackBasisInput(other.getId(), null, 1)),
                         draft.copies(),
-                        draft.checks())));
+                        draft.checks(),
+                        null,
+                        null)));
         UUID first = mark(supportingResult.getId()), second = mark(other.getId());
         assertThat(current().getStopReason()).isEqualTo(FeedbackStopReason.RESULT_MARKED_INCORRECT);
         remove(first);

@@ -3,12 +3,26 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.handler.FeedbackDraftBuilder;
+import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedback;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobInput;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.feedback.decision.FeedbackContentDigest;
+import de.tum.cit.aet.hephaestus.practices.feedback.delivery.PracticePageFeedbackRouter;
+import de.tum.cit.aet.hephaestus.practices.feedback.page.PracticePageFeedbackService;
+import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
+import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultSnapshot;
+import de.tum.cit.aet.hephaestus.practices.spi.CurrentDeveloperLookup;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackBasisInput;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheckStage;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCompositionTrace;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyInput;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
@@ -16,12 +30,19 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDraft;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackIds;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.practices.spi.PreparedFeedback;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultCandidate;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 class FeedbackPreparationReceiptIntegrationTest extends AbstractFeedbackDeliveryIntegrationTest {
     @Autowired
@@ -29,6 +50,18 @@ class FeedbackPreparationReceiptIntegrationTest extends AbstractFeedbackDelivery
 
     @Autowired
     ReviewRepository reviews;
+
+    @Autowired
+    PracticePageFeedbackService page;
+
+    @MockitoBean
+    CurrentDeveloperLookup currentDeveloper;
+
+    @MockitoBean
+    ResultVisibilityPolicy resultVisibility;
+
+    @MockitoBean
+    PracticePageFeedbackRouter pageRouter;
 
     @Test
     void shouldReturnOnePersistedPreparationTimeAndCanonicalOrderedPackageDigest() {
@@ -175,6 +208,169 @@ class FeedbackPreparationReceiptIntegrationTest extends AbstractFeedbackDelivery
                 .isZero();
     }
 
+    @Test
+    void shouldReplaceQueuedConversationFeedbackAndPreventItsSelection() {
+        var previous = conversation(developerId);
+        store.prepareAll(workspace.getId(), reviewId, List.of(previous));
+        UUID nextId = UUID.randomUUID();
+        UUID copyId = FeedbackIds.copy(nextId, FeedbackCopyKind.CHAT_TURN, 0);
+        var trace = new FeedbackCompositionTrace(
+                List.of(new FeedbackCompositionTrace.CopySupport(
+                        FeedbackCopyKind.CHAT_TURN,
+                        0,
+                        List.of(new FeedbackCompositionTrace.Support(supportingResult.getId(), null)))),
+                List.of(),
+                previous.id(),
+                supportingResult.getId());
+        var next = new FeedbackDraft(
+                nextId,
+                workspace.getId(),
+                reviewId,
+                itemId,
+                developerId,
+                FeedbackDestination.CONVERSATION,
+                FeedbackState.READY,
+                null,
+                "Discuss the token boundary.",
+                previous.basis(),
+                List.of(new FeedbackCopyInput(
+                        copyId, FeedbackCopyKind.CHAT_TURN, 0, null, null, null, null, null, copyId.toString(), null)),
+                Map.of(),
+                trace,
+                null);
+        store.prepareAll(workspace.getId(), reviewId, List.of(next));
+        assertThat(feedback.findById(previous.id()).orElseThrow().getState()).isEqualTo(FeedbackState.REPLACED);
+        assertThat(feedback.findById(nextId).orElseThrow().getReplacesId()).isEqualTo(previous.id());
+        assertThat(store.claimConversationCopy(workspace.getId(), previous.id(), UUID.randomUUID()))
+                .isEmpty();
+        var retained = reviews.findById(reviewId)
+                .orElseThrow()
+                .getChecks()
+                .path("feedbackComposition")
+                .path(nextId.toString());
+        assertThat(retained.path("replacesId").asString())
+                .isEqualTo(previous.id().toString());
+        assertThat(store.prepareAll(workspace.getId(), reviewId, List.of(next)).pieces())
+                .hasSize(1);
+    }
+
+    @Test
+    void shouldKeepAnAcceptedPublicPackageWhenAPrivatePackageIsRefused() {
+        var publicReceipt = store.prepareAll(workspace.getId(), reviewId, List.of(draft(false)));
+        assertThatThrownBy(() -> store.prepareAll(workspace.getId(), reviewId, List.of(conversation(developerId + 1))))
+                .isInstanceOf(RuntimeException.class);
+        assertThat(feedback.findById(feedbackId)).isPresent();
+        assertThat(store.prepareAll(workspace.getId(), reviewId, List.of(draft(false))))
+                .isEqualTo(publicReceipt);
+    }
+
+    @Test
+    void shouldRetainQuietWitnessesBesideRaisedFeedbackAndRejectChangedDecisionsOnReplay() {
+        var quiet = negativeResult();
+        var original = draft(false);
+        var exact = new FeedbackCompositionTrace(
+                List.of(new FeedbackCompositionTrace.CopySupport(
+                        FeedbackCopyKind.SUMMARY,
+                        0,
+                        List.of(new FeedbackCompositionTrace.Support(supportingResult.getId(), null)))),
+                List.of(new FeedbackCompositionTrace.QuietDecision(
+                        List.of(new FeedbackCompositionTrace.Support(quiet.getId(), null)),
+                        "ALREADY_SAID",
+                        List.of("github:review-comment:7"))),
+                null,
+                null);
+        var proposal = new FeedbackDraft(
+                original.id(),
+                original.workspaceId(),
+                original.reviewId(),
+                original.itemId(),
+                original.developerId(),
+                original.destination(),
+                original.state(),
+                original.stopReason(),
+                original.body(),
+                original.basis(),
+                original.copies(),
+                original.checks(),
+                exact,
+                null);
+        store.prepareAll(workspace.getId(), reviewId, List.of(proposal));
+        var retained = reviews.findById(reviewId)
+                .orElseThrow()
+                .getChecks()
+                .path("feedbackComposition")
+                .path(proposal.id().toString());
+        assertThat(retained.path("withheld")
+                        .required(0)
+                        .path("witnessIds")
+                        .required(0)
+                        .asString())
+                .isEqualTo("github:review-comment:7");
+        var changed = new FeedbackDraft(
+                original.id(),
+                original.workspaceId(),
+                original.reviewId(),
+                original.itemId(),
+                original.developerId(),
+                original.destination(),
+                original.state(),
+                original.stopReason(),
+                original.body(),
+                original.basis(),
+                original.copies(),
+                original.checks(),
+                new FeedbackCompositionTrace(exact.copies(), List.of(), null, null),
+                null);
+        assertThatThrownBy(() -> store.prepareAll(workspace.getId(), reviewId, List.of(changed)))
+                .isInstanceOf(RuntimeException.class);
+        assertThat(feedback.findById(proposal.id()).orElseThrow().getState()).isEqualTo(FeedbackState.READY);
+    }
+
+    @Test
+    void shouldProjectTheReportedCardFieldsThroughPreparationIntoThePracticePageDto() throws IOException {
+        String source;
+        try (var input = Objects.requireNonNull(getClass().getResourceAsStream("/agent/composer-card.json"))) {
+            source = new String(input.readAllBytes(), StandardCharsets.UTF_8)
+                    .replace(
+                            "30000000-0000-4000-8000-000000000001",
+                            supportingResult.getId().toString());
+        }
+        var fixture = mapper.readTree(source);
+        var composed = mapper.treeToValue(fixture.path("prepared"), ComposedFeedback.class);
+        var candidate = mock(ResultCandidate.class);
+        when(candidate.developerId()).thenReturn(developerId);
+        when(candidate.practiceId()).thenReturn(supportingResult.getPracticeId());
+        var job = new ReviewJob();
+        job.setId(UUID.randomUUID());
+        job.setWorkspaceId(workspace.getId());
+        job.setReviewId(reviewId);
+        job.setInput(new ReviewJobInput(itemId, List.of()));
+        var proposal = FeedbackDraftBuilder.build(
+                        job,
+                        Set.of(supportingResult.getId()),
+                        List.of(new AdmittedResultSnapshot(supportingResult.getId(), candidate, List.of())),
+                        List.of(),
+                        List.of(composed),
+                        Map.of())
+                .getFirst();
+        // Pattern eligibility has separate coverage. This seam exercises preparation and the visible card fields.
+        when(pageRouter.supportsPattern(any(), anyList())).thenReturn(true);
+        store.prepareAll(workspace.getId(), reviewId, List.of(proposal));
+        when(currentDeveloper.currentDeveloperId()).thenReturn(Optional.of(developerId));
+        when(resultVisibility.permitsShown(
+                        eq(workspace.getId()), anyList(), eq(SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)))
+                .thenReturn(Set.of(supportingResult.getId()));
+        var card = page.getOwnPracticePageFeedback(workspace.getId()).stream()
+                .filter(row -> row.id().equals(proposal.id()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(card.headline())
+                .isEqualTo(fixture.path("reported").path("title").asString());
+        assertThat(card.body()).isEqualTo(fixture.path("reported").path("body").asString());
+        assertThat(card.nextStep())
+                .isEqualTo(fixture.path("reported").path("nextStep").asString());
+    }
+
     private FeedbackDraft conversation(long developer) {
         UUID id = FeedbackIds.conversation(workspace.getId(), reviewId, developer, List.of(supportingResult.getId()));
         UUID copyId = FeedbackIds.copy(id, FeedbackCopyKind.CHAT_TURN, 0);
@@ -191,6 +387,8 @@ class FeedbackPreparationReceiptIntegrationTest extends AbstractFeedbackDelivery
                 List.of(new FeedbackBasisInput(supportingResult.getId(), null, 0)),
                 List.of(new FeedbackCopyInput(
                         copyId, FeedbackCopyKind.CHAT_TURN, 0, null, null, null, null, null, copyId.toString(), null)),
-                Map.of());
+                Map.of(),
+                null,
+                null);
     }
 }

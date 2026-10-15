@@ -286,6 +286,12 @@ if (scenario !== undefined && scenario !== "") {
 	const sessions: unknown = JSON.parse(scenario);
 	assert.ok(typeof sessions === "object" && sessions !== null);
 	const behaviourOf = (slug: string): unknown => field(sessions, slug) ?? "submit";
+	const contextRoot = field(
+		parseJson(readFileSync(nodePath.join(cwd, "task.json"), "utf8")),
+		"contextRoot",
+	);
+	assert.ok(typeof contextRoot === "string");
+	const metadataPath = `${contextRoot}/metadata.json`;
 	mkdirSync(nodePath.join(cwd, "captured"), { recursive: true });
 	const capture = (name: string, value: unknown) => {
 		appendFileSync(nodePath.join(cwd, "captured", `${name}.jsonl`), `${JSON.stringify(value)}\n`);
@@ -393,13 +399,18 @@ if (scenario !== undefined && scenario !== "") {
 							type: "tool_execution_start",
 							toolCallId: `read-${session}`,
 							toolName: "read",
-							args: { path: "evidence/metadata.json" },
+							args: { path: metadataPath },
 						});
 						emit({
 							type: "tool_execution_end",
 							toolCallId: `read-${session}`,
 							toolName: "read",
-							result: { content: [{ type: "text", text: "[L1] {}" }], details: {} },
+							result: {
+								content: [
+									{ type: "text", text: readFileSync(nodePath.join(cwd, metadataPath), "utf8") },
+								],
+								details: {},
+							},
 							isError: false,
 						});
 						if (hasText(process.env.PI_HOST_SCAN_PATH)) {

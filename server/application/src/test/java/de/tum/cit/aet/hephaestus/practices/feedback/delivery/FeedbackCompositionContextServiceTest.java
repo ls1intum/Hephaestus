@@ -10,7 +10,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.handler.AdmittedResultFixtures;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.framework.ItemDescriptorRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
@@ -28,7 +27,6 @@ import de.tum.cit.aet.hephaestus.practices.feedback.PreviousPracticePageFeedback
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeVersion;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
-import de.tum.cit.aet.hephaestus.practices.result.ProblemRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationDecision;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheck;
@@ -42,6 +40,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.PracticePageSupport;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryEntry;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewInlineAnchorQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshot;
@@ -61,7 +60,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import tools.jackson.databind.json.JsonMapper;
-import tools.jackson.databind.node.ObjectNode;
 
 @Tag("unit")
 class FeedbackCompositionContextServiceTest {
@@ -84,6 +82,7 @@ class FeedbackCompositionContextServiceTest {
     final PracticeDefinition definition = mock(PracticeDefinition.class);
     final PracticeVersion version = TestEntities.practiceVersion(
             8, 1, new JsonMapper().valueToTree(DefinitionTestFixtures.definition()), "v6:" + "a".repeat(64));
+    final ReviewInlineAnchorQuery inlineAnchors = mock(ReviewInlineAnchorQuery.class);
     final FeedbackCompositionContextService service = new FeedbackCompositionContextService(
             reviews,
             results,
@@ -93,7 +92,7 @@ class FeedbackCompositionContextServiceTest {
             new PracticePageFeedbackRouter(),
             gate,
             basis,
-            new FeedbackAnchorEligibility(mock(ProblemRepository.class), catalog, new JsonMapper()),
+            new FeedbackAnchorEligibility(catalog, inlineAnchors),
             history,
             mentor,
             Clock.fixed(now, ZoneOffset.UTC));
@@ -267,24 +266,14 @@ class FeedbackCompositionContextServiceTest {
         var descriptor = mock(ItemDescriptor.class);
         when(descriptor.copyCapabilities()).thenReturn(Set.of(CopyCapability.LINE_NOTE));
         when(catalog.descriptorFor(item.kind())).thenReturn(Optional.of(descriptor));
-        var evidence = AdmittedResultFixtures.evidence(
-                "scm.pull-request.diff", "context/diff.txt", "src/Work.java", "changed line");
-        ((ObjectNode) evidence.path("citations").required(0)).put("side", "NEW");
-        var anchored = resultBuilder(current).evidence(evidence).build();
-        assertThat(service.conversationDecision(snapshot, anchored))
-                .isEqualTo(new FeedbackCompositionContextService.ConversationAdmission(
-                        ConversationDecision.HAS_INLINE_ANCHOR, FeedbackStopReason.NOTHING_NEW));
-        var example = new JsonMapper()
-                .createObjectNode()
-                .set("citation", evidence.path("citations").required(0));
-        assertThat(service.conversationDecision(
-                        snapshot, resultBuilder(current).example(example).build()))
-                .isEqualTo(new FeedbackCompositionContextService.ConversationAdmission(
-                        ConversationDecision.HAS_INLINE_ANCHOR, FeedbackStopReason.NOTHING_NEW));
-        ((ObjectNode) evidence.path("citations").required(0)).remove("verification");
-        assertThat(service.conversationDecision(snapshot, anchored))
+        // Verified evidence and examples alone do not establish provider placement.
+        assertThat(service.conversationDecision(snapshot, current))
                 .isEqualTo(
                         new FeedbackCompositionContextService.ConversationAdmission(ConversationDecision.ADMIT, null));
+        when(inlineAnchors.hasInlineAnchor(1, reviewId, current.getId())).thenReturn(true);
+        assertThat(service.conversationDecision(snapshot, current))
+                .isEqualTo(new FeedbackCompositionContextService.ConversationAdmission(
+                        ConversationDecision.HAS_INLINE_ANCHOR, FeedbackStopReason.NOTHING_NEW));
     }
 
     @Test

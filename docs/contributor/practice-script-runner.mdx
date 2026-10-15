@@ -65,6 +65,8 @@ An example can appear only on Met or Not met and cannot overlap a problem.
 
 Coverage distinguishes host read receipts from a script's claimed counts.
 Claimed completeness is not a trusted complete file read.
+Host coverage can remain unknown without a failed or truncated read.
+Its omissions name material that was not supplied or read.
 A scan Met needs a COMPLETE receipt for its assigned file at the pinned commit.
 An unavailable required read withholds the result instead of producing an outcome.
 
@@ -74,6 +76,19 @@ Core verifies the quote against captured text and fills coordinates.
 An ambiguous quote is refused.
 A duty basis must quote the practice criteria and cite the captured event.
 Domain citation verifiers own change-side, version and basis checks.
+
+In `submit_result`, cite the source you read with `path`, `startLine`, optional `endLine`, and a required exact `quote`.
+The runner resolves source kind, manifest identity, and the captured repository revision.
+Repository-relative paths and absolute sandbox paths are accepted.
+For a diff, you can set `sourcePath` to `work/change/diff.patch` and `path` to the changed file.
+The runner resolves the diff side from the quote when you omit `side`.
+Historical repository quotes still need a full commit SHA.
+
+Git history output is not repository file content.
+Cite the captured commit record for commit facts.
+A citation refusal includes a corrected example from captured text or an exact read call when text is unavailable.
+An example proves citation syntax only. The evidence must still support the claim.
+
 A missing verifier cannot authorize version-dependent proof.
 
 Non-code source records cannot borrow diff-side semantics.
@@ -84,6 +99,10 @@ The [source contract](./item-source-contract.mdx) owns source citation capabilit
 ## Models and limits
 
 `meta.models` declares required or optional chat, decision, embedding and reranking slots.
+The `agent()` helper chooses forced tool calls only for models that support them.
+Opus 5.5 and Sonnet 5.5 use automatic tool choice, including through an OpenAI-compatible gateway.
+After a text-only turn, the helper gives at most two submission reminders within its original step budget.
+
 A required missing model stops the script.
 An optional model remains absent and the script must handle that state.
 The frozen method records every slot, including absent bindings, without executing code to discover dependencies.

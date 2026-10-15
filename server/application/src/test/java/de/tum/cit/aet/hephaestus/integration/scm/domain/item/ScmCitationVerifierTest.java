@@ -177,10 +177,75 @@ class ScmCitationVerifierTest extends BaseUnitTest {
         assertThat(verifier.verify(check(List.of(revision), List.of()))).hasSize(1);
     }
 
+    @Test
+    void shouldRefuseAnIntroducedClaimOnUnchangedCodeInATouchedFile() throws Exception {
+        range(BASE, HEAD);
+        var unchanged =
+                new CitationToCheck(0, "scm.pull-request.diff", "src/a.ts", CitationSide.NEW, HEAD, 2, 2, "unchanged");
+        assertThat(verifier.verify(check(List.of(unchanged), List.of(new BasisToCheck(0, "introduced", 0, null)))))
+                .singleElement()
+                .satisfies(refusal -> {
+                    assertThat(refusal.reason()).isEqualTo(CandidateRefusal.BASIS_WITNESS_MISSING);
+                    assertThat(refusal.message()).contains("intersect added lines");
+                });
+    }
+
+    @Test
+    void shouldRefuseAWorsenedClaimWithoutARemovedBaseLine() throws Exception {
+        range(BASE, HEAD);
+        var unchanged =
+                new CitationToCheck(0, "scm.repository.tree", "src/a.ts", CitationSide.NEW, BASE, 2, 2, "unchanged");
+        assertThat(verifier.verify(check(
+                        List.of(unchanged, citation(1, CitationSide.NEW, HEAD)),
+                        List.of(new BasisToCheck(0, "worsened", 1, 0)))))
+                .singleElement()
+                .satisfies(refusal -> {
+                    assertThat(refusal.reason()).isEqualTo(CandidateRefusal.BASIS_WITNESS_MISSING);
+                    assertThat(refusal.message()).contains("intersect removed lines");
+                });
+    }
+
+    @Test
+    void shouldAcceptAWitnessRangeThatIntersectsAnAddedLine() throws Exception {
+        range(BASE, HEAD);
+        var spanning = new CitationToCheck(
+                0, "scm.pull-request.diff", "src/a.ts", CitationSide.NEW, HEAD, 1, 2, "after\nunchanged");
+        assertThat(verifier.verify(check(List.of(spanning), List.of(new BasisToCheck(0, "introduced", 0, null)))))
+                .isEmpty();
+    }
+
+    @Test
+    void shouldRefuseACodeBasisWhenThePinnedDiffIsMissing() throws Exception {
+        range(BASE, HEAD);
+        Files.writeString(
+                root.resolve("context/change.json"), "{\"base_sha\":\"" + BASE + "\",\"head_sha\":\"" + HEAD + "\"}");
+        assertThat(verifier.verify(check(
+                        List.of(citation(0, CitationSide.NEW, HEAD)),
+                        List.of(new BasisToCheck(0, "introduced", 0, null)))))
+                .singleElement()
+                .satisfies(refusal -> assertThat(refusal.reason()).isEqualTo(CandidateRefusal.BASIS_WITNESS_MISSING));
+    }
+
     private void range(String base, String head) throws Exception {
         Files.createDirectories(root.resolve("context"));
-        Files.writeString(
-                root.resolve("context/change.json"), "{\"base_sha\":\"" + base + "\",\"head_sha\":\"" + head + "\"}");
+        var mapper = new ObjectMapper();
+        var change = mapper.createObjectNode().put("base_sha", base).put("head_sha", head);
+        change.put("diff", """
+                diff --git a/src/a.ts b/src/a.ts
+                --- a/src/a.ts
+                +++ b/src/a.ts
+                @@ -1,2 +1,2 @@
+                -before
+                +after
+                 unchanged
+                diff --git a/src/old.ts b/src/new.ts
+                --- a/src/old.ts
+                +++ b/src/new.ts
+                @@ -1 +1 @@
+                -before
+                +after
+                """);
+        Files.writeString(root.resolve("context/change.json"), mapper.writeValueAsString(change));
         for (String side : List.of("old", "new")) {
             Files.createDirectories(root.resolve("context/citable/" + side + "/src"));
             Files.writeString(root.resolve("context/citable/" + side + "/src/a.ts"), "words");

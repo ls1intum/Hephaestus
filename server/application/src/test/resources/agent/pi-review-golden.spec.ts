@@ -105,7 +105,16 @@ function runScenario(name: string): Map<string, string> {
 							file: { path: "repos/primary/.git/hephaestus-captured-refs" },
 						},
 					],
-					citableTexts: [],
+					citableTexts: [
+						{
+							source: "scm.repository.tree",
+							path: "src/healthy.ts",
+							side: "NEW",
+							commit: "a".repeat(40),
+							stagedPath: "repos/primary/src/healthy.ts",
+							sha256: createHash("sha256").update("const healthy = true;\n").digest("hex"),
+						},
+					],
 					sources: [
 						{
 							kind: "scm.repository.tree",

@@ -79,8 +79,9 @@ always a pattern claim, and so is any note that says something recurs. Write one
 2. You can name the observable concern the occurrences share beyond the practice's name. The recurring gap is
    itself what they share. If they share only the practice's name, they are a list, not a pattern.
 
-Several results or problems of one concern, even from related practices, are one piece. Choose the practice that
-best names it as `practiceSlug`, and include the related results or problems in `basedOn`. Do not merge separate
+A practice-page card addresses exactly one practice. Its `basedOn` names only that practice's NOT_MET results or problems.
+Conversation notes may include related NOT_MET practices for the same concern only when each is eligible for CONVERSATION.
+Choose the primary practice as `practiceSlug`. Do not merge separate
 concerns because their advice sounds similar. Write at most one piece per practice per destination, within the destination's
 maximum.
 
@@ -91,8 +92,8 @@ Staying quiet is a decision you record: `action: "WITHHOLD"` with a reason.
 
 - `BELOW_BAR` — the evidence does not clear the bar for this destination.
 - `ALREADY_SAID` — `<historyRoot>/feedback.json` records the point as already delivered on this destination. Only that
-  file supports this reason, and only for the destination it was delivered on.
-- `NO_MATERIAL_CHANGE` — no current fact adds anything material to the earlier feedback recorded there.
+  file supports this reason, and only for the destination it was delivered on. Name its feedback IDs in `witnessIds`.
+- `NO_MATERIAL_CHANGE` — no current fact adds anything material to the earlier feedback recorded there. Name its feedback IDs in `witnessIds`.
 
 An empty destination with a stated reason is a correct and common outcome.
 
@@ -142,7 +143,7 @@ no confidence.
     concern.
 - `basedOn` names admitted ids from `work/composition/results.json`: a result's `resultId`, or an
   problem's `problemId` for one located problem. It must name the `NOT_MET` result of the piece's
-  `practiceSlug` or one of its problems. It may include results or problems from related practices that
-  describe the same concern.
+  `practiceSlug` or one of its problems. A card uses that practice alone.
+  Conversation support may include related NOT_MET practices only when each is eligible for that destination.
 
 Stop when you have written what the bar justifies on each open destination.

@@ -111,9 +111,17 @@ const NAMED_WHEN_ABSENT = new Set([
 	"linked_work_items.json",
 ]);
 
-/** The brief's text, or an empty string when nothing it would show exists. */
-export function buildBrief(root: string, paths: BriefPaths, limits = DEFAULT_BRIEF_LIMITS): string {
-	const blocks: { text: string; omission: string }[] = [];
+export interface BriefSource {
+	path: string;
+	supplied: boolean;
+	lines?: number;
+}
+
+/** Text and source coverage describe the same final brief, after all size limits. */
+export function buildBrief(root: string, paths: BriefPaths, limits = DEFAULT_BRIEF_LIMITS) {
+	const sources = new Map<string, BriefSource>();
+	const result = (text: string) => ({ text, sources: [...sources.values()] });
+	const blocks: { text: string; omission: string; path: string }[] = [];
 	const withheld: string[] = [];
 	const absent: string[] = [];
 	const empty: string[] = [];
@@ -125,9 +133,11 @@ export function buildBrief(root: string, paths: BriefPaths, limits = DEFAULT_BRI
 			}
 			continue;
 		}
+		sources.set(candidate.label, { path: candidate.label, supplied: false });
 		const { size } = statSync(candidate.absolute);
 		if (size === 0) {
 			empty.push(`\`${candidate.label}\``);
+			sources.set(candidate.label, { path: candidate.label, supplied: true, lines: 1 });
 			continue;
 		}
 		const omission = `- \`${candidate.label}\` (${Math.ceil(size / 1024)} KB)`;
@@ -151,11 +161,16 @@ export function buildBrief(root: string, paths: BriefPaths, limits = DEFAULT_BRI
 			withheld.push(omission);
 			continue;
 		}
-		blocks.push({ text: block, omission });
+		blocks.push({ text: block, omission, path: candidate.label });
+		sources.set(candidate.label, {
+			path: candidate.label,
+			supplied: true,
+			lines: raw.split("\n").length,
+		});
 		used += block.length;
 	}
-	if (blocks.length === 0 && withheld.length === 0) {
-		return "";
+	if (blocks.length === 0 && withheld.length === 0 && empty.length === 0) {
+		return result("");
 	}
 
 	const render = () => {
@@ -165,7 +180,7 @@ export function buildBrief(root: string, paths: BriefPaths, limits = DEFAULT_BRI
 		];
 		if (withheld.length > 0) {
 			parts.push(
-				`### Too large to show here — read with \`read\`, or \`bash\` for a slice\n${withheld.join("\n")}`,
+				`### Too large to show here — read with \`read\` and continue until EOF\n${withheld.join("\n")}`,
 			);
 		}
 		if (empty.length > 0) {
@@ -183,17 +198,21 @@ export function buildBrief(root: string, paths: BriefPaths, limits = DEFAULT_BRI
 	while (brief.length > limits.totalChars && blocks.length > 0) {
 		const removed = blocks.pop();
 		if (removed) {
+			sources.set(removed.path, { path: removed.path, supplied: false });
 			withheld.unshift(removed.omission);
 		}
 		brief = render();
 	}
 	if (brief.length <= limits.totalChars) {
-		return brief;
+		return result(brief);
 	}
 	// Even the file index can exceed the bound. Keep a complete instruction, not a cut-off path.
 	const omitted =
 		"The capture index exceeds the brief limit. Read the capture manifest and context files using the task paths.";
-	return omitted.length <= limits.totalChars ? omitted : "";
+	for (const source of sources.values()) {
+		source.supplied = false;
+	}
+	return result(omitted.length <= limits.totalChars ? omitted : "");
 }
 
 /** A fence inside the content would end the block early; a longer fence cannot be closed by it. */

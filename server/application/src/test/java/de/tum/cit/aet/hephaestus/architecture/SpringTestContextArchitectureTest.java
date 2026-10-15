@@ -66,6 +66,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             assignment("practices.adapter.PracticesWorkspacePurgeAdapterTest", "review-fixture"),
             assignment("practices.feedback.AbstractFeedbackDeliveryIntegrationTest", "review-feedbackdelivery"),
             assignment("practices.feedback.FeedbackGateIntegrationTest", "review-feedbackgate"),
+            assignment("practices.feedback.FeedbackPreparationReceiptIntegrationTest", "review-preparation-receipt"),
             assignment("practices.feedback.FeedbackHistoryQueryIntegrationTest", "review-feedbackhistoryquery"),
             assignment("practices.feedback.FeedbackReviewControllerIntegrationTest", "review-feedbackreviewcontroller"),
             assignment("practices.groupdetail.PracticeGroupReviewHistoryIntegrationTest", "review-evidence"),
@@ -158,6 +159,9 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
                     "review-feedbackdelivery",
                     "real feedback receipts and recovery with irreversible delivery and"
                             + " readiness boundaries controlled"),
+            Map.entry(
+                    "review-preparation-receipt",
+                    "real preparation and page projection with developer identity, visibility and pattern eligibility controlled"),
             Map.entry(
                     "review-feedbackhistoryquery",
                     "real persisted history with exact private/public source permissions" + " controlled"),
@@ -256,7 +260,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             "practices.acrossworkspace.PracticesAcrossWorkspaceIntegrationTest",
             "practices.feedback.AbstractFeedbackDeliveryIntegrationTest",
             "practices.feedback.FeedbackGateIntegrationTest",
-            "practices.feedback.FeedbackGateIntegrationTest",
+            "practices.feedback.FeedbackPreparationReceiptIntegrationTest",
             "practices.feedback.FeedbackHistoryQueryIntegrationTest",
             "practices.feedback.FeedbackReviewControllerIntegrationTest",
             "practices.groupdetail.PracticeGroupReviewHistoryIntegrationTest",

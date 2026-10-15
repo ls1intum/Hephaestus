@@ -1,0 +1,29 @@
+{
+  "reported": {
+    "destination": "PRACTICE_PAGE",
+    "practiceSlug": "tokens",
+    "basedOn": ["30000000-0000-4000-8000-000000000001"],
+    "action": "NEW",
+    "title": "Guard the token boundary",
+    "body": "Unchecked tokens reach the handler across these changes.",
+    "nextStep": "Check invalid tokens before forwarding."
+  },
+  "prepared": {
+    "destination": "PRACTICE_PAGE",
+    "resultIds": ["30000000-0000-4000-8000-000000000001"],
+    "summary": null,
+    "notes": [],
+    "withheldReason": null,
+    "page": {
+      "title": "Guard the token boundary",
+      "body": "Unchecked tokens reach the handler across these changes.",
+      "nextStep": "Check invalid tokens before forwarding."
+    },
+    "trace": {
+      "copies": [{"kind": "SUMMARY", "position": 0, "basedOn": [{"resultId": "30000000-0000-4000-8000-000000000001"}]}],
+      "withheld": [],
+      "replacesId": null,
+      "primaryResultId": "30000000-0000-4000-8000-000000000001"
+    }
+  }
+}

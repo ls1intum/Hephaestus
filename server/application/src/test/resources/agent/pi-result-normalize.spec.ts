@@ -18,11 +18,23 @@ import {
 	resolveQuote,
 	resolveCapturedText,
 	submissionCitations,
+	validateChangeBasis,
 	validateEvidenceSources,
 	validateInapplicabilityScope,
 	validateSearchScope,
 	withoutCoordinates,
 } from "../../../main/resources/agent/pi-result-normalize.ts";
+
+import { z } from "../../../../../../docker/agents/practice-scripts/lib/core/practice-script.ts";
+
+const coordinateCase = z.object({
+	name: z.string(),
+	content: z.string(),
+	quote: z.string(),
+	startLine: z.int(),
+	endLine: z.int(),
+	expectedStartLine: z.int().nullable(),
+});
 
 const DIFF_CITATION = {
 	sourceKind: "scm.pull-request.diff",
@@ -1361,4 +1373,121 @@ void test("a registered logical text resolves plaintext independently of source 
 	assert.deepEqual(resolveCapturedText(citation, "first\n  checked();\n"), {
 		quote: "  checked();",
 	});
+});
+
+void test("quotation coordinates follow the shared Java admission contract", () => {
+	const fixtures: unknown = JSON.parse(
+		readFileSync(new URL("citation-coordinate-cases.json", import.meta.url), "utf8"),
+	);
+	assert.ok(Array.isArray(fixtures));
+	for (const fixture of fixtures) {
+		const parsed = coordinateCase.parse(fixture);
+		const result = resolveCapturedText(
+			{
+				sourceKind: "docs.document.core",
+				sourcePath: "context/body.txt",
+				path: "document/body",
+				startLine: parsed.startLine,
+				endLine: parsed.endLine,
+				quote: parsed.quote,
+			},
+			parsed.content,
+		);
+		if (parsed.expectedStartLine === null) {
+			assert.ok("mismatch" in result, parsed.name);
+		} else {
+			assert.ok("quote" in result, parsed.name);
+			assert.equal(result.startLine ?? parsed.startLine, parsed.expectedStartLine, parsed.name);
+		}
+	}
+});
+
+void test("a repeated diff quote uses supplied view coordinates before relocation", () => {
+	const fixtures: unknown = JSON.parse(
+		readFileSync(new URL("citation-coordinate-cases.json", import.meta.url), "utf8"),
+	);
+	const fixture = z
+		.array(coordinateCase)
+		.parse(fixtures)
+		.find((entry) => entry.name === "second repeated quote");
+	assert.ok(fixture !== undefined);
+	const diff = `diff --git a/src/a.ts b/src/a.ts\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -0,0 +1,4 @@\n${fixture.content
+		.trimEnd()
+		.split("\n")
+		.map((line, index) => `[L${index + 1}] +${line}`)
+		.join("\n")}`;
+	const result = resolveQuote(
+		{
+			sourceKind: "scm.pull-request.diff",
+			sourcePath: "context/change.json",
+			path: "src/a.ts",
+			side: "NEW",
+			startLine: fixture.startLine + 4,
+			endLine: fixture.endLine + 4,
+			quote: fixture.quote,
+		},
+		diff,
+	);
+	assert.ok("quote" in result);
+	assert.equal(result.startLine, fixture.expectedStartLine);
+	assert.equal(result.quote, fixture.quote);
+});
+
+const basisDiff = `diff --git a/src/Auth.java b/src/Auth.java
+--- a/src/Auth.java
++++ b/src/Auth.java
+@@ -9,2 +9,2 @@
+[L9] - before();
+[L9] + after();
+[L10]   unchanged();
+`;
+
+void test("a code change basis needs added and removed witness lines", () => {
+	const introduced = normalizeSubmission(
+		baseSubmission({
+			problems: [
+				problemFixture({
+					citations: [citationFixture({ startLine: 10, endLine: 10, quote: "unchanged();" })],
+				}),
+			],
+		}),
+	);
+	assert.throws(
+		() => validateChangeBasis(introduced, basisDiff),
+		/head witness must intersect added lines/u,
+	);
+	const changed = normalizeSubmission(
+		baseSubmission({
+			problems: [
+				problemFixture({
+					citations: [
+						citationFixture({ startLine: 9, endLine: 10, quote: "after();\nunchanged();" }),
+					],
+				}),
+			],
+		}),
+	);
+	assert.doesNotThrow(() => validateChangeBasis(changed, basisDiff));
+	const worsened = normalizeSubmission(
+		baseSubmission({
+			problems: [
+				problemFixture({
+					citations: [
+						citationFixture({ startLine: 9, endLine: 9, quote: "after();" }),
+						citationFixture({ side: "OLD", startLine: 10, endLine: 10, quote: "unchanged();" }),
+					],
+					basis: {
+						type: "worsened",
+						head: 0,
+						base: 1,
+						explanation: "The change makes this worse.",
+					},
+				}),
+			],
+		}),
+	);
+	assert.throws(
+		() => validateChangeBasis(worsened, basisDiff),
+		/base witness must intersect removed lines/u,
+	);
 });

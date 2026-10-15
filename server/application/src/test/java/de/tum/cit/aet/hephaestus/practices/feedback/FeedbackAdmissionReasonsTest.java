@@ -43,6 +43,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.PinnedPractice;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticePageDecision;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewInlineAnchorQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewMethod;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
@@ -119,7 +120,7 @@ class FeedbackAdmissionReasonsTest {
             new PracticePageFeedbackRouter(),
             gate,
             basis,
-            new FeedbackAnchorEligibility(mock(ProblemRepository.class), catalog, new JsonMapper()),
+            new FeedbackAnchorEligibility(catalog, mock(ReviewInlineAnchorQuery.class)),
             mock(ResultHistoryQuery.class),
             mock(MentorReadinessQuery.class),
             clock);
@@ -264,6 +265,8 @@ class FeedbackAdmissionReasonsTest {
                 "Add a focused test.",
                 List.of(new FeedbackBasisInput(current.getId(), null, 0)),
                 List.of(),
-                Map.of());
+                Map.of(),
+                null,
+                null);
     }
 }

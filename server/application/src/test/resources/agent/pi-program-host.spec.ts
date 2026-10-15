@@ -96,6 +96,17 @@ void test("the runner admits the results that passed the host's checks and exits
 	assert.equal(main.status, 0, main.stderr);
 });
 
+void test("a partial run submits completed results and explicit runtime non-results separately", () => {
+	const [admission] = capturedLines(main.cwd, "admission");
+	const body: unknown = field(admission, "body");
+	assert.deepEqual(field(body, "nonResults"), [
+		{ practiceSlug: "c-invalid-meta", reason: "EXECUTION_FAILED" },
+		{ practiceSlug: "d-silent", reason: "EXECUTION_FAILED" },
+		{ practiceSlug: "e-no-inputs", reason: "EXECUTION_INCOMPLETE" },
+	]);
+	assert.deepEqual(admittedSlugs(main.cwd), ["a-direct", "b-builtin"]);
+});
+
 void test("a custom program that returns a result directly opens no session, and its result is admitted", () => {
 	const prompted = capturedLines(main.cwd, "prompts").map((line) => field(line, "slug"));
 	assert.equal(prompted.includes("a-direct"), false);

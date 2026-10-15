@@ -55,7 +55,9 @@ class FeedbackConversationReceiptIntegrationTest extends AbstractFeedbackDeliver
                 List.of(new FeedbackBasisInput(supportingResult.getId(), null, 0)),
                 List.of(new FeedbackCopyInput(
                         copyId, FeedbackCopyKind.CHAT_TURN, 0, null, null, null, null, null, copyId.toString(), null)),
-                Map.of());
+                Map.of(),
+                null,
+                null);
         store.prepareAll(workspace.getId(), reviewId, List.of(draft));
     }
 

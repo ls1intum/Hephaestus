@@ -100,6 +100,34 @@ class ReviewJobCompletionServiceTest extends BaseUnitTest {
     }
 
     @Test
+    void shouldCloseAnAdmittedPartialRunWithItsRuntimeNonResultReason() {
+        var job = RuntimeReviewTestData.job();
+        job.setStatus(ReviewJobStatus.COMPLETED);
+        job.setAdmissionAttempt(0);
+        job.setAdmissionDigest("proof");
+        var capture = new JsonMapper().createObjectNode();
+        capture.putArray("nonResults")
+                .addObject()
+                .put("practiceSlug", "clear-names")
+                .put("reason", "BUDGET");
+        job.setCapture(capture);
+        var service = service(job, ReviewKind.ITEM);
+        var assignment = RuntimeReviewTestData.assignment(null, null);
+        when(assignments.admissible(job)).thenReturn(List.of(assignment));
+        service.tick();
+        verify(members)
+                .fail(
+                        1,
+                        assignment.id(),
+                        ReviewStopReason.BUDGET,
+                        "Runtime execution ended without a result for this practice");
+        var completion = ArgumentCaptor.forClass(ReviewCompletion.class);
+        verify(reviews).complete(ArgumentMatchers.eq(1L), ArgumentMatchers.eq(job.getReviewId()), completion.capture());
+        assertThat(completion.getValue().status()).isEqualTo(ReviewStatus.PARTIAL);
+        assertThat(completion.getValue().reason()).isEqualTo(ReviewStopReason.EXECUTION_INCOMPLETE);
+    }
+
+    @Test
     void capturedRefusalClosesAsNotReviewedWithItsReadinessReason() {
         var job = RuntimeReviewTestData.job();
         job.setStatus(ReviewJobStatus.COMPLETED);

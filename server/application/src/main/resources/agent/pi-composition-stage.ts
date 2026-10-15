@@ -128,6 +128,7 @@ interface FeedbackPieceOf<Basis> extends ComposedFeedbackPiece {
 	action: FeedbackAction;
 	supersedesThreadKey?: string;
 	withholdReason?: string;
+	witnessIds?: string[];
 	title?: string;
 	body?: string;
 	nextStep?: string;
@@ -257,6 +258,7 @@ const feedbackPieceSchema = z.strictObject({
 	action: z.enum(ACTIONS),
 	basedOn: z.array(z.string().trim().min(1)).default([]),
 	supersedesThreadKey: optionalFeedbackText("supersedesThreadKey"),
+	witnessIds: z.array(z.string().trim().min(1)).optional(),
 	withholdReason: z
 		.enum(WITHHOLD_REASONS)
 		.nullish()
@@ -340,6 +342,12 @@ function validateFeedback(
 		return evidenceError;
 	}
 	const named = namedEvidence(results);
+	if (
+		piece.destination === "PRACTICE_PAGE" &&
+		piece.basedOn.some((id) => named.get(id)?.result.practiceSlug !== piece.practiceSlug)
+	) {
+		return "A PRACTICE_PAGE card addresses one practice; basedOn must name only that practice's NOT_MET results or problems. Skipped.";
+	}
 	if (piece.action === "WITHHOLD") {
 		const reason = piece.withholdReason;
 		if (!hasText(reason)) {
@@ -357,10 +365,35 @@ function validateFeedback(
 				`or WITHHOLD with BELOW_BAR. Skipped.`
 			);
 		}
+		if (reason !== "BELOW_BAR" && (piece.witnessIds?.length ?? 0) === 0) {
+			return `${reason} needs witnessIds from the delivered-feedback file; skipped.`;
+		}
+		const witnessedSlugs = notMetPractices(
+			piece.basedOn.flatMap((id) => named.get(id)?.result ?? []),
+		);
+		const witnessIds = piece.witnessIds ?? [];
+		if (
+			witnessIds.some(
+				(id) =>
+					!witnessedSlugs.some((slug) =>
+						deliveredPractices.has(`${piece.destination}:${slug}:${id}`),
+					),
+			) ||
+			witnessedSlugs.some(
+				(slug) =>
+					reason !== "BELOW_BAR" &&
+					!witnessIds.some((id) => deliveredPractices.has(`${piece.destination}:${slug}:${id}`)),
+			)
+		) {
+			return "Witnesses must name current delivered feedback for every supported practice on this destination; skipped.";
+		}
 		return null;
 	}
 	if (isBlank(piece.title)) {
 		return "A piece that is not a WITHHOLD needs a title; skipped.";
+	}
+	if (piece.destination === "PRACTICE_PAGE" && piece.action === "SUPERSEDE") {
+		return "A practice-page card replaces the open card automatically; use NEW and name no target. Skipped.";
 	}
 	if (piece.action === "SUPERSEDE") {
 		if (!hasText(piece.supersedesThreadKey)) {
@@ -454,10 +487,18 @@ export function buildFeedbackTool(
 		if (rejection !== null) {
 			return skipped(rejection);
 		}
-		if (!(runtime.routes(piece.practiceSlug) ?? []).includes(piece.destination)) {
+		const supportingSlugs = [
+			...new Set(
+				piece.basedOn.flatMap((id) => namedEvidence(admitted).get(id)?.result.practiceSlug ?? []),
+			),
+		];
+		const ineligible = supportingSlugs.find(
+			(slug) => !(runtime.routes(slug) ?? []).includes(piece.destination),
+		);
+		if (ineligible !== undefined) {
 			return skipped(
 				`${piece.destination} cannot carry feedback about ${piece.practiceSlug} this run ` +
-					`(${runtime.destinationRefusal(piece.destination, piece.practiceSlug)}); write no piece for it there, not even a WITHHOLD. Skipped.`,
+					`(${runtime.destinationRefusal(piece.destination, ineligible)}); write no piece for it there, not even a WITHHOLD. Skipped.`,
 			);
 		}
 		if (piece.destination === "PRACTICE_PAGE" && delivers) {
@@ -484,8 +525,139 @@ export function buildFeedbackTool(
 		};
 	};
 
+	const properties = {
+		destination: {
+			type: "string",
+			enum: enabledDestinations,
+			description: "Which surface this piece is for. Each has its own level and its own rules.",
+		},
+		practiceSlug: {
+			type: "string",
+			enum: practiceSlugs,
+			description: "The primary practice. A practice-page card uses only this practice.",
+		},
+		basedOn: {
+			type: "array",
+			minItems: 1,
+			items: { type: "string", minLength: 1 },
+			description:
+				"What this rests on: admitted ids from this run, a result's resultId or, for one located problem, a problem's problemId. Related NOT_MET practices may support CONVERSATION only when each is eligible there.",
+		},
+		action: {
+			type: "string",
+			enum: ACTIONS,
+			description:
+				"NEW to say something; SUPERSEDE to replace prepared feedback that has not been delivered; " +
+				"WITHHOLD to record, with a reason, that you decided to stay quiet.",
+		},
+		supersedesThreadKey: {
+			type: "string",
+			maxLength: FEEDBACK_TEXT_BOUNDS.supersedesThreadKey,
+			description:
+				"Required for SUPERSEDE: the threadKey of an entry in the task-declared prepared-feedback file. " +
+				"You may not name a key that is not in that file.",
+		},
+		witnessIds: {
+			type: "array",
+			items: { type: "string" },
+			description: "Delivered feedback IDs that witness prior advice; empty for BELOW_BAR.",
+		},
+		withholdReason: { type: "string", enum: WITHHOLD_REASONS },
+		title: {
+			type: "string",
+			maxLength: FEEDBACK_TEXT_BOUNDS.title,
+			description: "Names the issue in a few words. Never names the person.",
+		},
+		body: {
+			type: "string",
+			maxLength: FEEDBACK_TEXT_BOUNDS.body,
+			description:
+				"PRACTICE_PAGE only: the evidenced pattern across the work and why it matters; the future way of working belongs to nextStep. Grounded in current results and their problems; never quote a line or claim change over time from the pre-run history. Markdown, read verbatim.",
+		},
+		nextStep: {
+			type: "string",
+			maxLength: FEEDBACK_TEXT_BOUNDS.nextStep,
+			description:
+				"PRACTICE_PAGE only: the one repeatable way of working for the next piece of work; the body does not state it. Name the missing decision, not a heading/template unless the practice requires one; never provide paste-ready prose.",
+		},
+		notes: {
+			type: "object",
+			additionalProperties: false,
+			required: ["situation", "capability", "evidenceSummary", "inConversationLearning"],
+			description:
+				"CONVERSATION only. Notes TO the mentor, which composes the whole turn itself, later, " +
+				"with the live conversation in front of it. Write what it needs to know, never a " +
+				"sentence for it to say: anything phrased as a line of dialogue will be spoken, and " +
+				"will sound like a script.",
+			properties: {
+				situation: {
+					type: "string",
+					maxLength: FEEDBACK_TEXT_BOUNDS.situation,
+					description:
+						"The concern the problems have in common, as it can be observed, stated once rather than " +
+						"listing each item again. Your words about it, not words for it - third person, never " +
+						"addressed to the developer as 'you', and never a judgement of the person.",
+				},
+				capability: {
+					type: "string",
+					maxLength: FEEDBACK_TEXT_BOUNDS.capability,
+					description:
+						"The self-check of the assessed behaviour this conversation should support: how the developer can tell whether their own work shows it, not only whether something is wired up. State the capability, not a solution such as a required heading/template, and not a question, script, diagnosis, or fixed tactic.",
+				},
+				evidenceSummary: {
+					type: "string",
+					maxLength: FEEDBACK_TEXT_BOUNDS.evidenceSummary,
+					description:
+						"Where the concern occurred, compactly: each supporting work and problem located once. " +
+						"Summarise rather than inventing a quote; the original result evidence is " +
+						"staged separately for the mentor to inspect.",
+				},
+				inConversationLearning: {
+					type: "string",
+					maxLength: FEEDBACK_TEXT_BOUNDS.inConversationLearning,
+					description:
+						"Understanding the developer articulates in a way that can be observed before the conversation ends: a distinction, decision, question, or self-check they say. Not a promise, future output, message text, or compliance target.",
+				},
+				alreadySaid: {
+					type: "string",
+					maxLength: FEEDBACK_TEXT_BOUNDS.alreadySaid,
+					description:
+						"Optional. Relevant prior communication the shown history records, and movement the shown evidence supports. Omit when none is shown. Partial or missing history leaves coverage unknown: it never proves that nothing was said or that a concern was resolved.",
+				},
+			},
+		},
+	};
+	const common = ["destination", "practiceSlug", "basedOn", "action"];
+	const branch = (destination: PrivateDestination, action: FeedbackAction) => {
+		let fields: string[];
+		if (action === "WITHHOLD") {
+			fields = ["withholdReason", "witnessIds"];
+		} else if (destination === "PRACTICE_PAGE") {
+			fields = ["title", "body", "nextStep"];
+		} else {
+			fields = ["title", "notes", ...(action === "SUPERSEDE" ? ["supersedesThreadKey"] : [])];
+		}
+		const keys = [...common, ...fields];
+		return {
+			type: "object",
+			additionalProperties: false,
+			required: keys,
+			properties: {
+				...Object.fromEntries(Object.entries(properties).filter(([key]) => keys.includes(key))),
+				destination: { type: "string", enum: [destination] },
+				action: { type: "string", enum: [action] },
+			},
+		};
+	};
+	const branches = enabledDestinations.flatMap((destination) => [
+		branch(destination, "WITHHOLD"),
+		branch(destination, "NEW"),
+		...(destination === "CONVERSATION" ? [branch(destination, "SUPERSEDE")] : []),
+	]);
+
 	return defineTool({
 		name: "report_feedback",
+		constrainedSampling: { type: "json_schema", strict: "prefer" },
 		exposure: "model-only",
 		label: "Report Feedback",
 		description:
@@ -496,122 +668,9 @@ export function buildFeedbackTool(
 			"confidence, and no citation you typed yourself.",
 		parameters: {
 			type: "object",
+			additionalProperties: false,
 			required: ["feedback"],
-			properties: {
-				feedback: runtime.documentedShape(
-					runtime.listSchema(
-						{
-							type: "object",
-							required: ["destination", "practiceSlug", "basedOn", "action"],
-							properties: {
-								destination: {
-									type: "string",
-									enum: enabledDestinations,
-									description:
-										"Which surface this piece is for. Each has its own level and its own rules.",
-								},
-								practiceSlug: {
-									type: "string",
-									enum: practiceSlugs,
-									description:
-										"The primary practice whose intervention this piece advances. Related results may support it.",
-								},
-								basedOn: {
-									type: "array",
-									minItems: 1,
-									items: { type: "string", minLength: 1 },
-									description:
-										"What this rests on: admitted ids from this run, a result's resultId or, for one located problem, a problem's problemId. Include related practices only when they describe the same underlying event.",
-								},
-								action: {
-									type: "string",
-									enum: ACTIONS,
-									description:
-										"NEW to say something; SUPERSEDE to replace prepared feedback that has not been delivered; " +
-										"WITHHOLD to record, with a reason, that you decided to stay quiet.",
-								},
-								supersedesThreadKey: {
-									type: "string",
-									maxLength: FEEDBACK_TEXT_BOUNDS.supersedesThreadKey,
-									description:
-										"Required for SUPERSEDE: the threadKey of an entry in the task-declared prepared-feedback file. " +
-										"You may not name a key that is not in that file.",
-								},
-								withholdReason: { type: "string", enum: WITHHOLD_REASONS },
-								title: {
-									type: "string",
-									maxLength: FEEDBACK_TEXT_BOUNDS.title,
-									description: "Names the issue in a few words. Never names the person.",
-								},
-								body: {
-									type: "string",
-									maxLength: FEEDBACK_TEXT_BOUNDS.body,
-									description:
-										"PRACTICE_PAGE only: the evidenced pattern across the work and why it matters; the future way of working belongs to nextStep. Grounded in current results and their problems; never quote a line or claim change over time from the pre-run history. Markdown, read verbatim.",
-								},
-								nextStep: {
-									type: "string",
-									maxLength: FEEDBACK_TEXT_BOUNDS.nextStep,
-									description:
-										"PRACTICE_PAGE only: the one repeatable way of working for the next piece of work; the body does not state it. Name the missing decision, not a heading/template unless the practice requires one; never provide paste-ready prose.",
-								},
-								notes: {
-									type: "object",
-									additionalProperties: false,
-									required: [
-										"situation",
-										"capability",
-										"evidenceSummary",
-										"inConversationLearning",
-									],
-									description:
-										"CONVERSATION only. Notes TO the mentor, which composes the whole turn itself, later, " +
-										"with the live conversation in front of it. Write what it needs to know, never a " +
-										"sentence for it to say: anything phrased as a line of dialogue will be spoken, and " +
-										"will sound like a script.",
-									properties: {
-										situation: {
-											type: "string",
-											maxLength: FEEDBACK_TEXT_BOUNDS.situation,
-											description:
-												"The concern the problems have in common, as it can be observed, stated once rather than " +
-												"listing each item again. Your words about it, not words for it - third person, never " +
-												"addressed to the developer as 'you', and never a judgement of the person.",
-										},
-										capability: {
-											type: "string",
-											maxLength: FEEDBACK_TEXT_BOUNDS.capability,
-											description:
-												"The self-check of the assessed behaviour this conversation should support: how the developer can tell whether their own work shows it, not only whether something is wired up. State the capability, not a solution such as a required heading/template, and not a question, script, diagnosis, or fixed tactic.",
-										},
-										evidenceSummary: {
-											type: "string",
-											maxLength: FEEDBACK_TEXT_BOUNDS.evidenceSummary,
-											description:
-												"Where the concern occurred, compactly: each supporting work and problem located once. " +
-												"Summarise rather than inventing a quote; the original result evidence is " +
-												"staged separately for the mentor to inspect.",
-										},
-										inConversationLearning: {
-											type: "string",
-											maxLength: FEEDBACK_TEXT_BOUNDS.inConversationLearning,
-											description:
-												"Understanding the developer articulates in a way that can be observed before the conversation ends: a distinction, decision, question, or self-check they say. Not a promise, future output, message text, or compliance target.",
-										},
-										alreadySaid: {
-											type: "string",
-											maxLength: FEEDBACK_TEXT_BOUNDS.alreadySaid,
-											description:
-												"Optional. Relevant prior communication the shown history records, and movement the shown evidence supports. Omit when none is shown. Partial or missing history leaves coverage unknown: it never proves that nothing was said or that a concern was resolved.",
-										},
-									},
-								},
-							},
-						},
-						"feedback",
-					),
-				),
-			},
+			properties: { feedback: { type: "array", minItems: 1, items: { anyOf: branches } } },
 		},
 		execute: async (toolCallId, params): Promise<AgentToolResult<ReportFeedbackDetails>> => {
 			if (!runtime.admitted()) {
@@ -670,75 +729,144 @@ export async function prepareComposedFeedback(options: {
 		return;
 	}
 
-	const composition: FeedbackComposition[] = [];
+	const packages: {
+		composition: FeedbackComposition[];
+		publicComposition: boolean;
+		privateIndex?: number;
+	}[] = [];
 	const { review } = composedFeedback;
 	if (review !== null) {
 		const refs = [
 			...(review.summary?.basedOn ?? []),
 			...review.inline.flatMap((note) => note.basedOn),
+			...review.withheld.flatMap((piece) => piece.basedOn),
 		];
 		const resultIds = [...new Set(refs.map((ref) => ref.resultId))];
-		const quiet = resultIds.length === 0;
-		const selected = quiet
-			? [...new Set(review.withheld.flatMap((piece) => piece.basedOn.map((ref) => ref.resultId)))]
-			: resultIds;
-		if (selected.length > 0) {
-			composition.push({
-				destination: "ON_WORK",
-				resultIds: selected,
-				summary: review.summary?.body ?? null,
-				notes: review.inline.map((note) => ({
-					problemId: note.anchor.problemId,
-					body: note.body,
-				})),
-				withheldReason: quiet ? "COMPOSER_WITHHELD" : null,
-			});
-		}
-	}
-	for (const piece of composedFeedback.feedback) {
-		composition.push({
-			destination: piece.destination,
-			resultIds: [...new Set(piece.basedOn.map((ref) => ref.resultId))],
-			summary: piece.action === "WITHHOLD" ? null : feedbackBody(piece),
-			notes: [],
-			withheldReason: piece.action === "WITHHOLD" ? "COMPOSER_WITHHELD" : null,
+		const quiet = review.summary === null && review.inline.length === 0;
+		packages.push({
+			publicComposition: true,
+			composition:
+				resultIds.length === 0
+					? []
+					: [
+							{
+								destination: "ON_WORK",
+								resultIds,
+								summary: review.summary?.body ?? null,
+								notes: review.inline.map((note) => ({ ...note.anchor, body: note.body })),
+								withheldReason: quiet ? "COMPOSER_WITHHELD" : null,
+								page: null,
+								trace: {
+									copies: [
+										...(review.summary === null
+											? []
+											: [
+													{
+														kind: "SUMMARY" as const,
+														position: 0,
+														basedOn: review.summary.basedOn,
+													},
+												]),
+										...review.inline.map((note, index) => ({
+											kind: "LINE_NOTE" as const,
+											position: index + (review.summary === null ? 0 : 1),
+											basedOn: note.basedOn,
+										})),
+									],
+									withheld: review.withheld,
+									replacesId: null,
+									primaryResultId: null,
+								},
+							},
+						],
 		});
 	}
-	const publicComposition = review !== null;
-	if (composition.length === 0 && !publicComposition) {
-		return;
+	for (const [privateIndex, piece] of composedFeedback.feedback.entries()) {
+		const quiet = piece.action === "WITHHOLD";
+		const primary = composedFeedback.results.find(
+			(result) => result.practiceSlug === piece.practiceSlug,
+		);
+		const card = piece.destination === "PRACTICE_PAGE" && !quiet;
+		packages.push({
+			publicComposition: false,
+			privateIndex,
+			composition: [
+				{
+					destination: piece.destination,
+					resultIds: [...new Set(piece.basedOn.map((ref) => ref.resultId))],
+					summary: quiet || card ? null : feedbackBody(piece),
+					page:
+						card &&
+						piece.title !== undefined &&
+						piece.body !== undefined &&
+						piece.nextStep !== undefined
+							? { title: piece.title, body: piece.body, nextStep: piece.nextStep }
+							: null,
+					notes: [],
+					withheldReason: quiet ? "COMPOSER_WITHHELD" : null,
+					trace: {
+						copies: quiet
+							? []
+							: [
+									{
+										kind: piece.destination === "CONVERSATION" ? "CHAT_TURN" : "SUMMARY",
+										position: 0,
+										basedOn: piece.basedOn,
+									},
+								],
+						withheld: quiet
+							? [
+									{
+										basedOn: piece.basedOn,
+										reason: piece.withholdReason ?? "BELOW_BAR",
+										witnessIds: piece.witnessIds ?? [],
+									},
+								]
+							: [],
+						replacesId:
+							piece.action === "SUPERSEDE"
+								? (composedFeedback.preparedTargets.find(
+										(target) =>
+											target.threadKey === piece.supersedesThreadKey &&
+											target.destination === piece.destination &&
+											target.practiceSlug === piece.practiceSlug,
+									)?.feedbackId ?? null)
+								: null,
+						primaryResultId: primary?.resultId ?? null,
+					},
+				},
+			],
+		});
 	}
-	const result = await prepareFeedback({
-		url: options.url,
-		token: options.token,
-		payload: {
-			reviewId: options.task.reviewId,
-			jobId: options.task.jobId,
-			attempt: options.task.attempt,
-			basisResultIds: [...new Set(composition.flatMap((piece) => piece.resultIds))],
-			composition,
-			publicComposition,
-		},
-		timeoutMs: options.timeoutMs,
-	});
-	if (result.state === "REFUSED") {
-		// The server made a final decision: returning this package at terminal must not bypass it.
-		composedFeedback.review = null;
-		composedFeedback.feedback = [];
-		if (composition.some((piece) => piece.destination === "ON_WORK")) {
-			options.recordFailure("PUBLIC_REVIEW", "SERVER_REFUSED");
+	const refused = new Set<number>();
+	for (const entry of packages) {
+		const result = await prepareFeedback({
+			url: options.url,
+			token: options.token,
+			payload: {
+				...options.task,
+				basisResultIds: [...new Set(entry.composition.flatMap((piece) => piece.resultIds))],
+				composition: entry.composition,
+				publicComposition: entry.publicComposition,
+			},
+			timeoutMs: options.timeoutMs,
+		});
+		if (result.state === "REFUSED") {
+			if (entry.publicComposition) {
+				composedFeedback.review = null;
+				options.recordFailure("PUBLIC_REVIEW", "SERVER_REFUSED");
+			} else if (entry.privateIndex !== undefined) {
+				refused.add(entry.privateIndex);
+				options.recordFailure("PRIVATE_FEEDBACK", "SERVER_REFUSED");
+			}
 		}
-		if (composition.some((piece) => piece.destination !== "ON_WORK")) {
-			options.recordFailure("PRIVATE_FEEDBACK", "SERVER_REFUSED");
+		if (result.state === "PREPARED") {
+			composedFeedback.preparation = result.receipt;
 		}
-		options.persist();
+		console.error(`[pi-runner] feedback preparation: ${result.state}`);
 	}
-	if (result.state === "PREPARED") {
-		composedFeedback.preparation = result.receipt;
-		options.persist();
-	}
-	// An acknowledgement can be lost after preparation commits; reconcile the unchanged immutable package.
-	console.error(`[pi-runner] feedback preparation: ${result.state}`);
+	composedFeedback.feedback = composedFeedback.feedback.filter((_, index) => !refused.has(index));
+	options.persist();
 }
 
 interface ReportReviewDetails {
@@ -1344,13 +1472,15 @@ function stagedPreparedTargets(PREPARED_FEEDBACK_PATH: string): PreparedFeedback
 			if (!isRecord(entry)) {
 				return [];
 			}
-			const { threadKey, destination, practiceSlug } = entry;
+			const { threadKey, feedbackId, destination, practiceSlug } = entry;
 			return typeof threadKey === "string" &&
 				threadKey.trim() &&
+				z.uuid().safeParse(feedbackId).success &&
+				typeof feedbackId === "string" &&
 				isDestination(destination) &&
 				typeof practiceSlug === "string" &&
 				practiceSlug.trim()
-				? [{ threadKey, destination, practiceSlug }]
+				? [{ threadKey, feedbackId, destination, practiceSlug }]
 				: [];
 		});
 	} catch (error) {
@@ -1393,7 +1523,10 @@ function stagedDeliveredPractices(PREPARED_FEEDBACK_PATH: string): Set<string> {
 				}
 				return jsonArray(entry.basedOn).flatMap((support) =>
 					isRecord(support) && support.outcome === "NOT_MET"
-						? [`${destination}:${trimmedText(support.practiceSlug)}`]
+						? [
+								`${destination}:${trimmedText(support.practiceSlug)}`,
+								`${destination}:${trimmedText(support.practiceSlug)}:${trimmedText(entry.id) || trimmedText(entry.feedbackId)}`,
+							]
 						: [],
 				);
 			}),

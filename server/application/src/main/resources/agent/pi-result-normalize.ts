@@ -1,3 +1,7 @@
+import nodePath from "node:path";
+
+import type { CitableText } from "./pi-folder-index.ts";
+
 import { DIFF_SOURCE, TREE_SOURCE } from "./work/practice-scripts/kits/scm/sources.ts";
 // Repair transport and coordinates before admission; emit a result only when its full contract holds.
 import {
@@ -87,7 +91,16 @@ function nullish(value: unknown): boolean {
 	return value == null;
 }
 
+export interface CitationSources {
+	sourceFiles: ReadonlyMap<string, string>;
+	capturedTexts?: readonly CitableText[];
+	sandboxRoot: string;
+	repositoryRoot: string;
+	headRevision: string | null;
+}
+
 export interface CitationRepairs {
+	sources?: CitationSources;
 	sourceOf?: (sourcePath: string) => string | undefined;
 	notes?: string[];
 }
@@ -116,6 +129,146 @@ function insideCheckout(
 	return read;
 }
 
+function capturedSourceFields(
+	fields: Record<string, unknown>,
+	sources: CitationSources,
+): Record<string, unknown> {
+	const matches = (sources.capturedTexts ?? []).filter(
+		(text) =>
+			(text.stagedPath === fields.path ||
+				(text.path === fields.path &&
+					text.source !== TREE_SOURCE &&
+					text.source !== DIFF_SOURCE)) &&
+			(fields.commit == null || text.commit === fields.commit),
+	);
+	const defaults = matches.filter((text) => text.commit === null);
+	const choices = defaults.length > 0 ? defaults : matches;
+	if (choices.length === 0) {
+		return fields;
+	}
+	const proof = choices[0];
+	if (proof === undefined) {
+		return fields;
+	}
+	if (
+		choices.some(
+			(text) =>
+				text.source !== proof.source ||
+				text.path !== proof.path ||
+				text.side !== proof.side ||
+				text.commit !== proof.commit,
+		)
+	) {
+		throw new Error("the captured path names multiple text versions; specify the commit you read");
+	}
+	const sourcePath =
+		sources.sourceFiles.get(trimmedText(fields.sourcePath)) === proof.source
+			? fields.sourcePath
+			: [...sources.sourceFiles].find(
+					([path, kind]) =>
+						kind === proof.source && (proof.source !== TREE_SOURCE || CHECKOUT_WITNESS.test(path)),
+				)?.[0];
+	return {
+		...fields,
+		sourcePath,
+		sourceKind: proof.source,
+		path: proof.path,
+		...(proof.commit === null ? {} : { commit: proof.commit }),
+		...(proof.source === DIFF_SOURCE ? { side: fields.side ?? proof.side } : {}),
+	};
+}
+
+/** Resolve names from read tools to manifest identities before the shared contract is parsed. */
+function sourceFields(
+	fields: Record<string, unknown>,
+	sources: CitationSources,
+): Record<string, unknown> {
+	const relative = (value: unknown): string => {
+		if (typeof value !== "string") {
+			return "";
+		}
+		if (!nodePath.isAbsolute(value)) {
+			return value.replace(/^\.\//u, "");
+		}
+		const path = nodePath.relative(sources.sandboxRoot, value);
+		if (path.startsWith("../") || path === "..") {
+			throw new Error(`citation path ${JSON.stringify(value)} is outside the captured sandbox`);
+		}
+		return path;
+	};
+	const resolved = capturedSourceFields(
+		{ ...fields, path: relative(fields.path), sourcePath: relative(fields.sourcePath) },
+		sources,
+	);
+	let path = typeof resolved.path === "string" ? resolved.path : "";
+	let sourcePath = typeof resolved.sourcePath === "string" ? resolved.sourcePath : "";
+	let sourceKind = trimmedText(resolved.sourceKind);
+	const staged = sources.sourceFiles.get(path);
+	if (staged !== undefined && staged !== TREE_SOURCE && staged !== DIFF_SOURCE) {
+		return { ...resolved, path, sourcePath: path, sourceKind: staged };
+	}
+	const declared = sources.sourceFiles.get(sourcePath);
+	const diff = [...sources.sourceFiles].find(([, kind]) => kind === DIFF_SOURCE)?.[0];
+	if (
+		path === DIFF_VIEW ||
+		sourcePath === DIFF_VIEW ||
+		declared === DIFF_SOURCE ||
+		sourceKind === DIFF_SOURCE
+	) {
+		return { ...resolved, path, sourcePath: diff ?? sourcePath, sourceKind: DIFF_SOURCE };
+	}
+	const witnesses = [...sources.sourceFiles.keys()].filter((file) => CHECKOUT_WITNESS.test(file));
+	const explicitRoot = witnesses.find((file) => {
+		const root = file.slice(0, -".git/HEAD".length);
+		return path.startsWith(root) || sourcePath === file || sourcePath.startsWith(root);
+	});
+	const head = explicitRoot ?? `${sources.repositoryRoot.replace(/\/+$/u, "")}/.git/HEAD`;
+	// An explicit record identity must never be reinterpreted as repository text.
+	if (declared !== undefined && declared !== TREE_SOURCE) {
+		return {
+			...resolved,
+			path:
+				sources.capturedTexts?.some((text) => text.source === declared && text.path === path) ===
+				true
+					? path
+					: sourcePath,
+			sourcePath,
+			sourceKind: declared,
+		};
+	}
+	if (sourceKind && sourceKind !== TREE_SOURCE) {
+		return { ...resolved, path, sourcePath, sourceKind };
+	}
+
+	if (
+		sources.sourceFiles.get(head) === TREE_SOURCE &&
+		(!sourcePath ||
+			sourcePath === ".git/HEAD" ||
+			explicitRoot !== undefined ||
+			sourceKind === TREE_SOURCE ||
+			sourcePath === path)
+	) {
+		const root = head.slice(0, -".git/HEAD".length);
+		if (path.startsWith(root)) {
+			path = path.slice(root.length);
+		}
+		sourcePath = head;
+		sourceKind = TREE_SOURCE;
+		return {
+			...resolved,
+			path,
+			sourcePath,
+			sourceKind,
+			...(resolved.commit == null &&
+			head === `${sources.repositoryRoot}/.git/HEAD` &&
+			sources.headRevision !== null
+				? { commit: sources.headRevision }
+				: {}),
+		};
+	}
+	return { ...resolved, path, sourcePath, sourceKind };
+}
+
 function completedFromManifest(
 	fields: Record<string, unknown>,
 	path: string,
@@ -130,7 +283,7 @@ function completedFromManifest(
 	}
 	let sourceKind = trimmedText(fields.sourceKind);
 	const staged = sourcePath.trim() ? sourceOf?.(sourcePath) : undefined;
-	if (!sourceKind && staged !== undefined) {
+	if (staged !== undefined && sourceKind !== staged) {
 		sourceKind = staged;
 		notes.push(`${which}sourceKind filled in as ${staged}, the source that staged ${sourcePath}`);
 	}
@@ -138,7 +291,7 @@ function completedFromManifest(
 }
 
 /** Quotes are required and verified verbatim against captured text; coordinates alone cannot establish evidence. */
-export function normalizeCitation(
+function normalizedCitationFields(
 	raw: unknown,
 	which: string,
 	{ sourceOf, notes = [] }: CitationRepairs = {},
@@ -197,7 +350,7 @@ export function normalizeCitation(
 	if (nullish(fields.startLine) || fields.startLine === "") {
 		throw new Error(
 			`${which}evidence citation startLine is required:` +
-				" the 1-based line of the quoted text in the sourceFile " +
+				" the 1-based line in the file or captured record you read " +
 				"(for a quote of the change, the [L<n>] coordinate of work/change/diff.patch)",
 		);
 	}
@@ -213,12 +366,12 @@ export function normalizeCitation(
 	}
 	if (quote.trim() === "") {
 		throw new Error(
-			`${which}evidence citation quote is required: the cited text, verbatim as the sourceFile writes it`,
+			`${which}evidence citation quote is required: the exact text from the file or captured record you read`,
 		);
 	}
 	if (quote.length > CANDIDATE_LIMITS.quoteChars) {
 		throw new Error(
-			`${which}quote must be at most ${CANDIDATE_LIMITS.quoteChars} characters; this one is ${quote.length}. Quote a fragment of the lines`,
+			`${which}quote must be at most ${CANDIDATE_LIMITS.quoteChars} characters; this one is ${quote.length}. Cite a shorter span`,
 		);
 	}
 	const side: DiffSide | null =
@@ -233,6 +386,55 @@ export function normalizeCitation(
 		endLine,
 		quote,
 	};
+}
+
+export function normalizeCitation(
+	raw: unknown,
+	which: string,
+	repairs: CitationRepairs = {},
+): Citation {
+	try {
+		const input: Record<string, unknown> = isRecord(raw) ? raw : {};
+		const fields = repairs.sources === undefined ? input : sourceFields(input, repairs.sources);
+		if (typeof input.sourceKind === "string" && input.sourceKind !== fields.sourceKind) {
+			repairs.notes?.push(
+				`${which}sourceKind ${input.sourceKind} recorded as ${trimmedText(fields.sourceKind)}`,
+			);
+		}
+		return normalizedCitationFields(fields, which, repairs);
+	} catch (error) {
+		const fields = isRecord(raw) ? raw : {};
+		let path = trimmedText(fields.path) || trimmedText(fields.sourcePath);
+		const line = citedLine(fields.startLine);
+		const outside =
+			repairs.sources !== undefined &&
+			nodePath.isAbsolute(path) &&
+			nodePath.relative(repairs.sources.sandboxRoot, path).startsWith("..");
+		if (repairs.sources !== undefined && !nodePath.isAbsolute(path)) {
+			const proof = repairs.sources.capturedTexts?.find((text) => text.path === path);
+			const root = CHECKOUT_WITNESS.exec(trimmedText(fields.sourcePath))?.groups?.root;
+			if (proof !== undefined) {
+				path = proof.stagedPath;
+			} else if (
+				!repairs.sources.sourceFiles.has(path) &&
+				!path.startsWith("repos/") &&
+				path !== DIFF_VIEW
+			) {
+				path = `${root ?? `${repairs.sources.repositoryRoot}/`}${path}`;
+			}
+		}
+		const read = { path, offset: Number.isSafeInteger(line) && line > 0 ? line : 1, limit: 20 };
+		const example = outside
+			? `ls(${JSON.stringify({ path: repairs.sources?.repositoryRoot })})`
+			: `read(${JSON.stringify(read)})`;
+
+		throw new Error(
+			`${error instanceof Error ? error.message : String(error)}. ` +
+				`Correction example: ${example}, then submit ` +
+				"{path, startLine, endLine, quote} with the exact text you read. Source identity is resolved by the runner.",
+			{ cause: error },
+		);
+	}
 }
 
 const TRIMMED_FIELDS = new Set([
@@ -254,9 +456,10 @@ export function normalizeSubmission(
 	raw: unknown,
 	notes: string[] = [],
 	sourceOf?: (sourcePath: string) => string | undefined,
+	sources?: CitationSources,
 ): NormalizedSubmission {
 	const errors: string[] = [];
-	const repairs: CitationRepairs = { sourceOf, notes };
+	const repairs: CitationRepairs = { sourceOf, sources, notes };
 	const citation = (value: unknown): unknown => {
 		try {
 			return normalizeCitation(value, "", repairs);
@@ -488,6 +691,57 @@ const MISMATCH_EXCERPT_CHARS = 160;
 
 const NO_QUOTE = "the citation has no quote; quote the cited text verbatim";
 
+/** An example uses captured bytes, never invented replacement evidence. */
+export function citationCorrectionExample(citation: Citation, content: string | null): string {
+	let example: Citation | undefined;
+	if (content !== null && citation.sourceKind === DIFF_SOURCE) {
+		const lines = annotatedDiff(content);
+		if (typeof lines !== "string") {
+			const preferred = [...lines].filter(([key]) => key === diffKey(citation.path, citation.side));
+			for (const [key, values] of preferred.length > 0 ? preferred : lines) {
+				const nonblank = [...values].filter(([, text]) => text.slice(1).trim());
+				const line = nonblank.find(([number]) => number === citation.startLine) ?? nonblank[0];
+				if (line === undefined) {
+					continue;
+				}
+				const [side, ...path] = key.split(" ");
+				example = {
+					...citation,
+					path: path.join(" "),
+					side: side === "OLD" ? "OLD" : "NEW",
+					startLine: line[0],
+					endLine: line[0],
+					quote: line[1].slice(1),
+				};
+				break;
+			}
+		}
+	} else if (content !== null) {
+		const lines = content.split("\n");
+		const requested = citation.startLine - 1;
+		const at =
+			(lines[requested]?.trim() ?? "") === ""
+				? lines.findIndex((line) => line.trim() !== "")
+				: requested;
+		const quote = lines[at];
+		if (quote !== undefined && at >= 0) {
+			example = { ...citation, startLine: at + 1, endLine: at + 1, quote };
+		}
+	}
+	if (example !== undefined && example.quote.length <= CANDIDATE_LIMITS.quoteChars) {
+		return `Corrected citation example: ${JSON.stringify(example)}. Use this text only if it supports your claim.`;
+	}
+	const root =
+		citation.sourceKind === TREE_SOURCE
+			? (CHECKOUT_WITNESS.exec(citation.sourcePath)?.groups?.root ?? "")
+			: "";
+	const path = citation.sourceKind === DIFF_SOURCE ? DIFF_VIEW : `${root}${citation.path}`;
+	return (
+		`Read the source again, for example read(${JSON.stringify({ path, offset: citation.startLine, limit: 20 })}), ` +
+		"then cite its path, line range and exact quote. Remove the claim if no captured text supports it."
+	);
+}
+
 export function describeCitationMismatch(citation: Citation, content: string): string | null {
 	const resolved = resolveQuote(citation, content);
 	return "mismatch" in resolved ? resolved.mismatch : null;
@@ -517,11 +771,6 @@ export function resolveCapturedText(
 ): ResolvedQuote | { mismatch: string } {
 	const quote = citation.quote.replace(/\r?\n$/u, "");
 	const lines = content.split(/(?<=\n)/u);
-	if (citation.startLine > lines.length) {
-		return {
-			mismatch: `the sourceFile has ${lines.length} line(s), so there is no [L${citation.startLine}]`,
-		};
-	}
 	const citedText = lines
 		.slice(citation.startLine - 1, citation.endLine)
 		.join("")
@@ -532,7 +781,12 @@ export function resolveCapturedText(
 	}
 	const found = findAsWritten(citedText, quote);
 	if (found !== null) {
-		return { quote: found };
+		const startLine =
+			citation.startLine + citedText.slice(0, citedText.indexOf(found)).split("\n").length - 1;
+		const endLine = startLine + found.split("\n").length - 1;
+		return startLine === citation.startLine && endLine === citation.endLine
+			? { quote: found }
+			: { quote: found, startLine, endLine };
 	}
 	// Repair guessed coordinates only when the quote occurs exactly once in the captured text.
 	const elsewhere = locateAsWritten(content, quote);
@@ -542,6 +796,11 @@ export function resolveCapturedText(
 	if (elsewhere.length > 1) {
 		return {
 			mismatch: `${where} does not hold that text; it occurs at ${elsewhere.map((hit) => `[L${hit.startLine}]`).join(", ")} — cite the one you mean`,
+		};
+	}
+	if (citation.startLine > lines.length) {
+		return {
+			mismatch: `the sourceFile has ${lines.length} line(s), so there is no [L${citation.startLine}]`,
 		};
 	}
 	const hint = citedText.includes(String.raw`\n`)
@@ -563,7 +822,7 @@ function resolveQuoteText(
 		return { mismatch: lines };
 	}
 	if (citation.path === DIFF_VIEW) {
-		return placedInDiff(lines, quote);
+		return placedInDiff(lines, quote, citation);
 	}
 	const citedLines = lines.get(diffKey(citation.path, citation.side));
 	if (citedLines === undefined || citedLines.size === 0) {
@@ -604,6 +863,50 @@ function resolveQuoteText(
 		};
 	}
 	return atCited;
+}
+
+/** Changed-line custody bounds a code claim; it does not establish the claimed consequence. */
+export function validateChangeBasis(
+	submission: {
+		outcome: Outcome;
+		problems?: readonly NonNullable<NormalizedSubmission["problems"]>[number][];
+	},
+	diff: string,
+): void {
+	const lines = annotatedDiff(diff);
+	for (const problem of submission.problems ?? []) {
+		const { basis } = problem;
+		if (basis.type !== "introduced" && basis.type !== "worsened") {
+			continue;
+		}
+		const witnesses =
+			basis.type === "introduced"
+				? ([[basis.head, "NEW"]] as const)
+				: ([
+						[basis.head, "NEW"],
+						[basis.base, "OLD"],
+					] as const);
+		for (const [index, side] of witnesses) {
+			const citation = problem.citations[index];
+			if (citation === undefined || ![DIFF_SOURCE, TREE_SOURCE].includes(citation.sourceKind)) {
+				continue;
+			}
+			const changed =
+				typeof lines === "string" ? undefined : lines.get(diffKey(citation.path, side));
+			if (
+				![...(changed ?? [])].some(
+					([line, text]) =>
+						citation.startLine <= line &&
+						line <= citation.endLine &&
+						text.startsWith(side === "NEW" ? "+" : "-"),
+				)
+			) {
+				throw new Error(
+					`basis_witness_missing: the ${basis.type} code basis ${side === "NEW" ? "head" : "base"} witness must intersect ${side === "NEW" ? "added" : "removed"} lines in the pinned change; cite the changed code that supports the claim`,
+				);
+			}
+		}
+	}
 }
 
 function noLinesToCite(
@@ -783,11 +1086,33 @@ function readAtViewLines(
 function placedInDiff(
 	lines: ReadonlyMap<string, ReadonlyMap<number, string>>,
 	quote: string,
+	citation: Citation,
 ): ResolvedQuote | { mismatch: string } {
 	const how =
 		`${DIFF_VIEW} is the view of the change, not a file in it: cite the changed file's path (the ` +
 		"`+++ b/<path>` above its hunk) and the [L<n>] that prefixes the line";
 	const quoteLines = quote.split(/\r\n|\r|\n/u);
+	const viewed = viewLines.get(lines)?.get(citation.startLine);
+	const atFile = viewed === undefined ? undefined : lines.get(viewed.key);
+	if (viewed !== undefined && atFile !== undefined) {
+		const atView = diffLinesMatch(atFile, viewed.line, quoteLines.length, quoteLines);
+		if ("text" in atView) {
+			const [side, ...path] = viewed.key.split(" ");
+			if (side !== (citation.side ?? "NEW")) {
+				return {
+					mismatch: `the cited diff view line is on the ${side ?? "unknown"} side, not ${citation.side ?? "NEW"}`,
+				};
+			}
+			return {
+				quote: atView.text,
+				path: path.join(" "),
+				side: side === "OLD" ? "OLD" : "NEW",
+				startLine: viewed.line,
+				endLine: viewed.line + quoteLines.length - 1,
+			};
+		}
+	}
+
 	const found = [...lines].flatMap(([key, fileLines]) =>
 		[...fileLines.keys()].flatMap((start) => {
 			const match = diffLinesMatch(fileLines, start, quoteLines.length, quoteLines);

@@ -428,3 +428,23 @@ void test("frozen scan grants also govern metadata reads and record citations", 
 		false,
 	);
 });
+
+void test("governed receipts retain a middle gap until every line through EOF was read", async (t) => {
+	const { reader, repo, receipts } = await captures(t);
+	await writeFile(
+		path.join(repo, "long.txt"),
+		Array.from({ length: 10_000 }, (_, i) => `line ${i + 1}`).join("\n"),
+	);
+	await reader.answer({ op: "read", path: "long.txt", offsetLine: 1, maxLines: 2000 });
+	await reader.answer({ op: "read", path: "long.txt", offsetLine: 9999 });
+	assert.equal(receipts.truncatedReads, 1);
+	assert.ok(reader.readReceipts.every((receipt) => receipt.status !== "COMPLETE"));
+	await reader.answer({ op: "read", path: "long.txt", offsetLine: 2001, maxLines: 7998 });
+	assert.equal(receipts.truncatedReads, 0);
+	assert.ok(
+		reader.readReceipts.some(
+			(receipt) =>
+				receipt.status === "COMPLETE" && receipt.startLine === 1 && receipt.endLine === 10_000,
+		),
+	);
+});

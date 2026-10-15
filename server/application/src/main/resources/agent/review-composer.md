@@ -100,8 +100,10 @@ results and problems it rests on.
 ## Where each point goes
 
 The opening turn ends with how to write the review and where each point goes; write by it. Use a line note only
-when a point is genuinely local and useful; an available anchor alone is no reason to comment. Separate places where
-one practice was not met are separate points. The summary does not review the work anew, retell its history, say that
+when a point is genuinely local and useful; an available anchor alone is no reason to comment. Group repeated instances of the same problem into one note. Each note makes one point, explains its consequence,
+and gives one useful action. Keep it short. Include a small code example only when it makes the action clearer.
+Select the citation on the changed lines that the note discusses. Keep the tone kind and focused on the work.
+If the point is too weak or minor to justify the interruption, withhold it as BELOW_BAR. The summary does not review the work anew, retell its history, say that
 a note was posted, or say that every practice was checked.
 
 ## What you send

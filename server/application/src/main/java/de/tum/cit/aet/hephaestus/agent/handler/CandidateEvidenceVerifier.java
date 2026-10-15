@@ -141,8 +141,12 @@ class CandidateEvidenceVerifier {
             var text = files.readText(job, proof.stagedPath(), proof.sha256())
                     .orElseThrow(() -> new Unverified(
                             CandidateRefusal.SOURCE_UNAVAILABLE, "Captured source text is unavailable", citation));
-            int start = quote.isEmpty() ? -1 : text.indexOf(quote);
-            if (start < 0 || text.indexOf(quote, start + 1) >= 0) {
+            int start = atCoordinates(text, quote, citation.startLine(), citation.endLine());
+            if (start < 0) {
+                start = quote.isEmpty() ? -1 : text.indexOf(quote);
+                if (start >= 0 && text.indexOf(quote, start + 1) >= 0) start = -1;
+            }
+            if (start < 0) {
                 throw new Unverified(
                         CandidateRefusal.QUOTE_UNVERIFIED,
                         "The quote is absent or ambiguous in the captured text",
@@ -249,6 +253,27 @@ class CandidateEvidenceVerifier {
             }
         }
         return candidate.withCitations(citation -> Objects.requireNonNull(verified.get(citation)));
+    }
+
+    private static int atCoordinates(String text, String quote, int firstLine, int lastLine) {
+        if (quote.isEmpty()) return -1;
+        int first = 0;
+        for (int line = 1; line < firstLine; line++) {
+            int newline = text.indexOf('\n', first);
+            if (newline < 0) return -1;
+            first = newline + 1;
+        }
+        int end = first;
+        for (int line = firstLine; line <= lastLine; line++) {
+            int newline = text.indexOf('\n', end);
+            if (newline < 0) {
+                end = text.length();
+                break;
+            }
+            end = newline + 1;
+        }
+        int found = text.indexOf(quote, first);
+        return found >= 0 && found + quote.length() <= end ? found : -1;
     }
 
     private record QuoteLocation(

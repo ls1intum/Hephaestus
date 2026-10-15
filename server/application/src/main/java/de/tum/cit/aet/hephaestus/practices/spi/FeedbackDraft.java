@@ -17,8 +17,15 @@ public record FeedbackDraft(
         @Nullable String body,
         List<FeedbackBasisInput> basis,
         List<FeedbackCopyInput> copies,
-        Map<FeedbackCheckStage, FeedbackChecks> checks) {
+        Map<FeedbackCheckStage, FeedbackChecks> checks,
+        @Nullable FeedbackCompositionTrace composition,
+        @Nullable Page page) {
+    public record Page(String title, String body, String nextStep) {}
+
     public FeedbackDraft {
+        if (page != null && (destination != FeedbackDestination.PRACTICE_PAGE || body != null))
+            throw new IllegalArgumentException(
+                    "Structured page feedback needs the practice-page destination and no rendered body.");
         basis = List.copyOf(basis);
         copies = List.copyOf(copies);
         checks = Map.copyOf(checks);

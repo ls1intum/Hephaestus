@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import de.tum.cit.aet.hephaestus.agent.context.JobEvidenceFiles;
 import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewHistoryContentSource;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedResults;
@@ -11,35 +10,24 @@ import de.tum.cit.aet.hephaestus.agent.job.ReviewJobAssignments;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmissionRequestDTO;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmissionResponseDTO;
-import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmittedProblemDTO;
-import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmittedResultDTO;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.PrepareFeedbackRequestDTO;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.PrepareFeedbackResponseDTO;
-import de.tum.cit.aet.hephaestus.agent.proxy.dto.ProjectedCitationDTO;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.PublicFeedbackHistoryDTO;
 import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultQuery;
-import de.tum.cit.aet.hephaestus.practices.spi.EvidenceCitation;
-import de.tum.cit.aet.hephaestus.practices.spi.InapplicabilityWarrant;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewWriteGuard;
-import de.tum.cit.aet.hephaestus.practices.spi.SearchWarrant;
 import java.io.Serial;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -57,7 +45,7 @@ public class ResultAdmissionService {
     private final ReviewOutputService output;
     private final AdmittedResultQuery proof;
     private final ReviewJobAssignments assignments;
-    private final PublicReviewEligibility publicEligibility;
+    private final AdmittedResultProjectionService projection;
     private final JobEvidenceFiles files;
     private final ReviewHistoryContentSource history;
     private final ObjectMapper mapper;
@@ -71,7 +59,7 @@ public class ResultAdmissionService {
             ReviewOutputService output,
             AdmittedResultQuery proof,
             ReviewJobAssignments assignments,
-            PublicReviewEligibility publicEligibility,
+            AdmittedResultProjectionService projection,
             JobEvidenceFiles files,
             ReviewHistoryContentSource history,
             ObjectMapper mapper,
@@ -83,7 +71,7 @@ public class ResultAdmissionService {
         this.output = output;
         this.proof = proof;
         this.assignments = assignments;
-        this.publicEligibility = publicEligibility;
+        this.projection = projection;
         this.files = files;
         this.history = history;
         this.mapper = mapper;
@@ -149,67 +137,7 @@ public class ResultAdmissionService {
     private AdmissionResponseDTO response(ReviewJob job, boolean duringCapture) {
         if (!isAdmitted(job)) throw new AdmissionConflictException();
         var admitted = proof.forAttempt(job.getWorkspaceId(), job.getReviewId(), job.getId(), citationAttempt(job));
-        var pinned = assignments.load(job).stream()
-                .collect(Collectors.toMap(a -> a.practice().practiceId(), Function.identity()));
-        Set<UUID> eligible = publicEligibility.publicResultIds(job, admitted);
-        var results = admitted.stream()
-                .map(row -> {
-                    var candidate = row.candidate();
-                    var assignment = Objects.requireNonNull(pinned.get(candidate.practiceId()));
-                    boolean summaryOnly = !assignment.practice().definition().lineNotes();
-                    boolean publicEligible = eligible.contains(row.id());
-                    var problems = row.problems().stream()
-                            .map(problem -> {
-                                var child = problem.candidate();
-                                return new AdmittedProblemDTO(
-                                        problem.id(),
-                                        child.severity(),
-                                        child.summary(),
-                                        row.id(),
-                                        child.position(),
-                                        child.key(),
-                                        child.explanation(),
-                                        projected(child.citations(), !summaryOnly),
-                                        child.basis(),
-                                        child.nextStep(),
-                                        publicEligible);
-                            })
-                            .toList();
-                    JsonNode evidence = mapper.valueToTree(new ProjectedEvidence(
-                            projected(candidate.evidence().citations(), false),
-                                    candidate.evidence().search(),
-                            candidate.evidence().inapplicability(),
-                                    candidate.evidence().openQuestions().stream()
-                                            .map(question -> new ProjectedQuestion(
-                                                    question.openQuestion(),
-                                                    question.wouldSettleIt(),
-                                                    question.citation() == null
-                                                            ? null
-                                                            : projected(List.of(question.citation()), false)
-                                                                    .getFirst()))
-                                            .toList()));
-                    var sourceExample = candidate.example();
-                    JsonNode example = sourceExample == null
-                            ? null
-                            : mapper.valueToTree(new ProjectedExample(
-                                    projected(List.of(sourceExample.citation()), false)
-                                            .getFirst(),
-                                    sourceExample.note()));
-                    return new AdmittedResultDTO(
-                            assignment.practiceSlug(),
-                            Long.toString(candidate.itemId()),
-                            row.id(),
-                            candidate.outcome(),
-                            candidate.summary(),
-                            candidate.explanation(),
-                            evidence,
-                            example,
-                            candidate.coverage(),
-                            problems,
-                            summaryOnly,
-                            publicEligible);
-                })
-                .toList();
+        var results = projection.results(job, admitted);
         var withheld = new ArrayList<AdmissionResponseDTO.Withheld>();
         JsonNode capture = job.getCapture();
         if (capture != null)
@@ -274,21 +202,7 @@ public class ResultAdmissionService {
             var allowed = new HashSet<>(resultIds);
             context.support().stream().map(row -> row.resultId()).forEach(allowed::add);
             if (!allowed.containsAll(request.basisResultIds())) throw new AdmissionConflictException();
-            var anchors = new LinkedHashMap<UUID, FeedbackAnchor>();
-            for (var row : rows)
-                for (var problem : row.problems()) {
-                    var citations = projected(problem.candidate().citations(), true);
-                    citations.stream()
-                            .filter(ProjectedCitationDTO::anchorable)
-                            .findFirst()
-                            .ifPresent(citation -> anchors.put(
-                                    problem.id(),
-                                    new FeedbackAnchor(
-                                            Objects.requireNonNull(citation.path()),
-                                            citation.startLine(),
-                                            citation.endLine(),
-                                            citation.side())));
-                }
+            var anchors = projection.anchors(job, rows);
             var response = composition.prepare(
                     job,
                     request,
@@ -344,42 +258,6 @@ public class ResultAdmissionService {
     }
 
     public record AdmissionIdentity(UUID jobId, long workspaceId, int attempt, String workerId) {}
-
-    private List<ProjectedCitationDTO> projected(List<EvidenceCitation> citations, boolean permitsAnchor) {
-        var projected = new ArrayList<ProjectedCitationDTO>();
-        for (int index = 0; index < citations.size(); index++) {
-            var citation = citations.get(index);
-            boolean anchorable = permitsAnchor && citation.verification() != null && citation.side() != null;
-            projected.add(new ProjectedCitationDTO(
-                    citation.sourceKind().value(),
-                    citation.sourcePath(),
-                    citation.path(),
-                    citation.side(),
-                    citation.commit(),
-                    citation.startLine(),
-                    citation.endLine(),
-                    citation.quote(),
-                    citation.verification(),
-                    index,
-                    anchorable));
-        }
-        return List.copyOf(projected);
-    }
-
-    @JsonInclude(JsonInclude.Include.ALWAYS)
-    private record ProjectedEvidence(
-            List<ProjectedCitationDTO> citations,
-            @Nullable SearchWarrant search,
-            @Nullable InapplicabilityWarrant inapplicability,
-            List<ProjectedQuestion> openQuestions) {}
-
-    @JsonInclude(JsonInclude.Include.ALWAYS)
-    private record ProjectedQuestion(
-            String openQuestion,
-            String wouldSettleIt,
-            @Nullable ProjectedCitationDTO citation) {}
-
-    private record ProjectedExample(ProjectedCitationDTO citation, String note) {}
 
     public static class StaleAttemptException extends RuntimeException {
         @Serial

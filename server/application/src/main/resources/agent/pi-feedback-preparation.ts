@@ -17,7 +17,22 @@ export interface FeedbackComposition {
 	destination: "ON_WORK" | "PRACTICE_PAGE" | "CONVERSATION";
 	resultIds: string[];
 	summary: string | null;
-	notes: { problemId: string; body: string }[];
+	notes: { problemId: string; citationIndex: number; body: string }[];
+	trace: {
+		copies: {
+			kind: "SUMMARY" | "LINE_NOTE" | "CHAT_TURN";
+			position: number;
+			basedOn: { resultId: string; problemId?: string }[];
+		}[];
+		withheld: {
+			basedOn: { resultId: string; problemId?: string }[];
+			reason: string;
+			witnessIds: string[];
+		}[];
+		replacesId: string | null;
+		primaryResultId: string | null;
+	};
+	page: { title: string; body: string; nextStep: string } | null;
 	withheldReason: "COMPOSER_WITHHELD" | null;
 }
 export interface FeedbackPreparationRequest {

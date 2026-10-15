@@ -354,7 +354,7 @@ class AppliesWhenExecutionIntegrationTest extends AbstractResultAdmissionIntegra
             if (!inlineCommentPresent) {
                 var output = new ReviewOutputService(
                         assignments, mock(CandidateEvidenceVerifier.class), store, mapper, files, catalogs, members);
-                output.prepare(job, new AdmissionRequestDTO(3, job.getReviewId(), job.getId(), 1, List.of()))
+                output.prepare(job, new AdmissionRequestDTO(3, job.getReviewId(), job.getId(), 1, List.of(), List.of()))
                         .record(job);
                 var resultId = Objects.requireNonNull(job.getCapture())
                         .path("admission")
@@ -383,7 +383,7 @@ class AppliesWhenExecutionIntegrationTest extends AbstractResultAdmissionIntegra
                     .isTrue();
             var output = new ReviewOutputService(
                     assignments, mock(CandidateEvidenceVerifier.class), store, mapper, files, catalogs, members);
-            output.prepare(job, new AdmissionRequestDTO(3, job.getReviewId(), job.getId(), 1, List.of()))
+            output.prepare(job, new AdmissionRequestDTO(3, job.getReviewId(), job.getId(), 1, List.of(), List.of()))
                     .record(job);
         }
         var resultId = Objects.requireNonNull(job.getCapture())

@@ -55,7 +55,7 @@ import {
 } from "./pi-change.ts";
 import { errorText } from "./pi-error-text.ts";
 
-import { folderCitationIndex, citableTextIndex } from "./pi-folder-index.ts";
+import { type CitableText, folderCitationIndex, citableTextIndex } from "./pi-folder-index.ts";
 import {
 	addModelCall,
 	type ModelCallTiming,
@@ -74,6 +74,7 @@ import {
 } from "./pi-provider.ts";
 import {
 	CONVERSATION_THREAD,
+	citationCorrectionExample,
 	MAX_SUMMARY_CHARS,
 	OUTCOME_DESCRIPTIONS,
 	SEVERITY_DESCRIPTIONS,
@@ -83,6 +84,7 @@ import {
 	resolveQuote,
 	resolveCapturedText,
 	submissionCitations,
+	validateChangeBasis,
 	validateEvidenceSources,
 	validateInapplicabilityScope,
 	validateSearchScope,
@@ -120,6 +122,7 @@ import {
 	stopSession,
 	scheduleDeadline,
 } from "./pi-session-lifecycle.ts";
+import { SessionReads } from "./pi-session-reads.ts";
 import { SUPPORTED_SCHEMA_VERSION, taskPaths, resolveTaskPaths } from "./pi-task-paths.ts";
 import { hasText, isBlank } from "./pi-text.ts";
 import { prepareResultArguments } from "./pi-tool-arguments.ts";
@@ -137,7 +140,6 @@ import {
 	type Candidate,
 	type Citation,
 	type Coverage,
-	type Omission,
 	type PracticeInputs,
 	isDecimalId,
 	type ReadReceipt,
@@ -332,7 +334,8 @@ function incompleteCoverageText(coverage: Coverage): string {
 	return (
 		`a MET result needs complete coverage, and this session's reads did not complete: ${omitted.join("; ")}. ` +
 		"Read the rest of what was cut short, with an offset or a narrower search, and submit again; or submit what the " +
-		"evidence supports: NOT_MET for a problem it proves, or COULD_NOT_DETERMINE with the open question"
+		"evidence supports: NOT_MET for a problem it proves, or COULD_NOT_DETERMINE with the open question. " +
+		"Shell access has unknown coverage and cannot establish MET. A required read failure produces no result."
 	);
 }
 
@@ -428,30 +431,6 @@ function problemsIn(result: unknown): number {
 	return [details.inserted, details.duplicates, details.refused]
 		.map((count) => (typeof count === "number" ? count : 0))
 		.reduce((sum, count) => sum + count, 0);
-}
-
-/**
- * What one review session's evidence reads reached, from the host's own receipts of its tools: every read,
- * the reads its tool cut short and the session did not read on from, and the reads that failed.
- */
-interface SessionReads {
-	reads: number;
-	cutFiles: Set<string>;
-	cutSearches: string[];
-	failed: string[];
-	pending: Map<string, unknown>;
-}
-
-function newSessionReads(): SessionReads {
-	return { reads: 0, cutFiles: new Set(), cutSearches: [], failed: [], pending: new Map() };
-}
-
-function sessionReceipts(reads: SessionReads): Receipts {
-	return {
-		reads: reads.reads,
-		truncatedReads: reads.cutFiles.size + reads.cutSearches.length,
-		failedReads: reads.failed.length,
-	};
 }
 
 // Each review owns its draft; only the script's final return becomes a candidate.
@@ -766,9 +745,11 @@ export async function runReviewJob(): Promise<void> {
 
 	const assignedInputs = new Map<string, PracticeInputs>();
 	const assignmentReceipts = new Map<string, readonly ReadReceipt[]>();
+	const runtimeNonResults: { practiceSlug: string; reason: string }[] = [];
 	function admissionRequest() {
 		return {
 			contractVersion: 3,
+			nonResults: runtimeNonResults,
 			reviewId: taskEnvelope.reviewId,
 			jobId: taskEnvelope.jobId,
 			attempt: taskEnvelope.attempt,
@@ -842,36 +823,47 @@ export async function runReviewJob(): Promise<void> {
 	const citationSchema = {
 		type: "object",
 		additionalProperties: false,
-		required: ["sourceKind", "sourcePath", "path", "startLine"],
+		required: ["path", "startLine", "quote"],
 		properties: {
-			sourceKind: { type: "string", enum: availableSourceKindValues },
+			sourceKind: {
+				type: ["string", "null"],
+				enum: [...availableSourceKindValues, null],
+				description: "Optional. The runner resolves the source kind from the path you read.",
+			},
 			// Validate source membership at submission; large enums can exceed the SDK schema compiler's capacity.
 			sourcePath: {
+				type: ["string", "null"],
+				minLength: 1,
+				maxLength: CANDIDATE_LIMITS.pathChars,
+				description:
+					"Optional. The source you read, such as work/change/diff.patch or a captured record. The runner resolves its manifest identity.",
+			},
+			path: {
 				type: "string",
 				minLength: 1,
+				maxLength: CANDIDATE_LIMITS.pathChars,
 				description:
-					"The captured sourceFile the citation reads, exactly as the capture manifest names it.",
+					"The file you read: a repository-relative path, a sandbox path, work/change/diff.patch, or a captured record path.",
 			},
-			path: { type: "string", minLength: 1 },
 			side: {
 				type: ["string", "null"],
 				enum: ["OLD", "NEW", null],
 				description:
-					"For a quote of the change: sourcePath names the pinned change (change.json), path is the file as named on that side, and the lines are the [L<n>] coordinates of work/change/diff.patch.",
+					"For a diff quote, OLD selects removed lines and NEW selects added lines. Omission lets the runner resolve the side from the exact quote.",
 			},
 			commit: {
 				type: ["string", "null"],
 				minLength: 1,
 				maxLength: 1024,
 				description:
-					"For repository text: sourcePath names the captured .git/HEAD, path is repository-relative, and commit optionally selects a full commit SHA; omission means the captured HEAD.",
+					"Optional full commit SHA for historical repository text. Omission selects the captured HEAD automatically. Do not use a branch name.",
 			},
 			startLine: {
 				type: "integer",
 				minimum: 1,
 				maximum: 2_147_483_647,
 				description:
-					"The 1-based line of the quoted text in the sourceFile; for a quote of the change, the [L<n>] coordinate of work/change/diff.patch.",
+					"The 1-based line you read. For a diff, use its [L<n>] file coordinate or the physical line number of diff.patch.",
 			},
 			endLine: {
 				type: ["integer", "null"],
@@ -880,9 +872,11 @@ export async function runReviewJob(): Promise<void> {
 				description: "The last line of the quote, at least startLine; omitted means one line.",
 			},
 			quote: {
-				type: ["string", "null"],
+				type: "string",
+				minLength: 1,
+				maxLength: CANDIDATE_LIMITS.quoteChars,
 				description:
-					"The text at those lines, copied as shown; a diff marker, a [L<n>] prefix or a non-breaking space read as a space are tolerated. Omit it to cite the whole of the lines: what was recorded is echoed back.",
+					"Required verbatim text at those lines. For repository text and records, a fragment is enough. For a diff, copy each whole line. Diff markers and [L<n>] prefixes are accepted.",
 			},
 		},
 	} as const;
@@ -942,6 +936,7 @@ export async function runReviewJob(): Promise<void> {
 			citations: {
 				type: "array",
 				minItems: 1,
+				maxItems: CANDIDATE_LIMITS.citationsPerProblem,
 				items: citationSchema,
 				description: "The lines that show this problem.",
 			},
@@ -952,7 +947,12 @@ export async function runReviewJob(): Promise<void> {
 				description:
 					"All indexes are zero-based positions in THIS problem's citations array: with one citation, use 0. Why the problem belongs to this work. introduced: the change adds it (head: the index of a citation of the NEW side or the reviewed head). worsened: the change makes it worse (base: the index of the OLD side's citation, head: the NEW side's). duty: the criteria require an event that this work lacks (criterionQuote: the criteria's exact words, event: the index of the citation that shows the event). state: the problem exists in the pinned file; its citations witness that state at the reviewed version.",
 				properties: {
-					type: { type: "string", enum: ["introduced", "worsened", "duty", "state"] },
+					type: {
+						type: "string",
+						enum: ["introduced", "worsened", "duty", "state"],
+						description:
+							"Use introduced or worsened for changed behavior, duty for a required event, and state only for SCAN.",
+					},
 					head: { type: ["integer", "null"], minimum: 0 },
 					base: { type: ["integer", "null"], minimum: 0 },
 					event: { type: ["integer", "null"], minimum: 0 },
@@ -998,12 +998,16 @@ export async function runReviewJob(): Promise<void> {
 			},
 			citations: {
 				type: "array",
+				maxItems: CANDIDATE_LIMITS.resultCitations,
 				items: citationSchema,
 				description:
 					"The lines that decide the outcome. Required for MET, DOES_NOT_APPLY and COULD_NOT_DETERMINE; a NOT_MET result may leave it empty, since each problem cites its own lines.",
 			},
 			problems: {
-				anyOf: [{ type: "array", minItems: 1, items: problemSchema }, { type: "null" }],
+				anyOf: [
+					{ type: "array", minItems: 1, maxItems: CANDIDATE_LIMITS.problems, items: problemSchema },
+					{ type: "null" },
+				],
 				description:
 					"NOT_MET only, and required there: each problem the evidence shows, each with its own severity, citations and basis. null for every other outcome.",
 			},
@@ -1035,7 +1039,15 @@ export async function runReviewJob(): Promise<void> {
 					search: { anyOf: [searchSchema, { type: "null" }] },
 					inapplicability: { anyOf: [inapplicabilitySchema, { type: "null" }] },
 					openQuestions: {
-						anyOf: [{ type: "array", minItems: 1, items: openQuestionSchema }, { type: "null" }],
+						anyOf: [
+							{
+								type: "array",
+								minItems: 1,
+								maxItems: CANDIDATE_LIMITS.openQuestions,
+								items: openQuestionSchema,
+							},
+							{ type: "null" },
+						],
 					},
 				},
 			},
@@ -1165,8 +1177,20 @@ export async function runReviewJob(): Promise<void> {
 
 	function validateSubmission(raw: unknown, slug: string, coverage: Coverage): Validated {
 		const notes: string[] = [];
-		const submission = normalizeSubmission(raw, notes, (sourceFile) =>
-			sourceFileSources.get(sourceFile),
+		const submission = normalizeSubmission(
+			raw,
+			notes,
+			(sourceFile) => sourceFileSources.get(sourceFile),
+			{
+				sourceFiles: sourceFileSources,
+				capturedTexts,
+				sandboxRoot: CWD,
+				repositoryRoot: taskEnvelope.paths.repositoryRoot,
+				headRevision:
+					checkedOutCommit(INPUT_PATHS.repositoryRoot) ??
+					readChange(INPUT_PATHS.contextRoot)?.head ??
+					null,
+			},
 		);
 		const citations = submissionCitations(submission);
 		const assignmentScope = assignedInputs.get(slug)?.scope;
@@ -1174,43 +1198,25 @@ export async function runReviewJob(): Promise<void> {
 			const contextPaths = practiceIndex.find((practice) => practice.slug === slug)?.contextPaths;
 			const allowed = new Set([assignmentScope.item.path, ...(contextPaths ?? [])]);
 			if (citations.some((citation) => !allowed.has(citation.path))) {
-				throw new Error("a scan citation is outside its frozen context");
+				throw new Error(
+					`a scan citation is outside its frozen context. Correction example: read(${JSON.stringify({ path: assignmentScope.item.path })}), then cite the exact text from the assigned file.`,
+				);
 			}
 		}
 
-		for (const citation of citations) {
-			const stagedAtPath = sourceFileSources.get(citation.path);
-			if (stagedAtPath !== undefined && citation.sourcePath !== citation.path) {
-				notes.push(
-					`${citation.path} is a source file of its own, staged by ${stagedAtPath}; recorded against it, not ${citation.sourcePath}`,
-				);
-				citation.sourcePath = citation.path;
-				citation.sourceKind = stagedAtPath;
-			}
-			const staged = sourceFileSources.get(citation.sourcePath);
-			if (staged !== undefined && staged !== citation.sourceKind) {
-				notes.push(
-					`${citation.sourcePath} is staged by ${staged}, not ${citation.sourceKind}; recorded as ${staged}`,
-				);
-				citation.sourceKind = staged;
-			}
-			const flags = citationCapabilities.get(citation.sourceKind);
-			if (flags === undefined) {
-				throw new Error(
-					`the source catalog declares no citation capabilities for ${citation.sourceKind}`,
-				);
-			}
-			const capabilityError = validateCitationCapabilities(citation, flags);
-			if (capabilityError !== undefined) {
-				throw new Error(capabilityError);
-			}
+		try {
+			validateEvidenceSources(
+				submission,
+				availableSourceKinds,
+				sourceFileSources,
+				`${taskEnvelope.paths.repositoryRoot.replace(/\/+$/u, "")}/`,
+			);
+		} catch (error) {
+			throw new Error(
+				`${errorText(error)}. Correction example: read(${JSON.stringify({ path: taskEnvelope.paths.manifest })}), then cite a captured source listed there.`,
+				{ cause: error },
+			);
 		}
-		validateEvidenceSources(
-			submission,
-			availableSourceKinds,
-			sourceFileSources,
-			`${taskEnvelope.paths.repositoryRoot.replace(/\/+$/u, "")}/`,
-		);
 		validateSearchScope(
 			submission,
 			practiceExhaustiveSources.get(slug) ?? new Set(),
@@ -1219,7 +1225,6 @@ export async function runReviewJob(): Promise<void> {
 		validateInapplicabilityScope(submission, availableSourceKinds);
 		const assignment = assignedInputs.get(slug);
 		const scan = assignment?.scope.kind === "SCAN";
-		validateDomainBasis(submission, assignment);
 
 		if (
 			(submission.outcome === "DOES_NOT_APPLY" || submission.outcome === "COULD_NOT_DETERMINE") &&
@@ -1240,37 +1245,15 @@ export async function runReviewJob(): Promise<void> {
 			);
 		}
 		for (const citation of citations) {
-			// Match admission: repository quotes use Git blobs; change quotes use the derived diff.
-			const registered = capturedText(citation);
-			const resolved =
-				registered === null
-					? resolveCited(citation, citedContent(citation))
-					: resolveCapturedText(citation, registered);
-			if ("mismatch" in resolved) {
-				throw new Error(
-					`citation does not match ${citation.path}:${citation.startLine}-${citation.endLine} ` +
-						`(${citation.side ?? "text"}) in '${citation.sourcePath}': ${resolved.mismatch}. Copy the exact ` +
-						`sourceFile text and, for the change, the [L<n>] coordinates and OLD/NEW side of ${CHANGE_ROOT}/diff.patch ` +
-						"(the numbers sed -n or grep -n print are lines of diff.patch, not these coordinates)",
-				);
-			}
-			const cited = `${citation.path}:${citation.startLine}-${citation.endLine}`;
-			if (!citation.quote.trim()) {
-				notes.push(`${cited} recorded ${excerptOf(resolved.quote)}`);
-			}
-			if (resolved.path !== undefined && resolved.side !== undefined) {
-				citation.path = resolved.path;
-				citation.side = resolved.side;
-			}
-			if (resolved.startLine !== undefined && resolved.endLine !== undefined) {
-				notes.push(
-					`${cited} does not hold that text; it is at ${citation.path}:${resolved.startLine}-${resolved.endLine}${resolved.side === undefined ? "" : ` (${resolved.side})`}, recorded there`,
-				);
-				citation.startLine = resolved.startLine;
-				citation.endLine = resolved.endLine;
-			}
-			citation.quote = resolved.quote;
+			verifySubmissionCitation(citation, notes);
 		}
+		validateDomainBasis(submission, assignment);
+		validateChangeBasis(
+			submission,
+			existsSync(`${CWD}/${CHANGE_ROOT}/diff.patch`)
+				? readFileSync(`${CWD}/${CHANGE_ROOT}/diff.patch`, "utf8")
+				: "",
+		);
 		validateConversationAttribution(submission, assignment);
 		const parsed = parseCandidate({ ...submission, coverage });
 		if (!parsed.ok) {
@@ -1283,8 +1266,107 @@ export async function runReviewJob(): Promise<void> {
 		return { candidate: parsed.candidate, notes };
 	}
 
+	function verifySubmissionCitation(citation: Citation, notes: string[]): void {
+		if (citation.sourceKind !== DIFF_SOURCE) {
+			requireCitationCapabilities(citation);
+		}
+		if (citation.sourceKind === TREE_SOURCE && citation.path.startsWith(".git/")) {
+			const recordPath = [...sourceFileSources.keys()].find((path) =>
+				path.endsWith("/commits.json"),
+			);
+			const commit =
+				citation.commit ?? /commit (?<sha>[0-9a-f]{40,64})/u.exec(citation.quote)?.groups?.sha;
+			const text =
+				recordPath === undefined ? null : readFileSync(nodePath.resolve(CWD, recordPath), "utf8");
+			const line =
+				commit === undefined
+					? -1
+					: (text?.split("\n").findIndex((textLine) => textLine.includes(commit)) ?? -1);
+			const example =
+				recordPath !== undefined && commit !== undefined && line >= 0
+					? `Corrected citation example: ${JSON.stringify({ path: recordPath, startLine: line + 1, quote: commit })}. ` +
+						"Cite the captured commit record for commit facts. Reassess your claim against that record."
+					: `Read the captured commit record, for example read(${JSON.stringify({ path: recordPath ?? `${taskEnvelope.paths.contextRoot}/commits.json` })}), then quote its exact text.`;
+			throw new Error(
+				`A Git log is not the content of ${citation.path}. The captured HEAD identifies the tree. It is not a repository file that can quote Git history. ${example}`,
+			);
+		}
+		// Match admission: repository quotes use Git blobs; change quotes use the derived diff.
+		const registered = citation.sourceKind === DIFF_SOURCE ? null : capturedText(citation);
+		const content = registered ?? citedContent(citation);
+		const resolved =
+			registered === null
+				? resolveCited(citation, content)
+				: resolveCapturedText(citation, registered);
+		if ("mismatch" in resolved) {
+			throw new Error(
+				`citation does not match ${citation.path}:${citation.startLine}-${citation.endLine} ` +
+					`(${citation.side ?? "text"}) in '${citation.sourcePath}': ${resolved.mismatch}. ${citationCorrectionExample(citation, typeof content === "string" ? content : null)}`,
+			);
+		}
+		const cited = `${citation.path}:${citation.startLine}-${citation.endLine}`;
+		if (!citation.quote.trim()) {
+			notes.push(`${cited} recorded ${excerptOf(resolved.quote)}`);
+		}
+		if (resolved.path !== undefined && resolved.side !== undefined) {
+			citation.path = resolved.path;
+			citation.side = resolved.side;
+		}
+		if (resolved.startLine !== undefined && resolved.endLine !== undefined) {
+			notes.push(
+				`${cited} does not hold that text; it is at ${citation.path}:${resolved.startLine}-${resolved.endLine}${resolved.side === undefined ? "" : ` (${resolved.side})`}, recorded there`,
+			);
+			citation.startLine = resolved.startLine;
+			citation.endLine = resolved.endLine;
+		}
+		citation.quote = resolved.quote;
+		if (citation.sourceKind === DIFF_SOURCE) {
+			requireCitationCapabilities(citation);
+		}
+	}
+
+	function requireCitationCapabilities(citation: Citation): void {
+		const flags = citationCapabilities.get(citation.sourceKind);
+		if (flags === undefined) {
+			throw new Error(
+				`the source catalog declares no citation capabilities for ${citation.sourceKind}`,
+			);
+		}
+		const capabilityError = validateCitationCapabilities(citation, flags);
+		if (capabilityError !== undefined) {
+			const { side: _side, commit: _commit, ...location } = citation;
+			const corrected = {
+				...location,
+				...(flags.side !== "FORBIDDEN" && citation.side !== undefined
+					? { side: citation.side }
+					: {}),
+				...(flags.commit !== "FORBIDDEN" && citation.commit !== undefined
+					? { commit: citation.commit }
+					: {}),
+			};
+			throw new Error(
+				`${capabilityError} for ${citation.sourcePath}. Corrected citation example: ${JSON.stringify(corrected)}.`,
+			);
+		}
+	}
+
 	// Git classifies a file as binary when its first 8000 bytes contain NUL.
 	const BINARY = Symbol("binary");
+
+	// A model cannot know which captured commit holds a text, so an omitted commit means the reviewed version of its side.
+	function reviewedVersion(citation: Citation, matches: readonly CitableText[]): CitableText {
+		const change = readChange(INPUT_PATHS.contextRoot);
+		const reviewed = (citation.side ?? "NEW") === "OLD" ? change?.base : change?.head;
+		const pinned = citation.commit === undefined ? matches.filter((entry) => entry.commit === reviewed) : [];
+		const [only] = pinned;
+		if (pinned.length === 1 && only !== undefined) {
+			return only;
+		}
+		const commits = [...new Set(matches.map((entry) => entry.commit ?? "none"))];
+		throw new Error(
+			`citation names text captured at several commits (${commits.join(", ")}); add the commit you read. Corrected citation example: ${JSON.stringify({ ...citation, commit: commits[0] })}.`,
+		);
+	}
 
 	function capturedText(citation: Citation): string | null {
 		const matches = capturedTexts.filter(
@@ -1297,10 +1379,7 @@ export async function runReviewJob(): Promise<void> {
 		if (matches.length === 0) {
 			return null;
 		}
-		if (matches.length !== 1) {
-			throw new Error("citation names ambiguous captured text; specify its commit");
-		}
-		const proof = matches[0];
+		const proof = matches.length === 1 ? matches[0] : reviewedVersion(citation, matches);
 		if (proof === undefined) {
 			throw new Error("the captured text proof is absent");
 		}
@@ -1536,117 +1615,6 @@ export async function runReviewJob(): Promise<void> {
 
 	const IDENTICAL_REFUSAL_ABORT = 2;
 
-	const READ_TOOLS: ReadonlySet<string> = new Set(["read", "grep", "find", "ls"]);
-	const OMISSION_ITEMS = CANDIDATE_LIMITS.omissionItems;
-	const ABSENT_PATH = /\bENOENT\b|^Path not found: /u;
-
-	function noteSessionRead(reads: SessionReads, event: AgentSessionEvent): void {
-		if (event.type === "tool_execution_start" && READ_TOOLS.has(event.toolName)) {
-			reads.pending.set(event.toolCallId, event.args);
-			return;
-		}
-		if (event.type !== "tool_execution_end" || !reads.pending.has(event.toolCallId)) {
-			return;
-		}
-		const args = reads.pending.get(event.toolCallId);
-		reads.pending.delete(event.toolCallId);
-		reads.reads += 1;
-		const target = isRecord(args)
-			? [args.path, args.pattern].find((value): value is string => typeof value === "string")
-			: undefined;
-		const named = target ?? event.toolName;
-		const result: unknown = event.result;
-		if (event.isError) {
-			if (!ABSENT_PATH.test(toolResultText(result))) {
-				reads.failed.push(named);
-			}
-			return;
-		}
-		const details = isRecord(result) && isRecord(result.details) ? result.details : {};
-		const cut =
-			(isRecord(details.truncation) && details.truncation.truncated === true) ||
-			details.matchLimitReached !== undefined ||
-			details.resultLimitReached !== undefined ||
-			details.entryLimitReached !== undefined;
-		if (event.toolName === "read" && target !== undefined) {
-			// The tool cuts at its own limit with a truncation detail, and at the session's `limit` with only a
-			// "more lines in file" notice. Only a read that reaches the end of the file clears an earlier cut.
-			if (cut || /more lines in file/u.test(toolResultText(result))) {
-				reads.cutFiles.add(target);
-			} else {
-				reads.cutFiles.delete(target);
-			}
-			return;
-		}
-		if (cut) {
-			reads.cutSearches.push(named);
-		}
-	}
-
-	function sessionCoverage(
-		reads: SessionReads,
-		reader?: EvidenceReader,
-		domainReads: Receipts = noReceipts(),
-	): Coverage {
-		const native = sessionReceipts(reads);
-		const receipts = {
-			reads: native.reads + domainReads.reads,
-			truncatedReads: native.truncatedReads + domainReads.truncatedReads,
-			failedReads: native.failedReads + domainReads.failedReads,
-		};
-		const cut = [...reads.cutFiles, ...reads.cutSearches];
-		const omitted: Omission[] = [
-			...(cut.length > 0
-				? [
-						{
-							what: "reads cut short at the tool's output limit",
-							count: cut.length,
-							reason: "truncated" as const,
-							items: cut
-								.slice(0, OMISSION_ITEMS)
-								.map((piece) => piece.slice(0, CANDIDATE_LIMITS.warrantFieldChars)),
-						},
-					]
-				: []),
-			...(reads.failed.length > 0
-				? [
-						{
-							what: "reads that failed",
-							count: reads.failed.length,
-							reason: "unavailable" as const,
-							items: reads.failed
-								.slice(0, OMISSION_ITEMS)
-								.map((piece) => piece.slice(0, CANDIDATE_LIMITS.warrantFieldChars)),
-						},
-					]
-				: []),
-		];
-		if (domainReads.truncatedReads > 0) {
-			omitted.push({
-				what: "governed file reads cut short",
-				count: domainReads.truncatedReads,
-				reason: "truncated",
-			});
-		}
-		if (domainReads.failedReads > 0) {
-			omitted.push({
-				what: "governed file reads that failed",
-				count: domainReads.failedReads,
-				reason: "unavailable",
-			});
-		}
-		const [first, ...rest] = omitted;
-		return first === undefined
-			? { source: "host", ...receipts, receipts: reader?.readReceipts ?? [], complete: true }
-			: {
-					source: "host",
-					...receipts,
-					receipts: reader?.readReceipts ?? [],
-					complete: false,
-					omitted: [first, ...rest],
-				};
-	}
-
 	let activeReview: ActiveReview | null = null;
 
 	function record(raw: unknown): Recorded {
@@ -1692,7 +1660,7 @@ export async function runReviewJob(): Promise<void> {
 			validated = validateSubmission(
 				raw,
 				slug,
-				sessionCoverage(review.reads, review.reader, review.domainReads),
+				review.reads.coverage(review.reader, review.domainReads),
 			);
 		} catch (error) {
 			countRefusal(slug);
@@ -1840,7 +1808,12 @@ export async function runReviewJob(): Promise<void> {
 				"Submit the one complete evidenced result of this session's practice: its outcome, the explanation, the " +
 				"citations it rests on, and for NOT_MET each problem with its severity, citations and basis. The host adds " +
 				"the coverage it measured from your reads and keeps the result for server admission after measuring. To " +
-				"correct it, submit the complete result again.",
+				"correct it, submit the complete result again. Cite the source you read; the runner resolves source kind, " +
+				"manifest identity and the captured revision. Citation examples: " +
+				'{"path":"src/Auth.java","startLine":10,"quote":"insecure();"}; ' +
+				'{"sourcePath":"work/change/diff.patch","path":"src/Auth.java","side":"NEW","startLine":10,"quote":"+ insecure();"}; ' +
+				`{"path":"${taskEnvelope.paths.contextRoot}/metadata.json","startLine":1,"quote":"Add login"}. ` +
+				"Use only text you read. Examples show the shape, not evidence for this review.",
 			parameters: resultSchema,
 			prepareArguments: prepareResultArguments,
 			execute: async (toolCallId, params): Promise<AgentToolResult<SubmitResultDetails>> => {
@@ -2768,7 +2741,7 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 		}
 		persistRecordedNotes();
 		const turns = planTurns(practiceIndex, PRACTICES_PER_TURN);
-		const brief = buildBrief(CWD, {
+		const { text: brief, sources: briefSources } = buildBrief(CWD, {
 			contextRoot: taskEnvelope.paths.contextRoot,
 			repositoryRoot: taskEnvelope.paths.repositoryRoot,
 		});
@@ -3113,11 +3086,25 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 					}
 					assignedText = `\n## Assigned scan file\nPath: ${path}\nCommit: ${evidenceSources.headRevision ?? "unavailable"}\nSource: ${TREE_SOURCE}\nSource path: ${evidenceSources.treeSourceFile}\n${file.text}\n`;
 				}
+				const readSources = new Set(
+					practiceIndex.find((practice) => practice.slug === slug)?.readsSources,
+				);
+				const relevantBrief = isScan
+					? []
+					: [...sourceFileSources].flatMap(([sourcePath, kind]) => {
+							if (kind === TREE_SOURCE || !readSources.has(kind)) {
+								return [];
+							}
+							const path = kind === DIFF_SOURCE ? `${CHANGE_ROOT}/diff.patch` : sourcePath;
+							return [
+								briefSources.find((source) => source.path === path) ?? { path, supplied: false },
+							];
+						});
 				const review: ActiveReview = {
 					slug,
 					draft: null,
 					requireSubmission: false,
-					reads: newSessionReads(),
+					reads: new SessionReads(CWD, relevantBrief),
 					reader,
 					domainReads,
 				};
@@ -3141,7 +3128,7 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 				}
 				const unsubscribeReads = opened.session.subscribe((event) => {
 					if (!isScan) {
-						noteSessionRead(review.reads, event);
+						review.reads.note(event);
 					}
 				});
 				const { finishTurn } = opened.session.agent;
@@ -3188,7 +3175,7 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 						(error: unknown) => (error instanceof Error ? error : new Error(String(error))),
 					);
 					unsubscribeReads();
-					const receipts = sessionReceipts(review.reads);
+					const { receipts } = review.reads;
 					reads.reads += receipts.reads + domainReads.reads;
 					reads.truncatedReads += receipts.truncatedReads + domainReads.truncatedReads;
 					reads.failedReads += receipts.failedReads + domainReads.failedReads;
@@ -3280,14 +3267,33 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 					`[pi-runner] ${slug}: ${program.script === null ? "built-in" : "custom"} program ${outcome.status}` +
 						`${outcome.stopReason === null ? "" : ` (${outcome.stopReason})`}${outcome.error === undefined ? "" : `: ${firstLine(outcome.error)}`}`,
 				);
-				if (outcome.candidate !== undefined) {
-					assignmentReceipts.set(slug, outcome.readReceipts ?? []);
-					reviewState.set(slug, outcome.candidate);
-					persistReviewState();
-					maybeWriteResultFile();
-					persistPracticeCoverage();
-					persistRecordedNotes();
+				const { candidate } = outcome;
+				if (candidate === undefined) {
+					return;
 				}
+				try {
+					validateChangeBasis(
+						candidate,
+						existsSync(`${CWD}/${CHANGE_ROOT}/diff.patch`)
+							? readFileSync(`${CWD}/${CHANGE_ROOT}/diff.patch`, "utf8")
+							: "",
+					);
+				} catch (error) {
+					executions.set(slug, {
+						...outcome,
+						candidate: undefined,
+						status: "failed",
+						stopReason: "invalid-candidate",
+						error: errorText(error),
+					});
+					return;
+				}
+				assignmentReceipts.set(slug, outcome.readReceipts ?? []);
+				reviewState.set(slug, candidate);
+				persistReviewState();
+				maybeWriteResultFile();
+				persistPracticeCoverage();
+				persistRecordedNotes();
 			}
 			try {
 				for (const [index, slug] of slugs.entries()) {
@@ -3378,6 +3384,17 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 		}
 
 		const notReached = missingSlugs(allSlugs, [...reviewState.keys()]);
+		const runtimeReasons: Partial<Record<NonNullable<ProgramOutcome["stopReason"]>, string>> = {
+			budget: "BUDGET",
+			deadline: "DEADLINE",
+			cancelled: "CANCELLED",
+			unavailable: "EXECUTION_INCOMPLETE",
+		};
+		for (const practiceSlug of notReached) {
+			const stop = executions.get(practiceSlug)?.stopReason ?? unreachedReason;
+			const reason = runtimeReasons[stop] ?? "EXECUTION_FAILED";
+			runtimeNonResults.push({ practiceSlug, reason });
+		}
 		logPracticeCoverage();
 		if (notReached.length > 0) {
 			console.error(

@@ -262,7 +262,7 @@ public class DefaultReviewExecutionHandler {
         admission.admit(
                 new ResultAdmissionService.AdmissionIdentity(
                         job.getId(), job.getWorkspaceId(), job.getAttempt(), Objects.requireNonNull(job.getWorkerId())),
-                new AdmissionRequestDTO(3, job.getReviewId(), job.getId(), job.getAttempt(), List.of()));
+                new AdmissionRequestDTO(3, job.getReviewId(), job.getId(), job.getAttempt(), List.of(), List.of()));
     }
 
     private JsonNode previousCitations(JsonNode evidence) {

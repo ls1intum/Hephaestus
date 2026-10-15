@@ -11899,6 +11899,10 @@ components:
         jobId:
           type: string
           format: uuid
+        nonResults:
+          type: array
+          items:
+            $ref: "#/components/schemas/RuntimeNonResult"
         results:
           type: array
           items:
@@ -11906,6 +11910,8 @@ components:
         reviewId:
           type: string
           format: uuid
+      required:
+      - nonResults
     AdmissionResponse:
       type: object
       properties:
@@ -13134,6 +13140,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Note"
+        page:
+          $ref: "#/components/schemas/Page"
         resultIds:
           type: array
           items:
@@ -13141,6 +13149,8 @@ components:
             format: uuid
         summary:
           type: string
+        trace:
+          $ref: "#/components/schemas/FeedbackCompositionTrace"
         withheldReason:
           type: string
           enum:
@@ -13733,6 +13743,23 @@ components:
       - side
       - startLine
       - state
+    CopySupport:
+      type: object
+      properties:
+        basedOn:
+          type: array
+          items:
+            $ref: "#/components/schemas/Support"
+        kind:
+          type: string
+          enum:
+          - SUMMARY
+          - LINE_NOTE
+          - FILE_NOTE
+          - CHAT_TURN
+        position:
+          type: integer
+          format: int32
     CoverageOmission:
       type: object
       properties:
@@ -14863,6 +14890,25 @@ components:
       - incorrectBasis
       - modelAllowed
       - writeStarted
+    FeedbackCompositionTrace:
+      type: object
+      description: Exact support and quiet decisions retained with the immutable preparation
+        receipt.
+      properties:
+        copies:
+          type: array
+          items:
+            $ref: "#/components/schemas/CopySupport"
+        primaryResultId:
+          type: string
+          format: uuid
+        replacesId:
+          type: string
+          format: uuid
+        withheld:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuietDecision"
     FeedbackCopy:
       type: object
       properties:
@@ -16904,9 +16950,14 @@ components:
       properties:
         body:
           type: string
+        citationIndex:
+          type: integer
+          format: int32
         problemId:
           type: string
           format: uuid
+      required:
+      - citationIndex
     NotificationPreferences:
       type: object
       properties:
@@ -17276,6 +17327,15 @@ components:
       - item
       - results
       - review
+    Page:
+      type: object
+      properties:
+        body:
+          type: string
+        nextStep:
+          type: string
+        title:
+          type: string
     PageMetadata:
       properties:
         number:
@@ -20357,6 +20417,19 @@ components:
       - answered
       - counts
       - questionId
+    QuietDecision:
+      type: object
+      properties:
+        basedOn:
+          type: array
+          items:
+            $ref: "#/components/schemas/Support"
+        reason:
+          type: string
+        witnessIds:
+          type: array
+          items:
+            type: string
     RateLimitSnapshot:
       type: object
       description: "Vendor API rate-limit observation, read from in-memory trackers\
@@ -23703,6 +23776,43 @@ components:
       - environment
       - roles
       - version
+    RuntimeNonResult:
+      type: object
+      description: "An assigned practice that runtime execution could not complete,\
+        \ without an outcome about the work."
+      properties:
+        practiceSlug:
+          type: string
+        reason:
+          type: string
+          enum:
+          - TIMED_OUT
+          - EXECUTION_FAILED
+          - PREPARATION_FAILED
+          - PROCESSING_FAILED
+          - PERSON_DATA_ERASED
+          - STALE_ROLLOUT_REVISION
+          - CANCELLED_BY_ADMIN
+          - REPLACED
+          - LEGACY_FAILURE
+          - EXECUTION_INCOMPLETE
+          - RESULT_WITHHELD
+          - READINESS_REFUSED
+          - SUSPECT_LISTING
+          - BUDGET
+          - DEADLINE
+          - CANCELLED
+          - ENUMERATION_FAILED
+          - ENUMERATION_LIMIT
+          - NO_SCAN_PRACTICES
+          - MODEL_CHANGED
+          - MODEL_UNAVAILABLE
+          - ERROR
+          - LEGACY_SCOPE_UNKNOWN
+          - CONTRACT_CHANGED
+      required:
+      - practiceSlug
+      - reason
     ScanAvailability:
       type: object
       properties:
@@ -24634,6 +24744,15 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ReadReceipt"
+    Support:
+      type: object
+      properties:
+        problemId:
+          type: string
+          format: uuid
+        resultId:
+          type: string
+          format: uuid
     SupportOccurrence:
       type: object
       properties:

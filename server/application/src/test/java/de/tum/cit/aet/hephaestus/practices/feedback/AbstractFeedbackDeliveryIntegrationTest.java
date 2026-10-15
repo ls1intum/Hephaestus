@@ -184,7 +184,9 @@ public abstract class AbstractFeedbackDeliveryIntegrationTest extends AbstractFe
                 "Add a focused regression test.",
                 List.of(new FeedbackBasisInput(supportingResult.getId(), null, 0)),
                 planned,
-                Map.of());
+                Map.of(),
+                null,
+                null);
     }
 
     protected Feedback current() {

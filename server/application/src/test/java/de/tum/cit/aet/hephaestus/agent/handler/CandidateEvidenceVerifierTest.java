@@ -54,6 +54,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 class CandidateEvidenceVerifierTest extends BaseUnitTest {
     private static final JsonMapper MAPPER = new JsonMapper();
@@ -99,9 +100,13 @@ class CandidateEvidenceVerifierTest extends BaseUnitTest {
     }
 
     private CapturedEvidence captured(boolean registered) {
-        String digest = ProvenanceDigest.sha256Hex(TEXT.getBytes(StandardCharsets.UTF_8));
+        return captured(TEXT, registered);
+    }
+
+    private CapturedEvidence captured(String text, boolean registered) {
+        String digest = ProvenanceDigest.sha256Hex(text.getBytes(StandardCharsets.UTF_8));
         var file = new CapturedSource(
-                "context/body.txt", "text/plain", digest, TEXT.getBytes(StandardCharsets.UTF_8).length);
+                "context/body.txt", "text/plain", digest, text.getBytes(StandardCharsets.UTF_8).length);
         var now = Instant.now();
         var state = new SourceCaptureState.Available(
                 SourceContentState.NON_EMPTY,
@@ -191,6 +196,46 @@ class CandidateEvidenceVerifierTest extends BaseUnitTest {
         assertThatThrownBy(() ->
                         verifier.verifyCandidate(job, assignment(), ReviewKind.ITEM, candidate(), captured(false)))
                 .isInstanceOf(CandidateEvidenceVerifier.Unverified.class);
+    }
+
+    @Test
+    void shouldMatchTheSharedCoordinateContract() throws Exception {
+        try (var input =
+                Objects.requireNonNull(getClass().getResourceAsStream("/agent/citation-coordinate-cases.json"))) {
+            for (var fixture : MAPPER.readTree(input)) {
+                var verifier = verifier(fixture.path("content").asString());
+                var raw = (ObjectNode) MAPPER.readTree("""
+                    {"outcome":"MET","summary":"Clear names","explanation":"The text supports the criterion",
+                    "citations":[{"sourceKind":"docs.document.core","sourcePath":"context/body.txt","path":"document/body",
+                    "startLine":1,"endLine":1,"quote":"Exact quote"}],"evidence":{},
+                    "coverage":{"source":"claimed","selected":1,"checked":1,"total":1,"complete":true}}
+                    """);
+                var citation = (ObjectNode) raw.path("citations").get(0);
+                citation.set("startLine", fixture.path("startLine"));
+                citation.set("endLine", fixture.path("endLine"));
+                citation.set("quote", fixture.path("quote"));
+                var candidate = CandidateParser.parse(raw);
+                if (fixture.path("expectedStartLine").isNull()) {
+                    assertThatThrownBy(() -> verifier.verifyCandidate(
+                                    job,
+                                    assignment(),
+                                    ReviewKind.ITEM,
+                                    candidate,
+                                    captured(fixture.path("content").asString(), true)))
+                            .isInstanceOf(CandidateEvidenceVerifier.Unverified.class);
+                } else {
+                    var verified = verifier.verifyCandidate(
+                            job,
+                            assignment(),
+                            ReviewKind.ITEM,
+                            candidate,
+                            captured(fixture.path("content").asString(), true));
+                    assertThat(verified.citations().getFirst().startLine())
+                            .as(fixture.path("name").asString())
+                            .isEqualTo(fixture.path("expectedStartLine").asInt());
+                }
+            }
+        }
     }
 
     @Test

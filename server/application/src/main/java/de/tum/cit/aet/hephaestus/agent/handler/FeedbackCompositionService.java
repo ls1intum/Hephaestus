@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.context.HistoryCopies;
 import de.tum.cit.aet.hephaestus.agent.context.HistoryCopy;
+import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedback;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.ConversationEligibilityDTO;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.PracticePageSupportDTO;
@@ -24,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
@@ -44,15 +44,18 @@ public class FeedbackCompositionService {
             PrepareFeedbackRequestDTO request,
             List<AdmittedResultSnapshot> rows,
             Read context,
-            Map<UUID, FeedbackAnchor> anchors,
+            Map<ComposedFeedback.Anchor, FeedbackAnchor> anchors,
             boolean publicAlreadyAccepted) {
         var drafts = FeedbackDraftBuilder.build(
                 job, Set.copyOf(request.basisResultIds()), rows, context.support(), request.composition(), anchors);
         boolean hasPublic = drafts.stream().anyMatch(draft -> draft.destination() == FeedbackDestination.ON_WORK);
         if (hasPublic && !request.publicComposition()) throw new AdmissionConflictException();
-        if (publicAlreadyAccepted && job.getPublicReviewDigest() == null) throw new AdmissionConflictException();
+        if (request.publicComposition() && publicAlreadyAccepted && job.getPublicReviewDigest() == null)
+            throw new AdmissionConflictException();
         var prepared = feedback.prepareAll(job.getWorkspaceId(), job.getReviewId(), drafts);
-        if (publicAlreadyAccepted && !prepared.packageDigest().equals(job.getPublicReviewDigest()))
+        if (request.publicComposition()
+                && publicAlreadyAccepted
+                && !prepared.packageDigest().equals(job.getPublicReviewDigest()))
             throw new AdmissionConflictException();
         if (request.publicComposition()) {
             members.publicReviewed(

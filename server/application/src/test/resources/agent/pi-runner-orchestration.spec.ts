@@ -226,6 +226,7 @@ const STAGED_PREPARED_HISTORY = JSON.stringify({
 	prepared: [
 		{
 			threadKey: "queued-current",
+			feedbackId: "00000000-0000-4000-8000-000000000101",
 			practiceSlug: "test-practice",
 			destination: "CONVERSATION",
 			recordedClaimCurrentness: "CURRENT",
@@ -234,6 +235,7 @@ const STAGED_PREPARED_HISTORY = JSON.stringify({
 		},
 		{
 			threadKey: "queued-withdrawn",
+			feedbackId: "00000000-0000-4000-8000-000000000102",
 			practiceSlug: "test-practice",
 			destination: "CONVERSATION",
 			withdrawn: true,
@@ -374,6 +376,7 @@ const ALREADY_SAID_PREPARED = JSON.stringify({
 	prepared: [
 		{
 			threadKey: "queued-test",
+			feedbackId: "00000000-0000-4000-8000-000000000103",
 			practiceSlug: "test-practice",
 			destination: "CONVERSATION",
 			preparedAt: "2026-09-01T10:00:00Z",
@@ -549,6 +552,18 @@ const withhold = (
 	basedOn,
 	action: "WITHHOLD",
 	withholdReason,
+	witnessIds:
+		withholdReason === "BELOW_BAR"
+			? []
+			: basedOn.map((id) => {
+					let suffix = "other";
+					if (id.endsWith("1")) {
+						suffix = "test";
+					} else if (id.endsWith("2")) {
+						suffix = "second";
+					}
+					return `${destination === "PRACTICE_PAGE" ? "app" : "chat"}-${suffix}`;
+				}),
 });
 
 type NativeStream = Awaited<ReturnType<AgentSession["agent"]["streamFunction"]>>;
@@ -2262,10 +2277,6 @@ if (scenario !== undefined && scenario !== "") {
 								}
 								if (scenario === "compose-already-said") {
 									const feedback = tool("report_feedback");
-									const both = [
-										"00000000-0000-4000-8000-000000000001",
-										"00000000-0000-4000-8000-000000000002",
-									];
 									const first = await feedback.execute("said", {
 										feedback: [
 											withhold("CONVERSATION", "second-practice", "NO_MATERIAL_CHANGE", [
@@ -2273,7 +2284,7 @@ if (scenario !== undefined && scenario !== "") {
 												"00000000-0000-4000-8000-000000000001",
 											]),
 											withhold("CONVERSATION", "test-practice", "ALREADY_SAID"),
-											withhold("PRACTICE_PAGE", "test-practice", "ALREADY_SAID", both),
+											withhold("PRACTICE_PAGE", "test-practice", "ALREADY_SAID"),
 										],
 									});
 									record(`said-first:${JSON.stringify(first)}`);
@@ -2282,7 +2293,6 @@ if (scenario !== undefined && scenario !== "") {
 											withhold("CONVERSATION", "test-practice", "NO_MATERIAL_CHANGE"),
 											withhold("CONVERSATION", "second-practice", "NO_MATERIAL_CHANGE", [
 												"00000000-0000-4000-8000-000000000002",
-												"00000000-0000-4000-8000-000000000003",
 											]),
 											withhold("CONVERSATION", "test-practice", "BELOW_BAR"),
 										],
@@ -2291,21 +2301,18 @@ if (scenario !== undefined && scenario !== "") {
 									return;
 								}
 								if (scenario === "compose-fold") {
+									const pieces = admitted()
+										.map(recordOf)
+										.filter((row) => row.outcome === "NOT_MET")
+										.map((row) => ({
+											destination: "PRACTICE_PAGE",
+											practiceSlug: row.practiceSlug,
+											basedOn: [row.resultId],
+											action: "WITHHOLD",
+											withholdReason: "BELOW_BAR",
+										}));
 									const folded = await tool("report_feedback").execute("f-fold", {
-										feedback: [
-											{
-												destination: "PRACTICE_PAGE",
-												practiceSlug: "test-practice",
-												basedOn: [
-													"00000000-0000-4000-8000-000000000001",
-													"00000000-0000-4000-8000-000000000002",
-													"00000000-0000-4000-8000-000000000011",
-													"00000000-0000-4000-8000-000000000012",
-												],
-												action: "WITHHOLD",
-												withholdReason: "BELOW_BAR",
-											},
-										],
+										feedback: pieces,
 									});
 									record(`feedback-fold:${JSON.stringify(folded)}`);
 									return;
@@ -2341,14 +2348,17 @@ if (scenario !== undefined && scenario !== "") {
 								};
 								const feedback = tool("report_feedback");
 								const schema = JSON.stringify(feedback.parameters);
-								for (const keyword of ["maxLength", "additionalProperties", "minItems", "oneOf"]) {
+								for (const keyword of ["maxLength", "additionalProperties", "minItems", "anyOf"]) {
 									assert.ok(
-										!schema.includes(`"${keyword}"`),
+										schema.includes(`"${keyword}"`),
 										`${keyword} in ${schema.slice(0, 200)}`,
 									);
 								}
-								assert.match(schema, /One of: PRACTICE_PAGE\./u);
-								assert.match(schema, /Required: destination, practiceSlug, basedOn, action\./u);
+								assert.match(schema, /"enum":\["PRACTICE_PAGE"\]/u);
+								assert.match(
+									schema,
+									/"required":\["destination","practiceSlug","basedOn","action"/u,
+								);
 								const historical = await feedback
 									.execute("historical", {
 										feedback: [{ ...card, basedOn: ["support-scm.issue-3"] }],
@@ -2671,6 +2681,21 @@ if (scenario !== undefined && scenario !== "") {
 								return;
 							}
 							if (scenario === "tree-citation") {
+								const quotedProblem = (summary: string, citation: SubmittedCitation) => {
+									const candidate = notMet(summary, citation);
+									return {
+										...candidate,
+										problems: candidate.problems.map((problem) => ({
+											...problem,
+											basis: {
+												type: "duty",
+												event: 0,
+												criterionQuote: "Added authentication calls use checked(), not insecure().",
+												explanation: "The citation witnesses the required authentication check.",
+											},
+										})),
+									};
+								};
 								const cite = async (
 									path: string,
 									quote: string,
@@ -2678,7 +2703,7 @@ if (scenario !== undefined && scenario !== "") {
 								) =>
 									report.execute(
 										"o-1",
-										notMet(summary, {
+										quotedProblem(summary, {
 											sourceKind: "scm.repository.tree",
 											sourcePath: "repos/primary/.git/HEAD",
 											path,
@@ -2705,7 +2730,7 @@ if (scenario !== undefined && scenario !== "") {
 								const atRevision = async (commit: string, startLine: number) =>
 									report.execute(
 										"o-2",
-										notMet(`Cited at commit line ${startLine}`, {
+										quotedProblem(`Cited at commit line ${startLine}`, {
 											sourceKind: "scm.repository.tree",
 											sourcePath: "repos/primary/.git/HEAD",
 											path: "src/Auth.java",
@@ -3355,8 +3380,7 @@ if (scenario !== undefined && scenario !== "") {
 					"private counterevidence retains MET source qualifications and coordinates without quoted or verified-runtime claims",
 				"compose-context-unavailable":
 					"keeps missing and empty standards and unknown history explicit without inventing their contents",
-				"compose-fold":
-					"counts a NOT_MET practice folded into another practice's piece as decided and asks no more",
+				"compose-fold": "keeps one practice per card and leaves non-NOT_MET records as context",
 				"compose-already-said":
 					"withholds as already said only on the destination and practice that captured delivered feedback records",
 				"compose-already-said-inline":
@@ -3857,7 +3881,7 @@ if (scenario !== undefined && scenario !== "") {
 						if (fixture.startsWith("compose-completion-")) {
 							assert.equal(child.status, 0, child.stderr);
 							const attempts = events.filter((event) => event.startsWith("public-completion:"));
-							assert.equal(attempts.length, fixture === "compose-completion-lost-ack" ? 2 : 1);
+							assert.equal(attempts.length, fixture === "compose-completion-lost-ack" ? 3 : 2);
 							const privateIndex = events.findIndex((event) => event.startsWith("private-turn"));
 							const lastAttempt = attempts.at(-1);
 							assert.ok(lastAttempt !== undefined);
@@ -3875,7 +3899,7 @@ if (scenario !== undefined && scenario !== "") {
 								assert.deepEqual(payload.compositionFailures, []);
 							}
 							assert.ok(events.includes("private-turn history=true review=true"));
-							if (attempts.length === 2) {
+							if (fixture === "compose-completion-lost-ack") {
 								const [first, second] = attempts;
 								assert.ok(first !== undefined && second !== undefined);
 								assert.equal(first.split(":")[2], second.split(":")[2]);
@@ -4484,7 +4508,7 @@ for (const item of [
   { ...base, problems: [without(problem, "basis")] },
   { ...base, problems: [{ ...problem, basis: { ...problem.basis, type: "unknown" } }] },
   { ...base, problems: [{ ...problem, citations: [] }] },
-  { ...base, problems: [{ ...problem, citations: [without(citation, "sourcePath")] }] },
+  { ...base, problems: [{ ...problem, citations: [without(citation, "quote")] }] },
   { ...base, problems: [{ ...problem, citations: [{ ...citation, sourcePath: "" }] }] },
   { ...base, problems: [{ ...problem, citations: [{ ...citation, sourceKind: "hephaestus.00000000-0000-4000-8000-000000000010" }] }] },
   { ...base, problems: [{ ...problem, citations: [{ ...citation, side: "MIDDLE" }] }] },
@@ -4497,7 +4521,7 @@ const decided = { outcome: "MET", summary: base.summary, explanation: base.expla
 const inapplicability = { consulted: [citation.sourceKind], prerequisite: "Runtime behavior", ruledOutBy: "Only documentation changed." };
 const question = { openQuestion: "Was the described test run?", wouldSettleIt: "The referenced test report." };
 for (const item of [
-  { ...base, problems: [{ ...problem, citations: [without(without(without(citation, "side"), "endLine"), "quote")] }] },
+  { ...base, problems: [{ ...problem, citations: [without(without(without(citation, "side"), "endLine"), "sourcePath")] }] },
   { ...decided, evidence: {} },
   { ...decided, outcome: "DOES_NOT_APPLY", evidence: { inapplicability } },
   { ...decided, outcome: "COULD_NOT_DETERMINE", evidence: { openQuestions: [question] } },
@@ -4506,13 +4530,13 @@ for (const item of [
 }
 // Nullable absence is valid for every outcome, including a provider that requires all declared fields.
 const absent = { search: null, inapplicability: null, openQuestions: null };
-const withoutQuote = { ...citation, side: null, commit: null, endLine: null, quote: null };
+const nullableCitation = { ...citation, sourceKind: null, sourcePath: null, side: null, commit: null, endLine: null };
 const nulls = { problems: null, example: null };
 const nullableCases = [
-  { ...base, example: null, problems: [{ ...problem, key: null, nextStep: null, citations: [withoutQuote] }], evidence: absent },
-  { ...decided, ...nulls, citations: [withoutQuote], evidence: absent },
-  { ...decided, ...nulls, outcome: "DOES_NOT_APPLY", citations: [withoutQuote], evidence: { ...absent, inapplicability } },
-  { ...decided, ...nulls, outcome: "COULD_NOT_DETERMINE", citations: [withoutQuote], evidence: { ...absent, openQuestions: [{ ...question, citation: null }] } },
+  { ...base, example: null, problems: [{ ...problem, key: null, nextStep: null, citations: [nullableCitation] }], evidence: absent },
+  { ...decided, ...nulls, citations: [nullableCitation], evidence: absent },
+  { ...decided, ...nulls, outcome: "DOES_NOT_APPLY", citations: [nullableCitation], evidence: { ...absent, inapplicability } },
+  { ...decided, ...nulls, outcome: "COULD_NOT_DETERMINE", citations: [nullableCitation], evidence: { ...absent, openQuestions: [{ ...question, citation: null }] } },
 ];
 const responseDeclaration = convertResponsesTools([{ ...tool, description: "Submit a result." }])[0];
 assert.equal(responseDeclaration.strict, false);
@@ -4527,7 +4551,7 @@ for (const value of ["", false, true, 0, []]) {
   }
 }
 for (const [field, invalid] of [
-  ["side", ["", false]], ["commit", ["", false]], ["endLine", ["", false]], ["quote", [false, 0]],
+  ["side", ["", false]], ["commit", ["", false]], ["endLine", ["", false]], ["quote", [false, 0, null, ""]],
 ]) {
   for (const value of invalid) {
     assert.throws(() => validate({ ...base, problems: [{ ...problem, citations: [{ ...citation, [field]: value }] }] }));
@@ -4617,6 +4641,7 @@ for (const item of nullableCases) {
 							const admission = recordOf(JSON.parse(readFileSync(admissionPath, "utf8")));
 							assert.deepEqual(Object.keys(admission), [
 								"contractVersion",
+								"nonResults",
 								"reviewId",
 								"jobId",
 								"attempt",
@@ -5791,6 +5816,7 @@ for (const item of nullableCases) {
 									{
 										basedOn: [{ resultId: "00000000-0000-4000-8000-000000000002" }],
 										reason: "BELOW_BAR",
+										witnessIds: [],
 									},
 								],
 							});
@@ -5934,8 +5960,8 @@ for (const item of nullableCases) {
 									return `${String(piece.destination)}:${String(piece.practiceSlug)}:${String(piece.withholdReason)}:${refs.join("+")}`;
 								}),
 								[
-									"PRACTICE_PAGE:test-practice:ALREADY_SAID:00000000-0000-4000-8000-000000000001+00000000-0000-4000-8000-000000000002",
-									"CONVERSATION:second-practice:NO_MATERIAL_CHANGE:00000000-0000-4000-8000-000000000002+00000000-0000-4000-8000-000000000003",
+									"PRACTICE_PAGE:test-practice:ALREADY_SAID:00000000-0000-4000-8000-000000000001",
+									"CONVERSATION:second-practice:NO_MATERIAL_CHANGE:00000000-0000-4000-8000-000000000002",
 									...(inline
 										? []
 										: [
@@ -6047,12 +6073,13 @@ for (const item of nullableCases) {
 								assert.ok(isRecord(feedback) && Array.isArray(feedback.feedback));
 								const piece: unknown = feedback.feedback[0];
 								assert.ok(isRecord(piece));
-								assert.deepEqual(piece.basedOn, [
-									{ resultId: "00000000-0000-4000-8000-000000000001" },
-									{ resultId: "00000000-0000-4000-8000-000000000002" },
-									{ resultId: "00000000-0000-4000-8000-000000000011" },
-									{ resultId: "00000000-0000-4000-8000-000000000012" },
-								]);
+								assert.deepEqual(
+									feedback.feedback.map((entry) => recordOf(entry).basedOn),
+									[
+										[{ resultId: "00000000-0000-4000-8000-000000000001" }],
+										[{ resultId: "00000000-0000-4000-8000-000000000002" }],
+									],
+								);
 							}
 							break;
 						}

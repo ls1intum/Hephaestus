@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStopReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewWriteGuard;
 import java.time.Clock;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
@@ -86,6 +87,24 @@ public class ReviewJobCompletionService {
                         assignment.id(),
                         reason,
                         "The execution ended without an admitted result");
+        var capture = job.getCapture();
+        boolean runtimeIncomplete =
+                admitted && capture != null && !capture.path("nonResults").isEmpty();
+        if (runtimeIncomplete) {
+            var pinned = assignments.admissible(job);
+            for (var nonResult : Objects.requireNonNull(capture).path("nonResults")) {
+                var assignment = pinned.stream()
+                        .filter(value -> value.practiceSlug()
+                                .equals(nonResult.path("practiceSlug").asString()))
+                        .findFirst()
+                        .orElseThrow();
+                members.fail(
+                        job.getWorkspaceId(),
+                        assignment.id(),
+                        ReviewStopReason.valueOf(nonResult.path("reason").asString()),
+                        "Runtime execution ended without a result for this practice");
+            }
+        }
         boolean completed = job.getStatus() == ReviewJobStatus.COMPLETED;
         job.setProcessingStatus(completed ? ProcessingStatus.DONE : ProcessingStatus.FAILED);
         jobs.saveAndFlush(job);
@@ -103,14 +122,14 @@ public class ReviewJobCompletionService {
                 : readinessRefused
                         ? ReviewStatus.PARTIAL
                         : completed
-                                ? ReviewStatus.COMPLETE
+                                ? runtimeIncomplete ? ReviewStatus.PARTIAL : ReviewStatus.COMPLETE
                                 : admitted || job.getExecutionStartedAt() != null
                                         ? ReviewStatus.PARTIAL
                                         : ReviewStatus.FAILED;
         var stop = readinessRefused
                 ? ReviewStopReason.READINESS_REFUSED
                 : completed
-                        ? null
+                        ? runtimeIncomplete ? ReviewStopReason.EXECUTION_INCOMPLETE : null
                         : job.getStatus() == ReviewJobStatus.TIMED_OUT
                                 ? ReviewStopReason.TIMED_OUT
                                 : job.getStatus() == ReviewJobStatus.CANCELLED ? ReviewStopReason.CANCELLED : reason;

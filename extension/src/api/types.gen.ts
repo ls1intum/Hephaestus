@@ -290,6 +290,7 @@ export type AdmissionRequest = {
     attempt?: number;
     contractVersion?: number;
     jobId?: string;
+    nonResults: Array<RuntimeNonResult>;
     results?: Array<SubmittedResult>;
     reviewId?: string;
 };
@@ -788,8 +789,10 @@ export type CompletePracticePageSupport = {
 export type ComposedFeedback = {
     destination?: 'ON_WORK' | 'PRACTICE_PAGE' | 'CONVERSATION';
     notes?: Array<Note>;
+    page?: Page;
     resultIds?: Array<string>;
     summary?: string;
+    trace?: FeedbackCompositionTrace;
     withheldReason?: 'VOLUME_CAPPED' | 'COMPOSER_WITHHELD' | 'NOTHING_NEW' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISAGREE' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'DELIVERY_UNCONFIRMED' | 'ITEM_GONE' | 'ITEM_CLOSED' | 'ITEM_MERGED' | 'ITEM_STATE_INELIGIBLE' | 'ISSUE_SNAPSHOT_CHANGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'NO_AI' | 'DELIVERY_OFF' | 'PERSON_SUPPRESSED' | 'RECIPIENT_UNAVAILABLE' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'FEEDBACK_OFF' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_SCOPE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'RESULT_MARKED_INCORRECT' | 'REVIEWED_VERSION_CHANGED' | 'REVIEW_CANCELLED' | 'EVIDENCE_NOT_PERMITTED' | 'NO_EVIDENCE' | 'UNCORROBORATED';
 };
 
@@ -1056,6 +1059,12 @@ export type Copy = {
     side: 'OLD' | 'NEW' | null;
     startLine: null | number;
     state: 'PLANNED' | 'WRITE_STARTED' | 'POSTED' | 'FAILED' | 'WITHHELD' | 'RETRACTED';
+};
+
+export type CopySupport = {
+    basedOn?: Array<Support>;
+    kind?: 'SUMMARY' | 'LINE_NOTE' | 'FILE_NOTE' | 'CHAT_TURN';
+    position?: number;
 };
 
 export type CoverageOmission = {
@@ -1559,6 +1568,16 @@ export type FeedbackCheckFacts = {
     incorrectBasis: boolean;
     modelAllowed: boolean;
     writeStarted: boolean;
+};
+
+/**
+ * Exact support and quiet decisions retained with the immutable preparation receipt.
+ */
+export type FeedbackCompositionTrace = {
+    copies?: Array<CopySupport>;
+    primaryResultId?: string;
+    replacesId?: string;
+    withheld?: Array<QuietDecision>;
 };
 
 export type FeedbackCopy = {
@@ -2536,6 +2555,7 @@ export type NotReviewedScanReportItem = {
 
 export type Note = {
     body?: string;
+    citationIndex: number;
     problemId?: string;
 };
 
@@ -2753,6 +2773,12 @@ export type OwnItemTrace = {
     item: ItemRef;
     results: Array<ResultList>;
     review: ReviewRef;
+};
+
+export type Page = {
+    body?: string;
+    nextStep?: string;
+    title?: string;
 };
 
 export type PageMetadata = {
@@ -3836,6 +3862,12 @@ export type QuestionSummary = {
     score?: number;
 };
 
+export type QuietDecision = {
+    basedOn?: Array<Support>;
+    reason?: string;
+    witnessIds?: Array<string>;
+};
+
 /**
  * Vendor API rate-limit observation, read from in-memory trackers (not persisted across restarts). Every field except observedAt is present only if the vendor actually reported it.
  */
@@ -4789,6 +4821,14 @@ export type RunningRelease = {
     version: string;
 };
 
+/**
+ * An assigned practice that runtime execution could not complete, without an outcome about the work.
+ */
+export type RuntimeNonResult = {
+    practiceSlug: string;
+    reason: 'TIMED_OUT' | 'EXECUTION_FAILED' | 'PREPARATION_FAILED' | 'PROCESSING_FAILED' | 'PERSON_DATA_ERASED' | 'STALE_ROLLOUT_REVISION' | 'CANCELLED_BY_ADMIN' | 'REPLACED' | 'LEGACY_FAILURE' | 'EXECUTION_INCOMPLETE' | 'RESULT_WITHHELD' | 'READINESS_REFUSED' | 'SUSPECT_LISTING' | 'BUDGET' | 'DEADLINE' | 'CANCELLED' | 'ENUMERATION_FAILED' | 'ENUMERATION_LIMIT' | 'NO_SCAN_PRACTICES' | 'MODEL_CHANGED' | 'MODEL_UNAVAILABLE' | 'ERROR' | 'LEGACY_SCOPE_UNKNOWN' | 'CONTRACT_CHANGED';
+};
+
 export type ScanAvailability = {
     expired: boolean;
     expiredProofPairs: number;
@@ -5122,6 +5162,11 @@ export type SubmittedResult = {
     itemVersion?: string;
     practiceSlug?: string;
     readReceipts?: Array<ReadReceipt>;
+};
+
+export type Support = {
+    problemId?: string;
+    resultId?: string;
 };
 
 export type SupportOccurrence = {

@@ -56,6 +56,20 @@ class CandidateFixturesTest extends BaseUnitTest {
     }
 
     @Test
+    void shouldKeepUnknownHostCoverageIncompleteWithoutInventingAReadFailure() throws IOException {
+        ObjectNode candidate = fixture("host-coverage-unknown.json");
+        HostCoverage coverage = (HostCoverage) CandidateParser.parse(candidate).coverage();
+        assertThat(coverage.complete()).isFalse();
+        assertThat(coverage.truncatedReads()).isZero();
+        assertThat(coverage.failedReads()).isZero();
+        assertThat(coverage.omitted()).isNotEmpty();
+
+        candidate.put("outcome", "MET");
+        evidence(candidate).remove("openQuestions");
+        assertRefused(candidate, CandidateRefusal.MET_COVERAGE_INCOMPLETE);
+    }
+
+    @Test
     void shouldKeepSeverityOnEachProblem() throws IOException {
         NotMetCandidate candidate = (NotMetCandidate) CandidateParser.parse(fixture("candidate-not-met.json"));
 

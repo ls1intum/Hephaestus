@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.agent.context.HistoryCopies;
 import de.tum.cit.aet.hephaestus.agent.context.JobEvidenceFiles;
 import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewHistoryContentSource;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedback;
+import de.tum.cit.aet.hephaestus.agent.handler.composition.PinnedInlineAnchorQuery;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewCompositionBasisRepository;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobAssignments;
@@ -24,6 +25,8 @@ import de.tum.cit.aet.hephaestus.agent.proxy.dto.PrepareFeedbackRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCompositionContext;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCompositionTrace;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackIds;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStore;
@@ -79,7 +82,8 @@ class ResultAdmissionServiceTest extends BaseUnitTest {
                 output,
                 proof,
                 assignments,
-                publicEligibility,
+                new AdmittedResultProjectionService(
+                        assignments, publicEligibility, mock(PinnedInlineAnchorQuery.class), mapper),
                 files,
                 mock(ReviewHistoryContentSource.class),
                 mapper,
@@ -122,7 +126,20 @@ class ResultAdmissionServiceTest extends BaseUnitTest {
                 0,
                 List.of(resultId),
                 List.of(new ComposedFeedback(
-                        FeedbackDestination.ON_WORK, List.of(resultId), "Use clear names.", List.of(), null)),
+                        FeedbackDestination.ON_WORK,
+                        List.of(resultId),
+                        "Use clear names.",
+                        List.of(),
+                        null,
+                        new FeedbackCompositionTrace(
+                                List.of(new FeedbackCompositionTrace.CopySupport(
+                                        FeedbackCopyKind.SUMMARY,
+                                        0,
+                                        List.of(new FeedbackCompositionTrace.Support(resultId, null)))),
+                                List.of(),
+                                null,
+                                null),
+                        null)),
                 true);
         var response = service.prepareFeedback(identity(), request);
         assertThat(response.feedbackIds()).containsExactly(feedbackId);
@@ -150,7 +167,7 @@ class ResultAdmissionServiceTest extends BaseUnitTest {
         when(assignments.load(job)).thenReturn(List.of(assignment));
         when(proof.forAttempt(1, job.getReviewId(), job.getId(), 0)).thenReturn(List.of());
         when(publicEligibility.publicResultIds(job, List.of())).thenReturn(Set.of());
-        var request = new AdmissionRequestDTO(3, job.getReviewId(), job.getId(), 0, List.of());
+        var request = new AdmissionRequestDTO(3, job.getReviewId(), job.getId(), 0, List.of(), List.of());
         var writes = new AtomicInteger();
         when(output.prepare(job, request)).thenReturn(owned -> writes.incrementAndGet());
         service.admit(identity(), request);

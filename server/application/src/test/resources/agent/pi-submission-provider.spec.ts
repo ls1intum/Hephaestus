@@ -23,15 +23,18 @@ import {
 	submissionExtension,
 } from "../../../main/resources/agent/pi-provider.ts";
 
-for (const [apiProtocol, reasoningEffort] of [
+for (const [apiProtocol, reasoningEffort, modelId = "test-model"] of [
 	["openai-completions", undefined],
 	["openai-responses", undefined],
 	["google-generative-ai", undefined],
 	["anthropic-messages", undefined],
 	["anthropic-messages", "MEDIUM"],
+	["anthropic-messages", undefined, "claude-opus-5-5"],
+	["anthropic-messages", undefined, "claude-sonnet-5-5"],
+	["openai-completions", undefined, "anthropic/claude-opus-5.5"],
 ] as const) {
 	const manualThinking = reasoningEffort !== undefined;
-	void test(`${apiProtocol} ${manualThinking ? "preserves manual thinking without an unsupported forced tool" : "requires submit_result after exploration and preserves the other tools"}`, async () => {
+	void test(`${apiProtocol} ${modelId} ${manualThinking ? "preserves manual thinking without an unsupported forced tool" : "requires submit_result after exploration and preserves the other tools"}`, async () => {
 		const bodies: Record<string, unknown>[] = [];
 		const server = createServer((request, response) => {
 			const chunks: Buffer[] = [];
@@ -62,7 +65,7 @@ for (const [apiProtocol, reasoningEffort] of [
 				modelsPath: path.join(cwd, "models.json"),
 				allowModelNetwork: false,
 			});
-			const config = { apiProtocol, modelId: "test-model", reasoningEffort };
+			const config = { apiProtocol, modelId, reasoningEffort };
 			assert.ok(
 				registerHephaestusProvider(modelRuntime, config, {
 					LLM_PROXY_URL: `http://127.0.0.1:${address.port}/v1`,
@@ -110,7 +113,9 @@ for (const [apiProtocol, reasoningEffort] of [
 			const [exploring, recording] = bodies;
 			assert.ok(exploring && recording);
 			assert.equal("tool_choice" in exploring, false);
-			if (manualThinking) {
+			if (modelId !== "test-model") {
+				assert.equal(recording.tool_choice, undefined);
+			} else if (manualThinking) {
 				assert.equal(recording.tool_choice, undefined);
 				assert.ok(isRecord(recording.thinking));
 				assert.equal(recording.thinking.type, "enabled");

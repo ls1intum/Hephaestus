@@ -628,8 +628,8 @@ function readCoverage(coverage: Superset["coverage"]): Coverage | string {
 	}
 	if (coverage.source === "host") {
 		const { reads, truncatedReads, failedReads, receipts } = coverage;
-		if (coverage.complete !== (truncatedReads === 0 && failedReads === 0)) {
-			return "host coverage is complete exactly when no read was truncated or failed";
+		if (coverage.complete && (truncatedReads > 0 || failedReads > 0)) {
+			return "complete host coverage cannot have truncated or failed reads";
 		}
 		if (coverage.complete && receipts.some((receipt) => receipt.status === "FAILED")) {
 			return "complete host coverage cannot contain a failed receipt";

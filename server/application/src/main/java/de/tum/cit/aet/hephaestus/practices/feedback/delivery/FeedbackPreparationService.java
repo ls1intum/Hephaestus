@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackBasis;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackBasisRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSupersession;
+import de.tum.cit.aet.hephaestus.practices.feedback.PracticePageFeedbackBody;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.result.ProblemRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
@@ -27,6 +28,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshotQuery;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -60,7 +62,11 @@ public class FeedbackPreparationService {
     public record Preparation(FeedbackDraft draft, @Nullable UUID replacesId) {}
 
     public Preparation prepare(FeedbackDraft draft, Optional<Feedback> existing) {
-        if ((draft.body() != null && draft.body().length() > 8000)
+        var page = draft.page();
+        String rendered = page == null
+                ? draft.body()
+                : PracticePageFeedbackBody.render(page.title(), page.body(), page.nextStep());
+        if ((rendered != null && rendered.length() > 8000)
                 || draft.copies().stream()
                                 .filter(copy -> copy.kind() == FeedbackCopyKind.LINE_NOTE
                                         || copy.kind() == FeedbackCopyKind.FILE_NOTE)
@@ -86,9 +92,26 @@ public class FeedbackPreparationService {
                 .filter(row -> row.getReviewId().equals(draft.reviewId()))
                 .findFirst()
                 .orElseThrow();
-        String body = clean(draft.body());
+        String body = clean(rendered);
         FeedbackStopReason reason = draft.stopReason();
         UUID replacesId = null;
+        var trace = draft.composition();
+        if (trace != null && trace.replacesId() != null) {
+            if (draft.destination() != FeedbackDestination.CONVERSATION || trace.primaryResultId() == null)
+                throw conflict("Only conversation feedback can replace a queued conversation concern.");
+            var primaryResult = support.stream()
+                    .filter(row -> row.getId().equals(trace.primaryResultId()))
+                    .findFirst()
+                    .orElseThrow(() -> conflict("Replacement needs its current primary practice."));
+            if (existing.isEmpty()
+                    && !replacements.canReplaceConversation(
+                            draft.workspaceId(),
+                            trace.replacesId(),
+                            draft.developerId(),
+                            primaryResult.getPracticeId()))
+                throw conflict("The conversation target is no longer queued for this developer and practice.");
+            replacesId = trace.replacesId();
+        }
         if (draft.destination() == FeedbackDestination.PRACTICE_PAGE) {
             if (support.stream().anyMatch(row -> row.getPracticeId() != primary.getPracticeId()))
                 throw conflict("A practice-page piece must address one practice.");
@@ -164,15 +187,20 @@ public class FeedbackPreparationService {
                     && !descriptor.copyCapabilities().contains(CopyCapability.LINE_NOTE))
                 reason = FeedbackStopReason.RECIPIENT_UNAVAILABLE;
         }
-        var suppressed = suppression.suppressedProblems(
-                draft.workspaceId(),
-                problems
-                        .findByWorkspaceIdAndResultIdInOrderByResultIdAscPositionAsc(
-                                draft.workspaceId(),
-                                support.stream().map(Result::getId).toList())
-                        .stream()
-                        .map(row -> row.getId())
-                        .toList());
+        var wideResults = draft.basis().stream()
+                .filter(edge -> edge.problemId() == null)
+                .map(FeedbackBasisInput::resultId)
+                .distinct()
+                .toList();
+        var communicatedProblems = new HashSet<UUID>();
+        draft.basis().stream()
+                .map(FeedbackBasisInput::problemId)
+                .filter(Objects::nonNull)
+                .forEach(communicatedProblems::add);
+        if (!wideResults.isEmpty())
+            problems.findByWorkspaceIdAndResultIdInOrderByResultIdAscPositionAsc(draft.workspaceId(), wideResults)
+                    .forEach(problem -> communicatedProblems.add(problem.getId()));
+        var suppressed = suppression.suppressedProblems(draft.workspaceId(), communicatedProblems);
         if (reason == null && !suppressed.isEmpty())
             reason = suppressed.containsValue(FeedbackStopReason.REACTED_DISAGREE)
                     ? FeedbackStopReason.REACTED_DISAGREE
@@ -219,13 +247,17 @@ public class FeedbackPreparationService {
                         body,
                         edges,
                         planned,
-                        draft.checks()),
+                        draft.checks(),
+                        draft.composition(),
+                        null),
                 replacesId);
     }
 
     public void recorded(Preparation preparation, Feedback row) {
-        if (preparation.replacesId() != null)
-            replacements.replaceOpen(row.getWorkspaceId(), preparation.replacesId(), row.getId());
+        if (preparation.replacesId() != null
+                && row.getState() == FeedbackState.READY
+                && !replacements.replaceOpen(row.getWorkspaceId(), preparation.replacesId(), row.getId()))
+            throw conflict("The queued feedback could not be replaced.");
         if (row.getDestination() == FeedbackDestination.CONVERSATION && row.getState() == FeedbackState.READY)
             events.publishEvent(new ConversationFeedbackPreparedEvent(row.getWorkspaceId(), row.getDeveloperId(), 1));
     }

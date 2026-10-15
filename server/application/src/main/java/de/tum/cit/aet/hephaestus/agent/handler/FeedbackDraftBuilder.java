@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackBasisInput;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCompositionTrace;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyInput;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
@@ -32,7 +33,7 @@ public final class FeedbackDraftBuilder {
             List<AdmittedResultSnapshot> admitted,
             List<ResultHistoryEntry> historical,
             List<ComposedFeedback> composition,
-            Map<UUID, FeedbackAnchor> anchors) {
+            Map<ComposedFeedback.Anchor, FeedbackAnchor> anchors) {
         var byId = admitted.stream().collect(Collectors.toMap(AdmittedResultSnapshot::id, Function.identity()));
         var historyById =
                 historical.stream().collect(Collectors.toMap(ResultHistoryEntry::resultId, Function.identity()));
@@ -78,25 +79,60 @@ public final class FeedbackDraftBuilder {
                             FeedbackIds.conversation(
                                     job.getWorkspaceId(), job.getReviewId(), developer, piece.resultIds());
                     };
+            var trace = piece.trace();
+            var allRefs = new ArrayList<FeedbackCompositionTrace.Support>();
+            trace.copies().forEach(copy -> allRefs.addAll(copy.basedOn()));
+            trace.withheld().forEach(decision -> allRefs.addAll(decision.basedOn()));
+            if (!Set.copyOf(piece.resultIds())
+                    .equals(allRefs.stream()
+                            .map(FeedbackCompositionTrace.Support::resultId)
+                            .collect(Collectors.toSet()))) throw new AdmissionConflictException();
+            for (var ref : allRefs) {
+                if (ref.problemId() != null
+                        && (byId.get(ref.resultId()) == null
+                                || byId.get(ref.resultId()).problems().stream()
+                                        .noneMatch(problem -> problem.id().equals(ref.problemId()))))
+                    throw new AdmissionConflictException();
+            }
+            var communicated = trace.copies().stream()
+                    .flatMap(copy -> copy.basedOn().stream())
+                    .distinct()
+                    .toList();
+            var retained = communicated.isEmpty() ? allRefs.stream().distinct().toList() : communicated;
             var basis = new ArrayList<FeedbackBasisInput>();
-            for (var resultId : piece.resultIds()) basis.add(new FeedbackBasisInput(resultId, null, basis.size()));
+            for (var ref : retained) basis.add(new FeedbackBasisInput(ref.resultId(), ref.problemId(), basis.size()));
             var copies = new ArrayList<FeedbackCopyInput>();
             if (piece.destination() == FeedbackDestination.CONVERSATION) {
                 copies.add(copy(id, FeedbackCopyKind.CHAT_TURN, 0, null, null));
             } else if (piece.destination() == FeedbackDestination.ON_WORK) {
                 if (piece.summary() != null) copies.add(copy(id, FeedbackCopyKind.SUMMARY, 0, null, null));
                 for (var note : piece.notes()) {
-                    var owner = support.stream()
-                            .filter(row -> row.problems().stream()
-                                    .anyMatch(problem -> problem.id().equals(note.problemId())))
-                            .findFirst()
-                            .orElseThrow(AdmissionConflictException::new);
-                    var anchor = anchors.get(note.problemId());
+                    var anchor = anchors.get(new ComposedFeedback.Anchor(note.problemId(), note.citationIndex()));
                     if (anchor == null) throw new AdmissionConflictException();
-                    basis.add(new FeedbackBasisInput(owner.id(), note.problemId(), basis.size()));
+
                     copies.add(copy(id, FeedbackCopyKind.LINE_NOTE, copies.size(), note.body(), anchor));
                 }
             }
+            if (piece.withheldReason() == null) {
+                if (piece.destination() == FeedbackDestination.PRACTICE_PAGE) {
+                    if (trace.copies().size() != 1
+                            || trace.copies().getFirst().kind() != FeedbackCopyKind.SUMMARY
+                            || trace.copies().getFirst().position() != 0) throw new AdmissionConflictException();
+                } else if (copies.size() != trace.copies().size()) throw new AdmissionConflictException();
+                for (var planned : copies) {
+                    var exact = trace.copies().stream()
+                            .filter(copy -> copy.kind() == planned.kind() && copy.position() == planned.position())
+                            .findFirst()
+                            .orElseThrow(AdmissionConflictException::new);
+                    if (exact.basedOn().isEmpty()) throw new AdmissionConflictException();
+                    if (planned.kind() == FeedbackCopyKind.LINE_NOTE) {
+                        var note = piece.notes().get(planned.position() - (piece.summary() == null ? 0 : 1));
+                        if (exact.basedOn().stream()
+                                .noneMatch(ref -> note.problemId().equals(ref.problemId())))
+                            throw new AdmissionConflictException();
+                    }
+                }
+            } else if (!trace.copies().isEmpty()) throw new AdmissionConflictException();
             if (drafts.stream().anyMatch(draft -> draft.id().equals(id))) throw new AdmissionConflictException();
             drafts.add(new FeedbackDraft(
                     id,
@@ -112,7 +148,14 @@ public final class FeedbackDraftBuilder {
                     piece.summary(),
                     basis,
                     copies,
-                    Map.of()));
+                    Map.of(),
+                    trace,
+                    piece.page() == null
+                            ? null
+                            : new FeedbackDraft.Page(
+                                    piece.page().title(),
+                                    piece.page().body(),
+                                    piece.page().nextStep())));
         }
         return List.copyOf(drafts);
     }

@@ -40,6 +40,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -119,6 +120,19 @@ public class FeedbackPreparationStore {
 
     private PreparedFeedback preparePiece(Review review, FeedbackDraft proposal, Instant preparedAt) {
         var existing = feedback.findByIdAndWorkspaceId(proposal.id(), proposal.workspaceId());
+        if (proposal.composition() != null) {
+            var checks = (ObjectNode) review.getChecks().deepCopy();
+            var compositions = checks.withObject("feedbackComposition");
+            var incoming = new JsonMapper().valueToTree(proposal.composition());
+            var retained = compositions.path(proposal.id().toString());
+            if (!retained.isMissingNode() && !retained.equals(incoming))
+                throw conflict("The prepared composition support and quiet decisions are immutable.");
+            compositions.set(proposal.id().toString(), incoming);
+            if (checks.toString().getBytes(StandardCharsets.UTF_8).length > MAX_REVIEW_CHECK_BYTES)
+                throw conflict("Composition history exceeds the review checks limit.");
+            review.setChecks(checks);
+            reviews.saveAndFlush(review);
+        }
         if (proposal.developerId() <= 0 || proposal.workspaceId() <= 0)
             throw new IllegalArgumentException("Feedback needs positive workspace and developer ids.");
         if (proposal.destination() == FeedbackDestination.ON_WORK

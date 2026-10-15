@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.PullRequestContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.RepositoryTreeContentSource;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.LinkOption;
@@ -21,6 +22,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
+import org.eclipse.jgit.patch.FileHeader;
+import org.eclipse.jgit.patch.Patch;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
@@ -95,6 +98,7 @@ public class ScmCitationVerifier implements CitationVerifier {
                             && (change || citation.commit() == null || head.equals(citation.commit()));
             if (!valid) refused.add(refusal(citation.index(), "The citation refers to another SCM commit or side"));
         }
+        var changedFiles = capturedEdits(check, base, head);
         for (BasisToCheck basis : check.bases()) {
             CitationToCheck newest = find(check.citations(), basis.headCitation());
             CitationToCheck oldest =
@@ -111,9 +115,47 @@ public class ScmCitationVerifier implements CitationVerifier {
                 refused.add(refusal(
                         basis.headCitation(),
                         "The problem basis cites another repository commit than the reviewed change"));
+            } else if (code(newest) && !intersectsChange(changedFiles, newest, CitationSide.NEW)) {
+                refused.add(new CitationRefusal(
+                        basis.headCitation(),
+                        CandidateRefusal.BASIS_WITNESS_MISSING,
+                        "The code basis head witness must intersect added lines in the pinned change"));
+            } else if (oldest != null && code(oldest) && !intersectsChange(changedFiles, oldest, CitationSide.OLD)) {
+                refused.add(new CitationRefusal(
+                        oldest.index(),
+                        CandidateRefusal.BASIS_WITNESS_MISSING,
+                        "The worsened code basis base witness must intersect removed lines in the pinned change"));
             }
         }
         return List.copyOf(refused);
+    }
+
+    private List<? extends FileHeader> capturedEdits(
+            CitationCheck check, @Nullable String base, @Nullable String head) {
+        if (head == null || !capturedRange(check, base, head)) return List.of();
+        try {
+            var change = mapper.readTree(
+                    Files.readAllBytes(check.evidence().source().resolve(PullRequestContentSource.CHANGE_FILE)));
+            var patch = new Patch();
+            byte[] bytes = change.path("diff").asString("").getBytes(StandardCharsets.UTF_8);
+            patch.parse(bytes, 0, bytes.length);
+            return patch.getErrors().isEmpty() ? patch.getFiles() : List.of();
+        } catch (IOException | RuntimeException failed) {
+            return List.of();
+        }
+    }
+
+    private static boolean intersectsChange(
+            List<? extends FileHeader> files, CitationToCheck citation, CitationSide side) {
+        for (var file : files) {
+            if (!citation.path().equals(side == CitationSide.NEW ? file.getNewPath() : file.getOldPath())) continue;
+            for (var edit : file.toEditList()) {
+                int first = side == CitationSide.NEW ? edit.getBeginB() : edit.getBeginA();
+                int end = side == CitationSide.NEW ? edit.getEndB() : edit.getEndA();
+                if (first < end && citation.startLine() <= end && citation.endLine() > first) return true;
+            }
+        }
+        return false;
     }
 
     private boolean capturedRange(CitationCheck check, @Nullable String base, String head) {
@@ -122,7 +164,7 @@ public class ScmCitationVerifier implements CitationVerifier {
         try {
             if (!path.startsWith(root)
                     || !Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)
-                    || Files.size(path) > 65536
+                    || Files.size(path) > 64L * 1024 * 1024
                     || !path.toRealPath().startsWith(root.toRealPath())) return false;
             var range = mapper.readTree(Files.readAllBytes(path));
             return Objects.equals(base, range.path("base_sha").asString())

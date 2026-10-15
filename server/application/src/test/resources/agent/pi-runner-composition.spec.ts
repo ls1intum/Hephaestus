@@ -46,6 +46,7 @@ const supersede = (threadKey: string): ComposedFeedbackPiece => ({
 
 const target = (threadKey: string, destination: Destination = "CONVERSATION") => ({
 	threadKey,
+	feedbackId: "00000000-0000-4000-8000-000000000004",
 	destination,
 	practiceSlug: "writes-focused-pull-requests",
 });
@@ -107,7 +108,10 @@ void test("private feedback rests on a problem of its own practice, named by its
 		validateFeedbackEvidence("acceptance-criteria", basedOn, results) ?? "",
 		/must name the NOT_MET result of the primary practice 'acceptance-criteria' or one of its problems/u,
 	);
-	assert.equal(validateFeedbackEvidence("issue-outcome", basedOn, results), null);
+	assert.match(
+		validateFeedbackEvidence("issue-outcome", basedOn, results) ?? "",
+		/Every supporting result must be NOT_MET/u,
+	);
 	assert.equal(validateFeedbackEvidence("issue-outcome", ["no-closing-note"], results), null);
 	const missing = validateFeedbackEvidence("issue-outcome", ["missing"], results) ?? "";
 	assert.match(missing, /does not name an admitted result or problem/u);
@@ -613,8 +617,8 @@ void test("a stored review is the wire shape: every basedOn a list of references
 				},
 			],
 			withheld: [
-				{ basedOn: [{ resultId: "handoff" }], reason: "BELOW_BAR" },
-				{ basedOn: [{ resultId: "description" }], reason: "BELOW_BAR" },
+				{ basedOn: [{ resultId: "handoff" }], reason: "BELOW_BAR", witnessIds: [] },
+				{ basedOn: [{ resultId: "description" }], reason: "BELOW_BAR", witnessIds: [] },
 			],
 		},
 	});
@@ -867,7 +871,7 @@ void test("what a review decided covers the results it says, through any problem
 						anchor: { problemId: "colors-fill", citationIndex: 0 },
 					},
 				],
-				withheld: [{ basedOn: [{ resultId: "handoff" }], reason: "ALREADY_SAID" }],
+				withheld: [{ basedOn: [{ resultId: "handoff" }], reason: "ALREADY_SAID", witnessIds: [] }],
 			}),
 		].toSorted(),
 		["colors", "handoff", "why"],
@@ -1815,8 +1819,8 @@ void test("a withholding that says the advice was given names a statement that m
 		);
 		assert.ok("review" in read, JSON.stringify(read));
 		assert.deepEqual(read.review.withheld, [
-			{ basedOn: [{ resultId: "description" }], reason: "BELOW_BAR" },
-			{ basedOn: [{ resultId: "handoff" }], reason: "NO_MATERIAL_CHANGE" },
+			{ basedOn: [{ resultId: "description" }], reason: "BELOW_BAR", witnessIds: [] },
+			{ basedOn: [{ resultId: "handoff" }], reason: "NO_MATERIAL_CHANGE", witnessIds: [witness] },
 		]);
 	}
 	// Below the bar is a judgement about this reader, not a claim about what was said before.

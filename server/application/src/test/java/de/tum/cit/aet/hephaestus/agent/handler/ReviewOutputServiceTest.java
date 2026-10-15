@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.ResultsRefusedException;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobAssignments;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmissionRequestDTO;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.RuntimeNonResultDTO;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.SubmittedResultDTO;
 import de.tum.cit.aet.hephaestus.evidence.AppliesWhenCheck;
 import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
@@ -34,6 +35,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewStopReason;
 import de.tum.cit.aet.hephaestus.practices.spi.WithheldItem;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
@@ -97,7 +99,8 @@ class ReviewOutputServiceTest extends BaseUnitTest {
                 job.getReviewId(),
                 job.getId(),
                 0,
-                List.of(new SubmittedResultDTO(slug, "2", version, candidate, List.of())));
+                List.of(new SubmittedResultDTO(slug, "2", version, candidate, List.of())),
+                List.of());
     }
 
     @Test
@@ -197,7 +200,8 @@ class ReviewOutputServiceTest extends BaseUnitTest {
         var valid = submission("clear-names", "docs:one").results().getFirst();
         var malformed = new SubmittedResultDTO("other-practice", "2", "docs:one", mapper.createObjectNode(), List.of());
         var prepared = service.prepare(
-                job, new AdmissionRequestDTO(3, job.getReviewId(), job.getId(), 0, List.of(valid, malformed)));
+                job,
+                new AdmissionRequestDTO(3, job.getReviewId(), job.getId(), 0, List.of(valid, malformed), List.of()));
         prepared.record(job);
         ArgumentCaptor<List<ResultCandidate>> admitted = ArgumentCaptor.captor();
         verify(results).admit(eq(1L), eq(job.getReviewId()), eq(job.getId()), eq(0), admitted.capture());
@@ -219,6 +223,77 @@ class ReviewOutputServiceTest extends BaseUnitTest {
     }
 
     @Test
+    void shouldAdmitACompletedPracticeWhenAnotherExhaustsItsRuntimeBudget() {
+        acceptReadReceipts();
+        when(verifier.verifyCandidate(eq(job), any(), eq(ReviewKind.ITEM), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(3));
+        var first = RuntimeReviewTestData.assignment(5L, null);
+        var second = new ReviewAssignmentSnapshot(
+                new ReviewAssignmentId(job.getReviewId(), 41, 2),
+                first.item(),
+                first.version(),
+                first.developerId(),
+                "other-practice",
+                new PinnedPractice(
+                        41,
+                        42,
+                        first.practice().definition(),
+                        first.practice().reviewDigest(),
+                        first.practice().method()));
+        when(assignments.admissible(job)).thenReturn(List.of(first, second));
+        when(results.admit(eq(1L), eq(job.getReviewId()), eq(job.getId()), eq(0), any()))
+                .thenReturn(new AdmissionReceipt(List.of(), List.of()));
+        var request = new AdmissionRequestDTO(
+                3,
+                job.getReviewId(),
+                job.getId(),
+                0,
+                submission("clear-names", "docs:one").results(),
+                List.of(new RuntimeNonResultDTO("other-practice", ReviewStopReason.BUDGET)));
+        var prepared = service.prepare(job, request);
+        verifyNoInteractions(results, membership);
+        prepared.record(job);
+        ArgumentCaptor<List<ResultCandidate>> admitted = ArgumentCaptor.captor();
+        verify(results).admit(eq(1L), eq(job.getReviewId()), eq(job.getId()), eq(0), admitted.capture());
+        assertThat(admitted.getValue())
+                .singleElement()
+                .satisfies(result -> assertThat(result.practiceId()).isEqualTo(31));
+        assertThat(Objects.requireNonNull(job.getCapture()).path("nonResults"))
+                .isEqualTo(mapper.valueToTree(request.nonResults()));
+        verifyNoInteractions(membership);
+    }
+
+    @Test
+    void shouldRefuseARunThatHasOnlyRuntimeNonResults() {
+        var request = new AdmissionRequestDTO(
+                3,
+                job.getReviewId(),
+                job.getId(),
+                0,
+                List.of(),
+                List.of(new RuntimeNonResultDTO("clear-names", ReviewStopReason.BUDGET)));
+        assertThatThrownBy(() -> service.prepare(job, request))
+                .isInstanceOf(ResultsRefusedException.class)
+                .hasMessage("The submission contains no practice results");
+        verifyNoInteractions(results, membership, verifier);
+    }
+
+    @Test
+    void shouldRejectADuplicateRuntimeNonResultOrAnUnassignedPractice() {
+        for (var slug : List.of("clear-names", "unknown")) {
+            var request = new AdmissionRequestDTO(
+                    3,
+                    job.getReviewId(),
+                    job.getId(),
+                    0,
+                    submission("clear-names", "docs:one").results(),
+                    List.of(new RuntimeNonResultDTO(slug, ReviewStopReason.BUDGET)));
+            assertThatThrownBy(() -> service.prepare(job, request)).isInstanceOf(ResultsRefusedException.class);
+        }
+        verifyNoInteractions(results, membership);
+    }
+
+    @Test
     void shouldAdmitAHostInapplicabilityResultWithoutAModelSubmission() {
         var assigned = RuntimeReviewTestData.assignment(5L, null);
         when(assignments.load(job)).thenReturn(List.of(assigned));
@@ -234,7 +309,7 @@ class ReviewOutputServiceTest extends BaseUnitTest {
                 .set(assigned.practiceSlug(), mapper.valueToTree(check));
         when(results.admit(eq(1L), eq(job.getReviewId()), eq(job.getId()), eq(0), any()))
                 .thenReturn(new AdmissionReceipt(List.of(), List.of()));
-        service.prepare(job, new AdmissionRequestDTO(3, job.getReviewId(), job.getId(), 0, List.of()))
+        service.prepare(job, new AdmissionRequestDTO(3, job.getReviewId(), job.getId(), 0, List.of(), List.of()))
                 .record(job);
         ArgumentCaptor<List<ResultCandidate>> candidates = ArgumentCaptor.captor();
         verify(results).admit(eq(1L), eq(job.getReviewId()), eq(job.getId()), eq(0), candidates.capture());
@@ -268,7 +343,7 @@ class ReviewOutputServiceTest extends BaseUnitTest {
                                 assigned.practice().practiceId(),
                                 assigned.item().itemId(),
                                 "ROLE_UNAVAILABLE"))));
-        service.prepare(job, new AdmissionRequestDTO(3, job.getReviewId(), job.getId(), 0, List.of()))
+        service.prepare(job, new AdmissionRequestDTO(3, job.getReviewId(), job.getId(), 0, List.of(), List.of()))
                 .record(job);
         assertThat(Objects.requireNonNull(job.getCapture())
                         .path("withheld")

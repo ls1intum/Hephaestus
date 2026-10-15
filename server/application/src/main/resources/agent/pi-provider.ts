@@ -5,6 +5,7 @@ import type { ExtensionFactory, ModelRuntime } from "@earendil-works/pi-coding-a
 import { errorText } from "./pi-error-text.ts";
 import { hasText } from "./pi-text.ts";
 import { isJsonObject as isRecord } from "./work/practice-scripts/lib/core/json.ts";
+import { supportsForcedToolChoice } from "./work/practice-scripts/lib/core/model-capabilities.ts";
 
 /** One chat model as {@link ModelRuntime.registerProvider} takes it; the extension-facing type omits sampling. */
 export type RegisteredModel = Extract<
@@ -45,7 +46,7 @@ export function submissionExtension(
 ): ExtensionFactory {
 	return (pi) => {
 		pi.on("before_provider_request", ({ payload }) => {
-			if (!required() || !isRecord(payload)) {
+			if (!required() || !isRecord(payload) || !supportsForcedToolChoice(config.modelId)) {
 				return;
 			}
 			const tools: unknown[] = Array.isArray(payload.tools) ? payload.tools : [];

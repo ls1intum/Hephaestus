@@ -74,6 +74,28 @@ public class ReviewOutputService {
                 || job.getAttempt() != submission.attempt()) throw new ResultAdmissionService.StaleAttemptException();
         Map<String, ReviewAssignmentSnapshot> pinned = assignments.admissible(job).stream()
                 .collect(Collectors.toUnmodifiableMap(ReviewAssignmentSnapshot::practiceSlug, Function.identity()));
+        var seen = new HashSet<String>();
+        for (var entry : submission.results()) {
+            if (!seen.add(entry.practiceSlug()))
+                throw new ResultsRefusedException("ambiguous_practice_results", "A practice repeats in the submission");
+            var assignment = pinned.get(entry.practiceSlug());
+            if (assignment == null)
+                throw new ResultsRefusedException("practice_not_admitted", "The practice is not assigned to this job");
+            if (!Long.toString(assignment.item().itemId()).equals(entry.itemId())
+                    || !assignment.version().value().equals(entry.itemVersion())) {
+                throw new ResultsRefusedException(
+                        "wrong_attribution", "The submitted item or version differs from the frozen assignment");
+            }
+        }
+        for (var nonResult : submission.nonResults()) {
+            if (!seen.add(nonResult.practiceSlug()))
+                throw new ResultsRefusedException("ambiguous_practice_results", "A practice repeats in the submission");
+            if (!pinned.containsKey(nonResult.practiceSlug()))
+                throw new ResultsRefusedException("practice_not_admitted", "The practice is not assigned to this job");
+        }
+        if (!seen.equals(pinned.keySet()))
+            throw new ResultsRefusedException(
+                    "unaccounted_practices", "Each assigned practice needs a candidate or a runtime non-result reason");
         var review = assignments.review(job);
         JsonNode originalCapture = Objects.requireNonNull(job.getCapture());
         var manifest = mapper.treeToValue(originalCapture.path("manifest"), JobFolderIndex.class);
@@ -113,19 +135,9 @@ public class ReviewOutputService {
                     List.of()));
         }
         var withheld = new LinkedHashMap<String, AdmissionResponseDTO.Withheld>();
-        var seen = new HashSet<String>();
         var refusals = new ArrayList<WithheldAssignment>();
         for (var entry : submission.results()) {
-            if (!seen.add(entry.practiceSlug()))
-                throw new ResultsRefusedException("ambiguous_practice_results", "A practice repeats in the submission");
-            var assignment = pinned.get(entry.practiceSlug());
-            if (assignment == null)
-                throw new ResultsRefusedException("practice_not_admitted", "The practice is not assigned to this job");
-            if (!Long.toString(assignment.item().itemId()).equals(entry.itemId())
-                    || !assignment.version().value().equals(entry.itemVersion())) {
-                throw new ResultsRefusedException(
-                        "wrong_attribution", "The submitted item or version differs from the frozen assignment");
-            }
+            var assignment = Objects.requireNonNull(pinned.get(entry.practiceSlug()));
             Candidate candidate;
             try {
                 candidate = CandidateParser.parse(entry.candidate());
@@ -169,10 +181,8 @@ public class ReviewOutputService {
                         assignment, refusal.refusal(), Objects.requireNonNull(refusal.getMessage())));
             }
         }
-        if ((submission.results().isEmpty() && admitted.isEmpty()) || !seen.equals(pinned.keySet())) {
-            throw new ResultsRefusedException(
-                    "no_admissible_results", "Every assigned practice must submit one result");
-        }
+        if (submission.results().isEmpty() && admitted.isEmpty())
+            throw new ResultsRefusedException("no_admissible_results", "The submission contains no practice results");
         int attempt = job.getAttempt();
         String worker = job.getWorkerId();
         JsonNode capture = Objects.requireNonNull(job.getCapture()).deepCopy();
@@ -210,6 +220,7 @@ public class ReviewOutputService {
             retained.set("manifest", mapper.valueToTree(retainedManifest));
             retained.set("readReceipts", mapper.valueToTree(receipts));
             retained.set("withheld", mapper.valueToTree(withheld.values()));
+            retained.set("nonResults", mapper.valueToTree(submission.nonResults()));
             retained.set("admission", mapper.valueToTree(receipt));
             owned.setCapture(retained);
         };

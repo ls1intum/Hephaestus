@@ -83,6 +83,14 @@ Composite foreign keys enforce the same workspace and developer on both parents.
 A problem reference must belong to the named result.
 A developerless result cannot support feedback.
 
+`review.checks.feedbackComposition` retains each feedback proposal's exact support per copy and its quiet decisions with prior-advice witness IDs.
+The same record retains the primary result and any explicit conversation replacement target.
+Preparation rejects a replay that changes this record.
+These records share the review's existing JSON limit and require no additional table.
+
+The runtime passes practice-page title, body and next step through the practices SPI.
+Feedback preparation renders these fields inside the practices module.
+
 Feedback preparation persists the basis and physical copies before provider access.
 An on-work send owns lease and reconciliation state.
 Copy text, anchors and write identity become immutable after a write begins.

@@ -38,7 +38,7 @@ class ResultAdmissionControllerTest extends BaseUnitTest {
     void shouldReportAnAttemptConflictWithoutAdmittingAnotherPayload(RuntimeException conflict) {
         var admission = mock(ResultAdmissionService.class);
         var id = UUID.randomUUID();
-        var request = new AdmissionRequestDTO(3, UUID.randomUUID(), id, 0, List.of());
+        var request = new AdmissionRequestDTO(3, UUID.randomUUID(), id, 0, List.of(), List.of());
         var now = Instant.now();
         var jwt = new JobJwt(id, 1L, 0, Set.of("llm_proxy"), "test", now, now.plusSeconds(60));
         var identity = new ProxyIdentity(jwt, "worker", null);

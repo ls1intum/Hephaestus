@@ -271,7 +271,7 @@ void describe("the candidate rules", () => {
 		}
 	});
 
-	void test("host coverage is complete exactly when no read was cut short or failed", () => {
+	void test("complete host coverage has no cut or failed read, while unknown coverage stays incomplete", () => {
 		const value = undetermined();
 		value.coverage = {
 			source: "host",
@@ -283,7 +283,7 @@ void describe("the candidate rules", () => {
 		};
 		assert.equal(refusalOf(value), "coverage_inconsistent");
 		value.coverage = { ...incomplete, truncatedReads: 0 };
-		assert.equal(refusalOf(value), "coverage_inconsistent");
+		accepted(value);
 		value.coverage = incomplete;
 		accepted(value);
 	});

@@ -22,6 +22,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackBasis;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackBasisRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSupersession;
+import de.tum.cit.aet.hephaestus.practices.model.Problem;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.result.ProblemRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
@@ -60,16 +61,18 @@ class FeedbackPreparationServiceTest {
     final PracticePageSupportReader support = mock(PracticePageSupportReader.class);
     final UUID reviewId = UUID.randomUUID(), resultId = UUID.randomUUID();
     final Instant now = Instant.parse("2026-10-14T00:00:00Z");
+    final ProblemRepository problems = mock(ProblemRepository.class);
+    final FeedbackResponseSuppressionFilter suppression = mock(FeedbackResponseSuppressionFilter.class);
     final FeedbackPreparationService service = new FeedbackPreparationService(
             reviews,
             results,
-            mock(ProblemRepository.class),
+            problems,
             basis,
             catalog,
             Clock.fixed(now, ZoneOffset.UTC),
             mock(PracticeVersionRepository.class),
             mock(RepeatedSummaryCheck.class),
-            mock(FeedbackResponseSuppressionFilter.class),
+            suppression,
             mock(FeedbackSupersession.class),
             mock(ApplicationEventPublisher.class),
             support,
@@ -119,7 +122,9 @@ class FeedbackPreparationServiceTest {
                 "Add a focused test when changing behavior.",
                 edges,
                 List.of(),
-                Map.of());
+                Map.of(),
+                null,
+                null);
     }
 
     @Test
@@ -203,5 +208,35 @@ class FeedbackPreparationServiceTest {
                         .draft()
                         .stopReason())
                 .isEqualTo(FeedbackStopReason.NO_AI);
+    }
+
+    @Test
+    void shouldIgnoreASuppressedSiblingProblemThatTheCardDoesNotCommunicate() {
+        UUID suppressedId = UUID.randomUUID(), communicatedId = UUID.randomUUID();
+        var original = draft(List.of(resultId));
+        var exact = new FeedbackDraft(
+                original.id(),
+                original.workspaceId(),
+                original.reviewId(),
+                null,
+                original.developerId(),
+                original.destination(),
+                original.state(),
+                null,
+                original.body(),
+                List.of(new FeedbackBasisInput(resultId, communicatedId, 0)),
+                List.of(),
+                Map.of(),
+                null,
+                null);
+        when(problems.findByWorkspaceIdAndResultIdInOrderByResultIdAscPositionAsc(1, List.of(resultId)))
+                .thenReturn(List.of(
+                        Problem.builder().id(suppressedId).build(),
+                        Problem.builder().id(communicatedId).build()));
+        when(suppression.suppressedProblems(1, Set.of(communicatedId))).thenReturn(Map.of());
+        var prepared = service.prepare(exact, Optional.empty()).draft();
+        assertThat(prepared.state()).isEqualTo(FeedbackState.READY);
+        verify(suppression).suppressedProblems(1, Set.of(communicatedId));
+        verify(problems, never()).findByWorkspaceIdAndResultIdInOrderByResultIdAscPositionAsc(anyLong(), anyList());
     }
 }
