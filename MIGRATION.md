@@ -11,20 +11,18 @@ This document helps you upgrade between versions of Hephaestus. For what a versi
 | Symbol | Meaning |
 |--------|---------|
 | 🔴 | **Breaking**: Action required before upgrade |
-| 🟡 | **Deprecated**: Works now; removed in a later release — the release notes say which |
+| 🟡 | **Deprecated**: Works now. Removed in a later release — the release notes say which |
 | 🟢 | **New**: No action needed |
 
 ## Check Your Version
 
-Run these from the directory you deploy from — for a self-hosted install that is
-`/opt/hephaestus/docker/self-host`, the same directory as your `.env`. Running them from the
-repository root points at a different Compose project and reports nothing.
+For the running version, follow the
+[runtime identity handoff](https://docs.hephaestus.build/admin/release-image-lock#runtime-identity-handoff).
+It explains how to check each runtime role against the signed release lock.
+The administration overview shows the server's identity.
 
 ```bash
-# Deployed version (the image tag your containers run; APP_VERSION is derived from it)
-docker compose images application-server
-
-# Latest release
+# Latest published release
 curl -fsSL https://api.github.com/repos/hephaestus-build/Hephaestus/releases/latest \
   | grep -m1 '"tag_name"'
 ```
@@ -45,7 +43,7 @@ During pre-1.0, we follow [Semantic Versioning 0.x conventions](https://semver.o
 | Version Bump | May Contain |
 |--------------|-------------|
 | `0.x.0` → `0.y.0` | Breaking changes |
-| `0.x.y` → `0.x.z` | Bug fixes, minor features |
+| `0.x.y` → `0.x.z` | Bug and security fixes |
 
 ### Upgrade Checklist
 
@@ -53,7 +51,7 @@ Before upgrading to any new `0.x.0` version:
 
 1. ✅ Read the [release notes](https://github.com/hephaestus-build/Hephaestus/releases)
 2. ✅ Check this migration guide for breaking changes
-3. ✅ Verify in staging first (auto-deployed on every release)
+3. ✅ Verify the upgrade in staging first
 4. ✅ Approve production deployment after staging verification
 
 ---
@@ -64,6 +62,53 @@ Entries exist only for releases that need operator action. Everything else is in
 [release notes](https://github.com/hephaestus-build/Hephaestus/releases).
 
 ### Next release
+
+### v0.93.0
+
+#### 🔴 Audit text and native Hibernate JSON cutover
+
+**Operators:** Schedule an outage for every replica of `server`, `worker`, and `webhook`.
+Stop all runtime roles, external database writers, and scheduled database maintenance.
+Verify restoration of a complete database backup before the migration.
+
+The migration converts authentication details, both configuration snapshots, GitHub project options,
+and connection audit detail from JSONB to TEXT.
+It takes exclusive locks and rewrites tables, authentication partitions, and the configured pg_partman template.
+Typed JSON data remains JSONB.
+Unexpected source types or partition/template states stop the migration.
+
+Apply the migration once while all writers remain stopped.
+Confirm migration completion and future partition creation before restarting all runtime roles on the same new release.
+Direct person-data exports of previously structured objects and arrays now return Strings that contain JSON text.
+Check consumers that require nested export values.
+
+Downgrade requires restoration of the verified backup from before this cutover.
+Do not start the previous binary against the converted database.
+Liquibase rollback stops because TEXT cannot recover the original JSONB representation.
+
+Follow the complete [operator procedure](https://docs.hephaestus.build/admin/native-hibernate-json-cutover).
+
+#### 🔴 Handle unavailable operator observation text
+
+Observation summaries in the operator review API are optional when source access cannot be verified. This applies to observation lists and details, observations linked to feedback, and lineage records. The detail also withholds the rationale and evidence in that state.
+
+**Operators:** Update external API consumers to handle an absent summary. The bundled interface displays the unavailable state and retains the observation’s outcome, practice, work and delivery facts. No manual database change is required.
+
+#### 🔴 Upgrade usage verification with all writers stopped
+
+**Operators:** Follow the [stopped-writer upgrade procedure](https://docs.hephaestus.build/admin/native-hibernate-json-cutover).
+Do not mix runtime-role versions during this cutover.
+An older repricer does not honor the new measurement-verification decision and can price usage that must remain unpriced.
+
+The migration records historical verification as `UNKNOWN` without changing existing token counts, rates, or stored costs.
+Historical `UNKNOWN` records that are already unpriced cannot be repaired automatically by adding rates.
+Their existing current-month cap holds remain.
+Previously priced amounts stay in totals; they do not gain a new verification claim.
+
+New incomparable measurements are `UNVERIFIABLE` and have no confirmed cost, even when rates exist.
+Adding a rate repairs only verified usage with positive billable tokens.
+Do not assign historical verification through manual database edits.
+This cutover does not recover provider usage that arrives after terminal accounting.
 
 ### v0.92.0
 
@@ -1855,16 +1900,17 @@ HEPHAESTUS_MENTOR_AGENT_PULL_POLICY=IF_NOT_PRESENT
 
 ## Automatic vs Manual Migrations
 
-### Automatic (No Action Needed)
+### Normal Startup Migrations
 
 | Component | Tool | Notes |
 |-----------|------|-------|
-| Database schema | Liquibase | Changesets apply automatically, in order, on server startup |
+| Database schema | Liquibase | Follow the [database migration instructions](https://docs.hephaestus.build/admin/compatibility-policy#database-migrations) |
 
 ### Manual (Action Required)
 
 | Component | How | Notes |
 |-----------|-----|-------|
+| Database cutover | Follow the target release's migration entry | Complete any required procedure before starting the new runtime roles |
 | Environment variables | Check release notes | New config may be required |
 | Docker compose | Check `docker/` files | Image versions may change |
 
@@ -1874,10 +1920,9 @@ HEPHAESTUS_MENTOR_AGENT_PULL_POLICY=IF_NOT_PRESENT
 
 ### v1.0.0 (Future)
 
-At v1.0.0 the [Compatibility Policy](https://docs.hephaestus.build/admin/compatibility-policy)
-takes effect — the public contract, the "any 1.x → any later 1.y" upgrade guarantee,
-deprecation-ahead-of-removal, and latest-release-only support. Until then, expect rapid iteration and
-occasional breaking changes in minor releases.
+The [Compatibility Policy](https://docs.hephaestus.build/admin/compatibility-policy) applies now,
+including its pre-1.0 exception. Its stable compatibility and upgrade guarantees begin at v1.0.0.
+Before then, minor releases can contain breaking changes.
 
 ---
 
@@ -1885,7 +1930,7 @@ occasional breaking changes in minor releases.
 
 ### You build against our REST API
 
-The API surface is published as `server/openapi.yaml` in each release; regenerate your client from it
+The API surface is published as `server/openapi.yaml` in each release. Regenerate your client from it
 and review the release notes for endpoint changes.
 
 ### New Required Environment Variable
@@ -1896,38 +1941,35 @@ and review the release notes for endpoint changes.
 
 ### Database Schema Changed
 
-Liquibase applies changelogs automatically, in order, on server startup. A failure is not silent: the
-application context fails to start, so the container exits and your orchestrator restarts it — a
-crash-loop whose first useful line is in the *first* startup attempt's log, not the latest. Capture
-that before doing anything else:
+First follow the [database migration instructions](https://docs.hephaestus.build/admin/compatibility-policy#database-migrations).
+For a migration run at startup, a failure prevents the application context from starting.
+The container exits, and the orchestrator may restart it.
+Capture the first failed startup log before retrying:
 
 ```bash
 docker compose logs application-server | grep -i -m5 liquibase
 ```
 
-Liquibase runs each changeset in its own transaction, so a failure leaves earlier changesets applied
-and the failing one rolled back. The database is therefore consistent but *partially migrated*, and
-the old application version may no longer match it — do not assume rolling back the image is safe.
+Liquibase normally runs each changeset in a transaction. A changeset with `runInTransaction="false"`
+can fail after applying some statements. Earlier completed changesets also remain applied.
+Do not assume that a failed upgrade rolled back or that the previous application can read its schema.
 
 | Symptom in the log | What it means | What to do |
 | --- | --- | --- |
-| `Could not acquire change log lock` | A previous run was killed (OOM, `docker kill`, node eviction) mid-migration and left its row in `DATABASECHANGELOGLOCK`. | Confirm no server is actually running, then clear it: `UPDATE databasechangeloglock SET locked = FALSE, lockgranted = NULL, lockedby = NULL WHERE id = 1;` and restart. Never clear it while another replica may still be migrating. |
+| `Could not acquire change log lock` | A migration is active, or an interrupted process left its lock. | Follow [stale lock recovery](https://docs.hephaestus.build/admin/liquibase-baseline-runbook#stale-lock-recovery) with the target release image. Never clear an active migration process's lock. |
 | `Validation Failed: … checksums do not match` | A changelog file that already ran was edited. Released changelogs are immutable for exactly this reason. | Restore the file to its released content and fix forward with a *new* changelog. Do not `clearCheckSums` on production to make the error go away — it tells Liquibase to trust a file whose applied effect you no longer know. |
-| A constraint or `NOT NULL` addition fails | Existing rows violate the new rule. CI replays migrations against an empty database, so a data-incompatible migration passes CI and fails only on real data. | Do not hand-edit the schema. Report it with the failing changeset id; the fix ships as a new changelog that cleans the data first. |
-| `permission denied` / `must be owner of` | The database user lacks DDL rights on an existing object. | Grant ownership or `ALTER` on the named object and restart. |
+| A constraint or `NOT NULL` addition fails | Existing rows violate the new constraint. Migration tests do not cover every installed dataset. | Report the failing changeset and follow the release's recovery instructions. Do not bypass the constraint or mark a failed changeset as applied. |
+| `permission denied` / `must be owner of` | The migration user lacks the required rights on an existing object. | Have the database owner restore the required ownership or permissions before retrying. |
 
-**Fix forward, do not roll back.** Changelogs carry `<rollback>` blocks, but they are never exercised
-in CI and are not a supported recovery path. The supported recoveries, in order of preference:
+**Follow the target release's recovery procedure.** A `<rollback>` block does not establish a supported
+downgrade. Keep writers stopped if the release requires it. Choose one of these recovery paths:
 
-1. **Wait for a patch release** that fixes the changeset forward. A partially migrated database keeps
-   serving on the previous image only if no applied changeset broke it — check the log for which
-   changesets succeeded before deciding.
-2. **Restore from backup** if the instance must come back now and forward-fixing will take longer than
-   the outage budget. Follow
-   [Backup & restore](https://docs.hephaestus.build/admin/backup-restore); restore the
-   database dump *and* the `.env` holding `HEPHAESTUS_SECURITY_ENCRYPTION_KEY`, or every encrypted
-   credential in the restored database is unreadable. Then pin `IMAGE_TAG` to the version the dump
-   was taken under so it is not immediately re-migrated by the release that failed.
+1. **Apply a forward fix** qualified for the observed migration state. Do not restart an older image
+   against a partially migrated database without an explicit supported procedure.
+2. **Restore a verified backup** with its matching signed release lock and configuration. Follow
+   [Backup & restore](https://docs.hephaestus.build/admin/backup-restore), including its key, broker,
+   privacy and restart checks. The matching lock prevents a failed target release from immediately
+   migrating the restored database again.
 
 Take a database dump before every upgrade that ships a migration. The release notes flag which ones
 do.
