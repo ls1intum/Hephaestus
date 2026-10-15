@@ -39,7 +39,6 @@ const meta = {
 	args: {
 		workspaces,
 		isLoading: false,
-		isError: false,
 		hasSearch: false,
 		onViewUsers: fn(),
 	},
@@ -71,10 +70,71 @@ export const Loading: Story = {
 	args: { isLoading: true },
 };
 
+export const Empty: Story = {
+	args: { workspaces: [] },
+	play: async ({ canvas }) => {
+		canvas.getByText("No workspaces yet");
+	},
+};
+
 export const EmptyWithSearch: Story = {
 	args: { workspaces: [], hasSearch: true },
 	play: async ({ canvas }) => {
 		canvas.getByText("No workspaces match your search");
+	},
+};
+
+/** A first read failed. Nothing is listed, and Retry asks again. */
+export const LoadError: Story = {
+	args: {
+		workspaces: [],
+		loadFailure: {
+			error: { status: 503, detail: "The workspace directory is temporarily unavailable." },
+			onRetry: fn(),
+			pending: false,
+		},
+	},
+	play: async ({ canvas }) => {
+		canvas.getByText("We could not load workspaces");
+		await expect(canvas.getByRole("button", { name: "Retry" })).toBeEnabled();
+		await expect(canvas.queryByRole("table")).not.toBeInTheDocument();
+	},
+};
+
+/** The list was refused: it says so, offers no Retry, and lists no workspace to reach. */
+export const Refused: Story = {
+	args: {
+		workspaces: [],
+		loadFailure: { error: { status: 403 }, onRetry: fn(), pending: false },
+	},
+	play: async ({ canvas }) => {
+		canvas.getByText("You do not have access to workspaces");
+		await expect(canvas.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+		await expect(canvas.queryByText("No workspaces yet")).not.toBeInTheDocument();
+	},
+};
+
+/**
+ * A failed refresh keeps the workspaces last read, with their support actions, under the failure. A
+ * workspace that is not active still cannot be viewed.
+ */
+export const RefreshFailed: Story = {
+	args: { refreshFailure: { error: { status: 503 }, onRetry: fn(), pending: false } },
+	play: async ({ canvas }) => {
+		canvas.getByText("These workspaces may be out of date");
+		await expect(canvas.getByRole("button", { name: "Retry" })).toBeEnabled();
+		await expect(canvas.getByRole("button", { name: "View users of AET" })).toBeEnabled();
+		await expectGenuinelyDisabled(
+			canvas.getByRole("button", { name: "View users of Intro Course" }),
+		);
+	},
+};
+
+export const RefreshRetrying: Story = {
+	args: { refreshFailure: { error: { status: 503 }, onRetry: fn(), pending: true } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "Retrying…" })).toBeDisabled();
+		await expect(canvas.getByRole("button", { name: "View users of AET" })).toBeEnabled();
 	},
 };
 
