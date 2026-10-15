@@ -1038,7 +1038,7 @@ async function openSlackRemove(user: ReturnType<typeof userEvent.setup>, channel
 }
 
 const standupChannel: Wire<SlackMonitoredChannel> = {
-	id: 2,
+	id: "00000000-0000-4000-8000-000000000002",
 	slackChannelId: "C02ACTIVE002",
 	slackTeamId: "T0000000000",
 	channelName: "team-standup",
@@ -1051,17 +1051,17 @@ const standupChannel: Wire<SlackMonitoredChannel> = {
 describe("Slack channel management reads", () => {
 	const designChannel: Wire<SlackMonitoredChannel> = {
 		...standupChannel,
-		id: 3,
+		id: "00000000-0000-4000-8000-000000000003",
 		slackChannelId: "C03DESIGN03",
 		channelName: "team-design",
 	};
 	const introChannel: Wire<SlackMonitoredChannel> = {
 		...standupChannel,
-		id: 1,
+		id: "00000000-0000-4000-8000-000000000001",
 		slackChannelId: "C01PENDING01",
 		channelName: "team-intro",
 		consentState: "PENDING",
-		consentAnnouncedAt: undefined,
+		consentAnnouncedAt: null,
 	};
 	const general: SlackChannelCandidate = {
 		slackChannelId: "C05GENERAL5",
