@@ -5,7 +5,7 @@ import type { GetPracticeReviewLineageData, ReviewLineage } from "@/api/types.ge
 import { ACTIVE_REVIEW_POLL_MS } from "@/components/admin/practice-reviews/review-search";
 import { type PanelState, panelState } from "@/components/common/panel-state";
 import { problemStatusOf } from "@/lib/problem-detail";
-import { retryUnlessNotFound } from "@/runtime/tanstack-query/query-defaults";
+import { retryQuery } from "@/runtime/tanstack-query/query-defaults";
 
 /** What a lineage starts from: a record by id, or a piece of work by kind and id. */
 export type ReviewLineageTarget = GetPracticeReviewLineageData["query"];
@@ -29,7 +29,7 @@ export function useReviewLineage(
 	const query = useQuery({
 		...options,
 		queryFn: target === undefined ? skipToken : options.queryFn,
-		retry: retryUnlessNotFound,
+		retry: retryQuery,
 		refetchInterval: ({ state }) =>
 			state.status === "success" && state.data?.review?.status === "IN_PROGRESS"
 				? ACTIVE_REVIEW_POLL_MS

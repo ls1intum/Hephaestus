@@ -23,6 +23,7 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/mentor")(
 			? context.queryClient.query({
 					...getMemberOnboardingOptions({ path: params }),
 					staleTime: "static",
+					retry: false,
 				})
 			: undefined,
 	component: MentorLayout,

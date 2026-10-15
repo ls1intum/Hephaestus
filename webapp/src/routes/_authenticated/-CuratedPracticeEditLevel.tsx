@@ -261,7 +261,7 @@ function LoadedCuratedPracticeEditor({
 				exact: true,
 				refetchType: "none",
 			});
-			const latest: CuratedPractice = await queryClient.query(detailOptions);
+			const latest: CuratedPractice = await queryClient.query({ ...detailOptions, retry: false });
 			setBasePractice(latest);
 			setConflict(false);
 		} catch (error) {

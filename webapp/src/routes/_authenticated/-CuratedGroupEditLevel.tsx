@@ -118,7 +118,7 @@ function LoadedCuratedGroupEditor({
 				exact: true,
 				refetchType: "none",
 			});
-			const latest: CuratedGroup = await queryClient.query(detailOptions);
+			const latest: CuratedGroup = await queryClient.query({ ...detailOptions, retry: false });
 			setBaseGroup(latest);
 			setConflict(false);
 		} catch (error) {

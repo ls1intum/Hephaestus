@@ -21,7 +21,7 @@ import {
 import { type PanelState, panelState } from "@/components/common/panel-state";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
 import { invalidateWorkspaceReads } from "@/runtime/tanstack-query/invalidate-workspace-reads";
-import { retryUnlessNotFound } from "@/runtime/tanstack-query/query-defaults";
+import { retryQuery } from "@/runtime/tanstack-query/query-defaults";
 
 /**
  * Everything the review's sheet needs, already resolved: the review, how it answered each practice,
@@ -47,7 +47,7 @@ export function useReviewRunController(workspaceSlug: string, jobId: string): Re
 	const queryClient = useQueryClient();
 	const jobQuery = useQuery({
 		...getAgentJobOptions({ path: { workspaceSlug, jobId } }),
-		retry: retryUnlessNotFound,
+		retry: retryQuery,
 		refetchInterval: (result) =>
 			result.state.data?.status === "QUEUED" ||
 			result.state.data?.status === "RUNNING" ||
@@ -69,16 +69,15 @@ export function useReviewRunController(workspaceSlug: string, jobId: string): Re
 	const traceQuery = useQuery({
 		...traceOptions,
 		queryFn: work === undefined ? skipToken : traceOptions.queryFn,
-		// A 404 is work nothing was ever recorded about: asking again answers the same.
-		retry: retryUnlessNotFound,
+		retry: retryQuery,
 		refetchInterval: runIsActive ? ACTIVE_REVIEW_POLL_MS : false,
 	});
 	const checksOptions = listPracticeReviewDeliveryChecksOptions({
 		path: { workspaceSlug, agentJobId: jobId },
 	});
-	const checksQuery = useQuery({ ...checksOptions, retry: retryUnlessNotFound });
+	const checksQuery = useQuery({ ...checksOptions, retry: retryQuery });
 	const usageOptions = getAgentJobUsageOptions({ path: { workspaceSlug, jobId } });
-	const usageQuery = useQuery({ ...usageOptions, retry: retryUnlessNotFound });
+	const usageQuery = useQuery({ ...usageOptions, retry: retryQuery });
 
 	// The trace polls only while the review runs, the checks are written when its results are
 	// processed and its cost when an attempt ends, and the review's row (its counts and developers,

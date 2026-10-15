@@ -26,9 +26,8 @@ import {
 import { PRACTICE_PROFILE_POLL_MS } from "@/hooks/use-practice-profile-overview";
 import { useRequestPracticeReview } from "@/hooks/use-request-practice-review";
 import { sameReviewedWork } from "@/lib/artifact-kinds";
-import { problemStatusOf } from "@/lib/problem-detail";
 import { hasText } from "@/lib/text";
-import { QUERY_RETRIES, sessionRetriesQueries } from "@/runtime/tanstack-query/query-defaults";
+import { retryQuery } from "@/runtime/tanstack-query/query-defaults";
 import { slicePageParams } from "@/runtime/tanstack-query/spring-page";
 import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
@@ -78,9 +77,7 @@ export function usePracticeProfileReviewRuns({
 	const runQuery = useQuery({
 		...runOptions,
 		queryFn: reviewId === undefined ? skipToken : runOptions.queryFn,
-		// A 404 is not the reader's review, or gone: asking again answers the same.
-		retry: (failureCount, error) =>
-			sessionRetriesQueries() && problemStatusOf(error) !== 404 && failureCount < QUERY_RETRIES,
+		retry: retryQuery,
 		refetchInterval: (query) =>
 			query.state.data?.run.status === "IN_PROGRESS" ? ACTIVE_REVIEW_POLL_MS : false,
 	});
