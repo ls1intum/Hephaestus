@@ -52,6 +52,8 @@ class FeedbackReviewControllerIntegrationTest extends AbstractFeedbackIntegratio
                 .exists()
                 .jsonPath("$.copies[0].externalRef")
                 .isEmpty()
+                .jsonPath("$.textHidden")
+                .isEqualTo(true)
                 .jsonPath("$.body")
                 .isEmpty()
                 .jsonPath("$.contentDigest")

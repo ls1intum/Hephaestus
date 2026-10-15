@@ -40,5 +40,3 @@ export const scanReportSearchSchema = z.object({
 	baseline: z.enum(PROBLEM_BASELINE_STATES).optional().catch(undefined),
 	fileStatus: z.enum(SCAN_ENTRY_STATUSES).optional().catch(undefined),
 });
-
-export type ScanReportSearch = z.infer<typeof scanReportSearchSchema>;

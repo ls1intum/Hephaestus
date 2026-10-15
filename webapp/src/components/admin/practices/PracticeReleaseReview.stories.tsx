@@ -18,7 +18,14 @@ const proposal = releaseProposal({
 
 const meta = {
 	component: PracticeReleaseReview,
-	args: { proposal, pending: null, onAccept: fn(), onDecline: fn() },
+	args: {
+		proposal,
+		pending: null,
+		declineNote:
+			"Declining keeps your practice as it is until the catalog changes again. Reset to catalog stays available on the practice.",
+		onAccept: fn(),
+		onDecline: fn(),
+	},
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
 } satisfies Meta<typeof PracticeReleaseReview>;

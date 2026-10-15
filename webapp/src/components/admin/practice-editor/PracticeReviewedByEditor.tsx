@@ -145,7 +145,7 @@ export function PracticeReviewedByEditor({
 					<div>
 						<p className="font-medium">What the review cannot support</p>
 						<p className="text-sm text-muted-foreground">
-							List the claims this kind of item can never support, even when every source is
+							List the claims this kind of work can never support, even when every source is
 							captured.
 						</p>
 					</div>

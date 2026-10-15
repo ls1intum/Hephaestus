@@ -1574,6 +1574,8 @@ function preview(spec: FeedbackSpec) {
 	return {
 		bodyPreview: body?.slice(0, BODY_PREVIEW_LENGTH) ?? null,
 		bodyTruncated: (body?.length ?? 0) > BODY_PREVIEW_LENGTH,
+		textHidden: ADMIN_WITHHELD_TEXT[spec.destination] !== undefined,
+		unverifiedHistory: false,
 	};
 }
 

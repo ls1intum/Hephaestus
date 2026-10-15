@@ -145,7 +145,7 @@ export const CancelFailed: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("We could not cancel the scan.")).toBeVisible();
+		await expect(canvas.getByText("We could not cancel the scan")).toBeVisible();
 		await expect(canvas.getByRole("button", { name: "Cancel scan" })).toBeEnabled();
 	},
 };
@@ -239,7 +239,7 @@ export const ExportFailed: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("We could not export the SARIF file.")).toBeVisible();
+		await expect(canvas.getByText("We could not export the SARIF file")).toBeVisible();
 		await expect(canvas.getByText("This scan’s details are past their retention.")).toBeVisible();
 		await expect(canvas.getByRole("region", { name: "Counts" })).toBeVisible();
 		await expect(canvas.getByRole("button", { name: "Export SARIF" })).toBeEnabled();
@@ -264,7 +264,7 @@ export const Loading: Story = {
 export const Error: Story = {
 	args: { state: { status: "error", error: { status: 500 }, onRetry: fn() } },
 	play: async ({ canvas, userEvent, args }) => {
-		await expect(canvas.getByText("We could not load this scan. Try again.")).toBeVisible();
+		await expect(canvas.getByText("We could not load this scan")).toBeVisible();
 		await userEvent.click(canvas.getByRole("button", { name: "Retry" }));
 		if (args.state.status === "error") {
 			await expect(args.state.onRetry).toHaveBeenCalledOnce();
@@ -272,6 +272,15 @@ export const Error: Story = {
 	},
 };
 
+export const NotFound: Story = {
+	args: { state: { status: "error", error: { status: 404 }, onRetry: fn() } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("We could not find this scan")).toBeVisible();
+		await expect(canvas.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+		await expect(canvas.getByRole("link", { name: "Scans" })).toBeVisible();
+	},
+};
+
 export const Reflow: Story = {
-	globals: { viewport: { value: "reflow" } },
+	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
 };

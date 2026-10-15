@@ -40,7 +40,7 @@ export function problemCount(count: number): string {
 	return `${count} ${count === 1 ? "problem" : "problems"}`;
 }
 
-export function resultVerdict(outcome: Outcome, problems: number | undefined): string {
+export function outcomeLabel(outcome: Outcome, problems: number | undefined): string {
 	const { label } = OUTCOME_DEFS[outcome];
 	return outcome === "NOT_MET" && problems !== undefined && problems > 0
 		? `${label} · ${problemCount(problems)}`

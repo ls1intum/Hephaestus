@@ -163,7 +163,7 @@ export function WorkLevel({
 				</SheetSection>
 				<SheetTechnical
 					facts={[
-						{ label: "Item ID", value: item.id, copy: item.id },
+						{ label: "Work ID", value: <code>{item.id}</code>, copy: item.id },
 						{ label: "Kind", value: <code>{item.kind}</code> },
 						{
 							label: "Latest version",

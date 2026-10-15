@@ -83,12 +83,32 @@ export const Waiting: Story = {
 	},
 };
 
+export const LoadMoreFailed: Story = {
+	args: {
+		state: { ...ready([LISTED_ENTRY, WITHHELD_ENTRY], true), loadMoreError: { status: 500 } },
+	},
+	play: async ({ canvas, userEvent, args }) => {
+		await expect(canvas.getByText("We could not load more files")).toBeVisible();
+		await expect(canvas.getAllByRole("row")).toHaveLength(3);
+		await userEvent.click(canvas.getByRole("button", { name: "Show more files" }));
+		if (args.state.status === "ready") {
+			await expect(args.state.onLoadMore).toHaveBeenCalledOnce();
+		}
+	},
+};
+
+export const NoFilesYet: Story = {
+	args: { state: ready([]) },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("heading", { name: "No files listed yet" })).toBeVisible();
+		await expect(canvas.queryByRole("table")).not.toBeInTheDocument();
+	},
+};
+
 export const NoMatches: Story = {
 	args: { state: ready([]), filter: "NOT_REVIEWED" },
 	play: async ({ canvas }) => {
-		await expect(
-			canvas.getByRole("heading", { name: "No files match this filter." }),
-		).toBeVisible();
+		await expect(canvas.getByRole("heading", { name: "No files match this filter" })).toBeVisible();
 	},
 };
 

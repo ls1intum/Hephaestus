@@ -428,7 +428,7 @@ function PracticeCatalogRoute() {
 				setStaleLevelKey(detailStackKey(entry));
 			} else {
 				toast.error(
-					"The catalog changed and the preview could not reload. Reopen the practice to try again.",
+					"The catalog changed, and we could not reload the preview. Reopen the practice, then try again.",
 				);
 			}
 		}
@@ -577,7 +577,7 @@ function PracticeCatalogRoute() {
 						setStaleLevelKey(detailStackKey(entry));
 					} else {
 						toast.error(
-							"The catalog changed and the group plan could not reload. Reopen the group to try again.",
+							"The catalog changed, and we could not reload the group plan. Reopen the group, then try again.",
 						);
 					}
 				}

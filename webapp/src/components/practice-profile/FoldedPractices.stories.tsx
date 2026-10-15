@@ -163,47 +163,47 @@ export const Phone: Story = {
 	globals: { viewport: { value: "phone390" } },
 };
 
-// --- Not observed yet ---------------------------------------------------------------------------
+// --- Not reviewed ---------------------------------------------------------------------------
 
-const notObservedArgs = {
+const notReviewedArgs = {
 	count: NOT_OBSERVED_ROWS.length,
-	reason: "not-observed",
+	reason: "not-reviewed",
 	practices: NOT_OBSERVED_ROWS,
 } as const;
 
-/** A group's practices that no review has observed yet, folded. */
-export const NotObservedPracticesFolded: Story = {
-	args: notObservedArgs,
+/** A group's practices that no review has reviewed yet, folded. */
+export const NotReviewedPracticesFolded: Story = {
+	args: notReviewedArgs,
 	play: async ({ canvas, userEvent }) => {
-		const trigger = canvas.getByRole("button", { name: "Practices not observed yet" });
+		const trigger = canvas.getByRole("button", { name: "Practices not reviewed" });
 		await expect(trigger).toHaveAttribute("aria-expanded", "false");
 		await userEvent.click(trigger);
 		await expect(trigger).toHaveAttribute("aria-expanded", "true");
-		await expect(canvas.getByText(/No review has observed these practices/u)).toBeVisible();
-		const rows = canvas.getByRole("rowgroup", { name: "Practices not observed yet" });
-		await expect(within(rows).getAllByText("Not observed yet")).toHaveLength(2);
+		await expect(canvas.getByText(/has looked at these practices in your work/u)).toBeVisible();
+		const rows = canvas.getByRole("rowgroup", { name: "Practices not reviewed" });
+		await expect(within(rows).getAllByText("Not reviewed")).toHaveLength(2);
 	},
 };
 
 /** Opened, every folded row's cells start where the cells of the rows above start. */
-export const NotObservedPracticesOpen: Story = {
-	args: { ...notObservedArgs, defaultOpen: true },
+export const NotReviewedPracticesOpen: Story = {
+	args: { ...notReviewedArgs, defaultOpen: true },
 	globals: { viewport: { value: "desktop" } },
 	play: async ({ canvas }) => {
 		const shown = canvas.getAllByRole("row").find((row) => row.textContent.includes("Describe"));
 		await expectFoldOnTableColumns(
 			shown ?? null,
-			canvas.getByRole("rowgroup", { name: "Practices not observed yet" }),
+			canvas.getByRole("rowgroup", { name: "Practices not reviewed" }),
 		);
 	},
 };
 
-export const NotObservedDark: Story = {
-	args: { ...notObservedArgs, defaultOpen: true },
+export const NotReviewedDark: Story = {
+	args: { ...notReviewedArgs, defaultOpen: true },
 	globals: { theme: "dark" },
 };
 
-export const NotObservedPhone: Story = {
-	args: { ...notObservedArgs, defaultOpen: true },
+export const NotReviewedPhone: Story = {
+	args: { ...notReviewedArgs, defaultOpen: true },
 	globals: { viewport: { value: "phone390" } },
 };

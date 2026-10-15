@@ -48,5 +48,5 @@ export const TotalsNotKnownYet: Story = {
 };
 
 export const Reflow: Story = {
-	globals: { viewport: { value: "reflow" } },
+	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
 };

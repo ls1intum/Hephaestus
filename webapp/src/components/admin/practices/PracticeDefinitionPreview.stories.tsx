@@ -194,15 +194,15 @@ export const CriteriaIsMarkdown: Story = {
 };
 
 // Adoption needs the rationale first; model instructions belong behind the criteria disclosure.
-export const RationaleLeadsTheRuleFollows: Story = {
+export const RationaleLeadsTheCriteriaFollow: Story = {
 	play: async ({ canvas }) => {
 		const rationale = canvas.getByText(realPracticeDefinition.guidance.whyItMatters);
 		await expect(rationale).toBeVisible();
 		await expect(
 			canvas.queryByRole("heading", { name: "The standard", level: 4 }),
 		).not.toBeInTheDocument();
-		const rule = canvas.getByRole("button", { name: "How it decides" });
-		await expect(precedes(rationale, rule)).toBe(true);
+		const criteria = canvas.getByRole("button", { name: "How it decides" });
+		await expect(precedes(rationale, criteria)).toBe(true);
 	},
 };
 

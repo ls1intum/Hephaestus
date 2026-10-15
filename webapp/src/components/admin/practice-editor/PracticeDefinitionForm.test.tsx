@@ -87,7 +87,7 @@ describe("the definition an edit submits", () => {
 	it("shows the kind of an existing practice without offering to change it", async () => {
 		await renderEditForm(vi.fn());
 		expect(screen.queryByRole("radio", { name: /^Issue/u })).toBeNull();
-		screen.getByText(/The kind of item cannot change after the practice exists\./u);
+		screen.getByText(/The kind of work cannot change after the practice exists\./u);
 	});
 
 	it("saves Going well, which every practice can say", async () => {

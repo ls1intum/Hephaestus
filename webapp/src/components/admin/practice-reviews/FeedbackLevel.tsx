@@ -15,6 +15,7 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
 import { Section } from "@/components/layout/Section";
 import { FeedbackChecks } from "@/components/practice-trace/FeedbackChecks";
+import { UNVERIFIED_HISTORY_NOTE } from "@/components/practice-vocabulary/claim-currentness";
 import {
 	DELIVERY_STATE_DEFS,
 	deliveryOutcome,
@@ -98,12 +99,19 @@ function inOrder(copies: readonly FeedbackCopy[]): FeedbackCopy[] {
 
 // Private feedback belongs to the developer; identify it by destination rather than its text.
 function feedbackTitle(feedback: FeedbackRecord): string {
+	const withheld = ADMIN_WITHHELD_TEXT[feedback.destination];
+	if (withheld !== undefined) {
+		return withheld.title;
+	}
+	if (feedback.textHidden) {
+		return "Feedback text hidden";
+	}
 	const body =
 		feedback.body ?? inOrder(feedback.copies).find((copy) => hasText(copy.body))?.body ?? undefined;
 	return (
 		ADMIN_WITHHELD_TEXT[feedback.destination]?.title ??
 		feedbackOpeningLine(body) ??
-		(hasText(body) ? "Opens with a quote from the work…" : "No feedback text was composed")
+		(hasText(body) ? "Opens with a quote from the work…" : "No recorded feedback text")
 	);
 }
 
@@ -179,6 +187,9 @@ export function FeedbackLevel({
 		<>
 			{header}
 			<DrawerBody className="flex flex-col gap-8 pt-2">
+				{record.unverifiedHistory && (
+					<p className="text-sm text-muted-foreground">{UNVERIFIED_HISTORY_NOTE}</p>
+				)}
 				<SheetSection part="what">
 					<FeedbackWhat feedback={record} />
 				</SheetSection>

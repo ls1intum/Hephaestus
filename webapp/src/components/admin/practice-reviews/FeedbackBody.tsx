@@ -7,7 +7,9 @@ import { hasText } from "@/lib/text";
 
 import { feedbackDisplayMarkdown } from "./feedback-display";
 
-export type FeedbackBodyFeedback = Pick<ReviewFeedback, "destination"> & { body: string | null };
+export type FeedbackBodyFeedback = Pick<ReviewFeedback, "destination" | "textHidden"> & {
+	body: string | null;
+};
 
 export interface FeedbackBodyProps {
 	feedback: FeedbackBodyFeedback;
@@ -29,11 +31,15 @@ export function FeedbackBody({ feedback, className }: FeedbackBodyProps) {
 		);
 	}
 
-	if (!hasText(body)) {
+	if (feedback.textHidden || !hasText(body)) {
 		return (
 			<Card flush className={className}>
 				<CardContent className="py-4">
-					<p className="text-muted-foreground">No feedback text was composed for this record.</p>
+					<p className="text-muted-foreground">
+						{feedback.textHidden
+							? "Feedback text is hidden because access to its sources could not be verified."
+							: "No feedback text is recorded here."}
+					</p>
 				</CardContent>
 			</Card>
 		);

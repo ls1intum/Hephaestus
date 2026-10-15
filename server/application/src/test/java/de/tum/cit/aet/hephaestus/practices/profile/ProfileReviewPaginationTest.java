@@ -50,28 +50,23 @@ class ProfileReviewPaginationTest extends BaseUnitTest {
             developer, results, views, presentation, reviews, mock(OwnItemTraceQueryService.class), authorization);
 
     @Test
-    void hiddenReviewsAreExcludedBeforePageBoundaries() {
+    void shouldKeepReviewsWithHiddenTextInsidePageBoundaries() {
         assertPage(10, Set.of(3, 4, 5), 0, 3, List.of(0, 1, 2), true);
-        assertPage(10, Set.of(3, 4, 5), 1, 3, List.of(6, 7, 8), true);
-        assertPage(10, Set.of(3, 4, 5), 2, 3, List.of(9), false);
+        assertPage(10, Set.of(3, 4, 5), 1, 3, List.of(3, 4, 5), true);
+        assertPage(10, Set.of(3, 4, 5), 3, 3, List.of(9), false);
     }
 
     @Test
-    void aPageBeyondFiftyCandidatesUsesAllVisibleHistory() {
+    void shouldPageThroughRetainedReviewsRegardlessOfTextVisibility() {
         var hidden = IntStream.range(0, 120).filter(i -> i % 2 == 1).boxed().collect(Collectors.toSet());
-        assertPage(
-                120,
-                hidden,
-                3,
-                10,
-                IntStream.range(30, 40).map(i -> i * 2).boxed().toList(),
-                true);
+        assertPage(120, hidden, 3, 10, List.of(30, 31, 32, 33, 34, 35, 36, 37, 38, 39), true);
     }
 
     @Test
-    void hiddenTailDoesNotCreateAnotherPage() {
+    void shouldRetainTheLastPageOfReviewsWithHiddenText() {
         var hidden = IntStream.range(5, 80).boxed().collect(Collectors.toSet());
-        assertPage(80, hidden, 0, 5, List.of(0, 1, 2, 3, 4), false);
+        assertPage(80, hidden, 0, 5, List.of(0, 1, 2, 3, 4), true);
+        assertPage(80, hidden, 15, 5, List.of(75, 76, 77, 78, 79), false);
     }
 
     void assertPage(int count, Set<Integer> hidden, int number, int size, List<Integer> expected, boolean hasNext) {
@@ -144,6 +139,6 @@ class ProfileReviewPaginationTest extends BaseUnitTest {
                 .extracting(p -> Integer.parseInt(p.review().item().id()) - 1)
                 .containsExactlyElementsOf(expected);
         assertThat(page.hasNext()).isEqualTo(hasNext);
-        assertThat(page.getTotalElements()).isEqualTo(count - hidden.size());
+        assertThat(page.getTotalElements()).isEqualTo(count);
     }
 }

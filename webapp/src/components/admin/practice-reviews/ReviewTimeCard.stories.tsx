@@ -373,7 +373,7 @@ export const OlderReviewsNotSplit: Story = {
 export const Loading: Story = {
 	args: { state: { status: "loading" } },
 	play: async ({ canvas }) => {
-		canvas.getByText("Loading the review time");
+		canvas.getByText("Loading the review time…");
 	},
 };
 

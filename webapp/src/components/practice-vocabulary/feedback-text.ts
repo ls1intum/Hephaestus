@@ -6,7 +6,6 @@
  * it is the same pill and a work reference the same link everywhere without the text being HTML.
  */
 import type { ItemRef } from "@/api/types.gen";
-import { itemKindNoun, type ItemProvider } from "@/lib/item-kinds";
 import { andList } from "@/lib/text";
 
 /**
@@ -114,13 +113,6 @@ export function countsTogether(
 	const digits = items.some((item) => item.n >= 10);
 	return items.map((item) => count(item.n, item.one, item.many, digits));
 }
-
-/**
- * "four pull requests", "four merge requests" on GitLab: the registry's noun for the kind of work
- * at its provider, under the number rule.
- */
-export const countedWork = (kind: string | undefined, n: number, provider?: ItemProvider): string =>
-	`${spell(n)} ${itemKindNoun(kind, n, provider)}`;
 
 /** "A", "A and B", "A, B and C", each item keeping its own segments. */
 export function list(items: FeedbackTextSegment[][]): FeedbackTextSegment[] {

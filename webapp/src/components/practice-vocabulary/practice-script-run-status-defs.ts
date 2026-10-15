@@ -3,7 +3,7 @@ import type { PracticeScriptRun } from "@/api/types.gen";
 export type PracticeScriptRunStatus = PracticeScriptRun["status"];
 export type PracticeScriptStopReason = NonNullable<PracticeScriptRun["stopReason"]>;
 
-const program = (run: Pick<PracticeScriptRun, "scriptKind">) =>
+const scriptName = (run: Pick<PracticeScriptRun, "scriptKind">) =>
 	run.scriptKind === "BUILTIN" ? "Built-in review" : "Practice script";
 
 export const PRACTICE_SCRIPT_STOP_REASON_DEFS = {
@@ -35,29 +35,29 @@ interface PracticeScriptRunStatusDef {
 // Script execution is an operating fact; a status badge would imply a practice outcome.
 export const PRACTICE_SCRIPT_RUN_STATUS_DEFS = {
 	OK: {
-		sentence: (run) => `${program(run)} returned a result.`,
+		sentence: (run) => `${scriptName(run)} returned a result.`,
 		result: () => "Returned a result",
 	},
 	WITHHELD: {
-		sentence: (run) => `${program(run)} did not run: the practice was withheld.`,
+		sentence: (run) => `${scriptName(run)} did not run: the practice was withheld.`,
 		result: () => "Withheld",
 	},
 	FAILED: {
 		sentence: (run) =>
 			run.stopReason === null
-				? `${program(run)} stopped without a result.`
-				: `${program(run)} stopped without a result: ${PRACTICE_SCRIPT_STOP_REASON_DEFS[run.stopReason].sentence}.`,
+				? `${scriptName(run)} stopped without a result.`
+				: `${scriptName(run)} stopped without a result: ${PRACTICE_SCRIPT_STOP_REASON_DEFS[run.stopReason].sentence}.`,
 		result: (run) =>
 			run.stopReason === null
 				? "Failed"
 				: `Failed: ${PRACTICE_SCRIPT_STOP_REASON_DEFS[run.stopReason].result.toLowerCase()}`,
 	},
 	NOT_REACHED: {
-		sentence: (run) => `The review ended before the ${program(run).toLowerCase()} started.`,
+		sentence: (run) => `The review ended before the ${scriptName(run).toLowerCase()} started.`,
 		result: () => "Not reached",
 	},
 	NOT_FINISHED: {
-		sentence: (run) => `${program(run)} did not finish.`,
+		sentence: (run) => `${scriptName(run)} did not finish.`,
 		result: () => "Did not finish",
 	},
 } satisfies Record<PracticeScriptRunStatus, PracticeScriptRunStatusDef>;

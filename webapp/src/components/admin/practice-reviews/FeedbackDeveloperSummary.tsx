@@ -101,10 +101,10 @@ function SummaryBody({
 	const total = rows.reduce((sum, row) => sum + row.count, 0);
 	return (
 		<div className="@container rounded-xl border bg-card">
-			<Table>
+			<Table aria-label={`Feedback for ${who} by where it goes`}>
 				<TableHeader>
 					<TableRow variant="static">
-						<TableHead>Location</TableHead>
+						<TableHead>Where</TableHead>
 						<TableHead numeric className="text-right">
 							Feedback
 						</TableHead>
@@ -120,7 +120,7 @@ function SummaryBody({
 						/>
 					))}
 					<TableRow variant="static">
-						<TableCell className="font-medium">All locations</TableCell>
+						<TableCell className="font-medium">Everywhere</TableCell>
 						<TableCell numeric className="text-right font-medium">
 							<CountLink
 								workspaceSlug={workspaceSlug}

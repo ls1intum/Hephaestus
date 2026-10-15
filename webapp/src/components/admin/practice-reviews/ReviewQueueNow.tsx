@@ -78,8 +78,8 @@ export function ReviewQueueNow({ workspaceSlug, state }: ReviewQueueNowProps) {
 		);
 	} else if (state.status === "loading") {
 		body = (
-			<div role="status" className="flex flex-col gap-2">
-				<span className="sr-only">Loading the queue</span>
+			<div aria-busy="true" className="flex flex-col gap-2">
+				<span className="sr-only">Loading the queue…</span>
 				<Skeleton className="h-9 w-full" />
 				<Skeleton className="h-4 w-40" />
 			</div>

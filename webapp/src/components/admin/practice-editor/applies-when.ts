@@ -39,7 +39,7 @@ export function parseAppliesWhen(
 		if (itemType && !itemType.applicabilityClauses.includes(clauseKind(clause))) {
 			return {
 				value: null,
-				clausesError: "This kind of item cannot check one of these conditions.",
+				clausesError: "This kind of work cannot check one of these conditions.",
 			};
 		}
 		if (clause.changedPath !== undefined || clause.diffContains !== undefined) {

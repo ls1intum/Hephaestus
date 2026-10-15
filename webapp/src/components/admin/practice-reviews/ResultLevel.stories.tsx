@@ -259,10 +259,10 @@ export const Disagreed: Story = {
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
 		panel.getAllByText("Disagreed");
-		panel.getByText("The developer disagreed with feedback on their practice pages");
+		panel.getByText("The developer disagreed with feedback on the practice page");
 		panel.getByText("The retry is the caller's job here; this service only reports the failure.");
 		await expect(panel.queryByRole("alert")).toBeNull();
-		await expect(panel.queryByRole("link", { name: /practice pages/u })).not.toBeInTheDocument();
+		await expect(panel.queryByRole("link", { name: /practice page/u })).not.toBeInTheDocument();
 		panel.getByRole("button", { name: "Mark incorrect" });
 	},
 };
@@ -471,5 +471,28 @@ export const TextUnavailable: Story = {
 		await expect(panel.getByText(RESULT_WORDS_UNAVAILABLE)).toBeVisible();
 		await expect(panel.queryByText(/Nothing was quoted/u)).not.toBeInTheDocument();
 		panel.getByText(reviewResultDetail.practiceName);
+	},
+};
+
+export const HiddenProblemEvidence: Story = {
+	args: {
+		result: ready({
+			...reviewResultDetail,
+			evidenceHidden: true,
+			evidence: null,
+			problems: reviewResultDetail.problems.map((problem) => ({
+				...problem,
+				summary: "Evidence hidden",
+				explanation: null,
+				citations: [],
+			})),
+		}),
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		panel.getAllByText(
+			"Quoted evidence is hidden because access to its sources could not be verified.",
+		);
+		await expect(panel.queryByText(/Nothing was quoted/u)).not.toBeInTheDocument();
 	},
 };

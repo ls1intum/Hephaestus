@@ -71,8 +71,11 @@ public class ResultSourceAuthorization implements ResultProofAccess {
 
     public boolean authorized(Result result, HistoryCustody facts, SourceUsePurpose purpose) {
         if (!facts.complete()) return false;
-        var item = items.find(result.getWorkspaceId(), result.getItemId());
-        if (item.isEmpty() || !source(item.orElseThrow(), purpose)) return false;
+        if (!sourceAuthorized(result, purpose)) return false;
+        return custodyAuthorized(result, facts, purpose);
+    }
+
+    private boolean custodyAuthorized(Result result, HistoryCustody facts, SourceUsePurpose purpose) {
         if (facts.sourceJobIds().stream().anyMatch(suppression::isReviewJobSuppressed)) return false;
         for (var copy : facts.copiedIdentities()) {
             var providers = people.providers().stream()
@@ -96,6 +99,37 @@ public class ResultSourceAuthorization implements ResultProofAccess {
             if (repositories.size() != 1
                     || !source(items.require(result.getWorkspaceId(), repositories.getFirst()), purpose)) return false;
         }
+        return true;
+    }
+
+    /** Migrated words are readable history, never a certificate of complete copy custody. */
+    @Override
+    @Transactional(readOnly = true)
+    public boolean permitsHistory(long workspaceId, UUID resultId, SourceUsePurpose purpose) {
+        if (purpose != SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW
+                && purpose != SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY) return false;
+        return results.findByIdAndWorkspaceId(resultId, workspaceId)
+                .map(result -> {
+                    var facts = custody(result);
+                    if (result.getEvidenceVersion() != 0) return authorized(result, facts, purpose);
+                    if (suppression.isReviewJobSuppressed(result.getReviewId())) return false;
+                    var developerId = result.getDeveloperId();
+                    if (developerId != null) {
+                        var developer = accounts.find(developerId);
+                        if (developer.isEmpty()
+                                || suppression.isAccountSuppressed(developerId)
+                                || developer.orElseThrow().aiChoice() == AiChoice.NO_AI
+                                || (developer.orElseThrow().status() != Account.Status.ACTIVE
+                                        && developer.orElseThrow().status() != Account.Status.UNCLAIMED)) return false;
+                    }
+                    return visibleSource(result, purpose)
+                            && (!facts.complete() || custodyAuthorized(result, facts, purpose));
+                })
+                .orElse(false);
+    }
+
+    private boolean sourceAuthorized(Result result, SourceUsePurpose purpose) {
+        if (!visibleSource(result, purpose)) return false;
         var citations = new ArrayList<>(ResultCitations.all(result));
         problems.findByWorkspaceIdAndResultIdOrderByPositionAsc(result.getWorkspaceId(), result.getId())
                 .forEach(p -> p.getCitations().forEach(citations::add));
@@ -108,6 +142,11 @@ public class ResultSourceAuthorization implements ResultProofAccess {
             return false;
         }
         return true;
+    }
+
+    private boolean visibleSource(Result result, SourceUsePurpose purpose) {
+        var item = items.find(result.getWorkspaceId(), result.getItemId());
+        return item.isPresent() && source(item.orElseThrow(), purpose);
     }
 
     @Override

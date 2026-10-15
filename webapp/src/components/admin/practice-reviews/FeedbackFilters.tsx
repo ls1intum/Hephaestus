@@ -136,7 +136,7 @@ export function FeedbackFilters({
 				<>
 					{search.location !== undefined && (
 						<ReferenceFilterPill
-							label="Location"
+							label="Where"
 							value={FEEDBACK_LOCATION_DEFS[search.location].label}
 							onClear={() => onPatch({ location: undefined })}
 						/>

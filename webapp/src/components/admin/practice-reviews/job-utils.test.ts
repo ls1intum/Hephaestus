@@ -1,27 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { BUDGET_HOLD, isCancellable, jobPhases, jobWait } from "./job-utils";
+import { jobPhases } from "./job-utils";
 
 const NOW = new Date("2026-05-20T12:00:00Z").getTime();
-const SOON = new Date("2026-05-20T12:05:00Z");
-const EARLIER = new Date("2026-05-20T11:55:00Z");
-
-describe("jobWait", () => {
-	it("reports a backoff for a queued job whose next attempt is still ahead", () => {
-		expect(jobWait({ status: "QUEUED", availableAt: SOON }, NOW)).toStrictEqual({
-			kind: "backoff",
-		});
-	});
-
-	it("reports nothing for a queued job that is already claimable", () => {
-		expect(jobWait({ status: "QUEUED", availableAt: EARLIER }, NOW)).toBeNull();
-	});
-
-	it("reports nothing once the job has left the queue, whatever its timestamps say", () => {
-		expect(jobWait({ status: "RUNNING", availableAt: SOON }, NOW)).toBeNull();
-		expect(jobWait({ status: "COMPLETED", availableAt: SOON }, NOW)).toBeNull();
-	});
-});
 
 describe("jobPhases", () => {
 	const at = (seconds: number) => new Date(NOW + seconds * 1000);
@@ -72,26 +53,5 @@ describe("jobPhases", () => {
 			wait: "12 seconds",
 			retried: true,
 		});
-	});
-});
-
-describe("BUDGET_HOLD", () => {
-	it("never suggests a held review failed", () => {
-		expect(BUDGET_HOLD.label).toBe("Over the AI budget");
-		expect(BUDGET_HOLD.detail).toMatch(/waiting, not failed/u);
-		expect(BUDGET_HOLD.detail).toMatch(/continues on its own/u);
-	});
-});
-
-describe("isCancellable", () => {
-	it.each([
-		["QUEUED", true],
-		["RUNNING", true],
-		["COMPLETE", false],
-		["PARTIAL", false],
-		["FAILED", false],
-		["CANCELLED", false],
-	] as const)("%s is cancellable: %s", (status, cancellable) => {
-		expect(isCancellable(status)).toBe(cancellable);
 	});
 });

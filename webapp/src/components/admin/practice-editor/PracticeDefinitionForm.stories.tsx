@@ -150,7 +150,7 @@ export const CustomScript: Story = {
 	play: async ({ canvas }) => {
 		const section = canvas.getByRole("button", { name: /^Script/u });
 		await expect(section).toHaveAttribute("aria-expanded", "true");
-		await expect(section).toHaveTextContent(/The program that reviews this practice/u);
+		await expect(section).toHaveTextContent(/The practice script that reviews this practice/u);
 	},
 };
 

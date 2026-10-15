@@ -13,10 +13,18 @@ import { hasText } from "@/lib/text";
 
 export interface ResultEvidenceProps {
 	citations: EvidenceCitation[];
+	hidden?: boolean;
 }
 
 // Non-code coordinates refer to serialized input, so they cannot identify a location in the source app.
-export function ResultEvidence({ citations }: ResultEvidenceProps) {
+export function ResultEvidence({ citations, hidden = false }: ResultEvidenceProps) {
+	if (hidden) {
+		return (
+			<p className="text-sm text-muted-foreground">
+				Quoted evidence is hidden because access to its sources could not be verified.
+			</p>
+		);
+	}
 	if (citations.length === 0) {
 		return (
 			<p className="text-sm text-muted-foreground">

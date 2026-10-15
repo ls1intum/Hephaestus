@@ -18664,6 +18664,8 @@ components:
           anyOf:
           - $ref: "#/components/schemas/FeedbackResponse"
           - type: "null"
+        unverifiedHistory:
+          type: boolean
         whatGoodLooksLike:
           type:
           - string
@@ -18691,6 +18693,7 @@ components:
       - preparedAt
       - readAt
       - response
+      - unverifiedHistory
       - whatGoodLooksLike
       - whyItMatters
       - withdrawn
@@ -21837,6 +21840,10 @@ components:
           - NO_EVIDENCE
           - UNCORROBORATED
           - null
+        textHidden:
+          type: boolean
+        unverifiedHistory:
+          type: boolean
         withdrawn:
           type: boolean
       required:
@@ -21856,6 +21863,8 @@ components:
       - reviewId
       - state
       - stopReason
+      - textHidden
+      - unverifiedHistory
       - withdrawn
     ReviewFeedbackCounts:
       type: object
@@ -22037,6 +22046,10 @@ components:
           - NO_EVIDENCE
           - UNCORROBORATED
           - null
+        textHidden:
+          type: boolean
+        unverifiedHistory:
+          type: boolean
         withdrawn:
           type: boolean
       required:
@@ -22064,6 +22077,8 @@ components:
       - sends
       - state
       - stopReason
+      - textHidden
+      - unverifiedHistory
       - withdrawn
     ReviewItemCounts:
       type: object

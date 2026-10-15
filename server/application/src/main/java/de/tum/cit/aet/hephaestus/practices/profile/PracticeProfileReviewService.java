@@ -21,8 +21,8 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
@@ -57,11 +57,7 @@ public class PracticeProfileReviewService {
                 ws.id(), List.of(account.get()), since == null ? Instant.EPOCH : since, false);
         var permitted = authorization.permitsAll(ws.id(), rows, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
         var byReview = new LinkedHashMap<UUID, List<ResultView>>();
-        views
-                .views(
-                        ws.id(),
-                        rows.stream().filter(r -> permitted.contains(r.getId())).toList())
-                .stream()
+        views.views(ws.id(), rows).stream()
                 .filter(v -> itemKind == null || v.item().kind().equals(itemKind))
                 .filter(v -> itemId == null || v.result().getItemId() == itemId)
                 .filter(v -> groupSlug == null
@@ -79,7 +75,7 @@ public class PracticeProfileReviewService {
                 ordered.stream()
                         .skip(page.getOffset())
                         .limit(page.getPageSize())
-                        .map(v -> dto(v))
+                        .map(v -> dto(v, permitted))
                         .toList(),
                 page,
                 ordered.size());
@@ -91,11 +87,10 @@ public class PracticeProfileReviewService {
                 .filter(r -> Objects.equals(r.getDeveloperId(), account))
                 .toList();
         var permitted = authorization.permitsAll(ws.id(), rows, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
-        var visible = rows.stream().filter(r -> permitted.contains(r.getId())).toList();
-        if (visible.isEmpty()) throw new EntityNotFoundException("Review", id.toString());
-        var projected = views.views(ws.id(), visible);
-        var dto = dto(projected);
-        var counts = ReviewSummaryQueryService.counts(visible);
+        if (rows.isEmpty()) throw new EntityNotFoundException("Review", id.toString());
+        var projected = views.views(ws.id(), rows);
+        var dto = dto(projected, permitted);
+        var counts = ReviewSummaryQueryService.counts(rows);
         return new ProfileReviewDetailDTO(
                 dto.review(),
                 dto.results(),
@@ -104,13 +99,10 @@ public class PracticeProfileReviewService {
                 new OutcomeVectorDTO(counts.met(), counts.notMet(), counts.doesNotApply(), counts.couldNotDetermine()));
     }
 
-    private ProfileReviewDTO dto(List<ResultView> v) {
+    private ProfileReviewDTO dto(List<ResultView> v, Set<UUID> permitted) {
         return new ProfileReviewDTO(
                 reviews.ref(v.getFirst().review()),
-                presentation.lists(
-                        v.getFirst().result().getWorkspaceId(),
-                        v,
-                        v.stream().map(r -> r.result().getId()).collect(Collectors.toSet())),
+                presentation.lists(v.getFirst().result().getWorkspaceId(), v, permitted),
                 v.stream()
                         .flatMap(r -> presentation.ownFeedback(r.result()).stream())
                         .distinct()

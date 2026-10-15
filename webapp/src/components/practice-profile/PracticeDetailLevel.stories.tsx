@@ -346,7 +346,7 @@ export const MoreToLoad: Story = {
  * A practice no review has settled: the badge and the trend in the header say so, and nothing
  * claims a basis or a direction.
  */
-export const NotObserved: Story = {
+export const NotReviewed: Story = {
 	args: {
 		practice: {
 			...focusedChanges,
@@ -358,7 +358,7 @@ export const NotObserved: Story = {
 	},
 	play: async () => {
 		await expectSettledVisible(await screen.findByRole("region", { name: "Introduction" }));
-		await expect(screen.getAllByText("Not observed yet")).toHaveLength(1);
+		await expect(screen.getAllByText("Not reviewed")).toHaveLength(1);
 		await expect(screen.queryByText(/No practice in this group/u)).not.toBeInTheDocument();
 		await expect(screen.queryByText(/Read from|counts most/u)).not.toBeInTheDocument();
 		await expect(screen.queryByText(/pieces? of work$/u)).not.toBeInTheDocument();
@@ -410,17 +410,36 @@ export const GuidanceOnly: Story = {
 		await expect(screen.getByRole("heading", { level: 3, name: "Practice guide" })).toBeVisible();
 		await expect(screen.queryByRole("tab")).toBeNull();
 		await expect(screen.queryByRole("heading", { name: "Results" })).toBeNull();
-		await expect(screen.queryByText("Not observed yet")).toBeNull();
+		await expect(screen.queryByText("Not reviewed")).toBeNull();
 	},
 };
 
+/** The server answers 404 for a practice that this workspace does not review, which offers no retry. */
 export const Missing: Story = {
 	args: {
 		practice: undefined,
-		guidance: { status: "error", error: new Error("Not found"), onRetry: fn() },
+		guidance: { status: "error", error: { status: 404 }, onRetry: fn() },
 	},
 	play: async () => {
 		await expectSettledVisible(await screen.findByText(/We could not find this practice\./u));
+		await expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+	},
+};
+
+/** Any other failure says nothing about whether the practice exists, so it offers the retry. */
+export const MissingLoadFailed: Story = {
+	args: {
+		practice: undefined,
+		guidance: { status: "error", error: new Error("Unavailable"), onRetry: fn() },
+	},
+	play: async ({ args }) => {
+		await expectSettledVisible(await screen.findByText("We could not load this practice"));
+		await expect(screen.queryByText(/We could not find this practice\./u)).toBeNull();
+		await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+		if (args.guidance.status !== "error") {
+			throw new Error("Expected the guidance to have failed.");
+		}
+		await expect(args.guidance.onRetry).toHaveBeenCalledOnce();
 	},
 };
 

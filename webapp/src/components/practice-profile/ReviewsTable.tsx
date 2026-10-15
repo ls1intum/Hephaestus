@@ -25,6 +25,7 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
+import { Spinner } from "@/components/ui/spinner";
 import { TableCell } from "@/components/ui/table";
 import { formatDayTime } from "@/lib/dates";
 import { itemKindNoun } from "@/lib/item-kinds";
@@ -181,7 +182,11 @@ function ReviewRow({
 						onClick={() => onReviewNow(item.id)}
 						aria-label={`${isRequesting ? "Requesting review…" : "Request review"}: ${item.label}`}
 					>
-						<PlayIcon aria-hidden data-icon="inline-start" />
+						{isRequesting ? (
+							<Spinner data-icon="inline-start" />
+						) : (
+							<PlayIcon aria-hidden data-icon="inline-start" />
+						)}
 						{isRequesting ? "Requesting review…" : "Request review"}
 					</Button>
 				)}

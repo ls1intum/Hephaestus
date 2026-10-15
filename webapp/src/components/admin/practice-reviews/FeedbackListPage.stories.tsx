@@ -216,11 +216,7 @@ export const DeveloperSummary: Story = {
 	parameters: { chromatic: { viewports: [320, 1440] } },
 	play: async ({ canvas }) => {
 		await canvas.findByRole("heading", { name: "Feedback for Grace Hopper" });
-		// The summary's table comes first; the list's own table is named.
-		const table = canvas.getAllByRole("table").find((each) => !each.hasAttribute("aria-label"));
-		if (table === undefined) {
-			throw new Error("The developer summary has no table");
-		}
+		const table = canvas.getByRole("table", { name: "Feedback for Grace Hopper by where it goes" });
 		await expect(within(table).getByRole("cell", { name: "With Heph in Slack" })).toBeVisible();
 		await expect(within(table).getByRole("cell", { name: "In conversation" })).toBeVisible();
 		const [count] = within(table).getAllByRole("link");
@@ -272,7 +268,7 @@ export const FilterToOneDestination: Story = {
 		const trigger = canvas.getByRole("combobox", { name: "Destination" });
 		await userEvent.click(trigger);
 		const listbox = await screen.findByRole("listbox", { name: "Destination options" });
-		for (const name of ["On the work", "In conversation", "On their practice pages"]) {
+		for (const name of ["On the work", "In conversation", "On the practice page"]) {
 			within(listbox).getByRole("option", { name: new RegExp(name, "u") });
 		}
 		await userEvent.click(within(listbox).getByRole("option", { name: /In conversation/u }));
@@ -316,7 +312,7 @@ export const FilterToOneWithholdingFamily: Story = {
 		await userEvent.click(canvas.getByRole("combobox", { name: "Destination" }));
 		const destinations = await screen.findByRole("listbox", { name: "Destination options" });
 		await userEvent.click(
-			await within(destinations).findByRole("option", { name: /On their practice pages/u }),
+			await within(destinations).findByRole("option", { name: /On the practice page/u }),
 		);
 		await userEvent.keyboard("{Escape}");
 		await canvas.findByText("No feedback matches these filters");
@@ -407,7 +403,7 @@ export const RefreshFailed: Story = {
 		}),
 	},
 	play: async ({ canvas, userEvent }) => {
-		await canvas.findByText("These pieces of feedback may be out of date");
+		await canvas.findByText("We could not refresh feedback");
 		await expect(canvas.getByRole("table").querySelectorAll("tbody tr").length).toBeGreaterThan(0);
 		await userEvent.click(canvas.getByRole("button", { name: "Retry" }));
 		await expect(retryRefresh).toHaveBeenCalledOnce();

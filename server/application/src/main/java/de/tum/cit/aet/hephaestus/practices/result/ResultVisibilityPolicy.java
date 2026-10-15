@@ -47,8 +47,8 @@ public class ResultVisibilityPolicy {
                 .toList();
         Map<Long, PracticeVersion> pinned = pinnedVersions(workspaceId, owned);
         List<Result> verifiable = owned.stream()
-                .filter(result -> result.getPracticeVersionId() != null)
-                .filter(result -> pinned.containsKey(result.getPracticeVersionId()))
+                .filter(result -> result.getEvidenceVersion() == 0
+                        || (result.getPracticeVersionId() != null && pinned.containsKey(result.getPracticeVersionId())))
                 .toList();
         return evidenceAuthorization.permitsAll(workspaceId, withoutIncorrect(workspaceId, verifiable), purpose);
     }
@@ -63,6 +63,7 @@ public class ResultVisibilityPolicy {
     }
 
     public static Currentness currentness(Result result, @Nullable PracticeVersion pinned, PracticeVersion current) {
+        if (result.getEvidenceVersion() == 0) return Currentness.UNVERIFIABLE;
         if (result.getEndedAt() != null) {
             return Currentness.STALE;
         }

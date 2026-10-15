@@ -333,7 +333,7 @@ export function draftErrors(
 			itemType !== undefined &&
 			!itemType.aboutRoles.includes(draft.about) && {
 				fieldId: FIELD_IDS.about,
-				message: "Choose a role this kind of item has, or The work.",
+				message: "Choose a role this kind of work has, or The work.",
 			},
 		hasText(appliesWhen.clausesError) && {
 			fieldId: FIELD_IDS.appliesWhen,

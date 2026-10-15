@@ -53,7 +53,8 @@ public record PracticePageFeedbackDTO(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
         FeedbackResponseDTO response,
 
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean withdrawn) {
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean withdrawn,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean unverifiedHistory) {
     public PracticePageFeedbackDTO {
         evidence = List.copyOf(evidence);
         cleanWork = List.copyOf(cleanWork);

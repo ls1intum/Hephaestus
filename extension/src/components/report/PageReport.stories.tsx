@@ -98,7 +98,7 @@ export const Default: Story = {
 
 /**
  * Every state's collapsed line is one height, and carries the Hephaestus mark, so the page, which
- * can measure the frame, learns nothing from it, and nothing here passes for the provider's verdict.
+ * can measure the frame, learns nothing from it, and nothing here passes for the provider's own status.
  */
 export const OneHeightInEveryState: Story = {
 	render: (args) => {
@@ -317,7 +317,7 @@ export const ReviewRunning: Story = {
 	},
 };
 
-/** Incomplete reviews must not imply a verdict for practices they did not finish. */
+/** Incomplete reviews must not imply an outcome for practices they did not finish. */
 export const ReviewIncomplete: Story = {
 	args: {
 		expanded: true,

@@ -42,7 +42,7 @@ export const Default: Story = {
 			"3Mixed",
 			"7Going well",
 			"1Nothing to report",
-			"3Not observed",
+			"3Not reviewed",
 		]);
 
 		// The chip is one control, and the level it opens is an address.
@@ -70,7 +70,7 @@ export const SomeStandingsAbsent: Story = {
 	},
 };
 
-export const NothingObservedYet: Story = {
+export const NothingReviewedYet: Story = {
 	args: {
 		latestReview: undefined,
 		counts: { STRENGTH: 0, MIXED: 0, DEVELOPING: 0, NO_OPPORTUNITY: 0, NOT_OBSERVED: 16 },
@@ -79,7 +79,7 @@ export const NothingObservedYet: Story = {
 		await expect(canvas.getByText("No review yet")).toBeVisible();
 		await expect(canvas.queryByRole("link", { name: /review/iu })).toBeNull();
 		await expect(canvas.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
-			"16Not observed",
+			"16Not reviewed",
 		]);
 		await expect(canvas.getByRole("link", { name: "See all practice groups" })).toBeVisible();
 	},

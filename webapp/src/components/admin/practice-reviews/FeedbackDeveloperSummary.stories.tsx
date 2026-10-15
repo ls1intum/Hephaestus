@@ -57,7 +57,7 @@ export const Default: Story = {
 			"With Heph in the app",
 			"With Heph in Slack",
 			"In conversation",
-			"On their practice pages",
+			"On the practice page",
 		]) {
 			within(table).getByRole("cell", { name });
 		}
@@ -66,7 +66,7 @@ export const Default: Story = {
 		await expect(
 			parseSearch(new URL(String(githubLink.getAttribute("href")), window.location.origin).search),
 		).toMatchObject({ developerId: "9", location: "GITHUB" });
-		const all = within(table).getByRole("row", { name: /All locations/u });
+		const all = within(table).getByRole("row", { name: /Everywhere/u });
 		await expect(within(all).getByRole("link", { name: "15" })).toBeVisible();
 	},
 };

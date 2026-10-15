@@ -193,7 +193,7 @@ describe("scan report route", () => {
 		within(absent).getByText(/That alone does not prove a fix\./u);
 
 		await user.click(screen.getByRole("button", { name: "Updated (0)" }));
-		await screen.findByText("No problems match these filters.");
+		await screen.findByText("No problems match this filter");
 		await user.click(screen.getByRole("button", { name: "New (1)" }));
 		await screen.findByText("A failed upload is logged and then ignored.");
 	});
@@ -245,11 +245,7 @@ describe("scan report route", () => {
 		const user = userEvent.setup();
 
 		renderRouteAtWithRouter(REPORT_URL);
-		await screen.findByText(
-			"We could not load this scan. Try again.",
-			undefined,
-			ROUTE_RENDER_WAIT,
-		);
+		await screen.findByText("We could not load this scan", undefined, ROUTE_RENDER_WAIT);
 		report.recover();
 		await user.click(screen.getByRole("button", { name: "Retry" }));
 		await screen.findByRole("heading", { name: "ls1intum/hephaestus" });
@@ -344,7 +340,7 @@ describe("scan report SARIF export", () => {
 			await screen.findByRole("button", { name: "Export SARIF" }, ROUTE_RENDER_WAIT),
 		);
 
-		await screen.findByText("We could not export the SARIF file.");
+		await screen.findByText("We could not export the SARIF file");
 		screen.getByText("This scan's details are past their retention.");
 		expect(downloads).toHaveLength(0);
 		screen.getByRole("heading", { name: "ls1intum/hephaestus" });

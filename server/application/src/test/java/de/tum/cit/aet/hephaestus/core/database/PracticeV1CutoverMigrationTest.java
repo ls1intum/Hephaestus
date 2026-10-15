@@ -101,6 +101,25 @@ class PracticeV1CutoverMigrationTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"prod", "dev"})
+    void shouldPreserveEachReleasedOutcomeAndNegativeSeverity(String context) throws Exception {
+        var database = migratedDatabase(context);
+        assertThat(column(database, """
+            SELECT r.id::text || '|' || r.outcome || '|' || coalesce(r.severity,'NONE') || '|'
+                || coalesce(p.severity,'NONE') || '|' || r.practice_version_id || '|' || (r.ended_at IS NULL)
+            FROM result r LEFT JOIN problem p ON p.result_id=r.id AND p.workspace_id=r.workspace_id
+            WHERE r.workspace_id=992101 AND r.practice_id BETWEEN 992501 AND 992506 ORDER BY r.id
+            """))
+                .containsExactly(
+                        "00000000-0000-0000-0000-000000992521|MET|NONE|NONE|992511|true",
+                        "00000000-0000-0000-0000-000000992522|DOES_NOT_APPLY|NONE|NONE|992512|true",
+                        "00000000-0000-0000-0000-000000992523|COULD_NOT_DETERMINE|NONE|NONE|992513|true",
+                        "00000000-0000-0000-0000-000000992524|NOT_MET|CRITICAL|CRITICAL|992514|true",
+                        "00000000-0000-0000-0000-000000992525|NOT_MET|MAJOR|MAJOR|992515|true",
+                        "00000000-0000-0000-0000-000000992526|NOT_MET|MINOR|MINOR|992516|true");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"prod", "dev"})
     void shouldPreserveUnclaimedAccountsAndTheirMemberships(String context) throws Exception {
         var database = migratedDatabase(context);
         assertThat(column(
@@ -304,9 +323,15 @@ class PracticeV1CutoverMigrationTest {
                         "00000000-0000-0000-0000-000000992316|POST|DONE");
         assertThat(column(
                         database,
-                        "SELECT id::text || '|' || state || '|' || external_ref FROM feedback_copy"
+                        "SELECT id::text || '|' || state || '|' || external_ref || '|' ||"
+                                + " (posted_at='2026-01-01T00:01:30Z'::timestamptz) FROM feedback_copy"
                                 + " WHERE id='00000000-0000-0000-0000-000000992334'"))
-                .containsExactly("00000000-0000-0000-0000-000000992334|RETRACTED|provider:updated");
+                .containsExactly("00000000-0000-0000-0000-000000992334|RETRACTED|provider:updated|true");
+        assertThat(column(database, """
+            SELECT kind || '|' || state || '|' || (write_started_at IS NULL) || '|' || (external_ref IS NULL)
+                || '|' || (posted_at IS NULL)
+            FROM feedback_copy WHERE feedback_id='00000000-0000-0000-0000-000000992314' AND kind='LINE_NOTE'
+            """)).containsExactly("LINE_NOTE|FAILED|true|true|true");
     }
 
     @ParameterizedTest
@@ -396,6 +421,19 @@ class PracticeV1CutoverMigrationTest {
                                 + " feedback_response r JOIN feedback f ON f.id=r.feedback_id AND"
                                 + " f.workspace_id=r.workspace_id WHERE r.id='00000000-0000-0000-0000-000000992263'"))
                 .containsExactly("992106|ADDRESSED|HELPFUL");
+        assertThat(column(database, """
+            SELECT id::text || '|' || coalesce(resolution,'NONE') || '|' || coalesce(usefulness,'NONE')
+                || '|' || coalesce(comment,'NONE') || '|' || to_char(created_at AT TIME ZONE 'UTC','HH24:MI:SS')
+            FROM feedback_response
+            WHERE id IN ('00000000-0000-0000-0000-000000992281',
+                '00000000-0000-0000-0000-000000992282','00000000-0000-0000-0000-000000992283')
+                AND workspace_id=992101 AND feedback_id='00000000-0000-0000-0000-000000992161'
+            ORDER BY created_at
+            """))
+                .containsExactly(
+                        "00000000-0000-0000-0000-000000992281|DISAGREE|UNHELPFUL|The cited revision already explains why.|00:04:00",
+                        "00000000-0000-0000-0000-000000992282|NOT_APPLICABLE|NONE|This change has no retry behavior.|00:05:00",
+                        "00000000-0000-0000-0000-000000992283|NONE|HELPFUL|NONE|00:06:00");
     }
 
     @ParameterizedTest

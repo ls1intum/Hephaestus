@@ -15,6 +15,10 @@ import {
 	listPracticeVersionsQueryKey,
 } from "@/api/@tanstack/react-query.gen";
 import { PracticeReleaseReview } from "@/components/admin/practices/PracticeReleaseReview";
+import {
+	PracticeListSkeleton,
+	PracticeReleaseSkeleton,
+} from "@/components/admin/practices/PracticeSkeletons";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PageLayout } from "@/components/layout/PageLayout";
@@ -26,7 +30,6 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
-import { Spinner } from "@/components/ui/spinner";
 import { refreshPracticeGuidance } from "@/hooks/practice-guidance-cache";
 import { workspaceAdminHead } from "@/lib/page-title";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
@@ -95,8 +98,9 @@ function PracticeReleaseInbox() {
 	let content: ReactNode;
 	if (query.isPending) {
 		content = (
-			<div className="flex items-center gap-2 text-sm text-muted-foreground">
-				<Spinner /> Loading updates…
+			<div className="grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
+				<PracticeListSkeleton rows={2} />
+				<PracticeReleaseSkeleton rows={3} />
 			</div>
 		);
 	} else if (query.isError) {
@@ -148,6 +152,7 @@ function PracticeReleaseInbox() {
 					key={selected.etag}
 					proposal={selected}
 					pending={pending}
+					declineNote="Declining keeps your practice as it is until the catalog changes again. Reset to catalog stays available on the practice."
 					onAccept={(choices) =>
 						accept.mutate({
 							path: { workspaceSlug, slug: selected.practiceSlug },

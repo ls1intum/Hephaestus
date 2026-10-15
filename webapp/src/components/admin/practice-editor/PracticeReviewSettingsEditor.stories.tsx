@@ -167,12 +167,12 @@ export const InvalidState: Story = {
 			reviewOn: { ...reviewOn, state: { draftStatus: ["ARCHIVED"] } },
 			reads: reads.sources,
 		},
-		error: "Choose states this kind of item offers.",
+		error: "Choose states this kind of work offers.",
 		errorFocusId: "practice-review-on-state",
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("group", { name: "When" })).toHaveAccessibleDescription(
-			"Choose states this kind of item offers.",
+			"Choose states this kind of work offers.",
 		);
 	},
 };

@@ -4,8 +4,6 @@ export type CatalogEntryStatus = Pick<
 	CatalogPractice | CatalogGroup,
 	"state" | "changeKind" | "excluded"
 >;
-export type CatalogEntryState = CatalogEntryStatus["state"];
-export type CatalogChangeKind = CatalogEntryStatus["changeKind"];
 
 export interface CatalogEntryCopy {
 	label: string;

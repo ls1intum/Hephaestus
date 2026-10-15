@@ -19,6 +19,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { formatDay, formatDayTime } from "@/lib/dates";
 import { hasText } from "@/lib/text";
 
+import { UNVERIFIED_HISTORY_NOTE } from "./claim-currentness";
 import { FEEDBACK_RESOLUTION_DEFS, type FeedbackResolution } from "./feedback-resolution-defs";
 import { FEEDBACK_STATE_DEFS, type FeedbackState, isOpenFeedback } from "./feedback-state-defs";
 import { count, type FeedbackTextSegment, linkWork } from "./feedback-text";
@@ -82,6 +83,7 @@ export interface PracticeFeedbackCardGroup {
  */
 export interface PracticeFeedbackCardEntry {
 	feedbackId: string;
+	unverifiedHistory?: boolean;
 	practiceSlug: string;
 	practiceName: string;
 	/**
@@ -244,6 +246,12 @@ const ZONE_HEADING = "text-sm font-semibold text-foreground";
 
 const workKey = (ref: { kind: string; id: string | number }) => `${ref.kind} ${ref.id}`;
 
+function UnverifiedHistoryNotice({ unverified }: { unverified?: boolean }) {
+	return unverified === true ? (
+		<p className="text-xs text-muted-foreground">{UNVERIFIED_HISTORY_NOTE}</p>
+	) : null;
+}
+
 /**
  * One piece of practice feedback in zones a reader takes in at a glance. The top says what it is
  * about, its explanation under "Why this was raised"; the tinted band under it, what to do next;
@@ -254,6 +262,7 @@ const workKey = (ref: { kind: string; id: string | number }) => `${ref.kind} ${r
  * the earlier card dense and its parts hard to tell apart; these zones answer that. A withdrawn card
  * keeps the head and the footer only, with the notice in between.
  */
+
 export function PracticeFeedbackCard({
 	card: {
 		practiceSlug,
@@ -269,6 +278,7 @@ export function PracticeFeedbackCard({
 		state,
 		timestamp,
 		preparedAt,
+		unverifiedHistory,
 	},
 	usefulness,
 	resolution,
@@ -377,6 +387,7 @@ export function PracticeFeedbackCard({
 				<h3 id={headingId} className="max-w-3xl text-lg leading-snug font-semibold">
 					{headline}
 				</h3>
+				<UnverifiedHistoryNotice unverified={unverifiedHistory} />
 				{/*
 				 * The whole explanation under a heading that names it: it is short, and a clamp only hid the
 				 * reason behind a click.

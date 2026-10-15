@@ -32,9 +32,9 @@ import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { Section } from "@/components/layout/Section";
-import { DASHBOARD_VISIBILITY_DEFS } from "@/components/practice-vocabulary/dashboard-visibility-defs";
 import { FeedbackModeBadge } from "@/components/practice-vocabulary/FeedbackModeBadge";
 import { FeedbackModeSourceNote } from "@/components/practice-vocabulary/FeedbackModeSourceNote";
+import { PROFILE_VISIBILITY_DEFS } from "@/components/practice-vocabulary/profile-visibility-defs";
 import { WorkTypeLabel } from "@/components/practice-vocabulary/WorkTypeLabel";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -232,7 +232,7 @@ export function PracticeCatalog({
 				)}
 				renderGroupMeta={(group) => (
 					<>
-						{!group.shownToDevelopers && <StatusBadge def={DASHBOARD_VISIBILITY_DEFS.HIDDEN} />}
+						{!group.shownToDevelopers && <StatusBadge def={PROFILE_VISIBILITY_DEFS.HIDDEN} />}
 						<CatalogOriginBadge origin={group.catalogOrigin} kind="group" />
 					</>
 				)}
@@ -284,7 +284,7 @@ export function PracticeCatalog({
 					if (total > 0) {
 						return "No matching practices";
 					}
-					return groupSlug === null ? "Nothing unassigned" : "No practices in this group";
+					return groupSlug === null ? "Nothing unassigned" : "No practices here";
 				}}
 			/>
 

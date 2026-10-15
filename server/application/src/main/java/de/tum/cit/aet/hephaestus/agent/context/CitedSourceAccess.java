@@ -14,6 +14,10 @@ import org.springframework.stereotype.Component;
 public class CitedSourceAccess {
     private final ResultProofAccess results;
 
+    public boolean permitsHistory(long workspaceId, UUID resultId, SourceUsePurpose purpose) {
+        return results.permitsHistory(workspaceId, resultId, purpose);
+    }
+
     public boolean permits(long workspaceId, UUID resultId, SourceUsePurpose purpose) {
         return results.permits(workspaceId, resultId, purpose);
     }

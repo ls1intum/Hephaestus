@@ -1,38 +1,7 @@
 import { formatDistanceStrict } from "date-fns";
-import type { ReviewJob, ReviewSummary } from "@/api/types.gen";
+import type { ReviewJob } from "@/api/types.gen";
 import { asDate } from "@/lib/dates";
 import { ITEM_KIND } from "@/lib/item-kinds";
-
-export interface JobWait {
-	kind: "backoff";
-}
-
-export function jobWait(
-	job: Pick<ReviewJob, "status" | "availableAt">,
-	now: number,
-): JobWait | null {
-	if (job.status !== "QUEUED") {
-		return null;
-	}
-	const availableAt = asDate(job.availableAt);
-	return availableAt && availableAt.getTime() > now ? { kind: "backoff" } : null;
-}
-
-export interface HoldReasonCopy {
-	label: string;
-	/** Sentence for the details panel. Never says "failed": a hold is a wait that ends by itself. */
-	detail: string;
-}
-
-export const BUDGET_HOLD: HoldReasonCopy = {
-	label: "Over the AI budget",
-	detail:
-		"The monthly AI budget is used up, so this review is waiting, not failed. It continues on its own when the budget is raised or the next month starts. AI usage shows which budget is used up and who can raise it.",
-};
-
-export function isCancellable(status: ReviewSummary["status"]): boolean {
-	return status === "QUEUED" || status === "RUNNING";
-}
 
 export const REVIEWABLE_ON_DEMAND: ReadonlySet<string> = new Set([
 	ITEM_KIND.pullRequest,

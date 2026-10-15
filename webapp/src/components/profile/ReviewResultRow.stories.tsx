@@ -300,3 +300,20 @@ export const ExampleFromThisWork: Story = {
 		await expect(canvas.queryByText(/great|well done|nice work/iu)).toBeNull();
 	},
 };
+
+export const HiddenHistoryText: Story = {
+	args: {
+		result: {
+			...metWithoutSummary,
+			summary: null,
+			explanation: null,
+			evidence: null,
+			problems: [],
+			currentness: "UNVERIFIABLE",
+		},
+	},
+	play: async ({ canvas }) => {
+		canvas.getByText("Result text unavailable");
+		canvas.getByText(metWithoutSummary.practiceName);
+	},
+};

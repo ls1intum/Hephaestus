@@ -201,7 +201,7 @@ export const WorkspaceDefaultSet: Story = {
 	},
 };
 
-export const GroupOverride: Story = {
+export const GroupSetByHand: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		const testing = canvas.getByRole("radiogroup", {
 			name: "Feedback mode for Testing",
@@ -254,7 +254,7 @@ export const PracticeAutomaticRequiresConfirmation: Story = {
 	},
 };
 
-export const PracticeOverrideWithReset: Story = {
+export const PracticeSetByHandWithReset: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: /Pull request hygiene/u }));
 		const row = canvas.getByText("Links the issue it closes").closest("li");
@@ -336,7 +336,7 @@ export const PracticeDetailOnKeyboardFocus: Story = {
 	},
 };
 
-export const OverridesOnly: Story = {
+export const SetByHandOnly: Story = {
 	args: { overridesOnly: true },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("Links the issue it closes")).toBeVisible();
@@ -347,7 +347,7 @@ export const OverridesOnly: Story = {
 	},
 };
 
-export const OverridesOnlyEmpty: Story = {
+export const SetByHandOnlyEmpty: Story = {
 	args: { overridesOnly: true, ...from(nothingSetByHand) },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("Nothing was set by hand")).toBeVisible();
@@ -464,7 +464,7 @@ export const DecisionsShareOneColumn: Story = {
 	},
 };
 
-export const AtScaleOverridesOnly: Story = {
+export const AtScaleSetByHandOnly: Story = {
 	args: { overridesOnly: true, ...from(atScale) },
 	play: async ({ canvas }) => {
 		await expect(canvas.getAllByRole("checkbox", { name: /^Select /u })).toHaveLength(2);

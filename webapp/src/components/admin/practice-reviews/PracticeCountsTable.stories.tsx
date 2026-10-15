@@ -152,7 +152,7 @@ export const Default: Story = {
 			"Tests name the behaviour",
 			"Product language",
 		]);
-		await expect(canvas.queryByText("Often undecided")).not.toBeInTheDocument();
+		await expect(canvas.queryByText("Often could not determine")).not.toBeInTheDocument();
 		// A practice that recorded nothing is not a row, and no line under the table counts it.
 		await expect(canvas.queryByText(/recorded nothing/u)).not.toBeInTheDocument();
 		await expect(
@@ -212,14 +212,14 @@ export const NeedsALookFirst: Story = {
 		]);
 		const wiki = canvas.getByRole("row", { name: /Wiki pages/u });
 		await expect(
-			within(wiki).getByText("Mostly not applicable").closest("[data-marker]"),
+			within(wiki).getByText("Mostly does not apply").closest("[data-marker]"),
 		).toHaveAttribute(
 			"title",
 			"Does not apply in 29 of 30 results. Consider turning it off for this workspace.",
 		);
 		const threads = canvas.getByRole("row", { name: /Open threads/u });
 		await expect(
-			within(threads).getByText("Often undecided").closest("[data-marker]"),
+			within(threads).getByText("Often could not determine").closest("[data-marker]"),
 		).toHaveAttribute(
 			"title",
 			"Could not determine in 9 of 22 results. The review may lack the evidence to decide.",
@@ -289,7 +289,7 @@ export const LongNamesAndMarkers: Story = {
 		await expect(name).toHaveAttribute("title", expect.stringContaining("with every change"));
 		await expect(name.scrollWidth).toBeGreaterThan(name.clientWidth);
 		// The marker sits on the name's line, not under it.
-		const marker = canvas.getByText("Mostly not applicable").closest("[data-marker]");
+		const marker = canvas.getByText("Mostly does not apply").closest("[data-marker]");
 		await expect(marker?.parentElement).toBe(name.parentElement);
 	},
 };

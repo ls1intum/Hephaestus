@@ -86,7 +86,7 @@ export const FewApprovals: Story = {
 export const Loading: Story = {
 	args: { approvals: { state: { status: "loading" } } },
 	play: async ({ canvas }) => {
-		canvas.getByText("Loading what needs you");
+		canvas.getByText("Loading what needs you…");
 		await expect(canvas.queryByText(/No feedback awaits your approval/u)).not.toBeInTheDocument();
 	},
 };

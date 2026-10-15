@@ -38,13 +38,13 @@ export const Default: Story = {
  * The same standing on one practice: the sentence is about that practice, not about a group of
  * them.
  */
-export const PracticeNotObserved: Story = {
+export const PracticeNotReviewed: Story = {
 	args: { standing: "NOT_OBSERVED", scope: "practice" },
 	play: async ({ canvas }) => {
-		await userEvent.hover(canvas.getByRole("button", { name: "Not observed yet" }));
+		await userEvent.hover(canvas.getByRole("button", { name: "Not reviewed" }));
 		const tooltip = await settledPopup();
 		await expect(tooltip).toHaveTextContent(
-			"No review has observed this practice in your work yet.",
+			"No review has looked at this practice in your work yet.",
 		);
 	},
 };

@@ -87,7 +87,7 @@ export const NoSources: Story = {
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("combobox", { name: "Condition 1" }));
 		const options = within(await screen.findByRole("listbox", { name: "Condition 1" }));
-		await expect(options.queryByRole("option", { name: "A source has items" })).toBeNull();
+		await expect(options.queryByRole("option", { name: "A source is not empty" })).toBeNull();
 		await expect(options.getByRole("option", { name: "A file changed" })).toBeVisible();
 		await userEvent.keyboard("{Escape}");
 	},

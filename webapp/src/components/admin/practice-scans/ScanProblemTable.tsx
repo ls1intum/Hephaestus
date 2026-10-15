@@ -118,18 +118,14 @@ function ScanProblemResults({
 	if (state.status === "ready" && state.entries.length === 0) {
 		if (filtered) {
 			return (
-				<EmptyState
-					icon={<SearchXIcon />}
-					headingLevel={2}
-					title="No problems match these filters."
-				/>
+				<EmptyState icon={<SearchXIcon />} headingLevel={2} title="No problems match this filter" />
 			);
 		}
 		return (
 			<EmptyState
 				icon={<CircleCheckIcon />}
 				headingLevel={2}
-				title="This scan recorded no problems."
+				title="This scan recorded no problems"
 				description={
 					pairsWithoutResult > 0
 						? `That does not mean every practice is met: ${pairsWithoutResult} practice and file ${pairsWithoutResult === 1 ? "pair has" : "pairs have"} no result in this scan.`
@@ -194,6 +190,7 @@ function ScanProblemResults({
 				<ScanListMore
 					hasNext={state.hasNext}
 					loadingMore={state.loadingMore}
+					loadMoreError={state.loadMoreError}
 					onLoadMore={state.onLoadMore}
 					noun="problems"
 				/>

@@ -75,6 +75,9 @@ class ResultVisibilityPolicyTest {
                 .isEqualTo(Currentness.UNVERIFIABLE);
         assertThat(policy.permitsAll(1L, List.of(r), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
                 .isEmpty();
+        r.end(ResultEndReason.REPLACED, r.getRecordedAt().plusSeconds(1));
+        assertThat(ResultVisibilityPolicy.currentness(r, practice.getCurrentVersion(), practice.getCurrentVersion()))
+                .isEqualTo(Currentness.UNVERIFIABLE);
     }
 
     @Test
@@ -182,6 +185,20 @@ class ResultVisibilityPolicyTest {
         assertThat(policy.permitsAt(1L, List.of(r), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY, edge))
                 .containsExactly(r.getId());
         assertThat(policy.permitsAt(1L, List.of(r), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY, edge.plusSeconds(1)))
+                .isEmpty();
+    }
+
+    @Test
+    void shouldShowAuthorizedMigratedFeedbackWithoutACertifiedPracticeVersion() {
+        var archived = resultBuilder(result())
+                .evidenceVersion((short) 0)
+                .practiceVersionId(null)
+                .build();
+        when(authorization.permitsAll(1L, List.of(archived), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+                .thenReturn(Set.of(archived.getId()));
+        assertThat(policy.permitsShown(1L, List.of(archived), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+                .containsExactly(archived.getId());
+        assertThat(policy.permitsAll(1L, List.of(archived), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
                 .isEmpty();
     }
 }

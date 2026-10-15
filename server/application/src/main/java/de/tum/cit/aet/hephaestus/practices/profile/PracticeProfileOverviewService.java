@@ -79,7 +79,9 @@ public class PracticeProfileOverviewService {
         var newest = new LinkedHashMap<UUID, ResultView>();
         projected.forEach(v -> newest.putIfAbsent(v.result().getReviewId(), v));
         var newestReviews = List.copyOf(newest.values());
-        var latest = newestReviews.isEmpty() ? null : newestReviews.getFirst();
+        var latest = read.findFirstByWorkspaceIdAndDeveloperIdOrderByRecordedAtDescIdDesc(ws.id(), account.get())
+                .map(result -> views.views(ws.id(), List.of(result)).getFirst())
+                .orElse(null);
         var window = OverviewWindow.sincePreviousRun(
                 newestReviews.size() < 2 ? null : newestReviews.get(1).result().getRecordedAt(), now);
         var snapshots = practiceStandingService.getStandingSnapshots(

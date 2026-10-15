@@ -357,7 +357,7 @@ export const RefreshFailed: Story = {
 		}),
 	},
 	play: async ({ canvas }) => {
-		await expect(await canvas.findByText("These results may be out of date")).toBeVisible();
+		await expect(await canvas.findByText("We could not refresh results")).toBeVisible();
 		await expect(canvas.getByRole("button", { name: "Retry" })).toBeEnabled();
 	},
 };

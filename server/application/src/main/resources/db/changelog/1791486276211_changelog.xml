@@ -77,7 +77,11 @@ LOCK TABLE identity_link,person_suppression,public_activity_objection,workspace_
 UPDATE pull_request_review r SET commit_id=NULL
 FROM identity_provider p WHERE p.id=r.provider_id AND p.type='GITLAB' AND r.commit_id IS NOT NULL;
 
+-- Source copies do not inherit indexes or planner statistics. Keep keyed lookups local to each copy.
 CREATE TEMP TABLE _cutover_old_identity_link ON COMMIT DROP AS TABLE identity_link;
+CREATE UNIQUE INDEX ON _cutover_old_identity_link(id);
+CREATE INDEX ON _cutover_old_identity_link(provider_id,subject,COALESCE(team_id,''));
+ANALYZE _cutover_old_identity_link;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='identity_link'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE identity_link RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -95,6 +99,9 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE identity_link RENAME TO _released_identity_link;
 CREATE TEMP TABLE _cutover_old_person_suppression ON COMMIT DROP AS TABLE person_suppression;
+CREATE UNIQUE INDEX ON _cutover_old_person_suppression(id);
+CREATE INDEX ON _cutover_old_person_suppression(provider_id,subject,team_key);
+ANALYZE _cutover_old_person_suppression;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='person_suppression'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE person_suppression RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -112,6 +119,8 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE person_suppression RENAME TO _released_person_suppression;
 CREATE TEMP TABLE _cutover_old_public_activity_objection ON COMMIT DROP AS TABLE public_activity_objection;
+CREATE UNIQUE INDEX ON _cutover_old_public_activity_objection(id);
+ANALYZE _cutover_old_public_activity_objection;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='public_activity_objection'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE public_activity_objection RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -129,6 +138,8 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE public_activity_objection RENAME TO _released_public_activity_objection;
 CREATE TEMP TABLE _cutover_old_workspace_membership ON COMMIT DROP AS TABLE workspace_membership;
+CREATE UNIQUE INDEX ON _cutover_old_workspace_membership(workspace_id,user_id);
+ANALYZE _cutover_old_workspace_membership;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='workspace_membership'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE workspace_membership RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -146,6 +157,8 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE workspace_membership RENAME TO _released_workspace_membership;
 CREATE TEMP TABLE _cutover_old_workspace_hidden_former_member ON COMMIT DROP AS TABLE workspace_hidden_former_member;
+CREATE UNIQUE INDEX ON _cutover_old_workspace_hidden_former_member(workspace_id,user_id);
+ANALYZE _cutover_old_workspace_hidden_former_member;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='workspace_hidden_former_member'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE workspace_hidden_former_member RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -163,6 +176,9 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE workspace_hidden_former_member RENAME TO _released_workspace_hidden_former_member;
 CREATE TEMP TABLE _cutover_old_workspace_member_onboarding ON COMMIT DROP AS TABLE workspace_member_onboarding;
+CREATE UNIQUE INDEX ON _cutover_old_workspace_member_onboarding(id);
+CREATE UNIQUE INDEX ON _cutover_old_workspace_member_onboarding(workspace_id,account_id);
+ANALYZE _cutover_old_workspace_member_onboarding;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='workspace_member_onboarding'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE workspace_member_onboarding RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -180,6 +196,8 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE workspace_member_onboarding RENAME TO _released_workspace_member_onboarding;
 CREATE TEMP TABLE _cutover_old_practice_review_person_target ON COMMIT DROP AS TABLE practice_review_person_target;
+CREATE UNIQUE INDEX ON _cutover_old_practice_review_person_target(workspace_id,user_id);
+ANALYZE _cutover_old_practice_review_person_target;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='practice_review_person_target'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE practice_review_person_target RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -197,6 +215,9 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE practice_review_person_target RENAME TO _released_practice_review_person_target;
 CREATE TEMP TABLE _cutover_old_user_preferences ON COMMIT DROP AS TABLE user_preferences;
+CREATE UNIQUE INDEX ON _cutover_old_user_preferences(id);
+CREATE INDEX ON _cutover_old_user_preferences(user_id);
+ANALYZE _cutover_old_user_preferences;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='user_preferences'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE user_preferences RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -214,6 +235,8 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE user_preferences RENAME TO _released_user_preferences;
 CREATE TEMP TABLE _cutover_old_account_ai_choice ON COMMIT DROP AS TABLE account_ai_choice;
+CREATE UNIQUE INDEX ON _cutover_old_account_ai_choice(account_id);
+ANALYZE _cutover_old_account_ai_choice;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='account_ai_choice'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE account_ai_choice RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -231,6 +254,8 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE account_ai_choice RENAME TO _released_account_ai_choice;
 CREATE TEMP TABLE _cutover_old_practice ON COMMIT DROP AS TABLE practice;
+CREATE UNIQUE INDEX ON _cutover_old_practice(id);
+ANALYZE _cutover_old_practice;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='practice'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE practice RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -248,6 +273,9 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE practice RENAME TO _released_practice;
 CREATE TEMP TABLE _cutover_old_practice_revision ON COMMIT DROP AS TABLE practice_revision;
+CREATE UNIQUE INDEX ON _cutover_old_practice_revision(id);
+CREATE INDEX ON _cutover_old_practice_revision(practice_id,revision_number,id);
+ANALYZE _cutover_old_practice_revision;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='practice_revision'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE practice_revision RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -265,6 +293,8 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE practice_revision RENAME TO _released_practice_revision;
 CREATE TEMP TABLE _cutover_old_practice_group ON COMMIT DROP AS TABLE practice_group;
+CREATE UNIQUE INDEX ON _cutover_old_practice_group(id);
+ANALYZE _cutover_old_practice_group;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='practice_group'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE practice_group RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -282,6 +312,8 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE practice_group RENAME TO _released_practice_group;
 CREATE TEMP TABLE _cutover_old_curated_practice_override ON COMMIT DROP AS TABLE curated_practice_override;
+CREATE UNIQUE INDEX ON _cutover_old_curated_practice_override(slug);
+ANALYZE _cutover_old_curated_practice_override;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='curated_practice_override'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE curated_practice_override RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -299,6 +331,8 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE curated_practice_override RENAME TO _released_curated_practice_override;
 CREATE TEMP TABLE _cutover_old_curated_group_override ON COMMIT DROP AS TABLE curated_group_override;
+CREATE UNIQUE INDEX ON _cutover_old_curated_group_override(slug);
+ANALYZE _cutover_old_curated_group_override;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='curated_group_override'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE curated_group_override RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -316,6 +350,8 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE curated_group_override RENAME TO _released_curated_group_override;
 CREATE TEMP TABLE _cutover_old_practice_catalog_installation ON COMMIT DROP AS TABLE practice_catalog_installation;
+CREATE UNIQUE INDEX ON _cutover_old_practice_catalog_installation(workspace_id);
+ANALYZE _cutover_old_practice_catalog_installation;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='practice_catalog_installation'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE practice_catalog_installation RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -333,6 +369,8 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE practice_catalog_installation RENAME TO _released_practice_catalog_installation;
 CREATE TEMP TABLE _cutover_old_practice_review_repository_target ON COMMIT DROP AS TABLE practice_review_repository_target;
+CREATE UNIQUE INDEX ON _cutover_old_practice_review_repository_target(workspace_id,repository_monitor_id);
+ANALYZE _cutover_old_practice_review_repository_target;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='practice_review_repository_target'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE practice_review_repository_target RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -350,6 +388,8 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE practice_review_repository_target RENAME TO _released_practice_review_repository_target;
 CREATE TEMP TABLE _cutover_old_review_sweep_schedule ON COMMIT DROP AS TABLE review_sweep_schedule;
+CREATE UNIQUE INDEX ON _cutover_old_review_sweep_schedule(id);
+ANALYZE _cutover_old_review_sweep_schedule;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='review_sweep_schedule'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE review_sweep_schedule RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -367,6 +407,8 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE review_sweep_schedule RENAME TO _released_review_sweep_schedule;
 CREATE TEMP TABLE _cutover_old_review_backfill_run ON COMMIT DROP AS TABLE review_backfill_run;
+CREATE UNIQUE INDEX ON _cutover_old_review_backfill_run(id);
+ANALYZE _cutover_old_review_backfill_run;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='review_backfill_run'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE review_backfill_run RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -384,6 +426,10 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE review_backfill_run RENAME TO _released_review_backfill_run;
 CREATE TEMP TABLE _cutover_old_artifact_signal ON COMMIT DROP AS TABLE artifact_signal;
+CREATE UNIQUE INDEX ON _cutover_old_artifact_signal(id);
+CREATE INDEX ON _cutover_old_artifact_signal(job_id,workspace_id,state_changed_at DESC,id);
+CREATE INDEX ON _cutover_old_artifact_signal(requested_by_user_id);
+ANALYZE _cutover_old_artifact_signal;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='artifact_signal'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE artifact_signal RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -401,6 +447,9 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE artifact_signal RENAME TO _released_artifact_signal;
 CREATE TEMP TABLE _cutover_old_agent_job ON COMMIT DROP AS TABLE agent_job;
+CREATE UNIQUE INDEX ON _cutover_old_agent_job(id);
+CREATE INDEX ON _cutover_old_agent_job((metadata->>'about_user_id'));
+ANALYZE _cutover_old_agent_job;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='agent_job'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE agent_job RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -418,6 +467,12 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE agent_job RENAME TO _released_agent_job;
 CREATE TEMP TABLE _cutover_old_observation ON COMMIT DROP AS TABLE observation;
+CREATE UNIQUE INDEX ON _cutover_old_observation(id);
+CREATE INDEX ON _cutover_old_observation(agent_job_id,origin);
+CREATE INDEX ON _cutover_old_observation(practice_id);
+CREATE INDEX ON _cutover_old_observation(practice_revision_id);
+CREATE INDEX ON _cutover_old_observation(about_user_id);
+ANALYZE _cutover_old_observation;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='observation'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE observation RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -435,6 +490,9 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE observation RENAME TO _released_observation;
 CREATE TEMP TABLE _cutover_old_observation_invalidation ON COMMIT DROP AS TABLE observation_invalidation;
+CREATE UNIQUE INDEX ON _cutover_old_observation_invalidation(id);
+CREATE INDEX ON _cutover_old_observation_invalidation(observation_id);
+ANALYZE _cutover_old_observation_invalidation;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='observation_invalidation'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE observation_invalidation RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -452,6 +510,11 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE observation_invalidation RENAME TO _released_observation_invalidation;
 CREATE TEMP TABLE _cutover_old_feedback ON COMMIT DROP AS TABLE feedback;
+CREATE UNIQUE INDEX ON _cutover_old_feedback(id);
+CREATE INDEX ON _cutover_old_feedback(agent_job_id,workspace_id,channel,position,created_at,id);
+CREATE INDEX ON _cutover_old_feedback(recipient_user_id);
+CREATE INDEX ON _cutover_old_feedback(about_user_id);
+ANALYZE _cutover_old_feedback;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='feedback'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE feedback RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -469,6 +532,9 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE feedback RENAME TO _released_feedback;
 CREATE TEMP TABLE _cutover_old_feedback_observation ON COMMIT DROP AS TABLE feedback_observation;
+CREATE UNIQUE INDEX ON _cutover_old_feedback_observation(feedback_id,observation_id);
+CREATE INDEX ON _cutover_old_feedback_observation(observation_id);
+ANALYZE _cutover_old_feedback_observation;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='feedback_observation'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE feedback_observation RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -486,6 +552,9 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE feedback_observation RENAME TO _released_feedback_observation;
 CREATE TEMP TABLE _cutover_old_feedback_placement ON COMMIT DROP AS TABLE feedback_placement;
+CREATE UNIQUE INDEX ON _cutover_old_feedback_placement(id);
+CREATE INDEX ON _cutover_old_feedback_placement(feedback_id);
+ANALYZE _cutover_old_feedback_placement;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='feedback_placement'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE feedback_placement RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -503,6 +572,10 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE feedback_placement RENAME TO _released_feedback_placement;
 CREATE TEMP TABLE _cutover_old_feedback_dispatch ON COMMIT DROP AS TABLE feedback_dispatch;
+CREATE UNIQUE INDEX ON _cutover_old_feedback_dispatch(id);
+CREATE INDEX ON _cutover_old_feedback_dispatch(agent_job_id);
+CREATE INDEX ON _cutover_old_feedback_dispatch(feedback_id);
+ANALYZE _cutover_old_feedback_dispatch;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='feedback_dispatch'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE feedback_dispatch RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -520,6 +593,9 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE feedback_dispatch RENAME TO _released_feedback_dispatch;
 CREATE TEMP TABLE _cutover_old_feedback_approval ON COMMIT DROP AS TABLE feedback_approval;
+CREATE UNIQUE INDEX ON _cutover_old_feedback_approval(id);
+CREATE INDEX ON _cutover_old_feedback_approval(feedback_id);
+ANALYZE _cutover_old_feedback_approval;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='feedback_approval'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE feedback_approval RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -537,6 +613,9 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE feedback_approval RENAME TO _released_feedback_approval;
 CREATE TEMP TABLE _cutover_old_feedback_withdrawal ON COMMIT DROP AS TABLE feedback_withdrawal;
+CREATE UNIQUE INDEX ON _cutover_old_feedback_withdrawal(id);
+CREATE INDEX ON _cutover_old_feedback_withdrawal(feedback_id);
+ANALYZE _cutover_old_feedback_withdrawal;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='feedback_withdrawal'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE feedback_withdrawal RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -554,6 +633,10 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE feedback_withdrawal RENAME TO _released_feedback_withdrawal;
 CREATE TEMP TABLE _cutover_old_reaction ON COMMIT DROP AS TABLE reaction;
+CREATE UNIQUE INDEX ON _cutover_old_reaction(id);
+CREATE INDEX ON _cutover_old_reaction(feedback_id);
+CREATE INDEX ON _cutover_old_reaction(reactor_user_id);
+ANALYZE _cutover_old_reaction;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='reaction'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE reaction RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -571,6 +654,10 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE reaction RENAME TO _released_reaction;
 CREATE TEMP TABLE _cutover_old_delivery_policy_evaluation ON COMMIT DROP AS TABLE delivery_policy_evaluation;
+CREATE UNIQUE INDEX ON _cutover_old_delivery_policy_evaluation(id);
+CREATE INDEX ON _cutover_old_delivery_policy_evaluation(feedback_id);
+CREATE INDEX ON _cutover_old_delivery_policy_evaluation(agent_job_id);
+ANALYZE _cutover_old_delivery_policy_evaluation;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='delivery_policy_evaluation'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE delivery_policy_evaluation RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -588,6 +675,8 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE delivery_policy_evaluation RENAME TO _released_delivery_policy_evaluation;
 CREATE TEMP TABLE _cutover_old_public_review_completion ON COMMIT DROP AS TABLE public_review_completion;
+CREATE UNIQUE INDEX ON _cutover_old_public_review_completion(job_id);
+ANALYZE _cutover_old_public_review_completion;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='public_review_completion'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE public_review_completion RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -605,6 +694,8 @@ DO $$ DECLARE r record; BEGIN
 END $$;
 ALTER TABLE public_review_completion RENAME TO _released_public_review_completion;
 CREATE TEMP TABLE _cutover_old_review_composition_basis ON COMMIT DROP AS TABLE review_composition_basis;
+CREATE UNIQUE INDEX ON _cutover_old_review_composition_basis(job_id);
+ANALYZE _cutover_old_review_composition_basis;
 DO $$ DECLARE r record; BEGIN
  FOR r IN SELECT conname FROM pg_constraint WHERE conrelid='review_composition_basis'::regclass AND contype IN ('p','u','x') LOOP
   EXECUTE format('ALTER TABLE review_composition_basis RENAME CONSTRAINT %I TO %I',r.conname,'_released_'||substr(r.conname,1,53));
@@ -1883,6 +1974,8 @@ CREATE TEMP TABLE _job_work ON COMMIT DROP AS
 CREATE UNIQUE INDEX ON _job_work(job_id);
 CREATE TEMP TABLE _discarded_job_ids ON COMMIT DROP AS
  SELECT j.id FROM _cutover_old_agent_job j WHERE NOT EXISTS(SELECT 1 FROM _job_work w WHERE w.job_id=j.id);
+CREATE UNIQUE INDEX ON _discarded_job_ids(id);
+ANALYZE _discarded_job_ids;
 DO $$ BEGIN
  IF EXISTS(SELECT 1 FROM _discarded_job_ids d JOIN _cutover_old_agent_job j ON j.id=d.id
   WHERE (j.metadata IS NOT NULL AND j.metadata<>'{}'::jsonb)
@@ -1985,6 +2078,8 @@ CREATE TEMP TABLE _item_map ON COMMIT DROP AS SELECT workspace_id,kind,source_id
 CREATE UNIQUE INDEX ON _item_map(workspace_id,kind,source_id);
 CREATE TEMP TABLE _cutover_person ON COMMIT DROP AS SELECT user_id,account_id FROM _person_map;
 ALTER TABLE _cutover_person ADD PRIMARY KEY(user_id);
+CREATE INDEX ON _cutover_person((user_id::text));
+ANALYZE _cutover_person;
 CREATE TEMP TABLE _cutover_item ON COMMIT DROP AS
  SELECT workspace_id,kind AS old_kind,source_id AS old_source_id,item_id FROM _item_map;
 ALTER TABLE _cutover_item ADD PRIMARY KEY(workspace_id,old_kind,old_source_id);
@@ -2248,6 +2343,9 @@ UPDATE review r SET status='PARTIAL',stop_reason=CASE
 
 CREATE TEMP TABLE _cutover_result ON COMMIT DROP AS SELECT r.id AS observation_id,r.id AS result_id,p.id AS problem_id,r.workspace_id,r.developer_id FROM result r LEFT JOIN problem p ON p.result_id=r.id;
 ALTER TABLE _cutover_result ADD PRIMARY KEY(observation_id);
+-- Legacy jobs without a person key resolve their person through recorded results.
+CREATE UNIQUE INDEX uk_result_review_claim ON result(review_id, practice_id, item_id, developer_id) NULLS NOT DISTINCT;
+ANALYZE result;
 CREATE TEMP TABLE _cutover_review ON COMMIT DROP AS
 SELECT r.id AS job_id,r.id AS review_id,r.workspace_id,r.item_id,
  COALESCE((SELECT m.account_id FROM _cutover_person m JOIN _cutover_old_agent_job j ON j.id=r.id WHERE j.metadata->>'about_user_id'=m.user_id::text),
@@ -2301,6 +2399,7 @@ CREATE FUNCTION pg_temp.cutover_stop(v text) RETURNS text LANGUAGE sql IMMUTABLE
  WHEN 'OUTSIDE_CURRENT_COVERAGE' THEN 'OUTSIDE_CURRENT_SCOPE' WHEN 'OBSERVATION_INVALIDATED' THEN 'RESULT_MARKED_INCORRECT'
  WHEN 'REVIEWED_REVISION_CHANGED' THEN 'REVIEWED_VERSION_CHANGED' ELSE v END $$;
 CREATE TEMP TABLE _cutover_send_parent(dispatch_id uuid PRIMARY KEY,feedback_id uuid NOT NULL,workspace_id bigint NOT NULL,review_id uuid NOT NULL,developer_id bigint NOT NULL) ON COMMIT DROP;
+CREATE INDEX ON _cutover_send_parent(feedback_id);
 INSERT INTO _cutover_send_parent
  SELECT d.id,coalesce(d.feedback_id,f.id,d.id),d.workspace_id,r.review_id,coalesce(p.account_id,r.developer_id)
  FROM _cutover_old_feedback_dispatch d JOIN _cutover_review r ON r.job_id=d.agent_job_id AND r.workspace_id=d.workspace_id
@@ -2453,6 +2552,8 @@ INSERT INTO _cutover_copy_candidate(feedback_id,source,source_order,kind,body,pa
  CROSS JOIN LATERAL(SELECT o.evidence->'citations'->((note->'anchor'->>'citationIndex')::integer) AS citation) a;
 
 CREATE TEMP TABLE _cutover_physical_copy(LIKE feedback_copy INCLUDING DEFAULTS) ON COMMIT DROP;
+CREATE UNIQUE INDEX ON _cutover_physical_copy(id);
+CREATE INDEX ON _cutover_physical_copy(feedback_id);
 ALTER TABLE _cutover_physical_copy ADD COLUMN plan_order bigint;
 DO $$ DECLARE r record; existing _cutover_physical_copy%ROWTYPE; n bigint; chosen uuid; BEGIN
  FOR r IN SELECT * FROM _cutover_copy_candidate ORDER BY CASE source WHEN 'PLACEMENT' THEN 0 WHEN 'SUMMARY' THEN 1 WHEN 'PACKAGE' THEN 2 WHEN 'PROPOSED' THEN 3 ELSE 4 END,source_order,candidate_id LOOP
@@ -3092,7 +3193,6 @@ CREATE INDEX idx_review_composition_basis_expiry ON review_composition_basis(exp
 CREATE INDEX idx_person_evidence_copy_retention ON person_evidence_copy(state,created_at);
 
 
-CREATE UNIQUE INDEX uk_result_review_claim ON result(review_id, practice_id, item_id, developer_id) NULLS NOT DISTINCT;
 CREATE UNIQUE INDEX uk_result_current ON result(practice_id, item_id, developer_id) NULLS NOT DISTINCT WHERE ended_at IS NULL;
 CREATE INDEX idx_result_developer_current ON result(workspace_id, developer_id, recorded_at DESC, id) WHERE ended_at IS NULL;
 CREATE INDEX idx_result_item_current ON result(workspace_id, item_id, practice_id, id) WHERE ended_at IS NULL;
@@ -3420,7 +3520,7 @@ DO $$ DECLARE checked_row record; BEGIN
  IF EXISTS(SELECT 1 FROM _cutover_old_feedback_approval o LEFT JOIN feedback_decision d ON d.id=o.id WHERE d.id IS NULL OR d.feedback_id<>o.feedback_id OR d.decided_at<>o.decided_at OR d.note IS DISTINCT FROM o.rejection_note) THEN RAISE EXCEPTION 'approval history changed'; END IF;
  IF EXISTS(SELECT 1 FROM _cutover_old_reaction o LEFT JOIN feedback_response r ON r.id=o.id WHERE r.id IS NULL OR r.feedback_id<>o.feedback_id OR r.created_at<>o.created_at OR r.comment IS DISTINCT FROM o.explanation) THEN RAISE EXCEPTION 'response history changed'; END IF;
  IF EXISTS(SELECT 1 FROM feedback_send s JOIN _cutover_send_parent sp ON sp.feedback_id=s.feedback_id JOIN _cutover_old_feedback_dispatch d ON d.id=sp.dispatch_id WHERE d.state IN('SENT','SUPPRESSED','FAILED') AND s.action='POST' AND s.state='PENDING') THEN RAISE EXCEPTION 'terminal delivery was re-enqueued'; END IF;
- IF EXISTS(SELECT 1 FROM _cutover_old_feedback f WHERE f.delivery_state IN('PARTIALLY_DELIVERED','PARTIALLY_FAILED') AND NOT EXISTS(SELECT 1 FROM feedback_copy c WHERE c.feedback_id=f.id AND c.state='POSTED')) THEN RAISE EXCEPTION 'partial delivery has no confirmed appearance'; END IF;
+ IF EXISTS(SELECT 1 FROM _cutover_old_feedback f WHERE f.delivery_state IN('PARTIALLY_DELIVERED','PARTIALLY_FAILED') AND NOT EXISTS(SELECT 1 FROM feedback_copy c WHERE c.feedback_id=f.id AND (c.state='POSTED' OR (c.state='RETRACTED' AND c.external_ref IS NOT NULL AND c.posted_at IS NOT NULL)))) THEN RAISE EXCEPTION 'partial delivery has no confirmed appearance'; END IF;
  IF EXISTS(SELECT 1 FROM _cutover_old_agent_job o LEFT JOIN review_job j ON j.id=o.id WHERE NOT EXISTS(SELECT 1 FROM _discarded_job_ids d WHERE d.id=o.id) AND(j.id IS NULL OR j.review_id<>o.id)) THEN RAISE EXCEPTION 'routed job identity changed'; END IF;
  IF EXISTS(SELECT 1 FROM _cutover_old_agent_job o JOIN review_job j ON j.id=o.id WHERE o.status IN('QUEUED','RUNNING') AND(j.status<>'CANCELLED' OR j.processing_status<>'DONE' OR j.cancellation_reason<>'CONTRACT_CHANGED' OR j.worker_id IS NOT NULL)) THEN RAISE EXCEPTION 'old runtime authority survived cutover'; END IF;
  IF EXISTS(SELECT 1 FROM _cutover_old_observation o WHERE o.evidence->'inapplicability' ? 'subject' AND o.evidence->'inapplicability' ? 'prerequisite' AND o.evidence->'inapplicability'->'subject' IS DISTINCT FROM o.evidence->'inapplicability'->'prerequisite') THEN RAISE EXCEPTION 'historical inapplicability keys conflict'; END IF;

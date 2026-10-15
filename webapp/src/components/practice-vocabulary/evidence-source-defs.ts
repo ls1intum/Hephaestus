@@ -91,7 +91,7 @@ const EVIDENCE_SOURCE_DEFS: Record<string, EvidenceSourceDef> = {
 		label: "Linked issues and requests",
 		icon: LinkIcon,
 		badgeVariant: "outline",
-		description: "Work the reviewed item points at, for the intent behind it.",
+		description: "Issues and requests that the reviewed work links to, for the intent behind it.",
 		locator: "object",
 	},
 	"scm.review-threads": {

@@ -22,7 +22,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TableCell } from "@/components/ui/table";
 
 import { type FoldReason, FoldedPractices, FoldedStandingCell } from "./FoldedPractices";
-import { groupNeverApplied, groupNotObservedYet } from "./practice-folds";
+import { groupNeverApplied, groupNotReviewedYet } from "./practice-folds";
 import { ALL_PRACTICE_GROUPS, NO_PRACTICE_GROUPS } from "./practice-profile-search";
 
 export interface AllPracticeGroupsTableProps {
@@ -43,7 +43,7 @@ export interface AllPracticeGroupsTableProps {
 	state: LoadState;
 	/**
 	 * Groups with no practice to show: none added, or all switched off. They join the fold of groups
-	 * not observed yet, so the reader can still open them.
+	 * not reviewed yet, so the reader can still open them.
 	 */
 	emptyGroups?: GroupRef[];
 }
@@ -184,25 +184,25 @@ export function AllPracticeGroupsTable({
 		);
 	}
 
-	// Groups whose every practice never applied, and groups no review has observed a practice of
+	// Groups whose every practice never applied, and groups no review has reviewed a practice of
 	// yet (the rest never applied), leave the table for one folded line each under it.
 	const neverApplied = groups.filter((group) =>
 		groupNeverApplied(practicesByGroup[group.slug] ?? []),
 	);
 	// A group with nothing in it has nothing to act on, so it is folded away with the groups nothing
-	// observed yet rather than left out: it still opens.
-	const notObserved = [
-		...groups.filter((group) => groupNotObservedYet(practicesByGroup[group.slug] ?? [])),
+	// reviewed yet rather than left out: it still opens.
+	const notReviewed = [
+		...groups.filter((group) => groupNotReviewedYet(practicesByGroup[group.slug] ?? [])),
 		...emptyGroups,
 	];
 	const shown = groups.filter(
-		(group) => !neverApplied.includes(group) && !notObserved.includes(group),
+		(group) => !neverApplied.includes(group) && !notReviewed.includes(group),
 	);
 	// Every group with practices sits in a fold: the workspace has practices, so "No practices set
 	// up yet" would be wrong. The folds stand open instead and their own sentences say why. Groups
-	// with no practices do not count: with only those, nothing is set up to observe.
+	// with no practices do not count: with only those, nothing is set up to review.
 	const onlyFolded =
-		shown.length === 0 && neverApplied.length + notObserved.length > emptyGroups.length;
+		shown.length === 0 && neverApplied.length + notReviewed.length > emptyGroups.length;
 	const renderGroupRow = (group: GroupRef, folded?: FoldReason) => (
 		<GroupRow
 			group={group}
@@ -249,7 +249,7 @@ export function AllPracticeGroupsTable({
 				state.status === "loading" ? undefined : (
 					<>
 						{fold(neverApplied, "never-applied", columns)}
-						{fold(notObserved, "not-observed", columns)}
+						{fold(notReviewed, "not-reviewed", columns)}
 					</>
 				)
 			}

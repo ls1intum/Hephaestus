@@ -18,14 +18,14 @@ export const FEEDBACK_DESTINATION_DEFS: StatusDefs<FeedbackDestination> = {
 		icon: BotMessageSquareIcon,
 		badgeVariant: "outline",
 		description:
-			"Held back until the developer’s next chat with Heph, then raised there. What is stored is the move to make, not the words, so it is withheld from every admin surface including this one.",
+			"Held back until the developer’s next chat with Heph, then raised there. What is stored is the move to make, not the words, so it is withheld from every admin page, including this one.",
 	},
 	PRACTICE_PAGE: {
-		label: "On their practice pages",
+		label: "On the practice page",
 		icon: UserRoundIcon,
 		badgeVariant: "outline",
 		description:
-			"Shown only on the developer’s own practice pages, which is also what delivers it. The text is withheld from every admin surface, including this one.",
+			"Shown only on the developer’s own practice pages, which is also what delivers it. The text is withheld from every admin page, including this one.",
 	},
 };
 
@@ -43,10 +43,4 @@ export const ADMIN_WITHHELD_TEXT: Partial<
 		detail:
 			"The text was written for the developer’s own practice pages and is withheld from admins.",
 	},
-};
-
-export const OWN_FEEDBACK_DESTINATION_LABELS: Record<FeedbackDestination, string> = {
-	ON_WORK: "On your work",
-	CONVERSATION: "In your conversation with Heph",
-	PRACTICE_PAGE: "On your practice pages",
 };

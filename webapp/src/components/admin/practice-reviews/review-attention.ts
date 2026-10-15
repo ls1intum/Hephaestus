@@ -1,6 +1,5 @@
 import type { ReviewResultCounts } from "@/api/types.gen";
 import type { BadgeVariant } from "@/components/common/status-def";
-import type { WithholdingReason } from "@/components/practice-vocabulary/withholding-defs";
 
 import { PRACTICE_MARKER_THRESHOLDS } from "./review-attention-thresholds";
 
@@ -21,56 +20,6 @@ export function percentText(share: number): string {
 		: `${Math.max(0.1, Math.round(percent * 10) / 10)} %`;
 }
 
-/**
- * Why withheld feedback did not reach the developer, by what it asks of an admin. Only timing is an
- * operating problem: the work moved on before the comment was ready. The review holding a piece back
- * is the review working as meant, and the developer's choice is theirs; anything else, such as an
- * admin's own correction or a setting, is listed as other.
- */
-export type WithheldClass = "TIMING" | "HELD_BY_REVIEW" | "DEVELOPER_CHOICE" | "OTHER";
-
-const REASON_CLASS: Record<WithholdingReason, WithheldClass> = {
-	EVIDENCE_NOT_PERMITTED: "OTHER",
-	NO_EVIDENCE: "OTHER",
-	UNCORROBORATED: "OTHER",
-	ITEM_MERGED: "TIMING",
-	ITEM_CLOSED: "TIMING",
-	STALE_ROLLOUT_REVISION: "TIMING",
-	REVIEWED_VERSION_CHANGED: "TIMING",
-	COMPOSER_WITHHELD: "HELD_BY_REVIEW",
-	NOTHING_NEW: "HELD_BY_REVIEW",
-	REPEATS_DELIVERED_NOTE: "HELD_BY_REVIEW",
-	VOLUME_CAPPED: "HELD_BY_REVIEW",
-	BACKFILL_QUIET: "HELD_BY_REVIEW",
-	NO_AI: "DEVELOPER_CHOICE",
-	DELIVERY_OFF: "DEVELOPER_CHOICE",
-	REACTED_DISAGREE: "DEVELOPER_CHOICE",
-	REACTED_NOT_APPLICABLE: "DEVELOPER_CHOICE",
-	PERSON_SUPPRESSED: "OTHER",
-	RECIPIENT_UNAVAILABLE: "OTHER",
-	REVIEW_CANCELLED: "OTHER",
-	ITEM_GONE: "OTHER",
-	ITEM_STATE_INELIGIBLE: "OTHER",
-	ISSUE_SNAPSHOT_CHANGED: "OTHER",
-	CONVERSATION_EXPIRED: "OTHER",
-	DELIVERY_UNCONFIRMED: "OTHER",
-	EMPTY_AFTER_SANITIZE: "OTHER",
-	PUBLIC_SUBJECT_INELIGIBLE: "OTHER",
-	INSTANCE_SILENCED: "OTHER",
-	FEEDBACK_OFF: "OTHER",
-	WORKSPACE_DISABLED: "OTHER",
-	WORKSPACE_DELIVERY_PAUSED: "OTHER",
-	OUTSIDE_CURRENT_SCOPE: "OTHER",
-	APPROVAL_STALE: "OTHER",
-	APPROVAL_NO_LONGER_ELIGIBLE: "OTHER",
-	PRACTICE_REQUIRES_APPROVAL: "OTHER",
-	RESULT_MARKED_INCORRECT: "OTHER",
-};
-
-export function withheldClass(reason: WithholdingReason): WithheldClass {
-	return REASON_CLASS[reason];
-}
-
 export type PracticeMarker = "NEVER_APPLIES" | "OFTEN_UNDECIDED";
 
 export interface PracticeMarkerDef {
@@ -80,12 +29,12 @@ export interface PracticeMarkerDef {
 
 export const PRACTICE_MARKER_DEFS: Record<PracticeMarker, PracticeMarkerDef> = {
 	NEVER_APPLIES: {
-		label: "Mostly not applicable",
+		label: "Mostly does not apply",
 		reason: (count, whole) =>
 			`Does not apply in ${count} of ${whole} results. Consider turning it off for this workspace.`,
 	},
 	OFTEN_UNDECIDED: {
-		label: "Often undecided",
+		label: "Often could not determine",
 		reason: (count, whole) =>
 			`Could not determine in ${count} of ${whole} results. The review may lack the evidence to decide.`,
 	},

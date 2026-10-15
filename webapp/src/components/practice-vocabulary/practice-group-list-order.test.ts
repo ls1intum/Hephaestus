@@ -31,7 +31,7 @@ describe("sortPracticeGroups", () => {
 		group("well", "Going well"),
 		group("attention", "Needs attention"),
 		group("mixed", "Mixed"),
-		group("silent", "Not observed"),
+		group("silent", "Not reviewed"),
 	];
 	const standings = {
 		well: standing("well", "STRENGTH"),

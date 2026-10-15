@@ -93,7 +93,7 @@ export const AnItemWithoutEvents: Story = {
 	play: async ({ canvas }) => {
 		await expect(
 			canvas.getByText(
-				"This kind of item has no events. It is reviewed when someone requests a review.",
+				"This kind of work has no events. It is reviewed when someone requests a review.",
 			),
 		).toBeVisible();
 	},

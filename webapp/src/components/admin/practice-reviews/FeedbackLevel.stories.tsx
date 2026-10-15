@@ -659,3 +659,20 @@ export const LoadFailed: Story = {
 		await expect(panel.getByRole("button", { name: "Retry" })).toBeEnabled();
 	},
 };
+
+export const HiddenSource: Story = {
+	args: {
+		feedback: ready({
+			...partialPackageFeedbackDetail,
+			textHidden: true,
+			body: null,
+			bodyPreview: null,
+		}),
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		panel.getByRole("heading", { level: 2, name: "Feedback text hidden" });
+		panel.getByText("Feedback text is hidden because access to its sources could not be verified.");
+		await expect(panel.queryByText(/No feedback text is recorded/u)).toBeNull();
+	},
+};

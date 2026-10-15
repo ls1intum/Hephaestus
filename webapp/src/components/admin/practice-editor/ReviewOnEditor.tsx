@@ -50,7 +50,7 @@ export function ReviewOnEditor({
 				<FieldLegend variant="label">Review on</FieldLegend>
 				{bands.length === 0 ? (
 					<FieldDescription>
-						This kind of item has no events. It is reviewed when someone requests a review.
+						This kind of work has no events. It is reviewed when someone requests a review.
 					</FieldDescription>
 				) : (
 					<div className="flex flex-wrap items-start gap-x-6 gap-y-4">
@@ -110,7 +110,7 @@ export function ReviewOnEditor({
 				>
 					<FieldLegend variant="label">When</FieldLegend>
 					<FieldDescription>
-						Review only items in these states. A requested review ignores them.
+						Review only work in these states. A requested review ignores them.
 					</FieldDescription>
 					{itemType.reviewOnStateDimensions.map((dimension) => {
 						const options = dimension.values.flatMap(({ value, label }) =>

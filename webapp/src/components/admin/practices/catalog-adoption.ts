@@ -55,7 +55,6 @@ const adoptablePractice = z.object({
 	reviewedBy: present<ReviewedBy>(),
 }) satisfies z.ZodType<CatalogPracticeSummary>;
 
-export type AdoptionGroup = z.infer<typeof adoptionGroup>;
 export type PracticeAdoptionPreview = z.infer<typeof practiceAdoptionPreview>;
 export type GroupAdoptionPreview = z.infer<typeof groupAdoptionPreview>;
 export type AdoptablePractice = z.infer<typeof adoptablePractice>;

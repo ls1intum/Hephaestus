@@ -256,7 +256,7 @@ export const MovingBetweenGroupsKeepsFocusOnTheRow: Story = {
 	},
 };
 
-export const AnGroupWithAMoveInFlightIsNotADestination: Story = {
+export const AGroupWithAMoveInFlightIsNotADestination: Story = {
 	args: { blockedDestinations: ["quality"] },
 	play: async ({ args, canvas }) => {
 		const menu = await openActions(canvas, "Explain what changed and why");
@@ -279,7 +279,7 @@ export const AnGroupWithAMoveInFlightIsNotADestination: Story = {
 	},
 };
 
-export const AnGroupWithAReorderInFlightStillAcceptsArrivals: Story = {
+export const AGroupWithAReorderInFlightStillAcceptsArrivals: Story = {
 	args: { blockedOrderBuckets: ["delivery"] },
 	play: async ({ args, canvas }) => {
 		const menu = await openActions(canvas, "Explain what changed and why");
@@ -303,7 +303,7 @@ export const AnGroupWithAReorderInFlightStillAcceptsArrivals: Story = {
 };
 
 /** The move itself refuses too, because the caller renders the control and may leave it reachable. */
-export const TheEndsOfAnGroupHaveNowhereToGo: Story = {
+export const TheEndsOfAGroupHaveNowhereToGo: Story = {
 	play: async ({ args, canvas }) => {
 		const first = await openActions(canvas, "Small, reviewable changes");
 		const up = first.getByRole("menuitem", { name: "Move up" });
@@ -319,7 +319,7 @@ export const TheEndsOfAnGroupHaveNowhereToGo: Story = {
 	},
 };
 
-export const ReorderingInsideAnGroup: Story = {
+export const ReorderingInsideAGroup: Story = {
 	play: async ({ args, canvas }) => {
 		const menu = await openActions(canvas, "Explain what changed and why");
 
@@ -329,7 +329,7 @@ export const ReorderingInsideAnGroup: Story = {
 	},
 };
 
-export const AnGroupWithItsOwnMoveInFlightHoldsItsPosition: Story = {
+export const AGroupWithItsOwnMoveInFlightHoldsItsPosition: Story = {
 	args: { disabledGroups: ["delivery"] },
 	play: async ({ args, canvas }) => {
 		await expect(canvas.getByRole("button", { name: "Move Delivery down" })).toHaveAttribute(

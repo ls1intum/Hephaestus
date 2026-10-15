@@ -10,7 +10,7 @@ export const REVIEW_SECTIONS = [
 		id: "feedback-mode",
 		label: "Feedback mode",
 		description:
-			"Choose how feedback reaches developers for the whole workspace. Override it for a group or a single practice only where it needs something different.",
+			"Choose how feedback reaches developers for the whole workspace. Set a different mode for a group or a single practice only where it needs one.",
 	},
 	{
 		id: "automated-review",
@@ -36,5 +36,3 @@ export const reviewSearchSchema = z.object({
 	section: z.enum(REVIEW_SECTION_IDS).optional().catch(undefined),
 	overrides: z.boolean().optional().catch(undefined),
 });
-
-export type ReviewSearch = z.infer<typeof reviewSearchSchema>;

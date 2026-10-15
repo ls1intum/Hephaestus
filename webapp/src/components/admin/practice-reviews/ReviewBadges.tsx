@@ -1,7 +1,7 @@
 import type { ReviewResult } from "@/api/types.gen";
 import type { StatusDef } from "@/components/common/status-def";
 import { StatusBadge } from "@/components/common/StatusBadge";
-import { OUTCOME_DEFS, resultVerdict } from "@/components/practice-vocabulary/outcome-defs";
+import { OUTCOME_DEFS, outcomeLabel } from "@/components/practice-vocabulary/outcome-defs";
 import { REVIEW_ORIGIN_DEFS } from "@/components/practice-vocabulary/review-origin-defs";
 import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
 import { StatusLabel } from "@/components/practice-vocabulary/StatusTooltip";
@@ -10,7 +10,7 @@ export function resultOutcomeDef(
 	outcome: ReviewResult["outcome"],
 	problems: number | undefined,
 ): StatusDef {
-	return { ...OUTCOME_DEFS[outcome], label: resultVerdict(outcome, problems) };
+	return { ...OUTCOME_DEFS[outcome], label: outcomeLabel(outcome, problems) };
 }
 
 export interface ResultOutcomeProps {

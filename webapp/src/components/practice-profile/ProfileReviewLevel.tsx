@@ -36,6 +36,7 @@ import { OwnFeedbackList } from "@/components/profile/OwnFeedbackList";
 import type { FeedbackResponseControls } from "@/components/profile/reviews";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { DrawerBody, DrawerTitle } from "@/components/ui/drawer";
+import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { formatDayTime } from "@/lib/dates";
 import { itemName } from "@/lib/item-kinds";
@@ -289,7 +290,11 @@ function ReviewHead({
 					)}
 					{canAsk && (
 						<Button type="button" disabled={isRequesting} onClick={() => onReviewNow(item.id)}>
-							<PlayIcon aria-hidden data-icon="inline-start" />
+							{isRequesting ? (
+								<Spinner data-icon="inline-start" />
+							) : (
+								<PlayIcon aria-hidden data-icon="inline-start" />
+							)}
 							{isRequesting ? "Requesting review…" : "Request review"}
 						</Button>
 					)}

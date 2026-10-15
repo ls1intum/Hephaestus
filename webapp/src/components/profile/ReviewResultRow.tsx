@@ -17,7 +17,7 @@ import { statusToneClass } from "@/components/common/status-def";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { UNTRUSTED_MARKDOWN_PROSE, UntrustedMarkdown } from "@/components/common/UntrustedMarkdown";
 import { claimCurrentnessNote } from "@/components/practice-vocabulary/claim-currentness";
-import { OUTCOME_DEFS, resultVerdict } from "@/components/practice-vocabulary/outcome-defs";
+import { OUTCOME_DEFS, outcomeLabel } from "@/components/practice-vocabulary/outcome-defs";
 import { PracticePill } from "@/components/practice-vocabulary/PracticePill";
 import { RESULT_MARK_DEFS } from "@/components/practice-vocabulary/result-mark-defs";
 import { REVIEW_ORIGIN_DEFS } from "@/components/practice-vocabulary/review-origin-defs";
@@ -178,6 +178,9 @@ export function ReviewResultRow({
 		<>
 			<span className="flex min-w-0 basis-full flex-col items-start gap-1 text-sm sm:flex-1 sm:basis-0">
 				<span className="font-medium text-foreground">{summary}</span>
+				{result.summary === null && (
+					<span className="text-xs text-muted-foreground">Result text unavailable</span>
+				)}
 				{showPill && <PracticePill name={result.practiceName} />}
 			</span>
 			<span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-2.5 gap-y-1">
@@ -195,7 +198,7 @@ export function ReviewResultRow({
 					)}
 				>
 					<OutcomeIcon className="size-3.5 shrink-0" aria-hidden />
-					{resultVerdict(result.outcome, reasons.problems.length)}
+					{outcomeLabel(result.outcome, reasons.problems.length)}
 				</StatusTooltip>
 				{hasBody && (
 					<ChevronDownIcon

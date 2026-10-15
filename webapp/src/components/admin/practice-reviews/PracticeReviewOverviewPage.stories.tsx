@@ -137,7 +137,7 @@ export const Default: Story = {
 		const delivery = canvas.getByRole("list", { name: "Delivery" }).querySelectorAll(":scope > li");
 		await expect(delivery).toHaveLength(2);
 		await expect(delivery[0]).toHaveTextContent(/^Feedback/u);
-		await expect(delivery[1]).toHaveTextContent(/^By location and reason/u);
+		await expect(delivery[1]).toHaveTextContent(/^Delivered and withheld/u);
 		await expect(delivery[1]?.querySelector("[role=group][aria-label=Failures]")).toHaveTextContent(
 			/^Feedback failed to deliver · 1 of 16 sent6 %/u,
 		);
@@ -317,7 +317,7 @@ export const NeedsAttention: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		canvas.getByText("Mostly not applicable");
+		canvas.getByText("Mostly does not apply");
 	},
 };
 

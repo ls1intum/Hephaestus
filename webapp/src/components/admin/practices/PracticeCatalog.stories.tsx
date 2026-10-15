@@ -527,7 +527,7 @@ export const EmptyDestinations: Story = {
 			if (!(groupSection instanceof HTMLElement)) {
 				throw new Error(`Group ${group.name} not rendered`);
 			}
-			await expect(within(groupSection).getByText("No practices in this group")).toBeVisible();
+			await expect(within(groupSection).getByText("No practices here")).toBeVisible();
 		}
 		await expect(canvas.getByText("Nothing unassigned")).toBeVisible();
 		await expectNoPageOverflow();
@@ -548,7 +548,7 @@ export const CrossGroupDrag: Story = {
 		if (!(destinationGroup instanceof HTMLElement)) {
 			throw new Error("Destination group not rendered");
 		}
-		const destination = within(destinationGroup).getByText("No practices in this group");
+		const destination = within(destinationGroup).getByText("No practices here");
 		const sourceRow = handle.closest('[data-slot="item"]');
 		if (!(sourceRow instanceof HTMLElement)) {
 			throw new Error("Practice row not rendered");
@@ -663,7 +663,7 @@ export const BlockedDestinationDrag: Story = {
 		if (!destinationGroup) {
 			throw new Error("Blocked destination group not rendered");
 		}
-		const destination = within(destinationGroup).getByText("No practices in this group");
+		const destination = within(destinationGroup).getByText("No practices here");
 		const start = handle.getBoundingClientRect();
 		const end = destination.getBoundingClientRect();
 

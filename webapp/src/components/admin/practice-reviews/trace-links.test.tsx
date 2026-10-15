@@ -32,7 +32,7 @@ function renderTrace(
 	const onOpen = vi.fn<(record: RecordRef) => void>();
 	const { container } = render(
 		<ReviewLineageGraph
-			lineage={{ status: "ready", lineage: entry.lineage }}
+			lineage={entry.lineage}
 			here={here ?? { kind: "review" }}
 			defaultDisplay={display}
 			onOpen={onOpen}

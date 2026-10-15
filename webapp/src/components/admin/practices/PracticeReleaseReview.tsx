@@ -41,6 +41,11 @@ type Source = Choices[string];
 export interface PracticeReleaseReviewProps {
 	proposal: PracticeReleaseProposal;
 	pending: "accept" | "decline" | null;
+	/**
+	 * What declining leaves in place and how to undo it. The instance catalog and a workspace both
+	 * render this review, and each has its own source of updates and its own way back to it.
+	 */
+	declineNote: string;
 	onAccept: (choices: Choices) => void;
 	onDecline: () => void;
 }
@@ -48,11 +53,12 @@ export interface PracticeReleaseReviewProps {
 export function PracticeReleaseReview({
 	proposal,
 	pending,
+	declineNote,
 	onAccept,
 	onDecline,
 }: PracticeReleaseReviewProps) {
 	const id = useId();
-	// Without the adopted version, local edits cannot be distinguished from catalog changes.
+	// Without the adopted version, local edits cannot be distinguished from the update's changes.
 	const base: PracticeDefinition | null = proposal.base;
 	const baseKnown = base !== null;
 	const [choices, setChoices] = useState(
@@ -94,8 +100,8 @@ export function PracticeReleaseReview({
 				<Alert variant="warning">
 					<AlertTitle>The version you adopted is not recorded</AlertTitle>
 					<AlertDescription>
-						We cannot tell your edits from the catalog’s changes. Choose a version for each changed
-						field.
+						We cannot tell your edits from the changes in this update. Choose a version for each
+						changed field.
 					</AlertDescription>
 				</Alert>
 			)}
@@ -105,11 +111,15 @@ export function PracticeReleaseReview({
 				</caption>
 				<TableHeader>
 					<TableRow variant="static">
-						<TableHead className="w-38">Field</TableHead>
-						<TableHead>Base</TableHead>
-						<TableHead>Current</TableHead>
-						<TableHead>Proposed</TableHead>
-						<TableHead className="w-42">Use</TableHead>
+						<TableHead scope="col" className="w-38">
+							Field
+						</TableHead>
+						<TableHead scope="col">Base</TableHead>
+						<TableHead scope="col">Current</TableHead>
+						<TableHead scope="col">Proposed</TableHead>
+						<TableHead scope="col" className="w-42">
+							Use
+						</TableHead>
 					</TableRow>
 				</TableHeader>
 				<TableBody>
@@ -174,10 +184,7 @@ export function PracticeReleaseReview({
 					{pending === "decline" ? "Declining update…" : "Decline this update"}
 				</Button>
 			</div>
-			<p className="text-xs text-muted-foreground">
-				Declining keeps your practice as it is until the catalog changes again. Reset to catalog
-				stays available on the practice.
-			</p>
+			<p className="text-xs text-muted-foreground">{declineNote}</p>
 			<AlertDialog open={confirmingAccept} onOpenChange={setConfirmingAccept}>
 				<AlertDialogContent>
 					<AlertDialogHeader>

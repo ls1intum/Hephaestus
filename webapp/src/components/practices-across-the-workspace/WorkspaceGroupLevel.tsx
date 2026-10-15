@@ -94,7 +94,7 @@ function GroupPractices({
 	return (
 		<WorkspaceComparisonTable
 			aria-label={group === undefined ? "Practices" : `Practices of ${group.name}`}
-			subjectHead="Practices"
+			subjectHead="Practice"
 			countHead="Developers with results"
 			state={state.status === "ready" ? { status: "ready", rows } : { status: "loading" }}
 			empty={{

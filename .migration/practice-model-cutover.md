@@ -5,20 +5,23 @@ Old and new runtime roles cannot use the database together.
 There is no rolling upgrade or compatibility period.
 
 Before the outage, test this release's migration on a verified database restore.
+Follow the mandatory [pre-boot isolation procedure](https://docs.hephaestus.build/admin/production-operations-runbook#pre-boot-isolation--mandatory-for-every-restore) before restoring secrets or starting application code.
+Complete the [pilot rehearsal and history checks](https://docs.hephaestus.build/admin/practice-model-cutover#rehearse-the-pilot-upgrade), including the outage measurements.
 Prepare any script changes with the procedure under **Custom practice scripts**.
 Repeat the test on a fresh restore until the migration completes.
 
 Before the upgrade:
 
-1. Quiesce new review submission and provider input.
-2. Apply the script changes tested during the rehearsal through the previous release's server.
-3. Drain active worker operations through the [role drain procedure](https://docs.hephaestus.build/admin/runtime-roles#graceful-drain).
-4. Let active worker reviews finish.
-5. Stop every worker role after its drain completes.
-6. Drain and stop the server and webhook roles.
-7. Make a database backup.
-8. Restore the backup to a test database and verify the restore.
-9. Record the release lock and configuration of the previous release.
+1. Pause [automatic reconciliation](https://docs.hephaestus.build/admin/production-operations-runbook#production-upgrade).
+2. Quiesce new review submission and provider input.
+3. Apply the script changes tested during the rehearsal through the previous release's server.
+4. Drain active worker operations through the [role drain procedure](https://docs.hephaestus.build/admin/runtime-roles#graceful-drain).
+5. Let active worker reviews finish.
+6. Stop every worker role after its drain completes.
+7. Drain and stop the server and webhook roles.
+8. Make a database backup.
+9. Restore the backup under the mandatory isolation procedure and verify the restore.
+10. Record the release lock and configuration of the previous release.
 
 A provider can lose events that arrive while the webhook role is stopped.
 After restart, normal source sync repairs only the events that its adapter can recover.
@@ -29,14 +32,17 @@ Upgrade:
 1. Install this release for the server, worker and webhook roles.
 2. Use this release's verified agent image.
 3. If HEPHAESTUS_IMAGE_AGENT_PI is overridden, update it to the matching agent-pi image.
-4. Start only the server role and wait for the migration to complete.
+4. Start only the server role under the [silent deployment checklist](https://docs.hephaestus.build/admin/production-operations-runbook#silent-deployment-checklist).
+   That procedure requires egress isolation and silent-mode readback before reviews or provider ingress resume.
+   Keep review execution disabled until the history checks pass.
 5. Deploy the matching webapp.
 6. Restore saved custom definitions with tested version 3 scripts.
-7. Start the worker and webhook roles.
+7. Complete the [retained pilot history checks](https://docs.hephaestus.build/admin/practice-model-cutover#check-retained-pilot-history).
 8. Ask developers to update the browser extension.
 9. Update custom API clients before they use practice resources.
-10. Verify one item review and one repository scan in the operator interface.
-11. Check results, withheld reasons and provider-copy receipts.
+10. Start the worker and webhook roles only at the checklist's permitted stage.
+11. Verify one controlled item review and one repository scan under **Prove silence** in that checklist.
+12. Check results, withheld reasons and provider-copy receipts.
 
 **If the migration stops at a precondition.**
 Stop all remaining containers from the previous release before you retry.
@@ -48,16 +54,19 @@ Run the previous release's server until its delivery recovery settles those reco
 Drain and stop it, then retry this release's server.
 Do not clear delivery ownership or provider receipts by hand: the provider can already have accepted the feedback.
 
-If the migration reports another data precondition, keep the previous release and verified backup.
-This includes unsupported job purposes.
-Correct the reported source records before you retry.
+For any other refusal, use the [cutover diagnosis map](https://docs.hephaestus.build/admin/practice-model-cutover#diagnose-a-refused-cutover).
+It identifies source records, supported recovery actions, and cases that need escalation with the previous release retained.
 
 See [Removed settings and redundant data](https://docs.hephaestus.build/contributor/database-migration#removed-settings-and-redundant-data) for the data the cutover removes.
 
-The migration preserves retained result IDs and feedback relationships.
-It does not post migrated feedback again.
+The migration keeps every migrated result as history, including its ID, text, citations, feedback relationships and provider receipts.
+Every migrated result has evidence version 0, regardless of outcome.
+It is not current proof and cannot establish current standing.
+Use a fresh review to establish current standing.
+History views can show retained text when source access and privacy checks permit it.
+
+The migration does not post migrated feedback again.
 Historical unknown visibility stays Unconfirmed. A confirmed sibling copy keeps its delivery time.
-Old positive measurements do not establish the complete current standard merely because their names changed.
 
 **Practice settings.**
 Practice definitions are stored on practice versions.
@@ -172,7 +181,8 @@ Feedback response resolution and usefulness remain independent dimensions.
 Result outcomes and feedback response values are different enums.
 
 **Rollback.**
-Stop this release's roles and restore the verified pre-upgrade backup.
-Start the previous release with its matching images and configuration.
+Follow [failed-migration recovery](https://docs.hephaestus.build/admin/production-operations-runbook#if-migration-fails) to stop roles and restore the verified pre-upgrade backup.
+Complete its [JetStream and provider-divergence procedure](https://docs.hephaestus.build/admin/production-operations-runbook#choose-the-broker-recovery-strategy-before-starting-consumers) before starting consumers.
+Start the previous release with its matching images and configuration under mandatory pre-boot isolation.
 Do not start old binaries against the migrated database.
 The backup does not contain data recorded after the upgrade.

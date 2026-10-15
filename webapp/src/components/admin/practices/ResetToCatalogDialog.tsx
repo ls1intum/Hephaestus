@@ -132,9 +132,11 @@ export function ResetToCatalogDialog({
 								<caption className="sr-only">What the reset changes</caption>
 								<TableHeader>
 									<TableRow variant="static">
-										<TableHead className="w-32">Field</TableHead>
-										<TableHead>Yours</TableHead>
-										<TableHead>Catalog</TableHead>
+										<TableHead scope="col" className="w-32">
+											Field
+										</TableHead>
+										<TableHead scope="col">Yours</TableHead>
+										<TableHead scope="col">Catalog</TableHead>
 									</TableRow>
 								</TableHeader>
 								<TableBody>

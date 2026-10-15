@@ -110,6 +110,9 @@ export function PracticeReviewBatch({
 	const history = pastWork.filter(
 		(batch) => batch.status === "COMPLETED" || batch.status === "CANCELLED",
 	);
+	// A first read that failed says nothing about past reviews or a running one: the error stands in
+	// for the history, and a new estimate waits until the page knows nothing is running.
+	const unknown = isError && batches.length === 0;
 
 	let current: ReactNode;
 	if (active) {
@@ -126,7 +129,11 @@ export function PracticeReviewBatch({
 		);
 	} else {
 		current = (
-			<EstimateSection isLoading={isLoading} isEstimating={isEstimating} onEstimate={onEstimate} />
+			<EstimateSection
+				isLoading={isLoading || unknown}
+				isEstimating={isEstimating}
+				onEstimate={onEstimate}
+			/>
 		);
 	}
 
@@ -147,7 +154,7 @@ export function PracticeReviewBatch({
 
 			{current}
 
-			<HistorySection batches={history} isLoading={isLoading} />
+			{!unknown && <HistorySection batches={history} isLoading={isLoading} />}
 		</div>
 	);
 }

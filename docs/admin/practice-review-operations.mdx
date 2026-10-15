@@ -436,7 +436,7 @@ See [Install § Rollback](./install.mdx#rollback).
 
 Operator review views keep the outcome, practice, reviewed work and delivery history when source access cannot be verified.
 They withhold the result summary, rationale and evidence in that state.
-The API omits the summary instead of returning an empty result.
+The API returns `summary: null`, as specified by the [ReviewResult contract](https://github.com/hephaestus-build/Hephaestus/blob/main/server/openapi.yaml).
 Private practice-page and conversation feedback bodies remain unavailable to operators.
 
 ## Scans and durable retention

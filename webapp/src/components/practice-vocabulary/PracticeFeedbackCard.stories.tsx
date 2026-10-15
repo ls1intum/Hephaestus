@@ -1081,3 +1081,12 @@ export const Loading: Story = {
 		await expect(canvas.queryByRole("button")).toBeNull();
 	},
 };
+
+export const UnverifiedHistory: Story = {
+	args: { card: { ...card, unverifiedHistory: true } },
+	play: async ({ canvas }) => {
+		canvas.getByText(
+			"Unverified history from an earlier review. It does not show whether the current standard is met.",
+		);
+	},
+};

@@ -59,7 +59,7 @@ export interface PracticeGroupDetailDrawerProps {
 	groups: GroupRef[];
 	/**
 	 * The groups with no practice in them. Not in the table: they sit in the fold of groups not
-	 * observed yet. A link to one opens its level, which says the group has no practices.
+	 * reviewed yet. A link to one opens its level, which says the group has no practices.
 	 */
 	emptyGroups?: GroupRef[];
 	groupStandings: Record<string, PracticeGroupStanding | undefined>;

@@ -117,6 +117,8 @@ public class FeedbackReadService {
                 summary.deliveredAt(),
                 summary.bodyPreview(),
                 summary.bodyTruncated(),
+                summary.textHidden(),
+                summary.unverifiedHistory(),
                 summary.resultCount(),
                 summary.copyCounts(),
                 summary.withdrawn(),
@@ -207,6 +209,8 @@ public class FeedbackReadService {
                 row.getDeliveredAt(),
                 body == null ? null : body.substring(0, Math.min(body.length(), PREVIEW_LENGTH)),
                 body != null && body.length() > PREVIEW_LENGTH,
+                !allowed && (row.getBody() != null || children.stream().anyMatch(copy -> copy.getBody() != null)),
+                selected.results().stream().anyMatch(result -> result.getEvidenceVersion() == 0),
                 resultCount,
                 new FeedbackCopyCountsDTO(
                         copyCounts.getOrDefault(FeedbackCopyState.PLANNED, 0),

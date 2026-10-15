@@ -182,7 +182,6 @@ export function reviewLineage(kind: LineageKind, id: string): ReviewLineage {
 
 export const LINEAGE_REVIEW_ID = "11111111-1111-1111-1111-111111111111";
 export const EARLIER_REVIEW_ID = "11111111-1111-1111-1111-000000000000";
-export const LINEAGE_SCAN_ID = "dddddddd-9999-9999-9999-999999999999";
 
 export const at = (time: string): Date => new Date(`2026-07-28T${time}Z`);
 export const dayAt = (day: string, time: string): Date => new Date(`2026-${day}T${time}Z`);

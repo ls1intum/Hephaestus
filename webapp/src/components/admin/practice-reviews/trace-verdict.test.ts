@@ -181,7 +181,7 @@ describe("traceVerdict on a piece of feedback", () => {
 
 	it("says an admin withdrew a piece, before or after it reached the developer", () => {
 		expect(verdictOf("withdrawn", piece).sentence).toBe(
-			"This feedback reached the developer on their practice pages, then an admin withdrew it.",
+			"This feedback reached the developer on the practice page, then an admin withdrew it.",
 		);
 		const unsent = withFeedback(lineageStateCase("state-ready").lineage, { withdrawn: true });
 		expect(traceVerdict(unsent, piece)).toMatchObject({

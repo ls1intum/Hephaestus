@@ -99,7 +99,7 @@ class PracticeProfileReviewIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void inaccessibleEvidenceDoesNotPopulateTheProfile() {
+    void shouldKeepOwnReviewMetadataWhenItsTextIsHidden() {
         data.result(scenario, ResultOutcome.NOT_MET, Instant.now());
         Mockito.when(evidenceAuthorization.permitsAll(
                         ArgumentMatchers.anyLong(), ArgumentMatchers.anyCollection(), ArgumentMatchers.any()))
@@ -109,6 +109,10 @@ class PracticeProfileReviewIntegrationTest extends BaseIntegrationTest {
                 .isOk()
                 .expectBody()
                 .jsonPath("$.totalElements")
+                .isEqualTo(1)
+                .jsonPath("$.content[0].results[0].summary")
+                .isEmpty()
+                .jsonPath("$.content[0].results[0].problems.length()")
                 .isEqualTo(0);
     }
 

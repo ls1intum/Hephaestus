@@ -74,8 +74,8 @@ export function ReviewTimeCard({
 		);
 	} else if (state.status === "loading") {
 		body = (
-			<div role="status" className="flex flex-col gap-3">
-				<span className="sr-only">Loading the review time</span>
+			<div aria-busy="true" className="flex flex-col gap-3">
+				<span className="sr-only">Loading the review time…</span>
 				<Skeleton className="h-6 w-16" />
 				<Skeleton className="h-4 w-full" />
 			</div>

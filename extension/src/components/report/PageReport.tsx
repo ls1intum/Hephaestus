@@ -121,12 +121,15 @@ function Ready({
 	const offer = context.requestAllowed;
 	return (
 		<>
-			{stale === undefined ? null : (
-				<p role="status" className={cn(INDENT, "border-t border-border py-2 text-xs text-warning")}>
-					Not refreshed: {stale.message} The report shows what Hephaestus said at{" "}
-					<time dateTime={context.fetchedAt}>{formatTime(context.fetchedAt)}</time>.
-				</p>
-			)}
+			{/* The live region exists before a failed refresh fills it, so a screen reader announces it. */}
+			<div role="status">
+				{stale === undefined ? null : (
+					<p className={cn(INDENT, "border-t border-border py-2 text-xs text-warning")}>
+						Not refreshed: {stale.message} The report shows what Hephaestus said at{" "}
+						<time dateTime={context.fetchedAt}>{formatTime(context.fetchedAt)}</time>.
+					</p>
+				)}
+			</div>
 			{context.alternatives.length > 0 ? (
 				<div className={cn(INDENT, "border-t border-border py-2.5")}>
 					<WorkspaceChooser

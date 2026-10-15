@@ -253,3 +253,13 @@ export const WithoutALocation: Story = {
 		await expect(canvas.queryByText(/:12/u)).not.toBeInTheDocument();
 	},
 };
+
+export const HiddenSource: Story = {
+	args: { citations: [], hidden: true },
+	play: async ({ canvas }) => {
+		canvas.getByText(
+			"Quoted evidence is hidden because access to its sources could not be verified.",
+		);
+		await expect(canvas.queryByText(/Nothing was quoted/u)).toBeNull();
+	},
+};

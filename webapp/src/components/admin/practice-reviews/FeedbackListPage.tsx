@@ -98,7 +98,7 @@ export function FeedbackListPage({
 			{feedback.status === "loading" && <FeedbackResults state={{ status: "loading" }} />}
 			{feedback.status === "ready" && (
 				<>
-					<ReviewListRefresh failure={feedback.refreshFailure} noun="pieces of feedback" />
+					<ReviewListRefresh failure={feedback.refreshFailure} noun="feedback" />
 					<FeedbackResults state={resultsState(rows, hasFilter ? reset : undefined)} />
 					{rows.length > 0 && <ReviewListEnd {...feedback} noun="feedback" />}
 				</>

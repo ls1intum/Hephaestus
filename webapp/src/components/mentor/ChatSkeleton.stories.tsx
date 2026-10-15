@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect } from "storybook/test";
 
 import { ChatSkeleton } from "./ChatSkeleton";
 
@@ -17,4 +18,9 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+/** The stand-in turns are hidden; a screen reader hears that the conversation loads. */
+export const Default: Story = {
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Loading the conversation…")).toBeVisible();
+	},
+};

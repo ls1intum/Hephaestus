@@ -22,6 +22,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.review.ProductItemQuery;
 import de.tum.cit.aet.hephaestus.practices.review.ProductItemRepository;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewItemRepository;
+import de.tum.cit.aet.hephaestus.practices.review.model.ReviewItem;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustody;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustodyQuery;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -49,11 +50,14 @@ class ResultSourceAuthorizationTest extends BaseUnitTest {
     final UUID job = UUID.randomUUID();
     final Result result =
             Result.builder().id(UUID.randomUUID()).workspaceId(1).itemId(2).build();
+    final ResultRepository results = mock(ResultRepository.class);
+    final ReviewItemRepository assignments = mock(ReviewItemRepository.class);
+    final HistoryCustodyQuery custody = mock(HistoryCustodyQuery.class);
     final ResultSourceAuthorization authorization = new ResultSourceAuthorization(
             items,
-            mock(ReviewItemRepository.class),
-            mock(HistoryCustodyQuery.class),
-            mock(ResultRepository.class),
+            assignments,
+            custody,
+            results,
             json,
             catalog,
             suppression,
@@ -125,5 +129,57 @@ class ResultSourceAuthorizationTest extends BaseUnitTest {
         assertThat(authorization.authorized(proof, receipt(List.of()), purpose)).isFalse();
         when(catalog.isSourceUsePermitted(kind, purpose)).thenReturn(true);
         assertThat(authorization.authorized(proof, receipt(List.of()), purpose)).isTrue();
+    }
+
+    @Test
+    void shouldKeepMigratedHistoryBehindSourceConsentAndErasureChecks() {
+        var history = resultBuilder(result)
+                .evidence(json.readTree("{\"citations\":[{\"sourceKind\":\"hephaestus.observation-history\"}]}"))
+                .evidenceVersion((short) 0)
+                .developerId(7L)
+                .reviewId(job)
+                .build();
+        when(results.findByIdAndWorkspaceId(history.getId(), 1)).thenReturn(Optional.of(history));
+        when(accounts.find(7))
+                .thenReturn(Optional.of(new AccountDirectory.AccountView(
+                        7, Account.Status.ACTIVE, "Person", AiChoice.CLOUD, null, true)));
+        when(source.permits(item, SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW)).thenReturn(true);
+        assertThat(authorization.permitsHistory(1, history.getId(), SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW))
+                .isTrue();
+        assertThat(authorization.authorized(history, receipt(List.of()), SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW))
+                .isFalse();
+        when(assignments.findByWorkspaceIdAndReviewIdAndPracticeIdAndItemId(1, job, history.getPracticeId(), 2))
+                .thenReturn(Optional.of(ReviewItem.builder()
+                        .resultId(history.getId())
+                        .jobId(job)
+                        .build()));
+        when(custody.find(1, List.of(job))).thenReturn(receipt(List.of()));
+        assertThat(authorization.permitsHistory(1, history.getId(), SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW))
+                .isTrue();
+        assertThat(authorization.permits(1, history.getId(), SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW))
+                .isFalse();
+        assertThat(authorization.permitsHistory(1, history.getId(), SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))
+                .isFalse();
+        assertThat(authorization.permitsHistory(1, history.getId(), SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                .isFalse();
+        when(source.permits(item, SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW)).thenReturn(false);
+        assertThat(authorization.permitsHistory(1, history.getId(), SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW))
+                .isFalse();
+        when(source.permits(item, SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW)).thenReturn(true);
+        when(suppression.isAccountSuppressed(7)).thenReturn(true);
+        assertThat(authorization.permitsHistory(1, history.getId(), SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW))
+                .isFalse();
+        when(suppression.isAccountSuppressed(7)).thenReturn(false);
+        when(accounts.find(7))
+                .thenReturn(Optional.of(new AccountDirectory.AccountView(
+                        7, Account.Status.ACTIVE, "Person", AiChoice.NO_AI, null, true)));
+        assertThat(authorization.permitsHistory(1, history.getId(), SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW))
+                .isFalse();
+        when(accounts.find(7))
+                .thenReturn(Optional.of(new AccountDirectory.AccountView(
+                        7, Account.Status.ACTIVE, "Person", AiChoice.CLOUD, null, true)));
+        when(suppression.isReviewJobSuppressed(job)).thenReturn(true);
+        assertThat(authorization.permitsHistory(1, history.getId(), SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW))
+                .isFalse();
     }
 }

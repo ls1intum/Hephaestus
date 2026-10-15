@@ -156,7 +156,7 @@ describe("draftErrors", () => {
 
 	it("refuses a role the item type does not have, and accepts the work itself", () => {
 		expect(errorsOf(draft({ about: "REVIEWER" }))).toStrictEqual([
-			"Choose a role this kind of item has, or The work.",
+			"Choose a role this kind of work has, or The work.",
 		]);
 		expect(errorsOf(draft({ about: null }))).toStrictEqual([]);
 	});

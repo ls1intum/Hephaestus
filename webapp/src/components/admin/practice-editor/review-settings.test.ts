@@ -113,7 +113,7 @@ describe("reviewSettingsProblem", () => {
 				"HEPHAESTUS",
 				mockPullRequestItemType,
 			)?.message,
-		).toBe("Choose states this kind of item offers.");
+		).toBe("Choose states this kind of work offers.");
 	});
 
 	it("checks reads only while Hephaestus reviews the practice", () => {
@@ -132,7 +132,7 @@ describe("reviewSettingsProblem", () => {
 				"HEPHAESTUS",
 				mockIssueItemType,
 			)?.message,
-		).toBe("One chosen source is not offered for this kind of item. Turn it off to continue.");
+		).toBe("One chosen source is not offered for this kind of work. Turn it off to continue.");
 	});
 });
 

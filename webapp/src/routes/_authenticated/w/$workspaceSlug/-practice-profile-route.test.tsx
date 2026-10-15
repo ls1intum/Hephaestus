@@ -866,6 +866,7 @@ describe("own result", () => {
 
 /** One piece of feedback on the page, about the practice the level opens. */
 const feedback: PracticePageFeedback = {
+	unverifiedHistory: false,
 	id: "00000000-0000-0000-0000-000000000201",
 	headline: "Pull requests bundle a fix with a refactor",
 	body: "Reviewers had to follow two intentions in one diff.",
@@ -960,7 +961,9 @@ describe("practice introduction", () => {
 		screen.getByRole("heading", { name: "Pair on schema changes" });
 		screen.getByRole("heading", { level: 4, name: "How to do it" });
 		expect(screen.queryByRole("tab", { name: /^Results/u })).toBeNull();
-		expect(screen.queryByText("Not observed yet")).toBeNull();
+		// The page behind counts its own practices by standing; the level makes up none for this one.
+		const level = screen.getByRole("dialog", { name: "Pair on schema changes" });
+		expect(within(level).queryByText("Not reviewed")).toBeNull();
 	});
 });
 

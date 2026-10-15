@@ -19,7 +19,7 @@ public record ResultEvidenceDTO(
 
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<OpenQuestionDTO> openQuestions) {
     public ResultEvidenceDTO {
-        citations = List.copyOf(citations);
-        openQuestions = List.copyOf(openQuestions);
+        citations = citations == null ? List.of() : List.copyOf(citations);
+        openQuestions = openQuestions == null ? List.of() : List.copyOf(openQuestions);
     }
 }

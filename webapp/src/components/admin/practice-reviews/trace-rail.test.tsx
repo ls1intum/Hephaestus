@@ -23,7 +23,7 @@ const whole = lineageRecords(wholeReview);
 function renderTrace(options: { here?: TraceNode } = {}) {
 	return render(
 		<ReviewLineageGraph
-			lineage={{ status: "ready", lineage: wholeReview }}
+			lineage={wholeReview}
 			here={options.here ?? { kind: "review" }}
 			defaultDisplay={DEFAULT_TRACE_DISPLAY}
 			onOpen={() => undefined}

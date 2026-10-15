@@ -23,8 +23,8 @@ export function ItemFeedbackPage({ feed, responses }: ItemFeedbackPageProps) {
 				feed={feed}
 				responses={responses}
 				skeletonRows={2}
-				emptyTitle="Nothing here is about your work"
-				emptyDescription="Reviews of this work recorded no results about you. The comment that brought you here was written for somebody else."
+				emptyTitle="No review results are available here"
+				emptyDescription="There are no results you can read here. Results can be hidden when access to their sources cannot be verified."
 			/>
 		</div>
 	);

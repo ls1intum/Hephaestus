@@ -138,7 +138,7 @@ describe("practice trend copy", () => {
 			explainStanding("STRENGTH", "practice", support({ standingWork: 0, reviewedWork: 0 })),
 		).toBe("Recent reviews here were almost entirely positive.");
 		expect(explainStanding("NOT_OBSERVED", "practice", support({ standingWork: 1 }))).toBe(
-			"No review has observed this practice in your work yet.",
+			"No review has looked at this practice in your work yet.",
 		);
 	});
 

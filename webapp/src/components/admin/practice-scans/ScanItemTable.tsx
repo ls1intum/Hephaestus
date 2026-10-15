@@ -43,7 +43,7 @@ export interface ScanItemTableProps {
 
 const SKELETON_COLUMNS = ["w-56", "w-40", "w-20", "w-64"] as const;
 
-// Earlier evidence on a not-reviewed row is not this scan's verdict.
+// Earlier evidence on a not-reviewed row is not this scan's result.
 export function ScanItemTable({ state, filter, onFilterChange }: ScanItemTableProps) {
 	return (
 		<section aria-label="Files" className="space-y-4">
@@ -79,7 +79,7 @@ function ScanItemResults({
 			<EmptyState
 				icon={<FileSearchIcon />}
 				headingLevel={2}
-				title={filtered ? "No files match this filter." : "No files listed yet."}
+				title={filtered ? "No files match this filter" : "No files listed yet"}
 			/>
 		);
 	}
@@ -126,6 +126,7 @@ function ScanItemResults({
 				<ScanListMore
 					hasNext={state.hasNext}
 					loadingMore={state.loadingMore}
+					loadMoreError={state.loadMoreError}
 					onLoadMore={state.onLoadMore}
 					noun="files"
 				/>

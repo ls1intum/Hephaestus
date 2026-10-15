@@ -84,7 +84,7 @@ export type ReviewContext =
 	| { status: "error"; message: string };
 
 /**
- * One of the reader's own results on the work, as the report lists it: one practice's verdict and,
+ * One of the reader's own results on the work, as the report lists it: one practice's outcome and,
  * when it is not met, the one line of each problem under it.
  */
 export type ResultRow = Pick<

@@ -165,5 +165,8 @@ export const Error: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText(/could not load reviews of past work/iu)).toBeVisible();
 		await expect(canvas.getByText(/running review is not affected/iu)).toBeVisible();
+		// A failed read knows nothing of the history or of a running review.
+		await expect(canvas.queryByText("No past work reviewed yet")).not.toBeInTheDocument();
+		await expect(canvas.getByRole("button", { name: "Estimate this review" })).toBeDisabled();
 	},
 };

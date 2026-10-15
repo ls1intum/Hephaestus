@@ -33,6 +33,7 @@ import {
 import { DrawerBody } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { problemStatusOf } from "@/lib/problem-detail";
 import { hasText } from "@/lib/text";
 
 import { NeverAppliedBadge } from "./FoldedPractices";
@@ -306,12 +307,21 @@ export function PracticeDetailLevel({
 				<Skeleton className="h-5 w-3/4" />
 			</div>
 		);
-	} else {
+	} else if (problemStatusOf(guidance.error) === 404) {
 		body = (
 			<p className="text-sm text-muted-foreground">
 				We could not find this practice. Check the link, or ask a workspace admin whether this
 				workspace reviews it.
 			</p>
+		);
+	} else {
+		// Any other failure says nothing about whether the practice exists, so it offers the retry.
+		body = (
+			<QueryErrorAlert
+				error={guidance.error}
+				title="We could not load this practice"
+				onRetry={guidance.onRetry}
+			/>
 		);
 	}
 

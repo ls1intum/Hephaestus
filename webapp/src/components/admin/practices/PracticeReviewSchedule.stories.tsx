@@ -215,5 +215,10 @@ export const Error: Story = {
 		await expect(canvas.getByText(/could not load recurring checks/iu)).toBeVisible();
 		await expect(canvas.getByText(/keep running/iu)).toBeVisible();
 		await expect(canvas.getByRole("button", { name: "Retry" })).toBeVisible();
+		// A failed read knows nothing of what is scheduled, so it neither says nothing is nor adds one.
+		await expect(canvas.queryByText("Nothing is checked on a schedule")).not.toBeInTheDocument();
+		await expect(
+			canvas.getByRole("button", { name: "Start checking pull or merge requests" }),
+		).toBeDisabled();
 	},
 };

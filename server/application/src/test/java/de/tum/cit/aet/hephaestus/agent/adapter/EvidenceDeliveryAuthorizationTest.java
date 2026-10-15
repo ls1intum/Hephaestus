@@ -45,4 +45,27 @@ class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
         assertThat(authorization.permits(9, result, SourceUsePurpose.CONVERSATIONAL_MENTORING))
                 .isFalse();
     }
+
+    @Test
+    void shouldReadMigratedWordsWithoutCertifyingThemForNewUse() {
+        var access = mock(CitedSourceAccess.class);
+        var authorization = new EvidenceDeliveryAuthorization(mock(ClasspathSourceCatalogRegistry.class), access);
+        var result = Result.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(1)
+                .evidenceVersion((short) 0)
+                .build();
+        when(access.permitsHistory(1, result.getId(), SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW))
+                .thenReturn(true);
+        assertThat(authorization.permits(1, result, SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW))
+                .isTrue();
+        assertThat(authorization.permitsForNewDelivery(1, List.of(result), SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW))
+                .isEmpty();
+        assertThat(authorization.permits(1, result, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))
+                .isFalse();
+        assertThat(authorization.permits(1, result, SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                .isFalse();
+        assertThat(authorization.permits(2, result, SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW))
+                .isFalse();
+    }
 }

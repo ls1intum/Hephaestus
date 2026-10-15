@@ -1,8 +1,5 @@
-import { CircleIcon } from "lucide-react";
-
 import type { PracticeStanding } from "@/api/types.gen";
 import { statusToneClass, statusValues } from "@/components/common/status-def";
-import { capitalise } from "@/lib/text";
 
 import { PRACTICE_GROUP_STANDING_DEFS } from "./practice-group-standing-defs";
 
@@ -35,20 +32,6 @@ export const STANDING_SEGMENTS: readonly {
 	colorClass: standingColorClass(standing),
 	label: PRACTICE_GROUP_STANDING_DEFS[standing].shortLabel,
 }));
-
-const NONE_YET = "none yet";
-
-/**
- * Developers with no standing in a subject, for either reason that is no verdict. It holds both, so
- * it takes a neutral empty circle rather than either one's icon.
- */
-export const NONE_YET_SEGMENT = {
-	label: capitalise(NONE_YET),
-	/** The label inside a sentence: "7 none yet". */
-	inSentence: NONE_YET,
-	icon: CircleIcon,
-	colorClass: NEUTRAL_GREY,
-};
 
 export type StandingCounts = Partial<Record<Standing, number>>;
 

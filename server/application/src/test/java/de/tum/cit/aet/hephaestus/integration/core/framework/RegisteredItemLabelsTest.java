@@ -8,6 +8,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
@@ -47,9 +48,24 @@ class RegisteredItemLabelsTest extends BaseUnitTest {
                 .isInstanceOf(IllegalStateException.class);
     }
 
+    @Test
+    void shouldLeaveLabelsAbsentWhenNoAdapterSupportsStoredHistory() {
+        var labels = new RegisteredItemLabels(new ItemSourceRegistry(List.of()));
+        assertThat(labels.labels(1, List.of(ITEM))).isEmpty();
+    }
+
+    @Test
+    void shouldRejectAmbiguousSourcesWhenReadingLabels() {
+        var first = mock(ItemSource.class);
+        var second = mock(ItemSource.class);
+        when(first.supports(ITEM)).thenReturn(true);
+        when(second.supports(ITEM)).thenReturn(true);
+        var labels = new RegisteredItemLabels(new ItemSourceRegistry(List.of(first, second)));
+        assertThatThrownBy(() -> labels.labels(1, List.of(ITEM))).isInstanceOf(ItemCaptureException.class);
+    }
+
     private ItemSourceRegistry registry(ItemSource source) {
-        ItemSourceRegistry sources = mock(ItemSourceRegistry.class);
-        when(sources.sourceFor(ITEM)).thenReturn(source);
-        return sources;
+        when(source.supports(ITEM)).thenReturn(true);
+        return new ItemSourceRegistry(List.of(source));
     }
 }

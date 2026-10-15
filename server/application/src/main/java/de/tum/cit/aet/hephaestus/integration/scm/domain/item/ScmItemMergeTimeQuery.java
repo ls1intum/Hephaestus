@@ -66,7 +66,6 @@ public class ScmItemMergeTimeQuery implements ItemMergeTimeQuery {
             if (repositoryId == null) throw unavailable();
             Instant at = row.getMergedAt();
             if (at != null) result.put(row.getId(), at);
-            else if (row.getIsMerged()) throw unavailable();
         }
         return Map.copyOf(result);
     }

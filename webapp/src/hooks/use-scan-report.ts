@@ -57,6 +57,7 @@ function listState<TPage extends { content: readonly TEntry[]; hasNext: boolean 
 			entries: query.data.pages.flatMap((page) => page.content),
 			hasNext: query.hasNextPage,
 			loadingMore: query.isFetchingNextPage,
+			loadMoreError: query.isFetchNextPageError ? query.error : undefined,
 			onLoadMore: () => {
 				void query.fetchNextPage();
 			},

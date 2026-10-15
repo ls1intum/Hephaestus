@@ -1,5 +1,5 @@
 // The words and the arithmetic behind the folds of the Practice profile: practices and groups that
-// never applied to the developer's work, and the ones no review has observed yet. Each reads only
+// never applied to the developer's work, and the ones no review has reviewed yet. Each reads only
 // what the developer's own page already holds. Nothing here names another developer.
 
 import { CircleDashedIcon } from "lucide-react";
@@ -28,36 +28,35 @@ export const NEVER_APPLIED_DEF: StatusDef = {
 };
 
 /**
- * The fold of practices or groups that no review has observed in the reader's work yet. Its words
- * are the standing's: the badge says "Not observed yet", a count "Not observed", and the fold and
- * its sentence say "not observed yet" and "no review has observed … in the last 90 days", so one
- * phrase names the one state.
+ * The fold of practices or groups that no review has reviewed in the reader's work yet. Its words
+ * are the standing's: the badge and a count say "Not reviewed", and the fold and its sentence say
+ * "not reviewed" and "no review … in the last 90 days", so one phrase names the one state.
  */
-export const NOT_OBSERVED_YET = {
-	practiceLabel: "Practices not observed yet",
-	groupLabel: "Practice groups not observed yet",
-	practiceDescription: `No review has observed these practices in your work ${WINDOW}. Each gets a standing once a review does.`,
-	groupDescription: `No review has observed a practice of these groups in your work ${WINDOW}, or the practice did not apply to it. Open a group to see why.`,
+export const NOT_REVIEWED_YET = {
+	practiceLabel: "Practices not reviewed",
+	groupLabel: "Practice groups not reviewed",
+	practiceDescription: `No review ${WINDOW} has looked at these practices in your work. Each gets a standing once a review does.`,
+	groupDescription: `No review ${WINDOW} has looked at a practice of these groups in your work, or the practice did not apply to it. Open a group to see why.`,
 } as const;
 
 export const isNeverApplied = (practice: PracticeStanding): boolean =>
 	practice.standing === "NO_OPPORTUNITY" && practice.doesNotApplyOnly;
 
-/** No review has observed the practice in the reader's work yet. */
-export const isNotObservedYet = (practice: PracticeStanding): boolean =>
+/** No review has reviewed the practice in the reader's work yet. */
+export const isNotReviewedYet = (practice: PracticeStanding): boolean =>
 	practice.standing === "NOT_OBSERVED";
 
 /**
  * The practices split three ways: the ones the table lists, the ones that never applied, and the
- * ones no review has observed yet. Each of the last two folds into one line under the table.
+ * ones no review has reviewed yet. Each of the last two folds into one line under the table.
  */
 export function splitFoldedPractices<T extends PracticeStanding>(
 	practices: readonly T[],
-): { shown: T[]; neverApplied: T[]; notObserved: T[] } {
+): { shown: T[]; neverApplied: T[]; notReviewed: T[] } {
 	return {
-		shown: practices.filter((practice) => !isNeverApplied(practice) && !isNotObservedYet(practice)),
+		shown: practices.filter((practice) => !isNeverApplied(practice) && !isNotReviewedYet(practice)),
 		neverApplied: practices.filter(isNeverApplied),
-		notObserved: practices.filter(isNotObservedYet),
+		notReviewed: practices.filter(isNotReviewedYet),
 	};
 }
 
@@ -66,10 +65,10 @@ export const groupNeverApplied = (practices: readonly PracticeStanding[]): boole
 	practices.length > 0 && practices.every(isNeverApplied);
 
 /**
- * A group in which no review has observed any practice in the reader's work yet. A practice that
+ * A group in which no review has reviewed any practice in the reader's work yet. A practice that
  * never applied counts the same, so a group that mixes the two folds here too, as its own level
  * then shows nothing but folds. A group whose every practice never applied has its own fold.
  */
-export const groupNotObservedYet = (practices: readonly PracticeStanding[]): boolean =>
-	practices.some(isNotObservedYet) &&
-	practices.every((practice) => isNotObservedYet(practice) || isNeverApplied(practice));
+export const groupNotReviewedYet = (practices: readonly PracticeStanding[]): boolean =>
+	practices.some(isNotReviewedYet) &&
+	practices.every((practice) => isNotReviewedYet(practice) || isNeverApplied(practice));

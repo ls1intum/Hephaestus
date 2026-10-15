@@ -71,13 +71,13 @@ export const PRACTICE_GROUP_STANDING_DEFS: Record<
 		practicesTitle: "Practices with nothing to report yet",
 	},
 	NOT_OBSERVED: {
-		shortLabel: "Not observed",
-		label: "Not observed yet",
+		shortLabel: "Not reviewed",
+		label: "Not reviewed",
 		icon: CircleDashedIcon,
 		badgeVariant: "outline",
-		description: "No practice in this group has been observed in your work yet.",
-		predicate: { one: "is not observed yet", many: "are not observed yet" },
-		practicesTitle: "Practices not observed yet",
+		description: "No review has looked at a practice in this group in your work yet.",
+		predicate: { one: "is not reviewed yet", many: "are not reviewed yet" },
+		practicesTitle: "Practices not reviewed",
 	},
 };
 
@@ -95,7 +95,7 @@ export const PRACTICE_STANDING_DEFS: Record<PracticeGroupStandingValue, Practice
 		},
 		NOT_OBSERVED: {
 			...PRACTICE_GROUP_STANDING_DEFS.NOT_OBSERVED,
-			description: "No review has observed this practice in your work yet.",
+			description: "No review has looked at this practice in your work yet.",
 		},
 	};
 

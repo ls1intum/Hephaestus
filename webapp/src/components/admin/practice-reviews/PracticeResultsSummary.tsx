@@ -102,8 +102,8 @@ function Figures({ state }: { state: PracticeResultsSummaryProps["counts"] }) {
 		);
 	}
 	const { results, resultsMarkedIncorrect, feedback } = state.counts;
-	const verdicts = resultSlots(results);
-	const total = slotsTotal(verdicts);
+	const slots = resultSlots(results);
+	const total = slotsTotal(slots);
 	const feedbackTotal = feedbackComposed(feedback);
 	return (
 		<dl
@@ -114,7 +114,7 @@ function Figures({ state }: { state: PracticeResultsSummaryProps["counts"] }) {
 			)}
 		>
 			<Figure label="Results" value={String(total)}>
-				{verdicts
+				{slots
 					.filter((slot) => slot.count > 0)
 					.map((slot) => `${slot.count} ${slot.label}`)
 					.join(" · ")}

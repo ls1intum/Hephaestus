@@ -41,6 +41,8 @@ public record ReviewFeedbackDTO(
         String bodyPreview,
 
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean bodyTruncated,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean textHidden,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean unverifiedHistory,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int resultCount,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) FeedbackCopyCountsDTO copyCounts,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean withdrawn,

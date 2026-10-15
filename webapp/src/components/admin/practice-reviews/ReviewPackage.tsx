@@ -18,14 +18,14 @@ import {
 import { FeedbackBody } from "./FeedbackBody";
 
 export interface ReviewPackageProps {
-	feedback: Pick<ReviewFeedbackDetail, "destination" | "copies">;
+	feedback: Pick<ReviewFeedbackDetail, "destination" | "copies" | "body" | "textHidden">;
 	defaultExpanded?: boolean;
 }
 
 // Private destinations must hide copy text and counts even when the caller supplies them.
 export function ReviewPackage({ feedback, defaultExpanded = false }: ReviewPackageProps) {
-	if (ADMIN_WITHHELD_TEXT[feedback.destination] !== undefined) {
-		return <FeedbackBody feedback={{ destination: feedback.destination, body: null }} />;
+	if (feedback.textHidden || ADMIN_WITHHELD_TEXT[feedback.destination] !== undefined) {
+		return <FeedbackBody feedback={feedback} />;
 	}
 	const copies = [...feedback.copies].sort((a, b) => a.position - b.position);
 	const summaries = copies.filter((copy) => copy.kind === "SUMMARY");
@@ -39,7 +39,7 @@ export function ReviewPackage({ feedback, defaultExpanded = false }: ReviewPacka
 						def={FEEDBACK_COPY_STATE_DEFS[summary.state]}
 						className="text-xs text-muted-foreground"
 					/>
-					<FeedbackBody feedback={{ destination: feedback.destination, body: summary.body }} />
+					<FeedbackBody feedback={{ ...feedback, body: summary.body ?? feedback.body }} />
 				</div>
 			))}
 			{notes.length > 0 ? (

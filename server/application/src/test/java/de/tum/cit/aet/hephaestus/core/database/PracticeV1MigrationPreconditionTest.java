@@ -41,6 +41,12 @@ class PracticeV1MigrationPreconditionTest {
                     "person-owned data remains for an erased identity",
                     "DELETE FROM person_suppression WHERE id='00000000-0000-0000-0000-000000999999'"),
             new Corruption(
+                    "UPDATE feedback SET delivery_state='PARTIALLY_FAILED' WHERE"
+                            + " id='00000000-0000-0000-0000-000000992312'",
+                    "partial delivery has no confirmed appearance",
+                    "UPDATE feedback SET delivery_state='UNCONFIRMED' WHERE"
+                            + " id='00000000-0000-0000-0000-000000992312'"),
+            new Corruption(
                     "UPDATE observation SET evidence=jsonb_set(evidence,'{citations}','{}'::jsonb) WHERE"
                             + " id='00000000-0000-0000-0000-000000992141'",
                     "invalid released citations",

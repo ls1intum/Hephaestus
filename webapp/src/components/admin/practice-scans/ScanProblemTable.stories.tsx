@@ -66,7 +66,7 @@ export const NoMatches: Story = {
 	args: { state: ready([]), filter: "UPDATED" },
 	play: async ({ canvas }) => {
 		await expect(
-			canvas.getByRole("heading", { name: "No problems match these filters." }),
+			canvas.getByRole("heading", { name: "No problems match this filter" }),
 		).toBeVisible();
 	},
 };
@@ -80,7 +80,7 @@ export const NoProblemsWithWithholding: Story = {
 	},
 	play: async ({ canvas }) => {
 		await expect(
-			canvas.getByRole("heading", { name: "This scan recorded no problems." }),
+			canvas.getByRole("heading", { name: "This scan recorded no problems" }),
 		).toBeVisible();
 		await expect(
 			canvas.getByText(

@@ -1,7 +1,7 @@
 import { useId } from "react";
 
 import { claimCurrentnessNote } from "@/components/practice-vocabulary/claim-currentness";
-import { OUTCOME_DEFS, resultVerdict } from "@/components/practice-vocabulary/outcome-defs";
+import { OUTCOME_DEFS, outcomeLabel } from "@/components/practice-vocabulary/outcome-defs";
 import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
 
 import { cn } from "cn";
@@ -15,7 +15,7 @@ export interface ResultListProps {
 	onRetry: () => void;
 }
 
-function verdict(row: ResultRow) {
+function outcomeLine(row: ResultRow) {
 	let tone = "text-muted-foreground";
 	if (row.outcome === "MET") {
 		tone = "text-success";
@@ -24,7 +24,7 @@ function verdict(row: ResultRow) {
 	}
 	return {
 		def: OUTCOME_DEFS[row.outcome],
-		label: resultVerdict(row.outcome, row.problems.length),
+		label: outcomeLabel(row.outcome, row.problems.length),
 		tone,
 		severity:
 			row.outcome === "NOT_MET" && row.severity !== null
@@ -34,7 +34,7 @@ function verdict(row: ResultRow) {
 }
 
 function Result({ row }: { row: ResultRow }) {
-	const { def, label, tone, severity } = verdict(row);
+	const { def, label, tone, severity } = outcomeLine(row);
 	const Icon = def.icon;
 	const currentnessNote = claimCurrentnessNote(row.currentness);
 	return (

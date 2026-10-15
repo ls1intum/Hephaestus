@@ -8,6 +8,7 @@ import {
 	PracticeTabsRail,
 	PracticeTabsTrigger,
 } from "@/components/common/practice-tabs";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { PageLayout } from "@/components/layout/PageLayout";
 import {
@@ -20,7 +21,7 @@ import {
 	SCAN_COMPARISON_DEFS,
 } from "@/components/practice-vocabulary/scan-baseline-defs";
 import type { ScanEntryStatus } from "@/components/practice-vocabulary/scan-entry-defs";
-import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
@@ -69,7 +70,6 @@ export interface ScanReportPageProps {
 	exportSarif: ScanAction;
 }
 
-export const SCAN_LOAD_ERROR = "We could not load this scan. Try again.";
 export const PARTIAL_SENTENCE =
 	"The scan did not finish. These counts cover only the work it reached.";
 
@@ -88,16 +88,11 @@ export function ScanReportPage(props: ScanReportPageProps) {
 		return (
 			<PageLayout>
 				<BackToScans workspaceSlug={workspaceSlug} />
-				<Alert variant="destructive">
-					<AlertCircleIcon />
-					<AlertTitle>{SCAN_LOAD_ERROR}</AlertTitle>
-					<AlertDescription>{problemDetailOf(state.error, "")}</AlertDescription>
-					<AlertAction>
-						<Button type="button" variant="outline" size="sm" onClick={state.onRetry}>
-							Retry
-						</Button>
-					</AlertAction>
-				</Alert>
+				<QueryErrorAlert
+					error={state.error}
+					title="We could not load this scan"
+					onRetry={state.onRetry}
+				/>
 			</PageLayout>
 		);
 	}
@@ -184,10 +179,10 @@ function LoadedReport({
 					</div>
 				</header>
 				{active && cancel.error !== undefined && (
-					<ActionError title="We could not cancel the scan." error={cancel.error} />
+					<ActionError title="We could not cancel the scan" error={cancel.error} />
 				)}
 				{!active && exportSarif.error !== undefined && (
-					<ActionError title="We could not export the SARIF file." error={exportSarif.error} />
+					<ActionError title="We could not export the SARIF file" error={exportSarif.error} />
 				)}
 			</div>
 

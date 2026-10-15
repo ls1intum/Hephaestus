@@ -114,9 +114,14 @@ export function PracticeReviewSchedule({
 }: PracticeReviewScheduleProps) {
 	const scheduledKinds = new Set(schedules.map((schedule) => schedule.itemKind));
 	const availableKinds = ITEM_KIND_ITEMS.filter((kind) => !scheduledKinds.has(kind.value));
+	// A first read that failed leaves no list to show: the error stands in for it, and "nothing is
+	// scheduled" would be a claim the page cannot make.
+	const unknown = isError && schedules.length === 0;
 
 	let scheduleList: ReactNode;
-	if (isLoading) {
+	if (unknown) {
+		scheduleList = null;
+	} else if (isLoading) {
 		scheduleList = (
 			<div className="space-y-2" aria-hidden>
 				<Skeleton className="h-16 w-full" />
@@ -192,7 +197,7 @@ export function PracticeReviewSchedule({
 						kinds={availableKinds}
 						initial={null}
 						isSaving={isSaving}
-						disabled={isLoading}
+						disabled={isLoading || unknown}
 						onSubmit={onCreate}
 					/>
 				</section>

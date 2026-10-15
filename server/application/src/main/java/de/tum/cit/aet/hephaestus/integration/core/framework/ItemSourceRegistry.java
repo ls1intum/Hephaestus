@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSource;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -16,12 +17,16 @@ public class ItemSourceRegistry {
     }
 
     public ItemSource sourceFor(ItemRef item) {
+        return findSource(item)
+                .orElseThrow(
+                        () -> new ItemCaptureException(ItemCaptureCode.SOURCE_NOT_READY, "No source supports item"));
+    }
+
+    public Optional<ItemSource> findSource(ItemRef item) {
         List<ItemSource> matching =
                 sources.stream().filter(s -> s.supports(item)).toList();
-        if (matching.size() != 1)
-            throw new ItemCaptureException(
-                    ItemCaptureCode.SOURCE_NOT_READY,
-                    matching.isEmpty() ? "No source supports item" : "Multiple sources support item");
-        return matching.getFirst();
+        if (matching.size() > 1)
+            throw new ItemCaptureException(ItemCaptureCode.SOURCE_NOT_READY, "Multiple sources support item");
+        return matching.stream().findFirst();
     }
 }

@@ -186,7 +186,11 @@ export function ResultLevel({
 							<Section level={4} size="sm" title="Problems">
 								<ol aria-label="Problems" className="space-y-8">
 									{problems.map((problem) => (
-										<ProblemItem key={problem.id} problem={problem} />
+										<ProblemItem
+											key={problem.id}
+											problem={problem}
+											hidden={record.evidenceHidden}
+										/>
 									))}
 								</ol>
 							</Section>
@@ -334,7 +338,7 @@ function resultNow(result: ReviewResultDetail): ReactNode {
 	return undefined;
 }
 
-function ProblemItem({ problem }: { problem: Problem }) {
+function ProblemItem({ problem, hidden }: { problem: Problem; hidden: boolean }) {
 	return (
 		<li className="space-y-3">
 			<div className="flex flex-wrap items-start gap-2">
@@ -346,7 +350,7 @@ function ProblemItem({ problem }: { problem: Problem }) {
 					<UntrustedMarkdown>{problem.explanation}</UntrustedMarkdown>
 				</div>
 			)}
-			<ResultEvidence citations={problem.citations} />
+			<ResultEvidence citations={problem.citations} hidden={hidden} />
 			{hasText(problem.nextStep) && (
 				<div className="space-y-1 text-sm">
 					<p className="font-medium">Next step</p>

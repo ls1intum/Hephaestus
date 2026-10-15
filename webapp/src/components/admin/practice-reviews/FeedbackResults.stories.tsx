@@ -241,7 +241,7 @@ export const EveryLocation: Story = {
 		canvas.getByText("With Heph in the app");
 		canvas.getByText("With Heph in Slack");
 		canvas.getByText("In conversation");
-		canvas.getByText("On their practice pages");
+		canvas.getByText("On the practice page");
 		await expectNoPageOverflow();
 	},
 };

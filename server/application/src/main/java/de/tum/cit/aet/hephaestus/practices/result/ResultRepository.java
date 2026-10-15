@@ -48,6 +48,9 @@ public interface ResultRepository extends JpaRepository<Result, UUID>, ResultQue
         """, nativeQuery = true)
     int deleteWithoutFeedbackBasis(long workspaceId, UUID[] ids);
 
+    Optional<Result> findFirstByWorkspaceIdAndDeveloperIdOrderByRecordedAtDescIdDesc(
+            long workspaceId, long developerId);
+
     Optional<Result> findByIdAndWorkspaceId(UUID id, long workspaceId);
 
     Optional<Result> findByIdAndDeveloperIdAndWorkspaceId(UUID id, long developerId, long workspaceId);

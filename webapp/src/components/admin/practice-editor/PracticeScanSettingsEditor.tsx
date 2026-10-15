@@ -83,7 +83,7 @@ export function PracticeScanSettingsEditor({
 		return value.enabled ? (
 			<div className="space-y-2">
 				<p className="text-sm text-muted-foreground">
-					This kind of item no longer offers scans. The saved scan settings stay until you remove
+					This kind of work no longer offers scans. The saved scan settings stay until you remove
 					them.
 				</p>
 				<Button

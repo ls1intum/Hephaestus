@@ -2,8 +2,6 @@ import { ChevronsDownUpIcon, ChevronsUpDownIcon } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
 import type { ReviewDetail, ReviewLineage } from "@/api/types.gen";
-import type { PanelState } from "@/components/common/panel-state";
-import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { useNow } from "@/components/common/use-now";
 import type { ReviewOrigin } from "@/components/practice-vocabulary/review-origin-defs";
 import { Button } from "@/components/ui/button";
@@ -14,7 +12,6 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { formatWeekdayDay } from "@/lib/dates";
 
@@ -61,8 +58,9 @@ import { resultRows } from "./TraceResultTable";
 import { traceStepFacts } from "./TraceStepFacts";
 import { type StoryContext, StoryNodes } from "./TraceStoryNode";
 
+/** The chain once it is in: `TraceLevel` owns its loading and error states. */
 export interface ReviewLineageGraphProps {
-	lineage: PanelState<{ lineage: ReviewLineage }>;
+	lineage: ReviewLineage;
 	/**
 	 * The record the trace was opened for, marked "You started here" and ringed: its path is drawn
 	 * strong. Opening another record over the trace leaves the mark where it is. Absent, nothing is
@@ -85,29 +83,7 @@ export interface ReviewLineageGraphProps {
 	position?: { index: number; total: number };
 }
 
-export function ReviewLineageGraph({ lineage: state, ...props }: ReviewLineageGraphProps) {
-	if (state.status === "loading") {
-		return <LineageSkeleton />;
-	}
-	if (state.status === "error") {
-		return (
-			<QueryErrorAlert
-				error={state.error}
-				title="We could not load this trace"
-				onRetry={state.onRetry}
-			/>
-		);
-	}
-	return <Story {...props} lineage={state.lineage} />;
-}
-
-// ------------------------------------------------------------------------------------------------
-// The story
-// ------------------------------------------------------------------------------------------------
-
-type StoryProps = Omit<ReviewLineageGraphProps, "lineage"> & { lineage: ReviewLineage };
-
-function Story({
+export function ReviewLineageGraph({
 	lineage: full,
 	here,
 	onOpen,
@@ -119,7 +95,7 @@ function Story({
 	review,
 	origin,
 	position,
-}: StoryProps) {
+}: ReviewLineageGraphProps) {
 	const now = new Date(useNow());
 	const [ownDisplay, setOwnDisplay] = useState<TraceDisplay>(defaultDisplay);
 	const [ownFilter, setOwnFilter] = useState<TraceFilter>(ALL_STEPS);
@@ -517,22 +493,4 @@ function pathResults(
 		return feedback === undefined ? undefined : sourcesOf(feedback, numbered);
 	}
 	return undefined;
-}
-
-/** The story's steps, in the shape they land in. */
-function LineageSkeleton() {
-	return (
-		<div aria-hidden className="space-y-3">
-			<Skeleton className="h-3 w-24" />
-			{[1, 1, 2, 2].map((lines, index) => (
-				<div key={index} className="flex gap-2">
-					<Skeleton className="size-[11px] shrink-0 rounded-full" />
-					<div className="flex-1 space-y-1.5">
-						<Skeleton className="h-3 w-3/4" />
-						{lines > 1 && <Skeleton className="h-10 w-full" />}
-					</div>
-				</div>
-			))}
-		</div>
-	);
 }

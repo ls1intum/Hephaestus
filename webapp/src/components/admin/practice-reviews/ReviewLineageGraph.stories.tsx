@@ -21,8 +21,6 @@ import type { TraceNode } from "./review-trace";
 import { ReviewLineageGraph } from "./ReviewLineageGraph";
 import { DEFAULT_TRACE_DISPLAY, FULL_TRACE_DISPLAY } from "./trace-display";
 
-const ready = (value: ReviewLineage) => ({ status: "ready" as const, lineage: value });
-
 const meta = {
 	component: ReviewLineageGraph,
 	tags: ["autodocs"],
@@ -34,7 +32,7 @@ const meta = {
 		),
 	],
 	args: {
-		lineage: ready(lineageResultFocus),
+		lineage: lineageResultFocus,
 		here: { kind: "result", id: LINEAGE_RESULT.cache404 },
 		onOpen: fn(),
 	},
@@ -133,7 +131,7 @@ export const LegendOpen: Story = {
  * words only wrap a little earlier.
  */
 export const ConnectionsKeepTheSteps: Story = {
-	args: { lineage: ready(wholeReview), here: undefined },
+	args: { lineage: wholeReview, here: undefined },
 	play: async ({ canvasElement, userEvent }) => {
 		const content = () =>
 			stepsOf(canvasElement)
@@ -152,7 +150,7 @@ export const ConnectionsKeepTheSteps: Story = {
 
 export const FeedbackStory: Story = {
 	args: {
-		lineage: ready(lineageFeedbackFocus),
+		lineage: lineageFeedbackFocus,
 		here: { kind: "feedback", id: LINEAGE_FEEDBACK.onGitHub },
 	},
 	play: async ({ canvasElement }) => {
@@ -168,7 +166,7 @@ export const FeedbackStory: Story = {
 
 /** A piece of work's story: the work is "You started here", and its newest review tells the rest. */
 export const WorkStory: Story = {
-	args: { lineage: ready(wholeReview), here: { kind: "work" } },
+	args: { lineage: wholeReview, here: { kind: "work" } },
 	play: async ({ canvasElement }) => {
 		await expect(hereOf(canvasElement)).toHaveAttribute("data-lineage-node", "work");
 		await expect(stepsOf(canvasElement).querySelectorAll('[data-step="feedback"]')).toHaveLength(8);
@@ -176,7 +174,7 @@ export const WorkStory: Story = {
 };
 
 export const AllShown: Story = {
-	args: { lineage: ready(wholeReview), here: undefined, defaultDisplay: FULL_TRACE_DISPLAY },
+	args: { lineage: wholeReview, here: undefined, defaultDisplay: FULL_TRACE_DISPLAY },
 	play: async ({ canvas, canvasElement, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Expand all" }));
 		await expect(verdictOf(canvasElement)).toHaveTextContent(
@@ -195,7 +193,7 @@ export const AllShown: Story = {
 };
 
 export const DeliveredFeedback: Story = {
-	args: { lineage: ready(wholeReview), here: { kind: "feedback", id: LINEAGE_FEEDBACK.onGitHub } },
+	args: { lineage: wholeReview, here: { kind: "feedback", id: LINEAGE_FEEDBACK.onGitHub } },
 	play: async ({ canvasElement }) => {
 		await expect(verdictOf(canvasElement)).toHaveTextContent(
 			"This feedback reached the developer on GitHub.",
@@ -205,7 +203,7 @@ export const DeliveredFeedback: Story = {
 };
 
 export const ResultTable: Story = {
-	args: { lineage: ready(wholeReview), here: { kind: "review" } },
+	args: { lineage: wholeReview, here: { kind: "review" } },
 	play: async ({ canvas, canvasElement, userEvent }) => {
 		const table = () => canvasElement.querySelector('[data-trace-table="results"]');
 		await expect(table()).toBeNull();
@@ -222,7 +220,7 @@ export const ResultTable: Story = {
 };
 
 export const FeedbackTable: Story = {
-	args: { lineage: ready(wholeReview), here: { kind: "review" } },
+	args: { lineage: wholeReview, here: { kind: "review" } },
 	play: async ({ canvasElement }) => {
 		const tables = [...canvasElement.querySelectorAll('[data-trace-table="feedback"]')];
 		await expect(tables).toHaveLength(1);
@@ -234,7 +232,7 @@ export const FeedbackTable: Story = {
 
 /** On a phone, the tables stack their rows: no column runs off the sheet. */
 export const NarrowSheetStacks: Story = {
-	args: { lineage: ready(wholeReview), here: { kind: "review" } },
+	args: { lineage: wholeReview, here: { kind: "review" } },
 	decorators: [
 		(Story) => (
 			<div className="w-[22rem] max-w-full">
@@ -248,14 +246,6 @@ export const NarrowSheetStacks: Story = {
 			await expect(table.scrollWidth).toBeLessThanOrEqual(table.clientWidth + 1);
 		}
 		await expect(canvasElement.scrollWidth).toBeLessThanOrEqual(canvasElement.clientWidth + 1);
-	},
-};
-
-/** While the chain loads, the rail in the shape it lands in. */
-export const Loading: Story = {
-	args: { lineage: { status: "loading" } },
-	play: async ({ canvas }) => {
-		await expect(canvas.queryByRole("group", { name: "How this came about" })).toBeNull();
 	},
 };
 
@@ -320,7 +310,7 @@ export const OpenAStep: Story = {
 };
 
 export const OnlyFeedback: Story = {
-	args: { lineage: ready(wholeReview), here: { kind: "review" }, filter: { kind: "feedback" } },
+	args: { lineage: wholeReview, here: { kind: "review" }, filter: { kind: "feedback" } },
 	play: async ({ canvasElement }) => {
 		await expect(showToggle(canvasElement, "Siblings")).toBeDisabled();
 		await expect(
@@ -334,7 +324,7 @@ export const OnlyFeedback: Story = {
 
 /** Only what was lost: the feedback that never reached the developer, and nothing that arrived. */
 export const OnlyLosses: Story = {
-	args: { lineage: ready(wholeReview), here: { kind: "review" }, filter: { kind: "losses" } },
+	args: { lineage: wholeReview, here: { kind: "review" }, filter: { kind: "losses" } },
 	play: async ({ canvasElement }) => {
 		const pieces = [...stepsOf(canvasElement).querySelectorAll('[data-step="feedback"]')];
 		for (const piece of pieces) {
@@ -347,7 +337,7 @@ export const OnlyLosses: Story = {
 
 export const OnlyOnePractice: Story = {
 	args: {
-		lineage: ready(wholeReview),
+		lineage: wholeReview,
 		here: { kind: "review" },
 		filter: { kind: "practice", practiceSlug: "errors-carry-context" },
 	},
@@ -440,7 +430,7 @@ async function expectCentredSoon(root: HTMLElement) {
 }
 
 export const ConnectionsMeetEveryCardInTheMiddle: Story = {
-	args: { lineage: ready(mixedHeights), here: undefined, defaultDisplay: FULL_TRACE_DISPLAY },
+	args: { lineage: mixedHeights, here: undefined, defaultDisplay: FULL_TRACE_DISPLAY },
 	decorators: [
 		(Story) => (
 			<div data-connector-frame className="w-(--frame) max-w-full" style={{ "--frame": "34rem" }}>
@@ -468,7 +458,7 @@ export const ConnectionsMeetEveryCardInTheMiddle: Story = {
 
 export const ConnectionsManyLines: Story = {
 	args: {
-		lineage: ready(wholeReviewManyFeedback),
+		lineage: wholeReviewManyFeedback,
 		here: { kind: "review" },
 		defaultDisplay: { ...DEFAULT_TRACE_DISPLAY, siblings: true, connections: true },
 	},
@@ -496,7 +486,7 @@ const STATE_PIECE: TraceNode = { kind: "feedback", id: STATE_FEEDBACK_ID };
 
 function stateCaseArgs(key: string, here?: TraceNode) {
 	const entry = lineageStateCase(key);
-	return { lineage: ready(entry.lineage), here: here ?? STATE_PIECE, review: entry.review };
+	return { lineage: entry.lineage, here: here ?? STATE_PIECE, review: entry.review };
 }
 
 export const BottleneckReviewFailed: Story = {
@@ -527,7 +517,7 @@ export const BottleneckNarrow: Story = {
 };
 
 export const ExpandAllSaysEachThingOnce: Story = {
-	args: { lineage: ready(wholeReview), here: { kind: "review" } },
+	args: { lineage: wholeReview, here: { kind: "review" } },
 	play: async ({ canvas, canvasElement, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Expand all" }));
 		const boxes = [...canvasElement.querySelectorAll<HTMLElement>("[data-step-facts]")];

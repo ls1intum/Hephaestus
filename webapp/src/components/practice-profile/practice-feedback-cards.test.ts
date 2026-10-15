@@ -50,6 +50,7 @@ const evidence = (n: number, recordedAt: string): PracticePageEvidence => ({
 });
 
 const feedback: PracticePageFeedback = {
+	unverifiedHistory: false,
 	id: "f1",
 	headline: "Descriptions name the what, rarely the why",
 	body: "#16 and #17 list the files touched.",

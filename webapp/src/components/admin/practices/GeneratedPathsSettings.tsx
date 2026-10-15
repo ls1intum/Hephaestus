@@ -25,9 +25,9 @@ export function GeneratedPathsSettings(props: GeneratedPathsSettingsProps) {
 					Generated paths
 				</h2>
 				<p className="text-sm text-muted-foreground">
-					Mark intentionally committed generated output for each repository. Reviews keep it as
-					generated content, not hand-written work, in item reviews and in scans. Review scope
-					changes do not clear these settings.
+					Mark intentionally committed generated output for each repository. Reviews and scans treat
+					it as generated content, not hand-written work. Review scope changes do not clear these
+					settings.
 				</p>
 			</div>
 			{repositories.status === "loading" && <Skeleton className="h-32 w-full" />}
@@ -39,7 +39,10 @@ export function GeneratedPathsSettings(props: GeneratedPathsSettingsProps) {
 				/>
 			)}
 			{repositories.status === "ready" && repositories.options.length === 0 && (
-				<p className="text-sm text-muted-foreground">No monitored repositories.</p>
+				<p className="text-sm text-muted-foreground">
+					No repositories are monitored yet. Each monitored repository gets its own generated paths
+					here.
+				</p>
 			)}
 			{repositories.status === "ready" &&
 				repositories.options.map((option) => (

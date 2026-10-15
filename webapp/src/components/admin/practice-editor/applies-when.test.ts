@@ -57,7 +57,7 @@ describe("parseAppliesWhen", () => {
 
 	it("permits a condition only when the item type can check it", () => {
 		expect(parseAppliesWhen(draft(swift.anyOf), mockIssueItemType).clausesError).toBe(
-			"This kind of item cannot check one of these conditions.",
+			"This kind of work cannot check one of these conditions.",
 		);
 	});
 

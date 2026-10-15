@@ -250,7 +250,8 @@ public class PracticePageFeedbackService {
                 card.withdrawn() ? null : card.closedAt(),
                 card.withdrawn() ? null : card.closedBy(),
                 card.withdrawn() ? null : card.response(),
-                card.withdrawn());
+                card.withdrawn(),
+                card.evidence().stream().anyMatch(result -> result.getEvidenceVersion() == 0));
     }
 
     private static @Nullable String guidance(Practice practice, String key) {

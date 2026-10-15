@@ -43,7 +43,7 @@ import {
 	type PracticeReviewWorkspaceUpdate,
 } from "@/components/admin/practices/PracticeReviewSettings";
 import {
-	PracticeDefinitionSkeleton,
+	PracticeTreeSkeleton,
 	ReviewSettingsSkeleton,
 } from "@/components/admin/practices/PracticeSkeletons";
 import {
@@ -136,7 +136,7 @@ function FeedbackModeSection({
 
 	const queries = [settingsQuery, rollupQuery, groupsQuery, practicesQuery];
 	if (queries.some((query) => query.isPending)) {
-		return <PracticeDefinitionSkeleton />;
+		return <PracticeTreeSkeleton groups={3} practicesPerGroup={3} />;
 	}
 
 	const error = queries.find((query) => query.error)?.error;

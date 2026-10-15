@@ -14,7 +14,7 @@ import { GroupName } from "@/components/practice-vocabulary/GroupName";
 import {
 	type Outcome,
 	OUTCOME_DEFS,
-	resultVerdict,
+	outcomeLabel,
 } from "@/components/practice-vocabulary/outcome-defs";
 import { PracticePill } from "@/components/practice-vocabulary/PracticePill";
 import { RESULT_MARK_DEFS } from "@/components/practice-vocabulary/result-mark-defs";
@@ -214,7 +214,7 @@ export function ReviewPracticeTable({
 											<span className="font-medium">{result.summary.trim()}</span>
 										)}
 										<span className="text-muted-foreground">
-											{resultVerdict(result.outcome, result.problems.length)}
+											{outcomeLabel(result.outcome, result.problems.length)}
 										</span>
 										{result.markedIncorrectAt !== null && (
 											<StatusBadge def={RESULT_MARK_DEFS.INCORRECT} />
@@ -284,9 +284,13 @@ function PracticesFrame({ busy = false, children }: { busy?: boolean; children: 
 			<Table aria-label={TABLE_LABEL} aria-busy={busy || undefined} className="min-w-152">
 				<TableHeader>
 					<TableRow>
-						<TableHead className="w-40">Outcome</TableHead>
-						<TableHead className="w-64">Practice</TableHead>
-						<TableHead>Result</TableHead>
+						<TableHead scope="col" className="w-40">
+							Outcome
+						</TableHead>
+						<TableHead scope="col" className="w-64">
+							Practice
+						</TableHead>
+						<TableHead scope="col">Result</TableHead>
 					</TableRow>
 				</TableHeader>
 				<TableBody>{children}</TableBody>

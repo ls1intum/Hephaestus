@@ -133,7 +133,7 @@ function TraceBody({
 			);
 		}
 		case "ready": {
-			return <ReviewLineageGraph lineage={chain} onOpen={onOpen} {...story} />;
+			return <ReviewLineageGraph lineage={chain.lineage} onOpen={onOpen} {...story} />;
 		}
 	}
 }

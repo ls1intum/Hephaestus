@@ -73,4 +73,17 @@ class PracticeProfileOverviewIntegrationTest extends BaseIntegrationTest {
                 .jsonPath("$.latestReview")
                 .isEmpty();
     }
+
+    @Test
+    void shouldKeepTheLatestReviewEvenWhenItsEvidenceIsUnavailableOrOutsideTheStandingWindow() {
+        var result = data.result(scenario, ResultOutcome.NOT_MET, Instant.now().minusSeconds(120L * 86400));
+        get("/practice-profile/overview")
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.latestReview.reviewId")
+                .isEqualTo(result.getReviewId().toString())
+                .jsonPath("$.goingWell.length()")
+                .isEqualTo(0);
+    }
 }

@@ -363,15 +363,10 @@ Never re-invent `role === "ADMIN"`. Use the shared pieces:
   workspace is always false.
 - There is **no `<RequireRole>` wrapper component**.
   The route tree gates whole surfaces.
-  For the rest, the route reads a boolean once and passes it down.
-  From the practice profile route, `canAdminister` reaches `RefusalFixLink` through three components:
-  - `PracticeGroupDetailDrawer`.
-  - `ProfileReviewLevel`.
-  - `TraceSignalTimeline`.
-
-  These are three hops for one leaf.
-  Copy the shape of the refusal beside it instead.
-  The route renders `TraceRefusalAlert` and passes it down as a node.
+  For the rest, the route reads a boolean once.
+  Do not pass that flag through several components to reach one leaf.
+  Copy the shape of the practice profile route instead.
+  It renders `TraceRefusalAlert` with its `RefusalFixLink` and passes the alert down as a node.
   Before you pass a flag further down, render the gated leaf in the route.
   Pass it down as `children`.
   When a role-assignment UI arrives, its mutation must invalidate the membership query key.

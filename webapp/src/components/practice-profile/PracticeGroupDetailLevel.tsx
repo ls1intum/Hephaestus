@@ -120,12 +120,12 @@ export function PracticeGroupDetailLevel({
 	const counts = countPracticeStandings(practices ?? []);
 	// The table's sort is this level's alone: it is not a place a reader returns to by URL.
 	const [sort, setSort] = useState(DEFAULT_PRACTICE_GROUP_SORT);
-	// Practices that never applied, and the ones no review has observed yet, leave the table for one
+	// Practices that never applied, and the ones no review has reviewed yet, leave the table for one
 	// folded line each under it.
-	const { shown: applied, neverApplied, notObserved } = splitFoldedPractices(practices ?? []);
+	const { shown: applied, neverApplied, notReviewed } = splitFoldedPractices(practices ?? []);
 	// Every practice of the group sits in a fold: the group has practices, so "No practices yet"
 	// would be wrong. The folds stand open instead and their own sentences say why.
-	const onlyFolded = applied.length === 0 && neverApplied.length + notObserved.length > 0;
+	const onlyFolded = applied.length === 0 && neverApplied.length + notReviewed.length > 0;
 	const byStanding = (rows: readonly PracticeStanding[]) =>
 		sortByStanding(
 			rows,
@@ -210,7 +210,7 @@ export function PracticeGroupDetailLevel({
 				isLoading ? undefined : (
 					<>
 						{fold(neverApplied, "never-applied", columns)}
-						{fold(notObserved, "not-observed", columns)}
+						{fold(notReviewed, "not-reviewed", columns)}
 					</>
 				)
 			}

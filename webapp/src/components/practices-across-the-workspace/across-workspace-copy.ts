@@ -34,7 +34,7 @@ export const PAGE_INTRO: readonly InfoLine[] = [
 	},
 	{
 		term: "Not a grade:",
-		text: "each result comes from AI review of someone's work and can be wrong.",
+		text: "each result comes from AI review of someone’s work and can be wrong.",
 	},
 	{ term: "Your own results:", text: "they are in your Practice profile." },
 ];
@@ -48,7 +48,7 @@ export const SLOW_LOAD_SHORT = "Counting takes longer than usual…";
 /** Behind the (i) of the loading line. */
 export const SLOW_LOAD_NOTE: readonly InfoLine[] = [
 	{
-		term: "A large course:",
+		term: "A large workspace:",
 		text: "counting every result in the workspace takes a moment.",
 	},
 	{ term: "Then:", text: "the page fills in when the counts are ready." },

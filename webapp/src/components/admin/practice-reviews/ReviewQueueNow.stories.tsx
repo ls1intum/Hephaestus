@@ -246,7 +246,7 @@ export const ManyItems: Story = {
 export const Loading: Story = {
 	args: { state: { status: "loading" } },
 	play: async ({ canvas }) => {
-		canvas.getByText("Loading the queue");
+		canvas.getByText("Loading the queue…");
 	},
 };
 

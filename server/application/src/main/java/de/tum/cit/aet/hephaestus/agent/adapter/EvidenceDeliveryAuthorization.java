@@ -28,6 +28,11 @@ public class EvidenceDeliveryAuthorization implements EvidenceAuthorization {
     @Override
     public boolean permits(long workspaceId, Result result, SourceUsePurpose purpose) {
         if (result.getId() == null || result.getWorkspaceId() != workspaceId) return false;
+        if (result.getEvidenceVersion() == 0
+                && (purpose == SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW
+                        || purpose == SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)) {
+            return access.permitsHistory(workspaceId, result.getId(), purpose);
+        }
         if (!access.permits(workspaceId, result.getId(), purpose)) return false;
         var citations = ResultCitations.all(result);
         if (citations.isEmpty()) return false;

@@ -79,7 +79,7 @@ export function readsProblem(
 	for (const entry of sources) {
 		const option = offered.find((candidate) => candidate.source === entry.source);
 		if (!option) {
-			return "One chosen source is not offered for this kind of item. Turn it off to continue.";
+			return "One chosen source is not offered for this kind of work. Turn it off to continue.";
 		}
 		if (!option.needs.includes(entry.need)) {
 			return `${option.label} cannot be captured whole. Change it to Required or Optional.`;
@@ -109,7 +109,7 @@ export function reviewSettingsProblem(
 	if (reviewOn.events.some((name) => !offered.has(name))) {
 		return {
 			message:
-				"One of the chosen events is not offered for this kind of item. Clear it to continue.",
+				"One of the chosen events is not offered for this kind of work. Clear it to continue.",
 			focusId: reviewOnFieldId("events"),
 		};
 	}
@@ -121,7 +121,7 @@ export function reviewSettingsProblem(
 			values.some((value) => !dimension.values.some((option) => option.value === value))
 		) {
 			return {
-				message: "Choose states this kind of item offers.",
+				message: "Choose states this kind of work offers.",
 				focusId:
 					itemType.reviewOnStateDimensions.length > 0
 						? reviewOnFieldId("state")

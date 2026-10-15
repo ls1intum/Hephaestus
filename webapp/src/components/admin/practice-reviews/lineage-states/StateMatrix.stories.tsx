@@ -35,11 +35,7 @@ function Case({ entry, display }: { entry: LineageStateCase; display: TraceDispl
 			className="min-w-0 rounded-lg border bg-background p-3"
 		>
 			<h3 className="mb-2 text-sm font-semibold">{entry.title}</h3>
-			<ReviewLineageGraph
-				lineage={{ status: "ready", lineage: entry.lineage }}
-				defaultDisplay={display}
-				review={entry.review}
-			/>
+			<ReviewLineageGraph lineage={entry.lineage} defaultDisplay={display} review={entry.review} />
 		</section>
 	);
 }

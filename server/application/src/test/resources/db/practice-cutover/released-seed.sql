@@ -123,10 +123,10 @@ INSERT INTO feedback(id,workspace_id,agent_job_id,recipient_user_id,about_user_i
     delivery_state,source,body,created_at,delivered_at,suppression_reason)
 SELECT ('00000000-0000-0000-0000-000000'||n)::uuid,992101,'00000000-0000-0000-0000-000000992111',
     992103,992103,'IN_CONTEXT',n-992100,state,'AGENT','Explain this change.',
-    '2026-01-01T00:01:00Z',CASE WHEN state='DELIVERED' THEN '2026-01-01T00:01:30Z'::timestamptz END,
+    '2026-01-01T00:01:00Z',CASE WHEN state IN('DELIVERED','PARTIALLY_FAILED') THEN '2026-01-01T00:01:30Z'::timestamptz END,
     CASE WHEN state='SUPPRESSED' THEN 'OUTSIDE_CURRENT_COVERAGE' END
 FROM (VALUES (992311,'PREPARED'),(992312,'UNCONFIRMED'),(992313,'PREPARED'),
-    (992314,'DELIVERED'),(992315,'DELIVERED'),(992316,'SUPPRESSED')) f(n,state);
+    (992314,'PARTIALLY_FAILED'),(992315,'DELIVERED'),(992316,'SUPPRESSED')) f(n,state);
 INSERT INTO feedback_observation(feedback_id,observation_id,role,ordinal)
 SELECT ('00000000-0000-0000-0000-000000'||n)::uuid,
     ('00000000-0000-0000-0000-000000'||(n-10))::uuid,'PRIMARY',0
@@ -148,6 +148,13 @@ SELECT ('00000000-0000-0000-0000-000000'||(n+40))::uuid,'send-case-'||n,
 FROM (VALUES (992311,'PENDING',NULL::text),(992312,'PENDING',NULL::text),
     (992313,'UNCERTAIN',NULL::text),(992314,'SENT','provider:updated'),
     (992315,'SENT','provider:correction'),(992316,'PENDING',NULL::text)) d(n,state,external);
+-- A confirmed summary can be corrected after a separate inline note failed before writing.
+UPDATE feedback SET proposed_placements='[{"type":"INLINE","body":"Check the timeout.","path":"src/retry.ts","startLine":1,"endLine":1,"deliveryKey":"approved:00000000-0000-0000-0000-000000992314:0"}]'
+WHERE id='00000000-0000-0000-0000-000000992314';
+UPDATE feedback_dispatch SET
+    package_content=package_content||'{"diffNotes":[{"body":"Check the timeout.","filePath":"src/retry.ts","startLine":1,"endLine":1,"deliveryKey":"approved:00000000-0000-0000-0000-000000992314:0"}]}',
+    delivered_placements='[{"deliveryKey":"approved:00000000-0000-0000-0000-000000992314:0","path":"src/retry.ts","startLine":1,"endLine":1,"disposition":"FAILED","writeMayHaveStarted":false,"placement":"INLINE"}]'
+WHERE feedback_id='00000000-0000-0000-0000-000000992314';
 INSERT INTO observation_invalidation(id,workspace_id,observation_id,reason,invalidated_at,
     invalidated_by_account_id,provider_copy,provider_copy_retry_at)
 SELECT ('00000000-0000-0000-0000-000000'||(n+60))::uuid,992101,
@@ -177,3 +184,30 @@ INSERT INTO artifact_signal(id,workspace_id,artifact_kind,artifact_id,signal_nam
 VALUES('00000000-0000-0000-0000-000000992184',992101,'scm.pull_request',992109,
     'scm.pull_request.synchronized','pending-head','2026-01-02T00:00:00Z','SYNC','PENDING',
     '2026-01-02T00:01:00Z','2026-01-02T00:01:00Z',992103);
+
+-- A response can disagree, close as inapplicable, or rate usefulness without a resolution.
+INSERT INTO reaction(id,reactor_user_id,action,explanation,created_at,feedback_id,usefulness)
+VALUES('00000000-0000-0000-0000-000000992281',992103,'DISPUTED','The cited revision already explains why.','2026-01-01T00:04:00Z','00000000-0000-0000-0000-000000992161','UNHELPFUL'),
+('00000000-0000-0000-0000-000000992282',992103,'NOT_APPLICABLE','This change has no retry behavior.','2026-01-01T00:05:00Z','00000000-0000-0000-0000-000000992161',NULL),
+('00000000-0000-0000-0000-000000992283',992103,NULL,NULL,'2026-01-01T00:06:00Z','00000000-0000-0000-0000-000000992161','HELPFUL');
+
+-- Distinct practices keep each released outcome independent of current-claim ordering.
+INSERT INTO practice(id,workspace_id,slug,name,criteria,applies_to,subject,signals,evidence_requirements,
+    review_when,automated_review_policy,delivery_behavior,created_at)
+SELECT n,workspace_id,'outcome-practice-'||n,name,criteria,applies_to,subject,signals,evidence_requirements,
+    review_when,automated_review_policy,delivery_behavior,created_at
+FROM practice CROSS JOIN generate_series(992501,992506) n WHERE id=992121;
+INSERT INTO practice_revision(id,practice_id,revision_number,slug,name,applies_to,subject,signals,
+    evidence_requirements,review_when,criteria,automated_review_policy,delivery_behavior,created_at)
+SELECT id+10,id,1,slug,name,applies_to,subject,signals,evidence_requirements,review_when,criteria,
+    automated_review_policy,delivery_behavior,created_at FROM practice WHERE id BETWEEN 992501 AND 992506;
+UPDATE practice SET current_revision_id=id+10 WHERE id BETWEEN 992501 AND 992506;
+INSERT INTO observation(id,occurrence_key,agent_job_id,workspace_id,practice_id,practice_revision_id,
+    artifact_kind,artifact_id,about_user_id,summary,outcome,severity,evidence,evidence_rationale,observed_at)
+SELECT ('00000000-0000-0000-0000-000000'||(n+20))::uuid,'outcome-case-'||n,
+    '00000000-0000-0000-0000-000000992111',992101,n,n+10,'scm.pull_request',992109,992103,
+    'Retain the released assessment.',outcome,severity,'{"citations":[]}',
+    'The assessment is bounded by the captured description.','2026-01-01T00:00:30Z'
+FROM (VALUES (992501,'MET',NULL::text),(992502,'NOT_APPLICABLE',NULL::text),
+    (992503,'UNDETERMINED',NULL::text),(992504,'NOT_MET','CRITICAL'),
+    (992505,'NOT_MET','MAJOR'),(992506,'NOT_MET','MINOR')) cases(n,outcome,severity);

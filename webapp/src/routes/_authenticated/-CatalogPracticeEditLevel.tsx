@@ -18,12 +18,14 @@ import type { CatalogGroup, CatalogPractice, PracticeDefinitionOptions } from "@
 import { CatalogFormLevel } from "@/components/admin/catalog/CatalogFormLevel";
 import { CatalogPracticeForm } from "@/components/admin/catalog/CatalogPracticeForm";
 import { PracticeReleaseReview } from "@/components/admin/practices/PracticeReleaseReview";
-import { PracticeDefinitionSkeleton } from "@/components/admin/practices/PracticeSkeletons";
+import {
+	PracticeDefinitionSkeleton,
+	PracticeReleaseSkeleton,
+} from "@/components/admin/practices/PracticeSkeletons";
 import { QueryErrorAlert, queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
 import { LevelCancel } from "@/components/layout/detail-drawer/LevelCancel";
 import { DrawerBody } from "@/components/ui/drawer";
-import { Spinner } from "@/components/ui/spinner";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
 import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
@@ -265,11 +267,7 @@ function LoadedCatalogPracticeEditor({
 	};
 	let releaseReview: ReactNode;
 	if (releaseQuery.isPending) {
-		releaseReview = (
-			<div className="flex items-center gap-2 text-sm text-muted-foreground">
-				<Spinner /> Loading update…
-			</div>
-		);
+		releaseReview = <PracticeReleaseSkeleton rows={3} />;
 	} else if (releaseQuery.isError) {
 		releaseReview = (
 			<QueryErrorAlert
@@ -290,6 +288,7 @@ function LoadedCatalogPracticeEditor({
 					(acceptRelease.isPending ? "accept" : null) ??
 					(declineRelease.isPending ? "decline" : null)
 				}
+				declineNote="Declining keeps your practice as it is until the next Hephaestus update. Restore Hephaestus default stays available on the practice."
 				onAccept={(choices) =>
 					acceptRelease.mutate({
 						path: { slug: practiceSlug },

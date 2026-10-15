@@ -2,7 +2,7 @@ import { Eye, EyeOff } from "lucide-react";
 
 import type { StatusDefs } from "@/components/common/status-def";
 
-export type DashboardVisibility = "VISIBLE" | "HIDDEN";
+export type ProfileVisibility = "VISIBLE" | "HIDDEN";
 
 /**
  * Whether a group's practices appear on the practice profiles developers read.
@@ -12,7 +12,7 @@ export type DashboardVisibility = "VISIBLE" | "HIDDEN";
  * a relationship to the catalog. Rendered as two identical outline chips they read as one family.
  * The icon is what separates them when colour cannot (WCAG 2.2 SC 1.4.1).
  */
-export const DASHBOARD_VISIBILITY_DEFS: StatusDefs<DashboardVisibility> = {
+export const PROFILE_VISIBILITY_DEFS: StatusDefs<ProfileVisibility> = {
 	VISIBLE: {
 		label: "On practice profiles",
 		icon: Eye,
@@ -27,7 +27,3 @@ export const DASHBOARD_VISIBILITY_DEFS: StatusDefs<DashboardVisibility> = {
 			"Reviews still run and still record what they find. Only the display on practice profiles is off.",
 	},
 };
-
-export function dashboardVisibilityOf(visible: boolean): DashboardVisibility {
-	return visible ? "VISIBLE" : "HIDDEN";
-}

@@ -398,7 +398,7 @@ export function OptionsView() {
 			<Notice
 				icon={CircleAlertIcon}
 				tone="destructive"
-				title="Settings did not load"
+				title="We could not load settings"
 				action={
 					<Button
 						variant="outline"

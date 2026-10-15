@@ -90,6 +90,7 @@ export function toFeedbackCard(
 	}));
 	return {
 		feedbackId: feedback.id,
+		unverifiedHistory: feedback.unverifiedHistory,
 		practiceSlug: feedback.practiceSlug,
 		practiceName: feedback.practiceName,
 		// A practice in no group leaves the card's group out; the card names it itself.

@@ -13,8 +13,12 @@ const TURNS = [
 /** A conversation while it loads, in the shape `Chat` gives it: turns above, the composer below. */
 export function ChatSkeleton() {
 	return (
-		<div className="flex h-full min-h-0 flex-col" aria-hidden>
-			<div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 overflow-hidden px-4 py-6">
+		<div className="flex h-full min-h-0 flex-col" aria-busy="true">
+			<span className="sr-only">Loading the conversation…</span>
+			<div
+				className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 overflow-hidden px-4 py-6"
+				aria-hidden
+			>
 				{TURNS.map((turn, index) => (
 					<Message key={index} align={turn.align}>
 						<MessageContent>
@@ -26,7 +30,10 @@ export function ChatSkeleton() {
 					</Message>
 				))}
 			</div>
-			<div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-2 px-4 pb-2">
+			<div
+				className="mx-auto flex w-full max-w-3xl flex-col items-center gap-2 px-4 pb-2"
+				aria-hidden
+			>
 				<Skeleton className="h-24 w-full rounded-lg" />
 				<Skeleton className="h-3 w-64" />
 			</div>

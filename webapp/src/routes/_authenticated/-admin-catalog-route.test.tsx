@@ -112,7 +112,7 @@ describe("instance catalog routes", () => {
 		const user = userEvent.setup();
 		await user.click(screen.getByRole("button", { name: "Add condition" }));
 		await user.click(screen.getByRole("combobox", { name: "Condition 1" }));
-		await user.click(await screen.findByRole("option", { name: "A source has items" }));
+		await user.click(await screen.findByRole("option", { name: "A source is not empty" }));
 		await user.click(screen.getByRole("combobox", { name: "Source 1" }));
 		const sourceOptions = await screen.findByRole("listbox", { name: "Source 1" });
 		expect(

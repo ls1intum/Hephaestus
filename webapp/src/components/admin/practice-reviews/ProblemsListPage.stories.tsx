@@ -123,7 +123,7 @@ export const RefreshFailed: Story = {
 		}),
 	},
 	play: async ({ canvas, userEvent }) => {
-		await canvas.findByText("These problems may be out of date");
+		await canvas.findByText("We could not refresh problems");
 		await expect(canvas.getByRole("table").querySelectorAll("tbody tr").length).toBeGreaterThan(0);
 		await userEvent.click(canvas.getByRole("button", { name: "Retry" }));
 		await expect(retryRefresh).toHaveBeenCalledOnce();

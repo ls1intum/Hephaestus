@@ -173,7 +173,7 @@ export function ReviewLevel({
 					<SheetSection
 						part="details"
 						title="Practice scripts"
-						description="How the program of each practice ran in this review."
+						description="How each practice script ran in this review."
 					>
 						<ReviewPracticeScriptTable workspaceSlug={workspaceSlug} practices={scripted} />
 						<p className="text-xs text-muted-foreground">

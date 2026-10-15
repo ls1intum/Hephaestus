@@ -4,7 +4,6 @@ import { type StatusDef, statusValues } from "@/components/common/status-def";
 
 import {
 	baselineDef,
-	comparisonCanShowFixes,
 	METHOD_CHANGED_SENTENCE,
 	NOW_MET_DEF,
 	PROBLEM_BASELINE_STATES,
@@ -45,10 +44,5 @@ describe("scan baseline vocabulary", () => {
 			"The review method changed. This scan cannot show which problems were fixed.",
 		);
 		expect(METHOD_CHANGED_SENTENCE).toBe(SCAN_COMPARISON_DEFS.METHOD_CHANGED.description);
-		expect(comparisonCanShowFixes("METHOD_CHANGED")).toBe(false);
-		expect(comparisonCanShowFixes("STANDARD_CHANGED")).toBe(false);
-		expect(comparisonCanShowFixes("INCOMPLETE")).toBe(false);
-		expect(comparisonCanShowFixes("FIRST_SCAN")).toBe(false);
-		expect(comparisonCanShowFixes("COMPARABLE")).toBe(true);
 	});
 });

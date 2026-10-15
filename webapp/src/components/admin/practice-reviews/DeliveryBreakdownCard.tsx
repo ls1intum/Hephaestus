@@ -56,12 +56,12 @@ export function DeliveryBreakdownCard({
 	failedDeliveries,
 }: DeliveryBreakdownCardProps) {
 	return (
-		<Card size="sm" className="w-full" role="region" aria-label="By location and reason">
+		<Card size="sm" className="w-full" role="region" aria-label="Delivered and withheld">
 			<CardHeader>
 				<CardTitle className="flex items-center gap-2 text-sm font-medium">
 					<SplitIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-					By location and reason
-					<InfoTip label="About locations and reasons">
+					Delivered and withheld
+					<InfoTip label="About delivered and withheld feedback">
 						<InfoLines lines={BREAKDOWN_INFO} />
 					</InfoTip>
 				</CardTitle>
@@ -71,8 +71,8 @@ export function DeliveryBreakdownCard({
 			<CardContent className="@container flex flex-1 flex-col gap-4">
 				<div className="grid grid-cols-1 gap-x-6 gap-y-4 @md:grid-cols-2">
 					<BreakdownTable
-						caption="Delivered by location"
-						what="delivered feedback by location"
+						caption="Delivered by where it appeared"
+						what="delivered feedback by where it appeared"
 						state={delivered}
 						empty={`Nothing delivered ${range.during}`}
 						rows={(counts) => deliveredByLocation(counts, scope)}
@@ -107,7 +107,7 @@ export function DeliveryBreakdownCard({
 const BREAKDOWN_INFO = [
 	{
 		term: "Delivered",
-		text: "counts the feedback that reached the developer, by location.",
+		text: "counts the feedback that reached the developer, by where it appeared.",
 	},
 	{
 		term: "Withheld",
@@ -173,8 +173,8 @@ function BreakdownTable<T>({
 		);
 	} else if (state.status === "loading") {
 		body = (
-			<div role="status" className="flex flex-col gap-1">
-				<span className="sr-only">Loading {what}</span>
+			<div aria-busy="true" className="flex flex-col gap-1">
+				<span className="sr-only">Loading {what}…</span>
 				<Skeleton className="h-4 w-full" />
 				<Skeleton className="h-4 w-40" />
 			</div>
@@ -273,8 +273,8 @@ function RateLine({
 	}
 	if (state.status === "loading") {
 		return (
-			<div role="status" className="col-span-2">
-				<span className="sr-only">Loading {rate.what}</span>
+			<div aria-busy="true" className="col-span-2">
+				<span className="sr-only">Loading {rate.what}…</span>
 				<Skeleton className="h-4 w-48" />
 			</div>
 		);

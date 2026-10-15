@@ -315,7 +315,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 									<FieldSet>
 										<FieldLegend variant="label">Reviews</FieldLegend>
 										<FieldDescription>
-											The kind of item cannot change after the practice exists.
+											The kind of work cannot change after the practice exists.
 										</FieldDescription>
 										<RadioGroup
 											value={draft.kind}
@@ -347,8 +347,8 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 									<div className="text-sm">
 										<p className="font-medium">Reviews</p>
 										<p className="text-muted-foreground">
-											{itemType?.label ?? "A kind of item this instance no longer offers."} The kind
-											of item cannot change after the practice exists.
+											{itemType?.label ?? "A kind of work this instance no longer offers."} The kind
+											of work cannot change after the practice exists.
 										</p>
 									</div>
 								)}
@@ -468,7 +468,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 								/>
 							) : (
 								<p className="text-sm text-muted-foreground">
-									This practice reviews a kind of item this instance no longer offers, so its review
+									This practice reviews a kind of work this instance no longer offers, so its review
 									settings cannot be changed here.
 								</p>
 							)}
@@ -534,8 +534,8 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 									title="Script"
 									subtitle={
 										hasText(draft.script.trim())
-											? "The program that reviews this practice."
-											: "Built-in. Add a program to review this practice your own way."
+											? "The practice script that reviews this practice."
+											: "Built-in. Add a practice script to review this practice your own way."
 									}
 									open={showScript}
 									onOpenChange={setShowScript}
@@ -711,7 +711,7 @@ function AboutField({ itemType, about, onChange, error }: AboutFieldProps) {
 			value: role,
 			label: itemType.aboutRoles.includes(role)
 				? ABOUT_ROLE_LABELS[role]
-				: `${ABOUT_ROLE_LABELS[role]} (not available for this item)`,
+				: `${ABOUT_ROLE_LABELS[role]} (not available for this kind of work)`,
 		})),
 	];
 	return (

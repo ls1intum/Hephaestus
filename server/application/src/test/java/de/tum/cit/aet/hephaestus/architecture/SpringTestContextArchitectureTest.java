@@ -36,6 +36,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             assignment("core.auth.clientsession.ClientSessionIntegrationTest", "dev-login"),
             assignment("core.auth.consent.ConsentSignInBootstrapIntegrationTest", "consent-sign-in"),
             assignment("core.auth.dev.DevLoginIntegrationTest", "dev-login"),
+            assignment("core.database.PracticeV1ReviewJobsIntegrationTest", "practice-upgrade-history"),
             assignment("integration.core.oauth.SlackOAuthCallbackConflictIntegrationTest", "slack-signed"),
             assignment("integration.core.sync.api.SyncControllerIntegrationTest", "sync-controller-focused"),
             assignment("integration.outline.OutlineFrameworkRegistrationIntegrationTest", "outline-enabled"),
@@ -73,6 +74,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             assignment("practices.result.PracticeGroupStandingIntegrationTest", "review-fixture"),
             assignment("practices.review.AbstractResultAdmissionIntegrationTest", "review-resultadmission"),
             assignment("practices.result.ResultControllerIntegrationTest", "review-fixture"),
+            assignment("practices.result.MigratedHistoryReadIntegrationTest", "review-migrated-history"),
             assignment("practices.result.ResultHistoryIntegrationTest", "review-resulthistory"),
             assignment("practices.result.ResultMarkServiceIntegrationTest", "review-fixture"),
             assignment("practices.result.ResultRepositoryIntegrationTest", "review-fixture"),
@@ -81,6 +83,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             assignment("practices.review.PracticeReviewCoverageReplaceIntegrationTest", "review-fixture"),
             assignment("practices.review.PracticeReviewSettingsControllerIntegrationTest", "review-fixture"),
             assignment("practices.review.ProductItemQueryIntegrationTest", "review-fixture"),
+            assignment("practices.review.DisabledIntegrationHistoryIntegrationTest", "review-disabled-integrations"),
             assignment("practices.review.ReviewContextControllerIntegrationTest", "review-fixture"),
             assignment("practices.review.ReviewGateIntegrationTest", "review-fixture"),
             assignment("practices.review.ReviewNarrativeHistoryIntegrationTest", "review-fixture"),
@@ -130,9 +133,15 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
                     "shared mentor HTTP authorization context with only asynchronous turn" + " transport spied"),
             Map.entry("outline-enabled", "enabled Outline integration wiring"),
             Map.entry(
+                    "practice-upgrade-history",
+                    "authenticated HTTP reads against populated released history after the production migration"),
+            Map.entry(
                     "practice-script-live",
                     "worker role with the real LLM proxy on a free sandbox gateway port," + " calling live models"),
             Map.entry("real-auth", "real OAuth and authentication wiring without test security"),
+            Map.entry(
+                    "review-disabled-integrations",
+                    "persisted mixed-provider history and real timing reads with Slack and Outline adapters disabled"),
             Map.entry(
                     "review-evidence",
                     "shared review fixture with the neutral evidence authorization boundary"
@@ -154,6 +163,9 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             Map.entry(
                     "review-feedbackreviewcontroller",
                     "real authenticated feedback routes with item display labels" + " controlled"),
+            Map.entry(
+                    "review-migrated-history",
+                    "real persisted historical reads with only current SCM source access controlled"),
             Map.entry(
                     "review-fixture",
                     "shared persisted review/item/account fixture with real product"
@@ -204,6 +216,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             "testconfig.RealAuthIntegrationTest");
 
     private static final Set<String> PROPERTY_SOURCE_TESTS = names(
+            "core.database.PracticeV1ReviewJobsIntegrationTest",
             "agent.mentor.chat.MentorWorkerSplitIntegrationTest",
             "core.auth.clientsession.ClientSessionConcurrencyIntegrationTest",
             "core.auth.clientsession.ClientSessionIntegrationTest",
@@ -222,6 +235,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             "notification.AccountDeletionEmailIntegrationTest",
             "notification.AccountSecurityEmailIntegrationTest",
             "notification.email.EmailAdminControllerIntegrationTest",
+            "practices.review.DisabledIntegrationHistoryIntegrationTest",
             "productfeedback.ProductFeedbackEmailIntegrationTest",
             "productfeedback.SurveyEmailInvitationIntegrationTest",
             "testconfig.BaseIntegrationTest",
@@ -230,6 +244,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
     private static final Set<String> DIRTY_CONTEXT_TESTS = Set.of();
 
     private static final Set<String> MOCKITO_BEAN_TESTS = names(
+            "practices.result.MigratedHistoryReadIntegrationTest",
             "agent.mentor.chat.MentorWorkerSplitIntegrationTest",
             "integration.scm.gitlab.credentials.GitLabTokenLifecycleIntegrationTest",
             "integration.scm.gitlab.workspace.GitLabWorkspaceEventRoutingIntegrationTest",

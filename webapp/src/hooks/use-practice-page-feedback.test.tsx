@@ -85,6 +85,7 @@ function practicePageFeedback(
 ): Wire<PracticePageFeedback> {
 	return {
 		id: feedbackId,
+		unverifiedHistory: false,
 		headline: "Pull requests bundle a fix with a refactor",
 		body: "Reviewers had to follow two intentions in one diff.",
 		practiceSlug: "scope-one-reviewable-change",

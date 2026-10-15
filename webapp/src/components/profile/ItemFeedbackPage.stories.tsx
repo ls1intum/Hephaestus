@@ -45,10 +45,12 @@ export const Default: Story = {
 	},
 };
 
-export const NotAboutTheReader: Story = {
+export const NoReadableResults: Story = {
 	args: { feed: { ...readyFeed, reviews: [] } },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("Nothing here is about your work")).toBeVisible();
+		await expect(canvas.getByText("No review results are available here")).toBeVisible();
+		canvas.getByText(/Results can be hidden/u);
+		await expect(canvas.queryByText(/written for somebody else/u)).toBeNull();
 		await expect(canvas.queryByRole("list", { name: "Reviews" })).toBeNull();
 	},
 };

@@ -104,7 +104,7 @@ export const UnsupportedKind: Story = {
 export const UnsupportedKindWithASavedScan: Story = {
 	args: { itemType: mockIssueItemType },
 	play: async ({ args, canvas, userEvent }) => {
-		await expect(canvas.getByText(/This kind of item no longer offers scans/u)).toBeVisible();
+		await expect(canvas.getByText(/This kind of work no longer offers scans/u)).toBeVisible();
 		await userEvent.click(canvas.getByRole("button", { name: "Remove scan settings" }));
 		await expect(args.onChange).toHaveBeenLastCalledWith(
 			expect.objectContaining({ enabled: false }),

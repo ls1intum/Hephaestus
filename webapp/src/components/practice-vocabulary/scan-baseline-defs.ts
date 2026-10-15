@@ -163,7 +163,3 @@ export const REMOVAL_GUARD_DEFS: StatusDefs<RemovalGuardState> = {
 			"Too many files disappeared at once to trust the listing, so no file was recorded as removed.",
 	},
 };
-
-export function comparisonCanShowFixes(comparison: ScanComparison): boolean {
-	return comparison === "COMPARABLE" || comparison === "MIXED";
-}

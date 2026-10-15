@@ -175,7 +175,7 @@ export const LoadingSlow: Story = {
 		canvas.getByText(LOADING_STATUS, { selector: "[role=status]" });
 		await expect(canvas.queryByText(SLOW_LOAD_SHORT, { selector: "[role=status]" })).toBeNull();
 		const wait = within(await openTip(canvas, "About the wait"));
-		await expect(wait.getByText("A large course:")).toBeVisible();
+		await expect(wait.getByText("A large workspace:")).toBeVisible();
 		await closeTip();
 	},
 };

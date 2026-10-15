@@ -6,7 +6,6 @@ import {
 	PRACTICE_MARKER_DEFS,
 	practiceMarker,
 	shareOf,
-	withheldClass,
 } from "./review-attention";
 
 describe("shareOf and percentText", () => {
@@ -22,23 +21,6 @@ describe("shareOf and percentText", () => {
 	});
 });
 
-describe("withheld classes", () => {
-	it("counts only the work moving on before the comment was ready as timing", () => {
-		for (const reason of [
-			"ITEM_CLOSED",
-			"ITEM_MERGED",
-			"REVIEWED_VERSION_CHANGED",
-			"STALE_ROLLOUT_REVISION",
-		] as const) {
-			expect(withheldClass(reason)).toBe("TIMING");
-		}
-		expect(withheldClass("COMPOSER_WITHHELD")).toBe("HELD_BY_REVIEW");
-		expect(withheldClass("NO_AI")).toBe("DEVELOPER_CHOICE");
-		expect(withheldClass("RESULT_MARKED_INCORRECT")).toBe("OTHER");
-		expect(withheldClass("REVIEW_CANCELLED")).toBe("OTHER");
-	});
-});
-
 const counted = (met: number, notMet: number, doesNotApply: number, couldNotDetermine: number) => ({
 	met,
 	notMet,
@@ -47,7 +29,7 @@ const counted = (met: number, notMet: number, doesNotApply: number, couldNotDete
 });
 
 describe("practiceMarker", () => {
-	it("marks a practice that mostly does not apply from 90 % not applicable", () => {
+	it("marks a practice that mostly does not apply from 90 % does not apply", () => {
 		const marked = practiceMarker(counted(1, 1, 18, 0));
 		expect(marked).toStrictEqual({
 			marker: "NEVER_APPLIES",
@@ -55,7 +37,7 @@ describe("practiceMarker", () => {
 			whole: 20,
 		});
 		// It applied twice, so its label must not say it never applies.
-		expect(PRACTICE_MARKER_DEFS.NEVER_APPLIES.label).toBe("Mostly not applicable");
+		expect(PRACTICE_MARKER_DEFS.NEVER_APPLIES.label).toBe("Mostly does not apply");
 		expect(practiceMarker(counted(2, 1, 17, 0))).toBeUndefined();
 	});
 

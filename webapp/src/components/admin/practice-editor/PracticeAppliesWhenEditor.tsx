@@ -34,7 +34,7 @@ const CONDITIONS = {
 		description: "One phrase per line. Any phrase can match.",
 	},
 	HAS_ITEMS: {
-		label: "A source has items",
+		label: "A source is not empty",
 		values: "Source",
 		description: "Choose the source to check.",
 	},
@@ -91,7 +91,7 @@ export function PracticeAppliesWhenEditor({
 			<FieldLegend variant="label">Applies when</FieldLegend>
 			<FieldDescription id={`${id}-description`}>
 				{value.clauses.length === 0
-					? "Reviews can start for every item. Add a condition to limit which items apply."
+					? "Reviews can start for all work of this kind. Add a condition to limit which work applies."
 					: "A review can start when any condition holds."}
 			</FieldDescription>
 			{value.clauses.map((clause, index) => {
