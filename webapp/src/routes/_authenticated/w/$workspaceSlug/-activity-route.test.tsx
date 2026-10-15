@@ -4,6 +4,7 @@ import { HttpResponse, http } from "msw";
 import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+	getActivityFacetsQueryKey,
 	getActivityPeopleQueryKey,
 	getActivityPersonWorkInfiniteQueryKey,
 	getActivityWorkInfiniteQueryKey,
@@ -619,6 +620,16 @@ async function openAdaInstead(
 	expect(router.state.location.search.detail).toBe("person:ada-lrz");
 }
 
+/** The team picker's options, read with the picker open and closed again after. */
+async function teamOptions(user: ReturnType<typeof userEvent.setup>) {
+	await user.click(screen.getByRole("combobox", { name: /^Team: /u }));
+	const options = await screen.findAllByRole("option");
+	const names = options.map((option) => option.textContent);
+	await user.keyboard("{Escape}");
+	await waitFor(() => expect(screen.queryByRole("option")).toBeNull());
+	return names;
+}
+
 describe("Workspace activity", () => {
 	let reads: URL[] = [];
 	let automation: URL[] = [];
@@ -952,6 +963,154 @@ describe("Workspace activity", () => {
 		expect(readsOf("/activity/people").every(({ pathname }) => pathname.includes("/acme/"))).toBe(
 			true,
 		);
+	});
+
+	describe("Timeline filter read recovery", () => {
+		const freshFacets = {
+			teams: [{ id: 30, key: "platform", name: "Platform" }],
+			repositories: [
+				{ id: 30, key: "acme/platform", name: "platform" },
+				{ id: 31, key: "acme/docs", name: "docs" },
+			],
+		};
+		const facetsKey = getActivityFacetsQueryKey({ path: { workspaceSlug: "acme" } });
+
+		/** The timeline's filter reads answer in turn; its work read always answers. */
+		function serveFacets(
+			answers: readonly ({ teams: unknown[]; repositories: unknown[] } | { status: number })[],
+		) {
+			const served: number[] = [];
+			server.use(
+				http.get("*/workspaces/acme/activity/facets", ({ request }) => {
+					record(request);
+					const answer = answers[served.length];
+					assert(answer, "Filter read exceeded the prepared responses");
+					const status = "status" in answer ? answer.status : 200;
+					served.push(status);
+					return HttpResponse.json(answer, { status });
+				}),
+				http.get("*/workspaces/acme/activity/work", ({ request }) => {
+					record(request);
+					return HttpResponse.json({ content: [workItem(1)] });
+				}),
+			);
+			return served;
+		}
+
+		it("hides refused filter options from a timeline, keeps them hidden through an outage, and shows only a fresh read", async () => {
+			const served = serveFacets([
+				{ teams: people.teams, repositories: people.repositories },
+				{ status: 403 },
+				{ status: 503 },
+				freshFacets,
+			]);
+			const user = userEvent.setup();
+			const { router, queryClient } = renderRouteAtWithRouter(
+				"/w/acme/workspace-activity?view=timeline&team=backend",
+			);
+			await screen.findByRole("combobox", { name: "Team: Core / Backend" }, ROUTE_RENDER_WAIT);
+			await screen.findByText("Pull request 1");
+			await expect(teamOptions(user)).resolves.toStrictEqual([
+				"Everyone",
+				"Core",
+				"Core / Backend",
+			]);
+			screen.getByRole("combobox", { name: "Repository" });
+			const reread = async () => {
+				await act(async () => {
+					await queryClient.invalidateQueries({ queryKey: facetsKey, exact: true });
+				});
+			};
+
+			await reread();
+			await screen.findByText("Ask a workspace admin or instance admin for access.");
+			expect(served).toStrictEqual([200, 403]);
+			await expect(teamOptions(user)).resolves.toStrictEqual(["Everyone"]);
+			expect(screen.queryByRole("combobox", { name: "Repository" })).toBeNull();
+			// The chosen team stays as the address names it, so the filter can still be cleared.
+			screen.getByRole("combobox", { name: "Team: backend" });
+			expect(screen.queryByRole("button", { name: /^Retry/u })).toBeNull();
+
+			await reread();
+			await screen.findByRole("button", { name: /^Retry$/u });
+			expect(served).toStrictEqual([200, 403, 503]);
+			await expect(teamOptions(user)).resolves.toStrictEqual(["Everyone"]);
+			expect(screen.queryByRole("combobox", { name: "Repository" })).toBeNull();
+
+			await user.click(screen.getByRole("button", { name: /^Retry$/u }));
+			await screen.findByRole("combobox", { name: "Repository" });
+			expect(served).toStrictEqual([200, 403, 503, 200]);
+			await expect(teamOptions(user)).resolves.toStrictEqual(["Everyone", "Platform"]);
+			expect(screen.queryByText("We could not load activity filters")).toBeNull();
+			expect(screen.getByText("Pull request 1")).not.toBeNull();
+			expect(screen.getByRole("button", { name: "Copy as Markdown" })).not.toBeNull();
+			expect(router.state.location.search.team).toBe("backend");
+			expect(readsOf("/activity/work")).toHaveLength(1);
+			expect(readsOf("/activity/people")).toHaveLength(0);
+		});
+
+		it("keeps a timeline's filter options through an outage beside the failure, and retries it", async () => {
+			const served = serveFacets([
+				{ teams: people.teams, repositories: people.repositories },
+				{ status: 503 },
+			]);
+			const user = userEvent.setup();
+			const { queryClient } = renderRouteAtWithRouter("/w/acme/workspace-activity?view=timeline");
+			await screen.findByRole("combobox", { name: "Team: Everyone" }, ROUTE_RENDER_WAIT);
+			await screen.findByText("Pull request 1");
+			await act(async () => {
+				await queryClient.invalidateQueries({ queryKey: facetsKey, exact: true });
+			});
+
+			await screen.findByText("We could not load activity filters");
+			expect(served).toStrictEqual([200, 503]);
+			await expect(teamOptions(user)).resolves.toStrictEqual([
+				"Everyone",
+				"Core",
+				"Core / Backend",
+			]);
+			screen.getByRole("combobox", { name: "Repository" });
+
+			const response = deferred<Response>();
+			server.use(
+				http.get("*/workspaces/acme/activity/facets", async ({ request }) => {
+					record(request);
+					return response.promise;
+				}),
+			);
+			await user.click(screen.getByRole("button", { name: /^Retry$/u }));
+			try {
+				const retrying = await screen.findByRole("button", { name: "Retrying…" });
+				expect(retrying.hasAttribute("disabled")).toBe(true);
+			} finally {
+				response.resolve(HttpResponse.json(freshFacets));
+			}
+			await waitFor(() =>
+				expect(screen.queryByText("We could not load activity filters")).toBeNull(),
+			);
+			await expect(teamOptions(user)).resolves.toStrictEqual(["Everyone", "Platform"]);
+			expect(readsOf("/activity/facets")).toHaveLength(3);
+			expect(readsOf("/activity/people")).toHaveLength(0);
+		});
+
+		it("offers no filter options and no retry when a timeline's first filter read is refused", async () => {
+			const served = serveFacets([{ status: 403 }]);
+			const user = userEvent.setup();
+			renderRouteAtWithRouter("/w/acme/workspace-activity?view=timeline&repo=acme/api");
+			await screen.findByText(
+				"Ask a workspace admin or instance admin for access.",
+				undefined,
+				ROUTE_RENDER_WAIT,
+			);
+			await screen.findByText("Pull request 1");
+			expect(served).toStrictEqual([403]);
+			await expect(teamOptions(user)).resolves.toStrictEqual(["Everyone"]);
+			expect(screen.queryByRole("button", { name: /^Retry/u })).toBeNull();
+			// The chosen repository is only the address's own key, and can still be cleared.
+			expect(screen.queryByRole("combobox", { name: /^Repository/u })).toBeNull();
+			screen.getByRole("button", { name: "Reset" });
+			expect(readsOf("/activity/people")).toHaveLength(0);
+		});
 	});
 
 	it("reads the scope a readable address names, by slug and path", async () => {
