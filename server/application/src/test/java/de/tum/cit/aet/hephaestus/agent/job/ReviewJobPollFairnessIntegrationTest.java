@@ -231,27 +231,25 @@ class ReviewJobPollFairnessIntegrationTest extends BaseIntegrationTest {
                 .getId();
     }
 
-    private UUID queuedJob(Workspace workspace, Instant createdAt) {
-        return queuedJob(workspace, createdAt, null);
+    private UUID queuedJob(Workspace workspace, Instant submittedAt) {
+        return queuedJob(workspace, submittedAt, null);
     }
 
-    private UUID queuedJob(Workspace workspace, Instant createdAt, @Nullable DataHandlingTier tier) {
+    private UUID queuedJob(Workspace workspace, Instant submittedAt, @Nullable DataHandlingTier tier) {
         ReviewJob job = new ReviewJob();
         RuntimeJobTestData.initialize(job, workspace.getId());
 
         job.setStatus(ReviewJobStatus.QUEUED);
         job.setConfigSnapshot(snapshot(tier));
-        // @PrePersist only stamps createdAt when it is still null, so setting it up front here (before
-        // the first save/flush, i.e. before @PrePersist fires) lets this fixture control ordering exactly
-        // — created_at is `updatable=false`, so a second UPDATE after the initial INSERT would silently
-        // no-op instead of changing it.
-        job.setAvailableAt(createdAt);
+        // submitted_at is immutable after insertion, so the fixture must set it before the first flush.
+        job.setSubmittedAt(submittedAt);
+        job.setAvailableAt(submittedAt);
         UUID jobId = jobRepository
                 .saveAndFlush(RuntimeJobTestData.persistParent(jdbc, job))
                 .getId();
-        // The candidate query compares available_at with the database clock; an older createdAt keeps its order.
+        // The candidate query compares available_at with the database clock; an older submission keeps its order.
         jdbc.update(
-                "UPDATE review_job SET available_at = LEAST(created_at, now() - interval '1 second') WHERE id = ?",
+                "UPDATE review_job SET available_at = LEAST(submitted_at, now() - interval '1 second') WHERE id = ?",
                 jobId);
         return jobId;
     }
@@ -259,7 +257,7 @@ class ReviewJobPollFairnessIntegrationTest extends BaseIntegrationTest {
     private ObjectNode snapshot(@Nullable DataHandlingTier tier) {
         ObjectNode snapshot = objectMapper.createObjectNode();
         if (tier != null) {
-            snapshot.put("dataHandlingTier", tier.name());
+            snapshot.putObject("model").put("dataHandlingTier", tier.name());
         }
         return snapshot;
     }

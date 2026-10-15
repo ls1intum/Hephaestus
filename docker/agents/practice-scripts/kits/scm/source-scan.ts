@@ -62,13 +62,15 @@ export async function scanOccurrences(
 		linesInScope: 0,
 		filesWithUnknownLocation: 0,
 	};
-	for (const file of await selectedSources(inputs, files)) {
-		if (file.language === null || !options.languages.includes(file.language)) {
-			continue;
-		}
-		if (options.includeTests !== true && isTestPath(file.path)) {
-			continue;
-		}
+	const sources = await selectedSources(
+		inputs,
+		files,
+		(file) =>
+			file.language !== null &&
+			options.languages.includes(file.language) &&
+			(options.includeTests === true || !isTestPath(file.path)),
+	);
+	for (const file of sources) {
 		scan.filesScanned += 1;
 		const selected = selectedOccurrences(
 			inputs,

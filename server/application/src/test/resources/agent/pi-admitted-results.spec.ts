@@ -5,9 +5,11 @@ import {
 	admittedResultSchema,
 	admit,
 	parseAdmission,
-	admissionResponseSchema,
 	leanResults,
 } from "../../../main/resources/agent/pi-admitted-results.ts";
+
+import { isJsonObject } from "../../../../../../docker/agents/practice-scripts/lib/core/json.ts";
+import { z } from "../../../main/resources/agent/work/practice-scripts/lib/core/practice-script.ts";
 
 const admitted = {
 	resultId: "123e4567-e89b-42d3-a456-426614174000",
@@ -55,6 +57,12 @@ const response: unknown = JSON.parse(
 	readFileSync(new URL("admission-response.json", import.meta.url), "utf8"),
 );
 
+assert.ok(isJsonObject(response));
+
+void test("admission accepts the unchanged raw response", () => {
+	assert.doesNotThrow(() => parseAdmission(response));
+});
+
 void test("admission retries an interrupted answer with the exact frozen request", async () => {
 	const request = { results: ["frozen measurement"] };
 	const sent: string[] = [];
@@ -74,7 +82,7 @@ void test("admission retries an interrupted answer with the exact frozen request
 	assert.equal(admission.digest, "a".repeat(64));
 });
 
-void test("an explicit refusal and a malformed admission envelope are terminal", async () => {
+void test("an explicit admission refusal is terminal", async () => {
 	let calls = 0;
 	await assert.rejects(
 		admit({}, async () => {
@@ -84,13 +92,25 @@ void test("an explicit refusal and a malformed admission envelope are terminal",
 		/admission was refused: HTTP 403/u,
 	);
 	assert.equal(calls, 1);
-	const valid = admissionResponseSchema.parse(response);
-	for (const invalid of [
-		{ ...valid, contractVersion: 2 },
-		{ ...valid, admissionDigest: "not a digest" },
-		{ ...valid, withheld: [{ practiceSlug: "names-things" }] },
-		{ ...valid, publicReviewed: "false" },
-	]) {
-		assert.throws(() => parseAdmission(invalid));
-	}
 });
+
+for (const [field, value, path] of [
+	["contractVersion", 2, ["contractVersion"]],
+	["admissionDigest", "not a digest", ["admissionDigest"]],
+	["withheld", [{ practiceSlug: "names-things" }], ["withheld", 0, "reason"]],
+	["publicReviewed", "false", ["publicReviewed"]],
+] as const) {
+	void test(`admission rejects malformed ${field} at its issue path`, () => {
+		assert.throws(
+			() => parseAdmission({ ...response, [field]: value }),
+			(failure: unknown) => {
+				assert.ok(failure instanceof z.ZodError);
+				assert.deepEqual(
+					failure.issues.map((issue) => issue.path),
+					[path],
+				);
+				return true;
+			},
+		);
+	});
+}

@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import { z } from "zod";
+import type { DiffFile } from "./kits/scm/types.ts";
+import { MAX_READ_BYTES } from "./lib/core/evidence-reader.ts";
 import { UnratedError } from "./lib/core/practice-script.ts";
 import { runBundled, runBundledProgram, scan } from "./run-bundled.ts";
 
@@ -70,8 +72,72 @@ for (const [slug, path, text] of CASES) {
 	});
 }
 
-void test("a missing or binary required scan file withholds instead of returning a semantic result", async () => {
-	for (const repo of [{}, { "app/a.ts": "\u0000binary" }]) {
+for (const [slug, path, text] of CASES) {
+	void test(`${slug} reviews source changes beside a binary image`, async () => {
+		const review = await runBundled(slug, {
+			repo: { [path]: text, "logo.png": "\u0000binary" },
+			change: new Map([
+				[
+					path,
+					{
+						path,
+						addedLines: new Map(text.split("\n").map((line, i) => [i + 1, line])),
+						removedLines: new Map(),
+						hunks: [],
+					},
+				],
+				[
+					"logo.png",
+					{ path: "logo.png", addedLines: new Map(), removedLines: new Map(), hunks: [] },
+				],
+			]),
+		});
+		assert.ok((review.leads?.length ?? 0) > 0, JSON.stringify(review));
+		assert.equal(
+			review.leads?.every((lead) => "file" in lead.at && lead.at.file === path),
+			true,
+		);
+	});
+}
+
+void test("source selection skips unrelated languages, tests, and paths without added text before reading", async () => {
+	const source = "console.log(value);";
+	const changed = (path: string, added: boolean): [string, DiffFile] => [
+		path,
+		{
+			path,
+			addedLines: new Map<number, string>(added ? [[1, source]] : []),
+			removedLines: new Map(),
+			hunks: [],
+		},
+	];
+	const review = await runBundled("logs-through-the-platform-logger", {
+		repo: {
+			"app/a.ts": source,
+			"logo.png": "\u0000binary",
+			"tests/a.ts": "\u0000binary",
+			"app/unchanged.ts": "\u0000binary",
+			"dependencies.lock": "x".repeat(MAX_READ_BYTES + 1),
+		},
+		change: new Map([
+			changed("app/a.ts", true),
+			changed("logo.png", true),
+			changed("tests/a.ts", true),
+			changed("app/unchanged.ts", false),
+			changed("app/deleted.ts", false),
+			changed("dependencies.lock", true),
+		]),
+	});
+	assert.equal(review.leads?.length, 1);
+	assert.deepEqual(review.leads[0]?.at, { file: "app/a.ts", line: 1, endLine: 1 });
+});
+
+void test("an unavailable or oversized required scan file withholds instead of returning a semantic result", async () => {
+	for (const repo of [
+		{},
+		{ "app/a.ts": "\u0000binary" },
+		{ "app/a.ts": "x".repeat(MAX_READ_BYTES + 1) },
+	]) {
 		const result = await runBundledProgram("handles-errors-instead-of-swallowing-them", {
 			inputs: scan("app/a.ts"),
 			repo,

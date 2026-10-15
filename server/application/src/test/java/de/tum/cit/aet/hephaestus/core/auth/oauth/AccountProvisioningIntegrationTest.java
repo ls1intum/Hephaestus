@@ -169,6 +169,12 @@ class AccountProvisioningIntegrationTest extends RealAuthIntegrationTest {
                     .allSatisfy(account -> assertThat(
                                     identityRepository.findActiveByAccountId(persistedId(account.getId())))
                             .hasSize(1));
+            assertThat(accounts.stream()
+                            .flatMap(account ->
+                                    identityRepository.findActiveByAccountId(persistedId(account.getId())).stream())
+                            .map(Identity::getProviderId)
+                            .distinct())
+                    .hasSize(1);
         } finally {
             executor.shutdownNow();
         }

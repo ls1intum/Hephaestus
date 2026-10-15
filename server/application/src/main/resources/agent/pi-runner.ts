@@ -950,9 +950,9 @@ export async function runReviewJob(): Promise<void> {
 				additionalProperties: false,
 				required: ["type", "explanation"],
 				description:
-					"All indexes are zero-based positions in THIS problem's citations array: with one citation, use 0. Why the problem belongs to this work. introduced: the change adds it (head: the index of a citation of the NEW side or the reviewed head). worsened: the change makes it worse (base: the index of the OLD side's citation, head: the NEW side's). duty: the criteria require an event that this work lacks (criterionQuote: the criteria's exact words, event: the index of the citation that shows the event).",
+					"All indexes are zero-based positions in THIS problem's citations array: with one citation, use 0. Why the problem belongs to this work. introduced: the change adds it (head: the index of a citation of the NEW side or the reviewed head). worsened: the change makes it worse (base: the index of the OLD side's citation, head: the NEW side's). duty: the criteria require an event that this work lacks (criterionQuote: the criteria's exact words, event: the index of the citation that shows the event). state: the problem exists in the pinned file; its citations witness that state at the reviewed version.",
 				properties: {
-					type: { type: "string", enum: ["introduced", "worsened", "duty"] },
+					type: { type: "string", enum: ["introduced", "worsened", "duty", "state"] },
 					head: { type: ["integer", "null"], minimum: 0 },
 					base: { type: ["integer", "null"], minimum: 0 },
 					event: { type: ["integer", "null"], minimum: 0 },

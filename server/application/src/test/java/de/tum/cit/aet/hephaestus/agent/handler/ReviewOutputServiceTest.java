@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobAssignments;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmissionRequestDTO;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.SubmittedResultDTO;
+import de.tum.cit.aet.hephaestus.evidence.AppliesWhenCheck;
 import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCapture;
@@ -27,11 +28,13 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.CandidateRefusal;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmissionReceipt;
 import de.tum.cit.aet.hephaestus.practices.spi.PinnedPractice;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultCandidate;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
+import de.tum.cit.aet.hephaestus.practices.spi.WithheldItem;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.List;
@@ -76,8 +79,11 @@ class ReviewOutputServiceTest extends BaseUnitTest {
         capture.set("manifest", mapper.valueToTree(manifest));
         job.setCapture(capture);
         job.setWorkerId("worker");
+    }
+
+    private void acceptReadReceipts() {
         when(files.registerReadReceipts(eq(job), any(), eq(List.of()), eq(catalogs)))
-                .thenReturn(manifest);
+                .thenAnswer(invocation -> invocation.getArgument(1));
     }
 
     private AdmissionRequestDTO submission(String slug, String version) {
@@ -96,6 +102,7 @@ class ReviewOutputServiceTest extends BaseUnitTest {
 
     @Test
     void shouldWithholdAnUnverifiedPracticeThroughTheOneMembershipPort() {
+        acceptReadReceipts();
         doThrow(new CandidateEvidenceVerifier.Unverified(
                         CandidateRefusal.QUOTE_UNVERIFIED, "The text was unavailable", null))
                 .when(verifier)
@@ -157,6 +164,7 @@ class ReviewOutputServiceTest extends BaseUnitTest {
 
     @Test
     void shouldKeepTheWorkerAttemptFenceAroundTheProductWrite() {
+        acceptReadReceipts();
         when(verifier.verifyCandidate(eq(job), any(), eq(ReviewKind.ITEM), any(), any()))
                 .thenAnswer(invocation -> invocation.getArgument(3));
         var prepared = service.prepare(job, submission("clear-names", "docs:one"));
@@ -167,6 +175,7 @@ class ReviewOutputServiceTest extends BaseUnitTest {
 
     @Test
     void shouldKeepAnAdmissiblePracticeWhenAnotherCandidateBreaksItsContract() {
+        acceptReadReceipts();
         when(verifier.verifyCandidate(eq(job), any(), eq(ReviewKind.ITEM), any(), any()))
                 .thenAnswer(invocation -> invocation.getArgument(3));
         var first = RuntimeReviewTestData.assignment(5L, null);
@@ -207,5 +216,65 @@ class ReviewOutputServiceTest extends BaseUnitTest {
                         .path("reason")
                         .asString())
                 .isEqualTo("malformed_candidate");
+    }
+
+    @Test
+    void shouldAdmitAHostInapplicabilityResultWithoutAModelSubmission() {
+        var assigned = RuntimeReviewTestData.assignment(5L, null);
+        when(assignments.load(job)).thenReturn(List.of(assigned));
+        when(assignments.admissible(job)).thenReturn(List.of());
+        var check = new AppliesWhenCheck(
+                true,
+                "The change touches no Swift file.",
+                List.of(new AppliesWhenCheck.Clause(
+                        "CHANGED_PATH", new SourceKind("scm.pull-request.diff"), AppliesWhenCheck.Result.NOT_FOUND)));
+        var capture = (ObjectNode) Objects.requireNonNull(job.getCapture());
+        capture.putObject("readiness")
+                .putObject("applicability")
+                .set(assigned.practiceSlug(), mapper.valueToTree(check));
+        when(results.admit(eq(1L), eq(job.getReviewId()), eq(job.getId()), eq(0), any()))
+                .thenReturn(new AdmissionReceipt(List.of(), List.of()));
+        service.prepare(job, new AdmissionRequestDTO(3, job.getReviewId(), job.getId(), 0, List.of()))
+                .record(job);
+        ArgumentCaptor<List<ResultCandidate>> candidates = ArgumentCaptor.captor();
+        verify(results).admit(eq(1L), eq(job.getReviewId()), eq(job.getId()), eq(0), candidates.capture());
+        assertThat(candidates.getValue()).singleElement().satisfies(candidate -> {
+            assertThat(candidate.outcome()).isEqualTo(ResultOutcome.DOES_NOT_APPLY);
+            assertThat(candidate.explanation()).isEqualTo(check.otherwise());
+            assertThat(candidate.problems()).isEmpty();
+            assertThat(candidate.evidence().inapplicability()).isNotNull();
+        });
+        verifyNoInteractions(verifier);
+    }
+
+    @Test
+    void shouldRetainAnAdmissionRefusalForAHostInapplicabilityResult() {
+        var assigned = RuntimeReviewTestData.assignment(5L, null);
+        when(assignments.load(job)).thenReturn(List.of(assigned));
+        when(assignments.admissible(job)).thenReturn(List.of());
+        var check = new AppliesWhenCheck(
+                true,
+                "The change touches no Swift file.",
+                List.of(new AppliesWhenCheck.Clause(
+                        "CHANGED_PATH", new SourceKind("scm.pull-request.diff"), AppliesWhenCheck.Result.NOT_FOUND)));
+        var capture = (ObjectNode) Objects.requireNonNull(job.getCapture());
+        capture.putObject("readiness")
+                .putObject("applicability")
+                .set(assigned.practiceSlug(), mapper.valueToTree(check));
+        when(results.admit(eq(1L), eq(job.getReviewId()), eq(job.getId()), eq(0), any()))
+                .thenReturn(new AdmissionReceipt(
+                        List.of(),
+                        List.of(new WithheldItem(
+                                assigned.practice().practiceId(),
+                                assigned.item().itemId(),
+                                "ROLE_UNAVAILABLE"))));
+        service.prepare(job, new AdmissionRequestDTO(3, job.getReviewId(), job.getId(), 0, List.of()))
+                .record(job);
+        assertThat(Objects.requireNonNull(job.getCapture())
+                        .path("withheld")
+                        .get(0)
+                        .path("reason")
+                        .asString())
+                .isEqualTo("ROLE_UNAVAILABLE");
     }
 }

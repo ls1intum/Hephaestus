@@ -191,6 +191,8 @@ class CandidateEvidenceVerifier {
         for (int i = 0; i < candidate.problems().size(); i++) {
             var problem = candidate.problems().get(i);
 
+            if (scope == ReviewKind.SCAN && !(problem.basis() instanceof StateBasis))
+                throw new Unverified(CandidateRefusal.BASIS_STATE_UNSUPPORTED, "A scan requires a state basis", null);
             switch (problem.basis()) {
                 case StateBasis state -> {
                     if (scope != ReviewKind.SCAN)
@@ -218,11 +220,11 @@ class CandidateEvidenceVerifier {
                     }
                 }
                 case IntroducedBasis introduced -> {
-                    requireChangeVerifier(scope, verifier);
+                    requireChangeVerifier(verifier);
                     bases.add(new BasisToCheck(i, "introduced", citationOffset + introduced.head(), null));
                 }
                 case WorsenedBasis worsened -> {
-                    requireChangeVerifier(scope, verifier);
+                    requireChangeVerifier(verifier);
                     bases.add(new BasisToCheck(
                             i, "worsened", citationOffset + worsened.head(), citationOffset + worsened.base()));
                 }
@@ -260,9 +262,7 @@ class CandidateEvidenceVerifier {
         }
     }
 
-    private static void requireChangeVerifier(ReviewKind scope, @Nullable CitationVerifier verifier) {
-        if (scope == ReviewKind.SCAN)
-            throw new Unverified(CandidateRefusal.BASIS_STATE_UNSUPPORTED, "A scan requires a state basis", null);
+    private static void requireChangeVerifier(@Nullable CitationVerifier verifier) {
         if (verifier == null)
             throw new Unverified(
                     CandidateRefusal.BASIS_REVISION_UNSUPPORTED,

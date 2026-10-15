@@ -33,11 +33,7 @@ public class ReviewContextService {
         }
         if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null || uri.getUserInfo() != null)
             throw new IllegalArgumentException(MALFORMED_ADDRESS);
-        String raw = uri.toString();
-        int fragment = raw.indexOf('#');
-        String canonical = fragment < 0 ? raw : raw.substring(0, fragment);
-        var item =
-                items.atUrl(workspaceId, canonical).orElseThrow(() -> new EntityNotFoundException(NO_WORK_AT_ADDRESS));
+        var item = items.atUrl(workspaceId, url).orElseThrow(() -> new EntityNotFoundException(NO_WORK_AT_ADDRESS));
         var account = SecurityUtils.getCurrentAccountId().orElseThrow();
         boolean activeUserView = UserViewContextHolder.get() != null;
         boolean allowed = !activeUserView && requests.mayRequest(workspaceId, items.pin(item, null), account);

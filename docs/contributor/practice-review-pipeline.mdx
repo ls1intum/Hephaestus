@@ -19,7 +19,9 @@ flowchart TD
   E[Event, request, schedule or backfill] --> S{Select review}
   S -->|eligible| C{Capture evidence}
   S -->|refused| W[Recorded reason]
-  C -->|ready| P[Practice script]
+  C -->|ready| Q{Applies when}
+  Q -->|eligible or undecidable| P[Practice script]
+  Q -->|proven false| A
   C -->|not ready| W
   P --> A{Admit candidate}
   A -->|withheld| W
@@ -40,7 +42,14 @@ They change only decision and retry facts.
 
 `reviewOn` selects events and recorded state for automatic review.
 `appliesWhen` applies to every origin.
+
+After capture readiness passes, the server checks the pinned practice version's conditions before sandbox execution.
+If every alternative is proven false, admission records Does not apply with the authored `otherwise` reason.
+Only complete captured sources can prove absence.
+An undecidable alternative keeps the practice eligible.
+A required capture failure retains its capture refusal and produces no result.
 A request can bypass event selection, but cannot bypass scope, consent or evidence readiness.
+
 Feedback mode Off does not refuse an otherwise eligible review.
 Reviewed by People or Nobody prevents automated execution.
 

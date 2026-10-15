@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.context.AppliesWhenEvaluator;
 import de.tum.cit.aet.hephaestus.agent.context.InsufficientEvidenceException;
 import de.tum.cit.aet.hephaestus.agent.context.JobEvidenceFiles;
 import de.tum.cit.aet.hephaestus.agent.context.JobFolderIndex;
@@ -19,6 +20,9 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobAssignments;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
+import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReason;
+import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
+import de.tum.cit.aet.hephaestus.evidence.CapturedSource;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCapture;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureFacts;
@@ -33,6 +37,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSource;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScanItemVersions;
+import de.tum.cit.aet.hephaestus.practices.AppliesWhen;
+import de.tum.cit.aet.hephaestus.practices.AppliesWhenClause;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeReadSource;
 import de.tum.cit.aet.hephaestus.practices.PracticeReads;
@@ -52,6 +58,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -90,7 +97,9 @@ class DefaultReviewExecutionHandlerTest extends BaseUnitTest {
             items,
             List.of(),
             mapper,
-            Clock.fixed(NOW, ZoneOffset.UTC));
+            Clock.fixed(NOW, ZoneOffset.UTC),
+            new AppliesWhenEvaluator(mapper),
+            mock(ResultAdmissionService.class));
 
     private ReviewJob prepare(boolean available) {
         return prepare(
@@ -217,7 +226,9 @@ class DefaultReviewExecutionHandlerTest extends BaseUnitTest {
                 items,
                 List.of(composer),
                 mapper,
-                Clock.fixed(NOW, ZoneOffset.UTC));
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                new AppliesWhenEvaluator(mapper),
+                mock(ResultAdmissionService.class));
         try (var prepared = scanHandler.prepareInputs(job)) {
             assertThat(prepared.folderIndex()).isNotNull();
         }
@@ -253,6 +264,127 @@ class DefaultReviewExecutionHandlerTest extends BaseUnitTest {
         assertThatThrownBy(() -> handler.prepareInputs(job)).isInstanceOf(InsufficientEvidenceException.class);
         assertDecision(job, ReviewPracticeStatus.WITHHELD);
         verify(files).abortPersonCapture(job);
+    }
+
+    private ReviewJob prepareApplicability(boolean available, Set<String> paths) {
+        var job = prepare(true);
+        var oldAssignment = RuntimeReviewTestData.assignment(5L, null);
+        var old = oldAssignment.practice();
+        var d = old.definition();
+        var definition = new PracticeDefinition(
+                d.name(),
+                d.reviewOn(),
+                new AppliesWhen(
+                        List.of(new AppliesWhenClause(List.of("**/*.swift"), null, null)),
+                        "The change touches no Swift file."),
+                d.about(),
+                new PracticeReads(
+                        "2.0.0",
+                        List.of(new PracticeReadSource(new SourceKind("scm.pull-request.diff"), ReadNeed.REQUIRED))),
+                d.reviewedBy(),
+                d.criteria(),
+                d.script(),
+                d.scan(),
+                d.lineNotes(),
+                d.guidance());
+        var assignment = new ReviewAssignmentSnapshot(
+                oldAssignment.id(),
+                oldAssignment.item(),
+                oldAssignment.version(),
+                oldAssignment.developerId(),
+                oldAssignment.practiceSlug(),
+                new PinnedPractice(
+                        old.practiceId(), old.practiceVersionId(), definition, old.reviewDigest(), old.method()));
+        when(assignments.load(job)).thenReturn(List.of(assignment));
+        var diff = new SourceKind("scm.pull-request.diff");
+        SourceCaptureState state = available
+                ? new SourceCaptureState.Available(
+                        SourceContentState.NON_EMPTY,
+                        SourceCompleteness.COMPLETE,
+                        new SourceCaptureFacts(NOW, null, null, "base:head"))
+                : new SourceCaptureState.Unavailable(SourceAbsenceReason.NO_PROVIDER);
+        var manifest = new JobFolderIndex(
+                new SourceContractVersion("2.0.0"),
+                "a".repeat(64),
+                assignment.item().kind().value(),
+                NOW,
+                List.of(new SourceCapture(
+                        diff,
+                        state,
+                        EvidenceSnapshotFixtures.citation(diff),
+                        available
+                                ? List.of(new CapturedSource(
+                                        "context/change.json", "application/json", "a".repeat(64), 1))
+                                : List.of())),
+                List.of(),
+                List.of(),
+                List.of());
+        var pinned = mock(ItemSnapshot.class);
+        when(source.pin(assignment.item(), assignment.version())).thenReturn(pinned);
+        var captured = available
+                ? Map.of(
+                        "context/change.json",
+                        mapper.writeValueAsBytes(mapper.createObjectNode()
+                                .put("base_sha", "a".repeat(40))
+                                .put("head_sha", "b".repeat(40))
+                                .put("diff", "+changed();\n")
+                                .set("changed_paths", mapper.valueToTree(paths))))
+                : Map.<String, byte[]>of();
+        when(context.prepare(eq(pinned), any())).thenReturn(new PreparedEvidence(captured, manifest));
+        when(source.record(eq(pinned), any()))
+                .thenReturn(mapper.createObjectNode().put("title", "Captured change"));
+        when(files.prepare(eq(job), any(), any()))
+                .thenAnswer(
+                        call -> new PreparedJobInputs(Map.of(), List.of(), List.of(), manifest, call.getArgument(2)));
+        return job;
+    }
+
+    @Test
+    void shouldExcludeAProvenNonmatchingPracticeFromTheSandboxWithoutRefusingCapture() {
+        var job = prepareApplicability(true, Set.of("src/Main.java"));
+        try (var prepared = handler.prepareInputs(job)) {
+            var report = prepared.automatedReviewReadinessReport();
+            assertThat(report).isNotNull();
+            assertThat(report.decisions().getFirst().ready()).isTrue();
+            assertThat(Objects.requireNonNull(report.applicability().get("clear-names"))
+                            .absent())
+                    .isTrue();
+            assertThat(Objects.requireNonNull(report.applicability().get("clear-names"))
+                            .otherwise())
+                    .isEqualTo("The change touches no Swift file.");
+        }
+        verify(catalog).inject(any(), eq(List.of()), eq(ReviewKind.ITEM), eq(Map.of()));
+        assertDecision(job, ReviewPracticeStatus.READY);
+    }
+
+    @Test
+    void shouldReviewThePracticeWhenAChangedPathMatches() {
+        var job = prepareApplicability(true, Set.of("src/App.swift"));
+        try (var prepared = handler.prepareInputs(job)) {
+            var report = prepared.automatedReviewReadinessReport();
+            assertThat(report).isNotNull();
+            assertThat(Objects.requireNonNull(report.applicability().get("clear-names"))
+                            .absent())
+                    .isFalse();
+        }
+        ArgumentCaptor<List<ReviewAssignmentSnapshot>> staged = ArgumentCaptor.captor();
+        verify(catalog).inject(any(), staged.capture(), eq(ReviewKind.ITEM), eq(Map.of()));
+        assertThat(staged.getValue())
+                .singleElement()
+                .satisfies(assignment -> assertThat(assignment.practiceSlug()).isEqualTo("clear-names"));
+    }
+
+    @Test
+    void shouldKeepTheCaptureFailureWhenTheApplicabilitySourceIsUnavailable() {
+        var job = prepareApplicability(false, Set.of());
+        assertThatThrownBy(() -> handler.prepareInputs(job)).isInstanceOf(InsufficientEvidenceException.class);
+        assertDecision(job, ReviewPracticeStatus.WITHHELD);
+        var facts = ArgumentCaptor.forClass(PreparedEvidence.class);
+        var report = ArgumentCaptor.forClass(AutomatedReviewReadinessReport.class);
+        verify(files).prepare(eq(job), facts.capture(), report.capture());
+        assertThat(report.getValue().applicability()).isEmpty();
+        assertThat(report.getValue().decisions().getFirst().reasonCodes())
+                .contains(AutomatedReviewReadinessReason.DECLARED_EVIDENCE_INSUFFICIENT);
     }
 
     private void assertDecision(ReviewJob job, ReviewPracticeStatus expected) {

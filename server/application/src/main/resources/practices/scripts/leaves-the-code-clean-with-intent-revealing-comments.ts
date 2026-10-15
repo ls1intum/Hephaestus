@@ -73,7 +73,11 @@ export default definePracticeScript({
 		let processNotes = 0;
 		let placeholders = 0;
 
-		for (const file of await selectedSources(ctx, domain.files)) {
+		for (const file of await selectedSources(
+			ctx,
+			domain.files,
+			(source) => source.language !== null,
+		)) {
 			const lang = file.language;
 			if (lang === null) {
 				continue;

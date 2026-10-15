@@ -11,16 +11,22 @@ import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobAssignments;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmissionRequestDTO;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmissionResponseDTO;
+import de.tum.cit.aet.hephaestus.evidence.AppliesWhenCheck;
+import de.tum.cit.aet.hephaestus.evidence.CitationSide;
 import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CandidateRefusal;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.spi.HostCoverage;
+import de.tum.cit.aet.hephaestus.practices.spi.InapplicabilityWarrant;
 import de.tum.cit.aet.hephaestus.practices.spi.ProblemCandidate;
+import de.tum.cit.aet.hephaestus.practices.spi.ReadReceiptStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultCandidate;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultEvidence;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentStore;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -74,9 +80,38 @@ public class ReviewOutputService {
         var receipts = submission.results().stream()
                 .flatMap(entry -> entry.readReceipts().stream())
                 .toList();
-        var resolvedManifest = files.registerReadReceipts(job, manifest, receipts, catalogs);
-        var captured = CapturedEvidence.of(resolvedManifest);
+        var resolvedManifest = manifest;
         var admitted = new ArrayList<ResultCandidate>();
+        var assigned = assignments.load(job);
+        var applicability = originalCapture.path("readiness").path("applicability");
+        for (var assignment : assigned) {
+            var recorded = applicability.path(assignment.practiceSlug());
+            if (!recorded.path("absent").asBoolean(false)) continue;
+            var check = mapper.treeToValue(recorded, AppliesWhenCheck.class);
+            admitted.add(new ResultCandidate(
+                    assignment.practice().practiceId(),
+                    assignment.practice().practiceVersionId(),
+                    assignment.item().itemId(),
+                    assignment.version().value(),
+                    assignment.developerId(),
+                    ResultOutcome.DOES_NOT_APPLY,
+                    "This practice does not apply",
+                    check.otherwise(),
+                    new ResultEvidence(
+                            List.of(),
+                            null,
+                            new InapplicabilityWarrant(
+                                    check.clauses().stream()
+                                            .map(AppliesWhenCheck.Clause::readFrom)
+                                            .distinct()
+                                            .toList(),
+                                    "At least one Applies when condition must match",
+                                    check.otherwise()),
+                            List.of()),
+                    null,
+                    new HostCoverage(true, List.of(), 0, 0, 0, List.of()),
+                    List.of()));
+        }
         var withheld = new LinkedHashMap<String, AdmissionResponseDTO.Withheld>();
         var seen = new HashSet<String>();
         var refusals = new ArrayList<WithheldAssignment>();
@@ -108,6 +143,25 @@ public class ReviewOutputService {
                 continue;
             }
             try {
+                resolvedManifest = files.registerReadReceipts(job, resolvedManifest, entry.readReceipts(), catalogs);
+            } catch (IllegalArgumentException | IllegalStateException refusal) {
+                refusals.add(new WithheldAssignment(
+                        assignment,
+                        CandidateRefusal.COVERAGE_INCONSISTENT,
+                        Objects.requireNonNull(refusal.getMessage())));
+                continue;
+            }
+            var captured = CapturedEvidence.of(resolvedManifest);
+            if (review.kind() == ReviewKind.SCAN
+                    && candidate.outcome().isMet()
+                    && !hasCompleteAssignedRead(assignment, candidate, resolvedManifest, captured)) {
+                refusals.add(new WithheldAssignment(
+                        assignment,
+                        CandidateRefusal.COVERAGE_INCONSISTENT,
+                        "A scan MET needs complete host coverage and a complete read of its assigned pinned file"));
+                continue;
+            }
+            try {
                 var verified = verifier.verifyCandidate(job, assignment, review.kind(), candidate, captured);
                 admitted.add(result(assignment, verified));
             } catch (CandidateEvidenceVerifier.Unverified refusal) {
@@ -115,13 +169,14 @@ public class ReviewOutputService {
                         assignment, refusal.refusal(), Objects.requireNonNull(refusal.getMessage())));
             }
         }
-        if (submission.results().isEmpty() || !seen.equals(pinned.keySet())) {
+        if ((submission.results().isEmpty() && admitted.isEmpty()) || !seen.equals(pinned.keySet())) {
             throw new ResultsRefusedException(
                     "no_admissible_results", "Every assigned practice must submit one result");
         }
         int attempt = job.getAttempt();
         String worker = job.getWorkerId();
         JsonNode capture = Objects.requireNonNull(job.getCapture()).deepCopy();
+        var retainedManifest = resolvedManifest;
         return owned -> {
             if (!job.getId().equals(owned.getId())
                     || attempt != owned.getAttempt()
@@ -141,7 +196,7 @@ public class ReviewOutputService {
             var receipt = results.admit(
                     owned.getWorkspaceId(), owned.getReviewId(), owned.getId(), attempt, List.copyOf(admitted));
             for (var item : receipt.withheldItems()) {
-                var assignment = pinned.values().stream()
+                var assignment = assigned.stream()
                         .filter(value -> value.practice().practiceId() == item.practiceId()
                                 && value.item().itemId() == item.itemId())
                         .findFirst()
@@ -152,12 +207,37 @@ public class ReviewOutputService {
                                 assignment.practiceSlug(), Long.toString(item.itemId()), item.reason()));
             }
             ObjectNode retained = (ObjectNode) capture.deepCopy();
-            retained.set("manifest", mapper.valueToTree(resolvedManifest));
+            retained.set("manifest", mapper.valueToTree(retainedManifest));
             retained.set("readReceipts", mapper.valueToTree(receipts));
             retained.set("withheld", mapper.valueToTree(withheld.values()));
             retained.set("admission", mapper.valueToTree(receipt));
             owned.setCapture(retained);
         };
+    }
+
+    private static boolean hasCompleteAssignedRead(
+            ReviewAssignmentSnapshot assignment,
+            Candidate candidate,
+            JobFolderIndex manifest,
+            CapturedEvidence captured) {
+        if (!(candidate.coverage() instanceof HostCoverage host) || !host.complete()) return false;
+        String path = assignment.item().path();
+        String commit = assignment.version().baseVersion();
+        if (path == null || commit == null) return false;
+        return host.receipts().stream()
+                .anyMatch(receipt -> receipt.status() == ReadReceiptStatus.COMPLETE
+                        && path.equals(receipt.path())
+                        && commit.equals(receipt.version())
+                        && receipt.contentDigest() != null
+                        && receipt.contentDigest().matches("[0-9a-f]{64}")
+                        && captured.availableSources().contains(receipt.sourceKind())
+                        && manifest.citableTexts().stream()
+                                .anyMatch(text -> text.source()
+                                                .equals(receipt.sourceKind().value())
+                                        && text.path().equals(path)
+                                        && text.side() == CitationSide.NEW
+                                        && commit.equals(text.commit())
+                                        && text.sha256().equals(receipt.contentDigest())));
     }
 
     private record WithheldAssignment(ReviewAssignmentSnapshot assignment, CandidateRefusal reason, String message) {}

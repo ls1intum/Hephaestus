@@ -2,6 +2,9 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -13,10 +16,14 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
+import de.tum.cit.aet.hephaestus.agent.context.JobFolderIndex;
 import de.tum.cit.aet.hephaestus.agent.handler.DefaultReviewExecutionHandler;
+import de.tum.cit.aet.hephaestus.agent.handler.EvidenceSnapshotFixtures;
 import de.tum.cit.aet.hephaestus.agent.handler.RuntimeReviewTestData;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticePiAdapter;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerCapacityState;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetBlockReason;
@@ -24,18 +31,34 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetDecision;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
+import de.tum.cit.aet.hephaestus.evidence.AppliesWhenCheck;
+import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessDecision;
+import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
+import de.tum.cit.aet.hephaestus.evidence.SourceCapture;
+import de.tum.cit.aet.hephaestus.evidence.SourceCaptureFacts;
+import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
+import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
+import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
+import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.evidence.SourceReadinessCheck;
+import de.tum.cit.aet.hephaestus.practices.spi.ProcessingStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.tracing.Tracer;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.MDC;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -45,6 +68,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
 class ReviewJobExecutorTest extends BaseUnitTest {
+    @TempDir
+    Path folder;
+
     private final ReviewJobRepository jobs = mock(ReviewJobRepository.class);
     private final ReviewMemberAiPolicy policy = mock(ReviewMemberAiPolicy.class);
     private final DefaultReviewExecutionHandler handler = mock(DefaultReviewExecutionHandler.class);
@@ -264,6 +290,108 @@ class ReviewJobExecutorTest extends BaseUnitTest {
         assertThat(executor.processJob(job.getId())).isEqualTo(ReviewJobExecutor.StartOutcome.STARTED);
 
         assertThat(executor.computeCapacity()).isEqualTo(1);
+        verify(workerCapacity).releaseReview();
+        assertThat(MDC.get("job.id")).isNull();
+        verifyNoInteractions(sandbox);
+    }
+
+    @Test
+    void shouldCompleteInapplicablePracticesWithoutStartingASandbox() throws Exception {
+        var job = RuntimeReviewTestData.job();
+        job.setSubmittedAt(Instant.now().minusSeconds(2));
+        job.setConfigSnapshot(new ConfigSnapshot(
+                        ConfigSnapshot.SCHEMA_VERSION,
+                        new FrozenModel(
+                                LlmApiProtocol.OPENAI_COMPLETIONS,
+                                "https://model.example",
+                                "model",
+                                null,
+                                null,
+                                null,
+                                null,
+                                DataHandlingTier.UNDECLARED,
+                                null,
+                                null),
+                        null,
+                        null,
+                        600,
+                        false,
+                        null)
+                .toJson(new JsonMapper()));
+        var workerCapacity = mock(WorkerCapacityState.class);
+        when(workerCapacity.reviewMax()).thenReturn(1);
+        capacity = Optional.of(workerCapacity);
+        when(jobs.findByIdQueuedForUpdateSkipLocked(any(), any())).thenReturn(Optional.of(job));
+        when(jobs.findById(job.getId())).thenReturn(Optional.of(job));
+        when(jobs.transitionStatus(any(), any(), any(), any(), any())).thenReturn(1);
+        when(policy.permitsReview(job)).thenReturn(true);
+        var binding = mock(WorkspaceAgentBinding.class);
+        when(binding.getDataHandlingTier()).thenReturn(DataHandlingTier.UNDECLARED);
+        when(binding.getMaxConcurrentJobs()).thenReturn(1);
+        when(policy.binding(job)).thenReturn(Optional.of(binding));
+        when(budgets.decide(job.getWorkspaceId())).thenReturn(LlmBudgetDecision.ALLOWED);
+        when(assignments.load(job)).thenReturn(List.of(RuntimeReviewTestData.assignment(null, null)));
+        var now = Instant.now();
+        var source = new SourceKind("scm.pull-request.diff");
+        var contract = new SourceContractVersion("2.0.0");
+        var readiness = new AutomatedReviewReadinessDecision(
+                "clear-names",
+                now,
+                true,
+                List.of(),
+                List.of(new SourceReadinessCheck(source, contract, now, now, true, List.of())));
+        var report = new AutomatedReviewReadinessReport(
+                contract,
+                "a".repeat(64),
+                "scm.pull_request",
+                now,
+                now,
+                List.of(readiness),
+                Map.of(
+                        "clear-names",
+                        new AppliesWhenCheck(
+                                true,
+                                "The change touches no Swift file.",
+                                List.of(new AppliesWhenCheck.Clause(
+                                        "CHANGED_PATH", source, AppliesWhenCheck.Result.NOT_FOUND)))));
+        var manifest = folder.resolve("manifest.json");
+        var index = new JobFolderIndex(
+                contract,
+                "a".repeat(64),
+                "scm.pull_request",
+                now,
+                List.of(new SourceCapture(
+                        source,
+                        new SourceCaptureState.Available(
+                                SourceContentState.EMPTY,
+                                SourceCompleteness.COMPLETE,
+                                new SourceCaptureFacts(now, null, null, "base:head")),
+                        EvidenceSnapshotFixtures.citation(source),
+                        List.of())),
+                List.of(),
+                List.of(),
+                List.of());
+        Files.write(manifest, new JsonMapper().writeValueAsBytes(index));
+        when(handler.prepareInputs(job))
+                .thenReturn(new PreparedJobInputs(
+                        Map.of(SandboxLayout.MANIFEST_PATH, manifest), List.of(), List.of(), index, report));
+        when(jobs.updateCapture(any(), anyLong(), any(), anyInt(), any())).thenReturn(1);
+        var pool = mock(AsyncTaskExecutor.class);
+        doAnswer(invocation -> {
+                    Runnable work = invocation.getArgument(0);
+                    work.run();
+                    return null;
+                })
+                .when(pool)
+                .execute(any(Runnable.class));
+        var executor = executor(pool);
+
+        assertThat(executor.processJob(job.getId())).isEqualTo(ReviewJobExecutor.StartOutcome.STARTED);
+
+        assertThat(executor.computeCapacity()).isEqualTo(1);
+        assertThat(job.getProcessingStatus()).isEqualTo(ProcessingStatus.PENDING);
+        verify(jobs).transitionStatus(eq(job.getId()), eq(ReviewJobStatus.COMPLETED), any(), eq(null), any());
+        verify(handler).completeWithoutExecution(job);
         verify(workerCapacity).releaseReview();
         assertThat(MDC.get("job.id")).isNull();
         verifyNoInteractions(sandbox);

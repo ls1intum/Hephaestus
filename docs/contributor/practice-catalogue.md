@@ -31,6 +31,7 @@ A definition contains reviewOn, appliesWhen, about, reads, reviewedBy, criteria,
 Reads retains its source contract and source requirements.
 Reviewed by retains the human explanation and limits.
 About can be null when no developer is judged.
+The [review pipeline](./practice-review-pipeline.mdx#select-a-review) owns applicability checks and capture refusal behavior.
 
 ## Workspace adoption lifecycle
 

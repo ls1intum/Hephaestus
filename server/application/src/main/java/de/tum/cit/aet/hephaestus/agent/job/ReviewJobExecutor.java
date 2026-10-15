@@ -594,6 +594,18 @@ public class ReviewJobExecutor {
             PreparedSandbox preparedSandbox = prepareSandboxSpec(jobId, job, claim.snapshot(), preparationStage);
             stagedInputs = preparedSandbox.stagedInputs();
             SandboxSpec sandboxSpec = preparedSandbox.spec();
+            if (sandboxSpec == null) {
+                recordedTerminal = transactionTemplate.execute(status -> {
+                    int updated = transitionTerminal(jobId, ReviewJobStatus.COMPLETED, Instant.now(), null);
+                    if (updated == 0) return null;
+                    var completed = jobRepository.findById(jobId).orElseThrow();
+                    completed.setProcessingStatus(ProcessingStatus.PENDING);
+                    jobRepository.saveAndFlush(completed);
+                    return ReviewJobStatus.COMPLETED;
+                });
+                metricOutcome = recordedTerminal == null ? "OWNERSHIP_LOST" : recordedTerminal.name();
+                return;
+            }
             // Past this boundary provider usage may exist even if execute() throws, so it is persisted
             // for recovery on another process. A lost fence means the job was cancelled or requeued
             // while preparation ran, so its sandbox must not start.
@@ -678,7 +690,7 @@ public class ReviewJobExecutor {
     private ExecutionOutcome persistEvidenceRefusal(UUID jobId, ReviewJob job, InsufficientEvidenceException e) {
         // This evidence was not staged; no attempt owns its cleanup.
         try (PreparedJobInputs refused = e.preparedInputs()) {
-            persistRefusedEvidence(jobId, job.getWorkspaceId(), job.getAttempt(), refused);
+            persistPreparedEvidence(jobId, job.getWorkspaceId(), job.getAttempt(), refused);
             JsonNode output =
                     objectMapper.valueToTree(new RefusedExecution(RefusalOutcome.INSUFFICIENT_EVIDENCE, null, null));
             Integer updated = transactionTemplate.execute(status -> jobRepository.transitionToEvidenceRefused(
@@ -768,7 +780,7 @@ public class ReviewJobExecutor {
     }
 
     // The caller owns prepared-input cleanup through execution and admission, on every outcome.
-    private record PreparedSandbox(SandboxSpec spec, PreparedJobInputs stagedInputs) {}
+    private record PreparedSandbox(@Nullable SandboxSpec spec, PreparedJobInputs stagedInputs) {}
 
     private PreparedSandbox prepareSandboxSpec(
             UUID jobId, ReviewJob job, ConfigSnapshot snapshot, AtomicReference<PreparationFailure.Stage> stage) {
@@ -787,6 +799,13 @@ public class ReviewJobExecutor {
                 : handler.prepareInputs(preparedJob);
 
         try {
+            var report = preparedInputs.automatedReviewReadinessReport();
+            if (!continuation && report != null && report.decisions().stream().noneMatch(report::runs)) {
+                stage.set(PreparationFailure.Stage.PROVENANCE);
+                persistPreparedEvidence(jobId, job.getWorkspaceId(), job.getAttempt(), preparedInputs);
+                handler.completeWithoutExecution(jobRepository.findById(jobId).orElseThrow());
+                return new PreparedSandbox(null, preparedInputs);
+            }
             stage.set(PreparationFailure.Stage.CREDENTIAL);
             // Sandboxes access providers through the LLM proxy with an attempt-scoped credential.
             Instant workDeadline =
@@ -833,7 +852,7 @@ public class ReviewJobExecutor {
         }
     }
 
-    private void persistRefusedEvidence(UUID jobId, long workspaceId, int attempt, PreparedJobInputs preparedInputs) {
+    private void persistPreparedEvidence(UUID jobId, long workspaceId, int attempt, PreparedJobInputs preparedInputs) {
         persistProvenanceDigests(
                 jobId,
                 workspaceId,

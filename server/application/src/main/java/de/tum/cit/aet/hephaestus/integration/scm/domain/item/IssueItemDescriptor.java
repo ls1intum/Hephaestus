@@ -90,7 +90,7 @@ public class IssueItemDescriptor implements ItemDescriptor {
                         "State",
                         List.of(new ReviewStateValue("OPEN", "Open"), new ReviewStateValue("CLOSED", "Closed")),
                         Set.of("OPEN", "CLOSED"))),
-                Set.of("CHANGED_PATH", "DIFF_CONTAINS", "HAS_ITEMS"),
+                Set.of(),
                 Set.of(),
                 Set.of());
     }

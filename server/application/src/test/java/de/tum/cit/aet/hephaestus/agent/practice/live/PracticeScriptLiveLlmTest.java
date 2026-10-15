@@ -521,7 +521,9 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
             assertThat((long) row.getTotalCalls()).isEqualTo(counted.calls());
             assertThat(row.getInputTokens()).isEqualTo(counted.inputTokens());
             assertThat(row.getSourceAttempt()).isEqualTo(job.getAttempt());
-            assertThat(row.getPricingState()).isEqualTo(UsagePricingState.PRICED);
+            assertThat(row.getPricingState())
+                    .as("%s pricing of %s", kind, counted)
+                    .isEqualTo(UsagePricingState.PRICED);
         }
     }
 
@@ -578,8 +580,10 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
                                 PricingMode.PRICED,
                                 new BigDecimal("0.10"),
                                 new BigDecimal("0.40"),
-                                null,
-                                null,
+                                // Some endpoints report cache reads and writes; an unknown rate leaves the row
+                                // UNPRICED.
+                                new BigDecimal("0.05"),
+                                new BigDecimal("0.10"),
                                 null,
                                 null))
                 .getId();

@@ -16,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
@@ -44,6 +45,9 @@ class WorkerRegistryOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private TransactionTemplate transactionTemplate;
+
+    @Autowired
+    private JdbcTemplate jdbc;
 
     // This context has worker.enabled=true and NO hephaestus.worker.control.endpoint — the exact
     // topology where orphan recovery would otherwise silently no-op. required=false so a regression
@@ -158,7 +162,9 @@ class WorkerRegistryOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         job.setConfigSnapshot(objectMapper.createObjectNode());
         job.setWorkerId(workerId);
         job.setStartedAt(startedAt);
-        return jobRepository.saveAndFlush(job).getId();
+        return jobRepository
+                .saveAndFlush(RuntimeJobTestData.persistParent(jdbc, job))
+                .getId();
     }
 
     private void registerWorker(String workerId, Instant lastHeartbeat) {

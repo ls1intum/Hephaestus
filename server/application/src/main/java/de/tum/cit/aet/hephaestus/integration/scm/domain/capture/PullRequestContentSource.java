@@ -169,18 +169,15 @@ public class PullRequestContentSource {
         if (prepared != null) {
             String range = prepared.target() + ":" + prepared.head();
             if (selectedKinds.contains(DIFF)) {
-                storeChange(files, prepared);
+                var changedPaths =
+                        gitRepositoryManager.changedPaths(prepared.key(), prepared.target(), prepared.head());
+                storeChange(files, prepared, changedPaths);
                 if (selectedKinds.contains(CORE)) storeCommits(files, prepared);
                 citable.addAll(ScmCitableTexts.changed(gitRepositoryManager, prepared, files));
                 completeness.put(DIFF, SourceCompleteness.COMPLETE);
                 identities.put(DIFF, range);
                 contentStates.put(
-                        DIFF,
-                        gitRepositoryManager
-                                        .changedPaths(prepared.key(), prepared.target(), prepared.head())
-                                        .isEmpty()
-                                ? SourceContentState.EMPTY
-                                : SourceContentState.NON_EMPTY);
+                        DIFF, changedPaths.isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY);
             }
         }
         return new CaptureContribution(
@@ -226,10 +223,15 @@ public class PullRequestContentSource {
         }
     }
 
-    private void storeChange(Map<String, byte[]> files, ReviewRepositoryPreparer.PreparedReview prepared) {
+    private void storeChange(
+            Map<String, byte[]> files, ReviewRepositoryPreparer.PreparedReview prepared, Set<String> changedPaths) {
         ObjectNode change = objectMapper.createObjectNode();
         change.put("base_sha", prepared.target());
         change.put("head_sha", prepared.head());
+        change.set(
+                "changed_paths",
+                objectMapper.valueToTree(changedPaths.stream().sorted().toList()));
+        change.put("diff", gitRepositoryManager.unifiedDiff(prepared.key(), prepared.target(), prepared.head()));
         try {
             files.put(CHANGE_FILE, objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(change));
         } catch (JacksonException e) {

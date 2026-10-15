@@ -59,7 +59,12 @@ public class RegistrationToGitProviderResolver implements GitProviderRegistry {
         String origin = ScmOrigin.of(baseUrl)
                 .orElseThrow(() -> new IllegalStateException("login provider baseUrl has no origin: " + baseUrl));
         return Objects.requireNonNull(existingProvider(type, origin)
-                .orElseGet(() -> gitProviderRepository.save(new IdentityProvider(type, origin)))
+                .orElseGet(() -> {
+                    gitProviderRepository.registerSourceInstance(type.name(), origin);
+                    return gitProviderRepository
+                            .findByTypeAndServerUrl(type, origin)
+                            .orElseThrow();
+                })
                 .getId());
     }
 

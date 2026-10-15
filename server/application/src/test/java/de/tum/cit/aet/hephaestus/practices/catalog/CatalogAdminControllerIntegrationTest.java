@@ -78,8 +78,10 @@ class CatalogAdminControllerIntegrationTest extends AbstractWorkspaceIntegration
                     assertThat(options.itemTypes())
                             .filteredOn(item -> item.kind().equals("scm.issue"))
                             .singleElement()
-                            .satisfies(item ->
-                                    assertThat(item.applicabilitySources()).isEmpty());
+                            .satisfies(item -> {
+                                assertThat(item.applicabilitySources()).isEmpty();
+                                assertThat(item.applicabilityClauses()).isEmpty();
+                            });
                 });
     }
 

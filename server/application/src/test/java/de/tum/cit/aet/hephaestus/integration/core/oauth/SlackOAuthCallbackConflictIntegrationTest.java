@@ -81,9 +81,6 @@ class SlackOAuthCallbackConflictIntegrationTest extends AbstractWorkspaceIntegra
 
     @BeforeEach
     void setUp() {
-        // Hibernate creates this test schema; the Slack team uniqueness index is owned by Liquibase.
-        jdbcTemplate.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_connection_one_active_slack_per_team ON"
-                + " connection (instance_key) WHERE state = 'ACTIVE' AND kind = 'SLACK'");
         team = "T" + System.nanoTime();
         when(slackOAuthClient.exchangeCode(any(), any()))
                 .thenReturn(new OAuthV2Access(
@@ -93,7 +90,6 @@ class SlackOAuthCallbackConflictIntegrationTest extends AbstractWorkspaceIntegra
     @AfterEach
     void tearDown() {
         reset(slackOAuthClient);
-        jdbcTemplate.execute("DROP INDEX IF EXISTS uq_connection_one_active_slack_per_team");
     }
 
     @Test

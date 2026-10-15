@@ -83,12 +83,6 @@ public interface ProductItemRepository extends Repository<Review, UUID> {
     List<ItemRow> items(long ws, Collection<Long> ids);
 
     @Query(
-            value = "SELECT id,kind,source_id AS sourceId,parent_id AS parentId,path,removed_at AS removedAt"
-                    + " FROM item WHERE workspace_id=:ws AND removed_at IS NULL AND source_id IS NOT NULL",
-            nativeQuery = true)
-    List<ItemRow> activeSourceItems(long ws);
-
-    @Query(
             value = "SELECT id FROM item WHERE workspace_id=:ws AND (CAST(:kind AS text) IS NULL OR kind=:kind) ORDER"
                     + " BY id DESC",
             countQuery =

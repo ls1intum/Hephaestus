@@ -99,6 +99,9 @@ hephaestus:
     integration:
         oauth-state:
             secret: test-oauth-state-hmac-secret-not-real
+        slack:
+            enabled: true
+            signing-secret: test-slack-signing-secret-not-real
         # Suite-wide so GitLab @ConditionalOnProperty beans load in the base context — the GitLab
         # tests no longer need a per-class @TestPropertySource (which forked a context each).
         gitlab:

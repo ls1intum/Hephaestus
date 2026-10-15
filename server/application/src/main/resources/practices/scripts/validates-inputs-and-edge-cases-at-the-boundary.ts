@@ -109,10 +109,17 @@ export default definePracticeScript({
 		let filesScanned = 0;
 		let linesScanned = 0;
 
-		for (const file of await selectedSources(ctx, domain.files)) {
+		for (const file of await selectedSources(
+			ctx,
+			domain.files,
+			(source) =>
+				source.language !== null &&
+				LANG_PATTERNS[source.language] !== undefined &&
+				!isTestPath(source.path),
+		)) {
 			const lang = file.language;
 			const own = lang === null ? undefined : LANG_PATTERNS[lang];
-			if (lang === null || own === undefined || isTestPath(file.path)) {
+			if (lang === null || own === undefined) {
 				continue;
 			}
 			const request = REQUEST_INPUT[lang];

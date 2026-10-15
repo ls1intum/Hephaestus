@@ -66,7 +66,7 @@ export default definePracticeScript({
 		}
 		const leads: ReviewLead[] = [];
 		const byKind: Record<string, number> = {};
-		for (const file of await selectedSources(ctx, domain.files)) {
+		for (const file of await selectedSources(ctx, domain.files, () => true)) {
 			for (const [kind, test] of PATTERNS) {
 				const found = selectedOccurrences(
 					ctx,

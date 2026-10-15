@@ -82,6 +82,6 @@ class PracticeV1CurrentResultMigrationTest {
                         database,
                         "UPDATE review_item SET state='REUSED' WHERE review_id='00000000-0000-0000-0000-000000992111'"))
                 .hasRootCauseInstanceOf(SQLException.class)
-                .hasMessageContaining("cannot reuse legacy evidence");
+                .hasMessageContaining("new assignments cannot reuse released evidence");
     }
 }

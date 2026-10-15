@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.capture.CaptureContribution;
 import de.tum.cit.aet.hephaestus.evidence.capture.CitableText;
+import de.tum.cit.aet.hephaestus.evidence.capture.EvidenceDirectory;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
@@ -25,6 +26,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.json.JsonMapper;
 
 class JobFolderIndexBuilderTest extends BaseUnitTest {
@@ -100,5 +104,116 @@ class JobFolderIndexBuilderTest extends BaseUnitTest {
         assertThatThrownBy(() -> builder()
                         .build(new ItemKind("docs.document"), Map.of(source, contribution("docs.document.other"))))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @TempDir
+    Path root;
+
+    private CaptureContribution staged(
+            Map<String, byte[]> memory,
+            Map<String, Path> disk,
+            List<EvidenceDirectory> directories,
+            List<CitableText> texts) {
+        return new CaptureContribution(
+                memory,
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                disk,
+                null,
+                Map.of(),
+                directories,
+                List.of(),
+                texts);
+    }
+
+    @Test
+    void shouldIndexDiskFilesWithTheirActualDigestAndMediaType() throws IOException {
+        Path file = Files.writeString(root.resolve("document.json"), "{\"title\":\"Design\"}");
+        var captured = staged(
+                Map.of(),
+                Map.of("context/document.json", file),
+                List.of(),
+                List.of(new CitableText(
+                        source.value(),
+                        "document/body",
+                        CitationSide.NEW,
+                        null,
+                        "context/document.json",
+                        ProvenanceDigest.sha256Hex(Files.readAllBytes(file)))));
+        var prepared = builder().build(new ItemKind("docs.document"), Map.of(source, captured));
+        assertThat(prepared.filesOnDisk()).containsEntry("context/document.json", file);
+        assertThat(Objects.requireNonNull(prepared.manifest()).files())
+                .singleElement()
+                .satisfies(entry -> {
+                    assertThat(entry.file().mediaType()).isEqualTo("application/json");
+                    assertThat(entry.file().bytes()).isEqualTo(Files.size(file));
+                    assertThat(entry.file().sha256()).isEqualTo(ProvenanceDigest.sha256Hex(Files.readAllBytes(file)));
+                });
+        assertThat(Objects.requireNonNull(prepared.manifest()).citableTexts()).isEqualTo(captured.citableTexts());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void shouldResolveBothRelativeAndAlreadyPrefixedDirectoryText(boolean prefixed) throws IOException {
+        Files.writeString(root.resolve("body.txt"), "Evidence");
+        var text = new CitableText(
+                source.value(),
+                "document/body",
+                CitationSide.NEW,
+                null,
+                prefixed ? "context/body.txt" : "body.txt",
+                ProvenanceDigest.sha256Hex("Evidence".getBytes(StandardCharsets.UTF_8)));
+        var captured = staged(
+                Map.of("context/index.json", "{}".getBytes(StandardCharsets.UTF_8)),
+                Map.of(),
+                List.of(new EvidenceDirectory("context/", root)),
+                List.of(text));
+        var prepared = builder().build(new ItemKind("docs.document"), Map.of(source, captured));
+        assertThat(prepared.directories()).isEqualTo(captured.directories());
+        assertThat(Objects.requireNonNull(prepared.manifest()).citableTexts())
+                .containsExactly(new CitableText(
+                        text.source(), text.path(), text.side(), text.commit(), "context/body.txt", text.sha256()));
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, 2})
+    void shouldRefuseTextWithoutOneCapturedDirectory(int owners) throws IOException {
+        Files.writeString(root.resolve("body.txt"), "Evidence");
+        var text = new CitableText(source.value(), "document/body", CitationSide.NEW, null, "body.txt", "a".repeat(64));
+        var directory = new EvidenceDirectory("context/", root);
+        var captured =
+                staged(Map.of(), Map.of(), owners == 0 ? List.of() : List.of(directory, directory), List.of(text));
+        assertThatThrownBy(() -> builder().build(new ItemKind("docs.document"), Map.of(source, captured)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("A citable text has no unique captured directory");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"memory-memory", "memory-disk", "disk-memory", "disk-disk"})
+    void shouldRefuseAPathClaimedByTwoSources(String storage) throws IOException {
+        Path file = Files.writeString(root.resolve("body.txt"), "Evidence");
+        var other = new SourceKind("scm.pull-request.core");
+        var contributions = new LinkedHashMap<SourceKind, CaptureContribution>();
+        contributions.put(
+                source,
+                staged(
+                        storage.startsWith("memory") ? Map.of("context/body.txt", new byte[0]) : Map.of(),
+                        storage.startsWith("disk") ? Map.of("context/body.txt", file) : Map.of(),
+                        List.of(),
+                        List.of()));
+        contributions.put(
+                other,
+                staged(
+                        storage.endsWith("memory") ? Map.of("context/body.txt", new byte[0]) : Map.of(),
+                        storage.endsWith("disk") ? Map.of("context/body.txt", file) : Map.of(),
+                        List.of(),
+                        List.of()));
+        assertThatThrownBy(() -> builder().build(new ItemKind("docs.document"), contributions))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Duplicate captured path: context/body.txt");
     }
 }

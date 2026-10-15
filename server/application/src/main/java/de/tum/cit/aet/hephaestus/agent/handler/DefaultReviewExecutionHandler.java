@@ -1,18 +1,22 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import de.tum.cit.aet.hephaestus.agent.context.AppliesWhenEvaluator;
 import de.tum.cit.aet.hephaestus.agent.context.InsufficientEvidenceException;
 import de.tum.cit.aet.hephaestus.agent.context.JobEvidenceFiles;
 import de.tum.cit.aet.hephaestus.agent.context.JobFolderIndex;
+import de.tum.cit.aet.hephaestus.agent.context.ReviewChange;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewHistoryContentSource;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionInputs;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobAssignments;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmissionRequestDTO;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.task.Task;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
+import de.tum.cit.aet.hephaestus.evidence.AppliesWhenCheck;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessDecision;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReason;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
@@ -49,6 +53,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 @Component
 @ConditionalOnCaptureRole
@@ -66,6 +71,8 @@ public class DefaultReviewExecutionHandler {
     private final List<ScanItemVersions> scanVersions;
     private final ObjectMapper mapper;
     private final Clock clock;
+    private final AppliesWhenEvaluator applicability;
+    private final ResultAdmissionService admission;
 
     public PreparedJobInputs prepareInputs(ReviewJob job) {
         var review = assignments.review(job);
@@ -94,6 +101,11 @@ public class DefaultReviewExecutionHandler {
                         .sources().stream())
                 .map(read -> read.source())
                 .collect(Collectors.toSet());
+        for (var assignment : pinned) {
+            var conditions = assignment.practice().definition().appliesWhen();
+            if (review.kind() == ReviewKind.ITEM && conditions != null)
+                for (var clause : conditions.anyOf()) required.add(AppliesWhenEvaluator.sourceOf(clause));
+        }
         var grantedContext = new LinkedHashMap<ReviewAssignmentId, List<String>>();
         if (review.kind() == ReviewKind.SCAN) {
             var composers = scanVersions.stream()
@@ -132,13 +144,23 @@ public class DefaultReviewExecutionHandler {
                 var decisions = pinned.stream()
                         .map(a -> readiness(a, manifest, now, review.kind()))
                         .toList();
+                var checks = new LinkedHashMap<String, AppliesWhenCheck>();
+                var change = ReviewChange.of(evidence.files(), mapper);
+                for (var assignment : pinned) {
+                    if (decisions.stream()
+                            .noneMatch(d -> d.practiceSlug().equals(assignment.practiceSlug()) && d.ready())) continue;
+                    var check = applicability.evaluate(
+                            assignment.practice().definition().appliesWhen(), manifest, evidence.files(), change);
+                    if (check != null) checks.put(assignment.practiceSlug(), check);
+                }
                 var report = new AutomatedReviewReadinessReport(
                         manifest.contractVersion(),
                         manifest.catalogDigest(),
                         item.kind().value(),
                         manifest.capturedAt(),
                         now,
-                        decisions);
+                        decisions,
+                        checks);
                 capture.capture(
                         job.getWorkspaceId(),
                         review.id(),
@@ -156,13 +178,13 @@ public class DefaultReviewExecutionHandler {
                                                     ? ReviewPracticeStatus.READY
                                                     : ReviewPracticeStatus.WITHHELD,
                                             decision.ready() ? null : "readiness_refused",
-                                            mapper.valueToTree(decision));
+                                            captureFacts(decision, checks.get(decision.practiceSlug())));
                                 })
                                 .toList());
                 var staged = new LinkedHashMap<>(evidence.files());
                 var ready = pinned.stream()
                         .filter(a -> decisions.stream()
-                                .anyMatch(d -> d.practiceSlug().equals(a.practiceSlug()) && d.ready()))
+                                .anyMatch(d -> d.practiceSlug().equals(a.practiceSlug()) && report.runs(d)))
                         .toList();
                 catalog.inject(staged, ready, review.kind(), grantedContext);
                 if (!ready.isEmpty()) {
@@ -218,7 +240,7 @@ public class DefaultReviewExecutionHandler {
                                         () -> new IllegalStateException("The captured item kind has no descriptor")),
                         mapper);
                 var prepared = files.prepare(job, evidence.withFiles(staged), report);
-                if (ready.isEmpty())
+                if (decisions.stream().noneMatch(AutomatedReviewReadinessDecision::ready))
                     throw new InsufficientEvidenceException(
                             "No assigned practice has its required captured evidence", prepared);
                 return prepared;
@@ -230,6 +252,19 @@ public class DefaultReviewExecutionHandler {
             files.abortPersonCapture(job);
             throw failure;
         }
+    }
+
+    private JsonNode captureFacts(AutomatedReviewReadinessDecision decision, @Nullable AppliesWhenCheck check) {
+        ObjectNode facts = mapper.valueToTree(decision);
+        if (check != null) facts.set("applicability", mapper.valueToTree(check));
+        return facts;
+    }
+
+    public void completeWithoutExecution(ReviewJob job) {
+        admission.admit(
+                new ResultAdmissionService.AdmissionIdentity(
+                        job.getId(), job.getWorkspaceId(), job.getAttempt(), Objects.requireNonNull(job.getWorkerId())),
+                new AdmissionRequestDTO(3, job.getReviewId(), job.getId(), job.getAttempt(), List.of()));
     }
 
     private JsonNode previousCitations(JsonNode evidence) {

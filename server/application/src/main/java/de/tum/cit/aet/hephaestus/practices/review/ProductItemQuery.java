@@ -1,11 +1,11 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.integration.core.framework.RegisteredItemLabels;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSource;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemUrlResolver;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import java.util.List;
 import java.util.Optional;
@@ -20,7 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProductItemQuery {
     private final ProductItemRepository rows;
     private final List<ItemSource> sources;
-    private final RegisteredItemLabels labels;
+    private final List<ItemUrlResolver> urlResolvers;
 
     public Optional<ItemRef> find(long workspaceId, long itemId) {
         return rows.activeItem(workspaceId, itemId).map(row -> row.ref(workspaceId));
@@ -46,15 +46,9 @@ public class ProductItemQuery {
 
     @Transactional(readOnly = true)
     public Optional<ItemRef> atUrl(long workspaceId, String url) {
-        var refs = rows.activeSourceItems(workspaceId).stream()
-                .map(row -> row.ref(workspaceId))
-                .toList();
-        var named = labels.labels(workspaceId, refs);
-        var matched = refs.stream()
-                .filter(i -> {
-                    var label = named.get(i.itemId());
-                    return label != null && url.equals(label.url());
-                })
+        var matched = urlResolvers.stream()
+                .flatMap(resolver -> resolver.resolve(workspaceId, url).stream())
+                .limit(2)
                 .toList();
         return matched.size() == 1 && current(matched.getFirst()).isPresent()
                 ? Optional.of(matched.getFirst())

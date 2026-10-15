@@ -11,27 +11,27 @@ A term has one definition in one of these pages.
 
 ## Review terms
 
-| Term                | Meaning                                                                                                                      | Identifier                                          |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| **Item**            | One thing that a result can concern or a review can cover. Its kind states what it is.                                       | item, item.kind                                     |
-| **Version**         | One fixed state of an item. Its domain defines what identifies that state.                                                   | item_version                                        |
-| **Event**           | A recorded change to an item, such as a pull request merged.                                                                 | item_event                                          |
-| **Review**          | One operation that checks practices against an item at a version and can record results.                                     | review                                              |
+| Term                | Meaning                                                                                                              | Identifier                                          |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| **Item**            | One thing that a result can concern or a review can cover. Its kind states what it is.                               | item, item.kind                                     |
+| **Version**         | One fixed state of an item. Its domain defines what identifies that state.                                           | item_version                                        |
+| **Event**           | A recorded change to an item, such as a pull request merged.                                                         | item_event                                          |
+| **Review**          | One operation that checks practices against an item at a version and can record results.                             | review                                              |
 | **Scan**            | A review of the items held by another item at a version. The holder is a repository on its monitored default branch. | review.kind = SCAN                                  |
-| **Origin**          | How a review started: an event, a request, a schedule or a backfill.                                                         | review.origin                                       |
-| **Review scope**    | The repositories and people that a workspace permits Hephaestus to review.                                                   | review_scope_repository, membership.review_selected |
-| **Role**            | The developer's role a practice concerns: author, reviewer, assignee or merger. The editor label is About.                   | definition.about                                    |
-| **Review on**       | The events and recorded state that select a practice for automatic review.                                                   | definition.reviewOn                                 |
-| **Applies when**    | The conditions that establish whether a practice applies on every review origin.                                             | definition.appliesWhen                              |
-| **Reviewed by**     | Who reviews a practice: Hephaestus, people or nobody.                                                                        | definition.reviewedBy                               |
-| **Practice script** | Code that reviews one practice for one item and returns one candidate result.                                                | definition.script                                   |
-| **Candidate**       | The proposed result that a script returns before server admission.                                                           | Candidate                                           |
-| **Admission**       | The server checks that decide whether a candidate can become a result.                                                       | result admission                                    |
-| **Feedback mode**   | How the workspace permits feedback: Off, Approve first or Automatic.                                                         | feedback_mode                                       |
-| **Evidence**        | The material that a review captured and read.                                                                                | result.evidence                                     |
-| **Citation**        | A pointer into captured source text at an item version, with its quote and available coordinates.                            | citation                                            |
-| **Coverage**        | What a result read and what it did not read.                                                                                 | result.coverage                                     |
-| **Report**          | A scan's summary and supported results for workspace admins and exports.                                                     | review.report                                       |
+| **Origin**          | How a review started: an event, a request, a schedule or a backfill.                                                 | review.origin                                       |
+| **Review scope**    | The repositories and people that a workspace permits Hephaestus to review.                                           | review_scope_repository, membership.review_selected |
+| **Role**            | The developer's role a practice concerns: author, reviewer, assignee or merger. The editor label is About.           | definition.about                                    |
+| **Review on**       | The events and recorded state that select a practice for automatic review.                                           | definition.reviewOn                                 |
+| **Applies when**    | The conditions that establish whether a practice applies on every review origin.                                     | definition.appliesWhen                              |
+| **Reviewed by**     | Who reviews a practice: Hephaestus, people or nobody.                                                                | definition.reviewedBy                               |
+| **Practice script** | Code that reviews one practice for one item and returns one candidate result.                                        | definition.script                                   |
+| **Candidate**       | The proposed result that a script returns before server admission.                                                   | Candidate                                           |
+| **Admission**       | The server checks that decide whether a candidate can become a result.                                               | result admission                                    |
+| **Feedback mode**   | How the workspace permits feedback: Off, Approve first or Automatic.                                                 | feedback_mode                                       |
+| **Evidence**        | The material that a review captured and read.                                                                        | result.evidence                                     |
+| **Citation**        | A pointer into captured source text at an item version, with its quote and available coordinates.                    | citation                                            |
+| **Coverage**        | What a result read and what it did not read.                                                                         | result.coverage                                     |
+| **Report**          | A scan's summary and supported results for workspace admins and exports.                                             | review.report                                       |
 
 Use Review as the short product name where the page establishes the practice context.
 Use practice review in prose that does not establish that context.
@@ -61,6 +61,7 @@ The [pipeline](./practice-review-pipeline.mdx) owns ordering, eligibility and fe
 A practice version holds its definition.
 The editor labels Review on, Applies when, About and Reviewed by map to the fields above.
 The [catalog guide](./practice-catalogue.md) owns definition identity and update behavior.
+The [review pipeline](./practice-review-pipeline.mdx#select-a-review) owns applicability checks and capture refusal behavior.
 
 HEPHAESTUS permits automated review.
 PEOPLE requires human review and an explanation of why.
@@ -82,21 +83,21 @@ The [operator guide](/admin/practice-review) owns their scope and controls.
 
 ## Runtime terms
 
-| Term                           | Meaning                                                                               | Identifier                     |
-| ------------------------------ | ------------------------------------------------------------------------------------- | ------------------------------ |
-| **Job**                        | Execution of a review in a sandbox, with attempts and costs.                          | review_job                     |
-| **Agent**                      | The sandboxed runtime that executes a review or a mentor session.                     | agent runtime                  |
-| **Attempt**                    | One claimed execution of a job, protected by its execution fence.                     | attempt                        |
-| **Model assignment**           | A workspace's choice of a model for an execution purpose and AI tier.                 | workspace model configuration  |
-| **Model for practice scripts** | A decision, embedding or reranking model that a script can call through its host.     | script model purposes          |
-| **Source contract**            | The definition of a source's identity, meaning, capture facts and permitted uses.     | reads.contract                 |
-| **Source kind**                | A stable name for a logical source of captured material.                              | SourceKind                     |
-| **Capture**                    | The authorized collection of material and its explicit source facts for a review.     | capture stage                  |
-| **Readiness**                  | Whether the captured sources meet the practice's declared requirements.               | review_practice                |
-| **Job folder**                 | The worker's disposable files and repository copies for one execution attempt.        | workspace ABI                  |
-| **Composition**                | The preparation of feedback from admitted and eligible results.                       | feedback composition           |
-| **Send**                       | One leased provider write or retraction of on-work feedback, with its reconciliation state. | feedback_send |
-| **Review digest**              | The digest of the definition inputs that can change a result from the same evidence. | practice_version.review_digest |
+| Term                           | Meaning                                                                                     | Identifier                     |
+| ------------------------------ | ------------------------------------------------------------------------------------------- | ------------------------------ |
+| **Job**                        | Execution of a review in a sandbox, with attempts and costs.                                | review_job                     |
+| **Agent**                      | The sandboxed runtime that executes a review or a mentor session.                           | agent runtime                  |
+| **Attempt**                    | One claimed execution of a job, protected by its execution fence.                           | attempt                        |
+| **Model assignment**           | A workspace's choice of a model for an execution purpose and AI tier.                       | workspace model configuration  |
+| **Model for practice scripts** | A decision, embedding or reranking model that a script can call through its host.           | script model purposes          |
+| **Source contract**            | The definition of a source's identity, meaning, capture facts and permitted uses.           | reads.contract                 |
+| **Source kind**                | A stable name for a logical source of captured material.                                    | SourceKind                     |
+| **Capture**                    | The authorized collection of material and its explicit source facts for a review.           | capture stage                  |
+| **Readiness**                  | Whether the captured sources meet the practice's declared requirements.                     | review_practice                |
+| **Job folder**                 | The worker's disposable files and repository copies for one execution attempt.              | workspace ABI                  |
+| **Composition**                | The preparation of feedback from admitted and eligible results.                             | feedback composition           |
+| **Send**                       | One leased provider write or retraction of on-work feedback, with its reconciliation state. | feedback_send                  |
+| **Review digest**              | The digest of the definition inputs that can change a result from the same evidence.        | practice_version.review_digest |
 
 A job can expire without removing its review or results.
 The [runtime guide](./practice-review-runtime.mdx) owns execution, retries and retention.

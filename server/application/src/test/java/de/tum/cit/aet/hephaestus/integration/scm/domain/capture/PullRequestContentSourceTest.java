@@ -165,6 +165,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
 
     private void stubGit() {
         lenient().when(gitRepositoryManager.read(any(), any())).thenReturn(Map.of());
+        lenient().when(gitRepositoryManager.unifiedDiff(REPOSITORY, BASE, HEAD)).thenReturn("+captured change\n");
         lenient().when(repositoryPreparer.prepare(any())).thenReturn(PREPARED);
         lenient().when(gitRepositoryManager.isEnabled()).thenReturn(true);
         lenient().when(gitRepositoryManager.isRepositoryCloned(REPOSITORY)).thenReturn(true);
@@ -668,14 +669,21 @@ class PullRequestContentSourceTest extends BaseUnitTest {
     class ReviewedChange {
 
         @Test
-        void shouldPinTheReviewedChangeAsBaseAndHeadWithoutStagingAnyPatch() throws Exception {
+        void shouldCaptureThePinnedRangePathsAndDiffForApplicability() throws Exception {
             stubGit();
+            var paths = Set.of("before.ts", "after.ts");
+            var diff = "diff --git a/before.ts b/after.ts\n-@Test\n+changed();\n";
+            when(gitRepositoryManager.changedPaths(REPOSITORY, BASE, HEAD)).thenReturn(paths);
+            when(gitRepositoryManager.unifiedDiff(REPOSITORY, BASE, HEAD)).thenReturn(diff);
 
             var captured = provider.capture(request(sampleMetadata()), Set.of(DIFF));
 
             JsonNode change = objectMapper.readTree(captured.files().get(PullRequestContentSource.CHANGE_FILE));
             assertThat(change.path("base_sha").asString()).isEqualTo(BASE);
             assertThat(change.path("head_sha").asString()).isEqualTo(HEAD);
+            assertThat(change.path("changed_paths"))
+                    .isEqualTo(objectMapper.valueToTree(List.of("after.ts", "before.ts")));
+            assertThat(change.path("diff").asString()).isEqualTo(diff);
             assertThat(captured.files().keySet()).contains(PullRequestContentSource.CHANGE_FILE);
             assertThat(captured.filesOnDisk()).isEmpty();
             assertThat(captured.cleanup()).isNull();
@@ -688,6 +696,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
         void shouldCaptureEmptyDiffAsCompleteEmptyEvidence() {
             stubGit();
             when(gitRepositoryManager.changedPaths(REPOSITORY, BASE, HEAD)).thenReturn(Set.of());
+            when(gitRepositoryManager.unifiedDiff(REPOSITORY, BASE, HEAD)).thenReturn("");
 
             var contribution = provider.capture(request(sampleMetadata()), Set.of(DIFF));
 

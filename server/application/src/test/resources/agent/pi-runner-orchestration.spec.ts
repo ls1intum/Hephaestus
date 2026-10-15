@@ -4482,7 +4482,7 @@ for (const item of [
   without(base, "explanation"),
   { ...base, problems: [] },
   { ...base, problems: [without(problem, "basis")] },
-  { ...base, problems: [{ ...problem, basis: { ...problem.basis, type: "state" } }] },
+  { ...base, problems: [{ ...problem, basis: { ...problem.basis, type: "unknown" } }] },
   { ...base, problems: [{ ...problem, citations: [] }] },
   { ...base, problems: [{ ...problem, citations: [without(citation, "sourcePath")] }] },
   { ...base, problems: [{ ...problem, citations: [{ ...citation, sourcePath: "" }] }] },

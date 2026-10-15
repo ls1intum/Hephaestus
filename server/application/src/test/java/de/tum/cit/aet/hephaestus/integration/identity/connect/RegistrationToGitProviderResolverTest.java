@@ -65,44 +65,32 @@ class RegistrationToGitProviderResolverTest {
         verifyNoInteractions(userRepository);
     }
 
-    private void stubSaveStampsId(long id) {
-        when(gitProviderRepository.save(any(IdentityProvider.class))).thenAnswer(inv -> {
-            IdentityProvider p = inv.getArgument(0);
-            setId(p, id);
-            return p;
-        });
+    private void stubRegistration(IdentityProviderType type, String origin, long id) {
+        when(gitProviderRepository.findByTypeAndServerUrl(type, origin))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(stamped(type, origin, id)));
     }
 
     @Test
     void upsertsGithubComOrigin() {
-        stubSaveStampsId(7L);
-        when(gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com"))
-                .thenReturn(Optional.empty());
+        stubRegistration(IdentityProviderType.GITHUB, "https://github.com", 7L);
 
         assertThat(resolver.resolveProviderId("GITHUB", "https://github.com")).isEqualTo(7L);
     }
 
     @Test
     void selfHostedGitlabOriginStripsPath() {
-        stubSaveStampsId(8L);
-        when(gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.example.test"))
-                .thenReturn(Optional.empty());
+        stubRegistration(IdentityProviderType.GITLAB, "https://gitlab.example.test", 8L);
 
-        resolver.resolveProviderId("GITLAB", "https://gitlab.example.test/sub/path");
-
-        // Save is keyed on the bare origin, not the full base URL.
-        when(gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.example.test"))
-                .thenReturn(Optional.of(stamped(IdentityProviderType.GITLAB, "https://gitlab.example.test", 8L)));
+        assertThat(resolver.resolveProviderId("GITLAB", "https://gitlab.example.test/sub/path"))
+                .isEqualTo(8L);
         assertThat(resolver.resolveProviderId("GITLAB", "https://gitlab.example.test/sub/path"))
                 .isEqualTo(8L);
     }
 
     @Test
     void preservesExplicitPort() {
-        stubSaveStampsId(9L);
-        when(gitProviderRepository.findByTypeAndServerUrl(
-                        IdentityProviderType.GITLAB, "https://gitlab.example.test:8443"))
-                .thenReturn(Optional.empty());
+        stubRegistration(IdentityProviderType.GITLAB, "https://gitlab.example.test:8443", 9L);
 
         assertThat(resolver.resolveProviderId("GITLAB", "https://gitlab.example.test:8443"))
                 .isEqualTo(9L);

@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.core.auth.spi.PeopleRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
@@ -29,7 +30,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issue.dto.GitLabIssueEve
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
-import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
+import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
@@ -97,6 +99,12 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private WorkspaceRepository workspaceRepository;
+
+    @Autowired
+    private ConnectionRepository connectionRepository;
+
+    @Autowired
+    private RepositoryToMonitorRepository repositoryMonitors;
 
     @Autowired
     private IdentityProviderRepository gitProviderRepository;
@@ -684,15 +692,12 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         repo.setProvider(savedProvider);
         savedRepo = repositoryRepository.save(repo);
 
-        Workspace workspace = new Workspace();
-        workspace.setWorkspaceSlug("hephaestus-test-gitlab");
-        workspace.setDisplayName("HephaestusTest GitLab");
-        workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
-        workspace.setPublicActivityEnabled(true);
-        workspace.setOrganizationId(org.getId());
-        workspace.setAccountLogin(FIXTURE_ORG_LOGIN);
-        workspace.setAccountType(AccountType.ORG);
-        savedWorkspace = workspaceRepository.save(workspace);
+        var workspace = WorkspaceTestFixtures.gitLabPatWorkspace("hephaestus-test-gitlab");
+        workspace.build().setPublicActivityEnabled(true);
+        savedWorkspace = WorkspaceTestFixtures.persistGitLabWorkspace(
+                workspaceRepository, connectionRepository, workspace, "https://gitlab.lrz.de");
+        repositoryMonitors.saveAndFlush(
+                WorkspaceTestFixtures.repositoryMonitor(savedWorkspace, FIXTURE_REPO_FULL_NAME));
     }
 
     private static long persistedId(IdentityProvider provider) {

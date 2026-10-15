@@ -204,6 +204,16 @@ describe("Applies when", () => {
 });
 
 describe("the kind a practice is created for", () => {
+	it("offers no applicability conditions for the issue options returned by the server", async () => {
+		await renderCreateForm(vi.fn());
+		fireEvent.click(screen.getByRole("radio", { name: /^Issue/u }));
+		expect(screen.getByRole<HTMLButtonElement>("button", { name: "Add condition" }).disabled).toBe(
+			true,
+		);
+		expect(screen.queryByRole("combobox", { name: "Condition 1" })).toBeNull();
+		expect(screen.queryByRole("textbox", { name: "File paths 1" })).toBeNull();
+	});
+
 	it("restores each kind's conditions when the item kind changes", async () => {
 		await renderCreateForm(vi.fn());
 		fireEvent.click(screen.getByRole("radio", { name: /^Pull request review/u }));

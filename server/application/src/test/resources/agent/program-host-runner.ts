@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
 import {
 	appendFileSync,
@@ -12,7 +12,7 @@ import {
 import nodePath from "node:path";
 import { mock } from "node:test";
 
-import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
+import type { ExtensionFactory, ToolDefinition } from "@earendil-works/pi-coding-agent";
 
 import {
 	AUTHENTICATION_PRACTICE,
@@ -326,6 +326,7 @@ if (scenario !== undefined && scenario !== "") {
 	};
 	interface CustomTool {
 		name: string;
+		parameters: ToolDefinition["parameters"];
 		prepareArguments?: (args: unknown) => unknown;
 		execute: (id: string, input: unknown) => Promise<unknown>;
 	}
@@ -401,6 +402,14 @@ if (scenario !== undefined && scenario !== "") {
 							result: { content: [{ type: "text", text: "[L1] {}" }], details: {} },
 							isError: false,
 						});
+						if (hasText(process.env.PI_HOST_SCAN_PATH)) {
+							const read = options.customTools.find((tool) => tool.name === "read");
+							assert.ok(read, "the governed scan reader is registered");
+							capture(
+								"scan-read",
+								await read.execute("scan-read", { path: process.env.PI_HOST_SCAN_PATH }),
+							);
+						}
 						const submits = behaviour === "submit";
 						emit({
 							type: "message_end",
@@ -431,10 +440,28 @@ if (scenario !== undefined && scenario !== "") {
 							const candidate: unknown = hasText(process.env.PI_HOST_SESSION_CANDIDATE)
 								? parseJson(process.env.PI_HOST_SESSION_CANDIDATE)
 								: SESSION_CANDIDATE;
-							const reply = await submit.execute(
-								`submit-${session}`,
-								submit.prepareArguments?.(candidate) ?? candidate,
-							);
+							let argumentsToSubmit = submit.prepareArguments?.(candidate) ?? candidate;
+							if (hasText(process.env.PI_HOST_SCAN_PATH)) {
+								const validated = spawnSync(
+									process.execPath,
+									[
+										"--experimental-import-meta-resolve",
+										"--input-type=module",
+										"-e",
+										`const { validateToolArguments } = await import(import.meta.resolve("@earendil-works/pi-ai", import.meta.resolve("@earendil-works/pi-coding-agent")));
+const { tool, args } = JSON.parse(process.argv[1]);
+process.stdout.write(JSON.stringify(validateToolArguments(tool, { name: tool.name, arguments: args })));`,
+										JSON.stringify({
+											tool: { name: submit.name, parameters: submit.parameters },
+											args: argumentsToSubmit,
+										}),
+									],
+									{ encoding: "utf8" },
+								);
+								assert.equal(validated.status, 0, validated.stderr);
+								argumentsToSubmit = parseJson(validated.stdout);
+							}
+							const reply = await submit.execute(`submit-${session}`, argumentsToSubmit);
 							capture("submitted", { slug, reply });
 						}
 					},

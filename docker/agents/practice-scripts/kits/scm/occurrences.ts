@@ -182,6 +182,7 @@ export function placeOccurrences(
 export async function selectedSources(
 	inputs: PracticeInputs,
 	files: Files | null,
+	select: (file: Pick<SourceFile, "path" | "language">) => boolean,
 ): Promise<readonly SourceFile[]> {
 	if (files === null) {
 		throw new UnratedError("unavailable", "the pinned file tree was not captured");
@@ -198,21 +199,23 @@ export async function selectedSources(
 		if (path === undefined) {
 			throw new UnratedError("unavailable", "the assigned file has no path");
 		}
+		const file = { path, language: languageOf(path) };
+		if (
+			inputs.scope.kind === "ITEM" &&
+			((files.change?.files.get(path)?.addedLines.size ?? 0) === 0 || !select(file))
+		) {
+			continue;
+		}
 		const read = await files.head.read(path);
 		if (read.status !== "FOUND") {
-			if (
-				inputs.scope.kind === "ITEM" &&
-				read.status === "ABSENT" &&
-				files.change?.files.get(path)?.addedLines.size === 0
-			) {
-				continue;
-			}
 			throw new UnratedError("unavailable", `${path} is not readable text`);
 		}
 		if (read.truncated) {
 			throw new UnratedError("too-large", `${path} was not read completely`);
 		}
-		sources.push({ path, language: languageOf(path), text: read.text });
+		if (select(file)) {
+			sources.push({ ...file, text: read.text });
+		}
 	}
 	return sources;
 }

@@ -1944,10 +1944,9 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         @Test
         void shouldRecordNoResolutionOnceTheProjectLeftTheWorkspaceDuringTheRead() throws Exception {
             handlerReadingDiscussions(() -> {
-                        transactionTemplate.executeWithoutResult(status -> repositoryRepository
-                                .findById(savedRepo.getId())
-                                .orElseThrow()
-                                .setOrganization(null));
+                        transactionTemplate.executeWithoutResult(status -> repositoryMonitors.delete(repositoryMonitors
+                                .findByWorkspaceIdAndNameWithOwner(savedWorkspace.getId(), FIXTURE_REPO_FULL_NAME)
+                                .orElseThrow()));
                         return discussions(true);
                     })
                     .dispatchEvent(unchangedUpdate(), Instant.now());

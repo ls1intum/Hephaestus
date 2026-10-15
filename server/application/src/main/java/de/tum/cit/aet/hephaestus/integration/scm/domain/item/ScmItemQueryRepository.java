@@ -11,6 +11,35 @@ import org.springframework.data.repository.query.Param;
 
 public interface ScmItemQueryRepository extends Repository<Item, Long> {
     @Query(value = """
+        SELECT i.id, i.source_id AS sourceId, i.parent_id AS parentId
+        FROM item i
+        JOIN issue work ON work.id=i.source_id AND work.issue_type=CASE :kind WHEN 'scm.pull_request' THEN 'PULL_REQUEST' ELSE 'ISSUE' END
+          AND work.deleted_at IS NULL
+        JOIN repository r ON r.id=work.repository_id AND r.provider_id=work.provider_id
+        JOIN identity_provider provider ON provider.id=r.provider_id
+        JOIN item parent ON parent.id=i.parent_id AND parent.workspace_id=i.workspace_id
+          AND parent.kind='scm.repository' AND parent.source_id=r.id AND parent.removed_at IS NULL
+        WHERE i.workspace_id=:workspaceId AND i.kind=:kind AND i.removed_at IS NULL
+          AND provider.type=:providerType AND provider.server_url=:serverUrl
+          AND r.name_with_owner=:repositoryName AND work.number=:number
+          AND EXISTS (SELECT 1 FROM repository_to_monitor monitor
+            WHERE monitor.workspace_id=i.workspace_id AND monitor.name_with_owner=r.name_with_owner
+              AND (monitor.native_id IS NULL OR monitor.native_id=r.native_id))
+        ORDER BY i.id
+        LIMIT 2
+        """, nativeQuery = true)
+    List<AddressRow> atAddress(
+            long workspaceId, String providerType, String serverUrl, String repositoryName, String kind, int number);
+
+    interface AddressRow {
+        long getId();
+
+        long getSourceId();
+
+        long getParentId();
+    }
+
+    @Query(value = """
         WITH selected AS (SELECT * FROM item WHERE workspace_id=:workspaceId AND id IN (:ids))
         SELECT idx.id,
           CASE idx.kind WHEN :#{#kinds.repository()} THEN repository.name_with_owner

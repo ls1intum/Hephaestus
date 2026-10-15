@@ -26,6 +26,13 @@ The [outcome contract](/contributor/practice-feedback-language#result-outcomes) 
 
 Review on selects events. When selects their recorded state for automatic review.
 Applies when governs every origin, including a request.
+
+The server checks these conditions against captured evidence before the practice script runs.
+If every condition is proven false, the result is Does not apply with your Otherwise explanation.
+Incomplete or unavailable evidence cannot prove a condition false.
+Required capture failure withholds the practice without a result.
+Issues offer no applicability conditions.
+
 A request does not bypass source access, scope or consent.
 
 About selects Author, Reviewer, Assignee or Merger.
@@ -125,19 +132,19 @@ The server checks the visual, the guide, and each figure when you save.
 If it refuses the save, its message names the element, the attribute, or the limit.
 The webapp cleans the markup again before it shows the picture.
 
-| Rule               | Limit                                                                                                                                                        |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Root element       | `<svg xmlns="http://www.w3.org/2000/svg" viewBox="…">`                                                                                                       |
-| File size          | 64 KB or less for each SVG                                                                                                                                   |
-| Elements           | `svg`, `g`, `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`, `text`, `tspan`, `title`, `desc`                                             |
-| Attributes         | Geometry and presentation only. The list follows this table.                                                                                                 |
+| Rule               | Limit                                                                                                                                                            |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Root element       | `<svg xmlns="http://www.w3.org/2000/svg" viewBox="…">`                                                                                                           |
+| File size          | 64 KB or less for each SVG                                                                                                                                       |
+| Elements           | `svg`, `g`, `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`, `text`, `tspan`, `title`, `desc`                                                 |
+| Attributes         | Geometry and presentation only. The list follows this table.                                                                                                     |
 | Attribute values   | Letters, digits, spaces, and the characters `#` `.` `,` `%` `+` `(` `)` `/` `-` `_`. Thus, a value cannot contain a `url(...)` reference, a quote, or an escape. |
-| Not accepted       | Ids, the `style` attribute and element, links, a DOCTYPE, scripts, images, CDATA sections, processing instructions, and comments that contain `<` or `>`     |
-| Visual description | 1 to 300 characters                                                                                                                                          |
-| Guide text         | Markdown with no HTML, 12,000 characters or fewer                                                                                                            |
-| Links in a guide   | Web addresses that start with `https://` or `http://`                                                                                                        |
-| Figures            | 4 or fewer for each guide. A figure name has lowercase letters, digits, and single hyphens.                                                                  |
-| Images in a guide  | Only the guide's own figures, as `![description](figures/<name>.svg)`. The text shows each figure, with a description.                                       |
+| Not accepted       | Ids, the `style` attribute and element, links, a DOCTYPE, scripts, images, CDATA sections, processing instructions, and comments that contain `<` or `>`         |
+| Visual description | 1 to 300 characters                                                                                                                                              |
+| Guide text         | Markdown with no HTML, 12,000 characters or fewer                                                                                                                |
+| Links in a guide   | Web addresses that start with `https://` or `http://`                                                                                                            |
+| Figures            | 4 or fewer for each guide. A figure name has lowercase letters, digits, and single hyphens.                                                                      |
+| Images in a guide  | Only the guide's own figures, as `![description](figures/<name>.svg)`. The text shows each figure, with a description.                                           |
 
 The accepted attributes are:
 `viewBox`, `width`, `height`, `preserveAspectRatio`, `version`, `x`, `y`, `x1`, `y1`, `x2`, `y2`, `cx`, `cy`, `r`, `rx`, `ry`, `d`, `points`, `dx`, `dy`, `transform`, `class`, `fill`, `fill-rule`, `fill-opacity`, `clip-rule`, `stroke`, `stroke-width`, `stroke-linecap`, `stroke-linejoin`, `stroke-miterlimit`, `stroke-dasharray`, `stroke-dashoffset`, `stroke-opacity`, `opacity`, `font-size`, `font-weight`, `font-style`, `text-anchor`, `dominant-baseline`, `letter-spacing`, `vector-effect`, `role`, `aria-hidden`, `focusable`, and `xml:space`.

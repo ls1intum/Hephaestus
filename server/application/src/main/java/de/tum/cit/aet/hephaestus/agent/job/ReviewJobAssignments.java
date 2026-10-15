@@ -75,7 +75,12 @@ public class ReviewJobAssignments {
         if (captured == null || !captured.path("readiness").path("decisions").isArray()) return pinned;
         var ready = new HashSet<String>();
         for (var decision : captured.path("readiness").path("decisions"))
-            if (decision.path("ready").asBoolean(false))
+            if (decision.path("ready").asBoolean(false)
+                    && !captured.path("readiness")
+                            .path("applicability")
+                            .path(decision.path("practiceSlug").asString())
+                            .path("absent")
+                            .asBoolean(false))
                 ready.add(decision.path("practiceSlug").asString());
         return pinned.stream()
                 .filter(assignment -> ready.contains(assignment.practiceSlug()))

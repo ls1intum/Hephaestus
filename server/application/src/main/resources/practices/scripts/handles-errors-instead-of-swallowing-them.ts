@@ -110,7 +110,11 @@ export default definePracticeScript({
 		const byLang: Record<string, number> = {};
 		let filesScanned = 0;
 		let linesSelected = 0;
-		for (const file of await selectedSources(ctx, domain.files)) {
+		for (const file of await selectedSources(
+			ctx,
+			domain.files,
+			(source) => source.language !== null && LANG_PATTERNS[source.language] !== undefined,
+		)) {
 			const lang = file.language;
 			const patterns = lang === null ? undefined : LANG_PATTERNS[lang];
 			if (lang === null || patterns === undefined) {
