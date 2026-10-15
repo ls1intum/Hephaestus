@@ -1,6 +1,6 @@
 import { LogOut, MoreHorizontal, UserCog, Users } from "lucide-react";
 import type { AdminAccountView } from "@/api/types.gen";
-import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { QueryErrorAlert, type QueryErrorAlertProps } from "@/components/common/QueryErrorAlert";
 import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,7 +29,8 @@ import { ACCOUNT_STATUS_LABELS, APP_ROLE_LABELS, type AppRole } from "./account-
 export interface AdminUsersTableProps extends Pick<MorePages, "loadMoreError" | "refreshFailure"> {
 	users: AdminAccountView[];
 	isLoading: boolean;
-	isError: boolean;
+	/** Why no users could be read at all; a refusal offers no retry, an outage does. */
+	loadFailure?: Pick<QueryErrorAlertProps, "error" | "onRetry" | "pending">;
 	/** Whether a search term is currently narrowing the visible rows. */
 	hasSearch: boolean;
 	/** Total rows loaded from the server (before client-side search filtering). */
@@ -72,17 +73,24 @@ function emptyTitle(hasSearch: boolean, hasNextPage: boolean) {
 	return hasNextPage ? "No matches among the loaded users" : "No users found";
 }
 
-export function AdminUsersTable({ totalLoaded, onLoadMore, ...rows }: AdminUsersTableProps) {
+export function AdminUsersTable({
+	totalLoaded,
+	onLoadMore,
+	loadFailure,
+	...rows
+}: AdminUsersTableProps) {
 	const {
 		users,
 		isLoading,
-		isError,
 		hasSearch,
 		hasNextPage,
 		isFetchingNextPage,
 		loadMoreError,
 		refreshFailure,
 	} = rows;
+	if (loadFailure !== undefined) {
+		return <QueryErrorAlert title="We could not load users" {...loadFailure} />;
+	}
 	return (
 		<div className="space-y-4">
 			{refreshFailure !== undefined && (
@@ -113,7 +121,7 @@ export function AdminUsersTable({ totalLoaded, onLoadMore, ...rows }: AdminUsers
 			<div className="flex flex-col items-center justify-between gap-2 sm:flex-row">
 				<p className="text-sm text-muted-foreground" aria-live="polite">
 					{/* No count until the first page is in: "0 users" while loading would read as a result. */}
-					{!isLoading && !isError && (
+					{!isLoading && (
 						<>
 							Showing {users.length}
 							{hasSearch ? ` of ${totalLoaded} loaded` : ""}{" "}
@@ -141,7 +149,6 @@ export function AdminUsersTable({ totalLoaded, onLoadMore, ...rows }: AdminUsers
 
 function UserRows({
 	users,
-	isError,
 	hasSearch,
 	currentUserId,
 	hasNextPage,
@@ -150,18 +157,7 @@ function UserRows({
 	refreshFailure,
 	onChangeRole,
 	onForceSignOut,
-}: Omit<AdminUsersTableProps, "totalLoaded" | "onLoadMore" | "isLoading">) {
-	if (isError) {
-		return (
-			<TableRow>
-				<TableCell colSpan={COLUMN_COUNT} className="h-32 text-center">
-					<p className="text-sm text-destructive">
-						We could not load users. Reload the page to try again.
-					</p>
-				</TableCell>
-			</TableRow>
-		);
-	}
+}: Omit<AdminUsersTableProps, "totalLoaded" | "onLoadMore" | "isLoading" | "loadFailure">) {
 	if (users.length === 0) {
 		// A failed read stops the search from loading more, so it must not keep promising results.
 		const stopped = loadMoreError !== undefined || refreshFailure !== undefined;
