@@ -70,17 +70,18 @@ export function useWorkspacePublicActivity({
 	});
 	const update = useMutation({
 		...updatePublicActivityMutation(),
-		onSuccess: (data, { path: submitted, body }) => {
-			queryClient.setQueryData(
-				getWorkspacePublicActivitySettingsQueryKey({ path: submitted }),
-				data,
-			);
+		onSuccess: async (_data, { path: submitted, body }) => {
 			// The list carries the publication status, and the count follows what the page lists.
 			void queryClient.invalidateQueries({ queryKey: listWorkspacesQueryKey() });
 			void queryClient.invalidateQueries({
 				queryKey: getPublicActivityHiddenCountQueryKey({ path: submitted }),
 			});
 			announce(body, submitted.workspaceSlug);
+			// The saved settings reach the page only through a fresh read, so a read that is refused
+			// by the time the change returns stays refused.
+			await queryClient.invalidateQueries({
+				queryKey: getWorkspacePublicActivitySettingsQueryKey({ path: submitted }),
+			});
 		},
 		onError: (error, { path: submitted }) => {
 			void queryClient.invalidateQueries({

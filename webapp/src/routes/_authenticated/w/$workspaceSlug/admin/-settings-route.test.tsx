@@ -409,6 +409,55 @@ describe("the public activity page setting", () => {
 		expect(changes).toStrictEqual([]);
 	});
 
+	it("keeps refused settings refused when an earlier change is accepted, and shows only a fresh read", async () => {
+		const settingsRead = serveRead("*/workspaces/acme/public-activity", {
+			status: 200,
+			body: { enabled: true, allowSearchEngines: false },
+		});
+		const accepted = deferred();
+		const writes: unknown[] = [];
+		server.use(
+			http.patch("*/workspaces/acme/public-activity", async ({ request }) => {
+				writes.push(await request.json());
+				await accepted.promise;
+				return HttpResponse.json({ enabled: true, allowSearchEngines: true });
+			}),
+		);
+		const user = userEvent.setup();
+		const queryClient = renderSettingsRoute(false);
+		try {
+			await user.click(
+				await screen.findByRole("switch", { name: "Allow search engines" }, ROUTE_RENDER_WAIT),
+			);
+			await waitFor(() =>
+				expect(writes).toStrictEqual([{ publicActivityEnabled: true, allowSearchEngines: true }]),
+			);
+
+			settingsRead.answer = { status: 403 };
+			await reread(queryClient, getWorkspacePublicActivitySettingsQueryKey(ACME));
+			const page = within(screen.getByRole("region", { name: "Public activity page" }));
+			await page.findByText("You do not have access to the public activity page settings");
+
+			accepted.resolve();
+			await waitFor(() => expect(queryClient.isMutating()).toBe(0));
+			settingsRead.answer = { status: 503 };
+			await reread(queryClient, getWorkspacePublicActivitySettingsQueryKey(ACME));
+			await page.findByText("We could not load the public activity page settings");
+			expect(page.queryByRole("switch")).toBeNull();
+			expect(page.queryByText("These settings may be out of date")).toBeNull();
+
+			settingsRead.answer = { status: 200, body: { enabled: true, allowSearchEngines: true } };
+			await user.click(page.getByRole("button", { name: "Retry" }));
+			const searchEngines = await page.findByRole("switch", { name: "Allow search engines" });
+			expect(searchEngines.getAttribute("aria-checked")).toBe("true");
+			expect(settingsRead.count).toBe(5);
+			expect(writes).toHaveLength(1);
+			expect(screen.queryByRole("alertdialog")).toBeNull();
+		} finally {
+			accepted.resolve();
+		}
+	});
+
 	it("leaves out a refused hidden-people count, also through a later outage", async () => {
 		settings = { enabled: true, allowSearchEngines: false };
 		const count = serveRead("*/workspaces/acme/activity/public-hidden-count", {
