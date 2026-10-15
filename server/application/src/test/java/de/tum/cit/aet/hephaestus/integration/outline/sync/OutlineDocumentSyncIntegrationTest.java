@@ -19,6 +19,8 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialBundleCon
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRepository;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobStatus;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineClientModels;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineContentClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineWebhookClient;
@@ -92,6 +94,9 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private CredentialBundleConverter credentialConverter;
+
+    @Autowired
+    private SyncJobRepository syncJobRepository;
 
     private long workspaceId;
     private long connectionId;
@@ -330,6 +335,14 @@ class OutlineDocumentSyncIntegrationTest extends BaseIntegrationTest {
 
         OutlineCollection collection = onlyCollection();
         assertThat(collection.getLastSyncError()).contains("no longer visible");
+        var job = syncJobRepository
+                .findFirstByConnection_IdAndStatusInOrderByFinishedAtDesc(connectionId, SyncJobStatus.TERMINAL)
+                .orElseThrow();
+        assertThat(job.getStatus()).isEqualTo(SyncJobStatus.SUCCEEDED_WITH_WARNINGS);
+        assertThat(job.getErrorSummary()).isNull();
+        assertThat(job.getProgress())
+                .containsEntry("phase", "collections")
+                .containsEntry("currentStep", "Collection is no longer visible to the integration token.");
         List<OutlineDocument> rows = mirroredRows();
         assertThat(rows).hasSize(2);
         assertThat(rows).allSatisfy(r -> assertThat(r.isDeleted()).isFalse());

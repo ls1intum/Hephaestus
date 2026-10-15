@@ -73,6 +73,9 @@ public final class SyncJobHandle implements SyncExecutionHandle {
 
     private Map<String, Object> progressDetail = Map.of();
 
+    @Nullable
+    private SyncProgress warningDetail;
+
     SyncJobHandle(long jobId, ProgressWriter writer, Clock clock) {
         this.jobId = jobId;
         this.writer = writer;
@@ -102,6 +105,16 @@ public final class SyncJobHandle implements SyncExecutionHandle {
     @Override
     public void reportWarnings() {
         this.warningsReported = true;
+    }
+
+    @Override
+    public void reportWarnings(SyncProgress detail) {
+        synchronized (writeLock) {
+            if (warningDetail == null) {
+                warningDetail = detail;
+            }
+            warningsReported = true;
+        }
     }
 
     boolean warningsReported() {
@@ -192,6 +205,14 @@ public final class SyncJobHandle implements SyncExecutionHandle {
     Map<String, Object> currentProgressDetail() {
         synchronized (writeLock) {
             return progressDetail;
+        }
+    }
+
+    Map<String, Object> terminalProgressDetail(SyncJobStatus status) {
+        synchronized (writeLock) {
+            return status == SyncJobStatus.SUCCEEDED_WITH_WARNINGS && warningDetail != null
+                    ? warningDetail.toDetail()
+                    : progressDetail;
         }
     }
 }
