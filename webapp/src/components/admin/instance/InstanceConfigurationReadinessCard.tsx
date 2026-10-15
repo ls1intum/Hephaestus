@@ -21,6 +21,7 @@ import {
 	EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { RefreshFailure } from "@/runtime/tanstack-query/infinite-list";
 
 import {
 	CONFIGURATION_REQUIREMENT_DEFS,
@@ -31,12 +32,12 @@ import {
 export type InstanceConfigurationReadinessCardState =
 	| { status: "loading" }
 	| { status: "error"; error: unknown; onRetry: () => void }
-	| { status: "empty" }
+	| { status: "empty"; refreshFailure?: RefreshFailure }
 	| {
 			status: "ready";
 			facts: ConfigurationFact[];
 			/** Set when the latest refresh failed, so `facts` are the last known ones, not current. */
-			refreshFailure?: { error: unknown; onRetry: () => void };
+			refreshFailure?: RefreshFailure;
 	  };
 
 export interface InstanceConfigurationReadinessCardProps {
@@ -120,17 +121,20 @@ function ReadinessBody({ state }: InstanceConfigurationReadinessCardProps) {
 		}
 		case "empty": {
 			return (
-				<Empty>
-					<EmptyHeader>
-						<EmptyMedia variant="icon">
-							<ClipboardCheckIcon aria-hidden />
-						</EmptyMedia>
-						<EmptyTitle>No configuration checks reported</EmptyTitle>
-						<EmptyDescription>
-							The server returned no checks, which is unexpected. Reload the page to ask again.
-						</EmptyDescription>
-					</EmptyHeader>
-				</Empty>
+				<>
+					<RefreshNotice refreshFailure={state.refreshFailure} />
+					<Empty>
+						<EmptyHeader>
+							<EmptyMedia variant="icon">
+								<ClipboardCheckIcon aria-hidden />
+							</EmptyMedia>
+							<EmptyTitle>No configuration checks reported</EmptyTitle>
+							<EmptyDescription>
+								The server returned no checks, which is unexpected. Reload the page to ask again.
+							</EmptyDescription>
+						</EmptyHeader>
+					</Empty>
+				</>
 			);
 		}
 		case "ready": {
@@ -139,12 +143,21 @@ function ReadinessBody({ state }: InstanceConfigurationReadinessCardProps) {
 	}
 }
 
+function RefreshNotice({ refreshFailure }: { refreshFailure: RefreshFailure | undefined }) {
+	return refreshFailure ? (
+		<QueryErrorAlert
+			title="We could not refresh. This card shows the last successful check."
+			{...refreshFailure}
+		/>
+	) : null;
+}
+
 function ReadyBody({
 	facts,
 	refreshFailure,
 }: {
 	facts: ConfigurationFact[];
-	refreshFailure: { error: unknown; onRetry: () => void } | undefined;
+	refreshFailure: RefreshFailure | undefined;
 }) {
 	const groups = statusValues(CONFIGURATION_STATUS_DEFS).map((status) => ({
 		status,
@@ -163,13 +176,7 @@ function ReadyBody({
 
 	return (
 		<>
-			{refreshFailure ? (
-				<QueryErrorAlert
-					title="We could not refresh. This card shows the last successful check."
-					error={refreshFailure.error}
-					onRetry={refreshFailure.onRetry}
-				/>
-			) : null}
+			<RefreshNotice refreshFailure={refreshFailure} />
 			<p className="flex items-center gap-2 text-sm font-medium">
 				<SummaryIcon className={cn("size-4 shrink-0", statusToneClass(badgeVariant))} aria-hidden />
 				{summary.text}

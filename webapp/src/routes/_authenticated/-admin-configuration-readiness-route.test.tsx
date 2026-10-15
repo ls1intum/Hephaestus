@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { assert, describe, expect, it, vi } from "vitest";
@@ -42,6 +42,37 @@ const facts = [
 		documentationUrl: `${GUIDE}#login`,
 	},
 ] satisfies ConfigurationFact[];
+
+type ReadinessRead = { status: 200; body: ConfigurationFact[] } | { status: 403 | 503 };
+
+/** Answers every readiness read with the answer the test last chose. */
+function serveReadinessReads() {
+	const reads: { count: number; answer: ReadinessRead } = {
+		count: 0,
+		answer: { status: 200, body: facts },
+	};
+	server.use(
+		http.get("*/admin/configuration-readiness", () => {
+			reads.count += 1;
+			const { answer } = reads;
+			return answer.status === 200
+				? HttpResponse.json(answer.body)
+				: HttpResponse.json(
+						{ status: answer.status, title: "Request failed" },
+						{ status: answer.status },
+					);
+		}),
+	);
+	return reads;
+}
+
+/** The overview's other cards have no API here and show alerts of their own; this is readiness's. */
+async function findReadinessAlert(title: string) {
+	await screen.findByText(title);
+	const alert = screen.getAllByRole("alert").find((node) => node.textContent.includes(title));
+	assert(alert);
+	return alert;
+}
 
 describe("instance overview configuration readiness", () => {
 	it("asks the readiness endpoint and lists what needs action before anything optional", async () => {
@@ -110,6 +141,41 @@ describe("instance overview configuration readiness", () => {
 				screen.queryByText("We could not refresh. This card shows the last successful check."),
 			).toBeNull();
 		});
+	});
+
+	it("hides refused facts, does not bring them back on an outage, and shows a fresh check", async () => {
+		const reads = serveReadinessReads();
+		const user = userEvent.setup();
+		const queryClient = renderRouteAt("/admin");
+		await screen.findByText("login-provider capability", {}, ROUTE_RENDER_WAIT);
+		const reread = async () =>
+			act(async () => {
+				await queryClient.invalidateQueries({ queryKey: adminGetConfigurationReadinessQueryKey() });
+			});
+
+		reads.answer = { status: 403 };
+		await reread();
+		expect(reads.count).toBe(2);
+		const refused = await findReadinessAlert("Configuration readiness is unavailable");
+		expect(refused.textContent).toContain("Ask a workspace admin or instance admin for access.");
+		expect(within(refused).queryByRole("button", { name: "Retry" })).toBeNull();
+		expect(screen.queryByText("login-provider capability")).toBeNull();
+
+		reads.answer = { status: 503 };
+		await reread();
+		expect(reads.count).toBe(3);
+		const outage = await findReadinessAlert("Configuration readiness is unavailable");
+		await within(outage).findByText(/Try again in a moment\./u);
+		expect(screen.queryByText("login-provider capability")).toBeNull();
+		expect(
+			screen.queryByText("We could not refresh. This card shows the last successful check."),
+		).toBeNull();
+
+		reads.answer = { status: 200, body: facts.slice(0, 1) };
+		await user.click(within(outage).getByRole("button", { name: "Retry" }));
+		await screen.findByText("Every check that applies to this instance passes.");
+		expect(reads.count).toBe(4);
+		expect(screen.queryByText("login-provider capability")).toBeNull();
 	});
 
 	it("keeps the rest of the overview when readiness is unavailable", async () => {

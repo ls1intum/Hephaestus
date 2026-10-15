@@ -4,6 +4,7 @@ import { expect, fn, userEvent } from "storybook/test";
 import { expectGenuinelyDisabled } from "@/test/controls";
 
 import type { ReleaseStatus } from "@/api/types.gen";
+import type { RefreshFailure } from "@/runtime/tanstack-query/infinite-list";
 import { daysBefore, hoursBefore, minutesAfter, minutesBefore } from "@/stories/story-clock";
 
 import {
@@ -34,10 +35,12 @@ const IDLE_CHECK: ReleaseCheckRequest = { status: "idle" };
 function ready(
 	release: Partial<ReleaseStatus>,
 	check: ReleaseCheckRequest = IDLE_CHECK,
+	refreshFailure?: RefreshFailure,
 ): InstanceReleaseCardState {
 	return {
 		status: "ready",
 		release: { running, status: "NEVER_CHECKED", history: [], ...release },
+		refreshFailure,
 		check,
 		onCheck,
 	};
@@ -255,4 +258,44 @@ export const Loading: Story = {
 
 export const Unavailable: Story = {
 	args: { state: { status: "error", error: new Error("Network Error"), onRetry: fn() } },
+};
+
+/** A refused read shows no release and offers no retry that would be refused again. */
+export const Refused: Story = {
+	args: { state: { status: "error", error: { status: 403 }, onRetry: fn() } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText(/ask a workspace admin or instance admin/iu)).toBeVisible();
+		await expect(canvas.queryByRole("button", { name: /retry/iu })).toBeNull();
+		await expect(canvas.queryByRole("button", { name: "Check now" })).toBeNull();
+	},
+};
+
+/** A failed refresh keeps the last release on screen and says it may be out of date. */
+export const RefreshFailed: Story = {
+	args: {
+		state: ready({ status: "CURRENT", lastSuccess: hoursBefore(2) }, IDLE_CHECK, {
+			error: { status: 503 },
+			onRetry: fn(),
+			pending: false,
+		}),
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Release information may be out of date")).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Retry" })).toBeEnabled();
+		await expect(canvas.getByText("v1.2.3")).toBeVisible();
+	},
+};
+
+export const RefreshRetrying: Story = {
+	args: {
+		state: ready({ status: "CURRENT", lastSuccess: hoursBefore(2) }, IDLE_CHECK, {
+			error: { status: 503 },
+			onRetry: fn(),
+			pending: true,
+		}),
+	},
+	play: async ({ canvas }) => {
+		await expectGenuinelyDisabled(canvas.getByRole("button", { name: "Retrying…" }));
+		await expect(canvas.getByText("v1.2.3")).toBeVisible();
+	},
 };
