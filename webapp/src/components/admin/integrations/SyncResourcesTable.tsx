@@ -34,6 +34,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { asDate } from "@/lib/dates";
 import { andList, hasText } from "@/lib/text";
+import type { RefreshFailure } from "@/runtime/tanstack-query/infinite-list";
 
 import { freshnessTone, stateLabel } from "./sync-format";
 
@@ -655,6 +656,8 @@ export interface SyncResourcesTableProps {
 	isError?: boolean;
 	error?: unknown;
 	onRetry?: () => void;
+	/** Reading the sync state again failed; the rows last read stay, with the failure above them. */
+	refreshFailure?: RefreshFailure;
 	resourceNoun: string;
 	resourceNounPlural: string;
 	/**
@@ -687,6 +690,7 @@ export function SyncResourcesTable({
 	isError = false,
 	error,
 	onRetry,
+	refreshFailure,
 	resourceNoun,
 	resourceNounPlural,
 	syncIntervalSeconds,
@@ -720,19 +724,29 @@ export function SyncResourcesTable({
 		);
 	}
 
+	const refreshAlert = refreshFailure !== undefined && (
+		<QueryErrorAlert
+			title={`The ${resourceNoun} sync state may be out of date`}
+			{...refreshFailure}
+		/>
+	);
+
 	if (resources.length === 0) {
 		return (
-			<Empty variant="outlined">
-				<EmptyHeader>
-					<EmptyMedia variant="icon">
-						<DatabaseIcon />
-					</EmptyMedia>
-					<EmptyTitle>No {resourceNounPlural} synced yet</EmptyTitle>
-					<EmptyDescription>
-						Synced {resourceNounPlural} and their item counts appear here once a sync job runs.
-					</EmptyDescription>
-				</EmptyHeader>
-			</Empty>
+			<div className="space-y-3">
+				{refreshAlert}
+				<Empty variant="outlined">
+					<EmptyHeader>
+						<EmptyMedia variant="icon">
+							<DatabaseIcon />
+						</EmptyMedia>
+						<EmptyTitle>No {resourceNounPlural} synced yet</EmptyTitle>
+						<EmptyDescription>
+							Synced {resourceNounPlural} and their item counts appear here once a sync job runs.
+						</EmptyDescription>
+					</EmptyHeader>
+				</Empty>
+			</div>
 		);
 	}
 
@@ -786,6 +800,7 @@ export function SyncResourcesTable({
 
 	return (
 		<div className="space-y-3">
+			{refreshAlert}
 			<div className="flex flex-wrap items-center gap-3">
 				<InputGroup className="max-w-xs min-w-56 flex-1">
 					<InputGroupAddon>

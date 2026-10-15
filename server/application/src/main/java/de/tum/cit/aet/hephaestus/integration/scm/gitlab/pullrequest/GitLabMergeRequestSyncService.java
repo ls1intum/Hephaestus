@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabUserLookup;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcomment.GitLabDiscussionSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.sync.backfill.BackfillBatchResult;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -81,6 +82,7 @@ public class GitLabMergeRequestSyncService {
     private final GitLabClosingIssueClient closingIssueClient;
     private final GitLabApprovalClient approvalClient;
     private final GitLabProperties gitLabProperties;
+    private final GitLabProjectAdmission admission;
 
     public GitLabMergeRequestSyncService(
             GitLabGraphQlClientProvider graphQlClientProvider,
@@ -89,7 +91,8 @@ public class GitLabMergeRequestSyncService {
             GitLabDiscussionSyncService discussionSyncService,
             GitLabClosingIssueClient closingIssueClient,
             GitLabProperties gitLabProperties,
-            GitLabApprovalClient approvalClient) {
+            GitLabApprovalClient approvalClient,
+            GitLabProjectAdmission admission) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.responseHandler = responseHandler;
         this.mergeRequestProcessor = mergeRequestProcessor;
@@ -97,9 +100,21 @@ public class GitLabMergeRequestSyncService {
         this.closingIssueClient = closingIssueClient;
         this.gitLabProperties = gitLabProperties;
         this.approvalClient = approvalClient;
+        this.admission = admission;
     }
 
     public SyncResult syncMergeRequests(Long scopeId, Repository repository, @Nullable OffsetDateTime updatedAfter) {
+        return admission
+                .capture(scopeId, repository)
+                .map(read -> syncMergeRequests(scopeId, repository, updatedAfter, read))
+                .orElseGet(() -> SyncResult.completed(0));
+    }
+
+    public SyncResult syncMergeRequests(
+            Long scopeId,
+            Repository repository,
+            @Nullable OffsetDateTime updatedAfter,
+            GitLabProjectAdmission.ProjectRead read) {
         String projectPath = repository.getNameWithOwner();
         String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(projectPath), "<unknown>");
 
@@ -196,7 +211,8 @@ public class GitLabMergeRequestSyncService {
                                         mrNode,
                                         repository,
                                         scopeId,
-                                        fetchedAt)
+                                        fetchedAt,
+                                        read)
                                 != null) {
                             totalSynced++;
                         } else {
@@ -256,6 +272,7 @@ public class GitLabMergeRequestSyncService {
         }
 
         SyncResult result;
+        if (!admission.current(read)) return SyncResult.completed(0);
         if (errorAborted) {
             result = SyncResult.abortedError(totalSynced);
         } else if (rateLimitAborted) {
@@ -326,6 +343,18 @@ public class GitLabMergeRequestSyncService {
      */
     public BackfillBatchResult backfillMergeRequests(
             Long scopeId, Repository repository, @Nullable String cursor, int maxItems) {
+        return admission
+                .capture(scopeId, repository)
+                .map(read -> backfillMergeRequests(scopeId, repository, cursor, maxItems, read))
+                .orElseGet(() -> new BackfillBatchResult(0, -1, -1, null, false, false));
+    }
+
+    public BackfillBatchResult backfillMergeRequests(
+            Long scopeId,
+            Repository repository,
+            @Nullable String cursor,
+            int maxItems,
+            GitLabProjectAdmission.ProjectRead read) {
         String projectPath = repository.getNameWithOwner();
         String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(projectPath), "<unknown>");
 
@@ -391,7 +420,8 @@ public class GitLabMergeRequestSyncService {
                                 mrNode,
                                 repository,
                                 scopeId,
-                                fetchedAt);
+                                fetchedAt,
+                                read);
                         totalProcessed++;
                     } catch (Exception e) {
                         log.warn(
@@ -433,6 +463,8 @@ public class GitLabMergeRequestSyncService {
                         maxIid);
             }
 
+            if (!admission.current(read)) return new BackfillBatchResult(0, -1, -1, null, false, false);
+
             return new BackfillBatchResult(
                     totalProcessed, minIid == Integer.MAX_VALUE ? -1 : minIid, maxIid, resumeCursor, complete, false);
         } catch (InterruptedException e) {
@@ -458,7 +490,8 @@ public class GitLabMergeRequestSyncService {
             Map<String, Object> node,
             Repository repository,
             Long scopeId,
-            Instant fetchedAt) {
+            Instant fetchedAt,
+            GitLabProjectAdmission.ProjectRead read) {
         String projectPath = repository.getNameWithOwner();
         ScalarFields fields = extractScalarFields(response, nodePath, node);
         String mrContext = sanitizeForLog(projectPath) + "!" + fields.iid();
@@ -543,8 +576,13 @@ public class GitLabMergeRequestSyncService {
                 headPipeline,
                 closingIssueNumbers,
                 approvalRows);
-        PullRequest pr = mergeRequestProcessor.processFromSync(
-                syncData, ProcessingContext.forSync(scopeId, repository).withObservedAt(fetchedAt));
+        PullRequest pr = admission
+                .write(
+                        read,
+                        () -> mergeRequestProcessor.processFromSync(
+                                syncData,
+                                ProcessingContext.forSync(scopeId, repository).withObservedAt(fetchedAt)))
+                .orElse(null);
 
         // Sync discussions (threads + comments) for this MR when something can be there.
         // Uses discussion-based sync to preserve thread structure, resolution state, and diff positions.
@@ -553,7 +591,7 @@ public class GitLabMergeRequestSyncService {
                 && readsDiscussions(
                         fields.userNotesCount(), syncApprovers != null && !syncApprovers.isEmpty(), fields.state())) {
             try {
-                discussionSyncService.syncDiscussionsForMergeRequest(scopeId, repository, iid, pr);
+                discussionSyncService.syncDiscussionsForMergeRequest(scopeId, repository, iid, pr, read);
             } catch (Exception e) {
                 log.error("Discussion sync failed for MR: context={}", mrContext, e);
             }

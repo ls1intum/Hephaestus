@@ -24,8 +24,12 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.support.TransactionTemplate;
 
 class GitLabSharedWebhookProviderIdentityIntegrationTest extends BaseIntegrationTest {
+
+    @Autowired
+    private TransactionTemplate transactions;
 
     @Autowired
     private GitLabWebhookContextResolver resolver;
@@ -82,7 +86,9 @@ class GitLabSharedWebhookProviderIdentityIntegrationTest extends BaseIntegration
         assertThat(identity(selected)).isEqualTo(expected(fixture, correct, gitlab));
         assertThat(repositories.findById(correct.getId()).orElseThrow().getNativeId())
                 .isEqualTo(fixture.nativeId());
-        assertThat(resolver.mayStillWrite(selected)).isTrue();
+        var mayWrite = transactions.execute(status ->
+                resolver.mayStillWrite(selected, resolver.capture(selected).orElseThrow()));
+        assertThat(mayWrite).isTrue();
     }
 
     @Test

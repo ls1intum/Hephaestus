@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabRateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -25,7 +26,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
@@ -62,17 +62,20 @@ public class GitLabIssueDependencySyncService {
     private final GitLabTokenService tokenService;
     private final GitLabRateLimitTracker rateLimitTracker;
     private final WebClient webClient;
+    private final GitLabProjectAdmission admission;
 
     public GitLabIssueDependencySyncService(
             IssueRepository issueRepository,
             RepositoryRepository repositoryRepository,
             GitLabTokenService tokenService,
             GitLabRateLimitTracker rateLimitTracker,
-            WebClient.Builder webClientBuilder) {
+            WebClient.Builder webClientBuilder,
+            GitLabProjectAdmission admission) {
         this.issueRepository = issueRepository;
         this.repositoryRepository = repositoryRepository;
         this.tokenService = tokenService;
         this.rateLimitTracker = rateLimitTracker;
+        this.admission = admission;
         this.webClient = webClientBuilder.build();
     }
 
@@ -87,14 +90,27 @@ public class GitLabIssueDependencySyncService {
      * @param updatedAfter optional cutoff for incremental sync
      * @return sync result
      */
-    @Transactional
     public SyncResult syncDependenciesForRepository(
             Long scopeId, Repository repository, @Nullable OffsetDateTime updatedAfter) {
-        return syncDependenciesInternal(scopeId, repository, updatedAfter);
+        return admission
+                .capture(scopeId, repository)
+                .map(read -> syncDependenciesForRepository(scopeId, repository, updatedAfter, read))
+                .orElseGet(() -> SyncResult.completed(0));
+    }
+
+    public SyncResult syncDependenciesForRepository(
+            Long scopeId,
+            Repository repository,
+            @Nullable OffsetDateTime updatedAfter,
+            GitLabProjectAdmission.ProjectRead read) {
+        return syncDependenciesInternal(scopeId, repository, updatedAfter, read);
     }
 
     private SyncResult syncDependenciesInternal(
-            Long scopeId, Repository repository, @Nullable OffsetDateTime updatedAfter) {
+            Long scopeId,
+            Repository repository,
+            @Nullable OffsetDateTime updatedAfter,
+            GitLabProjectAdmission.ProjectRead read) {
         String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(repository.getNameWithOwner()), "<unknown>");
 
         // Issues only: GitLab keeps issue IIDs and merge-request IIDs in separate per-project namespaces
@@ -147,7 +163,7 @@ public class GitLabIssueDependencySyncService {
             }
 
             try {
-                int deps = processIssueDependencies(scopeId, serverUrl, token, nativeId, issue, repository);
+                int deps = processIssueDependencies(scopeId, serverUrl, token, nativeId, issue, repository, read);
                 totalDeps += deps;
             } catch (Exception e) {
                 log.debug(
@@ -166,20 +182,25 @@ public class GitLabIssueDependencySyncService {
                     totalDeps);
         }
 
-        return SyncResult.completed(totalDeps);
+        return admission.current(read) ? SyncResult.completed(totalDeps) : SyncResult.completed(0);
     }
 
     /**
      * Overload for backward compatibility — delegates to full sync (no incremental filter).
      */
-    @Transactional
     public SyncResult syncDependenciesForRepository(Long scopeId, Repository repository) {
-        return syncDependenciesInternal(scopeId, repository, null);
+        return syncDependenciesForRepository(scopeId, repository, null);
     }
 
     @SuppressWarnings("unchecked")
     private int processIssueDependencies(
-            long scopeId, String serverUrl, String token, long projectId, Issue issue, Repository repository) {
+            long scopeId,
+            String serverUrl,
+            String token,
+            long projectId,
+            Issue issue,
+            Repository repository,
+            GitLabProjectAdmission.ProjectRead read) {
         List<Map<String, Object>> links = webClient
                 .get()
                 .uri(serverUrl + "/api/v4/projects/{projectId}/issues/{iid}/links", projectId, issue.getNumber())
@@ -189,6 +210,21 @@ public class GitLabIssueDependencySyncService {
                 .bodyToMono(new ParameterizedTypeReference<List<Map<String, Object>>>() {})
                 .block(REQUEST_TIMEOUT);
 
+        return admission
+                .write(
+                        read,
+                        () -> issueRepository
+                                .findByIdWithBlockedBy(issue.getId())
+                                .map(current -> applyIssueDependencies(links, current, repository, read))
+                                .orElse(0))
+                .orElse(0);
+    }
+
+    private int applyIssueDependencies(
+            @Nullable List<Map<String, Object>> links,
+            Issue issue,
+            Repository repository,
+            GitLabProjectAdmission.ProjectRead read) {
         if (links == null || links.isEmpty()) {
             // No links — clear any stale blockedBy entries for this issue
             clearAllBlockers(issue);
@@ -224,7 +260,8 @@ public class GitLabIssueDependencySyncService {
             } else if ("blocks".equals(linkType)) {
                 // This issue blocks the linked issue
                 Issue blocked = findIssueByLink(link, linkedIid, repository);
-                if (blocked != null) {
+                Repository referenced = blocked != null ? blocked.getRepository() : null;
+                if (blocked != null && referenced != null && admission.allowsReference(read, referenced)) {
                     currentBlockingIds.add(blocked.getId());
                     Issue blockedWithDeps = issueRepository
                             .findByIdWithBlockedBy(blocked.getId())

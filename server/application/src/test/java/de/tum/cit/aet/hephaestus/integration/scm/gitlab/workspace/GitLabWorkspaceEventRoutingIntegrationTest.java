@@ -611,6 +611,10 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
         await().atMost(Duration.ofSeconds(10)).until(() -> filterSubjects().equals(withoutRepository));
         clearInvocations(integrationNatsConsumer);
 
+        doReturn(Optional.of(reported(REPOSITORY_NATIVE_ID, REPOSITORY)))
+                .when(projectSyncService)
+                .fetchProject(connected.getId(), REPOSITORY);
+
         transactionTemplate.executeWithoutResult(status -> {
             workspaceRepositoryMonitorService.addRepositoryToMonitor(connected.getWorkspaceSlug(), REPOSITORY);
             verify(integrationNatsConsumer, never()).updateScopeConsumer(connected.getId());

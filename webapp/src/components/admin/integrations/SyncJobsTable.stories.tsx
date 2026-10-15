@@ -232,6 +232,32 @@ export const ErrorState: Story = {
 	args: { jobs: [], isError: true, error: new Error("Network error"), onRetry: fn() },
 };
 export const Empty: Story = { args: { jobs: [] } };
+
+/** A failed refresh keeps the jobs last read, with their warnings, under the failure. */
+export const RefreshFailed: Story = {
+	args: {
+		jobs: allStatuses,
+		refreshFailure: { error: { status: 503 }, pending: false, onRetry: fn() },
+	},
+	play: async ({ canvas }) => {
+		canvas.getByText("The job history may be out of date");
+		await expect(canvas.getByRole("button", { name: "Retry" })).toBeEnabled();
+		canvas.getByRole("button", { name: "Show error for job 30" });
+		await expect(canvas.queryByText("We could not load the job history")).not.toBeInTheDocument();
+	},
+};
+
+export const RefreshRetrying: Story = {
+	args: {
+		jobs: allStatuses,
+		refreshFailure: { error: { status: 503 }, pending: true, onRetry: fn() },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "Retrying…" })).toBeDisabled();
+		canvas.getByRole("button", { name: "Show error for job 30" });
+	},
+};
+
 export const Paged: Story = {
 	args: { jobs, page: 1, totalPages: 4, onPageChange: fn() },
 };

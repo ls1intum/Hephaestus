@@ -42,6 +42,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreview.GitLab
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcomment.GitLabDiscussionSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcomment.GitLabPullRequestReviewCommentProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewthread.GitLabPullRequestReviewThreadProcessor;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.GraphQlResponses;
 import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
@@ -88,6 +89,8 @@ import tools.jackson.databind.node.ObjectNode;
 @Tag("integration")
 @DisplayName("GitLab Merge Request Message Handler")
 class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTest {
+    @Autowired
+    private GitLabProjectAdmission projectAdmission;
 
     private static final long NATIVE_AUTHOR_ID = 18024L;
     private static final String FIXTURE_AUTHOR_LOGIN = "ga84xah";
@@ -1771,7 +1774,10 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         when(provider.forScope(any())).thenReturn(ScriptedGraphQlClient.of(request -> Mono.just(response)));
         var approvalClient = mock(GitLabApprovalClient.class);
         if (rows != null)
-            when(approvalClient.read(1L, savedRepo.getNativeId(), Integer.parseInt(Objects.toString(node.get("iid")))))
+            when(approvalClient.read(
+                            savedWorkspace.getId(),
+                            savedRepo.getNativeId(),
+                            Integer.parseInt(Objects.toString(node.get("iid")))))
                     .thenReturn(rows);
         new GitLabMergeRequestSyncService(
                         provider,
@@ -1780,8 +1786,9 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                         mock(GitLabDiscussionSyncService.class),
                         mock(GitLabClosingIssueClient.class),
                         gitLabProperties,
-                        approvalClient)
-                .syncMergeRequests(1L, savedRepo, null);
+                        approvalClient,
+                        projectAdmission)
+                .syncMergeRequests(savedWorkspace.getId(), savedRepo, null);
     }
 
     private static final String FIXTURE_HEAD = "2be093fe73e06752381b635b99518c2255ee7946";
@@ -2021,7 +2028,8 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                             reviewCommentProcessor,
                             issueCommentProcessor,
                             reviewReconciler,
-                            gitLabProperties),
+                            gitLabProperties,
+                            projectAdmission),
                     natsMessageDeserializer,
                     transactionTemplate);
         }
@@ -2340,7 +2348,8 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         repo.setProvider(savedProvider);
         savedRepo = repositoryRepository.save(repo);
 
-        var workspace = WorkspaceTestFixtures.gitLabPatWorkspace("hephaestus-test-gitlab");
+        var workspace =
+                WorkspaceTestFixtures.gitLabPatWorkspace(FIXTURE_ORG_LOGIN).withSlug("hephaestus-test-gitlab");
         workspace.build().setPublicActivityEnabled(true);
         savedWorkspace = WorkspaceTestFixtures.persistGitLabWorkspace(
                 workspaceRepository, connectionRepository, workspace, "https://gitlab.lrz.de");

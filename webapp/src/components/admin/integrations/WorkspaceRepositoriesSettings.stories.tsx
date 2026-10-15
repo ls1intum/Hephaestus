@@ -15,13 +15,14 @@ const meta = {
 			{ nameWithOwner: "microsoft/vscode" },
 			{ nameWithOwner: "facebook/react" },
 		],
+		provider: "GITHUB",
 		providerLabel: "GitHub",
 		isLoading: false,
 		error: null,
 		addRepositoryError: null,
 		isAddingRepository: false,
 		isRemovingRepository: false,
-		onAddRepository: fn(),
+		onAddRepository: fn(async () => true),
 		onRemoveRepository: fn(),
 	},
 } satisfies Meta<typeof WorkspaceRepositoriesSettings>;
@@ -43,6 +44,7 @@ export const Default: Story = {
 		await expect(addButton).toBeEnabled();
 		await userEvent.click(addButton);
 		await expect(args.onAddRepository).toHaveBeenCalledWith("owner/name");
+		await expect(input).toHaveValue("");
 	},
 };
 
@@ -74,10 +76,47 @@ export const RemoveConfirm: Story = {
 
 		const dialog = await screen.findByRole("alertdialog");
 		within(dialog).getByText(/stop monitoring octocat\/Hello-World/iu);
-		within(dialog).getByText(/permanently erases everything it has mirrored/iu);
-		within(dialog).getByText(/repository on GitHub is not affected/iu);
-		within(dialog).getByText(/monitoring it again later/iu);
+		const description = within(dialog).getByText(/repository on GitHub is not affected/iu);
+		await expect(description).toHaveTextContent(
+			/if no other workspace on this instance still monitors it, Hephaestus also erases/iu,
+		);
+		await expect(description).toHaveTextContent(/practice reviews and feedback can remain/iu);
+		await expect(description).toHaveTextContent(/to sync it again, add it below/iu);
+		await expect(description).not.toHaveTextContent(/permanently|stays stopped/iu);
 		await expect(within(dialog).getByRole("button", { name: /stop monitoring/iu })).toBeEnabled();
+	},
+};
+
+export const RemoveConfirmGitLab: Story = {
+	args: {
+		repositories: [{ nameWithOwner: "acme/platform/api" }],
+		provider: "GITLAB",
+		providerLabel: "GitLab",
+	},
+	play: async ({ canvas }) => {
+		await userEvent.click(
+			canvas.getByRole("button", { name: "Stop monitoring acme/platform/api" }),
+		);
+
+		const dialog = await screen.findByRole("alertdialog");
+		const description = within(dialog).getByText(/repository on GitLab is not affected/iu);
+		await expect(description).toHaveTextContent(/stays stopped until you add it again below/iu);
+		await expect(description).toHaveTextContent(/if no other workspace/iu);
+	},
+};
+
+export const RemoveConfirmUnknownProvider: Story = {
+	args: { provider: undefined, providerLabel: undefined },
+	play: async ({ canvas }) => {
+		await userEvent.click(
+			canvas.getByRole("button", { name: "Stop monitoring octocat/Hello-World" }),
+		);
+
+		const dialog = await screen.findByRole("alertdialog");
+		const description = within(dialog).getByText(
+			/repository on GitHub or GitLab is not affected/iu,
+		);
+		await expect(description).not.toHaveTextContent(/permanently|stays stopped/iu);
 	},
 };
 
@@ -157,6 +196,28 @@ export const AddValidationError: Story = {
 		await expect(
 			canvas.queryByText(/an error occurred while adding the repository/iu),
 		).not.toBeInTheDocument();
+	},
+};
+
+/** A failed add keeps the entered path, so the admin can retry without typing it again. */
+export const AddFailedKeepsPath: Story = {
+	args: {
+		provider: "GITLAB",
+		providerLabel: "GitLab",
+		onAddRepository: fn(async () => false),
+		addRepositoryError: Object.assign(new Error("request failed"), {
+			status: 503,
+			detail: "GitLab is unavailable.",
+		}),
+	},
+	play: async ({ canvas }) => {
+		const input = canvas.getByLabelText("Add a repository");
+		await userEvent.type(input, "acme/platform/api");
+		await userEvent.click(canvas.getByRole("button", { name: /^add repository$/iu }));
+
+		await expect(input).toHaveValue("acme/platform/api");
+		await expect(canvas.getByRole("button", { name: /^add repository$/iu })).toBeEnabled();
+		canvas.getByText("GitLab is unavailable.");
 	},
 };
 

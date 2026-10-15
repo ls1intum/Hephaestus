@@ -12,6 +12,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClie
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlResponseHandler;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.user.GitLabUserService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabAdmissionTestFixtures;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabWorkspaceLinkService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
@@ -21,6 +23,8 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 class GitLabCollaboratorSyncServiceTest extends BaseUnitTest {
+
+    private final GitLabProjectAdmission projectAdmission = mock(GitLabProjectAdmission.class);
 
     @Mock
     private GitLabGraphQlClientProvider graphQlClientProvider;
@@ -40,10 +44,13 @@ class GitLabCollaboratorSyncServiceTest extends BaseUnitTest {
                 mock(GitLabUserService.class),
                 mock(GitLabProperties.class),
                 new TransactionTemplate(mock(PlatformTransactionManager.class)),
-                workspaceLinkService);
+                workspaceLinkService,
+                projectAdmission);
         Repository project = new Repository();
+        project.setId(11L);
         project.setNameWithOwner("course/intro/team-1/demo");
         project.setProvider(TestEntities.gitProvider(10L, IdentityProviderType.GITLAB));
+        GitLabAdmissionTestFixtures.permit(projectAdmission, 2L, project, 7L);
         when(workspaceLinkService.mayWriteRepository(2L, project)).thenReturn(false);
 
         var result = service.syncCollaboratorsForRepository(2L, project);

@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcommen
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -15,6 +16,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment.GitLabIssueCommentProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreview.GitLabReviewReconciler;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewthread.GitLabPullRequestReviewThreadProcessor;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.Map;
@@ -27,6 +29,8 @@ import org.mockito.Mock;
  * loop is not driven here; the per-note reading is, with the notes' bodies as GitLab writes them.
  */
 class GitLabDiscussionSyncServiceTest extends BaseUnitTest {
+
+    private final GitLabProjectAdmission projectAdmission = mock(GitLabProjectAdmission.class);
 
     private static final long PROVIDER_ID = 2L;
 
@@ -65,7 +69,8 @@ class GitLabDiscussionSyncServiceTest extends BaseUnitTest {
                 reviewCommentProcessor,
                 issueCommentProcessor,
                 reviewReconciler,
-                gitLabProperties);
+                gitLabProperties,
+                projectAdmission);
         provider = new IdentityProvider();
         provider.setId(PROVIDER_ID);
         pr = new PullRequest();

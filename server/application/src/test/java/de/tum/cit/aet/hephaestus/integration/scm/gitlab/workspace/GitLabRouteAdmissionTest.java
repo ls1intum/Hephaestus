@@ -44,12 +44,16 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceScopeFilter;
 import io.nats.client.Message;
 import io.nats.client.impl.Headers;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -61,6 +65,8 @@ import tools.jackson.databind.ObjectMapper;
 
 @Tag("unit")
 class GitLabRouteAdmissionTest {
+
+    private final GitLabProjectAdmission projectAdmission = mock(GitLabProjectAdmission.class);
 
     private static final String ORIGIN = "https://gitlab.lrz.de";
     private static final String GROUP = "hephaestustest/introcourse";
@@ -87,10 +93,17 @@ class GitLabRouteAdmissionTest {
     private final GitLabRouteAdmission.AdmittedRoute route =
             new GitLabRouteAdmission.AdmittedRoute(CONNECTION_ID, WORKSPACE_ID, PROVIDER_ID, GROUP_ID, GROUP);
 
+    private final List<GitLabProjectResponse> reportedProjects = new ArrayList<>();
+    private final List<Repository> permittedRepositories = new ArrayList<>();
+    private final List<RepositoryToMonitor> originalMonitors = new ArrayList<>();
     private GitLabRouteAdmission admission;
+    private GitLabProjectAdmission.ConnectionRead originalConnection =
+            new GitLabProjectAdmission.ConnectionRead(CONNECTION_ID, WORKSPACE_ID, PROVIDER_ID, GROUP, Map.of());
 
     @BeforeEach
     void setUp() {
+        when(projectAdmission.captureConnection(WORKSPACE_ID, PROVIDER_ID))
+                .thenAnswer(invocation -> Optional.of(originalConnection));
         GitLabProperties properties = mock(GitLabProperties.class);
         when(properties.defaultServerUrl()).thenReturn(ORIGIN + "/");
         admission = new GitLabRouteAdmission(
@@ -106,10 +119,12 @@ class GitLabRouteAdmissionTest {
                 syncTargets,
                 properties,
                 new ObjectMapper(),
-                mock(PlatformTransactionManager.class));
+                mock(PlatformTransactionManager.class),
+                projectAdmission);
 
         provider.setId(PROVIDER_ID);
         provider.setType(IdentityProviderType.GITLAB);
+        provider.setServerUrl(ORIGIN + "/");
         when(identityProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITLAB, ORIGIN + "/"))
                 .thenReturn(Optional.of(provider));
         ReflectionTestUtils.setField(workspace, "id", WORKSPACE_ID);
@@ -119,6 +134,8 @@ class GitLabRouteAdmissionTest {
         when(connection.getState()).thenReturn(IntegrationState.ACTIVE);
         when(connection.getWorkspace()).thenReturn(workspace);
         when(connection.getConfig()).thenReturn(config(ORIGIN, GROUP_ID));
+        when(connectionRepository.findConfigInState(CONNECTION_ID, WORKSPACE_ID, IntegrationState.ACTIVE))
+                .thenReturn(Optional.of(config(ORIGIN, GROUP_ID)));
         when(connectionRepository.findByIdAndWorkspaceId(CONNECTION_ID, WORKSPACE_ID))
                 .thenReturn(Optional.of(connection));
     }
@@ -206,11 +223,14 @@ class GitLabRouteAdmissionTest {
 
         @Test
         void shouldAdmitWorkOnAProjectThisWorkspaceMonitorsWithoutAskingGitLab() {
+            var monitored = repository(PROJECT_A, GROUP + "/a");
             when(repositoryRepository.findByNameWithOwnerAndProviderId(GROUP + "/a", PROVIDER_ID))
-                    .thenReturn(Optional.of(repository(PROJECT_A, GROUP + "/a")));
+                    .thenReturn(Optional.of(monitored));
             when(monitors.existsByWorkspaceIdAndNameWithOwner(WORKSPACE_ID, GROUP + "/a"))
                     .thenReturn(true);
 
+            when(repositoryRepository.findByNativeIdAndProviderId(PROJECT_A, PROVIDER_ID))
+                    .thenReturn(Optional.of(monitored));
             assertProjectAdmitted(workEvent(PROJECT_A, GROUP + "/a"));
             verify(projectSync, never()).fetchProject(any(), anyString());
         }
@@ -236,6 +256,8 @@ class GitLabRouteAdmissionTest {
             Repository stored = repository(PROJECT_A, GROUP + "/sub/new");
             when(projectSync.fetchProject(WORKSPACE_ID, GROUP + "/sub/new")).thenReturn(Optional.of(nested));
             when(projectSync.persistProject(nested)).thenReturn(Optional.of(stored));
+            when(repositoryRepository.findByNativeIdAndProviderId(PROJECT_A, PROVIDER_ID))
+                    .thenReturn(Optional.of(stored));
 
             assertProjectAdmitted(workEvent(PROJECT_A, GROUP + "/sub/new"));
             verify(repositoryMonitors).monitorAllowed(workspace, List.of(stored));
@@ -309,7 +331,7 @@ class GitLabRouteAdmissionTest {
             when(repositoryRepository.findByNativeIdAndProviderId(PROJECT_A, PROVIDER_ID))
                     .thenReturn(Optional.of(repository(PROJECT_A, GROUP + "/a")));
             when(monitors.findByWorkspaceIdAndNameWithOwner(WORKSPACE_ID, GROUP + "/a"))
-                    .thenReturn(Optional.of(monitor(56L)));
+                    .thenReturn(Optional.of(monitor(56L, GROUP + "/a")));
             when(projectSync.fetchProjectById(WORKSPACE_ID, PROJECT_A))
                     .thenReturn(Optional.of(reported(PROJECT_A, "elsewhere/a")))
                     .thenReturn(Optional.empty());
@@ -326,7 +348,7 @@ class GitLabRouteAdmissionTest {
         void shouldLeaveAMonitorWithoutIdAloneWhenOnlyTheEventNamesItsPath() {
             // This workspace's monitor predates native ids; the event claims another project used to live there.
             when(monitors.findByWorkspaceIdAndNameWithOwner(WORKSPACE_ID, GROUP + "/a"))
-                    .thenReturn(Optional.of(monitor(57L)));
+                    .thenReturn(Optional.of(monitor(57L, GROUP + "/a")));
             when(repositoryRepository.findByNativeIdAndProviderId(PROJECT_B, PROVIDER_ID))
                     .thenReturn(Optional.empty())
                     .thenReturn(Optional.of(repository(PROJECT_B, "other-group/b")));
@@ -453,7 +475,17 @@ class GitLabRouteAdmissionTest {
             when(scopeFilter.isRepositoryAllowed(workspace, GROUP + "/selected"))
                     .thenReturn(true);
 
-            assertThat(admission.admitRepository(route, repository(PROJECT_A, GROUP + "/selected")))
+            Repository selected = repository(PROJECT_A, GROUP + "/selected");
+            when(repositoryRepository.findByNameWithOwnerAndProviderId(GROUP + "/selected", PROVIDER_ID))
+                    .thenReturn(Optional.of(selected));
+            when(repositoryRepository.findByNativeIdAndProviderId(PROJECT_A, PROVIDER_ID))
+                    .thenReturn(Optional.of(selected));
+            installOriginalPermits();
+            assertThat(admission.admit(
+                            WORKSPACE_ID,
+                            message(workEvent(PROJECT_A, GROUP + "/selected"), h -> {}),
+                            () -> assertThat(admission.admitRepository(route, selected))
+                                    .isTrue()))
                     .isTrue();
             verify(repositoryMonitors, never()).monitorAllowed(any(), any());
         }
@@ -482,8 +514,8 @@ class GitLabRouteAdmissionTest {
                 {"event_name":"%s","project_id":%d,"path_with_namespace":"%s"}""".formatted(eventName, projectId, path);
     }
 
-    private static GitLabProjectResponse reported(long nativeId, String fullPath) {
-        return new GitLabProjectResponse(
+    private GitLabProjectResponse reported(long nativeId, String fullPath) {
+        GitLabProjectResponse project = new GitLabProjectResponse(
                 "gid://gitlab/Project/" + nativeId,
                 fullPath,
                 fullPath.substring(fullPath.lastIndexOf('/') + 1),
@@ -495,9 +527,37 @@ class GitLabRouteAdmissionTest {
                 null,
                 null,
                 null);
+        if (route.contains(fullPath)) reportedProjects.add(project);
+        return project;
+    }
+
+    private void installOriginalPermits() {
+        Map<String, Set<Long>> originalIds = originalMonitors.stream()
+                .collect(Collectors.groupingBy(
+                        monitor -> monitor.getNativeId() != null
+                                ? "id:" + monitor.getNativeId()
+                                : "path:" + monitor.getNameWithOwner().toLowerCase(Locale.ROOT),
+                        Collectors.mapping(RepositoryToMonitor::getId, Collectors.toUnmodifiableSet())));
+        originalConnection = new GitLabProjectAdmission.ConnectionRead(
+                CONNECTION_ID, WORKSPACE_ID, PROVIDER_ID, GROUP, Map.copyOf(originalIds));
+        for (GitLabProjectResponse project : reportedProjects) {
+            GitLabAdmissionTestFixtures.discovery(
+                    projectAdmission,
+                    originalConnection,
+                    Long.parseLong(project.id().substring(project.id().lastIndexOf('/') + 1)),
+                    Objects.requireNonNull(project.fullPath()),
+                    ORIGIN + "/");
+        }
+        for (Repository repository : permittedRepositories) {
+            var read = new GitLabProjectAdmission.ProjectRead(
+                    originalConnection, repository.getId(), Objects.requireNonNull(repository.getNativeId()), 55L);
+            when(projectAdmission.capture(originalConnection, repository)).thenReturn(Optional.of(read));
+            when(projectAdmission.hold(read)).thenReturn(true);
+        }
     }
 
     private void assertProjectAdmitted(String body) {
+        installOriginalPermits();
         Runnable handling = mock(Runnable.class);
         assertThat(admission.admit(WORKSPACE_ID, message(body, h -> {}), handling))
                 .isTrue();
@@ -505,6 +565,7 @@ class GitLabRouteAdmissionTest {
     }
 
     private void assertProjectNotAdmitted(String body) {
+        installOriginalPermits();
         assertNotAdmitted(body, WORKSPACE_ID, h -> {});
     }
 
@@ -538,15 +599,24 @@ class GitLabRouteAdmissionTest {
 
     private Repository repository(long nativeId, String nameWithOwner) {
         Repository repository = new Repository();
+        repository.setId(nativeId);
         repository.setNativeId(nativeId);
         repository.setNameWithOwner(nameWithOwner);
         repository.setProvider(provider);
+        if (route.contains(nameWithOwner)) permittedRepositories.add(repository);
         return repository;
     }
 
-    private static RepositoryToMonitor monitor(long id) {
+    private RepositoryToMonitor monitor(long id) {
         RepositoryToMonitor monitor = new RepositoryToMonitor();
         monitor.setId(id);
+        originalMonitors.add(monitor);
+        return monitor;
+    }
+
+    private RepositoryToMonitor monitor(long id, String path) {
+        RepositoryToMonitor monitor = monitor(id);
+        monitor.setNameWithOwner(path);
         return monitor;
     }
 }

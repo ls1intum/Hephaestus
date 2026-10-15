@@ -58,8 +58,12 @@ For a token-managed workspace, as a workspace admin:
 1. Open **Administration → Integrations → GitHub/GitLab → Manage repositories → Add a repository**.
 2. Enter the full repository path.
 
-**CAUTION:** Removal of a monitored repository permanently deletes its mirrored Hephaestus data.
-To keep that data, do not remove the repository monitor.
+For a GitLab project, **Stop monitoring** keeps it excluded from later discovery, webhooks, and syncs.
+To resume it, add its current full namespace path again.
+Stopping a project does not change group membership.
+
+**CAUTION:** If no other workspace monitors the same source repository, removal deletes its mirrored repository data.
+Shared mirrored data remains while another workspace monitors it.
 The upstream repository does not change.
 
 The first sync takes longer for large repositories and long histories.
@@ -167,8 +171,7 @@ To recover:
 
 Otherwise, the check waits for its next daily run.
 
-**CAUTION:** Removal of a monitor permanently deletes mirrored data, but not the upstream repository.
-To keep mirrored data, do not remove the monitor.
+Before you stop monitoring, read [Repositories](#repositories) for the effect on mirrored data.
 
 If the repository is no longer wanted in the workspace:
 

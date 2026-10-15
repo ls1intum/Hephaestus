@@ -12,6 +12,8 @@ import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import jakarta.persistence.EntityManager;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -115,6 +117,64 @@ class ConnectionConfigJsonRoundTripIntegrationTest extends BaseIntegrationTest {
         Connection reloaded = connectionRepository.findById(id).orElseThrow();
         ConnectionConfig.GitLabConfig cfg = (ConnectionConfig.GitLabConfig) reloaded.getConfig();
         assertThat(cfg.signingMode()).isEqualTo(ConnectionConfig.GitLabConfig.SigningMode.WHSEC);
+    }
+
+    @Test
+    void shouldKeepReleasedGitLabProjectExclusionsThroughReadAndConfigUpdates() {
+        Long id = persistAndClear(
+                IntegrationKind.GITLAB,
+                "https://gitlab.example.test",
+                new ConnectionConfig.GitLabConfig(
+                        "https://gitlab.example.test",
+                        null,
+                        null,
+                        ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                        Set.of("issues"),
+                        null));
+        entityManager
+                .createNativeQuery("""
+                UPDATE connection SET config = CAST(:config AS jsonb)
+                WHERE id = :id AND workspace_id = :workspaceId
+                """)
+                .setParameter("config", """
+                        {"type":"GITLAB","serverUrl":"https://gitlab.example.test",
+                         "gitlabGroupId":42,"gitlabWebhookId":73,"signingMode":"PLAINTEXT",
+                         "enabledStreams":["issues"],"tokenMetadata":null,
+                         "projectExclusions":{"nativeIds":[7001,7002],"unresolvedPaths":["team/legacy"]}}
+                        """)
+                .setParameter("id", id)
+                .setParameter("workspaceId", workspace.getId())
+                .executeUpdate();
+        entityManager.clear();
+
+        Connection connection = connectionRepository.findById(id).orElseThrow();
+        var config = (ConnectionConfig.GitLabConfig) connection.getConfig();
+        var expected = new ConnectionConfig.GitLabProjectExclusions(Set.of(7001L, 7002L), Set.of("team/legacy"));
+        assertThat(config.projectExclusions()).isEqualTo(expected);
+        var metadata = new ConnectionConfig.GitLabTokenMetadata(
+                LocalDate.of(2027, 1, 1), Instant.parse("2026-10-15T10:00:00Z"));
+        connection.setConfig(
+                config.withGitlabGroupId(43L).withGitlabWebhookId(74L).withTokenMetadata(metadata));
+        connectionRepository.saveAndFlush(connection);
+        entityManager.clear();
+
+        var reloaded = (ConnectionConfig.GitLabConfig)
+                connectionRepository.findById(id).orElseThrow().getConfig();
+        assertThat(reloaded.projectExclusions()).isEqualTo(expected);
+        assertThat(reloaded.gitlabGroupId()).isEqualTo(43L);
+        assertThat(reloaded.gitlabWebhookId()).isEqualTo(74L);
+        assertThat(reloaded.tokenMetadata()).isEqualTo(metadata);
+        Object stored = entityManager
+                .createNativeQuery("""
+                SELECT (config -> 'projectExclusions') @> CAST(:expected AS jsonb)
+                       AND CAST(:expected AS jsonb) @> (config -> 'projectExclusions')
+                FROM connection WHERE id = :id AND workspace_id = :workspaceId
+                """)
+                .setParameter("expected", "{\"nativeIds\":[7001,7002],\"unresolvedPaths\":[\"team/legacy\"]}")
+                .setParameter("id", id)
+                .setParameter("workspaceId", workspace.getId())
+                .getSingleResult();
+        assertThat(stored).isEqualTo(true);
     }
 
     @Test

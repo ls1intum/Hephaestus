@@ -27,6 +27,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBeans;
 class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
 
     private static final Map<String, String> FULL_CONTEXT_ASSIGNMENTS = Map.ofEntries(
+            assignment("workspace.RepositoryProviderScopeIntegrationTest", "repository-provider-scope"),
             assignment("StartupBudgetIntegrationTest", "startup"),
             assignment("agent.mentor.chat.MentorWorkerSplitIntegrationTest", "mentor-worker-split"),
             assignment("agent.mentor.chat.MentorChatControllerAuthIntegrationTest", "mentor-http"),
@@ -107,6 +108,9 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
 
     private static final Map<String, String> FULL_CONTEXT_JUSTIFICATIONS = Map.ofEntries(
             Map.entry("base", "shared PostgreSQL, HTTP, security, and application acceptance" + " context"),
+            Map.entry(
+                    "repository-provider-scope",
+                    "real SQL provider, tenant and monitor lifetime enforcement with controlled GitLab transport and sync orchestration boundary"),
             Map.entry(
                     "consent-sign-in",
                     "real cookie and installed-client sign-in with the production consent" + " interceptor enabled"),
@@ -262,7 +266,8 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             "practices.review.ReviewOperationalViewsIntegrationTest",
             "practices.review.ReviewTimingFactsIntegrationTest",
             "practices.review.feedbackmode.FeedbackModeReviewIntegrationTest",
-            "practices.scan.ScanReportIntegrationTest");
+            "practices.scan.ScanReportIntegrationTest",
+            "workspace.RepositoryProviderScopeIntegrationTest");
 
     @Test
     void shouldMatchReviewedContextDeclarationsWhenArchitectureTestsRun() {

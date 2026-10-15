@@ -9,9 +9,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
@@ -42,11 +47,14 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreview.GitLab
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcomment.GitLabDiscussionSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcomment.GitLabPullRequestReviewCommentProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewthread.GitLabPullRequestReviewThreadProcessor;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.GraphQlResponses;
 import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
 import de.tum.cit.aet.hephaestus.testconfig.ScriptedGraphQlClient;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
+import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
@@ -56,6 +64,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import org.jspecify.annotations.Nullable;
@@ -78,6 +87,8 @@ import tools.jackson.databind.node.ObjectNode;
 @Tag("integration")
 @DisplayName("GitLab Note Message Handler")
 class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
+    @Autowired
+    private GitLabProjectAdmission projectAdmission;
 
     // Native IDs from fixtures
     private static final long NATIVE_NOTE_ID = 4406174L;
@@ -132,6 +143,12 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private IdentityProviderRepository gitProviderRepository;
 
     @Autowired
+    private ConnectionRepository connections;
+
+    @Autowired
+    private RepositoryToMonitorRepository monitors;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
     @Autowired
@@ -170,6 +187,7 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    private long workspaceId;
     private Repository savedRepo;
     private IdentityProvider savedProvider;
     private Issue savedIssue;
@@ -538,11 +556,11 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
         @Test
         void shouldNotLetAnOlderReadUndoANewerSyncThatChangedNothing() throws Exception {
             receiveDiffNote();
-            GitLabDiscussionSyncService.DiscussionRead older = Objects.requireNonNull(
-                    service(onePage(discussion(true))).readThreadResolutions(1L, FIXTURE_REPO_FULL_NAME, MR_IID));
+            GitLabDiscussionSyncService.DiscussionRead older = Objects.requireNonNull(service(onePage(discussion(true)))
+                    .readThreadResolutions(workspaceId, FIXTURE_REPO_FULL_NAME, MR_IID));
 
             sync(false);
-            service(onePage(discussion(true))).applyThreadResolutions(savedRepo, MR_IID, older, 1L);
+            service(onePage(discussion(true))).applyThreadResolutions(savedRepo, MR_IID, older, workspaceId);
 
             assertThat(thread().getState()).isEqualTo(PullRequestReviewThread.State.UNRESOLVED);
             assertThat(thread().getResolvedAt()).isNull();
@@ -555,12 +573,12 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
             sync(true);
             GitLabDiscussionSyncService reader = service(onePage(discussion(false)));
             GitLabDiscussionSyncService.DiscussionRead older =
-                    Objects.requireNonNull(reader.readThreadResolutions(1L, FIXTURE_REPO_FULL_NAME, MR_IID));
-            GitLabDiscussionSyncService.DiscussionRead newer = Objects.requireNonNull(
-                    service(onePage(discussion(true))).readThreadResolutions(1L, FIXTURE_REPO_FULL_NAME, MR_IID));
+                    Objects.requireNonNull(reader.readThreadResolutions(workspaceId, FIXTURE_REPO_FULL_NAME, MR_IID));
+            GitLabDiscussionSyncService.DiscussionRead newer = Objects.requireNonNull(service(onePage(discussion(true)))
+                    .readThreadResolutions(workspaceId, FIXTURE_REPO_FULL_NAME, MR_IID));
 
-            reader.applyThreadResolutions(savedRepo, MR_IID, newer, 1L);
-            reader.applyThreadResolutions(savedRepo, MR_IID, older, 1L);
+            reader.applyThreadResolutions(savedRepo, MR_IID, newer, workspaceId);
+            reader.applyThreadResolutions(savedRepo, MR_IID, older, workspaceId);
 
             assertThat(thread().getState()).isEqualTo(PullRequestReviewThread.State.RESOLVED);
             assertThat(discussionsObservedAt()).isEqualTo(newer.requestedAt());
@@ -575,11 +593,11 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
                             savedRepo,
                             MR_IID,
                             Objects.requireNonNull(
-                                    webhookRead.readThreadResolutions(1L, FIXTURE_REPO_FULL_NAME, MR_IID)),
-                            1L),
+                                    webhookRead.readThreadResolutions(workspaceId, FIXTURE_REPO_FULL_NAME, MR_IID)),
+                            workspaceId),
                     onePage(discussion(!newer)));
 
-            olderSync.syncDiscussionsForMergeRequest(1L, savedRepo, MR_IID, savedPr);
+            olderSync.syncDiscussionsForMergeRequest(workspaceId, savedRepo, MR_IID, savedPr);
 
             PullRequestReviewThread stored = thread();
             assertThat(stored.getState())
@@ -718,7 +736,7 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
         /** Runs the discussion sync of MR !2 over {@code pages}, answered in order. */
         @SafeVarargs
         private void syncPages(Map<String, @Nullable Object>... pages) {
-            service(pages).syncDiscussionsForMergeRequest(1L, savedRepo, MR_IID, savedPr);
+            service(pages).syncDiscussionsForMergeRequest(workspaceId, savedRepo, MR_IID, savedPr);
         }
 
         /** The discussion sync, reading MR !2's discussions from {@code pages} in order. */
@@ -738,7 +756,8 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
                     reviewCommentProcessor,
                     issueCommentProcessor,
                     reviewReconciler,
-                    gitLabProperties);
+                    gitLabProperties,
+                    projectAdmission);
         }
 
         @SafeVarargs
@@ -762,7 +781,8 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
                     reviewCommentProcessor,
                     issueCommentProcessor,
                     reviewReconciler,
-                    gitLabProperties);
+                    gitLabProperties,
+                    projectAdmission);
         }
 
         private Map<String, @Nullable Object> onePage(Map<String, @Nullable Object> discussion) {
@@ -1039,6 +1059,25 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
         workspace.setOrganizationId(org.getId());
         workspace.setAccountLogin(FIXTURE_ORG_LOGIN);
         workspace.setAccountType(AccountType.ORG);
-        workspaceRepository.save(workspace);
+        workspace = workspaceRepository.save(workspace);
+        workspaceId = workspace.getId();
+        var connection = new Connection(
+                workspace,
+                IntegrationKind.GITLAB,
+                "note-fixture",
+                new ConnectionConfig.GitLabConfig(
+                        savedProvider.getServerUrl(),
+                        null,
+                        null,
+                        ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                        Set.of(),
+                        null));
+        connection.setState(IntegrationState.ACTIVE);
+        connections.saveAndFlush(connection);
+        var monitor = new RepositoryToMonitor();
+        monitor.setWorkspace(workspace);
+        monitor.setNameWithOwner(savedRepo.getNameWithOwner());
+        monitor.setNativeId(savedRepo.getNativeId());
+        monitors.saveAndFlush(monitor);
     }
 }

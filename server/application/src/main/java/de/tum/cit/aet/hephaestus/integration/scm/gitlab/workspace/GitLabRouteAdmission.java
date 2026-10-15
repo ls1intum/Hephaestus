@@ -99,7 +99,8 @@ public class GitLabRouteAdmission implements RouteAdmission {
             AdmittedRoute route,
             Map<Long, GitLabUserLookup> users,
             @Nullable ReportedMembership membership,
-            @Nullable GitLabDescendantGroupResponse group) {}
+            @Nullable GitLabDescendantGroupResponse group,
+            GitLabProjectAdmission.@Nullable ProjectRead project) {}
 
     private final ConnectionRepository connectionRepository;
     private final IdentityProviderRepository identityProviderRepository;
@@ -114,6 +115,7 @@ public class GitLabRouteAdmission implements RouteAdmission {
     private final GitLabProperties gitLabProperties;
     private final ObjectMapper objectMapper;
     private final TransactionTemplate transaction;
+    private final GitLabProjectAdmission projectAdmission;
 
     public GitLabRouteAdmission(
             ConnectionRepository connectionRepository,
@@ -128,7 +130,8 @@ public class GitLabRouteAdmission implements RouteAdmission {
             SyncTargetProvider syncTargetProvider,
             GitLabProperties gitLabProperties,
             ObjectMapper objectMapper,
-            PlatformTransactionManager transactionManager) {
+            PlatformTransactionManager transactionManager,
+            GitLabProjectAdmission projectAdmission) {
         this.connectionRepository = connectionRepository;
         this.identityProviderRepository = identityProviderRepository;
         this.repositoryRepository = repositoryRepository;
@@ -142,6 +145,7 @@ public class GitLabRouteAdmission implements RouteAdmission {
         this.gitLabProperties = gitLabProperties;
         this.objectMapper = objectMapper;
         this.transaction = new TransactionTemplate(transactionManager);
+        this.projectAdmission = projectAdmission;
     }
 
     /** The route the delivery being handled on this thread was admitted for, when it came through one. */
@@ -182,9 +186,24 @@ public class GitLabRouteAdmission implements RouteAdmission {
             return false;
         }
         JsonNode payload = objectMapper.readTree(msg.getData());
-        if (!admitProject(route, payload)) {
+        var read = projectAdmission
+                .captureConnection(route.workspaceId(), route.providerId())
+                .orElse(null);
+        if (read == null || read.connectionId() != route.connectionId() || !admitProject(route, payload, read)) {
             return false;
         }
+        Long projectId = number(payload.path("project"), "id");
+        if (projectId == null) projectId = number(payload, "project_id");
+        String projectPath = text(payload.path("project"), "path_with_namespace");
+        var repository = projectId != null
+                ? repositoryRepository.findByNativeIdAndProviderId(projectId, route.providerId())
+                : projectPath != null
+                        ? repositoryRepository.findByNameWithOwnerAndProviderId(projectPath, route.providerId())
+                        : Optional.<Repository>empty();
+        var projectRead = repository
+                .flatMap(stored -> projectAdmission.capture(read, stored))
+                .orElse(null);
+        if ((projectId != null || projectPath != null) && projectRead == null) return false;
         String eventName = text(payload, "event_name");
         ReportedMembership membership = null;
         if (eventName != null && eventName.startsWith("user_") && eventName.endsWith("_group")) {
@@ -199,7 +218,7 @@ public class GitLabRouteAdmission implements RouteAdmission {
             group = teamSyncService.fetchGroup(route.workspaceId(), groupId).orElse(null);
         }
         Map<Long, GitLabUserLookup> users = userService.fetchCanonicalUsers(route.workspaceId(), userIds(payload));
-        CURRENT.set(new Delivery(route, users, membership, group));
+        CURRENT.set(new Delivery(route, users, membership, group, projectRead));
         try {
             handling.run();
         } finally {
@@ -244,7 +263,11 @@ public class GitLabRouteAdmission implements RouteAdmission {
                     repository.getId());
             return false;
         }
-        return repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(route.workspaceId(), path)
+        Delivery delivery = CURRENT.get();
+        return delivery != null
+                && delivery.project() != null
+                && delivery.project().repositoryId() == repository.getId()
+                && projectAdmission.hold(delivery.project())
                 && workspaceScopeFilter.isRepositoryAllowed(workspace(route), path);
     }
 
@@ -348,11 +371,11 @@ public class GitLabRouteAdmission implements RouteAdmission {
      * workspace: its shared row is left as last stored, since not being reported to one connection proves neither a
      * deletion nor where it went.
      */
-    private boolean admitProject(AdmittedRoute route, JsonNode payload) {
+    private boolean admitProject(AdmittedRoute route, JsonNode payload, GitLabProjectAdmission.ConnectionRead read) {
         String eventName = text(payload, "event_name");
         if (eventName != null && eventName.startsWith("project_")) {
             Long nativeId = number(payload, "project_id");
-            return nativeId != null && admitProjectEvent(route, nativeId);
+            return nativeId != null && admitProjectEvent(route, nativeId, read);
         }
         JsonNode project = payload.path("project");
         String path = text(project, "path_with_namespace");
@@ -367,12 +390,13 @@ public class GitLabRouteAdmission implements RouteAdmission {
         }
         // A stored project is trusted without asking GitLab only while this workspace monitors it: the shared row may
         // still hold a path its project was moved away from, and monitoring it again needs GitLab's word.
-        Boolean monitoredKnown = transaction.execute(status ->
-                repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(route.workspaceId(), path)
-                        && repositoryRepository
-                                .findByNameWithOwnerAndProviderId(path, route.providerId())
-                                .filter(known -> projectId == null || projectId.equals(known.getNativeId()))
-                                .isPresent());
+        Boolean monitoredKnown = transaction.execute(status -> holdActive(route)
+                && projectAllowed(route, projectId, path)
+                && repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(route.workspaceId(), path)
+                && repositoryRepository
+                        .findByNameWithOwnerAndProviderId(path, route.providerId())
+                        .filter(known -> projectId == null || projectId.equals(known.getNativeId()))
+                        .isPresent());
         if (Boolean.TRUE.equals(monitoredKnown)) {
             return true;
         }
@@ -384,17 +408,22 @@ public class GitLabRouteAdmission implements RouteAdmission {
             log.info("Skipped GitLab delivery: reason=projectNotReported, connectionId={}", route.connectionId());
             return false;
         }
-        return Boolean.TRUE.equals(transaction.execute(status -> {
-            if (!holdActive(route)) {
-                return false;
-            }
-            Optional<Repository> stored = projectSyncService.persistProject(reported);
-            stored.ifPresent(repository -> monitorIfAllowed(route, repository));
-            return stored.isPresent();
-        }));
+        return projectAdmission
+                .discover(
+                        read,
+                        extractId(reported),
+                        Objects.requireNonNull(reported.fullPath()),
+                        gitLabProperties.defaultServerUrl(),
+                        () -> {
+                            if (!holdActive(route)) return false;
+                            Optional<Repository> stored = projectSyncService.persistProject(reported);
+                            stored.ifPresent(repository -> monitorIfAllowed(route, repository));
+                            return stored.isPresent();
+                        })
+                .orElse(false);
     }
 
-    private boolean admitProjectEvent(AdmittedRoute route, long nativeId) {
+    private boolean admitProjectEvent(AdmittedRoute route, long nativeId, GitLabProjectAdmission.ConnectionRead read) {
         final GitLabProjectResponse reported;
         try {
             reported = projectSyncService
@@ -407,7 +436,9 @@ public class GitLabRouteAdmission implements RouteAdmission {
                             .findByNativeIdAndProviderId(nativeId, route.providerId())
                             .map(Repository::getNameWithOwner)
                             .orElse(null);
-                    ownMonitors(route, nativeId, knownPath)
+                    ownMonitors(route, nativeId, knownPath).stream()
+                            .filter(monitor -> read.originalMonitors().values().stream()
+                                    .anyMatch(ids -> ids.contains(monitor.getId())))
                             .forEach(monitor -> syncTargetProvider.recordRepositoryUnavailable(
                                     route.workspaceId(), monitor.getId()));
                 }
@@ -427,10 +458,22 @@ public class GitLabRouteAdmission implements RouteAdmission {
                     .orElse(null);
             List<RepositoryToMonitor> own = ownMonitors(route, nativeId, knownPath);
             Repository stored = inside && reported != null
-                    ? projectSyncService.persistProject(reported).orElse(null)
+                    ? projectAdmission
+                            .discover(
+                                    read,
+                                    nativeId,
+                                    Objects.requireNonNull(reported.fullPath()),
+                                    gitLabProperties.defaultServerUrl(),
+                                    () -> projectSyncService
+                                            .persistProject(reported)
+                                            .orElse(null))
+                            .orElse(null)
                     : null;
             if (!inside) {
-                own.forEach(monitor -> syncTargetProvider.removeSyncTarget(monitor.getId()));
+                own.stream()
+                        .filter(monitor -> read.originalMonitors().values().stream()
+                                .anyMatch(ids -> ids.contains(monitor.getId())))
+                        .forEach(monitor -> syncTargetProvider.removeSyncTarget(monitor.getId()));
             }
             if (stored == null) {
                 return false;
@@ -498,6 +541,15 @@ public class GitLabRouteAdmission implements RouteAdmission {
         if (id != null) {
             ids.add(id);
         }
+    }
+
+    private boolean projectAllowed(AdmittedRoute route, @Nullable Long nativeId, String path) {
+        return connectionRepository
+                .findConfigInState(route.connectionId(), route.workspaceId(), IntegrationState.ACTIVE)
+                .filter(ConnectionConfig.GitLabConfig.class::isInstance)
+                .map(ConnectionConfig.GitLabConfig.class::cast)
+                .filter(config -> !config.projectExclusions().excludes(nativeId, path))
+                .isPresent();
     }
 
     private static long extractId(GitLabProjectResponse project) {

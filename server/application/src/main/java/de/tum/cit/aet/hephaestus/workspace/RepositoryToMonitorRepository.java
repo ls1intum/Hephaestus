@@ -121,6 +121,16 @@ public interface RepositoryToMonitorRepository extends JpaRepository<RepositoryT
             nativeQuery = true)
     List<Long> findSourceRepositoryIds(@Param("workspaceId") Long workspaceId);
 
+    /** This workspace's monitors of the exact source repository, including monitors without a native id. */
+    @Query(
+            value = "SELECT rtm.* FROM repository_to_monitor rtm JOIN repository r ON"
+                    + " r.name_with_owner = rtm.name_with_owner WHERE r.id = :repositoryId"
+                    + " AND rtm.workspace_id = :workspaceId AND "
+                    + MonitoredRepositoryScope.NATIVE_RTM_R,
+            nativeQuery = true)
+    List<RepositoryToMonitor> findByWorkspaceIdAndSourceRepositoryId(
+            @Param("workspaceId") Long workspaceId, @Param("repositoryId") Long repositoryId);
+
     /** Exact mirrored repository ids covered by the monitor being removed. */
     @Query(
             value = "SELECT r.id FROM repository_to_monitor rtm JOIN repository r ON"

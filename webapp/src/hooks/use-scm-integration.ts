@@ -154,14 +154,20 @@ export function useScmIntegration(workspaceSlug: string) {
 		} satisfies ComponentProps<typeof WorkspaceScmTokenSettings>,
 		repositoriesSettingsProps: {
 			repositories: (repositories ?? []).map((repo) => ({ nameWithOwner: repo })),
+			provider: kind,
 			providerLabel: label,
 			isLoading: isLoadingRepositories,
 			error: repositoriesError,
 			addRepositoryError: addRepository.error,
 			isAddingRepository: addRepository.isPending,
 			isRemovingRepository: removeRepository.isPending,
-			onAddRepository: (nameWithOwner: string) => {
-				addRepository.mutate({ path: { workspaceSlug }, query: { nameWithOwner } });
+			onAddRepository: async (nameWithOwner: string) => {
+				try {
+					await addRepository.mutateAsync({ path: { workspaceSlug }, query: { nameWithOwner } });
+					return true;
+				} catch {
+					return false;
+				}
 			},
 			onRemoveRepository: (nameWithOwner: string) => {
 				removeRepository.mutate({ path: { workspaceSlug }, query: { nameWithOwner } });

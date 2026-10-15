@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -24,18 +25,21 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.Bear
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabRateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncServiceHolder;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issue.GitLabIssueSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuetype.GitLabIssueTypeSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.organization.GitLabGroupMemberSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.organization.GitLabGroupSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.organization.GitLabSyncResult;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.team.GitLabTeamSyncService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceActorSelector;
@@ -61,6 +65,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 @Tag("unit")
 class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
+
+    private final GitLabProjectAdmission projectAdmission = mock(GitLabProjectAdmission.class);
 
     @Mock
     private WorkspaceRepository workspaceRepository;
@@ -163,7 +169,8 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
                         repositoryToMonitorRepository),
                 repositoryMonitors,
                 actorSelector,
-                monitoringExecutor);
+                monitoringExecutor,
+                projectAdmission);
 
         workspace = new Workspace();
         workspace.setAccountLogin("my-group/subgroup");
@@ -222,7 +229,8 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
                         repositoryToMonitorRepository),
                 repositoryMonitors,
                 actorSelector,
-                monitoringExecutor);
+                monitoringExecutor,
+                projectAdmission);
     }
 
     /** Configures the executor mock to run submitted tasks synchronously. */
@@ -238,7 +246,9 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
 
     private Repository createRepo(String nameWithOwner) {
         Repository repo = new Repository();
+        repo.setId(nameWithOwner.endsWith("project-a") ? 10L : 20L);
         repo.setNameWithOwner(nameWithOwner);
+        GitLabAdmissionTestFixtures.permit(projectAdmission, 1L, repo, repo.getId());
         return repo;
     }
 
@@ -700,6 +710,44 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
 
     @Nested
     class SyncFullData {
+
+        @Test
+        void shouldNotAdvanceRepositoryCooldownAfterAuthorityIsWithdrawnAtTheIssueWatermark() {
+            var issueSync = mock(GitLabIssueSyncService.class);
+            when(gitLabSyncServiceHolderProvider.getIfAvailable()).thenReturn(gitLabSyncServiceHolder);
+            when(gitLabSyncServiceHolder.getIssueSyncService()).thenReturn(issueSync);
+            Repository stopped = new Repository();
+            stopped.setId(10L);
+            stopped.setNameWithOwner("my-group/subgroup/project-a");
+            Repository sibling = new Repository();
+            sibling.setId(20L);
+            sibling.setNameWithOwner("my-group/subgroup/project-b");
+            var originalRead = GitLabAdmissionTestFixtures.permit(projectAdmission, 1L, stopped, 77L);
+            GitLabAdmissionTestFixtures.permit(projectAdmission, 1L, sibling, 78L);
+            var originalMonitor = new RepositoryToMonitor();
+            originalMonitor.setId(77L);
+            originalMonitor.setNameWithOwner(stopped.getNameWithOwner());
+            var siblingMonitor = new RepositoryToMonitor();
+            siblingMonitor.setId(78L);
+            siblingMonitor.setNameWithOwner(sibling.getNameWithOwner());
+            when(repositoryRepository.findAllByWorkspaceMonitors(1L)).thenReturn(List.of(stopped, sibling));
+            when(repositoryToMonitorRepository.findByWorkspaceId(1L))
+                    .thenReturn(List.of(originalMonitor, siblingMonitor));
+            when(issueSync.syncIssues(eq(1L), any(), any(), any())).thenReturn(SyncResult.completed(1));
+            doAnswer(invocation -> {
+                        doReturn(false).when(projectAdmission).hold(originalRead);
+                        return null;
+                    })
+                    .when(syncTargetProvider)
+                    .updateSyncTimestamp(eq(77L), eq(SyncType.ISSUES), any());
+
+            assertThat(initService.syncFullData(workspace)).isEqualTo(SyncResult.completed(2));
+
+            verify(repositoryRepository).updateLastSyncAt(eq(20L), any());
+            verify(syncTargetProvider).updateSyncTimestamp(eq(78L), eq(SyncType.FULL_REPOSITORY), any());
+            verify(repositoryRepository, never()).updateLastSyncAt(eq(10L), any());
+            verify(syncTargetProvider, never()).updateSyncTimestamp(eq(77L), eq(SyncType.FULL_REPOSITORY), any());
+        }
 
         @Test
         void shouldSyncTheRosterOfTheGroupOnTheConnectedInstanceWhenAnotherHasTheSamePath() {

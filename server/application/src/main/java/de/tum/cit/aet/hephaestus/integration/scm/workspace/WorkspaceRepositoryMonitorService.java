@@ -18,7 +18,9 @@ import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionPropert
 import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationRepositoryEnumerator;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationSuspensionTracker;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener;
+import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryIdentityLookup;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WorkspaceDataSyncTrigger;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
@@ -31,6 +33,8 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceScopeFilter;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import io.micrometer.common.util.StringUtils;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.util.Collection;
 import java.util.EnumMap;
 import java.util.List;
@@ -54,6 +58,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 @WorkspaceAgnostic("Manages workspace-repository mapping configuration")
 public class WorkspaceRepositoryMonitorService {
 
+    @PersistenceContext
+    private @Nullable EntityManager entityManager;
+
     private static final Logger log = LoggerFactory.getLogger(WorkspaceRepositoryMonitorService.class);
     private static final String GITHUB_SERVER_URL = "https://github.com";
 
@@ -69,6 +76,11 @@ public class WorkspaceRepositoryMonitorService {
     private final WorkspaceScopeFilter workspaceScopeFilter;
     private final GitRepositoryManager gitRepositoryManager;
 
+    /**
+     * Installation-bound operations dispatch by the workspace's bound kind. A missing
+     * impl for a given kind is treated as "this kind doesn't support installation-bound
+     * operations" (e.g. GitLab PAT) rather than an error.
+     */
     private final Map<IntegrationKind, InstallationSuspensionTracker> suspensionTrackers;
 
     private final Map<IntegrationKind, InstallationRepositoryEnumerator> installationEnumerators;
@@ -78,6 +90,7 @@ public class WorkspaceRepositoryMonitorService {
     private final ConnectionService connectionService;
     private final ConnectionRepository connectionRepository;
     private final TransactionTemplate transactionTemplate;
+    private final Map<IntegrationKind, RepositoryIdentityLookup> repositoryIdentityLookups;
 
     public WorkspaceRepositoryMonitorService(
             NatsConnectionProperties natsProperties,
@@ -94,7 +107,8 @@ public class WorkspaceRepositoryMonitorService {
             List<InstallationRepositoryEnumerator> installationEnumeratorList,
             List<WorkspaceDataSyncTrigger> dataSyncTriggerList,
             ApplicationEventPublisher eventPublisher,
-            TransactionTemplate transactionTemplate) {
+            TransactionTemplate transactionTemplate,
+            List<RepositoryIdentityLookup> repositoryIdentityLookupList) {
         this.natsProperties = natsProperties;
         this.workspaceRepository = workspaceRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
@@ -107,6 +121,11 @@ public class WorkspaceRepositoryMonitorService {
         this.connectionRepository = connectionRepository;
         this.eventPublisher = eventPublisher;
         this.transactionTemplate = transactionTemplate;
+        Map<IntegrationKind, RepositoryIdentityLookup> identityLookupMap = new EnumMap<>(IntegrationKind.class);
+        for (RepositoryIdentityLookup lookup : repositoryIdentityLookupList) {
+            identityLookupMap.put(lookup.kind(), lookup);
+        }
+        this.repositoryIdentityLookups = identityLookupMap;
 
         Map<IntegrationKind, InstallationSuspensionTracker> suspensionMap = new EnumMap<>(IntegrationKind.class);
         for (InstallationSuspensionTracker t : suspensionTrackerList) {
@@ -205,15 +224,52 @@ public class WorkspaceRepositoryMonitorService {
     // Hold the connection lifecycle lock across lookup and write; a renamed project must not acquire a second monitor.
     private void addGitLabRepositoryToMonitor(Workspace workspace, String nameWithOwner) {
         Long workspaceId = workspace.getId();
+        var connection = connectionRepository
+                .findActive(workspaceId, IntegrationKind.GITLAB)
+                .orElseThrow(() -> new RepositoryProviderNotConnectedException(workspace.getWorkspaceSlug()));
+        if (!(connection.getConfig() instanceof ConnectionConfig.GitLabConfig initialConfig)) {
+            throw new RepositoryProviderNotConnectedException(workspace.getWorkspaceSlug());
+        }
+        Long storedNativeId = sourceProvider(IntegrationKind.GITLAB, initialConfig)
+                .flatMap(provider -> repositoryRepository.findByNameWithOwnerAndProviderId(
+                        nameWithOwner, Objects.requireNonNull(provider.getId())))
+                .map(Repository::getNativeId)
+                .orElse(null);
+        // Stop can remove the last mirror. Resolve an explicit Add against GitLab before taking the write lock;
+        // a path alone cannot tell which excluded native project it is, or whether that path has been reused.
+        Long includedNativeId = storedNativeId;
+        if (includedNativeId == null
+                && (!initialConfig.projectExclusions().nativeIds().isEmpty()
+                        || initialConfig.projectExclusions().excludes(null, nameWithOwner))) {
+            RepositoryIdentityLookup lookup = repositoryIdentityLookups.get(IntegrationKind.GITLAB);
+            if (lookup == null) throw new RepositoryProviderNotConnectedException(workspace.getWorkspaceSlug());
+            var reported = lookup.resolve(workspaceId, nameWithOwner)
+                    .orElseThrow(() -> new EntityNotFoundException("Repository", nameWithOwner));
+            if (!nameWithOwner.equalsIgnoreCase(reported.fullPath())) {
+                throw new EntityNotFoundException("Repository", nameWithOwner);
+            }
+            includedNativeId = reported.nativeId();
+        }
+        Long resolvedNativeId = includedNativeId;
         RepositoryToMonitor monitor = transactionTemplate.execute(status -> {
             ConnectionConfig config = connectionRepository
                     .lockActiveConfig(workspaceId, IntegrationKind.GITLAB)
                     .orElseThrow(() -> new RepositoryProviderNotConnectedException(workspace.getWorkspaceSlug()));
-            Long nativeId = sourceProvider(IntegrationKind.GITLAB, config)
-                    .flatMap(provider -> repositoryRepository.findByNameWithOwnerAndProviderId(
-                            nameWithOwner, Objects.requireNonNull(provider.getId())))
-                    .map(Repository::getNativeId)
-                    .orElse(null);
+            if (!(config instanceof ConnectionConfig.GitLabConfig currentConfig)
+                    || !Objects.equals(currentConfig.serverUrl(), initialConfig.serverUrl())
+                    || connectionRepository
+                            .findActive(workspaceId, IntegrationKind.GITLAB)
+                            .filter(current -> Objects.equals(current.getId(), connection.getId()))
+                            .isEmpty()) {
+                throw new RepositoryProviderNotConnectedException(workspace.getWorkspaceSlug());
+            }
+            Long nativeId = resolvedNativeId;
+            if (connectionService
+                    .updateGitLabProjectExclusions(
+                            workspaceId, exclusions -> exclusions.include(nativeId, nameWithOwner))
+                    .isEmpty()) {
+                throw new RepositoryProviderNotConnectedException(workspace.getWorkspaceSlug());
+            }
             if (repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(workspaceId, nameWithOwner)
                     || (nativeId != null
                             && !repositoryToMonitorRepository
@@ -259,6 +315,21 @@ public class WorkspaceRepositoryMonitorService {
         transactionTemplate.executeWithoutResult(status -> {
             Workspace workspace = requireWorkspace(slug);
 
+            boolean gitLab = connectionService
+                    .findActiveProviderKind(workspace.getId())
+                    .map(kind -> kind == IntegrationKind.GITLAB)
+                    .orElseGet(() -> connectionRepository
+                            .findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                                    workspace.getId(), IntegrationKind.GITLAB, IntegrationState.SUSPENDED)
+                            .isPresent());
+            if (gitLab) {
+                var locked = connectionService
+                        .updateGitLabProjectExclusions(workspace.getId(), exclusions -> exclusions)
+                        .orElseThrow(() -> new RepositoryProviderNotConnectedException(slug));
+                // A concurrent discovery may have changed the eager monitor set while Stop waited for the lock.
+                Objects.requireNonNull(entityManager).refresh(locked.getWorkspace());
+            }
+
             if (isGitHubAppWorkspace(workspace)) {
                 throw new RepositoryManagementNotAllowedException(slug);
             }
@@ -284,6 +355,24 @@ public class WorkspaceRepositoryMonitorService {
 
             List<Long> repositoryIds =
                     repositoryToMonitorRepository.findSourceRepositoryIdsOfMonitor(repositoryToMonitor.getId());
+            if (gitLab) {
+                Long stoppedNativeId = repositoryToMonitor.getNativeId() != null
+                        ? repositoryToMonitor.getNativeId()
+                        : repositoryIds.size() == 1
+                                ? repositoryRepository
+                                        .findById(repositoryIds.getFirst())
+                                        .map(Repository::getNativeId)
+                                        .orElse(null)
+                                : null;
+                if (connectionService
+                        .updateGitLabProjectExclusions(
+                                workspace.getId(),
+                                exclusions ->
+                                        exclusions.exclude(stoppedNativeId, repositoryToMonitor.getNameWithOwner()))
+                        .isEmpty()) {
+                    throw new RepositoryProviderNotConnectedException(slug);
+                }
+            }
             deleteRepositoryMonitor(workspace, repositoryToMonitor);
             repositoryIds.forEach(this::deleteRepositoryIfOrphaned);
         });

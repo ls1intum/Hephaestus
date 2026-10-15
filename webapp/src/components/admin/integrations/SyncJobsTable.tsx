@@ -23,6 +23,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/h
 import { Table, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { asDate } from "@/lib/dates";
 import { hasText } from "@/lib/text";
+import type { RefreshFailure } from "@/runtime/tanstack-query/infinite-list";
 
 import {
 	JOB_STATUS_LABEL,
@@ -50,6 +51,8 @@ export interface SyncJobsTableProps {
 	isError?: boolean;
 	error?: unknown;
 	onRetry?: () => void;
+	/** Reading the jobs again failed; the jobs last read stay, with the failure above them. */
+	refreshFailure?: RefreshFailure;
 	page?: number;
 	totalPages?: number;
 	onPageChange?: (page: number) => void;
@@ -260,6 +263,7 @@ export function SyncJobsTable({
 	isError = false,
 	error,
 	onRetry,
+	refreshFailure,
 	page,
 	totalPages,
 	onPageChange,
@@ -279,24 +283,32 @@ export function SyncJobsTable({
 		);
 	}
 
+	const refreshAlert = refreshFailure !== undefined && (
+		<QueryErrorAlert title="The job history may be out of date" {...refreshFailure} />
+	);
+
 	if (jobs.length === 0) {
 		return (
-			<Empty variant="outlined">
-				<EmptyHeader>
-					<EmptyMedia variant="icon">
-						<HistoryIcon />
-					</EmptyMedia>
-					<EmptyTitle>No sync jobs yet</EmptyTitle>
-					<EmptyDescription>
-						Initial syncs, reconciliations and manual triggers appear here as they run.
-					</EmptyDescription>
-				</EmptyHeader>
-			</Empty>
+			<div className="space-y-3">
+				{refreshAlert}
+				<Empty variant="outlined">
+					<EmptyHeader>
+						<EmptyMedia variant="icon">
+							<HistoryIcon />
+						</EmptyMedia>
+						<EmptyTitle>No sync jobs yet</EmptyTitle>
+						<EmptyDescription>
+							Initial syncs, reconciliations and manual triggers appear here as they run.
+						</EmptyDescription>
+					</EmptyHeader>
+				</Empty>
+			</div>
 		);
 	}
 
 	return (
 		<div className="space-y-3">
+			{refreshAlert}
 			<Table>
 				<JobsTableHeader />
 				{jobs.map((job) => (

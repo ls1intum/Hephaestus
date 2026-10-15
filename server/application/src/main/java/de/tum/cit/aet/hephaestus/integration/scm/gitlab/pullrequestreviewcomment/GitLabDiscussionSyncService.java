@@ -21,6 +21,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPag
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment.GitLabIssueCommentProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreview.GitLabReviewReconciler;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewthread.GitLabPullRequestReviewThreadProcessor;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
@@ -77,6 +78,7 @@ public class GitLabDiscussionSyncService {
     private final GitLabIssueCommentProcessor issueCommentProcessor;
     private final GitLabReviewReconciler reviewReconciler;
     private final GitLabProperties gitLabProperties;
+    private final GitLabProjectAdmission admission;
 
     public GitLabDiscussionSyncService(
             GitLabGraphQlClientProvider graphQlClientProvider,
@@ -85,7 +87,8 @@ public class GitLabDiscussionSyncService {
             GitLabPullRequestReviewCommentProcessor reviewCommentProcessor,
             GitLabIssueCommentProcessor issueCommentProcessor,
             GitLabReviewReconciler reviewReconciler,
-            GitLabProperties gitLabProperties) {
+            GitLabProperties gitLabProperties,
+            GitLabProjectAdmission admission) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.responseHandler = responseHandler;
         this.threadProcessor = threadProcessor;
@@ -93,6 +96,7 @@ public class GitLabDiscussionSyncService {
         this.issueCommentProcessor = issueCommentProcessor;
         this.reviewReconciler = reviewReconciler;
         this.gitLabProperties = gitLabProperties;
+        this.admission = admission;
     }
 
     /**
@@ -107,6 +111,14 @@ public class GitLabDiscussionSyncService {
      * @return total number of notes synced (diff + general)
      */
     public int syncDiscussionsForMergeRequest(Long scopeId, Repository repository, int mrIid, PullRequest pr) {
+        return admission
+                .capture(scopeId, repository)
+                .map(read -> syncDiscussionsForMergeRequest(scopeId, repository, mrIid, pr, read))
+                .orElse(0);
+    }
+
+    public int syncDiscussionsForMergeRequest(
+            Long scopeId, Repository repository, int mrIid, PullRequest pr, GitLabProjectAdmission.ProjectRead read) {
         String projectPath = repository.getNameWithOwner();
         String safeContext = sanitizeForLog(projectPath) + "!" + mrIid;
         IdentityProvider provider = repository.getProvider();
@@ -123,7 +135,12 @@ public class GitLabDiscussionSyncService {
                     resolutions.add(resolution);
                 }
                 try {
-                    int[] result = processDiscussion(discussionNode, pr, repository, provider, providerId, scopeId);
+                    int[] result = admission
+                            .write(
+                                    read,
+                                    () -> processDiscussion(
+                                            discussionNode, pr, repository, provider, providerId, scopeId))
+                            .orElseGet(() -> new int[] {0, 0, 0});
                     totals[0] += result[0];
                     totals[1] += result[1];
                     totals[2] += result[2];
@@ -136,7 +153,10 @@ public class GitLabDiscussionSyncService {
         });
         if (whole) {
             try {
-                applyThreadResolutions(repository, mrIid, new DiscussionRead(requestedAt, resolutions), scopeId);
+                admission.runWrite(
+                        read,
+                        () -> applyThreadResolutions(
+                                repository, mrIid, new DiscussionRead(requestedAt, resolutions), scopeId));
             } catch (Exception e) {
                 log.warn("Error recording discussion resolution: context={}", safeContext, e);
             }

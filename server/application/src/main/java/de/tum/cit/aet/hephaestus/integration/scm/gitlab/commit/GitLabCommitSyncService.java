@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -64,6 +65,7 @@ public class GitLabCommitSyncService {
     private final GitLabTokenService tokenService;
     private final ApplicationEventPublisher eventPublisher;
     private final WebClient webClient;
+    private final GitLabProjectAdmission admission;
 
     public GitLabCommitSyncService(
             CommitRepository commitRepository,
@@ -71,13 +73,15 @@ public class GitLabCommitSyncService {
             CommitAuthorResolver authorResolver,
             GitLabTokenService tokenService,
             ApplicationEventPublisher eventPublisher,
-            WebClient.Builder webClientBuilder) {
+            WebClient.Builder webClientBuilder,
+            GitLabProjectAdmission admission) {
         this.commitRepository = commitRepository;
         this.contributorRepository = contributorRepository;
         this.authorResolver = authorResolver;
         this.tokenService = tokenService;
         this.eventPublisher = eventPublisher;
         this.webClient = webClientBuilder.build();
+        this.admission = admission;
     }
 
     /**
@@ -89,6 +93,17 @@ public class GitLabCommitSyncService {
      * @return sync result with count of commits processed
      */
     public SyncResult syncCommitsForRepository(Long scopeId, Repository repository, @Nullable OffsetDateTime since) {
+        return admission
+                .capture(scopeId, repository)
+                .map(read -> syncCommitsForRepository(scopeId, repository, since, read))
+                .orElseGet(() -> SyncResult.completed(0));
+    }
+
+    public SyncResult syncCommitsForRepository(
+            Long scopeId,
+            Repository repository,
+            @Nullable OffsetDateTime since,
+            GitLabProjectAdmission.ProjectRead read) {
         String projectPath = repository.getNameWithOwner();
         String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(projectPath), "<unknown>");
         String branch = repository.getDefaultBranch();
@@ -119,7 +134,9 @@ public class GitLabCommitSyncService {
                 if (commits == null || commits.isEmpty()) break;
 
                 for (Map<String, Object> commitData : commits) {
-                    processCommit(commitData, repository, providerId, scopeId);
+                    if (!admission.runWrite(read, () -> processCommit(commitData, repository, providerId, scopeId))) {
+                        return SyncResult.abortedError(totalSynced);
+                    }
                     totalSynced++;
                 }
 
@@ -143,6 +160,7 @@ public class GitLabCommitSyncService {
             log.info("GitLab commit sync: project={}, commits={}, pages={}", safeProjectPath, totalSynced, page - 1);
         }
 
+        if (!admission.current(read)) return SyncResult.completed(0);
         return errorAborted ? SyncResult.abortedError(totalSynced) : SyncResult.completed(totalSynced);
     }
 

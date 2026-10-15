@@ -14,7 +14,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstan
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncException;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.milestone.dto.GitLabMilestoneDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -56,18 +58,21 @@ public class GitLabMilestoneSyncService {
     private final GitLabMilestoneProcessor milestoneProcessor;
     private final MilestoneRepository milestoneRepository;
     private final GitLabProperties gitLabProperties;
+    private final GitLabProjectAdmission admission;
 
     public GitLabMilestoneSyncService(
             GitLabGraphQlClientProvider graphQlClientProvider,
             GitLabGraphQlResponseHandler responseHandler,
             GitLabMilestoneProcessor milestoneProcessor,
             MilestoneRepository milestoneRepository,
-            GitLabProperties gitLabProperties) {
+            GitLabProperties gitLabProperties,
+            GitLabProjectAdmission admission) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.responseHandler = responseHandler;
         this.milestoneProcessor = milestoneProcessor;
         this.milestoneRepository = milestoneRepository;
         this.gitLabProperties = gitLabProperties;
+        this.admission = admission;
     }
 
     /**
@@ -78,6 +83,14 @@ public class GitLabMilestoneSyncService {
      * @return sync result with status and count
      */
     public SyncResult syncMilestonesForRepository(Long scopeId, Repository repository) {
+        return admission
+                .capture(scopeId, repository)
+                .map(read -> syncMilestonesForRepository(scopeId, repository, read))
+                .orElseGet(() -> SyncResult.completed(0));
+    }
+
+    public SyncResult syncMilestonesForRepository(
+            Long scopeId, Repository repository, GitLabProjectAdmission.ProjectRead read) {
         String projectPath = repository.getNameWithOwner();
         String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(projectPath), "<unknown>");
 
@@ -148,10 +161,12 @@ public class GitLabMilestoneSyncService {
                     Map<String, Object> typedNode = node;
                     GitLabMilestoneDTO dto = GitLabMilestoneDTO.fromGraphQlNode(typedNode);
                     if (dto != null) {
-                        Milestone milestone = milestoneProcessor.process(dto, repository, context);
+                        syncedNumbers.add(dto.iid());
+                        Milestone milestone = admission
+                                .write(read, () -> milestoneProcessor.process(dto, repository, context))
+                                .orElse(null);
                         if (milestone != null) {
                             totalSynced++;
-                            syncedNumbers.add(milestone.getNumber());
                         }
                     }
                 }
@@ -181,8 +196,12 @@ public class GitLabMilestoneSyncService {
 
         // Remove stale milestones only if sync completed fully
         if (syncComplete) {
-            int removedCount = removeStaleMilestones(
-                    repository.getId(), syncedNumbers, ProcessingContext.forSync(scopeId, repository));
+            int removedCount = admission
+                    .write(
+                            read,
+                            () -> removeStaleMilestones(
+                                    repository.getId(), syncedNumbers, ProcessingContext.forSync(scopeId, repository)))
+                    .orElse(0);
             if (removedCount > 0) {
                 log.info("Removed stale milestones: removedCount={}, projectPath={}", removedCount, safeProjectPath);
             }
@@ -227,6 +246,18 @@ public class GitLabMilestoneSyncService {
      * @return sync result with total number of milestone rows written (milestones * repos)
      */
     public SyncResult syncMilestonesForGroup(Long scopeId, String groupFullPath, List<Repository> repositoriesInGroup) {
+        var reads = new HashMap<Long, GitLabProjectAdmission.ProjectRead>();
+        for (Repository repository : repositoriesInGroup) {
+            admission.capture(scopeId, repository).ifPresent(read -> reads.put(repository.getId(), read));
+        }
+        return syncMilestonesForGroup(scopeId, groupFullPath, repositoriesInGroup, reads);
+    }
+
+    public SyncResult syncMilestonesForGroup(
+            Long scopeId,
+            String groupFullPath,
+            List<Repository> repositoriesInGroup,
+            Map<Long, GitLabProjectAdmission.ProjectRead> reads) {
         String safeGroupPath = sanitizeForLog(groupFullPath);
 
         if (groupFullPath == null || groupFullPath.isBlank()) {
@@ -343,10 +374,14 @@ public class GitLabMilestoneSyncService {
         int totalWritten = 0;
         if (!collected.isEmpty()) {
             for (Repository repo : repositoriesInGroup) {
+                GitLabProjectAdmission.ProjectRead read = reads.get(repo.getId());
+                if (read == null) continue;
                 ProcessingContext context = ProcessingContext.forSync(scopeId, repo);
                 for (GitLabMilestoneDTO dto : collected) {
                     try {
-                        Milestone saved = milestoneProcessor.process(dto, repo, context);
+                        Milestone saved = admission
+                                .write(read, () -> milestoneProcessor.process(dto, repo, context))
+                                .orElse(null);
                         if (saved != null) {
                             totalWritten++;
                         }

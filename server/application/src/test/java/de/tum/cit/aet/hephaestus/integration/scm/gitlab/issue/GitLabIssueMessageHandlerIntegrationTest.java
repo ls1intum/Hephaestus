@@ -692,7 +692,8 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         repo.setProvider(savedProvider);
         savedRepo = repositoryRepository.save(repo);
 
-        var workspace = WorkspaceTestFixtures.gitLabPatWorkspace("hephaestus-test-gitlab");
+        var workspace =
+                WorkspaceTestFixtures.gitLabPatWorkspace(FIXTURE_ORG_LOGIN).withSlug("hephaestus-test-gitlab");
         workspace.build().setPublicActivityEnabled(true);
         savedWorkspace = WorkspaceTestFixtures.persistGitLabWorkspace(
                 workspaceRepository, connectionRepository, workspace, "https://gitlab.lrz.de");

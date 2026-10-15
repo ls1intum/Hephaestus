@@ -27,11 +27,14 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncExcepti
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabGroupResponse;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabProjectResponse;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.organization.GitLabGroupProcessor;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabAdmissionTestFixtures;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,6 +58,8 @@ import reactor.core.publisher.Mono;
 
 @Tag("unit")
 class GitLabProjectSyncServiceTest extends BaseUnitTest {
+
+    private final GitLabProjectAdmission projectAdmission = mock(GitLabProjectAdmission.class);
 
     private static final Long TEST_PROVIDER_ID = 100L;
 
@@ -81,10 +86,13 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
             Duration.ofMinutes(5));
 
     private GitLabProjectSyncService service;
+    private GitLabProjectAdmission.ConnectionRead originalConnection;
 
     @BeforeEach
     void setUp() {
+        originalConnection = GitLabAdmissionTestFixtures.connection(projectAdmission, 1L, TEST_PROVIDER_ID, "my-org");
         IdentityProvider gitLabProvider = TestEntities.gitProvider(TEST_PROVIDER_ID, IdentityProviderType.GITLAB);
+        gitLabProvider.setServerUrl(gitLabProperties.defaultServerUrl());
         lenient()
                 .when(gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.com"))
                 .thenReturn(Optional.of(gitLabProvider));
@@ -101,7 +109,8 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
                 groupProcessor,
                 gitLabProperties,
                 gitProviderRepository,
-                new GitLabExceptionClassifier(new SimpleMeterRegistry()));
+                new GitLabExceptionClassifier(new SimpleMeterRegistry()),
+                projectAdmission);
     }
 
     @ParameterizedTest
@@ -225,6 +234,7 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
 
         @Test
         void projectWithoutGroup_syncsWithNullOrg() {
+            originalConnection = GitLabAdmissionTestFixtures.connection(projectAdmission, 1L, TEST_PROVIDER_ID, "user");
             var projectData = new GitLabProjectResponse(
                     "gid://gitlab/Project/456",
                     "user/personal-project",
@@ -331,6 +341,15 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
 
     @SuppressWarnings("unchecked")
     private void mockGraphQlProjectResponse(@Nullable GitLabProjectResponse projectResponse) {
+        if (projectResponse != null) {
+            GitLabAdmissionTestFixtures.discovery(
+                    projectAdmission,
+                    originalConnection,
+                    Long.parseLong(
+                            projectResponse.id().substring(projectResponse.id().lastIndexOf('/') + 1)),
+                    Objects.requireNonNull(projectResponse.fullPath()),
+                    "https://gitlab.com");
+        }
         HttpGraphQlClient client = mock(HttpGraphQlClient.class);
         when(graphQlClientProvider.forScope(any())).thenReturn(client);
 

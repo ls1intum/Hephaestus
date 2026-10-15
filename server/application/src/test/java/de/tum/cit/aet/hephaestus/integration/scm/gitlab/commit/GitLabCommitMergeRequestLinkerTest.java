@@ -30,6 +30,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlResp
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlResponseHandler.HandleResult;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabAdmissionTestFixtures;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.PassThroughTransactionTemplate;
 import java.time.Clock;
@@ -56,6 +58,8 @@ import reactor.core.publisher.Mono;
 
 @Tag("unit")
 class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
+
+    private final GitLabProjectAdmission projectAdmission = mock(GitLabProjectAdmission.class);
 
     private static final Long SCOPE_ID = 7L;
     private static final Long REPO_ID = 42L;
@@ -107,7 +111,8 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
                 eventPublisher,
                 mock(),
                 new PassThroughTransactionTemplate(),
-                Clock.fixed(Instant.EPOCH, ZoneOffset.UTC));
+                Clock.fixed(Instant.EPOCH, ZoneOffset.UTC),
+                projectAdmission);
 
         repository = new Repository();
         repository.setId(REPO_ID);
@@ -116,6 +121,7 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
         provider.setId(2L);
         provider.setType(IdentityProviderType.GITLAB);
         repository.setProvider(provider);
+        GitLabAdmissionTestFixtures.permit(projectAdmission, SCOPE_ID, repository, 7L);
     }
 
     @Test

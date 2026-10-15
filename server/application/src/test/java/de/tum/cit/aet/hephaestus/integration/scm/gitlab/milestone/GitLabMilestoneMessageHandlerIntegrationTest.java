@@ -3,9 +3,14 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.milestone;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.MilestoneRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
@@ -17,11 +22,14 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.milestone.dto.GitLabMile
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
+import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -65,6 +73,12 @@ class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private IdentityProviderRepository gitProviderRepository;
+
+    @Autowired
+    private ConnectionRepository connections;
+
+    @Autowired
+    private RepositoryToMonitorRepository monitors;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -264,6 +278,24 @@ class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         workspace.setOrganizationId(org.getId());
         workspace.setAccountLogin(FIXTURE_ORG_LOGIN);
         workspace.setAccountType(AccountType.ORG);
-        workspaceRepository.save(workspace);
+        workspace = workspaceRepository.save(workspace);
+        var connection = new Connection(
+                workspace,
+                IntegrationKind.GITLAB,
+                "milestone-fixture",
+                new ConnectionConfig.GitLabConfig(
+                        provider.getServerUrl(),
+                        null,
+                        null,
+                        ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                        Set.of(),
+                        null));
+        connection.setState(IntegrationState.ACTIVE);
+        connections.saveAndFlush(connection);
+        var monitor = new RepositoryToMonitor();
+        monitor.setWorkspace(workspace);
+        monitor.setNameWithOwner(savedRepo.getNameWithOwner());
+        monitor.setNativeId(savedRepo.getNativeId());
+        monitors.saveAndFlush(monitor);
     }
 }

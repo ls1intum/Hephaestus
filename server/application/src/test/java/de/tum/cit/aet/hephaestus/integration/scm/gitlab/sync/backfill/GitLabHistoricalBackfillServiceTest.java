@@ -5,8 +5,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -32,6 +35,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncServiceHolder;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issue.GitLabIssueSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest.GitLabMergeRequestSyncService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabAdmissionTestFixtures;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceActorSelector;
 import java.time.Instant;
@@ -43,6 +48,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.springframework.beans.factory.ObjectProvider;
 
@@ -54,6 +60,8 @@ import org.springframework.beans.factory.ObjectProvider;
  */
 @Tag("unit")
 class GitLabHistoricalBackfillServiceTest extends BaseUnitTest {
+
+    private final GitLabProjectAdmission projectAdmission = mock(GitLabProjectAdmission.class);
 
     private static final Long SCOPE_ID = 100L;
     private static final Long SYNC_TARGET_ID = 7L;
@@ -90,6 +98,7 @@ class GitLabHistoricalBackfillServiceTest extends BaseUnitTest {
     private GitLabMergeRequestSyncService mergeRequests;
 
     private GitLabHistoricalBackfillService service;
+    private GitLabProjectAdmission.ProjectRead originalPermit;
 
     @BeforeEach
     void setUp() {
@@ -108,7 +117,8 @@ class GitLabHistoricalBackfillServiceTest extends BaseUnitTest {
                         null,
                         null),
                 ledger,
-                pullRequests);
+                pullRequests,
+                projectAdmission);
 
         lenient().when(syncServiceHolderProvider.getIfAvailable()).thenReturn(syncServiceHolder);
         lenient().when(syncServiceHolder.getIssueSyncService()).thenReturn(issueSyncService);
@@ -118,6 +128,7 @@ class GitLabHistoricalBackfillServiceTest extends BaseUnitTest {
         Repository repository = new Repository();
         repository.setId(42L);
         repository.setNameWithOwner(REPO);
+        originalPermit = GitLabAdmissionTestFixtures.permit(projectAdmission, SCOPE_ID, repository, SYNC_TARGET_ID);
         lenient().when(actorSelector.connectedProviderId(SCOPE_ID)).thenReturn(Optional.of(20L));
         lenient()
                 .when(repositoryRepository.findByNameWithOwnerAndProviderId(REPO, 20L))
@@ -163,6 +174,8 @@ class GitLabHistoricalBackfillServiceTest extends BaseUnitTest {
         prepareAdminRepair(List.of(completedTarget(7L), good));
         var other = new Repository();
         other.setId(43L);
+        other.setNameWithOwner("acme/other");
+        GitLabAdmissionTestFixtures.permit(projectAdmission, SCOPE_ID, other, 8L);
         when(repositoryRepository.findByNameWithOwnerAndProviderId("acme/other", 20L))
                 .thenReturn(Optional.of(other));
         when(ledger.reconcileRepository(SCOPE_ID, 42L)).thenThrow(new IllegalStateException("Database unavailable"));
@@ -178,6 +191,8 @@ class GitLabHistoricalBackfillServiceTest extends BaseUnitTest {
     private void prepareAdminRepair(List<SyncTarget> targets) {
         var repository = new Repository();
         repository.setId(42L);
+        repository.setNameWithOwner(REPO);
+        GitLabAdmissionTestFixtures.permit(projectAdmission, SCOPE_ID, repository, SYNC_TARGET_ID);
         when(repositoryRepository.findByNameWithOwnerAndProviderId(REPO, 20L)).thenReturn(Optional.of(repository));
         when(syncTargetProvider.getSyncSession(SCOPE_ID, IntegrationKind.GITLAB))
                 .thenReturn(Optional.of(new SyncSession(
@@ -210,7 +225,7 @@ class GitLabHistoricalBackfillServiceTest extends BaseUnitTest {
                 .thenThrow(unreadable);
 
         assertThatThrownBy(() -> service.runBackfillPass(SCOPE_ID, handle)).isSameAs(unreadable);
-        verify(issueSyncService, never()).backfillIssues(any(), any(), any(), anyInt());
+        verify(issueSyncService, never()).backfillIssues(any(), any(), any(), anyInt(), any());
     }
 
     @Test
@@ -218,13 +233,13 @@ class GitLabHistoricalBackfillServiceTest extends BaseUnitTest {
         when(syncTargetProvider.isRepositoryUnavailable(SCOPE_ID, SYNC_TARGET_ID))
                 .thenReturn(true);
         assertThat(service.runBackfillPass(SCOPE_ID, handle)).isZero();
-        verify(issueSyncService, never()).backfillIssues(any(), any(), any(), anyInt());
+        verify(issueSyncService, never()).backfillIssues(any(), any(), any(), anyInt(), any());
     }
 
     @Test
     void scheduledPassAfterAProductiveOneIsGatedByTheSuccessCooldown() {
         // One page of issues with more to come: the repository is nowhere near backfilled.
-        when(issueSyncService.backfillIssues(eq(SCOPE_ID), any(), any(), anyInt()))
+        when(issueSyncService.backfillIssues(eq(SCOPE_ID), any(), any(), anyInt(), any()))
                 .thenReturn(new BackfillBatchResult(25, 100, 124, "cursor-2", false, false));
 
         // No handle: this is the 60s scheduler tick, which the success cooldown exists to space out.
@@ -233,14 +248,14 @@ class GitLabHistoricalBackfillServiceTest extends BaseUnitTest {
 
         assertThat(firstPass).isEqualTo(1);
         assertThat(secondPass).isZero();
-        verify(issueSyncService, times(1)).backfillIssues(eq(SCOPE_ID), any(), any(), anyInt());
+        verify(issueSyncService, times(1)).backfillIssues(eq(SCOPE_ID), any(), any(), anyInt(), any());
         verify(syncTargetProvider).updateSyncError(SYNC_TARGET_ID, SyncPass.HISTORICAL_BACKFILL, null);
     }
 
     @Test
     void jobDrivenPassIgnoresTheSuccessCooldownSoAManualBackfillDrains() {
         // Same repository, same "more history remains" answer — but an administrator is driving.
-        when(issueSyncService.backfillIssues(eq(SCOPE_ID), any(), any(), anyInt()))
+        when(issueSyncService.backfillIssues(eq(SCOPE_ID), any(), any(), anyInt(), any()))
                 .thenReturn(new BackfillBatchResult(25, 100, 124, "cursor-2", false, false));
 
         int firstPass = service.runBackfillPass(SCOPE_ID, handle);
@@ -250,19 +265,19 @@ class GitLabHistoricalBackfillServiceTest extends BaseUnitTest {
         // asked for; otherwise "Run backfill" would stop after one page on GitLab and drain on GitHub.
         assertThat(firstPass).isEqualTo(1);
         assertThat(secondPass).isEqualTo(1);
-        verify(issueSyncService, times(2)).backfillIssues(eq(SCOPE_ID), any(), any(), anyInt());
+        verify(issueSyncService, times(2)).backfillIssues(eq(SCOPE_ID), any(), any(), anyInt(), any());
     }
 
     @Test
     void errorBackoffGatesTheJobDrivenPassToo() {
         // A vendor that just failed is backed off for everybody — an admin click cannot hammer it.
-        when(issueSyncService.backfillIssues(eq(SCOPE_ID), any(), any(), anyInt()))
+        when(issueSyncService.backfillIssues(eq(SCOPE_ID), any(), any(), anyInt(), any()))
                 .thenReturn(new BackfillBatchResult(0, 0, 0, null, false, true));
 
         assertThat(service.runBackfillPass(SCOPE_ID, handle)).isZero();
         assertThat(service.runBackfillPass(SCOPE_ID, handle)).isZero();
 
-        verify(issueSyncService, times(1)).backfillIssues(eq(SCOPE_ID), any(), any(), anyInt());
+        verify(issueSyncService, times(1)).backfillIssues(eq(SCOPE_ID), any(), any(), anyInt(), any());
         verify(syncTargetProvider)
                 .updateSyncError(SYNC_TARGET_ID, SyncPass.HISTORICAL_BACKFILL, "Historical issue backfill aborted");
     }
@@ -270,14 +285,14 @@ class GitLabHistoricalBackfillServiceTest extends BaseUnitTest {
     @Test
     void passThatDidNoWorkLeavesTheRepositoryEligibleForTheNextPass() {
         // No issues at all: didWork stays false, so no COOLDOWN_NORMAL is parked on the target.
-        when(issueSyncService.backfillIssues(eq(SCOPE_ID), any(), any(), anyInt()))
+        when(issueSyncService.backfillIssues(eq(SCOPE_ID), any(), any(), anyInt(), any()))
                 .thenReturn(BackfillBatchResult.empty());
 
         assertThat(service.runBackfillPass(SCOPE_ID, handle)).isZero();
         assertThat(service.runBackfillPass(SCOPE_ID, handle)).isZero();
 
         // Not cooled down — the gate is on work performed, not on having been visited.
-        verify(issueSyncService, times(2)).backfillIssues(eq(SCOPE_ID), any(), any(), anyInt());
+        verify(issueSyncService, times(2)).backfillIssues(eq(SCOPE_ID), any(), any(), anyInt(), any());
     }
 
     @Test
@@ -286,7 +301,86 @@ class GitLabHistoricalBackfillServiceTest extends BaseUnitTest {
 
         assertThat(service.runBackfillPass(SCOPE_ID, handle)).isZero();
 
-        verify(issueSyncService, times(0)).backfillIssues(any(), any(), any(), anyInt());
+        verify(issueSyncService, times(0)).backfillIssues(any(), any(), any(), anyInt(), any());
+    }
+
+    @Test
+    void shouldNotTreatAReplacementMonitorAsTheOriginalPendingTarget() {
+        var replacement = SyncTargetTestBuilder.syncTarget()
+                .id(8L)
+                .scopeId(SCOPE_ID)
+                .repositoryNameWithOwner(REPO)
+                .build();
+        var replacementSession = new SyncSession(
+                SCOPE_ID,
+                "acme",
+                "Acme",
+                "acme",
+                null,
+                null,
+                List.of(replacement),
+                session().syncContext());
+        when(syncTargetProvider.getSyncSession(SCOPE_ID, IntegrationKind.GITLAB))
+                .thenReturn(Optional.of(replacementSession));
+
+        assertThat(service.hasPendingTargets(SCOPE_ID, Set.of(SYNC_TARGET_ID))).isFalse();
+        assertThat(service.hasPendingTargets(SCOPE_ID, Set.of(8L))).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void shouldDiscardALostPermitWithoutStateOrCooldownAndContinueOtherTargets(boolean throwsAfterRemoval) {
+        var otherTarget = SyncTargetTestBuilder.syncTarget()
+                .id(8L)
+                .scopeId(SCOPE_ID)
+                .repositoryNameWithOwner("acme/other")
+                .lastIssuesSyncedAt(Instant.now())
+                .issueBackfillHighWaterMark(500)
+                .issueBackfillCheckpoint(125)
+                .issueSyncCursor("other-cursor")
+                .build();
+        var other = new Repository();
+        other.setId(43L);
+        other.setNameWithOwner("acme/other");
+        var otherPermit = GitLabAdmissionTestFixtures.permit(projectAdmission, SCOPE_ID, other, 8L);
+        var twoTargets = new SyncSession(
+                SCOPE_ID,
+                "acme",
+                "Acme",
+                "acme",
+                null,
+                null,
+                List.of(target(), otherTarget),
+                session().syncContext());
+        when(syncTargetProvider.getSyncSession(SCOPE_ID, IntegrationKind.GITLAB))
+                .thenReturn(Optional.of(twoTargets));
+        when(repositoryRepository.findByNameWithOwnerAndProviderId("acme/other", 20L))
+                .thenReturn(Optional.of(other));
+        when(issueSyncService.backfillIssues(eq(SCOPE_ID), any(), any(), anyInt(), eq(originalPermit)))
+                .thenAnswer(invocation -> {
+                    when(projectAdmission.hold(originalPermit)).thenReturn(false);
+                    if (throwsAfterRemoval) throw new IllegalStateException("Monitor removed during read");
+                    return new BackfillBatchResult(0, 0, 0, null, false, true);
+                });
+        when(issueSyncService.backfillIssues(eq(SCOPE_ID), eq(other), any(), anyInt(), eq(otherPermit)))
+                .thenReturn(new BackfillBatchResult(25, 100, 124, "other-next", false, false));
+
+        assertThat(service.runBackfillPass(SCOPE_ID, handle)).isEqualTo(1);
+
+        verify(syncTargetProvider, never()).updateIssueBackfillState(eq(SYNC_TARGET_ID), any(), any(), any());
+        verify(syncTargetProvider, never()).updateSyncCursor(eq(SYNC_TARGET_ID), any(), any());
+        verify(syncTargetProvider, never()).updateSyncError(eq(SYNC_TARGET_ID), any(), any());
+        verify(syncTargetProvider).updateIssueBackfillState(8L, null, 100, null);
+        verify(handle, never()).progress(any(), any(), argThat(progress -> REPO.equals(progress.currentRepository())));
+        verify(handle).progress(any(), any(), argThat(progress -> "acme/other".equals(progress.currentRepository())));
+
+        // Restoring the same permit lets a scheduled pass retry immediately: no error cooldown was stored.
+        when(projectAdmission.hold(originalPermit)).thenReturn(true);
+        doReturn(new BackfillBatchResult(25, 100, 124, "retry-next", false, false))
+                .when(issueSyncService)
+                .backfillIssues(eq(SCOPE_ID), any(), any(), anyInt(), eq(originalPermit));
+        assertThat(service.runBackfillPass(SCOPE_ID, null)).isEqualTo(1);
+        verify(issueSyncService, times(2)).backfillIssues(eq(SCOPE_ID), any(), any(), anyInt(), eq(originalPermit));
     }
 
     private static SyncSession session() {

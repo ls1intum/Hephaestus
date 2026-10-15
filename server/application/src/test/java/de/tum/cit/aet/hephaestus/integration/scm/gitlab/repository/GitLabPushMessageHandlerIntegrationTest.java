@@ -2,9 +2,14 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitFileChange;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
@@ -13,7 +18,13 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository.dto.GitLabPushEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
+import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
@@ -38,7 +49,16 @@ class GitLabPushMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private CommitRepository commits;
 
     @Autowired
+    private WorkspaceRepository workspaces;
+
+    @Autowired
     private TransactionTemplate transactions;
+
+    @Autowired
+    private ConnectionRepository connections;
+
+    @Autowired
+    private RepositoryToMonitorRepository monitors;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -74,6 +94,31 @@ class GitLabPushMessageHandlerIntegrationTest extends BaseIntegrationTest {
         repository.setOrganization(organization);
         repository.setProvider(provider);
         Long repositoryId = repositories.save(repository).getId();
+        var workspace = new Workspace();
+        workspace.setWorkspaceSlug("push-fixture");
+        workspace.setDisplayName("Push fixture");
+        workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
+        workspace.setAccountLogin("hephaestustest");
+        workspace.setAccountType(AccountType.ORG);
+        workspace = workspaces.saveAndFlush(workspace);
+        var connection = new Connection(
+                workspace,
+                IntegrationKind.GITLAB,
+                "push-fixture",
+                new ConnectionConfig.GitLabConfig(
+                        provider.getServerUrl(),
+                        null,
+                        null,
+                        ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                        Set.of(),
+                        null));
+        connection.setState(IntegrationState.ACTIVE);
+        connections.saveAndFlush(connection);
+        var monitor = new RepositoryToMonitor();
+        monitor.setWorkspace(workspace);
+        monitor.setNameWithOwner(repository.getNameWithOwner());
+        monitor.setNativeId(repository.getNativeId());
+        monitors.saveAndFlush(monitor);
 
         GitLabPushEventDTO event;
         try (var input = new ClassPathResource("gitlab/push.json").getInputStream()) {
