@@ -223,7 +223,7 @@ Review on selects automatic events and state. Applies when checks every review o
 
 The [review pipeline](./practice-review-pipeline.mdx#select-a-review) owns applicability checks and capture refusal behavior.
 
-SCM capture retains the pinned base, head, changed paths and unified diff in `context/change.json`.
+SCM capture retains the pinned base, head, changed paths and unified diff in the captured change record of the job context.
 Changed paths include both names of a rename.
 Applicability reads these captured facts without access to the repository mirror.
 The practice's item kind is explicit and need not have an event.

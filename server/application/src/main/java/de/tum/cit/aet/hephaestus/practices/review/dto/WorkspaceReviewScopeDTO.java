@@ -11,7 +11,7 @@ import java.util.List;
 public record WorkspaceReviewScopeDTO(
         @NotNull ReviewScopeMode repositories,
         @NotNull ReviewScopeMode people,
-        @Valid List<ReviewScopeRepositoryDTO> selectedRepositories,
+        List<@Valid ReviewScopeRepositoryDTO> selectedRepositories,
         List<@Pattern(regexp = "[1-9][0-9]*") String> accountIds) {
     public WorkspaceReviewScopeDTO {
         selectedRepositories = List.copyOf(selectedRepositories);

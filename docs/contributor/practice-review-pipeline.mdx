@@ -44,6 +44,11 @@ They change only decision and retry facts.
 `appliesWhen` applies to every origin.
 
 After capture readiness passes, the server checks the pinned practice version's conditions before sandbox execution.
+The capture adapter interprets its evidence files and returns a decision for each clause through `CapturedApplicability`.
+Capture requests use each collection's owning source from `EvidenceCollection`.
+For example, `scm.inline-review-comments` reads the complete `scm.pull-request.comments` capture.
+SCM changed-path conditions use Spring Ant path patterns with `/` as the separator.
+
 If every alternative is proven false, admission records Does not apply with the authored `otherwise` reason.
 Only complete captured sources can prove absence.
 An undecidable alternative keeps the practice eligible.

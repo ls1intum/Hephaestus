@@ -32,10 +32,10 @@ record CandidateDocument(
         @JsonProperty(required = true) @Size(min = 1, max = EXPLANATION_CHARS)
         String explanation,
 
-        @JsonProperty(required = true) @Size(max = RESULT_CITATIONS) @Valid
-        List<EvidenceCitation> citations,
+        @JsonProperty(required = true) @Size(max = RESULT_CITATIONS)
+        List<@Valid EvidenceCitation> citations,
 
-        @Nullable @Size(max = PROBLEMS) @Valid List<CandidateProblem> problems,
+        @Nullable @Size(max = PROBLEMS) List<@Valid CandidateProblem> problems,
         @Nullable @Valid ResultExample example,
         @JsonProperty(required = true) @Valid Evidence evidence,
         @JsonProperty(required = true) @Valid ResultCoverage coverage) {
@@ -45,6 +45,5 @@ record CandidateDocument(
             @Nullable @Valid SearchWarrant search,
             @Nullable @Valid InapplicabilityWarrant inapplicability,
 
-            @Nullable @Size(min = 1, max = OPEN_QUESTIONS) @Valid
-            List<OpenQuestion> openQuestions) {}
+            @Nullable @Size(min = 1, max = OPEN_QUESTIONS) List<@Valid OpenQuestion> openQuestions) {}
 }

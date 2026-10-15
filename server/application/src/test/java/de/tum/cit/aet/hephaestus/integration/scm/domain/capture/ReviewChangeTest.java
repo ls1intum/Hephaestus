@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.agent.context;
+package de.tum.cit.aet.hephaestus.integration.scm.domain.capture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

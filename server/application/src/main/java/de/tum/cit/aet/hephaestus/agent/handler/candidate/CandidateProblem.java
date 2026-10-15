@@ -38,8 +38,8 @@ public record CandidateProblem(
         @JsonProperty(required = true) @Size(min = 1, max = PROBLEM_EXPLANATION_CHARS)
         String explanation,
 
-        @JsonProperty(required = true) @Size(min = 1, max = CITATIONS_PER_PROBLEM) @Valid
-        List<EvidenceCitation> citations,
+        @JsonProperty(required = true) @Size(min = 1, max = CITATIONS_PER_PROBLEM)
+        List<@Valid EvidenceCitation> citations,
 
         @JsonProperty(required = true) @Valid ClaimBasis basis,
         @Nullable @Size(min = 1, max = NEXT_STEP_CHARS) String nextStep) {

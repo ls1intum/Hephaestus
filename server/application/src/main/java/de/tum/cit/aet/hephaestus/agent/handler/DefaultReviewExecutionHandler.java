@@ -5,7 +5,6 @@ import de.tum.cit.aet.hephaestus.agent.context.AppliesWhenEvaluator;
 import de.tum.cit.aet.hephaestus.agent.context.InsufficientEvidenceException;
 import de.tum.cit.aet.hephaestus.agent.context.JobEvidenceFiles;
 import de.tum.cit.aet.hephaestus.agent.context.JobFolderIndex;
-import de.tum.cit.aet.hephaestus.agent.context.ReviewChange;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewHistoryContentSource;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionInputs;
@@ -104,7 +103,7 @@ public class DefaultReviewExecutionHandler {
         for (var assignment : pinned) {
             var conditions = assignment.practice().definition().appliesWhen();
             if (review.kind() == ReviewKind.ITEM && conditions != null)
-                for (var clause : conditions.anyOf()) required.add(AppliesWhenEvaluator.sourceOf(clause));
+                required.addAll(applicability.sources(item.kind(), conditions));
         }
         var grantedContext = new LinkedHashMap<ReviewAssignmentId, List<String>>();
         if (review.kind() == ReviewKind.SCAN) {
@@ -145,12 +144,11 @@ public class DefaultReviewExecutionHandler {
                         .map(a -> readiness(a, manifest, now, review.kind()))
                         .toList();
                 var checks = new LinkedHashMap<String, AppliesWhenCheck>();
-                var change = ReviewChange.of(evidence.files(), mapper);
                 for (var assignment : pinned) {
                     if (decisions.stream()
                             .noneMatch(d -> d.practiceSlug().equals(assignment.practiceSlug()) && d.ready())) continue;
                     var check = applicability.evaluate(
-                            assignment.practice().definition().appliesWhen(), manifest, evidence.files(), change);
+                            assignment.practice().definition().appliesWhen(), manifest, evidence.files());
                     if (check != null) checks.put(assignment.practiceSlug(), check);
                 }
                 var report = new AutomatedReviewReadinessReport(

@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus.agent.context;
+package de.tum.cit.aet.hephaestus.integration.scm.domain.capture;
 
 import java.util.HashSet;
 import java.util.Map;
@@ -8,7 +8,7 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 /** The paths and diff text that capture retained for the pinned change. */
-public interface ReviewChange {
+interface ReviewChange {
     /** Both the old and new paths of a rename count. */
     Set<String> changedPaths();
 

@@ -34,11 +34,14 @@ import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.framework.ItemDescriptorRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSource;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScanItemVersions;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ScmCapturedApplicability;
 import de.tum.cit.aet.hephaestus.practices.AppliesWhen;
 import de.tum.cit.aet.hephaestus.practices.AppliesWhenClause;
+import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeReadSource;
 import de.tum.cit.aet.hephaestus.practices.PracticeReads;
@@ -98,7 +101,7 @@ class DefaultReviewExecutionHandlerTest extends BaseUnitTest {
             List.of(),
             mapper,
             Clock.fixed(NOW, ZoneOffset.UTC),
-            new AppliesWhenEvaluator(mapper),
+            new AppliesWhenEvaluator(List.of(new ScmCapturedApplicability(mapper))),
             mock(ResultAdmissionService.class));
 
     private ReviewJob prepare(boolean available) {
@@ -227,7 +230,7 @@ class DefaultReviewExecutionHandlerTest extends BaseUnitTest {
                 List.of(composer),
                 mapper,
                 Clock.fixed(NOW, ZoneOffset.UTC),
-                new AppliesWhenEvaluator(mapper),
+                new AppliesWhenEvaluator(List.of(new ScmCapturedApplicability(mapper))),
                 mock(ResultAdmissionService.class));
         try (var prepared = scanHandler.prepareInputs(job)) {
             assertThat(prepared.folderIndex()).isNotNull();
@@ -270,7 +273,12 @@ class DefaultReviewExecutionHandlerTest extends BaseUnitTest {
         var job = prepare(true);
         var oldAssignment = RuntimeReviewTestData.assignment(5L, null);
         var old = oldAssignment.practice();
-        var d = old.definition();
+        var kind = new ItemKind("scm.pull_request");
+        var d = DefinitionTestFixtures.definition(
+                kind, old.definition().name(), old.definition().criteria(), null);
+        var oldItem = oldAssignment.item();
+        var item = new ItemRef(
+                oldItem.workspaceId(), oldItem.itemId(), kind, oldItem.sourceId(), oldItem.parentId(), oldItem.path());
         var definition = new PracticeDefinition(
                 d.name(),
                 d.reviewOn(),
@@ -289,13 +297,15 @@ class DefaultReviewExecutionHandlerTest extends BaseUnitTest {
                 d.guidance());
         var assignment = new ReviewAssignmentSnapshot(
                 oldAssignment.id(),
-                oldAssignment.item(),
+                item,
                 oldAssignment.version(),
                 oldAssignment.developerId(),
                 oldAssignment.practiceSlug(),
                 new PinnedPractice(
                         old.practiceId(), old.practiceVersionId(), definition, old.reviewDigest(), old.method()));
         when(assignments.load(job)).thenReturn(List.of(assignment));
+        when(assignments.review(job)).thenReturn(RuntimeReviewTestData.review(ReviewKind.ITEM, assignment));
+        when(source.supports(item)).thenReturn(true);
         var diff = new SourceKind("scm.pull-request.diff");
         SourceCaptureState state = available
                 ? new SourceCaptureState.Available(

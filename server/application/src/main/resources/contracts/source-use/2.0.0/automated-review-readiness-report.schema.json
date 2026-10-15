@@ -2,7 +2,7 @@
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
 	"$id": "https://hephaestus.aet.cit.tum.de/contracts/item-source/2.0.0/automated-review-readiness-report.schema.json",
 	"title": "Practice review readiness report",
-	"description": "Per-practice decision to run or skip automated review for one captured evidence manifest.",
+	"description": "Per-practice capture readiness and applicability decisions for one captured evidence manifest.",
 	"type": "object",
 	"additionalProperties": false,
 	"required": [
@@ -11,7 +11,8 @@
 		"itemKind",
 		"manifestCapturedAt",
 		"decidedAt",
-		"decisions"
+		"decisions",
+		"applicability"
 	],
 	"properties": {
 		"contractVersion": {
@@ -44,7 +45,14 @@
 				"$ref": "#/$defs/decision"
 			},
 			"uniqueItems": true,
-			"description": "One run-or-skip decision for each practice considered by the invocation."
+			"description": "One capture-readiness decision for each practice considered by the invocation."
+		},
+		"applicability": {
+			"type": "object",
+			"additionalProperties": {
+				"$ref": "#/$defs/applicability"
+			},
+			"description": "Mechanical Applies when decisions keyed by practice slug. Practices withheld by capture readiness have no applicability decision."
 		}
 	},
 	"$defs": {
@@ -65,7 +73,7 @@
 				},
 				"ready": {
 					"type": "boolean",
-					"description": "Whether automated review may run for this practice."
+					"description": "Whether the practice and its captured sources meet readiness requirements. Applicability is recorded separately."
 				},
 				"sourceChecks": {
 					"type": "array",
@@ -394,6 +402,51 @@
 				}
 			],
 			"description": "Result of checking one required source against the practice requirements."
+		},
+		"applicability": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["absent", "otherwise", "clauses"],
+			"description": "A practice is absent only when every clause proves absence in complete captured evidence.",
+			"properties": {
+				"absent": {
+					"type": "boolean",
+					"description": "Whether every declared clause returned NOT_FOUND."
+				},
+				"otherwise": {
+					"type": "string",
+					"minLength": 1,
+					"description": "Authored reason recorded when the practice does not apply."
+				},
+				"clauses": {
+					"type": "array",
+					"minItems": 1,
+					"items": {
+						"$ref": "#/$defs/applicabilityClause"
+					},
+					"description": "Decision and owning evidence source for each declared condition."
+				}
+			}
+		},
+		"applicabilityClause": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["aspect", "readFrom", "result"],
+			"description": "A neutral decision returned by the integration that captured the evidence.",
+			"properties": {
+				"aspect": {
+					"enum": ["CHANGED_PATH", "DIFF_CONTAINS", "HAS_ITEMS"],
+					"description": "The kind of condition evaluated."
+				},
+				"readFrom": {
+					"$ref": "#/$defs/sourceCheck/properties/sourceKind",
+					"description": "The source that owns the captured evidence, including a named collection."
+				},
+				"result": {
+					"enum": ["FOUND", "NOT_FOUND", "UNDECIDABLE"],
+					"description": "Whether the condition matched, was proven absent, or could not be decided."
+				}
+			}
 		}
 	},
 	"allOf": [
