@@ -15,6 +15,7 @@ import { CAPTURE_LIMIT_BYTES, output, run, succeeds } from "./lib/process.ts";
 const root = path.join(import.meta.dirname, "..");
 const project = `hephaestus-edge-${randomUUID().slice(0, 8)}`;
 const directory = await mkdtemp(path.join(tmpdir(), `${project}-`));
+console.log(`Smoke project=${project}, directory=${directory}, source=${root}`);
 const base = "edge.example.invalid";
 let ca: Buffer;
 const image = `${project}-webapp:smoke`;
@@ -106,6 +107,8 @@ async function get(port: number, host: string, url: string, method = "GET") {
 		status: number;
 		location?: string;
 		cache?: string;
+		contentType?: string;
+		server?: string | string[];
 		body: string;
 	}>();
 	{
@@ -131,6 +134,8 @@ async function get(port: number, host: string, url: string, method = "GET") {
 						status: response.statusCode ?? 0,
 						location: response.headers.location,
 						cache: response.headers["cache-control"],
+						contentType: response.headers["content-type"],
+						server: response.headers.server,
 						body,
 					}),
 				);
@@ -169,6 +174,30 @@ async function waitForBody(port: number, host: string, url: string, expected: st
 		await setTimeout(500);
 	}
 	assert.fail(`The edge did not serve ${expected} at ${host}${url}`);
+}
+
+async function waitForApiWithdrawal(port: number) {
+	for (let attempt = 0; attempt < 60; attempt += 1) {
+		const response = await fetch(`http://127.0.0.1:${port}/api/http/routers`, {
+			signal: AbortSignal.timeout(5000),
+		});
+		assert.equal(response.status, 200);
+		const routers = asArray(parseJson(await response.text()), "edge routers").map((router) =>
+			asRecord(router, "edge router"),
+		);
+		if (
+			!routers.some((router) =>
+				["http-application-server@docker", "https-application-server@docker"].includes(
+					asString(router.name, "router name"),
+				),
+			)
+		) {
+			console.log("Fixture API routers withdrawn from Traefik");
+			return;
+		}
+		await setTimeout(500);
+	}
+	assert.fail("The edge did not withdraw the fixture API routers");
 }
 
 try {
@@ -251,6 +280,11 @@ try {
 	await writeFile(
 		path.join(directory, "fixture/index.html"),
 		'<html><script src="/env-config.js"></script>tenant-spa</html>',
+	);
+	await mkdir(path.join(directory, "fixture/assets"));
+	await writeFile(
+		path.join(directory, "fixture/assets/smoke.svg"),
+		'<svg xmlns="http://www.w3.org/2000/svg"/>',
 	);
 	await cp(path.join(root, "webapp/docker"), path.join(directory, "webapp/docker"), {
 		recursive: true,
@@ -520,20 +554,10 @@ try {
 		}
 		const post = await get(port, base, "/w/acme", "POST");
 		assert.equal(post.status, 405);
-		const api = await get(port, base, "/api/auth/csrf");
-		assert.equal(api.body, "apex-api");
-		for (const url of [
-			"/login",
-			"/consent",
-			"/auth/login",
-			"/privacy",
-			"/imprint",
-			"/terms",
-			"/unsubscribe",
-			"/admin",
-			"/settings",
-		]) {
-			await expectStatus(port, base, url, 200, `Apex passthrough ${url}`);
+		for (const url of ["/api", "/api/auth/csrf", "/apiary", "/api/smoke.svg"]) {
+			const api = await get(port, base, url);
+			assert.equal(api.status, 200, url);
+			assert.equal(api.body, "apex-api", url);
 		}
 		for (const [url, tail] of [
 			["/w/acme", "/"],
@@ -570,6 +594,68 @@ try {
 		]) {
 			await expectStatus(port, `acme.${base}`, url, 404, `Tenant isolation ${url}`);
 		}
+		const fixtureListing = await output(
+			"docker",
+			[...args, "ps", "--quiet", "application-server"],
+			{
+				env,
+			},
+		);
+		const fixtureId = fixtureListing.trim();
+		const fixture = asRecord(
+			asArray(parseJson(await output("docker", ["inspect", fixtureId])), "fixture inspect")[0],
+			"fixture container",
+		);
+		const labels = asRecord(asRecord(fixture.Config, "fixture config").Labels, "fixture labels");
+		assert.equal(labels["com.docker.compose.project"], project);
+		assert.equal(labels["com.docker.compose.service"], "application-server");
+		console.log(`Withdrawing owned fixture API container=${fixtureId}, project=${project}`);
+		await run("docker", [...args, "rm", "--stop", "--force", "application-server"], { env });
+		await waitForApiWithdrawal(await publishedPort(8080));
+		await waitForBody(port, base, "/", "tenant-spa");
+		for (const [url, method] of [
+			["/api/user/consent", "GET"],
+			["/api", "GET"],
+			["/apiary", "GET"],
+			["/webhooks", "GET"],
+			["/webhooks/github", "GET"],
+			["/webhooks-extra", "GET"],
+			["/api/smoke.svg", "GET"],
+			["/webhooks/smoke.svg", "GET"],
+			["/api/user/consent", "POST"],
+			["/webhooks/github", "POST"],
+		]) {
+			assert.ok(url !== undefined && method !== undefined);
+			const response = await get(port, base, url, method);
+			console.log(`Backend fallback ${method} ${url}: ${JSON.stringify(response)}`);
+			assert.equal(response.server, "nginx", `NGINX must answer ${method} ${url}`);
+			assert.equal(response.status, 503, `Backend fallback ${method} ${url}`);
+			assert.ok(!response.body.includes("tenant-spa"), url);
+		}
+		for (const url of [
+			"/",
+			"/login",
+			"/consent",
+			"/auth/login",
+			"/privacy",
+			"/imprint",
+			"/terms",
+			"/unsubscribe",
+			"/admin",
+			"/settings",
+			"/some/deep/link",
+		]) {
+			await expectStatus(port, base, url, 200, `Apex passthrough without API ${url}`);
+		}
+		await expectStatus(port, base, "/assets/smoke.svg", 200);
+		await expectStatus(port, base, "/assets/missing.svg", 404);
+		await expectStatus(port, base, "/missing.svg", 404);
+		const apexPage = await get(port, base, "/");
+		const apexConfigPath = /src="(?<path>\/env-config[^"]+)"/u.exec(apexPage.body)?.groups?.path;
+		assert.ok(apexConfigPath !== undefined);
+		const apexConfig = await get(port, base, apexConfigPath);
+		assert.equal(apexConfig.status, 200);
+		assert.ok(apexConfig.body.includes(`APPLICATION_SERVER_URL: "https://${base}/api"`));
 		if (enabled === "true") {
 			const page = await get(port, `acme.${base}`, "/");
 			const configPath = /src="(?<path>\/env-config[^"]+)"/u.exec(page.body)?.groups?.path;
@@ -595,7 +681,9 @@ try {
 } finally {
 	if (composePrepared) {
 		await run("docker", [...args, "down", "--volumes", "--remove-orphans"], { env });
+		console.log(`Cleaned Compose project=${project}`);
 	}
-	await succeeds("docker", ["image", "rm", image]);
+	const imageRemoved = await succeeds("docker", ["image", "rm", image]);
+	console.log(`Smoke image=${image}, removed=${imageRemoved}`);
 	await rm(directory, { recursive: true, force: true });
 }
