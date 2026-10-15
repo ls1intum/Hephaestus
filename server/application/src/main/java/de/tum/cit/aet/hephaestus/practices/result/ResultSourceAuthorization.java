@@ -19,7 +19,6 @@ import de.tum.cit.aet.hephaestus.practices.review.ReviewItemRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustody;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustodyQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultProofAccess;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -130,9 +129,9 @@ public class ResultSourceAuthorization implements ResultProofAccess {
 
     private boolean sourceAuthorized(Result result, SourceUsePurpose purpose) {
         if (!visibleSource(result, purpose)) return false;
-        var citations = new ArrayList<>(ResultCitations.all(result));
-        problems.findByWorkspaceIdAndResultIdOrderByPositionAsc(result.getWorkspaceId(), result.getId())
-                .forEach(p -> p.getCitations().forEach(citations::add));
+        var citations = ResultCitations.all(
+                result,
+                problems.findByWorkspaceIdAndResultIdOrderByPositionAsc(result.getWorkspaceId(), result.getId()));
         try {
             for (var citation : citations)
                 if (!citation.path("sourceKind").isString()

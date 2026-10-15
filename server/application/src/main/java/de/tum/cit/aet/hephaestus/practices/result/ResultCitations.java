@@ -9,7 +9,7 @@ import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
-/** Stored citations include problem citations; authorization must also include example and open-question sources. */
+/** Authorization includes result, problem, example and open-question sources. */
 public final class ResultCitations {
 
     private ResultCitations() {}
@@ -26,11 +26,13 @@ public final class ResultCitations {
         return List.copyOf(own);
     }
 
-    public static List<JsonNode> all(Result result) {
-        return all(result.getEvidence(), result.getExample());
+    public static List<JsonNode> all(Result result, List<Problem> problems) {
+        var citations = new ArrayList<>(all(result.getEvidence(), result.getExample()));
+        problems.forEach(problem -> problem.getCitations().forEach(citations::add));
+        return List.copyOf(citations);
     }
 
-    public static List<JsonNode> all(@Nullable JsonNode evidence, @Nullable JsonNode example) {
+    private static List<JsonNode> all(@Nullable JsonNode evidence, @Nullable JsonNode example) {
         List<JsonNode> all = new ArrayList<>();
         if (evidence != null) {
             evidence.path("citations").forEach(all::add);

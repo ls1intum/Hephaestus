@@ -11,18 +11,25 @@ import de.tum.cit.aet.hephaestus.agent.context.CitedSourceAccess;
 import de.tum.cit.aet.hephaestus.agent.handler.AdmittedResultFixtures;
 import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
+import de.tum.cit.aet.hephaestus.practices.model.Problem;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
+import de.tum.cit.aet.hephaestus.practices.result.ProblemRepository;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
     @Test
     void keepsVerifiedDeliveryIndependentOfRuntimeJobRetention() {
         var sources = mock(ClasspathSourceCatalogRegistry.class);
         var access = mock(CitedSourceAccess.class);
-        var authorization = new EvidenceDeliveryAuthorization(sources, access);
+        var authorization = new EvidenceDeliveryAuthorization(sources, access, mock(ProblemRepository.class));
         var result = Result.builder()
                 .id(UUID.randomUUID())
                 .workspaceId(1)
@@ -49,7 +56,8 @@ class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
     @Test
     void shouldReadMigratedWordsWithoutCertifyingThemForNewUse() {
         var access = mock(CitedSourceAccess.class);
-        var authorization = new EvidenceDeliveryAuthorization(mock(ClasspathSourceCatalogRegistry.class), access);
+        var authorization = new EvidenceDeliveryAuthorization(
+                mock(ClasspathSourceCatalogRegistry.class), access, mock(ProblemRepository.class));
         var result = Result.builder()
                 .id(UUID.randomUUID())
                 .workspaceId(1)
@@ -67,5 +75,71 @@ class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
                 .isFalse();
         assertThat(authorization.permits(2, result, SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW))
                 .isFalse();
+    }
+
+    @ParameterizedTest
+    @EnumSource(SourceUsePurpose.class)
+    void shouldAuthorizeProblemOnlyProofWhenEveryCitationAndLiveAccessPermitUse(SourceUsePurpose purpose) {
+        var sources = mock(ClasspathSourceCatalogRegistry.class);
+        var access = mock(CitedSourceAccess.class);
+        var problems = mock(ProblemRepository.class);
+        var authorization = new EvidenceDeliveryAuthorization(sources, access, problems);
+        var result = Result.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(1)
+                .developerId(2L)
+                .outcome(ResultOutcome.NOT_MET)
+                .evidence(new JsonMapper().readTree("{\"citations\":[],\"openQuestions\":[]}"))
+                .build();
+        var problem = Problem.builder()
+                .workspaceId(1)
+                .resultId(result.getId())
+                .citations(
+                        AdmittedResultFixtures.evidence("scm.pull-request.core").path("citations"))
+                .build();
+        when(problems.findByWorkspaceIdAndResultIdOrderByPositionAsc(1, result.getId()))
+                .thenReturn(List.of(problem));
+        when(access.permits(1, result.getId(), purpose)).thenReturn(true);
+        when(sources.isSourceUsePermitted(any(), eq(purpose))).thenReturn(true);
+
+        assertThat(authorization.permitsForNewDelivery(1, List.of(result), purpose))
+                .containsExactly(result.getId());
+        when(sources.isSourceUsePermitted(any(), eq(purpose))).thenReturn(false);
+        assertThat(authorization.permitsForNewDelivery(1, List.of(result), purpose))
+                .isEmpty();
+        when(sources.isSourceUsePermitted(any(), eq(purpose))).thenReturn(true);
+        assertThat(authorization.permitsForNewDelivery(1, List.of(result), purpose))
+                .containsExactly(result.getId());
+        when(access.permits(1, result.getId(), purpose)).thenReturn(false);
+        assertThat(authorization.permitsForNewDelivery(1, List.of(result), purpose))
+                .isEmpty();
+    }
+
+    @ParameterizedTest
+    @EnumSource(SourceUsePurpose.class)
+    void shouldRejectDamagedProblemProofEvenWhenResultCitationsAreVerified(SourceUsePurpose purpose) {
+        var sources = mock(ClasspathSourceCatalogRegistry.class);
+        var access = mock(CitedSourceAccess.class);
+        var problems = mock(ProblemRepository.class);
+        var authorization = new EvidenceDeliveryAuthorization(sources, access, problems);
+        var result = Result.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(1)
+                .outcome(ResultOutcome.NOT_MET)
+                .evidence(AdmittedResultFixtures.evidence("scm.pull-request.core"))
+                .build();
+        var evidence = new JsonMapper()
+                .convertValue(AdmittedResultFixtures.evidence("scm.pull-request.core"), ObjectNode.class);
+        evidence.withObject("/citations/0/verification").put("quoteSha256", "0".repeat(64));
+        when(problems.findByWorkspaceIdAndResultIdOrderByPositionAsc(1, result.getId()))
+                .thenReturn(List.of(Problem.builder()
+                        .workspaceId(1)
+                        .resultId(result.getId())
+                        .citations(evidence.path("citations"))
+                        .build()));
+        when(access.permits(1, result.getId(), purpose)).thenReturn(true);
+
+        assertThat(authorization.permitsForNewDelivery(1, List.of(result), purpose))
+                .isEmpty();
     }
 }
