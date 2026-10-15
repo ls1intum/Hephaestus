@@ -75,8 +75,6 @@ services:
       DEPLOYMENT_ENVIRONMENT: ${DEPLOYMENT_ENVIRONMENT:-local}
       SENTRY_DSN: ${SENTRY_DSN}
       TANSTACK_DEVTOOLS_ENABLED: ${TANSTACK_DEVTOOLS_ENABLED:-false}
-    ports:
-      - "80"
     depends_on:
       # Gate on app-server readiness so the SPA isn't served before the API answers.
       application-server:
@@ -191,8 +189,6 @@ services:
     mem_limit: ${APPLICATION_SERVER_MEM_LIMIT:-5g}
     cpus: ${APPLICATION_SERVER_CPUS:-4.0}
     pids_limit: ${APPLICATION_SERVER_PIDS_LIMIT:-512}
-    ports:
-      - "8080"
     environment:
       HEPHAESTUS_PUBLIC_ACTIVITY_ENABLED: ${HEPHAESTUS_PUBLIC_ACTIVITY_ENABLED:-false}
       HEPHAESTUS_PUBLIC_ACTIVITY_REPOSITORY_VISIBILITY_MAX_AGE: ${HEPHAESTUS_PUBLIC_ACTIVITY_REPOSITORY_VISIBILITY_MAX_AGE:-48h}
@@ -544,8 +540,6 @@ services:
       - POSTGRES_DB=hephaestus
       - POSTGRES_PASSWORD=root
       - POSTGRES_USER=root
-    ports:
-      - "5432"
     networks:
       shared-network:
         aliases:
