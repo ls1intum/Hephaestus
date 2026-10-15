@@ -453,10 +453,8 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
                         failure -> assertThat(failure.code()).isEqualTo(ItemCaptureCode.ITEM_NOT_VISIBLE));
         pull.setMergedAt(null);
         pulls.saveAndFlush(pull);
-        assertThatThrownBy(() -> mergeTimes.mergedAt(holder.workspaceId(), List.of(pullRef)))
-                .isInstanceOfSatisfying(
-                        ItemCaptureException.class,
-                        failure -> assertThat(failure.code()).isEqualTo(ItemCaptureCode.SOURCE_NOT_READY));
+        assertThat(mergeTimes.mergedAt(holder.workspaceId(), List.of(pullRef, reviewRef)))
+                .isEmpty();
         pull.setMergedAt(mergedAt);
         pulls.saveAndFlush(pull);
         var timingMonitor = monitors.findByWorkspaceIdAndNameWithOwner(
