@@ -28,34 +28,49 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import tools.jackson.databind.json.JsonMapper;
 
 class ReviewRuntimeRoleContextTest extends BaseUnitTest {
-    private final ApplicationContextRunner context = new ApplicationContextRunner()
-            .withUserConfiguration(
-                    ReviewSnapshotQueryService.class,
-                    PracticeReviewCoverageService.class,
-                    ResultAdmissionPolicy.class,
-                    ResultViewQuery.class,
-                    ResultPresentation.class,
-                    ResultVisibilityPolicy.class,
-                    ProductReferenceQuery.class)
-            .withBean(WorkspaceRepository.class, () -> mock(WorkspaceRepository.class))
-            .withBean(RepositoryToMonitorRepository.class, () -> mock(RepositoryToMonitorRepository.class))
-            .withBean(ReviewScopeRepositoryRepository.class, () -> mock(ReviewScopeRepositoryRepository.class))
-            .withBean(MonitoredRepositoryQuery.class, () -> mock(MonitoredRepositoryQuery.class))
-            .withBean(MembershipReviewSelection.class, () -> mock(MembershipReviewSelection.class))
-            .withBean(HistoryCustodyQuery.class, () -> mock(HistoryCustodyQuery.class))
-            .withBean(PracticeRepository.class, () -> mock(PracticeRepository.class))
-            .withBean(ResultMarkRepository.class, () -> mock(ResultMarkRepository.class))
-            .withBean(ProblemRepository.class, () -> mock(ProblemRepository.class))
-            .withBean(EvidenceAuthorization.class, () -> mock(EvidenceAuthorization.class))
-            .withBean(ProductItemRepository.class, () -> mock(ProductItemRepository.class))
-            .withBean(RegisteredItemLabels.class, () -> mock(RegisteredItemLabels.class))
-            .withBean(ItemDescriptorRegistry.class, () -> mock(ItemDescriptorRegistry.class))
-            .withBean(ResultCommunicationRepository.class, () -> mock(ResultCommunicationRepository.class))
-            .withBean(ReviewRepository.class, () -> mock(ReviewRepository.class))
-            .withBean(ReviewPracticeRepository.class, () -> mock(ReviewPracticeRepository.class))
-            .withBean(PracticeVersionRepository.class, () -> mock(PracticeVersionRepository.class))
-            .withBean(ProductItemQuery.class, () -> mock(ProductItemQuery.class))
-            .withBean(JsonMapper.class, () -> JsonMapper.builder().build());
+    private final ApplicationContextRunner context = withMocks(
+            new ApplicationContextRunner()
+                    .withUserConfiguration(
+                            ReviewSnapshotQueryService.class,
+                            PracticeReviewCoverageService.class,
+                            ResultAdmissionPolicy.class,
+                            ResultViewQuery.class,
+                            ResultPresentation.class,
+                            ResultVisibilityPolicy.class,
+                            ProductReferenceQuery.class)
+                    .withBean(JsonMapper.class, () -> JsonMapper.builder().build()),
+            WorkspaceRepository.class,
+            RepositoryToMonitorRepository.class,
+            ReviewScopeRepositoryRepository.class,
+            MonitoredRepositoryQuery.class,
+            MembershipReviewSelection.class,
+            HistoryCustodyQuery.class,
+            PracticeRepository.class,
+            ResultMarkRepository.class,
+            ProblemRepository.class,
+            EvidenceAuthorization.class,
+            ProductItemRepository.class,
+            RegisteredItemLabels.class,
+            ItemDescriptorRegistry.class,
+            ResultCommunicationRepository.class,
+            ReviewRepository.class,
+            ReviewPracticeRepository.class,
+            PracticeVersionRepository.class,
+            ProductItemQuery.class);
+
+    // One withBean call per statement: NullAway infers a generic call chain through every receiver, so a long
+    // chain of generic calls with lambdas grows its inference work exponentially.
+    private static ApplicationContextRunner withMocks(ApplicationContextRunner runner, Class<?>... types) {
+        var withMocks = runner;
+        for (Class<?> type : types) {
+            withMocks = withMock(withMocks, type);
+        }
+        return withMocks;
+    }
+
+    private static <T> ApplicationContextRunner withMock(ApplicationContextRunner runner, Class<T> type) {
+        return runner.withBean(type, () -> mock(type));
+    }
 
     @Test
     void shouldSupplyFrozenReadsOnTheWorkerWithoutTheServerCommandService() {
