@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type UseQueryResult, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -23,10 +23,35 @@ import type {
 	SyncStatusHeaderError,
 	SyncStatusHeaderProps,
 } from "@/components/admin/integrations/SyncStatusHeader";
+import { queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
 import { useLivePushUnavailable } from "@/hooks/use-sync-liveness";
 import { problemDetailOf } from "@/lib/problem-detail";
+import type { RefreshFailure } from "@/runtime/tanstack-query/infinite-list";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 const JOBS_PAGE_SIZE = 10;
+
+/**
+ * A sync read as its table shows it. A retryable failed refresh keeps the rows this key last read,
+ * with the failure beside them. A refusal, or a read that never succeeded, shows no rows.
+ */
+function syncRead<TData>(query: UseQueryResult<TData>) {
+	if (query.isRefetchError && queryErrorIsRetryable(query.error)) {
+		const refreshFailure: RefreshFailure = {
+			error: query.error,
+			pending: query.isFetching,
+			onRetry: () => {
+				void query.refetch();
+			},
+		};
+		return { data: query.data, isError: false, refreshFailure };
+	}
+	return {
+		data: query.isError ? undefined : query.data,
+		isError: query.isError,
+		refreshFailure: undefined,
+	};
+}
 
 export interface ConnectionSyncOptions extends Pick<
 	SyncResourcesTableProps,
@@ -86,17 +111,26 @@ export function useConnectionSync({
 	const status = statusQuery.data;
 	const hasActiveJob = status?.activeJob != null;
 
+	const resourcesOptions = listConnectionSyncResourcesOptions({ path });
 	const resourcesQuery = useQuery({
-		...listConnectionSyncResourcesOptions({ path }),
+		...resourcesOptions,
 		enabled: hasConnection,
 		refetchInterval: syncPollInterval(hasActiveJob, livePushUnavailable),
 	});
+	useQueryReadRefusal(resourcesOptions.queryKey, resourcesQuery.isError, resourcesQuery.error);
+	const resources = syncRead(resourcesQuery);
 
+	const jobsOptions = listConnectionSyncJobsOptions({
+		path,
+		query: { page: jobsPage, size: JOBS_PAGE_SIZE },
+	});
 	const jobsQuery = useQuery({
-		...listConnectionSyncJobsOptions({ path, query: { page: jobsPage, size: JOBS_PAGE_SIZE } }),
+		...jobsOptions,
 		enabled: hasConnection,
 		refetchInterval: syncPollInterval(hasActiveJob, livePushUnavailable),
 	});
+	useQueryReadRefusal(jobsOptions.queryKey, jobsQuery.isError, jobsQuery.error);
+	const jobs = syncRead(jobsQuery);
 
 	const invalidateSyncActivity = async () => {
 		const invalidations: Promise<void>[] = [];
@@ -198,10 +232,11 @@ export function useConnectionSync({
 		},
 		syncStatusHeaderProps,
 		syncResourcesProps: {
-			resources: resourcesQuery.data ?? [],
+			resources: resources.data ?? [],
 			isLoading: resourcesQuery.isLoading,
-			isError: resourcesQuery.isError,
+			isError: resources.isError,
 			error: resourcesQuery.error,
+			refreshFailure: resources.refreshFailure,
 			onRetry: () => {
 				void resourcesQuery.refetch();
 			},
@@ -211,15 +246,16 @@ export function useConnectionSync({
 			expectedClassKeys,
 		} satisfies SyncResourcesTableProps,
 		jobHistoryProps: {
-			jobs: jobsQuery.data?.content ?? [],
+			jobs: jobs.data?.content ?? [],
 			isLoading: jobsQuery.isLoading,
-			isError: jobsQuery.isError,
+			isError: jobs.isError,
 			error: jobsQuery.error,
+			refreshFailure: jobs.refreshFailure,
 			onRetry: () => {
 				void jobsQuery.refetch();
 			},
 			page: jobsPage,
-			totalPages: jobsQuery.data?.totalPages ?? 1,
+			totalPages: jobs.data?.totalPages ?? 1,
 			onPageChange: (page: number) => setPagination({ connectionId, page }),
 		} satisfies SyncJobsTableProps,
 	};

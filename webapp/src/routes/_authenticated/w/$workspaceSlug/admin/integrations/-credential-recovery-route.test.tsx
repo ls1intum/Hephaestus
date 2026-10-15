@@ -1,15 +1,21 @@
+import type { QueryClient } from "@tanstack/react-query";
 import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { toast } from "sonner";
 import { describe, expect, it, vi } from "vitest";
 
-import { getIntegrationCatalogQueryKey } from "@/api/@tanstack/react-query.gen";
+import {
+	getIntegrationCatalogQueryKey,
+	listConnectionSyncJobsQueryKey,
+	listConnectionSyncResourcesQueryKey,
+} from "@/api/@tanstack/react-query.gen";
 import type {
 	ConnectionSyncStatus,
 	ConnectionDetail,
 	IntegrationCatalogEntry,
 	SyncJob,
+	SyncResourceState,
 	Workspace,
 } from "@/api/types.gen";
 import type { Wire } from "@/lib/dates";
@@ -706,4 +712,219 @@ describe("canceled sync recovery on the integration overview", () => {
 			expect(screen.queryByRole("button", { name: /check and retry/iu })).toBeNull();
 		},
 	);
+});
+
+/** The answer every sync resource and job read gets until the test chooses another. */
+type SyncReads =
+	| { status: 200; resources: Wire<SyncResourceState>[]; jobs: Wire<SyncJob>[] }
+	| { status: 403 | 503 };
+
+const SYNC_READ_FAILURE = {
+	403: "You are not allowed to read this connection.",
+	503: "The sync state is temporarily unavailable.",
+} as const;
+
+/** Serves connection 7's resources and jobs, counting each read. A held answer waits for `hold`. */
+function serveSyncReads(initial: SyncReads) {
+	const requests = { resources: 0, jobs: 0 };
+	const current = { reads: initial, hold: Promise.resolve() };
+	const failed = (status: 403 | 503) =>
+		HttpResponse.json(
+			{ status, title: "Sync read failed", detail: SYNC_READ_FAILURE[status] },
+			{ status },
+		);
+	server.use(
+		http.get("*/workspaces/acme/connections/7/sync/resources", async () => {
+			requests.resources += 1;
+			await current.hold;
+			const { reads } = current;
+			return reads.status === 200 ? HttpResponse.json(reads.resources) : failed(reads.status);
+		}),
+		http.get("*/workspaces/acme/connections/7/sync/jobs", async () => {
+			requests.jobs += 1;
+			await current.hold;
+			const { reads } = current;
+			return reads.status === 200
+				? HttpResponse.json({ content: reads.jobs, totalPages: 1 })
+				: failed(reads.status);
+		}),
+	);
+	return {
+		requests,
+		answer: (reads: SyncReads, hold = Promise.resolve()) => {
+			current.reads = reads;
+			current.hold = hold;
+		},
+	};
+}
+
+/** Reads the connection's resources and jobs again through their own keys, as the page's poll does. */
+async function refreshSyncReads(queryClient: QueryClient) {
+	const path = { workspaceSlug: "acme", connectionId: 7 };
+	await act(async () => {
+		await Promise.all([
+			queryClient.invalidateQueries({ queryKey: listConnectionSyncResourcesQueryKey({ path }) }),
+			queryClient.invalidateQueries({ queryKey: listConnectionSyncJobsQueryKey({ path }) }),
+		]);
+	});
+}
+
+async function pressEveryRetry(user: ReturnType<typeof userEvent.setup>) {
+	for (const retry of screen.getAllByRole("button", { name: "Retry" })) {
+		await user.click(retry);
+	}
+}
+
+function syncedRepository(id: number, name: string, issues: number): Wire<SyncResourceState> {
+	const syncedAt = "2026-10-15T08:00:00Z";
+	return {
+		id,
+		externalId: name,
+		name,
+		type: "REPOSITORY",
+		counts: [{ key: "issues", label: "Issues", count: issues, lastSyncedAt: syncedAt }],
+		state: "SYNCED",
+		lastSyncedAt: syncedAt,
+		itemCount: issues,
+	};
+}
+
+describe("sync evidence through a failed refresh", () => {
+	const ledger = syncedRepository(1, "acme/platform/ledger", 3141);
+	const billing = syncedRepository(2, "acme/platform/billing", 2718);
+	const warned: Wire<SyncJob> = {
+		id: 41,
+		type: "RECONCILIATION",
+		trigger: "SCHEDULED",
+		status: "SUCCEEDED_WITH_WARNINGS",
+		cancelRequested: false,
+		createdAt: "2026-10-15T02:00:00Z",
+		startedAt: "2026-10-15T02:00:00Z",
+		finishedAt: "2026-10-15T02:03:20Z",
+		itemsProcessed: 40,
+		itemsTotal: 52,
+		errorSummary: "12 issues skipped: their sub-issues did not sync",
+		progress: {
+			phase: "issues",
+			currentStep: "Sub-issue sync stopped after 40 of 52 issues.",
+			unitsCompleted: 40,
+			unitsTotal: 52,
+		},
+	};
+	const later: Wire<SyncJob> = {
+		id: 42,
+		type: "RECONCILIATION",
+		trigger: "MANUAL",
+		status: "SUCCEEDED",
+		cancelRequested: false,
+		createdAt: "2026-10-15T09:00:00Z",
+		itemsProcessed: 77_777,
+	};
+
+	it("keeps the loaded repositories and an open job detail through a failed refresh, then retries", async () => {
+		const { entry } = mockConnection("GITLAB");
+		entry.credentialsUnreadableSince = undefined;
+		const reads = serveSyncReads({ status: 200, resources: [ledger, billing], jobs: [warned] });
+		const { queryClient } = renderRouteAtWithRouter("/w/acme/admin/integrations/scm");
+		const user = userEvent.setup();
+		const search = await screen.findByRole(
+			"searchbox",
+			{ name: "Search repositories" },
+			ROUTE_RENDER_WAIT,
+		);
+		await user.type(search, "ledger");
+		await user.click(await screen.findByRole("button", { name: "Show details for job 41" }));
+		screen.getByText("Sub-issue sync stopped after 40 of 52 issues.");
+		const alertsBefore = screen.queryAllByRole("alert").length;
+		const requestsBefore = { ...reads.requests };
+
+		reads.answer({ status: 503 });
+		await refreshSyncReads(queryClient);
+		await waitFor(() => expect(screen.queryAllByRole("alert")).toHaveLength(alertsBefore + 2));
+
+		expect(reads.requests).toStrictEqual({
+			resources: requestsBefore.resources + 1,
+			jobs: requestsBefore.jobs + 1,
+		});
+		screen.getByText("acme/platform/ledger");
+		expect(screen.queryByText("acme/platform/billing")).toBeNull();
+		expect(screen.getByRole("searchbox", { name: "Search repositories" })).toHaveProperty(
+			"value",
+			"ledger",
+		);
+		screen.getByText("1 of 2 repositories");
+		screen.getByText("Sub-issue sync stopped after 40 of 52 issues.");
+		screen.getByRole("button", { name: "Show error for job 41" });
+		screen.getByText("The repository sync state may be out of date");
+		screen.getByText("The job history may be out of date");
+		expect(screen.queryByText("We could not load the repository sync state")).toBeNull();
+		expect(screen.queryByText("We could not load the job history")).toBeNull();
+
+		const response = deferred();
+		reads.answer(
+			{
+				status: 200,
+				resources: [syncedRepository(1, "acme/platform/ledger", 3200), billing],
+				jobs: [later, warned],
+			},
+			response.promise,
+		);
+		try {
+			await pressEveryRetry(user);
+			await waitFor(() =>
+				expect(reads.requests).toStrictEqual({
+					resources: requestsBefore.resources + 2,
+					jobs: requestsBefore.jobs + 2,
+				}),
+			);
+			const retrying = screen.getAllByRole("button", { name: "Retrying…" });
+			expect(retrying.map((button) => button.hasAttribute("disabled"))).toStrictEqual([true, true]);
+			screen.getByText("acme/platform/ledger");
+			screen.getByText("Sub-issue sync stopped after 40 of 52 issues.");
+		} finally {
+			response.resolve();
+		}
+
+		await screen.findByText("77,777");
+		screen.getByText("3,200");
+		screen.getByText("Sub-issue sync stopped after 40 of 52 issues.");
+		expect(screen.queryByText("The repository sync state may be out of date")).toBeNull();
+		expect(screen.queryByText("The job history may be out of date")).toBeNull();
+	});
+
+	it("does not bring back refused sync evidence when a later read fails", async () => {
+		const { entry } = mockConnection("GITLAB");
+		entry.credentialsUnreadableSince = undefined;
+		const reads = serveSyncReads({ status: 200, resources: [ledger], jobs: [warned] });
+		const { queryClient } = renderRouteAtWithRouter("/w/acme/admin/integrations/scm");
+		await screen.findByText("acme/platform/ledger", undefined, ROUTE_RENDER_WAIT);
+		await screen.findByText("40/52");
+
+		reads.answer({ status: 403 });
+		await refreshSyncReads(queryClient);
+		await screen.findByText("You do not have access to the repository sync state");
+		screen.getByText("You do not have access to the job history");
+		expect(screen.queryByText("acme/platform/ledger")).toBeNull();
+		expect(screen.queryByText("40/52")).toBeNull();
+
+		reads.answer({ status: 503 });
+		await refreshSyncReads(queryClient);
+		await screen.findByText("We could not load the repository sync state");
+		screen.getByText("We could not load the job history");
+		expect(screen.queryByText("acme/platform/ledger")).toBeNull();
+		expect(screen.queryByText("40/52")).toBeNull();
+		expect(screen.queryByText("The repository sync state may be out of date")).toBeNull();
+		expect(screen.queryByText("The job history may be out of date")).toBeNull();
+
+		reads.answer({
+			status: 200,
+			resources: [syncedRepository(3, "acme/platform/console", 1618)],
+			jobs: [later],
+		});
+		await pressEveryRetry(userEvent.setup());
+		await screen.findByText("acme/platform/console");
+		await screen.findByText("77,777");
+		expect(screen.queryByText("acme/platform/ledger")).toBeNull();
+		expect(screen.queryByText("40/52")).toBeNull();
+	});
 });

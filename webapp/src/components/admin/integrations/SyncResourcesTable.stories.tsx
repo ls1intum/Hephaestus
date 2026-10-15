@@ -511,3 +511,31 @@ export const ErrorState: Story = {
 };
 
 export const Empty: Story = { args: { resources: [] } };
+
+/** A failed refresh keeps the rows last read, and their search, under the failure. */
+export const RefreshFailed: Story = {
+	args: {
+		resources,
+		refreshFailure: { error: { status: 503 }, pending: false, onRetry: fn() },
+	},
+	play: async ({ canvas }) => {
+		canvas.getByText("The repository sync state may be out of date");
+		await expect(canvas.getByRole("button", { name: "Retry" })).toBeEnabled();
+		await userEvent.type(canvas.getByRole("searchbox"), "Artemis");
+		canvas.getByText(/1 of 5 repositories/iu);
+		await expect(
+			canvas.queryByText("We could not load the repository sync state"),
+		).not.toBeInTheDocument();
+	},
+};
+
+export const RefreshRetrying: Story = {
+	args: {
+		resources,
+		refreshFailure: { error: { status: 503 }, pending: true, onRetry: fn() },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "Retrying…" })).toBeDisabled();
+		canvas.getByText("ls1intum/Artemis");
+	},
+};
