@@ -78,8 +78,6 @@ const isUnknownArray = (value: unknown): value is readonly unknown[] => Array.is
 
 /** The `assertFunctionNames` `oxlint.app.jsonc` hands `vitest/expect-expect`. */
 function configuredAssertFunctionNames(): readonly string[] {
-	// Resolved as a path rather than through `new URL(…, import.meta.url)`: these tests run in jsdom,
-	// whose `URL` resolves a relative reference against the document's origin, not the module's.
 	const here = import.meta.dirname;
 	const config = readJsonc(pathToFileURL(path.join(here, "../../../../oxlint.app.jsonc")));
 	const rules = isRecord(config) ? config.rules : undefined;

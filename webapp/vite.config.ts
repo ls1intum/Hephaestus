@@ -3,7 +3,7 @@ import path from "node:path";
 import { sentryVitePlugin } from "@sentry/vite-plugin";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import Terminal from "vite-plugin-terminal";
-import { configDefaults } from "vitest/config";
+import { configDefaults, defineConfig } from "vite-plus";
 
 import { readJsonc } from "./tools/jsonc.ts";
 import { loadLintConfig } from "./tools/oxlint/load-config.ts";
@@ -34,7 +34,7 @@ if (sentryUploadValues.some(Boolean) && !sentryUploadConfigured) {
 		"Sentry source-map upload requires SENTRY_AUTH_TOKEN, SENTRY_ORG, and SENTRY_PROJECT",
 	);
 }
-const viteConfig = {
+const viteConfig = defineConfig({
 	root: import.meta.dirname,
 	fmt,
 	lint,
@@ -68,13 +68,29 @@ const viteConfig = {
 	},
 	test: {
 		globals: true,
-		environment: "jsdom",
-		exclude: [...configDefaults.exclude, "e2e/**/*.spec.ts"],
-		setupFiles: ["./src/test/setup-msw.ts"],
 		reporters: ["default", "junit"],
 		outputFile: {
 			junit: "./test-results/junit-webapp.xml",
 		},
+		projects: [
+			{
+				extends: true,
+				test: {
+					name: "app",
+					environment: "jsdom",
+					exclude: [...configDefaults.exclude, "e2e/**/*.spec.ts", "tools/oxlint/rules/**"],
+					setupFiles: ["./src/test/setup-msw.ts"],
+				},
+			},
+			{
+				extends: true,
+				test: {
+					name: "lint-rules",
+					environment: "node",
+					include: ["tools/oxlint/rules/**/*.test.ts"],
+				},
+			},
+		],
 	},
 	resolve: {
 		tsconfigPaths: true,
@@ -88,6 +104,6 @@ const viteConfig = {
 			allow: [path.resolve(import.meta.dirname, "..")],
 		},
 	},
-};
+});
 
 export default viteConfig;
