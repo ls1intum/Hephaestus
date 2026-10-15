@@ -11,7 +11,7 @@
  "customTools": [
   {
    "name": "submit_result",
-   "description": "Submit the one complete evidenced result of this session's practice: its outcome, the explanation, the citations it rests on, and for NOT_MET each problem with its severity, citations and basis. The host adds the coverage it measured from your reads and keeps the result for server admission after measuring. To correct it, submit the complete result again. Cite the source you read; the runner resolves source kind, manifest identity and the captured revision. Citation examples: {\"path\":\"src/Auth.java\",\"startLine\":10,\"quote\":\"insecure();\"}; {\"sourcePath\":\"work/change/diff.patch\",\"path\":\"src/Auth.java\",\"side\":\"NEW\",\"startLine\":10,\"quote\":\"+ insecure();\"}; {\"path\":\"evidence/metadata.json\",\"startLine\":1,\"quote\":\"Add login\"}. Use only text you read. Examples show the shape, not evidence for this review.",
+   "description": "Submit the one complete evidenced result of this session's practice: its outcome, the explanation, the citations it rests on, and for NOT_MET each problem with its severity, citations and basis. The host adds the coverage it measured from your reads and keeps the result for server admission after measuring. To correct it, submit the complete result again. Cite the source you read; the runner resolves source kind, manifest identity and the captured revision. Citation examples: {\"path\":\"src/Auth.java\",\"startLine\":10,\"quote\":\"insecure();\"}; {\"sourcePath\":\"work/change/diff.patch\",\"path\":\"src/Auth.java\",\"side\":\"NEW\",\"startLine\":10,\"quote\":\"+ insecure();\"}; {\"path\":\"evidence/metadata.json\",\"startLine\":1,\"quote\":\"Add login\"}. Use only text you read. Examples show the shape, not evidence for this review. Evidence examples by outcome: MET: {\"evidence\":{\"search\":{\"consulted\":[\"scm.review-threads\"],\"lookedFor\":\"unanswered requests\",\"boundary\":\"Captured threads only; no private discussion.\"}}}; DOES_NOT_APPLY: {\"evidence\":{\"inapplicability\":{\"consulted\":[\"scm.pull-request.diff\"],\"prerequisite\":\"UI changes\",\"ruledOutBy\":\"Only a server test changed.\"}}}; COULD_NOT_DETERMINE: {\"evidence\":{\"openQuestions\":[{\"openQuestion\":\"Did the named check pass?\",\"wouldSettleIt\":\"The check report linked in the description.\"}]}}; NOT_MET: {\"evidence\":{},\"problems\":[{\"severity\":\"MAJOR\",\"summary\":\"Required check is skipped\",\"explanation\":\"The captured event skips the required check.\",\"citations\":[{\"path\":\"context/events.json\",\"startLine\":2,\"quote\":\"check skipped\"}],\"basis\":{\"type\":\"duty\",\"event\":0,\"criterionQuote\":\"Run the check\",\"explanation\":\"The cited event skips the required check.\"}}]}. MET may use evidence:{} when cited positive evidence decides it. Search warrants also apply to absence claims in NOT_MET and COULD_NOT_DETERMINE. Never turn a capture failure into an outcome.",
    "parameters": {
     "type": "object",
     "additionalProperties": false,
@@ -263,56 +263,114 @@
            "description": "The lines that show this problem."
           },
           "basis": {
-           "type": "object",
-           "additionalProperties": false,
-           "required": [
-            "type",
-            "explanation"
-           ],
            "description": "All indexes are zero-based positions in THIS problem's citations array: with one citation, use 0. Why the problem belongs to this work. introduced: the change adds it (head: the index of a citation of the NEW side or the reviewed head). worsened: the change makes it worse (base: the index of the OLD side's citation, head: the NEW side's). duty: the criteria require an event that this work lacks (criterionQuote: the criteria's exact words, event: the index of the citation that shows the event). state: the problem exists in the pinned file; its citations witness that state at the reviewed version.",
-           "properties": {
-            "type": {
-             "type": "string",
-             "enum": [
-              "introduced",
-              "worsened",
-              "duty",
-              "state"
+           "anyOf": [
+            {
+             "type": "object",
+             "additionalProperties": false,
+             "required": [
+              "type",
+              "head",
+              "explanation"
              ],
-             "description": "Use introduced or worsened for changed behavior, duty for a required event, and state only for SCAN."
+             "properties": {
+              "type": {
+               "type": "string",
+               "enum": [
+                "introduced"
+               ]
+              },
+              "head": {
+               "type": "integer",
+               "minimum": 0
+              },
+              "explanation": {
+               "type": "string",
+               "minLength": 1
+              }
+             }
             },
-            "head": {
-             "type": [
-              "integer",
-              "null"
+            {
+             "type": "object",
+             "additionalProperties": false,
+             "required": [
+              "type",
+              "base",
+              "head",
+              "explanation"
              ],
-             "minimum": 0
+             "properties": {
+              "type": {
+               "type": "string",
+               "enum": [
+                "worsened"
+               ]
+              },
+              "base": {
+               "type": "integer",
+               "minimum": 0
+              },
+              "head": {
+               "type": "integer",
+               "minimum": 0
+              },
+              "explanation": {
+               "type": "string",
+               "minLength": 1
+              }
+             }
             },
-            "base": {
-             "type": [
-              "integer",
-              "null"
+            {
+             "type": "object",
+             "additionalProperties": false,
+             "required": [
+              "type",
+              "event",
+              "criterionQuote",
+              "explanation"
              ],
-             "minimum": 0
+             "properties": {
+              "type": {
+               "type": "string",
+               "enum": [
+                "duty"
+               ]
+              },
+              "event": {
+               "type": "integer",
+               "minimum": 0
+              },
+              "criterionQuote": {
+               "type": "string",
+               "minLength": 1
+              },
+              "explanation": {
+               "type": "string",
+               "minLength": 1
+              }
+             }
             },
-            "event": {
-             "type": [
-              "integer",
-              "null"
+            {
+             "type": "object",
+             "additionalProperties": false,
+             "required": [
+              "type",
+              "explanation"
              ],
-             "minimum": 0
-            },
-            "criterionQuote": {
-             "type": [
-              "string",
-              "null"
-             ]
-            },
-            "explanation": {
-             "type": "string",
-             "minLength": 1
+             "properties": {
+              "type": {
+               "type": "string",
+               "enum": [
+                "state"
+               ]
+              },
+              "explanation": {
+               "type": "string",
+               "minLength": 1
+              }
+             }
             }
-           }
+           ]
           },
           "nextStep": {
            "type": [
@@ -328,7 +386,7 @@
         "type": "null"
        }
       ],
-      "description": "NOT_MET only, and required there: each problem the evidence shows, each with its own severity, citations and basis. null for every other outcome."
+      "description": "NOT_MET requires a nonempty array: each problem has severity, summary, explanation, citations and basis. For every other outcome, omit problems or use null or []."
      },
      "example": {
       "anyOf": [
@@ -436,7 +494,7 @@
      "evidence": {
       "type": "object",
       "additionalProperties": false,
-      "description": "The warrant the outcome owes, and nothing else: search for a MET or NOT_MET or COULD_NOT_DETERMINE that rests on something missing — what you looked for, where, and what the search did not cover; inapplicability for DOES_NOT_APPLY; openQuestions, a list of open questions, for COULD_NOT_DETERMINE and, beside its problems, for a NOT_MET. Use null for branches that do not apply.",
+      "description": "An object with only these outcome-specific fields. MET: optional search warrant; DOES_NOT_APPLY: required inapplicability; COULD_NOT_DETERMINE: required openQuestions and optional search; NOT_MET: optional search and openQuestions. Put consulted, lookedFor and boundary inside search, never directly inside evidence. Omit unused fields or use null.",
       "properties": {
        "search": {
         "anyOf": [

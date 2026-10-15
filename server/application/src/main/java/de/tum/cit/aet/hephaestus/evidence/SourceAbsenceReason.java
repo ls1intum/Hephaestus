@@ -18,6 +18,10 @@ public enum SourceAbsenceReason {
     EMPTY_NOT_VALID,
     /** {@code UNAVAILABLE}: this repository has no working copy, so nothing could be read at any commit. */
     NO_WORKING_COPY,
+    /** {@code UNAVAILABLE}: the authorized upstream could not supply repository Git objects. */
+    REPOSITORY_FETCH_FAILED,
+    /** {@code UNAVAILABLE}: the pinned base or head cannot be read from the repository. */
+    REVIEW_VERSION_UNAVAILABLE,
     /** {@code UNAVAILABLE}: the requested conversation or item does not exist upstream. */
     NOT_FOUND,
     /** The item exists but its content was evicted; increasing the cap can restore it. */

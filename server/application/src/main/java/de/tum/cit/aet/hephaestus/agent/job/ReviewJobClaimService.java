@@ -137,7 +137,6 @@ public class ReviewJobClaimService {
                         job.getWorkerId(),
                         objectMapper.writeValueAsString(diagnosis));
                 jobTelemetry.preparationFailed(job, preparation, "FAILED");
-                log.warn("Review job {} could not validate its frozen assignments", job.getId(), failure);
                 return new TerminalClaim(job, ReviewJobStatus.FAILED);
             }
         });

@@ -16,6 +16,7 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
             "pi-assessment-cache.ts",
             "pi-task-paths.ts",
             "pi-tool-arguments.ts",
+            "pi-tool-validation.ts",
             "pi-change.ts",
             "pi-practice-scripts-report.ts",
             "pi-error-text.ts",

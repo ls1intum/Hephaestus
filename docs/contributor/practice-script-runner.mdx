@@ -78,6 +78,15 @@ A duty basis must quote the practice criteria and cite the captured event.
 Domain citation verifiers own change-side, version and basis checks.
 
 In `submit_result`, cite the source you read with `path`, `startLine`, optional `endLine`, and a required exact `quote`.
+The runner accepts one `args`, `arguments`, or `input` wrapper before it validates the call.
+For outcomes other than `NOT_MET`, omitted, null, or empty `problems` means no problems.
+`evidence` is an object: `search` for a search warrant, `inapplicability` for `DOES_NOT_APPLY`, and `openQuestions` for `COULD_NOT_DETERMINE`.
+`NOT_MET` can also carry `search` and `openQuestions`.
+
+The tool description gives an example for each outcome.
+An invalid field gets a correction example.
+An example never supplies evidence or changes the stored result.
+
 The runner resolves source kind, manifest identity, and the captured repository revision.
 Repository-relative paths and absolute sandbox paths are accepted.
 For a diff, you can set `sourcePath` to `work/change/diff.patch` and `path` to the changed file.

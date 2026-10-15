@@ -307,9 +307,18 @@ public class DefaultReviewExecutionHandler {
                             .orElse(null);
                     var missing = new ArrayList<SourceReadinessReason>();
                     if (read.need() != ReadNeed.OPTIONAL) {
-                        if (!(state instanceof SourceCaptureState.Available available))
+                        if (!(state instanceof SourceCaptureState.Available available)) {
                             missing.add(SourceReadinessReason.SOURCE_NOT_AVAILABLE);
-                        else if (read.need() == ReadNeed.COMPLETE
+                            if (state instanceof SourceCaptureState.Unavailable unavailable) {
+                                switch (unavailable.reasonCode()) {
+                                    case REPOSITORY_FETCH_FAILED ->
+                                        missing.add(SourceReadinessReason.REPOSITORY_FETCH_FAILED);
+                                    case REVIEW_VERSION_UNAVAILABLE ->
+                                        missing.add(SourceReadinessReason.REVIEW_VERSION_UNAVAILABLE);
+                                    default -> {}
+                                }
+                            }
+                        } else if (read.need() == ReadNeed.COMPLETE
                                 && available.completeness() != SourceCompleteness.COMPLETE)
                             missing.add(SourceReadinessReason.SOURCE_INCOMPLETE);
                     }

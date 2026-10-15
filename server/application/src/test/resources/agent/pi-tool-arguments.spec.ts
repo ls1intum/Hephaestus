@@ -197,14 +197,20 @@ void test("a side, commit or quote that is not text is refused, wherever the cit
 		for (const field of ["side", "commit", "quote"]) {
 			assert.throws(
 				() => prepareResultArguments(place({ ...changeCitation, [field]: 42 })),
-				new RegExp(`^Error: ${where} ${field} must be a string or null$`, "u"),
+				new RegExp(
+					`^Error: ${where} ${field} must be a string or null\\. Corrected field example:`,
+					"u",
+				),
 				`${where} ${field}`,
 			);
 		}
 		for (const field of ["side", "commit"]) {
 			assert.throws(
 				() => prepareResultArguments(place({ ...changeCitation, [field]: " " })),
-				new RegExp(`^Error: ${where} ${field} must be nonempty or null$`, "u"),
+				new RegExp(
+					`^Error: ${where} ${field} must be nonempty or null\\. Corrected field example:`,
+					"u",
+				),
 				`${where} ${field}`,
 			);
 		}
@@ -269,4 +275,19 @@ void test("review prompts and bundled practices do not require write or edit too
 			path,
 		);
 	}
+});
+
+void test("all outcomes without problems accept null and empty lists without changing evidence", () => {
+	for (const outcome of ["MET", "DOES_NOT_APPLY", "COULD_NOT_DETERMINE"]) {
+		const { problems: _problems, ...withoutProblems } = { ...result, outcome };
+		for (const problems of [null, []]) {
+			assert.deepEqual(prepareResultArguments({ ...withoutProblems, problems }), withoutProblems);
+		}
+	}
+});
+
+void test("argument envelopes neither discard sibling fields nor unwrap a second envelope", () => {
+	const withSibling = { args: result, confidence: 1 };
+	assert.deepEqual(prepareResultArguments(withSibling), withSibling);
+	assert.deepEqual(prepareResultArguments({ args: { input: result } }), { input: result });
 });

@@ -45,6 +45,8 @@ public class RepositoryTreeContentSource {
         }
         if (gitRepositoryManager.isEnabled() && request.pullRequest())
             request.preparation().prepare(repositoryPreparer, request);
+        var unavailable = request.preparation().unavailableReason();
+        if (unavailable != null) return CaptureContribution.unavailable(Set.of(KIND), unavailable);
         SourceCaptureState absence = absenceOrNull(request);
         if (absence != null) {
             return absent(absence);

@@ -137,7 +137,9 @@ public class PullRequestContentSource {
         Map<SourceKind, SourceCaptureState> states = cloneRequested && !cloneEnabled
                 ? Map.of(DIFF, new SourceCaptureState.NotCollected(SourceAbsenceReason.DISABLED))
                 : Map.of();
-        if (cloneEnabled) {
+        var unavailable = request.preparation().unavailableReason();
+        if (cloneEnabled && unavailable != null) states = Map.of(DIFF, new SourceCaptureState.Unavailable(unavailable));
+        if (prepared != null) {
             ensureRepositoryAvailable(new RepositoryKey(capture.workspaceId(), repositoryId));
         }
         if (selectedKinds.contains(CORE)) {

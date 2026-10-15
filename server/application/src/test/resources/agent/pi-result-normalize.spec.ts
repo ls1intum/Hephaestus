@@ -186,7 +186,7 @@ void test("session outcomes retain their distinct evidence and problem bounds", 
 	}
 });
 
-void test("normalization preserves unknown fields for contract refusal and reports all bad text fields", () => {
+void test("normalization preserves unknown fields for contract refusal and reports the first bad text field", () => {
 	for (const key of ["severity", "confidence", "guidance", "assessment", "coverage"]) {
 		assert.throws(
 			() => normalizeSubmission(baseSubmission({ [key]: "untrusted" })),
@@ -200,9 +200,8 @@ void test("normalization preserves unknown fields for contract refusal and repor
 			problems: [problemFixture({ severity: "HIGH" })],
 		}),
 	);
-	for (const path of ["summary", "explanation", "problems.0.severity"]) {
-		assert.ok(error.includes(path), error);
-	}
+	assert.match(error, /^summary:.*160/u);
+	assert.doesNotMatch(error, /; also:/u);
 });
 
 void test("an uncertain session cannot turn a missing warrant into a verdict", () => {
@@ -263,7 +262,10 @@ void test("submissionCitations lists the result's, each problem's, the example's
 void test("a line-number refusal names what was received, and an omitted line as omitted", () => {
 	const cited = (lines: Record<string, unknown>) =>
 		citing(citationFixture({ startLine: undefined, endLine: undefined, ...lines }));
-	assert.match(refusal(cited({})), /^evidence citation startLine is required: the 1-based line/u);
+	assert.match(
+		refusal(cited({})),
+		/^citations\.0: evidence citation startLine is required: the 1-based line/u,
+	);
 	assert.match(refusal(cited({ startLine: null })), /startLine is required/u);
 	assert.match(
 		refusal(cited({ startLine: 0 })),
@@ -284,12 +286,12 @@ void test("citation requires an exact sourceFile path and quote", () => {
 	for (const quote of [undefined, null, "", "  "]) {
 		assert.match(
 			refusal(citing(citationFixture({ quote }))),
-			/^evidence citation quote is required/u,
+			/^citations\.0: evidence citation quote is required/u,
 		);
 	}
 	assert.match(
 		refusal(citing(citationFixture({ quote: "x".repeat(4001) }))),
-		/^quote must be at most 4000 characters/u,
+		/^citations\.0: quote must be at most 4000 characters/u,
 	);
 });
 
@@ -304,7 +306,7 @@ void test("normalization preserves side for source-catalog validation", () => {
 void test("a citation of change.json is refused with what to quote instead", () => {
 	assert.match(
 		refusal(citing(citationFixture({ path: "inputs/context/change.json" }))),
-		/^change\.json pins the reviewed range and is not quotable/u,
+		/^citations\.0: change\.json pins the reviewed range and is not quotable/u,
 	);
 	assert.match(
 		refusal(
@@ -316,7 +318,7 @@ void test("a citation of change.json is refused with what to quote instead", () 
 				}),
 			),
 		),
-		/^repository citations must use the captured \.git\/HEAD sourceFile/u,
+		/^citations\.0: repository citations must use the captured \.git\/HEAD sourceFile/u,
 	);
 });
 
@@ -627,7 +629,7 @@ void test("a citation is completed from the manifest and its line numbers read a
 				[],
 				() => undefined,
 			),
-		/citations\.0\.sourceKind[\s\S]*citations\.1\.sourceKind/u,
+		/citations\.0: evidence citation sourceKind is required[\s\S]*Correction example/u,
 	);
 });
 
@@ -1490,4 +1492,14 @@ void test("a code change basis needs added and removed witness lines", () => {
 		() => validateChangeBasis(worsened, basisDiff),
 		/base witness must intersect removed lines/u,
 	);
+});
+
+void test("null problems normalize to absence for every outcome without problems", () => {
+	for (const outcome of ["MET", "DOES_NOT_APPLY", "COULD_NOT_DETERMINE"] as const) {
+		const candidate = resultOf(outcome);
+		assert.deepEqual(
+			normalizeSubmission({ ...candidate, problems: null }),
+			normalizeSubmission(candidate),
+		);
+	}
 });

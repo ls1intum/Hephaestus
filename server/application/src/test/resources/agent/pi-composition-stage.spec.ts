@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { parseAdmission } from "../../../main/resources/agent/pi-admitted-results.ts";
 import {
 	createReviewRecorder,
+	buildReviewTool,
 	closeUnroutedPrivateDestinations,
 	persistComposedFeedback,
 	type ComposedFeedback,
@@ -353,6 +354,40 @@ void test("the card tool and preparation share the server's title/body/nextStep 
 			onStored: () => undefined,
 		},
 	);
+	assert.ok(tool.prepareArguments);
+	for (const wrapper of ["args", "arguments", "input"]) {
+		assert.deepEqual(tool.prepareArguments({ [wrapper]: { feedback: [card.reported] } }), {
+			feedback: [card.reported],
+		});
+	}
+	assert.throws(
+		() => tool.prepareArguments?.({ feedback: "card" }),
+		/feedback.*Expected array.*Corrected field example/u,
+	);
+	const quietPiece = {
+		destination: "PRACTICE_PAGE",
+		practiceSlug: "tokens",
+		basedOn: [result.resultId],
+		action: "WITHHOLD",
+		withholdReason: "BELOW_BAR",
+		witnessIds: null,
+		title: null,
+		body: null,
+		nextStep: null,
+		notes: null,
+	};
+	assert.deepEqual(tool.prepareArguments({ feedback: [quietPiece] }), {
+		feedback: [
+			{
+				destination: "PRACTICE_PAGE",
+				practiceSlug: "tokens",
+				basedOn: [result.resultId],
+				action: "WITHHOLD",
+				withholdReason: "BELOW_BAR",
+				witnessIds: [],
+			},
+		],
+	});
 	const reply = z
 		.object({ details: z.object({ stored: z.number() }) })
 		.parse(
@@ -382,4 +417,75 @@ void test("the card tool and preparation share the server's title/body/nextStep 
 		persist: () => undefined,
 		recordFailure: () => assert.fail("the card should prepare"),
 	});
+});
+
+void test("report_review accepts one wrapper and null unused lists, and explains wrong text before storing a correction", async () => {
+	for (const wrapper of ["args", "arguments", "input"]) {
+		const resultId = "123e4567-e89b-42d3-a456-426614174000";
+		const feedback: ComposedFeedback = {
+			contractVersion: 3,
+			admissionDigest: "a".repeat(64),
+			compositionFailures: [],
+			results: [],
+			preparedTargets: [],
+			feedback: [],
+			review: null,
+			preparation: null,
+		};
+		const state: PublicReviewState = { final: false, reviewContext: "HELD" };
+		const tool = buildReviewTool(
+			false,
+			new Map([[resultId, { practiceSlug: "authentication", outcome: "NOT_MET", problems: [] }]]),
+			new Map(),
+			state,
+			() => "",
+			{
+				admitted: () => true,
+				feedback,
+				persist: () => undefined,
+				onStored: () => undefined,
+				refusal: async (_id, text) => {
+					throw new Error(text);
+				},
+			},
+		);
+		assert.ok(tool.prepareArguments);
+		const quiet = {
+			decisions: [{ resultId, disposition: "BELOW_BAR", witnessIds: null }],
+			inline: null,
+		};
+		assert.throws(
+			() =>
+				tool.prepareArguments?.({
+					...quiet,
+					decisions: [{ resultId, disposition: "BELOW_BAR", witnessIds: [] }],
+					inline: [],
+					summary: "No concern.",
+				}),
+			/summary.*Expected.*Corrected field example/u,
+		);
+		assert.throws(
+			() =>
+				tool.prepareArguments?.({
+					...quiet,
+					decisions: [{ resultId, disposition: "BELOW_BAR", witnessIds: [] }],
+					inline: [],
+					summary: null,
+					unknown: true,
+				}),
+			/unknown.*only.*decisions.*Corrected field example/u,
+		);
+		const prepared = tool.prepareArguments({ [wrapper]: quiet });
+		const reply: unknown = await Reflect.apply(tool.execute.bind(tool), tool, ["quiet", prepared]);
+		assert.ok(typeof reply === "object" && reply !== null);
+		const details: unknown = Reflect.get(reply, "details");
+		assert.ok(typeof details === "object" && details !== null);
+		assert.equal(Reflect.get(details, "stored"), 1);
+		assert.equal(state.final, true);
+		assert.deepEqual(feedback.review, {
+			summary: null,
+			inline: [],
+			withheld: [{ basedOn: [{ resultId }], reason: "BELOW_BAR", witnessIds: [] }],
+		});
+	}
 });

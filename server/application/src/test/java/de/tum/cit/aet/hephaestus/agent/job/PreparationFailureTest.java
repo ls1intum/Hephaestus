@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ReviewSourceNotReadyException;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.stream.Stream;
@@ -22,6 +24,9 @@ class PreparationFailureTest {
         return Stream.of(
                 Arguments.of(new ReviewSourceNotReadyException("pending"), PreparationFailure.Kind.SOURCE_NOT_READY),
                 Arguments.of(new IOException("file"), PreparationFailure.Kind.IO),
+                Arguments.of(
+                        new ItemCaptureException(ItemCaptureCode.ITEM_NOT_VISIBLE, "private"),
+                        PreparationFailure.Kind.SOURCE_CAPTURE),
                 Arguments.of(new UncheckedIOException(new IOException("file")), PreparationFailure.Kind.IO),
                 Arguments.of(new DataIntegrityViolationException("constraint"), PreparationFailure.Kind.DATABASE),
                 Arguments.of(new CannotCreateTransactionException("database"), PreparationFailure.Kind.DATABASE),
@@ -64,6 +69,18 @@ class PreparationFailureTest {
         first.initCause(second);
         assertThat(PreparationFailure.of(PreparationFailure.Stage.INPUTS, first).kind())
                 .isEqualTo(PreparationFailure.Kind.INPUT_PREPARATION);
+        assertThat(PreparationFailure.of(PreparationFailure.Stage.INPUTS, first).exceptionTypes())
+                .containsExactly(JobPreparationException.class.getName(), JobPreparationException.class.getName());
+    }
+
+    @Test
+    void shouldClassifyAnUnavailablePinnedRangeWithoutReadingTheMessage() {
+        var failure = PreparationFailure.of(
+                PreparationFailure.Stage.INPUTS,
+                new ItemCaptureException(ItemCaptureCode.VERSION_UNAVAILABLE, "secret"));
+        assertThat(failure.kind()).isEqualTo(PreparationFailure.Kind.SOURCE_CAPTURE);
+        assertThat(failure.reason()).isEqualTo(JobPreparationException.Reason.REVIEW_RANGE_UNAVAILABLE);
+        assertThat(failure.exceptionTypes()).containsExactly(ItemCaptureException.class.getName());
     }
 
     @Test
@@ -101,6 +118,17 @@ class PreparationFailureTest {
         assertThat(databaseFailure.message()).doesNotContain(privateText);
         assertThat(ReviewJobExecutor.isRetryableExecutionFailure(io)).isFalse();
         assertThat(ReviewJobExecutor.isRetryableExecutionFailure(database)).isFalse();
+    }
+
+    @Test
+    void shouldKeepAnExplicitPreparationReasonWhenTheCauseIsAnItemCaptureFailure() {
+        var failure = new JobPreparationException(
+                JobPreparationException.Reason.WORKSPACE_RENDERING_FAILED,
+                "private",
+                new ItemCaptureException(ItemCaptureCode.CAPTURE_FAILED, "private"));
+        assertThat(PreparationFailure.of(PreparationFailure.Stage.INPUTS, failure)
+                        .reason())
+                .isEqualTo(JobPreparationException.Reason.WORKSPACE_RENDERING_FAILED);
     }
 
     @Test

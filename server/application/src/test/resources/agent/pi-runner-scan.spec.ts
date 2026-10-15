@@ -134,7 +134,10 @@ for (const basis of ["state", "introduced"] as const) {
 			});
 			if (basis === "introduced") {
 				assert.equal(exit.status, 1, exit.stderr);
-				assert.match(exit.stderr, /basis_not_allowed: a scan needs state basis/u);
+				assert.match(
+					exit.stderr,
+					/basis_not_allowed: problems\.0\.basis: a scan needs state basis/u,
+				);
 				assert.deepEqual(capturedLines(cwd, "admission"), []);
 				return;
 			}

@@ -24,6 +24,8 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.InvalidRemoteException;
+import org.eclipse.jgit.api.errors.TransportException;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.diff.Edit;
@@ -161,6 +163,8 @@ public class GitRepositoryManager {
                             .call();
                 }
                 return null;
+            } catch (InvalidRemoteException | TransportException e) {
+                throw new RepositoryFetchException(e);
             } catch (GitAPIException | IOException e) {
                 throw new GitOperationException("Cannot fetch repository " + repository.repositoryId(), e);
             }
@@ -186,6 +190,8 @@ public class GitRepositoryManager {
                         .call();
                 ObjectId resolved = git.getRepository().resolve(localRef);
                 return resolved != null && resolved.getName().equals(expectedSha.toLowerCase(Locale.ROOT));
+            } catch (InvalidRemoteException | TransportException e) {
+                throw new RepositoryFetchException(e);
             } catch (GitAPIException | IOException e) {
                 throw new GitOperationException("Cannot fetch review commit " + expectedSha, e);
             }
@@ -743,6 +749,16 @@ public class GitRepositoryManager {
         @Override
         public void close() {
             deleteTreeQuietly(stagingDir);
+        }
+    }
+
+    /** The authorized upstream could not supply Git objects. Local storage failures stay distinct. */
+    public static final class RepositoryFetchException extends GitOperationException {
+        @Serial
+        private static final long serialVersionUID = 1L;
+
+        public RepositoryFetchException(GitAPIException cause) {
+            super("Repository Git transport is unavailable", cause);
         }
     }
 

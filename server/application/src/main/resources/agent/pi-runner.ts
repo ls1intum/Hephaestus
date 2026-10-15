@@ -125,7 +125,12 @@ import {
 import { SessionReads } from "./pi-session-reads.ts";
 import { SUPPORTED_SCHEMA_VERSION, taskPaths, resolveTaskPaths } from "./pi-task-paths.ts";
 import { hasText, isBlank } from "./pi-text.ts";
-import { prepareResultArguments } from "./pi-tool-arguments.ts";
+import {
+	prepareResultArguments,
+	validateResultEvidence,
+	RESULT_EVIDENCE_EXAMPLES,
+} from "./pi-tool-arguments.ts";
+import { toolArgumentValidator } from "./pi-tool-validation.ts";
 import { prepareTurnText } from "./pi-turn-context.ts";
 import { parseDiff } from "./work/practice-scripts/kits/scm/diff-parser.ts";
 import type { DiffFile } from "./work/practice-scripts/kits/scm/types.ts";
@@ -345,13 +350,15 @@ function validateDomainBasis(
 ): void {
 	const scan = assignment?.scope.kind === "SCAN";
 
-	for (const problem of submission.problems ?? []) {
+	for (const [index, problem] of (submission.problems ?? []).entries()) {
 		if (scan && problem.basis.type !== "state") {
-			throw new Error("basis_not_allowed: a scan needs state basis");
+			throw new Error(
+				`basis_not_allowed: problems.${index}.basis: a scan needs state basis. Corrected field example: ${JSON.stringify({ basis: { type: "state", explanation: problem.basis.explanation } })}. Use only when the pinned file supports the claim.`,
+			);
 		}
 		if (!scan && assignment?.kind === "scm.pull_request" && problem.basis.type === "state") {
 			throw new Error(
-				"state_basis_not_allowed: an ITEM change needs introduced, worsened or duty basis",
+				`state_basis_not_allowed: problems.${index}.basis.type: an ITEM change needs introduced, worsened or duty basis. Corrected field example: ${JSON.stringify({ basis: { type: "introduced", head: 0, explanation: "<how the cited NEW line introduces this problem>" } })}. This is a shape example; choose introduced only if the changed line proves introduction, worsened only with OLD and NEW witnesses, or duty with an exact criterionQuote and event index. Otherwise remove the problem.`,
 			);
 		}
 	}
@@ -941,24 +948,51 @@ export async function runReviewJob(): Promise<void> {
 				description: "The lines that show this problem.",
 			},
 			basis: {
-				type: "object",
-				additionalProperties: false,
-				required: ["type", "explanation"],
 				description:
 					"All indexes are zero-based positions in THIS problem's citations array: with one citation, use 0. Why the problem belongs to this work. introduced: the change adds it (head: the index of a citation of the NEW side or the reviewed head). worsened: the change makes it worse (base: the index of the OLD side's citation, head: the NEW side's). duty: the criteria require an event that this work lacks (criterionQuote: the criteria's exact words, event: the index of the citation that shows the event). state: the problem exists in the pinned file; its citations witness that state at the reviewed version.",
-				properties: {
-					type: {
-						type: "string",
-						enum: ["introduced", "worsened", "duty", "state"],
-						description:
-							"Use introduced or worsened for changed behavior, duty for a required event, and state only for SCAN.",
+				anyOf: [
+					{
+						type: "object",
+						additionalProperties: false,
+						required: ["type", "head", "explanation"],
+						properties: {
+							type: { type: "string", enum: ["introduced"] },
+							head: { type: "integer", minimum: 0 },
+							explanation: { type: "string", minLength: 1 },
+						},
 					},
-					head: { type: ["integer", "null"], minimum: 0 },
-					base: { type: ["integer", "null"], minimum: 0 },
-					event: { type: ["integer", "null"], minimum: 0 },
-					criterionQuote: { type: ["string", "null"] },
-					explanation: { type: "string", minLength: 1 },
-				},
+					{
+						type: "object",
+						additionalProperties: false,
+						required: ["type", "base", "head", "explanation"],
+						properties: {
+							type: { type: "string", enum: ["worsened"] },
+							base: { type: "integer", minimum: 0 },
+							head: { type: "integer", minimum: 0 },
+							explanation: { type: "string", minLength: 1 },
+						},
+					},
+					{
+						type: "object",
+						additionalProperties: false,
+						required: ["type", "event", "criterionQuote", "explanation"],
+						properties: {
+							type: { type: "string", enum: ["duty"] },
+							event: { type: "integer", minimum: 0 },
+							criterionQuote: { type: "string", minLength: 1 },
+							explanation: { type: "string", minLength: 1 },
+						},
+					},
+					{
+						type: "object",
+						additionalProperties: false,
+						required: ["type", "explanation"],
+						properties: {
+							type: { type: "string", enum: ["state"] },
+							explanation: { type: "string", minLength: 1 },
+						},
+					},
+				],
 			},
 			nextStep: {
 				type: ["string", "null"],
@@ -1009,7 +1043,7 @@ export async function runReviewJob(): Promise<void> {
 					{ type: "null" },
 				],
 				description:
-					"NOT_MET only, and required there: each problem the evidence shows, each with its own severity, citations and basis. null for every other outcome.",
+					"NOT_MET requires a nonempty array: each problem has severity, summary, explanation, citations and basis. For every other outcome, omit problems or use null or [].",
 			},
 			example: {
 				anyOf: [
@@ -1031,10 +1065,9 @@ export async function runReviewJob(): Promise<void> {
 				type: "object",
 				additionalProperties: false,
 				description:
-					"The warrant the outcome owes, and nothing else: search for a MET or NOT_MET or COULD_NOT_DETERMINE that rests on something " +
-					"missing — what you looked for, where, and what the search did not cover; inapplicability for DOES_NOT_APPLY; " +
-					"openQuestions, a list of open questions, for COULD_NOT_DETERMINE and, beside its problems, for a NOT_MET. Use null for " +
-					"branches that do not apply.",
+					"An object with only these outcome-specific fields. MET: optional search warrant; DOES_NOT_APPLY: required inapplicability; " +
+					"COULD_NOT_DETERMINE: required openQuestions and optional search; NOT_MET: optional search and openQuestions. " +
+					"Put consulted, lookedFor and boundary inside search, never directly inside evidence. Omit unused fields or use null.",
 				properties: {
 					search: { anyOf: [searchSchema, { type: "null" }] },
 					inapplicability: { anyOf: [inapplicabilitySchema, { type: "null" }] },
@@ -1357,7 +1390,8 @@ export async function runReviewJob(): Promise<void> {
 	function reviewedVersion(citation: Citation, matches: readonly CitableText[]): CitableText {
 		const change = readChange(INPUT_PATHS.contextRoot);
 		const reviewed = (citation.side ?? "NEW") === "OLD" ? change?.base : change?.head;
-		const pinned = citation.commit === undefined ? matches.filter((entry) => entry.commit === reviewed) : [];
+		const pinned =
+			citation.commit === undefined ? matches.filter((entry) => entry.commit === reviewed) : [];
 		const [only] = pinned;
 		if (pinned.length === 1 && only !== undefined) {
 			return only;
@@ -1800,22 +1834,29 @@ export async function runReviewJob(): Promise<void> {
 	}
 
 	function buildSubmitResultTool() {
+		const validateArguments = toolArgumentValidator(resultSchema);
 		return defineTool({
 			name: "submit_result",
 			exposure: "model-only",
 			label: "Submit Result",
 			description:
-				"Submit the one complete evidenced result of this session's practice: its outcome, the explanation, the " +
-				"citations it rests on, and for NOT_MET each problem with its severity, citations and basis. The host adds " +
-				"the coverage it measured from your reads and keeps the result for server admission after measuring. To " +
-				"correct it, submit the complete result again. Cite the source you read; the runner resolves source kind, " +
-				"manifest identity and the captured revision. Citation examples: " +
-				'{"path":"src/Auth.java","startLine":10,"quote":"insecure();"}; ' +
-				'{"sourcePath":"work/change/diff.patch","path":"src/Auth.java","side":"NEW","startLine":10,"quote":"+ insecure();"}; ' +
+				`Submit the one complete evidenced result of this session's practice: its outcome, the explanation, the ` +
+				`citations it rests on, and for NOT_MET each problem with its severity, citations and basis. The host adds ` +
+				`the coverage it measured from your reads and keeps the result for server admission after measuring. To ` +
+				`correct it, submit the complete result again. Cite the source you read; the runner resolves source kind, ` +
+				`manifest identity and the captured revision. Citation examples: ` +
+				`{"path":"src/Auth.java","startLine":10,"quote":"insecure();"}; ` +
+				`{"sourcePath":"work/change/diff.patch","path":"src/Auth.java","side":"NEW","startLine":10,"quote":"+ insecure();"}; ` +
 				`{"path":"${taskEnvelope.paths.contextRoot}/metadata.json","startLine":1,"quote":"Add login"}. ` +
-				"Use only text you read. Examples show the shape, not evidence for this review.",
+				`Use only text you read. Examples show the shape, not evidence for this review. ${
+					RESULT_EVIDENCE_EXAMPLES
+				}`,
 			parameters: resultSchema,
-			prepareArguments: prepareResultArguments,
+			prepareArguments: (raw) => {
+				const prepared = prepareResultArguments(raw);
+				validateResultEvidence(prepared, availableSourceKindValues);
+				return validateArguments(prepared);
+			},
 			execute: async (toolCallId, params): Promise<AgentToolResult<SubmitResultDetails>> => {
 				if (measurementClosed || activeReview === null) {
 					const text = "Measurement is closed; this turn may only compose feedback.";

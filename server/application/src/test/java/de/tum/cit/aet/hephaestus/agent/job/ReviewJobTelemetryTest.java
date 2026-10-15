@@ -8,6 +8,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.tracing.Tracer;
@@ -20,12 +23,50 @@ import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
 import io.opentelemetry.sdk.trace.export.SpanExporter;
 import io.opentelemetry.sdk.trace.samplers.Sampler;
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 
 @Tag("unit")
 class ReviewJobTelemetryTest {
+
+    @Test
+    void shouldLogTheExceptionClassAndCauseChainOnceWithoutPrivateMessages() {
+        var logger = (Logger) LoggerFactory.getLogger(ReviewJobTelemetry.class);
+        var appender = new ListAppender<ILoggingEvent>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            var telemetry = new ReviewJobTelemetry(new SimpleMeterRegistry(), Tracer.NOOP);
+            var job = new ReviewJob();
+            RuntimeJobTestData.initialize(job, workspace(42L).getId());
+            var cause = new IllegalArgumentException("provider body with token=secret");
+            var exception = new IllegalStateException("https://private:secret@provider/repo", cause);
+            var failure = PreparationFailure.of(PreparationFailure.Stage.INPUTS, exception);
+
+            telemetry.preparationFailed(job, failure, "FAILED");
+
+            assertThat(appender.list).singleElement().satisfies(event -> {
+                assertThat(event.getThrowableProxy()).isNull();
+                assertThat(event.getFormattedMessage()).isEqualTo("Agent job preparation failed");
+                assertThat(event.getKeyValuePairs())
+                        .anySatisfy(pair -> {
+                            assertThat(pair.key).isEqualTo("exception.type");
+                            assertThat(pair.value).isEqualTo(IllegalStateException.class.getName());
+                        })
+                        .anySatisfy(pair -> {
+                            assertThat(pair.key).isEqualTo("exception.cause.types");
+                            assertThat(pair.value).isEqualTo(List.of(IllegalArgumentException.class.getName()));
+                        });
+                assertThat(event.getKeyValuePairs().toString()).doesNotContain("secret", "provider body");
+            });
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+    }
 
     @Test
     void shouldExposeOnlyBoundedLifecycleLabelsWhenRecordingTerminalJob() {

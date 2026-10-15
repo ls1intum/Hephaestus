@@ -21,6 +21,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import org.eclipse.jgit.api.errors.TransportException;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,6 +38,7 @@ class RepositoryTreeContentSourceTest extends BaseUnitTest {
     private GitRepositoryManager gitRepositoryManager;
 
     private RepositoryTreeContentSource source;
+    private final ReviewRepositoryPreparer preparer = Mockito.mock(ReviewRepositoryPreparer.class);
     private final List<AutoCloseable> cleanups = new ArrayList<>();
 
     @AfterEach
@@ -47,9 +49,7 @@ class RepositoryTreeContentSourceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         source = new RepositoryTreeContentSource(
-                gitRepositoryManager,
-                Mockito.mock(ReviewRepositoryPreparer.class),
-                Mockito.mock(PersonDataCopyRecorder.class));
+                gitRepositoryManager, preparer, Mockito.mock(PersonDataCopyRecorder.class));
     }
 
     @TempDir
@@ -171,6 +171,24 @@ class RepositoryTreeContentSourceTest extends BaseUnitTest {
                 .containsExactly(entry(
                         new SourceKind("scm.repository.tree"),
                         new SourceCaptureState.Unavailable(SourceAbsenceReason.NO_WORKING_COPY)));
+    }
+
+    @Test
+    void shouldRecordATreeOnlyFetchFailureAsUnavailable() {
+        var request = job(17L, "a".repeat(40));
+        when(gitRepositoryManager.isEnabled()).thenReturn(true);
+        when(preparer.prepare(request))
+                .thenThrow(
+                        new GitRepositoryManager.RepositoryFetchException(new TransportException("private upstream")));
+
+        var captured = source.capture(request, Set.of(RepositoryTreeContentSource.KIND));
+
+        assertThat(captured.stateOverrides())
+                .containsEntry(
+                        RepositoryTreeContentSource.KIND,
+                        new SourceCaptureState.Unavailable(SourceAbsenceReason.REPOSITORY_FETCH_FAILED));
+        assertThat(captured.directories()).isEmpty();
+        assertThat(captured.citableTexts()).isEmpty();
     }
 
     private static ScmCaptureContext job(long repositoryId, @Nullable String commitSha) {

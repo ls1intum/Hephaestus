@@ -135,6 +135,11 @@ final class ReviewJobTelemetry {
                 .addKeyValue("job.preparation.stage", failure.stage().tag())
                 .addKeyValue("job.preparation.kind", failure.kind().tag())
                 .addKeyValue("job.preparation.reason", failure.reasonTag())
+                .addKeyValue("exception.type", failure.exceptionTypes().getFirst())
+                .addKeyValue(
+                        "exception.cause.types",
+                        failure.exceptionTypes()
+                                .subList(1, failure.exceptionTypes().size()))
                 .addKeyValue("job.result", result)
                 .log("Agent job preparation failed");
         Span span = tracer.currentSpan();

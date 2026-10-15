@@ -90,7 +90,21 @@ The domain source supplies the pinned record, version, roles and authorized mate
 Capture records availability, content, completeness and collection outcome separately.
 Every required source must meet the practice's declared read requirements.
 A missing, failed, redacted or incomplete required source records a readiness refusal.
-It produces no result.
+It produces no result for that practice.
+Other practices can run when their required sources are available.
+
+For GitHub and GitLab reviews, a Git transport failure records `UNAVAILABLE` with `REPOSITORY_FETCH_FAILED` for the repository tree.
+An unreadable pinned base or head records `REVIEW_VERSION_UNAVAILABLE`.
+
+The pinned diff, file citations and commit records currently require the same Git objects.
+They have no provider API fallback.
+A fetch failure therefore also makes the diff unavailable and omits commit records.
+Description and discussion capture can still succeed from synchronized provider records.
+Readiness withholds practices that require the unavailable source and retains the precise reason in each source check.
+Neither a fetch failure nor an unavailable source is evidence of a problem in the work.
+
+Preparation failures log exception class names and their cause chain once per attempt.
+These diagnostics exclude exception messages, credentials and provider bodies.
 
 Consent checks apply to every person whose work the review reads.
 The result's developer is not the only source-person dependency.

@@ -37,6 +37,29 @@ await test("serialized absent, matched and undecidable reports conform to source
 	for (const report of Object.values(reports)) {
 		assert.ok(validate(report), JSON.stringify(validate.errors));
 	}
+	for (const reason of ["REPOSITORY_FETCH_FAILED", "REVIEW_VERSION_UNAVAILABLE"]) {
+		const unavailable = structuredClone(asRecord(reports.NOT_FOUND, "absent report"));
+		unavailable.applicability = {};
+		unavailable.decisions = [
+			{
+				practiceSlug: "tree-practice",
+				decidedAt: unavailable.decidedAt,
+				ready: false,
+				reasonCodes: ["DECLARED_EVIDENCE_INSUFFICIENT"],
+				sourceChecks: [
+					{
+						sourceKind: "scm.repository.tree",
+						sourceContractVersion: "2.0.0",
+						checkedAt: unavailable.decidedAt,
+						temporalAnchor: unavailable.manifestCapturedAt,
+						meetsRequirements: false,
+						reasonCodes: ["SOURCE_NOT_AVAILABLE", reason],
+					},
+				],
+			},
+		];
+		assert.ok(validate(unavailable), JSON.stringify(validate.errors));
+	}
 	const invalid = structuredClone(asRecord(reports.NOT_FOUND, "absent report"));
 	asRecord(invalid.applicability, "applicability").other = {
 		absent: true,

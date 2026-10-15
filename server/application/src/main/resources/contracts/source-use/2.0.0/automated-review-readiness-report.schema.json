@@ -367,7 +367,7 @@
 					"type": "array",
 					"uniqueItems": true,
 					"items": {
-						"enum": ["SOURCE_NOT_AVAILABLE", "SOURCE_INCOMPLETE"]
+						"enum": ["SOURCE_NOT_AVAILABLE", "SOURCE_INCOMPLETE", "REPOSITORY_FETCH_FAILED", "REVIEW_VERSION_UNAVAILABLE"]
 					},
 					"description": "Stable reasons this required source did not pass."
 				}

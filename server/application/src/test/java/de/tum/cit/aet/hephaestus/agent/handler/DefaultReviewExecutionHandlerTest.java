@@ -31,6 +31,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.evidence.SourceReadinessReason;
 import de.tum.cit.aet.hephaestus.integration.core.framework.ItemDescriptorRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
@@ -49,6 +50,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.PinnedPractice;
 import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryEntry;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewCaptureDecision;
@@ -67,6 +69,8 @@ import java.util.Set;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
@@ -402,6 +406,89 @@ class DefaultReviewExecutionHandlerTest extends BaseUnitTest {
         verify(members)
                 .capture(eq(1L), eq(job.getReviewId()), eq(job.getId()), eq(job.getAttempt()), decisions.capture());
         assertThat(decisions.getValue().getFirst().status()).isEqualTo(expected);
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = SourceAbsenceReason.class,
+            names = {"REPOSITORY_FETCH_FAILED", "REVIEW_VERSION_UNAVAILABLE"})
+    void shouldRunAvailablePracticesAndWithholdOnlyRequiredRepositoryReads(SourceAbsenceReason reason) {
+        var job = RuntimeReviewTestData.job();
+        var available = RuntimeReviewTestData.assignment(5L, null);
+        var original = available.practice();
+        var d = original.definition();
+        var tree = new SourceKind("scm.repository.tree");
+        var definition = new PracticeDefinition(
+                d.name(),
+                d.reviewOn(),
+                d.appliesWhen(),
+                d.about(),
+                new PracticeReads("2.0.0", List.of(new PracticeReadSource(tree, ReadNeed.REQUIRED))),
+                d.reviewedBy(),
+                d.criteria(),
+                d.script(),
+                d.scan(),
+                d.lineNotes(),
+                d.guidance());
+        var withheld = new ReviewAssignmentSnapshot(
+                new ReviewAssignmentId(job.getReviewId(), 41L, available.item().itemId()),
+                available.item(),
+                available.version(),
+                available.developerId(),
+                "repository-practice",
+                new PinnedPractice(41L, 42L, definition, original.reviewDigest(), original.method()));
+        when(assignments.load(job)).thenReturn(List.of(available, withheld));
+        when(assignments.review(job)).thenReturn(RuntimeReviewTestData.review(ReviewKind.ITEM, available));
+        when(source.supports(available.item())).thenReturn(true);
+        var snapshot = mock(ItemSnapshot.class);
+        when(source.pin(available.item(), available.version())).thenReturn(snapshot);
+        when(source.record(eq(snapshot), any()))
+                .thenReturn(mapper.createObjectNode().put("title", "Captured work"));
+        var manifest = new JobFolderIndex(
+                new SourceContractVersion("2.0.0"),
+                "a".repeat(64),
+                available.item().kind().value(),
+                NOW,
+                List.of(
+                        new SourceCapture(
+                                new SourceKind("docs.document.core"),
+                                new SourceCaptureState.Available(
+                                        SourceContentState.EMPTY,
+                                        SourceCompleteness.COMPLETE,
+                                        new SourceCaptureFacts(NOW, null, null, "docs:one")),
+                                EvidenceSnapshotFixtures.citation(new SourceKind("docs.document.core")),
+                                List.of()),
+                        new SourceCapture(
+                                tree,
+                                new SourceCaptureState.Unavailable(reason),
+                                EvidenceSnapshotFixtures.citation(tree),
+                                List.of())),
+                List.of(),
+                List.of(),
+                List.of());
+        when(context.prepare(eq(snapshot), any())).thenReturn(new PreparedEvidence(Map.of(), manifest));
+        when(files.prepare(eq(job), any(), any()))
+                .thenReturn(new PreparedJobInputs(Map.of(), List.of(), List.of(), manifest, null));
+
+        try (var prepared = handler.prepareInputs(job)) {
+            assertThat(prepared.folderIndex()).isNotNull();
+        }
+
+        ArgumentCaptor<List<ReviewCaptureDecision>> decisions = ArgumentCaptor.captor();
+        verify(members)
+                .capture(eq(1L), eq(job.getReviewId()), eq(job.getId()), eq(job.getAttempt()), decisions.capture());
+        assertThat(decisions.getValue())
+                .satisfiesExactly(
+                        decision -> assertThat(decision.status()).isEqualTo(ReviewPracticeStatus.READY), decision -> {
+                            assertThat(decision.status()).isEqualTo(ReviewPracticeStatus.WITHHELD);
+                            assertThat(decision.facts()
+                                            .path("sourceChecks")
+                                            .get(0)
+                                            .path("reasonCodes"))
+                                    .isEqualTo(mapper.valueToTree(
+                                            List.of(SourceReadinessReason.SOURCE_NOT_AVAILABLE.name(), reason.name())));
+                        });
+        verify(catalog).inject(any(), eq(List.of(available)), eq(ReviewKind.ITEM), eq(Map.of()));
     }
 
     @Test

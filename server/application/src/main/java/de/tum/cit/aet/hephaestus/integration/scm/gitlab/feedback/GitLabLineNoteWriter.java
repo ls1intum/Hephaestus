@@ -37,6 +37,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -50,8 +51,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.stereotype.Component;
 
-// Ordinary comments use static links at the reviewed commit; GitLab does not attach them to diff lines.
-// Fence each create separately, and preserve existing copy markers during correction.
+// Fence each physical copy before creating it, and preserve its marker during correction.
 @Component
 @ConditionalOnServerRole
 @OutboundEgressGateway
@@ -69,6 +69,7 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
     private final GitLabGraphQlClientProvider gitLabProvider;
     private final GitLabMrResolver mrResolver;
     private final GitLabTokenService tokenService;
+    private final GitLabDiffVersionReader diffVersions;
     private final OutboundEgressGuard egressGuard;
     private final ScmFeedbackTargetResolver targets;
 
@@ -77,12 +78,14 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
             GitLabMrResolver mrResolver,
             GitLabTokenService tokenService,
             OutboundEgressGuard egressGuard,
-            ScmFeedbackTargetResolver targets) {
+            ScmFeedbackTargetResolver targets,
+            GitLabDiffVersionReader diffVersions) {
         this.gitLabProvider = gitLabProvider;
         this.mrResolver = mrResolver;
         this.tokenService = tokenService;
         this.egressGuard = egressGuard;
         this.targets = targets;
+        this.diffVersions = diffVersions;
     }
 
     @Override
@@ -118,6 +121,7 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
         String projectUrl = projectUrl(scopeId, mr);
         Map<String, Copy> copies = indexCopies(scopeId, mr, feedbackItems, target.version(), projectUrl);
 
+        var pinnedDiff = diffVersions.read(scopeId, mr, target.version());
         List<CopyReceipt> completed = new ArrayList<>(feedbackItems.size());
         Set<String> processedKeys = new HashSet<>();
         for (int index = 0; index < feedbackItems.size(); index++) {
@@ -155,12 +159,25 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
                 completed.addAll(unrequested(rest, copies));
                 return CopyWriteResult.of(completed);
             }
-            Attempt attempt = createLocationComment(
-                    scopeId,
-                    mrInfo.globalId(),
-                    locationBody(projectUrl, anchorVersion, diff, item),
-                    diff,
-                    item.copyId());
+            var position = pinnedDiff == null ? null : GitLabDiffPositions.build(pinnedDiff, diff);
+            Attempt attempt = position == null ? null : createDiffNote(scopeId, mrInfo.globalId(), item, position);
+            if (attempt == null) {
+                // The committed copy fence covers the fallback after a confirmed position rejection.
+                if (position != null) {
+                    try {
+                        egressGuard.requireDeliveryAllowed("gitlab.post-inline-feedback");
+                    } catch (OutboundEgressSuppressedException e) {
+                        completed.addAll(unrequested(rest, copies));
+                        return CopyWriteResult.withheld(completed, deliveryKeys(rest));
+                    }
+                }
+                attempt = createLocationComment(
+                        scopeId,
+                        mrInfo.globalId(),
+                        locationBody(projectUrl, anchorVersion, diff, item),
+                        diff,
+                        item.copyId());
+            }
             completed.add(attempt.receipt());
             if (attempt.stop()) {
                 completed.addAll(unrequested(feedbackItems.subList(index + 1, feedbackItems.size()), copies));
@@ -195,6 +212,57 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
         } catch (RuntimeException e) {
             return null;
         }
+    }
+
+    // Only an explicit position rejection proves that a fallback cannot duplicate a created note.
+    private @Nullable Attempt createDiffNote(long scopeId, String mrId, LineNote item, Map<String, Object> position) {
+        try {
+            var response = gitLabProvider
+                    .forScope(scopeId)
+                    .documentName("CreateDiffNote")
+                    .variable("noteableId", mrId)
+                    .variable("body", postedBody(item))
+                    .variable("position", position)
+                    .execute()
+                    .block(GRAPHQL_TIMEOUT);
+            Map<String, Object> payload =
+                    response == null ? null : response.field("createDiffNote").getValue();
+            if (payload != null
+                    && payload.get("note") instanceof Map<?, ?> note
+                    && note.get("id") instanceof String id
+                    && !id.isBlank()) {
+                return new Attempt(
+                        new CopyReceipt(
+                                item.copyId(),
+                                CopyDisposition.POSTED,
+                                id,
+                                note.get("url") instanceof String url ? url : null,
+                                true,
+                                CopyForm.LINE_NOTE),
+                        false);
+            }
+            if (response != null
+                    && response.getErrors().isEmpty()
+                    && payload != null
+                    && payload.containsKey("note")
+                    && payload.get("note") == null
+                    && payload.get("errors") instanceof List<?> errors
+                    && !errors.isEmpty()
+                    && errors.stream().allMatch(GitLabLineNoteWriter::positionError)) return null;
+            return new Attempt(CopyReceipt.attempted(item.copyId()), false);
+        } catch (RuntimeException failure) {
+            return new Attempt(CopyReceipt.attempted(item.copyId()), isRateLimitError(failure));
+        }
+    }
+
+    private static boolean positionError(Object error) {
+        if (!(error instanceof String text)) return false;
+        String message = text.toLowerCase(Locale.ROOT);
+        return message.contains("position")
+                || message.contains("line code")
+                || message.contains("line_code")
+                || message.contains("diff refs")
+                || message.contains("diff_refs");
     }
 
     // A failed ordinary-note request can still create a comment; it cannot prove rejection before the write.
@@ -356,7 +424,10 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
                 && position.get(diff.side() == CitationSide.OLD ? "oldLine" : "newLine") instanceof Number line
                 && line.intValue() == diff.endLine()
                 && position.get("diffRefs") instanceof Map<?, ?> diffRefs
-                && revision.equals(diffRefs.get(diff.side() == CitationSide.OLD ? "baseSha" : "headSha"));
+                && Objects.equals(version.baseVersion(), diffRefs.get("baseSha"))
+                && Objects.equals(ScmVersion.reviewedHead(version), diffRefs.get("headSha"))
+                && diffRefs.get("startSha") instanceof String startSha
+                && COMMIT_SHA.matcher(startSha).matches();
         return lineCopy ? CopyForm.LINE_NOTE : null;
     }
 

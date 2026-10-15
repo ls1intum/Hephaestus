@@ -349,6 +349,48 @@ if (scenario !== undefined && scenario !== "") {
 			};
 			const submit = options.customTools.find((tool) => tool.name === "submit_result");
 			assert.ok(submit, "submit_result is registered");
+			const submitCandidate = async (sent: unknown, slug: string, allowFailure: boolean) => {
+				try {
+					let argumentsToSubmit = submit.prepareArguments?.(sent) ?? sent;
+					if (hasText(process.env.PI_HOST_SCAN_PATH)) {
+						const payload: string = JSON.stringify({
+							tool: { name: submit.name, parameters: submit.parameters },
+							args: argumentsToSubmit,
+						});
+						const validated = spawnSync(
+							process.execPath,
+							[
+								"--experimental-import-meta-resolve",
+								"--input-type=module",
+								"-e",
+								`const { validateToolArguments } = await import(import.meta.resolve("@earendil-works/pi-ai", import.meta.resolve("@earendil-works/pi-coding-agent")));
+const { tool, args } = JSON.parse(process.argv[1]);
+process.stdout.write(JSON.stringify(validateToolArguments(tool, { name: tool.name, arguments: args })));`,
+								payload,
+							],
+							{ encoding: "utf8" },
+						);
+						assert.equal(validated.status, 0, validated.stderr);
+						argumentsToSubmit = parseJson(validated.stdout);
+					}
+					const reply = await submit.execute(`submit-${session}`, argumentsToSubmit);
+					capture("submitted", { slug, reply });
+				} catch (error) {
+					if (!allowFailure) {
+						throw error;
+					}
+					capture("submitted", {
+						slug,
+						reply: {
+							isError: true,
+							content: [
+								{ type: "text", text: error instanceof Error ? error.message : String(error) },
+							],
+						},
+					});
+				}
+			};
+
 			let sessionSlug: string | undefined;
 			return {
 				extensionsResult: { errors: [] },
@@ -451,29 +493,13 @@ if (scenario !== undefined && scenario !== "") {
 							const candidate: unknown = hasText(process.env.PI_HOST_SESSION_CANDIDATE)
 								? parseJson(process.env.PI_HOST_SESSION_CANDIDATE)
 								: SESSION_CANDIDATE;
-							let argumentsToSubmit = submit.prepareArguments?.(candidate) ?? candidate;
-							if (hasText(process.env.PI_HOST_SCAN_PATH)) {
-								const validated = spawnSync(
-									process.execPath,
-									[
-										"--experimental-import-meta-resolve",
-										"--input-type=module",
-										"-e",
-										`const { validateToolArguments } = await import(import.meta.resolve("@earendil-works/pi-ai", import.meta.resolve("@earendil-works/pi-coding-agent")));
-const { tool, args } = JSON.parse(process.argv[1]);
-process.stdout.write(JSON.stringify(validateToolArguments(tool, { name: tool.name, arguments: args })));`,
-										JSON.stringify({
-											tool: { name: submit.name, parameters: submit.parameters },
-											args: argumentsToSubmit,
-										}),
-									],
-									{ encoding: "utf8" },
-								);
-								assert.equal(validated.status, 0, validated.stderr);
-								argumentsToSubmit = parseJson(validated.stdout);
+							const correction = process.env.PI_HOST_SESSION_CORRECTION;
+							const candidates = hasText(correction)
+								? [candidate, parseJson(correction)]
+								: [candidate];
+							for (const sent of candidates) {
+								await submitCandidate(sent, slug, hasText(correction));
 							}
-							const reply = await submit.execute(`submit-${session}`, argumentsToSubmit);
-							capture("submitted", { slug, reply });
 						}
 					},
 				},

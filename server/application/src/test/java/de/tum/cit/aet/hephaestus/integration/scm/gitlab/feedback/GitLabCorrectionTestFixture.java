@@ -21,6 +21,7 @@ public final class GitLabCorrectionTestFixture {
                 mock(GitLabMrResolver.class),
                 mock(GitLabTokenService.class),
                 mock(OutboundEgressGuard.class),
-                ScmFeedbackFixtures.resolver());
+                ScmFeedbackFixtures.resolver(),
+                mock(GitLabDiffVersionReader.class));
     }
 }

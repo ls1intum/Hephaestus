@@ -9,6 +9,7 @@ import {
 	type createAgentSession,
 	type SettingsManager,
 } from "@earendil-works/pi-coding-agent";
+import { toolArgumentValidator, unwrapToolArguments } from "./pi-tool-validation.ts";
 
 import {
 	type Admission,
@@ -439,6 +440,54 @@ export function persistComposedFeedback(composedFeedback: ComposedFeedback, outp
 	writeFileSync(output, JSON.stringify({ ...composedFeedback, feedback }, null, 2));
 }
 
+/** Null unused copy fields and absent witness lists carry no evidence; basedOn is never inferred. */
+export function prepareFeedbackArguments(raw: unknown): unknown {
+	const input = unwrapToolArguments(raw);
+	if (!isRecord(input)) {
+		return input;
+	}
+	let listed = input.feedback;
+	if (typeof listed === "string") {
+		try {
+			const decoded: unknown = JSON.parse(listed);
+			listed = decoded;
+		} catch {
+			return input;
+		}
+	}
+	const pieces = isRecord(listed) ? [listed] : listed;
+	if (!Array.isArray(pieces)) {
+		return input;
+	}
+	return {
+		...input,
+		feedback: pieces.map((piece: unknown) => {
+			if (!isRecord(piece)) {
+				return piece;
+			}
+			const absent = new Set([
+				"supersedesThreadKey",
+				"title",
+				"body",
+				"nextStep",
+				"notes",
+				"withholdReason",
+			]);
+			const prepared = Object.fromEntries(
+				Object.entries(piece).filter(([key, value]) => value !== null || !absent.has(key)),
+			);
+			if (prepared.witnessIds === null) {
+				prepared.witnessIds = [];
+			}
+			if (isRecord(prepared.notes) && prepared.notes.alreadySaid === null) {
+				const { alreadySaid: _absent, ...notes } = prepared.notes;
+				prepared.notes = notes;
+			}
+			return prepared;
+		}),
+	};
+}
+
 export function buildFeedbackTool(
 	practiceSlugs: string[],
 	request: CompositionRequest,
@@ -655,8 +704,23 @@ export function buildFeedbackTool(
 		...(destination === "CONVERSATION" ? [branch(destination, "SUPERSEDE")] : []),
 	]);
 
+	const parameters = {
+		type: "object",
+		additionalProperties: false,
+		required: ["feedback"],
+		properties: { feedback: { type: "array", minItems: 1, items: { anyOf: branches } } },
+	};
+	// Each piece is stored or refused on its own; envelope preparation must preserve valid siblings.
+	const validateArguments = toolArgumentValidator(
+		{
+			...parameters,
+			properties: { feedback: { type: "array", minItems: 1, items: {} } },
+		},
+		parameters,
+	);
 	return defineTool({
 		name: "report_feedback",
+		prepareArguments: (raw) => validateArguments(prepareFeedbackArguments(raw)),
 		constrainedSampling: { type: "json_schema", strict: "prefer" },
 		exposure: "model-only",
 		label: "Report Feedback",
@@ -665,13 +729,10 @@ export function buildFeedbackTool(
 			"destination and practice. Send every piece you have ready in one call; each is stored or skipped on " +
 			"its own, with the reason, and a skipped piece can be sent again corrected without re-sending the " +
 			"stored ones. This is an intervention, not a measurement: it takes no outcome, severity or " +
-			"confidence, and no citation you typed yourself.",
-		parameters: {
-			type: "object",
-			additionalProperties: false,
-			required: ["feedback"],
-			properties: { feedback: { type: "array", minItems: 1, items: { anyOf: branches } } },
-		},
+			"confidence, and no citation you typed yourself. " +
+			'Input example for a practice page: {"feedback":[{"destination":"PRACTICE_PAGE","practiceSlug":"<admitted practice slug>","basedOn":["<its NOT_MET resultId or problemId>"],"action":"NEW","title":"Name the concern","body":"Explain the supported concern.","nextStep":"One action that addresses it."}]}. ' +
+			'For WITHHOLD, send destination, practiceSlug, basedOn, action:"WITHHOLD", withholdReason and witnessIds:[]; omit title, body, nextStep and notes.',
+		parameters,
 		execute: async (toolCallId, params): Promise<AgentToolResult<ReportFeedbackDetails>> => {
 			if (!runtime.admitted()) {
 				return {
@@ -898,17 +959,26 @@ export function buildReviewTool(
 ) {
 	// Every witness a decision can name; readReview checks which reason each one may support.
 	const eligible = [...witnesses].filter(([, witness]) => witness.eligibleForAlreadySaid);
+	const parameters = reviewToolParameters(
+		restable,
+		lineNotes,
+		eligible.map(([id]) => id),
+	);
+	const validateArguments = toolArgumentValidator(parameters);
 	return defineTool({
 		name: "report_review",
-		prepareArguments: prepareReviewArguments,
+		prepareArguments: (raw) => {
+			try {
+				return prepareReviewArguments(raw);
+			} catch (error) {
+				validateArguments(unwrapToolArguments(raw));
+				throw error;
+			}
+		},
 		exposure: "model-only",
 		label: "Report Review",
 		description: REVIEW_TOOL_DESCRIPTION,
-		parameters: reviewToolParameters(
-			restable,
-			lineNotes,
-			eligible.map(([id]) => id),
-		),
+		parameters,
 		execute: createReviewRecorder(lineNotes, restable, witnesses, state, restore, runtime),
 	});
 }

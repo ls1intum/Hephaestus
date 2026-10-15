@@ -1286,8 +1286,10 @@ if (scenario !== undefined && scenario !== "") {
 									),
 								);
 								assert.ok(
-									errors.some((error) =>
-										JSON.stringify(error.content).includes("evidence.boundary"),
+									errors.some(
+										(error) =>
+											JSON.stringify(error.content).includes("evidence.consulted") &&
+											JSON.stringify(error.content).includes("Corrected field example"),
 									),
 								);
 								content.push(submitCall("repaired", candidate));
@@ -4541,7 +4543,7 @@ const nullableCases = [
 const responseDeclaration = convertResponsesTools([{ ...tool, description: "Submit a result." }])[0];
 assert.equal(responseDeclaration.strict, false);
 for (const item of nullableCases) {
-  assert.deepEqual(validate(item), item);
+  assert.deepEqual(validate(item), prepareResultArguments(item));
   assert.deepEqual(validateToolArguments({ ...tool, parameters: responseDeclaration.parameters }, { name: tool.name, arguments: item }), item);
 }
 // Invalid primitives must not become null before outcome and citation validation sees them.

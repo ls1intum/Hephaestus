@@ -460,21 +460,23 @@ export function normalizeSubmission(
 ): NormalizedSubmission {
 	const errors: string[] = [];
 	const repairs: CitationRepairs = { sourceOf, sources, notes };
-	const citation = (value: unknown): unknown => {
+	const citation = (value: unknown, path: string): unknown => {
 		try {
 			return normalizeCitation(value, "", repairs);
 		} catch (error) {
-			errors.push(error instanceof Error ? error.message : String(error));
+			errors.push(`${path}: ${error instanceof Error ? error.message : String(error)}`);
 			return value;
 		}
 	};
-	const repair = (value: unknown, field = ""): unknown => {
+	const repair = (value: unknown, field = "", path = ""): unknown => {
 		if (field === "citation") {
-			return citation(value);
+			return citation(value, path);
 		}
 		if (Array.isArray(value)) {
-			return value.map((entry: unknown) =>
-				field === "citations" ? citation(entry) : repair(entry),
+			return value.map((entry: unknown, index: number) =>
+				field === "citations"
+					? citation(entry, `${path}.${index}`)
+					: repair(entry, "", `${path}.${index}`),
 			);
 		}
 		if (isRecord(value)) {
@@ -487,6 +489,7 @@ export function normalizeSubmission(
 								entry === null &&
 								[
 									"example",
+									"problems",
 									"search",
 									"inapplicability",
 									"openQuestions",
@@ -495,7 +498,7 @@ export function normalizeSubmission(
 								].includes(key)
 							),
 					)
-					.map(([key, entry]) => [key, repair(entry, key)]),
+					.map(([key, entry]) => [key, repair(entry, key, path ? `${path}.${key}` : key)]),
 			);
 		}
 		if (typeof value !== "string") {
@@ -518,7 +521,22 @@ export function normalizeSubmission(
 		);
 	}
 	if (!parsed.success || errors.length > 0) {
-		throw new Error(errors.join("; also: "));
+		let message = errors[0] ?? "result: expected a complete result object";
+		const index = /problem (?<index>\d+): its basis names citation/u.exec(message)?.groups?.index;
+		if (index !== undefined && isRecord(input) && Array.isArray(input.problems)) {
+			const problem: unknown = input.problems[Number(index)];
+			if (isRecord(problem) && isRecord(problem.basis) && Array.isArray(problem.citations)) {
+				const { basis } = problem;
+				const count = problem.citations.length;
+				const field = ["head", "base", "event"].find(
+					(key) => typeof basis[key] === "number" && basis[key] >= count,
+				);
+				if (field !== undefined) {
+					message = `problems.${index}.basis.${field}: ${message}. Expected a zero-based citation index from 0 through ${count - 1}. Corrected field example: ${JSON.stringify({ basis: { ...basis, [field]: 0 } })}. Choose the citation that supports this basis; remove the problem if no citation does.`;
+				}
+			}
+		}
+		throw new Error(message);
 	}
 	return parsed.data;
 }

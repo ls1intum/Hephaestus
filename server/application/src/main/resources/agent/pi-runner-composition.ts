@@ -3,6 +3,8 @@ import {
 	type PublicReviewHistory,
 	SAME_WORK_LIMITS,
 } from "./pi-review-brief.ts";
+import { unwrapToolArguments } from "./pi-tool-validation.ts";
+
 import { isJsonObject as isRecord } from "./work/practice-scripts/lib/core/json.ts";
 import { z } from "./work/practice-scripts/lib/core/practice-script.ts";
 
@@ -727,7 +729,8 @@ function readDecisions(
 
 /** Validate before the SDK can coerce a malformed text or list into an empty review. */
 export function prepareReviewArguments(value: unknown): Record<string, unknown> {
-	return reviewToolInputSchema.parse(value);
+	const parsed = reviewToolInputSchema.parse(unwrapToolArguments(value));
+	return { ...parsed, summary: parsed.summary ?? null, inline: parsed.inline ?? [] };
 }
 
 /** Store the review whole: a refused part cannot be dropped while retaining decisions written with it. */
@@ -1042,7 +1045,9 @@ export const REVIEW_TOOL_DESCRIPTION =
 	"its problems, and no withheld one. Each body is published whole as written, with provider safety formatting and a fixed disclosure; nothing is " +
 	"assembled from fragments. An accepted call is final and ends the composition. A missing or contradicted decision, " +
 	"invalid support, eligibility or location, or a witness that cannot stand as the advice refuses the whole " +
-	"review, with every reason, so it can be corrected and sent again.";
+	"review, with every reason, so it can be corrected and sent again. " +
+	'Input example: {"decisions":[{"resultId":"<admitted NOT_MET resultId>","disposition":"RAISE"}],"summary":{"basedOn":["<same resultId>"],"body":"Explain the supported concern and its remedy."},"inline":[]}. ' +
+	"For a quiet review, use summary:null, inline:[] and a supported withholding decision for each result. Unused inline and witnessIds lists may be null or omitted.";
 
 /**
  * How the review is written. It ends the opening turn, after the criteria, so reference material is followed by the
@@ -1232,6 +1237,7 @@ export function reviewToolParameters(
 		: [];
 	return {
 		type: "object",
+		additionalProperties: false,
 		required: ["decisions", "summary"],
 		properties: {
 			decisions: {
@@ -1244,6 +1250,7 @@ export function reviewToolParameters(
 					"speaks about it or its problems.",
 				items: {
 					type: "object",
+					additionalProperties: false,
 					required: ["resultId", "disposition"],
 					properties: {
 						resultId: { type: "string", enum: notMet },
@@ -1264,6 +1271,7 @@ export function reviewToolParameters(
 			},
 			summary: {
 				type: ["object", "null"],
+				additionalProperties: false,
 				required: ["basedOn", "body"],
 				description:
 					"The one overview comment on the work: the guidance its raised NOT_MET results warrant, and " +
@@ -1291,6 +1299,7 @@ export function reviewToolParameters(
 					"its line. Each location can fail independently.",
 				items: {
 					type: "object",
+					additionalProperties: false,
 					required: ["basedOn", "body", "anchor"],
 					properties: {
 						basedOn: idList(
@@ -1306,6 +1315,7 @@ export function reviewToolParameters(
 						},
 						anchor: {
 							type: "object",
+							additionalProperties: false,
 							required: ["problemId", "citationIndex"],
 							description:
 								"The line, as one citation marked anchorable of a problem that basedOn names, itself or " +

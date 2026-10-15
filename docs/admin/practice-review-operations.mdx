@@ -347,7 +347,13 @@ A failure does not erase the supporting result.
 A correction waits for any started POST to settle before the send changes to RETRACT.
 Unsupported provider correction keeps the actual posted appearance and its recorded reason.
 
-GitHub and GitLab adapters preserve their supported line/file fallback and approved anchors.
+GitHub and GitLab attach line notes to the selected diff line.
+GitLab uses the reviewed diff version, including its base, start and head commit references.
+If GitLab rejects the position, the copy becomes a file note with a static link to the reviewed code.
+The recorded copy kind distinguishes a positioned line note from this fallback.
+An uncertain write stays fenced until reconciliation confirms its outcome.
+Existing ordinary comments retain their original placement.
+
 Historical write keys, markers, sides and provider references stay immutable.
 Never clear a fence or edit an internal send row to force a retry.
 Use the [review controls](./practice-review.mdx#approve-reject-and-retry) after authoritative lookup proves absence.
