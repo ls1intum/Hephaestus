@@ -8,6 +8,9 @@ import de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsum
 import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionProperties;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncProgress;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncType;
@@ -188,6 +191,10 @@ public class GitLabWorkspaceInitializationService {
      * @return discovery and setup outcome, with the number of projects discovered
      */
     public SyncResult initialize(Workspace workspace) {
+        return initialize(workspace, null);
+    }
+
+    public SyncResult initialize(Workspace workspace, @Nullable SyncExecutionHandle handle) {
         var gitLabConfigOpt = connectionService.findActiveGitLabConfig(workspace.getId());
         if (gitLabConfigOpt.isEmpty()) {
             return SyncResult.completed(0);
@@ -199,12 +206,14 @@ public class GitLabWorkspaceInitializationService {
                 .orElse(false);
         if (!hasToken) {
             log.warn("Skipped GitLab initialization: reason=missingToken, workspaceId={}", workspace.getId());
+            reportIncomplete(handle, SyncResult.abortedError(0), SyncPhase.CONNECTION, "Connection token check", null);
             return SyncResult.abortedError(0);
         }
 
         String accountLogin = workspace.getAccountLogin();
         if (accountLogin == null || accountLogin.isBlank()) {
             log.warn("Skipped GitLab initialization: reason=missingAccountLogin, workspaceId={}", workspace.getId());
+            reportIncomplete(handle, SyncResult.abortedError(0), SyncPhase.CONNECTION, "Connected group check", null);
             return SyncResult.abortedError(0);
         }
 
@@ -222,7 +231,7 @@ public class GitLabWorkspaceInitializationService {
                     LoggingUtils.sanitizeForLog(workspace.getAccountLogin()));
 
             // Phase 0: Token rotation
-            SyncResult result = rotateToken(workspace);
+            SyncResult result = rotateToken(workspace, handle);
 
             // Phase 1: Discover group projects via GraphQL
             GitLabSyncResult discovery = discoverGroupProjects(workspace);
@@ -235,6 +244,7 @@ public class GitLabWorkspaceInitializationService {
                         case ABORTED_RATE_LIMIT -> SyncResult.abortedRateLimit(syncedRepos.size());
                         case ABORTED_ERROR -> SyncResult.abortedError(syncedRepos.size());
                     };
+            reportIncomplete(handle, discoveryResult, SyncPhase.REPOSITORIES, "Project discovery", accountLogin);
             result = SyncResult.merge(result, discoveryResult);
 
             // Phase 2: Link organization + create monitors
@@ -250,6 +260,8 @@ public class GitLabWorkspaceInitializationService {
             } else {
                 boolean routed = establishScopeConsumer(workspace);
                 if (!routed) {
+                    reportIncomplete(
+                            handle, SyncResult.abortedError(0), SyncPhase.CONNECTION, "Event consumer setup", null);
                     result = SyncResult.merge(result, SyncResult.abortedError(0));
                 }
                 if (discovery == null || discovery.status() != GitLabSyncResult.Status.COMPLETED) {
@@ -258,7 +270,9 @@ public class GitLabWorkspaceInitializationService {
                             workspace.getId(),
                             discovery == null ? null : discovery.status());
                 } else if (routed) {
-                    result = SyncResult.merge(result, registerWebhook(workspace));
+                    SyncResult webhookResult = registerWebhook(workspace);
+                    reportIncomplete(handle, webhookResult, SyncPhase.CONNECTION, "Webhook setup", null);
+                    result = SyncResult.merge(result, webhookResult);
                 }
             }
 
@@ -301,7 +315,7 @@ public class GitLabWorkspaceInitializationService {
     }
 
     /** Rotates the token when it expires soon; a failed attempt contributes warnings without stopping discovery. */
-    private SyncResult rotateToken(Workspace workspace) {
+    private SyncResult rotateToken(Workspace workspace, @Nullable SyncExecutionHandle handle) {
         var webhookService = gitLabWebhookServiceProvider.getIfAvailable();
         if (webhookService == null) {
             return SyncResult.completed(0);
@@ -311,6 +325,9 @@ public class GitLabWorkspaceInitializationService {
             return SyncResult.completed(0);
         } catch (Exception e) {
             log.warn("Token rotation failed (non-fatal): workspaceId={}", workspace.getId(), e);
+            if (handle != null) {
+                handle.reportWarnings(SyncProgress.of(SyncPhase.CONNECTION, "Token rotation did not complete."));
+            }
             return SyncResult.completedWithWarnings(0);
         }
     }
@@ -440,6 +457,11 @@ public class GitLabWorkspaceInitializationService {
      * @return aggregate outcome; the caller records consumed cancellation separately
      */
     public SyncResult syncFullData(Workspace workspace, BooleanSupplier cancelled) {
+        return syncFullData(workspace, cancelled, null);
+    }
+
+    public SyncResult syncFullData(
+            Workspace workspace, BooleanSupplier cancelled, @Nullable SyncExecutionHandle handle) {
         var gitLabServices = gitLabSyncServiceHolderProvider.getIfAvailable();
         if (gitLabServices == null) {
             log.debug(
@@ -448,6 +470,7 @@ public class GitLabWorkspaceInitializationService {
         }
         String accountLogin = workspace.getAccountLogin();
         if (accountLogin == null || accountLogin.isBlank()) {
+            reportIncomplete(handle, SyncResult.abortedError(0), SyncPhase.CONNECTION, "Connected group check", null);
             return SyncResult.abortedError(0);
         }
 
@@ -463,15 +486,23 @@ public class GitLabWorkspaceInitializationService {
                 try {
                     int membersSynced =
                             memberSyncService.syncGroupMemberships(workspace.getId(), accountLogin, organization);
-                    result = SyncResult.merge(
-                            result,
-                            membersSynced < 0 ? SyncResult.abortedError(0) : SyncResult.completed(membersSynced));
+                    SyncResult membershipResult =
+                            membersSynced < 0 ? SyncResult.abortedError(0) : SyncResult.completed(membersSynced);
+                    reportIncomplete(
+                            handle, membershipResult, SyncPhase.ORGANIZATION, "Group membership sync", accountLogin);
+                    result = SyncResult.merge(result, membershipResult);
                     log.info(
                             "GitLab membership sync: workspaceId={}, membersSynced={}",
                             workspace.getId(),
                             membersSynced);
                 } catch (Exception e) {
                     log.warn("Failed membership sync: workspaceId={}", workspace.getId(), e);
+                    reportIncomplete(
+                            handle,
+                            SyncResult.abortedError(0),
+                            SyncPhase.ORGANIZATION,
+                            "Group membership sync",
+                            accountLogin);
                     result = SyncResult.merge(result, SyncResult.abortedError(0));
                 }
             }
@@ -486,6 +517,7 @@ public class GitLabWorkspaceInitializationService {
                 log.info("GitLab issue type sync: workspaceId={}, types={}", workspace.getId(), issueTypes);
             } catch (Exception e) {
                 log.warn("Failed issue type sync: workspaceId={}", workspace.getId(), e);
+                reportIncomplete(handle, SyncResult.abortedError(0), SyncPhase.ISSUES, "Issue type sync", accountLogin);
                 result = SyncResult.merge(result, SyncResult.abortedError(0));
             }
         }
@@ -505,6 +537,8 @@ public class GitLabWorkspaceInitializationService {
                 try {
                     SyncResult groupMilestoneResult =
                             milestoneSyncService.syncMilestonesForGroup(workspace.getId(), accountLogin, repos);
+                    reportIncomplete(
+                            handle, groupMilestoneResult, SyncPhase.ISSUES, "Group milestone sync", accountLogin);
                     result = SyncResult.merge(result, groupMilestoneResult);
                     log.info(
                             "GitLab group milestone sync: workspaceId={}, group={}, written={}",
@@ -517,6 +551,8 @@ public class GitLabWorkspaceInitializationService {
                             workspace.getId(),
                             LoggingUtils.sanitizeForLog(accountLogin),
                             e);
+                    reportIncomplete(
+                            handle, SyncResult.abortedError(0), SyncPhase.ISSUES, "Group milestone sync", accountLogin);
                     result = SyncResult.merge(result, SyncResult.abortedError(0));
                 }
             }
@@ -526,7 +562,8 @@ public class GitLabWorkspaceInitializationService {
             // all repos have finished syncing.
             List<Repository> commitLinkTargets = new ArrayList<>();
             result = SyncResult.merge(
-                    result, syncGitLabRepositories(workspace, gitLabServices, repos, commitLinkTargets, cancelled));
+                    result,
+                    syncGitLabRepositories(workspace, gitLabServices, repos, commitLinkTargets, cancelled, handle));
 
             // Second pass: link commits to MRs now that every repo has populated its commits
             // and every MR-targeted repo has populated its MRs.
@@ -541,12 +578,18 @@ public class GitLabWorkspaceInitializationService {
                                 workspace.getId(),
                                 repo.getNameWithOwner(),
                                 e);
+                        reportIncomplete(
+                                handle,
+                                SyncResult.abortedError(0),
+                                SyncPhase.REPOSITORIES,
+                                "Commit linking",
+                                repo.getNameWithOwner());
                         result = SyncResult.merge(result, SyncResult.abortedError(0));
                     }
                 }
             }
 
-            result = SyncResult.merge(result, syncGitLabPostRepo(workspace, gitLabServices, repos));
+            result = SyncResult.merge(result, syncGitLabPostRepo(workspace, gitLabServices, repos, handle));
         }
 
         // Teams (subgroups)
@@ -554,11 +597,10 @@ public class GitLabWorkspaceInitializationService {
         if (teamSyncService != null) {
             try {
                 var teams = teamSyncService.syncTeamsForGroup(workspace.getId(), accountLogin);
-                result = SyncResult.merge(
-                        result,
-                        teams.complete()
-                                ? SyncResult.completed(teams.teams())
-                                : SyncResult.abortedError(teams.teams()));
+                SyncResult teamResult =
+                        teams.complete() ? SyncResult.completed(teams.teams()) : SyncResult.abortedError(teams.teams());
+                reportIncomplete(handle, teamResult, SyncPhase.TEAMS, "Team sync", accountLogin);
+                result = SyncResult.merge(result, teamResult);
                 // Stamp the teams watermark so the cron scheduler's cooldown logic reflects that
                 // initial sync just ran; otherwise cron would re-sync teams redundantly right after
                 // workspace activation. An incomplete listing leaves it for cron to retry.
@@ -572,6 +614,7 @@ public class GitLabWorkspaceInitializationService {
                         teams.complete());
             } catch (Exception e) {
                 log.warn("Failed to sync teams: workspaceId={}", workspace.getId(), e);
+                reportIncomplete(handle, SyncResult.abortedError(0), SyncPhase.TEAMS, "Team sync", accountLogin);
                 result = SyncResult.merge(result, SyncResult.abortedError(0));
             }
         }
@@ -599,7 +642,8 @@ public class GitLabWorkspaceInitializationService {
             GitLabSyncServiceHolder gitLabServices,
             List<Repository> repos,
             List<Repository> commitLinkTargets,
-            BooleanSupplier cancelled) {
+            BooleanSupplier cancelled,
+            @Nullable SyncExecutionHandle handle) {
         var labelSyncService = gitLabServices.getLabelSyncService();
         var milestoneSyncService = gitLabServices.getMilestoneSyncService();
         var issueSyncService = gitLabServices.getIssueSyncService();
@@ -645,6 +689,14 @@ public class GitLabWorkspaceInitializationService {
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     log.info("Rate limit wait interrupted, stopping repo sync: workspaceId={}", workspace.getId());
+                    if (handle != null) {
+                        handle.reportWarnings(SyncProgress.ofResource(
+                                SyncPhase.REPOSITORIES,
+                                "Repository sync stopped while waiting for the provider rate limit.",
+                                repo.getNameWithOwner(),
+                                null,
+                                null));
+                    }
                     result = SyncResult.merge(result, SyncResult.abortedRateLimit(0));
                     break;
                 }
@@ -673,6 +725,7 @@ public class GitLabWorkspaceInitializationService {
                 try {
                     SyncResult r = labelSyncService.syncLabelsForRepository(workspace.getId(), repo);
                     totalLabels += r.count();
+                    reportIncomplete(handle, r, SyncPhase.REPOSITORIES, "Label sync", repo.getNameWithOwner());
                     result = SyncResult.merge(result, r);
                     if (rtmId != null && r.isCompleted()) {
                         syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.LABELS, Instant.now());
@@ -683,6 +736,12 @@ public class GitLabWorkspaceInitializationService {
                             workspace.getId(),
                             repo.getNameWithOwner(),
                             e);
+                    reportIncomplete(
+                            handle,
+                            SyncResult.abortedError(0),
+                            SyncPhase.REPOSITORIES,
+                            "Label sync",
+                            repo.getNameWithOwner());
                     result = SyncResult.merge(result, SyncResult.abortedError(0));
                 }
             }
@@ -690,6 +749,7 @@ public class GitLabWorkspaceInitializationService {
                 try {
                     SyncResult r = milestoneSyncService.syncMilestonesForRepository(workspace.getId(), repo);
                     totalMilestones += r.count();
+                    reportIncomplete(handle, r, SyncPhase.ISSUES, "Milestone sync", repo.getNameWithOwner());
                     result = SyncResult.merge(result, r);
                     if (rtmId != null && r.isCompleted()) {
                         syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.MILESTONES, Instant.now());
@@ -700,6 +760,12 @@ public class GitLabWorkspaceInitializationService {
                             workspace.getId(),
                             repo.getNameWithOwner(),
                             e);
+                    reportIncomplete(
+                            handle,
+                            SyncResult.abortedError(0),
+                            SyncPhase.ISSUES,
+                            "Milestone sync",
+                            repo.getNameWithOwner());
                     result = SyncResult.merge(result, SyncResult.abortedError(0));
                 }
             }
@@ -707,6 +773,7 @@ public class GitLabWorkspaceInitializationService {
                 try {
                     SyncResult r = issueSyncService.syncIssues(workspace.getId(), repo, updatedAfter);
                     totalIssues += r.count();
+                    reportIncomplete(handle, r, SyncPhase.ISSUES, "Issue sync", repo.getNameWithOwner());
                     result = SyncResult.merge(result, r);
                     issuesDone = r.isCompleted();
                     if (rtmId != null && issuesDone) {
@@ -718,6 +785,12 @@ public class GitLabWorkspaceInitializationService {
                             workspace.getId(),
                             repo.getNameWithOwner(),
                             e);
+                    reportIncomplete(
+                            handle,
+                            SyncResult.abortedError(0),
+                            SyncPhase.ISSUES,
+                            "Issue sync",
+                            repo.getNameWithOwner());
                     result = SyncResult.merge(result, SyncResult.abortedError(0));
                 }
             }
@@ -725,6 +798,7 @@ public class GitLabWorkspaceInitializationService {
                 try {
                     SyncResult r = mrSyncService.syncMergeRequests(workspace.getId(), repo, updatedAfter);
                     totalMRs += r.count();
+                    reportIncomplete(handle, r, SyncPhase.PULL_REQUESTS, "Merge request sync", repo.getNameWithOwner());
                     result = SyncResult.merge(result, r);
                     mrsDone = r.isCompleted();
                     if (rtmId != null && mrsDone) {
@@ -732,6 +806,12 @@ public class GitLabWorkspaceInitializationService {
                     }
                 } catch (Exception e) {
                     log.warn("Failed MR sync: workspaceId={}, repo={}", workspace.getId(), repo.getNameWithOwner(), e);
+                    reportIncomplete(
+                            handle,
+                            SyncResult.abortedError(0),
+                            SyncPhase.PULL_REQUESTS,
+                            "Merge request sync",
+                            repo.getNameWithOwner());
                     result = SyncResult.merge(result, SyncResult.abortedError(0));
                 }
             }
@@ -739,6 +819,7 @@ public class GitLabWorkspaceInitializationService {
                 try {
                     SyncResult r = collaboratorSyncService.syncCollaboratorsForRepository(workspace.getId(), repo);
                     totalCollaborators += r.count();
+                    reportIncomplete(handle, r, SyncPhase.REPOSITORIES, "Collaborator sync", repo.getNameWithOwner());
                     result = SyncResult.merge(result, r);
                     if (rtmId != null && r.isCompleted()) {
                         syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.COLLABORATORS, Instant.now());
@@ -749,6 +830,12 @@ public class GitLabWorkspaceInitializationService {
                             workspace.getId(),
                             repo.getNameWithOwner(),
                             e);
+                    reportIncomplete(
+                            handle,
+                            SyncResult.abortedError(0),
+                            SyncPhase.REPOSITORIES,
+                            "Collaborator sync",
+                            repo.getNameWithOwner());
                     result = SyncResult.merge(result, SyncResult.abortedError(0));
                 }
             }
@@ -758,6 +845,7 @@ public class GitLabWorkspaceInitializationService {
                 try {
                     SyncResult r = commitBackfillService.backfillCommits(workspace.getId(), repo);
                     totalCommits += r.count();
+                    reportIncomplete(handle, r, SyncPhase.REPOSITORIES, "Commit backfill", repo.getNameWithOwner());
                     result = SyncResult.merge(result, r);
                 } catch (Exception e) {
                     log.warn(
@@ -765,12 +853,19 @@ public class GitLabWorkspaceInitializationService {
                             workspace.getId(),
                             repo.getNameWithOwner(),
                             e);
+                    reportIncomplete(
+                            handle,
+                            SyncResult.abortedError(0),
+                            SyncPhase.REPOSITORIES,
+                            "Commit backfill",
+                            repo.getNameWithOwner());
                     result = SyncResult.merge(result, SyncResult.abortedError(0));
                 }
             } else if (commitSyncService != null) {
                 try {
                     SyncResult r = commitSyncService.syncCommitsForRepository(workspace.getId(), repo, updatedAfter);
                     totalCommits += r.count();
+                    reportIncomplete(handle, r, SyncPhase.REPOSITORIES, "Commit sync", repo.getNameWithOwner());
                     result = SyncResult.merge(result, r);
                 } catch (Exception e) {
                     log.warn(
@@ -778,6 +873,12 @@ public class GitLabWorkspaceInitializationService {
                             workspace.getId(),
                             repo.getNameWithOwner(),
                             e);
+                    reportIncomplete(
+                            handle,
+                            SyncResult.abortedError(0),
+                            SyncPhase.REPOSITORIES,
+                            "Commit sync",
+                            repo.getNameWithOwner());
                     result = SyncResult.merge(result, SyncResult.abortedError(0));
                 }
             }
@@ -813,7 +914,10 @@ public class GitLabWorkspaceInitializationService {
      * Post-repo sync: sub-issues and issue dependencies.
      */
     private SyncResult syncGitLabPostRepo(
-            Workspace workspace, GitLabSyncServiceHolder gitLabServices, List<Repository> repos) {
+            Workspace workspace,
+            GitLabSyncServiceHolder gitLabServices,
+            List<Repository> repos,
+            @Nullable SyncExecutionHandle handle) {
         var subIssueSync = gitLabServices.getSubIssueSyncService();
         var depSync = gitLabServices.getIssueDependencySyncService();
         if (subIssueSync == null && depSync == null) return SyncResult.completed(0);
@@ -825,6 +929,7 @@ public class GitLabWorkspaceInitializationService {
                 try {
                     SyncResult r = subIssueSync.syncSubIssuesForRepository(workspace.getId(), repo);
                     totalSubIssues += r.count();
+                    reportIncomplete(handle, r, SyncPhase.ISSUES, "Sub-issue sync", repo.getNameWithOwner());
                     result = SyncResult.merge(result, r);
                 } catch (Exception e) {
                     log.warn(
@@ -832,6 +937,12 @@ public class GitLabWorkspaceInitializationService {
                             workspace.getId(),
                             repo.getNameWithOwner(),
                             e);
+                    reportIncomplete(
+                            handle,
+                            SyncResult.abortedError(0),
+                            SyncPhase.ISSUES,
+                            "Sub-issue sync",
+                            repo.getNameWithOwner());
                     result = SyncResult.merge(result, SyncResult.abortedError(0));
                 }
             }
@@ -839,6 +950,7 @@ public class GitLabWorkspaceInitializationService {
                 try {
                     SyncResult r = depSync.syncDependenciesForRepository(workspace.getId(), repo);
                     totalDeps += r.count();
+                    reportIncomplete(handle, r, SyncPhase.ISSUES, "Issue dependency sync", repo.getNameWithOwner());
                     result = SyncResult.merge(result, r);
                 } catch (Exception e) {
                     log.warn(
@@ -846,6 +958,12 @@ public class GitLabWorkspaceInitializationService {
                             workspace.getId(),
                             repo.getNameWithOwner(),
                             e);
+                    reportIncomplete(
+                            handle,
+                            SyncResult.abortedError(0),
+                            SyncPhase.ISSUES,
+                            "Issue dependency sync",
+                            repo.getNameWithOwner());
                     result = SyncResult.merge(result, SyncResult.abortedError(0));
                 }
             }
@@ -858,5 +976,24 @@ public class GitLabWorkspaceInitializationService {
                     totalDeps);
         }
         return result;
+    }
+
+    private static void reportIncomplete(
+            @Nullable SyncExecutionHandle handle,
+            SyncResult result,
+            SyncPhase phase,
+            String operation,
+            @Nullable String resource) {
+        if (handle == null || result.status() == SyncResult.Status.COMPLETED) {
+            return;
+        }
+        String outcome =
+                switch (result.status()) {
+                    case ABORTED_RATE_LIMIT -> " stopped at the provider rate limit.";
+                    case COMPLETED_WITH_WARNINGS -> " completed with warnings.";
+                    case ABORTED_ERROR -> " did not complete.";
+                    case COMPLETED -> throw new IllegalStateException("Completed result already excluded");
+                };
+        handle.reportWarnings(SyncProgress.ofResource(phase, operation + outcome, resource, null, null));
     }
 }

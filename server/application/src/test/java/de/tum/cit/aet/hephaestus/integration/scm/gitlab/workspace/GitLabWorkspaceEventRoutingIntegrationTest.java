@@ -35,12 +35,16 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.Bear
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
+import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJob;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRequest;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobStatus;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobTrigger;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
+import de.tum.cit.aet.hephaestus.integration.core.sync.api.ConnectionHealth;
+import de.tum.cit.aet.hephaestus.integration.core.sync.api.SyncJobDTO;
+import de.tum.cit.aet.hephaestus.integration.core.sync.api.SyncStatusService;
 import de.tum.cit.aet.hephaestus.integration.core.webhook.JetStreamPublishers;
 import de.tum.cit.aet.hephaestus.integration.core.webhook.WebhookIngestPipeline;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -234,6 +238,9 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private SyncJobRepository syncJobRepository;
 
+    @Autowired
+    private SyncStatusService syncStatusService;
+
     @MockitoSpyBean
     private IntegrationNatsConsumer integrationNatsConsumer;
 
@@ -399,6 +406,73 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
             jsm.deleteStream(STREAM);
         }
         natsConnection.close();
+    }
+
+    @Test
+    void shouldRetainDiscoveryRateLimitInFinishedInitialJob() throws Exception {
+        createStream();
+        when(groupSync.syncGroupProjects(anyLong(), eq(GROUP), eq(SERVER_URL)))
+                .thenReturn(GitLabSyncResult.aborted(GitLabSyncResult.Status.ABORTED_RATE_LIMIT, List.of(), 0, 0));
+
+        Workspace connected = connectGroup();
+        awaitMonitoringIdle();
+        SyncJob job = finishedInitialJob(connected);
+
+        assertThat(job.getStatus()).isEqualTo(SyncJobStatus.SUCCEEDED_WITH_WARNINGS);
+        assertThat(job.getErrorSummary()).isNull();
+        assertThat(syncStatusService
+                        .getStatus(
+                                connected.getId(),
+                                Objects.requireNonNull(job.getConnection().getId()))
+                        .health())
+                .isEqualTo(ConnectionHealth.DEGRADED);
+        assertThat(SyncJobDTO.from(job).progress()).containsEntry("phase", "repositories");
+        assertThat(SyncJobDTO.from(job).progress())
+                .extractingByKey("currentStep")
+                .asString()
+                .containsIgnoringCase("rate limit");
+    }
+
+    @Test
+    void shouldRetainPartialDiscoveryWithoutClaimingARateLimit() throws Exception {
+        createStream();
+        when(groupSync.syncGroupProjects(anyLong(), eq(GROUP), eq(SERVER_URL)))
+                .thenReturn(GitLabSyncResult.withErrors(List.of(), 1, 1, 0, 0));
+
+        Workspace connected = connectGroup();
+        awaitMonitoringIdle();
+        SyncJob job = finishedInitialJob(connected);
+
+        assertThat(job.getStatus()).isEqualTo(SyncJobStatus.SUCCEEDED_WITH_WARNINGS);
+        assertThat(job.getErrorSummary()).isNull();
+        assertThat(SyncJobDTO.from(job).progress())
+                .containsEntry("phase", "repositories")
+                .containsEntry("currentStep", "Project discovery completed with warnings.");
+    }
+
+    @Test
+    void shouldKeepCleanInitialJobSuccessful() throws Exception {
+        createStream();
+        Workspace connected = connectGroup();
+        awaitMonitoringIdle();
+
+        SyncJob job = finishedInitialJob(connected);
+        assertThat(job.getStatus()).isEqualTo(SyncJobStatus.SUCCEEDED);
+        assertThat(job.getErrorSummary()).isNull();
+    }
+
+    private SyncJob finishedInitialJob(Workspace target) {
+        Connection connection = connectionRepository
+                .findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                        target.getId(), IntegrationKind.GITLAB, IntegrationState.ACTIVE)
+                .orElseThrow();
+        SyncJob job = syncJobRepository
+                .findFirstByConnection_IdAndStatusInOrderByFinishedAtDesc(
+                        Objects.requireNonNull(connection.getId()), SyncJobStatus.TERMINAL)
+                .orElseThrow();
+        assertThat(job.getType()).isEqualTo(SyncJobType.INITIAL);
+        assertThat(job.getTrigger()).isEqualTo(SyncJobTrigger.LIFECYCLE);
+        return job;
     }
 
     @Test

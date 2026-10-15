@@ -437,6 +437,10 @@ class GitHubLifecycleSyncCancellationIntegrationTest extends AbstractWorkspaceIn
         assertThat(job.getStatus()).isEqualTo(SyncJobStatus.SUCCEEDED_WITH_WARNINGS);
         assertThat(job.isCancelRequested()).isFalse();
         assertThat(job.getErrorSummary()).isNull();
+        assertThat(job.getProgress())
+                .containsEntry("phase", "repositories")
+                .containsEntry("currentStep", "Repository refresh did not complete.")
+                .containsEntry("currentRepository", first.getNameWithOwner());
         assertThat(status.getStatus(workspace.getId(), run.connection().getId()).lastSuccessfulSyncAt())
                 .isEqualTo(job.getFinishedAt())
                 .isAfter(run.previousSuccessfulAt());

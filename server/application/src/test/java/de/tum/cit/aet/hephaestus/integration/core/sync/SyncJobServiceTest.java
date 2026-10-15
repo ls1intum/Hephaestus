@@ -579,6 +579,55 @@ class SyncJobServiceTest extends BaseUnitTest {
     }
 
     @Test
+    void shouldRetainFirstWarningAfterLaterProgressAndWarnings() {
+        SyncJobService.Started started = beginTestJob();
+
+        service.executeBody(started, handle -> {
+            handle.reportWarnings(SyncProgress.of(SyncPhase.CONNECTION, "Token rotation did not complete."));
+            handle.progress(4, 12, SyncProgress.of(SyncPhase.PULL_REQUESTS, "Pull requests synced."));
+            handle.reportWarnings(SyncProgress.of(SyncPhase.TEAMS, "Team sync did not complete."));
+        });
+
+        assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.SUCCEEDED_WITH_WARNINGS);
+        assertThat(started.job().getErrorSummary()).isNull();
+        assertThat(started.job().getItemsProcessed()).isEqualTo(4);
+        assertThat(started.job().getItemsTotal()).isEqualTo(12);
+        assertThat(started.job().getProgress())
+                .containsEntry("phase", "connection")
+                .containsEntry("currentStep", "Token rotation did not complete.");
+    }
+
+    @Test
+    void shouldKeepFailureAndLastProgressWhenAWarningPrecedesTheException() {
+        SyncJobService.Started started = beginTestJob();
+
+        service.executeBody(started, handle -> {
+            handle.reportWarnings(SyncProgress.of(SyncPhase.CONNECTION, "Token rotation did not complete."));
+            handle.progress(4, 12, SyncProgress.of(SyncPhase.PULL_REQUESTS, "Pull requests syncing."));
+            throw new IllegalStateException("The repository request failed.");
+        });
+
+        assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.FAILED);
+        assertThat(started.job().getErrorSummary()).contains("The repository request failed.");
+        assertThat(started.job().getProgress()).containsEntry("currentStep", "Pull requests syncing.");
+    }
+
+    @Test
+    void shouldKeepCancellationAndLastProgressWhenAWarningPrecedesCancellation() {
+        SyncJobService.Started started = beginTestJob();
+
+        service.executeBody(started, handle -> {
+            handle.reportWarnings(SyncProgress.of(SyncPhase.CONNECTION, "Token rotation did not complete."));
+            handle.progress(4, 12, SyncProgress.of(SyncPhase.PULL_REQUESTS, "Pull requests syncing."));
+            handle.reportCancelled();
+        });
+
+        assertThat(started.job().getStatus()).isEqualTo(SyncJobStatus.CANCELLED);
+        assertThat(started.job().getErrorSummary()).isNull();
+        assertThat(started.job().getProgress()).containsEntry("currentStep", "Pull requests syncing.");
+    }
+
+    @Test
     void executeBody_bodyThrows_marksFailedWithTruncatedErrorSummary() {
         SyncJobService.Started started = beginTestJob();
 

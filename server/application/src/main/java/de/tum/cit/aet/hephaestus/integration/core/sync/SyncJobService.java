@@ -507,7 +507,7 @@ public class SyncJobService implements SmartLifecycle {
                     errorSummary,
                     handle.currentItemsProcessed(),
                     handle.currentItemsTotal(),
-                    handle.currentProgressDetail(),
+                    handle.terminalProgressDetail(status),
                     SyncJobStatus.ACTIVE);
             if (updated == 0) {
                 log.warn("Sync job {} was no longer active at completion (attempted {})", jobId, status);
