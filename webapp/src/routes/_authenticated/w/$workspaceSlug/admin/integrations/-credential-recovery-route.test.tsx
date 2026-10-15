@@ -700,6 +700,109 @@ describe("source-control management reads", () => {
 	});
 });
 
+/** Serves the connection catalog, unavailable until the test makes it available, recording each answer. */
+function serveConnectionLookup(entries: JsonBodyType, available: boolean) {
+	const answers: number[] = [];
+	const lookup = { available };
+	server.use(
+		http.get("*/workspaces/acme/connections/catalog", () => {
+			if (!lookup.available) {
+				answers.push(503);
+				return HttpResponse.json(
+					{
+						status: 503,
+						title: "Service Unavailable",
+						detail: "The connections are temporarily unavailable.",
+					},
+					{ status: 503 },
+				);
+			}
+			answers.push(200);
+			return HttpResponse.json(entries);
+		}),
+	);
+	return { answers, lookup };
+}
+
+/**
+ * Records the connection id of every sync status read. Connection 7 is unavailable until the test
+ * recovers it; an id that names no connection gets the server's answer for that, a 500.
+ */
+function serveStatusReads(status: ConnectionSyncStatus) {
+	const connectionIds: string[] = [];
+	const connection = { recovered: false };
+	server.use(
+		http.get("*/workspaces/acme/connections/:connectionId/sync", ({ params }) => {
+			const connectionId = String(params.connectionId);
+			connectionIds.push(connectionId);
+			if (connectionId !== "7") {
+				return HttpResponse.json(
+					{
+						status: 500,
+						title: "Internal server error",
+						detail:
+							"We could not finish that. Try again. If it keeps failing, contact your instance operator.",
+					},
+					{ status: 500 },
+				);
+			}
+			if (!connection.recovered) {
+				return HttpResponse.json(
+					{ status: 503, title: "Service Unavailable", detail: "Sync status is unavailable." },
+					{ status: 503 },
+				);
+			}
+			return HttpResponse.json(status);
+		}),
+	);
+	return { connectionIds, connection };
+}
+
+describe("source-control connection Retry", () => {
+	it("shows no GitLab connection when a retried lookup finds none, without reading a sync status", async () => {
+		const { status } = mockConnection("GITLAB");
+		const lookups = serveConnectionLookup([], false);
+		const statusReads = serveStatusReads(status);
+		renderRouteAt("/w/acme/admin/integrations/scm");
+		await screen.findByText(
+			"We could not load the GitLab connection",
+			undefined,
+			ROUTE_RENDER_WAIT,
+		);
+		expect(lookups.answers).toStrictEqual([503]);
+
+		lookups.lookup.available = true;
+		await userEvent.setup().click(screen.getByRole("button", { name: "Retry" }));
+		await waitFor(() => expect(lookups.answers).toStrictEqual([503, 200]));
+		const header = await screen.findByText(
+			/^(?:No GitLab connection found for this workspace\.|We could not load GitLab sync status)$/u,
+		);
+		expect({ header: header.textContent, statusReads: statusReads.connectionIds }).toStrictEqual({
+			header: "No GitLab connection found for this workspace.",
+			statusReads: [],
+		});
+		expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+	});
+
+	it("reads a GitLab connection's status again on Retry and shows it once it loads", async () => {
+		const { entry, status } = mockConnection("GITLAB");
+		entry.credentialsUnreadableSince = undefined;
+		const lookups = serveConnectionLookup([entry], true);
+		const statusReads = serveStatusReads(status);
+		renderRouteAt("/w/acme/admin/integrations/scm");
+		await screen.findByText("We could not load GitLab sync status", undefined, ROUTE_RENDER_WAIT);
+		expect(statusReads.connectionIds).toStrictEqual(["7"]);
+		const lookupsBefore = lookups.answers.length;
+
+		statusReads.connection.recovered = true;
+		await userEvent.setup().click(screen.getByRole("button", { name: "Retry" }));
+		await screen.findByRole("button", { name: "Sync now" });
+		expect(screen.queryByText("We could not load GitLab sync status")).toBeNull();
+		expect(statusReads.connectionIds).toStrictEqual(["7", "7"]);
+		expect(lookups.answers).toHaveLength(lookupsBefore + 1);
+	});
+});
+
 function mockSlackConnection(credentialsUnreadableSince?: string) {
 	const { entry, workspace } = mockConnection("GITHUB");
 	server.use(
