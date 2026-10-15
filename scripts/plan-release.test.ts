@@ -7,6 +7,7 @@ import { after, test } from "node:test";
 
 import { environmentForGitFixture } from "./lib/git-environment.ts";
 import {
+	assertCurrentStableRelease,
 	hasPendingChangesets,
 	hasSchemaMigrations,
 	planRelease,
@@ -149,6 +150,34 @@ void test("orders the published releases by version, not by listing order", () =
 	);
 	assert.equal(plan.kind, "cut");
 	assert.equal(plan.previousVersion, "0.74.0");
+});
+
+void test("promotion accepts the same stable version that seeds the next release", () => {
+	const releases = [
+		published("v0.93.0"),
+		published("v0.100.0"),
+		draft("v0.101.0", SHA),
+		{ ...published("v99.0.0"), isPrerelease: true },
+		published("v0.93.1"),
+	];
+	const plan = planRelease(SHA, "0.101.0", releases, false);
+	assert.equal(plan.kind, "cut");
+	assert.equal(plan.previousVersion, "0.100.0");
+	assert.doesNotThrow(() => assertCurrentStableRelease(plan.previousVersion, releases));
+	for (const version of ["0.93.0", "0.93.1", "0.101.0", "99.0.0", "0.100.0-rc.1"]) {
+		assert.throws(
+			() => assertCurrentStableRelease(version, releases),
+			/Only the current stable release/u,
+		);
+	}
+});
+
+void test("promotion refuses when no published stable release exists", () => {
+	assert.throws(() => assertCurrentStableRelease("0.75.0", []), /Only the current stable release/u);
+	assert.throws(
+		() => assertCurrentStableRelease("0.75.0", [draft("v0.75.0", SHA)]),
+		/Only the current stable release/u,
+	);
 });
 
 void test("holds an unpublished release until pending changesets are consumed", () => {

@@ -375,7 +375,7 @@ On a new instance, the manifest-generated secret can become `WEBHOOK_SECRET`.
 5. Restart with the new environment:
 
    ```bash
-   docker compose up -d
+   docker compose --env-file .env --env-file release-lock.env up -d
    ```
 
 ## GitHub webhooks — manual setup (PAT mode)
@@ -508,7 +508,7 @@ Leave the receiver's `WEBHOOK_SECRET` unchanged.
    For failures, use [delivery triage](#failed-deliveries-and-redelivery) and:
 
    ```bash
-   docker compose logs -f webhook-server
+   docker compose --env-file .env --env-file release-lock.env logs -f webhook-server
    ```
 
 8. For Projects v2, change a project item.
