@@ -224,7 +224,11 @@ function AdminUsersPage() {
 			<AdminUsersTable
 				users={filteredUsers}
 				isLoading={list.status === "loading"}
-				isError={list.status === "error"}
+				loadFailure={
+					list.status === "error"
+						? { error: list.error, onRetry: list.onRetry, pending: listQuery.isFetching }
+						: undefined
+				}
 				hasSearch={term !== ""}
 				totalLoaded={allUsers.length}
 				currentUserId={currentUserId}

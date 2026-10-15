@@ -38,7 +38,6 @@ const meta = {
 	args: {
 		users: [admin, user, suspended],
 		isLoading: false,
-		isError: false,
 		hasSearch: false,
 		totalLoaded: 3,
 		currentUserId: 1,
@@ -117,12 +116,41 @@ export const EmptySearch: Story = {
 	},
 };
 
-/** No count beside the failure: the list it would count is gone. */
+/** The first read failed in an outage: it says so and offers Retry, with no table or count. */
 export const ErrorState: Story = {
-	args: { users: [], isError: true },
+	args: {
+		users: [],
+		loadFailure: { error: { status: 503 }, onRetry: fn(), pending: false },
+	},
 	play: async ({ canvas }) => {
-		canvas.getByText(/could not load users/iu);
+		canvas.getByText("We could not load users");
+		await expect(canvas.getByRole("button", { name: "Retry" })).toBeEnabled();
+		await expect(canvas.queryByRole("table")).not.toBeInTheDocument();
 		await expect(canvas.queryByText(/^Showing /u)).not.toBeInTheDocument();
+	},
+};
+
+export const ErrorRetrying: Story = {
+	args: {
+		users: [],
+		loadFailure: { error: { status: 503 }, onRetry: fn(), pending: true },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "Retrying…" })).toBeDisabled();
+	},
+};
+
+/** A refused read says so and offers no retry that would be refused again. */
+export const Refused: Story = {
+	args: {
+		users: [],
+		loadFailure: { error: { status: 403 }, onRetry: fn(), pending: false },
+	},
+	play: async ({ canvas }) => {
+		canvas.getByText("You do not have access to users");
+		await expect(canvas.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+		await expect(canvas.queryByText(/reload the page/iu)).not.toBeInTheDocument();
+		await expect(canvas.queryByRole("table")).not.toBeInTheDocument();
 	},
 };
 

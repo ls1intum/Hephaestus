@@ -305,7 +305,7 @@ describe("instance users list lifecycle", () => {
 				expect(
 					[
 						reads.length > 2,
-						screen.queryByText("We could not load users. Reload the page to try again.") !== null,
+						screen.queryByText("We could not load users") !== null,
 						screen.queryByRole("button", { name: /retry/iu }) !== null,
 					].some(Boolean),
 				).toBe(true),
@@ -384,7 +384,7 @@ describe("instance users list lifecycle", () => {
 			{ status: 403 },
 		);
 		await refresh();
-		await screen.findByText("We could not load users. Reload the page to try again.");
+		await screen.findByText("You do not have access to users");
 		// A dialog whose target is cleared stays mounted until its exit transition ends.
 		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
 		expect.soft(screen.queryByText("Showing 1 user"), "No stale loaded count after 403").toBeNull();
@@ -402,7 +402,7 @@ describe("instance users list lifecycle", () => {
 			{ status: 503 },
 		);
 		await refresh();
-		await screen.findByText("We could not load users. Reload the page to try again.");
+		await screen.findByText("We could not load users");
 		expect.soft(screen.queryByText("Showing 1 user"), "No stale loaded count after 503").toBeNull();
 		expect
 			.soft(screen.queryByText("lifecycle-ada@example.com"), "No refused email after 503")
@@ -433,5 +433,62 @@ describe("instance users list lifecycle", () => {
 			{ page: 0, status: 200 },
 		]);
 		expect(mutations).toBe(0);
+	});
+});
+
+/** Answers the first users read with each status in turn, after a healthy admin layout. */
+function serveFirstReads(statuses: readonly number[], account: AdminAccountView) {
+	const reads: number[] = [];
+	server.use(
+		http.get("*/admin/settings", () =>
+			HttpResponse.json({ etag: "1", silentModeEngaged: false } satisfies InstanceSettings),
+		),
+		http.get("*/admin/users", () => {
+			const status = statuses[reads.length] ?? 200;
+			reads.push(status);
+			return status === 200
+				? HttpResponse.json([account])
+				: HttpResponse.json({ status, detail: "Account read unavailable." }, { status });
+		}),
+	);
+	return reads;
+}
+
+const coldAccount = {
+	id: 900,
+	displayName: "Cold Grace",
+	primaryEmail: "cold-grace@example.com",
+	appRole: "USER",
+	status: "ACTIVE",
+} satisfies AdminAccountView;
+
+describe("instance users first read", () => {
+	it("explains a refused first read without offering a retry or a table", async () => {
+		const reads = serveFirstReads([403], coldAccount);
+		renderRouteAt("/admin/users");
+
+		await screen.findByText("You do not have access to users", {}, ROUTE_RENDER_WAIT);
+		expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+		expect(screen.queryByText(/reload the page/iu)).toBeNull();
+		expect(screen.queryByRole("table", { name: "Application users" })).toBeNull();
+		expect(screen.queryByText(/^Showing /u)).toBeNull();
+		expect(reads).toStrictEqual([403]);
+	});
+
+	it("offers Retry after an outage on the first read and lists the users it then reads", async () => {
+		const reads = serveFirstReads([503], coldAccount);
+		renderRouteAt("/admin/users");
+
+		await screen.findByText("We could not load users", {}, ROUTE_RENDER_WAIT);
+		expect(screen.queryByText(/reload the page/iu)).toBeNull();
+		expect(screen.queryByText(/^Showing /u)).toBeNull();
+		expect(reads).toStrictEqual([503]);
+		await userEvent.setup().click(screen.getByRole("button", { name: "Retry" }));
+
+		const table = await screen.findByRole("table", { name: "Application users" });
+		await within(table).findByText("cold-grace@example.com");
+		screen.getByText("Showing 1 user");
+		expect(screen.queryByText("We could not load users")).toBeNull();
+		expect(reads).toStrictEqual([503, 200]);
 	});
 });
