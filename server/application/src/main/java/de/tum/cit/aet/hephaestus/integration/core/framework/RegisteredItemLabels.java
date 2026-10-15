@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.core.framework;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabels;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import java.util.Collection;
 import java.util.HashMap;
@@ -10,14 +9,13 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 @Component
-public class RegisteredItemLabels implements ItemLabels {
+public class RegisteredItemLabels {
     private final ItemSourceRegistry sources;
 
     public RegisteredItemLabels(ItemSourceRegistry sources) {
         this.sources = sources;
     }
 
-    @Override
     public Map<Long, ItemLabel> labels(long workspaceId, Collection<ItemRef> items) {
         Map<Long, ItemLabel> labels = new HashMap<>();
         for (ItemRef item : items)

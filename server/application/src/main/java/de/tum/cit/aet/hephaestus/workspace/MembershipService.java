@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.workspace.exception.LastOwnerRemovalException;
 import java.time.Clock;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
@@ -77,17 +78,26 @@ public class MembershipService {
         }
         for (var entry : desired.entrySet()) {
             var existing = memberships.findByWorkspace_IdAndId_AccountId(workspace.getId(), entry.getKey());
-            if (existing.isEmpty()) createMembership(workspace, entry.getKey(), entry.getValue());
-            else {
+            if (existing.isEmpty()) {
+                var member = createMembership(workspace, entry.getKey(), entry.getValue());
+                recordProviderGrant(member);
+            } else {
                 var member = existing.get();
+                var before = snapshot(member);
+                boolean rejoining = member.getLeftAt() != null;
                 if (member.getRole() != Membership.WorkspaceRole.OWNER) member.setRole(entry.getValue());
                 member.setLeftAt(null);
+                if (rejoining) recordProviderGrant(member);
+                else recordProviderRoleChange(member, before);
             }
         }
         for (var member : memberships.findByWorkspace_Id(workspace.getId())) {
             if (member.getRole() != Membership.WorkspaceRole.OWNER
                     && !desired.containsKey(member.getAccountId())
-                    && member.getLeftAt() == null) member.setLeftAt(clock.instant());
+                    && member.getLeftAt() == null) {
+                recordProviderDeparture(member);
+                member.setLeftAt(clock.instant());
+            }
         }
     }
 
@@ -95,11 +105,47 @@ public class MembershipService {
         long accountId = accountIdForUser(scmUserId);
         var existing = memberships.findByWorkspace_IdAndId_AccountId(workspace.getId(), accountId);
         if (existing.isPresent() && existing.get().getRole() == Membership.WorkspaceRole.OWNER) return;
-        if (role == null) existing.ifPresent(member -> member.setLeftAt(clock.instant()));
-        else if (existing.isPresent()) {
-            existing.get().setRole(role);
-            existing.get().setLeftAt(null);
-        } else createMembership(workspace, accountId, role);
+        if (role == null) {
+            existing.filter(member -> member.getLeftAt() == null).ifPresent(member -> {
+                recordProviderDeparture(member);
+                member.setLeftAt(clock.instant());
+            });
+        } else if (existing.isPresent()) {
+            var member = existing.get();
+            var before = snapshot(member);
+            boolean rejoining = member.getLeftAt() != null;
+            member.setRole(role);
+            member.setLeftAt(null);
+            if (rejoining) recordProviderGrant(member);
+            else recordProviderRoleChange(member, before);
+        } else recordProviderGrant(createMembership(workspace, accountId, role));
+    }
+
+    private void recordProviderGrant(Membership member) {
+        configAudit.record(ConfigAuditEntry.created(
+                ConfigAuditEntityType.WORKSPACE_ROLE,
+                Objects.requireNonNull(member.getAccountId()),
+                member.getWorkspace().getId(),
+                snapshot(member)));
+    }
+
+    private void recordProviderDeparture(Membership member) {
+        configAudit.record(ConfigAuditEntry.deleted(
+                ConfigAuditEntityType.WORKSPACE_ROLE,
+                Objects.requireNonNull(member.getAccountId()),
+                member.getWorkspace().getId(),
+                snapshot(member)));
+    }
+
+    private void recordProviderRoleChange(Membership member, WorkspaceAuditSnapshots.RoleSnapshot before) {
+        var after = snapshot(member);
+        if (!before.equals(after))
+            configAudit.record(ConfigAuditEntry.updated(
+                    ConfigAuditEntityType.WORKSPACE_ROLE,
+                    Objects.requireNonNull(member.getAccountId()),
+                    member.getWorkspace().getId(),
+                    before,
+                    after));
     }
 
     public Membership createMembership(Workspace workspace, Long accountId, Membership.WorkspaceRole role) {

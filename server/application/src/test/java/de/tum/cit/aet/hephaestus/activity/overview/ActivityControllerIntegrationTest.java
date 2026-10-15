@@ -774,12 +774,12 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                     .filter(store -> store.store().equals("workspace_member_onboarding"))
                     .findFirst()
                     .orElseThrow();
-            assertThat(accountStore.export(accountStore.select(scope)))
+            assertThat(accountStore.export(accountStore.select(scope), scope))
                     .singleElement()
                     .satisfies(row -> assertThat(
                                     row.path("public_activity_visible").asBoolean(true))
                             .isFalse());
-            assertThat(onboardingStore.export(onboardingStore.select(scope)))
+            assertThat(onboardingStore.export(onboardingStore.select(scope), scope))
                     .singleElement()
                     .satisfies(
                             row -> assertThat(row.path("public_activity_seen").asBoolean())

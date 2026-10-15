@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
+import de.tum.cit.aet.hephaestus.integration.core.framework.RegisteredItemLabels;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabels;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.practices.review.dto.ItemRefDTO;
 import java.util.Collection;
@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
 public class FeedbackItemReferences {
 
     private final FeedbackBasisRepository basis;
-    private final ItemLabels labels;
+    private final RegisteredItemLabels labels;
 
     public Map<Long, ItemRefDTO> find(long workspaceId, Collection<Long> itemIds) {
         if (itemIds.isEmpty()) {

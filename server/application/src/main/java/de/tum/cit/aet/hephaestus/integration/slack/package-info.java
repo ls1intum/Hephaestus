@@ -12,6 +12,7 @@
             "integration.core",
             "integration.core::events",
             "integration.core::spi",
+            "integration.core::items",
             "integration.core::handler",
             "integration.core::oauth",
             "integration.core::consumer",

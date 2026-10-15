@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.mentor.adapter;
 
 import de.tum.cit.aet.hephaestus.core.privacy.spi.JdbcPersonDataStore;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataSelection;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
 import java.util.List;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import tools.jackson.databind.JsonNode;
@@ -28,8 +29,8 @@ final class MentorMessagePersonDataStore extends JdbcPersonDataStore {
     }
 
     @Override
-    public List<JsonNode> export(PersonDataSelection selection) {
-        return super.export(selection).stream()
+    public List<JsonNode> export(PersonDataSelection selection, PersonScope frozenScope) {
+        return super.export(selection, frozenScope).stream()
                 .map(row -> conversationRow(mapper, row))
                 .toList();
     }

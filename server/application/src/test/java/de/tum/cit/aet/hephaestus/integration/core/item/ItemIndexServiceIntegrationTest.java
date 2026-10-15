@@ -3,9 +3,9 @@ package de.tum.cit.aet.hephaestus.integration.core.item;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -20,7 +20,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 class ItemIndexServiceIntegrationTest extends BaseIntegrationTest {
     @Autowired
-    private ItemWriter writer;
+    private ItemIndexService writer;
 
     @Autowired
     private ItemRepository items;

@@ -19,7 +19,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 
@@ -49,12 +50,17 @@ class PreviewSeedPolicyIntegrationTest {
     private static final TestDatabase DATABASE =
             PostgreSQLTestContainer.createMigratedDatabase("hephaestus_preview_seed_policy");
 
-    private final JdbcTemplate jdbcTemplate = new JdbcTemplate(
-            new SingleConnectionDataSource(DATABASE.jdbcUrl(), DATABASE.username(), DATABASE.password(), true));
-    private final SchemaRowSeeder seeder = new SchemaRowSeeder(jdbcTemplate);
+    private static final TestDatabase RELEASED_DATABASE =
+            PostgreSQLTestContainer.createReleasedDatabase("hephaestus_preview_released_policy", "prod");
 
-    @Test
-    void shouldClearEveryColumnOfTheSchemaThatCanHoldAStagingSecret() {
+    private JdbcTemplate jdbcTemplate = new JdbcTemplate(
+            new SingleConnectionDataSource(DATABASE.jdbcUrl(), DATABASE.username(), DATABASE.password(), true));
+    private SchemaRowSeeder seeder = new SchemaRowSeeder(jdbcTemplate);
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void shouldClearEveryColumnOfTheSchemaThatCanHoldAStagingSecret(boolean released) {
+        useDatabase(released);
         Map<String, String> updates = new HashMap<>();
         Set<String> emptied = new HashSet<>();
         for (String statement : read(POLICY).split(";", -1)) {
@@ -92,10 +98,11 @@ class PreviewSeedPolicyIntegrationTest {
                 .isEmpty();
     }
 
-    @Test
-    void shouldStripStagingCredentialsAndKeepConnectionMetadataWhenACloneIsSeeded() {
-        // Foreign keys are not seeded, and the marker per agent_job row is what the UNIQUE index on
-        // job_token forces the policy to compute rather than write as one literal.
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void shouldStripStagingCredentialsAndKeepConnectionMetadataWhenACloneIsSeeded(boolean released) {
+        useDatabase(released);
+        // Foreign keys are not seeded. The clone must stop jobs and clear source credentials.
         jdbcTemplate.execute("SET session_replication_role = 'replica'");
         long workspaceId = 9_100_001L;
         long instanceCatalogId = 9_100_002L;
@@ -139,15 +146,46 @@ class PreviewSeedPolicyIntegrationTest {
                 workspaceId,
                 "OUTLINE",
                 "{\"type\": \"OUTLINE\", \"webhookSecret\": \"staging-signing-secret\"}");
-        seeder.insert(
-                "agent_job",
-                Map.of(
-                        "id", jobId,
-                        "workspace_id", workspaceId,
-                        "status", "COMPLETED",
-                        "practice_trigger_mode", "AUTO",
-                        "job_token", "staging-minted-token",
-                        "job_token_hash", "staging-token-hash"));
+        if (released) {
+            seeder.insert(
+                    "agent_job",
+                    Map.of(
+                            "id",
+                            jobId,
+                            "workspace_id",
+                            workspaceId,
+                            "status",
+                            "COMPLETED",
+                            "practice_trigger_mode",
+                            "AUTO",
+                            "job_token",
+                            "staging-minted-token",
+                            "job_token_hash",
+                            "staging-token-hash"));
+        } else {
+            seeder.insert(
+                    "review_job",
+                    Map.of(
+                            "id",
+                            jobId,
+                            "workspace_id",
+                            workspaceId,
+                            "status",
+                            "COMPLETED",
+                            "processing_status",
+                            "PENDING"));
+            seeder.insert(
+                    "feedback_send",
+                    Map.of(
+                            "feedback_id",
+                            UUID.randomUUID(),
+                            "workspace_id",
+                            workspaceId,
+                            "action",
+                            "POST",
+                            "state",
+                            "PENDING"));
+        }
         jdbcTemplate.execute("SET session_replication_role = 'origin'");
 
         applyPolicy();
@@ -181,19 +219,28 @@ class PreviewSeedPolicyIntegrationTest {
         assertThat(scalar("SELECT config ->> 'type' FROM connection WHERE id = " + outlineConnectionId))
                 .isEqualTo("OUTLINE");
 
-        String marker = scalar("SELECT job_token FROM agent_job WHERE id = '" + jobId + "'");
-        assertThat(marker).isEqualTo(MARKER_PREFIX + jobId);
-        assertThat(scalar("SELECT job_token_hash FROM agent_job WHERE id = '" + jobId + "'"))
-                .isNull();
+        if (released) {
+            assertThat(scalar("SELECT job_token FROM agent_job WHERE id = '" + jobId + "'"))
+                    .isEqualTo(MARKER_PREFIX + jobId);
+            assertThat(scalar("SELECT job_token_hash FROM agent_job WHERE id = '" + jobId + "'"))
+                    .isNull();
+        } else {
+            assertThat(scalar("SELECT processing_status FROM review_job WHERE id = '" + jobId + "'"))
+                    .isEqualTo("FAILED");
+            assertThat(scalar("SELECT count(*)::text FROM feedback_send WHERE workspace_id = " + workspaceId))
+                    .isEqualTo("0");
+        }
         assertThat(residualCredentials())
                 .as("the seed marker is earned by counting, so nothing the policy touches may be left")
                 .isZero();
 
         applyPolicy();
-        assertThat(scalar("SELECT job_token FROM agent_job WHERE id = '" + jobId + "'"))
-                .as("a second pass rewrites no marker, so a redeployed seed loader is a no-op")
-                .isEqualTo(marker);
         assertThat(residualCredentials()).isZero();
+        if (released) {
+            assertThat(scalar("SELECT job_token FROM agent_job WHERE id = '" + jobId + "'"))
+                    .as("a second pass leaves the marker unchanged")
+                    .isEqualTo(MARKER_PREFIX + jobId);
+        }
 
         for (String publication : List.of(
                 "UPDATE instance_settings SET public_activity_allowed = true WHERE id = 1",
@@ -210,8 +257,10 @@ class PreviewSeedPolicyIntegrationTest {
                 .isPositive();
     }
 
-    @Test
-    void shouldApplyThePolicyBeforePublicActivityColumnsExist() {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void shouldApplyThePolicyBeforePublicActivityColumnsExist(boolean released) {
+        useDatabase(released);
         jdbcTemplate.execute("BEGIN");
         try {
             jdbcTemplate.execute("ALTER TABLE instance_settings DROP COLUMN public_activity_allowed");
@@ -221,6 +270,13 @@ class PreviewSeedPolicyIntegrationTest {
         } finally {
             jdbcTemplate.execute("ROLLBACK");
         }
+    }
+
+    private void useDatabase(boolean released) {
+        TestDatabase database = released ? RELEASED_DATABASE : DATABASE;
+        jdbcTemplate = new JdbcTemplate(
+                new SingleConnectionDataSource(database.jdbcUrl(), database.username(), database.password(), true));
+        seeder = new SchemaRowSeeder(jdbcTemplate);
     }
 
     private void seedConnection(long id, long workspaceId, String kind, String config) {

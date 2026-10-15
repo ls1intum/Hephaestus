@@ -26,13 +26,13 @@ import org.springframework.test.context.DynamicPropertySource;
 @Tag("integration")
 class StartupBudgetIntegrationTest {
 
-    // Isolate schema creation/drop from other contexts sharing the PostgreSQL container.
+    // The bean budget starts after schema preparation.
     private static final PostgreSQLTestContainer.TestDatabase DATABASE =
-            PostgreSQLTestContainer.createDatabase("startup_budget");
+            PostgreSQLTestContainer.createMigratedDatabase("startup_budget");
 
     private static final String BEAN_INSTANTIATE = "spring.beans.instantiate";
 
-    // Database connection and schema export time are external to application bean initialization.
+    // Database connection and schema validation are external to application bean initialization.
     private static final String JPA_WARM_UP_BEAN = "&entityManagerFactory";
 
     private static final Duration PER_BEAN_CEILING = Duration.ofSeconds(6);

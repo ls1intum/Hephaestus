@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabels;
+import de.tum.cit.aet.hephaestus.integration.core.framework.RegisteredItemLabels;
 import de.tum.cit.aet.hephaestus.practices.feedback.response.FeedbackResponse;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
@@ -26,7 +26,7 @@ class FeedbackReviewControllerIntegrationTest extends AbstractFeedbackIntegratio
     WebTestClient client;
 
     @MockitoBean
-    ItemLabels labels;
+    RegisteredItemLabels labels;
 
     String route() {
         return "/workspaces/" + workspace.getWorkspaceSlug() + "/practices/reviews/feedback";

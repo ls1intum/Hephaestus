@@ -1,9 +1,9 @@
 package de.tum.cit.aet.hephaestus.practices.feedback.delivery;
 
+import de.tum.cit.aet.hephaestus.integration.core.framework.ItemDescriptorRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyCapability;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCatalog;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeveloperTextSanitizer;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
@@ -47,7 +47,7 @@ public class FeedbackPreparationService {
     private final ResultRepository results;
     private final ProblemRepository problems;
     private final FeedbackBasisRepository basis;
-    private final ItemCatalog catalog;
+    private final ItemDescriptorRegistry catalog;
     private final Clock clock;
     private final PracticeVersionRepository versions;
     private final RepeatedSummaryCheck repeated;

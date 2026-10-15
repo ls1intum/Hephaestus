@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.integration.outline.item;
 
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FoundBy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventInput;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventName;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.integration.docs.item.DocumentEvents;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnapshot;
 import java.time.Instant;
@@ -17,9 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Component
 public class OutlineDocumentEventRecorder {
-    private final ItemWriter items;
+    private final ItemIndexService items;
 
-    public OutlineDocumentEventRecorder(ItemWriter items) {
+    public OutlineDocumentEventRecorder(ItemIndexService items) {
         this.items = items;
     }
 

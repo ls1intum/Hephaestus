@@ -40,6 +40,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
@@ -49,7 +50,6 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.tracing.Tracer;
-import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -118,7 +118,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     private PracticeRepository practiceRepository;
 
     @Autowired
-    private PracticeVersionRepository practiceRevisionRepository;
+    private PracticeVersionRepository practiceVersionRepository;
 
     @Autowired
     private ResultRepository practiceResultRepository;
@@ -134,6 +134,9 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private ReviewCompositionContinuation continuation;
+
+    @Autowired
+    private ReviewCompositionBasisRepository compositionBasisRepository;
 
     private Workspace workspace;
     private LlmModel instanceModel;
@@ -314,23 +317,23 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         assertThat(failed.getCapture()).isEqualTo(before.getCapture());
         Result kept = practiceResultRepository.findById(observed.getId()).orElseThrow();
         assertThat(kept.getReviewId()).isEqualTo(before.getReviewId());
-        Long originalRevisionId = requireNonNull(observed.getPracticeVersionId());
-        assertThat(kept.getPracticeVersionId()).isEqualTo(originalRevisionId);
-        assertThat(practiceRevisionRepository
-                        .findById(originalRevisionId)
+        Long originalVersionId = requireNonNull(observed.getPracticeVersionId());
+        assertThat(kept.getPracticeVersionId()).isEqualTo(originalVersionId);
+        assertThat(practiceVersionRepository
+                        .findById(originalVersionId)
                         .orElseThrow()
                         .getDefinition()
                         .path("criteria")
                         .asString())
                 .isEqualTo("The first definition");
-        assertThat(practiceRepository
-                        .findById(practice.getId())
-                        .orElseThrow()
-                        .getCurrentVersion()
-                        .getDefinition()
-                        .path("criteria")
-                        .asString())
-                .isEqualTo("The changed definition");
+        var currentCriteria = transactionTemplate.execute(status -> practiceRepository
+                .findById(practice.getId())
+                .orElseThrow()
+                .getCurrentVersion()
+                .getDefinition()
+                .path("criteria")
+                .asString());
+        assertThat(currentCriteria).isEqualTo("The second definition");
         assertThat(kept.getEvidence()).isEqualTo(observed.getEvidence());
         assertThat(jobRepository.findQueuedIdsOldestFirst(10)).doesNotContain(jobId);
     }
@@ -412,7 +415,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
                 "erased receipt",
                 "receipt not indexing its copies",
                 "expired inputs",
-                "legacy admission",
+                "inputs from another admission",
                 "suppressed person"
             })
     @DisplayName("a lost admitted review whose original inputs cannot be vouched for fails as before")
@@ -425,7 +428,8 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
             case "suppressed person" -> {
                 keepOriginalInputs(jobId, 0, "READY", "COMPLETE", fresh);
                 jdbc.update(
-                        "INSERT INTO identity_restriction(id,provider_id,provider_user_key,team_key,kind) VALUES (?,?,?,'','ERASED')",
+                        "INSERT INTO identity_restriction(id,provider_id,provider_user_key,team_key,kind) VALUES"
+                                + " (?,?,?,'','ERASED')",
                         UUID.randomUUID(),
                         requireNonNull(developer.getProvider()).getId(),
                         "100");
@@ -433,11 +437,14 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
             case "receipt not indexing its copies" -> keepOriginalInputs(jobId, 0, "READY", "UNKNOWN", fresh);
             case "expired inputs" ->
                 keepOriginalInputs(jobId, 0, "READY", "COMPLETE", Instant.now().minusSeconds(1));
-            default -> {
+            case "inputs from another admission" -> {
                 keepOriginalInputs(jobId, 0, "READY", "COMPLETE", fresh);
-                // Admitted before the admitting attempt was recorded: nothing says whose citations these were.
-                jdbc.update("UPDATE review_job SET admission_attempt = NULL WHERE id = ?", jobId);
+                jdbc.update(
+                        "UPDATE review_composition_basis SET admission_digest = ? WHERE job_id = ?",
+                        "another-admission-digest",
+                        jobId);
             }
+            default -> throw new IllegalArgumentException("Unknown recovery case: " + why);
         }
         spentBeforeItWasLost(jobId, 2);
         registerStaleWorker("dead-replica-10");
@@ -560,6 +567,15 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
                     .recordedAt(Instant.now())
                     .build();
             practiceResultRepository.saveAndFlush(row);
+            jdbc.update(
+                    "UPDATE review_item SET state='JUDGED',result_id=?,job_id=? WHERE workspace_id=? AND review_id=?"
+                            + " AND practice_id=? AND item_id=?",
+                    row.getId(),
+                    job.getId(),
+                    job.getWorkspaceId(),
+                    job.getReviewId(),
+                    practice.getId(),
+                    job.getInput().itemId());
             job.setAdmissionDigest("admitted-digest");
             job.setAdmissionAttempt(job.getAttempt());
             job.setCapture(objectMapper
@@ -590,21 +606,17 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
                                 objectMapper.valueToTree(
                                         List.of(new PersonCopyIdentity("GITHUB", "https://github.com", "100", null))))
                         .toString());
-        jdbc.update(
-                "INSERT INTO review_composition_basis(job_id,workspace_id,admission_attempt,admission_digest,"
-                        + "basis_version,basis_digest,copy_id,byte_size,created_at,expires_at,payload) "
-                        + "VALUES (?,?,?,?,?,?,?,?,?,?,CAST(? AS jsonb))",
-                jobId,
-                workspace.getId(),
-                attempt,
-                "admitted-digest",
-                ReviewCompositionBasis.VERSION,
-                ReviewCompositionBasis.digest(Map.of()),
-                copyId,
-                12,
-                Timestamp.from(expiresAt.minus(Duration.ofHours(2))),
-                Timestamp.from(expiresAt),
-                "{\"files\":{}}");
+        var basis = new ReviewCompositionBasis();
+        basis.setJobId(jobId);
+        basis.setWorkspaceId(workspace.getId());
+        basis.setAdmissionAttempt(attempt);
+        basis.setAdmissionDigest("admitted-digest");
+        basis.setBasisVersion(ReviewCompositionBasis.VERSION);
+        basis.setBasisDigest(ReviewCompositionBasis.digest(Map.of()));
+        basis.setCopyId(copyId);
+        basis.setExpiresAt(expiresAt);
+        basis.setPayload(objectMapper.createObjectNode().set("files", objectMapper.createObjectNode()));
+        transactionTemplate.executeWithoutResult(status -> compositionBasisRepository.save(basis));
     }
 
     private void spentBeforeItWasLost(UUID jobId, int calls) {
@@ -648,9 +660,35 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         job.setWorkerId(workerId);
         job.setStartedAt(startedAt);
         job.setAttempt(attempt);
-        return jobRepository
-                .saveAndFlush(RuntimeJobTestData.persistParent(jdbc, job))
-                .getId();
+        long itemId = requireNonNull(jdbc.queryForObject(
+                "INSERT INTO item(workspace_id,kind,source_id,created_at) VALUES (?,?,?,now()) RETURNING id",
+                Long.class,
+                workspace.getId(),
+                practice.getKind().value(),
+                (job.getReviewId().getLeastSignificantBits() & Long.MAX_VALUE) | 1));
+        jdbc.update(
+                "INSERT INTO review(id,workspace_id,item_id,kind,item_version,origin,ordered_at) VALUES"
+                        + " (?,?,?,'ITEM','fixture:one','REQUEST',now())",
+                job.getReviewId(),
+                workspace.getId(),
+                itemId);
+        jdbc.update(
+                "INSERT INTO review_practice(review_id,workspace_id,practice_id,practice_version_id,status) VALUES"
+                        + " (?,?,?,?,'READY')",
+                job.getReviewId(),
+                workspace.getId(),
+                practice.getId(),
+                practice.getCurrentVersion().getId());
+        jdbc.update(
+                "INSERT INTO review_item(review_id,workspace_id,practice_id,item_id,item_version) VALUES"
+                        + " (?,?,?,?,'fixture:one')",
+                job.getReviewId(),
+                workspace.getId(),
+                practice.getId(),
+                itemId);
+        job.setInput(new ReviewJobInput(
+                itemId, List.of(new ReviewAssignmentId(job.getReviewId(), practice.getId(), itemId))));
+        return jobRepository.saveAndFlush(job).getId();
     }
 
     private void registerStaleWorker(String workerId) {

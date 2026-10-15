@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.review.model.Review;
 import de.tum.cit.aet.hephaestus.practices.review.model.ReviewItem;
@@ -44,7 +44,7 @@ public class ReviewScanStoreService implements ReviewScanStore {
     private final ScanReuseCandidateQuery reuseCandidates;
     private final ReviewAssignmentQuery assignments;
     private final ResultRepository results;
-    private final ItemWriter writer;
+    private final ItemIndexService writer;
     private final ProductItemRepository itemRows;
     private final JsonMapper json;
     private final Clock clock;

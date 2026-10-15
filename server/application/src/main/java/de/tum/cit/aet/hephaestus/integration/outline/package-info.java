@@ -9,6 +9,7 @@
             // Connection registry + SPI ports (credential provider, manifest, lifecycle listener, connect strategy).
             "integration.core",
             "integration.core::spi",
+            "integration.core::items",
             // OutlineWebhookMessageHandler rides the JetStream consumer lane (ADR 0023 §3).
             "integration.core::handler",
             // The scope consumer is reconciled when the stored subscription id changes.

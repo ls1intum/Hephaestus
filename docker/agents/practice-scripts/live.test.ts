@@ -161,6 +161,14 @@ async function runLive(slug: string, source: string, bound: BoundModels): Promis
 		if (isJsonObject(first)) {
 			const message = isJsonObject(first.message) ? first.message : {};
 			const probabilities = isJsonObject(first.logprobs) ? first.logprobs.content : undefined;
+			const tokens = Array.isArray(probabilities)
+				? probabilities.flatMap((entry: unknown) =>
+						isJsonObject(entry) && typeof entry.token === "string" ? [entry.token] : [],
+					)
+				: [];
+			const content = typeof message.content === "string" ? message.content : "";
+			const completion = tokens.join("");
+			const answerAt = content === "" ? -1 : completion.lastIndexOf(content);
 			log.push(
 				JSON.stringify({
 					slot: request.slot,
@@ -173,6 +181,10 @@ async function runLive(slug: string, source: string, bound: BoundModels): Promis
 						),
 					),
 					logprobTokens: Array.isArray(probabilities) ? probabilities.length : 0,
+					answerInLogprobs: answerAt !== -1,
+					answerAtEnd: content !== "" && completion.endsWith(content),
+					charsAfterAnswer: answerAt === -1 ? null : completion.length - answerAt - content.length,
+					lastTokenIsSpecial: /^<\|[^|>]+\|>$/u.test(tokens.at(-1) ?? ""),
 				}),
 			);
 		}

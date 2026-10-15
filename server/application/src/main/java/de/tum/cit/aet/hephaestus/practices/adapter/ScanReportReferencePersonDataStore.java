@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.adapter;
 
 import de.tum.cit.aet.hephaestus.core.privacy.spi.JdbcPersonDataStore;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataSelection;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
 import de.tum.cit.aet.hephaestus.practices.review.report.ScanReportService;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -27,7 +28,7 @@ final class ScanReportReferencePersonDataStore extends JdbcPersonDataStore {
     }
 
     @Override
-    public long erase(PersonDataSelection selection) {
+    public long erase(PersonDataSelection selection, PersonScope frozenScope) {
         var rows = querySelected(
                 "jsonb_build_object('workspaceId',t.workspace_id,'resultId',t.result_id)::text",
                 "review_item t",
@@ -43,6 +44,6 @@ final class ScanReportReferencePersonDataStore extends JdbcPersonDataStore {
                             .map(row -> UUID.fromString(row.path("resultId").asString()))
                             .distinct()
                             .toList());
-        return erased + super.erase(selection);
+        return erased + super.erase(selection, frozenScope);
     }
 }

@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.result;
 
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmissionReceipt;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultCandidate;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
@@ -25,7 +25,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @RequiredArgsConstructor
 public class ResultStoreService implements ResultStore {
     private final ResultAdmissionWriter admission;
-    private final ItemWriter itemLocks;
+    private final ItemIndexService itemLocks;
     private final ResultRepository results;
     private final ResultMarkRepository marks;
     private final ResultMarkService marking;

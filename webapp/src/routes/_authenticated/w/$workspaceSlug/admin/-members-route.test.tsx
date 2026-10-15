@@ -130,14 +130,10 @@ describe("workspace members route", () => {
 	});
 
 	it("reads only the selected page and uses the server count before an explicit page jump", async () => {
-		const many = Array.from({ length: 20 }, (_, index) =>
+		const many = Array.from({ length: 10 }, (_, index) =>
 			member(String(index + 100), { displayName: `Member ${String(index).padStart(3, "0")}` }),
 		);
-		const pageContents: Record<string, Wire<WorkspaceMembership>[]> = {
-			"0": many.slice(0, 10),
-			"1": many.slice(10),
-			"2": [SAM],
-		};
+		const requests: Record<string, string>[] = [];
 		const pages: number[] = [];
 		mockMembersRoute();
 		server.use(
@@ -145,19 +141,41 @@ describe("workspace members route", () => {
 				const params = new URL(request.url).searchParams;
 				const page = Number(params.get("page"));
 				pages.push(page);
-				return HttpResponse.json(
-					membershipPage(pageContents[String(page)] ?? [], page, 21, Number(params.get("size"))),
-				);
+				requests.push(Object.fromEntries(params));
+				return HttpResponse.json(membershipPage(many, 0, 21));
 			}),
 		);
 		renderRouteAt("/w/acme/admin/members");
 		await screen.findByText("Showing 10 of 21 members", undefined, ROUTE_RENDER_WAIT);
 		expect(pages).toStrictEqual([0]);
+		expect(requests).toStrictEqual([{ page: "0", size: "10", sort: "name,asc" }]);
 		expect(screen.queryByText("Sam Unclaimed", { selector: "div" })).toBeNull();
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/members", ({ request }) => {
+				pages.push(Number(new URL(request.url).searchParams.get("page")));
+				return HttpResponse.json(membershipPage([SAM], 2, 21));
+			}),
+		);
 		await userEvent.click(screen.getByRole("link", { name: "Go to page 3" }));
 		await screen.findByText("Sam Unclaimed", { selector: "div" }, ROUTE_RENDER_WAIT);
 		screen.getByText("Showing 1 of 21 members");
 		expect(pages).toStrictEqual([0, 2]);
+	});
+
+	it("opens a later page directly without reading earlier pages", async () => {
+		const requests: Record<string, string>[] = [];
+		mockMembersRoute();
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/members", ({ request }) => {
+				requests.push(Object.fromEntries(new URL(request.url).searchParams));
+				return HttpResponse.json(membershipPage([SAM], 2, 21));
+			}),
+		);
+		renderRouteAt("/w/acme/admin/members?page=2");
+		await screen.findByText("Sam Unclaimed", { selector: "div" }, ROUTE_RENDER_WAIT);
+		screen.getByText("Showing 1 of 21 members");
+		expect(screen.queryByText("Ada Lovelace", { selector: "div" })).toBeNull();
+		expect(requests).toStrictEqual([{ page: "2", size: "10", sort: "name,asc" }]);
 	});
 
 	it("keeps an empty page honest and lets the reader return to the first page", async () => {
@@ -167,67 +185,78 @@ describe("workspace members route", () => {
 			http.get("*/workspaces/:workspaceSlug/members", ({ request }) => {
 				const page = Number(new URL(request.url).searchParams.get("page"));
 				pages.push(page);
-				return HttpResponse.json(membershipPage(page === 0 ? [ADA, SAM] : [], page, 2));
+				return HttpResponse.json(membershipPage([], 9, 2));
 			}),
 		);
 		renderRouteAt("/w/acme/admin/members?page=9");
 		await screen.findByText("No members on this page", {}, ROUTE_RENDER_WAIT);
 		expect(screen.queryByText("This workspace has no members yet.")).toBeNull();
 		expect(pages).toStrictEqual([9]);
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/members", ({ request }) => {
+				pages.push(Number(new URL(request.url).searchParams.get("page")));
+				return HttpResponse.json(membershipPage([ADA, SAM]));
+			}),
+		);
 		await userEvent.click(screen.getByRole("button", { name: "Go to first page" }));
 		await screen.findByText("Ada Lovelace", { selector: "div" }, ROUTE_RENDER_WAIT);
 		expect(pages).toStrictEqual([9, 0]);
 	});
 
-	it("sends search, team, sorting and page scope without filtering the server's result again", async () => {
-		const profileMatch = {
-			...ADA,
-			account: {
-				...ADA.account,
-				identities: [
-					{
-						provider: "GITHUB" as const,
-						login: "ada",
-						displayName: "Profile match",
-						avatarUrl: null,
-					},
-				],
-			},
-		};
-		const requests: Record<string, string>[] = [];
-		mockMembersRoute();
-		server.use(
-			http.get("*/workspaces/:workspaceSlug/teams", () =>
-				HttpResponse.json([
-					{
-						id: 3,
-						name: "Reviewers",
-						slug: "reviewers",
-						hidden: false,
-						membershipCount: 1,
-						repoPermissionCount: 0,
-						repositories: [],
-						labels: [],
-						members: [],
-					},
-				]),
-			),
-			http.get("*/workspaces/:workspaceSlug/members", ({ request }) => {
-				const params = new URL(request.url).searchParams;
-				requests.push(Object.fromEntries(params));
-				return HttpResponse.json(membershipPage([profileMatch], 1, 21, 20));
-			}),
-		);
-		renderRouteAt("/w/acme/admin/members?q=Profile&team=3&sort=username&desc=true&page=1&size=20");
-		await screen.findByText("Ada Lovelace", { selector: "div" }, ROUTE_RENDER_WAIT);
-		screen.getByText("Showing 1 of 21 members");
-		expect(requests).toStrictEqual([
-			{ q: "Profile", team: "3", sort: "username,desc", page: "1", size: "20" },
-		]);
-		expect(screen.getByRole("columnheader", { name: "Username" }).getAttribute("aria-sort")).toBe(
-			"descending",
-		);
-	});
+	it.each(["Profile", "123"])(
+		"sends search %s, team, sorting and page scope without filtering the server's result again",
+		async (query) => {
+			const profileMatch = {
+				...ADA,
+				account: {
+					...ADA.account,
+					identities: [
+						{
+							provider: "GITHUB" as const,
+							login: "ada",
+							displayName: `${query} match`,
+							avatarUrl: null,
+						},
+					],
+				},
+			};
+			const requests: Record<string, string>[] = [];
+			mockMembersRoute();
+			server.use(
+				http.get("*/workspaces/:workspaceSlug/teams", () =>
+					HttpResponse.json([
+						{
+							id: 3,
+							name: "Reviewers",
+							slug: "reviewers",
+							hidden: false,
+							membershipCount: 1,
+							repoPermissionCount: 0,
+							repositories: [],
+							labels: [],
+							members: [],
+						},
+					]),
+				),
+				http.get("*/workspaces/:workspaceSlug/members", ({ request }) => {
+					const params = new URL(request.url).searchParams;
+					requests.push(Object.fromEntries(params));
+					return HttpResponse.json(membershipPage([profileMatch], 1, 21, 20));
+				}),
+			);
+			renderRouteAt(
+				`/w/acme/admin/members?q=${query}&team=3&sort=username&desc=true&page=1&size=20`,
+			);
+			await screen.findByText("Ada Lovelace", { selector: "div" }, ROUTE_RENDER_WAIT);
+			screen.getByText("Showing 1 of 21 members");
+			expect(requests).toStrictEqual([
+				{ q: query, team: "3", sort: "username,desc", page: "1", size: "20" },
+			]);
+			expect(screen.getByRole("columnheader", { name: "Username" }).getAttribute("aria-sort")).toBe(
+				"descending",
+			);
+		},
+	);
 
 	it("preserves the server's username order and reverses the sort through the URL", async () => {
 		const ada = {
@@ -259,18 +288,29 @@ describe("workspace members route", () => {
 			http.get("*/workspaces/:workspaceSlug/members", ({ request }) => {
 				const sort = new URL(request.url).searchParams.get("sort");
 				sorts.push(sort);
-				const rows = sort === "username,asc" ? [sam, ada] : [ada, sam];
-				return HttpResponse.json(membershipPage(rows));
+				return HttpResponse.json(membershipPage([ada, sam]));
 			}),
 		);
 		const { router } = renderRouteAtWithRouter("/w/acme/admin/members");
 		await screen.findByText("Ada Lovelace", { selector: "div" }, ROUTE_RENDER_WAIT);
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/members", ({ request }) => {
+				sorts.push(new URL(request.url).searchParams.get("sort"));
+				return HttpResponse.json(membershipPage([sam, ada]));
+			}),
+		);
 		await userEvent.click(screen.getByRole("button", { name: "Username" }));
 		await waitFor(() => expect(sorts).toContain("username,asc"), ROUTE_RENDER_WAIT);
 		await waitFor(() =>
 			expect(
 				within(screen.getByRole("table", { name: "Workspace members" })).getAllByRole("row")[1],
 			).toBe(rowOf("Sam Unclaimed")),
+		);
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/members", ({ request }) => {
+				sorts.push(new URL(request.url).searchParams.get("sort"));
+				return HttpResponse.json(membershipPage([ada, sam]));
+			}),
 		);
 		await userEvent.click(screen.getByRole("button", { name: "Username" }));
 		await waitFor(() => expect(sorts).toContain("username,desc"), ROUTE_RENDER_WAIT);
@@ -279,7 +319,7 @@ describe("workspace members route", () => {
 				within(screen.getByRole("table", { name: "Workspace members" })).getAllByRole("row")[1],
 			).toBe(rowOf("Ada Lovelace")),
 		);
-		expect(router.state.location.search).toEqual(
+		expect(router.state.location.search).toStrictEqual(
 			expect.objectContaining({ sort: "username", desc: true }),
 		);
 	});

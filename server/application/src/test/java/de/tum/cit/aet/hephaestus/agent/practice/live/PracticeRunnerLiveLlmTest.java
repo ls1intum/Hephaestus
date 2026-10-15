@@ -50,6 +50,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -66,6 +67,7 @@ import tools.jackson.databind.node.ObjectNode;
 // Pi does not read OPENAI_BASE_URL; the harness must configure its provider extension explicitly.
 @LiveLlmTest
 @Tag("live")
+@Slf4j
 class PracticeRunnerLiveLlmTest {
 
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
@@ -99,7 +101,7 @@ class PracticeRunnerLiveLlmTest {
     }
 
     @Test
-    @Timeout(value = 300, unit = TimeUnit.SECONDS)
+    @Timeout(value = LiveRunnerWorkspace.TIMEOUT_SECONDS + 30, unit = TimeUnit.SECONDS)
     void flagsHardcodedSecret_inOneFileDiff() throws Exception {
         LiveLlmCredentials creds = LiveLlmCredentials.fromEnv();
         try (ProxyStandIn proxy = new ProxyStandIn(creds)) {
@@ -109,7 +111,7 @@ class PracticeRunnerLiveLlmTest {
 
     @ParameterizedTest(name = CriteriaCaseSelection.NAME)
     @MethodSource(CriteriaCaseSelection.SOURCE)
-    @Timeout(value = 300, unit = TimeUnit.SECONDS)
+    @Timeout(value = LiveRunnerWorkspace.TIMEOUT_SECONDS + 30, unit = TimeUnit.SECONDS)
     void shouldApplyCatalogueBoundaryWhenEvidenceMatchesCase(JsonNode scenario) throws Exception {
         LiveLlmCredentials creds = LiveLlmCredentials.fromEnv();
         try (ProxyStandIn proxy = new ProxyStandIn(creds)) {
@@ -132,12 +134,14 @@ class PracticeRunnerLiveLlmTest {
         Thread stdoutPump = pumpStream(runner.getInputStream(), "[practice-runner stdout]");
         Thread stderrPump = pumpStream(runner.getErrorStream(), "[practice-runner stderr]");
 
-        boolean finished = runner.waitFor(240, TimeUnit.SECONDS);
+        // The process needs the job's shutdown buffer after its own model budget ends.
+        boolean finished = runner.waitFor(LiveRunnerWorkspace.TIMEOUT_SECONDS, TimeUnit.SECONDS);
         if (!finished) {
             runner.destroyForcibly();
             stdoutPump.join(5_000);
             stderrPump.join(5_000);
-            fail("pi-runner did not exit within 240s — likely an LLM stall or watchdog miss. Check "
+            fail("pi-runner did not exit within " + LiveRunnerWorkspace.TIMEOUT_SECONDS
+                    + "s. Check "
                     + "the [practice-runner *] output above for diagnostics.");
             return;
         }
@@ -477,6 +481,9 @@ class PracticeRunnerLiveLlmTest {
                 exchange.close();
                 return;
             }
+            int requestId = System.identityHashCode(exchange);
+            long started = System.nanoTime();
+            log.info("Live upstream request {} started", requestId);
             try (exchange) {
                 HttpRequest request = HttpRequest.newBuilder(URI.create(
                                 creds.baseUrl() + exchange.getRequestURI().getPath()))
@@ -490,6 +497,11 @@ class PracticeRunnerLiveLlmTest {
                 try {
                     HttpResponse<InputStream> response =
                             client.send(request, HttpResponse.BodyHandlers.ofInputStream());
+                    log.info(
+                            "Live upstream request {} headers: status={}, elapsedMs={}",
+                            requestId,
+                            response.statusCode(),
+                            TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
                     try (InputStream upstream = response.body()) {
                         if (!attach(forwarding, upstream)) {
                             // close() took its snapshot before this stream arrived.
@@ -509,6 +521,10 @@ class PracticeRunnerLiveLlmTest {
                     exchange.sendResponseHeaders(502, -1);
                 }
             } finally {
+                log.info(
+                        "Live upstream request {} ended: elapsedMs={}",
+                        requestId,
+                        TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
                 synchronized (lifecycle) {
                     active.remove(forwarding);
                 }

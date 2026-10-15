@@ -75,12 +75,12 @@ class PersonDataRegistryTest extends BaseUnitTest {
         }
 
         @Override
-        public List<JsonNode> export(PersonDataSelection selection) {
+        public List<JsonNode> export(PersonDataSelection selection, PersonScope frozenScope) {
             return List.of();
         }
 
         @Override
-        public long erase(PersonDataSelection selection) {
+        public long erase(PersonDataSelection selection, PersonScope frozenScope) {
             return selection.rows().size();
         }
     }

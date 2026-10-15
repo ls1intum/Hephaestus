@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCatalog;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataContributor;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataSelection;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataStores;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +37,7 @@ class CoreAccountPersonDataCatalog implements PersonDataCatalog {
                         "",
                         1000) {
                     @Override
-                    public long erase(PersonDataSelection selection) {
+                    public long erase(PersonDataSelection selection, PersonScope frozenScope) {
                         for (var row : selection.rows())
                             purger.purgeInCurrentTransaction(
                                     Long.valueOf(row.columns().get("id")));

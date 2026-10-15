@@ -770,9 +770,10 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
                 .filter(store -> store.store().equals("chat_thread_runtime_journal"))
                 .findFirst()
                 .orElseThrow();
-        var selection = journals.select(new PersonScope(colleagueId, List.of(), List.of()));
+        var selectionScope = new PersonScope(colleagueId, List.of(), List.of());
+        var selection = journals.select(selectionScope);
         assertThat(selection.rows()).isNotEmpty();
-        journals.erase(selection);
+        journals.erase(selection, selectionScope);
 
         TranslatorState warm = new TranslatorState(runningId);
         warm.observeSessionJsonl("{\"type\":\"warm\",\"context\":\"colleague\"}\n".getBytes(StandardCharsets.UTF_8));

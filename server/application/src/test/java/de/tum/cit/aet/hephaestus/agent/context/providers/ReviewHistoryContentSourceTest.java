@@ -8,7 +8,7 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.context.HistoryCopies;
 import de.tum.cit.aet.hephaestus.agent.context.HistoryCopy;
 import de.tum.cit.aet.hephaestus.agent.handler.RuntimeReviewTestData;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabels;
+import de.tum.cit.aet.hephaestus.integration.core.framework.RegisteredItemLabels;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackHistoryQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryEntry;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryQuery;
@@ -32,7 +32,7 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
         when(copies.of(unknown)).thenReturn(incomplete);
         when(copies.record(actual)).thenReturn(true);
         var source = new ReviewHistoryContentSource(
-                results, mock(FeedbackHistoryQuery.class), copies, mock(ItemLabels.class), new JsonMapper());
+                results, mock(FeedbackHistoryQuery.class), copies, mock(RegisteredItemLabels.class), new JsonMapper());
         assertThat(source.previousResults(assignment)).containsExactly(vouched);
         verify(copies).record(actual);
         verify(copies).record(incomplete);

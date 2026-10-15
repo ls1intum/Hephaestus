@@ -9,8 +9,8 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.framework.ItemDescriptorRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyCapability;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCatalog;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
@@ -106,7 +106,7 @@ class FeedbackAdmissionReasonsTest {
     private final PracticeVersionRepository versions = mock(PracticeVersionRepository.class);
     private final FeedbackQueryRepository queries = mock(FeedbackQueryRepository.class);
     private final FeedbackGate gate = mock(FeedbackGate.class);
-    private final ItemCatalog catalog = mock(ItemCatalog.class);
+    private final ItemDescriptorRegistry catalog = mock(ItemDescriptorRegistry.class);
     private final FeedbackBasisRepository basis = mock(FeedbackBasisRepository.class);
     private final PreviousPracticePageFeedback previous = mock(PreviousPracticePageFeedback.class);
     private final PracticePageSupportReader support = new PracticePageSupportReader(previous, practices, queries);

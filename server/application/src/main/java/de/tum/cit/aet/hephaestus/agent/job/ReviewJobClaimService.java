@@ -16,7 +16,6 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWorkerRole;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
-import de.tum.cit.aet.hephaestus.integration.core.metrics.IntegrationCoreMetrics;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
@@ -349,7 +348,7 @@ public class ReviewJobClaimService {
 
     private void recordPracticeReviewRefusal(String reason) {
         meterRegistry
-                .counter(IntegrationCoreMetrics.PRACTICE_REVIEW_REFUSED, "phase", "execution", "reason", reason)
+                .counter(AgentMetrics.AGENT_REVIEW_REFUSED, "phase", "execution", "reason", reason)
                 .increment();
     }
 

@@ -12,8 +12,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.framework.ItemDescriptorRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyCapability;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCatalog;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
@@ -55,7 +55,7 @@ class FeedbackPreparationServiceTest {
     final ReviewSnapshotQuery reviews = mock(ReviewSnapshotQuery.class);
     final ResultRepository results = mock(ResultRepository.class);
     final FeedbackBasisRepository basis = mock(FeedbackBasisRepository.class);
-    final ItemCatalog catalog = mock(ItemCatalog.class);
+    final ItemDescriptorRegistry catalog = mock(ItemDescriptorRegistry.class);
     final FeedbackCompositionContextService composition = mock(FeedbackCompositionContextService.class);
     final PracticePageSupportReader support = mock(PracticePageSupportReader.class);
     final UUID reviewId = UUID.randomUUID(), resultId = UUID.randomUUID();

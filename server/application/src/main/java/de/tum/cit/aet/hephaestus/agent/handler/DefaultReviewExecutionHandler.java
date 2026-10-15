@@ -21,8 +21,8 @@ import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceReadinessCheck;
 import de.tum.cit.aet.hephaestus.evidence.SourceReadinessReason;
 import de.tum.cit.aet.hephaestus.evidence.capture.CaptureRequest;
+import de.tum.cit.aet.hephaestus.integration.core.framework.ItemDescriptorRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCatalog;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSource;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScanItemVersions;
@@ -62,7 +62,7 @@ public class DefaultReviewExecutionHandler {
     private final PracticeScriptInputs inputs;
     private final ReviewHistoryContentSource history;
     private final ReviewAssignmentStore capture;
-    private final ItemCatalog items;
+    private final ItemDescriptorRegistry items;
     private final List<ScanItemVersions> scanVersions;
     private final ObjectMapper mapper;
     private final Clock clock;

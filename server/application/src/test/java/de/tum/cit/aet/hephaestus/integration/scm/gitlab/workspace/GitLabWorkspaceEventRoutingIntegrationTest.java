@@ -20,6 +20,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
@@ -34,7 +35,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.Bear
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRequest;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
@@ -244,7 +244,7 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
     private ConnectionService connectionService;
 
     @Autowired
-    private ItemWriter itemWriter;
+    private ItemIndexService itemWriter;
 
     @Autowired
     private ConnectionRepository connectionRepository;

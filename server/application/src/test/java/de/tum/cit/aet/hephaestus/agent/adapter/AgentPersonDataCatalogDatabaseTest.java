@@ -57,7 +57,7 @@ class AgentPersonDataCatalogDatabaseTest {
                 .extracting(row -> row.columns().get("id"))
                 .contains(job.toString())
                 .doesNotContain("00000000-0000-0000-0000-000000992112");
-        assertThat(unacknowledgedStore.export(selected))
+        assertThat(unacknowledgedStore.export(selected, person))
                 .anySatisfy(row -> assertThat(row.path("id").asString()).isEqualTo(job.toString()));
         assertThatThrownBy(() -> unacknowledgedStore.prepareErasure(selected))
                 .isInstanceOf(IllegalStateException.class)
@@ -77,13 +77,13 @@ class AgentPersonDataCatalogDatabaseTest {
         var frozen = stores.stream()
                 .map(store -> new Selected(store, store.select(person)))
                 .toList();
-        frozen.forEach(entry -> entry.store().export(entry.selection()));
+        frozen.forEach(entry -> entry.store().export(entry.selection(), person));
         frozen.forEach(entry -> entry.store().prepareErasure(entry.selection()));
         var transactions = new TransactionTemplate(
                 new DataSourceTransactionManager(Objects.requireNonNull(plain.getDataSource())));
         transactions.executeWithoutResult(transaction -> frozen.stream()
                 .sorted(Comparator.comparingInt(entry -> entry.store().getOrder()))
-                .forEach(entry -> entry.store().erase(entry.selection())));
+                .forEach(entry -> entry.store().erase(entry.selection(), person)));
         assertThat(plain.queryForList("SELECT id FROM review_job WHERE id=?", UUID.class, job))
                 .isEmpty();
         assertThat(plain.queryForList(

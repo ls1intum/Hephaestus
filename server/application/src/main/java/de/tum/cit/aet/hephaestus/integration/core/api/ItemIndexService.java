@@ -1,10 +1,10 @@
-package de.tum.cit.aet.hephaestus.integration.core.item;
+package de.tum.cit.aet.hephaestus.integration.core.api;
 
-import de.tum.cit.aet.hephaestus.integration.core.itemevent.ItemEventService;
+import de.tum.cit.aet.hephaestus.integration.core.item.Item;
+import de.tum.cit.aet.hephaestus.integration.core.item.ItemRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventInput;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
@@ -17,12 +17,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional
-public class ItemIndexService implements ItemWriter {
+public class ItemIndexService {
     private final ItemRepository repository;
     private final ItemEventService events;
     private final Clock clock;
 
-    @Override
     public ItemRef upsert(ItemRegistration registration) {
         Long parentId = registration.parentId();
         if (parentId != null
@@ -53,7 +52,7 @@ public class ItemIndexService implements ItemWriter {
         return ref(item);
     }
 
-    @Override
+    /** Holds the workspace item lock until the caller transaction ends. Requires an active transaction. */
     @Transactional(propagation = Propagation.MANDATORY)
     public void lock(long workspaceId, long itemId) {
         if (repository.lockByIdAndWorkspaceId(itemId, workspaceId).isEmpty()) {
@@ -61,17 +60,14 @@ public class ItemIndexService implements ItemWriter {
         }
     }
 
-    @Override
     public UUID record(ItemEventInput event) {
         return events.record(event);
     }
 
-    @Override
     public boolean remove(long workspaceId, long itemId, Instant at) {
         return repository.remove(workspaceId, itemId, at) == 1;
     }
 
-    @Override
     public boolean restore(long workspaceId, long itemId) {
         return repository.restore(workspaceId, itemId) == 1;
     }

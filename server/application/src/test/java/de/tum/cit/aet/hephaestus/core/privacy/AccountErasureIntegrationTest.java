@@ -86,6 +86,8 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
@@ -466,7 +468,8 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
         for (var contributor : registry.stores())
             otherRows.put(
                     contributor.store(),
-                    contributor.export(Objects.requireNonNull(otherSelection.get(contributor.store()))));
+                    contributor.export(
+                            Objects.requireNonNull(otherSelection.get(contributor.store())), otherPrimaryScope));
         long administratorId = Objects.requireNonNull(administrator.getId());
         var preview = personData.preview(administratorId, targetAccount.getId(), List.of());
         UUID requestId = preview.request().getId();
@@ -663,7 +666,8 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
         for (var contributor : registry.stores()) {
             // A shared thread's aggregate changes; the other person's participant projection does
             // not.
-            assertThat(contributor.export(Objects.requireNonNull(otherSelection.get(contributor.store()))))
+            assertThat(contributor.export(
+                            Objects.requireNonNull(otherSelection.get(contributor.store())), otherPrimaryScope))
                     .as("Another person's %s rows", contributor.store())
                     .isEqualTo(otherRows.get(contributor.store()));
         }
@@ -743,12 +747,14 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
         assertThat(accounts.findById(administratorId).orElseThrow().getStatus()).isEqualTo(Account.Status.ACTIVE);
     }
 
-    @Test
-    void shouldEraseAffectedProofAndPreserveUnrelatedWorkWhenThePersonAppearsInCopiedEvidence() {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void shouldEraseAffectedProofAndPreserveUnrelatedWorkWhenThePersonAppearsInCopiedEvidence(boolean linked) {
         var provider = providers.saveAndFlush(
                 new IdentityProvider(IdentityProviderType.GITLAB, "https://secondary-evidence.example"));
         var target = users.saveAndFlush(TestUserFactory.createUser(42L, "target", provider));
         var other = users.saveAndFlush(TestUserFactory.createUser(84L, "OTHER-PROFILE-CANARY", provider));
+        if (linked) accountFor(target);
         var administrator = new Account("Administrator");
         administrator.setAppRole(Account.AppRole.APP_ADMIN);
         long administratorId =

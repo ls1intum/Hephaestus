@@ -57,8 +57,9 @@ class NativeHibernateJsonCutoverMigrationTest {
                 "SELECT id || ':' || author || ':' || filename || ':' || md5sum FROM databasechangelog ORDER BY"
                         + " orderexecuted");
         var store = exportStore(database);
-        var selected = store.select(new PersonScope(null, List.of(), List.of(995101L)));
-        var beforeExport = store.export(selected);
+        var selectedScope = new PersonScope(null, List.of(), List.of(995101L));
+        var selected = store.select(selectedScope);
+        var beforeExport = store.export(selected, selectedScope);
         var configStore = new JdbcPersonDataStore(
                 new NamedParameterJdbcTemplate(
                         new DriverManagerDataSource(database.jdbcUrl(), database.username(), database.password())),
@@ -70,8 +71,9 @@ class NativeHibernateJsonCutoverMigrationTest {
                 "id",
                 "old_value=NULL,new_value=NULL",
                 0);
-        var configSelected = configStore.select(new PersonScope(null, List.of(), List.of()));
-        var beforeConfigExport = configStore.export(configSelected);
+        var configSelectedScope = new PersonScope(null, List.of(), List.of());
+        var configSelected = configStore.select(configSelectedScope);
+        var beforeConfigExport = configStore.export(configSelected, configSelectedScope);
         assertThat(beforeConfigExport.get(5).path("old_value").isObject()).isTrue();
         assertThat(beforeConfigExport.get(5).path("new_value").isObject()).isTrue();
         assertThat(beforeExport.get(5).path("detail").isObject()).isTrue();
@@ -113,7 +115,7 @@ class NativeHibernateJsonCutoverMigrationTest {
                         "SELECT (tableoid <> 'public.auth_event_default'::regclass)::text FROM auth_event"
                                 + " WHERE id=995204"))
                 .containsExactly("true");
-        var afterExport = store.export(selected);
+        var afterExport = store.export(selected, selectedScope);
         assertThat(afterExport.get(5).path("detail").isString()).isTrue();
         assertThat(afterExport.get(5).path("detail").asString())
                 .isEqualTo(SHAPES.get(5).text());
@@ -121,7 +123,7 @@ class NativeHibernateJsonCutoverMigrationTest {
                 .isEqualTo(beforeExport.get(3).path("detail"));
         assertThat(afterExport.get(1).path("detail").isNull()).isTrue();
         assertThat(afterExport.get(2).path("detail").asString()).isEqualTo("null");
-        var afterConfigExport = configStore.export(configSelected);
+        var afterConfigExport = configStore.export(configSelected, configSelectedScope);
         for (String column : List.of("old_value", "new_value")) {
             assertThat(afterConfigExport.get(5).path(column).isString()).isTrue();
             assertThat(afterConfigExport.get(5).path(column).asString())

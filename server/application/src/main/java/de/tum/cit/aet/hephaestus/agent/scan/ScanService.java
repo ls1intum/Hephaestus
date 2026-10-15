@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.agent.scan;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemListRequest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLister;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ListedItem;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScanItemVersions;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewScanStore;
@@ -32,7 +32,7 @@ import org.springframework.util.AntPathMatcher;
 public class ScanService {
     private final List<ItemLister> listers;
     private final List<ScanItemVersions> versions;
-    private final ItemWriter writer;
+    private final ItemIndexService writer;
     private final ReviewScanStore store;
     private final ScanProperties limits;
     private final Clock clock;

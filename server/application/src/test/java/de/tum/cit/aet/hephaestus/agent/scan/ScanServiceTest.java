@@ -9,13 +9,13 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.handler.RuntimeReviewTestData;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLister;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemPage;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ListedItem;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScanItemVersions;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
@@ -41,7 +41,7 @@ class ScanServiceTest extends BaseUnitTest {
     private static final ItemKind FILE = new ItemKind("scm.file");
     private final ItemLister lister = mock(ItemLister.class);
     private final ScanItemVersions versions = mock(ScanItemVersions.class);
-    private final ItemWriter writer = mock(ItemWriter.class);
+    private final ItemIndexService writer = mock(ItemIndexService.class);
     private final ReviewScanStore store = mock(ReviewScanStore.class);
 
     private ScanService service(int entries) {

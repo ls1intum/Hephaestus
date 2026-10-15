@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
-import de.tum.cit.aet.hephaestus.integration.core.itemevent.ItemEventRecorded;
-import de.tum.cit.aet.hephaestus.integration.core.itemevent.ItemEventService;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemEventRecorded;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemEventService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;

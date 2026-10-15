@@ -92,7 +92,7 @@ class PracticeV1CutoverMigrationTest {
         assertThat(column(
                         database,
                         "SELECT workspace_id || '|' || (parts->0->>'text') || '|' || (parts->1->>'type') ||"
-                                + " '|' || (parts->1->'data'->>'resultId') || '|' || (parts->1->'data' ?"
+                                + " '|' || (parts->1->'data'->>'resultId') || '|' || jsonb_exists(parts->1->'data',"
                                 + " 'observationId') FROM chat_message WHERE"
                                 + " id='00000000-0000-0000-0000-000000992192'"))
                 .containsExactly(

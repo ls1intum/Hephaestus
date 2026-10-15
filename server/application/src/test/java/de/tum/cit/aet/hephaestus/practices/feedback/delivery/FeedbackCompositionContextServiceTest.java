@@ -12,9 +12,9 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.handler.AdmittedResultFixtures;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
+import de.tum.cit.aet.hephaestus.integration.core.framework.ItemDescriptorRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyCapability;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCatalog;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
@@ -71,7 +71,7 @@ class FeedbackCompositionContextServiceTest {
     final PracticeVersionRepository versions = mock(PracticeVersionRepository.class);
     final PracticePageSupportReader support = mock(PracticePageSupportReader.class);
     final FeedbackGate gate = mock(FeedbackGate.class);
-    final ItemCatalog catalog = mock(ItemCatalog.class);
+    final ItemDescriptorRegistry catalog = mock(ItemDescriptorRegistry.class);
     final FeedbackBasisRepository basis = mock(FeedbackBasisRepository.class);
     final ResultHistoryQuery history = mock(ResultHistoryQuery.class);
     final MentorReadinessQuery mentor = mock(MentorReadinessQuery.class);

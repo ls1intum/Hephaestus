@@ -3,7 +3,8 @@ package de.tum.cit.aet.hephaestus.integration.core.spi;
 import java.util.List;
 import java.util.Set;
 
-/** Composes a scan member version from the pinned container and the practice's declared context. */
+/** Composes a scan member version from its pinned container and declared context.
+ * This port keeps provider version serialization outside core and the runtime module. */
 public interface ScanItemVersions {
     Set<ItemKind> kinds();
 

@@ -5,8 +5,8 @@ import de.tum.cit.aet.hephaestus.agent.context.HistoryCopy;
 import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.PublicFeedbackHistoryDTO;
+import de.tum.cit.aet.hephaestus.integration.core.framework.RegisteredItemLabels;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabels;
 import de.tum.cit.aet.hephaestus.practices.review.dto.ItemRefDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackHistoryEntry;
@@ -29,7 +29,7 @@ public class ReviewHistoryContentSource {
     private final ResultHistoryQuery results;
     private final FeedbackHistoryQuery feedback;
     private final HistoryCopies copies;
-    private final ItemLabels labels;
+    private final RegisteredItemLabels labels;
     private final ObjectMapper mapper;
 
     public List<ResultHistoryEntry> previousResults(ReviewAssignmentSnapshot assignment) {

@@ -6,7 +6,8 @@ import tools.jackson.databind.JsonNode;
 
 /**
  * Each store must implement all three operations. Selection contains stable row keys, not content.
- * Export and erasure receive exactly those keys; neither can perform a new subject lookup.
+ * Export and erasure use those keys and the original frozen scope for projection or redaction values.
+ * Neither operation may resolve the subject again or select additional rows.
  * Contributors must be idempotent. Database writes and the step receipt commit together.
  */
 public interface PersonDataContributor extends Ordered {
@@ -14,9 +15,9 @@ public interface PersonDataContributor extends Ordered {
 
     PersonDataSelection select(PersonScope person);
 
-    List<JsonNode> export(PersonDataSelection selection);
+    List<JsonNode> export(PersonDataSelection selection, PersonScope frozenScope);
 
-    long erase(PersonDataSelection selection);
+    long erase(PersonDataSelection selection, PersonScope frozenScope);
 
     /** Stop admitted writers before any store is erased. Repeat calls must be safe. */
     default void prepareErasure(PersonDataSelection selection) {}

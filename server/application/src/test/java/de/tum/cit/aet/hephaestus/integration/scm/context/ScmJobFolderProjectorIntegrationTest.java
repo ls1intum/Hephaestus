@@ -6,13 +6,13 @@ import de.tum.cit.aet.hephaestus.core.auth.spi.PeopleRegistry;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonCopyIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCopyRecorder;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.integration.scm.context.WorkspaceScmProjection.Format;
 import de.tum.cit.aet.hephaestus.integration.scm.context.WorkspaceScmProjection.ProjectedRecord;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation;
@@ -127,7 +127,7 @@ class ScmJobFolderProjectorIntegrationTest extends AbstractWorkspaceIntegrationT
     private JdbcTemplate jdbc;
 
     @Autowired
-    private ItemWriter itemWriter;
+    private ItemIndexService itemWriter;
 
     @Autowired
     private PeopleRegistry people;

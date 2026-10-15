@@ -5,10 +5,10 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.integration.chat.item.ThreadEvents;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
@@ -134,7 +134,7 @@ public final class SlackConversationTestSupport {
             ReviewRepository reviews,
             ReviewPracticeRepository assignments,
             ReviewItemRepository reviewItems,
-            ItemWriter items,
+            ItemIndexService items,
             ResultRepository results,
             long workspaceId,
             Practice practice,
@@ -196,7 +196,7 @@ public final class SlackConversationTestSupport {
             ReviewRepository reviews,
             ReviewPracticeRepository assignments,
             ReviewItemRepository reviewItems,
-            ItemWriter items,
+            ItemIndexService items,
             ResultRepository results,
             FeedbackRepository feedbacks,
             FeedbackBasisRepository bases,

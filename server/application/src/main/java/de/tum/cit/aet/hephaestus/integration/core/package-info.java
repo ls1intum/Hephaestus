@@ -1,11 +1,6 @@
 /**
- * Vendor-neutral integration core — substrate every vendor adapter consumes.
- *
- * <p>Houses {@code webhook/}, {@code consumer/}, {@code events/}, {@code spi/},
- * {@code handler/}, {@code connection/}, {@code oauth/}, {@code feedback/}, and
- * {@code framework/}. OPEN so vendor adapters can reach non-interfaced internals
- * (connection aggregate, framework bootstrap) without a wholesale named-interface
- * inventory. Nothing here may know an {@code IntegrationKind} by name.
+ * Shared integration lifecycle, events and item contracts. Provider adapters consume this module;
+ * its code cannot depend on provider implementations.
  */
 @org.springframework.modulith.ApplicationModule(
         displayName = "Integration · Core",

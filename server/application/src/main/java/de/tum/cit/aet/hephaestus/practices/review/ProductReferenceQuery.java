@@ -3,10 +3,10 @@ package de.tum.cit.aet.hephaestus.practices.review;
 import de.tum.cit.aet.hephaestus.core.auth.AccountReferenceService;
 import de.tum.cit.aet.hephaestus.core.auth.dto.AccountRefDTO;
 import de.tum.cit.aet.hephaestus.core.auth.dto.ProviderIdentityRefDTO;
+import de.tum.cit.aet.hephaestus.integration.core.framework.ItemDescriptorRegistry;
+import de.tum.cit.aet.hephaestus.integration.core.framework.RegisteredItemLabels;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCatalog;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabels;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.practices.review.dto.ItemRefDTO;
 import de.tum.cit.aet.hephaestus.practices.review.dto.ReviewDeveloperDTO;
@@ -28,8 +28,8 @@ public class ProductReferenceQuery {
 
     private final ProductItemRepository rows;
     private final @Nullable AccountReferenceService accountReferences;
-    private final ItemLabels labels;
-    private final ItemCatalog catalog;
+    private final RegisteredItemLabels labels;
+    private final ItemDescriptorRegistry catalog;
 
     @Transactional(readOnly = true)
     public Map<Long, ItemRefDTO> items(long workspaceId, Collection<Long> ids) {

@@ -291,7 +291,7 @@ BEGIN
       VALUES (this_result, 20, this_review, 923100 + f.ordinal, 923100 + f.ordinal, target.item_id, version, reader,
         f.outcome, 'Synthetic browser-test result; no model reviewed this work.',
         'Synthetic explanation for deterministic browser validation only.',
-        jsonb_build_object('citations', CASE WHEN f.outcome = 'NOT_MET' THEN jsonb_build_array(citation)
+        jsonb_build_object('citations', CASE WHEN f.ordinal IN (1, 2) THEN jsonb_build_array(citation)
           ELSE '[]'::jsonb END, 'openQuestions', '[]'::jsonb),
         '{"source":"claimed","complete":true,"selected":1,"checked":1,"total":1}'::jsonb, fixture_time)
       ON CONFLICT (id) DO NOTHING;

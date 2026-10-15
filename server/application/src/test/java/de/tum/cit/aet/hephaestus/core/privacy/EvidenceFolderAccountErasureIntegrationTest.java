@@ -1032,7 +1032,7 @@ class EvidenceFolderAccountErasureIntegrationTest extends BaseIntegrationTest {
         var selected = store.select(person);
         assertThat(selected.rows()).hasSize(2);
         assertThat(catalog.jobsContaining(person)).containsExactlyInAnyOrder(first.getId(), second.getId());
-        assertThat(mapper.writeValueAsString(store.export(selected)))
+        assertThat(mapper.writeValueAsString(store.export(selected, person)))
                 .doesNotContain("COPIED-PROFILE", "authorLogin", "authorName");
         var pool = Executors.newSingleThreadExecutor();
         try {
@@ -1050,8 +1050,8 @@ class EvidenceFolderAccountErasureIntegrationTest extends BaseIntegrationTest {
             assertThat(firstFolder).doesNotExist();
             assertThat(secondFolder).doesNotExist();
             assertThat(otherFolder).exists();
-            assertThat(store.erase(selected)).isEqualTo(2);
-            assertThat(store.erase(selected)).isZero();
+            assertThat(store.erase(selected, person)).isEqualTo(2);
+            assertThat(store.erase(selected, person)).isZero();
             assertThat(store.select(person).rows()).isEmpty();
             assertThat(jdbc.queryForObject(
                             "SELECT count(*) FROM person_evidence_copy WHERE job_id=?",
@@ -1119,7 +1119,7 @@ class EvidenceFolderAccountErasureIntegrationTest extends BaseIntegrationTest {
         assertThat(jdbc.queryForObject(
                         "SELECT payload::text FROM person_evidence_copy WHERE job_id=?", String.class, job.getId()))
                 .contains("42");
-        assertThat(store.erase(selected)).isEqualTo(1);
+        assertThat(store.erase(selected, person)).isEqualTo(1);
         assertThat(store.select(person).rows()).isEmpty();
     }
 
@@ -1139,7 +1139,7 @@ class EvidenceFolderAccountErasureIntegrationTest extends BaseIntegrationTest {
         var selected = store.select(scope);
         assertThat(selected.rows()).hasSize(1);
         store.prepareErasure(selected);
-        assertThat(store.erase(selected)).isEqualTo(1);
+        assertThat(store.erase(selected, scope)).isEqualTo(1);
         databaseTestUtils.erase(Objects.requireNonNull(provider.getId()), "42", "");
         var blocked = job("folder-origin-blocked");
         assertThatThrownBy(() -> copy(root, owner, recorder, blocked, identity))
@@ -1215,18 +1215,19 @@ class EvidenceFolderAccountErasureIntegrationTest extends BaseIntegrationTest {
         var job = job("folder-offline");
         copy(mounted, owner, recorder, job, identity).close();
         var serverStore = catalog(server, recorder).contributors().getFirst();
-        var selected = serverStore.select(new PersonScope(
-                null, List.of(new PersonIdentity(Objects.requireNonNull(provider.getId()), "42", null)), List.of()));
+        var selectedScope = new PersonScope(
+                null, List.of(new PersonIdentity(Objects.requireNonNull(provider.getId()), "42", null)), List.of());
+        var selected = serverStore.select(selectedScope);
         assertThat(selected.rows()).hasSize(1);
         assertThatThrownBy(() -> serverStore.prepareErasure(selected))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("not acknowledged");
-        assertThatThrownBy(() -> serverStore.erase(selected)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> serverStore.erase(selected, selectedScope)).isInstanceOf(IllegalStateException.class);
         jdbc.update("DELETE FROM review_job WHERE id=?", job.getId());
         var restarted = catalog(mounted, new ExactPersonDataCopyRecorder());
         restarted.removeLocalRequests();
         serverStore.prepareErasure(selected);
-        assertThat(serverStore.erase(selected)).isEqualTo(1);
+        assertThat(serverStore.erase(selected, selectedScope)).isEqualTo(1);
         assertThat(mounted.resolve("jobs")
                         .resolve(Long.toString(job.getWorkspaceId()))
                         .resolve(job.getId().toString()))
@@ -1290,7 +1291,7 @@ class EvidenceFolderAccountErasureIntegrationTest extends BaseIntegrationTest {
         assertThat(selected.rows()).hasSize(1);
         assertThat(catalog.jobsContaining(person)).isEmpty();
         store.prepareErasure(selected);
-        assertThat(store.erase(selected)).isEqualTo(1);
+        assertThat(store.erase(selected, person)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT message FROM git_commit WHERE id=998802", String.class))
                 .isEqualTo("Source history stays");
         assertThat(jdbc.queryForObject(

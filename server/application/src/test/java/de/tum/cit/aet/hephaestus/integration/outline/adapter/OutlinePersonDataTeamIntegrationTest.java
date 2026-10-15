@@ -72,8 +72,8 @@ class OutlinePersonDataTeamIntegrationTest extends BaseIntegrationTest {
         assertThat(selected.rows())
                 .singleElement()
                 .satisfies(row -> assertThat(row.columns().get("id")).isEqualTo(Long.toString(firstId)));
-        assertThat(store.export(selected)).hasSize(1);
-        assertThat(store.erase(selected)).isEqualTo(1L);
+        assertThat(store.export(selected, person)).hasSize(1);
+        assertThat(store.erase(selected, person)).isEqualTo(1L);
         entities.clear();
         var untouched = documents.findById(secondId).orElseThrow();
         assertThat(untouched.getCreatedBySubject()).isEqualTo("same-native-subject");

@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.core.framework;
 
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCatalog;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import java.util.Collection;
@@ -12,7 +11,7 @@ import org.springframework.stereotype.Component;
 
 // Duplicate descriptors must fail: bean order cannot determine a kind's events or delivery capabilities.
 @Component
-public class ItemDescriptorRegistry implements ItemCatalog {
+public class ItemDescriptorRegistry {
 
     private final Map<ItemKind, ItemDescriptor> byKind;
 
@@ -28,12 +27,10 @@ public class ItemDescriptorRegistry implements ItemCatalog {
                 }));
     }
 
-    @Override
     public Collection<ItemDescriptor> all() {
         return byKind.values();
     }
 
-    @Override
     public Optional<ItemDescriptor> descriptorFor(ItemKind kind) {
         return Optional.ofNullable(byKind.get(kind));
     }

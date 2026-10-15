@@ -7,13 +7,13 @@ import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemListRequest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.ItemFixtures;
 import java.util.List;
@@ -28,7 +28,7 @@ class ScmWorkItemListerTest extends BaseUnitTest {
     @Test
     void shouldRetainMembershipAndVersionsEstablishedByTheFirstPage() {
         var sources = mock(ScmItemService.class);
-        var writer = mock(ItemWriter.class);
+        var writer = mock(ItemIndexService.class);
         var queries = mock(ScmItemQueryRepository.class);
         var root = new ItemRef(1, 2, ScmItemEvents.REPOSITORY, 10L, null, null);
         var commit = new ItemVersion("a".repeat(40), null);

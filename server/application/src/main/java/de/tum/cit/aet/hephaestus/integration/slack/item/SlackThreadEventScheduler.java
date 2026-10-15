@@ -3,10 +3,10 @@ package de.tum.cit.aet.hephaestus.integration.slack.item;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.chat.item.ThreadEvents;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FoundBy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventInput;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.integration.slack.conversation.SlackConversationCandidateSource;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackTs;
@@ -33,7 +33,7 @@ public class SlackThreadEventScheduler {
     private static final Duration QUIESCENCE = Duration.ofMinutes(10);
     private final SlackConversationCandidateSource candidates;
     private final ThreadItemSource source;
-    private final ItemWriter items;
+    private final ItemIndexService items;
     private final SlackThreadRepository threads;
     private final ReviewService reviews;
     private final TransactionTemplate transactions;
@@ -42,7 +42,7 @@ public class SlackThreadEventScheduler {
     public SlackThreadEventScheduler(
             SlackConversationCandidateSource candidates,
             ThreadItemSource source,
-            ItemWriter items,
+            ItemIndexService items,
             SlackThreadRepository threads,
             ReviewService reviews,
             TransactionTemplate transactions,

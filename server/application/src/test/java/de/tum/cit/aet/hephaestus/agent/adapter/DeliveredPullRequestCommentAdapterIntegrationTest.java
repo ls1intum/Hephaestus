@@ -3,12 +3,12 @@ package de.tum.cit.aet.hephaestus.agent.adapter;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.handler.RetainedFeedbackTestData;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.DeliveredPullRequestCommentLookup;
 import de.tum.cit.aet.hephaestus.integration.core.spi.DeliveredPullRequestCommentLookup.CommentIds;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
@@ -42,7 +42,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 /** The comments on one pull request that a workspace's own delivery records name, matched against the mirror. */
 class DeliveredPullRequestCommentAdapterIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Autowired
-    private ItemWriter itemWriter;
+    private ItemIndexService itemWriter;
 
     @Autowired
     private JdbcTemplate jdbc;

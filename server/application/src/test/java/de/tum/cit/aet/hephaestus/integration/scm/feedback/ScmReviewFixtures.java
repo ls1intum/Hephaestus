@@ -2,8 +2,8 @@ package de.tum.cit.aet.hephaestus.integration.scm.feedback;
 
 import de.tum.cit.aet.hephaestus.core.auth.spi.PeopleRegistry;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -24,14 +24,14 @@ import tools.jackson.databind.ObjectMapper;
 
 public final class ScmReviewFixtures {
     private final JdbcTemplate jdbc;
-    private final ItemWriter items;
+    private final ItemIndexService items;
     private final PeopleRegistry people;
     private final TransactionTemplate transactions;
     private final ObjectMapper mapper;
 
     public ScmReviewFixtures(
             JdbcTemplate jdbc,
-            ItemWriter items,
+            ItemIndexService items,
             PeopleRegistry people,
             TransactionTemplate transactions,
             ObjectMapper mapper) {

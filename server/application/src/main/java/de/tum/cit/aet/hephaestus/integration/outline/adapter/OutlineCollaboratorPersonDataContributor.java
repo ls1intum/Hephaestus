@@ -58,7 +58,7 @@ final class OutlineCollaboratorPersonDataContributor implements PersonDataContri
     }
 
     @Override
-    public List<JsonNode> export(PersonDataSelection selection) {
+    public List<JsonNode> export(PersonDataSelection selection, PersonScope frozenScope) {
         List<JsonNode> rows = new ArrayList<>();
         for (var key : selection.rows())
             rows.addAll(jdbc.query(
@@ -71,7 +71,7 @@ final class OutlineCollaboratorPersonDataContributor implements PersonDataContri
     }
 
     @Override
-    public long erase(PersonDataSelection selection) {
+    public long erase(PersonDataSelection selection, PersonScope frozenScope) {
         long rows = 0;
         for (var key : selection.rows()) rows += jdbc.update("""
             UPDATE outline_document SET collaborator_subjects=(

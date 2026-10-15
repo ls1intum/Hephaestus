@@ -22,10 +22,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.EvidenceCitation;
-import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
-import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStore;
 import de.tum.cit.aet.hephaestus.practices.spi.InapplicabilityWarrant;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewWriteGuard;
@@ -62,13 +59,11 @@ public class ResultAdmissionService {
     private final ReviewJobAssignments assignments;
     private final PublicReviewEligibility publicEligibility;
     private final JobEvidenceFiles files;
-    private final FeedbackStore feedback;
     private final ReviewHistoryContentSource history;
     private final ObjectMapper mapper;
     private final TransactionTemplate transactions;
     private final ReviewCompositionBasisRepository bases;
-    private final FeedbackCompositionContextReader composition;
-    private final ReviewAssignmentStore members;
+    private final FeedbackCompositionService composition;
     private final ReviewWriteGuard writeGuard;
 
     public ResultAdmissionService(
@@ -78,13 +73,11 @@ public class ResultAdmissionService {
             ReviewJobAssignments assignments,
             PublicReviewEligibility publicEligibility,
             JobEvidenceFiles files,
-            FeedbackStore feedback,
             ReviewHistoryContentSource history,
             ObjectMapper mapper,
             PlatformTransactionManager manager,
             ReviewCompositionBasisRepository bases,
-            FeedbackCompositionContextReader composition,
-            ReviewAssignmentStore members,
+            FeedbackCompositionService composition,
             ReviewWriteGuard writeGuard) {
         this.jobs = jobs;
         this.output = output;
@@ -92,13 +85,11 @@ public class ResultAdmissionService {
         this.assignments = assignments;
         this.publicEligibility = publicEligibility;
         this.files = files;
-        this.feedback = feedback;
         this.history = history;
         this.mapper = mapper;
         this.transactions = new TransactionTemplate(manager);
         this.bases = bases;
         this.composition = composition;
-        this.members = members;
         this.writeGuard = writeGuard;
     }
 
@@ -228,7 +219,7 @@ public class ResultAdmissionService {
                         entry.path("itemId").asString(),
                         entry.path("reason").asString()));
             }
-        FeedbackCompositionContextReader.Read privateRead = null;
+        FeedbackCompositionService.Read privateRead = null;
         if (assignments.review(job).kind() == ReviewKind.ITEM && !admitted.isEmpty()) {
             if (duringCapture) privateRead = composition.readForCapture(job, admitted);
             else {
@@ -251,8 +242,8 @@ public class ResultAdmissionService {
                 Objects.requireNonNull(job.getAdmissionDigest()),
                 results,
                 withheld,
-                privateRead == null ? null : FeedbackCompositionContextReader.page(privateRead),
-                privateRead == null ? null : FeedbackCompositionContextReader.conversation(privateRead),
+                privateRead == null ? null : FeedbackCompositionService.page(privateRead),
+                privateRead == null ? null : FeedbackCompositionService.conversation(privateRead),
                 assignments.publicReviewed(job));
     }
 
@@ -298,35 +289,15 @@ public class ResultAdmissionService {
                                             citation.endLine(),
                                             citation.side())));
                 }
-            var drafts = FeedbackDraftBuilder.build(
-                    job, Set.copyOf(request.basisResultIds()), rows, context.support(), request.composition(), anchors);
-            boolean hasPublic = drafts.stream().anyMatch(draft -> draft.destination() == FeedbackDestination.ON_WORK);
-            if (hasPublic && !request.publicComposition()) throw new AdmissionConflictException();
-            boolean publicAlreadyAccepted = request.publicComposition() && assignments.publicReviewed(job);
-            if (publicAlreadyAccepted && job.getPublicReviewDigest() == null) throw new AdmissionConflictException();
-            var prepared = feedback.prepareAll(job.getWorkspaceId(), job.getReviewId(), drafts);
-            if (publicAlreadyAccepted && !prepared.packageDigest().equals(job.getPublicReviewDigest()))
-                throw new AdmissionConflictException();
-            if (request.publicComposition()) {
-                members.publicReviewed(
-                        job.getWorkspaceId(), job.getReviewId(), job.getId(), job.getAttempt(), prepared.preparedAt());
-                job.setPublicReviewDigest(prepared.packageDigest());
-            }
-            for (var draft : drafts) {
-                var receipt = prepared.pieces().stream()
-                        .filter(piece -> piece.feedbackId().equals(draft.id()))
-                        .findFirst()
-                        .orElseThrow();
-                if (draft.destination() == FeedbackDestination.PRACTICE_PAGE)
-                    job.setPracticePagePreparedAt(receipt.preparedAt());
-                else if (draft.destination() == FeedbackDestination.CONVERSATION)
-                    job.setConversationPreparedAt(receipt.preparedAt());
-            }
+            var response = composition.prepare(
+                    job,
+                    request,
+                    rows,
+                    context,
+                    anchors,
+                    request.publicComposition() && assignments.publicReviewed(job));
             jobs.saveAndFlush(job);
-            return new PrepareFeedbackResponseDTO(
-                    prepared.pieces().stream().map(piece -> piece.feedbackId()).toList(),
-                    prepared.packageDigest(),
-                    prepared.preparedAt());
+            return response;
         }));
     }
 

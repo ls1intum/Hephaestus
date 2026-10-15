@@ -34,7 +34,6 @@ import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
 import de.tum.cit.aet.hephaestus.evidence.capture.EvidenceDirectory;
-import de.tum.cit.aet.hephaestus.integration.core.metrics.IntegrationCoreMetrics;
 import de.tum.cit.aet.hephaestus.observability.StructuredLogKeys;
 import de.tum.cit.aet.hephaestus.practices.spi.ProcessingStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
@@ -1089,7 +1088,7 @@ public class ReviewJobExecutor {
 
     private void recordPracticeReviewRefusal(String reason) {
         meterRegistry
-                .counter(IntegrationCoreMetrics.PRACTICE_REVIEW_REFUSED, "phase", "execution", "reason", reason)
+                .counter(AgentMetrics.AGENT_REVIEW_REFUSED, "phase", "execution", "reason", reason)
                 .increment();
     }
 

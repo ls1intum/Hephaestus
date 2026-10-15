@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.workspace;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
@@ -14,7 +15,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemSourceAccess;
@@ -54,7 +54,7 @@ class RepositoryProviderScopeIntegrationTest extends AbstractWorkspaceIntegratio
     private WorkspaceSyncTargetProvider syncTargets;
 
     @Autowired
-    private ItemWriter itemWriter;
+    private ItemIndexService itemWriter;
 
     @Autowired
     private ScmItemSourceAccess sourceAccess;
@@ -110,7 +110,7 @@ class RepositoryProviderScopeIntegrationTest extends AbstractWorkspaceIntegratio
 
     @Test
     @WithMentorUser
-    void shouldAcceptTheRegisteredDefaultSourceWhileItsConnectionIsPaused() {
+    void shouldRetainMonitoredWorkAndRefuseDeliveryWhilePausedThenRestoreAccessOnResume() {
         Workspace workspace = workspace("default-source", persistUser("mentor"));
         Repository mine = repository(ensureGitHubProvider(), NATIVE_ID, NAME);
         IdentityProvider enterprise = gitProviderRepository.saveAndFlush(
@@ -134,7 +134,7 @@ class RepositoryProviderScopeIntegrationTest extends AbstractWorkspaceIntegratio
         Issue work = issue(mine);
         assertWorkFacts(workspace, work);
 
-        connectionService.transition(
+        Connection suspended = connectionService.transition(
                 active,
                 new ConnectionService.TransitionRequest(
                         IntegrationState.SUSPENDED,
@@ -146,6 +146,16 @@ class RepositoryProviderScopeIntegrationTest extends AbstractWorkspaceIntegratio
         assertThat(repositories.findAllByWorkspaceMonitors(workspace.getId()))
                 .extracting(Repository::getId)
                 .containsExactly(mine.getId());
+        assertNoWorkFacts(workspace, work);
+        connectionService.transition(
+                suspended,
+                new ConnectionService.TransitionRequest(
+                        IntegrationState.ACTIVE,
+                        "TEST_RESUMED",
+                        "SYSTEM",
+                        "provider-scope-test",
+                        UUID.randomUUID().toString(),
+                        "Source resumed"));
         assertWorkFacts(workspace, work);
     }
 

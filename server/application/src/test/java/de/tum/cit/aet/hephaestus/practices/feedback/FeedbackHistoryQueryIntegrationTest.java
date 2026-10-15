@@ -46,8 +46,8 @@ class FeedbackHistoryQueryIntegrationTest extends AbstractFeedbackIntegrationTes
                 Objects.requireNonNull(persistAccount("Another history viewer").getId());
         jdbc.update(
                 "INSERT INTO"
-                    + " membership(workspace_id,account_id,role,joined_at,review_selected,hidden,public_activity_seen)"
-                    + " VALUES (?,?,'MEMBER',now(),false,false,false)",
+                        + " membership(workspace_id,account_id,role,joined_at,review_selected,hidden,public_activity_seen)"
+                        + " VALUES (?,?,'MEMBER',now(),false,false,false)",
                 workspace.getId(),
                 otherId);
         assertThat(history.forItem(workspace.getId(), itemId, otherId, 10))
@@ -227,8 +227,8 @@ class FeedbackHistoryQueryIntegrationTest extends AbstractFeedbackIntegrationTes
                 Objects.requireNonNull(persistAccount("Public feedback viewer").getId());
         jdbc.update(
                 "INSERT INTO"
-                    + " membership(workspace_id,account_id,role,joined_at,review_selected,hidden,public_activity_seen)"
-                    + " VALUES (?,?,'MEMBER',now(),false,false,false)",
+                        + " membership(workspace_id,account_id,role,joined_at,review_selected,hidden,public_activity_seen)"
+                        + " VALUES (?,?,'MEMBER',now(),false,false,false)",
                 workspace.getId(),
                 peerId);
         var entry = history.forItem(workspace.getId(), itemId, peerId, 1).getFirst();

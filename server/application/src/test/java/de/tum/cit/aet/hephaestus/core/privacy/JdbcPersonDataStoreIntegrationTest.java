@@ -47,17 +47,51 @@ class JdbcPersonDataStoreIntegrationTest extends BaseIntegrationTest {
             plain.execute("SET LOCAL TIME ZONE 'UTC'");
             var selected = store.select(scope);
             assertThat(selected.rows()).hasSize(1);
-            assertThat(store.export(selected)).hasSize(1);
+            assertThat(store.export(selected, scope)).hasSize(1);
             plain.execute("SET LOCAL TIME ZONE 'Europe/Berlin'");
-            assertThat(store.export(selected)).hasSize(1);
-            assertThat(store.export(selected).getFirst().path("body").asString())
+            assertThat(store.export(selected, scope)).hasSize(1);
+            assertThat(store.export(selected, scope).getFirst().path("body").asString())
                     .isEqualTo("Target content");
-            assertThat(store.erase(selected)).isEqualTo(1);
-            assertThat(store.erase(selected)).isZero();
+            assertThat(store.erase(selected, scope)).isEqualTo(1);
+            assertThat(store.erase(selected, scope)).isZero();
             assertThat(plain.queryForObject("SELECT body FROM person_data_key_test", String.class))
                     .isEqualTo("Other content");
             assertThat(store.select(new PersonScope(null, List.of(), List.of())).rows())
                     .isEmpty();
+        });
+    }
+
+    @Test
+    void shouldRedactOnlyFrozenReferencesUsingTheOriginalSubjectScope() {
+        new TransactionTemplate(transactions).executeWithoutResult(status -> {
+            var plain = jdbc.getJdbcTemplate();
+            plain.execute(
+                    "CREATE TEMP TABLE person_data_key_test(id bigint PRIMARY KEY, subject_id bigint, actor_id bigint) ON COMMIT DROP");
+            plain.execute("INSERT INTO person_data_key_test VALUES (1,42,84),(2,84,42)");
+            var store = new JdbcPersonDataStore(
+                    jdbc,
+                    mapper,
+                    "key_test",
+                    "person_data_key_test",
+                    "t.subject_id=:account OR t.actor_id=:account",
+                    "id,subject_id,actor_id",
+                    "id",
+                    "subject_id=CASE WHEN subject_id=:account THEN NULL ELSE subject_id END,actor_id=CASE WHEN actor_id=:account THEN NULL ELSE actor_id END",
+                    0);
+            var scope = new PersonScope(42L, List.of(), List.of());
+            var selected = store.select(scope);
+            plain.execute("INSERT INTO person_data_key_test VALUES (3,42,84)");
+            assertThat(store.erase(selected, scope)).isEqualTo(2);
+            assertThat(plain.queryForObject("SELECT subject_id FROM person_data_key_test WHERE id=1", Long.class))
+                    .isNull();
+            assertThat(plain.queryForObject("SELECT actor_id FROM person_data_key_test WHERE id=1", Long.class))
+                    .isEqualTo(84L);
+            assertThat(plain.queryForObject("SELECT subject_id FROM person_data_key_test WHERE id=2", Long.class))
+                    .isEqualTo(84L);
+            assertThat(plain.queryForObject("SELECT actor_id FROM person_data_key_test WHERE id=2", Long.class))
+                    .isNull();
+            assertThat(plain.queryForObject("SELECT subject_id FROM person_data_key_test WHERE id=3", Long.class))
+                    .isEqualTo(42L);
         });
     }
 
@@ -78,10 +112,11 @@ class JdbcPersonDataStoreIntegrationTest extends BaseIntegrationTest {
                     "id,owner_id",
                     "owner_id=NULL",
                     0);
-            var selected = store.select(new PersonScope(null, List.of(), List.of(42L)));
+            var selectedScope = new PersonScope(null, List.of(), List.of(42L));
+            var selected = store.select(selectedScope);
             assertThat(selected.rows()).hasSize(1);
             plain.execute("UPDATE person_data_key_test SET owner_id=84 WHERE id=1");
-            assertThat(store.erase(selected)).isZero();
+            assertThat(store.erase(selected, selectedScope)).isZero();
             assertThat(plain.queryForObject("SELECT owner_id FROM person_data_key_test", Long.class))
                     .isEqualTo(84);
             assertThat(plain.queryForObject("SELECT body FROM person_data_key_test", String.class))

@@ -3,11 +3,11 @@ package de.tum.cit.aet.hephaestus.integration.slack.retention;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.SlackConversationTestSupport;
@@ -57,7 +57,7 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
     private ReviewRepository reviews;
 
     @Autowired
-    private ItemWriter items;
+    private ItemIndexService items;
 
     @Autowired
     private SlackRetentionSweeper slackRetentionSweeper;

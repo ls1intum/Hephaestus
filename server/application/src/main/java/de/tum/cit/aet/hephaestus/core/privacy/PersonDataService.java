@@ -29,6 +29,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
@@ -83,15 +84,16 @@ public class PersonDataService {
         requirePreview(r);
         var selected = selections(r);
         requireUnchanged(r, selected);
+        var frozenScope = scope(r);
         var bundle = mapper.createObjectNode();
         bundle.put("schemaVersion", "1.0");
         bundle.put("generatedAt", Instant.now().toString());
-        bundle.set("scope", mapper.valueToTree(scope(r)));
+        bundle.set("scope", mapper.valueToTree(frozenScope));
         var stores = bundle.putObject("stores");
         for (var store : registry.stores())
             stores.set(
                     store.store(),
-                    mapper.valueToTree(store.export(Objects.requireNonNull(selected.get(store.store())))));
+                    mapper.valueToTree(store.export(Objects.requireNonNull(selected.get(store.store())), frozenScope)));
         return bundle;
     }
 
@@ -164,7 +166,7 @@ public class PersonDataService {
         // administrators after both have accepted a token validated before either erasure.
         List<Boolean> eligible = jdbc.query(
                 "SELECT id,(status='ACTIVE' AND app_role='APP_ADMIN') FROM account WHERE id"
-                        + " IN (?,?) ORDER BY id FOR UPDATE",
+                        + " IN (?,?) ORDER BY id FOR NO KEY UPDATE",
                 (rs, row) -> rs.getLong(1) == administratorId && rs.getBoolean(2),
                 administratorId,
                 Objects.requireNonNullElse(personAccountId, -1L));
@@ -176,14 +178,15 @@ public class PersonDataService {
      * Account deletion uses the same frozen store inventory and physical-copy custody as admin
      * erasure.
      */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void eraseForAccount(long accountId) {
         TransactionTemplate tx = new TransactionTemplate(transactions);
         UUID requestId = tx.execute(status -> {
             PersonScope person = withEvidenceJobs(resolver.resolve(accountId, List.of()));
             copyFence.holdForErasure();
             writeFence.holdForErasure(person.identities());
-            var accountStatus =
-                    jdbc.queryForObject("SELECT status FROM account WHERE id=? FOR UPDATE", String.class, accountId);
+            var accountStatus = jdbc.queryForObject(
+                    "SELECT status FROM account WHERE id=? FOR NO KEY UPDATE", String.class, accountId);
             if ("DELETED".equals(accountStatus)) return null;
             var active = jdbc.query(
                     """
@@ -214,14 +217,19 @@ public class PersonDataService {
             return request.getId();
         });
         if (requestId == null) return;
-        run(requestId);
+        runSteps(requestId);
         var state = Objects.requireNonNull(
                 tx.execute(status -> requests.findById(requestId).orElseThrow().getState()));
         if (state != PersonDataRequest.State.COMPLETE)
             throw new IllegalStateException("Account erasure has unfinished copy or store custody: " + requestId);
     }
 
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void run(UUID id) {
+        runSteps(id);
+    }
+
+    private void runSteps(UUID id) {
         TransactionTemplate tx = new TransactionTemplate(transactions);
         var admission = copyFence.erase();
         String activeStore = "inventory";
@@ -249,7 +257,7 @@ public class PersonDataService {
                     if (!inventory.containsAll(completed.keySet()))
                         throw new IllegalStateException("Erasure contributor inventory changed");
                     if (!completed.containsKey(store.store())) {
-                        long count = store.erase(Objects.requireNonNull(frozen.get(store.store())));
+                        long count = store.erase(Objects.requireNonNull(frozen.get(store.store())), scope(r));
                         completed.put(
                                 store.store(),
                                 new PersonDataStoreReceipt(count, Instant.now(), r.getAdministratorAccountId()));
@@ -350,8 +358,8 @@ public class PersonDataService {
             requireActiveAdministratorAndLockAccount(actor.administratorAccountId(), person.accountId());
         } else {
             long accountId = Objects.requireNonNull(person.accountId());
-            var accountStatus =
-                    jdbc.queryForObject("SELECT status FROM account WHERE id=? FOR UPDATE", String.class, accountId);
+            var accountStatus = jdbc.queryForObject(
+                    "SELECT status FROM account WHERE id=? FOR NO KEY UPDATE", String.class, accountId);
             if (!"DELETING".equals(accountStatus) && !"DELETED".equals(accountStatus))
                 throw new IllegalStateException("Account deletion admission is no longer valid");
         }

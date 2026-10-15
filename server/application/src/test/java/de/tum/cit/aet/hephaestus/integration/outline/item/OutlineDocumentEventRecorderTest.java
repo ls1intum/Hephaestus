@@ -6,9 +6,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FoundBy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.integration.docs.item.DocumentEvents;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnapshot;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -18,7 +18,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 class OutlineDocumentEventRecorderTest extends BaseUnitTest {
-    private final ItemWriter items = mock(ItemWriter.class);
+    private final ItemIndexService items = mock(ItemIndexService.class);
     private final OutlineDocumentEventRecorder recorder = new OutlineDocumentEventRecorder(items);
     private static final Instant AT = Instant.parse("2026-08-07T09:00:00Z");
 

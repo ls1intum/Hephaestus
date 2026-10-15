@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.item;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
-import de.tum.cit.aet.hephaestus.integration.core.metrics.IntegrationCoreMetrics;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FoundBy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
@@ -12,10 +12,10 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.metrics.ScmMetrics;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.Collections;
 import java.util.List;
@@ -31,7 +31,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @WorkspaceAgnostic("Fans out one exact provider mirror event to explicitly monitored workspace items")
 @RequiredArgsConstructor
 public class ScmItemEventRecorder {
-    private final ItemWriter writer;
+    private final ItemIndexService writer;
     private final ScmItemService items;
     private final ScmRepositoryAccess access;
     private final RepositoryRepository repositories;
@@ -149,7 +149,7 @@ public class ScmItemEventRecorder {
                         && unavailable.code() != ItemCaptureCode.SOURCE_NOT_READY) throw unavailable;
                 // A partial provider read can update the mirror without proving an event version.
                 meters.counter(
-                                IntegrationCoreMetrics.PRACTICE_REVIEW_REFUSED,
+                                ScmMetrics.SCM_REVIEW_REFUSED,
                                 "phase",
                                 "submission",
                                 "reason",

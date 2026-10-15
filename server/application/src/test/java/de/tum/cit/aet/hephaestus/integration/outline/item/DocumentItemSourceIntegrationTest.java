@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.evidence.capture.CaptureRequest;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
@@ -22,7 +23,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.integration.docs.item.DocumentContentSource;
 import de.tum.cit.aet.hephaestus.integration.docs.item.DocumentEvents;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
@@ -82,7 +82,7 @@ class DocumentItemSourceIntegrationTest extends BaseIntegrationTest {
     private IdentityProviderRepository providers;
 
     @Autowired
-    private ItemWriter items;
+    private ItemIndexService items;
 
     @Autowired
     private MembershipService memberships;

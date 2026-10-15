@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices;
 
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCatalog;
+import de.tum.cit.aet.hephaestus.integration.core.framework.ItemDescriptorRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import java.util.Collection;
@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class PracticeItemOptions {
-    private final ItemCatalog items;
+    private final ItemDescriptorRegistry items;
 
     public ItemDescriptor require(ItemKind kind) {
         return items.descriptorFor(kind)

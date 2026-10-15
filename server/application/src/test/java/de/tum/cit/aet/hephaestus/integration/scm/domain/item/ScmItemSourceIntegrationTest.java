@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.evidence.capture.CaptureRequest;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -16,7 +17,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemMergeTimeQuery;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.MonitoredRepositoryQuery;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RoleHolder;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.IssueContentSource;
@@ -66,7 +66,7 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
     private ScmItemService sources;
 
     @Autowired
-    private ItemWriter writer;
+    private ItemIndexService writer;
 
     @Autowired
     private IdentityProviderRepository providers;

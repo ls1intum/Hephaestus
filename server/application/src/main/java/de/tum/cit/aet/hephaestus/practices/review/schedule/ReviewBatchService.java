@@ -7,7 +7,7 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCatalog;
+import de.tum.cit.aet.hephaestus.integration.core.framework.ItemDescriptorRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.practices.review.ProductReferenceQuery;
@@ -49,7 +49,7 @@ public class ReviewBatchService {
     private final ReviewBatchProperties properties;
     private final ReviewRepository reviews;
     private final ProductReferenceQuery references;
-    private final ItemCatalog catalog;
+    private final ItemDescriptorRegistry catalog;
     private final Clock clock;
     private final ConfigAuditPort audit;
     private final ReviewService reviewService;

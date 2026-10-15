@@ -30,8 +30,8 @@ import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-ref
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/members")({
 	head: workspaceAdminHead("Members"),
 	validateSearch: z.object({
-		q: z.string().max(200).optional().catch(undefined),
-		team: z.string().optional().catch(undefined),
+		q: z.coerce.string().max(200).optional().catch(undefined),
+		team: z.coerce.string().optional().catch(undefined),
 		sort: z.enum(["name", "username"]).optional().catch(undefined),
 		desc: z
 			.union([z.boolean(), z.enum(["true", "false"]).transform((value) => value === "true")])

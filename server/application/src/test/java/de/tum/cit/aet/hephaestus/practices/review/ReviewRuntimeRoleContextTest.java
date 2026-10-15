@@ -3,8 +3,8 @@ package de.tum.cit.aet.hephaestus.practices.review;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCatalog;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabels;
+import de.tum.cit.aet.hephaestus.integration.core.framework.ItemDescriptorRegistry;
+import de.tum.cit.aet.hephaestus.integration.core.framework.RegisteredItemLabels;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ProblemRepository;
@@ -33,8 +33,8 @@ class ReviewRuntimeRoleContextTest extends BaseUnitTest {
             .withBean(ProblemRepository.class, () -> mock(ProblemRepository.class))
             .withBean(EvidenceAuthorization.class, () -> mock(EvidenceAuthorization.class))
             .withBean(ProductItemRepository.class, () -> mock(ProductItemRepository.class))
-            .withBean(ItemLabels.class, () -> mock(ItemLabels.class))
-            .withBean(ItemCatalog.class, () -> mock(ItemCatalog.class))
+            .withBean(RegisteredItemLabels.class, () -> mock(RegisteredItemLabels.class))
+            .withBean(ItemDescriptorRegistry.class, () -> mock(ItemDescriptorRegistry.class))
             .withBean(ResultCommunicationRepository.class, () -> mock(ResultCommunicationRepository.class))
             .withBean(ReviewRepository.class, () -> mock(ReviewRepository.class))
             .withBean(ReviewPracticeRepository.class, () -> mock(ReviewPracticeRepository.class))

@@ -9,10 +9,10 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemEventRecorded;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemEventService;
 import de.tum.cit.aet.hephaestus.integration.core.itemevent.ItemEventLedgerProperties;
-import de.tum.cit.aet.hephaestus.integration.core.itemevent.ItemEventRecorded;
 import de.tum.cit.aet.hephaestus.integration.core.itemevent.ItemEventRepository;
-import de.tum.cit.aet.hephaestus.integration.core.itemevent.ItemEventService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FoundBy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;

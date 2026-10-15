@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.result;
 
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.practices.model.Problem;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewOrder;
@@ -22,7 +22,7 @@ import tools.jackson.databind.json.JsonMapper;
 @ConditionalOnCaptureRole
 @RequiredArgsConstructor
 public class ResultClaimWriter {
-    private final ItemWriter itemLocks;
+    private final ItemIndexService itemLocks;
     private final ResultRepository results;
     private final ReviewRepository reviews;
     private final ProblemRepository problems;

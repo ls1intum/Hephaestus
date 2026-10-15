@@ -412,7 +412,7 @@ test.describe("a developer who is not an admin", () => {
 		await expect(results.getByRole("list", { name: "Problems" })).toHaveText(
 			"Synthetic browser-test problem; no model reviewed this work.",
 		);
-		expect(readsOf(reads, "/members/me")).not.toStrictEqual([]);
+		expect(readsOf(reads, "/members/me")).toStrictEqual([]);
 		expect(readsOf(reads, `/practices/items/${MR6_ITEM_ID}/reviews`)).not.toStrictEqual([]);
 		expect(
 			readsOf(reads, `/practices/items/${MR6_ITEM_ID}/own-trace`).map((url) =>

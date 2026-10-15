@@ -82,8 +82,8 @@ final class MentorFeedbackCopyPersonDataStore extends JdbcPersonDataStore {
     }
 
     @Override
-    public List<JsonNode> export(PersonDataSelection selection) {
-        var rows = super.export(selection);
+    public List<JsonNode> export(PersonDataSelection selection, PersonScope frozenScope) {
+        var rows = super.export(selection, frozenScope);
         return runtime
                 ? rows
                 : rows.stream()

@@ -27,7 +27,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCatalog;
+import de.tum.cit.aet.hephaestus.integration.core.framework.ItemDescriptorRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
@@ -50,7 +50,6 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -72,12 +71,7 @@ class DefaultReviewExecutionHandlerTest extends BaseUnitTest {
     private final ReviewHistoryContentSource history = mock(ReviewHistoryContentSource.class);
     private final ReviewAssignmentStore members = mock(ReviewAssignmentStore.class);
     private final ItemDescriptor descriptor = mock(ItemDescriptor.class);
-    private final ItemCatalog items = new ItemCatalog() {
-        @Override
-        public Collection<ItemDescriptor> all() {
-            return List.of(descriptor);
-        }
-
+    private final ItemDescriptorRegistry items = new ItemDescriptorRegistry(List.of()) {
         @Override
         public Optional<ItemDescriptor> descriptorFor(ItemKind kind) {
             return Optional.of(descriptor);

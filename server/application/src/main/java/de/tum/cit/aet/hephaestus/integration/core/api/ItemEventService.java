@@ -1,6 +1,8 @@
-package de.tum.cit.aet.hephaestus.integration.core.itemevent;
+package de.tum.cit.aet.hephaestus.integration.core.api;
 
 import de.tum.cit.aet.hephaestus.integration.core.item.ItemRepository;
+import de.tum.cit.aet.hephaestus.integration.core.itemevent.ItemEventLedgerProperties;
+import de.tum.cit.aet.hephaestus.integration.core.itemevent.ItemEventRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventInput;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventName;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState;
@@ -12,12 +14,10 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.modulith.NamedInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@NamedInterface(value = "item-events", propagate = false)
 @RequiredArgsConstructor
 @Transactional
 public class ItemEventService {

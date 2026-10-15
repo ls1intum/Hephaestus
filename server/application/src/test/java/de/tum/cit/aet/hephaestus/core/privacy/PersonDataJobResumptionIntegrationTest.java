@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataStores;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataWriteFence;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentityResolver;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
@@ -108,9 +109,9 @@ class PersonDataJobResumptionIntegrationTest extends BaseIntegrationTest {
                     }
 
                     @Override
-                    public long erase(PersonDataSelection selection) {
+                    public long erase(PersonDataSelection selection, PersonScope frozenScope) {
                         firstCalls.incrementAndGet();
-                        return super.erase(selection);
+                        return super.erase(selection, frozenScope);
                     }
                 };
         var profile =
@@ -125,9 +126,9 @@ class PersonDataJobResumptionIntegrationTest extends BaseIntegrationTest {
                         "name=NULL",
                         1) {
                     @Override
-                    public long erase(PersonDataSelection selection) {
+                    public long erase(PersonDataSelection selection, PersonScope frozenScope) {
                         secondCalls.incrementAndGet();
-                        long count = super.erase(selection);
+                        long count = super.erase(selection, frozenScope);
                         if (failOnce.getAndSet(false))
                             throw new IllegalStateException("PERSONAL-CONTENT-FAILURE-CANARY");
                         return count;

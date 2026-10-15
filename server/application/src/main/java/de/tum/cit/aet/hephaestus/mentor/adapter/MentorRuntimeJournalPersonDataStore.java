@@ -64,14 +64,14 @@ final class MentorRuntimeJournalPersonDataStore extends JdbcPersonDataStore {
     }
 
     @Override
-    public List<JsonNode> export(PersonDataSelection selection) {
+    public List<JsonNode> export(PersonDataSelection selection, PersonScope frozenScope) {
         return List.of();
     }
 
     /** Counts workspaces, matching the preview. */
     @Override
-    public long erase(PersonDataSelection selection) {
-        super.erase(selection);
+    public long erase(PersonDataSelection selection, PersonScope frozenScope) {
+        super.erase(selection, frozenScope);
         return selection.rows().size();
     }
 }

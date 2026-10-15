@@ -731,7 +731,7 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
             }
 
             @Override
-            public List<JsonNode> export(PersonDataSelection selection) {
+            public List<JsonNode> export(PersonDataSelection selection, PersonScope frozenScope) {
                 return selection.rows().stream()
                         .map(key -> {
                             ObjectNode row = mapper.createObjectNode();
@@ -751,7 +751,7 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
             }
 
             @Override
-            public long erase(PersonDataSelection selection) {
+            public long erase(PersonDataSelection selection, PersonScope frozenScope) {
                 return eraseAcknowledgedCopies(selection);
             }
         });

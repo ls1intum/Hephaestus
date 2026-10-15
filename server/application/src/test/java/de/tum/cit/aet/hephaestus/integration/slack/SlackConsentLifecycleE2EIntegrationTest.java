@@ -10,12 +10,12 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobService;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.integration.slack.channel.SlackChannelConsentService;
 import de.tum.cit.aet.hephaestus.integration.slack.channel.SlackMonitoredChannelDTO;
 import de.tum.cit.aet.hephaestus.integration.slack.conversation.SlackConversationCandidateSource;
@@ -99,7 +99,7 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
     private ReviewRepository reviews;
 
     @Autowired
-    private ItemWriter items;
+    private ItemIndexService items;
 
     @Autowired
     private SlackMonitoredChannelRepository monitoredChannelRepository;

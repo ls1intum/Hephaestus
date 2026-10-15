@@ -9,7 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.slack.SlackConversationTestSupport;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackChannelConsentEventRepository;
@@ -79,7 +79,7 @@ class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegr
     private ReviewRepository reviews;
 
     @Autowired
-    private ItemWriter items;
+    private ItemIndexService items;
 
     @Autowired
     private WebTestClient webTestClient;

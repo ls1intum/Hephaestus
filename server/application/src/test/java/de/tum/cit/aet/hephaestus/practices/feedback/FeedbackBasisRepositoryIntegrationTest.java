@@ -117,12 +117,41 @@ class FeedbackBasisRepositoryIntegrationTest extends AbstractFeedbackIntegration
                 workspace.getId(),
                 repository,
                 Timestamp.from(AT)));
-        jdbc.update("UPDATE item SET parent_id=? WHERE workspace_id=? AND id=?", parent, workspace.getId(), itemId);
-        var copy = summary(piece(FeedbackDestination.ON_WORK, FeedbackState.DELIVERED, AT), FeedbackCopyState.POSTED);
+        long work = Objects.requireNonNull(jdbc.queryForObject(
+                "INSERT INTO item(workspace_id,kind,source_id,parent_id,created_at)"
+                        + " VALUES (?,'scm.pull_request',43,?,?) RETURNING id",
+                Long.class,
+                workspace.getId(),
+                parent,
+                Timestamp.from(AT)));
+        var review = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO"
+                        + " review(id,workspace_id,item_id,kind,item_version,origin,status,ordered_at,created_at)"
+                        + " SELECT"
+                        + " ?,workspace_id,?,kind,item_version,origin,status,ordered_at,created_at FROM"
+                        + " review WHERE workspace_id=? AND id=?",
+                review,
+                work,
+                workspace.getId(),
+                reviewId);
+        var piece = feedback.saveAndFlush(Feedback.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(workspace.getId())
+                .reviewId(review)
+                .itemId(work)
+                .developerId(developerId)
+                .destination(FeedbackDestination.ON_WORK)
+                .state(FeedbackState.DELIVERED)
+                .body("Add a focused regression test.")
+                .createdAt(AT)
+                .deliveredAt(AT)
+                .build());
+        var copy = summary(piece, FeedbackCopyState.POSTED);
         var kind = new ItemKind("scm.pull_request");
         assertThat(delivered
                         .findForRepository(workspace.getId(), repository, kind)
-                        .get(42L))
+                        .get(43L))
                 .singleElement()
                 .satisfies(receipt -> assertThat(receipt.externalRef()).isEqualTo(copy.getExternalRef()));
         assertThat(delivered.findForRepository(workspace.getId() + 1, repository, kind))

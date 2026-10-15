@@ -158,24 +158,41 @@ services:
                updated_at = NOW()
          WHERE purpose = 'PRACTICE_REVIEW';
 
-        UPDATE review_sweep_schedule
-           SET enabled = FALSE,
-               updated_at = NOW();
+        DO 'BEGIN
+          IF to_regclass(''public.review_job'') IS NOT NULL THEN
+            UPDATE review_schedule SET enabled = FALSE, updated_at = NOW();
+            UPDATE review_job
+               SET status = ''CANCELLED'', completed_at = COALESCE(completed_at, NOW()),
+                   worker_id = NULL, cancellation_reason = ''CANCELLED_BY_ADMIN'',
+                   error_message = ''Cancelled when staging data was cloned into a preview.''
+             WHERE status IN (''QUEUED'', ''RUNNING'');
+            UPDATE review_job SET processing_status = ''FAILED''
+             WHERE processing_status = ''PENDING'';
+            DELETE FROM feedback_send WHERE state IN (''PENDING'', ''SENDING'', ''UNCERTAIN'');
+          ELSE
+            UPDATE review_sweep_schedule
+               SET enabled = FALSE,
+                   updated_at = NOW();
 
-        UPDATE agent_job
-           SET status = 'CANCELLED',
-               completed_at = COALESCE(completed_at, NOW()),
-               worker_id = NULL,
-               error_message = 'Cancelled when staging data was cloned into a preview.',
-               cancellation_reason = NULL
-         WHERE status IN ('QUEUED', 'RUNNING');
+            UPDATE agent_job
+               SET status = ''CANCELLED'',
+                   completed_at = COALESCE(completed_at, NOW()),
+                   worker_id = NULL,
+                   error_message = ''Cancelled when staging data was cloned into a preview.'',
+                   cancellation_reason = NULL
+             WHERE status IN (''QUEUED'', ''RUNNING'');
 
-        UPDATE agent_job
-           SET delivery_status = 'FAILED',
-               error_message = CONCAT_WS(E'\n', NULLIF(error_message, ''),
-                   'Delivery paused when staging data was cloned into a preview.')
-         WHERE status = 'COMPLETED'
-           AND delivery_status = 'PENDING';
+            UPDATE agent_job
+               SET delivery_status = ''FAILED'',
+                   error_message = CONCAT_WS(E''\n'', NULLIF(error_message, ''''),
+                       ''Delivery paused when staging data was cloned into a preview.'')
+             WHERE status = ''COMPLETED''
+               AND delivery_status = ''PENDING'';
+
+            UPDATE agent_job SET job_token = ''cleared-by-preview-clone:'' || id, job_token_hash = NULL
+             WHERE job_token NOT LIKE ''cleared-by-preview-clone:%'';
+          END IF;
+        END';
 
         UPDATE sync_job
            SET status = 'CANCELLED',
@@ -187,7 +204,7 @@ services:
 
         -- 2. Re-home: a clone must not keep the source instance's identity. login_provider and
         -- jwt_signing_key are reseeded from this deployment's own config on boot; issued_jwt is
-        -- simply dropped. Accounts survive — identity_link keys on identity_provider.
+        -- simply dropped. Accounts and provider identities survive.
         DELETE FROM issued_jwt;
         DELETE FROM jwt_signing_key;
         DELETE FROM login_provider;
@@ -209,10 +226,22 @@ services:
          WHERE credentials_encrypted IS NOT NULL OR credentials_alg IS NOT NULL
             OR credentials_key_version IS NOT NULL OR credentials_rotation_failed_at IS NOT NULL
             OR config ? 'webhookSecret';
-        -- A job token is a credential staging minted; the jobs are cancelled or finished, so the
-        -- token has nothing left to authorise. The column is unique, hence a marker per row.
-        UPDATE agent_job SET job_token = 'cleared-by-preview-clone:' || id, job_token_hash = NULL
-         WHERE job_token NOT LIKE 'cleared-by-preview-clone:%';
+        CREATE OR REPLACE FUNCTION hephaestus_preview_review_live() RETURNS bigint
+        LANGUAGE plpgsql AS 'BEGIN
+          IF to_regclass(''public.review_job'') IS NOT NULL THEN
+            RETURN (SELECT count(*) FROM review_schedule WHERE enabled)
+                 + (SELECT count(*) FROM review_job
+                     WHERE status IN (''QUEUED'', ''RUNNING'') OR processing_status = ''PENDING'')
+                 + (SELECT count(*) FROM feedback_send WHERE state IN (''PENDING'', ''SENDING'', ''UNCERTAIN''));
+          ELSE
+            RETURN (SELECT count(*) FROM review_sweep_schedule WHERE enabled)
+                 + (SELECT count(*) FROM agent_job WHERE status IN (''QUEUED'', ''RUNNING''))
+                 + (SELECT count(*) FROM agent_job
+                     WHERE status = ''COMPLETED'' AND delivery_status = ''PENDING'')
+                 + (SELECT count(*) FROM agent_job
+                     WHERE job_token NOT LIKE ''cleared-by-preview-clone:%'' OR job_token_hash IS NOT NULL);
+          END IF;
+        END';
         SQL
 
         # Every statement above succeeds when it matches nothing, so the marker is earned by
@@ -225,10 +254,7 @@ services:
                + (SELECT count(*) FROM instance_settings settings
                    WHERE coalesce(to_jsonb(settings)->>'public_activity_allowed', 'false') = 'true')
                + (SELECT count(*) FROM workspace_agent_binding WHERE enabled AND purpose = 'PRACTICE_REVIEW')
-               + (SELECT count(*) FROM review_sweep_schedule WHERE enabled)
-               + (SELECT count(*) FROM agent_job WHERE status IN ('QUEUED', 'RUNNING'))
-               + (SELECT count(*) FROM agent_job
-                   WHERE status = 'COMPLETED' AND delivery_status = 'PENDING')
+               + hephaestus_preview_review_live()
                + (SELECT count(*) FROM sync_job WHERE status IN ('PENDING', 'RUNNING'))
                + (SELECT count(*) FROM login_provider)
                + (SELECT count(*) FROM jwt_signing_key)
@@ -238,15 +264,14 @@ services:
                + (SELECT count(*) FROM connection
                    WHERE credentials_encrypted IS NOT NULL OR credentials_alg IS NOT NULL
                       OR credentials_key_version IS NOT NULL OR credentials_rotation_failed_at IS NOT NULL
-                      OR config ? 'webhookSecret')
-               + (SELECT count(*) FROM agent_job
-                   WHERE job_token NOT LIKE 'cleared-by-preview-clone:%' OR job_token_hash IS NOT NULL)")
+                      OR config ? 'webhookSecret')")
         if [ "$$LIVE" != "0" ]; then
           echo "Preview policy did not take effect ($$LIVE rows still live); refusing to mark this preview seeded"
           exit 1
         fi
 
         psql -h "$$TARGET" -U hephaestus -d hephaestus -v ON_ERROR_STOP=1 \
+          -c 'DROP FUNCTION hephaestus_preview_review_live();' \
           -c 'CREATE TABLE hephaestus_preview_seeded (seeded_at timestamptz NOT NULL DEFAULT now());'
         echo "Seed loaded; reviews are paused and the preview owns its login apps and signing key"
     security_opt:

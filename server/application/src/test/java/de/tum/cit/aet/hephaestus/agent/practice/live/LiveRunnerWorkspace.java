@@ -46,7 +46,9 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -65,6 +67,22 @@ final class LiveRunnerWorkspace {
     static final int TIMEOUT_SECONDS = 300;
 
     private LiveRunnerWorkspace() {}
+
+    static void installToolkit() throws IOException, InterruptedException {
+        // Production toolkit dependencies use the same lockfile as the image.
+        Process installer = new ProcessBuilder(
+                        "pnpm", "install", "--prod", "--frozen-lockfile", "--ignore-scripts", "--reporter=silent")
+                .directory(Objects.requireNonNull(TOOLKIT.getParent()).toFile())
+                .inheritIO()
+                .start();
+        if (!installer.waitFor(180, TimeUnit.SECONDS)) {
+            installer.destroyForcibly();
+            throw new IllegalStateException("Practice script toolkit installation timed out");
+        }
+        if (installer.exitValue() != 0) {
+            throw new IllegalStateException("Practice script toolkit installation failed; see stderr above");
+        }
+    }
 
     static PracticePiAdapter adapter() {
         return new PracticePiAdapter(

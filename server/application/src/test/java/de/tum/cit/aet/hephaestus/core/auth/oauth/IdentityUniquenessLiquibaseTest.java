@@ -9,23 +9,21 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.Types;
 import liquibase.Contexts;
 import liquibase.Liquibase;
 import liquibase.database.Database;
 import liquibase.database.DatabaseFactory;
 import liquibase.database.jvm.JdbcConnection;
 import liquibase.resource.ClassLoaderResourceAccessor;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-// Hibernate uniqueness treats NULL teams as distinct; only the released expression index proves identity convergence.
+// The migrated index proves provider identity convergence independently of Hibernate schema creation.
 @Tag("database")
 class IdentityUniquenessLiquibaseTest {
 
-    private static final String UNIQUE_INDEX = "uq_identity_provider_subject_team";
+    private static final String UNIQUE_INDEX = "uk_identity_provider_key";
 
     private static final TestDatabase DATABASE =
             PostgreSQLTestContainer.createMigratedDatabase("identity_uniqueness_test");
@@ -43,57 +41,52 @@ class IdentityUniquenessLiquibaseTest {
     }
 
     @Test
-    void duplicateProviderSubjectWithNullTeamIsRejected() throws Exception {
+    void shouldRejectARepeatedProviderKeyWithoutATeam() throws Exception {
         try (Connection c = newConnection()) {
             long provider = insertGitProvider(c, "GITHUB", "https://dup-null-team.example");
             long accountA = insertAccount(c, "A");
             long accountB = insertAccount(c, "B");
 
-            // First NULL-team login for (provider, subject) inserts cleanly.
-            assertThatCode(() -> insertIdentity(c, accountA, provider, "race-subject", null))
+            // An empty team key identifies a provider login without a team.
+            assertThatCode(() -> insertIdentity(c, accountA, provider, "race-subject", ""))
                     .doesNotThrowAnyException();
 
-            // Second NULL-team login for the SAME (provider, subject) on a DIFFERENT account must
-            // be
-            // rejected by uq_identity_provider_subject_team — under ddl-auto's plain UNIQUE this
-            // would WRONGLY succeed (NULL != NULL), duplicating the account. COALESCE(team_id,'')
-            // closes it.
-            assertThatThrownBy(() -> insertIdentity(c, accountB, provider, "race-subject", null))
+            assertThatThrownBy(() -> insertIdentity(c, accountB, provider, "race-subject", ""))
                     .hasMessageContaining(UNIQUE_INDEX);
         }
     }
 
     @Test
-    void sameSubjectOnDifferentProvidersIsAllowed() throws Exception {
+    void shouldAllowTheSameUserKeyOnDifferentProviders() throws Exception {
         try (Connection c = newConnection()) {
             long github = insertGitProvider(c, "GITHUB", "https://multi-provider-gh.example");
             long gitlab = insertGitProvider(c, "GITLAB", "https://multi-provider-gl.example");
             long account = insertAccount(c, "Multi");
 
             assertThatCode(() -> {
-                        insertIdentity(c, account, github, "shared-subject", null);
-                        insertIdentity(c, account, gitlab, "shared-subject", null);
+                        insertIdentity(c, account, github, "shared-subject", "");
+                        insertIdentity(c, account, gitlab, "shared-subject", "");
                     })
                     .doesNotThrowAnyException();
         }
     }
 
     @Test
-    void sameProviderSubjectAcrossDistinctTeamsIsAllowedButRepeatedTeamCollides() throws Exception {
+    void shouldPartitionProviderKeysByTeamAndRejectARepeatedTeam() throws Exception {
         try (Connection c = newConnection()) {
             long provider = insertGitProvider(c, "GITLAB", "https://teams.example.test");
             long a1 = insertAccount(c, "T1");
             long a2 = insertAccount(c, "T2");
             long a3 = insertAccount(c, "T3");
 
-            // Distinct non-null teams partition the key (multi-instance IdP support).
+            // Distinct teams partition the provider key.
             assertThatCode(() -> {
                         insertIdentity(c, a1, provider, "team-subject", "team-alpha");
                         insertIdentity(c, a2, provider, "team-subject", "team-beta");
                     })
                     .doesNotThrowAnyException();
 
-            // Same provider+subject+team repeats the key → rejected, same as the NULL-team case.
+            // A repeated provider key within a team must collide.
             assertThatThrownBy(() -> insertIdentity(c, a3, provider, "team-subject", "team-alpha"))
                     .hasMessageContaining(UNIQUE_INDEX);
         }
@@ -122,17 +115,13 @@ class IdentityUniquenessLiquibaseTest {
     }
 
     private static void insertIdentity(
-            Connection c, long accountId, long providerId, String subject, @Nullable String teamId) throws Exception {
+            Connection c, long accountId, long providerId, String providerUserKey, String teamKey) throws Exception {
         try (PreparedStatement ps = c.prepareStatement(
-                "INSERT INTO identity (account_id, provider_id, subject, team_id) VALUES" + " (?, ?, ?, ?)")) {
+                "INSERT INTO identity (account_id, provider_id, provider_user_key, team_key, linked_via) VALUES (?, ?, ?, ?, 'SIGN_IN')")) {
             ps.setLong(1, accountId);
             ps.setLong(2, providerId);
-            ps.setString(3, subject);
-            if (teamId == null) {
-                ps.setNull(4, Types.VARCHAR);
-            } else {
-                ps.setString(4, teamId);
-            }
+            ps.setString(3, providerUserKey);
+            ps.setString(4, teamKey);
             ps.executeUpdate();
         }
     }

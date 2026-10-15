@@ -55,10 +55,10 @@ import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
 import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.capture.EvidenceDirectory;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSource;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.PullRequestContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -142,7 +142,7 @@ import tools.jackson.databind.node.ObjectNode;
 @LiveLlmTest
 class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
     @Autowired
-    private ItemWriter itemWriter;
+    private ItemIndexService itemWriter;
 
     @Autowired
     private List<ItemSource> itemSources;
@@ -283,6 +283,7 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
     @BeforeAll
     static void installPiSdk() throws Exception {
         PiSdkInstallation.ensureInstalled();
+        LiveRunnerWorkspace.installToolkit();
     }
 
     @AfterEach

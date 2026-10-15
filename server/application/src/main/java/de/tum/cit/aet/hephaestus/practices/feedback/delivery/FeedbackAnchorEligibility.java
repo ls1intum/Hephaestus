@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.feedback.delivery;
 
+import de.tum.cit.aet.hephaestus.integration.core.framework.ItemDescriptorRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyCapability;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCatalog;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.result.ProblemRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ResultCitations;
@@ -18,7 +18,7 @@ import tools.jackson.databind.ObjectMapper;
 @ConditionalOnCaptureRole
 public class FeedbackAnchorEligibility {
     private final ProblemRepository problems;
-    private final ItemCatalog catalog;
+    private final ItemDescriptorRegistry catalog;
     private final ObjectMapper json;
 
     public boolean hasInlineAnchor(ReviewSnapshot review, Result result) {

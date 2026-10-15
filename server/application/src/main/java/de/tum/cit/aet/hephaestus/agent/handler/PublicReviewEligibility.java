@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
+import de.tum.cit.aet.hephaestus.integration.core.framework.ItemDescriptorRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyCapability;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCatalog;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshotQuery;
@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
 @ConditionalOnCaptureRole
 public class PublicReviewEligibility {
     private final ReviewSnapshotQuery reviews;
-    private final ItemCatalog catalog;
+    private final ItemDescriptorRegistry catalog;
 
     public Set<UUID> publicResultIds(ReviewJob job, List<AdmittedResultSnapshot> results) {
         var review = reviews.find(job.getWorkspaceId(), job.getReviewId());

@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -10,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.context.HistoryCopies;
 import de.tum.cit.aet.hephaestus.agent.context.JobEvidenceFiles;
 import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewHistoryContentSource;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedback;
@@ -28,6 +30,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStore;
 import de.tum.cit.aet.hephaestus.practices.spi.PreparedFeedback;
 import de.tum.cit.aet.hephaestus.practices.spi.PreparedPackage;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultCandidate;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
@@ -55,8 +58,9 @@ class ResultAdmissionServiceTest extends BaseUnitTest {
     private final PublicReviewEligibility publicEligibility = mock(PublicReviewEligibility.class);
     private final JobEvidenceFiles files = mock(JobEvidenceFiles.class);
     private final FeedbackStore feedback = mock(FeedbackStore.class);
-    private final FeedbackCompositionContextReader composition = mock(FeedbackCompositionContextReader.class);
     private final ReviewAssignmentStore members = mock(ReviewAssignmentStore.class);
+    private final FeedbackCompositionService composition = new FeedbackCompositionService(
+            feedback, members, mock(ResultHistoryQuery.class), mock(HistoryCopies.class));
     private final PlatformTransactionManager manager = mock(PlatformTransactionManager.class);
     private final ReviewJob job = RuntimeReviewTestData.job();
     private ResultAdmissionService service;
@@ -68,9 +72,8 @@ class ResultAdmissionServiceTest extends BaseUnitTest {
                 .when(files.indexLateRead(any(), any(), any()))
                 .thenAnswer(call -> ((Supplier<?>) call.getArgument(1)).get());
         lenient()
-                .when(composition.read(any(), any()))
-                .thenReturn(new FeedbackCompositionContextReader.Read(
-                        new FeedbackCompositionContext(null, null), List.of(), List.of()));
+                .when(feedback.compositionContext(anyLong(), any(), any()))
+                .thenReturn(new FeedbackCompositionContext(null, null));
         service = new ResultAdmissionService(
                 jobs,
                 output,
@@ -78,13 +81,11 @@ class ResultAdmissionServiceTest extends BaseUnitTest {
                 assignments,
                 publicEligibility,
                 files,
-                feedback,
                 mock(ReviewHistoryContentSource.class),
                 mapper,
                 manager,
                 mock(ReviewCompositionBasisRepository.class),
                 composition,
-                members,
                 mock(ReviewWriteGuard.class));
         job.setStatus(ReviewJobStatus.RUNNING);
         job.setWorkerId("worker");

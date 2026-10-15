@@ -43,13 +43,13 @@ final class CapturedPersonDataContributor implements PersonDataContributor {
     }
 
     @Override
-    public List<JsonNode> export(PersonDataSelection selection) {
-        return store.export(selection);
+    public List<JsonNode> export(PersonDataSelection selection, PersonScope frozenScope) {
+        return store.export(selection, frozenScope);
     }
 
     @Override
-    public long erase(PersonDataSelection selection) {
-        return store.erase(selection);
+    public long erase(PersonDataSelection selection, PersonScope frozenScope) {
+        return store.erase(selection, frozenScope);
     }
 
     @Override

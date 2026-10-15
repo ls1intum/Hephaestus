@@ -1,13 +1,13 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.item;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemListRequest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLister;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemPage;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ListedItem;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -45,7 +45,7 @@ public class ScmWorkItemLister implements ItemLister {
     }
 
     private final ScmItemService sources;
-    private final ItemWriter writer;
+    private final ItemIndexService writer;
     private final ObjectMapper mapper;
     private final ScmItemQueryRepository queries;
 

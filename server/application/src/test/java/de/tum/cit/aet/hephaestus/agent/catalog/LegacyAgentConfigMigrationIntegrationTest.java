@@ -253,9 +253,9 @@ class LegacyAgentConfigMigrationIntegrationTest {
     @Test
     @Order(13)
     void deletingAnAgentJobIsRefusedWhileItsFeedbackExists() throws SQLException {
-        assertThatThrownBy(() -> execute("DELETE FROM review_job WHERE id = '9a000000-0000-0000-0000-000000000001'"))
+        assertThatThrownBy(() -> execute("DELETE FROM agent_job WHERE id = '9a000000-0000-0000-0000-000000000001'"))
                 .as("the FK is RESTRICT, so the delete is refused instead of cascading")
-                .hasMessageContaining("sfk_feedback_review_job");
+                .hasMessageContaining("sfk_feedback_agent_job");
 
         assertThat(scalar("SELECT count(*)::text FROM feedback")).isEqualTo("1");
     }
@@ -434,14 +434,14 @@ class LegacyAgentConfigMigrationIntegrationTest {
                 // this release hardens to RESTRICT has a row to refuse a cascade on.
                 "INSERT INTO \"user\" (id, native_id, provider_id) VALUES (9601, 9601, 1)",
                 """
-                INSERT INTO review_job (id, workspace_id, config_id, job_type, status, config_snapshot, job_token,
-                                       attempt, created_at, completed_at, llm_model, llm_calls,
-                                       llm_input_tokens, llm_output_tokens, llm_cost_usd)
+                INSERT INTO agent_job (id, workspace_id, config_id, job_type, status, config_snapshot, job_token,
+                                       retry_count, created_at, completed_at, llm_model, llm_total_calls,
+                                       llm_total_input_tokens, llm_total_output_tokens, llm_cost_usd)
                 VALUES ('9a000000-0000-0000-0000-000000000001', 9401, 9501, 'PRACTICE_DETECTION', 'COMPLETED',
                         '{}'::jsonb, 'token', 0, now(), now(), 'gpt-4o', 3, 1000, 500, 0.25)
                 """,
                 """
-                INSERT INTO feedback (id, review_job_id, workspace_id, recipient_user_id, about_user_id, channel,
+                INSERT INTO feedback (id, agent_job_id, workspace_id, recipient_user_id, about_user_id, channel,
                                       position, delivery_state, suppression_reason, source, created_at)
                 VALUES ('9b000000-0000-0000-0000-000000000001', '9a000000-0000-0000-0000-000000000001', 9401,
                         9601, 9601, 'IN_CONTEXT', 1, 'SUPPRESSED', 'VOLUME_CAPPED', 'AGENT', now())

@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.core.framework.RegisteredItemLabels;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabels;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSource;
@@ -20,7 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProductItemQuery {
     private final ProductItemRepository rows;
     private final List<ItemSource> sources;
-    private final ItemLabels labels;
+    private final RegisteredItemLabels labels;
 
     public Optional<ItemRef> find(long workspaceId, long itemId) {
         return rows.activeItem(workspaceId, itemId).map(row -> row.ref(workspaceId));

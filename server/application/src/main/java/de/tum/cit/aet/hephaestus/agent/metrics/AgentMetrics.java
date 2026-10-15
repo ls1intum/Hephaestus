@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.metrics;
 
 public final class AgentMetrics {
+    public static final String AGENT_REVIEW_REFUSED = "agent.review.refused";
 
     public static final String AGENT_CONTEXT_BUILD_DURATION = "agent.context.build.duration";
     public static final String AGENT_CONTEXT_PROVIDER_REQUIRED_FAILURE = "agent.context.provider.required.failure";

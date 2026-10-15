@@ -372,19 +372,16 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
                     }))));
                     int contenderPid = contender.get(20, SECONDS);
                     await().atMost(Duration.ofSeconds(20))
-                            .untilAsserted(() -> assertThat(jdbc.queryForObject(
-                                            """
+                            .untilAsserted(
+                                    () -> assertThat(jdbc.queryForObject("""
                                             WITH RECURSIVE blockers(pid) AS (
                                                 SELECT unnest(pg_blocking_pids(?))
                                                 UNION
                                                 SELECT unnest(pg_blocking_pids(b.pid)) FROM blockers b
                                             )
                                             SELECT EXISTS(SELECT 1 FROM blockers WHERE pid=?)
-                                            """,
-                                            Boolean.class,
-                                            contenderPid,
-                                            holderPid))
-                                    .isTrue());
+                                            """, Boolean.class, contenderPid, holderPid))
+                                            .isTrue());
                 }
                 release.countDown();
                 holding.get(20, SECONDS);

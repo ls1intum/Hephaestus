@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.framework.ItemDescriptorRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.EventTypeKey;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCatalog;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventCoverage;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventDefinition;
@@ -23,7 +23,7 @@ import tools.jackson.databind.json.JsonMapper;
 @Tag("unit")
 class PracticeItemEventCoverageTest {
     private final ItemDescriptor descriptor = mock(ItemDescriptor.class);
-    private final ItemCatalog catalog = mock(ItemCatalog.class);
+    private final ItemDescriptorRegistry catalog = mock(ItemDescriptorRegistry.class);
     private final ItemEventCoverage coverage = mock(ItemEventCoverage.class);
     private final PracticeItemEventCoverage policy = new PracticeItemEventCoverage(
             coverage, new PracticeItemOptions(catalog), mock(PracticeRepository.class), new JsonMapper());

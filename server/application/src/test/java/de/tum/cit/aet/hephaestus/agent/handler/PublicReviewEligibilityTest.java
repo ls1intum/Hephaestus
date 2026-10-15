@@ -4,9 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.framework.ItemDescriptorRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyCapability;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCatalog;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
@@ -34,7 +34,7 @@ class PublicReviewEligibilityTest {
     @Test
     void shouldPublishOnlyPinnedAuthorResultsWithProviderCopySupport() {
         var reviews = mock(ReviewSnapshotQuery.class);
-        var catalog = mock(ItemCatalog.class);
+        var catalog = mock(ItemDescriptorRegistry.class);
         var descriptor = mock(ItemDescriptor.class);
         var job = TestEntities.reviewJob();
         UUID reviewId = UUID.randomUUID();
