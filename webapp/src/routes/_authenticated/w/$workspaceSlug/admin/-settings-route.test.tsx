@@ -1,9 +1,14 @@
+import type { QueryClient, QueryKey } from "@tanstack/react-query";
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HttpResponse, http, type PathParams } from "msw";
+import { HttpResponse, http, type JsonBodyType, type PathParams } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getWorkspacePublicActivitySettingsQueryKey } from "@/api/@tanstack/react-query.gen";
+import {
+	getPublicActivityHiddenCountQueryKey,
+	getWorkspacePublicActivitySettingsQueryKey,
+	listHiddenContributorsQueryKey,
+} from "@/api/@tanstack/react-query.gen";
 import type { UpdateWorkspacePublicActivityRequest } from "@/api/types.gen";
 import { workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
@@ -29,7 +34,53 @@ function renderSettingsRoute(practicesEnabled: boolean) {
 		),
 		http.get("*/workspaces/:workspaceSlug/connections/catalog", () => HttpResponse.json([])),
 	);
-	renderRouteAt("/w/acme/admin/settings", testQueryClient());
+	return renderRouteAt("/w/acme/admin/settings", testQueryClient());
+}
+
+const ACME = { path: { workspaceSlug: "acme" } };
+
+type ReadAnswer<TBody> = { status: 200; body: TBody } | { status: 403 | 503 };
+
+/** Answers one GET with the answer the test last chose, held until `hold` settles, counting each read. */
+function serveRead<TBody extends JsonBodyType>(url: string, initial: ReadAnswer<TBody>) {
+	const read: { count: number; answer: ReadAnswer<TBody>; hold: Promise<unknown> } = {
+		count: 0,
+		answer: initial,
+		hold: Promise.resolve(),
+	};
+	server.use(
+		http.get(url, async () => {
+			read.count += 1;
+			await read.hold;
+			const { answer } = read;
+			return answer.status === 200
+				? HttpResponse.json(answer.body)
+				: HttpResponse.json(
+						{ status: answer.status, title: "Request failed" },
+						{ status: answer.status },
+					);
+		}),
+	);
+	return read;
+}
+
+/** Reads one query again through its own generated key, as a write or a returning admin does. */
+async function reread(queryClient: QueryClient, queryKey: QueryKey) {
+	await act(async () => {
+		await queryClient.invalidateQueries({ queryKey });
+	});
+}
+
+/** Every Show again the server receives. */
+function recordShowAgain() {
+	const shown: string[] = [];
+	server.use(
+		http.patch("*/workspaces/acme/activity/people/:userId/public-visibility", ({ params }) => {
+			shown.push(String(params.userId));
+			return new HttpResponse(null, { status: 204 });
+		}),
+	);
+	return shown;
 }
 
 describe("workspace settings route", () => {
@@ -248,7 +299,153 @@ describe("the public activity page setting", () => {
 
 		await waitFor(() => expect(shown).toStrictEqual(["?hidden=false"]));
 	});
+
+	it("hides refused hidden contributors, keeps them hidden through an outage, and shows only a fresh read", async () => {
+		settings = { enabled: true, allowSearchEngines: false };
+		const contributors = serveRead("*/workspaces/acme/activity/hidden-contributors", {
+			status: 200,
+			body: [HIDDEN_ADA],
+		});
+		const shown = recordShowAgain();
+		const user = userEvent.setup();
+		const queryClient = renderSettingsRoute(false);
+		const page = within(
+			await screen.findByRole("region", { name: "Public activity page" }, ROUTE_RENDER_WAIT),
+		);
+		await page.findByText("Ada Lovelace");
+
+		contributors.answer = { status: 403 };
+		await reread(queryClient, listHiddenContributorsQueryKey(ACME));
+		expect(contributors.count).toBe(2);
+		await page.findByText("You do not have access to hidden contributors");
+		expect(page.queryByText("Ada Lovelace")).toBeNull();
+		expect(page.queryByRole("button", { name: "Show again" })).toBeNull();
+		expect(page.queryByRole("button", { name: "Retry" })).toBeNull();
+		page.getByRole("switch", { name: "Publish the page" });
+
+		contributors.answer = { status: 503 };
+		await reread(queryClient, listHiddenContributorsQueryKey(ACME));
+		expect(contributors.count).toBe(3);
+		await page.findByText("We could not load hidden contributors");
+		expect(page.queryByText("Ada Lovelace")).toBeNull();
+		expect(page.queryByText("Hidden contributors may be out of date")).toBeNull();
+
+		contributors.answer = { status: 200, body: [HIDDEN_GRACE] };
+		await user.click(page.getByRole("button", { name: "Retry" }));
+		await page.findByText("Grace Hopper");
+		expect(contributors.count).toBe(4);
+		expect(page.queryByText("Ada Lovelace")).toBeNull();
+		expect(shown).toStrictEqual([]);
+	});
+
+	it("keeps hidden contributors through an outage with a notice, and reads them again", async () => {
+		settings = { enabled: true, allowSearchEngines: false };
+		const contributors = serveRead("*/workspaces/acme/activity/hidden-contributors", {
+			status: 200,
+			body: [HIDDEN_ADA],
+		});
+		const user = userEvent.setup();
+		const queryClient = renderSettingsRoute(false);
+		const page = within(
+			await screen.findByRole("region", { name: "Public activity page" }, ROUTE_RENDER_WAIT),
+		);
+		await page.findByText("Ada Lovelace");
+
+		contributors.answer = { status: 503 };
+		await reread(queryClient, listHiddenContributorsQueryKey(ACME));
+		expect(contributors.count).toBe(2);
+		await page.findByText("Hidden contributors may be out of date");
+		page.getByText("Ada Lovelace");
+		page.getByRole("button", { name: "Show again" });
+
+		const fresh = deferred();
+		contributors.answer = { status: 200, body: [HIDDEN_ADA, HIDDEN_GRACE] };
+		contributors.hold = fresh.promise;
+		try {
+			await user.click(page.getByRole("button", { name: "Retry" }));
+			const retrying = await page.findByRole("button", { name: "Retrying…" });
+			expect(retrying.hasAttribute("disabled")).toBe(true);
+		} finally {
+			fresh.resolve();
+		}
+		await page.findByText("Grace Hopper");
+		expect(contributors.count).toBe(3);
+		expect(page.queryByText("Hidden contributors may be out of date")).toBeNull();
+	});
+
+	it("closes a refused page's publishing confirmation and does not reopen it once the settings read again", async () => {
+		const settingsRead = serveRead("*/workspaces/acme/public-activity", {
+			status: 200,
+			body: { enabled: false, allowSearchEngines: false },
+		});
+		const user = userEvent.setup();
+		const queryClient = renderSettingsRoute(false);
+		await user.click(
+			await screen.findByRole("switch", { name: "Publish the page" }, ROUTE_RENDER_WAIT),
+		);
+		await screen.findByRole("alertdialog");
+
+		settingsRead.answer = { status: 403 };
+		await reread(queryClient, getWorkspacePublicActivitySettingsQueryKey(ACME));
+		expect(settingsRead.count).toBe(2);
+		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+		const page = within(screen.getByRole("region", { name: "Public activity page" }));
+		await page.findByText("You do not have access to the public activity page settings");
+		expect(page.queryByRole("switch")).toBeNull();
+		expect(page.queryByRole("button", { name: "Retry" })).toBeNull();
+
+		settingsRead.answer = { status: 503 };
+		await reread(queryClient, getWorkspacePublicActivitySettingsQueryKey(ACME));
+		expect(settingsRead.count).toBe(3);
+		await page.findByText("We could not load the public activity page settings");
+		expect(page.queryByRole("switch")).toBeNull();
+		expect(screen.queryByRole("alertdialog")).toBeNull();
+
+		settingsRead.answer = { status: 200, body: { enabled: false, allowSearchEngines: false } };
+		await user.click(page.getByRole("button", { name: "Retry" }));
+		await page.findByRole("switch", { name: "Publish the page" });
+		expect(settingsRead.count).toBe(4);
+		expect(screen.queryByRole("alertdialog")).toBeNull();
+		expect(changes).toStrictEqual([]);
+	});
+
+	it("leaves out a refused hidden-people count, also through a later outage", async () => {
+		settings = { enabled: true, allowSearchEngines: false };
+		const count = serveRead("*/workspaces/acme/activity/public-hidden-count", {
+			status: 200,
+			body: { hiddenPeople: 3 },
+		});
+		const queryClient = renderSettingsRoute(false);
+		const page = within(
+			await screen.findByRole("region", { name: "Public activity page" }, ROUTE_RENDER_WAIT),
+		);
+		await page.findByText("Hidden people");
+
+		count.answer = { status: 403 };
+		await reread(queryClient, getPublicActivityHiddenCountQueryKey(ACME));
+		expect(count.count).toBe(2);
+		await waitFor(() => expect(page.queryByText("Hidden people")).toBeNull());
+
+		count.answer = { status: 503 };
+		await reread(queryClient, getPublicActivityHiddenCountQueryKey(ACME));
+		expect(count.count).toBe(3);
+		expect(page.queryByText("Hidden people")).toBeNull();
+
+		count.answer = { status: 200, body: { hiddenPeople: 5 } };
+		await reread(queryClient, getPublicActivityHiddenCountQueryKey(ACME));
+		await page.findByText("5");
+		expect(count.count).toBe(4);
+	});
 });
+
+const HIDDEN_GRACE = {
+	id: 12,
+	login: "grace",
+	name: "Grace Hopper",
+	avatarUrl: "",
+	htmlUrl: "",
+	email: "",
+};
 
 /** One hidden contributor, as the settings list them. */
 const HIDDEN_ADA = {

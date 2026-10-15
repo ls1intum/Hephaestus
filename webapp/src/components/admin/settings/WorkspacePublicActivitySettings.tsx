@@ -24,6 +24,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { ARTIFACT_KIND, artifactKindNoun } from "@/lib/artifact-kinds";
 import { getProviderTerms, type ProviderType } from "@/lib/provider/provider-terms";
+import type { RefreshFailure } from "@/runtime/tanstack-query/infinite-list";
 
 export type WorkspacePublicActivityState =
 	| { status: "loading" }
@@ -32,6 +33,8 @@ export type WorkspacePublicActivityState =
 			status: "ready";
 			enabled: boolean;
 			allowSearchEngines: boolean;
+			/** Set when the latest read failed, so these settings are the last known ones. */
+			refreshFailure?: RefreshFailure;
 			/** Server-computed publication status from the workspace list. */
 			live: boolean;
 			/** How many people the page leaves out, never who; undefined where the count did not load. */
@@ -39,12 +42,16 @@ export type WorkspacePublicActivityState =
 			/** Who an admin hid without a membership: no other screen can show them again. */
 			hiddenContributors: PanelState<{
 				people: readonly Pick<UserInfo, "id" | "login" | "name" | "avatarUrl">[];
+				/** Set when the latest read failed, so `people` are the last known ones. */
+				refreshFailure?: RefreshFailure;
 			}>;
 			/** The person being shown again, if any. */
 			restoring: number | undefined;
 			/** The change in flight, if any. */
 			pending: "enabled" | "search-engines" | undefined;
 	  };
+
+type ReadySettings = Extract<WorkspacePublicActivityState, { status: "ready" }>;
 
 export interface WorkspacePublicActivitySettingsProps {
 	workspaceName: string;
@@ -71,7 +78,6 @@ export function WorkspacePublicActivitySettings({
 	onShowAgain,
 }: WorkspacePublicActivitySettingsProps) {
 	const headingId = useId();
-	const [confirming, setConfirming] = useState(false);
 	return (
 		<section aria-labelledby={headingId}>
 			<h2 id={headingId} className="text-lg font-semibold">
@@ -89,122 +95,161 @@ export function WorkspacePublicActivitySettings({
 				/>
 			)}
 			{state.status === "ready" && (
-				<div className="space-y-3">
-					<ul className="rounded-xl border bg-card">
-						<SettingRow
-							title="Publish the page"
-							description={publishDescription(state.enabled, state.live, address)}
-							checked={state.enabled}
-							pending={state.pending === "enabled"}
-							onCheckedChange={(next) => {
-								if (next) {
-									setConfirming(true);
-								} else {
-									onEnabledChange(false);
-								}
-							}}
-						/>
-						{state.enabled && (
-							<SettingRow
-								title="Allow search engines"
-								description={
-									state.allowSearchEngines
-										? "On. Search engines are allowed to list the page when it is public."
-										: "Off. A public page asks search engines not to list it. This is a request, not an access restriction."
-								}
-								checked={state.allowSearchEngines}
-								pending={state.pending === "search-engines"}
-								onCheckedChange={onSearchEnginesChange}
-							/>
-						)}
-						{state.enabled && state.hiddenPeople !== undefined && (
-							<Item render={<li />} variant="row">
-								<ItemContent>
-									<ItemTitle>Hidden people</ItemTitle>
-									<ItemDescription className="line-clamp-none">
-										The page leaves out and does not count people who hid themselves, and people an
-										admin hid. You see how many, never who.
-									</ItemDescription>
-								</ItemContent>
-								<ItemActions>
-									<span className="text-sm font-medium tabular-nums">
-										{state.hiddenPeople.toLocaleString("en-GB")}
-									</span>
-								</ItemActions>
-							</Item>
-						)}
-					</ul>
-					{state.enabled && !state.live && (
-						<Alert variant="warning">
-							<InfoIcon />
-							<AlertDescription>
-								Public availability is not confirmed. Public pages also require instance permission
-								and an active workspace.
-							</AlertDescription>
-						</Alert>
-					)}
-					{state.enabled && state.live && (
-						<p className="max-w-2xl text-xs text-muted-foreground">
-							Signed-in members open their workspace home at this address. To preview the page, open
-							it in a private window.
-						</p>
-					)}
-					{state.hiddenContributors.status === "loading" && (
-						<ul className="rounded-xl border bg-card" aria-busy="true" aria-hidden="true">
-							<Item render={<li />} variant="row">
-								<Skeleton className="size-8 rounded-full" />
-								<ItemContent>
-									<Skeleton className="h-4 w-32" />
-									<Skeleton className="h-3 w-20" />
-								</ItemContent>
-								<ItemActions>
-									<Skeleton className="h-8 w-24" />
-								</ItemActions>
-							</Item>
-						</ul>
-					)}
-					{state.hiddenContributors.status === "error" && (
-						<QueryErrorAlert
-							error={state.hiddenContributors.error}
-							title="We could not load hidden contributors"
-							onRetry={state.hiddenContributors.onRetry}
-						/>
-					)}
-					{state.hiddenContributors.status === "ready" &&
-						state.hiddenContributors.people.length > 0 && (
-							<Section
-								level={3}
-								size="sm"
-								title="Hidden by an admin"
-								description="These people have no membership, and an admin hid them from activity. A member is shown again under Members."
-							>
-								<ul className="rounded-xl border bg-card">
-									{state.hiddenContributors.people.map((person) => (
-										<Item key={person.id} render={<li />} variant="row">
-											<MemberAvatar user={person} />
-											<ItemContent>
-												<ItemTitle>{person.name}</ItemTitle>
-												<ItemDescription>{person.login}</ItemDescription>
-											</ItemContent>
-											<ItemActions>
-												<Button
-													variant="outline"
-													size="sm"
-													disabled={state.restoring !== undefined}
-													focusableWhenDisabled
-													onClick={() => onShowAgain(person.id)}
-												>
-													{state.restoring === person.id && <Spinner />}
-													Show again
-												</Button>
-											</ItemActions>
-										</Item>
-									))}
-								</ul>
-							</Section>
-						)}
-				</div>
+				<ReadySettingsBody
+					workspaceName={workspaceName}
+					providerType={providerType}
+					address={address}
+					state={state}
+					onEnabledChange={onEnabledChange}
+					onSearchEnginesChange={onSearchEnginesChange}
+					onShowAgain={onShowAgain}
+				/>
 			)}
+		</section>
+	);
+}
+
+/**
+ * The settings while they are readable. It owns the publishing confirmation, so a read that stops
+ * being readable takes an open confirmation with it, and a later read does not bring it back.
+ */
+function ReadySettingsBody({
+	workspaceName,
+	providerType,
+	address,
+	state,
+	onEnabledChange,
+	onSearchEnginesChange,
+	onShowAgain,
+}: Omit<WorkspacePublicActivitySettingsProps, "state"> & { state: ReadySettings }) {
+	const [confirming, setConfirming] = useState(false);
+	return (
+		<>
+			<div className="space-y-3">
+				{state.refreshFailure !== undefined && (
+					<QueryErrorAlert title="These settings may be out of date" {...state.refreshFailure} />
+				)}
+				<ul className="rounded-xl border bg-card">
+					<SettingRow
+						title="Publish the page"
+						description={publishDescription(state.enabled, state.live, address)}
+						checked={state.enabled}
+						pending={state.pending === "enabled"}
+						onCheckedChange={(next) => {
+							if (next) {
+								setConfirming(true);
+							} else {
+								onEnabledChange(false);
+							}
+						}}
+					/>
+					{state.enabled && (
+						<SettingRow
+							title="Allow search engines"
+							description={
+								state.allowSearchEngines
+									? "On. Search engines are allowed to list the page when it is public."
+									: "Off. A public page asks search engines not to list it. This is a request, not an access restriction."
+							}
+							checked={state.allowSearchEngines}
+							pending={state.pending === "search-engines"}
+							onCheckedChange={onSearchEnginesChange}
+						/>
+					)}
+					{state.enabled && state.hiddenPeople !== undefined && (
+						<Item render={<li />} variant="row">
+							<ItemContent>
+								<ItemTitle>Hidden people</ItemTitle>
+								<ItemDescription className="line-clamp-none">
+									The page leaves out and does not count people who hid themselves, and people an
+									admin hid. You see how many, never who.
+								</ItemDescription>
+							</ItemContent>
+							<ItemActions>
+								<span className="text-sm font-medium tabular-nums">
+									{state.hiddenPeople.toLocaleString("en-GB")}
+								</span>
+							</ItemActions>
+						</Item>
+					)}
+				</ul>
+				{state.enabled && !state.live && (
+					<Alert variant="warning">
+						<InfoIcon />
+						<AlertDescription>
+							Public availability is not confirmed. Public pages also require instance permission
+							and an active workspace.
+						</AlertDescription>
+					</Alert>
+				)}
+				{state.enabled && state.live && (
+					<p className="max-w-2xl text-xs text-muted-foreground">
+						Signed-in members open their workspace home at this address. To preview the page, open
+						it in a private window.
+					</p>
+				)}
+				{state.hiddenContributors.status === "loading" && (
+					<ul className="rounded-xl border bg-card" aria-busy="true" aria-hidden="true">
+						<Item render={<li />} variant="row">
+							<Skeleton className="size-8 rounded-full" />
+							<ItemContent>
+								<Skeleton className="h-4 w-32" />
+								<Skeleton className="h-3 w-20" />
+							</ItemContent>
+							<ItemActions>
+								<Skeleton className="h-8 w-24" />
+							</ItemActions>
+						</Item>
+					</ul>
+				)}
+				{state.hiddenContributors.status === "error" && (
+					<QueryErrorAlert
+						error={state.hiddenContributors.error}
+						title="We could not load hidden contributors"
+						onRetry={state.hiddenContributors.onRetry}
+					/>
+				)}
+				{state.hiddenContributors.status === "ready" &&
+					state.hiddenContributors.refreshFailure !== undefined && (
+						<QueryErrorAlert
+							title="Hidden contributors may be out of date"
+							{...state.hiddenContributors.refreshFailure}
+						/>
+					)}
+				{state.hiddenContributors.status === "ready" &&
+					state.hiddenContributors.people.length > 0 && (
+						<Section
+							level={3}
+							size="sm"
+							title="Hidden by an admin"
+							description="These people have no membership, and an admin hid them from activity. A member is shown again under Members."
+						>
+							<ul className="rounded-xl border bg-card">
+								{state.hiddenContributors.people.map((person) => (
+									<Item key={person.id} render={<li />} variant="row">
+										<MemberAvatar user={person} />
+										<ItemContent>
+											<ItemTitle>{person.name}</ItemTitle>
+											<ItemDescription>{person.login}</ItemDescription>
+										</ItemContent>
+										<ItemActions>
+											<Button
+												variant="outline"
+												size="sm"
+												disabled={state.restoring !== undefined}
+												focusableWhenDisabled
+												onClick={() => onShowAgain(person.id)}
+											>
+												{state.restoring === person.id && <Spinner />}
+												Show again
+											</Button>
+										</ItemActions>
+									</Item>
+								))}
+							</ul>
+						</Section>
+					)}
+			</div>
 			<PublishDialog
 				open={confirming}
 				onOpenChange={setConfirming}
@@ -215,7 +260,7 @@ export function WorkspacePublicActivitySettings({
 					onEnabledChange(true);
 				}}
 			/>
-		</section>
+		</>
 	);
 }
 
