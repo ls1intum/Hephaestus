@@ -40,7 +40,20 @@ const gitlabProvider: IdentityProviderView = {
 	registrationId: "gitlab",
 	displayName: "GitLab",
 	providerType: "GITLAB",
+	baseUrl: "https://gitlab.com",
 };
+const lrzGitlabProvider: IdentityProviderView = {
+	registrationId: "gitlab-lrz",
+	displayName: "LRZ GitLab",
+	providerType: "GITLAB",
+	baseUrl: "https://gitlab.lrz.de",
+};
+
+// The deployments each identity above is linked to, as the current user reports them. GitHub's
+// source origin is its API host; the account is matched to GitHub by type alone.
+const githubLinked = { type: "GITHUB", serverUrl: "https://api.github.com" };
+const gitlabLinked = { type: "GITLAB", serverUrl: "https://gitlab.com" };
+const outlineLinked = { type: "OUTLINE", serverUrl: "https://outline.acme.test" };
 // An instance can run SEVERAL Outline deployments (unique on type + base URL), so Outline is a LIST
 // of providers, never a single `find(...)` match — each unconnected one gets its own CTA.
 const outlineProvider: IdentityProviderView = {
@@ -82,6 +95,7 @@ const meta = {
 		onRetry: fn(),
 		identities: [github, gitlab],
 		providers: [githubProvider, gitlabProvider],
+		linkedProviders: [githubLinked, gitlabLinked],
 	},
 } satisfies Meta<typeof LinkedAccountsSection>;
 
@@ -113,6 +127,7 @@ export const MultipleIdentities: Story = {
 	args: {
 		identities: [github, gitlab, outline],
 		providers: [githubProvider, gitlabProvider, outlineProvider],
+		linkedProviders: [githubLinked, gitlabLinked, outlineLinked],
 	},
 	play: async ({ canvas }) => {
 		canvas.getByText("Outline");
@@ -125,7 +140,7 @@ export const MultipleIdentities: Story = {
 
 /** Only one identity — disconnect is unavailable so the account can never lock itself out. */
 export const SingleIdentity: Story = {
-	args: { identities: [github], providers: [githubProvider] },
+	args: { identities: [github], providers: [githubProvider], linkedProviders: [githubLinked] },
 	play: async ({ args, canvas }) => {
 		// The lockout reason is always-visible text (not a disabled button), so SR/keyboard users
 		// can read why disconnect is unavailable.
@@ -137,7 +152,7 @@ export const SingleIdentity: Story = {
 
 /** One identity plus another provider available to connect. */
 export const WithLinkableProvider: Story = {
-	args: { identities: [github] },
+	args: { identities: [github], linkedProviders: [githubLinked] },
 	play: async ({ canvas }) => {
 		canvas.getByRole("button", { name: /connect gitlab/iu });
 	},
@@ -154,11 +169,37 @@ export const OutlineConnectCTA: Story = {
 	},
 	play: async ({ args, canvas }) => {
 		// Every unconnected Outline instance gets its own CTA, named by its display name.
-		canvas.getByText("ACME Outline is not connected");
-		canvas.getByText("Research Outline is not connected");
+		canvas.getByText("Connect ACME Outline");
+		canvas.getByText("Connect Research Outline");
 
 		await userEvent.click(canvas.getByRole("button", { name: "Connect Research Outline" }));
 		await expect(args.onLink).toHaveBeenCalledWith("outline-research");
+	},
+};
+
+/**
+ * Linked to GitLab.com, with an LRZ GitLab also configured: the account is linked to one GitLab
+ * deployment, not to every one, so LRZ stays offered and GitLab.com does not.
+ */
+export const AnotherGitLabInstance: Story = {
+	args: { providers: [githubProvider, gitlabProvider, lrzGitlabProvider] },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "Connect LRZ GitLab" })).toBeVisible();
+		await expect(canvas.queryByRole("button", { name: "Connect GitLab" })).toBeNull();
+		await expect(canvas.queryByRole("button", { name: "Connect GitHub" })).toBeNull();
+	},
+};
+
+/** One of two Outline deployments is connected: only the other one is offered. */
+export const OneOutlineOfTwoConnected: Story = {
+	args: {
+		identities: [github, gitlab, outline],
+		providers: [githubProvider, gitlabProvider, outlineProvider, secondOutlineProvider],
+		linkedProviders: [githubLinked, gitlabLinked, outlineLinked],
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Connect Research Outline")).toBeVisible();
+		await expect(canvas.queryByText("Connect ACME Outline")).toBeNull();
 	},
 };
 
@@ -169,7 +210,7 @@ export const Disconnecting: Story = {
 
 /** No connected accounts yet — Empty state, with providers still offered to connect. */
 export const Empty: Story = {
-	args: { identities: [] },
+	args: { identities: [], linkedProviders: [] },
 	play: async ({ canvas }) => {
 		canvas.getByText(/no connected accounts yet/iu);
 		canvas.getByRole("button", { name: /connect github/iu });
@@ -193,6 +234,7 @@ export const ErrorState: Story = {
 		error: { detail: "The identity service is unavailable." },
 		identities: [],
 		providers: [],
+		linkedProviders: [],
 	},
 	play: async ({ args, canvas }) => {
 		canvas.getByText(/we could not load your connected accounts/iu);
