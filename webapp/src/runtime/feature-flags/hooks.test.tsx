@@ -20,6 +20,24 @@ function wrapper(queryClient: QueryClient) {
 }
 
 describe("useFeatureFlags", () => {
+	it("stops at a refused feature read without retrying it", async () => {
+		let requests = 0;
+		server.use(
+			http.get("*/user/features", () => {
+				requests += 1;
+				return HttpResponse.json({ status: 403, title: "Forbidden" }, { status: 403 });
+			}),
+		);
+
+		const { result } = renderHook(() => useFeatureFlags(), {
+			wrapper: wrapper(new QueryClient({ defaultOptions: { queries: { retry: false } } })),
+		});
+
+		await waitFor(() => expect(result.current.isError).toBe(true));
+		expect(result.current.flags).toBeUndefined();
+		expect(requests).toBe(1);
+	});
+
 	// One flag going wrong is not the flag service going down: its gate closes, the rest still answer.
 	it("reads a flag the server did not send as a boolean as off, and keeps the rest of the map", async () => {
 		server.use(

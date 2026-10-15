@@ -6,7 +6,7 @@ import { ACTIVE_REVIEW_POLL_MS } from "@/components/admin/practice-reviews/revie
 import { type PanelState, panelState } from "@/components/common/panel-state";
 import { isActiveReview } from "@/components/practice-vocabulary/review-status-defs";
 import { problemStatusOf } from "@/lib/problem-detail";
-import { retryUnlessNotFound } from "@/runtime/tanstack-query/query-defaults";
+import { retryQuery } from "@/runtime/tanstack-query/query-defaults";
 
 export type ReviewLineageTarget = GetReviewLineageData["query"];
 
@@ -22,7 +22,7 @@ export function useReviewLineage(
 	const query = useQuery({
 		...options,
 		queryFn: target === undefined ? skipToken : options.queryFn,
-		retry: retryUnlessNotFound,
+		retry: retryQuery,
 		refetchInterval: ({ state }) =>
 			state.status === "success" &&
 			state.data?.nodes.some(

@@ -16,7 +16,7 @@ import { type PanelState, panelState } from "@/components/common/panel-state";
 import { isActiveReview } from "@/components/practice-vocabulary/review-status-defs";
 import { problemDetailOf } from "@/lib/problem-detail";
 import { invalidateWorkspaceReads } from "@/runtime/tanstack-query/invalidate-workspace-reads";
-import { retryUnlessNotFound } from "@/runtime/tanstack-query/query-defaults";
+import { retryQuery } from "@/runtime/tanstack-query/query-defaults";
 
 import { useInvalidateOnSettle } from "./use-invalidate-on-settle";
 
@@ -38,14 +38,14 @@ export function useReviewController(workspaceSlug: string, reviewId: string): Re
 	const queryClient = useQueryClient();
 	const reviewQuery = useQuery({
 		...getReviewOptions({ path: { workspaceSlug, reviewId } }),
-		retry: retryUnlessNotFound,
+		retry: retryQuery,
 		refetchInterval: (result) =>
 			result.state.data !== undefined && isMoving(result.state.data)
 				? ACTIVE_REVIEW_POLL_MS
 				: false,
 	});
 	const checksOptions = listReviewFeedbackChecksOptions({ path: { workspaceSlug, reviewId } });
-	const checksQuery = useQuery({ ...checksOptions, retry: retryUnlessNotFound });
+	const checksQuery = useQuery({ ...checksOptions, retry: retryQuery });
 
 	// Refresh checks and lists after processing finishes; their last polled state can predate the final results.
 	const settled = reviewQuery.data !== undefined && !isMoving(reviewQuery.data);

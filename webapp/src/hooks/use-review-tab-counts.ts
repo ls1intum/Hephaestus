@@ -13,7 +13,7 @@ import {
 	resultsQuery,
 	reviewsQuery,
 } from "@/components/admin/practice-reviews/review-search";
-import { QUERY_RETRIES, sessionRetriesQueries } from "@/runtime/tanstack-query/query-defaults";
+import { retryQuery, sessionRetriesQueries } from "@/runtime/tanstack-query/query-defaults";
 
 /** One row is the smallest page the endpoints serve; only its total is read. */
 const COUNT_PAGE = 1;
@@ -27,7 +27,7 @@ const COUNT_REFRESH_MS = 60_000;
  * another scope or workspace is never shown as this one's: until its own read answers, it shows nothing.
  */
 const COUNT_READ = {
-	retry: (failureCount: number) => sessionRetriesQueries() && failureCount < QUERY_RETRIES,
+	retry: retryQuery,
 	retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 8000),
 	refetchInterval: () => (sessionRetriesQueries() ? COUNT_REFRESH_MS : false),
 } as const;

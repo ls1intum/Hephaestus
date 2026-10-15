@@ -112,28 +112,33 @@ describe("cancelling a review", () => {
 	});
 });
 
-describe("an unknown review", () => {
-	it("asks once and reports not found without retrying", async () => {
-		// Disable retry for a 404; repeating a denied or removed review read cannot recover it.
-		const client = new QueryClient({ defaultOptions: { queries: { retryDelay: 0 } } });
-		let reviewReads = 0;
-		server.use(
-			http.get("*/workspaces/demo/practices/reviews/:reviewId", () => {
-				reviewReads += 1;
-				return HttpResponse.json({ status: 404 }, { status: 404 });
-			}),
-			http.get("*/workspaces/demo/practices/reviews/:reviewId/feedback-checks", () =>
-				HttpResponse.json({ status: 404 }, { status: 404 }),
-			),
-		);
-		const { result, unmount } = render(client);
-		try {
-			await waitFor(() => expect(result.current.review.status).toBe("error"));
-			await waitFor(() => expect(result.current.feedbackChecks.status).toBe("error"));
-			expect(reviewReads).toBe(1);
-		} finally {
-			unmount();
-			client.clear();
-		}
-	});
+describe("a refused review read", () => {
+	it.each([401, 403, 404, 409, 428])(
+		"asks once for review and feedback checks after HTTP %s",
+		async (status) => {
+			const client = new QueryClient({ defaultOptions: { queries: { retryDelay: 0 } } });
+			let reviewReads = 0;
+			let checkReads = 0;
+			server.use(
+				http.get("*/workspaces/demo/practices/reviews/:reviewId", () => {
+					reviewReads += 1;
+					return HttpResponse.json({ status }, { status });
+				}),
+				http.get("*/workspaces/demo/practices/reviews/:reviewId/feedback-checks", () => {
+					checkReads += 1;
+					return HttpResponse.json({ status }, { status });
+				}),
+			);
+			const { result, unmount } = render(client);
+			try {
+				await waitFor(() => expect(result.current.review.status).toBe("error"));
+				await waitFor(() => expect(result.current.feedbackChecks.status).toBe("error"));
+				expect(reviewReads).toBe(1);
+				expect(checkReads).toBe(1);
+			} finally {
+				unmount();
+				client.clear();
+			}
+		},
+	);
 });

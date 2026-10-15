@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.93.1
+
+### Patch Changes
+
+- When the Users page cannot read any accounts, it now says why. A refused read explains that you do not have access and no longer suggests reloading. A temporary outage offers Retry and shows the accounts once they load.
+- Stopping a GitLab project now lasts until you explicitly add it again. Responses from earlier syncs cannot restart ingestion or advance the resumed project's sync state.
+- Empty GitHub and GitLab repositories finish commit sync without a false failure or skipped sync. Commit sync also reads reachable history when the configured default branch is no longer present.
+- Repository monitoring confirmations explain when mirrored work is erased and that practice reviews and feedback can remain. Stopped GitLab projects stay stopped until you add them again.
+- Integration job details now retain the first incomplete operation when a sync finishes with warnings, so workspace administrators can see which phase needs attention.
+- The instance overview now says when its release and configuration readiness cards could not refresh. During a temporary outage, each card keeps its last answer with a notice that it may be out of date, and offers Retry. If access is refused, the card hides that answer and does not show it again until a later read succeeds.
+- The public activity page settings no longer keep showing hidden contributors, the hidden people count, or the settings themselves after access to them is refused. An open publishing confirmation closes too, and it does not come back when the settings load again. During a temporary outage, the settings and hidden contributors stay visible with a notice that they may be out of date, and offer Retry.
+- When adding a monitored repository fails, the path you entered stays in the field, so you can try again without typing it again. The field clears once the repository is added.
+- Release publication can resume failed image tag promotion after the release becomes immutable. Retrying verifies the published evidence and host qualification records without replacing release assets.
+
+  Only the newest published stable release can move image tags. An older retry cannot replace the tags of a newer release.
+
+- The Slack channel settings now keep your monitored channels and their actions when Slack cannot list channels to add. That failure appears in the Add channel dialog with Retry, and you can still paste a channel link or ID. If access to the monitored channels is refused, the page says so, closes any open channel dialog, and does not bring it back when the channels load again. If a refresh fails after the channels loaded, they stay visible with a notice and Retry. While a channel is being added, activated or removed, its dialog stays open with your entry until the request finishes, unless access to the channels is refused.
+- When an integration page cannot refresh its sync state or job history after they loaded, it keeps showing the last results, with your search and any open job details. A notice says they may be out of date and offers Retry. If access was refused, the old results stay hidden until a later read succeeds.
+
 ## 0.93.0
 
 ### Minor Changes

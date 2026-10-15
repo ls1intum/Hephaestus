@@ -258,7 +258,7 @@ function LoadedCatalogPracticeEditor({
 				exact: true,
 				refetchType: "none",
 			});
-			const latest: CatalogPractice = await queryClient.query(detailOptions);
+			const latest: CatalogPractice = await queryClient.query({ ...detailOptions, retry: false });
 			setBasePractice(latest);
 			setConflict(false);
 		} catch (error) {

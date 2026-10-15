@@ -53,6 +53,7 @@ import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
 import { announcePublicActivityChoice } from "@/lib/public-activity-choice";
 import { hasText } from "@/lib/text";
 import { useAuth } from "@/runtime/auth/AuthContext";
+import { retryQuery } from "@/runtime/tanstack-query/query-defaults";
 import { refreshPublicActivity } from "@/runtime/tanstack-query/refresh-public-activity";
 
 export const Route = createFileRoute("/_authenticated/settings")({
@@ -84,7 +85,7 @@ function RouteComponent() {
 		refetch: refetchSettings,
 	} = useQuery({
 		...getUserSettingsOptions({}),
-		retry: 1,
+		retry: (failureCount, error) => failureCount < 1 && retryQuery(failureCount, error),
 	});
 
 	const emailPreferencesQuery = useQuery(getNotificationPreferencesOptions());
@@ -355,7 +356,7 @@ function RouteComponent() {
 	const slackPreferencesQuery = useQuery({
 		...getSlackUserPreferencesOptions({}),
 		enabled: slackAvailable,
-		retry: 1,
+		retry: (failureCount, error) => failureCount < 1 && retryQuery(failureCount, error),
 	});
 
 	const slackPreferencesProps: SlackPreferencesSectionProps = {

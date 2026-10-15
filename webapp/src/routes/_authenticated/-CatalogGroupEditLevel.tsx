@@ -117,7 +117,7 @@ function LoadedCatalogGroupEditor({
 				exact: true,
 				refetchType: "none",
 			});
-			const latest: CatalogGroup = await queryClient.query(detailOptions);
+			const latest: CatalogGroup = await queryClient.query({ ...detailOptions, retry: false });
 			setBaseGroup(latest);
 			setConflict(false);
 		} catch (error) {

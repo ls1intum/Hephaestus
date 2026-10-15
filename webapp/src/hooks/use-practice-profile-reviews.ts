@@ -25,9 +25,8 @@ import {
 import { useInvalidateOnSettle } from "@/hooks/use-invalidate-on-settle";
 import { PRACTICE_PROFILE_POLL_MS } from "@/hooks/use-practice-profile-overview";
 import { useRequestPracticeReview } from "@/hooks/use-request-practice-review";
-import { problemStatusOf } from "@/lib/problem-detail";
 import { hasText } from "@/lib/text";
-import { QUERY_RETRIES, sessionRetriesQueries } from "@/runtime/tanstack-query/query-defaults";
+import { retryQuery } from "@/runtime/tanstack-query/query-defaults";
 import { springPageParams } from "@/runtime/tanstack-query/spring-page";
 
 interface ProfileReviewsRequest {
@@ -75,9 +74,7 @@ export function usePracticeProfileReviews({
 	const reviewQuery = useQuery({
 		...reviewOptions,
 		queryFn: reviewId === undefined ? skipToken : reviewOptions.queryFn,
-		// A 404 is not the reader's review, or gone: asking again answers the same.
-		retry: (failureCount, error) =>
-			sessionRetriesQueries() && problemStatusOf(error) !== 404 && failureCount < QUERY_RETRIES,
+		retry: retryQuery,
 		refetchInterval: (query) =>
 			isActive(query.state.data?.review) ? ACTIVE_REVIEW_POLL_MS : false,
 	});

@@ -329,6 +329,7 @@ export function useActivityWork({
 			const pageRequest = { ...filter, cursor: cursor ?? undefined, size: COPY_PAGE_SIZE };
 			const page = await queryClient.query({
 				queryKey: reader.key(pageRequest),
+				retry: false,
 				queryFn: async ({ signal }) => {
 					const { data } = await reader.read(pageRequest, signal);
 					return data;

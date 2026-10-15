@@ -167,9 +167,10 @@ export function useNextInApprovalQueue(workspaceSlug: string, feedbackId: string
 	return async () => {
 		// The decision invalidated the queue, so this is a fresh read: the one the decision already
 		// waited for when the queue was on screen, or a new one when it was not.
-		const page = await queryClient.query(
-			awaitingApprovalOptions(workspaceSlug, APPROVAL_QUEUE_SIZE),
-		);
+		const page = await queryClient.query({
+			...awaitingApprovalOptions(workspaceSlug, APPROVAL_QUEUE_SIZE),
+			retry: false,
+		});
 		return page.content.find((item) => item.id !== feedbackId)?.id;
 	};
 }

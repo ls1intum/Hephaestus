@@ -1,4 +1,4 @@
-import { problemStatusOf } from "@/lib/problem-detail";
+import { problemIsRetryable } from "@/lib/problem-detail";
 import { getUserViewSession } from "@/runtime/user-view/session";
 
 export const QUERY_STALE_TIME_MS = 30_000;
@@ -15,7 +15,12 @@ export function sessionRetriesQueries(): boolean {
 	return getUserViewSession() === undefined;
 }
 
-/** A 404 is a record that does not exist here: asking again answers the same, only later. */
-export function retryUnlessNotFound(failureCount: number, error: unknown): boolean {
-	return sessionRetriesQueries() && problemStatusOf(error) !== 404 && failureCount < QUERY_RETRIES;
+/**
+ * The client's retry policy. A refusal settles at its first answer, so a cached read that is refused
+ * and then retried into an outage cannot end as a recoverable failure that keeps the refused answer.
+ * An imperative read (`queryClient.query`) passes `retry: false`: TanStack retries one only when the
+ * client has a retry default, and a guard, loader or action decides at once what a failure means.
+ */
+export function retryQuery(failureCount: number, error: unknown): boolean {
+	return sessionRetriesQueries() && problemIsRetryable(error) && failureCount < QUERY_RETRIES;
 }

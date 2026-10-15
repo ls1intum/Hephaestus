@@ -1465,6 +1465,31 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     @Nested
     class People {
         @Test
+        void shouldKeepPeopleWithoutAFirstContributionSeparateFromAnotherActorsHistory() {
+            record(ada, ActivityEventType.COMMENT_CREATED, ActivityTargetType.ISSUE_COMMENT, -1L, DAY, monitored);
+            Instant earlier = Instant.parse(FROM).minus(Duration.ofDays(365));
+            record(zoe, ActivityEventType.ISSUE_CREATED, ActivityTargetType.ISSUE, -2L, earlier, monitored);
+            record(zoe, ActivityEventType.ISSUE_CREATED, ActivityTargetType.ISSUE, -3L, DAY, monitored);
+
+            var people = members(uri -> uri);
+
+            assertThat(people)
+                    .filteredOn(person -> person.person().id().equals(ada.getId()))
+                    .singleElement()
+                    .satisfies(person -> {
+                        assertThat(person.counts().comments()).isEqualTo(1);
+                        assertThat(person.firstContributionAt()).isNull();
+                    });
+            assertThat(people)
+                    .filteredOn(person -> person.person().id().equals(zoe.getId()))
+                    .singleElement()
+                    .satisfies(person -> {
+                        assertThat(person.counts().contributions()).isEqualTo(1);
+                        assertThat(person.firstContributionAt()).isEqualTo(earlier);
+                    });
+        }
+
+        @Test
         void shouldKeepTheStatementBudgetWhenTheContributorListGrows() {
             record(ada, ActivityEventType.ISSUE_CREATED, ActivityTargetType.ISSUE, -1L, DAY, monitored);
             var range = new ActivityPeopleRangeParams("custom", Instant.parse(FROM), Instant.parse(TO));
