@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { expect, fn } from "storybook/test";
+import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
 
 import type { OutlineCollection } from "@/api/types.gen";
 import { daysBefore, minutesBefore } from "@/stories/story-clock";
@@ -116,5 +116,58 @@ export const LoadError: Story = {
 		canvas.getByText(/could not load the mirrored collections/iu);
 		canvas.getByText(/outline sync is unavailable/iu);
 		canvas.getByRole("button", { name: /^retry$/iu });
+	},
+};
+
+/** The collection list was refused: it says so, offers no Retry, and lists no collection to remove. */
+export const Refused: Story = {
+	args: { collections: [], error: { status: 403 }, onRetry: fn() },
+	play: async ({ canvas }) => {
+		canvas.getByText("You do not have access to the mirrored collections");
+		await expect(canvas.queryByRole("button", { name: /^retry$/iu })).not.toBeInTheDocument();
+		await expect(canvas.queryByText(/no collections mirrored yet/iu)).not.toBeInTheDocument();
+	},
+};
+
+/** A failed refresh keeps the collections last read, and their actions, under the failure. */
+export const RefreshFailed: Story = {
+	args: {
+		collections: [engineering, decisions],
+		refreshFailure: { error: { status: 503 }, pending: false, onRetry: fn() },
+	},
+	play: async ({ canvas }) => {
+		canvas.getByText("The mirrored collections may be out of date");
+		canvas.getByRole("button", { name: /actions for engineering/iu });
+
+		await expect(canvas.getByRole("button", { name: /^retry$/iu })).toBeEnabled();
+	},
+};
+
+export const RefreshRetrying: Story = {
+	args: {
+		collections: [engineering, decisions],
+		refreshFailure: { error: { status: 503 }, pending: true, onRetry: fn() },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "Retrying…" })).toBeDisabled();
+		canvas.getByRole("button", { name: /actions for engineering/iu });
+	},
+};
+
+/** Remove opens from the row and names the collection, with the count it erases, as the list reads it. */
+export const Remove: Story = {
+	args: { collections: [engineering, decisions] },
+	play: async ({ canvas }) => {
+		await userEvent.click(canvas.getByRole("button", { name: /actions for engineering/iu }));
+		await userEvent.click(await screen.findByRole("menuitem", { name: /remove and erase/iu }));
+		const dialog = within(
+			await screen.findByRole("alertdialog", {
+				name: "Remove “Engineering” and erase its mirror?",
+			}),
+		);
+		dialog.getByText(/all 87 mirrored documents/iu);
+
+		await userEvent.click(dialog.getByRole("button", { name: /^remove and erase$/iu }));
+		await waitFor(async () => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
 	},
 };

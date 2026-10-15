@@ -13,8 +13,9 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export interface RemoveCollectionAlertDialogProps {
-	/** Non-null drives the open state and names the collection being erased. */
-	collection: OutlineCollection | null;
+	/** The collection being erased, as the current list reads it. It stays named while the dialog closes. */
+	collection: OutlineCollection;
+	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	/** Confirm removal. Resolves on success (dialog closes), rejects to keep it open. */
 	onConfirm: (input: { collectionId: string }) => Promise<void> | void;
@@ -28,13 +29,14 @@ export interface RemoveCollectionAlertDialogProps {
  */
 export function RemoveCollectionAlertDialog({
 	collection,
+	open,
 	onOpenChange,
 	onConfirm,
 }: RemoveCollectionAlertDialogProps) {
 	const [submitting, setSubmitting] = useState(false);
 
-	const label = collection ? (collection.name ?? collection.collectionId) : "";
-	const documentCount = collection?.documentCount ?? 0;
+	const label = collection.name ?? collection.collectionId;
+	const { documentCount } = collection;
 
 	function handleOpenChange(next: boolean) {
 		if (!next) {
@@ -44,9 +46,6 @@ export function RemoveCollectionAlertDialog({
 	}
 
 	async function confirm() {
-		if (!collection) {
-			return;
-		}
 		setSubmitting(true);
 		try {
 			await onConfirm({ collectionId: collection.collectionId });
@@ -59,7 +58,17 @@ export function RemoveCollectionAlertDialog({
 	}
 
 	return (
-		<AlertDialog open={collection != null} onOpenChange={handleOpenChange}>
+		<AlertDialog
+			open={open}
+			onOpenChange={(next, details) => {
+				// A pending removal owns the dialog until its answer, so dismissing cannot clear it.
+				if (!next && submitting) {
+					details.cancel();
+					return;
+				}
+				handleOpenChange(next);
+			}}
+		>
 			<AlertDialogContent>
 				<AlertDialogHeader>
 					<AlertDialogTitle>Remove “{label}” and erase its mirror?</AlertDialogTitle>
