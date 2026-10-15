@@ -179,8 +179,78 @@ export const LoadError: Story = {
 	play: async ({ args, canvas }) => {
 		canvas.getByText(/could not load the monitored repositories/iu);
 		canvas.getByText(/repositories service is unavailable/iu);
+		await expect(canvas.queryByLabelText("Add a repository")).not.toBeInTheDocument();
 		await userEvent.click(canvas.getByRole("button", { name: /retry/iu }));
 		await expect(args.onRetry).toHaveBeenCalledTimes(1);
+	},
+};
+
+/** A failed refresh keeps the repositories last read, and their Stop, beside the failure. */
+export const RefreshFailed: Story = {
+	args: {
+		repositories: [{ nameWithOwner: "acme/platform/api" }],
+		provider: "GITLAB",
+		providerLabel: "GitLab",
+		refreshFailure: {
+			error: Object.assign(new Error("request failed"), {
+				status: 503,
+				detail: "GitLab is unavailable.",
+			}),
+			pending: false,
+			onRetry: fn(),
+		},
+	},
+	play: async ({ canvas }) => {
+		canvas.getByText("The monitored repositories may be out of date");
+		canvas.getByText(/GitLab is unavailable/u);
+		await expect(canvas.getByRole("button", { name: "Retry" })).toBeEnabled();
+		await expect(
+			canvas.getByRole("button", { name: "Stop monitoring acme/platform/api" }),
+		).toBeEnabled();
+		await expect(canvas.getByLabelText("Add a repository")).toBeVisible();
+		await expect(
+			canvas.queryByText(/could not load the monitored repositories/iu),
+		).not.toBeInTheDocument();
+	},
+};
+
+export const RefreshRetrying: Story = {
+	args: {
+		...RefreshFailed.args,
+		refreshFailure: {
+			error: Object.assign(new Error("request failed"), {
+				status: 503,
+				detail: "GitLab is unavailable.",
+			}),
+			pending: true,
+			onRetry: fn(),
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "Retrying…" })).toBeDisabled();
+		canvas.getByText("acme/platform/api");
+	},
+};
+
+/** A refused read shows no repositories, and no Add until the list reads again. */
+export const ListRefused: Story = {
+	args: {
+		repositories: [],
+		provider: "GITLAB",
+		providerLabel: "GitLab",
+		error: Object.assign(new Error("request failed"), {
+			status: 403,
+			detail: "You cannot manage this workspace’s source control.",
+		}),
+		onRetry: fn(),
+	},
+	play: async ({ canvas }) => {
+		canvas.getByText("You do not have access to the monitored repositories");
+		await expect(canvas.queryByRole("button", { name: /retry/iu })).not.toBeInTheDocument();
+		await expect(canvas.queryByLabelText("Add a repository")).not.toBeInTheDocument();
+		await expect(
+			canvas.queryByRole("button", { name: /stop monitoring/iu }),
+		).not.toBeInTheDocument();
 	},
 };
 

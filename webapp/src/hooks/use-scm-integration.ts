@@ -15,10 +15,17 @@ import type { Workspace } from "@/api/types.gen";
 import { SCM_CLASS_KEYS } from "@/components/admin/integrations/SyncResourcesTable";
 import type { WorkspaceRepositoriesSettings } from "@/components/admin/integrations/WorkspaceRepositoriesSettings";
 import type { WorkspaceScmTokenSettings } from "@/components/admin/integrations/WorkspaceScmTokenSettings";
+import { queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
 import { useConnectionSync } from "@/hooks/use-connection-sync";
 import { problemDetailOf } from "@/lib/problem-detail";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 type ScmKind = "GITHUB" | "GITLAB";
+
+/** Whether a failed refresh can be retried, so the data this key last read still stands beside it. */
+function refreshRetryable(query: { isRefetchError: boolean; error: unknown }) {
+	return query.isRefetchError && queryErrorIsRetryable(query.error);
+}
 
 /** Which source-control provider the workspace is on, and its display name once that is known. */
 function scmProviderOf(workspace: Workspace | undefined): {
@@ -45,7 +52,12 @@ export function useScmIntegration(workspaceSlug: string) {
 
 	const catalogQueryOptions = getIntegrationCatalogOptions({ path: { workspaceSlug } });
 	const catalogQuery = useQuery(catalogQueryOptions);
-	const entry = kind ? catalogQuery.data?.find((e) => e.kind === kind) : undefined;
+	useQueryReadRefusal(catalogQueryOptions.queryKey, catalogQuery.isError, catalogQuery.error);
+	// A refused lookup withdraws the connection it last read at once, before its entry is evicted, so
+	// nothing the connection owns stays actionable. An outage keeps it, with the failure in the header.
+	const catalog =
+		!catalogQuery.isError || refreshRetryable(catalogQuery) ? catalogQuery.data : undefined;
+	const entry = kind ? catalog?.find((e) => e.kind === kind) : undefined;
 	const hasConnection = entry?.connected === true;
 	const isConnectionActive = entry?.connectionState === "ACTIVE";
 	const connectionId = hasConnection ? entry.connectionId : undefined;
@@ -75,14 +87,19 @@ export function useScmIntegration(workspaceSlug: string) {
 	});
 
 	const repositoriesQueryOptions = getRepositoriesToMonitorOptions({ path: { workspaceSlug } });
-	const {
-		data: repositories,
-		isLoading: isLoadingRepositories,
-		error: repositoriesError,
-		refetch: refetchRepositories,
-	} = useQuery({
-		...repositoriesQueryOptions,
-	});
+	const repositoriesQuery = useQuery(repositoriesQueryOptions);
+	useQueryReadRefusal(
+		repositoriesQueryOptions.queryKey,
+		repositoriesQuery.isError,
+		repositoriesQuery.error,
+	);
+	// A failed refresh that can be retried keeps the rows, and a Stop open on one, beside the failure.
+	// A refusal, or a read that never succeeded, shows none.
+	const repositoriesRetained = refreshRetryable(repositoriesQuery);
+	const repositoriesFailed = repositoriesQuery.isError && !repositoriesRetained;
+	const refetchRepositories = () => {
+		void repositoriesQuery.refetch();
+	};
 
 	const invalidateRepositorySet = () => {
 		void queryClient.invalidateQueries({ queryKey: repositoriesQueryOptions.queryKey });
@@ -153,11 +170,20 @@ export function useScmIntegration(workspaceSlug: string) {
 			onSave: handleReplaceToken,
 		} satisfies ComponentProps<typeof WorkspaceScmTokenSettings>,
 		repositoriesSettingsProps: {
-			repositories: (repositories ?? []).map((repo) => ({ nameWithOwner: repo })),
+			repositories: (repositoriesFailed ? [] : (repositoriesQuery.data ?? [])).map((repo) => ({
+				nameWithOwner: repo,
+			})),
 			provider: kind,
 			providerLabel: label,
-			isLoading: isLoadingRepositories,
-			error: repositoriesError,
+			isLoading: repositoriesQuery.isLoading,
+			error: repositoriesFailed ? repositoriesQuery.error : null,
+			refreshFailure: repositoriesRetained
+				? {
+						error: repositoriesQuery.error,
+						pending: repositoriesQuery.isFetching,
+						onRetry: refetchRepositories,
+					}
+				: undefined,
 			addRepositoryError: addRepository.error,
 			isAddingRepository: addRepository.isPending,
 			isRemovingRepository: removeRepository.isPending,
@@ -172,9 +198,7 @@ export function useScmIntegration(workspaceSlug: string) {
 			onRemoveRepository: (nameWithOwner: string) => {
 				removeRepository.mutate({ path: { workspaceSlug }, query: { nameWithOwner } });
 			},
-			onRetry: () => {
-				void refetchRepositories();
-			},
+			onRetry: refetchRepositories,
 		} satisfies ComponentProps<typeof WorkspaceRepositoriesSettings>,
 	};
 }
