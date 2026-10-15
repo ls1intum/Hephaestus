@@ -1,5 +1,87 @@
 # Changelog
 
+## 0.93.0
+
+### Minor Changes
+
+- Audit text and GitHub project options now retain their supplied text. Typed JSON data uses the application's configured Jackson 3 mapper.
+
+  **Operators:** Stop all replicas of the server, worker, and webhook runtime roles before this database migration. Verify a database backup first. Restart all roles on the new release together. Previously structured audit values become JSON-text Strings in person-data exports. Downgrades require restoration of the verified backup. Follow the native Hibernate JSON cutover procedure in the operator documentation.
+
+- Operator review views withhold observation text and evidence when source access can no longer be verified. The review’s outcome, practice, work and delivery history remain visible. Observation summaries are optional in the operator API when this text is unavailable.
+
+  **Operators:** External clients of the operator review API must handle unavailable observation summaries. The bundled interface handles this state. No manual database change is required.
+
+- Public activity pages now show a person's contributions by repository and a timeline with links to their public work. Repository and activity filters keep the same public visibility and privacy choices as the people table.
+- Workspace admins can inspect observed review phase counts and durations from retained job output. Missing facts stay unknown, and diagnostics disappear when output expires or is erased.
+- Unverified usage no longer gains a confirmed cost when model rates are added. Usage measurements and missing prices are tracked separately, and budget notices now explain both causes without assigning a combined count to each cap. Historical costs are retained; historical unpriced usage without a verification decision stays unpriced and continues to affect current-month caps.
+
+  **Operators:** Use the [stopped-writer upgrade procedure](https://docs.hephaestus.build/admin/native-hibernate-json-cutover) for this accounting cutover. Do not mix runtime-role versions: an older repricer does not honor measurement verification.
+
+### Patch Changes
+
+- Treating an account as automation, or counting it as a person again, now finishes for the workspace and account you changed, even if you open someone else or another workspace before it saves. The notification names the account and its workspace, and only that account shows as saving.
+- Hiding a person from Workspace activity no longer closes another person you opened while the change was saving, or the same person in another workspace. The notification and its Undo name the person you hid and the workspace you hid them in, and a failed hide says whom it was for.
+- The People table on Workspace activity stays when it cannot refresh. You see a warning that it may be out of date, with a Retry. If you lose access to it, those people no longer come back after a later connection problem.
+- Activity timelines now say when they could not refresh. The work already shown stays, with a warning that it may be out of date and a Retry. If you lose access to a timeline, its work no longer comes back after a later connection problem.
+- Admin member, team, and label changes keep their updates and failure notices with the workspace where you submitted them, even after you switch workspaces. A failed visibility change no longer overwrites later updates.
+- Audit logs keep the events and settings changes already shown when a refresh or the next page fails, and offer a retry beside them. When access to an audit log is refused, its rows, names, count, export and any open detail disappear and stay away until the log can be read again. Switching workspace closes the previous workspace's open audit detail, and changing an audit filter keeps your place on the page.
+- The workspace members table and the instance users table show placeholder rows under their columns while they load, instead of a spinner and a count of zero.
+- The Users page keeps the accounts it already loaded when loading more fails, says when a search is incomplete, and loads the rest only when you select Retry. When access to the account list is refused, the page also removes the loaded count and closes any open role change or sign-out confirmation.
+- The Users page shows an account's updated role and available actions after an instance admin changes the role.
+- Unsaved changes to a workspace's AI model assignments now survive a failed refresh. The assignments stay on screen with a warning and a Retry that repeats only the read that failed. If you no longer have access, the page says so instead of showing the assignments.
+- Practice review campaigns and recurring sweeps now use the requesting workspace's review settings when several workspaces monitor the same repository.
+- Cancelled reviews retain the model usage already recorded for their attempt. Cost stays unknown when usage or a price is unavailable.
+- Unsaved edits in the instance catalog editors are no longer lost without warning. If a background refresh fails, your draft stays open with a Retry. If you no longer have access, the editor says so instead of showing the practice or group. Accepting a Hephaestus update for a practice with unsaved changes now asks first. If you cancel, your draft and your field choices stay in place.
+- Feedback for a conversation with Heph is prepared only when an available Mentor model respects the developer's AI choice. Feedback on the work and on practice pages remains available independently.
+- Delivery recovery no longer marks already delivered feedback or a newer pending attempt as failed, or overwrites its current comment.
+- Renaming a GitHub account leaves repository paths and URLs from other integrations unchanged.
+- A GitHub check failure is no longer lost when another check event is processed at the same time.
+- GitHub issue dependency sync updates the correct issues and preserves unrelated relationships when provider issue IDs overlap with local database IDs.
+- GitHub issue blocking relationships stay with GitHub repositories when another integration uses the same repository path.
+- Stopping GitHub’s initial sync between repositories or while waiting for rate limits now records it as canceled and keeps the last successful sync time unchanged, while retaining completed progress.
+- GitHub lifecycle sync jobs now report warnings when a repository sync is incomplete. This applies to full workspace syncs and individual repository refreshes.
+- GitHub sub-issues resolve their parent in the correct integration, even when another provider has a repository with the same path and issue number. Synchronization also removes a stored parent from another provider when it cannot resolve a readable GitHub parent reference.
+- Commits from GitHub pushes are recorded on the correct GitHub repository even when repository IDs overlap with another integration.
+- GitHub sub-issue synchronization stays on GitHub repositories when another integration has the same repository path, so summaries remain on the correct work and synchronization can continue.
+- Issue and pull request updates from GitHub stay with the correct GitHub repository when another integration uses the same repository path.
+- GitLab hierarchy syncs continue through readable items and later pages while preserving stored parent links for items whose hierarchy is unreadable. Stale parent links clear only after the full listing succeeds. Hierarchy syncs also retry the first page after a rate-limit wait. Scheduled and manual syncs report incomplete hierarchy reads as warnings.
+- Stopping GitLab’s initial sync between repositories now records it as canceled and keeps the last successful sync time unchanged, while retaining the progress already completed.
+- Initial GitLab syncs show warnings when discovery, required setup, or a data phase reports an incomplete result. Failed phase timestamps stay unchanged, while completed phases retain their progress.
+- GitLab issue parent links use the reported project and GitLab instance, even when another project or instance has the same issue number. If the reported parent is unavailable locally, sync preserves the stored link, continues through readable siblings, and reports an incomplete hierarchy read.
+- GitLab updates received through shared webhooks use the configured GitLab repository when another integration uses the same repository path.
+- Image scans stop registry subject lookups after two minutes. An unavailable lookup still fails the scan and blocks publication.
+- A review can deliver its feedback on the work while it still runs when copied history is not eligible for recovery. Erasure checks still apply, and a replacement writer still requires complete retained inputs.
+
+  Earlier review records retain their delivery facts when their words cannot be safely copied. Trusted history stays available, and erasure checks protect people quoted by earlier reviews.
+
+- Open review traces update as observations and feedback arrive. They show the final result-processing state without a reload and stop refreshing once that review settles.
+- Practice administrators can edit static-analysis scripts without an external editor download. An editor error can be retried without losing the form draft.
+- Heph usage no longer stays understated when the proxy records more prompt or output tokens without recording fewer in the other total.
+- Opening the full chat from the Heph panel while Heph is still answering keeps the answer coming. It finishes on the full chat page, where you can stop it or try again, without sending your question twice.
+- In operator review, evidence may be unavailable when its history cannot be verified in one read. Observation rows, counts, order, and outcomes stay visible. Independent observations retain their authorized summaries and evidence.
+- Disconnecting a GitHub token connection no longer leaves a repository monitored when an administrator adds it at the same time.
+- Practice reviews avoid unnecessary follow-up model calls after recording a practice, while preserving corrections to refused reports.
+- Operators can distinguish preparation failures in reviewed work, source access, pinned revisions and input collection without exposing exception text. Jobs retain the classified reason for the failed attempt, while retry behavior stays unchanged.
+- Workspace settings now tell a saved public activity choice apart from a page that is confirmed public. The page's address shows only when the page is confirmed public, a page that is on but not confirmed says so without guessing why, and saving says the settings were saved.
+- When a public activity page cannot be reached, a person or activity panel opened by a direct link now offers Retry instead of remaining in a loading state.
+- Reviews on the work can proceed when earlier feedback text is unavailable. Its recorded state remains visible without restoring withheld words or treating them as prior advice.
+- Reviews distinguish a supported response to earlier advice from a choice the work already made. Recognition can still explain a useful clarification, reasoned decline, or initial choice.
+- Reviews now recover their final processing status when feedback on the work was settled before the review finished. Recovery keeps the original public reference and preserves failures in private feedback composition.
+- Practice review lists show when retained rows may be out of date and offer Retry for the failed read. Reads that refuse access hide the previous rows. Empty reviews no longer promise results as each practice runs.
+- Feedback on reviewed work can arrive once its complete review is accepted, while feedback for your practice pages and conversations finishes independently. Accepted reviews keep their original decision through retries; quiet and approval decisions do not start another writer.
+- The GitHub source-control settings now state when the personal access token expiry is not available for the connection. They tell workspace administrators to check the token in GitHub and replace it on the same page if it has expired or been revoked.
+- Temporary Git checkouts are removed more reliably after snapshot capture or restoration because their fetches no longer start background maintenance.
+- Source checks use fewer database reads for cited Slack messages and Outline documents. Current access and consent checks still apply.
+- Review feeds keep refused feedback hidden until a new authorized read succeeds. A temporary refresh failure keeps loaded feedback and response drafts in place, with a warning and Retry.
+- Webhook errors now use standard problem responses with the same HTTP status codes and coarse reasons.
+  Errors on the shared webhook route no longer expose request read exception details.
+- Workspace members list even when the team filter cannot load. The team filter shows its own error with a retry, and a team chosen in the address keeps narrowing the members until the team list loads.
+- Practice setup keeps your unsaved work when a background refresh fails. A practice you are editing or creating, and a group you are naming, stay open, and the editor offers a Retry. If you no longer have access, the editor says so instead of showing the practice. A practice, catalog practice or catalog group that cannot load the first time now shows the error and a Retry instead of loading forever.
+- Editing a workspace's own AI provider or model no longer loses your changes when the list fails to refresh. The form stays open with a warning and a Retry that reads only what failed. If you lose access, the form closes and does not come back with the old values once access returns.
+- Automatic reviews of shared repositories now use each monitoring workspace's settings. Review occasions stay with the connected repository, including when repositories on different provider servers have the same name.
+- Switching workspaces while a change on Workspace settings is still saving no longer affects the workspace you switch to. The public activity page setting, a person shown in activity again, and an open publishing confirmation stay with the workspace where you made the change. The next workspace's controls are not shown as busy. The notification for the change names the workspace it was made in.
+
 ## 0.92.2
 
 ### Patch Changes
