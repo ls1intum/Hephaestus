@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -146,8 +147,8 @@ class ConsumerSubjectMathTest extends BaseUnitTest {
 
         @Test
         void scopeConsumerNameAppendsScopeIdSuffix() {
-            assertThat(ConsumerSubjectMath.scopeConsumerName("hephaestus-consumer", 42L))
-                    .isEqualTo("hephaestus-consumer-scope-42");
+            assertThat(ConsumerSubjectMath.scopeConsumerName("hephaestus-consumer", 42L, "github"))
+                    .isEqualTo("hephaestus-consumer-scope-42-github");
         }
 
         @Test
@@ -157,24 +158,46 @@ class ConsumerSubjectMathTest extends BaseUnitTest {
         }
 
         @Test
-        void everyDurableNameStartsWithTheSharedPrefix() {
-            // WebhookStreamMonitor tells this deployment's durables from another's by this prefix
-            // alone. If a name stopped carrying it, the loss counter would silently charge nothing.
-            String prefix = ConsumerSubjectMath.durablePrefix("hephaestus-consumer");
+        void shouldRecognizeCurrentScopeNamesOnEachStream() {
+            for (String stream : List.of("github", "gitlab", "slack", "outline")) {
+                String name = ConsumerSubjectMath.scopeConsumerName("hephaestus-consumer", Long.MAX_VALUE, stream);
+                assertThat(ConsumerSubjectMath.isDeploymentConsumerName("hephaestus-consumer", stream, name))
+                        .isTrue();
+            }
+        }
 
-            assertThat(ConsumerSubjectMath.scopeConsumerName("hephaestus-consumer", 42L))
-                    .startsWith(prefix);
-            assertThat(ConsumerSubjectMath.installationConsumerName("hephaestus-consumer"))
-                    .startsWith(prefix);
+        @Test
+        void shouldRecognizeOnlyTheGitHubInstallationName() {
+            String name = ConsumerSubjectMath.installationConsumerName("hephaestus-consumer");
+            assertThat(ConsumerSubjectMath.isDeploymentConsumerName("hephaestus-consumer", "github", name))
+                    .isTrue();
+            for (String stream : List.of("gitlab", "slack", "outline")) {
+                assertThat(ConsumerSubjectMath.isDeploymentConsumerName("hephaestus-consumer", stream, name))
+                        .isFalse();
+            }
+        }
+
+        @Test
+        void shouldRejectNestedObsoleteAndNoncanonicalNames() {
+            for (String name : List.of(
+                    "hephaestus-consumer-preview-scope-1-github",
+                    "hephaestus-consumer-preview-installation",
+                    "hephaestus-consumer-scope-1",
+                    "hephaestus-consumer-scope-1-gitlab",
+                    "hephaestus-consumer-scope-01-github",
+                    "hephaestus-consumer-scope-9223372036854775808-github")) {
+                assertThat(ConsumerSubjectMath.isDeploymentConsumerName("hephaestus-consumer", "github", name))
+                        .isFalse();
+            }
         }
 
         @Test
         void blankBaseNameIsRejected() {
             // Catching the misconfiguration here is cheaper than letting NATS reject a
             // consumer create with a partially-built name like "-scope-42".
-            assertThatThrownBy(() -> ConsumerSubjectMath.scopeConsumerName(null, 1L))
+            assertThatThrownBy(() -> ConsumerSubjectMath.scopeConsumerName(null, 1L, "github"))
                     .isInstanceOf(IllegalArgumentException.class);
-            assertThatThrownBy(() -> ConsumerSubjectMath.scopeConsumerName("", 1L))
+            assertThatThrownBy(() -> ConsumerSubjectMath.scopeConsumerName("", 1L, "github"))
                     .isInstanceOf(IllegalArgumentException.class);
             assertThatThrownBy(() -> ConsumerSubjectMath.installationConsumerName("   "))
                     .isInstanceOf(IllegalArgumentException.class);

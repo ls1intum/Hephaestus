@@ -659,7 +659,7 @@ public class IntegrationNatsConsumer {
         String streamName = subscription.streamName();
         String[] subjects = subscription.subjects().toArray(String[]::new);
         // Stream-suffixed durable so a scope's SCM and Outline consumers never share a durable name.
-        String consumerName = ConsumerSubjectMath.scopeConsumerName(durableBaseName(), scopeId) + "-" + streamName;
+        String consumerName = ConsumerSubjectMath.scopeConsumerName(durableBaseName(), scopeId, streamName);
         try {
             JetStreamOptions jsOptions = JetStreamOptions.builder()
                     .requestTimeout(connectionProperties.consumer().requestTimeout())

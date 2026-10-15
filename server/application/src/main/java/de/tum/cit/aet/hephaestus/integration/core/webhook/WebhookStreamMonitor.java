@@ -36,7 +36,7 @@ import org.slf4j.LoggerFactory;
  * cannot say which shed messages matched which filter, so current backlog is published instead.
  *
  * <p>Two things keep that worth alerting on, and both are about a broker that may be shared. Only
- * durables under {@code hephaestus.sync.nats.durable-consumer-name} are counted, and every meter is
+ * current consumer names built from {@code hephaestus.sync.nats.durable-consumer-name} are counted, and every meter is
  * tagged by stream alone and registered once at construction, so the series count is fixed at four
  * however many consumers, workspaces or stacks come and go.
  *
@@ -51,7 +51,7 @@ class WebhookStreamMonitor {
 
     private final JetStreamManagement jsm;
     private final WebhookProperties properties;
-    private final String durablePrefix;
+    private final String durableConsumerName;
     private final Map<String, Usage> usage = new ConcurrentHashMap<>();
     /**
      * When each stream's gauges were last refreshed. A monitor that cannot read the broker holds them at
@@ -74,7 +74,8 @@ class WebhookStreamMonitor {
             MeterRegistry meterRegistry) {
         this.jsm = jsm;
         this.properties = properties;
-        this.durablePrefix = ConsumerSubjectMath.durablePrefix(durableConsumerName);
+        ConsumerSubjectMath.durablePrefix(durableConsumerName);
+        this.durableConsumerName = durableConsumerName;
         for (String name : WebhookJetStreamBootstrap.STREAMS) {
             usage.put(name, UNKNOWN);
             Tags tags = Tags.of("stream", name);
@@ -157,9 +158,8 @@ class WebhookStreamMonitor {
                 long ackPending = 0;
                 long withoutPullRequests = 0;
                 for (ConsumerInfo consumer : jsm.getConsumers(name)) {
-                    if (!consumer.getName().startsWith(durablePrefix)) {
-                        // Another deployment's durable. An abandoned one keeps its backlog for good, so
-                        // counting it pegs these gauges at a number nobody here can act on.
+                    if (!ConsumerSubjectMath.isDeploymentConsumerName(durableConsumerName, name, consumer.getName())) {
+                        // A nested deployment base or obsolete name can retain a backlog indefinitely.
                         continue;
                     }
                     // Per durable, so a message matching two durables counts twice.

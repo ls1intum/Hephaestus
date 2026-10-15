@@ -203,9 +203,8 @@ public final class ConsumerSubjectMath {
     }
 
     /**
-     * The {@code <base>-} every durable this deployment creates starts with. Both name builders below
-     * are derived from it, so it is also what separates this deployment's durables from another's on a
-     * shared broker.
+     * The {@code <base>-} prefix used by the durable name builders. The prefix alone does not
+     * establish ownership: another deployment's base can start with it.
      */
     public static String durablePrefix(String baseConsumerName) {
         if (baseConsumerName == null || baseConsumerName.isBlank()) {
@@ -215,13 +214,39 @@ public final class ConsumerSubjectMath {
     }
 
     /**
-     * Builds the durable consumer name for a scope. Format: {@code <base>-scope-<scopeId>}.
+     * Builds the durable consumer name for one scope and stream: {@code <base>-scope-<scopeId>-<stream>}.
      */
-    public static String scopeConsumerName(@Nullable String baseConsumerName, long scopeId) {
+    public static String scopeConsumerName(@Nullable String baseConsumerName, long scopeId, String streamName) {
         if (baseConsumerName == null) {
             throw new IllegalArgumentException("baseConsumerName must not be null");
         }
-        return durablePrefix(baseConsumerName) + "scope-" + scopeId;
+        if (streamName.isBlank()) {
+            throw new IllegalArgumentException("Stream name cannot be blank.");
+        }
+        return durablePrefix(baseConsumerName) + "scope-" + scopeId + "-" + streamName;
+    }
+
+    /**
+     * Matches names this deployment creates, including durables with no current workspace or puller.
+     * Obsolete names and nested deployment bases do not belong to its current consumer fleet.
+     */
+    public static boolean isDeploymentConsumerName(String baseConsumerName, String streamName, String consumerName) {
+        if ("github".equals(streamName) && consumerName.equals(installationConsumerName(baseConsumerName))) {
+            return true;
+        }
+        String prefix = durablePrefix(baseConsumerName) + "scope-";
+        String suffix = "-" + streamName;
+        if (!consumerName.startsWith(prefix)
+                || !consumerName.endsWith(suffix)
+                || consumerName.length() <= prefix.length() + suffix.length()) {
+            return false;
+        }
+        String scopeId = consumerName.substring(prefix.length(), consumerName.length() - suffix.length());
+        try {
+            return consumerName.equals(scopeConsumerName(baseConsumerName, Long.parseLong(scopeId), streamName));
+        } catch (NumberFormatException invalidScopeId) {
+            return false;
+        }
     }
 
     /**
