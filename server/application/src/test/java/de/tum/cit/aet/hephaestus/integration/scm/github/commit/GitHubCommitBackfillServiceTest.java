@@ -8,10 +8,12 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AuthMode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
@@ -24,20 +26,27 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitFileChange;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryLockManager;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.RepositoryKey;
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import org.eclipse.jgit.api.Git;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -45,6 +54,9 @@ import org.mockito.Mock;
 class GitHubCommitBackfillServiceTest extends BaseUnitTest {
 
     private static final RepositoryKey KEY = new RepositoryKey(100L, 1L);
+
+    @TempDir
+    private Path temporary;
 
     @Mock
     private GitRepositoryManager gitRepositoryManager;
@@ -66,6 +78,60 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
 
     @InjectMocks
     private GitHubCommitBackfillService service;
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void shouldReadFetchedHistoryWithoutAConfiguredBranchHead(boolean populated) throws Exception {
+        Path remote = temporary.resolve("empty.git");
+        String expectedSha;
+        try (Git source = Git.init()
+                .setBare(!populated)
+                .setInitialBranch("feature")
+                .setDirectory(remote.toFile())
+                .call()) {
+            if (populated) {
+                expectedSha = source.commit()
+                        .setSign(false)
+                        .setAllowEmpty(true)
+                        .setMessage("Reachable feature history")
+                        .setAuthor("Test", "test@example.com")
+                        .setCommitter("Test", "test@example.com")
+                        .call()
+                        .name();
+            } else {
+                assertThat(source.getRepository().getRefDatabase().getRefs()).isEmpty();
+                expectedSha = "";
+            }
+        }
+        if (populated) when(persister.persist(any(), any(), any())).thenReturn(Outcome.CAPTURED);
+        var localGit = new GitRepositoryManager(
+                new GitRepositoryProperties(true, 2, 8L * 1024 * 1024 * 1024),
+                new GitRepositoryLockManager(),
+                new FabricLayout(temporary.resolve("fabric").toString()));
+        var localTransport = spy(localGit);
+        doAnswer(invocation -> {
+                    localGit.ensureRepository(KEY, remote.toUri().toString(), null);
+                    return null;
+                })
+                .when(localTransport)
+                .ensureRepository(eq(KEY), eq("https://github.com/owner/repo.git"), any());
+        var localService = new GitHubCommitBackfillService(
+                syncTargetProvider, localTransport, tokenService, commitRepository, persister, authorResolver);
+
+        assertThat(localService.backfillCommits(
+                        createSyncTarget(AuthMode.PERSONAL_ACCESS_TOKEN),
+                        createMockRepository(1L, "owner/repo", "main"),
+                        100L))
+                .isEqualTo(populated ? 1 : 0);
+        if (populated) {
+            ArgumentCaptor<CommitDetails> captured = ArgumentCaptor.forClass(CommitDetails.class);
+            verify(persister).persist(captured.capture(), any(), any());
+            assertThat(captured.getValue().sha()).isEqualTo(expectedSha);
+            assertThat(captured.getValue().message()).isEqualTo("Reachable feature history");
+        } else {
+            verify(persister, never()).persist(any(), any(), any());
+        }
+    }
 
     @Test
     void shouldNotFetchGitWhenRepositoryIsUnavailable() {
@@ -94,7 +160,6 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
 
     private void stubWalkableRepository() {
         when(gitRepositoryManager.isEnabled()).thenReturn(true);
-        when(gitRepositoryManager.resolveBranchHead(KEY, "main")).thenReturn("head");
     }
 
     private static SyncTarget createSyncTarget(AuthMode authMode) {
@@ -152,38 +217,43 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldReturnNegativeOneWhenDefaultBranchNull() {
-            when(gitRepositoryManager.isEnabled()).thenReturn(true);
+        void shouldCompleteEmptyHistoryWhenDefaultBranchNull() {
+            stubWalkableRepository();
+            stubCommits(List.of());
             Repository repo = createMockRepository(1L, "owner/repo", null);
             SyncTarget target = createSyncTarget(AuthMode.INSTALLATION_APP);
 
             int result = service.backfillCommits(target, repo, 100L);
 
-            assertThat(result).isEqualTo(-1);
-            verify(gitRepositoryManager, never()).ensureRepository(any(RepositoryKey.class), anyString(), any());
+            assertThat(result).isEqualTo(0);
+            verify(gitRepositoryManager).ensureRepository(eq(KEY), eq("https://github.com/owner/repo.git"), any());
         }
 
         @Test
-        void shouldReturnNegativeOneWhenDefaultBranchBlank() {
-            when(gitRepositoryManager.isEnabled()).thenReturn(true);
+        void shouldCompleteEmptyHistoryWhenDefaultBranchBlank() {
+            stubWalkableRepository();
+            stubCommits(List.of());
             Repository repo = createMockRepository(1L, "owner/repo", "  ");
             SyncTarget target = createSyncTarget(AuthMode.INSTALLATION_APP);
 
             int result = service.backfillCommits(target, repo, 100L);
 
-            assertThat(result).isEqualTo(-1);
+            assertThat(result).isEqualTo(0);
+            verify(gitRepositoryManager).ensureRepository(eq(KEY), eq("https://github.com/owner/repo.git"), any());
         }
 
         @Test
-        @DisplayName("should fail when HEAD cannot be resolved")
-        void shouldFailWhenHeadUnresolvable() {
-            when(gitRepositoryManager.isEnabled()).thenReturn(true);
-            when(gitRepositoryManager.resolveBranchHead(KEY, "main")).thenReturn(null);
+        void shouldPropagateAnUnreadableHistoryWalk() {
+            stubWalkableRepository();
+            doThrow(new GitRepositoryManager.GitOperationException("History walk failed", new RuntimeException()))
+                    .when(gitRepositoryManager)
+                    .forEachMissingCommit(eq(KEY), any(), any());
             Repository repo = createMockRepository(1L, "owner/repo", "main");
             SyncTarget target = createSyncTarget(AuthMode.INSTALLATION_APP);
 
             assertThatThrownBy(() -> service.backfillCommits(target, repo, 100L))
-                    .isInstanceOf(IllegalStateException.class);
+                    .isInstanceOf(GitRepositoryManager.GitOperationException.class)
+                    .hasMessage("History walk failed");
         }
     }
 

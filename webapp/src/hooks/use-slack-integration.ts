@@ -18,10 +18,12 @@ import type {
 	SlackConsentState,
 } from "@/components/admin/integrations/WorkspaceSlackChannelsSettings";
 import type { WorkspaceSlackConnectionSettingsProps } from "@/components/admin/integrations/WorkspaceSlackConnectionSettings";
+import { queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
 import { useConnectionSync } from "@/hooks/use-connection-sync";
 import { useLivePushUnavailable } from "@/hooks/use-sync-liveness";
 import { problemDetailOf } from "@/lib/problem-detail";
 import { hasText } from "@/lib/text";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 export function useSlackIntegration(workspaceSlug: string) {
 	const queryClient = useQueryClient();
@@ -60,29 +62,36 @@ export function useSlackIntegration(workspaceSlug: string) {
 	});
 
 	const slackChannelsQueryOptions = listSlackChannelsOptions({ path: { workspaceSlug } });
-	const {
-		data: slackChannels,
-		isLoading: isLoadingSlackChannels,
-		isError: isSlackChannelsError,
-		refetch: refetchSlackChannels,
-	} = useQuery({
+	const slackChannelsQuery = useQuery({
 		...slackChannelsQueryOptions,
 		enabled: hasSlackCredentials,
 		refetchInterval: syncPollInterval(sync.hasActiveJob, livePushUnavailable),
 	});
+	useQueryReadRefusal(
+		slackChannelsQueryOptions.queryKey,
+		slackChannelsQuery.isError,
+		slackChannelsQuery.error,
+	);
+	// A retryable failed refresh keeps the channels this key last read, with the failure beside them.
+	// A refusal, or a read that never succeeded, shows none.
+	const channelsRetained =
+		slackChannelsQuery.isRefetchError && queryErrorIsRetryable(slackChannelsQuery.error);
+	const channelsFailed = slackChannelsQuery.isError && !channelsRetained;
 
+	// The channels Slack lists for the picker are a separate read: its failure stays in the picker,
+	// and the monitored channels and the pasted-reference path do not depend on it.
 	const slackChannelCandidatesQueryOptions = listSlackChannelCandidatesOptions({
 		path: { workspaceSlug },
 	});
-	const {
-		data: slackChannelCandidates,
-		isLoading: isLoadingSlackChannelCandidates,
-		isError: isSlackChannelCandidatesError,
-		refetch: refetchSlackChannelCandidates,
-	} = useQuery({
+	const candidatesQuery = useQuery({
 		...slackChannelCandidatesQueryOptions,
 		enabled: hasSlackCredentials,
 	});
+	useQueryReadRefusal(
+		slackChannelCandidatesQueryOptions.queryKey,
+		candidatesQuery.isError,
+		candidatesQuery.error,
+	);
 
 	// A channel joining or leaving the set is a change to what sync mirrors, so the ledger refreshes too.
 	const invalidateSlackChannels = () => {
@@ -241,14 +250,34 @@ export function useSlackIntegration(workspaceSlug: string) {
 		channelsSettingsProps: {
 			workspaceSlug,
 			hasSlackConnection: isConnectionActive,
-			channels: isConnectionActive ? (slackChannels ?? []) : [],
-			channelCandidates: slackChannelCandidates ?? [],
-			isLoading: isConnectionActive && (isLoadingSlackChannels || isLoadingSlackChannelCandidates),
-			isError: isConnectionActive && (isSlackChannelsError || isSlackChannelCandidatesError),
+			channels: isConnectionActive && !channelsFailed ? (slackChannelsQuery.data ?? []) : [],
+			isLoading: isConnectionActive && slackChannelsQuery.isLoading,
+			isError: isConnectionActive && channelsFailed,
+			error: slackChannelsQuery.error,
 			onRetry: () => {
-				void refetchSlackChannels();
-				void refetchSlackChannelCandidates();
+				void slackChannelsQuery.refetch();
 			},
+			refreshFailure:
+				isConnectionActive && channelsRetained
+					? {
+							error: slackChannelsQuery.error,
+							pending: slackChannelsQuery.isFetching,
+							onRetry: () => {
+								void slackChannelsQuery.refetch();
+							},
+						}
+					: undefined,
+			channelCandidates: candidatesQuery.isError ? [] : (candidatesQuery.data ?? []),
+			candidatesLoading: candidatesQuery.isLoading,
+			candidatesFailure: candidatesQuery.isError
+				? {
+						error: candidatesQuery.error,
+						pending: candidatesQuery.isFetching,
+						onRetry: () => {
+							void candidatesQuery.refetch();
+						},
+					}
+				: undefined,
 			onRegisterChannel: handleRegisterChannel,
 			onUpdateConsent: handleUpdateConsent,
 			onRemoveChannel: handleRemoveChannel,

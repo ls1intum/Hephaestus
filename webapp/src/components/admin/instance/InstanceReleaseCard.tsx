@@ -26,6 +26,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { asDate } from "@/lib/dates";
+import type { RefreshFailure } from "@/runtime/tanstack-query/infinite-list";
 
 import {
 	RELEASE_CHECK_FAILURE_LABELS,
@@ -45,6 +46,8 @@ export type InstanceReleaseCardState =
 	| {
 			status: "ready";
 			release: ReleaseStatus;
+			/** Set when the latest read failed, so `release` is the last known answer, not current. */
+			refreshFailure?: RefreshFailure;
 			check: ReleaseCheckRequest;
 			onCheck: () => void;
 	  };
@@ -278,6 +281,9 @@ function ReleaseBody({ state }: InstanceReleaseCardProps) {
 	const newer = latest !== undefined && release.status === "UPDATE_AVAILABLE";
 	return (
 		<>
+			{state.refreshFailure !== undefined && (
+				<QueryErrorAlert title="Release information may be out of date" {...state.refreshFailure} />
+			)}
 			<div className="flex flex-wrap items-center gap-2">
 				<StatusBadge def={RELEASE_CHECK_STATUS_DEFS[release.status]} />
 				<span className="font-mono text-sm">{releaseLabel(release.running)}</span>

@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type UseQueryResult, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import {
@@ -15,7 +15,10 @@ import {
 import type { UpdateWorkspacePublicActivityRequest } from "@/api/types.gen";
 import type { WorkspacePublicActivityState } from "@/components/admin/settings/WorkspacePublicActivitySettings";
 import { panelState } from "@/components/common/panel-state";
+import { queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
 import { problemDetailOf } from "@/lib/problem-detail";
+import type { RefreshFailure } from "@/runtime/tanstack-query/infinite-list";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 /**
  * A workspace's public activity page as its admin settings show it: whether it is on, whether search
@@ -31,18 +34,23 @@ export function useWorkspacePublicActivity({
 }) {
 	const queryClient = useQueryClient();
 	const path = { workspaceSlug: workspaceSlug ?? "" };
-	const settings = useQuery({
-		...getWorkspacePublicActivitySettingsOptions({ path }),
-		enabled: workspaceSlug !== undefined,
-	});
-	const hidden = useQuery({
-		...getPublicActivityHiddenCountOptions({ path }),
-		enabled: settings.data?.enabled === true,
-	});
+	const settingsOptions = getWorkspacePublicActivitySettingsOptions({ path });
+	const settings = useQuery({ ...settingsOptions, enabled: workspaceSlug !== undefined });
+	useQueryReadRefusal(settingsOptions.queryKey, settings.isError, settings.error);
+	const current = lastRead(settings);
+	const hiddenOptions = getPublicActivityHiddenCountOptions({ path });
+	const hidden = useQuery({ ...hiddenOptions, enabled: current.data?.enabled === true });
+	useQueryReadRefusal(hiddenOptions.queryKey, hidden.isError, hidden.error);
+	const hiddenContributorsOptions = listHiddenContributorsOptions({ path });
 	const hiddenContributors = useQuery({
-		...listHiddenContributorsOptions({ path }),
+		...hiddenContributorsOptions,
 		enabled: workspaceSlug !== undefined,
 	});
+	useQueryReadRefusal(
+		hiddenContributorsOptions.queryKey,
+		hiddenContributors.isError,
+		hiddenContributors.error,
+	);
 	// Each write names, and refreshes, the workspace it was submitted for: the reply can arrive after
 	// the admin has moved to another workspace.
 	const showAgain = useMutation({
@@ -62,17 +70,18 @@ export function useWorkspacePublicActivity({
 	});
 	const update = useMutation({
 		...updatePublicActivityMutation(),
-		onSuccess: (data, { path: submitted, body }) => {
-			queryClient.setQueryData(
-				getWorkspacePublicActivitySettingsQueryKey({ path: submitted }),
-				data,
-			);
+		onSuccess: async (_data, { path: submitted, body }) => {
 			// The list carries the publication status, and the count follows what the page lists.
 			void queryClient.invalidateQueries({ queryKey: listWorkspacesQueryKey() });
 			void queryClient.invalidateQueries({
 				queryKey: getPublicActivityHiddenCountQueryKey({ path: submitted }),
 			});
 			announce(body, submitted.workspaceSlug);
+			// The saved settings reach the page only through a fresh read, so a read that is refused
+			// by the time the change returns stays refused.
+			await queryClient.invalidateQueries({
+				queryKey: getWorkspacePublicActivitySettingsQueryKey({ path: submitted }),
+			});
 		},
 		onError: (error, { path: submitted }) => {
 			void queryClient.invalidateQueries({
@@ -86,12 +95,12 @@ export function useWorkspacePublicActivity({
 	});
 
 	const change = (patch: Partial<UpdateWorkspacePublicActivityRequest>) => {
-		if (settings.data === undefined) {
+		if (current.data === undefined) {
 			return;
 		}
 		const body = {
-			publicActivityEnabled: settings.data.enabled,
-			allowSearchEngines: settings.data.allowSearchEngines,
+			publicActivityEnabled: current.data.enabled,
+			allowSearchEngines: current.data.allowSearchEngines,
 			...patch,
 		};
 		// A page that is off has no search engine choice: the server forgets it, so this says the same.
@@ -101,24 +110,31 @@ export function useWorkspacePublicActivity({
 		});
 	};
 
-	// A failed background read keeps the last available restoration controls.
+	// A failed background read keeps the last restoration controls only while it can be retried.
+	const contributors = lastRead(hiddenContributors);
 	const hiddenContributorsState =
-		hiddenContributors.data === undefined
+		contributors.data === undefined
 			? panelState(hiddenContributors, (people) => ({ status: "ready" as const, people }))
-			: { status: "ready" as const, people: hiddenContributors.data };
+			: {
+					status: "ready" as const,
+					people: contributors.data,
+					refreshFailure: contributors.refreshFailure,
+				};
 
 	let state: WorkspacePublicActivityState = { status: "loading" };
-	if (settings.data !== undefined) {
+	if (current.data !== undefined) {
 		const pendingBody = update.isPending ? update.variables.body : undefined;
 		state = {
 			status: "ready",
-			enabled: settings.data.enabled,
-			allowSearchEngines: settings.data.allowSearchEngines,
+			enabled: current.data.enabled,
+			allowSearchEngines: current.data.allowSearchEngines,
+			refreshFailure: current.refreshFailure,
 			live,
-			hiddenPeople: hidden.data?.hiddenPeople,
+			// A count that did not load is left out rather than shown from an earlier read.
+			hiddenPeople: hidden.isError ? undefined : hidden.data?.hiddenPeople,
 			hiddenContributors: hiddenContributorsState,
 			restoring: showAgain.isPending ? showAgain.variables.path.userId : undefined,
-			pending: pendingBody && pendingChange(pendingBody, settings.data.enabled),
+			pending: pendingBody && pendingChange(pendingBody, current.data.enabled),
 		};
 	} else if (settings.isError) {
 		state = {
@@ -136,6 +152,31 @@ export function useWorkspacePublicActivity({
 		onShowAgain: (userId: number) =>
 			showAgain.mutate({ path: { ...path, userId }, query: { hidden: false } }),
 	};
+}
+
+/**
+ * What the settings may show from a read. A retryable failed refresh keeps the last answer with the
+ * failure beside it. A refusal, or a read that never succeeded, shows nothing.
+ */
+function lastRead<TData, TError>(
+	query: UseQueryResult<TData, TError>,
+): {
+	data: TData | undefined;
+	refreshFailure?: RefreshFailure;
+} {
+	if (query.isRefetchError && queryErrorIsRetryable(query.error)) {
+		return {
+			data: query.data,
+			refreshFailure: {
+				error: query.error,
+				pending: query.isFetching,
+				onRetry: () => {
+					void query.refetch();
+				},
+			},
+		};
+	}
+	return { data: query.isError ? undefined : query.data };
 }
 
 /** The page's switch if the request turns it on or off, else the search engines' one. */

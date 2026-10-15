@@ -237,6 +237,85 @@ export const HiddenContributorsFailed: Story = {
 	},
 };
 
+/** A refused read of the hidden people shows nobody and no retry that would be refused again. */
+export const HiddenContributorsRefused: Story = {
+	args: {
+		state: {
+			...live,
+			hiddenContributors: { status: "error", error: { status: 403 }, onRetry: fn() },
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("You do not have access to hidden contributors")).toBeVisible();
+		await expect(canvas.queryByRole("button", { name: /Retry/u })).toBeNull();
+		await expect(canvas.queryByRole("button", { name: "Show again" })).toBeNull();
+		await expect(canvas.getByRole("switch", { name: PAGE })).toBeChecked();
+	},
+};
+
+/** A failed refresh keeps the people last read, and their Show again, with a notice and Retry. */
+export const HiddenContributorsRefreshFailed: Story = {
+	args: {
+		state: {
+			...live,
+			hiddenContributors: {
+				status: "ready",
+				people: [{ id: 11, login: "ada", name: "Ada Lovelace", avatarUrl: "" }],
+				refreshFailure: { error: { status: 503 }, onRetry: fn(), pending: false },
+			},
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Hidden contributors may be out of date")).toBeVisible();
+		await expect(canvas.getByRole("button", { name: /Retry/u })).toBeEnabled();
+		await expect(canvas.getByRole("button", { name: "Show again" })).toBeEnabled();
+	},
+};
+
+export const HiddenContributorsRetrying: Story = {
+	args: {
+		state: {
+			...live,
+			hiddenContributors: {
+				status: "ready",
+				people: [{ id: 11, login: "ada", name: "Ada Lovelace", avatarUrl: "" }],
+				refreshFailure: { error: { status: 503 }, onRetry: fn(), pending: true },
+			},
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "Retrying…" })).toBeDisabled();
+		await expect(canvas.getByText("Ada Lovelace")).toBeVisible();
+	},
+};
+
+/** A failed refresh of the settings keeps the last ones, says so, and offers Retry. */
+export const SettingsRefreshFailed: Story = {
+	args: {
+		state: {
+			...live,
+			refreshFailure: { error: { status: 503 }, onRetry: fn(), pending: false },
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("These settings may be out of date")).toBeVisible();
+		await expect(canvas.getByRole("button", { name: /Retry/u })).toBeEnabled();
+		await expect(canvas.getByRole("switch", { name: PAGE })).toBeChecked();
+	},
+};
+
+/** Refused settings show no switch and no retry that would be refused again. */
+export const Refused: Story = {
+	args: { state: { status: "error", error: { status: 403 }, onRetry: fn() } },
+	play: async ({ canvas }) => {
+		await expect(
+			canvas.getByText("You do not have access to the public activity page settings"),
+		).toBeVisible();
+		await expect(canvas.queryByRole("switch")).toBeNull();
+		await expect(canvas.queryByRole("button", { name: /Retry/u })).toBeNull();
+	},
+};
+
 /** Where the count did not load, the row is left out rather than guessed. */
 export const HiddenCountUnavailable: Story = {
 	args: { state: { ...live, hiddenPeople: undefined } },

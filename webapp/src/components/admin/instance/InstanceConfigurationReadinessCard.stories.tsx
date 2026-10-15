@@ -164,7 +164,7 @@ export const RefreshFailed: Story = {
 		state: {
 			status: "ready",
 			facts: satisfied,
-			refreshFailure: { error: new Error("Network Error"), onRetry },
+			refreshFailure: { error: new Error("Network Error"), onRetry, pending: false },
 		},
 	},
 	play: async ({ canvas }) => {
@@ -179,6 +179,22 @@ export const RefreshFailed: Story = {
 	},
 };
 
+export const RefreshRetrying: Story = {
+	args: {
+		state: {
+			status: "ready",
+			facts: satisfied,
+			refreshFailure: { error: { status: 503 }, onRetry, pending: true },
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "Retrying…" })).toBeDisabled();
+		await expect(
+			canvas.getByText("Every check that applies to this instance passes."),
+		).toBeVisible();
+	},
+};
+
 export const Loading: Story = {
 	args: { state: { status: "loading" } },
 };
@@ -187,6 +203,32 @@ export const Empty: Story = {
 	args: { state: { status: "empty" } },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("No configuration checks reported")).toBeVisible();
+	},
+};
+
+/** The last read reported no checks and the refresh failed: both facts are stated. */
+export const EmptyRefreshFailed: Story = {
+	args: {
+		state: {
+			status: "empty",
+			refreshFailure: { error: { status: 503 }, onRetry, pending: false },
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(
+			canvas.getByText("We could not refresh. This card shows the last successful check."),
+		).toBeVisible();
+		await expect(canvas.getByText("No configuration checks reported")).toBeVisible();
+	},
+};
+
+/** A refused read shows no facts and offers no retry that would be refused again. */
+export const Refused: Story = {
+	args: { state: { status: "error", error: { status: 403 }, onRetry } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Configuration readiness is unavailable")).toBeVisible();
+		await expect(canvas.getByText(/ask a workspace admin or instance admin/iu)).toBeVisible();
+		await expect(canvas.queryByRole("button", { name: /retry/iu })).toBeNull();
 	},
 };
 
