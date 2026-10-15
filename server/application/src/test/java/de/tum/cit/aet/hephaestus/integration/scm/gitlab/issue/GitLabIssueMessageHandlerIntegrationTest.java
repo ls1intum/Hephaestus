@@ -8,12 +8,17 @@ import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuetype.IssueType;
@@ -36,6 +41,8 @@ import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
+import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
@@ -44,6 +51,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -106,6 +114,12 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private IdentityProviderRepository gitProviderRepository;
+
+    @Autowired
+    private ConnectionRepository connections;
+
+    @Autowired
+    private RepositoryToMonitorRepository monitors;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -725,6 +739,24 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         workspace.setAccountLogin(FIXTURE_ORG_LOGIN);
         workspace.setAccountType(AccountType.ORG);
         savedWorkspace = workspaceRepository.save(workspace);
+        var connection = new Connection(
+                savedWorkspace,
+                IntegrationKind.GITLAB,
+                "issue-fixture",
+                new ConnectionConfig.GitLabConfig(
+                        savedProvider.getServerUrl(),
+                        null,
+                        null,
+                        ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                        Set.of(),
+                        null));
+        connection.setState(IntegrationState.ACTIVE);
+        connections.saveAndFlush(connection);
+        var monitor = new RepositoryToMonitor();
+        monitor.setWorkspace(savedWorkspace);
+        monitor.setNameWithOwner(savedRepo.getNameWithOwner());
+        monitor.setNativeId(savedRepo.getNativeId());
+        monitors.saveAndFlush(monitor);
     }
 
     private static long persistedId(IdentityProvider provider) {

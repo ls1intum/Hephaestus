@@ -2,9 +2,14 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.pipeline;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.CheckState;
@@ -15,11 +20,14 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pipeline.dto.GitLabPipelineEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
+import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -54,6 +62,12 @@ class GitLabPipelineMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private IdentityProviderRepository gitProviderRepository;
+
+    @Autowired
+    private ConnectionRepository connections;
+
+    @Autowired
+    private RepositoryToMonitorRepository monitors;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -102,7 +116,25 @@ class GitLabPipelineMessageHandlerIntegrationTest extends BaseIntegrationTest {
         workspace.setOrganization(org);
         workspace.setAccountLogin("hephaestustest");
         workspace.setAccountType(AccountType.ORG);
-        workspaceRepository.save(workspace);
+        workspace = workspaceRepository.save(workspace);
+        var connection = new Connection(
+                workspace,
+                IntegrationKind.GITLAB,
+                "pipeline-fixture",
+                new ConnectionConfig.GitLabConfig(
+                        provider.getServerUrl(),
+                        null,
+                        null,
+                        ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                        Set.of(),
+                        null));
+        connection.setState(IntegrationState.ACTIVE);
+        connections.saveAndFlush(connection);
+        var monitor = new RepositoryToMonitor();
+        monitor.setWorkspace(workspace);
+        monitor.setNameWithOwner(repository.getNameWithOwner());
+        monitor.setNativeId(repository.getNativeId());
+        monitors.saveAndFlush(monitor);
     }
 
     @Test

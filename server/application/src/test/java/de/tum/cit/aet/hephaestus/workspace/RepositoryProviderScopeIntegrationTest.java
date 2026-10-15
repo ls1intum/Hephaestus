@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.SoftAssertions.assertSoftly;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -325,6 +326,37 @@ class RepositoryProviderScopeIntegrationTest extends AbstractWorkspaceIntegratio
                         .orElseThrow()
                         .getNativeId())
                 .isEqualTo(NATIVE_ID + 1);
+    }
+
+    @Test
+    void shouldAddAnUnmirroredPathWithoutResolvingAnUnrelatedUnresolvedExclusion() {
+        Workspace own = workspace("unrelated-pending-add", persistUser("unrelated-add-owner"));
+        String origin = gitLabProperties.defaultServerUrl();
+        IdentityProvider source = gitProviderRepository
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, origin)
+                .orElseGet(() -> provider(origin));
+        long providerId = Objects.requireNonNull(source.getId());
+        Connection connection = connect(own, source);
+        monitor(own, null);
+        monitorService.removeRepositoryFromMonitor(own.getWorkspaceSlug(), NAME);
+        when(clients.forScope(own.getId())).thenThrow(new IllegalStateException("Canonical lookup unavailable"));
+        String addedPath = "shared-org/new-project";
+
+        monitorService.addRepositoryToMonitor(own.getWorkspaceSlug(), addedPath);
+
+        assertThat(monitors.findByWorkspaceIdAndNameWithOwner(own.getId(), addedPath))
+                .hasValueSatisfying(added -> assertThat(added.getNativeId()).isNull());
+        assertThat(repositories.findByNameWithOwnerAndProviderId(addedPath, providerId))
+                .isEmpty();
+        assertThatThrownBy(() -> monitorService.addRepositoryToMonitor(own.getWorkspaceSlug(), NAME))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Canonical lookup unavailable");
+        var current = (ConnectionConfig.GitLabConfig)
+                connections.findById(connection.getId()).orElseThrow().getConfig();
+        assertThat(current.projectExclusions().nativeIds()).isEmpty();
+        assertThat(current.projectExclusions().unresolvedPaths()).containsExactly(NAME);
+        assertThat(monitors.findByWorkspaceIdAndNameWithOwner(own.getId(), NAME))
+                .isEmpty();
     }
 
     @Test

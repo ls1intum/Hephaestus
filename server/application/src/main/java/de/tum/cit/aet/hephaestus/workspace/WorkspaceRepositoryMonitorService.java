@@ -248,7 +248,7 @@ public class WorkspaceRepositoryMonitorService {
         Long includedNativeId = storedNativeId;
         if (includedNativeId == null
                 && (!initialConfig.projectExclusions().nativeIds().isEmpty()
-                        || !initialConfig.projectExclusions().unresolvedPaths().isEmpty())) {
+                        || initialConfig.projectExclusions().excludes(null, nameWithOwner))) {
             RepositoryIdentityLookup lookup = repositoryIdentityLookups.get(IntegrationKind.GITLAB);
             if (lookup == null) throw new RepositoryProviderNotConnectedException(workspace.getWorkspaceSlug());
             var reported = lookup.resolve(workspaceId, nameWithOwner)

@@ -224,15 +224,15 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
             log.debug(
                     "Upserted project from push event: projectPath={}, repoId={}", safeProjectPath, repository.getId());
 
-            Long scopeId = read.connection().workspaceId();
+            long scopeId = read.connection().workspaceId();
 
             // Only a default-branch push is walked for line-level statistics; every other push still
             // fetches so practice reviews see fresh refs.
             if (event.isDefaultBranch() && gitRepositoryManager.isEnabled()) {
-                boolean scopeActive = scopeId != null && syncTargetProvider.isScopeActiveForSync(scopeId);
+                boolean scopeActive = syncTargetProvider.isScopeActiveForSync(scopeId);
 
                 if (scopeActive) {
-                    processCommitsViaLocalGit(event, repository, Objects.requireNonNull(scopeId), read);
+                    processCommitsViaLocalGit(event, repository, scopeId, read);
                 } else {
                     log.debug("Skipped local git: reason=scopeNotActive, scopeId={}", scopeId);
                     processCommitsViaWebhook(event, repository, false, read);
@@ -252,10 +252,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
     private record PreparedPush(Repository repository, GitLabProjectAdmission.ProjectRead read) {}
 
     private void linkCommitsToMergeRequests(
-            @Nullable Long scopeId, Repository repository, GitLabProjectAdmission.ProjectRead read) {
-        if (scopeId == null) {
-            return;
-        }
+            long scopeId, Repository repository, GitLabProjectAdmission.ProjectRead read) {
         try {
             commitMergeRequestLinker.linkCommits(
                     scopeId, repository, OffsetDateTime.now(ZoneOffset.UTC).minusHours(1), read);
@@ -268,8 +265,8 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
     private void fetchForNonDefaultBranch(
             GitLabPushEventDTO event, Repository repository, GitLabProjectAdmission.ProjectRead read) {
         try {
-            Long scopeId = read.connection().workspaceId();
-            if (scopeId == null || !syncTargetProvider.isScopeActiveForSync(scopeId)) {
+            long scopeId = read.connection().workspaceId();
+            if (!syncTargetProvider.isScopeActiveForSync(scopeId)) {
                 return;
             }
             String serverUrl = tokenService.resolveServerUrl(scopeId);

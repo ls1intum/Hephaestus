@@ -952,7 +952,6 @@ public class GitLabDataSyncScheduler {
                     }
                 } catch (Exception e) {
                     if (!admission.current(read)) continue;
-                    if (!admission.current(read)) continue;
                     Long targetId = availableTargetIds.get(repo.getId());
                     if (targetId != null) {
                         resourceErrors.putIfAbsent(
