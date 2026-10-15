@@ -2,6 +2,9 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.common;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
@@ -29,16 +32,22 @@ public class GitLabWebhookContextResolver {
     private static final Logger log = LoggerFactory.getLogger(GitLabWebhookContextResolver.class);
 
     private final RepositoryRepository repositoryRepository;
+    private final IdentityProviderRepository gitProviderRepository;
+    private final GitLabProperties gitLabProperties;
     private final RepositoryScopeFilter repositoryScopeFilter;
     private final ScopeIdResolver scopeIdResolver;
     private final GitLabRouteAdmission routeAdmission;
 
     GitLabWebhookContextResolver(
             RepositoryRepository repositoryRepository,
+            IdentityProviderRepository gitProviderRepository,
+            GitLabProperties gitLabProperties,
             RepositoryScopeFilter repositoryScopeFilter,
             ScopeIdResolver scopeIdResolver,
             GitLabRouteAdmission routeAdmission) {
         this.repositoryRepository = repositoryRepository;
+        this.gitProviderRepository = gitProviderRepository;
+        this.gitLabProperties = gitLabProperties;
         this.repositoryScopeFilter = repositoryScopeFilter;
         this.scopeIdResolver = scopeIdResolver;
         this.routeAdmission = routeAdmission;
@@ -80,8 +89,16 @@ public class GitLabWebhookContextResolver {
             return null;
         }
 
+        IdentityProvider provider = gitProviderRepository
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
+                .orElse(null);
+        if (provider == null) {
+            log.debug("Skipped {} event: reason=identityProviderNotFound, repoName={}", eventLabel, safePath);
+            return null;
+        }
+
         Repository repository = repositoryRepository
-                .findByNameWithOwnerWithOrganization(pathWithNamespace)
+                .findByNameWithOwnerAndProviderId(pathWithNamespace, Objects.requireNonNull(provider.getId()))
                 .orElse(null);
 
         if (repository == null) {

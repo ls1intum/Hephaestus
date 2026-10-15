@@ -36,6 +36,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.graphql.client.ClientGraphQlRequest;
@@ -76,6 +78,9 @@ class GitHubIssueDependencyScopeIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private GitHubIssueProcessor processor;
+
+    @Autowired
+    private GitHubIssueDependencySyncService dependencyService;
 
     @Autowired
     private GitHubSyncProperties syncProperties;
@@ -230,6 +235,126 @@ class GitHubIssueDependencyScopeIntegrationTest extends BaseIntegrationTest {
                     .as("dependency points to the GitHub repository")
                     .containsExactly(correct.getId());
         });
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITLAB", "GITHUB"})
+    void shouldReconcileOnlyTheGitHubIssueWhenItsNativeIdMatchesForeignIssuePk(IdentityProviderType collisionProvider) {
+        String targetPath = owner + "/target";
+        String siblingPath = owner + "/sibling";
+        monitor(targetPath);
+        monitor(siblingPath);
+        var foreignRepository = repository(
+                collisionProvider == IdentityProviderType.GITHUB ? github : gitlab, nativeId, owner + "/foreign");
+        var targetRepository = repository(github, nativeId + 1, targetPath);
+        var siblingRepository = repository(github, nativeId + 2, siblingPath);
+        var foreign = issue(foreignRepository, nativeId + 20, 1);
+        long incomingNativeId = foreign.getId();
+        var correct = issue(targetRepository, incomingNativeId, 7);
+        var foreignMarker = issue(foreignRepository, nativeId + 21, 2);
+        var correctMarker = issue(targetRepository, nativeId + 22, 8);
+        var sibling = issue(siblingRepository, nativeId + 23, 7);
+        var siblingMarker = issue(siblingRepository, nativeId + 24, 8);
+        dependencyService.processIssueDependencyEvent(foreign.getId(), foreignMarker.getId(), true);
+        dependencyService.processIssueDependencyEvent(correct.getId(), correctMarker.getId(), true);
+        dependencyService.processIssueDependencyEvent(sibling.getId(), siblingMarker.getId(), true);
+        assertThat(blockerIssueIds(foreign)).containsExactly(foreignMarker.getId());
+        assertThat(blockerIssueIds(correct)).containsExactly(correctMarker.getId());
+        assertThat(blockerIssueIds(sibling)).containsExactly(siblingMarker.getId());
+        assertThat(issues.findById(sibling.getNativeId())).isEmpty();
+        var service = service(Map.of(
+                "target", page(node(targetPath, incomingNativeId, 7, List.of())),
+                "sibling", page(node(siblingPath, sibling.getNativeId(), 7, List.of()))));
+
+        service.syncDependenciesForScope(workspace.getId());
+        var foreignBlockers = blockerIssueIds(foreign);
+        var correctBlockers = blockerIssueIds(correct);
+        var siblingBlockers = blockerIssueIds(sibling);
+
+        assertSoftly(softly -> {
+            softly.assertThat(foreignBlockers)
+                    .as("GitHub native ID collision must preserve unrelated foreign edges")
+                    .containsExactly(foreignMarker.getId());
+            softly.assertThat(correctBlockers)
+                    .as("GitHub page clears the correct stored issue's blockers")
+                    .isEmpty();
+            softly.assertThat(siblingBlockers)
+                    .as("ordinary GitHub sibling is reconciled")
+                    .isEmpty();
+        });
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITLAB", "GITHUB"})
+    void shouldLinkTheGitHubBlockerWhenItsNativeIdMatchesForeignIssuePk(IdentityProviderType collisionProvider) {
+        String sourcePath = owner + "/source";
+        String blockerPath = owner + "/blocker";
+        String siblingPath = owner + "/sibling-blocker";
+        monitor(sourcePath);
+        var sourceRepository = repository(github, nativeId, sourcePath);
+        var foreignRepository = repository(
+                collisionProvider == IdentityProviderType.GITHUB ? github : gitlab, nativeId + 1, owner + "/foreign");
+        var blockerRepository = repository(github, nativeId + 2, blockerPath);
+        var siblingRepository = repository(github, nativeId + 3, siblingPath);
+        var foreign = issue(foreignRepository, nativeId + 20, 1);
+        long incomingNativeId = foreign.getId();
+        var correct = issue(blockerRepository, incomingNativeId, 8);
+        var source = issue(sourceRepository, nativeId + 10, 7);
+        var sibling = issue(siblingRepository, nativeId + 12, 9);
+        assertThat(issues.findById(source.getNativeId())).isEmpty();
+        assertThat(issues.findById(sibling.getNativeId())).isEmpty();
+        var service = service(Map.of(
+                "source",
+                page(node(
+                        sourcePath,
+                        source.getNativeId(),
+                        7,
+                        List.of(
+                                blocker(blockerPath, blockerRepository.getNativeId(), incomingNativeId, 8),
+                                blocker(siblingPath, siblingRepository.getNativeId(), sibling.getNativeId(), 9))))));
+
+        service.syncDependenciesForScope(workspace.getId());
+        var linked = blockerIssueIds(source);
+
+        assertSoftly(softly -> {
+            softly.assertThat(linked)
+                    .as("native blocker IDs select their GitHub rows")
+                    .containsExactlyElementsOf(List.of(correct.getId(), sibling.getId()).stream()
+                            .sorted()
+                            .toList());
+            softly.assertThat(linked)
+                    .as("foreign issue is not a GitHub blocker")
+                    .doesNotContain(foreign.getId());
+            softly.assertThat(linked)
+                    .as("ordinary GitHub sibling blocker remains linked")
+                    .contains(sibling.getId());
+        });
+    }
+
+    private Issue issue(Repository repository, long providerNativeId, int number) {
+        var issue = new Issue();
+        issue.setProvider(repository.getProvider());
+        issue.setNativeId(providerNativeId);
+        issue.setRepository(repository);
+        issue.setNumber(number);
+        issue.setTitle("Stored dependency issue");
+        issue.setState(Issue.State.OPEN);
+        assertThat(issue.getId()).isNull();
+        var stored = issues.saveAndFlush(issue);
+        assertThat(stored.getId()).isPositive().isNotEqualTo(providerNativeId);
+        return stored;
+    }
+
+    private List<Long> blockerIssueIds(Issue issue) {
+        return Objects.requireNonNull(transactions.execute(
+                status -> issues.findByIdWithBlockedBy(issue.getId()).orElseThrow().getBlockedBy().stream()
+                        .map(Issue::getId)
+                        .sorted()
+                        .toList()));
     }
 
     private void monitor(String path) {
