@@ -70,6 +70,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreview.GitLab
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcomment.GitLabDiscussionSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcomment.GitLabPullRequestReviewCommentProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewthread.GitLabPullRequestReviewThreadProcessor;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -133,6 +134,8 @@ import tools.jackson.databind.node.ObjectNode;
 @Tag("integration")
 @DisplayName("GitLab Merge Request Message Handler")
 class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTest {
+    @Autowired
+    private GitLabProjectAdmission projectAdmission;
 
     @Autowired
     private ReviewRepositoryPreparer repositoryPreparer;
@@ -256,6 +259,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         databaseTestUtils.cleanDatabase();
         eventListener.clear();
         setupTestData();
+        prepareListenerAuthority();
     }
 
     @Nested
@@ -1873,7 +1877,10 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         when(provider.forScope(any())).thenReturn(ScriptedGraphQlClient.of(request -> Mono.just(response)));
         var approvalClient = mock(GitLabApprovalClient.class);
         if (rows != null)
-            when(approvalClient.read(1L, savedRepo.getNativeId(), Integer.parseInt(Objects.toString(node.get("iid")))))
+            when(approvalClient.read(
+                            savedWorkspace.getId(),
+                            savedRepo.getNativeId(),
+                            Integer.parseInt(Objects.toString(node.get("iid")))))
                     .thenReturn(rows);
         new GitLabMergeRequestSyncService(
                         provider,
@@ -1882,8 +1889,9 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                         mock(GitLabDiscussionSyncService.class),
                         mock(GitLabClosingIssueClient.class),
                         gitLabProperties,
-                        approvalClient)
-                .syncMergeRequests(1L, savedRepo, null);
+                        approvalClient,
+                        projectAdmission)
+                .syncMergeRequests(savedWorkspace.getId(), savedRepo, null);
     }
 
     private static final String FIXTURE_HEAD = "2be093fe73e06752381b635b99518c2255ee7946";
@@ -2051,10 +2059,13 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         @Test
         void shouldRecordNoResolutionOnceTheProjectLeftTheWorkspaceDuringTheRead() throws Exception {
             handlerReadingDiscussions(() -> {
-                        transactionTemplate.executeWithoutResult(status -> repositoryRepository
-                                .findById(savedRepo.getId())
-                                .orElseThrow()
-                                .setOrganization(null));
+                        transactionTemplate.executeWithoutResult(status -> {
+                            repositoryRepository
+                                    .findById(savedRepo.getId())
+                                    .orElseThrow()
+                                    .setOrganization(null);
+                            eventMonitors.deleteAll(eventMonitors.findByWorkspaceId(savedWorkspace.getId()));
+                        });
                         return discussions(true);
                     })
                     .dispatchEvent(unchangedUpdate(), Instant.now());
@@ -2131,7 +2142,8 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                             reviewCommentProcessor,
                             issueCommentProcessor,
                             reviewReconciler,
-                            gitLabProperties),
+                            gitLabProperties,
+                            projectAdmission),
                     natsMessageDeserializer,
                     transactionTemplate);
         }
@@ -2317,7 +2329,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         /** Settles the occasion as the real submission does, so a redelivery meets a decided signal. */
         @BeforeEach
         void submissionSettlesTheOccasion() {
-            prepareListenerAuthority();
             when(jobs.submit(any(), any(), any(), any(), any())).thenAnswer(invocation -> {
                 signalRecorder.markTriggered(invocation.getArgument(3), UUID.randomUUID());
                 return Optional.empty();
@@ -2867,7 +2878,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
          */
         @Test
         void tombstonedMergeRequestHoldsItsOccasionUntilAFurtherDeliveryRestoresIt() throws Exception {
-            prepareListenerAuthority();
             receive(loadPayload("merge_request.open"));
             ScmDomainEvent.PullRequestCreated created = eventListener
                     .ofType(ScmDomainEvent.PullRequestCreated.class)

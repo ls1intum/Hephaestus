@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabUserLookup;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment.GitLabNoteSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.sync.backfill.BackfillBatchResult;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -53,18 +54,21 @@ public class GitLabIssueSyncService {
     private final GitLabIssueProcessor issueProcessor;
     private final GitLabNoteSyncService noteSyncService;
     private final GitLabProperties gitLabProperties;
+    private final GitLabProjectAdmission admission;
 
     public GitLabIssueSyncService(
             GitLabGraphQlClientProvider graphQlClientProvider,
             GitLabGraphQlResponseHandler responseHandler,
             GitLabIssueProcessor issueProcessor,
             GitLabNoteSyncService noteSyncService,
-            GitLabProperties gitLabProperties) {
+            GitLabProperties gitLabProperties,
+            GitLabProjectAdmission admission) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.responseHandler = responseHandler;
         this.issueProcessor = issueProcessor;
         this.noteSyncService = noteSyncService;
         this.gitLabProperties = gitLabProperties;
+        this.admission = admission;
     }
 
     /**
@@ -76,6 +80,17 @@ public class GitLabIssueSyncService {
      * @return sync result indicating completion status and count
      */
     public SyncResult syncIssues(Long scopeId, Repository repository, @Nullable OffsetDateTime updatedAfter) {
+        return admission
+                .capture(scopeId, repository)
+                .map(read -> syncIssues(scopeId, repository, updatedAfter, read))
+                .orElseGet(() -> SyncResult.completed(0));
+    }
+
+    public SyncResult syncIssues(
+            Long scopeId,
+            Repository repository,
+            @Nullable OffsetDateTime updatedAfter,
+            GitLabProjectAdmission.ProjectRead read) {
         String projectPath = repository.getNameWithOwner();
         String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(projectPath), "<unknown>");
 
@@ -168,7 +183,7 @@ public class GitLabIssueSyncService {
 
                 for (Map<String, Object> issueNode : nodes) {
                     try {
-                        if (processIssueNode(issueNode, repository, scopeId) != null) {
+                        if (processIssueNode(issueNode, repository, scopeId, read) != null) {
                             totalSynced++;
                         } else {
                             totalSkipped++;
@@ -232,6 +247,7 @@ public class GitLabIssueSyncService {
         }
 
         SyncResult result;
+        if (!admission.current(read)) return SyncResult.completed(0);
         if (errorAborted) {
             result = SyncResult.abortedError(totalSynced);
         } else if (rateLimitAborted) {
@@ -263,6 +279,18 @@ public class GitLabIssueSyncService {
      */
     public BackfillBatchResult backfillIssues(
             Long scopeId, Repository repository, @Nullable String cursor, int maxItems) {
+        return admission
+                .capture(scopeId, repository)
+                .map(read -> backfillIssues(scopeId, repository, cursor, maxItems, read))
+                .orElseGet(() -> new BackfillBatchResult(0, -1, -1, null, false, false));
+    }
+
+    public BackfillBatchResult backfillIssues(
+            Long scopeId,
+            Repository repository,
+            @Nullable String cursor,
+            int maxItems,
+            GitLabProjectAdmission.ProjectRead read) {
         String projectPath = repository.getNameWithOwner();
         String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(projectPath), "<unknown>");
 
@@ -321,7 +349,7 @@ public class GitLabIssueSyncService {
                             minIid = Math.min(minIid, iid);
                             maxIid = Math.max(maxIid, iid);
                         }
-                        processIssueNode(issueNode, repository, scopeId);
+                        processIssueNode(issueNode, repository, scopeId, read);
                         totalProcessed++;
                     } catch (Exception e) {
                         log.warn(
@@ -365,6 +393,8 @@ public class GitLabIssueSyncService {
                         maxIid);
             }
 
+            if (!admission.current(read)) return new BackfillBatchResult(0, -1, -1, null, false, false);
+
             return new BackfillBatchResult(
                     totalProcessed, minIid == Integer.MAX_VALUE ? -1 : minIid, maxIid, resumeCursor, complete, false);
         } catch (InterruptedException e) {
@@ -390,7 +420,8 @@ public class GitLabIssueSyncService {
      */
     @SuppressWarnings("unchecked")
     @Nullable
-    private Issue processIssueNode(Map<String, Object> node, Repository repository, Long scopeId) {
+    private Issue processIssueNode(
+            Map<String, Object> node, Repository repository, Long scopeId, GitLabProjectAdmission.ProjectRead read) {
         String globalId = (String) node.get("id");
         String iid = String.valueOf(node.get("iid"));
         String issueContext = sanitizeForLog(repository.getNameWithOwner()) + "#" + iid;
@@ -503,12 +534,14 @@ public class GitLabIssueSyncService {
                 milestoneIid,
                 typeName,
                 closedAsDuplicateOfGid);
-        Issue issue = issueProcessor.processFromSync(syncData, repository, scopeId);
+        Issue issue = admission
+                .write(read, () -> issueProcessor.processFromSync(syncData, repository, scopeId))
+                .orElse(null);
 
         // Sync notes for this issue if it has comments and wasn't skipped
         if (issue != null && userNotesCount > 0) {
             try {
-                noteSyncService.syncNotesForIssue(scopeId, repository, Integer.parseInt(iid), issue);
+                noteSyncService.syncNotesForIssue(scopeId, repository, Integer.parseInt(iid), issue, read);
             } catch (Exception e) {
                 log.error("Note sync failed for issue: context={}", issueContext, e);
             }

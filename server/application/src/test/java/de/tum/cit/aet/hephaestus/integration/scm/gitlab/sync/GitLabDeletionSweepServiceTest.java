@@ -31,6 +31,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlResp
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlResponseHandler.HandleResult;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabAdmissionTestFixtures;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabWorkspaceLinkService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceActorSelector;
@@ -67,6 +69,8 @@ import reactor.core.publisher.Mono;
  */
 @Tag("unit")
 class GitLabDeletionSweepServiceTest extends BaseUnitTest {
+
+    private final GitLabProjectAdmission projectAdmission = mock(GitLabProjectAdmission.class);
 
     private static final Long SCOPE_ID = 100L;
     private static final Long REPO_ID = 7L;
@@ -120,7 +124,7 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
 
         var noteReconciliation = mock(GitLabNoteReconciliationService.class);
         lenient()
-                .when(noteReconciliation.reconcileRepository(anyLong(), any(), any()))
+                .when(noteReconciliation.reconcileRepository(anyLong(), any(), any(), any()))
                 .thenReturn(new GitLabNoteReconciliationService.Outcome(0, false));
         PlatformTransactionManager transactionManager = mock(PlatformTransactionManager.class);
         lenient().when(transactionManager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
@@ -134,7 +138,8 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
                 workspaceLinkService,
                 new TransactionTemplate(transactionManager),
                 noteReconciliation,
-                mock(SyncTargetProvider.class));
+                mock(SyncTargetProvider.class),
+                projectAdmission);
         // Default: the scope is connected to the repository's instance and may still write it.
         lenient().when(actorSelector.connectedProviderId(SCOPE_ID)).thenReturn(Optional.of(PROVIDER_ID));
         lenient()
@@ -154,10 +159,11 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
                 .thenReturn(new HandleResult(HandleResult.Action.CONTINUE, null));
     }
 
-    private static Repository repository() {
+    private Repository repository() {
         Repository repository = new Repository();
         repository.setId(REPO_ID);
         repository.setNameWithOwner(FULL_PATH);
+        GitLabAdmissionTestFixtures.permit(projectAdmission, SCOPE_ID, repository, 7L);
         return repository;
     }
 
@@ -668,6 +674,7 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
             Repository second = new Repository();
             second.setId(8L);
             second.setNameWithOwner("acme/gadgets");
+            GitLabAdmissionTestFixtures.permit(projectAdmission, SCOPE_ID, second, 8L);
             when(repositoryRepository.findAllByWorkspaceMonitorsOnProvider(SCOPE_ID, PROVIDER_ID))
                     .thenReturn(List.of(first, second));
             when(handle.isCancellationRequested()).thenReturn(true);
@@ -716,8 +723,9 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
 
         @Test
         void shouldReportSweepPhaseProgressPerProject() {
+            Repository project = repository();
             when(repositoryRepository.findAllByWorkspaceMonitorsOnProvider(SCOPE_ID, PROVIDER_ID))
-                    .thenReturn(List.of(repository()));
+                    .thenReturn(List.of(project));
             scriptEmptyUpstream();
             stubLocalNumbers(List.of(), List.of());
 
@@ -729,8 +737,9 @@ class GitLabDeletionSweepServiceTest extends BaseUnitTest {
 
         @Test
         void shouldRunWithoutAHandleOutsideARecordedJob() {
+            Repository project = repository();
             when(repositoryRepository.findAllByWorkspaceMonitorsOnProvider(SCOPE_ID, PROVIDER_ID))
-                    .thenReturn(List.of(repository()));
+                    .thenReturn(List.of(project));
             scriptEmptyUpstream();
             stubLocalNumbers(List.of(), List.of());
 

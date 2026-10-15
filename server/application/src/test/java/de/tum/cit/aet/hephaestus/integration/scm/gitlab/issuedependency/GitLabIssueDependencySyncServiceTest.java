@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuedependency;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -15,6 +16,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabRateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabAdmissionTestFixtures;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import java.util.List;
@@ -38,6 +41,8 @@ import org.springframework.web.reactive.function.client.WebClient;
  */
 @Tag("unit")
 class GitLabIssueDependencySyncServiceTest extends BaseUnitTest {
+
+    private final GitLabProjectAdmission projectAdmission = mock(GitLabProjectAdmission.class);
 
     private static final long SCOPE_ID = 1L;
     private static final long REPO_ID = 500L;
@@ -66,12 +71,18 @@ class GitLabIssueDependencySyncServiceTest extends BaseUnitTest {
     void setUp() {
         when(webClientBuilder.build()).thenReturn(webClient);
         service = new GitLabIssueDependencySyncService(
-                issueRepository, repositoryRepository, tokenService, rateLimitTracker, webClientBuilder);
+                issueRepository,
+                repositoryRepository,
+                tokenService,
+                rateLimitTracker,
+                webClientBuilder,
+                projectAdmission);
     }
 
     @Test
     void shouldNotFetchIssueLinksForACollidingMergeRequest() {
         Repository repository = TestEntities.repository(REPO_ID, "acme/widgets");
+        GitLabAdmissionTestFixtures.permit(projectAdmission, SCOPE_ID, repository, 7L);
 
         // The project's only artifact is a merge request; the type-scoped read returns no issues.
         PullRequest mergeRequest = TestEntities.pullRequest(9L, 9, "MR 9");

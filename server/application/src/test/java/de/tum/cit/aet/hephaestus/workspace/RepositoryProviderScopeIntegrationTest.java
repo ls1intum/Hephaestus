@@ -1,6 +1,10 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.SoftAssertions.assertSoftly;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
@@ -8,25 +12,72 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepositor
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.graphql.FragmentMergingDocumentSource;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.MilestoneRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncServiceHolder;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issue.GitLabIssueSyncService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.label.GitLabLabelSyncService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.milestone.GitLabMilestoneSyncService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository.GitLabProjectSyncService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.sync.backfill.GitLabHistoricalBackfillService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.webhook.GitLabRouteCredential;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabRepositoryMonitors;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabRouteAdmission;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabWorkspaceInitializationService;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.adapter.WorkspaceSyncTargetProvider;
+import io.nats.client.Message;
+import io.nats.client.impl.Headers;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.graphql.client.ClientGraphQlRequest;
+import org.springframework.graphql.client.ClientGraphQlResponse;
+import org.springframework.graphql.client.GraphQlClientInterceptor;
+import org.springframework.graphql.client.HttpGraphQlClient;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.reactive.function.client.ClientResponse;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
 class RepositoryProviderScopeIntegrationTest extends AbstractWorkspaceIntegrationTest {
     private static final String NAME = "shared-org/shared-repo";
@@ -58,6 +109,717 @@ class RepositoryProviderScopeIntegrationTest extends AbstractWorkspaceIntegratio
 
     @Autowired
     private WorkspaceRepositoryMonitorService monitorService;
+
+    @Autowired
+    private GitLabRepositoryMonitors gitLabMonitors;
+
+    @Autowired
+    private WorkspaceRepository workspaces;
+
+    @Autowired
+    private GitLabWorkspaceInitializationService initialization;
+
+    @Autowired
+    private GitLabIssueSyncService issueSync;
+
+    @Autowired
+    private GitLabLabelSyncService labelSync;
+
+    @Autowired
+    private GitLabMilestoneSyncService milestoneSync;
+
+    @Autowired
+    private LabelRepository labels;
+
+    @Autowired
+    private MilestoneRepository milestones;
+
+    @Autowired
+    private GitLabRouteAdmission routeAdmission;
+
+    @Autowired
+    private GitLabProjectAdmission projectAdmission;
+
+    @Autowired
+    private GitLabHistoricalBackfillService backfill;
+
+    @Autowired
+    private GitLabProjectSyncService projects;
+
+    @Autowired
+    private GitLabProperties gitLabProperties;
+
+    @Autowired
+    private TransactionTemplate transactions;
+
+    @MockitoBean
+    private GitLabGraphQlClientProvider clients;
+
+    @MockitoBean
+    private GitLabSyncServiceHolder syncServices;
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void shouldDiscardHeldIssueResponseAfterStopWithoutBlockingAllowedSibling(boolean reinclude) throws Exception {
+        User owner = persistUser("held-owner");
+        Workspace own = workspace("held-project", owner);
+        own.setRepositorySelection(RepositorySelection.ALL);
+        workspaces.saveAndFlush(own);
+        Workspace other = workspace("held-shared", owner);
+        IdentityProvider source = provider("https://held.example.test");
+        long sourceProviderId = Objects.requireNonNull(source.getId());
+        connect(own, source);
+        connect(other, source);
+        Repository stopped = repository(source, NATIVE_ID, NAME);
+        Repository sibling = repository(source, NATIVE_ID + 1, "shared-org/healthy-sibling");
+        monitor(other, NATIVE_ID);
+        gitLabMonitors.monitorAllowed(own, List.of(stopped, sibling));
+        long oldMonitorId = monitors.findByWorkspaceIdAndNameWithOwner(own.getId(), NAME)
+                .orElseThrow()
+                .getId();
+
+        CountDownLatch requested = new CountDownLatch(1);
+        CompletableFuture<String> held = new CompletableFuture<>();
+        when(clients.forScope(own.getId()))
+                .thenReturn(heldProjectClient(
+                        requested,
+                        held,
+                        source.getServerUrl(),
+                        issueResponse(source.getServerUrl(), "shared-org/healthy-sibling", 99002)));
+        when(syncServices.getIssueSyncService()).thenReturn(issueSync);
+        try (var executor = Executors.newSingleThreadExecutor()) {
+            var result = executor.submit(() -> initialization.syncFullData(own));
+            try {
+                assertThat(requested.await(10, TimeUnit.SECONDS))
+                        .as("provider read began before Stop")
+                        .isTrue();
+                monitorService.removeRepositoryFromMonitor(own.getWorkspaceSlug(), NAME);
+                if (reinclude) monitorService.addRepositoryToMonitor(own.getWorkspaceSlug(), NAME);
+                held.complete(issueResponse(source.getServerUrl(), NAME, 99001));
+
+                assertThat(result.get(30, TimeUnit.SECONDS)).isEqualTo(SyncResult.completed(1));
+                assertSoftly(softly -> {
+                    softly.assertThat(issues.findAllIssuesByRepositoryId(stopped.getId()))
+                            .isEmpty();
+                    softly.assertThat(issues.findAllIssuesByRepositoryId(sibling.getId()))
+                            .extracting(Issue::getTitle)
+                            .containsExactly("Healthy sibling issue");
+                    softly.assertThat(userRepository.findByLoginAndProviderId("late-excluded-author", sourceProviderId))
+                            .isEmpty();
+                    softly.assertThat(monitors.findById(oldMonitorId)).isEmpty();
+                    softly.assertThat(monitors.findByWorkspaceIdAndNameWithOwner(other.getId(), NAME))
+                            .isPresent();
+                });
+                if (reinclude) {
+                    var fresh = monitors.findByWorkspaceIdAndNameWithOwner(own.getId(), NAME)
+                            .orElseThrow();
+                    assertThat(fresh.getId()).isNotEqualTo(oldMonitorId);
+                    var target = syncTargets.findSyncTargetById(fresh.getId()).orElseThrow();
+                    assertThat(target.lastIssuesSyncedAt()).isNull();
+                    assertThat(target.lastFullSyncAt()).isNull();
+                }
+                var healthy = monitors.findByWorkspaceIdAndNameWithOwner(own.getId(), sibling.getNameWithOwner())
+                        .orElseThrow();
+                assertThat(syncTargets
+                                .findSyncTargetById(healthy.getId())
+                                .orElseThrow()
+                                .lastIssuesSyncedAt())
+                        .isNotNull();
+            } finally {
+                held.complete(issueResponse(source.getServerUrl(), NAME, 99001));
+                result.cancel(true);
+            }
+        }
+    }
+
+    @Test
+    void shouldDiscardHeldBackfillResponseAfterReincludeWithoutAdvancingReplacement() throws Exception {
+        User owner = persistUser("held-backfill-owner");
+        Workspace own = workspace("held-backfill", owner);
+        own.setRepositorySelection(RepositorySelection.ALL);
+        workspaces.saveAndFlush(own);
+        Workspace other = workspace("held-backfill-shared", owner);
+        IdentityProvider source = provider("https://backfill-held.example.test");
+        connect(own, source);
+        connect(other, source);
+        Repository stopped = repository(source, NATIVE_ID, NAME);
+        Repository sibling = repository(source, NATIVE_ID + 1, "shared-org/healthy-sibling");
+        monitor(other, NATIVE_ID);
+        gitLabMonitors.monitorAllowed(own, List.of(stopped, sibling));
+        var original = monitors.findByWorkspaceId(own.getId());
+        for (var target : original) syncTargets.updateSyncTimestamp(target.getId(), SyncType.ISSUES, Instant.EPOCH);
+        long oldMonitorId = monitors.findByWorkspaceIdAndNameWithOwner(own.getId(), NAME)
+                .orElseThrow()
+                .getId();
+
+        CountDownLatch requested = new CountDownLatch(1);
+        CompletableFuture<String> held = new CompletableFuture<>();
+        when(clients.forScope(own.getId()))
+                .thenReturn(heldProjectClient(
+                        requested,
+                        held,
+                        source.getServerUrl(),
+                        issueResponse(source.getServerUrl(), "shared-org/healthy-sibling", 99002)));
+        when(syncServices.getIssueSyncService()).thenReturn(issueSync);
+        try (var executor = Executors.newSingleThreadExecutor()) {
+            var result = executor.submit(() -> backfill.runBackfillPass(own.getId(), null));
+            try {
+                assertThat(requested.await(10, TimeUnit.SECONDS)).isTrue();
+                monitorService.removeRepositoryFromMonitor(own.getWorkspaceSlug(), NAME);
+                monitorService.addRepositoryToMonitor(own.getWorkspaceSlug(), NAME);
+                held.complete(issueResponse(source.getServerUrl(), NAME, 99001));
+
+                assertThat(result.get(30, TimeUnit.SECONDS)).isEqualTo(1);
+                assertThat(issues.findAllIssuesByRepositoryId(stopped.getId())).isEmpty();
+                assertThat(issues.findAllIssuesByRepositoryId(sibling.getId())).hasSize(1);
+                assertThat(monitors.findById(oldMonitorId)).isEmpty();
+                var replacement = monitors.findByWorkspaceIdAndNameWithOwner(own.getId(), NAME)
+                        .orElseThrow();
+                var fresh = syncTargets.findSyncTargetById(replacement.getId()).orElseThrow();
+                assertThat(fresh.issueSyncCursor()).isNull();
+                assertThat(fresh.issueBackfillCheckpoint()).isNull();
+                assertThat(fresh.lastIssuesSyncedAt()).isNull();
+                assertThat(fresh.lastFullSyncAt()).isNull();
+                assertThat(replacement.getHistoricalBackfillSyncError()).isNull();
+            } finally {
+                held.complete(issueResponse(source.getServerUrl(), NAME, 99001));
+                result.cancel(true);
+            }
+        }
+    }
+
+    @Test
+    void shouldBindUnresolvedStopBeforeProjectPersistenceAndPermitUnrelatedPathReuse() {
+        Workspace own = workspace("unresolved-stop", persistUser("unresolved-owner"));
+        own.setRepositorySelection(RepositorySelection.ALL);
+        workspaces.saveAndFlush(own);
+        String origin = gitLabProperties.defaultServerUrl();
+        IdentityProvider source = gitProviderRepository
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, origin)
+                .orElseGet(() -> provider(origin));
+        long sourceProviderId = Objects.requireNonNull(source.getId());
+        Connection connection = connect(own, source);
+        monitor(own, null);
+        monitorService.removeRepositoryFromMonitor(own.getWorkspaceSlug(), NAME);
+        assertThat(repositories.findByNameWithOwnerAndProviderId(NAME, sourceProviderId))
+                .isEmpty();
+        var answers =
+                new ArrayDeque<>(List.of(projectResponse(origin, NATIVE_ID), projectResponse(origin, NATIVE_ID + 1)));
+        when(clients.forScope(own.getId())).thenReturn(projectClient(origin, answers));
+
+        assertThat(projects.syncProject(own.getId(), NAME)).isEmpty();
+        assertThat(repositories.findByNameWithOwnerAndProviderId(NAME, sourceProviderId))
+                .isEmpty();
+        var bound = (ConnectionConfig.GitLabConfig)
+                connections.findById(connection.getId()).orElseThrow().getConfig();
+        assertThat(bound.projectExclusions().nativeIds()).containsExactly(NATIVE_ID);
+        assertThat(bound.projectExclusions().unresolvedPaths()).isEmpty();
+
+        var reused = projects.syncProject(own.getId(), NAME).orElseThrow();
+        assertThat(reused.getNativeId()).isEqualTo(NATIVE_ID + 1);
+        assertThat(repositories.findByNativeIdAndProviderId(NATIVE_ID, sourceProviderId))
+                .isEmpty();
+        assertThat(gitLabMonitors.monitorAllowed(
+                        workspaces.findById(own.getId()).orElseThrow(), List.of(reused)))
+                .isEqualTo(1);
+        assertThat(monitors.findByWorkspaceIdAndNameWithOwner(own.getId(), NAME)
+                        .orElseThrow()
+                        .getNativeId())
+                .isEqualTo(NATIVE_ID + 1);
+    }
+
+    @Test
+    void shouldAddAnUnmirroredPathWithoutResolvingAnUnrelatedUnresolvedExclusion() {
+        Workspace own = workspace("unrelated-pending-add", persistUser("unrelated-add-owner"));
+        String origin = gitLabProperties.defaultServerUrl();
+        IdentityProvider source = gitProviderRepository
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, origin)
+                .orElseGet(() -> provider(origin));
+        long providerId = Objects.requireNonNull(source.getId());
+        Connection connection = connect(own, source);
+        monitor(own, null);
+        monitorService.removeRepositoryFromMonitor(own.getWorkspaceSlug(), NAME);
+        when(clients.forScope(own.getId())).thenThrow(new IllegalStateException("Canonical lookup unavailable"));
+        String addedPath = "shared-org/new-project";
+
+        monitorService.addRepositoryToMonitor(own.getWorkspaceSlug(), addedPath);
+
+        assertThat(monitors.findByWorkspaceIdAndNameWithOwner(own.getId(), addedPath))
+                .hasValueSatisfying(added -> assertThat(added.getNativeId()).isNull());
+        assertThat(repositories.findByNameWithOwnerAndProviderId(addedPath, providerId))
+                .isEmpty();
+        assertThatThrownBy(() -> monitorService.addRepositoryToMonitor(own.getWorkspaceSlug(), NAME))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Canonical lookup unavailable");
+        var current = (ConnectionConfig.GitLabConfig)
+                connections.findById(connection.getId()).orElseThrow().getConfig();
+        assertThat(current.projectExclusions().nativeIds()).isEmpty();
+        assertThat(current.projectExclusions().unresolvedPaths()).containsExactly(NAME);
+        assertThat(monitors.findByWorkspaceIdAndNameWithOwner(own.getId(), NAME))
+                .isEmpty();
+    }
+
+    @Test
+    void shouldResolveExplicitReincludeAfterStopDeletesTheLastMirror() {
+        Workspace own = workspace("orphan-reinclude", persistUser("orphan-include-owner"));
+        String origin = gitLabProperties.defaultServerUrl();
+        IdentityProvider source = gitProviderRepository
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, origin)
+                .orElseGet(() -> provider(origin));
+        Connection connection = connect(own, source);
+        Repository stopped = repository(source, NATIVE_ID, NAME);
+        monitor(own, NATIVE_ID);
+        monitorService.removeRepositoryFromMonitor(own.getWorkspaceSlug(), NAME);
+        assertThat(repositories.findById(stopped.getId())).isEmpty();
+        var answers = new ArrayDeque<>(List.of(projectResponse(origin, NATIVE_ID), projectResponse(origin, NATIVE_ID)));
+        when(clients.forScope(own.getId())).thenReturn(projectClient(origin, answers));
+
+        monitorService.addRepositoryToMonitor(own.getWorkspaceSlug(), NAME);
+
+        var current =
+                monitors.findByWorkspaceIdAndNameWithOwner(own.getId(), NAME).orElseThrow();
+        assertThat(current.getNativeId()).isEqualTo(NATIVE_ID);
+        var included = (ConnectionConfig.GitLabConfig)
+                connections.findById(connection.getId()).orElseThrow().getConfig();
+        assertThat(included.projectExclusions().nativeIds()).isEmpty();
+        Repository recreated = projects.syncProject(own.getId(), NAME).orElseThrow();
+        assertThat(recreated.getId()).isNotEqualTo(stopped.getId());
+        assertThat(recreated.getNativeId()).isEqualTo(NATIVE_ID);
+        assertThat(repositories.findAllByWorkspaceMonitors(own.getId()))
+                .extracting(Repository::getId)
+                .containsExactly(recreated.getId());
+    }
+
+    @Test
+    void shouldPreserveStopWhenAConfigWriterLoadedTheConnectionBeforeStop() throws Exception {
+        User owner = persistUser("stale-config-owner");
+        Workspace own = workspace("stale-config-stop", owner);
+        Workspace other = workspace("stale-config-shared", owner);
+        IdentityProvider source = provider("https://stale-config.example.test");
+        Connection connection = connect(own, source);
+        connect(other, source);
+        repository(source, NATIVE_ID, NAME);
+        monitor(own, NATIVE_ID);
+        monitor(other, NATIVE_ID);
+        CountDownLatch loaded = new CountDownLatch(1);
+        CompletableFuture<Boolean> resume = new CompletableFuture<>();
+        try (var executor = Executors.newSingleThreadExecutor()) {
+            var writer = executor.submit(() -> transactions.execute(status -> {
+                var cached = connections
+                        .findByIdAndWorkspaceId(connection.getId(), own.getId())
+                        .orElseThrow();
+                assertThat(((ConnectionConfig.GitLabConfig) cached.getConfig())
+                                .projectExclusions()
+                                .nativeIds())
+                        .isEmpty();
+                loaded.countDown();
+                resume.join();
+                return connectionService.updateConfig(
+                        own.getId(),
+                        IntegrationKind.GITLAB,
+                        config -> ((ConnectionConfig.GitLabConfig) config).withGitlabWebhookId(123L));
+            }));
+            try {
+                assertThat(loaded.await(10, TimeUnit.SECONDS)).isTrue();
+                monitorService.removeRepositoryFromMonitor(own.getWorkspaceSlug(), NAME);
+                resume.complete(true);
+                assertThat(writer.get(20, TimeUnit.SECONDS)).isPresent();
+                var saved = (ConnectionConfig.GitLabConfig)
+                        connections.findById(connection.getId()).orElseThrow().getConfig();
+                assertThat(saved.gitlabWebhookId()).isEqualTo(123L);
+                assertThat(saved.projectExclusions().nativeIds()).containsExactly(NATIVE_ID);
+                assertThat(monitors.findByWorkspaceIdAndNameWithOwner(own.getId(), NAME))
+                        .isEmpty();
+            } finally {
+                resume.complete(true);
+                writer.cancel(true);
+            }
+        }
+    }
+
+    @Test
+    void shouldRefuseAWithdrawnLabelWriteInItsOwnTransactionAndKeepTheSiblingAllowed() throws Exception {
+        User owner = persistUser("held-label-owner");
+        Workspace own = workspace("held-label", owner);
+        Workspace other = workspace("held-label-shared", owner);
+        IdentityProvider source = provider("https://label-held.example.test");
+        connect(own, source);
+        connect(other, source);
+        Repository stopped = repository(source, NATIVE_ID, NAME);
+        Repository sibling = repository(source, NATIVE_ID + 1, "shared-org/healthy-sibling");
+        monitor(own, NATIVE_ID);
+        monitor(other, NATIVE_ID);
+        var allowed = new RepositoryToMonitor();
+        allowed.setWorkspace(own);
+        allowed.setNameWithOwner(sibling.getNameWithOwner());
+        allowed.setNativeId(sibling.getNativeId());
+        monitors.saveAndFlush(allowed);
+        var requested = new CountDownLatch(1);
+        var held = new CompletableFuture<String>();
+        when(clients.forScope(own.getId()))
+                .thenReturn(heldProjectClient(
+                        requested,
+                        held,
+                        source.getServerUrl(),
+                        inventoryResponse(SyncType.LABELS, 2, "Allowed label", false)));
+        try (var executor = Executors.newSingleThreadExecutor()) {
+            var result = executor.submit(() -> labelSync.syncLabelsForRepository(own.getId(), stopped));
+            try {
+                assertThat(requested.await(10, TimeUnit.SECONDS)).isTrue();
+                monitorService.removeRepositoryFromMonitor(own.getWorkspaceSlug(), NAME);
+                monitorService.addRepositoryToMonitor(own.getWorkspaceSlug(), NAME);
+                held.complete(inventoryResponse(SyncType.LABELS, 1, "Late label", false));
+                assertThat(result.get(30, TimeUnit.SECONDS)).isEqualTo(SyncResult.completed(0));
+                assertThat(labels.findAllByRepository_Id(stopped.getId())).isEmpty();
+                assertThat(labelSync.syncLabelsForRepository(own.getId(), sibling))
+                        .isEqualTo(SyncResult.completed(1));
+                assertThat(labels.findAllByRepository_Id(sibling.getId()))
+                        .extracting(Label::getName)
+                        .containsExactly("Allowed label");
+            } finally {
+                held.complete(inventoryResponse(SyncType.LABELS, 1, "Late label", false));
+                result.cancel(true);
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = SyncType.class,
+            names = {"LABELS", "MILESTONES"})
+    void shouldRetainProviderPresentInventoryWhenTheConnectionResumesAfterARefusedWrite(SyncType phase) {
+        Workspace own = workspace("inventory-" + phase.name().toLowerCase(Locale.ROOT), persistUser("inventory-owner"));
+        IdentityProvider source = provider("https://inventory.example.test");
+        Connection connection = connect(own, source);
+        Repository repository = repository(source, NATIVE_ID, NAME);
+        monitor(own, NATIVE_ID);
+        for (int iid : List.of(1, 3)) {
+            String title = iid == 1 ? "Provider present" : "Actually stale";
+            if (phase == SyncType.LABELS) {
+                var label = new Label();
+                label.setNativeId(1000L + iid);
+                label.setProvider(source);
+                label.setRepository(repository);
+                label.setName(title);
+                label.setColor("000000");
+                labels.saveAndFlush(label);
+            } else {
+                var milestone = new Milestone();
+                milestone.setNativeId(1000L + iid);
+                milestone.setProvider(source);
+                milestone.setRepository(repository);
+                milestone.setNumber(iid);
+                milestone.setTitle(title);
+                milestone.setHtmlUrl(source.getServerUrl() + "/" + NAME + "/-/milestones/" + iid);
+                milestone.setState(Milestone.State.OPEN);
+                milestones.saveAndFlush(milestone);
+            }
+        }
+        var page = new AtomicInteger();
+        var transport = projectClient(source.getServerUrl(), new ArrayDeque<>())
+                .mutate()
+                .webClient(builder -> builder.exchangeFunction(request -> {
+                    boolean first = page.getAndIncrement() == 0;
+                    connectionService.transition(
+                            connection,
+                            new ConnectionService.TransitionRequest(
+                                    first ? IntegrationState.SUSPENDED : IntegrationState.ACTIVE,
+                                    first ? "TEST_PAUSED" : "TEST_RESUMED",
+                                    "SYSTEM",
+                                    "inventory-test",
+                                    UUID.randomUUID().toString(),
+                                    "Test connection state"));
+                    return Mono.just(ClientResponse.create(HttpStatus.OK)
+                            .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                            .body(inventoryResponse(
+                                    phase, first ? 1 : 2, first ? "Provider present" : "New provider item", first))
+                            .build());
+                }))
+                .build();
+        when(clients.forScope(own.getId())).thenReturn(transport);
+        SyncResult result = phase == SyncType.LABELS
+                ? labelSync.syncLabelsForRepository(own.getId(), repository)
+                : milestoneSync.syncMilestonesForRepository(own.getId(), repository);
+        assertThat(result).isEqualTo(SyncResult.completed(1));
+        List<String> titles = phase == SyncType.LABELS
+                ? labels.findAllByRepository_Id(repository.getId()).stream()
+                        .map(Label::getName)
+                        .toList()
+                : milestones.findAllByRepository_Id(repository.getId()).stream()
+                        .map(Milestone::getTitle)
+                        .toList();
+        assertThat(titles).containsExactlyInAnyOrder("Provider present", "New provider item");
+        assertThat(page).hasValue(2);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void shouldNotApplyAnOldNegativeProjectEventToAReplacementMonitor(boolean unavailable) throws Exception {
+        User owner = persistUser("held-project-event-owner");
+        Workspace own = workspace("held-project-event", owner);
+        Workspace other = workspace("held-project-event-shared", owner);
+        String origin = gitLabProperties.defaultServerUrl();
+        IdentityProvider source = gitProviderRepository
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, origin)
+                .orElseGet(() -> provider(origin));
+        Connection connection = connect(own, source);
+        connect(other, source);
+        connectionService.updateConfig(
+                own.getId(),
+                IntegrationKind.GITLAB,
+                config -> ((ConnectionConfig.GitLabConfig) config).withGitlabGroupId(42L));
+        repository(source, NATIVE_ID, NAME);
+        monitor(own, NATIVE_ID);
+        monitor(other, NATIVE_ID);
+        var requested = new CountDownLatch(1);
+        var held = new CompletableFuture<ClientResponse>();
+        when(clients.forScope(own.getId()))
+                .thenReturn(projectClient(origin, new ArrayDeque<>())
+                        .mutate()
+                        .webClient(builder -> builder.exchangeFunction(request -> {
+                            requested.countDown();
+                            return Mono.fromFuture(held);
+                        }))
+                        .build());
+        Headers headers = new Headers();
+        new GitLabRouteCredential.Route(
+                        Objects.requireNonNull(connection.getId()), own.getId(), origin, 42L, own.getAccountLogin())
+                .headers()
+                .forEach(headers::put);
+        Message event = mock(Message.class);
+        when(event.getSubject()).thenReturn("gitlab.?connection." + connection.getId() + ".project");
+        when(event.getHeaders()).thenReturn(headers);
+        when(event.getData())
+                .thenReturn(("{\"event_name\":\"project_transfer\",\"project_id\":" + NATIVE_ID + "}")
+                        .getBytes(StandardCharsets.UTF_8));
+        try (var executor = Executors.newSingleThreadExecutor()) {
+            var result = executor.submit(() -> routeAdmission.admit(own.getId(), event, () -> {}));
+            try {
+                assertThat(requested.await(10, TimeUnit.SECONDS)).isTrue();
+                monitorService.removeRepositoryFromMonitor(own.getWorkspaceSlug(), NAME);
+                monitorService.addRepositoryToMonitor(own.getWorkspaceSlug(), NAME);
+                long replacement = monitors.findByWorkspaceIdAndNameWithOwner(own.getId(), NAME)
+                        .orElseThrow()
+                        .getId();
+                var response = ClientResponse.create(unavailable ? HttpStatus.NOT_FOUND : HttpStatus.OK)
+                        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                        .body(
+                                unavailable
+                                        ? "{\"message\":\"404 Project Not Found\"}"
+                                        : "{\"data\":{\"projects\":{\"nodes\":[{\"id\":\"gid://gitlab/Project/7001\","
+                                                + "\"fullPath\":\"elsewhere/moved\",\"name\":\"moved\",\"visibility\":\"private\"}]}}}")
+                        .build();
+                held.complete(response);
+                assertThat(result.get(30, TimeUnit.SECONDS)).isFalse();
+                assertThat(monitors.findById(replacement)).isPresent();
+                assertThat(syncTargets.isRepositoryUnavailable(own.getId(), replacement))
+                        .isFalse();
+                assertThat(monitors.findByWorkspaceIdAndNameWithOwner(other.getId(), NAME))
+                        .isPresent();
+            } finally {
+                held.complete(ClientResponse.create(HttpStatus.NOT_FOUND).build());
+                result.cancel(true);
+            }
+        }
+    }
+
+    @Test
+    void shouldRetainTheOriginalLegacyMonitorWhenDiscoveryMergesItsNativeDuplicate() {
+        Workspace own = workspace("duplicate-lifetime", persistUser("duplicate-owner"));
+        IdentityProvider source = provider("https://duplicate.example.test");
+        connect(own, source);
+        Repository stored = repository(source, NATIVE_ID, NAME);
+        var legacy = monitor(own, null);
+        var duplicate = new RepositoryToMonitor();
+        duplicate.setWorkspace(own);
+        duplicate.setNativeId(NATIVE_ID);
+        duplicate.setNameWithOwner("shared-org/old-path");
+        duplicate = monitors.saveAndFlush(duplicate);
+        var original = projectAdmission
+                .captureConnection(own.getId(), Objects.requireNonNull(source.getId()))
+                .orElseThrow();
+        gitLabMonitors.monitorAllowed(own, List.of(stored));
+        assertThat(monitors.findById(duplicate.getId())).isEmpty();
+        assertThat(projectAdmission.capture(original, stored).orElseThrow().monitorId())
+                .isEqualTo(legacy.getId());
+    }
+
+    private static String inventoryResponse(SyncType phase, int iid, String title, boolean hasNext) {
+        String nodes = phase == SyncType.LABELS
+                ? "{\"id\":\"gid://gitlab/ProjectLabel/" + (1000 + iid) + "\",\"title\":\"" + title
+                        + "\",\"color\":\"#123456\"}"
+                : "{\"id\":\"gid://gitlab/Milestone/" + (1000 + iid) + "\",\"iid\":\"" + iid + "\",\"title\":\"" + title
+                        + "\",\"state\":\"active\"}";
+        return "{\"data\":{\"project\":{\"" + (phase == SyncType.LABELS ? "labels" : "milestones")
+                + "\":{\"nodes\":[" + nodes + "],\"pageInfo\":{\"hasNextPage\":" + hasNext
+                + ",\"endCursor\":" + (hasNext ? "\"next\"" : "null") + "}}}}}";
+    }
+
+    private HttpGraphQlClient projectClient(String origin, Deque<String> answers) {
+        return HttpGraphQlClient.builder(WebClient.builder()
+                        .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK)
+                                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                                .body(answers.removeFirst())
+                                .build())))
+                .url(origin + "/api/graphql")
+                .documentSource(new FragmentMergingDocumentSource(
+                        List.of(
+                                new ClassPathResource("graphql/gitlab/operations/"),
+                                new ClassPathResource("graphql/gitlab/fragments/")),
+                        List.of(".graphql", ".gql"),
+                        List.of(new ClassPathResource("graphql/gitlab/fragments/GitLabUserFields.graphql"))))
+                .build();
+    }
+
+    private static String projectResponse(String origin, long nativeId) {
+        return """
+                {"data":{"project":{"id":"gid://gitlab/Project/%s","fullPath":"%s","name":"shared-repo",
+                  "webUrl":"%s/%s","visibility":"private","group":null}}}
+                """.formatted(nativeId, NAME, origin, NAME);
+    }
+
+    private HttpGraphQlClient heldProjectClient(
+            CountDownLatch requested, CompletableFuture<String> held, String origin, String siblingResponse) {
+        var web = WebClient.builder()
+                .exchangeFunction(request -> Mono.deferContextual(context -> {
+                    String path = context.get("projectPath");
+                    Mono<String> body;
+                    if (NAME.equals(path)) {
+                        requested.countDown();
+                        body = Mono.fromFuture(held);
+                    } else {
+                        body = Mono.just(siblingResponse);
+                    }
+                    return body.map(json -> ClientResponse.create(HttpStatus.OK)
+                            .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                            .body(json)
+                            .build());
+                }));
+        GraphQlClientInterceptor projects = new GraphQlClientInterceptor() {
+            @Override
+            public Mono<ClientGraphQlResponse> intercept(ClientGraphQlRequest request, Chain chain) {
+                Object path = Objects.requireNonNull(request.getVariables().get("fullPath"));
+                return chain.next(request).contextWrite(context -> context.put("projectPath", path));
+            }
+        };
+        return HttpGraphQlClient.builder(web)
+                .url(origin + "/api/graphql")
+                .documentSource(new FragmentMergingDocumentSource(
+                        List.of(
+                                new ClassPathResource("graphql/gitlab/operations/"),
+                                new ClassPathResource("graphql/gitlab/fragments/")),
+                        List.of(".graphql", ".gql"),
+                        List.of(new ClassPathResource("graphql/gitlab/fragments/GitLabUserFields.graphql"))))
+                .interceptor(projects)
+                .build();
+    }
+
+    private static String issueResponse(String origin, String path, long nativeId) {
+        boolean excluded = NAME.equals(path);
+        String author = excluded ? """
+                {"id":"gid://gitlab/User/88001","username":"late-excluded-author","name":"Late author",
+                 "avatarUrl":"https://example.test/avatar.png","webUrl":"https://example.test/late-author","bot":false}
+                """ : "null";
+        return """
+                {"data":{"project":{"issues":{"count":1,"nodes":[
+                  {"id":"gid://gitlab/Issue/%s","iid":"1","title":"%s","state":"opened","confidential":false,
+                   "webUrl":"%s/%s/-/issues/1","createdAt":"2026-10-14T10:00:00Z","updatedAt":"2026-10-14T10:00:00Z",
+                   "author":%s,"userNotesCount":0,"labels":{"nodes":[],"count":0},"assignees":{"nodes":[],"count":0}}
+                ],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}
+                """.formatted(nativeId, excluded ? "Withdrawn issue" : "Healthy sibling issue", origin, path, author);
+    }
+
+    @Test
+    void shouldKeepAnExplicitlyStoppedGitLabProjectExcludedWhenAllDiscoveryReconcilesAgain() {
+        User owner = persistUser("exclusion-owner");
+        Workspace own = workspace("excluded-project", owner);
+        own.setRepositorySelection(RepositorySelection.ALL);
+        workspaces.saveAndFlush(own);
+        Workspace shared = workspace("shared-project", owner);
+        IdentityProvider source = provider("https://exclusion.example.test");
+        connect(own, source);
+        connect(shared, source);
+        Repository excluded = repository(source, NATIVE_ID, NAME);
+        Repository sibling = repository(source, NATIVE_ID + 1, "shared-org/allowed-sibling");
+        monitor(shared, NATIVE_ID);
+        assertThat(workspaces.findById(own.getId()).orElseThrow().getRepositorySelection())
+                .isEqualTo(RepositorySelection.ALL);
+        assertThat(gitLabMonitors.monitorAllowed(own, List.of(excluded, sibling)))
+                .isEqualTo(2);
+
+        monitorService.removeRepositoryFromMonitor(own.getWorkspaceSlug(), NAME);
+
+        assertThat(monitors.findByWorkspaceIdAndNameWithOwner(own.getId(), NAME))
+                .isEmpty();
+        assertThat(repositories.findById(excluded.getId())).isPresent();
+        assertThat(repositories.findAllByWorkspaceMonitors(own.getId()))
+                .extracting(Repository::getId)
+                .containsExactly(sibling.getId());
+
+        Repository newlyDiscovered = repository(source, NATIVE_ID + 2, "shared-org/new-sibling");
+        Workspace current = workspaces.findById(own.getId()).orElseThrow();
+        var reported = repositories.findAllById(List.of(excluded.getId(), sibling.getId(), newlyDiscovered.getId()));
+
+        int created = gitLabMonitors.monitorAllowed(current, reported);
+
+        assertSoftly(softly -> {
+            softly.assertThat(monitors.findByWorkspaceIdAndNameWithOwner(own.getId(), NAME))
+                    .as("Stop monitoring must survive an independent later ALL discovery")
+                    .isEmpty();
+            softly.assertThat(created)
+                    .as("only the newly discovered allowed sibling is added")
+                    .isEqualTo(1);
+            softly.assertThat(repositories.findAllByWorkspaceMonitors(own.getId()))
+                    .extracting(Repository::getId)
+                    .as("this workspace keeps its allowed sources without regaining the excluded source")
+                    .containsExactlyInAnyOrder(sibling.getId(), newlyDiscovered.getId());
+            softly.assertThat(monitors.findByWorkspaceIdAndNameWithOwner(shared.getId(), NAME))
+                    .as("another workspace keeps its legitimate shared-source monitor")
+                    .isPresent();
+            softly.assertThat(repositories.findById(excluded.getId())).isPresent();
+            softly.assertThat(workspaces.findById(own.getId()).orElseThrow().getRepositorySelection())
+                    .as("Stop monitoring must preserve ALL mode for siblings and future projects")
+                    .isEqualTo(RepositorySelection.ALL);
+        });
+    }
+
+    @Test
+    void shouldRestoreAStoppedGitLabProjectWhenItIsExplicitlyAddedAgain() {
+        User owner = persistUser("include-owner");
+        Workspace own = workspace("included-project", owner);
+        own.setRepositorySelection(RepositorySelection.ALL);
+        workspaces.saveAndFlush(own);
+        Workspace shared = workspace("retained-project", owner);
+        IdentityProvider source = provider("https://include.example.test");
+        connect(own, source);
+        connect(shared, source);
+        Repository included = repository(source, NATIVE_ID, NAME);
+        Repository sibling = repository(source, NATIVE_ID + 1, "shared-org/allowed-sibling");
+        monitor(shared, NATIVE_ID);
+        assertThat(gitLabMonitors.monitorAllowed(own, List.of(included, sibling)))
+                .isEqualTo(2);
+        long siblingMonitorId = monitors.findByWorkspaceIdAndNameWithOwner(own.getId(), sibling.getNameWithOwner())
+                .orElseThrow()
+                .getId();
+
+        monitorService.removeRepositoryFromMonitor(own.getWorkspaceSlug(), NAME);
+        assertThat(monitors.findByWorkspaceIdAndNameWithOwner(own.getId(), NAME))
+                .isEmpty();
+
+        monitorService.addRepositoryToMonitor(own.getWorkspaceSlug(), NAME);
+
+        assertThat(monitors.findByWorkspaceIdAndNameWithOwner(own.getId(), NAME))
+                .hasValueSatisfying(
+                        restored -> assertThat(restored.getNativeId()).isEqualTo(NATIVE_ID));
+        assertThat(monitors.findById(siblingMonitorId)).isPresent();
+        assertThat(monitors.findByWorkspaceIdAndNameWithOwner(shared.getId(), NAME))
+                .isPresent();
+        assertThat(repositories.findAllByWorkspaceMonitors(own.getId()))
+                .extracting(Repository::getId)
+                .containsExactlyInAnyOrder(included.getId(), sibling.getId());
+        assertThat(workspaces.findById(own.getId()).orElseThrow().getRepositorySelection())
+                .isEqualTo(RepositorySelection.ALL);
+    }
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})

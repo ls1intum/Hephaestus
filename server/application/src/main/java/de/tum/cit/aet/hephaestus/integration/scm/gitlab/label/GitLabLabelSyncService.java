@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstan
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncException;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.label.dto.GitLabLabelDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -46,18 +47,21 @@ public class GitLabLabelSyncService {
     private final GitLabLabelProcessor labelProcessor;
     private final LabelRepository labelRepository;
     private final GitLabProperties gitLabProperties;
+    private final GitLabProjectAdmission admission;
 
     public GitLabLabelSyncService(
             GitLabGraphQlClientProvider graphQlClientProvider,
             GitLabGraphQlResponseHandler responseHandler,
             GitLabLabelProcessor labelProcessor,
             LabelRepository labelRepository,
-            GitLabProperties gitLabProperties) {
+            GitLabProperties gitLabProperties,
+            GitLabProjectAdmission admission) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.responseHandler = responseHandler;
         this.labelProcessor = labelProcessor;
         this.labelRepository = labelRepository;
         this.gitLabProperties = gitLabProperties;
+        this.admission = admission;
     }
 
     /**
@@ -68,6 +72,14 @@ public class GitLabLabelSyncService {
      * @return sync result with status and count
      */
     public SyncResult syncLabelsForRepository(Long scopeId, Repository repository) {
+        return admission
+                .capture(scopeId, repository)
+                .map(read -> syncLabelsForRepository(scopeId, repository, read))
+                .orElseGet(() -> SyncResult.completed(0));
+    }
+
+    public SyncResult syncLabelsForRepository(
+            Long scopeId, Repository repository, GitLabProjectAdmission.ProjectRead read) {
         String projectPath = repository.getNameWithOwner();
         String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(projectPath), "<unknown>");
 
@@ -138,10 +150,10 @@ public class GitLabLabelSyncService {
                     Map<String, Object> typedNode = node;
                     GitLabLabelDTO dto = GitLabLabelDTO.fromGraphQlNode(typedNode);
                     if (dto != null) {
-                        Label label = labelProcessor.process(dto, repository, context);
+                        syncedNames.add(dto.title());
+                        Label label = labelProcessor.process(dto, repository, context, read);
                         if (label != null) {
                             totalSynced++;
-                            syncedNames.add(label.getName());
                         }
                     }
                 }
@@ -170,8 +182,8 @@ public class GitLabLabelSyncService {
 
         // Remove stale labels only if sync completed fully
         if (syncComplete) {
-            int removedCount =
-                    removeStaleLabels(repository.getId(), syncedNames, ProcessingContext.forSync(scopeId, repository));
+            int removedCount = removeStaleLabels(
+                    repository.getId(), syncedNames, ProcessingContext.forSync(scopeId, repository), read);
             if (removedCount > 0) {
                 log.info("Removed stale labels: removedCount={}, projectPath={}", removedCount, safeProjectPath);
             }
@@ -189,6 +201,7 @@ public class GitLabLabelSyncService {
                 syncComplete,
                 scopeId);
 
+        if (!admission.current(read)) return SyncResult.completed(0);
         if (rateLimitAborted) {
             return SyncResult.abortedRateLimit(totalSynced);
         }
@@ -198,12 +211,16 @@ public class GitLabLabelSyncService {
         return SyncResult.completed(totalSynced);
     }
 
-    private int removeStaleLabels(Long repositoryId, Set<String> syncedNames, ProcessingContext context) {
+    private int removeStaleLabels(
+            Long repositoryId,
+            Set<String> syncedNames,
+            ProcessingContext context,
+            GitLabProjectAdmission.ProjectRead read) {
         List<Label> existingLabels = labelRepository.findAllByRepository_Id(repositoryId);
         int removedCount = 0;
         for (Label existingLabel : existingLabels) {
             if (!syncedNames.contains(existingLabel.getName())) {
-                labelProcessor.delete(existingLabel.getId(), context);
+                if (!labelProcessor.delete(existingLabel.getId(), context, read)) break;
                 removedCount++;
                 log.debug(
                         "Removed stale label: labelName={}, repoId={}",

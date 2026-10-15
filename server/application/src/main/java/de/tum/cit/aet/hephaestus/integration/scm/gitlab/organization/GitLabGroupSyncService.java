@@ -19,6 +19,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabGro
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabProjectResponse;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository.GitLabProjectProcessor;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -63,6 +64,7 @@ public class GitLabGroupSyncService {
     private final GitLabProjectProcessor projectProcessor;
     private final GitLabProperties gitLabProperties;
     private final IdentityProviderRepository gitProviderRepository;
+    private final GitLabProjectAdmission admission;
 
     public GitLabGroupSyncService(
             GitLabGraphQlClientProvider graphQlClientProvider,
@@ -70,13 +72,15 @@ public class GitLabGroupSyncService {
             GitLabGroupProcessor groupProcessor,
             GitLabProjectProcessor projectProcessor,
             GitLabProperties gitLabProperties,
-            IdentityProviderRepository gitProviderRepository) {
+            IdentityProviderRepository gitProviderRepository,
+            GitLabProjectAdmission admission) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.responseHandler = responseHandler;
         this.groupProcessor = groupProcessor;
         this.projectProcessor = projectProcessor;
         this.gitLabProperties = gitLabProperties;
         this.gitProviderRepository = gitProviderRepository;
+        this.admission = admission;
     }
 
     /**
@@ -207,10 +211,15 @@ public class GitLabGroupSyncService {
         int projectsRedacted = 0;
         boolean hadApiFailure = false;
         int reportedTotalCount = -1;
+        Set<Long> excluded = new HashSet<>();
 
         try {
             IdentityProvider provider = resolveProvider(serverUrl);
             Long providerId = Objects.requireNonNull(provider.getId());
+            var read = admission.captureConnection(scopeId, providerId).orElse(null);
+            if (read == null) {
+                return GitLabSyncResult.aborted(GitLabSyncResult.Status.ABORTED_ERROR, List.of(), 0, 0);
+            }
             graphQlClientProvider.acquirePermission();
 
             do {
@@ -303,12 +312,22 @@ public class GitLabGroupSyncService {
                         continue;
                     }
                     try {
-                        // Resolve the project's immediate parent group (may differ from top-level)
-                        Organization projectOrg = resolveProjectOrganization(
-                                project, Objects.requireNonNull(topLevelOrganization), providerId);
-                        Repository repo = projectProcessor.processGraphQlResponse(project, projectOrg, provider);
-                        if (repo != null) {
-                            syncedRepositories.add(repo);
+                        Organization root = Objects.requireNonNull(topLevelOrganization);
+                        long nativeId = extractEntityId(project.id());
+                        var applied = admission.discover(
+                                read,
+                                nativeId,
+                                Objects.requireNonNull(project.fullPath()),
+                                provider.getServerUrl(),
+                                () -> {
+                                    Organization projectOrg = resolveProjectOrganization(project, root, providerId);
+                                    return Optional.ofNullable(
+                                            projectProcessor.processGraphQlResponse(project, projectOrg, provider));
+                                });
+                        if (applied.isEmpty()) {
+                            excluded.add(nativeId);
+                        } else if (applied.get().isPresent()) {
+                            syncedRepositories.add(applied.get().get());
                         } else {
                             projectsSkipped++;
                         }
@@ -396,13 +415,20 @@ public class GitLabGroupSyncService {
 
                 List<Repository> reconciled = new ArrayList<>();
                 directProjectsListed = reconcileDirectProjects(
-                        scopeId, groupFullPath, topLevelOrganization, provider, seenNativeIds, reconciled);
+                        scopeId,
+                        groupFullPath,
+                        topLevelOrganization,
+                        provider,
+                        seenNativeIds,
+                        reconciled,
+                        read,
+                        excluded);
                 projectsReconciled = reconciled.size();
                 syncedRepositories.addAll(reconciled);
             }
 
             // Fewer projects than GitLab counted means some were never listed: the result is incomplete.
-            int totalProcessed = syncedRepositories.size() + projectsSkipped + projectsRedacted;
+            int totalProcessed = syncedRepositories.size() + projectsSkipped + projectsRedacted + excluded.size();
             boolean projectsMissing = reportedTotalCount >= 0 && totalProcessed < reportedTotalCount;
             if (projectsMissing) {
                 log.warn(
@@ -469,7 +495,9 @@ public class GitLabGroupSyncService {
             Organization topLevelOrganization,
             IdentityProvider provider,
             Set<Long> seenNativeIds,
-            List<Repository> reconciled) {
+            List<Repository> reconciled,
+            GitLabProjectAdmission.ConnectionRead read,
+            Set<Long> excluded) {
         String safeGroupPath = sanitizeForLog(groupFullPath);
         boolean listedToEnd = false;
         boolean projectMissed = false;
@@ -529,11 +557,18 @@ public class GitLabGroupSyncService {
                         if (seenNativeIds.contains(nativeId)) {
                             continue;
                         }
-                        // Direct projects belong to the top-level group
-                        Repository repo =
-                                projectProcessor.processGraphQlResponse(project, topLevelOrganization, provider);
-                        if (repo != null) {
-                            reconciled.add(repo);
+                        var applied = admission.discover(
+                                read,
+                                nativeId,
+                                Objects.requireNonNull(project.fullPath()),
+                                provider.getServerUrl(),
+                                () -> Optional.ofNullable(projectProcessor.processGraphQlResponse(
+                                        project, topLevelOrganization, provider)));
+                        if (applied.isEmpty()) {
+                            excluded.add(nativeId);
+                            seenNativeIds.add(nativeId);
+                        } else if (applied.get().isPresent()) {
+                            reconciled.add(applied.get().get());
                             seenNativeIds.add(nativeId);
                         } else {
                             projectMissed = true;

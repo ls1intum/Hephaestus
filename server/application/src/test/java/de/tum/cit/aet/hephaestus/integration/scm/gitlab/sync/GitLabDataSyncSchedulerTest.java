@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -50,6 +51,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.organization.GitLabGroup
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.organization.GitLabSyncResult;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository.GitLabProjectSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.subissue.GitLabSubIssueSyncService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabAdmissionTestFixtures;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabRepositoryMonitors;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabWorkspaceInitializationService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -74,6 +77,8 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 
 @Tag("unit")
 class GitLabDataSyncSchedulerTest extends BaseUnitTest {
+
+    private final GitLabProjectAdmission projectAdmission = mock(GitLabProjectAdmission.class);
 
     private static final long WORKSPACE_ID = 1L;
     private static final long CONNECTION_ID = 10L;
@@ -148,7 +153,8 @@ class GitLabDataSyncSchedulerTest extends BaseUnitTest {
                 mock(WorkspaceRepository.class),
                 mock(WorkspaceActorSelector.class),
                 projectSyncService,
-                mock(ActivityLedgerRepair.class));
+                mock(ActivityLedgerRepair.class),
+                projectAdmission);
 
         // syncScope's first real step: no GitLabSyncServiceHolder available -> it logs and returns
         // immediately. This isolates the job-recording wrapper from the sync pipeline itself.
@@ -321,7 +327,7 @@ class GitLabDataSyncSchedulerTest extends BaseUnitTest {
         var issueSync = mock(GitLabIssueSyncService.class);
         when(holder.getIssueSyncService()).thenReturn(issueSync);
         Repository project = prepareProject(holder);
-        when(issueSync.syncIssues(eq(WORKSPACE_ID), eq(project), any()))
+        when(issueSync.syncIssues(eq(WORKSPACE_ID), eq(project), any(), any()))
                 .thenReturn(SyncResult.abortedError(1), SyncResult.completed(2));
 
         scheduler.syncWorkspaceNow(WORKSPACE_ID, syncJobHandle, SyncJobType.INITIAL);
@@ -339,8 +345,9 @@ class GitLabDataSyncSchedulerTest extends BaseUnitTest {
         when(holder.getIssueSyncService()).thenReturn(issueSync);
         when(holder.getSubIssueSyncService()).thenReturn(subIssueSync);
         Repository project = prepareProject(holder);
-        when(issueSync.syncIssues(eq(WORKSPACE_ID), eq(project), any())).thenReturn(SyncResult.abortedError(1));
-        when(subIssueSync.syncSubIssuesForRepository(WORKSPACE_ID, project)).thenReturn(SyncResult.completed(1));
+        when(issueSync.syncIssues(eq(WORKSPACE_ID), eq(project), any(), any())).thenReturn(SyncResult.abortedError(1));
+        when(subIssueSync.syncSubIssuesForRepository(eq(WORKSPACE_ID), eq(project), any()))
+                .thenReturn(SyncResult.completed(1));
 
         scheduler.syncWorkspaceNow(WORKSPACE_ID, syncJobHandle, SyncJobType.INITIAL);
 
@@ -353,7 +360,7 @@ class GitLabDataSyncSchedulerTest extends BaseUnitTest {
         var subIssueSync = mock(GitLabSubIssueSyncService.class);
         when(holder.getSubIssueSyncService()).thenReturn(subIssueSync);
         Repository project = prepareProject(holder);
-        when(subIssueSync.syncSubIssuesForRepository(WORKSPACE_ID, project))
+        when(subIssueSync.syncSubIssuesForRepository(eq(WORKSPACE_ID), eq(project), any()))
                 .thenReturn(SyncResult.abortedError(0), SyncResult.completed(1));
 
         scheduler.syncWorkspaceNow(WORKSPACE_ID, syncJobHandle, SyncJobType.INITIAL);
@@ -361,6 +368,49 @@ class GitLabDataSyncSchedulerTest extends BaseUnitTest {
 
         scheduler.syncWorkspaceNow(WORKSPACE_ID, syncJobHandle, SyncJobType.INITIAL);
         verify(syncTargetProvider).updateSyncError(77L, SyncPass.RECENT, null);
+    }
+
+    @Test
+    void shouldNotAdvanceRepositoryCooldownAfterAuthorityIsWithdrawnAtTheIssueWatermark() {
+        var holder = mockHolder();
+        var issueSync = mock(GitLabIssueSyncService.class);
+        when(holder.getIssueSyncService()).thenReturn(issueSync);
+        Repository stopped = prepareProject(holder);
+        var originalRead = GitLabAdmissionTestFixtures.permit(projectAdmission, WORKSPACE_ID, stopped, 77L);
+        Repository sibling = new Repository();
+        sibling.setId(100L);
+        sibling.setNameWithOwner("course/sibling");
+        sibling.setProvider(stopped.getProvider());
+        GitLabAdmissionTestFixtures.permit(projectAdmission, WORKSPACE_ID, sibling, 78L);
+        var siblingTarget = SyncTargetTestBuilder.syncTarget()
+                .id(78L)
+                .scopeId(WORKSPACE_ID)
+                .repositoryNameWithOwner(sibling.getNameWithOwner())
+                .build();
+        when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of(stopped, sibling));
+        when(syncTargetProvider.getSyncTargetsForScope(WORKSPACE_ID))
+                .thenReturn(List.of(session.syncTargets().getFirst(), siblingTarget));
+        var siblingMetadata = mock(GitLabProjectResponse.class);
+        when(projectSyncService.fetchProject(WORKSPACE_ID, sibling.getNameWithOwner()))
+                .thenReturn(Optional.of(siblingMetadata));
+        when(projectSyncService.persistProject(siblingMetadata, sibling.getProvider()))
+                .thenReturn(Optional.of(sibling));
+        when(issueSync.syncIssues(eq(WORKSPACE_ID), any(), any(), any())).thenReturn(SyncResult.completed(1));
+        lenient()
+                .doAnswer(invocation -> {
+                    doReturn(false).when(projectAdmission).hold(originalRead);
+                    return null;
+                })
+                .when(syncTargetProvider)
+                .updateSyncTimestamp(eq(77L), eq(SyncType.ISSUES), any());
+
+        scheduler.syncWorkspaceNow(WORKSPACE_ID, syncJobHandle, SyncJobType.INITIAL);
+
+        verify(repositoryRepository).updateLastSyncAt(eq(100L), any());
+        verify(syncTargetProvider).updateSyncTimestamp(eq(78L), eq(SyncType.FULL_REPOSITORY), any());
+        verify(repositoryRepository, never()).updateLastSyncAt(eq(99L), any());
+        verify(syncTargetProvider, never()).updateSyncTimestamp(eq(77L), eq(SyncType.FULL_REPOSITORY), any());
+        verify(syncJobHandle, never()).reportWarnings();
     }
 
     @Test
@@ -379,7 +429,8 @@ class GitLabDataSyncSchedulerTest extends BaseUnitTest {
         var labelSync = mock(GitLabLabelSyncService.class);
         when(holder.getLabelSyncService()).thenReturn(labelSync);
         Repository project = prepareProject(holder);
-        when(labelSync.syncLabelsForRepository(WORKSPACE_ID, project)).thenReturn(SyncResult.abortedError(0));
+        when(labelSync.syncLabelsForRepository(eq(WORKSPACE_ID), eq(project), any()))
+                .thenReturn(SyncResult.abortedError(0));
 
         scheduler.syncWorkspaceNow(WORKSPACE_ID, syncJobHandle, SyncJobType.INITIAL);
 
@@ -426,8 +477,8 @@ class GitLabDataSyncSchedulerTest extends BaseUnitTest {
 
         scheduler.syncWorkspaceNow(WORKSPACE_ID, syncJobHandle, SyncJobType.INITIAL);
 
-        verify(linker, never()).linkCommits(any(), any(), any());
-        verify(subIssues, never()).syncSubIssuesForRepository(any(), any());
+        verify(linker, never()).linkCommits(any(), any(), any(), any());
+        verify(subIssues, never()).syncSubIssuesForRepository(any(), any(), any());
         verify(syncTargetProvider).recordRepositoryUnavailable(WORKSPACE_ID, 77L);
     }
 
@@ -449,13 +500,14 @@ class GitLabDataSyncSchedulerTest extends BaseUnitTest {
         var subIssues = mock(GitLabSubIssueSyncService.class);
         when(holder.getCommitMergeRequestLinker()).thenReturn(linker);
         when(holder.getSubIssueSyncService()).thenReturn(subIssues);
-        when(linker.linkCommits(WORKSPACE_ID, project, null)).thenReturn(SyncResult.completed(1));
-        when(subIssues.syncSubIssuesForRepository(WORKSPACE_ID, project)).thenReturn(SyncResult.completed(1));
+        when(linker.linkCommits(eq(WORKSPACE_ID), eq(project), eq(null), any())).thenReturn(SyncResult.completed(1));
+        when(subIssues.syncSubIssuesForRepository(eq(WORKSPACE_ID), eq(project), any()))
+                .thenReturn(SyncResult.completed(1));
         scheduler.syncWorkspaceNow(WORKSPACE_ID, syncJobHandle, SyncJobType.INITIAL);
         verify(syncTargetProvider).clearRepositoryUnavailable(WORKSPACE_ID, 77L);
         verify(syncTargetProvider).updateSyncTimestamp(eq(77L), eq(SyncType.REPOSITORY_VISIBILITY), any());
-        verify(linker).linkCommits(WORKSPACE_ID, project, null);
-        verify(subIssues).syncSubIssuesForRepository(WORKSPACE_ID, project);
+        verify(linker).linkCommits(eq(WORKSPACE_ID), eq(project), eq(null), any());
+        verify(subIssues).syncSubIssuesForRepository(eq(WORKSPACE_ID), eq(project), any());
     }
 
     @Test
@@ -497,6 +549,7 @@ class GitLabDataSyncSchedulerTest extends BaseUnitTest {
         Repository project = new Repository();
         project.setId(99L);
         project.setNameWithOwner("course/project");
+        GitLabAdmissionTestFixtures.permit(projectAdmission, WORKSPACE_ID, project, 77L);
         when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of(project));
         var target = SyncTargetTestBuilder.syncTarget()
                 .id(77L)

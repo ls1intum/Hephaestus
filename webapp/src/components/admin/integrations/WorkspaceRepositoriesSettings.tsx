@@ -41,13 +41,36 @@ interface RepositoryItem {
 	nameWithOwner: string;
 }
 
+type ScmProvider = "GITHUB" | "GITLAB";
+
+function StopDescription({
+	provider,
+	providerLabel,
+}: {
+	provider: ScmProvider | undefined;
+	providerLabel: string;
+}) {
+	return (
+		<>
+			Hephaestus stops syncing this repository. The repository on {providerLabel} is not affected.
+			If no other workspace on this instance still monitors it, Hephaestus also erases the work it
+			mirrored from it. Practice reviews and feedback can remain.{" "}
+			{provider === "GITLAB"
+				? "It stays stopped until you add it again below."
+				: "To sync it again, add it below."}
+		</>
+	);
+}
+
 function RepositoryRow({
 	repo,
+	provider,
 	providerLabel,
 	isRemoving,
 	onRemove,
 }: {
 	repo: RepositoryItem;
+	provider: ScmProvider | undefined;
 	providerLabel: string;
 	isRemoving: boolean;
 	onRemove: (nameWithOwner: string) => void;
@@ -82,13 +105,7 @@ function RepositoryRow({
 						<AlertDialogHeader>
 							<AlertDialogTitle>Stop monitoring {repo.nameWithOwner}?</AlertDialogTitle>
 							<AlertDialogDescription>
-								Hephaestus stops syncing the repository and{" "}
-								<strong>
-									permanently erases everything it has mirrored from it: issues, pull requests,
-									reviews, and the practice reviews built from them
-								</strong>
-								. The repository on {providerLabel} is not affected. You can start monitoring it
-								again later.
+								<StopDescription provider={provider} providerLabel={providerLabel} />
 							</AlertDialogDescription>
 						</AlertDialogHeader>
 						<AlertDialogFooter>
@@ -113,6 +130,7 @@ function RepositoryRow({
 
 interface WorkspaceRepositoriesSettingsProps {
 	repositories: RepositoryItem[];
+	provider?: ScmProvider;
 	providerLabel?: string;
 	isLoading: boolean;
 	error: unknown;
@@ -126,6 +144,7 @@ interface WorkspaceRepositoriesSettingsProps {
 
 export function WorkspaceRepositoriesSettings({
 	repositories,
+	provider,
 	providerLabel = "GitHub or GitLab",
 	isLoading,
 	error,
@@ -181,6 +200,7 @@ export function WorkspaceRepositoriesSettings({
 						<RepositoryRow
 							key={repo.nameWithOwner}
 							repo={repo}
+							provider={provider}
 							providerLabel={providerLabel}
 							isRemoving={isRemovingRepository}
 							onRemove={onRemoveRepository}

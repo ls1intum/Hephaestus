@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncExcepti
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabUserLookup;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.user.GitLabUserService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabWorkspaceLinkService;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -54,6 +55,7 @@ public class GitLabCollaboratorSyncService {
     private final GitLabProperties gitLabProperties;
     private final TransactionTemplate transactionTemplate;
     private final GitLabWorkspaceLinkService workspaceLinkService;
+    private final GitLabProjectAdmission admission;
 
     public GitLabCollaboratorSyncService(
             RepositoryCollaboratorRepository collaboratorRepository,
@@ -62,7 +64,8 @@ public class GitLabCollaboratorSyncService {
             GitLabUserService userService,
             GitLabProperties gitLabProperties,
             TransactionTemplate transactionTemplate,
-            GitLabWorkspaceLinkService workspaceLinkService) {
+            GitLabWorkspaceLinkService workspaceLinkService,
+            GitLabProjectAdmission admission) {
         this.collaboratorRepository = collaboratorRepository;
         this.graphQlClientProvider = graphQlClientProvider;
         this.responseHandler = responseHandler;
@@ -70,6 +73,7 @@ public class GitLabCollaboratorSyncService {
         this.gitLabProperties = gitLabProperties;
         this.transactionTemplate = transactionTemplate;
         this.workspaceLinkService = workspaceLinkService;
+        this.admission = admission;
     }
 
     /**
@@ -87,6 +91,14 @@ public class GitLabCollaboratorSyncService {
      * @return sync result
      */
     public SyncResult syncCollaboratorsForRepository(Long scopeId, Repository repository) {
+        return admission
+                .capture(scopeId, repository)
+                .map(read -> syncCollaboratorsForRepository(scopeId, repository, read))
+                .orElseGet(() -> SyncResult.completed(0));
+    }
+
+    public SyncResult syncCollaboratorsForRepository(
+            Long scopeId, Repository repository, GitLabProjectAdmission.ProjectRead read) {
         String projectPath = repository.getNameWithOwner();
         String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(projectPath), "<unknown>");
         // The scope's client reads its own instance, so its answer belongs only on a repository row of that instance.
@@ -190,7 +202,7 @@ public class GitLabCollaboratorSyncService {
         }
         Integer synced = transactionTemplate.execute(status -> {
             // The monitor, the connection or the group link may have changed while GitLab was being read.
-            if (!workspaceLinkService.mayWriteRepository(scopeId, repository)) {
+            if (!admission.hold(read) || !workspaceLinkService.mayWriteRepository(scopeId, repository)) {
                 return null;
             }
             Set<Long> syncedUserIds = new HashSet<>();
@@ -220,7 +232,7 @@ public class GitLabCollaboratorSyncService {
                     safeProjectPath);
             return SyncResult.abortedError(0);
         }
-        return SyncResult.completed(synced);
+        return admission.current(read) ? SyncResult.completed(synced) : SyncResult.completed(0);
     }
 
     /**

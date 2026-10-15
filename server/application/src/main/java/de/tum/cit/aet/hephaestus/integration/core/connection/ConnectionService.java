@@ -271,26 +271,57 @@ public class ConnectionService {
     @Transactional
     public Optional<Connection> updateConfig(
             long workspaceId, IntegrationKind kind, UnaryOperator<ConnectionConfig> mutator) {
-        return connectionRepository.findActive(workspaceId, kind).map(c -> {
-            ConnectionConfig next = mutator.apply(c.getConfig());
-            if (next == null) {
-                throw new IllegalArgumentException(
-                        "Mutator returned null for connection " + c.getId() + " — config must be non-null");
-            }
-            if (!next.getClass().equals(c.getConfig().getClass())) {
-                throw new IllegalArgumentException("Mutator changed config variant on connection " + c.getId()
-                        + ": "
-                        + c.getConfig().getClass().getSimpleName()
-                        + " → "
-                        + next.getClass().getSimpleName());
-            }
-            boolean namespaceChanged = !Objects.equals(
-                    SourceProviderNamespaces.configuredUrl(c.getConfig()),
-                    SourceProviderNamespaces.configuredUrl(next));
-            c.setConfig(next);
-            if (namespaceChanged) sourceNamespaces.ensure(kind, next);
-            return connectionRepository.save(c);
-        });
+        return connectionRepository
+                .findActive(workspaceId, kind)
+                .filter(c -> {
+                    if (kind != IntegrationKind.GITLAB) return true;
+                    // Refresh after the lifecycle lock: a metadata update must retain a concurrent project stop.
+                    connectionRepository.acquireLifecycleLock(c.getId(), workspaceId);
+                    Objects.requireNonNull(entityManager).refresh(c);
+                    return c.getState() == IntegrationState.ACTIVE;
+                })
+                .map(c -> {
+                    ConnectionConfig next = mutator.apply(c.getConfig());
+                    if (next == null) {
+                        throw new IllegalArgumentException(
+                                "Mutator returned null for connection " + c.getId() + " — config must be non-null");
+                    }
+                    if (!next.getClass().equals(c.getConfig().getClass())) {
+                        throw new IllegalArgumentException("Mutator changed config variant on connection " + c.getId()
+                                + ": "
+                                + c.getConfig().getClass().getSimpleName()
+                                + " → "
+                                + next.getClass().getSimpleName());
+                    }
+                    boolean namespaceChanged = !Objects.equals(
+                            SourceProviderNamespaces.configuredUrl(c.getConfig()),
+                            SourceProviderNamespaces.configuredUrl(next));
+                    c.setConfig(next);
+                    if (namespaceChanged) sourceNamespaces.ensure(kind, next);
+                    return connectionRepository.save(c);
+                });
+    }
+
+    /** Explicit project stops also survive a paused connection and its later resumption. */
+    @Transactional
+    public Optional<Connection> updateGitLabProjectExclusions(
+            long workspaceId, UnaryOperator<ConnectionConfig.GitLabProjectExclusions> mutator) {
+        return connectionRepository
+                .findActive(workspaceId, IntegrationKind.GITLAB)
+                .or(() -> connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                        workspaceId, IntegrationKind.GITLAB, IntegrationState.SUSPENDED))
+                .filter(connection -> {
+                    connectionRepository.acquireLifecycleLock(connection.getId(), workspaceId);
+                    Objects.requireNonNull(entityManager).refresh(connection);
+                    return connection.getState() == IntegrationState.ACTIVE
+                            || connection.getState() == IntegrationState.SUSPENDED;
+                })
+                .filter(connection -> connection.getConfig() instanceof ConnectionConfig.GitLabConfig)
+                .map(connection -> {
+                    var config = (ConnectionConfig.GitLabConfig) connection.getConfig();
+                    connection.setConfig(config.withProjectExclusions(mutator.apply(config.projectExclusions())));
+                    return connectionRepository.save(connection);
+                });
     }
 
     /**
@@ -352,7 +383,8 @@ public class ConnectionService {
                             "github-install-" + installationId,
                             correlationId + "-retire-" + existing.getId(),
                             "Replaced by GitHub App installation " + installationId),
-                    null);
+                    null,
+                    /* fenceOnActiveSyncJob */ false);
         }
 
         Connection connection = connectionRepository
@@ -386,7 +418,8 @@ public class ConnectionService {
                             "github-install-" + installationId,
                             correlationId,
                             "Linked workspace to GitHub App installation " + installationId),
-                    null);
+                    null,
+                    /* fenceOnActiveSyncJob */ false);
         }
 
         return connection;
@@ -422,7 +455,8 @@ public class ConnectionService {
                             "scm-connection-provisioner",
                             correlationId,
                             "Provisioned PAT connection on workspace creation"),
-                    null);
+                    null,
+                    /* fenceOnActiveSyncJob */ false);
         }
 
         if (token != null && !token.isBlank()) {
@@ -445,7 +479,7 @@ public class ConnectionService {
      */
     @Transactional
     public Connection transition(Connection connection, TransitionRequest req) {
-        return applyTransition(connection, req, null);
+        return applyTransition(connection, req, null, /* fenceOnActiveSyncJob */ false);
     }
 
     /**
@@ -504,11 +538,6 @@ public class ConnectionService {
                     erase.run();
                 },
                 /* fenceOnActiveSyncJob */ false);
-    }
-
-    private Connection applyTransition(
-            Connection connection, TransitionRequest req, @Nullable Consumer<Connection> beforeLocalTransition) {
-        return applyTransition(connection, req, beforeLocalTransition, /* fenceOnActiveSyncJob */ false);
     }
 
     private Connection applyTransition(

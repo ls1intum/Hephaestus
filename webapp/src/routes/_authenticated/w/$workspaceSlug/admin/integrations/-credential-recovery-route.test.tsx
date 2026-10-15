@@ -1,4 +1,4 @@
-import { act, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { toast } from "sonner";
@@ -276,6 +276,117 @@ describe("source-control credential recovery", () => {
 		);
 		expect(installationLink.getAttribute("href")).toBe("https://github.com/settings/installations");
 		expect(screen.queryByLabelText("New personal access token")).toBeNull();
+	});
+});
+
+/** The workspace's monitored paths as the server lists them, and every Stop and Add it receives. */
+function serveMonitored(initial: string[]) {
+	const monitored = [...initial];
+	const commands: string[] = [];
+	const command = (request: Request) => {
+		const url = new URL(request.url);
+		const name = url.searchParams.get("nameWithOwner") ?? "";
+		commands.push(`${request.method} ${url.pathname} ${name}`);
+		return name;
+	};
+	server.use(
+		http.get("*/workspaces/:workspaceSlug/repositories", () => HttpResponse.json(monitored)),
+		http.delete("*/workspaces/:workspaceSlug/repositories", ({ request }) => {
+			monitored.splice(monitored.indexOf(command(request)), 1);
+			return new HttpResponse(null, { status: 204 });
+		}),
+		http.post("*/workspaces/:workspaceSlug/repositories", ({ request }) => {
+			monitored.push(command(request));
+			return new HttpResponse(null, { status: 201 });
+		}),
+	);
+	return { commands, command };
+}
+
+describe("monitored repositories", () => {
+	it("stops a GitLab repository, still lists it as stopped after a reload, and resumes it only when added", async () => {
+		const { entry } = mockConnection("GITLAB");
+		entry.credentialsUnreadableSince = undefined;
+		const { commands } = serveMonitored(["acme/platform/api"]);
+		renderRouteAt("/w/acme/admin/integrations/scm");
+		const user = userEvent.setup();
+		await user.click(
+			await screen.findByRole(
+				"button",
+				{ name: "Stop monitoring acme/platform/api" },
+				ROUTE_RENDER_WAIT,
+			),
+		);
+		const dialog = await screen.findByRole("alertdialog");
+		const description = within(dialog).getByText(/repository on GitLab is not affected/u);
+		expect(description.textContent).toContain("It stays stopped until you add it again below.");
+		expect(description.textContent).toContain("If no other workspace on this instance");
+		await user.click(within(dialog).getByRole("button", { name: "Stop monitoring" }));
+
+		await screen.findByText("No repositories monitored yet");
+		expect(commands).toStrictEqual(["DELETE /workspaces/acme/repositories acme/platform/api"]);
+
+		cleanup();
+		renderRouteAt("/w/acme/admin/integrations/scm");
+		await screen.findByText("No repositories monitored yet", undefined, ROUTE_RENDER_WAIT);
+		expect(screen.queryByText("acme/platform/api")).toBeNull();
+
+		await user.type(screen.getByLabelText("Add a repository"), "acme/platform/api");
+		await user.click(screen.getByRole("button", { name: "Add repository" }));
+		await screen.findByText("acme/platform/api");
+		expect(commands).toStrictEqual([
+			"DELETE /workspaces/acme/repositories acme/platform/api",
+			"POST /workspaces/acme/repositories acme/platform/api",
+		]);
+	});
+
+	it("does not list a GitLab repository again when adding it back fails", async () => {
+		const { entry } = mockConnection("GITLAB");
+		entry.credentialsUnreadableSince = undefined;
+		const { commands, command } = serveMonitored([]);
+		server.use(
+			http.post("*/workspaces/:workspaceSlug/repositories", ({ request }) => {
+				command(request);
+				return HttpResponse.json(
+					{ status: 503, title: "Service Unavailable", detail: "GitLab is unavailable." },
+					{ status: 503 },
+				);
+			}),
+		);
+		renderRouteAt("/w/acme/admin/integrations/scm");
+		const input = await screen.findByLabelText("Add a repository", undefined, ROUTE_RENDER_WAIT);
+		const user = userEvent.setup();
+		await user.type(input, "acme/platform/api");
+		await user.click(screen.getByRole("button", { name: "Add repository" }));
+
+		await screen.findByText("We could not add the repository");
+		expect(input.getAttribute("aria-invalid")).toBe("true");
+		expect(commands).toStrictEqual(["POST /workspaces/acme/repositories acme/platform/api"]);
+		screen.getByText("No repositories monitored yet");
+		expect(screen.queryByText("acme/platform/api")).toBeNull();
+	});
+
+	it("explains a GitHub Stop with the shared outcome and no GitLab-only promise", async () => {
+		const { entry } = mockConnection("GITHUB");
+		entry.credentialsUnreadableSince = undefined;
+		serveMonitored(["octocat/hello-world"]);
+		renderRouteAt("/w/acme/admin/integrations/scm");
+		await userEvent
+			.setup()
+			.click(
+				await screen.findByRole(
+					"button",
+					{ name: "Stop monitoring octocat/hello-world" },
+					ROUTE_RENDER_WAIT,
+				),
+			);
+
+		const dialog = await screen.findByRole("alertdialog");
+		const description = within(dialog).getByText(/repository on GitHub is not affected/u);
+		expect(description.textContent).toContain("If no other workspace on this instance");
+		expect(description.textContent).toContain("To sync it again, add it below.");
+		expect(description.textContent).not.toContain("stays stopped");
+		expect(description.textContent).not.toContain("permanently");
 	});
 });
 

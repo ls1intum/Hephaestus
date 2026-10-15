@@ -18,6 +18,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.RepositoryKey;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashSet;
@@ -38,6 +39,8 @@ import org.springframework.stereotype.Service;
 @Service
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabCommitBackfillService {
+
+    private final GitLabProjectAdmission admission;
 
     private static final Logger log = LoggerFactory.getLogger(GitLabCommitBackfillService.class);
 
@@ -64,7 +67,9 @@ public class GitLabCommitBackfillService {
             CommitDetailsPersister persister,
             CommitContributorRepository contributorRepository,
             CommitAuthorResolver authorResolver,
-            SyncTargetProvider syncTargetProvider) {
+            SyncTargetProvider syncTargetProvider,
+            GitLabProjectAdmission admission) {
+        this.admission = admission;
         this.syncTargetProvider = syncTargetProvider;
         this.gitRepositoryManager = gitRepositoryManager;
         this.tokenService = tokenService;
@@ -82,6 +87,13 @@ public class GitLabCommitBackfillService {
      *     local Git checkout is disabled
      */
     public SyncResult backfillCommits(Long scopeId, Repository repository) {
+        return admission
+                .capture(scopeId, repository)
+                .map(read -> backfillCommits(scopeId, repository, read))
+                .orElseGet(() -> SyncResult.completed(0));
+    }
+
+    public SyncResult backfillCommits(Long scopeId, Repository repository, GitLabProjectAdmission.ProjectRead read) {
         if (syncTargetProvider.getSyncTargetsForScope(scopeId).stream()
                 .anyMatch(target -> (target.repositoryNameWithOwner().equals(repository.getNameWithOwner())
                                 || (target.nativeId() != null
@@ -138,13 +150,19 @@ public class GitLabCommitBackfillService {
             gitRepositoryManager.forEachMissingCommit(
                     key,
                     shas -> commitRepository.findGitDetailsCapturedShas(repoId, shas),
-                    info -> outcomes.merge(persister.persist(info, repository, origin), 1, Integer::sum));
+                    info -> outcomes.merge(
+                            admission
+                                    .write(read, () -> persister.persist(info, repository, origin))
+                                    .orElse(Outcome.FAILED),
+                            1,
+                            Integer::sum));
             log.info(
                     "Completed commit backfill: repoId={}, capturedCommits={}, failedCommits={}, scope=all-branches",
                     repoId,
                     outcomes.getOrDefault(Outcome.CAPTURED, 0),
                     outcomes.getOrDefault(Outcome.FAILED, 0));
-            return SyncResult.completed(outcomes.getOrDefault(Outcome.CAPTURED, 0));
+            int captured = outcomes.getOrDefault(Outcome.CAPTURED, 0);
+            return admission.current(read) ? SyncResult.completed(captured) : SyncResult.completed(0);
         } catch (GitRepositoryManager.GitOperationException e) {
             log.error(
                     "Commit backfill failed (git operation): repoId={}, repoName={}, error={}",

@@ -24,6 +24,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhook
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookUser;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest.dto.GitLabMergeRequestEventDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcomment.GitLabDiscussionSyncService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.nats.client.Message;
 import io.nats.client.impl.NatsJetStreamMetaData;
@@ -31,6 +32,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -102,7 +104,10 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
                 deserializer,
                 transactionTemplate);
 
-        lenient().when(contextResolver.mayStillWrite(any())).thenReturn(true);
+        var originalRead = new GitLabProjectAdmission.ProjectRead(
+                new GitLabProjectAdmission.ConnectionRead(1L, 1L, 1L, "org", Map.of()), 1L, 278964L, 1L);
+        lenient().when(contextResolver.capture(any())).thenReturn(Optional.of(originalRead));
+        lenient().when(contextResolver.mayStillWrite(any(), any())).thenReturn(true);
         lenient()
                 .when(mergeRequestProcessor.storedVersion(any(), anyInt()))
                 .thenReturn(Optional.of(new GitLabMergeRequestProcessor.StoredVersion("abc123", null)));
@@ -249,7 +254,7 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
             GitLabMergeRequestEventDTO event = createEvent("merge", "merged", false);
             setupRepository();
             when(readinessReader.read(eq(1L), anyString(), eq(5))).thenReturn(facts());
-            when(contextResolver.mayStillWrite(any())).thenReturn(false);
+            when(contextResolver.mayStillWrite(any(), any())).thenReturn(false);
 
             handler.onMessage(mockMessage(event));
 
@@ -274,7 +279,7 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
             setupRepository();
             when(readinessReader.read(eq(1L), anyString(), eq(5))).thenReturn(facts());
             when(closingIssueClient.closesIssues(1L, 278964L, 5)).thenReturn(List.of(41));
-            when(contextResolver.mayStillWrite(any())).thenReturn(false);
+            when(contextResolver.mayStillWrite(any(), any())).thenReturn(false);
 
             handler.onMessage(mockMessage(event));
 

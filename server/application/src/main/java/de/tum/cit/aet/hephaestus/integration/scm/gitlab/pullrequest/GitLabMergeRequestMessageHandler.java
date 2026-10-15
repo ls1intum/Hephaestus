@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabWebhookContextResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest.dto.GitLabMergeRequestEventDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcomment.GitLabDiscussionSyncService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
@@ -90,7 +91,10 @@ public class GitLabMergeRequestMessageHandler extends AbstractIntegrationMessage
     }
 
     /** An event stored in its transaction, with the version of the merge request it left stored. */
-    private record Stored(ProcessingContext context, GitLabMergeRequestProcessor.StoredVersion version) {}
+    private record Stored(
+            ProcessingContext context,
+            GitLabMergeRequestProcessor.StoredVersion version,
+            GitLabProjectAdmission.ProjectRead read) {}
 
     /**
      * The event is stored in the short transaction. GitLab's webhook carries none of the merge request's readiness —
@@ -118,9 +122,11 @@ public class GitLabMergeRequestMessageHandler extends AbstractIntegrationMessage
             if (context == null || context.repository() == null || attributes == null || attributes.iid() == null) {
                 return null;
             }
+            var read = contextResolver.capture(context).orElse(null);
+            if (read == null) return null;
             return mergeRequestProcessor
                     .storedVersion(context.repository(), attributes.iid())
-                    .map(version -> new Stored(context, version))
+                    .map(version -> new Stored(context, version, read))
                     .orElse(null);
         });
         GitLabEventAction action = event.actionType();
@@ -150,7 +156,7 @@ public class GitLabMergeRequestMessageHandler extends AbstractIntegrationMessage
             return;
         }
         transactionTemplate.executeWithoutResult(status -> {
-            if (!contextResolver.mayStillWrite(stored.context())) {
+            if (!contextResolver.mayStillWrite(stored.context(), stored.read())) {
                 return;
             }
             if (closing != null) {

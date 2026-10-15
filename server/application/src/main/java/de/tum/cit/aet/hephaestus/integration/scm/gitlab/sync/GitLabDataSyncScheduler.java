@@ -43,6 +43,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository.GitLabProject
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository.collaborator.GitLabCollaboratorSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.subissue.GitLabSubIssueSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.team.GitLabTeamSyncService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabRepositoryMonitors;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabWorkspaceInitializationService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceActorSelector;
@@ -119,6 +120,7 @@ public class GitLabDataSyncScheduler {
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceActorSelector actorSelector;
     private final GitLabProjectSyncService projectSyncService;
+    private final GitLabProjectAdmission admission;
 
     public GitLabDataSyncScheduler(
             SyncTargetProvider syncTargetProvider,
@@ -137,7 +139,8 @@ public class GitLabDataSyncScheduler {
             WorkspaceRepository workspaceRepository,
             WorkspaceActorSelector actorSelector,
             GitLabProjectSyncService projectSyncService,
-            ActivityLedgerRepair activityLedgerRepair) {
+            ActivityLedgerRepair activityLedgerRepair,
+            GitLabProjectAdmission admission) {
         this.syncTargetProvider = syncTargetProvider;
         this.syncContextProvider = syncContextProvider;
         this.organizationRepository = organizationRepository;
@@ -155,6 +158,7 @@ public class GitLabDataSyncScheduler {
         this.actorSelector = actorSelector;
         this.projectSyncService = projectSyncService;
         this.activityLedgerRepair = activityLedgerRepair;
+        this.admission = admission;
     }
 
     @PostConstruct
@@ -321,12 +325,13 @@ public class GitLabDataSyncScheduler {
             // Phase 3: Per-repository sync (labels, milestones, issues, MRs, collaborators) —
             // the dominant-cost phase, where cancel/progress are threaded through the handle.
             Map<Long, String> resourceErrors = new HashMap<>();
-            List<Repository> availableRepos = syncRepositories(services, session, handle, resourceErrors);
+            Map<Long, GitLabProjectAdmission.ProjectRead> reads = new HashMap<>();
+            List<Repository> availableRepos = syncRepositories(services, session, handle, resourceErrors, reads);
 
             // A cancel observed during the repo phase skips the remaining phases (cooperative best-effort).
             if (handle == null || !handle.isCancellationRequested()) {
                 // Phase 4: Post-repo sync (sub-issues, dependencies — needs issues to exist)
-                syncPostRepo(services, session, handle, resourceErrors, availableRepos);
+                syncPostRepo(services, session, handle, resourceErrors, availableRepos, reads);
             }
 
             resourceErrors.forEach((targetId, error) -> {
@@ -540,7 +545,8 @@ public class GitLabDataSyncScheduler {
             GitLabSyncServiceHolder services,
             SyncSession session,
             @Nullable SyncExecutionHandle handle,
-            Map<Long, String> resourceErrors) {
+            Map<Long, String> resourceErrors,
+            Map<Long, GitLabProjectAdmission.ProjectRead> reads) {
         GitLabLabelSyncService labelSync = services.getLabelSyncService();
         GitLabMilestoneSyncService milestoneSync = services.getMilestoneSyncService();
         GitLabIssueSyncService issueSync = services.getIssueSyncService();
@@ -595,6 +601,26 @@ public class GitLabDataSyncScheduler {
                 break;
             }
 
+            // Look up the sync-target id from the session so each phase can write its
+            // per-repo watermark via the SPI. Not all repositories have an entry in the
+            // refreshed targets (edge case); without a monitor, do not fetch the row.
+            Long rtmId = syncTargetIdsByNameWithOwner.get(repo.getNameWithOwner());
+
+            if (rtmId == null) continue;
+            var read = admission
+                    .capture(session.scopeId(), repo)
+                    .filter(captured -> captured.monitorId() == rtmId)
+                    .orElse(null);
+            if (read == null) continue;
+            reads.put(repo.getId(), read);
+            var deferred = admission.write(
+                    read, () -> syncTargetProvider.deferUnavailableRepository(session.scopeId(), rtmId));
+            if (deferred.isEmpty()) continue;
+            if (deferred.get()) {
+                reportWarning(handle);
+                continue;
+            }
+
             // Wait for rate limit if critical
             if (rateLimitTracker != null && rateLimitTracker.isCritical(session.scopeId())) {
                 log.info(
@@ -606,6 +632,7 @@ public class GitLabDataSyncScheduler {
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     log.info("Rate limit wait interrupted, stopping repo sync: scopeId={}", session.scopeId());
+                    if (!admission.current(read)) break;
                     reportWarning(handle);
                     break;
                 }
@@ -618,26 +645,24 @@ public class GitLabDataSyncScheduler {
                 updatedAfter = buffered.atOffset(ZoneOffset.UTC);
             }
 
-            // Look up the sync-target id from the session so each phase can write its
-            // per-repo watermark via the SPI. Not all repositories have an entry in the
-            // refreshed targets (edge case); without a monitor, do not fetch the row.
-            Long rtmId = syncTargetIdsByNameWithOwner.get(repo.getNameWithOwner());
-
-            if (rtmId == null || syncTargetProvider.deferUnavailableRepository(session.scopeId(), rtmId)) {
-                reportWarning(handle);
-                continue;
-            }
             Instant metadataRequestedAt = Instant.now();
             try {
                 var metadata = repo.getNativeId() != null
                         ? projectSyncService.fetchProjectById(session.scopeId(), repo.getNativeId())
                         : projectSyncService.fetchProject(session.scopeId(), repo.getNameWithOwner());
+                if (!admission.current(read)) continue;
                 if (metadata.isEmpty()) {
                     syncTargetProvider.recordRepositoryUnavailable(session.scopeId(), rtmId);
                     reportWarning(handle);
                     continue;
                 }
-                var refreshed = projectSyncService.persistProject(metadata.get(), repo.getProvider());
+                Repository beforeRefresh = repo;
+                var refreshed = admission.write(
+                        read,
+                        () -> projectSyncService
+                                .persistProject(metadata.get(), beforeRefresh.getProvider())
+                                .orElse(null));
+                if (!admission.current(read)) continue;
                 if (refreshed.isEmpty()) {
                     syncTargetProvider.retryUnavailableRepository(session.scopeId(), rtmId);
                     resourceErrors.put(rtmId, "Repository metadata sync failed");
@@ -647,14 +672,19 @@ public class GitLabDataSyncScheduler {
                 repo = refreshed.get();
                 syncTargetProvider.reconcileSyncTargetIdentity(rtmId, repo.getNativeId(), repo.getNameWithOwner());
                 syncTargetProvider.clearRepositoryUnavailable(session.scopeId(), rtmId);
-                syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.REPOSITORY_VISIBILITY, metadataRequestedAt);
+                admission.runWrite(
+                        read,
+                        () -> syncTargetProvider.updateSyncTimestamp(
+                                rtmId, SyncType.REPOSITORY_VISIBILITY, metadataRequestedAt));
                 availableRepos.add(repo);
                 availableTargetIds.put(repo.getId(), rtmId);
             } catch (RepositoryNotFoundOnGitProviderException | WebClientResponseException.NotFound e) {
+                if (!admission.current(read)) continue;
                 syncTargetProvider.recordRepositoryUnavailable(session.scopeId(), rtmId);
                 reportWarning(handle);
                 continue;
             } catch (Exception e) {
+                if (!admission.current(read)) continue;
                 // A refused credential, rate limit, partial response or transport failure is not absence.
                 syncTargetProvider.retryUnavailableRepository(session.scopeId(), rtmId);
                 resourceErrors.put(rtmId, "Repository metadata sync failed");
@@ -669,7 +699,8 @@ public class GitLabDataSyncScheduler {
             // Labels
             if (labelSync != null) {
                 try {
-                    SyncResult r = labelSync.syncLabelsForRepository(session.scopeId(), repo);
+                    SyncResult r = labelSync.syncLabelsForRepository(session.scopeId(), repo, read);
+                    if (!admission.current(read)) continue;
                     totalLabels += r.count();
                     if (r.status() != SyncResult.Status.COMPLETED) {
                         if (error == null) {
@@ -678,9 +709,12 @@ public class GitLabDataSyncScheduler {
                         reportWarning(handle);
                     }
                     if (rtmId != null && r.isCompleted()) {
-                        syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.LABELS, Instant.now());
+                        admission.runWrite(
+                                read,
+                                () -> syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.LABELS, Instant.now()));
                     }
                 } catch (Exception e) {
+                    if (!admission.current(read)) continue;
                     if (error == null) {
                         error = "Label sync failed (" + e.getClass().getSimpleName() + ")";
                     }
@@ -692,7 +726,8 @@ public class GitLabDataSyncScheduler {
             // Milestones
             if (milestoneSync != null) {
                 try {
-                    SyncResult r = milestoneSync.syncMilestonesForRepository(session.scopeId(), repo);
+                    SyncResult r = milestoneSync.syncMilestonesForRepository(session.scopeId(), repo, read);
+                    if (!admission.current(read)) continue;
                     totalMilestones += r.count();
                     if (r.status() != SyncResult.Status.COMPLETED) {
                         if (error == null) {
@@ -701,9 +736,13 @@ public class GitLabDataSyncScheduler {
                         reportWarning(handle);
                     }
                     if (rtmId != null && r.isCompleted()) {
-                        syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.MILESTONES, Instant.now());
+                        admission.runWrite(
+                                read,
+                                () -> syncTargetProvider.updateSyncTimestamp(
+                                        rtmId, SyncType.MILESTONES, Instant.now()));
                     }
                 } catch (Exception e) {
+                    if (!admission.current(read)) continue;
                     if (error == null) {
                         error = "Milestone sync failed (" + e.getClass().getSimpleName() + ")";
                     }
@@ -719,7 +758,8 @@ public class GitLabDataSyncScheduler {
             // Issues
             if (issueSync != null) {
                 try {
-                    SyncResult r = issueSync.syncIssues(session.scopeId(), repo, updatedAfter);
+                    SyncResult r = issueSync.syncIssues(session.scopeId(), repo, updatedAfter, read);
+                    if (!admission.current(read)) continue;
                     totalIssues += r.count();
                     if (error == null && r.status() != SyncResult.Status.COMPLETED) {
                         error = "Issue sync: " + r.status();
@@ -729,9 +769,12 @@ public class GitLabDataSyncScheduler {
                         reportWarning(handle);
                     }
                     if (rtmId != null && issuesDone) {
-                        syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.ISSUES, Instant.now());
+                        admission.runWrite(
+                                read,
+                                () -> syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.ISSUES, Instant.now()));
                     }
                 } catch (Exception e) {
+                    if (!admission.current(read)) continue;
                     if (error == null) {
                         error = "Issue sync failed (" + e.getClass().getSimpleName() + ")";
                     }
@@ -743,7 +786,8 @@ public class GitLabDataSyncScheduler {
             // Merge Requests
             if (mrSync != null) {
                 try {
-                    SyncResult r = mrSync.syncMergeRequests(session.scopeId(), repo, updatedAfter);
+                    SyncResult r = mrSync.syncMergeRequests(session.scopeId(), repo, updatedAfter, read);
+                    if (!admission.current(read)) continue;
                     totalMRs += r.count();
                     if (error == null && r.status() != SyncResult.Status.COMPLETED) {
                         error = "Merge request sync: " + r.status();
@@ -753,9 +797,13 @@ public class GitLabDataSyncScheduler {
                         reportWarning(handle);
                     }
                     if (rtmId != null && mrsDone) {
-                        syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.PULL_REQUESTS, Instant.now());
+                        admission.runWrite(
+                                read,
+                                () -> syncTargetProvider.updateSyncTimestamp(
+                                        rtmId, SyncType.PULL_REQUESTS, Instant.now()));
                     }
                 } catch (Exception e) {
+                    if (!admission.current(read)) continue;
                     if (error == null) {
                         error = "Merge request sync failed (" + e.getClass().getSimpleName() + ")";
                     }
@@ -767,7 +815,8 @@ public class GitLabDataSyncScheduler {
             // Collaborators
             if (collaboratorSync != null) {
                 try {
-                    SyncResult r = collaboratorSync.syncCollaboratorsForRepository(session.scopeId(), repo);
+                    SyncResult r = collaboratorSync.syncCollaboratorsForRepository(session.scopeId(), repo, read);
+                    if (!admission.current(read)) continue;
                     totalCollaborators += r.count();
                     if (r.status() != SyncResult.Status.COMPLETED) {
                         if (error == null) {
@@ -776,9 +825,13 @@ public class GitLabDataSyncScheduler {
                         reportWarning(handle);
                     }
                     if (rtmId != null && r.isCompleted()) {
-                        syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.COLLABORATORS, Instant.now());
+                        admission.runWrite(
+                                read,
+                                () -> syncTargetProvider.updateSyncTimestamp(
+                                        rtmId, SyncType.COLLABORATORS, Instant.now()));
                     }
                 } catch (Exception e) {
+                    if (!admission.current(read)) continue;
                     if (error == null) {
                         error = "Collaborator sync failed (" + e.getClass().getSimpleName() + ")";
                     }
@@ -795,7 +848,8 @@ public class GitLabDataSyncScheduler {
             // runs only when no backfill bean exists.
             if (commitBackfill != null) {
                 try {
-                    SyncResult r = commitBackfill.backfillCommits(session.scopeId(), repo);
+                    SyncResult r = commitBackfill.backfillCommits(session.scopeId(), repo, read);
+                    if (!admission.current(read)) continue;
                     totalCommits += r.count();
                     if (r.status() != SyncResult.Status.COMPLETED) {
                         if (error == null) {
@@ -804,6 +858,7 @@ public class GitLabDataSyncScheduler {
                         reportWarning(handle);
                     }
                 } catch (Exception e) {
+                    if (!admission.current(read)) continue;
                     if (error == null) {
                         error = "Commit backfill sync failed (" + e.getClass().getSimpleName() + ")";
                     }
@@ -816,7 +871,8 @@ public class GitLabDataSyncScheduler {
                 }
             } else if (commitSync != null) {
                 try {
-                    SyncResult r = commitSync.syncCommitsForRepository(session.scopeId(), repo, updatedAfter);
+                    SyncResult r = commitSync.syncCommitsForRepository(session.scopeId(), repo, updatedAfter, read);
+                    if (!admission.current(read)) continue;
                     totalCommits += r.count();
                     if (r.status() != SyncResult.Status.COMPLETED) {
                         if (error == null) {
@@ -825,6 +881,7 @@ public class GitLabDataSyncScheduler {
                         reportWarning(handle);
                     }
                 } catch (Exception e) {
+                    if (!admission.current(read)) continue;
                     if (error == null) {
                         error = "Commit sync failed (" + e.getClass().getSimpleName() + ")";
                     }
@@ -844,10 +901,11 @@ public class GitLabDataSyncScheduler {
             boolean allDone =
                     attempted && error == null && (issueSync == null || issuesDone) && (mrSync == null || mrsDone);
             if (allDone) {
-                repositoryRepository.updateLastSyncAt(repo.getId(), Instant.now());
-                if (rtmId != null) {
-                    syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.FULL_REPOSITORY, Instant.now());
-                }
+                admission.runWrite(read, () -> {
+                    Instant completedAt = Instant.now();
+                    repositoryRepository.updateLastSyncAt(read.repositoryId(), completedAt);
+                    syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.FULL_REPOSITORY, completedAt);
+                });
             }
             if (rtmId != null && attempted) {
                 resourceErrors.put(rtmId, error);
@@ -874,13 +932,16 @@ public class GitLabDataSyncScheduler {
         // repo may not have synced its MRs when this repo's commits were fetched).
         if (commitMrLinker != null && (handle == null || !handle.isCancellationRequested())) {
             for (Repository repo : availableRepos) {
+                var read = reads.get(repo.getId());
+                if (read == null || !admission.current(read)) continue;
                 OffsetDateTime repoUpdatedAfter = null;
                 if (repo.getLastSyncAt() != null) {
                     Instant buffered = repo.getLastSyncAt().minus(Duration.ofMinutes(5));
                     repoUpdatedAfter = buffered.atOffset(ZoneOffset.UTC);
                 }
                 try {
-                    SyncResult result = commitMrLinker.linkCommits(session.scopeId(), repo, repoUpdatedAfter);
+                    SyncResult result = commitMrLinker.linkCommits(session.scopeId(), repo, repoUpdatedAfter, read);
+                    if (!admission.current(read)) continue;
                     Long targetId = availableTargetIds.get(repo.getId());
                     if (targetId != null) {
                         resourceErrors.putIfAbsent(
@@ -890,6 +951,7 @@ public class GitLabDataSyncScheduler {
                                         : "Commit linking: " + result.status());
                     }
                 } catch (Exception e) {
+                    if (!admission.current(read)) continue;
                     Long targetId = availableTargetIds.get(repo.getId());
                     if (targetId != null) {
                         resourceErrors.putIfAbsent(
@@ -907,9 +969,13 @@ public class GitLabDataSyncScheduler {
         }
 
         for (Repository repo : availableRepos) {
+            var read = reads.get(repo.getId());
+            if (read == null || !admission.current(read)) continue;
             try {
-                activityLedgerRepair.reconcileRepository(session.scopeId(), repo.getId());
+                admission.runWrite(
+                        read, () -> activityLedgerRepair.reconcileRepository(session.scopeId(), repo.getId()));
             } catch (RuntimeException e) {
+                if (!admission.current(read)) continue;
                 log.warn(
                         "Activity ledger repair failed: workspaceId={}, repositoryId={}",
                         session.scopeId(),
@@ -937,7 +1003,8 @@ public class GitLabDataSyncScheduler {
             SyncSession session,
             @Nullable SyncExecutionHandle handle,
             Map<Long, String> resourceErrors,
-            List<Repository> repos) {
+            List<Repository> repos,
+            Map<Long, GitLabProjectAdmission.ProjectRead> reads) {
         GitLabSubIssueSyncService subIssueSync = services.getSubIssueSyncService();
         GitLabIssueDependencySyncService depSync = services.getIssueDependencySyncService();
 
@@ -949,6 +1016,8 @@ public class GitLabDataSyncScheduler {
                 .collect(Collectors.toMap(SyncTarget::repositoryNameWithOwner, SyncTarget::id, (a, b) -> a));
 
         for (Repository repo : repos) {
+            var read = reads.get(repo.getId());
+            if (read == null || !admission.current(read)) continue;
             Long syncTargetId = syncTargetIdsByName.get(repo.getNameWithOwner());
             if (syncTargetId != null && syncTargetProvider.isRepositoryUnavailable(session.scopeId(), syncTargetId)) {
                 continue;
@@ -958,7 +1027,8 @@ public class GitLabDataSyncScheduler {
             }
             if (subIssueSync != null) {
                 try {
-                    SyncResult r = subIssueSync.syncSubIssuesForRepository(session.scopeId(), repo);
+                    SyncResult r = subIssueSync.syncSubIssuesForRepository(session.scopeId(), repo, read);
+                    if (!admission.current(read)) continue;
                     totalSubIssues += r.count();
                     if (r.status() != SyncResult.Status.COMPLETED) {
                         if (syncTargetId != null) {
@@ -967,6 +1037,7 @@ public class GitLabDataSyncScheduler {
                         reportWarning(handle);
                     }
                 } catch (Exception e) {
+                    if (!admission.current(read)) continue;
                     if (syncTargetId != null) {
                         resourceErrors.putIfAbsent(
                                 syncTargetId,
@@ -982,7 +1053,8 @@ public class GitLabDataSyncScheduler {
             }
             if (depSync != null) {
                 try {
-                    SyncResult r = depSync.syncDependenciesForRepository(session.scopeId(), repo);
+                    SyncResult r = depSync.syncDependenciesForRepository(session.scopeId(), repo, null, read);
+                    if (!admission.current(read)) continue;
                     totalDeps += r.count();
                     if (r.status() != SyncResult.Status.COMPLETED) {
                         if (syncTargetId != null) {
@@ -991,6 +1063,7 @@ public class GitLabDataSyncScheduler {
                         reportWarning(handle);
                     }
                 } catch (Exception e) {
+                    if (!admission.current(read)) continue;
                     if (syncTargetId != null) {
                         resourceErrors.putIfAbsent(
                                 syncTargetId,

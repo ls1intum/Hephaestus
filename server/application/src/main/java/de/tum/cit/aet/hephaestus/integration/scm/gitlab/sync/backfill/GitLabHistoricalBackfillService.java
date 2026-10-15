@@ -21,6 +21,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncServiceHolder;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issue.GitLabIssueSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest.GitLabMergeRequestSyncService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.integration.scm.sync.status.BackfillTally;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceActorSelector;
 import java.time.Duration;
@@ -28,7 +29,9 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,6 +61,7 @@ public class GitLabHistoricalBackfillService {
 
     private final ActivityLedgerRepair activityLedgerRepair;
     private final PullRequestRepository pullRequests;
+    private final GitLabProjectAdmission admission;
     private final SyncTargetProvider syncTargetProvider;
     private final RepositoryRepository repositoryRepository;
     private final WorkspaceActorSelector actorSelector;
@@ -74,7 +78,8 @@ public class GitLabHistoricalBackfillService {
             ObjectProvider<GitLabSyncServiceHolder> syncServiceHolderProvider,
             SyncSchedulerProperties syncSchedulerProperties,
             ActivityLedgerRepair activityLedgerRepair,
-            PullRequestRepository pullRequests) {
+            PullRequestRepository pullRequests,
+            GitLabProjectAdmission admission) {
         this.syncTargetProvider = syncTargetProvider;
         this.repositoryRepository = repositoryRepository;
         this.actorSelector = actorSelector;
@@ -82,6 +87,7 @@ public class GitLabHistoricalBackfillService {
         this.syncSchedulerProperties = syncSchedulerProperties;
         this.activityLedgerRepair = activityLedgerRepair;
         this.pullRequests = pullRequests;
+        this.admission = admission;
     }
 
     /**
@@ -110,7 +116,12 @@ public class GitLabHistoricalBackfillService {
                 var repo = repositoryRepository
                         .findByNameWithOwnerAndProviderId(target.repositoryNameWithOwner(), providerId)
                         .orElseThrow(() -> new IllegalStateException("Stored repository not found"));
-                activityLedgerRepair.reconcileRepository(workspaceId, repo.getId());
+                var read = admission
+                        .capture(workspaceId, repo)
+                        .filter(captured -> captured.monitorId() == target.id())
+                        .orElse(null);
+                if (read == null) continue;
+                admission.runWrite(read, () -> activityLedgerRepair.reconcileRepository(workspaceId, repo.getId()));
                 if (!target.isPullRequestBackfillComplete()) continue;
                 var services = syncServiceHolderProvider.getIfAvailable();
                 var mergeRequests = services != null ? services.getMergeRequestSyncService() : null;
@@ -118,7 +129,9 @@ public class GitLabHistoricalBackfillService {
                 int total = mergeRequests.countMergeRequests(workspaceId, target.repositoryNameWithOwner());
                 long stored = pullRequests.countStoredByRepositoryId(repo.getId());
                 if (BackfillRestartProvider.hasMaterialGap(stored, total))
-                    syncTargetProvider.restartCompletedBackfill(workspaceId, target.id(), total, stored);
+                    admission.runWrite(
+                            read,
+                            () -> syncTargetProvider.restartCompletedBackfill(workspaceId, target.id(), total, stored));
             } catch (RuntimeException e) {
                 log.warn(
                         "Repository history repair failed: workspaceId={}, syncTargetId={}",
@@ -205,7 +218,14 @@ public class GitLabHistoricalBackfillService {
                 if (repoOpt.isEmpty()) continue;
                 Repository repo = repoOpt.get();
 
-                boolean worked = backfillRepository(session.scopeId(), repo, target, issueSync, mrSync, batchSize);
+                var read = admission
+                        .capture(session.scopeId(), repo)
+                        .filter(captured -> captured.monitorId() == target.id())
+                        .orElse(null);
+                if (read == null) continue;
+                boolean worked =
+                        backfillRepository(session.scopeId(), repo, target, issueSync, mrSync, batchSize, read);
+                if (!admission.current(read)) continue;
 
                 if (worked) {
                     processed++;
@@ -223,8 +243,8 @@ public class GitLabHistoricalBackfillService {
                             tally.itemsTotal(),
                             SyncProgress.ofResource(
                                     SyncPhase.REPOSITORIES,
-                                    "Backfilled " + target.repositoryNameWithOwner() + ": " + reposDone + " of "
-                                            + reposTotal,
+                                    "Checked history for " + target.repositoryNameWithOwner() + ": " + reposDone
+                                            + " of " + reposTotal,
                                     target.repositoryNameWithOwner(),
                                     reposDone,
                                     reposTotal));
@@ -235,13 +255,27 @@ public class GitLabHistoricalBackfillService {
         return processed;
     }
 
+    public Set<Long> pendingTargetIds(long workspaceId) {
+        return syncTargetProvider.getSyncSession(workspaceId, IntegrationKind.GITLAB).stream()
+                .flatMap(session -> session.syncTargets().stream())
+                .filter(target -> !target.isBackfillComplete())
+                .map(SyncTarget::id)
+                .collect(Collectors.toUnmodifiableSet());
+    }
+
+    public boolean hasPendingTargets(long workspaceId, Set<Long> originalIds) {
+        return pendingTargetIds(workspaceId).stream().anyMatch(originalIds::contains);
+    }
+
     private boolean backfillRepository(
             Long scopeId,
             Repository repo,
             SyncTarget target,
             @Nullable GitLabIssueSyncService issueSync,
             @Nullable GitLabMergeRequestSyncService mrSync,
-            int batchSize) {
+            int batchSize,
+            GitLabProjectAdmission.ProjectRead read) {
+        if (!admission.current(read)) return false;
         String safeName = sanitizeForLog(repo.getNameWithOwner());
         boolean didWork = false;
         boolean attempted = false;
@@ -251,29 +285,37 @@ public class GitLabHistoricalBackfillService {
             attempted = true;
             try {
                 BackfillBatchResult result =
-                        issueSync.backfillIssues(scopeId, repo, target.issueSyncCursor(), batchSize);
+                        issueSync.backfillIssues(scopeId, repo, target.issueSyncCursor(), batchSize, read);
 
+                if (!admission.current(read)) return didWork;
                 if (result.aborted()) {
-                    syncTargetProvider.updateSyncError(
-                            target.id(), SyncPass.HISTORICAL_BACKFILL, "Historical issue backfill aborted");
+                    admission.runWrite(
+                            read,
+                            () -> syncTargetProvider.updateSyncError(
+                                    target.id(), SyncPass.HISTORICAL_BACKFILL, "Historical issue backfill aborted"));
                     repositoryCooldowns.put(target.id(), Cooldown.afterError(COOLDOWN_ERROR));
                     return false;
                 }
 
                 if (result.count() > 0) {
                     didWork = true;
-                    updateIssueBackfillState(target, result);
+                    admission.runWrite(read, () -> updateIssueBackfillState(target, result));
                 }
 
                 if (result.complete() && result.count() == 0 && !target.isIssueBackfillInitialized()) {
                     // No issues at all — mark as complete
-                    syncTargetProvider.updateIssueBackfillState(target.id(), 0, 0, null);
+                    admission.runWrite(
+                            read, () -> syncTargetProvider.updateIssueBackfillState(target.id(), 0, 0, null));
                 }
             } catch (Exception e) {
-                syncTargetProvider.updateSyncError(
-                        target.id(),
-                        SyncPass.HISTORICAL_BACKFILL,
-                        "Historical issue backfill failed (" + e.getClass().getSimpleName() + ")");
+                if (!admission.current(read)) return didWork;
+                admission.runWrite(
+                        read,
+                        () -> syncTargetProvider.updateSyncError(
+                                target.id(),
+                                SyncPass.HISTORICAL_BACKFILL,
+                                "Historical issue backfill failed ("
+                                        + e.getClass().getSimpleName() + ")"));
                 log.warn("Issue backfill failed: repo={}", safeName, e);
                 repositoryCooldowns.put(target.id(), Cooldown.afterError(COOLDOWN_ERROR));
                 return didWork;
@@ -285,53 +327,65 @@ public class GitLabHistoricalBackfillService {
             attempted = true;
             try {
                 BackfillBatchResult result =
-                        mrSync.backfillMergeRequests(scopeId, repo, target.pullRequestSyncCursor(), batchSize);
+                        mrSync.backfillMergeRequests(scopeId, repo, target.pullRequestSyncCursor(), batchSize, read);
 
+                if (!admission.current(read)) return didWork;
                 if (result.aborted()) {
-                    syncTargetProvider.updateSyncError(
-                            target.id(), SyncPass.HISTORICAL_BACKFILL, "Historical merge request backfill aborted");
+                    admission.runWrite(
+                            read,
+                            () -> syncTargetProvider.updateSyncError(
+                                    target.id(),
+                                    SyncPass.HISTORICAL_BACKFILL,
+                                    "Historical merge request backfill aborted"));
                     repositoryCooldowns.put(target.id(), Cooldown.afterError(COOLDOWN_ERROR));
                     return didWork;
                 }
 
                 if (result.count() > 0) {
                     didWork = true;
-                    updateMrBackfillState(target, result);
+                    admission.runWrite(read, () -> updateMrBackfillState(target, result));
                 }
 
                 if (result.complete() && result.count() == 0 && !target.isPullRequestBackfillInitialized()) {
-                    syncTargetProvider.updatePullRequestBackfillState(target.id(), 0, 0, null);
+                    admission.runWrite(
+                            read, () -> syncTargetProvider.updatePullRequestBackfillState(target.id(), 0, 0, null));
                 }
             } catch (Exception e) {
-                syncTargetProvider.updateSyncError(
-                        target.id(),
-                        SyncPass.HISTORICAL_BACKFILL,
-                        "Historical merge request backfill failed ("
-                                + e.getClass().getSimpleName() + ")");
+                if (!admission.current(read)) return didWork;
+                admission.runWrite(
+                        read,
+                        () -> syncTargetProvider.updateSyncError(
+                                target.id(),
+                                SyncPass.HISTORICAL_BACKFILL,
+                                "Historical merge request backfill failed ("
+                                        + e.getClass().getSimpleName() + ")"));
                 log.warn("MR backfill failed: repo={}", safeName, e);
                 repositoryCooldowns.put(target.id(), Cooldown.afterError(COOLDOWN_ERROR));
                 return didWork;
             }
         }
 
+        if (!admission.current(read)) return didWork;
         if (syncTargetProvider
                 .findSyncTargetById(target.id())
                 .filter(SyncTarget::isBackfillComplete)
                 .isPresent()) {
             try {
-                activityLedgerRepair.reconcileRepository(scopeId, repo.getId());
+                admission.runWrite(read, () -> activityLedgerRepair.reconcileRepository(scopeId, repo.getId()));
             } catch (RuntimeException e) {
                 log.warn("Activity ledger repair failed: workspaceId={}, repositoryId={}", scopeId, repo.getId(), e);
             }
         }
 
         if (didWork) {
-            syncTargetProvider.updateIssueBackfillState(target.id(), null, null, Instant.now());
+            admission.runWrite(
+                    read, () -> syncTargetProvider.updateIssueBackfillState(target.id(), null, null, Instant.now()));
             repositoryCooldowns.put(target.id(), Cooldown.afterProgress(COOLDOWN_NORMAL));
         }
 
         if (attempted) {
-            syncTargetProvider.updateSyncError(target.id(), SyncPass.HISTORICAL_BACKFILL, null);
+            admission.runWrite(
+                    read, () -> syncTargetProvider.updateSyncError(target.id(), SyncPass.HISTORICAL_BACKFILL, null));
         }
 
         return didWork;

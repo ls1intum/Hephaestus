@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabRouteAdmission;
 import java.util.Objects;
 import java.util.Optional;
@@ -37,6 +38,7 @@ public class GitLabWebhookContextResolver {
     private final RepositoryScopeFilter repositoryScopeFilter;
     private final ScopeIdResolver scopeIdResolver;
     private final GitLabRouteAdmission routeAdmission;
+    private final GitLabProjectAdmission admission;
 
     GitLabWebhookContextResolver(
             RepositoryRepository repositoryRepository,
@@ -44,13 +46,15 @@ public class GitLabWebhookContextResolver {
             GitLabProperties gitLabProperties,
             RepositoryScopeFilter repositoryScopeFilter,
             ScopeIdResolver scopeIdResolver,
-            GitLabRouteAdmission routeAdmission) {
+            GitLabRouteAdmission routeAdmission,
+            GitLabProjectAdmission admission) {
         this.repositoryRepository = repositoryRepository;
         this.gitProviderRepository = gitProviderRepository;
         this.gitLabProperties = gitLabProperties;
         this.repositoryScopeFilter = repositoryScopeFilter;
         this.scopeIdResolver = scopeIdResolver;
         this.routeAdmission = routeAdmission;
+        this.admission = admission;
     }
 
     /**
@@ -107,6 +111,9 @@ public class GitLabWebhookContextResolver {
         }
 
         Long scopeId = resolveScopeId(repository);
+        if (scopeId == null) return null;
+        var read = admission.capture(scopeId, repository).orElse(null);
+        if (read == null || !admission.current(read)) return null;
         return ProcessingContext.forWebhook(scopeId, repository, action);
     }
 
@@ -118,7 +125,14 @@ public class GitLabWebhookContextResolver {
      * monitoring, or that moved out of the group, meanwhile takes nothing from the read. Off a route it must still pass
      * the scope filter and belong to the same workspace.
      */
-    public boolean mayStillWrite(ProcessingContext context) {
+    public Optional<GitLabProjectAdmission.ProjectRead> capture(ProcessingContext context) {
+        Long scopeId = context.scopeId();
+        Repository repository = context.repository();
+        return scopeId != null && repository != null ? admission.capture(scopeId, repository) : Optional.empty();
+    }
+
+    public boolean mayStillWrite(ProcessingContext context, GitLabProjectAdmission.ProjectRead read) {
+        if (!admission.hold(read)) return false;
         Repository resolved = context.repository();
         if (resolved == null) {
             return false;

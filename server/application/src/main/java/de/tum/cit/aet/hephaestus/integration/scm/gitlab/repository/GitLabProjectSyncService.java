@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
+import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants.extractEntityId;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -16,6 +17,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncExcepti
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabGroupResponse;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabProjectResponse;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.organization.GitLabGroupProcessor;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -50,6 +52,7 @@ public class GitLabProjectSyncService {
     private final GitLabGroupProcessor groupProcessor;
     private final GitLabProperties gitLabProperties;
     private final IdentityProviderRepository gitProviderRepository;
+    private final GitLabProjectAdmission admission;
 
     public GitLabProjectSyncService(
             GitLabGraphQlClientProvider graphQlClientProvider,
@@ -58,10 +61,12 @@ public class GitLabProjectSyncService {
             GitLabGroupProcessor groupProcessor,
             GitLabProperties gitLabProperties,
             IdentityProviderRepository gitProviderRepository,
-            GitLabExceptionClassifier exceptionClassifier) {
+            GitLabExceptionClassifier exceptionClassifier,
+            GitLabProjectAdmission admission) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.responseHandler = responseHandler;
         this.exceptionClassifier = exceptionClassifier;
+        this.admission = admission;
         this.projectProcessor = projectProcessor;
         this.groupProcessor = groupProcessor;
         this.gitLabProperties = gitLabProperties;
@@ -97,6 +102,11 @@ public class GitLabProjectSyncService {
             return Optional.empty();
         }
         try {
+            IdentityProvider provider = resolveProvider();
+            var read = admission
+                    .captureConnection(scopeId, Objects.requireNonNull(provider.getId()))
+                    .orElse(null);
+            if (read == null) return Optional.empty();
             ClientGraphQlResponse response = query(
                     scopeId,
                     GET_PROJECT_DOCUMENT,
@@ -105,7 +115,12 @@ public class GitLabProjectSyncService {
                     "project " + sanitizeForLog(projectFullPath),
                     false);
             return Optional.ofNullable(response.field("project").toEntity(GitLabProjectResponse.class))
-                    .flatMap(this::persistProject);
+                    .flatMap(project -> admission.discover(
+                            read,
+                            extractEntityId(project.id()),
+                            Objects.requireNonNull(project.fullPath()),
+                            provider.getServerUrl(),
+                            () -> persistProject(project, provider).orElse(null)));
         } catch (GitLabSyncException e) {
             return Optional.empty();
         } catch (Exception e) {

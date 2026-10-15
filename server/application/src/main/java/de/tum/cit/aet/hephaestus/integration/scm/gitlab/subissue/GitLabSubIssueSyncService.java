@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlResp
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncException;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -26,7 +27,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Syncs sub-issue (parent-child) relationships for GitLab issues.
@@ -55,16 +55,19 @@ public class GitLabSubIssueSyncService {
     private final RepositoryRepository repositoryRepository;
     private final GitLabGraphQlClientProvider graphQlClientProvider;
     private final GitLabGraphQlResponseHandler responseHandler;
+    private final GitLabProjectAdmission admission;
 
     public GitLabSubIssueSyncService(
             IssueRepository issueRepository,
             RepositoryRepository repositoryRepository,
             GitLabGraphQlClientProvider graphQlClientProvider,
-            GitLabGraphQlResponseHandler responseHandler) {
+            GitLabGraphQlResponseHandler responseHandler,
+            GitLabProjectAdmission admission) {
         this.issueRepository = issueRepository;
         this.repositoryRepository = repositoryRepository;
         this.graphQlClientProvider = graphQlClientProvider;
         this.responseHandler = responseHandler;
+        this.admission = admission;
     }
 
     /**
@@ -75,8 +78,15 @@ public class GitLabSubIssueSyncService {
      * @param repository the repository to sync sub-issues for
      * @return sync result
      */
-    @Transactional
     public SyncResult syncSubIssuesForRepository(Long scopeId, Repository repository) {
+        return admission
+                .capture(scopeId, repository)
+                .map(read -> syncSubIssuesForRepository(scopeId, repository, read))
+                .orElseGet(() -> SyncResult.completed(0));
+    }
+
+    public SyncResult syncSubIssuesForRepository(
+            Long scopeId, Repository repository, GitLabProjectAdmission.ProjectRead read) {
         String projectPath = repository.getNameWithOwner();
         String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(projectPath), "<unknown>");
 
@@ -88,14 +98,6 @@ public class GitLabSubIssueSyncService {
         // Sub-issue parenting is an issue-domain concept a merge request has no part in.
         List<Issue> issues = issueRepository.findAllIssuesByRepositoryId(repository.getId());
         if (issues.isEmpty()) return SyncResult.completed(0);
-
-        // Build IID -> Issue lookup map
-        Map<Integer, Issue> issueByIid = new HashMap<>();
-        for (Issue issue : issues) {
-            if (issue.getNumber() > 0) {
-                issueByIid.put(issue.getNumber(), issue);
-            }
-        }
 
         // Track which issues have a parent according to GitLab
         Set<Long> issuesWithParentInGitLab = new HashSet<>();
@@ -141,11 +143,26 @@ public class GitLabSubIssueSyncService {
                 List<Map<String, Object>> nodes = (List<Map<String, Object>>)
                         (List<?>) response.field("project.workItems.nodes").toEntityList(Map.class);
 
-                for (Map<String, Object> node : nodes) {
-                    int linked = processWorkItemNode(
-                            node, issueByIid, issuesWithParentInGitLab, unknownHierarchyIssueIds, repository);
-                    totalLinked += linked;
-                }
+                Integer linked = admission
+                        .write(read, () -> {
+                            Map<Integer, Issue> issueByIid = new HashMap<>();
+                            for (Issue issue : issueRepository.findAllIssuesByRepositoryId(repository.getId())) {
+                                if (issue.getNumber() > 0) issueByIid.put(issue.getNumber(), issue);
+                            }
+                            int count = 0;
+                            for (Map<String, Object> node : nodes) {
+                                count += processWorkItemNode(
+                                        node,
+                                        issueByIid,
+                                        issuesWithParentInGitLab,
+                                        unknownHierarchyIssueIds,
+                                        repository);
+                            }
+                            return count;
+                        })
+                        .orElse(null);
+                if (linked == null) return SyncResult.abortedError(totalLinked);
+                totalLinked += linked;
 
                 // Pagination
                 GitLabPageInfo pageInfo = Objects.requireNonNull(
@@ -171,7 +188,14 @@ public class GitLabSubIssueSyncService {
                 log.warn("Skipping stale-parent cleanup after an incomplete walk: project={}", safeProjectPath);
                 return SyncResult.abortedError(totalLinked);
             }
-            int staleCleared = clearStaleParents(issues, issuesWithParentInGitLab, unknownHierarchyIssueIds);
+            int staleCleared = admission
+                    .write(
+                            read,
+                            () -> clearStaleParents(
+                                    issueRepository.findAllIssuesByRepositoryId(repository.getId()),
+                                    issuesWithParentInGitLab,
+                                    unknownHierarchyIssueIds))
+                    .orElse(0);
 
             if (totalLinked > 0 || staleCleared > 0) {
                 log.info(
@@ -181,6 +205,7 @@ public class GitLabSubIssueSyncService {
                         staleCleared);
             }
 
+            if (!admission.current(read)) return SyncResult.completed(0);
             return unknownHierarchyIssueIds.isEmpty()
                     ? SyncResult.completed(totalLinked)
                     : SyncResult.abortedError(totalLinked);

@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstan
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncException;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabUserLookup;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -38,21 +39,32 @@ public class GitLabNoteSyncService {
     private final GitLabIssueCommentProcessor issueCommentProcessor;
     private final GitLabProperties gitLabProperties;
     private final TransactionTemplate transactions;
+    private final GitLabProjectAdmission admission;
 
     public GitLabNoteSyncService(
             GitLabGraphQlClientProvider graphQlClientProvider,
             GitLabGraphQlResponseHandler responseHandler,
             GitLabIssueCommentProcessor issueCommentProcessor,
             GitLabProperties gitLabProperties,
-            TransactionTemplate transactions) {
+            TransactionTemplate transactions,
+            GitLabProjectAdmission admission) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.responseHandler = responseHandler;
         this.issueCommentProcessor = issueCommentProcessor;
         this.gitLabProperties = gitLabProperties;
         this.transactions = transactions;
+        this.admission = admission;
     }
 
     public int syncNotesForIssue(Long scopeId, Repository repository, int issueIid, Issue parent) {
+        return admission
+                .capture(scopeId, repository)
+                .map(read -> syncNotesForIssue(scopeId, repository, issueIid, parent, read))
+                .orElse(0);
+    }
+
+    public int syncNotesForIssue(
+            Long scopeId, Repository repository, int issueIid, Issue parent, GitLabProjectAdmission.ProjectRead read) {
         return syncNotes(
                 scopeId,
                 repository,
@@ -60,7 +72,8 @@ public class GitLabNoteSyncService {
                 "iid",
                 String.valueOf(issueIid),
                 "project.issue.notes",
-                parent);
+                parent,
+                read);
     }
 
     @SuppressWarnings("unchecked")
@@ -71,7 +84,8 @@ public class GitLabNoteSyncService {
             String iidVariableName,
             String iidValue,
             String notesFieldPath,
-            Issue parent) {
+            Issue parent,
+            GitLabProjectAdmission.ProjectRead read) {
         String projectPath = repository.getNameWithOwner();
         String safeContext = sanitizeForLog(projectPath) + "#" + iidValue;
         Long providerId = Objects.requireNonNull(
@@ -157,6 +171,7 @@ public class GitLabNoteSyncService {
                 }
 
                 int synced = Objects.requireNonNull(transactions.execute(status -> {
+                    if (!admission.hold(read)) return 0;
                     int count = 0;
                     for (Map<String, Object> noteNode : nodes) {
                         if (processNoteNode(noteNode, parent, providerId, scopeId)) {

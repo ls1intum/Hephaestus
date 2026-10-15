@@ -33,6 +33,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -102,6 +103,7 @@ public class GitLabWorkspaceInitializationService {
     private final GitLabRepositoryMonitors repositoryMonitors;
     private final GitLabWorkspaceLinkService workspaceLinkService;
     private final WorkspaceActorSelector actorSelector;
+    private final GitLabProjectAdmission admission;
 
     // Infrastructure
     private final AsyncTaskExecutor monitoringExecutor;
@@ -123,7 +125,8 @@ public class GitLabWorkspaceInitializationService {
             GitLabWorkspaceLinkService workspaceLinkService,
             GitLabRepositoryMonitors repositoryMonitors,
             WorkspaceActorSelector actorSelector,
-            @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor) {
+            @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor,
+            GitLabProjectAdmission admission) {
         this.workspaceRepository = workspaceRepository;
         this.organizationRepository = organizationRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
@@ -140,6 +143,7 @@ public class GitLabWorkspaceInitializationService {
         this.workspaceLinkService = workspaceLinkService;
         this.repositoryMonitors = repositoryMonitors;
         this.actorSelector = actorSelector;
+        this.admission = admission;
         this.monitoringExecutor = monitoringExecutor;
     }
 
@@ -524,6 +528,10 @@ public class GitLabWorkspaceInitializationService {
 
         // Resolve repos via workspace monitors (includes subgroup repos)
         List<Repository> repos = repositoryRepository.findAllByWorkspaceMonitors(workspace.getId());
+        Map<Long, GitLabProjectAdmission.ProjectRead> reads = new HashMap<>();
+        for (Repository repository : repos) {
+            admission.capture(workspace.getId(), repository).ifPresent(read -> reads.put(repository.getId(), read));
+        }
 
         if (repos.isEmpty()) {
             log.debug("Skipped GitLab repo sync: reason=noRepos, workspaceId={}", workspace.getId());
@@ -536,7 +544,7 @@ public class GitLabWorkspaceInitializationService {
             if (milestoneSyncService != null) {
                 try {
                     SyncResult groupMilestoneResult =
-                            milestoneSyncService.syncMilestonesForGroup(workspace.getId(), accountLogin, repos);
+                            milestoneSyncService.syncMilestonesForGroup(workspace.getId(), accountLogin, repos, reads);
                     reportIncomplete(
                             handle, groupMilestoneResult, SyncPhase.ISSUES, "Group milestone sync", accountLogin);
                     result = SyncResult.merge(result, groupMilestoneResult);
@@ -563,16 +571,20 @@ public class GitLabWorkspaceInitializationService {
             List<Repository> commitLinkTargets = new ArrayList<>();
             result = SyncResult.merge(
                     result,
-                    syncGitLabRepositories(workspace, gitLabServices, repos, commitLinkTargets, cancelled, handle));
+                    syncGitLabRepositories(
+                            workspace, gitLabServices, repos, commitLinkTargets, cancelled, reads, handle));
 
             // Second pass: link commits to MRs now that every repo has populated its commits
             // and every MR-targeted repo has populated its MRs.
             var commitMrLinker = gitLabServices.getCommitMergeRequestLinker();
             if (commitMrLinker != null) {
                 for (Repository repo : commitLinkTargets) {
+                    var read = reads.get(repo.getId());
+                    if (read == null || !admission.current(read)) continue;
                     try {
-                        commitMrLinker.linkCommits(workspace.getId(), repo, null);
+                        commitMrLinker.linkCommits(workspace.getId(), repo, null, read);
                     } catch (Exception e) {
+                        if (!admission.current(read)) continue;
                         log.warn(
                                 "Failed commit→MR linking (second pass): workspaceId={}, repo={}",
                                 workspace.getId(),
@@ -589,7 +601,7 @@ public class GitLabWorkspaceInitializationService {
                 }
             }
 
-            result = SyncResult.merge(result, syncGitLabPostRepo(workspace, gitLabServices, repos, handle));
+            result = SyncResult.merge(result, syncGitLabPostRepo(workspace, gitLabServices, repos, reads, handle));
         }
 
         // Teams (subgroups)
@@ -643,6 +655,7 @@ public class GitLabWorkspaceInitializationService {
             List<Repository> repos,
             List<Repository> commitLinkTargets,
             BooleanSupplier cancelled,
+            Map<Long, GitLabProjectAdmission.ProjectRead> reads,
             @Nullable SyncExecutionHandle handle) {
         var labelSyncService = gitLabServices.getLabelSyncService();
         var milestoneSyncService = gitLabServices.getMilestoneSyncService();
@@ -669,6 +682,8 @@ public class GitLabWorkspaceInitializationService {
         SyncResult result = SyncResult.completed(0);
 
         for (Repository repo : repos) {
+            var read = reads.get(repo.getId());
+            if (read == null || !admission.current(read)) continue;
             if (cancelled.getAsBoolean()) {
                 log.info(
                         "GitLab repo sync cancelled: workspaceId={}, reposDone={}, reposTotal={}",
@@ -689,6 +704,7 @@ public class GitLabWorkspaceInitializationService {
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     log.info("Rate limit wait interrupted, stopping repo sync: workspaceId={}", workspace.getId());
+                    if (!admission.current(read)) break;
                     if (handle != null) {
                         handle.reportWarnings(SyncProgress.ofResource(
                                 SyncPhase.REPOSITORIES,
@@ -710,6 +726,7 @@ public class GitLabWorkspaceInitializationService {
 
             // Look up the sync-target id so each phase can stamp its per-repo watermark via the SPI.
             Long rtmId = syncTargetIdsByNameWithOwner.get(repo.getNameWithOwner());
+            if (rtmId == null || rtmId != read.monitorId()) continue;
 
             // Cooldown: skip labels/milestones/collaborators if recently synced
             boolean skipSlowChanging =
@@ -723,14 +740,18 @@ public class GitLabWorkspaceInitializationService {
 
             if (!skipSlowChanging && labelSyncService != null) {
                 try {
-                    SyncResult r = labelSyncService.syncLabelsForRepository(workspace.getId(), repo);
+                    SyncResult r = labelSyncService.syncLabelsForRepository(workspace.getId(), repo, read);
+                    if (!admission.current(read)) continue;
                     totalLabels += r.count();
                     reportIncomplete(handle, r, SyncPhase.REPOSITORIES, "Label sync", repo.getNameWithOwner());
                     result = SyncResult.merge(result, r);
                     if (rtmId != null && r.isCompleted()) {
-                        syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.LABELS, Instant.now());
+                        admission.runWrite(
+                                read,
+                                () -> syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.LABELS, Instant.now()));
                     }
                 } catch (Exception e) {
+                    if (!admission.current(read)) continue;
                     log.warn(
                             "Failed label sync: workspaceId={}, repo={}",
                             workspace.getId(),
@@ -747,14 +768,19 @@ public class GitLabWorkspaceInitializationService {
             }
             if (!skipSlowChanging && milestoneSyncService != null) {
                 try {
-                    SyncResult r = milestoneSyncService.syncMilestonesForRepository(workspace.getId(), repo);
+                    SyncResult r = milestoneSyncService.syncMilestonesForRepository(workspace.getId(), repo, read);
+                    if (!admission.current(read)) continue;
                     totalMilestones += r.count();
                     reportIncomplete(handle, r, SyncPhase.ISSUES, "Milestone sync", repo.getNameWithOwner());
                     result = SyncResult.merge(result, r);
                     if (rtmId != null && r.isCompleted()) {
-                        syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.MILESTONES, Instant.now());
+                        admission.runWrite(
+                                read,
+                                () -> syncTargetProvider.updateSyncTimestamp(
+                                        rtmId, SyncType.MILESTONES, Instant.now()));
                     }
                 } catch (Exception e) {
+                    if (!admission.current(read)) continue;
                     log.warn(
                             "Failed milestone sync: workspaceId={}, repo={}",
                             workspace.getId(),
@@ -771,15 +797,19 @@ public class GitLabWorkspaceInitializationService {
             }
             if (issueSyncService != null) {
                 try {
-                    SyncResult r = issueSyncService.syncIssues(workspace.getId(), repo, updatedAfter);
+                    SyncResult r = issueSyncService.syncIssues(workspace.getId(), repo, updatedAfter, read);
+                    if (!admission.current(read)) continue;
                     totalIssues += r.count();
                     reportIncomplete(handle, r, SyncPhase.ISSUES, "Issue sync", repo.getNameWithOwner());
                     result = SyncResult.merge(result, r);
                     issuesDone = r.isCompleted();
                     if (rtmId != null && issuesDone) {
-                        syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.ISSUES, Instant.now());
+                        admission.runWrite(
+                                read,
+                                () -> syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.ISSUES, Instant.now()));
                     }
                 } catch (Exception e) {
+                    if (!admission.current(read)) continue;
                     log.warn(
                             "Failed issue sync: workspaceId={}, repo={}",
                             workspace.getId(),
@@ -796,15 +826,20 @@ public class GitLabWorkspaceInitializationService {
             }
             if (mrSyncService != null) {
                 try {
-                    SyncResult r = mrSyncService.syncMergeRequests(workspace.getId(), repo, updatedAfter);
+                    SyncResult r = mrSyncService.syncMergeRequests(workspace.getId(), repo, updatedAfter, read);
+                    if (!admission.current(read)) continue;
                     totalMRs += r.count();
                     reportIncomplete(handle, r, SyncPhase.PULL_REQUESTS, "Merge request sync", repo.getNameWithOwner());
                     result = SyncResult.merge(result, r);
                     mrsDone = r.isCompleted();
                     if (rtmId != null && mrsDone) {
-                        syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.PULL_REQUESTS, Instant.now());
+                        admission.runWrite(
+                                read,
+                                () -> syncTargetProvider.updateSyncTimestamp(
+                                        rtmId, SyncType.PULL_REQUESTS, Instant.now()));
                     }
                 } catch (Exception e) {
+                    if (!admission.current(read)) continue;
                     log.warn("Failed MR sync: workspaceId={}, repo={}", workspace.getId(), repo.getNameWithOwner(), e);
                     reportIncomplete(
                             handle,
@@ -817,14 +852,20 @@ public class GitLabWorkspaceInitializationService {
             }
             if (!skipSlowChanging && collaboratorSyncService != null) {
                 try {
-                    SyncResult r = collaboratorSyncService.syncCollaboratorsForRepository(workspace.getId(), repo);
+                    SyncResult r =
+                            collaboratorSyncService.syncCollaboratorsForRepository(workspace.getId(), repo, read);
+                    if (!admission.current(read)) continue;
                     totalCollaborators += r.count();
                     reportIncomplete(handle, r, SyncPhase.REPOSITORIES, "Collaborator sync", repo.getNameWithOwner());
                     result = SyncResult.merge(result, r);
                     if (rtmId != null && r.isCompleted()) {
-                        syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.COLLABORATORS, Instant.now());
+                        admission.runWrite(
+                                read,
+                                () -> syncTargetProvider.updateSyncTimestamp(
+                                        rtmId, SyncType.COLLABORATORS, Instant.now()));
                     }
                 } catch (Exception e) {
+                    if (!admission.current(read)) continue;
                     log.warn(
                             "Failed collaborator sync: workspaceId={}, repo={}",
                             workspace.getId(),
@@ -843,11 +884,13 @@ public class GitLabWorkspaceInitializationService {
             // when no backfill bean exists.
             if (commitBackfillService != null) {
                 try {
-                    SyncResult r = commitBackfillService.backfillCommits(workspace.getId(), repo);
+                    SyncResult r = commitBackfillService.backfillCommits(workspace.getId(), repo, read);
+                    if (!admission.current(read)) continue;
                     totalCommits += r.count();
                     reportIncomplete(handle, r, SyncPhase.REPOSITORIES, "Commit backfill", repo.getNameWithOwner());
                     result = SyncResult.merge(result, r);
                 } catch (Exception e) {
+                    if (!admission.current(read)) continue;
                     log.warn(
                             "Failed commit backfill: workspaceId={}, repo={}",
                             workspace.getId(),
@@ -863,11 +906,14 @@ public class GitLabWorkspaceInitializationService {
                 }
             } else if (commitSyncService != null) {
                 try {
-                    SyncResult r = commitSyncService.syncCommitsForRepository(workspace.getId(), repo, updatedAfter);
+                    SyncResult r =
+                            commitSyncService.syncCommitsForRepository(workspace.getId(), repo, updatedAfter, read);
+                    if (!admission.current(read)) continue;
                     totalCommits += r.count();
                     reportIncomplete(handle, r, SyncPhase.REPOSITORIES, "Commit sync", repo.getNameWithOwner());
                     result = SyncResult.merge(result, r);
                 } catch (Exception e) {
+                    if (!admission.current(read)) continue;
                     log.warn(
                             "Failed commit sync: workspaceId={}, repo={}",
                             workspace.getId(),
@@ -889,10 +935,11 @@ public class GitLabWorkspaceInitializationService {
 
             boolean allDone = (issueSyncService == null || issuesDone) && (mrSyncService == null || mrsDone);
             if (allDone) {
-                repositoryRepository.updateLastSyncAt(repo.getId(), Instant.now());
-                if (rtmId != null) {
-                    syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.FULL_REPOSITORY, Instant.now());
-                }
+                admission.runWrite(read, () -> {
+                    Instant completedAt = Instant.now();
+                    repositoryRepository.updateLastSyncAt(read.repositoryId(), completedAt);
+                    syncTargetProvider.updateSyncTimestamp(rtmId, SyncType.FULL_REPOSITORY, completedAt);
+                });
             }
         }
 
@@ -918,6 +965,7 @@ public class GitLabWorkspaceInitializationService {
             Workspace workspace,
             GitLabSyncServiceHolder gitLabServices,
             List<Repository> repos,
+            Map<Long, GitLabProjectAdmission.ProjectRead> reads,
             @Nullable SyncExecutionHandle handle) {
         var subIssueSync = gitLabServices.getSubIssueSyncService();
         var depSync = gitLabServices.getIssueDependencySyncService();
@@ -926,13 +974,17 @@ public class GitLabWorkspaceInitializationService {
         int totalSubIssues = 0, totalDeps = 0;
         SyncResult result = SyncResult.completed(0);
         for (Repository repo : repos) {
+            var read = reads.get(repo.getId());
+            if (read == null || !admission.current(read)) continue;
             if (subIssueSync != null) {
                 try {
-                    SyncResult r = subIssueSync.syncSubIssuesForRepository(workspace.getId(), repo);
+                    SyncResult r = subIssueSync.syncSubIssuesForRepository(workspace.getId(), repo, read);
+                    if (!admission.current(read)) continue;
                     totalSubIssues += r.count();
                     reportIncomplete(handle, r, SyncPhase.ISSUES, "Sub-issue sync", repo.getNameWithOwner());
                     result = SyncResult.merge(result, r);
                 } catch (Exception e) {
+                    if (!admission.current(read)) continue;
                     log.warn(
                             "Failed sub-issue sync: workspaceId={}, repo={}",
                             workspace.getId(),
@@ -949,11 +1001,13 @@ public class GitLabWorkspaceInitializationService {
             }
             if (depSync != null) {
                 try {
-                    SyncResult r = depSync.syncDependenciesForRepository(workspace.getId(), repo);
+                    SyncResult r = depSync.syncDependenciesForRepository(workspace.getId(), repo, null, read);
+                    if (!admission.current(read)) continue;
                     totalDeps += r.count();
                     reportIncomplete(handle, r, SyncPhase.ISSUES, "Issue dependency sync", repo.getNameWithOwner());
                     result = SyncResult.merge(result, r);
                 } catch (Exception e) {
+                    if (!admission.current(read)) continue;
                     log.warn(
                             "Failed dependency sync: workspaceId={}, repo={}",
                             workspace.getId(),

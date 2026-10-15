@@ -25,11 +25,14 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabGro
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabProjectResponse;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository.GitLabProjectProcessor;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabAdmissionTestFixtures;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,6 +48,8 @@ import reactor.core.publisher.Mono;
 
 @Tag("unit")
 class GitLabGroupSyncServiceTest extends BaseUnitTest {
+
+    private final GitLabProjectAdmission projectAdmission = mock(GitLabProjectAdmission.class);
 
     private static final Long TEST_PROVIDER_ID = 100L;
 
@@ -71,10 +76,13 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             Duration.ofMinutes(5));
 
     private GitLabGroupSyncService service;
+    private GitLabProjectAdmission.ConnectionRead originalConnection;
 
     @BeforeEach
     void setUp() {
+        originalConnection = GitLabAdmissionTestFixtures.connection(projectAdmission, 1L, TEST_PROVIDER_ID, "my-org");
         IdentityProvider gitLabProvider = TestEntities.gitProvider(TEST_PROVIDER_ID, IdentityProviderType.GITLAB);
+        gitLabProvider.setServerUrl(gitLabProperties.defaultServerUrl());
         lenient()
                 .when(gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.com"))
                 .thenReturn(Optional.of(gitLabProvider));
@@ -89,7 +97,8 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
                 groupProcessor,
                 projectProcessor,
                 gitLabProperties,
-                gitProviderRepository);
+                gitProviderRepository,
+                projectAdmission);
     }
 
     @Nested
@@ -791,6 +800,16 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         @SuppressWarnings("unchecked")
         private ClientGraphQlResponse mockProjectsPage(
                 List<GitLabProjectResponse> projects, @Nullable GitLabPageInfo pageInfo) {
+            for (GitLabProjectResponse project : projects) {
+                if (project != null) {
+                    GitLabAdmissionTestFixtures.discovery(
+                            projectAdmission,
+                            originalConnection,
+                            Long.parseLong(project.id().substring(project.id().lastIndexOf('/') + 1)),
+                            Objects.requireNonNull(project.fullPath()),
+                            "https://gitlab.com");
+                }
+            }
             ClientGraphQlResponse resp = mock(ClientGraphQlResponse.class);
             lenient().when(resp.isValid()).thenReturn(true);
 

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
@@ -19,8 +20,12 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabWorkspaceLinkService;
+import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
+import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
@@ -38,6 +43,9 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 class GitLabNoteReconciliationIntegrationTest extends AbstractWorkspaceIntegrationTest {
+    @Autowired
+    private GitLabProjectAdmission projectAdmission;
+
     @Autowired
     private ApplicationEventPublisher events;
 
@@ -62,6 +70,16 @@ class GitLabNoteReconciliationIntegrationTest extends AbstractWorkspaceIntegrati
     @Autowired
     private TransactionTemplate transactions;
 
+    @Autowired
+    private WorkspaceRepository workspaces;
+
+    @Autowired
+    private ConnectionRepository connections;
+
+    @Autowired
+    private RepositoryToMonitorRepository monitors;
+
+    private long workspaceId;
     private Repository repository;
     private Issue issue;
     private PullRequest mr;
@@ -77,6 +95,12 @@ class GitLabNoteReconciliationIntegrationTest extends AbstractWorkspaceIntegrati
         repository.setHtmlUrl("https://gitlab.com/team/notes");
         repository.setVisibility(Repository.Visibility.PRIVATE);
         repository = repositories.save(repository);
+        var workspace = WorkspaceTestFixtures.persistGitLabWorkspace(
+                workspaces, connections, WorkspaceTestFixtures.gitLabPatWorkspace("team"), provider.getServerUrl());
+        workspaceId = Objects.requireNonNull(workspace.getId());
+        var monitor = WorkspaceTestFixtures.repositoryMonitor(workspace, repository.getNameWithOwner());
+        monitor.setNativeId(repository.getNativeId());
+        monitors.saveAndFlush(monitor);
         issue = new Issue();
         issue.setProvider(provider);
         issue.setNativeId(4002L);
@@ -100,7 +124,7 @@ class GitLabNoteReconciliationIntegrationTest extends AbstractWorkspaceIntegrati
         var deleted = comment(issue, 5001);
         var other = comment(mr, 5002);
         var service = service(request -> Mono.just(page("[]", 0, 1, "")));
-        assertThat(service.reconcileParent(1, repository, issue, null).removed())
+        assertThat(service.reconcileParent(workspaceId, repository, issue, null).removed())
                 .isEqualTo(1);
         assertThat(comments.findById(deleted.getId())).isEmpty();
         assertThat(comments.findById(other.getId())).isPresent();
@@ -124,7 +148,8 @@ class GitLabNoteReconciliationIntegrationTest extends AbstractWorkspaceIntegrati
                 1,
                 1,
                 "")));
-        assertThat(service.reconcileParent(1, repository, mr, null).removed()).isEqualTo(2);
+        assertThat(service.reconcileParent(workspaceId, repository, mr, null).removed())
+                .isEqualTo(2);
         assertThat(comments.findById(general.getId())).isEmpty();
         assertThat(diffComments.findById(root.getId())).isEmpty();
         assertThat(diffComments.findById(reply.getId()).orElseThrow().getInReplyTo())
@@ -136,7 +161,7 @@ class GitLabNoteReconciliationIntegrationTest extends AbstractWorkspaceIntegrati
                 .extracting(PullRequestReviewComment::getId)
                 .containsExactly(reply.getId());
         assertThat(service(request -> Mono.just(page("[]", 0, 1, "")))
-                        .reconcileParent(1, repository, mr, null)
+                        .reconcileParent(workspaceId, repository, mr, null)
                         .removed())
                 .isEqualTo(1);
         assertThat(threads.findById(thread.getId())).isEmpty();
@@ -154,7 +179,7 @@ class GitLabNoteReconciliationIntegrationTest extends AbstractWorkspaceIntegrati
                     : Mono.just(ClientResponse.create(HttpStatus.SERVICE_UNAVAILABLE)
                             .build());
         });
-        var result = service.reconcileRepository(1, repository, null);
+        var result = service.reconcileRepository(workspaceId, repository, null);
         assertThat(result.skipped()).isTrue();
         assertThat(result.removed()).isEqualTo(1);
         assertThat(comments.findById(note.getId())).isPresent();
@@ -172,21 +197,23 @@ class GitLabNoteReconciliationIntegrationTest extends AbstractWorkspaceIntegrati
             }
             return Mono.just(page("[{\"id\":5303}]", 3, 2, ""));
         });
-        assertThat(service.reconcileParent(1, repository, issue, null).skipped())
+        assertThat(service.reconcileParent(workspaceId, repository, issue, null).skipped())
                 .isTrue();
         assertThat(comments.findById(existing.getId())).isPresent();
         var missingHeaders = service(request -> Mono.just(ClientResponse.create(HttpStatus.OK)
                 .header("Content-Type", "application/json")
                 .body("[]")
                 .build()));
-        assertThat(missingHeaders.reconcileParent(1, repository, issue, null).skipped())
+        assertThat(missingHeaders
+                        .reconcileParent(workspaceId, repository, issue, null)
+                        .skipped())
                 .isTrue();
         assertThat(comments.findById(existing.getId())).isPresent();
         assertThat(service(request -> {
                             comment(issue, 5304);
                             return Mono.just(page("[]", 0, 1, ""));
                         })
-                        .reconcileParent(1, repository, issue, null)
+                        .reconcileParent(workspaceId, repository, issue, null)
                         .removed())
                 .isEqualTo(2);
         assertThat(comments.findByNativeIdAndProviderId(
@@ -204,7 +231,7 @@ class GitLabNoteReconciliationIntegrationTest extends AbstractWorkspaceIntegrati
                 request -> Mono.just(ClientResponse.create(
                                 request.url().getPath().endsWith("/5401") ? HttpStatus.OK : HttpStatus.NOT_FOUND)
                         .build()));
-        assertThat(service.reconcileParent(1, repository, issue, null).skipped())
+        assertThat(service.reconcileParent(workspaceId, repository, issue, null).skipped())
                 .isTrue();
         assertThat(comments.findById(missing.getId())).isPresent();
         assertThat(comments.findById(stillPresent.getId())).isPresent();
@@ -212,7 +239,7 @@ class GitLabNoteReconciliationIntegrationTest extends AbstractWorkspaceIntegrati
                                 complete,
                                 request -> Mono.just(ClientResponse.create(HttpStatus.SERVICE_UNAVAILABLE)
                                         .build()))
-                        .reconcileParent(1, repository, issue, null)
+                        .reconcileParent(workspaceId, repository, issue, null)
                         .skipped())
                 .isTrue();
         assertThat(comments.findById(missing.getId())).isPresent();
@@ -227,10 +254,10 @@ class GitLabNoteReconciliationIntegrationTest extends AbstractWorkspaceIntegrati
 
     private GitLabNoteReconciliationService service(ExchangeFunction exchange, ExchangeFunction confirmation) {
         var tokens = mock(GitLabTokenService.class);
-        when(tokens.getAccessToken(1L)).thenReturn("stored-token");
-        when(tokens.resolveServerUrl(1L)).thenReturn("https://gitlab.com");
+        when(tokens.getAccessToken(workspaceId)).thenReturn("stored-token");
+        when(tokens.resolveServerUrl(workspaceId)).thenReturn("https://gitlab.com");
         var links = mock(GitLabWorkspaceLinkService.class);
-        when(links.mayWriteRepository(1, repository)).thenReturn(true);
+        when(links.mayWriteRepository(workspaceId, repository)).thenReturn(true);
         var properties = new GitLabProperties(
                 "https://gitlab.com",
                 Duration.ofSeconds(5),
@@ -250,7 +277,8 @@ class GitLabNoteReconciliationIntegrationTest extends AbstractWorkspaceIntegrati
                                 ? confirmation.exchange(request)
                                 : exchange.exchange(request)),
                 links,
-                events);
+                events,
+                projectAdmission);
     }
 
     private static ClientResponse page(String body, int total, int page, String next) {
