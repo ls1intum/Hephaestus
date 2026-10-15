@@ -2,7 +2,7 @@ import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@ta
 
 import { captureException } from "@/runtime/sentry";
 
-import { QUERY_STALE_TIME_MS, sessionRetriesQueries } from "./query-defaults";
+import { QUERY_STALE_TIME_MS, retryQuery } from "./query-defaults";
 
 const queryClient = new QueryClient({
 	queryCache: new QueryCache({ onError: (error) => captureException(error) }),
@@ -20,7 +20,7 @@ const queryClient = new QueryClient({
 			 * `true`) must stay armed as the catch-up-after-absence healer.
 			 */
 			staleTime: QUERY_STALE_TIME_MS,
-			...(sessionRetriesQueries() ? {} : { retry: false }),
+			retry: retryQuery,
 		},
 	},
 });

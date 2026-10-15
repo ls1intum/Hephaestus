@@ -82,7 +82,7 @@ export const Route = createFileRoute("/w/$workspaceSlug/")({
 			});
 		}
 		const workspaces = await context.queryClient
-			.query(listWorkspacesOptions())
+			.query({ ...listWorkspacesOptions(), retry: false })
 			.catch(() => undefined);
 		const member = workspaces?.find(({ workspaceSlug }) => workspaceSlug === params.workspaceSlug);
 		// A workspace list that cannot be fetched is not proof of no access: the workspace gate under
@@ -110,7 +110,10 @@ export const Route = createFileRoute("/w/$workspaceSlug/")({
 		handler: async ({ context, params, deps, location }): Promise<PublicActivityLoad> => {
 			const options = publicActivityOptions(params.workspaceSlug, deps);
 			const read = async (repo: string[] | undefined) =>
-				context.queryClient.query(publicActivityOptions(params.workspaceSlug, { ...deps, repo }));
+				context.queryClient.query({
+					...publicActivityOptions(params.workspaceSlug, { ...deps, repo }),
+					retry: false,
+				});
 			try {
 				return { status: "ready", page: await read(deps.repo) };
 			} catch (error) {

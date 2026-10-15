@@ -51,6 +51,16 @@ export function stepUpChallengeOf(err: unknown): StepUpChallenge | undefined {
 }
 
 /**
+ * Whether asking again can answer differently: no HTTP answer at all, too many requests, or a
+ * server failure. Every other status is the server's answer about this request, and a refusal
+ * stays refused. The client's retries and the error guidance both read this one answer.
+ */
+export function problemIsRetryable(err: unknown): boolean {
+	const status = problemStatusOf(err);
+	return status === undefined || status === 429 || status >= 500;
+}
+
+/**
  * `undefined` is meaningful here and must not be collapsed to a number: it means the request never
  * got an HTTP answer (offline, DNS failure, CORS, an aborted fetch), which is a different situation
  * from any status the server could have returned.

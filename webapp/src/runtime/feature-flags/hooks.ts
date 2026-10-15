@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getUserFeatures } from "@/api/sdk.gen";
 import type { FeatureFlags } from "@/api/types.gen";
 import { useAuth } from "@/runtime/auth/AuthContext";
+import { retryQuery } from "@/runtime/tanstack-query/query-defaults";
 
 export type FeatureFlagName = keyof Required<FeatureFlags>;
 
@@ -23,7 +24,7 @@ const featureFlagsSchema = z.object({
 });
 
 async function fetchFeatureFlags(): Promise<FeatureFlagsResponse> {
-	const { data } = await getUserFeatures();
+	const { data } = await getUserFeatures({ throwOnError: true });
 	const parsed = featureFlagsSchema.safeParse(data);
 	if (!parsed.success) {
 		throw new Error("Failed to fetch feature flags");
@@ -50,7 +51,7 @@ function useFeatureFlagsQuery(): {
 		queryFn: fetchFeatureFlags,
 		enabled: isAuthenticated && !userView,
 		staleTime: 60_000,
-		retry: 3,
+		retry: retryQuery,
 	});
 	return userView ? { data: USER_VIEW_FLAGS, isLoading: false, isError: false } : query;
 }

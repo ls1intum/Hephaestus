@@ -254,12 +254,14 @@ export function useActivityWork({
 			const request = { ...filter, cursor: cursor ?? undefined, size: COPY_PAGE_SIZE };
 			const page =
 				userId === undefined
-					? await queryClient.query(
-							getActivityWorkOptions({ path: { workspaceSlug }, query: request }),
-						)
-					: await queryClient.query(
-							getActivityPersonWorkOptions({ path: personPath, query: request }),
-						);
+					? await queryClient.query({
+							...getActivityWorkOptions({ path: { workspaceSlug }, query: request }),
+							retry: false,
+						})
+					: await queryClient.query({
+							...getActivityPersonWorkOptions({ path: personPath, query: request }),
+							retry: false,
+						});
 			items.push(...page.content);
 			cursor = page.nextCursor;
 		}

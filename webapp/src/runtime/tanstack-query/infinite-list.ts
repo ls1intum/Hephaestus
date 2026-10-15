@@ -1,8 +1,7 @@
 import type { InfiniteData } from "@tanstack/react-query";
 
 import { type LoadState, type PanelState, queryLoadState } from "@/components/common/panel-state";
-
-import { queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
+import { problemIsRetryable } from "@/lib/problem-detail";
 
 import { loadedPages, type PagedModel } from "./spring-page";
 
@@ -61,7 +60,7 @@ export function infiniteListState<TPage, TReady extends object>(
 	const retained =
 		query.data !== undefined &&
 		(query.isFetchNextPageError || query.isRefetchError) &&
-		queryErrorIsRetryable(query.error);
+		problemIsRetryable(query.error);
 	if (query.data === undefined && !query.isError) {
 		return { status: "loading" };
 	}

@@ -26,7 +26,10 @@ export const Route = createFileRoute("/")({
 			});
 		}
 		// A failed workspace query must not render the no-workspace state.
-		const workspaces = await context.queryClient.query(listWorkspacesOptions());
+		const workspaces = await context.queryClient.query({
+			...listWorkspacesOptions(),
+			retry: false,
+		});
 		const workspaceSlug = workspaces[0]?.workspaceSlug;
 		if (hasText(workspaceSlug)) {
 			throw redirect({ to: "/w/$workspaceSlug", params: { workspaceSlug }, replace: true });

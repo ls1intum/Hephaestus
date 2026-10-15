@@ -95,7 +95,7 @@ export async function consentIsPending(queryClient: QueryClient): Promise<boolea
 		return false;
 	}
 	try {
-		const status = await queryClient.query(getConsentStatusOptions({}));
+		const status = await queryClient.query({ ...getConsentStatusOptions({}), retry: false });
 		return !status.completed;
 	} catch {
 		// Fail closed: `/consent` offers retry and sign-out, so holding the loader back is recoverable.

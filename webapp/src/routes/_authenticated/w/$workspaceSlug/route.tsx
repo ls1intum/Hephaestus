@@ -18,7 +18,7 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug")({
 	// components read the live list through `useWorkspaceFeatures`.
 	beforeLoad: async ({ context, params, location }) => {
 		const workspaces = await context.queryClient
-			.query(listWorkspacesOptions())
+			.query({ ...listWorkspacesOptions(), retry: false })
 			.catch(() => undefined);
 		// A list that cannot be fetched is not revoked access: keep the route rather than evicting
 		// the reader on a network error.
@@ -40,7 +40,10 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug")({
 				return { workspace };
 			}
 			const onboarding = await context.queryClient
-				.query(getMemberOnboardingOptions({ path: { workspaceSlug: params.workspaceSlug } }))
+				.query({
+					...getMemberOnboardingOptions({ path: { workspaceSlug: params.workspaceSlug } }),
+					retry: false,
+				})
 				.catch(() => undefined);
 			if (onboarding?.needsSetup === true) {
 				throw redirect({

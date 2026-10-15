@@ -15,7 +15,7 @@ import {
 	observationsQuery,
 	runsQuery,
 } from "@/components/admin/practice-reviews/review-search";
-import { QUERY_RETRIES, sessionRetriesQueries } from "@/runtime/tanstack-query/query-defaults";
+import { retryQuery, sessionRetriesQueries } from "@/runtime/tanstack-query/query-defaults";
 
 /** One row is the smallest page the endpoints serve; only its total is read. */
 const COUNT_PAGE = 1;
@@ -32,7 +32,7 @@ const total = (page: { page?: { totalElements?: number } }) => page.page?.totalE
  */
 const COUNT_READ = {
 	select: total,
-	retry: (failureCount: number) => sessionRetriesQueries() && failureCount < QUERY_RETRIES,
+	retry: retryQuery,
 	retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 8000),
 	refetchInterval: () => (sessionRetriesQueries() ? COUNT_REFRESH_MS : false),
 } as const;
