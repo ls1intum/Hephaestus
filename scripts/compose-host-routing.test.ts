@@ -7,6 +7,22 @@ import { isSet } from "./lib/env.ts";
 const STACKS = ["app", "core", "proxy"] as const;
 const MANAGEMENT_BIND = `$\${HOSTNAME}.shared-network`;
 
+await test("reference application services do not publish host ports", () => {
+	const document = parseDocument(
+		readFileSync(new URL("../docker/compose.app.yaml", import.meta.url), "utf8"),
+	);
+	assert.equal(document.errors.length, 0);
+	for (const name of ["webapp", "application-server", "postgres"]) {
+		const service = document.getIn(["services", name]);
+		assert.ok(isMap(service), `${name} is missing`);
+		const ports = service.get("ports");
+		assert.ok(
+			ports === undefined || (isSeq(ports) && ports.items.length === 0),
+			`${name} must be reached through the Docker network, not a published host port`,
+		);
+	}
+});
+
 /** Every `traefik.http.routers.<name>.<key>=` value in a stack's Compose file. */
 function labels(stack: (typeof STACKS)[number], key: string): { router: string; value: string }[] {
 	const file = readFileSync(new URL(`../docker/compose.${stack}.yaml`, import.meta.url), "utf8");
