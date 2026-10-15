@@ -42,6 +42,12 @@ import { firstNonBlank, hasText } from "@/lib/text";
 /** Providers that can only be *linked* from Settings — they are never a sign-in method. */
 const LINK_ONLY_PROVIDER_TYPES = new Set(["SLACK", "OUTLINE"]);
 
+/**
+ * Providers an instance can run more than one deployment of, each its own registration. An account
+ * linked to one deployment is not linked to another, so these are matched by origin, not by type.
+ */
+const PER_INSTANCE_PROVIDER_TYPES = new Set(["GITLAB", "OUTLINE"]);
+
 type LinkableProvider = IdentityProviderView & { registrationId: string };
 
 /**
@@ -56,6 +62,11 @@ const LINK_ONLY_RATIONALE: Record<string, string> = {
 export interface LinkedAccountsSectionProps {
 	identities: IdentityView[];
 	providers: IdentityProviderView[];
+	/**
+	 * The deployments the signed-in account is linked to, as the current user reports them: each
+	 * provider type with the canonical origin its identity came from.
+	 */
+	linkedProviders: readonly { type: string; serverUrl?: string }[];
 	/**
 	 * Start the link flow for a provider. Re-runs sign-in with that provider and
 	 * attaches the resulting identity to the current account (top-level redirect).
@@ -81,6 +92,7 @@ export interface LinkedAccountsSectionProps {
 export function LinkedAccountsSection({
 	identities,
 	providers,
+	linkedProviders,
 	onLink,
 	onUnlink,
 	unlinkingId = null,
@@ -137,15 +149,29 @@ export function LinkedAccountsSection({
 		identities.map((identity) => identity.providerType.toUpperCase()),
 	);
 
-	// Providers the account can still link: not already represented among the linked identities
-	// (compared by provider type). The synthetic DEV sign-in is not a federated identity — it is never
-	// offered as something to "connect".
+	// Providers the account can still link. A GitLab or Outline deployment is linked only when the
+	// account reports that type at that same origin; an origin missing on either side proves nothing,
+	// so the deployment stays offered. Every other type allows one deployment, so a linked identity of
+	// that type is enough. The synthetic DEV sign-in is not a federated identity — it is never offered
+	// as something to "connect".
 	const linkableProviders = providers.filter((provider) => {
 		const type = provider.providerType?.toUpperCase();
 		if (type === "DEV") {
 			return false;
 		}
-		return !hasText(type) || !linkedProviderTypes.has(type);
+		if (!hasText(type)) {
+			return true;
+		}
+		if (PER_INSTANCE_PROVIDER_TYPES.has(type)) {
+			const origin = provider.baseUrl;
+			return !(
+				hasText(origin) &&
+				linkedProviders.some(
+					(linked) => linked.type.toUpperCase() === type && linked.serverUrl === origin,
+				)
+			);
+		}
+		return !linkedProviderTypes.has(type);
 	});
 
 	// Slack and Outline link an identity but are never a way in, so they cannot be offered among the
@@ -233,7 +259,7 @@ export function LinkedAccountsSection({
 									<Icon />
 								</ItemMedia>
 								<ItemContent>
-									<ItemTitle>{label} is not connected</ItemTitle>
+									<ItemTitle>Connect {label}</ItemTitle>
 									<ItemDescription>{LINK_ONLY_RATIONALE[type]}</ItemDescription>
 								</ItemContent>
 								<ItemActions>
