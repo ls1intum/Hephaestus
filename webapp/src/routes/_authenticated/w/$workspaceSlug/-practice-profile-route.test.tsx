@@ -116,7 +116,11 @@ const plainGuidance: PracticeGuidanceDto = {
 
 const pageOf = (reviews: ProfileReview[]) => ({
 	content: reviews,
-	page: { number: 0, size: 10, totalElements: reviews.length, totalPages: 1 },
+	number: 0,
+	size: 10,
+	totalElements: reviews.length,
+	totalPages: 1,
+	last: true,
 });
 
 function reviewDetailOf(reviewId: string): ProfileReviewDetail | undefined {

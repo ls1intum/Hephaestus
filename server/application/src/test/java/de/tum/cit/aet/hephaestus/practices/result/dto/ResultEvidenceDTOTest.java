@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import de.tum.cit.aet.hephaestus.evidence.CitationSide;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -13,16 +15,33 @@ import tools.jackson.databind.json.JsonMapper;
 class ResultEvidenceDTOTest {
     private final JsonMapper json = new JsonMapper();
 
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "{}",
+                "{\"citations\":[]}",
+                "{\"openQuestions\":[]}",
+                "{\"citations\":null,\"openQuestions\":null}"
+            })
+    void shouldReadMissingHistoricalListsAsEmpty(String retained) {
+        var evidence = json.readValue(retained, ResultEvidenceDTO.class);
+        assertThat(evidence.citations()).isEmpty();
+        assertThat(evidence.openQuestions()).isEmpty();
+        assertThat(evidence.search()).isNull();
+        assertThat(evidence.inapplicability()).isNull();
+    }
+
     @Test
     void retainsThePinnedRevisionAndVerifiedLocation() {
         var evidence = json.readValue("""
-            {"citations":[{"sourceKind":"scm.pull-request.diff","sourcePath":"inputs/sources/scm/diff.patch","path":"src/Auth.java","side":"NEW","commit":"commit-1","startLine":10,"endLine":10,"quote":"check();","verification":null}],"search":null,"inapplicability":null,"openQuestions":[]}
+            {"citations":[{"sourceKind":"scm.pull-request.diff","sourcePath":"inputs/sources/scm/diff.patch","path":"src/Auth.java","side":"NEW","commit":"commit-1","startLine":10,"endLine":10,"quote":"check();","verification":null}],"search":null,"inapplicability":null}
             """, ResultEvidenceDTO.class);
         assertThat(evidence.citations()).singleElement().satisfies(c -> {
             assertThat(c.sourcePath()).isEqualTo("inputs/sources/scm/diff.patch");
             assertThat(c.commit()).isEqualTo("commit-1");
             assertThat(c.side()).isEqualTo(CitationSide.NEW);
         });
+        assertThat(evidence.openQuestions()).isEmpty();
     }
 
     @Test
@@ -50,8 +69,9 @@ class ResultEvidenceDTOTest {
     @Test
     void retainsLocatedAndUnlocatedOpenQuestions() {
         var evidence = json.readValue("""
-            {"citations":[],"search":null,"inapplicability":null,"openQuestions":[{"openQuestion":"where is the test?","wouldSettleIt":"the test file","citation":null},{"openQuestion":"is the flag used?","wouldSettleIt":"the configuration","citation":null}]}
+            {"search":null,"inapplicability":null,"openQuestions":[{"openQuestion":"where is the test?","wouldSettleIt":"the test file","citation":null},{"openQuestion":"is the flag used?","wouldSettleIt":"the configuration","citation":null}]}
             """, ResultEvidenceDTO.class);
+        assertThat(evidence.citations()).isEmpty();
         assertThat(evidence.openQuestions()).hasSize(2);
         assertThat(evidence.openQuestions().getFirst().citation()).isNull();
     }

@@ -9,7 +9,7 @@ import { ScanPracticeTable } from "./ScanPracticeTable";
 const meta = {
 	component: ScanPracticeTable,
 	decorators: [withStandardPage],
-	args: { practices: COMPLETE_REPORT.practices },
+	args: { practices: COMPLETE_REPORT.practices, progress: "complete" },
 	argTypes: { practices: { control: false } },
 	tags: ["autodocs"],
 } satisfies Meta<typeof ScanPracticeTable>;
@@ -64,6 +64,17 @@ export const WithheldAndIncomplete: Story = {
 export const Empty: Story = {
 	args: { practices: [] },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("This scan reached no practice.")).toBeVisible();
+		await expect(
+			canvas.getByRole("heading", { name: "This scan reached no practice" }),
+		).toBeVisible();
+	},
+};
+
+export const EmptyAfterTheScanStopped: Story = {
+	args: { practices: [], progress: "stopped" },
+	play: async ({ canvas }) => {
+		await expect(
+			canvas.getByText("It stopped before it reviewed any file against a practice."),
+		).toBeVisible();
 	},
 };

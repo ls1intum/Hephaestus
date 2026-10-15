@@ -108,7 +108,7 @@ export const GroupOpen: Story = {
 export const NoResultsYet: Story = {
 	args: { state: { status: "ready", overview: NO_RESULTS_WORKSPACE } },
 	play: async ({ canvas }) => {
-		await expect(groupsTable(canvas).getAllByText("No results yet")).toHaveLength(4);
+		await expect(groupsTable(canvas).getAllByText("No current results")).toHaveLength(4);
 	},
 };
 

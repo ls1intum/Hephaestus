@@ -81,7 +81,11 @@ beforeEach(() => {
 		http.get("*/workspaces/:workspaceSlug/practice-groups/:groupSlug/reviews", () =>
 			HttpResponse.json({
 				content: [],
-				page: { number: 0, size: 10, totalElements: 0, totalPages: 0 },
+				number: 0,
+				size: 10,
+				totalElements: 0,
+				totalPages: 0,
+				last: true,
 			}),
 		),
 	);

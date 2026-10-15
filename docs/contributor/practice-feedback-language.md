@@ -208,10 +208,9 @@ Removing a usefulness answer does not remove the developer's disagreement.
 | **Practice page** | The page for one practice within the developer's Practice profile. |  |
 | **Standing** | Needs attention, Mixed feedback or Going well, read from the newest eligible decided work. | score, grade, rating |
 | **Early read** | A standing based on fewer than three decided pieces of work. | preliminary score, provisional grade |
-| **Practices across the workspace** | The page that counts developers by standing without naming them. | course comparison, course figures, cohort view, benchmark, leaderboard |
-| **Split** | The count of developers in each standing for a practice or practice group. | distribution, breakdown, ranking |
-| **None yet** | Developers counted on the workspace page who have no standing for this practice or group. | no data, missing, unranked |
-| **Developer with a standing** | A developer with at least one eligible Met or Not met result in the workspace page's reference group. | observed developer |
+| **Practices across the workspace** | The page that counts, for each practice, the developers with current results and the outcomes of those results, without naming a developer. | course comparison, course figures, cohort view, benchmark, leaderboard |
+| **Current result** | A result from the last 90 days, recorded under the practice's current version, that nobody marked incorrect. Only current results count on Practices across the workspace. | recent result, valid result |
+| **No current results** | What Practices across the workspace shows for a practice or group with no current result. Older or unverifiable results can exist. | no data, no results yet, missing |
 | **Typical range** | The middle half of the developers' values in a selected window. | percentile, quartile range, average, norm |
 | **Activity** | The developer's page of work that needs them and work they did. | profile, stats |
 | **Workspace activity** | Counts and lists of work for workspace developers or one team. | leaderboard, ranking, standings |

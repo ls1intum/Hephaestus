@@ -90,7 +90,7 @@ export const Default: Story = {
 		await expect(
 			within(canvas.getByRole("list", { name: "Reviews not finished yet" })).getByRole("listitem"),
 		).toHaveTextContent("3 not finished yet");
-		await expect(canvas.getByTitle("3 of 35 finished reviews")).toHaveTextContent("9 % failed");
+		await expect(canvas.getByTitle("3 of 35 finished reviews")).toHaveTextContent("9% failed");
 		await expect(canvas.queryByText(/\brunning\b/u)).not.toBeInTheDocument();
 		// Every tile has the same rows: title, figure, comparison, chart, then the row of figures, so
 		// the charts of the tiles side by side stand at the same height and are as tall.

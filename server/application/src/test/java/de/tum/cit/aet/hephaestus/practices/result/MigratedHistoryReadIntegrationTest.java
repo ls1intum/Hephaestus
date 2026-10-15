@@ -21,6 +21,8 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -28,6 +30,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.json.JsonMapper;
 
 @Import(ReviewIntegrationData.class)
 class MigratedHistoryReadIntegrationTest extends BaseIntegrationTest {
@@ -48,6 +51,9 @@ class MigratedHistoryReadIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     IdentityRepository identities;
+
+    @Autowired
+    JsonMapper json;
 
     @MockitoBean
     ScmItemSourceAccess source;
@@ -72,7 +78,9 @@ class MigratedHistoryReadIntegrationTest extends BaseIntegrationTest {
     @Test
     void shouldReadMigratedTextAndQuotesAsUnverifiedHistoryWithoutCustodyReceipts() {
         var result = data.result(scenario, ResultOutcome.NOT_MET, Instant.now());
-        migrated(result, Objects.requireNonNull(result.getEvidence()).toString());
+        var retained = json.createObjectNode();
+        retained.set("citations", Objects.requireNonNull(result.getEvidence()).path("citations"));
+        migrated(result, retained.toString());
         get("/practices/reviews/results/" + result.getId())
                 .expectStatus()
                 .isOk()
@@ -137,10 +145,17 @@ class MigratedHistoryReadIntegrationTest extends BaseIntegrationTest {
                 .isEqualTo(true);
     }
 
-    @Test
-    void shouldReadAnOlderEvidenceObjectWithoutInventingQuotations() {
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "{}",
+                "{\"citations\":[]}",
+                "{\"openQuestions\":[]}",
+                "{\"citations\":null,\"openQuestions\":null}"
+            })
+    void shouldReadAnOlderEvidenceObjectWithoutInventingQuotations(String retained) {
         var result = data.result(scenario, ResultOutcome.MET, Instant.now());
-        migrated(result, "{}");
+        migrated(result, retained);
         get("/practices/reviews/results/" + result.getId())
                 .expectStatus()
                 .isOk()
@@ -151,6 +166,15 @@ class MigratedHistoryReadIntegrationTest extends BaseIntegrationTest {
                 .isEqualTo(0)
                 .jsonPath("$.evidence.openQuestions.length()")
                 .isEqualTo(0);
+        when(source.permits(any(), any())).thenReturn(false);
+        get("/practices/reviews/results/" + result.getId())
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.evidenceHidden")
+                .isEqualTo(true)
+                .jsonPath("$.evidence")
+                .isEmpty();
     }
 
     private void migrated(Result result, String evidence) {

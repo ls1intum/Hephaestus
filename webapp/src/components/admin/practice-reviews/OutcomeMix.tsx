@@ -93,7 +93,7 @@ export interface OutcomeMixProps {
 	/** Drawn between the total and the legend: the total over time. */
 	children?: ReactNode;
 	/**
-	 * A last item of the legend's row that is no count, such as a rate: "8 % failed or timed out".
+	 * A last item of the legend's row that is no count, such as a rate: "8% failed or timed out".
 	 * Drawn after the flags, in the same row.
 	 */
 	trailing?: ReactNode;

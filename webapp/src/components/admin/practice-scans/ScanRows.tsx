@@ -7,7 +7,14 @@ import type { TableSkeletonColumn } from "@/components/common/TableRowsSkeleton"
 import { REVIEW_STATUS_DEFS } from "@/components/practice-vocabulary/review-status-defs";
 import { TableBody, TableCell, TableHead, TableRow } from "@/components/ui/table";
 
-import { ofTotal, repositoryName, scanStartedBy, shortVersion } from "./scan-display";
+import {
+	countedNothing,
+	ofTotal,
+	repositoryName,
+	scanStartedBy,
+	shortVersion,
+} from "./scan-display";
+import { NotCounted } from "./ScanCounts";
 
 export const SCAN_COLUMNS = [
 	"Repository",
@@ -54,38 +61,49 @@ export interface ScanRowsProps {
 export function ScanRows({ workspaceSlug, scans }: ScanRowsProps) {
 	return (
 		<TableBody>
-			{scans.map((scan) => (
-				<TableRow key={scan.id}>
-					<TableCell className="max-w-xs">
-						<Link
-							to="/w/$workspaceSlug/admin/practices/scans/$scanId"
-							params={{ workspaceSlug, scanId: scan.id }}
-							className="block truncate font-medium hover:underline"
-						>
-							{repositoryName(scan.repository)}
-						</Link>
-					</TableCell>
-					<TableCell className="text-sm whitespace-nowrap">
-						{scan.ref}
-						<span className="font-mono text-xs text-muted-foreground">
-							{" · "}
-							{shortVersion(scan.itemVersion)}
-						</span>
-					</TableCell>
-					<TableCell className="text-sm">{scanStartedBy(scan)}</TableCell>
-					<TableCell>
-						<StatusBadge def={REVIEW_STATUS_DEFS[scan.status]} />
-					</TableCell>
-					<TableCell numeric>{scan.practiceCount}</TableCell>
-					<TableCell numeric>
-						{ofTotal(scan.counts.reviewed, scan.counts.practiceItemPairs)}
-					</TableCell>
-					<TableCell numeric>{scan.counts.problems}</TableCell>
-					<TableCell className="text-sm text-muted-foreground">
-						<RelativeTime value={scan.startedAt ?? scan.createdAt} />
-					</TableCell>
-				</TableRow>
-			))}
+			{scans.map((scan) => {
+				const nothing = countedNothing(scan);
+				return (
+					<TableRow key={scan.id}>
+						<TableCell className="max-w-xs">
+							<Link
+								to="/w/$workspaceSlug/admin/practices/scans/$scanId"
+								params={{ workspaceSlug, scanId: scan.id }}
+								className="block truncate font-medium hover:underline"
+							>
+								{repositoryName(scan.repository)}
+							</Link>
+						</TableCell>
+						<TableCell className="text-sm whitespace-nowrap">
+							{scan.ref}
+							<span className="font-mono text-xs text-muted-foreground">
+								{" · "}
+								{shortVersion(scan.itemVersion)}
+							</span>
+						</TableCell>
+						<TableCell className="text-sm">{scanStartedBy(scan)}</TableCell>
+						<TableCell>
+							<StatusBadge def={REVIEW_STATUS_DEFS[scan.status]} />
+						</TableCell>
+						<TableCell numeric className="text-right">
+							{nothing ? <NotCounted /> : scan.practiceCount}
+						</TableCell>
+						<TableCell numeric className="text-right">
+							{nothing ? (
+								<NotCounted />
+							) : (
+								ofTotal(scan.counts.reviewed, scan.counts.practiceItemPairs)
+							)}
+						</TableCell>
+						<TableCell numeric className="text-right">
+							{nothing ? <NotCounted /> : scan.counts.problems}
+						</TableCell>
+						<TableCell className="text-sm text-muted-foreground">
+							<RelativeTime value={scan.startedAt ?? scan.createdAt} />
+						</TableCell>
+					</TableRow>
+				);
+			})}
 		</TableBody>
 	);
 }

@@ -9,7 +9,7 @@ import { useFeedbackResponseWrite } from "@/hooks/use-feedback-response-write";
 import { REVIEW_PAGE_SIZE } from "@/hooks/use-practice-group-detail";
 import { pageHead } from "@/lib/page-title";
 import { useAuth } from "@/runtime/auth/AuthContext";
-import { pagedModelParams } from "@/runtime/tanstack-query/spring-page";
+import { springPageParams } from "@/runtime/tanstack-query/spring-page";
 
 const ITEM_ID = /^[1-9]\d{0,18}$/u;
 
@@ -36,7 +36,7 @@ function ItemFeedbackRoute() {
 	});
 	const reviews = useInfiniteQuery({
 		...listOptions,
-		...pagedModelParams,
+		...springPageParams,
 	});
 	useQueryReadRefusal(listOptions.queryKey, reviews.isError, reviews.error);
 	const responses = useFeedbackResponseWrite(workspaceSlug);

@@ -29,6 +29,10 @@ export const PAGE_INTRO: readonly InfoLine[] = [
 		text: "for each practice, how many developers have results and how those results came out.",
 	},
 	{
+		term: "Current results only:",
+		text: "it counts results from the last 90 days, reviewed under the practice as it is now. Results it cannot check are left out.",
+	},
+	{
 		term: "No names:",
 		text: "it counts developers and results, never who they are.",
 	},
@@ -66,4 +70,8 @@ export const developersInReview = (n: number): string =>
 
 export const practicesText = (n: number): string => count(n, "practice", "practices", true);
 
-export const NO_RESULTS_YET = "No results yet";
+/**
+ * A practice or group with no current result. Older results, and results recorded before an upgrade
+ * that cannot be checked, can exist, so this never says there are none.
+ */
+export const NO_CURRENT_RESULTS = "No current results";

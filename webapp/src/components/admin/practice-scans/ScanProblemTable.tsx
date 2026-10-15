@@ -1,4 +1,4 @@
-import { CircleCheckIcon, SearchXIcon } from "lucide-react";
+import { CircleCheckIcon, CircleDashedIcon, HourglassIcon, SearchXIcon } from "lucide-react";
 
 import type { ProblemChanges, ScanReportProblem } from "@/api/types.gen";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/table";
 import { itemName } from "@/lib/item-kinds";
 
+import type { ScanProgress } from "./scan-display";
 import { ScanListMore, type ScanListState } from "./scan-list-state";
 
 type BaselineFilter = ProblemBaselineState | "ALL";
@@ -33,6 +34,8 @@ export interface ScanProblemTableProps {
 	onFilterChange: (filter: ProblemBaselineState | undefined) => void;
 	changes: ProblemChanges;
 	pairsWithoutResult: number;
+	/** Only a scan through every file can say it recorded no problems. */
+	progress: ScanProgress;
 }
 
 const SKELETON_COLUMNS = ["w-64", "w-48", "w-32", "w-20"] as const;
@@ -72,6 +75,7 @@ export function ScanProblemTable({
 	onFilterChange,
 	changes,
 	pairsWithoutResult,
+	progress,
 }: ScanProblemTableProps) {
 	const options: readonly FilterOption<BaselineFilter>[] = [
 		{ value: "ALL", label: "All" },
@@ -92,6 +96,7 @@ export function ScanProblemTable({
 				state={state}
 				filtered={filter !== undefined}
 				pairsWithoutResult={pairsWithoutResult}
+				progress={progress}
 			/>
 		</section>
 	);
@@ -101,10 +106,12 @@ function ScanProblemResults({
 	state,
 	filtered,
 	pairsWithoutResult,
+	progress,
 }: {
 	state: ScanListState<ScanReportProblem>;
 	filtered: boolean;
 	pairsWithoutResult: number;
+	progress: ScanProgress;
 }) {
 	if (state.status === "error") {
 		return (
@@ -119,6 +126,26 @@ function ScanProblemResults({
 		if (filtered) {
 			return (
 				<EmptyState icon={<SearchXIcon />} headingLevel={2} title="No problems match this filter" />
+			);
+		}
+		if (progress === "active") {
+			return (
+				<EmptyState
+					icon={<HourglassIcon />}
+					headingLevel={2}
+					title="No problems recorded yet"
+					description="Problems appear here as the scan reviews files."
+				/>
+			);
+		}
+		if (progress === "stopped") {
+			return (
+				<EmptyState
+					icon={<CircleDashedIcon />}
+					headingLevel={2}
+					title="No problems recorded before the scan stopped"
+					description="The scan stopped before it reviewed every file, so this is not a clean result."
+				/>
 			);
 		}
 		return (

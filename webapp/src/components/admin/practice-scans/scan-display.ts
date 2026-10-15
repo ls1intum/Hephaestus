@@ -15,6 +15,22 @@ export const SCAN_POLL_MS = 5000;
 
 export const isActiveScan = (status: ScanSummary["status"]) => isActiveReview(status);
 
+/** Where a scan stands: still going, through every file, or stopped before it was. */
+export type ScanProgress = "active" | "complete" | "stopped";
+
+export function scanProgress(status: ScanSummary["status"]): ScanProgress {
+	if (isActiveScan(status)) {
+		return "active";
+	}
+	return status === "COMPLETE" ? "complete" : "stopped";
+}
+
+/** A stopped scan that counted no practice and file pair. Its zeros would read as a clean result. */
+export function countedNothing(scan: Pick<ScanSummary, "status" | "counts">): boolean {
+	const { reviewed, withheld, notReviewed } = scan.counts;
+	return scanProgress(scan.status) === "stopped" && reviewed + withheld + notReviewed === 0;
+}
+
 export function scanStartedBy(scan: Pick<ScanSummary, "requestedBy" | "origin">): string {
 	return scan.requestedBy === null
 		? REVIEW_ORIGIN_DEFS[scan.origin].label

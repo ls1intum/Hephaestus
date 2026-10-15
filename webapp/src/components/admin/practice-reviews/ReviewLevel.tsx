@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { cn } from "cn";
 import type { ReactNode } from "react";
 
 import type {
@@ -32,7 +33,7 @@ import {
 import { buttonVariants } from "@/components/ui/button";
 import { DrawerBody, DrawerFooter } from "@/components/ui/drawer";
 import { durationText } from "@/lib/dates";
-import { itemName } from "@/lib/item-kinds";
+import { itemKindNoun, itemName } from "@/lib/item-kinds";
 import { formatCostUsd } from "@/lib/money";
 import { hasText } from "@/lib/text";
 
@@ -47,7 +48,7 @@ import {
 	type TechnicalFact,
 } from "./RecordSheet";
 import { RequestReviewAction } from "./RequestReviewAction";
-import { resultSlots } from "./review-outcomes";
+import { feedbackSlots, resultSlots } from "./review-outcomes";
 import { ReviewActions } from "./ReviewActions";
 import { ReviewStatusMark } from "./ReviewBadges";
 import { ReviewDayTime } from "./ReviewDayTime";
@@ -74,10 +75,19 @@ export interface ReviewLevelProps {
 	requestRefusal?: ReactNode;
 }
 
-const KIND_LABELS: Record<ReviewDetail["kind"], string> = {
-	ITEM: "Review of the work",
-	SCAN: "Scan",
-};
+function kindLabel(review: ReviewDetail): string {
+	return review.kind === "SCAN"
+		? "Scan"
+		: `Review of the ${itemKindNoun(review.item.kind, 1, review.item.provider)}`;
+}
+
+/** "5 met, 2 not met", the counted slots only, or undefined when none counts anything. */
+function countsLine(slots: readonly { count: number; label: string }[]): string | undefined {
+	const counted = slots.filter((slot) => slot.count > 0);
+	return counted.length === 0
+		? undefined
+		: counted.map((slot) => `${slot.count} ${slot.label}`).join(", ");
+}
 
 export const RUNTIME_EXPIRED = "Execution details are no longer available.";
 
@@ -245,7 +255,7 @@ function ReviewWhat({
 	const event = review.startedBy;
 	return (
 		<ReviewFactGrid>
-			<ReviewFact label="Kind">{KIND_LABELS[review.kind]}</ReviewFact>
+			<ReviewFact label="Kind">{kindLabel(review)}</ReviewFact>
 			<ReviewFact label="Started by">
 				<span className="space-y-0.5">
 					<span className="block" title={origin.description}>
@@ -261,6 +271,10 @@ function ReviewWhat({
 						</span>
 					)}
 				</span>
+			</ReviewFact>
+			<ReviewFact label="Results">{countsLine(resultSlots(review.results)) ?? "None"}</ReviewFact>
+			<ReviewFact label="Feedback">
+				{countsLine(feedbackSlots(review.feedback)) ?? "None"}
 			</ReviewFact>
 			{hasText(review.itemVersion) && (
 				<ReviewFact label="Reviewed version">
@@ -335,10 +349,7 @@ export function reviewHistory(review: ReviewDetail): SheetEvent[] {
 }
 
 function resultsLine(practice: ReviewPractice): string {
-	const counted = resultSlots(practice.results).filter((slot) => slot.count > 0);
-	return counted.length === 0
-		? "No results"
-		: counted.map((slot) => `${slot.count} ${slot.label}`).join(", ");
+	return countsLine(resultSlots(practice.results)) ?? "No results";
 }
 
 function itemCountsLine(practice: ReviewPractice): string {
@@ -381,6 +392,8 @@ function ReviewPracticeList({
 			</p>
 		);
 	}
+	// The same Done on every row says nothing; the results line already shows each one finished.
+	const showStatus = review.practices.some((practice) => practice.status !== "DONE");
 	return (
 		<ul aria-label="Every practice in this review" className="divide-y rounded-xl border">
 			{review.practices.map((practice) => (
@@ -389,10 +402,19 @@ function ReviewPracticeList({
 					data-practice-status={practice.status}
 					className="@container px-3 py-2.5 text-sm"
 				>
-					<div className="grid min-w-0 items-start gap-x-4 gap-y-1.5 @lg:grid-cols-[9rem_minmax(0,14rem)_minmax(0,1fr)]">
-						<span>
-							<StatusBadge def={REVIEW_PRACTICE_STATUS_DEFS[practice.status]} />
-						</span>
+					<div
+						className={cn(
+							"grid min-w-0 items-start gap-x-4 gap-y-1.5",
+							showStatus
+								? "@lg:grid-cols-[9rem_minmax(0,1fr)_minmax(0,1fr)]"
+								: "@lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]",
+						)}
+					>
+						{showStatus && (
+							<span>
+								<StatusBadge def={REVIEW_PRACTICE_STATUS_DEFS[practice.status]} />
+							</span>
+						)}
 						<span className="font-medium break-words">{practice.practiceName}</span>
 						<span className="flex min-w-0 flex-col gap-1 text-pretty text-muted-foreground">
 							<span>{practiceReason(practice)}</span>

@@ -135,7 +135,7 @@ export function WorkspaceUsageReport({
 			/>
 		),
 		unpricedEventCount > 0 && (
-			<Alert key="unpriced" variant="warning" role="status">
+			<Alert key="unpriced" variant="warning" role="note">
 				<CircleAlert aria-hidden />
 				<AlertTitle>
 					{unpricedEventCount === 1
@@ -146,9 +146,8 @@ export function WorkspaceUsageReport({
 					<p>
 						Usage with unavailable cost is not counted in these totals. A rate may be missing or a
 						measurement unverified. Real spend may be higher. Adding rates repairs only verified
-						usage. Set rates for your own models in prices for your own models in{" "}
-						<AiModelsLink workspaceSlug={workspaceSlug} />. For shared models, ask an instance
-						admin.
+						usage. Set rates for your own models in <AiModelsLink workspaceSlug={workspaceSlug} />.
+						For shared models, ask an instance admin.
 					</p>
 				</AlertDescription>
 			</Alert>

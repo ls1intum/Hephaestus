@@ -15,7 +15,7 @@ export interface FeedbackModeGroup {
 	totalPractices: number;
 }
 
-/** Whether Heph reviews the practice. Reviewed by people or nobody is independent of feedback mode. */
+/** Whether Hephaestus reviews the practice. Reviewed by people or nobody is independent of feedback mode. */
 export function reviewedByHephaestus(practice: Pick<Practice, "slug" | "currentVersion">): boolean {
 	return currentDefinition(practice).reviewedBy.by === "HEPHAESTUS";
 }

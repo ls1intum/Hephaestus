@@ -34,9 +34,14 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
 	play: async ({ canvas }) => {
+		// The reader arrives from a comment on the work, so the page names which work it is.
 		await expect(
-			canvas.getByRole("heading", { level: 1, name: "Your feedback on this work" }),
+			canvas.getByRole("heading", { level: 1, name: "Your feedback on pull request #902" }),
 		).toBeVisible();
+		await expect(canvas.getAllByRole("link", { name: /^#902\b/u })[0]).toHaveAttribute(
+			"href",
+			detailReviews[0]?.review.item.url ?? "",
+		);
 		await expect(canvas.getByText(/Workspace admins read your reason/u)).toBeVisible();
 		await expect(canvas.getByRole("list", { name: "Reviews" })).toBeVisible();
 		await expect(

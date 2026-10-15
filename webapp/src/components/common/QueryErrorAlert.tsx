@@ -112,6 +112,12 @@ const LOAD_TITLE = /^We could not load (?<what>.+)$/u;
  */
 const GENERIC_NOT_FOUND = /^We could not find that\b.*\bIt may have been deleted\b/u;
 
+/**
+ * A detail that names a Java type (`de.tum.….ReviewJobInput`) is the server's diagnostics, not
+ * wording it chose for the reader, who can do nothing with it. The status's own cause stands in.
+ */
+const INTERNAL_DETAIL = /\b(?:[a-z][\da-z_]*\.){2,}[A-Z][\w$]*/u;
+
 function describe(lead: string, next: string): string {
 	if (lead.length === 0 || lead === next) {
 		return next;
@@ -133,7 +139,8 @@ export function QueryErrorAlert({
 	const status = problemStatusOf(error);
 	const { icon, cause, next, variant, retryable, retitle, ignoreDetail } = classifyError(status);
 	const raw = ignoreDetail === true ? "" : problemDetailOf(error, "").trim();
-	const detail = status === 404 && GENERIC_NOT_FOUND.test(raw) ? "" : raw;
+	const detail =
+		(status === 404 && GENERIC_NOT_FOUND.test(raw)) || INTERNAL_DETAIL.test(raw) ? "" : raw;
 	const showRetry = onRetry != null && retryable;
 	const what = LOAD_TITLE.exec(title)?.groups?.what;
 	const shownTitle = what != null && retitle != null ? retitle(what) : title;

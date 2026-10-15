@@ -161,6 +161,21 @@ export const BadRequest: Story = {
 	},
 };
 
+/** 400 whose detail is the server's diagnostics: a Java type name says nothing the reader can act on. */
+export const BadRequestWithInternalDetail: Story = {
+	args: {
+		error: {
+			status: 400,
+			detail:
+				"Could not deserialize string to java type: class de.tum.cit.aet.hephaestus.agent.job.ReviewJobInput.",
+		},
+	},
+	play: async ({ canvas }) => {
+		canvas.getByText("The request was not accepted. Reload the page and try again.");
+		await expect(canvas.queryByText(/ReviewJobInput/u)).not.toBeInTheDocument();
+	},
+};
+
 /**
  * No status at all — the request never reached a server (offline, DNS, CORS, abort). This is the one
  * unknown where retrying is the right guess, so Retry is offered.

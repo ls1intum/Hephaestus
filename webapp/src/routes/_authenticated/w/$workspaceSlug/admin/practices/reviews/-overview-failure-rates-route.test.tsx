@@ -28,13 +28,13 @@ describe("the overview's failure rates", () => {
 
 		const link = await screen.findByRole(
 			"link",
-			{ name: "6 % failed, 5 of 85 finished reviews" },
+			{ name: "6% failed, 5 of 85 finished reviews" },
 			ROUTE_RENDER_WAIT,
 		);
 		const item = link.closest<HTMLElement>("[data-tone]");
 		expect(item?.dataset.tone).toBe("secondary");
 		expect(item?.querySelector(".text-warning, .text-destructive")).toBeNull();
-		expect(item?.textContent).toBe("6 % failed");
+		expect(item?.textContent).toBe("6% failed");
 		// Needs you keeps the approvals only.
 		const needsYou = screen.getByRole("region", { name: "Needs you" });
 		expect(within(needsYou).queryByText(/failed/u)).toBeNull();
@@ -54,7 +54,7 @@ describe("the overview's failure rates", () => {
 		const delivery = await screen.findByRole("list", { name: "Delivery" }, ROUTE_RENDER_WAIT);
 		await within(delivery).findByRole("link", { name: "2 of 62 sent" }, ROUTE_RENDER_WAIT);
 		const failures = within(delivery).getByRole("group", { name: "Failures" });
-		expect(failures.textContent).toMatch(/^Feedback failed to deliver · 2 of 62 sent3 %/u);
+		expect(failures.textContent).toMatch(/^Feedback failed to deliver · 2 of 62 sent3%/u);
 		expect(within(delivery).queryByRole("button", { name: /^Why last/u })).toBeNull();
 	});
 });

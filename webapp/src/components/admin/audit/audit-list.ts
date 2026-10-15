@@ -12,7 +12,7 @@ export type AuditListState<TRow> = PanelState<{ rows: TRow[]; total?: number } &
  */
 export function auditRows<TRow extends { id?: number }>(pages: readonly SpringPage<TRow>[]) {
 	return {
-		rows: dedupeById(pages.flatMap((page) => page.content ?? [])),
+		rows: dedupeById(pages.flatMap((page) => page.content)),
 		total: pages[0]?.totalElements,
 	};
 }

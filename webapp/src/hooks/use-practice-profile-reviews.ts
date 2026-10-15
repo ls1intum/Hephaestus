@@ -28,7 +28,7 @@ import { useRequestPracticeReview } from "@/hooks/use-request-practice-review";
 import { problemStatusOf } from "@/lib/problem-detail";
 import { hasText } from "@/lib/text";
 import { QUERY_RETRIES, sessionRetriesQueries } from "@/runtime/tanstack-query/query-defaults";
-import { pagedModelParams } from "@/runtime/tanstack-query/spring-page";
+import { springPageParams } from "@/runtime/tanstack-query/spring-page";
 
 interface ProfileReviewsRequest {
 	workspaceSlug: string;
@@ -64,7 +64,7 @@ export function usePracticeProfileReviews({
 	});
 	const reviewsQuery = useInfiniteQuery({
 		...listOptions,
-		...pagedModelParams,
+		...springPageParams,
 		enabled: listOpen,
 		refetchInterval: PRACTICE_PROFILE_POLL_MS,
 	});

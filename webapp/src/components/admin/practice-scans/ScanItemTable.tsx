@@ -24,7 +24,7 @@ import { formatDate } from "@/lib/dates";
 import { itemName } from "@/lib/item-kinds";
 import { hasText } from "@/lib/text";
 
-import { notReviewedSentence, withheldSentence } from "./scan-display";
+import { notReviewedSentence, type ScanProgress, withheldSentence } from "./scan-display";
 import { ScanListMore, type ScanListState } from "./scan-list-state";
 import { SCAN_FILE_FILTERS } from "./scans-search";
 
@@ -39,12 +39,22 @@ export interface ScanItemTableProps {
 	state: ScanListState<ScanReportItem>;
 	filter: ScanEntryStatus | undefined;
 	onFilterChange: (filter: ScanEntryStatus | undefined) => void;
+	progress: ScanProgress;
 }
 
 const SKELETON_COLUMNS = ["w-56", "w-40", "w-20", "w-64"] as const;
 
+const NO_FILES: Record<ScanProgress, { title: string; description?: string }> = {
+	active: { title: "No files listed yet" },
+	complete: { title: "This scan listed no files" },
+	stopped: {
+		title: "No files were listed",
+		description: "The scan stopped before it could list the repository’s files.",
+	},
+};
+
 // Earlier evidence on a not-reviewed row is not this scan's result.
-export function ScanItemTable({ state, filter, onFilterChange }: ScanItemTableProps) {
+export function ScanItemTable({ state, filter, onFilterChange, progress }: ScanItemTableProps) {
 	return (
 		<section aria-label="Files" className="space-y-4">
 			<FilterToggle
@@ -53,7 +63,7 @@ export function ScanItemTable({ state, filter, onFilterChange }: ScanItemTablePr
 				value={filter ?? "ALL"}
 				onChange={(next) => onFilterChange(next === "ALL" ? undefined : next)}
 			/>
-			<ScanItemResults state={state} filtered={filter !== undefined} />
+			<ScanItemResults state={state} filtered={filter !== undefined} progress={progress} />
 		</section>
 	);
 }
@@ -61,9 +71,11 @@ export function ScanItemTable({ state, filter, onFilterChange }: ScanItemTablePr
 function ScanItemResults({
 	state,
 	filtered,
+	progress,
 }: {
 	state: ScanListState<ScanReportItem>;
 	filtered: boolean;
+	progress: ScanProgress;
 }) {
 	if (state.status === "error") {
 		return (
@@ -75,13 +87,12 @@ function ScanItemResults({
 		);
 	}
 	if (state.status === "ready" && state.entries.length === 0) {
-		return (
-			<EmptyState
-				icon={<FileSearchIcon />}
-				headingLevel={2}
-				title={filtered ? "No files match this filter" : "No files listed yet"}
-			/>
-		);
+		if (filtered) {
+			return (
+				<EmptyState icon={<FileSearchIcon />} headingLevel={2} title="No files match this filter" />
+			);
+		}
+		return <EmptyState icon={<FileSearchIcon />} headingLevel={2} {...NO_FILES[progress]} />;
 	}
 	return (
 		<div className="space-y-4">

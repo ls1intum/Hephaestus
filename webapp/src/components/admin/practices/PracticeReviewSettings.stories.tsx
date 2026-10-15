@@ -291,10 +291,10 @@ export const NarrowingAppliesAfterOnePreview: Story = {
 		await userEvent.click(canvas.getByRole("radio", { name: "Selected repositories" }));
 		await userEvent.click(canvas.getByRole("radio", { name: "Selected people" }));
 		await expect(
-			canvas.getByText(/With no repositories selected, Heph reviews no repository work/u),
+			canvas.getByText(/With no repositories selected, Hephaestus reviews no repository work/u),
 		).toBeVisible();
 		await expect(
-			canvas.getByText(/With no people selected, Heph reviews nobody’s work/u),
+			canvas.getByText(/With no people selected, Hephaestus reviews nobody’s work/u),
 		).toBeVisible();
 		await expect(args.scope.preview).not.toHaveBeenCalled();
 		await userEvent.click(canvas.getByRole("button", { name: "Review changes" }));

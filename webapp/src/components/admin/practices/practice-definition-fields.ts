@@ -66,7 +66,7 @@ export function definitionDifferences(
 }
 
 export const REVIEWED_BY_LABELS: Record<ReviewedBy["by"], string> = {
-	HEPHAESTUS: "Heph",
+	HEPHAESTUS: "Hephaestus",
 	PEOPLE: "People",
 	NOBODY: "Nobody",
 };

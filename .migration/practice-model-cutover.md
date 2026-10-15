@@ -63,6 +63,9 @@ The migration keeps every migrated result as history, including its ID, text, ci
 Every migrated result has evidence version 0, regardless of outcome.
 It is not current proof and cannot establish current standing.
 Use a fresh review to establish current standing.
+Until then, practice pages and *Practices across the workspace* show no current results.
+To restore standing for recent work at once, start a review of past work under *Practices › Review settings*.
+Its estimate shows the work and the model cost before it starts.
 History views can show retained text when source access and privacy checks permit it.
 
 The migration does not post migrated feedback again.

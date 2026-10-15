@@ -51,7 +51,11 @@ function mockStartScan(answer: StartAnswer, practices: Wire<Practice>[] = ELIGIB
 			repositoryReads.push(new URL(request.url));
 			return HttpResponse.json({
 				content: [wireRepository("300"), wireRepository("301", "artemis")],
-				page: { number: 0, size: 200, totalElements: 2, totalPages: 1 },
+				number: 0,
+				size: 200,
+				totalElements: 2,
+				totalPages: 1,
+				last: true,
 			});
 		}),
 		http.get("*/workspaces/:workspaceSlug/practices", () => HttpResponse.json(practices)),

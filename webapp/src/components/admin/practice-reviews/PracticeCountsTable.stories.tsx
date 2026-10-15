@@ -61,7 +61,7 @@ export const Default: Story = {
 				.map((header) => header.textContent.trim()),
 		).toEqual([
 			"Practice",
-			"Number of results",
+			"Results",
 			"Not met",
 			"Does not apply",
 			"Could not determine",
@@ -121,9 +121,9 @@ export const Default: Story = {
 			"1 of 33",
 			"7 of 12",
 		]);
-		await userEvent.click(canvas.getByRole("button", { name: "How Number of results is counted" }));
+		await userEvent.click(canvas.getByRole("button", { name: "How Results is counted" }));
 		await expect(
-			await screen.findByRole("dialog", { name: "How Number of results is counted" }),
+			await screen.findByRole("dialog", { name: "How Results is counted" }),
 		).not.toHaveTextContent("percentage");
 		await userEvent.keyboard("{Escape}");
 		// A practice that fired twice and led to no feedback still reads as a row, its feedback a
@@ -231,7 +231,7 @@ export const NeedsALookFirst: Story = {
 		// runs past the page's edge.
 		const list = await screen.findByRole("listbox", { name: "Sort" });
 		const trigger = sort.getBoundingClientRect();
-		// Measured once its opening animation, which scales it from 95 %, has finished.
+		// Measured once its opening animation, which scales it from 95%, has finished.
 		await waitFor(async () => {
 			const popup = list.getBoundingClientRect();
 			await expect(popup.top).toBeGreaterThanOrEqual(trigger.bottom);

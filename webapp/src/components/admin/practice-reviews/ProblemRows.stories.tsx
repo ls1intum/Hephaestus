@@ -4,6 +4,8 @@ import { expect, fn, within } from "storybook/test";
 import type { ReviewProblem } from "@/api/types.gen";
 import { expectNoPageOverflow } from "@/stories/reflow";
 
+import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
+
 import { reviewProblems } from "./fixtures";
 import { ProblemRows } from "./ProblemRows";
 
@@ -54,6 +56,11 @@ export const Ready: Story = {
 		within(table).getByText(
 			"server/application/src/main/java/de/tum/cit/aet/hephaestus/practices/reviewoutput/ReviewQueryService.java:116–119",
 		);
+		// Severity reads in words on the row, not only as the time column's glyph.
+		const [shown] = within(table).getAllByText(SEVERITY_DEFS[first.severity].label, {
+			ignore: ".sr-only, script, style",
+		});
+		await expect(shown).toBeVisible();
 		await expectNoPageOverflow();
 	},
 };

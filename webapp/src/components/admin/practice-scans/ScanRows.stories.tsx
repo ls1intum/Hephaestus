@@ -35,13 +35,22 @@ export const Default: Story = {
 	play: async ({ canvas }) => {
 		const rows = canvas.getAllByRole("row").slice(1);
 		await expect(rows).toHaveLength(5);
-		const [queued, running, complete] = rows;
-		if (!queued || !running || !complete) {
+		const [queued, running, complete, , cancelled] = rows;
+		if (!queued || !running || !complete || !cancelled) {
 			return;
 		}
 		await expect(within(queued).getByText("Queued")).toBeVisible();
 		await expect(within(complete).getByText("main")).toBeVisible();
 		await expect(within(complete).getByText("· 4f2a9c1", { exact: false })).toBeVisible();
 		await expect(within(running).getByText("Ada Lovelace")).toBeVisible();
+		// A scan that stopped before it counted anything shows no zeros that would read as clean.
+		await expect(within(cancelled).getAllByText("Not counted")).toHaveLength(3);
+		await expect(within(cancelled).queryByText("0")).not.toBeInTheDocument();
+		// Each figure lines up under its right-aligned heading.
+		const headAlign = getComputedStyle(
+			canvas.getByRole("columnheader", { name: "Problems" }),
+		).textAlign;
+		const problems = within(complete).getAllByRole("cell")[6];
+		await expect(problems && getComputedStyle(problems).textAlign).toBe(headAlign);
 	},
 };

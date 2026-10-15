@@ -132,12 +132,12 @@ export const Default: Story = {
 		await expect(
 			await screen.findByRole("dialog", { name: "About delivered and withheld feedback" }),
 		).toHaveTextContent(
-			"Feedback failed to deliver is the share of the feedback sent that failed. Above 5 % it is red.",
+			"Feedback failed to deliver is the share of the feedback sent that failed. Above 5% it is red.",
 		);
 	},
 };
 
-/** 1 of 20 is 5 %: at the mark, not past it, so grey. */
+/** 1 of 20 is 5%: at the mark, not past it, so grey. */
 export const RateWithinThreshold: Story = {
 	args: { failedDeliveries: { state: counted(1), list: FAILED_DELIVERIES, of: 20 } },
 	play: async ({ canvas }) => {
@@ -145,7 +145,7 @@ export const RateWithinThreshold: Story = {
 			"data-tone",
 			"secondary",
 		);
-		canvas.getByText("5 %");
+		canvas.getByText("5%");
 	},
 };
 

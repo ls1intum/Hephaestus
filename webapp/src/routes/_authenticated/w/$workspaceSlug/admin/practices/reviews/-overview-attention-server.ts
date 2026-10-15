@@ -68,7 +68,11 @@ export function serveAttention(week?: ReviewOverview) {
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback", () =>
 			HttpResponse.json({
 				content: [],
-				page: { size: 1, number: 0, totalElements: 0, totalPages: 1 },
+				size: 1,
+				number: 0,
+				totalElements: 0,
+				totalPages: 1,
+				last: true,
 			}),
 		),
 		...reviewHandlers(),

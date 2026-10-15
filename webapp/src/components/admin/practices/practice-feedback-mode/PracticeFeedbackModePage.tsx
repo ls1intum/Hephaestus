@@ -76,11 +76,12 @@ import {
 	reviewedByHephaestus,
 } from "./practice-feedback-mode-model";
 
-const DECISION_COLUMN = "sm:w-80";
+// Wide enough for "Approve first" whole in a third of it.
+const DECISION_COLUMN = "sm:w-96";
 
-const GROUP_GRID = "sm:grid-cols-[minmax(0,1fr)_20rem]";
+const GROUP_GRID = "sm:grid-cols-[minmax(0,1fr)_24rem]";
 
-const ROW_GRID = "grid-cols-[auto_minmax(0,1fr)] sm:grid-cols-[auto_minmax(0,1fr)_20rem]";
+const ROW_GRID = "grid-cols-[auto_minmax(0,1fr)] sm:grid-cols-[auto_minmax(0,1fr)_24rem]";
 
 type AutomaticPromotion =
 	| { scope: "workspace" }
@@ -275,6 +276,7 @@ export function PracticeFeedbackModePage({
 								onSetPracticeFeedbackMode(practice.slug, feedbackMode);
 							}}
 							onClearPracticeFeedbackMode={onClearPracticeFeedbackMode}
+							onResetPractices={(slugs) => onBulkSetFeedbackMode(slugs, null)}
 						/>
 					))}
 				</Accordion>
@@ -350,7 +352,7 @@ function WorkspaceDecisionCard({
 				<CardDescription>
 					One feedback mode for the whole workspace. Every group and practice below follows it,
 					unless you set that group or practice by hand. Feedback mode decides where results become
-					feedback. It does not decide what Heph reviews.
+					feedback. It does not decide what Hephaestus reviews.
 				</CardDescription>
 			</CardHeader>
 			<CardContent>
@@ -494,6 +496,7 @@ function GroupSection({
 	onClearGroupFeedbackMode,
 	onSetPracticeFeedbackMode,
 	onClearPracticeFeedbackMode,
+	onResetPractices,
 }: {
 	workspaceSlug: string;
 	bucket: FeedbackModeGroup;
@@ -504,8 +507,23 @@ function GroupSection({
 	onClearGroupFeedbackMode: (groupSlug: string) => void;
 	onSetPracticeFeedbackMode: (practice: Practice, feedbackMode: FeedbackMode) => void;
 	onClearPracticeFeedbackMode: (practiceSlug: string) => void;
+	onResetPractices: (practiceSlugs: string[]) => void;
 }) {
 	const { group } = bucket;
+	// Every practice holds its own mode, so the setting this group shows reaches none of them.
+	const allSetByHand =
+		bucket.totalPractices > 0 && bucket.overriddenCount === bucket.totalPractices;
+	const groupFollows =
+		group === null ? null : inheritedSentenceOrNull(group.feedbackMode, "GROUP", null);
+	const setByHandNote = allSetByHand ? (
+		<AllSetByHandNote
+			count={bucket.totalPractices}
+			setting={group === null ? "the workspace default" : "this group setting"}
+			name={bucket.name}
+			disabled={pending.bulk !== null}
+			onReset={() => onResetPractices(bucket.practices.map((practice) => practice.slug))}
+		/>
+	) : undefined;
 	const groupPending = group !== null && pending.groupSlugs.has(group.slug);
 	const slugs = bucket.practices.map((practice) => practice.slug);
 	const allSelected = slugs.length > 0 && slugs.every((slug) => selected.has(slug));
@@ -527,9 +545,11 @@ function GroupSection({
 					</span>
 				</AccordionTrigger>
 				{group === null ? (
-					<span className={cn("min-w-0 text-xs text-muted-foreground", DECISION_COLUMN)}>
-						Follows the workspace default
-					</span>
+					<div className={cn("min-w-0", DECISION_COLUMN)}>
+						{setByHandNote ?? (
+							<span className="text-xs text-muted-foreground">Follows the workspace default</span>
+						)}
+					</div>
 				) : (
 					<div className={cn("min-w-0 space-y-1", DECISION_COLUMN)}>
 						<FeedbackModeLadder
@@ -539,12 +559,16 @@ function GroupSection({
 							disabled={groupPending}
 							onChange={(feedbackMode) => onSetGroupFeedbackMode(group.slug, feedbackMode)}
 						/>
-						<DecisionNote
-							follows={inheritedSentenceOrNull(group.feedbackMode, "GROUP", null)}
-							resetLabel={`Use the default feedback mode for ${bucket.name}`}
-							disabled={groupPending}
-							onClear={() => onClearGroupFeedbackMode(group.slug)}
-						/>
+						{/* "Follows the workspace default" would read as effective here; the note says why it is not. */}
+						{!(allSetByHand && groupFollows !== null) && (
+							<DecisionNote
+								follows={groupFollows}
+								resetLabel={`Use the default feedback mode for ${bucket.name}`}
+								disabled={groupPending}
+								onClear={() => onClearGroupFeedbackMode(group.slug)}
+							/>
+						)}
+						{setByHandNote}
 						{group.feedbackMode.effective === "OFF" && <OffNote />}
 					</div>
 				)}
@@ -683,7 +707,7 @@ function ReviewedByNote({ practice }: { practice: Practice }) {
 			) : (
 				"Reviewed by: Nobody. This practice offers guidance without automated review."
 			)}{" "}
-			Heph does not review it, which is separate from feedback mode Off.
+			Hephaestus does not review it, which is separate from feedback mode Off.
 		</p>
 	);
 }
@@ -696,6 +720,36 @@ function inheritedSentenceOrNull(
 ): string | null {
 	const source = feedbackModeSourceOf(assignment, level, inheritedFrom);
 	return source.kind === "inherited" ? feedbackModeSourceSentence(source) : null;
+}
+
+function AllSetByHandNote({
+	count,
+	setting,
+	name,
+	disabled,
+	onReset,
+}: {
+	count: number;
+	setting: string;
+	name: string;
+	disabled: boolean;
+	onReset: () => void;
+}) {
+	return (
+		<p className="text-xs text-muted-foreground">
+			{count === 1 ? "Its 1 practice is" : `All ${count} practices are`} set by hand, so {setting}{" "}
+			has no effect.{" "}
+			<Button
+				variant="link"
+				size="inline"
+				aria-label={`Reset the practices in ${name} to follow ${setting}`}
+				disabled={disabled}
+				onClick={onReset}
+			>
+				Reset them to follow it
+			</Button>
+		</p>
+	);
 }
 
 interface DecisionNoteProps {

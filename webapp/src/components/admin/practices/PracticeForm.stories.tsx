@@ -10,9 +10,9 @@ import { settledDrawerPanel } from "@/stories/overlay";
 import { expectNoPanelOverflow, expectPanelContentInset } from "@/stories/reflow";
 import { Stateful } from "@/stories/stateful";
 
-import { mockDefinitionOptions } from "@/components/admin/practice-editor/fixtures";
+import { definitionOf, mockDefinitionOptions } from "@/components/admin/practice-editor/fixtures";
 
-import { mockGroups, mockScriptedPractice } from "./fixtures";
+import { mockGroups, mockPracticeOf, mockScriptedPractice, practiceScript } from "./fixtures";
 import { GUARDED_LEVEL_KINDS, practiceFormLevel } from "./practice-search";
 import { PracticeForm } from "./PracticeForm";
 import { PracticeFormLevel } from "./PracticeFormLevel";
@@ -109,6 +109,51 @@ export const Edit: Story = {
 			"href",
 			"/w/demo/admin/models",
 		);
+	},
+};
+
+/** The shipped instructions of "Keep the change reviewable": long Markdown lines and file paths. */
+const SHIPPED_CRITERIA = [
+	"Assess the complete practice standard within the captured evidence boundary.",
+	"",
+	"REVIEW FOCUS: the meaningful portion of this change is batched at a size and spread a reviewer can read end-to-end with confidence.",
+	"",
+	"## The standard",
+	"Judge whether this change is packaged so a reviewer can actually read it end-to-end and approve it responsibly. This is a workflow practice about how work is batched for review — never a code-defect claim about the code itself. A focused change does one coherent thing across a handful of related files; a sprawling one forces the reviewer to skim, and bugs slip through the gaps.",
+	"",
+	"## Sources",
+	"1. The provider counts (`context/metadata.json`): additions, deletions, total and changed-file count as synced. They establish the headline size.",
+	"2. The file index (`work/change/files.json`): the per-file spread and which files carry repetitive generated, vendored or lock churn.",
+	"3. The annotated diff (`work/change/diff.patch`): ground truth for what was actually changed and how much of it is meaningful.",
+].join("\n");
+
+/**
+ * The editor as an admin opens it on a desktop: every field and both footer actions sit inside the
+ * panel, with nothing to scroll sideways for.
+ */
+export const EditAtDesktop: Story = {
+	args: {
+		mode: "edit",
+		onSubmit: editSubmit,
+		initialData: mockPracticeOf({
+			id: "7",
+			slug: "keep-the-change-reviewable",
+			definition: definitionOf({
+				criteria: SHIPPED_CRITERIA,
+				script: `${practiceScript()}\n// ${"A long comment line that a code editor must scroll rather than widen the panel for. ".repeat(4)}`,
+			}),
+		}),
+	},
+	globals: { viewport: { value: "desktop" } },
+	play: async () => {
+		const panel = await settledDrawerPanel();
+		await expectNoPanelOverflow(panel);
+		const bounds = panel.getBoundingClientRect();
+		for (const name of ["Cancel", "Save changes"]) {
+			const button = within(panel).getByRole("button", { name }).getBoundingClientRect();
+			await expect(button.left).toBeGreaterThanOrEqual(bounds.left);
+			await expect(button.right).toBeLessThanOrEqual(bounds.right);
+		}
 	},
 };
 

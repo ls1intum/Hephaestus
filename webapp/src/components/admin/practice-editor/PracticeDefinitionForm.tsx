@@ -344,11 +344,11 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 										</RadioGroup>
 									</FieldSet>
 								) : (
-									<div className="text-sm">
+									<div className="space-y-1 text-sm">
 										<p className="font-medium">Reviews</p>
+										<p>{itemType?.label ?? "A kind of work this instance no longer offers."}</p>
 										<p className="text-muted-foreground">
-											{itemType?.label ?? "A kind of work this instance no longer offers."} The kind
-											of work cannot change after the practice exists.
+											You cannot change this after the practice exists.
 										</p>
 									</div>
 								)}

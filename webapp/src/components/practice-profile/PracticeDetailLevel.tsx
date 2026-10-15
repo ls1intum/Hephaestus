@@ -271,7 +271,7 @@ export function PracticeDetailLevel({
 								// came for; the rest are its history and wait for a press.
 								initiallyOpen="newest"
 								emptyTitle="No results yet"
-								emptyDescription="They appear after Heph reviews your work."
+								emptyDescription="They appear after Hephaestus reviews your work."
 							/>
 						</Section>
 					</TabsContent>

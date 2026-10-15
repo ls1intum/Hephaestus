@@ -202,7 +202,9 @@ function latestEvent(events: readonly ItemEvent[]): ItemEvent | undefined {
 
 function eventsFigure(events: readonly ItemEvent[]): string {
 	const count = events.length === 1 ? "1 event" : `${events.length} events`;
-	const started = events.filter((event) => hasText(event.reviewId)).length;
+	// The same test as the state badge, so the header cannot contradict itself. A migrated event can
+	// have started a review that it no longer links to.
+	const started = events.filter((event) => event.state === "STARTED").length;
 	return `${count}, ${started === 0 ? "none" : String(started)} started a review`;
 }
 

@@ -96,7 +96,7 @@ export const NoResultsYet: Story = {
 	},
 	play: async () => {
 		const level = within(await settledDrawerPanel());
-		await expect(level.getAllByText("No results yet")).toHaveLength(5);
+		await expect(level.getAllByText("No current results")).toHaveLength(5);
 		await expect(
 			level.getByRole("button", {
 				name: "Open in your Practice profile Scope the change to one concern",

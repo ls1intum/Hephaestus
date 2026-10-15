@@ -10,6 +10,8 @@ import {
 	CANCELLED_SCAN,
 	COMPLETE_REPORT,
 	COMPLETE_SCAN,
+	FAILED_REPORT,
+	FAILED_SCAN,
 	FIRST_BASELINE_REPORT,
 	ITEM_ENTRIES,
 	METHOD_CHANGED_REPORT,
@@ -168,6 +170,35 @@ export const Cancelled: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("Started by Scheduled")).toBeVisible();
 		await expect(canvas.getByText(/A workspace admin cancelled it\./u)).toBeVisible();
+	},
+};
+
+/**
+ * A first scan that failed while listing the repository. Every statement on the page must hold for
+ * a scan that reviewed nothing: one error explains it, and no tab or figure reads as a clean result.
+ */
+export const Failed: Story = {
+	args: { state: loaded(FAILED_SCAN, FAILED_REPORT), problems: list([]), files: list([]) },
+	play: async ({ canvas, userEvent }) => {
+		const alerts = canvas.getAllByRole("alert");
+		await expect(alerts).toHaveLength(1);
+		await expect(alerts[0]).toHaveTextContent(
+			"Scan failedThe scan stopped before it reviewed any file. Listing the repository’s files failed. Nothing here says the code is clean. Start a new scan to try again.",
+		);
+		await expect(canvas.queryByText("Not comparable")).not.toBeInTheDocument();
+		await expect(canvas.queryByText("Listing incomplete")).not.toBeInTheDocument();
+		await expect(canvas.queryByText(/Not known yet/u)).not.toBeInTheDocument();
+		await expect(
+			canvas.getByRole("heading", { name: "No problems recorded before the scan stopped" }),
+		).toBeVisible();
+		await expect(canvas.queryByText("This scan recorded no problems")).not.toBeInTheDocument();
+
+		await userEvent.click(canvas.getByRole("tab", { name: "Files" }));
+		await expect(canvas.getByRole("heading", { name: "No files were listed" })).toBeVisible();
+		await userEvent.click(canvas.getByRole("tab", { name: "Practices" }));
+		await expect(
+			canvas.getByRole("heading", { name: "This scan reached no practice" }),
+		).toBeVisible();
 	},
 };
 

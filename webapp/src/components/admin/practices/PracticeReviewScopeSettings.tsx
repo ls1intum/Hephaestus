@@ -213,11 +213,11 @@ export function PracticeReviewScopeSettings({
 					Review scope
 				</h2>
 				<p className="text-sm text-muted-foreground">
-					Heph reviews repository work when both its repository and its linked person are in scope.
-					The linked person is usually the author, and reviewer practices use the reviewer. Slack
-					conversations and Outline documents follow the people selection and their own collection
-					permissions. About {settings.scopeSummary.recentReviewVolume} reviews started in this
-					workspace during the last {settings.scopeSummary.estimateWindowDays} days.
+					Hephaestus reviews repository work when both its repository and its linked person are in
+					scope. The linked person is usually the author, and reviewer practices use the reviewer.
+					Slack conversations and Outline documents follow the people selection and their own
+					collection permissions. About {settings.scopeSummary.recentReviewVolume} reviews started
+					in this workspace during the last {settings.scopeSummary.estimateWindowDays} days.
 				</p>
 			</div>
 			{conflicted ? (
@@ -446,8 +446,9 @@ export function PracticeReviewScopeSettings({
 					<AlertDialogHeader>
 						<AlertDialogTitle>Widen the review scope?</AlertDialogTitle>
 						<AlertDialogDescription>
-							Heph can review more work. This does not review earlier work again or release existing
-							feedback. Feedback mode, developer preferences, and workspace delivery still apply.
+							Hephaestus can review more work. This does not review earlier work again or release
+							existing feedback. Feedback mode, developer preferences, and workspace delivery still
+							apply.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					{workflow.status === "confirm" ? <ScopeImpact preview={workflow.preview} /> : null}
@@ -539,8 +540,8 @@ function EmptySelection({ noun, allLabel }: { noun: "repositories" | "people"; a
 			<AlertTitle>No {noun} are selected</AlertTitle>
 			<AlertDescription>
 				{noun === "people"
-					? "With no people selected, Heph reviews nobody’s work."
-					: "With no repositories selected, Heph reviews no repository work."}{" "}
+					? "With no people selected, Hephaestus reviews nobody’s work."
+					: "With no repositories selected, Hephaestus reviews no repository work."}{" "}
 				Choose {noun === "people" ? "a person" : "a repository"} or select {allLabel}.
 			</AlertDescription>
 		</Alert>

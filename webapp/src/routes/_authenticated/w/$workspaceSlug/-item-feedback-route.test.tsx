@@ -1,12 +1,13 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import type { ProfileReview } from "@/api/types.gen";
 import { server } from "@/mocks/server";
 import { detailFeedback, detailReview } from "@/stories/practice-detail-story-mock-data";
 import { daysBefore } from "@/stories/story-clock";
+import { ObserverStub } from "@/test/observers";
 import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
 
 // Route mounting loads the app shell and lazy modules, so the initial render needs a longer test timeout.
@@ -39,19 +40,71 @@ beforeEach(() => {
 			reads.push({ workspaceSlug: String(params.workspaceSlug), itemId: String(params.itemId) });
 			return HttpResponse.json({
 				content: [ratedReview],
-				page: { number: 0, size: 10, totalElements: 1, totalPages: 1 },
+				number: 0,
+				size: 10,
+				totalElements: 1,
+				totalPages: 1,
+				last: true,
 			});
 		}),
 	);
 });
 
+/** The reader's reviews of the work over two flat pages, one each. Returns the pages asked for. */
+function serveTwoReviewPages(): string[] {
+	const earlier: ProfileReview = {
+		...ratedReview,
+		review: { ...ratedReview.review, id: "00000000-0000-4000-8000-0000000009a1" },
+	};
+	const reviews = [ratedReview, earlier];
+	const pages: string[] = [];
+	server.use(
+		http.get(REVIEWS_PATH, ({ request }) => {
+			const number = Number(new URL(request.url).searchParams.get("page"));
+			pages.push(String(number));
+			return HttpResponse.json({
+				content: reviews.slice(number, number + 1),
+				number,
+				size: 1,
+				totalElements: 2,
+				totalPages: 2,
+				last: number >= 1,
+			});
+		}),
+	);
+	return pages;
+}
+
 describe("the page a comment on the work links to", () => {
 	it("reads the reader's reviews of exactly the linked item", async () => {
 		renderRouteAt("/w/acme/feedback/1902");
 
-		await screen.findByRole("heading", { name: "Your feedback on this work" }, ROUTE_RENDER_WAIT);
 		await screen.findByRole("list", { name: "Reviews" }, ROUTE_RENDER_WAIT);
+		screen.getByRole("heading", { name: "Your feedback on pull request #902" });
 		expect(reads[0]).toStrictEqual({ workspaceSlug: "acme", itemId: "1902" });
+	});
+
+	/** The endpoint answers with a flat Spring page; reading it as anything else ends the feed at one page. */
+	it("loads the earlier reviews of the work on request", async () => {
+		// The observer never fires, so the press is what asks for the next page.
+		vi.stubGlobal("IntersectionObserver", ObserverStub);
+		onTestFinished(() => {
+			vi.unstubAllGlobals();
+		});
+		const pages = serveTwoReviewPages();
+		renderRouteAt("/w/acme/feedback/1902");
+
+		const more = await screen.findByRole(
+			"button",
+			{ name: "View earlier reviews" },
+			ROUTE_RENDER_WAIT,
+		);
+		await userEvent.click(more);
+
+		await waitFor(() => expect(pages).toStrictEqual(["0", "1"]));
+		await waitFor(() =>
+			expect(screen.queryByRole("button", { name: "View earlier reviews" })).toBeNull(),
+		);
 	});
 
 	it("writes a disagreement with its reason, keeps the rating, and reads the reviews again", async () => {

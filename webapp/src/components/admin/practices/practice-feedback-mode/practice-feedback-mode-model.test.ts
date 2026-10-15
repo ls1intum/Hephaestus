@@ -108,7 +108,7 @@ describe("countOverrides", () => {
 });
 
 describe("reviewedByHephaestus", () => {
-	it("tells reviewed by people or nobody apart from a practice that Heph reviews", () => {
+	it("tells reviewed by people or nobody apart from a practice that Hephaestus reviews", () => {
 		const others = buildFeedbackModeFixture({
 			groups: [
 				{

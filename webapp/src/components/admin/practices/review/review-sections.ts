@@ -16,7 +16,7 @@ export const REVIEW_SECTIONS = [
 		id: "automated-review",
 		label: "Automated review",
 		description:
-			"Choose the review model, what starts a review, which work Heph may review, and how often to keep checking.",
+			"Choose the review model, what starts a review, which work Hephaestus may review, and how often to keep checking.",
 	},
 	{
 		id: "past-work",

@@ -1,4 +1,7 @@
+import { ListChecksIcon } from "lucide-react";
+
 import type { ScanPracticeReport } from "@/api/types.gen";
+import { EmptyState } from "@/components/common/EmptyState";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { REVIEW_PRACTICE_STATUS_DEFS } from "@/components/practice-vocabulary/review-status-defs";
 import {
@@ -14,16 +17,26 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 
-import { ofTotal, withheldSentence } from "./scan-display";
+import { ofTotal, type ScanProgress, withheldSentence } from "./scan-display";
 
 export interface ScanPracticeTableProps {
 	practices: readonly ScanPracticeReport[];
+	progress: ScanProgress;
 }
 
+const NO_PRACTICES: Record<ScanProgress, { title: string; description?: string }> = {
+	active: { title: "No practice reached yet" },
+	complete: { title: "This scan reached no practice" },
+	stopped: {
+		title: "This scan reached no practice",
+		description: "It stopped before it reviewed any file against a practice.",
+	},
+};
+
 // Incomplete listings count only files reached, so their totals cannot describe the repository.
-export function ScanPracticeTable({ practices }: ScanPracticeTableProps) {
+export function ScanPracticeTable({ practices, progress }: ScanPracticeTableProps) {
 	if (practices.length === 0) {
-		return <p className="text-sm text-muted-foreground">This scan reached no practice.</p>;
+		return <EmptyState icon={<ListChecksIcon />} headingLevel={2} {...NO_PRACTICES[progress]} />;
 	}
 	return (
 		<Table bordered aria-label="Practices in this scan">

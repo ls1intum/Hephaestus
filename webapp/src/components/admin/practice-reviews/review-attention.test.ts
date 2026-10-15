@@ -11,13 +11,13 @@ import {
 describe("shareOf and percentText", () => {
 	it("says nothing of nothing is nothing", () => {
 		expect(shareOf(3, 0)).toBe(0);
-		expect(percentText(0)).toBe("0 %");
+		expect(percentText(0)).toBe("0%");
 	});
 
 	it("keeps a small share visible", () => {
-		expect(percentText(0.0004)).toBe("0.1 %");
-		expect(percentText(0.004)).toBe("0.4 %");
-		expect(percentText(0.304)).toBe("30 %");
+		expect(percentText(0.0004)).toBe("0.1%");
+		expect(percentText(0.004)).toBe("0.4%");
+		expect(percentText(0.304)).toBe("30%");
 	});
 });
 
@@ -29,7 +29,7 @@ const counted = (met: number, notMet: number, doesNotApply: number, couldNotDete
 });
 
 describe("practiceMarker", () => {
-	it("marks a practice that mostly does not apply from 90 % does not apply", () => {
+	it("marks a practice that mostly does not apply from 90% does not apply", () => {
 		const marked = practiceMarker(counted(1, 1, 18, 0));
 		expect(marked).toStrictEqual({
 			marker: "NEVER_APPLIES",
@@ -41,7 +41,7 @@ describe("practiceMarker", () => {
 		expect(practiceMarker(counted(2, 1, 17, 0))).toBeUndefined();
 	});
 
-	it("marks a practice that is often undecided from 30 % could not determine", () => {
+	it("marks a practice that is often undecided from 30% could not determine", () => {
 		expect(practiceMarker(counted(10, 4, 0, 6))?.marker).toBe("OFTEN_UNDECIDED");
 		expect(practiceMarker(counted(11, 4, 0, 5))).toBeUndefined();
 	});

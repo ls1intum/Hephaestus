@@ -109,7 +109,7 @@ export const Default: Story = {
 		await expect(canvas.queryByRole("button", { name: /^Why last/u })).not.toBeInTheDocument();
 		const failed = new URL(
 			canvas.getByRole<HTMLAnchorElement>("link", {
-				name: "9 % failed, 3 of 35 finished reviews",
+				name: "9% failed, 3 of 35 finished reviews",
 			}).href,
 		);
 		await expect(failed.searchParams.getAll("status")).toStrictEqual(["FAILED"]);
@@ -139,7 +139,7 @@ export const Default: Story = {
 		await expect(delivery[0]).toHaveTextContent(/^Feedback/u);
 		await expect(delivery[1]).toHaveTextContent(/^Delivered and withheld/u);
 		await expect(delivery[1]?.querySelector("[role=group][aria-label=Failures]")).toHaveTextContent(
-			/^Feedback failed to deliver · 1 of 16 sent6 %/u,
+			/^Feedback failed to deliver · 1 of 16 sent6%/u,
 		);
 		// Awaiting approval is counted under Delivery; the way to approve stays under Needs you.
 		await expect(canvas.getByRole("list", { name: "Feedback by delivery" })).toHaveTextContent(

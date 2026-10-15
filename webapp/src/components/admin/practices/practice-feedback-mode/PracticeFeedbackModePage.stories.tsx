@@ -91,7 +91,7 @@ const nothingSetByHand = buildFeedbackModeFixture({
 	groups: [{ slug: "testing", name: "Testing", practices: [{ name: "Covers the new branch" }] }],
 });
 
-const notReviewedByHeph = buildFeedbackModeFixture({
+const notReviewedByHephaestus = buildFeedbackModeFixture({
 	groups: [
 		{
 			slug: "observability",
@@ -113,6 +113,21 @@ const offByGroup = buildFeedbackModeFixture({
 			practices: [
 				{ name: "Covers the new branch" },
 				{ name: "Names what it asserts", override: "OFF" },
+			],
+		},
+	],
+});
+
+/** The upgraded pilot: every practice carries its own Automatic, so neither default reaches one. */
+const everyPracticeSetByHand = buildFeedbackModeFixture({
+	workspaceDefault: "AUTOMATIC",
+	groups: [
+		{
+			slug: "packaging",
+			name: "Packaging work for review",
+			practices: [
+				{ name: "Keep the change reviewable", override: "AUTOMATIC" },
+				{ name: "Write commit subjects that explain", override: "AUTOMATIC" },
 			],
 		},
 	],
@@ -179,7 +194,7 @@ export const WorkspaceDefaultUnset: Story = {
 		await expect(canvas.getByRole("heading", { name: "Workspace default" })).toBeVisible();
 		await expect(canvas.getByText("Not chosen yet, so Approve first applies.")).toBeVisible();
 		await expect(canvas.getByRole("radiogroup", { name: "Workspace feedback mode" })).toBeVisible();
-		await expect(canvas.getByText(/It does not decide what Heph reviews\./u)).toBeVisible();
+		await expect(canvas.getByText(/It does not decide what Hephaestus reviews\./u)).toBeVisible();
 		await expectNoPageOverflow();
 	},
 };
@@ -464,6 +479,39 @@ export const DecisionsShareOneColumn: Story = {
 	},
 };
 
+/**
+ * A group whose practices are all set by hand: its own setting reaches none of them, and the page
+ * says so beside it with the way back. At desktop width the three mode names fit whole.
+ */
+export const EveryPracticeSetByHand: Story = {
+	args: from(everyPracticeSetByHand),
+	globals: { viewport: { value: "desktop" } },
+	play: async ({ canvas, userEvent, args }) => {
+		await expect(canvas.queryByText("Follows the workspace default")).not.toBeInTheDocument();
+		await expect(
+			canvas.getByText(/All 2 practices are set by hand, so this group setting has no effect\./u),
+		).toBeVisible();
+
+		const ladder = canvas.getByRole("radiogroup", {
+			name: "Feedback mode for Packaging work for review",
+		});
+		for (const name of ["Off", "Approve first", "Automatic"]) {
+			const label = within(ladder).getByText(name);
+			await expect(label.scrollWidth).toBeLessThanOrEqual(label.clientWidth);
+		}
+
+		await userEvent.click(
+			canvas.getByRole("button", {
+				name: "Reset the practices in Packaging work for review to follow this group setting",
+			}),
+		);
+		await expect(args.onBulkSetFeedbackMode).toHaveBeenCalledWith(
+			everyPracticeSetByHand.practices.map((practice) => practice.slug),
+			null,
+		);
+	},
+};
+
 export const AtScaleSetByHandOnly: Story = {
 	args: { overridesOnly: true, ...from(atScale) },
 	play: async ({ canvas }) => {
@@ -491,8 +539,8 @@ export const OffDirectAndInherited: Story = {
 	},
 };
 
-export const NotReviewedByHeph: Story = {
-	args: from(notReviewedByHeph),
+export const NotReviewedByHephaestus: Story = {
+	args: from(notReviewedByHephaestus),
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: /Observability/u }));
 		await expect(
@@ -504,7 +552,9 @@ export const NotReviewedByHeph: Story = {
 			),
 		).toBeVisible();
 		await expect(
-			canvas.getAllByText(/Heph does not review it, which is separate from feedback mode Off\./u),
+			canvas.getAllByText(
+				/Hephaestus does not review it, which is separate from feedback mode Off\./u,
+			),
 		).toHaveLength(2);
 		await expect(
 			canvas.getByRole("radiogroup", { name: "Feedback mode for Alerts a human on failure" }),

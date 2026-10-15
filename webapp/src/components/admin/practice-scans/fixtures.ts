@@ -159,6 +159,15 @@ export const CANCELLED_SCAN = scanSummary({
 	createdAt: daysBefore(5),
 	counts: EMPTY_COUNTS,
 });
+/** A first scan that failed while it listed the repository: it reached no file and has no earlier scan. */
+export const FAILED_SCAN = scanSummary({
+	id: "a0000000-0000-4000-8000-000000000006",
+	status: "FAILED",
+	stopReason: "ENUMERATION_FAILED",
+	baselineScanId: null,
+	practiceCount: 0,
+	counts: EMPTY_COUNTS,
+});
 
 export const SCANS: ScanSummary[] = [RUNNING_SCAN, COMPLETE_SCAN, PARTIAL_SCAN, CANCELLED_SCAN];
 
@@ -339,6 +348,13 @@ export const CANCELLED_REPORT = scanReport(CANCELLED_SCAN, {
 	listingComplete: false,
 	problemChanges: { new: 0, unchanged: 0, updated: 0, absent: 0 },
 	practices: [],
+});
+
+export const FAILED_REPORT = scanReport(FAILED_SCAN, {
+	comparison: "INCOMPLETE",
+	problemChanges: { new: 0, unchanged: 0, updated: 0, absent: 0 },
+	practices: [],
+	removalGuard: { state: "INCOMPLETE_LISTING", previousFiles: 0, wouldRemove: 0 },
 });
 
 const entryBase = (path: string, slug = "error-handling", fileId = "901") => ({

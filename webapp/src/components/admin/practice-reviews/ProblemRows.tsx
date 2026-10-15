@@ -11,6 +11,7 @@ import {
 	RecordTimeCell,
 } from "@/components/practice-vocabulary/RecordTable";
 import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
+import { StatusLabel } from "@/components/practice-vocabulary/StatusTooltip";
 import { TableCell } from "@/components/ui/table";
 import { formatDayTime } from "@/lib/dates";
 
@@ -137,6 +138,8 @@ export function ProblemRow({ problem }: ProblemRowProps) {
 					</span>
 					<span className="flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
 						<ReviewPracticeName practiceName={problem.practiceName} group={problem.group} />
+						{/* In words too: the time column's glyph names it only on hover. */}
+						<StatusLabel def={SEVERITY_DEFS[problem.severity]} className="text-xs" />
 						{place !== undefined && <code className="break-all">{place.location}</code>}
 						{place?.before !== undefined && <span>{place.before}</span>}
 					</span>

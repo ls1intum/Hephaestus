@@ -9,7 +9,7 @@ import {
 	RecordTableSkeleton,
 } from "@/components/practice-vocabulary/RecordTable";
 import { TableCell } from "@/components/ui/table";
-import { hasText } from "@/lib/text";
+import { itemName } from "@/lib/item-kinds";
 
 import { reviewLead, reviewReach, type ReviewSaw } from "./review-saw";
 import { ReviewOrdinalTag } from "./review-tags";
@@ -87,6 +87,8 @@ export function ReviewItemCell({
 	children,
 }: ReviewItemCellProps) {
 	const ItemIcon = reviewedWorkIcon(item.kind, item.provider ?? undefined);
+	const name = itemName(item);
+	const title = titleBeside(item, name);
 	return (
 		<TableCell className="align-top whitespace-normal">
 			<span className="flex min-w-0 flex-col items-start gap-1">
@@ -99,21 +101,39 @@ export function ReviewItemCell({
 						<ItemIcon className="size-3.5 shrink-0 text-muted-foreground" />
 						{linked ? (
 							<InlineLink href={item.url ?? undefined} external className="truncate font-medium">
-								{item.label}
+								{name}
 							</InlineLink>
 						) : (
-							<span className="truncate font-medium">{item.label}</span>
+							<span className="truncate font-medium">{name}</span>
 						)}
 					</span>
 					{children}
 				</span>
-				{hasText(item.title) && (
-					<span className="max-w-xs text-xs text-muted-foreground">{item.title}</span>
+				{title !== undefined && (
+					<span className="max-w-xs text-xs text-muted-foreground">{title}</span>
 				)}
 				<ReviewOrdinalTag position={position} total={total} />
 			</span>
 		</TableCell>
 	);
+}
+
+/**
+ * What names the item under its kind, without repeating the line above. A provider title often ends
+ * in the number the kind line carries ("Make checkout retries safe #25"). A document or thread is
+ * named by its kind alone, so its label or title goes here.
+ */
+function titleBeside(item: ItemRef, name: string): string | undefined {
+	const label = item.label.trim();
+	const named = label !== "" && name.endsWith(label);
+	let title = item.title?.trim() ?? "";
+	if (named && title.endsWith(` ${label}`)) {
+		title = title.slice(0, -label.length).trim();
+	}
+	if (title === "") {
+		title = named ? "" : label;
+	}
+	return title === "" || title === name || (named && title === label) ? undefined : title;
 }
 
 export interface ReviewSawCellProps {

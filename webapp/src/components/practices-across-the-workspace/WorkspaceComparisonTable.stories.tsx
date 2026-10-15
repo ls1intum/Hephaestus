@@ -55,7 +55,7 @@ export const Default: Story = {
 		await expect(testing?.textContent).toContain("4 practices");
 		await expect(testing?.textContent).toContain("Not met 17");
 		const craft = canvas.getAllByRole("row").find((each) => each.textContent.startsWith("Writing"));
-		await expect(craft?.textContent).toContain("No results yet");
+		await expect(craft?.textContent).toContain("No current results");
 		await userEvent.click(canvas.getByRole("button", { name: "Open group Handling failure well" }));
 		await expect(onOpen).toHaveBeenCalledOnce();
 	},

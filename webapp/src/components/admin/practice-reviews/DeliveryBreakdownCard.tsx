@@ -115,7 +115,7 @@ const BREAKDOWN_INFO = [
 	},
 	{
 		term: "Feedback failed to deliver",
-		text: "is the share of the feedback sent that failed. Above 5 % it is red.",
+		text: "is the share of the feedback sent that failed. Above 5% it is red.",
 	},
 	{
 		term: "Each count",

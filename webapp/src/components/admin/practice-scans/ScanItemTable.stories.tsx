@@ -18,7 +18,7 @@ const ready = (entries = ITEM_ENTRIES, hasNext = false) => ({
 const meta = {
 	component: ScanItemTable,
 	decorators: [withStandardPage],
-	args: { state: ready(), filter: undefined, onFilterChange: fn() },
+	args: { state: ready(), filter: undefined, onFilterChange: fn(), progress: "complete" },
 	argTypes: { state: { control: false } },
 	render: (args) => (
 		<StatefulPatch initial={{ filter: args.filter }}>
@@ -98,10 +98,22 @@ export const LoadMoreFailed: Story = {
 };
 
 export const NoFilesYet: Story = {
-	args: { state: ready([]) },
+	args: { state: ready([]), progress: "active" },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("heading", { name: "No files listed yet" })).toBeVisible();
 		await expect(canvas.queryByRole("table")).not.toBeInTheDocument();
+	},
+};
+
+/** A scan that failed while listing: the empty list is not a repository without files. */
+export const NoFilesBeforeTheScanStopped: Story = {
+	args: { state: ready([]), progress: "stopped" },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("heading", { name: "No files were listed" })).toBeVisible();
+		await expect(
+			canvas.getByText("The scan stopped before it could list the repository’s files."),
+		).toBeVisible();
+		await expect(canvas.queryByText(/yet/u)).not.toBeInTheDocument();
 	},
 };
 

@@ -48,7 +48,7 @@ export const Complete: Story = {
 		await expect(row("Review on")).toHaveTextContent(/Opened.*Marked ready for review/u);
 		await expect(row("Review on")).toHaveTextContent(/Draft status: Ready for review/u);
 		await expect(row("About")).toHaveTextContent("Author");
-		await expect(row("Reviewed by")).toHaveTextContent("Heph");
+		await expect(row("Reviewed by")).toHaveTextContent("Hephaestus");
 		await expect(row("Reads")).toHaveTextContent("Pull request details (required)");
 		await expect(row("Script")).toHaveTextContent("Practice script");
 		await expect(row("Scan support")).toHaveTextContent("Not included in scans");

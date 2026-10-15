@@ -15,7 +15,7 @@ import {
 	reviewFeedState,
 } from "@/components/profile/reviews";
 import { useFeedbackResponseWrite } from "@/hooks/use-feedback-response-write";
-import { pagedModelParams } from "@/runtime/tanstack-query/spring-page";
+import { springPageParams } from "@/runtime/tanstack-query/spring-page";
 
 export const REVIEW_PAGE_SIZE = 10;
 
@@ -72,7 +72,7 @@ export function usePracticeGroupDetail({
 	});
 	const activityQuery = useInfiniteQuery({
 		...activityOptions,
-		...pagedModelParams,
+		...springPageParams,
 		enabled: practiceOpen,
 	});
 	useQueryReadRefusal(activityOptions.queryKey, activityQuery.isError, activityQuery.error);

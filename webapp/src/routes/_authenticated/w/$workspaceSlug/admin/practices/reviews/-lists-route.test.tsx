@@ -7,6 +7,8 @@ import type { ReviewSummary } from "@/api/types.gen";
 import {
 	reviewAccounts,
 	reviewFeedback,
+	reviewProblems,
+	reviewResults,
 	reviews,
 } from "@/components/admin/practice-reviews/fixtures";
 import { developerLabel } from "@/components/admin/practice-reviews/review-format";
@@ -141,6 +143,27 @@ function serveReviewPages(reviewUrls: URL[]) {
 			);
 		}),
 	);
+}
+
+/**
+ * One list endpoint as the server pages it: three rows over two flat pages, the first holding one.
+ * Returns the page numbers the list asked for, leaving out the tab counts.
+ */
+function serveTwoFlatPages(tab: string, [first, second, third]: readonly unknown[]): string[] {
+	assert(first !== undefined && second !== undefined && third !== undefined);
+	const pageReads: string[] = [];
+	const pages = [[first], [second, third]];
+	server.use(
+		http.get(`*/workspaces/:workspaceSlug/practices/reviews/${tab}`, ({ request }) => {
+			const url = new URL(request.url);
+			const number = Number(url.searchParams.get("page"));
+			if (!isTabCount(url)) {
+				pageReads.push(String(number));
+			}
+			return HttpResponse.json(springPage(pages[number] ?? [], number, 2, 3));
+		}),
+	);
+	return pageReads;
 }
 
 describe("practice review list routes", () => {
@@ -480,6 +503,32 @@ describe("practice review list routes", () => {
 		// The last page is in, so the list ends without a button.
 		expect(screen.queryByRole("button", { name: "Show more reviews" })).toBeNull();
 	});
+
+	/**
+	 * These endpoints answer with a flat Spring page. A list that read the paging from anywhere else
+	 * would stop after its first page and show no total, which hides most of the history.
+	 */
+	it.each([
+		["results", "results", reviewResults, "3 results."],
+		["problems", "problems", reviewProblems, "3 problems."],
+		["feedback", "feedback", reviewFeedback, "3 pieces of feedback."],
+	] as const)(
+		"shows the %s total and loads the second page",
+		async (tab, noun, fixtureRows, total) => {
+			vi.stubGlobal("IntersectionObserver", ObserverStub);
+			recordRequests();
+			const pageReads = serveTwoFlatPages(tab, fixtureRows);
+
+			renderRouteAtWithRouter(`/w/acme/admin/practices/reviews/${tab}`);
+			await screen.findByText(total, undefined, ROUTE_RENDER_WAIT);
+			const rowsBefore = screen.getAllByRole("row").length;
+			await userEvent.click(screen.getByRole("button", { name: `Show more ${noun}` }));
+
+			await waitFor(() => expect(screen.getAllByRole("row").length).toBeGreaterThan(rowsBefore));
+			expect(pageReads).toStrictEqual(["0", "1"]);
+			expect(screen.queryByRole("button", { name: `Show more ${noun}` })).toBeNull();
+		},
+	);
 
 	it("names who asked for a review and its failure on its row, and opens its sheet", async () => {
 		server.use(...reviewHandlers());

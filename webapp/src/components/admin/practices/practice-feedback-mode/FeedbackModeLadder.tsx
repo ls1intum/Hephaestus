@@ -71,13 +71,17 @@ export function FeedbackModeLadder({
 								aria-labelledby={titleId}
 								aria-describedby={full ? addsId : undefined}
 							/>
-							<Icon
-								className={cn(
-									"size-4 shrink-0 text-muted-foreground",
-									selected && "text-foreground",
-								)}
-								aria-hidden
-							/>
+							{/* The compact rungs share a narrow column, where the icon would cost the label its
+							    words. The label alone names the mode. */}
+							{full && (
+								<Icon
+									className={cn(
+										"size-4 shrink-0 text-muted-foreground",
+										selected && "text-foreground",
+									)}
+									aria-hidden
+								/>
+							)}
 							<span id={titleId} className={cn("truncate text-sm", selected && "font-medium")}>
 								{FEEDBACK_MODE_LABELS[feedbackMode]}
 							</span>

@@ -48,6 +48,12 @@ function fixLinkHref(banner: HTMLElement) {
 	);
 }
 
+/** A paragraph by its whole text, which can run through a link. */
+function paragraphContaining(text: string) {
+	return (_: string, element: Element | null) =>
+		element?.tagName === "P" && element.textContent.includes(text);
+}
+
 /** The pace warning, or null where the page deliberately stays quiet. */
 function paceNote() {
 	return screen.queryByRole("status")?.textContent ?? null;
@@ -102,7 +108,9 @@ describe("WorkspaceLlmUsagePage", () => {
 
 		screen.getByText("2 runs have unavailable cost");
 		screen.getByText(
-			/Adding rates repairs only verified usage\. Set rates for your own models in .*\. For shared models, ask an instance admin\./u,
+			paragraphContaining(
+				"Adding rates repairs only verified usage. Set rates for your own models in AI models. For shared models, ask an instance admin.",
+			),
 		);
 	});
 

@@ -101,9 +101,9 @@ function ReviewStatusSection({
 					Automated review
 				</h2>
 				<p className="text-sm text-muted-foreground">
-					Heph reviews new work against every practice it reviews automatically. Practices reviewed
-					by people or by nobody are left out. Feedback mode decides separately where results become
-					feedback.
+					Hephaestus reviews new work against every practice it reviews automatically. Practices
+					reviewed by people or by nobody are left out. Feedback mode decides separately where
+					results become feedback.
 				</p>
 			</div>
 			<Field orientation="horizontal">
@@ -322,7 +322,7 @@ function FeedbackDeliverySection({ policy }: Pick<PracticeReviewSettingsProps, "
 					Sending feedback
 				</h2>
 				<p className="text-sm text-muted-foreground">
-					These settings apply to all comments and feedback from Heph in the workspace. Each
+					These settings apply to all comments and feedback from Hephaestus in the workspace. Each
 					practice’s feedback mode still decides whether its feedback waits for approval.
 				</p>
 			</div>
@@ -331,10 +331,9 @@ function FeedbackDeliverySection({ policy }: Pick<PracticeReviewSettingsProps, "
 					<AlertCircle />
 					<AlertTitle>Sending is paused</AlertTitle>
 					<AlertDescription>
-						Reviews and in-app feedback continue, but no comments or feedback from Heph leave
-						Hephaestus. Automatic feedback is not queued for later delivery. Pending approvals
-						remain in the review queue, and a workspace owner or admin can decide them after
-						resuming.
+						Reviews and in-app feedback continue, but no comments or feedback leave Hephaestus.
+						Automatic feedback is not queued for later delivery. Pending approvals remain in the
+						review queue, and a workspace owner or admin can decide them after resuming.
 					</AlertDescription>
 				</Alert>
 			) : null}
@@ -345,7 +344,7 @@ function FeedbackDeliverySection({ policy }: Pick<PracticeReviewSettingsProps, "
 						<StatusBadge def={WORKSPACE_DELIVERY_STATUS_DEFS[settings.deliveryStatus]} />
 					</div>
 					<FieldDescription>
-						Pause all comments and feedback from Heph without stopping reviews or changing the
+						Pause all comments and feedback from Hephaestus without stopping reviews or changing the
 						review scope.
 					</FieldDescription>
 				</FieldContent>

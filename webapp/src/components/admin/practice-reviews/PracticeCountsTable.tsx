@@ -91,7 +91,7 @@ const DELIVERED = "Feedback delivered";
  * (i) sits beside the words. A figure never wraps, so every row keeps one height. Stacked on a
  * narrow screen, the figures stay at the start of their line.
  */
-const COUNT_COLUMN = "w-28 whitespace-normal text-center";
+const COUNT_COLUMN = "w-32 whitespace-normal text-center";
 const COUNT_CELL = "@2xl:text-center";
 
 const { minimumResults, neverAppliesShare, oftenUndecidedShare } = PRACTICE_MARKER_THRESHOLDS;
@@ -101,8 +101,8 @@ const COLUMN_INFO = {
 	results:
 		"Every result the reviews recorded about this practice in the range: met, not met, does not apply and could not determine.",
 	notMet: "The results of this practice whose outcome was not met, out of all its results.",
-	doesNotApply: `The results where the practice did not apply to the work, out of all its results. From ${minimumResults} results, a practice where ${Math.round(neverAppliesShare * 100)} % or more do not apply is marked "${PRACTICE_MARKER_DEFS.NEVER_APPLIES.label}".`,
-	couldNotDetermine: `The results where the review could not decide, out of all its results. From ${minimumResults} results, a practice where ${Math.round(oftenUndecidedShare * 100)} % or more could not be determined is marked "${PRACTICE_MARKER_DEFS.OFTEN_UNDECIDED.label}".`,
+	doesNotApply: `The results where the practice did not apply to the work, out of all its results. From ${minimumResults} results, a practice where ${Math.round(neverAppliesShare * 100)}% or more do not apply is marked "${PRACTICE_MARKER_DEFS.NEVER_APPLIES.label}".`,
+	couldNotDetermine: `The results where the review could not decide, out of all its results. From ${minimumResults} results, a practice where ${Math.round(oftenUndecidedShare * 100)}% or more could not be determined is marked "${PRACTICE_MARKER_DEFS.OFTEN_UNDECIDED.label}".`,
 	markedIncorrect: `The results an admin marked incorrect, out of all its results. They keep their outcome too. ${MARKED_INCORRECT.note}`,
 	feedbackDelivered:
 		"The feedback about this practice that reached the developer, out of all the feedback composed about it in the range: delivered, waiting, withheld, rejected or failed. A piece replaced by a newer one is not counted.",
@@ -172,9 +172,9 @@ export function PracticeCountsTable({ state, practices, filter }: PracticeCounts
 		{ label: "Practice" },
 		// Six columns of counts, each head at most two lines; the practice's name takes the rest.
 		{
-			label: "Number of results",
+			label: "Results",
 			className: COUNT_COLUMN,
-			info: <ColumnInfo label="Number of results">{COLUMN_INFO.results}</ColumnInfo>,
+			info: <ColumnInfo label="Results">{COLUMN_INFO.results}</ColumnInfo>,
 		},
 		{
 			label: NOT_MET,
@@ -337,7 +337,7 @@ function StackedColumnInfo() {
 			<InfoTip label={label}>
 				<InfoLines
 					lines={[
-						{ term: "Number of results", text: COLUMN_INFO.results },
+						{ term: "Results", text: COLUMN_INFO.results },
 						{ term: NOT_MET, text: COLUMN_INFO.notMet },
 						{ term: DOES_NOT_APPLY, text: COLUMN_INFO.doesNotApply },
 						{ term: COULD_NOT_DETERMINE, text: COLUMN_INFO.couldNotDetermine },

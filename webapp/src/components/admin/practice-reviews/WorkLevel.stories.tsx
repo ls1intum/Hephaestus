@@ -79,6 +79,24 @@ export const WithEvents: Story = {
 	},
 };
 
+/** Upgraded history: each event started a review it no longer links to. The header counts what the badges say. */
+export const StartedEventsWithoutReviewLink: Story = {
+	args: {
+		events: {
+			status: "ready",
+			events: reviewItemEvents
+				.slice(0, 2)
+				.map((event) => ({ ...event, state: "STARTED" as const, reviewId: null })),
+		},
+	},
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		await expect(panelElement.querySelector("[data-sheet-status]")).toHaveTextContent(
+			"2 events, 2 started a review",
+		);
+	},
+};
+
 export const RequestBlockedWhileRunning: Story = {
 	args: { requestBlocked: "A review of this work is already queued or running." },
 	play: async ({ args, userEvent }) => {

@@ -29,9 +29,11 @@ import { formatDate } from "@/lib/dates";
 import { problemDetailOf } from "@/lib/problem-detail";
 
 import {
-	isActiveScan,
+	countedNothing,
 	knownReasonSentence,
 	repositoryName,
+	type ScanProgress,
+	scanProgress,
 	scanStartedBy,
 	shortVersion,
 	withheldSentence,
@@ -132,9 +134,10 @@ function LoadedReport({
 	cancel,
 	exportSarif,
 }: LoadedReportProps) {
-	const active = isActiveScan(scan.status);
-	const unfinished = !active && scan.status !== "COMPLETE";
+	const progress = scanProgress(scan.status);
+	const active = progress === "active";
 	const { counts } = report;
+	const nothingCounted = countedNothing({ status: scan.status, counts });
 	return (
 		<PageLayout>
 			<div className="space-y-2">
@@ -186,9 +189,19 @@ function LoadedReport({
 				)}
 			</div>
 
-			<ReportNotes scan={scan} report={report} active={active} unfinished={unfinished} />
+			<ReportNotes
+				scan={scan}
+				report={report}
+				progress={progress}
+				nothingCounted={nothingCounted}
+			/>
 
-			<ScanCounts counts={counts} recorded={!active && report.recordedCounts !== null} />
+			<ScanCounts
+				counts={counts}
+				recorded={!active && report.recordedCounts !== null}
+				progress={progress}
+				countedNothing={nothingCounted}
+			/>
 
 			<Tabs
 				value={tab}
@@ -216,13 +229,19 @@ function LoadedReport({
 						onFilterChange={onProblemFilterChange}
 						changes={report.problemChanges}
 						pairsWithoutResult={counts.withheld + counts.notReviewed}
+						progress={progress}
 					/>
 				</TabsContent>
 				<TabsContent value="files">
-					<ScanItemTable state={files} filter={fileFilter} onFilterChange={onFileFilterChange} />
+					<ScanItemTable
+						state={files}
+						filter={fileFilter}
+						onFilterChange={onFileFilterChange}
+						progress={progress}
+					/>
 				</TabsContent>
 				<TabsContent value="practices">
-					<ScanPracticeTable practices={report.practices} />
+					<ScanPracticeTable practices={report.practices} progress={progress} />
 				</TabsContent>
 			</Tabs>
 		</PageLayout>
@@ -249,6 +268,24 @@ function Note({ title, children }: { title: string; children: ReactNode }) {
 	);
 }
 
+/** Why a scan that stopped says nothing about the code it did not reach. Failed is an error, not a note. */
+function StoppedNote({ scan, nothingCounted }: { scan: ScanDetail; nothingCounted: boolean }) {
+	const failed = scan.status === "FAILED";
+	const reason =
+		scan.stopReason === null ? "" : ` ${REVIEW_STOP_REASON_SENTENCES[scan.stopReason]}`;
+	return (
+		<Alert variant={failed ? "destructive" : "warning"}>
+			<AlertCircleIcon />
+			<AlertTitle>{failed ? "Scan failed" : REVIEW_STATUS_DEFS[scan.status].label}</AlertTitle>
+			<AlertDescription>
+				{nothingCounted
+					? `The scan stopped before it reviewed any file.${reason} Nothing here says the code is clean. Start a new scan to try again.`
+					: `${PARTIAL_SENTENCE}${reason}`}
+			</AlertDescription>
+		</Alert>
+	);
+}
+
 function progressSentence(scan: ScanDetail): string {
 	const { listedPairs, terminalPairs, activeJobs, queuedJobs } = scan.progress;
 	const finished =
@@ -261,31 +298,33 @@ function progressSentence(scan: ScanDetail): string {
 function ReportNotes({
 	scan,
 	report,
-	active,
-	unfinished,
+	progress,
+	nothingCounted,
 }: {
 	scan: ScanDetail;
 	report: ScanReport;
-	active: boolean;
-	unfinished: boolean;
+	progress: ScanProgress;
+	nothingCounted: boolean;
 }) {
 	const comparison = SCAN_COMPARISON_DEFS[report.comparison];
 	const guard = REMOVAL_GUARD_DEFS[report.removalGuard.state];
+	const stopped = progress === "stopped";
+	// Both notes speak of an earlier scan: what it covered, and its files missing now. With none,
+	// neither is true, and the stopped scan's own note already says the listing did not finish.
+	const firstScan = report.baselineScanId === null;
+	const showComparison =
+		report.comparison !== "COMPARABLE" && !(report.comparison === "INCOMPLETE" && firstScan);
+	const showGuard =
+		report.removalGuard.state !== "NOT_NEEDED" &&
+		!(report.removalGuard.state === "INCOMPLETE_LISTING" && firstScan);
 	return (
 		<div className="space-y-3">
-			{active && (
+			{progress === "active" && (
 				<Note title={REVIEW_STATUS_DEFS[scan.status].label}>{progressSentence(scan)}</Note>
 			)}
-			{unfinished && (
-				<Note title={REVIEW_STATUS_DEFS[scan.status].label}>
-					{PARTIAL_SENTENCE}
-					{scan.stopReason !== null && ` ${REVIEW_STOP_REASON_SENTENCES[scan.stopReason]}`}
-				</Note>
-			)}
-			{report.comparison !== "COMPARABLE" && (
-				<Note title={comparison.label}>{comparison.description}</Note>
-			)}
-			{report.removalGuard.state !== "NOT_NEEDED" && (
+			{stopped && <StoppedNote scan={scan} nothingCounted={nothingCounted} />}
+			{showComparison && <Note title={comparison.label}>{comparison.description}</Note>}
+			{showGuard && (
 				<Note title={guard.label}>
 					{guard.description}
 					{report.removalGuard.state === "SUSPECT_LISTING" &&
@@ -308,7 +347,7 @@ function ReportNotes({
 					}))}
 				/>
 			)}
-			{report.notReviewedReasons.length > 0 && !active && (
+			{report.notReviewedReasons.length > 0 && progress !== "active" && (
 				<ReasonList
 					title="Why pairs were not reviewed"
 					reasons={report.notReviewedReasons.map((reason) => ({

@@ -37,7 +37,7 @@ export const SomeZero: Story = {
 export const Empty: Story = {
 	args: { outcomes: NO_OUTCOMES },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("No results yet")).toBeVisible();
+		await expect(canvas.getByText("No current results")).toBeVisible();
 		await expect(canvas.queryByRole("list")).toBeNull();
 	},
 };

@@ -3,7 +3,7 @@ import type { OutcomeVector } from "@/api/types.gen";
 import { type Outcome, OUTCOME_DEFS } from "@/components/practice-vocabulary/outcome-defs";
 import { Skeleton } from "@/components/ui/skeleton";
 
-import { NO_RESULTS_YET } from "./across-workspace-copy";
+import { NO_CURRENT_RESULTS } from "./across-workspace-copy";
 
 const COUNTS = [
 	["met", "MET"],
@@ -19,7 +19,7 @@ export interface OutcomeCountsProps {
 
 export function OutcomeCounts({ outcomes, className }: OutcomeCountsProps) {
 	if (COUNTS.every(([key]) => outcomes[key] === 0)) {
-		return <p className={cn("text-sm text-muted-foreground", className)}>{NO_RESULTS_YET}</p>;
+		return <p className={cn("text-sm text-muted-foreground", className)}>{NO_CURRENT_RESULTS}</p>;
 	}
 	return (
 		<ul className={cn("flex flex-wrap gap-x-4 gap-y-1 text-sm", className)}>

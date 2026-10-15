@@ -24,6 +24,7 @@ const meta = {
 		onFilterChange: fn(),
 		changes: { new: 1, unchanged: 1, updated: 1, absent: 2 },
 		pairsWithoutResult: 0,
+		progress: "complete",
 	},
 	argTypes: { state: { control: false }, changes: { control: false } },
 	render: (args) => (
@@ -87,6 +88,33 @@ export const NoProblemsWithWithholding: Story = {
 				"That does not mean every practice is met: 4 practice and file pairs have no result in this scan.",
 			),
 		).toBeVisible();
+	},
+};
+
+/** A failed scan has no problems because it reviewed nothing, not because the code is clean. */
+export const NoProblemsBeforeTheScanStopped: Story = {
+	args: {
+		state: ready([]),
+		changes: { new: 0, unchanged: 0, updated: 0, absent: 0 },
+		progress: "stopped",
+	},
+	play: async ({ canvas }) => {
+		await expect(
+			canvas.getByRole("heading", { name: "No problems recorded before the scan stopped" }),
+		).toBeVisible();
+		await expect(canvas.getByText(/so this is not a clean result\./u)).toBeVisible();
+		await expect(canvas.queryByText("This scan recorded no problems")).not.toBeInTheDocument();
+	},
+};
+
+export const NoProblemsYet: Story = {
+	args: {
+		state: ready([]),
+		changes: { new: 0, unchanged: 0, updated: 0, absent: 0 },
+		progress: "active",
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("heading", { name: "No problems recorded yet" })).toBeVisible();
 	},
 };
 

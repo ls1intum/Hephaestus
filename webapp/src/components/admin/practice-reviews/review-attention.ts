@@ -9,15 +9,15 @@ export function shareOf(count: number, whole: number): number {
 	return whole > 0 ? count / whole : 0;
 }
 
-/** "5 %", "0.4 %": whole from one up, one decimal below, so a small loss never reads as none. */
+/** "5%", "0.4%": whole from one up, one decimal below, so a small loss never reads as none. */
 export function percentText(share: number): string {
 	const percent = share * 100;
 	if (percent === 0) {
-		return "0 %";
+		return "0%";
 	}
 	return percent >= 1
-		? `${Math.round(percent)} %`
-		: `${Math.max(0.1, Math.round(percent * 10) / 10)} %`;
+		? `${Math.round(percent)}%`
+		: `${Math.max(0.1, Math.round(percent * 10) / 10)}%`;
 }
 
 export type PracticeMarker = "NEVER_APPLIES" | "OFTEN_UNDECIDED";

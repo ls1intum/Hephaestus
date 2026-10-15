@@ -4,6 +4,8 @@ import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.web.PageResponseDTO;
 import de.tum.cit.aet.hephaestus.integration.core.api.ItemRefDTO;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.practices.profile.PracticeProfileReviewService;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.ProfileReviewDTO;
 import de.tum.cit.aet.hephaestus.practices.review.ProductItemQuery;
@@ -15,6 +17,7 @@ import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspace
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
+import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
@@ -58,11 +61,19 @@ public class ItemController {
     @Operation(operationId = "getItemFacts", summary = "Get current facts about an item")
     public ItemFactsDTO facts(WorkspaceContext ws, @PathVariable long itemId) {
         var item = items.require(ws.id(), itemId);
-        var snapshot =
-                items.current(item).orElseThrow(() -> new EntityNotFoundException("Item", Long.toString(itemId)));
+        Map<String, String> state;
+        try {
+            state = items.current(item)
+                    .orElseThrow(() -> new EntityNotFoundException("Item", Long.toString(itemId)))
+                    .state();
+        } catch (ItemCaptureException unavailable) {
+            if (unavailable.code() != ItemCaptureCode.VERSION_UNAVAILABLE) throw unavailable;
+            // Retained items can lack the provider revision needed to establish current facts.
+            return new ItemFactsDTO(trace.requireItem(ws.id(), itemId), List.of());
+        }
         return new ItemFactsDTO(
                 trace.requireItem(ws.id(), itemId),
-                snapshot.state().entrySet().stream()
+                state.entrySet().stream()
                         .sorted(Map.Entry.comparingByKey())
                         .map(e -> new ItemFactDTO(e.getKey(), e.getValue(), null))
                         .toList());
