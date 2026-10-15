@@ -340,30 +340,52 @@ describe("monitored repositories", () => {
 		]);
 	});
 
-	it("does not list a GitLab repository again when adding it back fails", async () => {
+	it("keeps a GitLab repository path when adding it back fails, and adds it on retry", async () => {
 		const { entry } = mockConnection("GITLAB");
 		entry.credentialsUnreadableSince = undefined;
 		const { commands, command } = serveMonitored([]);
+		const failure = deferred();
 		server.use(
-			http.post("*/workspaces/:workspaceSlug/repositories", ({ request }) => {
-				command(request);
-				return HttpResponse.json(
-					{ status: 503, title: "Service Unavailable", detail: "GitLab is unavailable." },
-					{ status: 503 },
-				);
-			}),
+			http.post(
+				"*/workspaces/:workspaceSlug/repositories",
+				async ({ request }) => {
+					command(request);
+					await failure.promise;
+					return HttpResponse.json(
+						{ status: 503, title: "Service Unavailable", detail: "GitLab is unavailable." },
+						{ status: 503 },
+					);
+				},
+				{ once: true },
+			),
 		);
 		renderRouteAt("/w/acme/admin/integrations/scm");
 		const input = await screen.findByLabelText("Add a repository", undefined, ROUTE_RENDER_WAIT);
 		const user = userEvent.setup();
 		await user.type(input, "acme/platform/api");
-		await user.click(screen.getByRole("button", { name: "Add repository" }));
+		try {
+			await user.click(screen.getByRole("button", { name: "Add repository" }));
+			await waitFor(() =>
+				expect(commands).toStrictEqual(["POST /workspaces/acme/repositories acme/platform/api"]),
+			);
+			expect(input).toHaveProperty("value", "acme/platform/api");
+		} finally {
+			failure.resolve();
+		}
 
 		await screen.findByText("We could not add the repository");
 		expect(input.getAttribute("aria-invalid")).toBe("true");
-		expect(commands).toStrictEqual(["POST /workspaces/acme/repositories acme/platform/api"]);
+		expect(input).toHaveProperty("value", "acme/platform/api");
 		screen.getByText("No repositories monitored yet");
 		expect(screen.queryByText("acme/platform/api")).toBeNull();
+
+		await user.click(screen.getByRole("button", { name: "Add repository" }));
+		await screen.findByText("acme/platform/api");
+		expect(commands).toStrictEqual([
+			"POST /workspaces/acme/repositories acme/platform/api",
+			"POST /workspaces/acme/repositories acme/platform/api",
+		]);
+		await waitFor(() => expect(input).toHaveProperty("value", ""));
 	});
 
 	it("explains a GitHub Stop with the shared outcome and no GitLab-only promise", async () => {

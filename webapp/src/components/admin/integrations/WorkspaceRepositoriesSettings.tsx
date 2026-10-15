@@ -137,7 +137,8 @@ interface WorkspaceRepositoriesSettingsProps {
 	addRepositoryError: unknown;
 	isAddingRepository: boolean;
 	isRemovingRepository: boolean;
-	onAddRepository: (nameWithOwner: string) => void;
+	/** Resolves to whether the repository was added; the entered path stays for a retry until it was. */
+	onAddRepository: (nameWithOwner: string) => Promise<boolean>;
 	onRemoveRepository: (nameWithOwner: string) => void;
 	onRetry?: () => void;
 }
@@ -158,10 +159,14 @@ export function WorkspaceRepositoriesSettings({
 	const [repositoryInput, setRepositoryInput] = useState("");
 	const isValidInput = repositoryInput.includes("/");
 
-	const handleAddRepository = () => {
-		if (isValidInput) {
-			onAddRepository(repositoryInput);
-			setRepositoryInput("");
+	const handleAddRepository = async () => {
+		if (!isValidInput) {
+			return;
+		}
+		const submitted = repositoryInput;
+		if (await onAddRepository(submitted)) {
+			// A path entered after this one was submitted is a new draft, not the added repository.
+			setRepositoryInput((current) => (current === submitted ? "" : current));
 		}
 	};
 
@@ -253,7 +258,9 @@ export function WorkspaceRepositoriesSettings({
 							<InputGroupAddon align="inline-end">
 								<InputGroupButton
 									variant="default"
-									onClick={handleAddRepository}
+									onClick={() => {
+										void handleAddRepository();
+									}}
 									disabled={!isValidInput || isAddingRepository}
 								>
 									Add repository

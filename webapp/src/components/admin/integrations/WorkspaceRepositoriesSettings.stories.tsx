@@ -22,7 +22,7 @@ const meta = {
 		addRepositoryError: null,
 		isAddingRepository: false,
 		isRemovingRepository: false,
-		onAddRepository: fn(),
+		onAddRepository: fn(async () => true),
 		onRemoveRepository: fn(),
 	},
 } satisfies Meta<typeof WorkspaceRepositoriesSettings>;
@@ -44,6 +44,7 @@ export const Default: Story = {
 		await expect(addButton).toBeEnabled();
 		await userEvent.click(addButton);
 		await expect(args.onAddRepository).toHaveBeenCalledWith("owner/name");
+		await expect(input).toHaveValue("");
 	},
 };
 
@@ -195,6 +196,28 @@ export const AddValidationError: Story = {
 		await expect(
 			canvas.queryByText(/an error occurred while adding the repository/iu),
 		).not.toBeInTheDocument();
+	},
+};
+
+/** A failed add keeps the entered path, so the admin can retry without typing it again. */
+export const AddFailedKeepsPath: Story = {
+	args: {
+		provider: "GITLAB",
+		providerLabel: "GitLab",
+		onAddRepository: fn(async () => false),
+		addRepositoryError: Object.assign(new Error("request failed"), {
+			status: 503,
+			detail: "GitLab is unavailable.",
+		}),
+	},
+	play: async ({ canvas }) => {
+		const input = canvas.getByLabelText("Add a repository");
+		await userEvent.type(input, "acme/platform/api");
+		await userEvent.click(canvas.getByRole("button", { name: /^add repository$/iu }));
+
+		await expect(input).toHaveValue("acme/platform/api");
+		await expect(canvas.getByRole("button", { name: /^add repository$/iu })).toBeEnabled();
+		canvas.getByText("GitLab is unavailable.");
 	},
 };
 
