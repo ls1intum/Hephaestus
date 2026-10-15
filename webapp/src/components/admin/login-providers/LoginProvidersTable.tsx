@@ -70,19 +70,18 @@ export function LoginProvidersTable({
 	onAdd,
 }: LoginProvidersTableProps) {
 	// ONE delete dialog for the whole table, driven by the row it targets — a dialog per row means N
-	// portals mounted for a single, rare action.
-	const [deleting, setDeleting] = useState<LoginProviderView | null>(null);
+	// portals mounted for a single, rare action. It reads that row from the current list.
+	const [deletingId, setDeletingId] = useState<string | null>(null);
+	const deleting = providers.find((provider) => provider.registrationId === deletingId);
 
 	// The delete succeeded exactly when the row leaves the list; close on that, so a *failed* delete
-	// (row still present, mutation settled) keeps the dialog open to retry.
-	if (
-		deleting &&
-		!providers.some((provider) => provider.registrationId === deleting.registrationId)
-	) {
-		setDeleting(null);
+	// (row still present, mutation settled) keeps the dialog open to retry. A row the list no longer
+	// holds, deleted or no longer readable, takes its dialog with it for good.
+	if (deletingId !== null && deleting === undefined) {
+		setDeletingId(null);
 	}
 
-	const isDeletePending = deleting != null && mutatingIds.has(deleting.registrationId);
+	const isDeletePending = deleting !== undefined && mutatingIds.has(deleting.registrationId);
 
 	if (isError) {
 		return (
@@ -210,7 +209,7 @@ export function LoginProvidersTable({
 											size="icon"
 											aria-label={`Delete ${provider.displayName}`}
 											disabled={busy}
-											onClick={() => setDeleting(provider)}
+											onClick={() => setDeletingId(provider.registrationId)}
 										>
 											<Trash2 className="size-4 text-destructive" aria-hidden />
 										</Button>
@@ -223,11 +222,11 @@ export function LoginProvidersTable({
 			</Table>
 
 			<AlertDialog
-				open={deleting != null}
+				open={deleting !== undefined}
 				// Dismissal is allowed even while the DELETE is in flight (ADR 0027).
 				onOpenChange={(open) => {
 					if (!open) {
-						setDeleting(null);
+						setDeletingId(null);
 					}
 				}}
 			>
@@ -245,7 +244,7 @@ export function LoginProvidersTable({
 							variant="destructive"
 							disabled={isDeletePending}
 							onClick={() => {
-								if (deleting !== null) {
+								if (deleting !== undefined) {
 									onDelete(deleting);
 								}
 							}}
