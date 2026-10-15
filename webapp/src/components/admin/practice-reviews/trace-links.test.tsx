@@ -91,22 +91,9 @@ describe.each(VIEWS)(
 	"the trace $name",
 	({ display, expand }) => {
 		it.each(CASES.map((entry) => [entry.key, entry] as const))(
-			"%s: opens each record from one step only",
+			"%s: names each control, keeps controls separate and opens each record once",
 			(_key, entry) => {
-				const { rail, onOpen } = renderTrace(entry, display, expand);
-				const audit = auditSteps(rail, onOpen);
-				for (const count of Object.values(audit.controls)) {
-					expect(count).toBe(1);
-				}
-				expect(audit.opensPerPress.every((count) => count === 1)).toBe(true);
-				expect(new Set(audit.opened).size).toBe(audit.opened.length);
-			},
-		);
-
-		it.each(CASES.map((entry) => [entry.key, entry] as const))(
-			"%s: nests no control in another, and names each control once",
-			(_key, entry) => {
-				const { container, rail } = renderTrace(entry, display, expand);
+				const { container, rail, onOpen } = renderTrace(entry, display, expand);
 				expect(container.querySelectorAll("button button, button a, a button, a a")).toHaveLength(
 					0,
 				);
@@ -119,6 +106,17 @@ describe.each(VIEWS)(
 				}
 				const repeated = names.filter((name, index) => names.indexOf(name) !== index);
 				expect(repeated).toStrictEqual([]);
+				for (const link of container.querySelectorAll<HTMLAnchorElement>("a[href]")) {
+					expect(link.getAttribute("href")).toMatch(/^https:\/\//u);
+					expect(link.target).toBe("_blank");
+					expect(link.rel).toContain("noopener");
+				}
+				const audit = auditSteps(rail, onOpen);
+				for (const count of Object.values(audit.controls)) {
+					expect(count).toBe(1);
+				}
+				expect(audit.opensPerPress.every((count) => count === 1)).toBe(true);
+				expect(new Set(audit.opened).size).toBe(audit.opened.length);
 			},
 		);
 	},
@@ -128,18 +126,6 @@ describe.each(VIEWS)(
 );
 
 describe("links out of the trace", () => {
-	it.each(CASES.map((entry) => [entry.key, entry] as const))(
-		"%s: open in a new tab",
-		(_key, entry) => {
-			const { container } = renderTrace(entry, FULL_TRACE_DISPLAY, true);
-			for (const link of container.querySelectorAll<HTMLAnchorElement>("a[href]")) {
-				expect(link.getAttribute("href")).toMatch(/^https:\/\//u);
-				expect(link.target).toBe("_blank");
-				expect(link.rel).toContain("noopener");
-			}
-		},
-	);
-
 	it("leads to the work on its provider from the work's facts", () => {
 		const { container } = renderTrace(stateCase("completed"), FULL_TRACE_DISPLAY, true);
 		const links = [...container.querySelectorAll<HTMLAnchorElement>("a[href]")];
