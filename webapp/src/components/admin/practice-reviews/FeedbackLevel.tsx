@@ -152,7 +152,10 @@ export function FeedbackLevel({
 						at={
 							feedback.deliveredAt === null
 								? { label: "composed", date: feedback.createdAt }
-								: { label: "delivered", date: feedback.deliveredAt }
+								: {
+										label: feedback.state === "DELIVERED" ? "delivered" : "first appeared",
+										date: feedback.deliveredAt,
+									}
 						}
 					/>
 				)

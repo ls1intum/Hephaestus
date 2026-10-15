@@ -144,7 +144,7 @@ class AppliesWhenExecutionIntegrationTest extends AbstractResultAdmissionIntegra
     void setup() {
         databaseTestUtils.cleanDatabase();
         when(custody.find(anyLong(), anyList()))
-                .thenAnswer(call -> new HistoryCustody(true, List.of(), List.of(), call.getArgument(1)));
+                .thenAnswer(call -> new HistoryCustody(true, false, List.of(), List.of(), call.getArgument(1)));
     }
 
     private ReviewAdmissionData.Pending pending() {

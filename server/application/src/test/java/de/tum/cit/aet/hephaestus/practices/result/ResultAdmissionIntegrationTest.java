@@ -170,7 +170,7 @@ class ResultAdmissionIntegrationTest extends AbstractResultAdmissionIntegrationT
         scenario = data.scenario();
         scenarioAccountId = Objects.requireNonNull(scenario.account().getId());
         when(custody.find(anyLong(), anyList()))
-                .thenAnswer(call -> new HistoryCustody(true, List.of(), List.of(), call.getArgument(1)));
+                .thenAnswer(call -> new HistoryCustody(true, false, List.of(), List.of(), call.getArgument(1)));
     }
 
     void running(ReviewAdmissionData.Pending p, int attempt) {

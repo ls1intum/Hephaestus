@@ -249,7 +249,7 @@ public class ScanReportTestData {
         member.setJobId(job);
         member.setDetail(json.createObjectNode()
                 .putNull("developerId")
-                .set("custody", json.valueToTree(new HistoryCustody(true, List.of(), List.of(), List.of(job)))));
+                .set("custody", json.valueToTree(new HistoryCustody(true, false, List.of(), List.of(), List.of(job)))));
         members.saveAndFlush(member);
         reports.freeze(review.getWorkspaceId(), review.getId());
         return result;

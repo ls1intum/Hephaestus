@@ -44,6 +44,7 @@ class ResultSourceAuthorizationTest extends BaseUnitTest {
     final ItemSourceAccess source = mock(ItemSourceAccess.class);
     final ClasspathSourceCatalogRegistry catalog = mock(ClasspathSourceCatalogRegistry.class);
     final ProblemRepository problems = mock(ProblemRepository.class);
+    final ProductItemRepository itemRows = mock(ProductItemRepository.class);
     final JsonMapper json = new JsonMapper();
     final SourceUsePurpose purpose = SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW;
     final ItemRef item = new ItemRef(1, 2, new ItemKind("scm.pull_request"), 3L, null, null);
@@ -65,7 +66,7 @@ class ResultSourceAuthorizationTest extends BaseUnitTest {
             identities,
             accounts,
             problems,
-            mock(ProductItemRepository.class),
+            itemRows,
             List.of(source));
 
     @BeforeEach
@@ -76,7 +77,7 @@ class ResultSourceAuthorizationTest extends BaseUnitTest {
     }
 
     HistoryCustody receipt(List<PersonCopyIdentity> copies) {
-        return new HistoryCustody(true, copies, List.of(), List.of(job));
+        return new HistoryCustody(true, false, copies, List.of(), List.of(job));
     }
 
     @Test
@@ -91,7 +92,7 @@ class ResultSourceAuthorizationTest extends BaseUnitTest {
     @Test
     void unknownCustodyAndSuppressedProducerAreUnavailable() {
         assertThat(authorization.authorized(
-                        result, new HistoryCustody(false, List.of(), List.of(), List.of()), purpose))
+                        result, new HistoryCustody(false, false, List.of(), List.of(), List.of()), purpose))
                 .isFalse();
         when(suppression.isReviewJobSuppressed(job)).thenReturn(true);
         assertThat(authorization.authorized(result, receipt(List.of()), purpose))
@@ -181,5 +182,73 @@ class ResultSourceAuthorizationTest extends BaseUnitTest {
         when(suppression.isReviewJobSuppressed(job)).thenReturn(true);
         assertThat(authorization.permitsHistory(1, history.getId(), SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW))
                 .isFalse();
+    }
+
+    @Test
+    void shouldRetainPrivacyChecksWhenMigratedCustodyIsIncomplete() {
+        var history =
+                resultBuilder(result).evidenceVersion((short) 0).reviewId(job).build();
+        var purpose = SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW;
+        when(results.findByIdAndWorkspaceId(history.getId(), 1)).thenReturn(Optional.of(history));
+        when(source.permits(item, purpose)).thenReturn(true);
+        when(assignments.findByWorkspaceIdAndReviewIdAndPracticeIdAndItemId(1, job, history.getPracticeId(), 2))
+                .thenReturn(Optional.of(ReviewItem.builder()
+                        .resultId(history.getId())
+                        .jobId(job)
+                        .build()));
+        var copy = new PersonCopyIdentity("GITHUB", "https://github.com", "native-7", null);
+        when(custody.find(1, List.of(job)))
+                .thenReturn(new HistoryCustody(false, false, List.of(copy), List.of(), List.of(job)));
+        when(people.providers())
+                .thenReturn(List.of(new PersonIdentityResolver.Provider(8, "GITHUB", "https://github.com")));
+        when(identities.resolveAccountId(8L, "native-7", null)).thenReturn(Optional.of(7L));
+        when(accounts.find(7))
+                .thenReturn(Optional.of(new AccountDirectory.AccountView(
+                        7, Account.Status.ACTIVE, "Person", AiChoice.CLOUD, null, true)));
+        assertThat(authorization.permitsHistory(1, history.getId(), purpose)).isTrue();
+        assertThat(authorization.permits(1, history.getId(), purpose)).isFalse();
+        when(suppression.isSuppressed(8, "native-7", null)).thenReturn(true);
+        assertThat(authorization.permitsHistory(1, history.getId(), purpose)).isFalse();
+
+        when(custody.find(1, List.of(job)))
+                .thenReturn(new HistoryCustody(false, false, List.of(), List.of(9L), List.of(job)));
+        assertThat(authorization.permitsHistory(1, history.getId(), purpose)).isFalse();
+        when(itemRows.activeRepositoryIds(1, 9)).thenReturn(List.of(2L));
+        when(items.require(1, 2)).thenReturn(item);
+        assertThat(authorization.permitsHistory(1, history.getId(), purpose)).isTrue();
+
+        var copiedJob = UUID.randomUUID();
+        when(custody.find(1, List.of(job)))
+                .thenReturn(new HistoryCustody(false, false, List.of(), List.of(), List.of(copiedJob)));
+        when(suppression.isReviewJobSuppressed(copiedJob)).thenReturn(true);
+        assertThat(authorization.permitsHistory(1, history.getId(), purpose)).isFalse();
+        when(custody.find(1, List.of(job)))
+                .thenReturn(new HistoryCustody(false, true, List.of(), List.of(), List.of()));
+        assertThat(authorization.permitsHistory(1, history.getId(), purpose)).isFalse();
+    }
+
+    @Test
+    void shouldRefuseConflictingRetainedCustodyInsteadOfTreatingItAsAbsent() {
+        var history =
+                resultBuilder(result).evidenceVersion((short) 0).reviewId(job).build();
+        when(results.findByIdAndWorkspaceId(history.getId(), 1)).thenReturn(Optional.of(history));
+        when(source.permits(item, SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW)).thenReturn(true);
+        var first = json.createObjectNode().set("custody", json.valueToTree(receipt(List.of())));
+        var second = json.createObjectNode()
+                .set("custody", json.valueToTree(new HistoryCustody(false, false, List.of(), List.of(), List.of(job))));
+        when(assignments.findByWorkspaceIdAndResultIdOrderByReviewIdAscPracticeIdAscItemIdAsc(1, history.getId()))
+                .thenReturn(List.of(
+                        ReviewItem.builder().detail(first).build(),
+                        ReviewItem.builder().detail(second).build()));
+        assertThat(authorization.permitsHistory(1, history.getId(), SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW))
+                .isFalse();
+    }
+
+    @Test
+    void shouldReadRetainedCustodyWrittenBeforeRefusalWasRecordedSeparately() {
+        var retained = json.readValue(
+                "{\"complete\":false,\"copiedIdentities\":[],\"repositoryIds\":[],\"sourceJobIds\":[]}",
+                HistoryCustody.class);
+        assertThat(retained).isEqualTo(new HistoryCustody(false, false, List.of(), List.of(), List.of()));
     }
 }

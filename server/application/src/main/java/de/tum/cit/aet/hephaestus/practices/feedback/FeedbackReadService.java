@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.practices.review.ProductReferenceQuery;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReasonCountDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyState;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackLocation;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackResolution;
 import java.time.Instant;
@@ -97,7 +98,7 @@ public class FeedbackReadService {
                 row, queries.locations(workspaceId, List.of(id)).getFirst().getLocation());
         var selected = basisRead.read(workspaceId, id);
         var bound = basisRead.bound(workspaceId, selected);
-        boolean readable = selected.readable();
+        boolean readable = row.getDestination() == FeedbackDestination.ON_WORK && selected.readable();
         var actualCopies = copies.findByWorkspaceIdAndFeedbackIdOrderByPositionAsc(workspaceId, id).stream()
                 .map(copy -> redactedCopy(copy, readable))
                 .toList();
@@ -189,7 +190,8 @@ public class FeedbackReadService {
                 .map(FeedbackBasis::getResultId)
                 .distinct()
                 .count();
-        boolean allowed = selected.readable();
+        boolean privateDestination = row.getDestination() != FeedbackDestination.ON_WORK;
+        boolean allowed = !privateDestination && selected.readable();
         String body = allowed ? row.getBody() : null;
         var answer = responses.findCurrent(workspaceId, id);
         Instant disagreedAt = answer.filter(response -> response.getResolution() == FeedbackResolution.DISAGREE)
@@ -209,7 +211,10 @@ public class FeedbackReadService {
                 row.getDeliveredAt(),
                 body == null ? null : body.substring(0, Math.min(body.length(), PREVIEW_LENGTH)),
                 body != null && body.length() > PREVIEW_LENGTH,
-                !allowed && (row.getBody() != null || children.stream().anyMatch(copy -> copy.getBody() != null)),
+                privateDestination
+                        || (!allowed
+                                && (row.getBody() != null
+                                        || children.stream().anyMatch(copy -> copy.getBody() != null))),
                 selected.results().stream().anyMatch(result -> result.getEvidenceVersion() == 0),
                 resultCount,
                 new FeedbackCopyCountsDTO(

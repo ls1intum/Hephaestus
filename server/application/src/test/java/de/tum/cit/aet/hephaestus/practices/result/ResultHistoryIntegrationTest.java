@@ -92,7 +92,7 @@ class ResultHistoryIntegrationTest extends BaseIntegrationTest {
         scenario = data.scenario();
         scenarioAccountId = Objects.requireNonNull(scenario.account().getId());
         when(authorization.custody(any()))
-                .thenReturn(new HistoryCustody(true, List.of(), List.of(), List.of(UUID.randomUUID())));
+                .thenReturn(new HistoryCustody(true, false, List.of(), List.of(), List.of(UUID.randomUUID())));
         when(authorization.authorized(any(), any(), any())).thenReturn(true);
     }
 

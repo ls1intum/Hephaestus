@@ -249,7 +249,11 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
     }
 
     private record Dependencies(
-            boolean complete, List<JsonNode> identities, List<JsonNode> repositories, DependencyCounts counts) {}
+            boolean complete,
+            List<JsonNode> identities,
+            List<JsonNode> repositories,
+            List<JsonNode> sourceJobIds,
+            DependencyCounts counts) {}
 
     private enum Assessment {
         CAPTURE,
@@ -283,7 +287,8 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
     }
 
     private Dependencies dependencies(JdbcOperations controls, long workspaceId, Collection<UUID> sources) {
-        if (sources.isEmpty()) return new Dependencies(true, List.of(), List.of(), new DependencyCounts(0, 0, 0, 0, 0));
+        if (sources.isEmpty())
+            return new Dependencies(true, List.of(), List.of(), List.of(), new DependencyCounts(0, 0, 0, 0, 0));
         var receipts = controls.query(
                 """
                 SELECT job_id,state,payload::text FROM person_evidence_copy
@@ -307,6 +312,7 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
                                         receipt.payload().path(DEPENDENCIES).asString()));
         var identities = new ArrayList<JsonNode>();
         var repositories = new ArrayList<JsonNode>();
+        var sourceJobIds = new ArrayList<JsonNode>();
         int notReady = 0;
         int unvouched = 0;
         for (var receipt : receipts) {
@@ -314,6 +320,7 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
             else if (!COMPLETE.equals(receipt.payload().path(DEPENDENCIES).asString())) unvouched++;
             receipt.payload().path("identities").forEach(identities::add);
             receipt.payload().path("repositories").forEach(repositories::add);
+            receipt.payload().path("copiedJobs").forEach(sourceJobIds::add);
         }
         var requested = Set.copyOf(sources);
         var counts = new DependencyCounts(
@@ -322,28 +329,31 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
                 receipts.size(),
                 notReady,
                 unvouched);
-        return new Dependencies(complete, identities, repositories, counts);
+        return new Dependencies(complete, identities, repositories, sourceJobIds, counts);
     }
 
-    /** Reads complete retained copy authority under the same privacy fence as capture. */
+    /** Keeps known privacy controls even when retained copy authority is incomplete. */
     public HistoryCustody custody(long workspaceId, List<UUID> producingJobs) {
-        if (producingJobs.isEmpty()) return new HistoryCustody(false, List.of(), List.of(), List.of());
+        if (producingJobs.isEmpty()) return new HistoryCustody(false, false, List.of(), List.of(), List.of());
         try (var admission = fence.capture()) {
             var retained = dependencies(admission.jdbc(), workspaceId, producingJobs);
-            if (!retained.complete()) return new HistoryCustody(false, List.of(), List.of(), List.of());
             var identities = retained.identities().stream()
                     .map(identity -> mapper.convertValue(identity, PersonCopyIdentity.class))
                     .toList();
-            if (isSuppressed(identities, admission.jdbc()))
-                return new HistoryCustody(false, List.of(), List.of(), List.of());
+            boolean refused = retained.counts().notReadyReceipts() > 0 || isSuppressed(identities, admission.jdbc());
+            var sourceJobIds = new LinkedHashSet<>(producingJobs);
+            retained.sourceJobIds().stream()
+                    .map(node -> UUID.fromString(node.asString()))
+                    .forEach(sourceJobIds::add);
             return new HistoryCustody(
-                    true,
+                    retained.complete() && !refused,
+                    refused,
                     identities,
                     retained.repositories().stream()
                             .map(JsonNode::longValue)
                             .distinct()
                             .toList(),
-                    producingJobs.stream().distinct().toList());
+                    List.copyOf(sourceJobIds));
         }
     }
 

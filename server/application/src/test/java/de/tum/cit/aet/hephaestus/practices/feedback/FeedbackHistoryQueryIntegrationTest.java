@@ -267,7 +267,7 @@ class FeedbackHistoryQueryIntegrationTest extends AbstractFeedbackIntegrationTes
     }
 
     private void authorize(Result proof) {
-        var custody = new HistoryCustody(true, List.of(), List.of(), List.of());
+        var custody = new HistoryCustody(true, false, List.of(), List.of(), List.of());
         when(publicPermission.custody(argThat(row -> row != null && row.getId().equals(proof.getId()))))
                 .thenReturn(custody);
         for (var purpose :

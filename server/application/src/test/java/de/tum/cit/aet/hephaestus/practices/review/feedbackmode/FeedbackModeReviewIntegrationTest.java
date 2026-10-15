@@ -168,7 +168,7 @@ class FeedbackModeReviewIntegrationTest extends AbstractWorkspaceIntegrationTest
                         null,
                         "mode-test")))));
         when(custody.find(workspaceId, List.of(pending.jobId())))
-                .thenReturn(new HistoryCustody(true, List.of(), List.of(), List.of(pending.jobId())));
+                .thenReturn(new HistoryCustody(true, false, List.of(), List.of(), List.of(pending.jobId())));
         var receipt = resultStore.admit(
                 workspaceId,
                 pending.review().getId(),

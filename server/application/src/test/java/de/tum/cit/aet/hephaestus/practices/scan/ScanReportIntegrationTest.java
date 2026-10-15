@@ -162,7 +162,7 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
         scenario = data.scenario();
         scenarioAccountId = Objects.requireNonNull(scenario.owner().account().getId());
         when(custody.find(anyLong(), anyList()))
-                .thenAnswer(call -> new HistoryCustody(false, List.of(), List.of(), call.getArgument(1)));
+                .thenAnswer(call -> new HistoryCustody(false, false, List.of(), List.of(), call.getArgument(1)));
         when(authorization.permitsAll(anyLong(), anyCollection(), any())).thenAnswer(call -> {
             long workspace = call.getArgument(0);
             Collection<Result> rows = call.getArgument(1);
@@ -432,7 +432,7 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
         when(runtime.activeJobIds(scan.getWorkspaceId(), scan.getId())).thenReturn(Set.of(job));
         var copiedPerson = new PersonCopyIdentity("GITHUB", "https://github.com", "copied-from-refused-file", null);
         when(custody.find(scan.getWorkspaceId(), List.of(job)))
-                .thenReturn(new HistoryCustody(false, List.of(copiedPerson), List.of(), List.of(job)));
+                .thenReturn(new HistoryCustody(false, false, List.of(copiedPerson), List.of(), List.of(job)));
         assignments.capture(
                 scan.getWorkspaceId(),
                 scan.getId(),
@@ -704,7 +704,7 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
         detail.set(
                 "custody",
                 json.valueToTree(new HistoryCustody(
-                        true, List.of(copy), List.of(), List.of(Objects.requireNonNull(member.getJobId())))));
+                        true, false, List.of(copy), List.of(), List.of(Objects.requireNonNull(member.getJobId())))));
         member.setDetail(detail);
         membership.saveAndFlush(member);
         when(people.providers())

@@ -63,9 +63,9 @@ public class ResultSourceAuthorization implements ResultProofAccess {
                 .distinct()
                 .toList();
         if (retained.size() == 1) return retained.getFirst();
-        if (retained.size() > 1) return new HistoryCustody(false, List.of(), List.of(), List.of());
+        if (retained.size() > 1) return new HistoryCustody(false, true, List.of(), List.of(), List.of());
         var job = producer.map(m -> m.getJobId()).orElse(null);
-        if (job == null) return new HistoryCustody(false, List.of(), List.of(), List.of());
+        if (job == null) return new HistoryCustody(false, false, List.of(), List.of(), List.of());
         return custody.find(result.getWorkspaceId(), List.of(job));
     }
 
@@ -76,6 +76,7 @@ public class ResultSourceAuthorization implements ResultProofAccess {
     }
 
     private boolean custodyAuthorized(Result result, HistoryCustody facts, SourceUsePurpose purpose) {
+        if (facts.refused()) return false;
         if (facts.sourceJobIds().stream().anyMatch(suppression::isReviewJobSuppressed)) return false;
         for (var copy : facts.copiedIdentities()) {
             var providers = people.providers().stream()
@@ -122,8 +123,7 @@ public class ResultSourceAuthorization implements ResultProofAccess {
                                 || (developer.orElseThrow().status() != Account.Status.ACTIVE
                                         && developer.orElseThrow().status() != Account.Status.UNCLAIMED)) return false;
                     }
-                    return visibleSource(result, purpose)
-                            && (!facts.complete() || custodyAuthorized(result, facts, purpose));
+                    return visibleSource(result, purpose) && custodyAuthorized(result, facts, purpose);
                 })
                 .orElse(false);
     }

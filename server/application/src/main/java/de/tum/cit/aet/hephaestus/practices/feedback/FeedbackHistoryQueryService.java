@@ -97,6 +97,7 @@ public class FeedbackHistoryQueryService implements FeedbackHistoryQuery {
                                 entry.practiceSlug(),
                                 new HistoryCustody(
                                         entry.copyAuthorityComplete(),
+                                        false,
                                         entry.copiedIdentities(),
                                         entry.repositoryIds(),
                                         entry.sourceJobIds())))
