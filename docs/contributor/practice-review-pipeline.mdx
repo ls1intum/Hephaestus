@@ -148,7 +148,8 @@ Only a unique quote can repair incorrect coordinates.
 
 Domain checks verify side, version and change-basis references through the citation-verifier port.
 An introduced code claim needs a head witness that intersects added lines in the pinned change.
-A worsened code claim also needs a base witness that intersects removed lines.
+A worsened code claim needs witnesses from the pinned base and head revisions, with added head evidence that supports the change mechanism.
+The base witness shows the prior state and need not intersect removed lines.
 These checks bound the witnesses. They do not prove the claimed consequence.
 
 A missing domain verifier cannot authorize a version-dependent claim.
@@ -172,7 +173,8 @@ Earlier advice cannot be inferred from a provider comment's current contents.
 
 Private cards and conversation feedback have their own permission and model gates.
 No conversation brief is prepared unless an available Mentor model respects the developer's AI choice.
-A private preparation failure does not erase a complete accepted public proposal.
+The host prepares the final public package before a private session starts.
+A private setup failure or deadline does not erase that prepared review.
 The destinations remain independently eligible.
 
 The composer selects an inline citation by problem ID and citation index.
@@ -181,7 +183,11 @@ A valid citation is not automatically commentable.
 Placement requires the pinned revision, side, file path and complete range within one diff hunk.
 The range must intersect changed lines.
 
-GitHub creates a review comment. GitLab creates a comment with a link to those lines.
+GitHub creates a review comment.
+GitLab creates a positioned diff discussion with the pinned base, start and head commit references.
+Only a confirmed position rejection permits a file note with a static link to the reviewed code.
+An uncertain write retains its attempted receipt and cannot start the fallback.
+The receipt records the physical copy kind.
 Slack and Outline do not receive SCM line notes.
 
 Each copy retains the results and problems it communicates.

@@ -28,12 +28,15 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshotQuery;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
@@ -59,7 +62,12 @@ public class FeedbackPreparationService {
     private final PracticePageSupportReader pageSupport;
     private final FeedbackCompositionContextService composition;
 
-    public record Preparation(FeedbackDraft draft, @Nullable UUID replacesId) {}
+    public record Preparation(
+            FeedbackDraft draft, @Nullable UUID replacesId, Map<UUID, FeedbackStopReason> withheldCopies) {
+        public Preparation {
+            withheldCopies = Map.copyOf(withheldCopies);
+        }
+    }
 
     public Preparation prepare(FeedbackDraft draft, Optional<Feedback> existing) {
         var page = draft.page();
@@ -197,14 +205,39 @@ public class FeedbackPreparationService {
                 .map(FeedbackBasisInput::problemId)
                 .filter(Objects::nonNull)
                 .forEach(communicatedProblems::add);
+        var resultProblems = new HashMap<UUID, List<UUID>>();
         if (!wideResults.isEmpty())
             problems.findByWorkspaceIdAndResultIdInOrderByResultIdAscPositionAsc(draft.workspaceId(), wideResults)
-                    .forEach(problem -> communicatedProblems.add(problem.getId()));
+                    .forEach(problem -> {
+                        communicatedProblems.add(problem.getId());
+                        resultProblems
+                                .computeIfAbsent(problem.getResultId(), ignored -> new ArrayList<>())
+                                .add(problem.getId());
+                    });
         var suppressed = suppression.suppressedProblems(draft.workspaceId(), communicatedProblems);
-        if (reason == null && !suppressed.isEmpty())
-            reason = suppressed.containsValue(FeedbackStopReason.REACTED_DISAGREE)
-                    ? FeedbackStopReason.REACTED_DISAGREE
-                    : FeedbackStopReason.REACTED_NOT_APPLICABLE;
+        var withheldCopies = new HashMap<UUID, FeedbackStopReason>();
+        if (draft.destination() == FeedbackDestination.ON_WORK
+                && trace != null
+                && !draft.copies().isEmpty()) {
+            for (var copy : draft.copies()) {
+                var exact = trace.copies().stream()
+                        .filter(entry -> entry.kind() == copy.kind() && entry.position() == copy.position())
+                        .findFirst()
+                        .orElseThrow(() -> conflict("A public copy needs its exact support."));
+                var copyReasons = exact.basedOn().stream()
+                        .flatMap(ref -> ref.problemId() == null
+                                ? resultProblems.getOrDefault(ref.resultId(), List.of()).stream()
+                                : Stream.of(ref.problemId()))
+                        .map(suppressed::get)
+                        .filter(Objects::nonNull)
+                        .toList();
+                if (!copyReasons.isEmpty()) withheldCopies.put(copy.id(), suppressionReason(copyReasons));
+            }
+            if (reason == null && withheldCopies.size() == draft.copies().size())
+                reason = suppressionReason(new ArrayList<>(withheldCopies.values()));
+        } else if (reason == null && !suppressed.isEmpty()) {
+            reason = suppressionReason(new ArrayList<>(suppressed.values()));
+        }
         List<FeedbackBasisInput> edges = new ArrayList<>(draft.basis());
         int ordinal = edges.stream().mapToInt(FeedbackBasisInput::ordinal).max().orElse(-1) + 1;
         for (var row : support)
@@ -250,7 +283,14 @@ public class FeedbackPreparationService {
                         draft.checks(),
                         draft.composition(),
                         null),
-                replacesId);
+                replacesId,
+                withheldCopies);
+    }
+
+    private static FeedbackStopReason suppressionReason(List<FeedbackStopReason> reasons) {
+        return reasons.contains(FeedbackStopReason.REACTED_DISAGREE)
+                ? FeedbackStopReason.REACTED_DISAGREE
+                : FeedbackStopReason.REACTED_NOT_APPLICABLE;
     }
 
     public void recorded(Preparation preparation, Feedback row) {

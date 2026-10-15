@@ -489,3 +489,96 @@ void test("report_review accepts one wrapper and null unused lists, and explains
 		});
 	}
 });
+
+for (const failure of ["setup", "deadline"] as const) {
+	void test(`public preparation finishes before a private ${failure} failure`, async (t) => {
+		const { composeAdmittedFeedback, prepareComposedFeedback } =
+			await import("../../../main/resources/agent/pi-composition-stage.ts");
+		const admission = parseAdmission(
+			JSON.parse(readFileSync(new URL("admission-response.json", import.meta.url), "utf8")),
+		);
+		const feedback: ComposedFeedback = {
+			compositionFailures: [],
+			contractVersion: 3,
+			admissionDigest: admission.digest,
+			results: [],
+			preparedTargets: [],
+			feedback: [],
+			review: null,
+			preparation: null,
+		};
+		const requests: unknown[] = [];
+		t.mock.method(globalThis, "fetch", async (_input: unknown, init: RequestInit) => {
+			assert.ok(typeof init.body === "string");
+			requests.push(JSON.parse(init.body));
+			return Response.json({
+				feedbackIds: [],
+				contentDigest: "a".repeat(64),
+				preparedAt: "2026-10-15T00:00:00Z",
+			});
+		});
+		const run = composeAdmittedFeedback({
+			request: {
+				contractVersion: 3,
+				destinations: { ON_WORK: { maxPieces: 1 }, CONVERSATION: { maxPieces: 1 } },
+				minDistinctItems: 2,
+				onWorkCopyForms: [],
+			},
+			admission,
+			feedback,
+			routes: null,
+			notReached: [],
+			remainingMs: 500,
+			onDeadline: () => undefined,
+			stage: {
+				composeReview: async () => {
+					feedback.review = {
+						summary: {
+							body: "Check the token boundary.",
+							basedOn: [
+								{ resultId: admission.results[0]?.resultId ?? assert.fail("fixture has results") },
+							],
+						},
+						inline: [],
+						withheld: [],
+					};
+				},
+				composePrivately: async (_request, safety) => {
+					assert.equal(
+						requests.length,
+						1,
+						"the public package must be durable before private setup",
+					);
+					assert.ok(feedback.preparation !== null);
+					if (failure === "setup") {
+						throw new Error("private session setup failed");
+					}
+					await safety.elapsed;
+				},
+			},
+			prepare: async (safety, phase) =>
+				prepareComposedFeedback({
+					feedback,
+					phase,
+					admitted: true,
+					expired: safety.expired(),
+					url: "https://example.test/prepare",
+					token: "synthetic",
+					task: { reviewId: "review", jobId: "job", attempt: 1 },
+					timeoutMs: 100,
+					persist: () => undefined,
+					recordFailure: () => assert.fail("public preparation must succeed"),
+				}),
+			persist: () => undefined,
+			after: () => undefined,
+		});
+		await run;
+		assert.equal(requests.length, 1);
+		assert.partialDeepStrictEqual(requests[0], { publicComposition: true });
+		assert.ok(feedback.review !== null);
+		assert.ok(feedback.preparation !== null);
+		assert.deepEqual(feedback.compositionFailures, [
+			{ phase: "PRIVATE_FEEDBACK", reason: failure === "setup" ? "RUNTIME_ERROR" : "SAFETY" },
+		]);
+	});
+}

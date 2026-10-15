@@ -22,8 +22,8 @@ class ReviewMethodVerifierTest extends BaseUnitTest {
     private final JsonMapper mapper = JsonMapper.builder().build();
     private final LlmModelResolver models = mock(LlmModelResolver.class);
     private final ModelBindingSource binding = mock(ModelBindingSource.class);
-    private final ReviewMethodVerifier verifier =
-            new ReviewMethodVerifier(models, new PracticeReviewProperties(false, 15, 5, 0.5, 12, 16000, 200000, 1000));
+    private final ReviewMethodVerifier verifier = new ReviewMethodVerifier(
+            models, new PracticeReviewProperties(false, 15, 5, 0.5, 12, 16000, 3, 200000, 1000));
 
     private ReviewMethod persisted() {
         when(models.resolve(binding))

@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.evidence.capture.CaptureContribution;
 import de.tum.cit.aet.hephaestus.evidence.capture.CitableText;
 import de.tum.cit.aet.hephaestus.evidence.capture.EvidenceDirectory;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ScmCitableTexts;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -97,6 +98,49 @@ class JobFolderIndexBuilderTest extends BaseUnitTest {
                 mapper.readTree(Files.readString(Path.of("src/test/resources/agent/folder-citation-index.json")));
         assertThat(actual.path("sources")).isEqualTo(expected.path("sources"));
         assertThat(actual.path("files")).isEqualTo(expected.path("files"));
+    }
+
+    @Test
+    void shouldEmitTheSharedRecordCoverageFixtureThroughScmCapture() throws IOException {
+        var mapper = new JsonMapper();
+        var clock = Clock.fixed(Instant.parse("2026-10-14T00:00:00Z"), ZoneOffset.UTC);
+        var source = new SourceKind("scm.pull-request.core");
+        var files = new LinkedHashMap<String, byte[]>();
+        byte[] record = "{\"title\":\"Add login\",\"details\":{\"body\":\"First line\\nSecond line\"}}"
+                .getBytes(StandardCharsets.UTF_8);
+        files.put("evidence/metadata.json", record);
+        files.put("evidence/metadata-alias.json", record);
+        var texts = ScmCitableTexts.files(files, ignored -> source, mapper);
+        var contribution = new CaptureContribution(
+                files,
+                Map.of(source, SourceCompleteness.COMPLETE),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                null,
+                Map.of(),
+                List.of(),
+                List.of(),
+                texts);
+        var prepared = new JobFolderIndexBuilder(new ClasspathSourceCatalogRegistry(mapper, clock), mapper, clock)
+                .build(new ItemKind("scm.pull_request"), Map.of(source, contribution));
+        var fixture = mapper.createObjectNode();
+        var contents = fixture.putObject("contents");
+        files.forEach((path, bytes) -> contents.put(path, new String(bytes, StandardCharsets.UTF_8)));
+        fixture.set("manifest", mapper.valueToTree(prepared.manifest()));
+        Path emitted = Path.of("build/record-coverage-capture.json");
+        Files.createDirectories(emitted.getParent());
+        Files.writeString(emitted, mapper.writerWithDefaultPrettyPrinter().writeValueAsString(fixture));
+        var expected =
+                mapper.readTree(Files.readString(Path.of("src/test/resources/agent/record-coverage-capture.json")));
+        assertThat(fixture.path("contents")).isEqualTo(expected.path("contents"));
+        assertThat(prepared.manifest())
+                .usingRecursiveComparison()
+                .ignoringCollectionOrder()
+                .isEqualTo(mapper.treeToValue(expected.path("manifest"), JobFolderIndex.class));
     }
 
     @Test

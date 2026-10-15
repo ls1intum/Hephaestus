@@ -12,10 +12,13 @@ import de.tum.cit.aet.hephaestus.agent.handler.FeedbackDraftBuilder;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedback;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobInput;
+import de.tum.cit.aet.hephaestus.evidence.CitationSide;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.feedback.decision.FeedbackContentDigest;
 import de.tum.cit.aet.hephaestus.practices.feedback.delivery.PracticePageFeedbackRouter;
 import de.tum.cit.aet.hephaestus.practices.feedback.page.PracticePageFeedbackService;
+import de.tum.cit.aet.hephaestus.practices.feedback.response.FeedbackResponse;
+import de.tum.cit.aet.hephaestus.practices.model.Problem;
 import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultSnapshot;
@@ -25,10 +28,13 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheckStage;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCompositionTrace;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyInput;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDraft;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackIds;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackResolution;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
 import de.tum.cit.aet.hephaestus.practices.spi.PreparedFeedback;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultCandidate;
 import java.io.IOException;
@@ -40,6 +46,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -206,6 +213,97 @@ class FeedbackPreparationReceiptIntegrationTest extends AbstractFeedbackDelivery
                         workspace.getId(),
                         feedbackId))
                 .isZero();
+    }
+
+    @Test
+    void shouldWithholdOnlyTheCopyWhoseExactProblemWasSuppressed() {
+        var first = problems.findByWorkspaceIdAndResultIdInOrderByResultIdAscPositionAsc(
+                        workspace.getId(), List.of(supportingResult.getId()))
+                .getFirst();
+        jdbc.update("UPDATE problem SET key='concern-a' WHERE id=?", first.getId());
+        var second = problems.saveAndFlush(Problem.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(workspace.getId())
+                .resultId(supportingResult.getId())
+                .position(1)
+                .key("concern-b")
+                .severity(first.getSeverity())
+                .summary("A separate concern")
+                .explanation("This independent concern has its own support.")
+                .citations(first.getCitations())
+                .basis(first.getBasis())
+                .build());
+        var prior = piece(FeedbackDestination.ON_WORK, FeedbackState.DELIVERED, AT);
+        basis.saveAndFlush(FeedbackBasis.builder()
+                .id(FeedbackIds.basis(prior.getId(), supportingResult.getId(), first.getId()))
+                .workspaceId(workspace.getId())
+                .feedbackId(prior.getId())
+                .resultId(supportingResult.getId())
+                .problemId(first.getId())
+                .developerId(developerId)
+                .ordinal(0)
+                .build());
+        responses.saveAndFlush(FeedbackResponse.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(workspace.getId())
+                .feedbackId(prior.getId())
+                .resolution(FeedbackResolution.DISAGREE)
+                .comment("This concern does not apply to the captured behavior.")
+                .createdAt(AT)
+                .build());
+        var supportA = new FeedbackCompositionTrace.Support(supportingResult.getId(), first.getId());
+        var supportB = new FeedbackCompositionTrace.Support(supportingResult.getId(), second.getId());
+        var trace = new FeedbackCompositionTrace(
+                List.of(
+                        new FeedbackCompositionTrace.CopySupport(FeedbackCopyKind.LINE_NOTE, 0, List.of(supportA)),
+                        new FeedbackCompositionTrace.CopySupport(FeedbackCopyKind.LINE_NOTE, 1, List.of(supportB))),
+                List.of(),
+                null,
+                null);
+        var notes = IntStream.range(0, 2)
+                .mapToObj(position -> {
+                    UUID id = FeedbackIds.copy(feedbackId, FeedbackCopyKind.LINE_NOTE, position);
+                    return new FeedbackCopyInput(
+                            id,
+                            FeedbackCopyKind.LINE_NOTE,
+                            position,
+                            "Independent note " + position,
+                            "src/A.java",
+                            10 + position,
+                            10 + position,
+                            CitationSide.NEW,
+                            id.toString(),
+                            FeedbackIds.writeMarker(id));
+                })
+                .toList();
+        var draft = new FeedbackDraft(
+                feedbackId,
+                workspace.getId(),
+                reviewId,
+                itemId,
+                developerId,
+                FeedbackDestination.ON_WORK,
+                FeedbackState.READY,
+                null,
+                null,
+                List.of(
+                        new FeedbackBasisInput(supportingResult.getId(), first.getId(), 0),
+                        new FeedbackBasisInput(supportingResult.getId(), second.getId(), 1)),
+                notes,
+                Map.of(),
+                trace,
+                null);
+        var receipt = store.prepareAll(workspace.getId(), reviewId, List.of(draft));
+        assertThat(current().getState()).isEqualTo(FeedbackState.READY);
+        var prepared = children();
+        assertThat(prepared).hasSize(2);
+        assertThat(prepared.get(0).getState()).isEqualTo(FeedbackCopyState.WITHHELD);
+        assertThat(prepared.get(0).getStopReason()).isEqualTo(FeedbackStopReason.REACTED_DISAGREE);
+        assertThat(prepared.get(1).getState()).isEqualTo(FeedbackCopyState.PLANNED);
+        assertThat(prepared.get(1).getStopReason()).isNull();
+        assertThat(store.prepareAll(workspace.getId(), reviewId, List.of(draft)))
+                .isEqualTo(receipt);
+        assertThat(provider.noteCreates).isZero();
     }
 
     @Test

@@ -187,6 +187,7 @@ function runScenario(name: string): Map<string, string> {
 					PI_CODING_AGENT_DIR: cwd,
 					AGENT_BUDGET_MS: "60000",
 					PI_PRACTICE_MODEL_CALLS: "2",
+					PI_PRACTICE_CONCURRENCY: "1",
 					PI_PRACTICE_OUTPUT_TOKENS: "8000",
 					PI_DIRECT_MODEL_TOKENS: "1000",
 					LLM_PROXY_URL: "https://unused.invalid",

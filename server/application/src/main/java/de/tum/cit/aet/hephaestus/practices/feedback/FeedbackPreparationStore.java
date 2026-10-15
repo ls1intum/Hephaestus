@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDraft;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackIds;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
 import de.tum.cit.aet.hephaestus.practices.spi.PreparedFeedback;
 import de.tum.cit.aet.hephaestus.practices.spi.PreparedPackage;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
@@ -179,8 +180,9 @@ public class FeedbackPreparationStore {
                             .build();
                 })
                 .toList();
-        var planned =
-                draft.copies().stream().map(input -> planned(draft, input)).toList();
+        var planned = draft.copies().stream()
+                .map(input -> planned(draft, input, prepared.withheldCopies().get(input.id())))
+                .toList();
         if (planned.stream().map(FeedbackCopy::getPosition).distinct().count() != planned.size()
                 || edges.stream().map(FeedbackBasis::getId).distinct().count() != edges.size())
             throw new IllegalArgumentException("Feedback references must be distinct.");
@@ -235,7 +237,9 @@ public class FeedbackPreparationStore {
         return new PreparedFeedback(row.getId(), digests.current(row.getWorkspaceId(), row.getId()), preparedAt);
     }
 
-    private FeedbackCopy planned(FeedbackDraft draft, FeedbackCopyInput input) {
+    private FeedbackCopy planned(
+            FeedbackDraft draft, FeedbackCopyInput input, @Nullable FeedbackStopReason copyReason) {
+        var reason = draft.state() == FeedbackState.WITHHELD ? draft.stopReason() : copyReason;
         if (!input.id().equals(FeedbackIds.copy(draft.id(), input.kind(), input.position()))
                 || !input.writeKey().equals(input.id().toString()))
             throw new IllegalArgumentException("Copy identity must match its prepared position.");
@@ -272,8 +276,8 @@ public class FeedbackPreparationStore {
                 .startLine(input.startLine())
                 .endLine(input.endLine())
                 .side(input.side())
-                .state(draft.state() == FeedbackState.WITHHELD ? FeedbackCopyState.WITHHELD : FeedbackCopyState.PLANNED)
-                .stopReason(draft.state() == FeedbackState.WITHHELD ? draft.stopReason() : null)
+                .state(reason == null ? FeedbackCopyState.PLANNED : FeedbackCopyState.WITHHELD)
+                .stopReason(reason)
                 .writeKey(input.writeKey())
                 .writeMarker(input.writeMarker())
                 .createdAt(clock.instant())

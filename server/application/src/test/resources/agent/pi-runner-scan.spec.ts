@@ -126,7 +126,11 @@ for (const basis of ["state", "introduced"] as const) {
 			const exit = await runRunner(
 				cwd,
 				{},
-				{ PI_HOST_SCAN_PATH: FILE, PI_HOST_SESSION_CANDIDATE: JSON.stringify(candidate) },
+				{
+					PI_HOST_SCAN_PATH: FILE,
+					PI_HOST_SESSION_CANDIDATE: JSON.stringify(candidate),
+					PI_PRACTICE_CONCURRENCY: "3",
+				},
 			);
 			assert.deepEqual(capturedLines(cwd, "scan-read")[0], {
 				content: [{ type: "text", text: TEXT }],
@@ -142,6 +146,7 @@ for (const basis of ["state", "introduced"] as const) {
 				return;
 			}
 			assert.equal(exit.status, 0, exit.stderr);
+			assert.match(exit.stderr, /Practice concurrency: configured=3, effective=1/u);
 			const [request] = capturedLines(cwd, "admission");
 			const body = field(request, "body");
 			const results = field(body, "results");

@@ -111,3 +111,10 @@ export function missingSlugs(all: readonly string[], observed: readonly string[]
 	const seen = new Set(observed);
 	return all.filter((slug) => !seen.has(slug));
 }
+
+/** Reserve disjoint shares before sessions start, so no practice can spend a sibling's work. */
+export function partitionBudget(budget: Work, practices: number, position: number): Work {
+	const share = (value: number) =>
+		Math.floor(value / practices) + (position < value % practices ? 1 : 0);
+	return { modelCalls: share(budget.modelCalls), outputTokens: share(budget.outputTokens) };
+}

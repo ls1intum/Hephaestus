@@ -119,7 +119,10 @@ public class AdmittedResultProjectionService {
                                         Objects.requireNonNull(citation.path()),
                                         citation.startLine(),
                                         citation.endLine(),
-                                        citation.side())));
+                                        Objects.requireNonNull(placement)
+                                                .placementSide(problem.candidate()
+                                                        .citations()
+                                                        .get(citation.index())))));
             }
         return Map.copyOf(anchors);
     }

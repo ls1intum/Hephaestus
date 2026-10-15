@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 
+import type { CitableText } from "./pi-folder-index.ts";
 import type { BriefSource } from "./pi-review-brief.ts";
 import {
 	CANDIDATE_LIMITS,
@@ -38,8 +39,9 @@ export class SessionReads {
 	readonly unknown: string[] = [];
 	readonly pending = new Map<string, unknown>();
 	readonly #supplied: boolean;
-	#observedContent = false;
+	readonly #observedContent = new Set<string>();
 	readonly #opened = new Set<string>();
+	readonly #coveredBy = new Map<string, Set<string>>();
 	readonly #root: string;
 	readonly #lineCount: (target: string) => number;
 
@@ -48,15 +50,46 @@ export class SessionReads {
 		sources: readonly BriefSource[] = [],
 		lineCount = (target: string) =>
 			readFileSync(path.resolve(root, target), "utf8").split("\n").length,
+		texts: readonly CitableText[] = [],
 	) {
 		this.#root = root;
 		this.#lineCount = lineCount;
+		const byContent = new Map<string, Set<string>>();
+		const byPath = new Map<string, Set<string>>();
+		for (const text of texts) {
+			for (const [index, key] of [
+				[byContent, `${text.source}:${text.sha256}`],
+				[byPath, `${text.source}:${text.path}`],
+			] as const) {
+				const paths = index.get(key) ?? new Set<string>();
+				paths.add(this.#key(text.stagedPath));
+				index.set(key, paths);
+			}
+		}
+		for (const text of texts) {
+			const key = this.#key(text.stagedPath);
+			const copies = this.#coveredBy.get(key) ?? new Set<string>();
+			for (const copy of byContent.get(`${text.source}:${text.sha256}`) ?? []) {
+				copies.add(copy);
+			}
+			// Extracted strings add citation coordinates, not new source content.
+			const separator = text.path.indexOf("#/");
+			if (separator !== -1 && text.stagedPath.startsWith("context/citable-records/")) {
+				const parent = text.path.slice(0, separator);
+				copies.add(this.#key(parent));
+				for (const record of byPath.get(`${text.source}:${parent}`) ?? []) {
+					copies.add(record);
+				}
+			}
+			this.#coveredBy.set(key, copies);
+		}
 		this.#supplied = sources.some((source) => source.supplied && source.lines !== undefined);
 		for (const source of sources) {
 			const key = this.#key(source.path);
 			this.ranges.expect(key);
 			if (source.supplied && source.lines !== undefined) {
 				this.ranges.add(key, 1, source.lines, source.lines);
+				this.#observedContent.add(key);
 			}
 		}
 	}
@@ -112,7 +145,9 @@ export class SessionReads {
 				}
 				if (truncation.firstLineExceedsLimit !== true && !/Read image file/u.test(text)) {
 					this.ranges.add(target, start, start + shown - 1, last);
-					this.#observedContent ||= shown > 0;
+					if (shown > 0) {
+						this.#observedContent.add(target);
+					}
 				}
 			} catch {
 				this.unknown.push(target);
@@ -124,12 +159,31 @@ export class SessionReads {
 		}
 	}
 
+	/** Content supplied in this session's opening or returned by its native reader. */
+	hasRead(target: string): boolean {
+		return this.#observedContent.has(this.#key(target));
+	}
+
+	#complete(key: string, visited = new Set<string>()): boolean {
+		if (this.ranges.complete(key)) {
+			return true;
+		}
+		if (visited.has(key)) {
+			return false;
+		}
+		visited.add(key);
+		return [...(this.#coveredBy.get(key) ?? [])].some((copy) => this.#complete(copy, visited));
+	}
+
+	get #incomplete(): string[] {
+		return this.ranges.incomplete.filter((key) => !this.#complete(key));
+	}
+
 	get receipts(): Receipts {
 		return {
 			reads: this.reads,
 			truncatedReads:
-				this.ranges.incomplete.filter((file) => this.#opened.has(file)).length +
-				this.cutSearches.length,
+				this.#incomplete.filter((file) => this.#opened.has(file)).length + this.cutSearches.length,
 			failedReads: this.failed.length,
 		};
 	}
@@ -154,18 +208,18 @@ export class SessionReads {
 		};
 		omit(
 			"reads cut short at the tool's output limit",
-			[...this.ranges.incomplete.filter((file) => this.#opened.has(file)), ...this.cutSearches],
+			[...this.#incomplete.filter((file) => this.#opened.has(file)), ...this.cutSearches],
 			"truncated",
 		);
 		omit(
 			"relevant sources not supplied or read",
-			this.ranges.incomplete.filter((file) => !this.#opened.has(file)),
+			this.#incomplete.filter((file) => !this.#opened.has(file)),
 			"unavailable",
 		);
 		omit("reads that failed", this.failed, "unavailable");
 		omit("evidence coverage is unknown", this.unknown, "unavailable");
 		omit("evidence reads still running", [...this.pending.keys()], "unavailable");
-		if (!this.#supplied && !this.#observedContent && domainReads.reads === 0) {
+		if (!this.#supplied && this.#observedContent.size === 0 && domainReads.reads === 0) {
 			omit(
 				"no relevant source was supplied or read",
 				["read the sources needed by the criterion"],

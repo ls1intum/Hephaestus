@@ -191,18 +191,46 @@ class ScmCitationVerifierTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldRefuseAWorsenedClaimWithoutARemovedBaseLine() throws Exception {
+    void shouldAcceptAWorsenedClaimWithAnUnchangedPinnedBaseWitness() throws Exception {
         range(BASE, HEAD);
         var unchanged =
                 new CitationToCheck(0, "scm.repository.tree", "src/a.ts", CitationSide.NEW, BASE, 2, 2, "unchanged");
         assertThat(verifier.verify(check(
                         List.of(unchanged, citation(1, CitationSide.NEW, HEAD)),
                         List.of(new BasisToCheck(0, "worsened", 1, 0)))))
+                .isEmpty();
+    }
+
+    @Test
+    void shouldAcceptAdditiveWorseningAndRefuseDeletionOnlyAndPreexistingClaims() throws Exception {
+        range(BASE, HEAD);
+        var mapper = new ObjectMapper();
+        var change = mapper.createObjectNode().put("base_sha", BASE).put("head_sha", HEAD);
+        var base =
+                new CitationToCheck(0, "scm.pull-request.diff", "src/a.ts", CitationSide.OLD, BASE, 1, 1, "unsafe();");
+        var added =
+                new CitationToCheck(1, "scm.pull-request.diff", "src/a.ts", CitationSide.NEW, HEAD, 2, 2, "unsafe();");
+        var basis = List.of(new BasisToCheck(0, "worsened", 1, 0));
+        change.put(
+                "diff",
+                "diff --git a/src/a.ts b/src/a.ts\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1 +1,2 @@\n unsafe();\n+unsafe();\n");
+        Files.writeString(root.resolve("context/change.json"), mapper.writeValueAsString(change));
+        assertThat(verifier.verify(check(List.of(base, added), basis))).isEmpty();
+        var preexisting =
+                new CitationToCheck(1, added.source(), added.path(), CitationSide.NEW, HEAD, 1, 1, "unsafe();");
+        assertThat(verifier.verify(check(List.of(base, preexisting), basis)))
                 .singleElement()
-                .satisfies(refusal -> {
-                    assertThat(refusal.reason()).isEqualTo(CandidateRefusal.BASIS_WITNESS_MISSING);
-                    assertThat(refusal.message()).contains("intersect removed lines");
-                });
+                .satisfies(refusal -> assertThat(refusal.reason()).isEqualTo(CandidateRefusal.BASIS_WITNESS_MISSING));
+        change.put(
+                "diff",
+                "diff --git a/src/a.ts b/src/a.ts\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1,2 +1 @@\n unsafe();\n-unsafe();\n");
+        Files.writeString(root.resolve("context/change.json"), mapper.writeValueAsString(change));
+        assertThat(verifier.verify(check(List.of(base, preexisting), basis)))
+                .singleElement()
+                .satisfies(refusal -> assertThat(refusal.reason()).isEqualTo(CandidateRefusal.BASIS_WITNESS_MISSING));
+        var historical =
+                new CitationToCheck(0, base.source(), base.path(), CitationSide.OLD, "c".repeat(40), 1, 1, "unsafe();");
+        assertThat(verifier.verify(check(List.of(historical, added), basis))).isNotEmpty();
     }
 
     @Test

@@ -28,17 +28,40 @@ Each workspace enables practice review and selects its own coverage.
 
 ### Work budgets
 
-A review measures one practice group at a time.
 By default, groups with more than six practices are split into smaller sets.
 Each set has a separate work budget.
-Within a set, each practice gets a fresh model session, in order.
-Work, not time, bounds the set.
+Each practice gets a fresh model session.
+
+`PRACTICE_REVIEW_PRACTICE_CONCURRENCY` sets the maximum number of practices that an item review evaluates at once.
+The default is 3. Valid values are 1 through 32.
+The runner starts practices in catalog order and fills each free slot with the next practice.
+Slots can span practice groups.
+Results and the admission request use practice order, independent of completion order.
+
+With concurrent evaluation, each practice reserves an equal share of its set's calls and output tokens before evaluation starts.
+The runner assigns any remainder in catalog order.
+A practice cannot spend another practice's reservation.
+Unused reservations remain unused.
+Each model request is capped at the practice's remaining output tokens.
+The direct model account stays shared across all practice scripts in the review attempt.
+
+Higher concurrency can cover more practices before the deadline when model response time limits progress.
+It also increases peak memory use and simultaneous model requests.
+The model proxy still paces upstream requests.
+A provider limit or model contention can reduce the benefit.
+
+Set the value to 1 to use the serial group pool.
+Scan reviews always use that serial path.
+A deadline stops active sessions and leaves queued practices `NOT_REACHED` with reason `DEADLINE`.
+The runner retains completed results for admission.
+The debug report and logs include the configured concurrency, effective concurrency, and time for each concurrent practice.
 
 `PRACTICE_REVIEW_PRACTICE_MODEL_CALLS` (default 12) and `PRACTICE_REVIEW_PRACTICE_OUTPUT_TOKENS` (default 16000) determine each set's budget.
 Each value is multiplied by the number of practices in the set, with a minimum of three.
 A set of five practices can make 60 model calls and write 80,000 output tokens.
 A set of one practice can make 36 model calls and write 48,000 output tokens.
-All review sessions in the set share this pool.
+Concurrent practices reserve shares of this pool.
+Serial review sessions share the pool without reservations.
 
 A practice script that calls `ctx.review()` opens review sessions, and their calls count against these same set budgets.
 The direct model calls of practice scripts have their own limits for each review attempt: a token limit and a search unit limit.
@@ -49,7 +72,8 @@ The defaults cap excessive work at several times a set's normal use.
 A review spends what its practices need, and no more.
 Each set has its own budget, independent of previous sets' spend.
 Near the budget limit, the model receives a request to record its current results.
-The set ends after the call that spends the budget.
+Each reservation ends after the call that spends its budget.
+The serial set ends after the call that spends its pool.
 
 Each composition pass gets at most one full set's work budget.
 All passes share the remaining whole-run safety ceiling.
@@ -59,8 +83,10 @@ All passes share the remaining whole-run safety ceiling.
 The timeout of the workspace's **Practice reviews** assignment is the whole-run safety ceiling.
 It can stop a productive review and leave later practices `NOT_REACHED`.
 Independent set budgets do not reserve time for every set.
-If a set has no streamed token or tool progress for five minutes, it stops.
-Two consecutive stalls end measurement with its recorded results.
+
+A session stops after five minutes without a model or tool event.
+On the serial path, two consecutive stalls end measurement with its recorded results.
+A stalled concurrent practice releases its slot after the session stops.
 
 A timeout below 61 seconds runs at 61 seconds.
 Each practice script runs inside the same timeout, with no time reserved before the review, as the [workspace ABI](/contributor/agent/agent-workspace-abi#practice-script-validation-and-limits) describes.
@@ -348,10 +374,8 @@ A correction waits for any started POST to settle before the send changes to RET
 Unsupported provider correction keeps the actual posted appearance and its recorded reason.
 
 GitHub and GitLab attach line notes to the selected diff line.
-GitLab uses the reviewed diff version, including its base, start and head commit references.
-If GitLab rejects the position, the copy becomes a file note with a static link to the reviewed code.
-The recorded copy kind distinguishes a positioned line note from this fallback.
-An uncertain write stays fenced until reconciliation confirms its outcome.
+The [delivery contract](../contributor/practice-review-pipeline#compose-feedback) defines GitLab positions, confirmed-rejection fallback and uncertain writes.
+
 Existing ordinary comments retain their original placement.
 
 Historical write keys, markers, sides and provider references stay immutable.

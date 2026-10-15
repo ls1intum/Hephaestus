@@ -776,6 +776,7 @@ export function buildFeedbackTool(
 
 export async function prepareComposedFeedback(options: {
 	feedback: ComposedFeedback;
+	phase?: CompositionPhase;
 	admitted: boolean;
 	expired: boolean;
 	url: string;
@@ -796,7 +797,7 @@ export async function prepareComposedFeedback(options: {
 		privateIndex?: number;
 	}[] = [];
 	const { review } = composedFeedback;
-	if (review !== null) {
+	if (review !== null && options.phase !== "PRIVATE_FEEDBACK") {
 		const refs = [
 			...(review.summary?.basedOn ?? []),
 			...review.inline.flatMap((note) => note.basedOn),
@@ -843,6 +844,9 @@ export async function prepareComposedFeedback(options: {
 		});
 	}
 	for (const [privateIndex, piece] of composedFeedback.feedback.entries()) {
+		if (options.phase === "PUBLIC_REVIEW") {
+			continue;
+		}
 		const quiet = piece.action === "WITHHOLD";
 		const primary = composedFeedback.results.find(
 			(result) => result.practiceSlug === piece.practiceSlug,
@@ -2208,7 +2212,7 @@ export async function composeAdmittedFeedback(options: {
 	notReached: readonly string[];
 	remainingMs: number;
 	onDeadline: () => void;
-	prepare: (safety: ReturnType<typeof scheduleDeadline>) => Promise<void>;
+	prepare: (safety: ReturnType<typeof scheduleDeadline>, phase: CompositionPhase) => Promise<void>;
 	persist: () => void;
 	after: () => void;
 }): Promise<void> {
@@ -2261,10 +2265,20 @@ export async function composeAdmittedFeedback(options: {
 		) {
 			await stage.composeReview(request, reviewable, notReached, safety);
 		}
-		if (privatelyComposable(admission, routes).length > 0 && !safety.expired()) {
-			await stage.composePrivately(request, safety, notReached);
+		await prepare(safety, "PUBLIC_REVIEW");
+		try {
+			if (privatelyComposable(admission, routes).length > 0 && !safety.expired()) {
+				await stage.composePrivately(request, safety, notReached);
+			}
+			await prepare(safety, "PRIVATE_FEEDBACK");
+		} catch (error) {
+			recordCompositionFailure(
+				feedback,
+				"PRIVATE_FEEDBACK",
+				safety.expired() ? "SAFETY" : "RUNTIME_ERROR",
+			);
+			console.error(`[pi-runner] private feedback failed: ${errorText(error)}`);
 		}
-		await prepare(safety);
 	} catch (error) {
 		markRemaining(safety.expired() ? "SAFETY" : "RUNTIME_ERROR");
 		throw error;

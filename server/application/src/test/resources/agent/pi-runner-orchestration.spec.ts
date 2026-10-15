@@ -2335,7 +2335,7 @@ if (scenario !== undefined && scenario !== "") {
 									}
 									return;
 								}
-								// The private composition sees the person's history, and the review planned for the work as a draft.
+								// The private composition sees the person's history and the accepted public review.
 								record(
 									`private-turn history=${String(text.includes(PRIVATE_HISTORY_SENTENCE))} review=${String(text.includes("The review composed for this work"))}`,
 								);
@@ -3001,14 +3001,8 @@ if (scenario !== undefined && scenario !== "") {
 								}
 								return;
 							}
-							await assert.rejects(
-								report.execute("o-na", undecided(["scm.pull-request.core"])),
-								/must show it read the change/u,
-							);
-							await report.execute(
-								"o-na2",
-								undecided(["scm.pull-request.core", "scm.pull-request.diff"]),
-							);
+							// This session received the complete change in its opening.
+							await report.execute("o-na", undecided(["scm.pull-request.core"]));
 							const revise = (summary: string, citation: SubmittedCitation = changeCitation) =>
 								notMet(summary, citation);
 							const before = notesText();
@@ -3332,7 +3326,8 @@ if (scenario !== undefined && scenario !== "") {
 					"normalizes corrections, refuses a non-root result and binds a result naming another practice to the session's own",
 				"draft-commit":
 					"replaces a draft only with a later valid complete submission, and refuses a submission after measurement closed",
-				"replacement-witness": "refuses a replacement that relies on its superseded diff witness",
+				"replacement-witness":
+					"refuses a quiet replacement when its session received no change content",
 				"comment-undecided":
 					"accepts an undecided result without the change only for a practice that does not read it",
 				finish:
@@ -3469,6 +3464,13 @@ if (scenario !== undefined && scenario !== "") {
 						nodePath.join(cwd, "work/change/diff.patch"),
 						"diff --git a/src/Auth.java b/src/Auth.java\n--- a/src/Auth.java\n+++ b/src/Auth.java\n@@ -10,0 +10,1 @@\n[L10] + insecure();\n",
 					);
+					if (stage === "replacement-witness" || stage === "comment-undecided") {
+						const changePath = nodePath.join(cwd, "work/change/diff.patch");
+						writeFileSync(
+							changePath,
+							readFileSync(changePath, "utf8") + " unchanged context".repeat(5000),
+						);
+					}
 					let practiceCriteria = "# Test practice\nCriteria.";
 					if (stage.startsWith("provider-reply-")) {
 						practiceCriteria =
@@ -3752,6 +3754,7 @@ if (scenario !== undefined && scenario !== "") {
 										["scope-native-submission-repair", "4"],
 										["scope-native-read-correction", "4"],
 									]).get(stage) ?? "2",
+								PI_PRACTICE_CONCURRENCY: "1",
 								PI_PRACTICE_OUTPUT_TOKENS: "8000",
 								PI_DIRECT_MODEL_TOKENS: "1000",
 								LLM_PROXY_URL: "https://unused.invalid",
@@ -3900,7 +3903,13 @@ if (scenario !== undefined && scenario !== "") {
 								assert.ok(isRecord(payload.review));
 								assert.deepEqual(payload.compositionFailures, []);
 							}
-							assert.ok(events.includes("private-turn history=true review=true"));
+							assert.ok(
+								events.includes(
+									`private-turn history=true review=${String(fixture !== "compose-completion-refused")}`,
+								),
+							);
+							const publicPreparation = events.indexOf("prepare-public:true");
+							assert.ok(publicPreparation !== -1 && publicPreparation < privateIndex);
 							if (fixture === "compose-completion-lost-ack") {
 								const [first, second] = attempts;
 								assert.ok(first !== undefined && second !== undefined);

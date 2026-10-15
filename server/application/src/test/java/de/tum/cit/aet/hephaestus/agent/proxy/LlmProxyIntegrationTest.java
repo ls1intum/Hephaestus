@@ -614,7 +614,15 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
                         new ProxyBudgetGate(
                                 mock(LlmBudgetService.class),
                                 new PracticeReviewProperties(
-                                        false, 15, 5, null, 12, 16000, maxTokensPerAttempt, maxSearchUnitsPerAttempt)),
+                                        false,
+                                        15,
+                                        5,
+                                        null,
+                                        12,
+                                        16000,
+                                        3,
+                                        maxTokensPerAttempt,
+                                        maxSearchUnitsPerAttempt)),
                         accumulator(),
                         mock(MentorTurnUsageAccumulator.class),
                         meterRegistry,

@@ -11,6 +11,7 @@ import {
 } from "node:fs";
 import nodePath from "node:path";
 import { mock } from "node:test";
+import { setTimeout as sleep } from "node:timers/promises";
 
 import type { ExtensionFactory, ToolDefinition } from "@earendil-works/pi-coding-agent";
 
@@ -98,7 +99,7 @@ export async function mockChange(overrides: Record<string, unknown>) {
 	mock.module(change, { namedExports: { ...derived, ...overrides } });
 }
 
-export type SessionBehaviour = "submit" | "silent" | "hang";
+export type SessionBehaviour = "submit" | "read-change" | "silent" | "hang" | "budget";
 
 export interface StagedPractice {
 	slug: string;
@@ -232,6 +233,7 @@ export async function runRunner(
 				PI_CODING_AGENT_DIR: cwd,
 				AGENT_BUDGET_MS: "60000",
 				PI_PRACTICE_MODEL_CALLS: "12",
+				PI_PRACTICE_CONCURRENCY: "1",
 				PI_PRACTICE_OUTPUT_TOKENS: "16000",
 				PI_DIRECT_MODEL_TOKENS: "200000",
 				LLM_PROXY_URL: "https://unused.invalid",
@@ -392,11 +394,25 @@ process.stdout.write(JSON.stringify(validateToolArguments(tool, { name: tool.nam
 			};
 
 			let sessionSlug: string | undefined;
+			let aborted = false;
+			const isAborted = () => aborted;
+			const agent = {
+				state: { tools: [] },
+				finishTurn: async () => ({ action: "continue" }),
+				streamFunction: (
+					_model: unknown,
+					_context: unknown,
+					requestOptions?: { maxTokens?: number },
+				) => {
+					capture("requests", { slug: sessionSlug, maxTokens: requestOptions?.maxTokens });
+					return requestOptions?.maxTokens ?? 100;
+				},
+			};
 			return {
 				extensionsResult: { errors: [] },
 				session: {
 					state: { messages: [] },
-					agent: { state: { tools: [] }, finishTurn: async () => ({ action: "continue" }) },
+					agent,
 					systemPrompt: "",
 					model: { contextWindow: 128_000, maxTokens: 16_384 },
 					settingsManager: { getCompactionSettings: () => ({ reserveTokens: 16_384 }) },
@@ -415,7 +431,12 @@ process.stdout.write(JSON.stringify(validateToolArguments(tool, { name: tool.nam
 					isStreaming: false,
 					waitForIdle: async () => undefined,
 					abortCompaction: () => undefined,
-					abort: async () => undefined,
+					abort: async () => {
+						aborted = true;
+						if (sessionSlug === process.env.PI_HOST_STOP_FAILURE) {
+							throw new Error("session stop failed");
+						}
+					},
 					dispose: () => undefined,
 					steer: async () => undefined,
 					async prompt(
@@ -429,19 +450,45 @@ process.stdout.write(JSON.stringify(validateToolArguments(tool, { name: tool.nam
 						const slug = sessionSlug;
 						assert.ok(slug !== undefined, "the session's first turn names its practice");
 						const behaviour = behaviourOf(slug);
+						const delays = parseJson(process.env.PI_HOST_DELAYS ?? "{}");
+						const delay = field(delays, slug);
+						capture("model-start", { slug, at: Date.now() });
+						if (typeof delay === "number") {
+							await sleep(delay);
+						}
+						if (behaviour === "budget") {
+							while (!isAborted()) {
+								const output = Math.min(100, agent.streamFunction({ maxTokens: 16_384 }, {}, {}));
+								emit({
+									type: "message_end",
+									message: {
+										role: "assistant",
+										stopReason: "toolUse",
+										content: [],
+										usage: { input: 100, output, cacheRead: 0, cacheWrite: 0, cost: { total: 0 } },
+									},
+								});
+								emit({ type: "turn_end" });
+								await sleep(10);
+							}
+							return;
+						}
 						capture("prompts", {
 							session,
 							slug,
 							reviewInput: existsSync(nodePath.join(cwd, `work/review-input/${slug}.json`)),
+							changeSupplied: text.includes("### `work/change/diff.patch`"),
 						});
 						if (behaviour === "hang") {
 							await Promise.withResolvers<never>().promise;
 						}
+						const readPath = behaviour === "read-change" ? "work/change/diff.patch" : metadataPath;
+						capture("reads", { slug, path: readPath });
 						emit({
 							type: "tool_execution_start",
 							toolCallId: `read-${session}`,
 							toolName: "read",
-							args: { path: metadataPath },
+							args: { path: readPath },
 						});
 						emit({
 							type: "tool_execution_end",
@@ -449,7 +496,7 @@ process.stdout.write(JSON.stringify(validateToolArguments(tool, { name: tool.nam
 							toolName: "read",
 							result: {
 								content: [
-									{ type: "text", text: readFileSync(nodePath.join(cwd, metadataPath), "utf8") },
+									{ type: "text", text: readFileSync(nodePath.join(cwd, readPath), "utf8") },
 								],
 								details: {},
 							},
@@ -463,7 +510,8 @@ process.stdout.write(JSON.stringify(validateToolArguments(tool, { name: tool.nam
 								await read.execute("scan-read", { path: process.env.PI_HOST_SCAN_PATH }),
 							);
 						}
-						const submits = behaviour === "submit";
+						agent.streamFunction({ maxTokens: 16_384 }, {}, {});
+						const submits = behaviour === "submit" || behaviour === "read-change";
 						emit({
 							type: "message_end",
 							message: {
@@ -499,6 +547,7 @@ process.stdout.write(JSON.stringify(validateToolArguments(tool, { name: tool.nam
 								: [candidate];
 							for (const sent of candidates) {
 								await submitCandidate(sent, slug, hasText(correction));
+								capture("model-finish", { slug, at: Date.now() });
 							}
 						}
 					},

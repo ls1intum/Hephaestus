@@ -6,6 +6,11 @@ import test from "node:test";
 import { createReadTool } from "@earendil-works/pi-coding-agent";
 import { parseCandidate } from "../../../../../../docker/agents/practice-scripts/lib/core/contract.ts";
 import { isJsonObject } from "../../../../../../docker/agents/practice-scripts/lib/core/json.ts";
+import { z } from "../../../../../../docker/agents/practice-scripts/lib/core/practice-script.ts";
+import {
+	folderCitationIndex,
+	citableTextIndex,
+} from "../../../main/resources/agent/pi-folder-index.ts";
 import { SessionReads } from "../../../main/resources/agent/pi-session-reads.ts";
 
 function read(
@@ -226,4 +231,76 @@ void test("native SDK pagination settles coverage only after the missing pages a
 		await inspect(offset, 2000);
 	}
 	assert.equal(reads.coverage().complete, true);
+});
+
+void test("Java-captured record aliases and extracted strings share complete parent coverage", () => {
+	const fixture = z
+		.object({ contents: z.record(z.string(), z.string()), manifest: z.unknown() })
+		.parse(
+			JSON.parse(readFileSync(new URL("record-coverage-capture.json", import.meta.url), "utf8")),
+		);
+	const { sourceFileSources } = folderCitationIndex(fixture.manifest);
+	const texts = citableTextIndex(fixture.manifest);
+	const sources = [...sourceFileSources.keys()].map((target) => ({
+		path: target,
+		supplied: false,
+	}));
+	const supplied = new SessionReads(
+		"/workspace",
+		sources.map((source) =>
+			source.path === "evidence/metadata.json" ? { ...source, supplied: true, lines: 1 } : source,
+		),
+		undefined,
+		texts,
+	);
+	assert.equal(supplied.coverage().complete, true);
+	const reads = new SessionReads(
+		"/workspace",
+		sources,
+		(target) => fixture.contents[target]?.split("\n").length ?? assert.fail(target),
+		texts,
+	);
+	assert.equal(reads.coverage().complete, false, "omitted parent content stays unread");
+	const record = (offset: number, limit: number, truncated: boolean) => {
+		reads.note({
+			type: "tool_execution_start",
+			toolName: "read",
+			toolCallId: "record",
+			args: { path: "evidence/metadata-alias.json", offset, limit },
+		});
+		reads.note({
+			type: "tool_execution_end",
+			toolName: "read",
+			toolCallId: "record",
+			isError: false,
+			result: {
+				content: [{ type: "text", text: "captured record" }],
+				details: truncated ? { truncation: { truncated: true, outputLines: 0 } } : {},
+			},
+		});
+	};
+	record(1, 1, true);
+	assert.equal(
+		reads.coverage().complete,
+		false,
+		"a truncated parent does not cover its extracted copies",
+	);
+	record(1, 1, false);
+	assert.equal(
+		reads.coverage().complete,
+		true,
+		"a complete alias read covers the same canonical record and its fields",
+	);
+});
+
+void test("change consultation belongs only to the session that received or read it", () => {
+	const supplied = new SessionReads("/workspace", [{ path: "file.ts", supplied: true, lines: 10 }]);
+	const reader = new SessionReads("/workspace", [{ path: "file.ts", supplied: false }], () => 10);
+	const sibling = new SessionReads("/workspace", [{ path: "file.ts", supplied: false }], () => 10);
+	assert.equal(supplied.hasRead("file.ts"), true);
+	assert.equal(reader.hasRead("file.ts"), false);
+	read(reader, 1, 1);
+	assert.equal(reader.hasRead("file.ts"), true);
+	assert.equal(reader.hasRead("other.ts"), false);
+	assert.equal(sibling.hasRead("file.ts"), false);
 });

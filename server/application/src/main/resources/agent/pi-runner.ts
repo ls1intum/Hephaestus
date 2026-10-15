@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import nodePath from "node:path";
@@ -96,6 +97,7 @@ import {
 	deriveWindows,
 	missingSlugs,
 	planTurns,
+	partitionBudget,
 	shouldRecordNow,
 	spent,
 	turnBudget,
@@ -256,6 +258,7 @@ interface AttemptDebug {
 }
 
 interface TurnTrace {
+	practiceSlug?: string;
 	phase: SessionPhase;
 	modelError: boolean;
 	/** Failed or aborted model calls of this turn, by the adapter's own closed kind; no provider text is kept. */
@@ -384,34 +387,6 @@ function resolveOnEitherSide(citation: Citation, content: string): ReturnType<ty
 
 function excerptOf(text: string): string {
 	return JSON.stringify(text.length > 160 ? `${text.slice(0, 160)}…` : text);
-}
-
-function readTheChange(submission: NormalizedSubmission): boolean {
-	if (submissionCitations(submission).some((citation) => citation.sourceKind === DIFF_SOURCE)) {
-		return true;
-	}
-	const consulted = [
-		...(submission.evidence.search?.consulted ?? []),
-		...(submission.evidence.inapplicability?.consulted ?? []),
-	];
-	return consulted.includes(DIFF_SOURCE);
-}
-
-function candidateReadTheChange(candidate: Candidate): boolean {
-	const cited = [
-		...candidate.citations,
-		...(candidate.outcome === "NOT_MET"
-			? candidate.problems.flatMap((problem) => problem.citations)
-			: []),
-	];
-	const { evidence } = candidate;
-	const consulted = [
-		...("search" in evidence && evidence.search !== undefined ? evidence.search.consulted : []),
-		...(candidate.outcome === "DOES_NOT_APPLY" ? candidate.evidence.inapplicability.consulted : []),
-	];
-	return (
-		cited.some((citation) => citation.sourceKind === DIFF_SOURCE) || consulted.includes(DIFF_SOURCE)
-	);
 }
 
 /** A draft disposition; its practice slug is its stable reference within this review. */
@@ -593,6 +568,46 @@ function toolResultText(result: unknown): string {
 		.join("\n");
 }
 
+interface ReviewSessionState {
+	currentTurn: TurnTrace | null;
+	activeSession: AgentSession | null;
+	turnDemand: TurnDemand | null;
+	tokensPerProblem: number;
+	recordingMessageTokens: number;
+	callOutputLimit: number | null;
+	lastEventAt: number;
+	activeReview: ActiveReview | null;
+	currentTurnSlugs: readonly string[];
+	/** A measuring session may submit only its assigned practice. */
+	activePractice: string | null;
+	openingInContext: boolean;
+	sessionGuards: { cutOff: number; recordingCalls: number; stored: number };
+	answeredRefusals: Set<string>;
+	refusedItems: Map<string, { reason: string; resent: number }>;
+	repeatedCalls: Map<string, number>;
+}
+
+// Native tools and SDK callbacks use the state of their session across awaited work.
+function newSessionState(): ReviewSessionState {
+	return {
+		currentTurn: null,
+		activeSession: null,
+		turnDemand: null,
+		tokensPerProblem: 1500,
+		recordingMessageTokens: 0,
+		callOutputLimit: null,
+		lastEventAt: Date.now(),
+		activeReview: null,
+		currentTurnSlugs: [],
+		activePractice: null,
+		openingInContext: false,
+		sessionGuards: { cutOff: 0, recordingCalls: 0, stored: 0 },
+		answeredRefusals: new Set(),
+		refusedItems: new Map(),
+		repeatedCalls: new Map(),
+	};
+}
+
 export async function runReviewJob(): Promise<void> {
 	function submittedList(value: unknown): { items: unknown[] } | { error: string } {
 		if (typeof value !== "string") {
@@ -654,6 +669,10 @@ export async function runReviewJob(): Promise<void> {
 	const LLM_PROXY_URL = requiredEnv("LLM_PROXY_URL");
 	const LLM_PROXY_TOKEN = requiredEnv("LLM_PROXY_TOKEN");
 	const DIRECT_MODEL_TOKENS = positiveIntegerEnv("PI_DIRECT_MODEL_TOKENS");
+	const PRACTICE_CONCURRENCY = positiveIntegerEnv("PI_PRACTICE_CONCURRENCY");
+	if (PRACTICE_CONCURRENCY > 32) {
+		throw new Error("PI_PRACTICE_CONCURRENCY must not exceed 32");
+	}
 	const PRACTICES_PER_TURN = hasText(process.env.PI_PRACTICE_BATCH_SIZE)
 		? Number(process.env.PI_PRACTICE_BATCH_SIZE)
 		: 6;
@@ -738,12 +757,17 @@ export async function runReviewJob(): Promise<void> {
 		turns: TurnTrace[];
 		usageTotals: UsageTotals;
 		publicHistory?: PublicHistoryReceipt;
+		practiceConcurrency?: { configured: number; effective: number };
 	} = {
 		attempts: [],
 		turns: [],
 		usageTotals,
 	};
-	let currentTurn: TurnTrace | null = null;
+
+	const sessionScopes = new AsyncLocalStorage<ReviewSessionState>();
+	const rootSessionState = newSessionState();
+	const activeScopes = new Set<ReviewSessionState>();
+	const sessionState = () => sessionScopes.getStore() ?? rootSessionState;
 
 	const TRACE_REASON_CHARS = 140;
 	const reviewState = new Map<string, Candidate>();
@@ -756,7 +780,9 @@ export async function runReviewJob(): Promise<void> {
 	function admissionRequest() {
 		return {
 			contractVersion: 3,
-			nonResults: runtimeNonResults,
+			nonResults: runtimeNonResults.toSorted((a, b) =>
+				compareSlugs(a.practiceSlug, b.practiceSlug),
+			),
 			reviewId: taskEnvelope.reviewId,
 			jobId: taskEnvelope.jobId,
 			attempt: taskEnvelope.attempt,
@@ -1091,7 +1117,12 @@ export async function runReviewJob(): Promise<void> {
 		writeFileSync(USAGE_PATH, JSON.stringify(usageTotals, null, 2));
 	}
 	function persistRunnerDebug() {
-		writeFileSync(RUNNER_DEBUG_PATH, JSON.stringify(runnerDebug, null, 2));
+		const turns = runnerDebug.turns.toSorted((a, b) =>
+			a.practiceSlug !== undefined && b.practiceSlug !== undefined
+				? compareSlugs(a.practiceSlug, b.practiceSlug)
+				: 0,
+		);
+		writeFileSync(RUNNER_DEBUG_PATH, JSON.stringify({ ...runnerDebug, turns }, null, 2));
 	}
 	function persistReviewState() {
 		writeFileSync(REVIEW_STATE_PATH, JSON.stringify(admissionRequest(), null, 2));
@@ -1208,7 +1239,12 @@ export async function runReviewJob(): Promise<void> {
 		}
 	}
 
-	function validateSubmission(raw: unknown, slug: string, coverage: Coverage): Validated {
+	function validateSubmission(
+		raw: unknown,
+		slug: string,
+		coverage: Coverage,
+		changeRead: boolean,
+	): Validated {
 		const notes: string[] = [];
 		const submission = normalizeSubmission(
 			raw,
@@ -1266,15 +1302,12 @@ export async function runReviewJob(): Promise<void> {
 			practiceIndex
 				.find((practice) => practice.slug === slug)
 				?.readsSources.includes(DIFF_SOURCE) === true &&
-			!readTheChange(submission) &&
-			![...reviewState].some(
-				([other, candidate]) => other !== slug && candidateReadTheChange(candidate),
-			)
+			!changeRead
 		) {
 			throw new Error(
-				"a result that decides nothing must show it read the change: cite a line of " +
-					`${CHANGE_ROOT}/diff.patch (sourceKind ${DIFF_SOURCE}), or list ${DIFF_SOURCE} among the ` +
-					"sources consulted in evidence.search or evidence.inapplicability",
+				"a result that decides nothing must show it read the change: this session must receive " +
+					`the complete ${CHANGE_ROOT}/diff.patch in its opening, or read that file with the read tool. ` +
+					"Another practice's reads and a list of consulted sources cannot establish this session's access.",
 			);
 		}
 		for (const citation of citations) {
@@ -1286,6 +1319,7 @@ export async function runReviewJob(): Promise<void> {
 			existsSync(`${CWD}/${CHANGE_ROOT}/diff.patch`)
 				? readFileSync(`${CWD}/${CHANGE_ROOT}/diff.patch`, "utf8")
 				: "",
+			readChange(INPUT_PATHS.contextRoot),
 		);
 		validateConversationAttribution(submission, assignment);
 		const parsed = parseCandidate({ ...submission, coverage });
@@ -1501,10 +1535,9 @@ export async function runReviewJob(): Promise<void> {
 	const REPEATED_RECORDING_ABORT = 3;
 
 	// SDK error events can repeat a refusal already logged by the tool.
-	const answeredRefusals = new Set<string>();
 
 	async function refusal<T>(toolCallId: string, text: string): Promise<AgentToolResult<T>> {
-		answeredRefusals.add(toolCallId);
+		sessionState().answeredRefusals.add(toolCallId);
 		throw new Error(text);
 	}
 
@@ -1519,62 +1552,65 @@ export async function runReviewJob(): Promise<void> {
 	const TOOL_ERROR_CHARS = 240;
 
 	// SDK error headings can be followed by the refused content; retain only a bounded reason.
+	function practiceLogLabel(): string {
+		const slug = sessionState().currentTurn?.practiceSlug;
+		return slug === undefined ? "review" : `review ${slug}`;
+	}
+
 	function firstLine(text: string): string {
 		const line = text.replaceAll(/\s+/gu, " ").trim() || "(no reason given)";
 		return line.length > TOOL_ERROR_CHARS ? `${line.slice(0, TOOL_ERROR_CHARS)}…` : line;
 	}
 
-	let activeSession: AgentSession | null = null;
-
-	let turnDemand: TurnDemand | null = null;
-
-	let tokensPerProblem = 1500;
-	let recordingMessageTokens = 0;
-	let lastEventAt = Date.now();
-
 	// End budget-exhausted turns between model calls so recording tools from the last call can finish.
 	function chargeWork(event: AgentSessionEvent): void {
-		lastEventAt = Date.now();
-		const turn = currentTurn;
+		const state = sessionState();
+		state.lastEventAt = Date.now();
+		const turn = state.currentTurn;
 		if (event.type === "message_end" && event.message.role === "assistant") {
 			const output = outputTokensOf(event.message);
-			recordingMessageTokens = listOrEmpty(event.message.content).some(
+			state.recordingMessageTokens = listOrEmpty(event.message.content).some(
 				(c) => c.type === "toolCall" && c.name === "submit_result",
 			)
 				? output
 				: 0;
-			if (!turn || !turnDemand) {
+			if (!turn || !state.turnDemand) {
 				return;
 			}
 			turn.calls += 1;
 			turn.outputTokens += output;
-			noteCutOff(turn, event.message.stopReason === "length" || output >= outputLimit);
+			noteCutOff(
+				turn,
+				event.message.stopReason === "length" || output >= (state.callOutputLimit ?? outputLimit),
+			);
 			const used: Work = { modelCalls: turn.calls, outputTokens: turn.outputTokens };
 			if (
 				!turn.askedToRecord &&
 				turn.stoppedBy === null &&
-				shouldRecordNow(used, turn.budget, turnDemand.owed(), tokensPerProblem)
+				shouldRecordNow(used, turn.budget, state.turnDemand.owed(), state.tokensPerProblem)
 			) {
 				turn.askedToRecord = true;
-				if (activeReview !== null) {
-					activeReview.requireSubmission = true;
+				if (state.activeReview !== null) {
+					state.activeReview.requireSubmission = true;
 				}
 				console.error(
 					`[pi-runner] ${turn.label}: ${turn.calls} of ${turn.budget.modelCalls} calls and ` +
 						`${turn.outputTokens} of ${turn.budget.outputTokens} output tokens spent — nudging to record`,
 				);
-				if (activeSession) {
-					void steer(activeSession, turnDemand.nudge);
+				if (state.activeSession) {
+					void steer(state.activeSession, state.turnDemand.nudge);
 				}
 			}
 			return;
 		}
 		if (event.type === "tool_execution_end" && event.toolName === "submit_result") {
 			const written = problemsIn(event.result);
-			if (written > 0 && recordingMessageTokens > 0) {
-				tokensPerProblem = Math.round((tokensPerProblem + recordingMessageTokens / written) / 2);
+			if (written > 0 && state.recordingMessageTokens > 0) {
+				state.tokensPerProblem = Math.round(
+					(state.tokensPerProblem + state.recordingMessageTokens / written) / 2,
+				);
 			}
-			recordingMessageTokens = 0;
+			state.recordingMessageTokens = 0;
 			return;
 		}
 		if (
@@ -1591,25 +1627,27 @@ export async function runReviewJob(): Promise<void> {
 
 	// A cutoff can produce invalid tool arguments; identify truncation before retrying.
 	function noteCutOff(turn: TurnTrace, cutOff: boolean): void {
+		const state = sessionState();
+		const limit = state.callOutputLimit ?? outputLimit;
 		if (!cutOff) {
 			return;
 		}
 		turn.cutOff += 1;
-		sessionGuards.cutOff += 1;
-		if (sessionGuards.cutOff >= CUT_OFF_ABORT) {
+		state.sessionGuards.cutOff += 1;
+		if (state.sessionGuards.cutOff >= CUT_OFF_ABORT) {
 			stopTurn(
 				"loop",
-				`${sessionGuards.cutOff} calls in this session ran into the ${outputLimit}-token output limit — aborting this turn`,
+				`${state.sessionGuards.cutOff} calls in this session ran into the ${limit}-token output limit — aborting this turn`,
 			);
 			return;
 		}
 		console.error(
 			`[pi-runner] ${turn.label}: a call ran into the output limit — telling the model`,
 		);
-		if (activeSession) {
+		if (state.activeSession) {
 			void steer(
-				activeSession,
-				`Your last call was cut off at the ${outputLimit}-token output limit, so its tool received it ` +
+				state.activeSession,
+				`Your last call was cut off at the ${limit}-token output limit, so its tool received it ` +
 					"incomplete and failed: the error it reports is the cut, not your syntax. Send a short call " +
 					"instead — a search with a pattern rather than a list of every value. Keep each recording " +
 					"call complete.",
@@ -1618,13 +1656,14 @@ export async function runReviewJob(): Promise<void> {
 	}
 
 	function stopTurn(reason: StopReason, why: string): void {
-		const turn = currentTurn;
+		const state = sessionState();
+		const turn = state.currentTurn;
 		console.error(`[pi-runner] ${turn?.label ?? "review"}: ${why}`);
 		if (turn && turn.stoppedBy === null) {
 			turn.stoppedBy = reason;
 		}
-		if (activeSession) {
-			void abortSession(activeSession);
+		if (state.activeSession) {
+			void abortSession(state.activeSession);
 		}
 	}
 
@@ -1645,14 +1684,11 @@ export async function runReviewJob(): Promise<void> {
 	}
 
 	// Identical refused submissions retain their answer within a turn.
-	const refusedItems = new Map<string, { reason: string; resent: number }>();
 
 	const IDENTICAL_REFUSAL_ABORT = 2;
 
-	let activeReview: ActiveReview | null = null;
-
 	function record(raw: unknown): Recorded {
-		const review = activeReview;
+		const review = sessionState().activeReview;
 		if (review === null) {
 			return {
 				kind: "refused",
@@ -1671,7 +1707,7 @@ export async function runReviewJob(): Promise<void> {
 			};
 		}
 		const sent = JSON.stringify(raw);
-		const earlier = refusedItems.get(sent);
+		const earlier = sessionState().refusedItems.get(sent);
 		if (earlier !== undefined) {
 			earlier.resent += 1;
 			countRefusal(slug);
@@ -1695,11 +1731,12 @@ export async function runReviewJob(): Promise<void> {
 				raw,
 				slug,
 				review.reads.coverage(review.reader, review.domainReads),
+				review.reads.hasRead(`${CHANGE_ROOT}/diff.patch`),
 			);
 		} catch (error) {
 			countRefusal(slug);
 			const reason = errorText(error);
-			refusedItems.set(sent, { reason, resent: 0 });
+			sessionState().refusedItems.set(sent, { reason, resent: 0 });
 			return { kind: "refused", slug, reason };
 		}
 		const { candidate, notes } = validated;
@@ -1727,10 +1764,15 @@ export async function runReviewJob(): Promise<void> {
 
 	function recordedSoFar(only?: readonly string[]): string {
 		const results = new Map(reviewState);
-		if (activeReview?.draft != null) {
-			results.set(activeReview.slug, activeReview.draft);
+		for (const scope of [rootSessionState, ...activeScopes]) {
+			const review = scope.activeReview;
+			if (review?.draft != null) {
+				results.set(review.slug, review.draft);
+			}
 		}
-		const shown = [...results].filter(([slug]) => only === undefined || only.includes(slug));
+		const shown = [...results]
+			.toSorted(([a], [b]) => compareSlugs(a, b))
+			.filter(([slug]) => only === undefined || only.includes(slug));
 		if (shown.length === 0) {
 			return "Nothing recorded yet.";
 		}
@@ -1754,25 +1796,21 @@ export async function runReviewJob(): Promise<void> {
 	const MAX_REFUSAL_LOG_CHARS = 500;
 
 	function logRefusal(slug: string, reason: string): void {
+		const state = sessionState();
 		const line = `[pi-runner] result refused for ${slug}: ${reason}`;
 		console.error(
 			line.length > MAX_REFUSAL_LOG_CHARS ? `${line.slice(0, MAX_REFUSAL_LOG_CHARS)}…` : line,
 		);
-		if (currentTurn) {
-			currentTurn.refused += 1;
-			currentTurn.refusalReasons.push(
+		if (state.currentTurn) {
+			state.currentTurn.refused += 1;
+			state.currentTurn.refusalReasons.push(
 				reason.length > TRACE_REASON_CHARS ? `${reason.slice(0, TRACE_REASON_CHARS)}…` : reason,
 			);
 		}
 	}
 
-	let currentTurnSlugs: readonly string[] = [];
-
-	// Each measuring session may submit only its assigned practice's result.
-	let activePractice: string | null = null;
-
-	function owedPractices(slugs: readonly string[] = currentTurnSlugs): string[] {
-		const review = activeReview;
+	function owedPractices(slugs: readonly string[] = sessionState().currentTurnSlugs): string[] {
+		const review = sessionState().activeReview;
 		return review === null || review.draft !== null || blockedPractices.has(review.slug)
 			? []
 			: slugs.filter((slug) => slug === review.slug);
@@ -1858,7 +1896,8 @@ export async function runReviewJob(): Promise<void> {
 				return validateArguments(prepared);
 			},
 			execute: async (toolCallId, params): Promise<AgentToolResult<SubmitResultDetails>> => {
-				if (measurementClosed || activeReview === null) {
+				const state = sessionState();
+				if (measurementClosed || state.activeReview === null) {
 					const text = "Measurement is closed; this turn may only compose feedback.";
 					return {
 						content: [{ type: "text", text }],
@@ -1875,9 +1914,9 @@ export async function runReviewJob(): Promise<void> {
 				if (outcome.kind === "refused") {
 					logRefusal(outcome.slug, outcome.reason);
 				}
-				if (currentTurn) {
-					currentTurn.stored += stored;
-					sessionGuards.stored += stored;
+				if (state.currentTurn) {
+					state.currentTurn.stored += stored;
+					state.sessionGuards.stored += stored;
 				}
 				if (stored > 0) {
 					persistRecordedNotes();
@@ -2177,9 +2216,13 @@ export async function runReviewJob(): Promise<void> {
 	}
 
 	const persistComposedFeedback = () => persistComposition(composedFeedback, FEEDBACK_PATH);
-	const prepareComposedFeedback = async (safety: ReturnType<typeof scheduleDeadline>) =>
+	const prepareComposedFeedback = async (
+		safety: ReturnType<typeof scheduleDeadline>,
+		phase?: "PUBLIC_REVIEW" | "PRIVATE_FEEDBACK",
+	) =>
 		prepareComposition({
 			feedback: composedFeedback,
+			phase,
 			admitted: admission !== null,
 			expired: safety.expired(),
 			url: `${LLM_PROXY_URL}/prepare-feedback`,
@@ -2190,7 +2233,8 @@ export async function runReviewJob(): Promise<void> {
 				AGENT_BUDGET_MS - (Date.now() - PROCESS_START_MS),
 			),
 			persist: persistComposedFeedback,
-			recordFailure: (phase, reason) => recordCompositionFailure(composedFeedback, phase, reason),
+			recordFailure: (failedPhase, reason) =>
+				recordCompositionFailure(composedFeedback, failedPhase, reason),
 		});
 
 	const THIS_WORK = ((): string | undefined => {
@@ -2316,28 +2360,29 @@ export async function runReviewJob(): Promise<void> {
 		args: unknown,
 		measuring: boolean,
 	): void {
+		const state = sessionState();
 		turn.toolCalls[toolName] = (turn.toolCalls[toolName] ?? 0) + 1;
-		if (!activeSession) {
+		if (!state.activeSession) {
 			return;
 		}
 		const calls = Object.values(turn.toolCalls).reduce((sum, count) => sum + count, 0);
 		if (
 			!measuring &&
 			!RECORDING_TOOLS.has(toolName) &&
-			sessionGuards.recordingCalls === 0 &&
+			state.sessionGuards.recordingCalls === 0 &&
 			calls === COMPOSITION_EXPLORATION_NUDGE
 		) {
 			console.error(
 				`[pi-runner] composition: ${COMPOSITION_EXPLORATION_NUDGE} calls without a recording call — nudging to persist`,
 			);
 			void steer(
-				activeSession,
+				state.activeSession,
 				composerTool === "report_review" ? REVIEW_NUDGE : COMPOSITION_NUDGE,
 			);
 		}
 		const signature = `${toolName}:${JSON.stringify(args)}`;
-		const repeats = (repeatedCalls.get(signature) ?? 0) + 1;
-		repeatedCalls.set(signature, repeats);
+		const repeats = (state.repeatedCalls.get(signature) ?? 0) + 1;
+		state.repeatedCalls.set(signature, repeats);
 		turn.repeatedCalls = Math.max(turn.repeatedCalls, repeats);
 		const recording = RECORDING_TOOLS.has(toolName);
 		if (repeats === (recording ? REPEATED_RECORDING_NUDGE : REPEATED_CALL_NUDGE)) {
@@ -2357,7 +2402,7 @@ export async function runReviewJob(): Promise<void> {
 				correction = `Correct what its answer names. ${REVIEW_NUDGE}`;
 			}
 			void steer(
-				activeSession,
+				state.activeSession,
 				measuring
 					? `You have run the same ${toolName} call ${repeats} times; its result will not change. ${next}, in one submit_result call. ${PERSIST_DISCIPLINE}`
 					: `You have run the same ${toolName} call ${repeats} times; its result will not change. ${correction}`,
@@ -2369,27 +2414,25 @@ export async function runReviewJob(): Promise<void> {
 		// SDK schema refusals bypass tool execution and its per-practice cap; count attempts here too.
 		if (RECORDING_TOOLS.has(toolName)) {
 			turn.recordingCalls += 1;
-			sessionGuards.recordingCalls += 1;
+			state.sessionGuards.recordingCalls += 1;
 			if (
-				sessionGuards.recordingCalls >= MAX_RECORDING_ATTEMPTS_PER_TURN &&
-				sessionGuards.stored === 0
+				state.sessionGuards.recordingCalls >= MAX_RECORDING_ATTEMPTS_PER_TURN &&
+				state.sessionGuards.stored === 0
 			) {
 				stopTurn(
 					"loop",
-					`${sessionGuards.recordingCalls} recording calls without a record — aborting this turn`,
+					`${state.sessionGuards.recordingCalls} recording calls without a record — aborting this turn`,
 				);
 			}
 		}
 	}
 
 	// Guard state belongs to one native session; the turn trace spans sessions.
-	const repeatedCalls = new Map<string, number>();
-	let sessionGuards = { cutOff: 0, recordingCalls: 0, stored: 0 };
 	function resetSessionGuards(): void {
-		repeatedCalls.clear();
-		refusedItems.clear();
-		recordingMessageTokens = 0;
-		sessionGuards = { cutOff: 0, recordingCalls: 0, stored: 0 };
+		sessionState().repeatedCalls.clear();
+		sessionState().refusedItems.clear();
+		sessionState().recordingMessageTokens = 0;
+		sessionState().sessionGuards = { cutOff: 0, recordingCalls: 0, stored: 0 };
 	}
 
 	function openTurnTrace(
@@ -2398,9 +2441,10 @@ export async function runReviewJob(): Promise<void> {
 		budget: Work,
 		demand: TurnDemand,
 	): TurnTrace {
+		const state = sessionState();
 		resetSessionGuards();
-		lastEventAt = Date.now();
-		currentTurn = {
+		state.lastEventAt = Date.now();
+		state.currentTurn = {
 			phase,
 			modelError: false,
 			modelFailures: {},
@@ -2428,15 +2472,15 @@ export async function runReviewJob(): Promise<void> {
 			askedToRecord: false,
 			stoppedBy: null,
 		};
-		turnDemand = demand;
-		return currentTurn;
+		state.turnDemand = demand;
+		return state.currentTurn;
 	}
 
 	function closeTurnTrace(trace: TurnTrace): void {
 		trace.durationMs = Date.now() - trace.durationMs;
 		runnerDebug.turns.push(trace);
-		currentTurn = null;
-		turnDemand = null;
+		sessionState().currentTurn = null;
+		sessionState().turnDemand = null;
 		persistRunnerDebug();
 		console.error(
 			`[pi-runner] ${trace.label}: ${(trace.durationMs / 1000).toFixed(1)}s, calls=${trace.calls}/${trace.budget.modelCalls}, ` +
@@ -2472,7 +2516,6 @@ export async function runReviewJob(): Promise<void> {
 	}
 
 	// Compaction summarizes the opening away; resend its exact text after compaction.
-	let openingInContext = false;
 
 	function assessmentOpening(brief: string): string {
 		return `${prompt}\n\n${brief}\n\n`;
@@ -2480,14 +2523,16 @@ export async function runReviewJob(): Promise<void> {
 
 	// Restore only the current practice's draft after compaction; other drafts are outside its context.
 	function openingIfNeeded(brief: string, composing = false): string {
-		if (openingInContext) {
+		if (sessionState().openingInContext) {
 			return "";
 		}
-		const ownDrafts = activeReview?.draft != null;
+		const ownDrafts = sessionState().activeReview?.draft != null;
 		return composing
 			? assessmentOpening(brief)
 			: `${assessmentOpening(brief)}${
-					ownDrafts ? `## Recorded so far\n${recordedSoFar(currentTurnSlugs)}\n\n` : ""
+					ownDrafts
+						? `## Recorded so far\n${recordedSoFar(sessionState().currentTurnSlugs)}\n\n`
+						: ""
 				}`;
 	}
 
@@ -2584,7 +2629,7 @@ ${example.map((result) => `\`\`\`json\n${JSON.stringify(result, null, 1)}\n\`\`\
 		brief: string,
 		prepared: string,
 	): string {
-		const illustrations = openingInContext ? "" : `\n\n${RESULT_EXAMPLE}`;
+		const illustrations = sessionState().openingInContext ? "" : `\n\n${RESULT_EXAMPLE}`;
 		return `${openingIfNeeded(brief)}${heading}
 
 ${criteriaOf([slug])}${illustrations}${preparedSectionOf(slug, prepared)}
@@ -2662,118 +2707,124 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 		let providerFailures = 0;
 		const measurementReply = { received: false };
 		let measuring = true;
-		const subscribeSession = (trackedSession: AgentSession) =>
-			trackedSession.subscribe((event: AgentSessionEvent) => {
-				chargeWork(event);
-				const label = measuring ? "review" : "composer";
-				if (event.type === "tool_execution_start") {
-					// A call a codemode script makes is the script's work, not a call the model sent: the loop
-					// guards count only the latter, and the trace keeps the former apart.
-					if (event.parentToolCallId === undefined) {
+		const subscribeSession = (trackedSession: AgentSession) => {
+			const scope = sessionState();
+			return trackedSession.subscribe((event: AgentSessionEvent) =>
+				sessionScopes.run(scope, () => {
+					chargeWork(event);
+					const label = measuring ? practiceLogLabel() : "composer";
+					if (event.type === "tool_execution_start") {
+						// A call a codemode script makes is the script's work, not a call the model sent: the loop
+						// guards count only the latter, and the trace keeps the former apart.
+						if (event.parentToolCallId === undefined) {
+							if (measuring) {
+								measurementReply.received = true;
+							}
+							console.error(`[pi-runner] ${label} tool: ${event.toolName}`);
+							if (scope.currentTurn) {
+								noteToolCall(scope.currentTurn, event.toolName, event.args, measuring);
+							}
+						} else {
+							console.error(`[pi-runner] ${label} tool: codemode → ${event.toolName}`);
+							if (scope.currentTurn) {
+								const key = `codemode.${event.toolName}`;
+								scope.currentTurn.toolCalls[key] = (scope.currentTurn.toolCalls[key] ?? 0) + 1;
+							}
+						}
+					}
+					// SDK validation errors do not reach the tool, so log them from the session event.
+					if (
+						event.type === "tool_execution_end" &&
+						event.isError &&
+						!scope.answeredRefusals.delete(event.toolCallId)
+					) {
+						const result: unknown = event.result;
+						const reason = firstLine(toolResultText(result));
+						const tool =
+							event.parentToolCallId === undefined
+								? event.toolName
+								: `codemode → ${event.toolName}`;
+						console.error(`[pi-runner] ${label} tool error: ${tool} — ${reason}`);
+						if (scope.currentTurn) {
+							scope.currentTurn.toolErrors += 1;
+							scope.currentTurn.toolErrorReasons.push(`${tool}: ${reason}`);
+						}
+					}
+					if (event.type === "compaction_end") {
+						console.error(
+							`[pi-runner] ${label} context compacted (${event.reason})${hasText(event.errorMessage) ? `: ${event.errorMessage}` : ""}`,
+						);
+						if (!event.aborted && !hasText(event.errorMessage)) {
+							scope.openingInContext = false;
+						}
+						if (scope.currentTurn && !event.aborted) {
+							scope.currentTurn.compactions += 1;
+						}
+					}
+					// The SDK rides out a retryable provider failure on its own. A run that took longer, or that
+					// gave up after several of these, says so here rather than looking like an idle session.
+					if (event.type === "auto_retry_start") {
+						if (scope.currentTurn) {
+							scope.currentTurn.providerRetries += 1;
+						}
+						console.error(
+							`[pi-runner] ${label} provider call failed, retrying in ${event.delayMs}ms ` +
+								`(attempt ${event.attempt}/${event.maxAttempts}): ${event.errorMessage}`,
+						);
+					}
+					if (event.type === "auto_retry_end" && !event.success) {
+						if (scope.currentTurn) {
+							scope.currentTurn.modelError = true;
+							recordUnsuccessfulRetryEnd(scope.currentTurn);
+						}
+						const finalError = event.finalError ?? "no error given";
+						// Only measurement failures can make a review eligible for provider retry.
 						if (measuring) {
+							providerFailures += 1;
+						}
+						console.error(
+							`[pi-runner] ${label} provider call failed for good after ${event.attempt} retries: ${finalError}`,
+						);
+					}
+					if (event.type === "message_end" && event.message.role === "assistant") {
+						addAssistantUsage(streamUsage, event.message);
+						const { stopReason } = event.message;
+						// An error or abort alone is not a reply; meaningful partial output is. Once answered,
+						// later provider failures cannot turn a recording failure into a wholly unreachable review.
+						if (
+							measuring &&
+							((stopReason !== "error" && stopReason !== "aborted") ||
+								event.message.content.some(
+									(content) =>
+										content.type === "toolCall" ||
+										(content.type === "text" && !isBlank(content.text)),
+								))
+						) {
 							measurementReply.received = true;
 						}
-						console.error(`[pi-runner] ${label} tool: ${event.toolName}`);
-						if (currentTurn) {
-							noteToolCall(currentTurn, event.toolName, event.args, measuring);
+						if (scope.currentTurn) {
+							scope.currentTurn.modelError = stopReason === "error";
+							recordModelResponse(scope.currentTurn, stopReason, event.message);
 						}
-					} else {
-						console.error(`[pi-runner] ${label} tool: codemode → ${event.toolName}`);
-						if (currentTurn) {
-							const key = `codemode.${event.toolName}`;
-							currentTurn.toolCalls[key] = (currentTurn.toolCalls[key] ?? 0) + 1;
+						const types = listOrEmpty(event.message.content).map((c) => c.type);
+						const toolCalls = types.filter((t) => t === "toolCall").length;
+						const { rawStopReason } = event.message;
+						// An error can leave a review unanswered even when the SDK does not retry it.
+						if (stopReason === "error" && measuring) {
+							providerFailures += 1;
 						}
+						const failure =
+							stopReason === "error" || stopReason === "length"
+								? `, error=${event.message.errorMessage ?? "none given"}${hasText(rawStopReason) ? `, rawStopReason=${rawStopReason}` : ""}`
+								: "";
+						console.error(
+							`[pi-runner] ${label} assistant msg: stopReason=${stopReason}, toolCalls=${toolCalls}, ` +
+								`types=[${types.join(",")}]${failure}`,
+						);
 					}
-				}
-				// SDK validation errors do not reach the tool, so log them from the session event.
-				if (
-					event.type === "tool_execution_end" &&
-					event.isError &&
-					!answeredRefusals.delete(event.toolCallId)
-				) {
-					const result: unknown = event.result;
-					const reason = firstLine(toolResultText(result));
-					const tool =
-						event.parentToolCallId === undefined ? event.toolName : `codemode → ${event.toolName}`;
-					console.error(`[pi-runner] ${label} tool error: ${tool} — ${reason}`);
-					if (currentTurn) {
-						currentTurn.toolErrors += 1;
-						currentTurn.toolErrorReasons.push(`${tool}: ${reason}`);
-					}
-				}
-				if (event.type === "compaction_end") {
-					console.error(
-						`[pi-runner] ${label} context compacted (${event.reason})${hasText(event.errorMessage) ? `: ${event.errorMessage}` : ""}`,
-					);
-					if (!event.aborted && !hasText(event.errorMessage)) {
-						openingInContext = false;
-					}
-					if (currentTurn && !event.aborted) {
-						currentTurn.compactions += 1;
-					}
-				}
-				// The SDK rides out a retryable provider failure on its own. A run that took longer, or that
-				// gave up after several of these, says so here rather than looking like an idle session.
-				if (event.type === "auto_retry_start") {
-					if (currentTurn) {
-						currentTurn.providerRetries += 1;
-					}
-					console.error(
-						`[pi-runner] ${label} provider call failed, retrying in ${event.delayMs}ms ` +
-							`(attempt ${event.attempt}/${event.maxAttempts}): ${event.errorMessage}`,
-					);
-				}
-				if (event.type === "auto_retry_end" && !event.success) {
-					if (currentTurn) {
-						currentTurn.modelError = true;
-						recordUnsuccessfulRetryEnd(currentTurn);
-					}
-					const finalError = event.finalError ?? "no error given";
-					// Only measurement failures can make a review eligible for provider retry.
-					if (measuring) {
-						providerFailures += 1;
-					}
-					console.error(
-						`[pi-runner] ${label} provider call failed for good after ${event.attempt} retries: ${finalError}`,
-					);
-				}
-				if (event.type === "message_end" && event.message.role === "assistant") {
-					addAssistantUsage(streamUsage, event.message);
-					const { stopReason } = event.message;
-					// An error or abort alone is not a reply; meaningful partial output is. Once answered,
-					// later provider failures cannot turn a recording failure into a wholly unreachable review.
-					if (
-						measuring &&
-						((stopReason !== "error" && stopReason !== "aborted") ||
-							event.message.content.some(
-								(content) =>
-									content.type === "toolCall" ||
-									(content.type === "text" && !isBlank(content.text)),
-							))
-					) {
-						measurementReply.received = true;
-					}
-					if (currentTurn) {
-						currentTurn.modelError = stopReason === "error";
-						recordModelResponse(currentTurn, stopReason, event.message);
-					}
-					const types = listOrEmpty(event.message.content).map((c) => c.type);
-					const toolCalls = types.filter((t) => t === "toolCall").length;
-					const { rawStopReason } = event.message;
-					// An error can leave a review unanswered even when the SDK does not retry it.
-					if (stopReason === "error" && measuring) {
-						providerFailures += 1;
-					}
-					const failure =
-						stopReason === "error" || stopReason === "length"
-							? `, error=${event.message.errorMessage ?? "none given"}${hasText(rawStopReason) ? `, rawStopReason=${rawStopReason}` : ""}`
-							: "";
-					console.error(
-						`[pi-runner] ${label} assistant msg: stopReason=${stopReason}, toolCalls=${toolCalls}, ` +
-							`types=[${types.join(",")}]${failure}`,
-					);
-				}
-			});
+				}),
+			);
+		};
 
 		const allSlugs = loadPracticeSlugs();
 		if (!continuing) {
@@ -2843,9 +2894,9 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 					closeTurnTrace,
 					settleSession: async (session, label) => settleSession(session, label, ABORT_SETTLE_MS),
 					opening: () => openingIfNeeded(brief, true),
-					hasOpening: () => openingInContext,
+					hasOpening: () => sessionState().openingInContext,
 					openedContext: () => {
-						openingInContext = true;
+						sessionState().openingInContext = true;
 					},
 					readPublicFeedbackHistory,
 					recordHistory: (history) => {
@@ -2853,12 +2904,16 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 						persistRunnerDebug();
 					},
 					onStored: (stored) => {
-						if (currentTurn) {
-							currentTurn.stored += stored;
-							sessionGuards.stored += stored;
+						const state = sessionState();
+						if (state.currentTurn) {
+							state.currentTurn.stored += stored;
+							state.sessionGuards.stored += stored;
 						}
 					},
-					paid: () => turnDemand?.endsWhenPaid === true && turnDemand.owed() === 0,
+					paid: () => {
+						const demand = sessionState().turnDemand;
+						return demand?.endsWhenPaid === true && demand.owed() === 0;
+					},
 					documentedShape,
 					listSchema,
 					submittedList,
@@ -2871,6 +2926,7 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 		}
 
 		async function assessmentLoader() {
+			const scope = sessionState();
 			// Extension bindings belong to the native session that uses them.
 			const resourceLoader = new DefaultResourceLoader({
 				cwd: CWD,
@@ -2883,7 +2939,10 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 				extensionFactories: [
 					createCodemodeExtension({ mode: "on", models: false }),
 					cacheExtension,
-					submissionExtension(providerConfig ?? {}, () => activeReview?.requireSubmission === true),
+					submissionExtension(
+						providerConfig ?? {},
+						() => scope.activeReview?.requireSubmission === true,
+					),
 				],
 			});
 			await resourceLoader.reload();
@@ -2901,25 +2960,54 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 				cwd: CWD,
 				agentDir: AGENT_DIR,
 				tools,
-				customTools,
-				sessionManager: nativeSessionManager(phase, activePractice),
+				customTools: customTools?.map((tool) => ({
+					...tool,
+					execute: AsyncLocalStorage.bind(async (...args: Parameters<typeof tool.execute>) =>
+						tool.execute(...args),
+					),
+				})),
+				sessionManager: nativeSessionManager(phase, sessionState().activePractice),
 				settingsManager,
 				resourceLoader: resourceLoader ?? (await assessmentLoader()),
 				modelRuntime,
 				model,
 				thinkingLevel,
 			});
+			const scope = sessionState();
+			if (phase === "practice" && scope.currentTurn?.practiceSlug !== undefined) {
+				const stream = fresh.agent.streamFunction;
+				fresh.agent.streamFunction = (
+					requestModel,
+					context,
+					options,
+				): ReturnType<AgentSession["agent"]["streamFunction"]> => {
+					const trace = scope.currentTurn;
+					if (
+						trace === null ||
+						trace.stoppedBy !== null ||
+						spent({ modelCalls: trace.calls, outputTokens: trace.outputTokens }, trace.budget)
+					) {
+						throw new UnratedError("budget", "the practice reservation is spent");
+					}
+					// A final call can finish, but cannot write tokens reserved for a sibling practice.
+					scope.callOutputLimit = Math.min(
+						options?.maxTokens ?? requestModel.maxTokens,
+						trace.budget.outputTokens - trace.outputTokens,
+					);
+					return stream(requestModel, context, { ...options, maxTokens: scope.callOutputLimit });
+				};
+			}
 			for (const error of extensionsResult.errors) {
 				console.error(`[pi-runner] extension error: ${error.path}: ${error.error}`);
 			}
 			if (phase === "public-review" || phase === "private-feedback") {
-				currentTurnSlugs = [];
+				sessionState().currentTurnSlugs = [];
 				composerTool = phase === "public-review" ? "report_review" : "report_feedback";
 			}
 			resetSessionGuards();
-			openingInContext = false;
-			lastEventAt = Date.now();
-			activeSession = fresh;
+			sessionState().openingInContext = false;
+			sessionState().lastEventAt = Date.now();
+			sessionState().activeSession = fresh;
 			return { session: fresh, phase, unsubscribe: subscribeSession(fresh) };
 		}
 
@@ -2951,19 +3039,26 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 				if (opened.phase === "public-review") {
 					composerTool = "report_feedback";
 				}
-				if (activeSession === opened.session) {
-					activeSession = null;
+				if (sessionState().activeSession === opened.session) {
+					sessionState().activeSession = null;
 				}
 			}
 		}
 
 		// Liveness, not a budget: a turn that shows no sign of life for STALL_MS is aborted.
-		const stallWatch = setInterval(() => {
-			if (currentTurn?.stoppedBy === null && Date.now() - lastEventAt >= STALL_MS) {
-				if (measuring) {
-					providerFailures += 1;
+		const checkStall = (scope: ReviewSessionState) => {
+			sessionScopes.run(scope, () => {
+				if (scope.currentTurn?.stoppedBy === null && Date.now() - scope.lastEventAt >= STALL_MS) {
+					if (measuring) {
+						providerFailures += 1;
+					}
+					stopTurn("stall", `no model or tool event for ${STALL_MS / 1000}s — aborting this turn`);
 				}
-				stopTurn("stall", `no model or tool event for ${STALL_MS / 1000}s — aborting this turn`);
+			});
+		};
+		const stallWatch = setInterval(() => {
+			for (const scope of [rootSessionState, ...activeScopes]) {
+				checkStall(scope);
 			}
 		}, STALL_CHECK_MS);
 		stallWatch.unref();
@@ -2973,27 +3068,33 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 		const boundModels = readBoundModels();
 		const directBudget = new ModelBudget(DIRECT_MODEL_TOKENS, MODEL_CONCURRENCY);
 		let sessionStopFailure: Error | null = null;
+		const sessionStopFailed = () => sessionStopFailure !== null;
 		const measuringEnded = new AbortController();
 
 		async function runScope(
 			label: string,
 			heading: string,
 			slugs: readonly string[],
+			reservedBudget?: Work,
+			practicePosition?: { index: number; count: number },
 		): Promise<StopReason | null> {
 			const safetyMs = measureEnd - Date.now();
-			if (safetyMs <= 0) {
+			if (safetyMs <= RETURN_MS) {
 				console.error(`[pi-runner] ${label}: the run is near its safety ceiling — skipped`);
 				return "safety";
 			}
-			const budget = turnBudget(slugs.length, PER_PRACTICE_WORK);
+			const budget = reservedBudget ?? turnBudget(slugs.length, PER_PRACTICE_WORK);
 			console.error(
-				`[pi-runner] ${label}: ${slugs.length} practice(s), up to ${budget.modelCalls} calls and ${budget.outputTokens} output tokens (${tokensPerProblem} tokens per result so far)`,
+				`[pi-runner] ${label}: ${slugs.length} practice(s), up to ${budget.modelCalls} calls and ${budget.outputTokens} output tokens (${sessionState().tokensPerProblem} tokens per result so far)`,
 			);
 			const phase: SessionPhase = "practice";
 			const trace = openTurnTrace(phase, label, budget, {
 				owed: () => owedPractices(slugs).length,
 				nudge: RECORD_NUDGE,
 			});
+			if (reservedBudget !== undefined) {
+				trace.practiceSlug = slugs[0];
+			}
 			const safety = scheduleDeadline(safetyMs, () =>
 				stopTurn("safety", "the run is near its safety ceiling — aborting this turn"),
 			);
@@ -3006,6 +3107,7 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 				!pastSafety() &&
 				!trace.modelError;
 			async function promptPractice(session: AgentSession, text: () => string, slug: string) {
+				const scope = sessionState();
 				if (pastSafety()) {
 					return;
 				}
@@ -3023,12 +3125,18 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 				await session.prompt(prepared, {
 					preflightResult: (disposition) => {
 						if (disposition === "started") {
-							openingInContext = true;
+							scope.openingInContext = true;
 						}
 					},
 				});
 			}
-			async function askOnceMore(session: AgentSession, text: () => string, slug: string) {
+			async function askOnceMore(
+				session: AgentSession,
+				text: () => string,
+				slug: string,
+				interrupted: Promise<undefined>,
+			) {
+				const state = sessionState();
 				if (
 					!endedUnrecorded(slug) ||
 					spent({ modelCalls: trace.calls, outputTokens: trace.outputTokens }, trace.budget)
@@ -3043,11 +3151,11 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 				}
 				// After a compaction the request carries the practice turn again, as any next turn does.
 				const onceMore = () =>
-					`${openingInContext ? "" : `${text()}\n\n`}${recordOnceMoreText(slug)}`;
-				if (activeReview !== null) {
-					activeReview.requireSubmission = true;
+					`${state.openingInContext ? "" : `${text()}\n\n`}${recordOnceMoreText(slug)}`;
+				if (state.activeReview !== null) {
+					state.activeReview.requireSubmission = true;
 				}
-				await Promise.race([promptPractice(session, onceMore, slug), safety.elapsed]);
+				await Promise.race([promptPractice(session, onceMore, slug), safety.elapsed, interrupted]);
 				if (endedUnrecorded(slug)) {
 					blockedPractices.set(slug, "off-format");
 					console.error(
@@ -3078,7 +3186,7 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 				signal: AbortSignal,
 				reads: Receipts,
 			): Promise<Candidate> {
-				if (activeReview !== null) {
+				if (sessionState().activeReview !== null) {
 					throw new UnratedError("refused", "a review is already running");
 				}
 				if (blockedPractices.has(slug)) {
@@ -3145,13 +3253,13 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 					slug,
 					draft: null,
 					requireSubmission: false,
-					reads: new SessionReads(CWD, relevantBrief),
+					reads: new SessionReads(CWD, relevantBrief, undefined, capturedTexts),
 					reader,
 					domainReads,
 				};
-				activeReview = review;
-				activePractice = slug;
-				currentTurnSlugs = [slug];
+				sessionState().activeReview = review;
+				sessionState().activePractice = slug;
+				sessionState().currentTurnSlugs = [slug];
 				trace.askedToRecord = false;
 				let opened: Awaited<ReturnType<typeof openSession>>;
 				try {
@@ -3163,8 +3271,8 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 							: [submitResultTool, governedScanRead(reader)],
 					);
 				} catch (error) {
-					activeReview = null;
-					activePractice = null;
+					sessionState().activeReview = null;
+					sessionState().activePractice = null;
 					throw error;
 				}
 				const unsubscribeReads = opened.session.subscribe((event) => {
@@ -3173,6 +3281,7 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 					}
 				});
 				const { finishTurn } = opened.session.agent;
+				const reviewScope = sessionState();
 				let unresolvedRefusal = false;
 				opened.session.agent.finishTurn = async (turn, finishSignal) => {
 					const decision = await finishTurn?.(turn, finishSignal);
@@ -3182,7 +3291,7 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 							if (result.isError) {
 								review.requireSubmission = true;
 								// Schema validation happens before execute; those refusals spend the same allowance.
-								if (!answeredRefusals.has(result.toolCallId)) {
+								if (!reviewScope.answeredRefusals.has(result.toolCallId)) {
 									countRefusal(slug);
 								}
 							}
@@ -3197,7 +3306,10 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 					}
 					return decision ?? undefined;
 				};
+				const interrupted = Promise.withResolvers<undefined>();
+				const signalIsAborted = () => signal.aborted;
 				const stop = () => {
+					interrupted.resolve(undefined);
 					void abortSession(opened.session);
 				};
 				signal.addEventListener("abort", stop, { once: true });
@@ -3205,8 +3317,14 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 					`${practiceTurnText(practiceHeading, slug, brief, prepared)}${assignedText}`;
 				try {
 					signal.throwIfAborted();
-					await Promise.race([promptPractice(opened.session, text, slug), safety.elapsed]);
-					await askOnceMore(opened.session, text, slug);
+					await Promise.race([
+						promptPractice(opened.session, text, slug),
+						safety.elapsed,
+						interrupted.promise,
+					]);
+					if (!signalIsAborted()) {
+						await askOnceMore(opened.session, text, slug, interrupted.promise);
+					}
 				} catch (error) {
 					console.error(`[pi-runner] ${label} (${slug}) failed: ${errorText(error)}`);
 				} finally {
@@ -3220,8 +3338,8 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 					reads.reads += receipts.reads + domainReads.reads;
 					reads.truncatedReads += receipts.truncatedReads + domainReads.truncatedReads;
 					reads.failedReads += receipts.failedReads + domainReads.failedReads;
-					activeReview = null;
-					activePractice = null;
+					sessionState().activeReview = null;
+					sessionState().activePractice = null;
 					sessionStopFailure ??= closed;
 				}
 				if (sessionStopFailure !== null) {
@@ -3318,6 +3436,7 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 						existsSync(`${CWD}/${CHANGE_ROOT}/diff.patch`)
 							? readFileSync(`${CWD}/${CHANGE_ROOT}/diff.patch`, "utf8")
 							: "",
+						readChange(INPUT_PATHS.contextRoot),
 					);
 				} catch (error) {
 					executions.set(slug, {
@@ -3338,7 +3457,7 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 			}
 			try {
 				for (const [index, slug] of slugs.entries()) {
-					if (stoppedBy() !== null || pastSafety()) {
+					if (stoppedBy() !== null || Date.now() >= measureEnd - RETURN_MS) {
 						break;
 					}
 					if (executions.has(slug)) {
@@ -3346,13 +3465,13 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 					}
 					await runProgram(
 						slug,
-						`${heading}\nPractice ${index + 1} of ${slugs.length} in this turn.`,
+						`${heading}\nPractice ${(practicePosition?.index ?? index) + 1} of ${practicePosition?.count ?? slugs.length} in this turn.`,
 					);
 				}
 			} finally {
 				clearTimeout(safety.timer);
-				activePractice = null;
-				currentTurnSlugs = slugs;
+				sessionState().activePractice = null;
+				sessionState().currentTurnSlugs = slugs;
 				closeTurnTrace(trace);
 			}
 			if (pastSafety() && stoppedBy() === null) {
@@ -3368,27 +3487,88 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 			await continueAdmittedReview();
 		}
 
-		let measureUsage: UsageReport;
-		try {
+		async function measurePractices(): Promise<void> {
 			let stalls = 0;
-			for (const [index, turn] of turns.entries()) {
-				const stop = await runScope(
-					`turn ${index + 1}/${turns.length} (${turn.id})`,
-					`## Turn ${index + 1} of ${turns.length}: ${turn.id}`,
-					turn.slugs,
-				);
-				stalls = stop === "stall" ? stalls + 1 : 0;
-				if (stop === "safety" || stalls >= 2) {
-					console.error(
-						`[pi-runner] Measuring ends early: ${stop === "safety" ? "safety ceiling" : "the session stalled twice in a row"}`,
+			const serial =
+				PRACTICE_CONCURRENCY === 1 ||
+				practiceIndex.some((practice) => practice.contextPaths !== undefined);
+			runnerDebug.practiceConcurrency = {
+				configured: PRACTICE_CONCURRENCY,
+				effective: serial ? 1 : PRACTICE_CONCURRENCY,
+			};
+			console.error(
+				`[pi-runner] Practice concurrency: configured=${PRACTICE_CONCURRENCY}, effective=${serial ? 1 : PRACTICE_CONCURRENCY}`,
+			);
+			if (serial) {
+				for (const [index, turn] of turns.entries()) {
+					const stop = await runScope(
+						`turn ${index + 1}/${turns.length} (${turn.id})`,
+						`## Turn ${index + 1} of ${turns.length}: ${turn.id}`,
+						turn.slugs,
 					);
-					break;
+					stalls = stop === "stall" ? stalls + 1 : 0;
+					if (stop === "safety" || stalls >= 2) {
+						console.error(
+							`[pi-runner] Measuring ends early: ${stop === "safety" ? "safety ceiling" : "the session stalled twice in a row"}`,
+						);
+						break;
+					}
+				}
+			} else {
+				const queue = turns.flatMap((turn, index) => {
+					const budget = turnBudget(turn.slugs.length, PER_PRACTICE_WORK);
+					return turn.slugs.map((slug, position) => ({
+						slug,
+						label: `turn ${index + 1}/${turns.length} (${turn.id}) / ${slug}`,
+						heading: `## Turn ${index + 1} of ${turns.length}: ${turn.id}`,
+						budget: partitionBudget(budget, turn.slugs.length, position),
+						position: { index: position, count: turn.slugs.length },
+					}));
+				});
+				let next = 0;
+				const workers = await Promise.allSettled(
+					Array.from({ length: Math.min(PRACTICE_CONCURRENCY, queue.length) }, async () => {
+						while (
+							next < queue.length &&
+							Date.now() < measureEnd - RETURN_MS &&
+							!measurementClosed
+						) {
+							const work = queue[next];
+							next += 1;
+							if (work === undefined) {
+								return;
+							}
+							const scope = newSessionState();
+							activeScopes.add(scope);
+							try {
+								await sessionScopes.run(scope, async () =>
+									runScope(work.label, work.heading, [work.slug], work.budget, work.position),
+								);
+							} catch (error) {
+								measurementClosed = true;
+								unreachedReason = "error";
+								measuringEnded.abort(
+									new UnratedError("unavailable", "a review session could not stop safely"),
+								);
+								throw error;
+							} finally {
+								activeScopes.delete(scope);
+							}
+						}
+					}),
+				);
+				const failure = workers.find((worker) => worker.status === "rejected");
+				if (failure?.status === "rejected") {
+					console.error(
+						`[pi-runner] Measurement stopped: ${errorText(failure.reason)}; retaining completed practices`,
+					);
 				}
 			}
+
 			const unfinished = allSlugs.filter(
 				(slug) => !executions.has(slug) && !blockedPractices.has(slug),
 			);
-			if (unfinished.length > 0 && stalls < 2 && Date.now() < measureEnd) {
+			if (serial && unfinished.length > 0 && stalls < 2 && Date.now() < measureEnd - RETURN_MS) {
 				console.error(
 					`[pi-runner] Finishing ${unfinished.length} practice(s): ${unfinished.join(", ")}`,
 				);
@@ -3398,9 +3578,15 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 					unfinished,
 				);
 			}
+		}
+
+		let measureUsage: UsageReport;
+		try {
+			await measurePractices();
 		} finally {
 			measuring = false;
 			measuringEnded.abort(new UnratedError("deadline", "measuring ended"));
+			persistRecordedNotes();
 			const measureDurationMs = Date.now() - startMs;
 			measureUsage = extractUsageFromSession({}, streamUsage);
 			accumulateUsage(null, measureUsage);
@@ -3480,9 +3666,22 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 				composedFeedback,
 			);
 		}
+		if (sessionStopFailed() && compositionRequest !== null) {
+			if (compositionRequest.destinations.ON_WORK !== undefined) {
+				recordCompositionFailure(composedFeedback, "PUBLIC_REVIEW", "RUNTIME_ERROR");
+			}
+			if (
+				PRIVATE_DESTINATIONS.some(
+					(destination) => compositionRequest.destinations[destination] !== undefined,
+				)
+			) {
+				recordCompositionFailure(composedFeedback, "PRIVATE_FEEDBACK", "RUNTIME_ERROR");
+			}
+		}
 		persistComposedFeedback();
 		maybeWriteResultFile();
 		if (
+			!sessionStopFailed() &&
 			compositionRequest &&
 			![...assignedInputs.values()].some((inputs) => inputs.scope.kind === "SCAN")
 		) {

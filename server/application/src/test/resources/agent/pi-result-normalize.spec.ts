@@ -1435,6 +1435,7 @@ void test("a repeated diff quote uses supplied view coordinates before relocatio
 	assert.equal(result.quote, fixture.quote);
 });
 
+const basisRange = { base: "b".repeat(40), head: "a".repeat(40) };
 const basisDiff = `diff --git a/src/Auth.java b/src/Auth.java
 --- a/src/Auth.java
 +++ b/src/Auth.java
@@ -1444,7 +1445,7 @@ const basisDiff = `diff --git a/src/Auth.java b/src/Auth.java
 [L10]   unchanged();
 `;
 
-void test("a code change basis needs added and removed witness lines", () => {
+void test("a code change basis needs an added head witness and permits an unchanged base", () => {
 	const introduced = normalizeSubmission(
 		baseSubmission({
 			problems: [
@@ -1455,7 +1456,7 @@ void test("a code change basis needs added and removed witness lines", () => {
 		}),
 	);
 	assert.throws(
-		() => validateChangeBasis(introduced, basisDiff),
+		() => validateChangeBasis(introduced, basisDiff, basisRange),
 		/head witness must intersect added lines/u,
 	);
 	const changed = normalizeSubmission(
@@ -1469,7 +1470,7 @@ void test("a code change basis needs added and removed witness lines", () => {
 			],
 		}),
 	);
-	assert.doesNotThrow(() => validateChangeBasis(changed, basisDiff));
+	assert.doesNotThrow(() => validateChangeBasis(changed, basisDiff, basisRange));
 	const worsened = normalizeSubmission(
 		baseSubmission({
 			problems: [
@@ -1488,9 +1489,67 @@ void test("a code change basis needs added and removed witness lines", () => {
 			],
 		}),
 	);
+	assert.doesNotThrow(() => validateChangeBasis(worsened, basisDiff, basisRange));
+});
+
+void test("additive worsening needs an added head witness; deletion and preexisting witnesses are refused", () => {
+	const citation = {
+		sourceKind: "scm.pull-request.diff",
+		sourcePath: "context/change.json",
+		path: "src/Auth.java",
+		startLine: 1,
+		endLine: 1,
+		quote: "unsafe();",
+	};
+	const candidate = normalizeSubmission(
+		baseSubmission({
+			problems: [
+				problemFixture({
+					citations: [
+						{ ...citation, side: "OLD" },
+						{ ...citation, side: "NEW", startLine: 2, endLine: 2 },
+					],
+					basis: {
+						type: "worsened",
+						base: 0,
+						head: 1,
+						explanation: "The existing unsafe operation now runs twice.",
+					},
+				}),
+			],
+		}),
+	);
+	const additive =
+		"diff --git a/src/Auth.java b/src/Auth.java\n--- a/src/Auth.java\n+++ b/src/Auth.java\n@@ -1 +1,2 @@\n[L1]  unsafe();\n[L2] +unsafe();\n";
+	assert.doesNotThrow(() => validateChangeBasis(candidate, additive, basisRange));
+	const base = candidate.problems?.[0]?.citations[0];
+	assert.ok(base !== undefined);
+	base.commit = "c".repeat(40);
 	assert.throws(
-		() => validateChangeBasis(worsened, basisDiff),
-		/base witness must intersect removed lines/u,
+		() => validateChangeBasis(candidate, additive, basisRange),
+		/base witness must belong to the pinned base revision/u,
+	);
+	base.commit = basisRange.base;
+	base.side = "NEW";
+	assert.throws(
+		() => validateChangeBasis(candidate, additive, basisRange),
+		/base witness must belong to the pinned base revision/u,
+	);
+	base.side = "OLD";
+
+	const head = candidate.problems?.[0]?.citations[1];
+	assert.ok(head !== undefined);
+	head.startLine = 1;
+	head.endLine = 1;
+	assert.throws(
+		() => validateChangeBasis(candidate, additive, basisRange),
+		/head witness must intersect added lines/u,
+	);
+	const deletion =
+		"diff --git a/src/Auth.java b/src/Auth.java\n--- a/src/Auth.java\n+++ b/src/Auth.java\n@@ -1,2 +1 @@\n[L1]  unsafe();\n[L2] -unsafe();\n";
+	assert.throws(
+		() => validateChangeBasis(candidate, deletion, basisRange),
+		/head witness must intersect added lines/u,
 	);
 });
 

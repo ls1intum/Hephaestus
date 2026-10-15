@@ -890,6 +890,7 @@ export function validateChangeBasis(
 		problems?: readonly NonNullable<NormalizedSubmission["problems"]>[number][];
 	},
 	diff: string,
+	range: { base: string; head: string } | null,
 ): void {
 	const lines = annotatedDiff(diff);
 	for (const problem of submission.problems ?? []) {
@@ -909,18 +910,31 @@ export function validateChangeBasis(
 			if (citation === undefined || ![DIFF_SOURCE, TREE_SOURCE].includes(citation.sourceKind)) {
 				continue;
 			}
+			const expected = side === "NEW" ? range?.head : range?.base;
+			const pinned =
+				expected !== undefined &&
+				(citation.sourceKind === DIFF_SOURCE
+					? citation.side === side &&
+						(citation.commit === undefined || citation.commit === expected)
+					: citation.commit === expected);
+			if (!pinned) {
+				throw new Error(
+					`basis_revision_unsupported: the ${basis.type} code basis ${side === "NEW" ? "head" : "base"} witness must belong to the pinned ${side === "NEW" ? "head" : "base"} revision`,
+				);
+			}
+			if (side === "OLD") {
+				continue;
+			}
 			const changed =
 				typeof lines === "string" ? undefined : lines.get(diffKey(citation.path, side));
 			if (
 				![...(changed ?? [])].some(
 					([line, text]) =>
-						citation.startLine <= line &&
-						line <= citation.endLine &&
-						text.startsWith(side === "NEW" ? "+" : "-"),
+						citation.startLine <= line && line <= citation.endLine && text.startsWith("+"),
 				)
 			) {
 				throw new Error(
-					`basis_witness_missing: the ${basis.type} code basis ${side === "NEW" ? "head" : "base"} witness must intersect ${side === "NEW" ? "added" : "removed"} lines in the pinned change; cite the changed code that supports the claim`,
+					`basis_witness_missing: the ${basis.type} code basis head witness must intersect added lines in the pinned change; cite the changed code that supports the claim`,
 				);
 			}
 		}

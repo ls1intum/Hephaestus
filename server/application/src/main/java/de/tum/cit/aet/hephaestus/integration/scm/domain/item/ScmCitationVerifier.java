@@ -120,11 +120,6 @@ public class ScmCitationVerifier implements CitationVerifier {
                         basis.headCitation(),
                         CandidateRefusal.BASIS_WITNESS_MISSING,
                         "The code basis head witness must intersect added lines in the pinned change"));
-            } else if (oldest != null && code(oldest) && !intersectsChange(changedFiles, oldest, CitationSide.OLD)) {
-                refused.add(new CitationRefusal(
-                        oldest.index(),
-                        CandidateRefusal.BASIS_WITNESS_MISSING,
-                        "The worsened code basis base witness must intersect removed lines in the pinned change"));
             }
         }
         return List.copyOf(refused);

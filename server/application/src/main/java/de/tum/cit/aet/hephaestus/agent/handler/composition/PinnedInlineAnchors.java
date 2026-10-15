@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.eclipse.jgit.patch.FileHeader;
 import org.eclipse.jgit.patch.Patch;
+import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
 /** Placement is narrower than verified evidence: it must belong to the pinned diff and its revision. */
@@ -23,8 +24,18 @@ public final class PinnedInlineAnchors {
         files = patch.getErrors().isEmpty() ? List.copyOf(patch.getFiles()) : List.of();
     }
 
+    public @Nullable CitationSide placementSide(EvidenceCitation citation) {
+        if (citation.sourceKind().value().equals("scm.repository.tree")) {
+            if (citation.side() != null) return null;
+            if (citation.commit() == null || head.equals(citation.commit())) return CitationSide.NEW;
+            if (base.equals(citation.commit())) return CitationSide.OLD;
+            return null;
+        }
+        return citation.sourceKind().value().equals("scm.pull-request.diff") ? citation.side() : null;
+    }
+
     public boolean permits(EvidenceCitation citation) {
-        var side = citation.side();
+        var side = placementSide(citation);
         if (citation.verification() == null
                 || side == null
                 || base.isEmpty()
