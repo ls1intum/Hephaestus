@@ -179,13 +179,18 @@ interface ActivityPeopleQueryRepository extends Repository<ActivityEvent, UUID> 
             """;
     String RESULT_HEAD = """
             ), first_contributions AS (
-                SELECT e.actor_id, min(e.occurred_at) AS first_contribution
+                SELECT current_actor.actor_id, earliest.first_contribution
+                FROM (SELECT DISTINCT actor_id FROM counts WHERE total = 1 AND all_repositories = 1) current_actor
+                LEFT JOIN LATERAL (
+                    SELECT e.occurred_at AS first_contribution
             """;
     String RESULT_TAIL = """
-                    AND e.actor_id IN (SELECT actor_id FROM counts WHERE total = 1 AND all_repositories = 1)
+                    AND e.actor_id = current_actor.actor_id
                     AND (e.event_type IN ('PULL_REQUEST_OPENED', 'ISSUE_CREATED')
                         OR (prr.pull_request_id IS NOT NULL AND e.event_type IN ('REVIEW_APPROVED', 'REVIEW_CHANGES_REQUESTED', 'REVIEW_COMMENTED')))
-                GROUP BY e.actor_id
+                    ORDER BY e.occurred_at ASC NULLS LAST
+                    LIMIT 1
+                ) earliest ON true
             )
             SELECT c.*, u.login, u.name, u.avatar_url, u.html_url,
                 CASE WHEN c.total = 1 AND c.all_repositories = 1 THEN first.first_contribution END AS first_contribution,
