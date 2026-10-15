@@ -31,6 +31,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             assignment(
                     "integration.scm.gitlab.credentials.GitLabTokenLifecycleIntegrationTest", "gitlab-token-lifecycle"),
             assignment("testconfig.BaseIntegrationTest", "base"),
+            assignment("workspace.RepositoryProviderScopeIntegrationTest", "repository-provider-scope"),
             assignment("agent.mentor.chat.MentorWorkerSplitIntegrationTest", "mentor-worker-split"),
             assignment("notification.AccountDeletionEmailIntegrationTest", "email-capture"),
             assignment("notification.AccountSecurityEmailIntegrationTest", "email-capture"),
@@ -76,6 +77,9 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
                     "gitlab-token-lifecycle",
                     "real credential storage, lifecycle locks and attention with only irreversible upstream token rotation mocked"),
             Map.entry("base", "shared PostgreSQL, HTTP, security, and application acceptance context"),
+            Map.entry(
+                    "repository-provider-scope",
+                    "real SQL provider, tenant and monitor lifetime enforcement with controlled GitLab transport and sync orchestration boundary"),
             Map.entry(
                     "email-capture",
                     "shared configured sender identity and captured SMTP boundary for durable delivery and HTTP authorization"),
@@ -154,7 +158,8 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             "agent.mentor.chat.MentorWorkerSplitIntegrationTest",
             "integration.scm.gitlab.credentials.GitLabTokenLifecycleIntegrationTest",
             "integration.scm.gitlab.workspace.GitLabWorkspaceEventRoutingIntegrationTest",
-            "integration.slack.SlackConsentLifecycleE2EIntegrationTest");
+            "integration.slack.SlackConsentLifecycleE2EIntegrationTest",
+            "workspace.RepositoryProviderScopeIntegrationTest");
 
     @Test
     void shouldMatchReviewedContextDeclarationsWhenArchitectureTestsRun() {
@@ -202,7 +207,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
 
         Set<String> mergedKeys =
                 fullContextTests.stream().map(this::mergedContextKey).collect(Collectors.toCollection(TreeSet::new));
-        assertThat(mergedKeys).hasSizeLessThanOrEqualTo(19);
+        assertThat(mergedKeys).hasSizeLessThanOrEqualTo(20);
         assertThat(FULL_CONTEXT_JUSTIFICATIONS.keySet()).isEqualTo(mergedKeys);
         assertThat(FULL_CONTEXT_JUSTIFICATIONS.values())
                 .allSatisfy(reason -> assertThat(reason).isNotBlank());

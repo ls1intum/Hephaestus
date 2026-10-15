@@ -69,6 +69,8 @@ import org.springframework.scheduling.concurrent.ConcurrentTaskExecutor;
 
 /** Runs the real initialization repository loop and job transactions; provider responses are controlled. */
 class GitLabLifecycleSyncCancellationIntegrationTest extends AbstractWorkspaceIntegrationTest {
+    @Autowired
+    private GitLabProjectAdmission projectAdmission;
 
     @Autowired
     private WorkspaceRepository workspaceRepository;
@@ -150,12 +152,12 @@ class GitLabLifecycleSyncCancellationIntegrationTest extends AbstractWorkspaceIn
         priorSuccessfulAt = Objects.requireNonNull(
                 statusService.getStatus(workspace.getId(), connection.getId()).lastSuccessfulSyncAt());
 
-        when(issues.syncIssues(anyLong(), any(Repository.class), any())).thenAnswer(invocation -> {
+        when(issues.syncIssues(anyLong(), any(Repository.class), any(), any())).thenAnswer(invocation -> {
             Repository repository = invocation.getArgument(1);
             processedRepositories.add(repository.getId());
             return SyncResult.completed(1);
         });
-        when(mergeRequests.syncMergeRequests(anyLong(), any(Repository.class), any()))
+        when(mergeRequests.syncMergeRequests(anyLong(), any(Repository.class), any(), any()))
                 .thenReturn(SyncResult.completed(1));
         when(teams.syncTeamsForGroup(workspace.getId(), workspace.getAccountLogin()))
                 .thenReturn(new GitLabTeamSyncService.Result(0, true));
@@ -170,7 +172,7 @@ class GitLabLifecycleSyncCancellationIntegrationTest extends AbstractWorkspaceIn
 
     @Test
     void shouldRecordCancelledWithoutAdvancingSuccessfulTimeWhenNextRepositoryIsSkipped() {
-        when(issues.syncIssues(eq(workspace.getId()), any(Repository.class), any()))
+        when(issues.syncIssues(eq(workspace.getId()), any(Repository.class), any(), any()))
                 .thenAnswer(invocation -> {
                     Repository repository = invocation.getArgument(1);
                     processedRepositories.add(repository.getId());
@@ -340,26 +342,27 @@ class GitLabLifecycleSyncCancellationIntegrationTest extends AbstractWorkspaceIn
         var labels = mock(GitLabLabelSyncService.class);
         var milestones = mock(GitLabMilestoneSyncService.class);
         var collaborators = mock(GitLabCollaboratorSyncService.class);
-        when(labels.syncLabelsForRepository(anyLong(), any(Repository.class))).thenReturn(SyncResult.completed(1));
-        when(milestones.syncMilestonesForRepository(anyLong(), any(Repository.class)))
+        when(labels.syncLabelsForRepository(anyLong(), any(Repository.class), any()))
                 .thenReturn(SyncResult.completed(1));
-        when(milestones.syncMilestonesForGroup(eq(workspace.getId()), eq(workspace.getAccountLogin()), any()))
+        when(milestones.syncMilestonesForRepository(anyLong(), any(Repository.class), any()))
+                .thenReturn(SyncResult.completed(1));
+        when(milestones.syncMilestonesForGroup(eq(workspace.getId()), eq(workspace.getAccountLogin()), any(), any()))
                 .thenReturn(SyncResult.completed(0));
-        when(collaborators.syncCollaboratorsForRepository(anyLong(), any(Repository.class)))
+        when(collaborators.syncCollaboratorsForRepository(anyLong(), any(Repository.class), any()))
                 .thenReturn(SyncResult.completed(1));
-        when(labels.syncLabelsForRepository(workspace.getId(), first))
+        when(labels.syncLabelsForRepository(eq(workspace.getId()), eq(first), any()))
                 .thenReturn(
                         failedPhase == SyncTargetProvider.SyncType.LABELS
                                 ? SyncResult.abortedError(1)
                                 : SyncResult.completed(1),
                         SyncResult.completed(1));
-        when(milestones.syncMilestonesForRepository(workspace.getId(), first))
+        when(milestones.syncMilestonesForRepository(eq(workspace.getId()), eq(first), any()))
                 .thenReturn(
                         failedPhase == SyncTargetProvider.SyncType.MILESTONES
                                 ? SyncResult.abortedError(1)
                                 : SyncResult.completed(1),
                         SyncResult.completed(1));
-        when(collaborators.syncCollaboratorsForRepository(workspace.getId(), first))
+        when(collaborators.syncCollaboratorsForRepository(eq(workspace.getId()), eq(first), any()))
                 .thenReturn(
                         failedPhase == SyncTargetProvider.SyncType.COLLABORATORS
                                 ? SyncResult.abortedError(1)
@@ -419,9 +422,10 @@ class GitLabLifecycleSyncCancellationIntegrationTest extends AbstractWorkspaceIn
     @Test
     void shouldRecordWarningsWithoutErasingPrimaryProgressWhenPostRepositoryPhaseAborts() {
         var subIssues = mock(GitLabSubIssueSyncService.class);
-        when(subIssues.syncSubIssuesForRepository(anyLong(), any(Repository.class)))
+        when(subIssues.syncSubIssuesForRepository(anyLong(), any(Repository.class), any()))
                 .thenReturn(SyncResult.completed(0));
-        when(subIssues.syncSubIssuesForRepository(workspace.getId(), first)).thenReturn(SyncResult.abortedError(1));
+        when(subIssues.syncSubIssuesForRepository(eq(workspace.getId()), eq(first), any()))
+                .thenReturn(SyncResult.abortedError(1));
         trigger = triggerWith(
                 providerFor(new GitLabSyncServiceHolder(
                         groups,
@@ -452,7 +456,7 @@ class GitLabLifecycleSyncCancellationIntegrationTest extends AbstractWorkspaceIn
     void shouldKeepConsumedCancellationWhenDiscoveryAlreadyReportedWarnings() {
         when(groups.syncGroupProjects(workspace.getId(), workspace.getAccountLogin(), gitLabConfig.serverUrl()))
                 .thenReturn(GitLabSyncResult.withErrors(List.of(first), 1, 1, 0, 0));
-        when(issues.syncIssues(eq(workspace.getId()), any(Repository.class), any()))
+        when(issues.syncIssues(eq(workspace.getId()), any(Repository.class), any(), any()))
                 .thenAnswer(invocation -> {
                     Repository repository = invocation.getArgument(1);
                     processedRepositories.add(repository.getId());
@@ -558,7 +562,8 @@ class GitLabLifecycleSyncCancellationIntegrationTest extends AbstractWorkspaceIn
                 workspaceLinkService,
                 repositoryMonitors,
                 actorSelector,
-                new ConcurrentTaskExecutor(new SyncTaskExecutor()));
+                new ConcurrentTaskExecutor(new SyncTaskExecutor()),
+                projectAdmission);
         return new GitLabWorkspaceDataSyncTrigger(
                 initialization, workspaceRepository, connectionRepository, jobService);
     }

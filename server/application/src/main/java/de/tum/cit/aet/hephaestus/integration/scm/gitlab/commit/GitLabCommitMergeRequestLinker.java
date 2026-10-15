@@ -18,6 +18,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncException;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabRouteAdmission;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -58,6 +59,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabCommitMergeRequestLinker {
 
+    private final GitLabProjectAdmission admission;
+
     private static final Logger log = LoggerFactory.getLogger(GitLabCommitMergeRequestLinker.class);
 
     private static final String LINK_COMMITS_DOCUMENT = "LinkCommitsToMergeRequests";
@@ -83,7 +86,9 @@ public class GitLabCommitMergeRequestLinker {
             GitLabProperties gitLabProperties,
             ApplicationEventPublisher eventPublisher,
             GitLabRouteAdmission routeAdmission,
-            TransactionTemplate transactions) {
+            TransactionTemplate transactions,
+            GitLabProjectAdmission admission) {
+        this.admission = admission;
         this.commitRepository = commitRepository;
         this.commitContributorRepository = commitContributorRepository;
         this.userRepository = userRepository;
@@ -99,13 +104,13 @@ public class GitLabCommitMergeRequestLinker {
      * Runs {@code write}; for a delivery on a connection route only while the connection is still active, held so for
      * the write's transaction. The GitLab reads before it stay outside that transaction.
      */
-    private int whileActive(IntSupplier write) {
-        Optional<GitLabRouteAdmission.AdmittedRoute> route = GitLabRouteAdmission.current();
-        if (route.isEmpty()) {
+    private int whileActive(GitLabProjectAdmission.ProjectRead read, IntSupplier write) {
+        return Objects.requireNonNull(transactions.execute(status -> {
+            if (!admission.hold(read)) return 0;
+            var route = GitLabRouteAdmission.current();
+            if (route.isPresent() && !routeAdmission.holdActive(route.get())) return 0;
             return write.getAsInt();
-        }
-        Integer written = transactions.execute(status -> routeAdmission.holdActive(route.get()) ? write.getAsInt() : 0);
-        return written != null ? written : 0;
+        }));
     }
 
     /**
@@ -118,6 +123,17 @@ public class GitLabCommitMergeRequestLinker {
      * @return sync result with the number of (commit, MR) pairs inserted
      */
     public SyncResult linkCommits(Long scopeId, Repository repository, @Nullable OffsetDateTime updatedAfter) {
+        return admission
+                .capture(scopeId, repository)
+                .map(read -> linkCommits(scopeId, repository, updatedAfter, read))
+                .orElseGet(() -> SyncResult.completed(0));
+    }
+
+    public SyncResult linkCommits(
+            Long scopeId,
+            Repository repository,
+            @Nullable OffsetDateTime updatedAfter,
+            GitLabProjectAdmission.ProjectRead read) {
         String projectPath = repository.getNameWithOwner();
         String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(projectPath), "<unknown>");
         long repositoryId = repository.getId();
@@ -225,7 +241,7 @@ public class GitLabCommitMergeRequestLinker {
                         int inserted = 0;
                         if (!shas.isEmpty()) {
                             inserted = whileActive(
-                                    () -> commitRepository.linkPullRequestToCommits(repositoryId, iid, shas));
+                                    read, () -> commitRepository.linkPullRequestToCommits(repositoryId, iid, shas));
                             totalLinks += inserted;
                         }
 
@@ -243,8 +259,10 @@ public class GitLabCommitMergeRequestLinker {
                                 for (CommitNode node : fallbackNodes) {
                                     fallbackShas.add(node.sha());
                                 }
-                                int fallbackInserted = whileActive(() ->
-                                        commitRepository.linkPullRequestToCommits(repositoryId, iid, fallbackShas));
+                                int fallbackInserted = whileActive(
+                                        read,
+                                        () -> commitRepository.linkPullRequestToCommits(
+                                                repositoryId, iid, fallbackShas));
                                 totalLinks += fallbackInserted;
                                 if (fallbackInserted == 0) {
                                     log.debug(
@@ -305,9 +323,11 @@ public class GitLabCommitMergeRequestLinker {
         }
 
         int attributed = whileActive(
+                read,
                 () -> reconcileCommitContributorUsers(loginToEmails, providerId, scopeId, repository, safeProjectPath));
 
         SyncResult result;
+        if (!admission.current(read)) return SyncResult.completed(0);
         if (errorAborted) {
             result = SyncResult.abortedError(totalLinks);
         } else if (rateLimitAborted) {

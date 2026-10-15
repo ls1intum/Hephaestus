@@ -33,6 +33,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.commit.GitLabCommitMerge
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository.dto.GitLabPushEventDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabAdmissionTestFixtures;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabRouteAdmission;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.PassThroughTransactionTemplate;
@@ -42,6 +44,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,6 +57,8 @@ import org.springframework.context.ApplicationEventPublisher;
 
 @Tag("unit")
 class GitLabPushMessageHandlerTest extends BaseUnitTest {
+
+    private final GitLabProjectAdmission projectAdmission = mock(GitLabProjectAdmission.class);
 
     private static final Long PROVIDER_ID = 2L;
     private static final String DEFAULT_SERVER_URL = "https://gitlab.lrz.de";
@@ -139,7 +144,8 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
                 commitMergeRequestLinker,
                 mock(GitLabRouteAdmission.class),
                 deserializer,
-                new PassThroughTransactionTemplate());
+                new PassThroughTransactionTemplate(),
+                projectAdmission);
     }
 
     @Test
@@ -171,6 +177,7 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
 
         Repository repo = new Repository();
         repo.setId(246765L);
+        permitPush(projectInfo, repo);
         when(projectProcessor.processPushEvent(projectInfo, gitLabProvider)).thenReturn(repo);
         when(repositoryRepository.findByIdWithOrganization(repo.getId())).thenReturn(Optional.of(repo));
 
@@ -236,6 +243,7 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
         var pushEvent =
                 new GitLabPushEventDTO("push", "refs/heads/main", "before", "after", "after", 1L, projectInfo, 1, null);
 
+        permitPushDiscovery(projectInfo);
         when(projectProcessor.processPushEvent(projectInfo, gitLabProvider)).thenReturn(null);
 
         Message msg = mockMessage("gitlab.org.proj.push", pushEvent);
@@ -252,6 +260,7 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
         Repository repo = new Repository();
         repo.setId(42L);
         repo.setNameWithOwner("org/proj");
+        var originalRead = permitPush(projectInfo, repo);
         when(projectProcessor.processPushEvent(projectInfo, gitLabProvider)).thenReturn(repo);
         when(repositoryRepository.findByIdWithOrganization(repo.getId())).thenReturn(Optional.of(repo));
         when(scopeIdResolver.findScopeIdByRepositoryName("org/proj")).thenReturn(Optional.of(7L));
@@ -271,7 +280,7 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
         handler.onMessage(msg);
 
         // ONE batched GraphQL call, not one per commit.
-        verify(commitMergeRequestLinker, times(1)).linkCommits(eq(7L), eq(repo), any());
+        verify(commitMergeRequestLinker, times(1)).linkCommits(eq(7L), eq(repo), any(), eq(originalRead));
     }
 
     @Test
@@ -382,6 +391,7 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
             repo.setOrganization(existingOrg); // already linked
 
             var projectInfo = createProjectInfo(1L, "org/proj");
+            permitPush(projectInfo, repo);
             when(projectProcessor.processPushEvent(projectInfo, gitLabProvider)).thenReturn(repo);
             when(repositoryRepository.findByIdWithOrganization(repo.getId())).thenReturn(Optional.of(repo));
 
@@ -398,6 +408,7 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
             repo.setId(1L);
 
             var projectInfo = createProjectInfo(1L, "org/proj");
+            permitPush(projectInfo, repo);
             when(projectProcessor.processPushEvent(projectInfo, gitLabProvider)).thenReturn(repo);
             when(repositoryRepository.findByIdWithOrganization(repo.getId())).thenReturn(Optional.of(repo));
 
@@ -419,6 +430,7 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
             repo.setId(1L);
 
             var projectInfo = createProjectInfo(1L, "org/proj");
+            permitPush(projectInfo, repo);
             when(projectProcessor.processPushEvent(projectInfo, gitLabProvider)).thenReturn(repo);
             when(repositoryRepository.findByIdWithOrganization(repo.getId())).thenReturn(Optional.of(repo));
             when(organizationRepository.findByLoginIgnoreCaseAndProviderId("org", PROVIDER_ID))
@@ -439,6 +451,7 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
 
             // Project in nested group: org/team/subteam/project
             var projectInfo = createProjectInfo(1L, "org/team/subteam/project");
+            permitPush(projectInfo, repo);
             when(projectProcessor.processPushEvent(projectInfo, gitLabProvider)).thenReturn(repo);
             when(repositoryRepository.findByIdWithOrganization(repo.getId())).thenReturn(Optional.of(repo));
 
@@ -461,6 +474,7 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
 
             // User-owned project has no slash in path
             var projectInfo = createProjectInfo(1L, "myproject");
+            permitPush(projectInfo, repo);
             when(projectProcessor.processPushEvent(projectInfo, gitLabProvider)).thenReturn(repo);
             when(repositoryRepository.findByIdWithOrganization(repo.getId())).thenReturn(Optional.of(repo));
 
@@ -527,10 +541,28 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
                 "push", "refs/heads/main", "before", "after", "after", projectInfo.id(), projectInfo, 1, null);
     }
 
+    private void permitPushDiscovery(GitLabPushEventDTO.ProjectInfo projectInfo) {
+        String path = Objects.requireNonNull(projectInfo.pathWithNamespace());
+        long nativeId = Objects.requireNonNull(projectInfo.id());
+        lenient().when(scopeIdResolver.findScopeIdByRepositoryName(path)).thenReturn(Optional.of(7L));
+        var connection =
+                GitLabAdmissionTestFixtures.connection(projectAdmission, 7L, PROVIDER_ID, path.split("/", -1)[0]);
+        GitLabAdmissionTestFixtures.discovery(projectAdmission, connection, nativeId, path, DEFAULT_SERVER_URL);
+    }
+
+    private GitLabProjectAdmission.ProjectRead permitPush(
+            GitLabPushEventDTO.ProjectInfo projectInfo, Repository repository) {
+        permitPushDiscovery(projectInfo);
+        repository.setNameWithOwner(Objects.requireNonNull(projectInfo.pathWithNamespace()));
+        repository.setNativeId(Objects.requireNonNull(projectInfo.id()));
+        return GitLabAdmissionTestFixtures.permit(projectAdmission, 7L, repository, 7L);
+    }
+
     /** A repository in an active scope with local git enabled: the handler walks default-branch pushes. */
     private Repository activeLocalGitRepository(GitLabPushEventDTO.ProjectInfo projectInfo) {
         Repository repo = TestEntities.repository(42L, "org/proj", "main");
         repo.setProvider(gitLabProvider);
+        permitPush(projectInfo, repo);
         when(projectProcessor.processPushEvent(projectInfo, gitLabProvider)).thenReturn(repo);
         when(repositoryRepository.findByIdWithOrganization(42L)).thenReturn(Optional.of(repo));
         when(scopeIdResolver.findScopeIdByRepositoryName("org/proj")).thenReturn(Optional.of(7L));

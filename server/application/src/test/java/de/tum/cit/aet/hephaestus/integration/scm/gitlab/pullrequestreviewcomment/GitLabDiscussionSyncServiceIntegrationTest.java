@@ -8,6 +8,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
@@ -33,7 +34,11 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment.dto.GitLabN
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreview.GitLabReviewReconciler;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewthread.GitLabPullRequestReviewThreadProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.user.GitLabUserService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
+import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -57,6 +62,9 @@ import reactor.core.publisher.Mono;
 
 class GitLabDiscussionSyncServiceIntegrationTest extends BaseIntegrationTest {
     @Autowired
+    private GitLabProjectAdmission projectAdmission;
+
+    @Autowired
     private JdbcTemplate jdbc;
 
     @Autowired
@@ -64,6 +72,15 @@ class GitLabDiscussionSyncServiceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private IdentityProviderRepository providers;
+
+    @Autowired
+    private WorkspaceRepository workspaces;
+
+    @Autowired
+    private ConnectionRepository connections;
+
+    @Autowired
+    private RepositoryToMonitorRepository monitors;
 
     @Autowired
     private PullRequestRepository pullRequests;
@@ -83,18 +100,27 @@ class GitLabDiscussionSyncServiceIntegrationTest extends BaseIntegrationTest {
     private long providerId;
     private long repositoryId;
     private long authorId;
-    private final long workspaceId = 1;
+    private long workspaceId;
     private final Instant at = Instant.parse("2025-01-03T10:11:12.123456Z");
 
     private void fixture(IdentityProviderType type) {
         String unique = UUID.randomUUID().toString();
-        providerId = Objects.requireNonNull(providers
-                .saveAndFlush(new IdentityProvider(type, "https://" + unique + ".example.com"))
-                .getId());
+        String serverUrl = "https://" + unique + ".example.com";
+        providerId = Objects.requireNonNull(
+                providers.saveAndFlush(new IdentityProvider(type, serverUrl)).getId());
         repositoryId = Objects.requireNonNull(jdbc.queryForObject("""
             INSERT INTO repository(native_id,provider_id,name,name_with_owner,has_discussions_enabled,is_private,is_archived,is_disabled,html_url,pushed_at,visibility)
             VALUES (1,?,'repo',?,false,false,false,false,'https://example.com/repo',now(),'PUBLIC') RETURNING id
             """, Long.class, providerId, "repair/" + unique));
+        var workspace = WorkspaceTestFixtures.persistGitLabWorkspace(
+                workspaces,
+                connections,
+                WorkspaceTestFixtures.gitLabPatWorkspace("repair").withSlug("discussion-" + unique),
+                serverUrl);
+        workspaceId = Objects.requireNonNull(workspace.getId());
+        var monitor = WorkspaceTestFixtures.repositoryMonitor(workspace, "repair/" + unique);
+        monitor.setNativeId(1L);
+        monitors.saveAndFlush(monitor);
         authorId = author(2, "author");
     }
 
@@ -258,7 +284,8 @@ class GitLabDiscussionSyncServiceIntegrationTest extends BaseIntegrationTest {
                 new GitLabPullRequestReviewCommentProcessor(reviewComments, pullRequests, reviews, ignoredEvents),
                 userLookup,
                 new GitLabReviewReconciler(reviews, pullRequests, ignoredEvents),
-                properties);
+                properties,
+                projectAdmission);
         new TransactionTemplate(transactions).executeWithoutResult(status -> {
             var pr = pullRequests.findById(prId).orElseThrow();
             when(userLookup.findOrCreateUser(any(GitLabUserLookup.class), eq(providerId)))

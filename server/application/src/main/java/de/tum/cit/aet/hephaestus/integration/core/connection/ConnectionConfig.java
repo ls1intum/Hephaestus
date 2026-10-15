@@ -4,7 +4,11 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -47,10 +51,44 @@ public sealed interface ConnectionConfig
             @Nullable Long gitlabWebhookId,
             SigningMode signingMode,
             Set<String> enabledStreams,
-            @Nullable GitLabTokenMetadata tokenMetadata)
+            @Nullable GitLabTokenMetadata tokenMetadata,
+            GitLabProjectExclusions projectExclusions)
             implements ConnectionConfig {
+        public GitLabConfig {
+            projectExclusions = Objects.requireNonNullElseGet(projectExclusions, GitLabProjectExclusions::empty);
+        }
+
+        public GitLabConfig(
+                @Nullable String serverUrl,
+                @Nullable Long gitlabGroupId,
+                @Nullable Long gitlabWebhookId,
+                SigningMode signingMode,
+                Set<String> enabledStreams,
+                @Nullable GitLabTokenMetadata tokenMetadata) {
+            this(
+                    serverUrl,
+                    gitlabGroupId,
+                    gitlabWebhookId,
+                    signingMode,
+                    enabledStreams,
+                    tokenMetadata,
+                    GitLabProjectExclusions.empty());
+        }
+
         public GitLabConfig withTokenMetadata(@Nullable GitLabTokenMetadata metadata) {
-            return new GitLabConfig(serverUrl, gitlabGroupId, gitlabWebhookId, signingMode, enabledStreams, metadata);
+            return new GitLabConfig(
+                    serverUrl,
+                    gitlabGroupId,
+                    gitlabWebhookId,
+                    signingMode,
+                    enabledStreams,
+                    metadata,
+                    projectExclusions);
+        }
+
+        public GitLabConfig withProjectExclusions(GitLabProjectExclusions exclusions) {
+            return new GitLabConfig(
+                    serverUrl, gitlabGroupId, gitlabWebhookId, signingMode, enabledStreams, tokenMetadata, exclusions);
         }
 
         public enum SigningMode {
@@ -64,7 +102,8 @@ public sealed interface ConnectionConfig
          * persist the swap atomically.
          */
         public GitLabConfig withGitlabWebhookId(@Nullable Long webhookId) {
-            return new GitLabConfig(serverUrl, gitlabGroupId, webhookId, signingMode, enabledStreams, tokenMetadata);
+            return new GitLabConfig(
+                    serverUrl, gitlabGroupId, webhookId, signingMode, enabledStreams, tokenMetadata, projectExclusions);
         }
 
         /**
@@ -72,7 +111,56 @@ public sealed interface ConnectionConfig
          * lookup resolves the numeric id on a workspace that only carried the group path.
          */
         public GitLabConfig withGitlabGroupId(@Nullable Long groupId) {
-            return new GitLabConfig(serverUrl, groupId, gitlabWebhookId, signingMode, enabledStreams, tokenMetadata);
+            return new GitLabConfig(
+                    serverUrl, groupId, gitlabWebhookId, signingMode, enabledStreams, tokenMetadata, projectExclusions);
+        }
+    }
+
+    /**
+     * Explicit stops survive mirror deletion. Known projects are identified only by native ID;
+     * a legacy monitor without a known source ID stops its path until a canonical read binds the ID.
+     */
+    record GitLabProjectExclusions(Set<Long> nativeIds, Set<String> unresolvedPaths) {
+        public GitLabProjectExclusions {
+            nativeIds = Set.copyOf(Objects.requireNonNullElse(nativeIds, Set.of()));
+            unresolvedPaths = Objects.requireNonNullElse(unresolvedPaths, Set.<String>of()).stream()
+                    .map(GitLabProjectExclusions::normalizePath)
+                    .collect(Collectors.toUnmodifiableSet());
+            if (nativeIds.stream().anyMatch(id -> id <= 0) || unresolvedPaths.contains("")) {
+                throw new IllegalArgumentException("Project exclusions require positive IDs or nonblank paths");
+            }
+        }
+
+        public static GitLabProjectExclusions empty() {
+            return new GitLabProjectExclusions(Set.of(), Set.of());
+        }
+
+        public boolean excludes(@Nullable Long nativeId, String path) {
+            return (nativeId != null && nativeIds.contains(nativeId)) || unresolvedPaths.contains(normalizePath(path));
+        }
+
+        public GitLabProjectExclusions exclude(@Nullable Long nativeId, String path) {
+            Set<Long> ids = new HashSet<>(nativeIds);
+            Set<String> paths = new HashSet<>(unresolvedPaths);
+            if (nativeId == null) paths.add(normalizePath(path));
+            else ids.add(nativeId);
+            return new GitLabProjectExclusions(ids, paths);
+        }
+
+        public GitLabProjectExclusions include(@Nullable Long nativeId, String path) {
+            Set<Long> ids = new HashSet<>(nativeIds);
+            Set<String> paths = new HashSet<>(unresolvedPaths);
+            if (nativeId != null) ids.remove(nativeId);
+            paths.remove(normalizePath(path));
+            return new GitLabProjectExclusions(ids, paths);
+        }
+
+        public GitLabProjectExclusions resolvePath(long nativeId, String path) {
+            return excludes(null, path) ? include(null, path).exclude(nativeId, path) : this;
+        }
+
+        private static String normalizePath(String path) {
+            return path.trim().toLowerCase(Locale.ROOT);
         }
     }
 

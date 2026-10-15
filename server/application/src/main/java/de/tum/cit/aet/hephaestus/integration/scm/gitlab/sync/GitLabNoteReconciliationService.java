@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClie
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabWorkspaceLinkService;
 import java.util.HashSet;
 import java.util.List;
@@ -48,6 +49,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true")
 public class GitLabNoteReconciliationService {
     private final GitLabWorkspaceLinkService workspaceLinks;
+    private final GitLabProjectAdmission admission;
     private final IssueRepository issues;
     private final IssueCommentRepository comments;
     private final PullRequestReviewCommentRepository diffComments;
@@ -68,7 +70,9 @@ public class GitLabNoteReconciliationService {
             TransactionTemplate transactions,
             WebClient.Builder builder,
             GitLabWorkspaceLinkService workspaceLinks,
-            ApplicationEventPublisher events) {
+            ApplicationEventPublisher events,
+            GitLabProjectAdmission admission) {
+        this.admission = admission;
         this.workspaceLinks = workspaceLinks;
         this.events = events;
         this.issues = issues;
@@ -87,6 +91,18 @@ public class GitLabNoteReconciliationService {
     record Note(long id) {}
 
     public Outcome reconcileRepository(long workspaceId, Repository repository, @Nullable SyncExecutionHandle handle) {
+        return admission
+                .capture(workspaceId, repository)
+                .map(read -> reconcileRepository(workspaceId, repository, handle, read))
+                .orElseGet(() -> new Outcome(0, false));
+    }
+
+    public Outcome reconcileRepository(
+            long workspaceId,
+            Repository repository,
+            @Nullable SyncExecutionHandle handle,
+            GitLabProjectAdmission.ProjectRead read) {
+        if (!admission.current(read)) return new Outcome(0, false);
         if (!workspaceLinks.mayWriteRepository(workspaceId, repository)) return new Outcome(0, true);
         int removed = 0;
         boolean skipped = false;
@@ -98,7 +114,7 @@ public class GitLabNoteReconciliationService {
             if (parents.isEmpty()) break;
             for (Issue parent : parents) {
                 if (cancelled(handle)) return new Outcome(removed, true);
-                Outcome outcome = reconcileParent(workspaceId, repository, parent, handle);
+                Outcome outcome = reconcileParent(workspaceId, repository, parent, handle, read);
                 removed += outcome.removed();
                 skipped |= outcome.skipped();
                 after = parent.getId();
@@ -109,6 +125,18 @@ public class GitLabNoteReconciliationService {
 
     public Outcome reconcileParent(
             long workspaceId, Repository repository, Issue parent, @Nullable SyncExecutionHandle handle) {
+        return admission
+                .capture(workspaceId, repository)
+                .map(read -> reconcileParent(workspaceId, repository, parent, handle, read))
+                .orElseGet(() -> new Outcome(0, false));
+    }
+
+    public Outcome reconcileParent(
+            long workspaceId,
+            Repository repository,
+            Issue parent,
+            @Nullable SyncExecutionHandle handle,
+            GitLabProjectAdmission.ProjectRead read) {
         if (parent.getRepository() == null
                 || !parent.getRepository().getId().equals(repository.getId())
                 || !workspaceLinks.mayWriteRepository(workspaceId, repository)) return new Outcome(0, true);
@@ -128,6 +156,7 @@ public class GitLabNoteReconciliationService {
                     parent.getNumber(),
                     parent instanceof PullRequest,
                     handle);
+            if (!admission.current(read)) return new Outcome(0, false);
             if (upstream == null || cancelled(handle)) return new Outcome(0, true);
             List<Long> staleComments = localComments.stream()
                     .filter(c -> !upstream.contains(c.getNativeId()))
@@ -154,9 +183,11 @@ public class GitLabNoteReconciliationService {
                     parent.getNumber(),
                     parent instanceof PullRequest,
                     missingNativeIds,
-                    handle)) return new Outcome(0, true);
+                    handle)) return new Outcome(0, admission.current(read));
             Integer removed = transactions.execute(status -> {
-                if (cancelled(handle) || !workspaceLinks.mayWriteRepository(workspaceId, repository)) return 0;
+                if (cancelled(handle)
+                        || !admission.hold(read)
+                        || !workspaceLinks.mayWriteRepository(workspaceId, repository)) return 0;
                 int count = 0;
                 if (!staleComments.isEmpty()) count += comments.deleteReconciled(parent.getId(), staleComments);
                 if (!staleDiff.isEmpty()) {
@@ -187,6 +218,7 @@ public class GitLabNoteReconciliationService {
             });
             return new Outcome(Objects.requireNonNull(removed), false);
         } catch (RuntimeException e) {
+            if (!admission.current(read)) return new Outcome(0, false);
             log.warn("GitLab note reconciliation incomplete: workspaceId={}, parentId={}", workspaceId, parent.getId());
             return new Outcome(0, true);
         }

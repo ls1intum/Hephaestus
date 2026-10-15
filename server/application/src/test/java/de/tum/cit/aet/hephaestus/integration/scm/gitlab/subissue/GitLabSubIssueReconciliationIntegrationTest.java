@@ -7,6 +7,7 @@ import static org.assertj.core.api.SoftAssertions.assertSoftly;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
@@ -18,7 +19,11 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlResponseHandler;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
+import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.time.Instant;
@@ -52,6 +57,19 @@ import reactor.core.publisher.Mono;
 /** Exercises the real hierarchy walk and committed parent links through native GraphQL JSON decoding. */
 @Tag("integration")
 class GitLabSubIssueReconciliationIntegrationTest extends BaseIntegrationTest {
+    @Autowired
+    private GitLabProjectAdmission projectAdmission;
+
+    @Autowired
+    private WorkspaceRepository workspaces;
+
+    @Autowired
+    private ConnectionRepository connections;
+
+    @Autowired
+    private RepositoryToMonitorRepository monitors;
+
+    private long scopeId;
 
     private static final String PROJECT = "team/hierarchy";
 
@@ -88,7 +106,16 @@ class GitLabSubIssueReconciliationIntegrationTest extends BaseIntegrationTest {
     void setUp() {
         var provider = providers.save(new IdentityProvider(
                 IdentityProviderType.GITLAB, "https://" + UUID.randomUUID() + ".gitlab.example.test"));
+        var workspace = WorkspaceTestFixtures.persistGitLabWorkspace(
+                workspaces,
+                connections,
+                WorkspaceTestFixtures.gitLabPatWorkspace("team").withSlug("hierarchy-" + UUID.randomUUID()),
+                provider.getServerUrl());
+        scopeId = workspace.getId();
         repository = repository(provider, 1, PROJECT);
+        var monitor = WorkspaceTestFixtures.repositoryMonitor(workspace, PROJECT);
+        monitor.setNativeId(repository.getNativeId());
+        monitors.saveAndFlush(monitor);
         parent = issue(repository, 1, 1, null);
         existingChild = issue(repository, 2, 2, parent);
         newChild = issue(repository, 3, 3, null);
@@ -105,8 +132,8 @@ class GitLabSubIssueReconciliationIntegrationTest extends BaseIntegrationTest {
         assertUnrelatedLink();
 
         var clients = mock(GitLabGraphQlClientProvider.class);
-        when(clients.forScope(1L)).thenReturn(gitLabClient());
-        service = new GitLabSubIssueSyncService(issues, repositories, clients, responseHandler);
+        when(clients.forScope(scopeId)).thenReturn(gitLabClient());
+        service = new GitLabSubIssueSyncService(issues, repositories, clients, responseHandler, projectAdmission);
     }
 
     @Test
@@ -432,7 +459,7 @@ class GitLabSubIssueReconciliationIntegrationTest extends BaseIntegrationTest {
         var currentEntityManager = Objects.requireNonNull(entityManager);
         var result = transactions.execute(status -> {
             var storedRepository = repositories.findById(repository.getId()).orElseThrow();
-            var synced = service.syncSubIssuesForRepository(1L, storedRepository);
+            var synced = service.syncSubIssuesForRepository(scopeId, storedRepository);
             currentEntityManager.flush();
             currentEntityManager.clear();
             return synced;

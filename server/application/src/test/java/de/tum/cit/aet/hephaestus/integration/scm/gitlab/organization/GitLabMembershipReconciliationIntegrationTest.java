@@ -39,6 +39,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository.collaborator.
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.team.GitLabTeamProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.team.GitLabTeamSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.user.GitLabUserService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabRouteAdmission;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabWorkspaceLinkService;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewCoverageService;
@@ -94,6 +95,8 @@ import reactor.core.publisher.Mono;
  * rows, the workspace roster, review eligibility and review coverage behind them are real.
  */
 class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest {
+    @Autowired
+    private GitLabProjectAdmission projectAdmission;
 
     private static final String GITLAB_URL = "https://gitlab.lrz.de";
     private static final String COURSE = "course/intro";
@@ -248,7 +251,8 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
                 gitLabUserService,
                 gitLabProperties,
                 transactionTemplate,
-                workspaceLinkService);
+                workspaceLinkService,
+                projectAdmission);
     }
 
     @Test

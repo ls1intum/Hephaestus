@@ -20,6 +20,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.RepositoryKey;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabAdmissionTestFixtures;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import java.util.List;
@@ -28,6 +30,9 @@ import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 
 class GitLabCommitBackfillServiceTest extends BaseUnitTest {
+
+    private final GitLabProjectAdmission projectAdmission = mock(GitLabProjectAdmission.class);
+
     @Test
     void shouldSkipGitFetchWhenWorkspaceMonitorIsUnavailable() {
         var git = mock(GitRepositoryManager.class);
@@ -39,6 +44,8 @@ class GitLabCommitBackfillServiceTest extends BaseUnitTest {
                 .build();
         when(targets.getSyncTargetsForScope(100L)).thenReturn(List.of(target));
         when(targets.isRepositoryUnavailable(100L, 7L)).thenReturn(true);
+        var repository = TestEntities.repository(1L, "owner/repo", "main");
+        GitLabAdmissionTestFixtures.permit(projectAdmission, 100L, repository, 7L);
         var service = new GitLabCommitBackfillService(
                 git,
                 mock(GitLabTokenService.class),
@@ -46,9 +53,9 @@ class GitLabCommitBackfillServiceTest extends BaseUnitTest {
                 mock(CommitDetailsPersister.class),
                 mock(CommitContributorRepository.class),
                 mock(CommitAuthorResolver.class),
-                targets);
-        assertThat(service.backfillCommits(100L, TestEntities.repository(1L, "owner/repo", "main")))
-                .isEqualTo(SyncResult.abortedError(0));
+                targets,
+                projectAdmission);
+        assertThat(service.backfillCommits(100L, repository)).isEqualTo(SyncResult.abortedError(0));
         verify(git, never()).ensureRepository(any(), any(), any());
     }
 
@@ -59,6 +66,7 @@ class GitLabCommitBackfillServiceTest extends BaseUnitTest {
         CommitRepository commits = mock(CommitRepository.class);
         var repository = TestEntities.repository(1L, "owner/repo", "main");
         repository.setProvider(TestEntities.gitProvider(1L, IdentityProviderType.GITLAB));
+        GitLabAdmissionTestFixtures.permit(projectAdmission, 100L, repository, 7L);
         var service = new GitLabCommitBackfillService(
                 git,
                 tokens,
@@ -66,7 +74,8 @@ class GitLabCommitBackfillServiceTest extends BaseUnitTest {
                 mock(CommitDetailsPersister.class),
                 mock(CommitContributorRepository.class),
                 mock(CommitAuthorResolver.class),
-                mock(SyncTargetProvider.class));
+                mock(SyncTargetProvider.class),
+                projectAdmission);
         when(git.isEnabled()).thenReturn(true);
         when(git.resolveBranchHead(new RepositoryKey(100L, 1L), "main")).thenReturn("unchanged-head");
         when(tokens.resolveServerUrl(100L)).thenReturn("https://gitlab.example.com");
@@ -91,6 +100,7 @@ class GitLabCommitBackfillServiceTest extends BaseUnitTest {
         GitLabTokenService tokens = mock(GitLabTokenService.class);
         var repository = TestEntities.repository(1L, "owner/repo", "main");
         repository.setProvider(TestEntities.gitProvider(1L, IdentityProviderType.GITLAB));
+        GitLabAdmissionTestFixtures.permit(projectAdmission, 100L, repository, 7L);
         var service = new GitLabCommitBackfillService(
                 git,
                 tokens,
@@ -98,7 +108,8 @@ class GitLabCommitBackfillServiceTest extends BaseUnitTest {
                 mock(CommitDetailsPersister.class),
                 mock(CommitContributorRepository.class),
                 mock(CommitAuthorResolver.class),
-                mock(SyncTargetProvider.class));
+                mock(SyncTargetProvider.class),
+                projectAdmission);
         when(git.isEnabled()).thenReturn(true);
         when(git.resolveBranchHead(new RepositoryKey(100L, 1L), "main")).thenReturn("head");
         when(tokens.resolveServerUrl(100L)).thenReturn("https://gitlab.example.com");

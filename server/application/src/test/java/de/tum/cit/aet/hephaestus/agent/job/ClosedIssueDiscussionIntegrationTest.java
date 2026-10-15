@@ -46,6 +46,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlResp
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment.GitLabIssueCommentProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment.GitLabNoteSyncService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
@@ -110,6 +111,8 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Import(DeferredIssueEventIntegrationTest.Configuration.class)
 class ClosedIssueDiscussionIntegrationTest extends BaseIntegrationTest {
+    @Autowired
+    private GitLabProjectAdmission projectAdmission;
 
     private static final String OWN_FEEDBACK = "<!-- hephaestus:practice-review:00000000 -->\nRecord the export.";
 
@@ -205,7 +208,9 @@ class ClosedIssueDiscussionIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
-        workspace = workspaces.save(WorkspaceTestFixtures.activeWorkspace("closed-discussion"));
+        workspace = WorkspaceTestFixtures.activeWorkspace("closed-discussion");
+        workspace.setAccountLogin("org");
+        workspace = workspaces.save(workspace);
         provider = providers
                 .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
                 .orElseGet(
@@ -584,6 +589,29 @@ class ClosedIssueDiscussionIntegrationTest extends BaseIntegrationTest {
         issue.setProvider(gitlab);
         issues.save(issue);
         issue = issues.findByIdWithRepository(issueId).orElseThrow();
+        RepositoryToMonitor monitor = WorkspaceTestFixtures.repositoryMonitor(workspace, repository.getNameWithOwner());
+        monitor.setNativeId(repository.getNativeId());
+        monitors.saveAndFlush(monitor);
+        Connection connection = connections.saveAndFlush(new Connection(
+                workspace,
+                IntegrationKind.GITLAB,
+                gitlab.getServerUrl(),
+                new ConnectionConfig.GitLabConfig(
+                        gitlab.getServerUrl(),
+                        null,
+                        null,
+                        ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                        Set.of(),
+                        null)));
+        connectionService.transition(
+                connection,
+                new ConnectionService.TransitionRequest(
+                        IntegrationState.ACTIVE,
+                        "TEST_CONNECTED",
+                        "SYSTEM",
+                        "discussion-test",
+                        UUID.randomUUID().toString(),
+                        "Source connected"));
         String response = """
                 {"data":{"project":{"issue":{"notes":{"count":2,"nodes":[
                   {"id":"gid://gitlab/Note/705","body":"CSV export completed.",
@@ -607,8 +635,8 @@ class ClosedIssueDiscussionIntegrationTest extends BaseIntegrationTest {
                 .build();
         GitLabGraphQlClientProvider clients = mock(GitLabGraphQlClientProvider.class);
         when(clients.forScope(workspace.getId())).thenReturn(transport);
-        GitLabNoteSyncService service =
-                new GitLabNoteSyncService(clients, gitlabResponses, gitlabComments, gitlabProperties, transactions);
+        GitLabNoteSyncService service = new GitLabNoteSyncService(
+                clients, gitlabResponses, gitlabComments, gitlabProperties, transactions, projectAdmission);
         int before = updates().size();
 
         assertThat(service.syncNotesForIssue(workspace.getId(), repository, 7, issue))

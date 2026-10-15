@@ -87,6 +87,7 @@ public class GitLabIntegrationSyncRunner implements IntegrationSyncRunner {
     @Override
     public void backfill(IntegrationRef ref, SyncExecutionHandle handle) {
         long workspaceId = ref.workspaceId();
+        var originalPending = backfillService.pendingTargetIds(workspaceId);
         backfillService.repairCompletedRepositories(workspaceId, handle);
         int totalProcessed = 0;
 
@@ -97,7 +98,7 @@ public class GitLabIntegrationSyncRunner implements IntegrationSyncRunner {
                 // Nothing advanced this pass: backfill is complete, or every pending repository is gated
                 // (cooldown / rate limit). Indistinguishable from here — and either way another pass could
                 // only repeat the skip, so stop rather than spin.
-                if (totalProcessed == 0) {
+                if (totalProcessed == 0 && backfillService.hasPendingTargets(workspaceId, originalPending)) {
                     // The whole job moved nothing. Surface it as a warning rather than a clean success —
                     // matching GitHubIntegrationSyncRunner.
                     handle.reportWarnings();

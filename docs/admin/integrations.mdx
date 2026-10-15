@@ -11,7 +11,7 @@ in [Integrations and reference deployment](./production-setup). Account linking 
 ## GitHub
 
 [GitHub integration](./github-integration) owns app setup and permissions.
-Removal of a monitored repository erases its mirror, not the upstream repository.
+See [Repositories](/user/workspace#repositories) for repository monitoring and removal.
 
 1. Install the GitHub App for the organization or use a personal access token connection.
 2. For an App connection, manage repository access in the GitHub installation.
@@ -32,6 +32,9 @@ Do not replace that token with `WEBHOOK_SECRET`.
 The connection shows token expiry. Hephaestus checks the token each day and rotates it before expiry
 when GitLab permits it. If it cannot rotate the token, use **Personal access token → Replace token**.
 This keeps repositories and stored work. Optional connection-alert emails report problems and recovery.
+
+Token checks, rotation, and replacement keep explicit project stops.
+Use **Add a repository** to resume a stopped project.
 
 GitLab reconciliation removes deleted issue and merge-request notes, including diff notes.
 Removal requires a complete listing and a direct check that each missing note is gone.

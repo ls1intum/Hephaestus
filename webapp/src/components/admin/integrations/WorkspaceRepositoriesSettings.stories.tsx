@@ -15,6 +15,7 @@ const meta = {
 			{ nameWithOwner: "microsoft/vscode" },
 			{ nameWithOwner: "facebook/react" },
 		],
+		provider: "GITHUB",
 		providerLabel: "GitHub",
 		isLoading: false,
 		error: null,
@@ -74,10 +75,47 @@ export const RemoveConfirm: Story = {
 
 		const dialog = await screen.findByRole("alertdialog");
 		within(dialog).getByText(/stop monitoring octocat\/Hello-World/iu);
-		within(dialog).getByText(/permanently erases everything it has mirrored/iu);
-		within(dialog).getByText(/repository on GitHub is not affected/iu);
-		within(dialog).getByText(/monitoring it again later/iu);
+		const description = within(dialog).getByText(/repository on GitHub is not affected/iu);
+		await expect(description).toHaveTextContent(
+			/if no other workspace on this instance still monitors it, Hephaestus also erases/iu,
+		);
+		await expect(description).toHaveTextContent(/practice reviews and feedback can remain/iu);
+		await expect(description).toHaveTextContent(/to sync it again, add it below/iu);
+		await expect(description).not.toHaveTextContent(/permanently|stays stopped/iu);
 		await expect(within(dialog).getByRole("button", { name: /stop monitoring/iu })).toBeEnabled();
+	},
+};
+
+export const RemoveConfirmGitLab: Story = {
+	args: {
+		repositories: [{ nameWithOwner: "acme/platform/api" }],
+		provider: "GITLAB",
+		providerLabel: "GitLab",
+	},
+	play: async ({ canvas }) => {
+		await userEvent.click(
+			canvas.getByRole("button", { name: "Stop monitoring acme/platform/api" }),
+		);
+
+		const dialog = await screen.findByRole("alertdialog");
+		const description = within(dialog).getByText(/repository on GitLab is not affected/iu);
+		await expect(description).toHaveTextContent(/stays stopped until you add it again below/iu);
+		await expect(description).toHaveTextContent(/if no other workspace/iu);
+	},
+};
+
+export const RemoveConfirmUnknownProvider: Story = {
+	args: { provider: undefined, providerLabel: undefined },
+	play: async ({ canvas }) => {
+		await userEvent.click(
+			canvas.getByRole("button", { name: "Stop monitoring octocat/Hello-World" }),
+		);
+
+		const dialog = await screen.findByRole("alertdialog");
+		const description = within(dialog).getByText(
+			/repository on GitHub or GitLab is not affected/iu,
+		);
+		await expect(description).not.toHaveTextContent(/permanently|stays stopped/iu);
 	},
 };
 

@@ -154,6 +154,7 @@ export function useScmIntegration(workspaceSlug: string) {
 		} satisfies ComponentProps<typeof WorkspaceScmTokenSettings>,
 		repositoriesSettingsProps: {
 			repositories: (repositories ?? []).map((repo) => ({ nameWithOwner: repo })),
+			provider: kind,
 			providerLabel: label,
 			isLoading: isLoadingRepositories,
 			error: repositoriesError,

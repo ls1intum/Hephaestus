@@ -34,6 +34,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository.dto.GitLabPushEventDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository.dto.GitLabPushEventDTO.CommitInfo;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabRouteAdmission;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -91,6 +92,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
     private final GitLabRouteAdmission routeAdmission;
 
     private final TransactionTemplate transactions;
+    private final GitLabProjectAdmission admission;
 
     GitLabPushMessageHandler(
             GitLabProjectProcessor projectProcessor,
@@ -109,7 +111,8 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
             GitLabCommitMergeRequestLinker commitMergeRequestLinker,
             GitLabRouteAdmission routeAdmission,
             NatsMessageDeserializer deserializer,
-            TransactionTemplate transactionTemplate) {
+            TransactionTemplate transactionTemplate,
+            GitLabProjectAdmission admission) {
         super(
                 IntegrationKind.GITLAB,
                 GitLabEventType.PUSH.getValue(),
@@ -132,6 +135,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
         this.commitMergeRequestLinker = commitMergeRequestLinker;
         this.routeAdmission = routeAdmission;
         this.transactions = transactionTemplate;
+        this.admission = admission;
     }
 
     @Override
@@ -171,7 +175,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
             return;
         }
 
-        var repository = transactions.execute(status -> {
+        var preparedPush = transactions.execute(status -> {
             // On a connection route admission already stored the project as GitLab reports it; the payload's copy of
             // its metadata is not written over that.
             if (route.isPresent()) {
@@ -180,24 +184,47 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
                                 projectPath, route.get().providerId())
                         .filter(admitted -> routeAdmission.admitRepository(route.get(), admitted))
                         .flatMap(admitted -> repositoryRepository.findByIdWithOrganization(admitted.getId()))
+                        .flatMap(admitted -> admission
+                                .capture(route.get().workspaceId(), admitted)
+                                .map(read -> new PreparedPush(admitted, read)))
                         .orElse(null);
             }
             IdentityProvider provider = gitProviderRepository
                     .findByTypeAndServerUrl(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
                     .orElseThrow(() -> new IllegalStateException("GitLab identity provider is unavailable"));
-            var prepared = projectProcessor.processPushEvent(event.project(), provider);
-            if (prepared == null) return null;
-            ensureOrganizationLinked(prepared, projectPath, provider);
-            return repositoryRepository
-                    .findByIdWithOrganization(prepared.getId())
-                    .orElseThrow();
+            // A legacy shared hook has no signed workspace claim. Only an existing positive monitor can
+            // authorize its project; an organization row shared with another workspace is not that authority.
+            Long scopeId =
+                    scopeIdResolver.findScopeIdByRepositoryName(projectPath).orElse(null);
+            Long nativeId = Objects.requireNonNull(event.project()).id();
+            if (scopeId == null || nativeId == null) return null;
+            var connection = admission
+                    .captureConnection(scopeId, Objects.requireNonNull(provider.getId()))
+                    .orElse(null);
+            if (connection == null) return null;
+            return admission
+                    .discover(connection, nativeId, projectPath, provider.getServerUrl(), () -> {
+                        var prepared = projectProcessor.processPushEvent(event.project(), provider);
+                        if (prepared == null) return null;
+                        ensureOrganizationLinked(prepared, projectPath, provider);
+                        Repository repository = repositoryRepository
+                                .findByIdWithOrganization(prepared.getId())
+                                .orElseThrow();
+                        return admission
+                                .capture(scopeId, repository)
+                                .map(read -> new PreparedPush(repository, read))
+                                .orElse(null);
+                    })
+                    .orElse(null);
         });
 
-        if (repository != null) {
+        if (preparedPush != null) {
+            Repository repository = preparedPush.repository();
+            GitLabProjectAdmission.ProjectRead read = preparedPush.read();
             log.debug(
                     "Upserted project from push event: projectPath={}, repoId={}", safeProjectPath, repository.getId());
 
-            Long scopeId = resolveScopeId(repository);
+            Long scopeId = read.connection().workspaceId();
 
             // Only a default-branch push is walked for line-level statistics; every other push still
             // fetches so practice reviews see fresh refs.
@@ -205,39 +232,43 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
                 boolean scopeActive = scopeId != null && syncTargetProvider.isScopeActiveForSync(scopeId);
 
                 if (scopeActive) {
-                    processCommitsViaLocalGit(event, repository, Objects.requireNonNull(scopeId));
+                    processCommitsViaLocalGit(event, repository, Objects.requireNonNull(scopeId), read);
                 } else {
                     log.debug("Skipped local git: reason=scopeNotActive, scopeId={}", scopeId);
-                    processCommitsViaWebhook(event, repository, false);
+                    processCommitsViaWebhook(event, repository, false, read);
                 }
             } else {
-                if (gitRepositoryManager.isEnabled()) fetchForNonDefaultBranch(event, repository);
-                processCommitsViaWebhook(event, repository, false);
+                if (gitRepositoryManager.isEnabled()) fetchForNonDefaultBranch(event, repository, read);
+                processCommitsViaWebhook(event, repository, false, read);
             }
 
-            linkCommitsToMergeRequests(scopeId, repository);
+            linkCommitsToMergeRequests(scopeId, repository, read);
         } else {
             log.warn("Failed to upsert project from push event: projectPath={}", safeProjectPath);
         }
     }
 
     /** One GraphQL round trip links every MR updated in the push window, rather than one call per commit. */
-    private void linkCommitsToMergeRequests(@Nullable Long scopeId, Repository repository) {
+    private record PreparedPush(Repository repository, GitLabProjectAdmission.ProjectRead read) {}
+
+    private void linkCommitsToMergeRequests(
+            @Nullable Long scopeId, Repository repository, GitLabProjectAdmission.ProjectRead read) {
         if (scopeId == null) {
             return;
         }
         try {
             commitMergeRequestLinker.linkCommits(
-                    scopeId, repository, OffsetDateTime.now(ZoneOffset.UTC).minusHours(1));
+                    scopeId, repository, OffsetDateTime.now(ZoneOffset.UTC).minusHours(1), read);
         } catch (Exception e) {
             log.debug("Push-time commit→MR link failed: repoId={}, error={}", repository.getId(), e.getMessage());
         }
     }
 
     /** Fetches so the mirror is current for practice reviews; commits on other branches are not walked. */
-    private void fetchForNonDefaultBranch(GitLabPushEventDTO event, Repository repository) {
+    private void fetchForNonDefaultBranch(
+            GitLabPushEventDTO event, Repository repository, GitLabProjectAdmission.ProjectRead read) {
         try {
-            Long scopeId = resolveScopeId(repository);
+            Long scopeId = read.connection().workspaceId();
             if (scopeId == null || !syncTargetProvider.isScopeActiveForSync(scopeId)) {
                 return;
             }
@@ -259,12 +290,13 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
 
     // Local git path (enriched with line-level diff stats)
 
-    private void processCommitsViaLocalGit(GitLabPushEventDTO event, Repository repository, Long scopeId) {
+    private void processCommitsViaLocalGit(
+            GitLabPushEventDTO event, Repository repository, Long scopeId, GitLabProjectAdmission.ProjectRead read) {
         String repoName = sanitizeForLog(repository.getNameWithOwner());
         String beforeSha = event.before();
         String afterSha = event.after();
         if (afterSha == null) {
-            processCommitsViaWebhook(event, repository, true);
+            processCommitsViaWebhook(event, repository, true, read);
             return;
         }
 
@@ -289,8 +321,8 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
                     afterSha,
                     shas -> commitRepository.findGitDetailsCapturedShas(repository.getId(), shas),
                     info -> {
-                        Outcome outcome = transactions.execute(
-                                status -> mayWrite() ? persister.persist(info, repository, origin) : Outcome.FAILED);
+                        Outcome outcome = transactions.execute(status ->
+                                mayWrite(read) ? persister.persist(info, repository, origin) : Outcome.FAILED);
                         if (outcome == Outcome.FAILED) failed[0]++;
                     });
 
@@ -302,7 +334,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
                     e.getMessage());
             failed[0]++;
         }
-        if (failed[0] > 0) processCommitsViaWebhook(event, repository, true);
+        if (failed[0] > 0) processCommitsViaWebhook(event, repository, true, read);
     }
 
     // Webhook-only path (file lists without line-level stats)
@@ -312,7 +344,11 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
      * its neighbours. As the fallback after a local-git failure the statistics and file lists are
      * withheld so {@code COALESCE} keeps what JGit already captured.
      */
-    private void processCommitsViaWebhook(GitLabPushEventDTO event, Repository repository, boolean asFallback) {
+    private void processCommitsViaWebhook(
+            GitLabPushEventDTO event,
+            Repository repository,
+            boolean asFallback,
+            GitLabProjectAdmission.ProjectRead read) {
         List<CommitInfo> commits = event.commits();
         if (commits == null || commits.isEmpty()) {
             return;
@@ -324,12 +360,13 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
                 continue;
             }
             try {
-                transactions.executeWithoutResult(status -> {
-                    if (mayWrite()) {
-                        persistWebhookCommit(commit, repository, asFallback);
-                    }
+                Boolean written = transactions.execute(status -> {
+                    if (!mayWrite(read)) return false;
+                    persistWebhookCommit(
+                            commit, repository, asFallback, read.connection().workspaceId());
+                    return true;
                 });
-                created++;
+                if (Boolean.TRUE.equals(written)) created++;
             } catch (Exception e) {
                 log.warn(
                         "Failed to upsert commit: sha={}, repoId={}, error={}",
@@ -349,7 +386,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
         }
     }
 
-    private void persistWebhookCommit(CommitInfo commit, Repository repository, boolean asFallback) {
+    private void persistWebhookCommit(CommitInfo commit, Repository repository, boolean asFallback, long scopeId) {
         String sha = Objects.requireNonNull(commit.id());
         Instant authoredAt = parseTimestamp(commit.timestamp());
         int changedFiles = commit.changedFilesCount();
@@ -376,7 +413,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
         if (!asFallback) {
             persistWebhookFileChanges(sha, commit, repository);
         }
-        publishCommitCreated(sha, repository);
+        publishCommitCreated(sha, repository, scopeId);
     }
 
     /**
@@ -407,15 +444,13 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
 
     // Domain event publishing
 
-    private void publishCommitCreated(String sha, Repository repository) {
+    private void publishCommitCreated(String sha, Repository repository, long scopeId) {
         Commit commit = commitRepository
                 .findByShaAndRepositoryId(sha, repository.getId())
                 .orElse(null);
         if (commit == null) {
             return;
         }
-
-        Long scopeId = resolveScopeId(repository);
 
         ScmEventPayload.CommitData commitData = ScmEventPayload.CommitData.from(commit);
         EventContext context = new EventContext(
@@ -437,26 +472,11 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
      * For a write transaction after the git fetch: whether the delivery may still write, which on a connection route
      * means the connection is still active, held so until the transaction ends.
      */
-    private boolean mayWrite() {
-        return GitLabRouteAdmission.current().map(routeAdmission::holdActive).orElse(true);
-    }
-
-    @Nullable
-    private Long resolveScopeId(Repository repository) {
-        Optional<GitLabRouteAdmission.AdmittedRoute> route = GitLabRouteAdmission.current();
-        if (route.isPresent()) {
-            return route.get().workspaceId();
-        }
-        if (repository.getOrganization() != null) {
-            String orgLogin = repository.getOrganization().getLogin();
-            Long scopeId = scopeIdResolver.findScopeIdByOrgLogin(orgLogin).orElse(null);
-            if (scopeId != null) {
-                return scopeId;
-            }
-        }
-        return scopeIdResolver
-                .findScopeIdByRepositoryName(repository.getNameWithOwner())
-                .orElse(null);
+    private boolean mayWrite(GitLabProjectAdmission.ProjectRead read) {
+        return admission.hold(read)
+                && GitLabRouteAdmission.current()
+                        .map(routeAdmission::holdActive)
+                        .orElse(true);
     }
 
     // Organization linking

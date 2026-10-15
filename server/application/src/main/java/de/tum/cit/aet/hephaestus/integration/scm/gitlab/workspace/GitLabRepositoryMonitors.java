@@ -97,7 +97,7 @@ public class GitLabRepositoryMonitors {
         MonitorPolicy policy =
                 workspaceRepository.findMonitorPolicy(workspaceId).orElse(null);
         Optional<String> origin = config != null ? ScmOrigin.of(config.serverUrl()) : Optional.empty();
-        if (policy == null || origin.isEmpty()) {
+        if (config == null || policy == null || origin.isEmpty()) {
             return 0;
         }
         String group = policy.getAccountLogin();
@@ -116,6 +116,9 @@ public class GitLabRepositoryMonitors {
                 continue;
             }
             Long nativeId = repository.getNativeId();
+            if (config.projectExclusions().excludes(nativeId, path)) {
+                continue;
+            }
             List<RepositoryToMonitor> same = own.stream()
                     .filter(monitor -> nativeId.equals(monitor.getNativeId())
                             || (monitor.getNativeId() == null && path.equals(monitor.getNameWithOwner())))

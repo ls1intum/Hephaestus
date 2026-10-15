@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.label.dto.GitLabLabelDTO;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
@@ -38,10 +39,31 @@ public class GitLabLabelProcessor {
 
     private final LabelRepository labelRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final GitLabProjectAdmission admission;
 
-    public GitLabLabelProcessor(LabelRepository labelRepository, ApplicationEventPublisher eventPublisher) {
+    public GitLabLabelProcessor(
+            LabelRepository labelRepository,
+            ApplicationEventPublisher eventPublisher,
+            GitLabProjectAdmission admission) {
         this.labelRepository = labelRepository;
         this.eventPublisher = eventPublisher;
+        this.admission = admission;
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public @Nullable Label process(
+            @Nullable GitLabLabelDTO dto,
+            Repository repository,
+            ProcessingContext context,
+            GitLabProjectAdmission.ProjectRead read) {
+        return admission.hold(read) ? persistLabel(dto, repository, context) : null;
+    }
+
+    @Transactional
+    public boolean delete(@Nullable Long labelId, ProcessingContext context, GitLabProjectAdmission.ProjectRead read) {
+        if (!admission.hold(read)) return false;
+        deleteLabel(labelId, context);
+        return true;
     }
 
     /**
@@ -58,6 +80,11 @@ public class GitLabLabelProcessor {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @Nullable
     public Label process(@Nullable GitLabLabelDTO dto, Repository repository, ProcessingContext context) {
+        return persistLabel(dto, repository, context);
+    }
+
+    private @Nullable Label persistLabel(
+            @Nullable GitLabLabelDTO dto, Repository repository, ProcessingContext context) {
         if (dto == null || dto.title() == null || dto.title().isBlank()) {
             log.warn(
                     "Skipped label processing: reason=nullOrMissingTitle, repoId={}",
@@ -114,6 +141,10 @@ public class GitLabLabelProcessor {
      */
     @Transactional
     public void delete(@Nullable Long labelId, ProcessingContext context) {
+        deleteLabel(labelId, context);
+    }
+
+    private void deleteLabel(@Nullable Long labelId, ProcessingContext context) {
         if (labelId == null) {
             return;
         }

@@ -12,6 +12,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabAdmissionTestFixtures;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabRouteAdmission;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,6 +28,8 @@ import org.junit.jupiter.api.Test;
 @Tag("unit")
 class GitLabWebhookContextResolverTest {
 
+    private final GitLabProjectAdmission projectAdmission = mock(GitLabProjectAdmission.class);
+
     private static final long REPOSITORY_ID = 7L;
     private static final long WORKSPACE_ID = 3L;
     private static final String PATH = "course/project";
@@ -36,12 +40,21 @@ class GitLabWebhookContextResolverTest {
     private final RepositoryScopeFilter scopeFilter = mock(RepositoryScopeFilter.class);
     private final ScopeIdResolver scopes = mock(ScopeIdResolver.class);
     private final GitLabWebhookContextResolver resolver = new GitLabWebhookContextResolver(
-            repositories, providers, properties, scopeFilter, scopes, mock(GitLabRouteAdmission.class));
+            repositories,
+            providers,
+            properties,
+            scopeFilter,
+            scopes,
+            mock(GitLabRouteAdmission.class),
+            projectAdmission);
 
     private final ProcessingContext resolved = ProcessingContext.forWebhook(WORKSPACE_ID, repository(PATH), "update");
 
+    private GitLabProjectAdmission.ProjectRead originalPermit;
+
     @BeforeEach
     void storeTheRepositoryAsResolved() {
+        originalPermit = GitLabAdmissionTestFixtures.permit(projectAdmission, WORKSPACE_ID, repository(PATH), 11L);
         when(repositories.findById(REPOSITORY_ID)).thenReturn(Optional.of(repository(PATH)));
         when(scopeFilter.isRepositoryAllowed(PATH)).thenReturn(true);
         when(scopes.findScopeIdByRepositoryName(PATH)).thenReturn(Optional.of(WORKSPACE_ID));
@@ -49,28 +62,28 @@ class GitLabWebhookContextResolverTest {
 
     @Test
     void shouldLetTheDeliveryWriteWhileItsRepositoryIsStillInScopeForTheSameWorkspace() {
-        assertThat(resolver.mayStillWrite(resolved)).isTrue();
+        assertThat(resolver.mayStillWrite(resolved, originalPermit)).isTrue();
     }
 
     @Test
     void shouldNotLetTheDeliveryWriteOnceItsRepositoryIsGone() {
         when(repositories.findById(REPOSITORY_ID)).thenReturn(Optional.empty());
 
-        assertThat(resolver.mayStillWrite(resolved)).isFalse();
+        assertThat(resolver.mayStillWrite(resolved, originalPermit)).isFalse();
     }
 
     @Test
     void shouldNotLetTheDeliveryWriteOnceItsRepositoryMovedOutOfScope() {
         when(repositories.findById(REPOSITORY_ID)).thenReturn(Optional.of(repository("elsewhere/project")));
 
-        assertThat(resolver.mayStillWrite(resolved)).isFalse();
+        assertThat(resolver.mayStillWrite(resolved, originalPermit)).isFalse();
     }
 
     @Test
     void shouldNotLetTheDeliveryWriteOnceItsRepositoryBelongsToAnotherWorkspace() {
         when(scopes.findScopeIdByRepositoryName(PATH)).thenReturn(Optional.of(WORKSPACE_ID + 1));
 
-        assertThat(resolver.mayStillWrite(resolved)).isFalse();
+        assertThat(resolver.mayStillWrite(resolved, originalPermit)).isFalse();
     }
 
     @Test

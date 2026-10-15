@@ -23,6 +23,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClie
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlResponseHandler;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlResponseHandler.HandleResult;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabAdmissionTestFixtures;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import java.util.ArrayList;
@@ -57,6 +59,8 @@ import reactor.core.publisher.Mono;
 @Tag("unit")
 class GitLabSubIssueSyncServiceTest extends BaseUnitTest {
 
+    private final GitLabProjectAdmission projectAdmission = mock(GitLabProjectAdmission.class);
+
     private static final long SCOPE_ID = 1L;
     private static final long REPO_ID = 500L;
     private static final int CHILD_IID = 5;
@@ -83,12 +87,13 @@ class GitLabSubIssueSyncServiceTest extends BaseUnitTest {
                 .when(responseHandler.handle(any(), anyString(), any()))
                 .thenReturn(new HandleResult(HandleResult.Action.CONTINUE, null));
         service = new GitLabSubIssueSyncService(
-                issueRepository, repositoryRepository, graphQlClientProvider, responseHandler);
+                issueRepository, repositoryRepository, graphQlClientProvider, responseHandler, projectAdmission);
     }
 
     @Test
     void shouldParentTheIssueAndLeaveACollidingMergeRequestUntouched() {
         Repository repository = TestEntities.repository(REPO_ID, "acme/widgets");
+        GitLabAdmissionTestFixtures.permit(projectAdmission, SCOPE_ID, repository, 7L);
 
         Issue parentIssue = issue(PARENT_IID * 100L, PARENT_IID);
         Issue childIssue = issue(CHILD_IID * 100L, CHILD_IID);
@@ -118,6 +123,7 @@ class GitLabSubIssueSyncServiceTest extends BaseUnitTest {
     @Test
     void shouldRepeatInitialNullCursorAndParentIssueWhenHandlerReturnsRetryThenContinue() {
         var repository = TestEntities.repository(REPO_ID, "acme/widgets");
+        GitLabAdmissionTestFixtures.permit(projectAdmission, SCOPE_ID, repository, 7L);
         var parentIssue = issue(PARENT_IID * 100L, PARENT_IID);
         var childIssue = issue(CHILD_IID * 100L, CHILD_IID);
         when(issueRepository.findAllIssuesByRepositoryId(REPO_ID)).thenReturn(List.of(childIssue, parentIssue));
@@ -143,6 +149,7 @@ class GitLabSubIssueSyncServiceTest extends BaseUnitTest {
     @Test
     void shouldPreserveStoredParentWithoutCleanupWhenHandlerAbortsFirstPage() {
         var repository = TestEntities.repository(REPO_ID, "acme/widgets");
+        GitLabAdmissionTestFixtures.permit(projectAdmission, SCOPE_ID, repository, 7L);
         var parentIssue = issue(PARENT_IID * 100L, PARENT_IID);
         var childIssue = issue(CHILD_IID * 100L, CHILD_IID);
         childIssue.setParentIssue(parentIssue);
@@ -162,6 +169,7 @@ class GitLabSubIssueSyncServiceTest extends BaseUnitTest {
     @Test
     void shouldRepeatLaterCursorAndParentBothIssuesWhenHandlerRetriesLaterPage() {
         var repository = TestEntities.repository(REPO_ID, "acme/widgets");
+        GitLabAdmissionTestFixtures.permit(projectAdmission, SCOPE_ID, repository, 7L);
         var parentIssue = issue(PARENT_IID * 100L, PARENT_IID);
         var childIssue = issue(CHILD_IID * 100L, CHILD_IID);
         var laterChild = issue((CHILD_IID + 1) * 100L, CHILD_IID + 1);

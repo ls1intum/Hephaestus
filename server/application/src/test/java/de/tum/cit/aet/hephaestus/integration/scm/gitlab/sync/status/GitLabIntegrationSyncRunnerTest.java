@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -16,6 +17,7 @@ import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.sync.GitLabDataSyncScheduler;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.sync.backfill.GitLabHistoricalBackfillService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -99,6 +101,9 @@ class GitLabIntegrationSyncRunnerTest extends BaseUnitTest {
 
         @Test
         void jobThatAdvancedNothingAtAll_reportsWarningsSoItDoesNotLookLikeACleanSuccess() {
+            var originalIds = Set.of(7L);
+            when(backfillService.pendingTargetIds(WORKSPACE_ID)).thenReturn(originalIds);
+            when(backfillService.hasPendingTargets(WORKSPACE_ID, originalIds)).thenReturn(true);
             when(backfillService.runBackfillPass(eq(WORKSPACE_ID), eq(handle))).thenReturn(0);
 
             runner.backfill(ref, handle);
@@ -106,6 +111,39 @@ class GitLabIntegrationSyncRunnerTest extends BaseUnitTest {
             verify(backfillService, times(1)).runBackfillPass(WORKSPACE_ID, handle);
             verify(handle).reportWarnings();
             verify(handle, never()).reportCancelled();
+        }
+
+        @Test
+        void shouldPreserveOriginalPendingMonitorIdsBeforeRepairAndPasses() {
+            var originalIds = Set.of(7L);
+            when(backfillService.pendingTargetIds(WORKSPACE_ID))
+                    .thenReturn(originalIds)
+                    .thenReturn(Set.of(8L));
+            when(backfillService.hasPendingTargets(WORKSPACE_ID, originalIds)).thenReturn(true);
+
+            runner.backfill(ref, handle);
+
+            var order = inOrder(backfillService);
+            order.verify(backfillService).pendingTargetIds(WORKSPACE_ID);
+            order.verify(backfillService).repairCompletedRepositories(WORKSPACE_ID, handle);
+            order.verify(backfillService).runBackfillPass(WORKSPACE_ID, handle);
+            order.verify(backfillService).hasPendingTargets(WORKSPACE_ID, originalIds);
+            verify(backfillService, times(1)).pendingTargetIds(WORKSPACE_ID);
+            verify(handle).reportWarnings();
+        }
+
+        @Test
+        void shouldNotWarnWhenTheOriginalMonitorIsGoneEvenIfItsReplacementIsPending() {
+            var originalIds = Set.of(7L);
+            when(backfillService.pendingTargetIds(WORKSPACE_ID))
+                    .thenReturn(originalIds)
+                    .thenReturn(Set.of(8L));
+            when(backfillService.hasPendingTargets(WORKSPACE_ID, originalIds)).thenReturn(false);
+
+            runner.backfill(ref, handle);
+
+            verify(backfillService).hasPendingTargets(WORKSPACE_ID, originalIds);
+            verify(handle, never()).reportWarnings();
         }
 
         /** The loop must re-poll cancellation every iteration, not just before the first pass. */
