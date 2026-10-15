@@ -112,28 +112,11 @@ public class GitLabCommitBackfillService {
         Long repoId = repository.getId();
         RepositoryKey key = new RepositoryKey(scopeId, repoId);
         String repoName = sanitizeForLog(repository.getNameWithOwner());
-        String defaultBranch = repository.getDefaultBranch();
-
-        if (defaultBranch == null || defaultBranch.isBlank()) {
-            log.debug("Skipped commit backfill: reason=noDefaultBranch, repoId={}, repoName={}", repoId, repoName);
-            return SyncResult.abortedError(0);
-        }
-
         try {
             String serverUrl = tokenService.resolveServerUrl(scopeId);
             String token = tokenService.getAccessToken(scopeId);
             String cloneUrl = serverUrl + "/" + repository.getNameWithOwner() + ".git";
             gitRepositoryManager.ensureRepository(key, cloneUrl, token);
-
-            String headSha = gitRepositoryManager.resolveBranchHead(key, defaultBranch);
-            if (headSha == null) {
-                log.warn(
-                        "Skipped commit backfill: reason=cannotResolveHead, repoId={}, repoName={}, branch={}",
-                        repoId,
-                        repoName,
-                        defaultBranch);
-                return SyncResult.abortedError(0);
-            }
 
             Long providerId = Objects.requireNonNull(repository.getProvider().getId());
             var origin = new CommitDetailsPersister.Origin(

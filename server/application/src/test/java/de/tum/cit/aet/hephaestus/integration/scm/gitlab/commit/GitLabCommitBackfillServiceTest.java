@@ -10,28 +10,42 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetTestBuilder;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitAuthorResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitContributorRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitDetails;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitDetailsPersister;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryLockManager;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.RepositoryKey;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabAdmissionTestFixtures;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
+import org.eclipse.jgit.api.Git;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class GitLabCommitBackfillServiceTest extends BaseUnitTest {
 
     private final GitLabProjectAdmission projectAdmission = mock(GitLabProjectAdmission.class);
+
+    @TempDir
+    private Path temporary;
 
     @Test
     void shouldSkipGitFetchWhenWorkspaceMonitorIsUnavailable() {
@@ -77,7 +91,6 @@ class GitLabCommitBackfillServiceTest extends BaseUnitTest {
                 mock(SyncTargetProvider.class),
                 projectAdmission);
         when(git.isEnabled()).thenReturn(true);
-        when(git.resolveBranchHead(new RepositoryKey(100L, 1L), "main")).thenReturn("unchanged-head");
         when(tokens.resolveServerUrl(100L)).thenReturn("https://gitlab.example.com");
         when(commits.findGitDetailsCapturedShas(1L, List.of("unchanged-head", "feature-commit")))
                 .thenReturn(Set.of("unchanged-head"));
@@ -111,7 +124,6 @@ class GitLabCommitBackfillServiceTest extends BaseUnitTest {
                 mock(SyncTargetProvider.class),
                 projectAdmission);
         when(git.isEnabled()).thenReturn(true);
-        when(git.resolveBranchHead(new RepositoryKey(100L, 1L), "main")).thenReturn("head");
         when(tokens.resolveServerUrl(100L)).thenReturn("https://gitlab.example.com");
         doAnswer(invocation -> {
                     throw new IllegalStateException("Persistence unavailable");
@@ -120,5 +132,103 @@ class GitLabCommitBackfillServiceTest extends BaseUnitTest {
                 .forEachMissingCommit(eq(new RepositoryKey(100L, 1L)), any(), any());
 
         assertThat(service.backfillCommits(100L, repository)).isEqualTo(SyncResult.abortedError(0));
+    }
+
+    @Test
+    void shouldCompleteBackfillForARealEmptyRepositoryWithoutADefaultBranchHead() throws Exception {
+        Path remote = temporary.resolve("remote/owner/repo.git");
+        Files.createDirectories(remote.getParent());
+        try (Git source = Git.init().setBare(true).setDirectory(remote.toFile()).call()) {
+            assertThat(source.getRepository().getRefDatabase().getRefs()).isEmpty();
+        }
+        var git = localGit();
+        var key = new RepositoryKey(100L, 1L);
+        git.ensureRepository(key, remote.toUri().toString(), null);
+        assertThat(git.resolveBranchHead(key, "main")).isNull();
+        List<CommitDetails> walked = new ArrayList<>();
+        git.forEachMissingCommit(key, shas -> Set.of(), walked::add);
+        assertThat(walked).isEmpty();
+        var repository = TestEntities.repository(1L, "owner/repo", "main");
+        repository.setProvider(TestEntities.gitProvider(1L, IdentityProviderType.GITLAB));
+        GitLabAdmissionTestFixtures.permit(projectAdmission, 100L, repository, 7L);
+        var persister = mock(CommitDetailsPersister.class);
+        var service = localBackfill(git, persister);
+
+        assertThat(service.backfillCommits(100L, repository)).isEqualTo(SyncResult.completed(0));
+        verify(persister, never()).persist(any(), any(), any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"main", "missing-default"})
+    void shouldCaptureTheActualCommitFromALocalPopulatedRepository(String configuredDefaultBranch) throws Exception {
+        Path remote = temporary.resolve("remote/owner/repo.git");
+        Files.createDirectories(remote.getParent());
+        String expectedSha;
+        try (Git source = Git.init()
+                .setInitialBranch("main")
+                .setDirectory(remote.toFile())
+                .call()) {
+            expectedSha = source.commit()
+                    .setSign(false)
+                    .setAllowEmpty(true)
+                    .setMessage("Local history control")
+                    .setAuthor("Test", "test@example.com")
+                    .setCommitter("Test", "test@example.com")
+                    .call()
+                    .name();
+        }
+        var repository = TestEntities.repository(1L, "owner/repo", configuredDefaultBranch);
+        repository.setProvider(TestEntities.gitProvider(1L, IdentityProviderType.GITLAB));
+        GitLabAdmissionTestFixtures.permit(projectAdmission, 100L, repository, 7L);
+        var persister = mock(CommitDetailsPersister.class);
+        List<CommitDetails> captured = new ArrayList<>();
+        when(persister.persist(any(), eq(repository), any())).thenAnswer(invocation -> {
+            captured.add(invocation.getArgument(0));
+            return CommitDetailsPersister.Outcome.CAPTURED;
+        });
+        var service = localBackfill(localGit(), persister);
+
+        assertThat(service.backfillCommits(100L, repository)).isEqualTo(SyncResult.completed(1));
+        assertThat(captured).singleElement().satisfies(commit -> {
+            assertThat(commit.sha()).isEqualTo(expectedSha);
+            assertThat(commit.message()).isEqualTo("Local history control");
+            assertThat(commit.parentShas()).isEmpty();
+        });
+    }
+
+    @Test
+    void shouldKeepARealMissingLocalRemoteAsABackfillFailure() {
+        var repository = TestEntities.repository(1L, "owner/repo", "main");
+        repository.setProvider(TestEntities.gitProvider(1L, IdentityProviderType.GITLAB));
+        GitLabAdmissionTestFixtures.permit(projectAdmission, 100L, repository, 7L);
+        var persister = mock(CommitDetailsPersister.class);
+        var service = localBackfill(localGit(), persister);
+
+        assertThat(service.backfillCommits(100L, repository)).isEqualTo(SyncResult.abortedError(0));
+        verify(persister, never()).persist(any(), any(), any());
+    }
+
+    private GitRepositoryManager localGit() {
+        return new GitRepositoryManager(
+                new GitRepositoryProperties(true, 2, 8L * 1024 * 1024 * 1024),
+                new GitRepositoryLockManager(),
+                new FabricLayout(temporary.resolve("fabric").toString()));
+    }
+
+    private GitLabCommitBackfillService localBackfill(GitRepositoryManager git, CommitDetailsPersister persister) {
+        var tokens = mock(GitLabTokenService.class);
+        String origin = temporary.resolve("remote").toUri().toString();
+        when(tokens.resolveServerUrl(100L))
+                .thenReturn(origin.endsWith("/") ? origin.substring(0, origin.length() - 1) : origin);
+        when(tokens.getAccessToken(100L)).thenReturn("local-test-token");
+        return new GitLabCommitBackfillService(
+                git,
+                tokens,
+                mock(CommitRepository.class),
+                persister,
+                mock(CommitContributorRepository.class),
+                mock(CommitAuthorResolver.class),
+                mock(SyncTargetProvider.class),
+                projectAdmission);
     }
 }

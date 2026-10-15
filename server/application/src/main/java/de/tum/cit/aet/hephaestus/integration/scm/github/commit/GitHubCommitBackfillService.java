@@ -1,7 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.commit;
 
-import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
-
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AuthMode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryAvailabilityProvider;
@@ -50,22 +48,9 @@ public class GitHubCommitBackfillService {
 
         Long repoId = repository.getId();
         RepositoryKey key = new RepositoryKey(scopeId, repoId);
-        String repoName = sanitizeForLog(repository.getNameWithOwner());
-        String defaultBranch = repository.getDefaultBranch();
-
-        if (defaultBranch == null || defaultBranch.isBlank()) {
-            log.debug("Skipped commit backfill: reason=noDefaultBranch, repoId={}, repoName={}", repoId, repoName);
-            return -1;
-        }
-
         String cloneUrl = "https://github.com/" + repository.getNameWithOwner() + ".git";
         String token = resolveToken(syncTarget);
         gitRepositoryManager.ensureRepository(key, cloneUrl, token);
-
-        String headSha = gitRepositoryManager.resolveBranchHead(key, defaultBranch);
-        if (headSha == null) {
-            throw new IllegalStateException("Cannot resolve repository HEAD");
-        }
 
         Long providerId = repository.getProvider().getId();
         var origin = new CommitDetailsPersister.Origin(
