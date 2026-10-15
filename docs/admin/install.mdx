@@ -124,10 +124,10 @@ It also generates these values:
   Changing either encryption key on an existing installation makes everything encrypted under the old
   one unreadable.
 
-Everything below runs from `/opt/hephaestus/docker/self-host`. After step 2 supplies the remaining
-required values, `docker compose config` renders the effective configuration. Before then it exits
-at the first missing required variable, as does every other `docker compose` subcommand in this
-directory. See [Troubleshooting](#troubleshooting).
+Everything below runs from `/opt/hephaestus/docker/self-host`.
+After step 2 supplies the remaining required values, `docker compose --env-file .env --env-file release-lock.env config` renders the effective configuration.
+Before then it exits at the first missing required variable, as does every other `docker compose` subcommand in this directory.
+See [Troubleshooting](#troubleshooting).
 
 ## 2. Configure `.env`
 
@@ -324,7 +324,7 @@ Each has a variable reference in [Integrations & Reference Deployment](./product
 2. Run:
 
    ```bash
-   docker compose up -d
+   docker compose --env-file .env --env-file release-lock.env up -d
    ```
 
 | Add-on             | What it gives you                                                                                             | Where                                                         |
@@ -483,4 +483,4 @@ Never reconstruct an old lock or resolve mutable image tags.
 | Signed in but not admin                                        | `HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS` did not match. On the account's **first** login, the server logs (INFO) the exact `provider subject username` it saw. Copy that into the allowlist. Restart. (For an account that already existed, check that log line from its first sign-in, or use the numeric id.) |
 | GitHub webhook deliveries show `401`                           | `WEBHOOK_SECRET` on GitHub differs from `.env` — must be byte-identical.                                                                                                                                                                                                                                  |
 | Data appears only ~hourly                                      | No GitHub webhook configured (see step 6).                                                                                                                                                                                                                                                                |
-| `docker compose down`/`logs` aborts with "variable is missing" | Required `.env` values are validated for every subcommand. Fill them (dummy values are fine) before teardown.                                                                                                                                                                                             |
+| `down` or `logs` aborts with "variable is missing" | Pass both `--env-file .env --env-file release-lock.env`. Every subcommand validates required variables. Restore the matching configuration if either file is missing.                                                                                                                                                                                             |

@@ -505,6 +505,7 @@ jobs:
       - name: Verify durable assets from a clean environment
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_SHA: ${{ needs.release.outputs.sha }}
           TAG_NAME: ${{ needs.release.outputs.tag_name }}
         run: |
           set -euo pipefail
@@ -516,8 +517,10 @@ jobs:
             --certificate-identity '${{ github.server_url }}/${{ github.repository }}/.github/workflows/release.yml@refs/heads/main' \
             --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
             "evidence/$lock"
+          jq -e --arg commit "$RELEASE_SHA" '.commit == $commit' "evidence/$lock" >/dev/null || {
+            echo "::error::Release lock does not cover the qualified source commit"; exit 1; }
           node scripts/release-image-lock.ts "evidence/$lock" evidence/manifest.json \
-            "$TAG_NAME" /tmp/release-lock.env
+            "$TAG_NAME" "$RUNNER_TEMP/release-lock.env"
           node scripts/verify-release-evidence.ts evidence --verify-signatures
           asset="evidence/release-${TAG_NAME}.json"
           cosign verify-blob --bundle "${asset}.sigstore.json" \
@@ -530,13 +533,23 @@ jobs:
           TAG_NAME: ${{ needs.release.outputs.tag_name }}
         run: |
           set -euo pipefail
-          gh release upload "$TAG_NAME" host-smoke/*.json --clobber --repo "${{ github.repository }}"
-          gh release edit "$TAG_NAME" --repo "${{ github.repository }}" --draft=false
+          if [ "$(gh release view "$TAG_NAME" --repo "${{ github.repository }}" --json isDraft --jq .isDraft)" = true ]; then
+            gh release upload "$TAG_NAME" host-smoke/*.json --clobber --repo "${{ github.repository }}"
+            gh release edit "$TAG_NAME" --repo "${{ github.repository }}" --draft=false
+          else
+            # A failed alias promotion leaves an immutable release. Its assets must match the
+            # qualified artifacts from this run; retrying must never replace published evidence.
+            for architecture in amd64 arm64; do
+              cmp "host-smoke/host-smoke-$architecture.json" "evidence/host-smoke-$architecture.json" || {
+                echo "::error::Published $architecture host smoke record differs or is missing; refusing image aliases"; exit 1; }
+            done
+          fi
           [ "$(gh release view "$TAG_NAME" --repo "${{ github.repository }}" --json isImmutable --jq .isImmutable)" = true ] || {
             echo "::error::The published release is not immutable; refusing to promote image aliases"; exit 1; }
 
       - name: Promote verified image digests
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.release.outputs.version }}
           SERIES: ${{ needs.release.outputs.major }}.${{ needs.release.outputs.minor }}
         run: |
@@ -550,6 +563,11 @@ jobs:
             source=$(docker buildx imagetools inspect "$ref@$digest" --format '{{json .Manifest}}' | jq -r .digest)
             [ "$source" = "$digest" ] || { echo "::error::Cannot resolve promotion source $ref@$digest"; exit 1; }
           done < "$RUNNER_TEMP/promotions.tsv"
+
+          # The planner owns release ordering; the promotion lock holds through all alias writes.
+          jq -e --arg tag "v$VERSION" '.release == $tag' evidence/manifest.json >/dev/null || {
+            echo "::error::Release version does not match verified evidence; refusing image aliases"; exit 1; }
+          node scripts/plan-release.ts --promote "$VERSION"
           while IFS=$'\t' read -r ref digest; do
             docker buildx imagetools create \
               -t "$ref:$VERSION" -t "$ref:$SERIES" -t "$ref:latest" "$ref@$digest"

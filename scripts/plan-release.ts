@@ -83,6 +83,14 @@ const latestPublished = (releases: readonly ReleaseRef[]): Version | undefined =
 	return latest;
 };
 
+/** Alias writes must not let a retry of an older release undo a newer publication. */
+export function assertCurrentStableRelease(version: string, releases: readonly ReleaseRef[]): void {
+	const latest = latestPublished(releases);
+	if (latest === undefined || version !== formatVersion(latest)) {
+		throw new Error("Only the current stable release may promote image aliases");
+	}
+}
+
 export function planRelease(
 	sha: string,
 	version: string,
@@ -240,9 +248,12 @@ async function listReleases(repository: string): Promise<ReleaseRef[]> {
 		.filter((line) => line.trim() !== "")
 		.map((line, index) => {
 			const release = asRecord(parseJson(line), `gh api releases[${index}]`);
+			if (typeof release.draft !== "boolean" || typeof release.prerelease !== "boolean") {
+				throw new Error(`gh api releases[${index}] must have boolean draft and prerelease flags`);
+			}
 			return {
-				isDraft: release.draft === true,
-				isPrerelease: release.prerelease === true,
+				isDraft: release.draft,
+				isPrerelease: release.prerelease,
 				tag: asString(release.tag, `gh api releases[${index}].tag_name`),
 				targetCommitish: asString(release.commitish, `gh api releases[${index}].target_commitish`),
 			};
@@ -281,7 +292,23 @@ export async function hasPendingChangesets(sha: string, cwd?: string): Promise<b
 		.some((file) => /^\.changeset\/[^/]+\.md$/u.test(file) && file !== ".changeset/README.md");
 }
 
-if (import.meta.main && process.argv[2] === "--notes") {
+if (import.meta.main && process.argv[2] === "--promote") {
+	const [, version] = process.argv.slice(2);
+	const repository = process.env.GITHUB_REPOSITORY;
+	if (!isSet(version) || !isSet(repository)) {
+		console.log(
+			"::error::usage: GITHUB_REPOSITORY=<owner/repo> plan-release.ts --promote <version>",
+		);
+		process.exitCode = 1;
+	} else {
+		try {
+			assertCurrentStableRelease(version, await listReleases(repository));
+		} catch (error) {
+			console.log(`::error::${error instanceof Error ? error.message : String(error)}`);
+			process.exitCode = 1;
+		}
+	}
+} else if (import.meta.main && process.argv[2] === "--notes") {
 	// Appends to a file rather than stdout, so a refusal reaches the log and not the notes.
 	const [, previousVersion, version, changelog, notes] = process.argv.slice(2);
 	if (!isSet(previousVersion) || !isSet(version) || !isSet(changelog) || !isSet(notes)) {
