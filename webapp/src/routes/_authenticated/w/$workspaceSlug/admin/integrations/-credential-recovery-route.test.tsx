@@ -1,7 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HttpResponse, http } from "msw";
+import { HttpResponse, http, type JsonBodyType } from "msw";
 import { toast } from "sonner";
 import { describe, expect, it, vi } from "vitest";
 
@@ -9,11 +9,14 @@ import {
 	getIntegrationCatalogQueryKey,
 	listConnectionSyncJobsQueryKey,
 	listConnectionSyncResourcesQueryKey,
+	listSlackChannelsQueryKey,
 } from "@/api/@tanstack/react-query.gen";
 import type {
 	ConnectionSyncStatus,
 	ConnectionDetail,
 	IntegrationCatalogEntry,
+	SlackChannelCandidate,
+	SlackMonitoredChannel,
 	SyncJob,
 	SyncResourceState,
 	Workspace,
@@ -21,7 +24,7 @@ import type {
 import type { Wire } from "@/lib/dates";
 import { workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
-import { deferred } from "@/test/async";
+import { type Deferred, deferred } from "@/test/async";
 import { ROUTE_RENDER_WAIT, renderRouteAt, renderRouteAtWithRouter } from "@/test/router-harness";
 
 vi.setConfig({ testTimeout: 30_000 });
@@ -418,29 +421,27 @@ describe("monitored repositories", () => {
 	});
 });
 
-describe("Slack credential recovery", () => {
-	function mockSlackConnection(credentialsUnreadableSince?: string) {
-		const { entry, workspace } = mockConnection("GITHUB");
-		server.use(
-			http.get("*/workspaces/:workspaceSlug", () =>
-				HttpResponse.json({
-					...workspace,
-					hasSlackToken: true,
-					slackConnectionId: 7,
-				}),
-			),
-			http.get("*/workspaces/:workspaceSlug/connections/catalog", () =>
-				HttpResponse.json([
-					{ ...entry, kind: "SLACK", displayName: "Slack", credentialsUnreadableSince },
-				]),
-			),
-			http.get("*/workspaces/:workspaceSlug/slack/channels", () => HttpResponse.json([])),
-			http.get("*/workspaces/:workspaceSlug/slack/channels/candidates", () =>
-				HttpResponse.json([]),
-			),
-		);
-	}
+function mockSlackConnection(credentialsUnreadableSince?: string) {
+	const { entry, workspace } = mockConnection("GITHUB");
+	server.use(
+		http.get("*/workspaces/:workspaceSlug", () =>
+			HttpResponse.json({
+				...workspace,
+				hasSlackToken: true,
+				slackConnectionId: 7,
+			}),
+		),
+		http.get("*/workspaces/:workspaceSlug/connections/catalog", () =>
+			HttpResponse.json([
+				{ ...entry, kind: "SLACK", displayName: "Slack", credentialsUnreadableSince },
+			]),
+		),
+		http.get("*/workspaces/:workspaceSlug/slack/channels", () => HttpResponse.json([])),
+		http.get("*/workspaces/:workspaceSlug/slack/channels/candidates", () => HttpResponse.json([])),
+	);
+}
 
+describe("Slack credential recovery", () => {
 	it("shows an unreadable bot token as unavailable, not as connected", async () => {
 		mockSlackConnection("2026-09-20T08:00:00Z");
 		renderRouteAt("/w/acme/admin/integrations/slack");
@@ -926,5 +927,378 @@ describe("sync evidence through a failed refresh", () => {
 		await screen.findByText("77,777");
 		expect(screen.queryByText("acme/platform/ledger")).toBeNull();
 		expect(screen.queryByText("40/52")).toBeNull();
+	});
+});
+
+/** The answer a Slack read gets until the test chooses another. */
+type SlackRead<TBody> = { status: 200; body: TBody } | { status: 403 | 503 };
+
+const SLACK_READ_FAILURE = {
+	403: "You cannot manage this workspace's Slack channels.",
+	503: "Slack is temporarily unavailable.",
+} as const;
+
+/** Serves one Slack GET with the answer the test last chose, counting each read. */
+function serveSlackRead<TBody extends JsonBodyType>(url: string, initial: SlackRead<TBody>) {
+	const reads = { count: 0 };
+	const current = { answer: initial };
+	server.use(
+		http.get(url, () => {
+			reads.count += 1;
+			const { answer } = current;
+			return answer.status === 200
+				? HttpResponse.json(answer.body)
+				: HttpResponse.json(
+						{
+							status: answer.status,
+							title: "Slack read failed",
+							detail: SLACK_READ_FAILURE[answer.status],
+						},
+						{ status: answer.status },
+					);
+		}),
+	);
+	return {
+		reads,
+		answer: (next: SlackRead<TBody>) => {
+			current.answer = next;
+		},
+	};
+}
+
+/** A connected Slack workspace whose channel reads the test controls, recording every consent change. */
+function serveSlackChannels(
+	channels: SlackRead<Wire<SlackMonitoredChannel>[]>,
+	candidates: SlackRead<SlackChannelCandidate[]>,
+) {
+	mockSlackConnection();
+	const changes: unknown[] = [];
+	server.use(
+		http.patch("*/workspaces/acme/slack/channels/:slackChannelId", async ({ request, params }) => {
+			changes.push({ slackChannelId: params.slackChannelId, body: await request.json() });
+			return HttpResponse.json(standupChannel);
+		}),
+	);
+	return {
+		channels: serveSlackRead("*/workspaces/acme/slack/channels", channels),
+		candidates: serveSlackRead("*/workspaces/acme/slack/channels/candidates", candidates),
+		changes,
+	};
+}
+
+/** Holds each Add on the next answer until the test settles it, recording its body. */
+function holdSlackAdds(answers: Deferred<201 | 503>[]) {
+	const bodies: unknown[] = [];
+	server.use(
+		http.post("*/workspaces/acme/slack/channels", async ({ request }) => {
+			const answer = answers[bodies.length];
+			bodies.push(await request.json());
+			const status = (await answer?.promise) ?? 503;
+			return status === 201
+				? HttpResponse.json(
+						{ ...standupChannel, id: 9, slackChannelId: "C0974LJBPBK", consentState: "PENDING" },
+						{ status },
+					)
+				: HttpResponse.json(
+						{ status, title: "Slack write failed", detail: SLACK_READ_FAILURE[status] },
+						{ status },
+					);
+		}),
+	);
+	return { bodies };
+}
+
+/** Reads the monitored channels again through their own key, as the page's poll does. */
+async function rereadSlackChannels(queryClient: QueryClient) {
+	await act(async () => {
+		await queryClient.invalidateQueries({
+			queryKey: listSlackChannelsQueryKey({ path: { workspaceSlug: "acme" } }),
+		});
+	});
+}
+
+/** Holds each consent change on the next answer until the test settles it; later ones answer at once. */
+function holdSlackChanges(answers: Deferred<void>[]) {
+	const changes: unknown[] = [];
+	server.use(
+		http.patch("*/workspaces/acme/slack/channels/:slackChannelId", async ({ request, params }) => {
+			const answer = answers[changes.length];
+			changes.push({ slackChannelId: params.slackChannelId, body: await request.json() });
+			await answer?.promise;
+			return HttpResponse.json(standupChannel);
+		}),
+	);
+	return { changes };
+}
+
+async function openSlackRemove(user: ReturnType<typeof userEvent.setup>, channelName: string) {
+	await user.click(await screen.findByRole("button", { name: `Actions for ${channelName}` }));
+	await user.click(await screen.findByRole("menuitem", { name: "Remove and erase…" }));
+	return screen.findByRole("alertdialog", { name: `Remove #${channelName} and erase its data?` });
+}
+
+const standupChannel: Wire<SlackMonitoredChannel> = {
+	id: 2,
+	slackChannelId: "C02ACTIVE002",
+	slackTeamId: "T0000000000",
+	channelName: "team-standup",
+	consentState: "ACTIVE",
+	optedOutMemberCount: 0,
+	consentAnnouncedAt: "2026-10-01T09:00:00Z",
+	createdAt: "2026-09-30T09:00:00Z",
+};
+
+describe("Slack channel management reads", () => {
+	const designChannel: Wire<SlackMonitoredChannel> = {
+		...standupChannel,
+		id: 3,
+		slackChannelId: "C03DESIGN03",
+		channelName: "team-design",
+	};
+	const introChannel: Wire<SlackMonitoredChannel> = {
+		...standupChannel,
+		id: 1,
+		slackChannelId: "C01PENDING01",
+		channelName: "team-intro",
+		consentState: "PENDING",
+		consentAnnouncedAt: undefined,
+	};
+	const general: SlackChannelCandidate = {
+		slackChannelId: "C05GENERAL5",
+		channelName: "general",
+		privateChannel: false,
+		member: true,
+		archived: false,
+	};
+
+	it("keeps the monitored channels manageable when Slack cannot list channels to add", async () => {
+		const slack = serveSlackChannels({ status: 200, body: [standupChannel] }, { status: 503 });
+		renderRouteAt("/w/acme/admin/integrations/slack");
+		await screen.findByText(
+			/^(?:#team-standup|We could not load the monitored channels)$/u,
+			undefined,
+			ROUTE_RENDER_WAIT,
+		);
+
+		screen.getByText("#team-standup");
+		const user = userEvent.setup();
+		await user.click(screen.getByRole("button", { name: "Actions for team-standup" }));
+		await user.click(await screen.findByRole("menuitem", { name: "Pause" }));
+		await waitFor(() =>
+			expect(slack.changes).toStrictEqual([
+				{ slackChannelId: "C02ACTIVE002", body: { consentState: "PAUSED" } },
+			]),
+		);
+
+		await user.click(screen.getByRole("button", { name: "Add channel" }));
+		const dialog = await screen.findByRole("dialog");
+		within(dialog).getByText("We could not load the channels from Slack");
+		within(dialog).getByLabelText("Paste a channel link or ID");
+		expect(within(dialog).queryByRole("combobox", { name: "Channel" })).toBeNull();
+
+		slack.candidates.answer({ status: 200, body: [general] });
+		await user.click(within(dialog).getByRole("button", { name: "Retry" }));
+		await within(dialog).findByRole("combobox", { name: "Channel" });
+		expect(within(dialog).queryByText("We could not load the channels from Slack")).toBeNull();
+		screen.getByText("#team-standup");
+	});
+
+	it("closes a refused channel's Remove dialog and does not reopen it when the channels read again", async () => {
+		const slack = serveSlackChannels(
+			{ status: 200, body: [standupChannel] },
+			{ status: 200, body: [] },
+		);
+		const { queryClient } = renderRouteAtWithRouter("/w/acme/admin/integrations/slack");
+		const user = userEvent.setup();
+		await user.click(
+			await screen.findByRole("button", { name: "Actions for team-standup" }, ROUTE_RENDER_WAIT),
+		);
+		await user.click(await screen.findByRole("menuitem", { name: "Remove and erase…" }));
+		const removal = await screen.findByRole("alertdialog", {
+			name: "Remove #team-standup and erase its data?",
+		});
+		await user.type(within(removal).getByLabelText(/to confirm/u), "C02ACTIVE002");
+		const readsBefore = slack.channels.reads.count;
+
+		slack.channels.answer({ status: 403 });
+		await rereadSlackChannels(queryClient);
+		await screen.findByText(/the monitored channels$/u);
+		expect(slack.channels.reads.count).toBe(readsBefore + 1);
+		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+		screen.getByText("You do not have access to the monitored channels");
+		expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+		expect(screen.queryByText("#team-standup")).toBeNull();
+
+		slack.channels.answer({ status: 503 });
+		await rereadSlackChannels(queryClient);
+		await screen.findByText("We could not load the monitored channels");
+		expect(screen.queryByText("#team-standup")).toBeNull();
+		expect(screen.queryByText("The monitored channels may be out of date")).toBeNull();
+		expect(screen.queryByRole("alertdialog")).toBeNull();
+
+		slack.channels.answer({ status: 200, body: [standupChannel, designChannel] });
+		await user.click(screen.getByRole("button", { name: "Retry" }));
+		await screen.findByText("#team-design");
+		screen.getByText("#team-standup");
+		expect(screen.queryByRole("alertdialog")).toBeNull();
+		expect(slack.channels.reads.count).toBe(readsBefore + 3);
+
+		await user.click(screen.getByRole("button", { name: "Actions for team-standup" }));
+		await user.click(await screen.findByRole("menuitem", { name: "Remove and erase…" }));
+		const reopened = await screen.findByRole("alertdialog", {
+			name: "Remove #team-standup and erase its data?",
+		});
+		expect(within(reopened).getByLabelText(/to confirm/u)).toHaveProperty("value", "");
+		expect(slack.changes).toStrictEqual([]);
+	});
+
+	it("keeps a pending Add open with its draft until that request settles", async () => {
+		serveSlackChannels({ status: 200, body: [standupChannel] }, { status: 200, body: [] });
+		const first = deferred<201 | 503>();
+		const second = deferred<201 | 503>();
+		const adds = holdSlackAdds([first, second]);
+		renderRouteAt("/w/acme/admin/integrations/slack");
+		const user = userEvent.setup();
+		try {
+			await user.click(
+				await screen.findByRole("button", { name: "Add channel" }, ROUTE_RENDER_WAIT),
+			);
+			const dialog = await screen.findByRole("dialog");
+			await user.type(within(dialog).getByLabelText("Paste a channel link or ID"), "C0974LJBPBK");
+			await user.click(within(dialog).getByRole("button", { name: "Add channel" }));
+			await waitFor(() => expect(adds.bodies).toStrictEqual([{ slackChannelId: "C0974LJBPBK" }]));
+
+			await user.keyboard("{Escape}");
+			const stillOpen = screen.getByRole("dialog");
+			expect(within(stillOpen).getByLabelText("Paste a channel link or ID")).toHaveProperty(
+				"value",
+				"C0974LJBPBK",
+			);
+			expect(within(stillOpen).getByRole("button", { name: "Adding…" })).toHaveProperty(
+				"disabled",
+				true,
+			);
+			expect(within(stillOpen).queryByRole("button", { name: "Close" })).toBeNull();
+
+			first.resolve(503);
+			const retry = await within(stillOpen).findByRole("button", { name: "Add channel" });
+			expect(retry).toHaveProperty("disabled", false);
+			expect(within(stillOpen).getByLabelText("Paste a channel link or ID")).toHaveProperty(
+				"value",
+				"C0974LJBPBK",
+			);
+			within(stillOpen).getByRole("button", { name: "Close" });
+
+			await user.click(retry);
+			await waitFor(() => expect(adds.bodies).toHaveLength(2));
+			screen.getByRole("dialog");
+			second.resolve(201);
+			await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+		} finally {
+			first.resolve(503);
+			second.resolve(503);
+		}
+	});
+
+	it.each([
+		{ reopened: "team-standup", channelId: "C02ACTIVE002", finish: "Cancel", changes: 1 },
+		{ reopened: "team-design", channelId: "C03DESIGN03", finish: "Remove and erase", changes: 2 },
+	])(
+		"leaves a Remove of $reopened opened after a refusal to its own answer when the refused Remove completes",
+		async ({ reopened, channelId, finish, changes }) => {
+			const slack = serveSlackChannels(
+				{ status: 200, body: [standupChannel, designChannel] },
+				{ status: 200, body: [] },
+			);
+			const refusedRemoval = deferred();
+			const removals = holdSlackChanges([refusedRemoval]);
+			const { queryClient } = renderRouteAtWithRouter("/w/acme/admin/integrations/slack");
+			const user = userEvent.setup();
+			try {
+				await screen.findByText("#team-standup", undefined, ROUTE_RENDER_WAIT);
+				const refused = await openSlackRemove(user, "team-standup");
+				await user.type(within(refused).getByLabelText(/to confirm/u), "C02ACTIVE002");
+				await user.click(within(refused).getByRole("button", { name: "Remove and erase" }));
+				await waitFor(() => expect(removals.changes).toHaveLength(1));
+				await user.keyboard("{Escape}");
+				const pending = screen.getByRole("alertdialog", {
+					name: "Remove #team-standup and erase its data?",
+				});
+				expect(within(pending).getByLabelText(/to confirm/u)).toHaveProperty(
+					"value",
+					"C02ACTIVE002",
+				);
+				expect(within(pending).getByRole("button", { name: "Removing…" })).toHaveProperty(
+					"disabled",
+					true,
+				);
+				const readsBefore = slack.channels.reads.count;
+
+				slack.channels.answer({ status: 403 });
+				await rereadSlackChannels(queryClient);
+				await screen.findByText("You do not have access to the monitored channels");
+				await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+
+				slack.channels.answer({ status: 200, body: [standupChannel, designChannel] });
+				await rereadSlackChannels(queryClient);
+				const latest = await openSlackRemove(user, reopened);
+				await user.type(within(latest).getByLabelText(/to confirm/u), channelId);
+
+				slack.channels.answer({
+					status: 200,
+					body: [{ ...standupChannel, consentState: "REVOKED" }, designChannel],
+				});
+				refusedRemoval.resolve();
+				await screen.findByText("Revoked");
+				expect(slack.channels.reads.count).toBe(readsBefore + 3);
+				const stillOpen = screen.getByRole("alertdialog", {
+					name: `Remove #${reopened} and erase its data?`,
+				});
+				expect(within(stillOpen).getByLabelText(/to confirm/u)).toHaveProperty("value", channelId);
+
+				await user.click(within(stillOpen).getByRole("button", { name: finish }));
+				await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+				expect(removals.changes).toHaveLength(changes);
+			} finally {
+				refusedRemoval.resolve();
+			}
+		},
+	);
+
+	it("keeps a pending Activate open through Escape until its own answer closes it", async () => {
+		serveSlackChannels({ status: 200, body: [introChannel] }, { status: 200, body: [] });
+		const activation = deferred();
+		const activations = holdSlackChanges([activation]);
+		renderRouteAt("/w/acme/admin/integrations/slack");
+		const user = userEvent.setup();
+		try {
+			await user.click(
+				await screen.findByRole("button", { name: "Actions for team-intro" }, ROUTE_RENDER_WAIT),
+			);
+			await user.click(await screen.findByRole("menuitem", { name: "Activate monitoring…" }));
+			const dialog = await screen.findByRole("dialog", {
+				name: "Activate monitoring for #team-intro?",
+			});
+			await user.click(within(dialog).getByRole("button", { name: "Activate monitoring" }));
+			await waitFor(() =>
+				expect(activations.changes).toStrictEqual([
+					{ slackChannelId: "C01PENDING01", body: { consentState: "ACTIVE" } },
+				]),
+			);
+
+			await user.keyboard("{Escape}");
+			const pending = screen.getByRole("dialog", { name: "Activate monitoring for #team-intro?" });
+			expect(within(pending).getByRole("button", { name: "Activating…" })).toHaveProperty(
+				"disabled",
+				true,
+			);
+			expect(within(pending).queryByRole("button", { name: "Close" })).toBeNull();
+
+			activation.resolve();
+			await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+			expect(activations.changes).toHaveLength(1);
+		} finally {
+			activation.resolve();
+		}
 	});
 });

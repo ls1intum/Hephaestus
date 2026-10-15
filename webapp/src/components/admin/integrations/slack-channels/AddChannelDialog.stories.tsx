@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 
 import type { SlackChannelCandidate } from "@/api/types.gen";
+import { pending } from "@/test/async";
 
 import { AddChannelDialog } from "./AddChannelDialog";
 
@@ -122,6 +123,61 @@ export const InvalidPaste: Story = {
 		const dialog = within(await screen.findByRole("dialog"));
 		await userEvent.type(dialog.getByLabelText(/paste a channel link or id/iu), "not-a-channel");
 		dialog.getByText(/paste a slack channel link, mention, or id/iu);
+	},
+};
+
+/** Slack's channel list is still loading: its slot holds a placeholder, and paste stays one click away. */
+export const CandidatesLoading: Story = {
+	args: { candidates: [], candidatesLoading: true },
+	play: async () => {
+		const dialog = within(await screen.findByRole("dialog"));
+		await expect(dialog.queryByRole("combobox", { name: /^channel$/iu })).not.toBeInTheDocument();
+		await expect(dialog.queryByLabelText(/paste a channel link or id/iu)).not.toBeInTheDocument();
+		dialog.getByRole("button", { name: /paste a channel link or id instead/iu });
+	},
+};
+
+/** Slack's channel list could not be read: the picker says so and offers Retry; paste still works. */
+export const CandidatesFailed: Story = {
+	args: {
+		candidates: [],
+		candidatesFailure: { error: { status: 503 }, onRetry: fn(), pending: false },
+	},
+	play: async () => {
+		const dialog = within(await screen.findByRole("dialog"));
+		dialog.getByText("We could not load the channels from Slack");
+		await expect(dialog.getByRole("button", { name: "Retry" })).toBeEnabled();
+		dialog.getByLabelText(/paste a channel link or id/iu);
+	},
+};
+
+/** Slack's channel list was refused: no Retry that would be refused again, and paste still works. */
+export const CandidatesRefused: Story = {
+	args: {
+		candidates: [],
+		candidatesFailure: { error: { status: 403 }, onRetry: fn(), pending: false },
+	},
+	play: async () => {
+		const dialog = within(await screen.findByRole("dialog"));
+		dialog.getByText("You do not have access to the channels from Slack");
+		await expect(dialog.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+		dialog.getByLabelText(/paste a channel link or id/iu);
+	},
+};
+
+/** While an Add is pending, the dialog cannot be dismissed, so its draft and answer stay together. */
+export const SubmitPending: Story = {
+	args: { candidates: [], onSubmit: fn(async (): Promise<void> => pending()) },
+	play: async () => {
+		const dialog = within(await screen.findByRole("dialog"));
+		await userEvent.type(dialog.getByLabelText(/paste a channel link or id/iu), "C0974LJBPBK");
+		await userEvent.click(dialog.getByRole("button", { name: /^add channel$/iu }));
+
+		await expect(dialog.getByRole("button", { name: "Adding…" })).toBeDisabled();
+		await expect(dialog.queryByRole("button", { name: "Close" })).not.toBeInTheDocument();
+		await userEvent.keyboard("{Escape}");
+		await expect(await screen.findByRole("dialog")).toBeVisible();
+		await expect(dialog.getByLabelText(/paste a channel link or id/iu)).toHaveValue("C0974LJBPBK");
 	},
 };
 
