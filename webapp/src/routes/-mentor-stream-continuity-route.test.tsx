@@ -11,6 +11,25 @@ import { server } from "@/mocks/server";
 import { currentUserQueryOptions } from "@/runtime/auth/guard";
 import { renderRouteAtWithRouter, ROUTE_RENDER_WAIT } from "@/test/router-harness";
 
+// Node Request copies can lose their abort link after GC (https://github.com/nodejs/undici/issues/4068).
+// Observe the SDK's original signal while the real CSRF transport and MSW handle the request.
+const chatTransport = vi.hoisted<{ signal: AbortSignal | null | undefined }>(() => ({
+	signal: undefined,
+}));
+
+vi.mock(import("@/runtime/auth/csrf"), async (importOriginal) => {
+	const actual = await importOriginal();
+	return {
+		...actual,
+		csrfFetch: async (...args: Parameters<typeof actual.csrfFetch>) => {
+			if (typeof args[0] === "string" && args[0].endsWith("/mentor/chat")) {
+				chatTransport.signal = args[1]?.signal;
+			}
+			return actual.csrfFetch(...args);
+		},
+	};
+});
+
 vi.setConfig({ testTimeout: 30_000 });
 
 const answerId = "3c634344-99c8-43d5-989a-f1d6913b7537";
@@ -23,6 +42,7 @@ interface Posted {
 }
 
 function mockMentor() {
+	chatTransport.signal = undefined;
 	server.use(
 		http.get("*/workspaces", () =>
 			HttpResponse.json([workspaceListItem("acme"), workspaceListItem("other")]),
@@ -173,12 +193,8 @@ it("stops the taken-over answer from the full chat, keeping what arrived", async
 	mockMentor();
 	const reply = heldReply();
 	const posted: Posted[] = [];
-	let aborted = false;
 	server.use(
 		http.post<PathParams, Posted>("*/workspaces/acme/mentor/chat", async ({ request }) => {
-			request.signal.addEventListener("abort", () => {
-				aborted = true;
-			});
 			posted.push(await request.json());
 			return reply.response();
 		}),
@@ -190,7 +206,7 @@ it("stops the taken-over answer from the full chat, keeping what arrived", async
 
 	await userEvent.click(await screen.findByRole("button", { name: "Stop generating" }));
 
-	await waitFor(() => expect(aborted).toBe(true));
+	await waitFor(() => expect(chatTransport.signal?.aborted).toBe(true));
 	await waitFor(() => expect(screen.queryByRole("button", { name: "Stop generating" })).toBeNull());
 	screen.getByText(/First step:/u);
 	expect(posted).toHaveLength(1);
@@ -285,12 +301,8 @@ it("stops a saved conversation's answer when the reader leaves its page", async 
 	mockMentor();
 	const reply = heldReply();
 	const posted: Posted[] = [];
-	let aborted = false;
 	server.use(
 		http.post<PathParams, Posted>("*/workspaces/acme/mentor/chat", async ({ request }) => {
-			request.signal.addEventListener("abort", () => {
-				aborted = true;
-			});
 			posted.push(await request.json());
 			return reply.response();
 		}),
@@ -314,7 +326,7 @@ it("stops a saved conversation's answer when the reader leaves its page", async 
 		await router.navigate({ to: "/w/$workspaceSlug/teams", params: { workspaceSlug: "acme" } });
 	});
 
-	await waitFor(() => expect(aborted).toBe(true));
+	await waitFor(() => expect(chatTransport.signal?.aborted).toBe(true));
 	expect(posted).toHaveLength(1);
 });
 
@@ -322,12 +334,8 @@ it("stops a live answer when the workspace changes, and starts the other workspa
 	mockMentor();
 	const reply = heldReply();
 	const posted: Posted[] = [];
-	let aborted = false;
 	server.use(
 		http.post<PathParams, Posted>("*/workspaces/acme/mentor/chat", async ({ request }) => {
-			request.signal.addEventListener("abort", () => {
-				aborted = true;
-			});
 			posted.push(await request.json());
 			return reply.response();
 		}),
@@ -340,7 +348,7 @@ it("stops a live answer when the workspace changes, and starts the other workspa
 		await router.navigate({ to: "/w/$workspaceSlug/teams", params: { workspaceSlug: "other" } });
 	});
 
-	await waitFor(() => expect(aborted).toBe(true));
+	await waitFor(() => expect(chatTransport.signal?.aborted).toBe(true));
 	await userEvent.click(
 		await screen.findByRole("button", { name: "Open Heph, AI mentor" }, ROUTE_RENDER_WAIT),
 	);
@@ -353,7 +361,6 @@ it("starts another account with the same username on a new, empty conversation",
 	mockMentor();
 	const reply = heldReply();
 	const posted: Posted[] = [];
-	let aborted = false;
 	server.use(
 		http.get("*/user", () => HttpResponse.json(currentUser)),
 		http.post<PathParams, Posted>(
@@ -367,9 +374,6 @@ it("starts another account with the same username on a new, empty conversation",
 		http.post<PathParams, Posted>(
 			"*/workspaces/acme/mentor/chat",
 			async ({ request }) => {
-				request.signal.addEventListener("abort", () => {
-					aborted = true;
-				});
 				posted.push(await request.json());
 				return reply.response();
 			},
@@ -405,7 +409,7 @@ it("starts another account with the same username on a new, empty conversation",
 		queryClient.setQueryData(currentUserQueryOptions().queryKey, { ...currentUser, id: 43 });
 	});
 
-	await waitFor(() => expect(aborted).toBe(true));
+	await waitFor(() => expect(chatTransport.signal?.aborted).toBe(true));
 	await waitFor(() => expect(screen.queryByText("The first answer.")).toBeNull());
 	expect(screen.queryByText(/First step:/u)).toBeNull();
 	expect(screen.queryByText("First question")).toBeNull();
