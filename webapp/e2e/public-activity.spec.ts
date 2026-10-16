@@ -127,6 +127,7 @@ test.describe("narrow touch", () => {
 		page,
 	}) => {
 		await openPublicWorkspace(page);
+		const peopleAddress = page.url();
 		await page
 			.getByRole("table", { name: "People", exact: true })
 			.getByRole("link", { name: PERSON, exact: true })
@@ -146,8 +147,7 @@ test.describe("narrow touch", () => {
 		await expect(person).toBeVisible();
 		await person.getByRole("button", { name: "Close", exact: true }).tap();
 		await expect(person).toBeHidden();
-		await expect(page).toHaveURL((url) => url.pathname === "/w/e2e-public");
-		expect(new URL(page.url()).searchParams.has("detail")).toBe(false);
+		await expect(page).toHaveURL(peopleAddress);
 		await expect(
 			page
 				.getByRole("table", { name: "People", exact: true })
