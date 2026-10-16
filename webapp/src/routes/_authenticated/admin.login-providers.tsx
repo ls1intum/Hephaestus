@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { KeyRound, Plus } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -58,9 +58,10 @@ function AdminLoginProvidersPage() {
 		setForm({ ...form, open: false });
 	}
 	// The form on screen, read when a save is sent and when it settles. A mutation callback's own
-	// closure can be older than both (ADR 0027).
+	// closure can be older than both (ADR 0027). A layout effect updates it in the commit itself; a
+	// passive one can run after a save has already settled against the previous form.
 	const formOnScreen = useRef<ProviderForm | null>(null);
-	useEffect(() => {
+	useLayoutEffect(() => {
 		formOnScreen.current = form.open ? form : null;
 	}, [form]);
 	const closeForm = (sentFrom: ProviderForm | null | undefined) => {
