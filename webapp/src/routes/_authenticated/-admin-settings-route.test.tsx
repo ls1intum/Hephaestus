@@ -1,9 +1,12 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import type { QueryClient } from "@tanstack/react-query";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 
+import { getPublicActivityPolicyQueryKey } from "@/api/@tanstack/react-query.gen";
 import { server } from "@/mocks/server";
+import { deferred } from "@/test/async";
 import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
 
 const settings = (revision: number) => ({
@@ -13,6 +16,34 @@ const settings = (revision: number) => ({
 	silentModeChangedAt: "2026-08-03T08:00:00Z",
 	silentModeChangedByAccountId: 42,
 });
+
+type PolicyAnswer = { status: 200; body: { allowed: boolean } } | { status: 403 | 503 };
+
+/** Answers the instance policy GET with the answer the test last chose, counting each read. */
+function servePolicy(initial: PolicyAnswer) {
+	const read = { count: 0, answer: initial };
+	server.use(
+		http.get("*/admin/settings", () => HttpResponse.json(settings(1))),
+		http.get("*/admin/settings/public-activity", () => {
+			read.count += 1;
+			const { answer } = read;
+			return answer.status === 200
+				? HttpResponse.json(answer.body)
+				: HttpResponse.json(
+						{ status: answer.status, title: "Request failed" },
+						{ status: answer.status },
+					);
+		}),
+	);
+	return read;
+}
+
+/** Reads the instance policy again through its generated key, as a returning admin does. */
+async function rereadPolicy(queryClient: QueryClient) {
+	await act(async () => {
+		await queryClient.invalidateQueries({ queryKey: getPublicActivityPolicyQueryKey() });
+	});
+}
 
 describe("instance settings route", () => {
 	it("sends If-Match and reloads current state after a stale release", async () => {
@@ -218,4 +249,115 @@ describe("instance settings route", () => {
 			).toBe("true"),
 		);
 	});
+
+	it("withdraws a refused public activity setting, also when an earlier change is accepted, and shows only a fresh read", async () => {
+		const policy = servePolicy({ status: 200, body: { allowed: false } });
+		const accepted = deferred();
+		const puts: unknown[] = [];
+		server.use(
+			http.put("*/admin/settings/public-activity", async ({ request }) => {
+				puts.push(await request.json());
+				await accepted.promise;
+				return HttpResponse.json({ allowed: true });
+			}),
+		);
+		const user = userEvent.setup();
+		const queryClient = renderRouteAt("/admin/settings");
+		try {
+			await user.click(
+				await screen.findByRole(
+					"switch",
+					{ name: "Allow public activity pages" },
+					ROUTE_RENDER_WAIT,
+				),
+			);
+			await waitFor(() => expect(puts).toStrictEqual([{ allowed: true }]));
+
+			policy.answer = { status: 403 };
+			await rereadPolicy(queryClient);
+			expect(policy.count).toBe(2);
+			await screen.findByText("You do not have access to the public activity setting");
+			expect(screen.queryByRole("switch", { name: "Allow public activity pages" })).toBeNull();
+			expect(screen.queryByText("Off. No workspace can publish a page.")).toBeNull();
+			expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+
+			accepted.resolve();
+			await waitFor(() => expect(queryClient.isMutating()).toBe(0));
+			expect(screen.queryByRole("switch", { name: "Allow public activity pages" })).toBeNull();
+			screen.getByText("You do not have access to the public activity setting");
+
+			policy.answer = { status: 503 };
+			await rereadPolicy(queryClient);
+			await screen.findByText("We could not load the public activity setting");
+			expect(screen.queryByRole("switch", { name: "Allow public activity pages" })).toBeNull();
+			expect(screen.queryByText("This setting may be out of date")).toBeNull();
+
+			const readsBeforeRetry = policy.count;
+			policy.answer = { status: 200, body: { allowed: true } };
+			await user.click(screen.getByRole("button", { name: "Retry" }));
+			const fresh = await screen.findByRole("switch", { name: "Allow public activity pages" });
+			expect(fresh.getAttribute("aria-checked")).toBe("true");
+			screen.getByText("On. Workspaces can publish their page.");
+			expect(policy.count).toBe(readsBeforeRetry + 1);
+			expect(puts).toHaveLength(1);
+		} finally {
+			accepted.resolve();
+		}
+	});
+
+	it("keeps the last public activity setting beside a failed refresh, and shows the next read", async () => {
+		const policy = servePolicy({ status: 200, body: { allowed: true } });
+		const puts: unknown[] = [];
+		server.use(
+			http.put("*/admin/settings/public-activity", async ({ request }) => {
+				puts.push(await request.json());
+				return HttpResponse.json({ allowed: false });
+			}),
+		);
+		const user = userEvent.setup();
+		const queryClient = renderRouteAt("/admin/settings");
+		const loaded = await screen.findByRole(
+			"switch",
+			{ name: "Allow public activity pages" },
+			ROUTE_RENDER_WAIT,
+		);
+		expect(loaded.getAttribute("aria-checked")).toBe("true");
+
+		policy.answer = { status: 503 };
+		await rereadPolicy(queryClient);
+		expect(policy.count).toBe(2);
+		await screen.findByText("This setting may be out of date");
+		expect(
+			screen
+				.getByRole("switch", { name: "Allow public activity pages" })
+				.getAttribute("aria-checked"),
+		).toBe("true");
+		screen.getByText("On. Workspaces can publish their page.");
+
+		policy.answer = { status: 200, body: { allowed: false } };
+		await user.click(screen.getByRole("button", { name: "Retry" }));
+		await screen.findByText("Off. No workspace can publish a page.");
+		expect(screen.queryByText("This setting may be out of date")).toBeNull();
+		expect(policy.count).toBe(3);
+		expect(puts).toStrictEqual([]);
+	});
+
+	it.each([
+		{
+			status: 403 as const,
+			title: "You do not have access to the public activity setting",
+			retry: false,
+		},
+		{ status: 503 as const, title: "We could not load the public activity setting", retry: true },
+	])(
+		"offers no public activity switch when the first read answers $status",
+		async ({ status, title, retry }) => {
+			servePolicy({ status });
+			renderRouteAt("/admin/settings");
+
+			await screen.findByText(title, undefined, ROUTE_RENDER_WAIT);
+			expect(screen.queryByRole("switch", { name: "Allow public activity pages" })).toBeNull();
+			expect(screen.queryByRole("button", { name: "Retry" }) !== null).toBe(retry);
+		},
+	);
 });

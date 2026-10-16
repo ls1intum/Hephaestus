@@ -59,6 +59,35 @@ export const Failed: Story = {
 	},
 };
 
+/** A failed refresh keeps the last setting, says so, and offers Retry. */
+export const RefreshFailed: Story = {
+	args: {
+		state: {
+			status: "ready",
+			allowed: true,
+			pending: false,
+			refreshFailure: { error: { status: 503 }, onRetry: fn(), pending: false },
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("This setting may be out of date")).toBeVisible();
+		await expect(canvas.getByRole("button", { name: /Retry/u })).toBeEnabled();
+		await expect(canvas.getByRole("switch", { name: SWITCH })).toBeChecked();
+	},
+};
+
+/** A refused setting shows no switch and no retry that would be refused again. */
+export const Refused: Story = {
+	args: { state: { status: "error", error: { status: 403 }, onRetry: fn() } },
+	play: async ({ canvas }) => {
+		await expect(
+			canvas.getByText("You do not have access to the public activity setting"),
+		).toBeVisible();
+		await expect(canvas.queryByRole("switch")).toBeNull();
+		await expect(canvas.queryByRole("button", { name: /Retry/u })).toBeNull();
+	},
+};
+
 export const Dark: Story = {
 	globals: { theme: "dark" },
 };

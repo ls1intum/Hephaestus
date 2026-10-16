@@ -22,7 +22,7 @@ import {
 } from "@/components/admin/instance/InstancePublicActivityCard";
 import { SilentModeCard } from "@/components/admin/instance/SilentModeCard";
 import { ConfirmAccessDialog } from "@/components/auth/ConfirmAccessDialog";
-import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { QueryErrorAlert, queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -34,6 +34,7 @@ import {
 	type StepUpChallenge,
 	stepUpChallengeOf,
 } from "@/lib/problem-detail";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 export const Route = createFileRoute("/_authenticated/admin/settings")({
 	head: instanceAdminHead("Instance settings"),
@@ -80,14 +81,15 @@ function WorkspaceSettingsPage() {
 		},
 	});
 
-	const policyQuery = useQuery(getPublicActivityPolicyOptions());
+	const policyOptions = getPublicActivityPolicyOptions();
+	const policyQuery = useQuery(policyOptions);
+	useQueryReadRefusal(policyOptions.queryKey, policyQuery.isError, policyQuery.error);
 	// Changing who may publish asks for a recent sign-in; the refusal opens that ask instead of a toast.
 	const [challenge, setChallenge] = useState<StepUpChallenge>();
 	const confirmAccess = useConfirmAccess(challenge !== undefined);
 	const policyMutation = useMutation({
 		...updatePublicActivityPolicyMutation(),
-		onSuccess: (data) => {
-			queryClient.setQueryData(getPublicActivityPolicyQueryKey(), data);
+		onSuccess: async (data) => {
 			// Whether each workspace's page is live follows the instance.
 			void queryClient.invalidateQueries({ queryKey: listWorkspacesQueryKey() });
 			toast.success(
@@ -101,6 +103,9 @@ function WorkspaceSettingsPage() {
 								"Visitors see the change when they load the page again, at most about a minute later.",
 						},
 			);
+			// The saved setting reaches the card only through a fresh read, so a read that is refused
+			// by the time the change returns stays refused.
+			await queryClient.invalidateQueries({ queryKey: getPublicActivityPolicyQueryKey() });
 		},
 		onError: (error) => {
 			const stepUp = stepUpChallengeOf(error);
@@ -112,21 +117,24 @@ function WorkspaceSettingsPage() {
 			toast.error(problemDetailOf(error, "We could not change public activity pages. Try again."));
 		},
 	});
+	const retryPolicy = () => {
+		void policyQuery.refetch();
+	};
+	// A refused read shows nothing it read before. A read that can be retried keeps its last answer.
+	const policy =
+		policyQuery.isError && !queryErrorIsRetryable(policyQuery.error) ? undefined : policyQuery.data;
 	let publicActivity: InstancePublicActivityState = { status: "loading" };
-	if (policyQuery.data) {
+	if (policy !== undefined) {
 		publicActivity = {
 			status: "ready",
-			allowed: policyQuery.data.allowed,
+			allowed: policy.allowed,
 			pending: policyMutation.isPending,
+			refreshFailure: policyQuery.isError
+				? { error: policyQuery.error, pending: policyQuery.isFetching, onRetry: retryPolicy }
+				: undefined,
 		};
 	} else if (policyQuery.isError) {
-		publicActivity = {
-			status: "error",
-			error: policyQuery.error,
-			onRetry: () => {
-				void policyQuery.refetch();
-			},
-		};
+		publicActivity = { status: "error", error: policyQuery.error, onRetry: retryPolicy };
 	}
 
 	let body: ReactNode;
