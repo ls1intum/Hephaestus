@@ -173,8 +173,8 @@ class PreviewSeedPolicyIntegrationTest {
             assertThat(scalar("SELECT credentials_key_version::text FROM connection WHERE id = " + connectionId))
                     .isNull();
             assertThat(scalar("SELECT state FROM connection WHERE id = " + connectionId))
-                    .as("a clone keeps each connection's state; only what can act as staging goes")
-                    .isEqualTo("ACTIVE");
+                    .as("a clone suspends active connections before owned reviews can be enabled")
+                    .isEqualTo("SUSPENDED");
         }
         assertThat(scalar("SELECT config ->> 'webhookSecret' FROM connection WHERE id = " + outlineConnectionId))
                 .isNull();

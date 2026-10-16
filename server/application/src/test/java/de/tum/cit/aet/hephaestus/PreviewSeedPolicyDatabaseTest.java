@@ -55,6 +55,9 @@ class PreviewSeedPolicyDatabaseTest {
                     connection,
                     "SELECT (to_jsonb(d)-'projection_owner'-'projection_expires_at')::text FROM feedback_dispatch d WHERE id=md5('dispatch:6')::uuid");
             var reasons = scalar(connection, "SELECT jsonb_object_agg(id,reason)::text FROM observation_invalidation");
+            var terminalSignal = scalar(
+                    connection,
+                    "SELECT to_jsonb(s)::text FROM artifact_signal s WHERE id=md5('signal:SUPPRESSED')::uuid");
             assertThat(scalar(connection, "SELECT coalesce(to_regclass('public.review_job')::text,'absent')"))
                     .isEqualTo("absent");
             var completed =
@@ -65,6 +68,21 @@ class PreviewSeedPolicyDatabaseTest {
             assertThat(scalar(connection, policy.verification())).isEqualTo("0");
             assertThat(scalar(connection, "SELECT silent_mode_engaged::text FROM instance_settings WHERE id=1"))
                     .isEqualTo("true");
+            assertThat(scalar(connection, "SELECT practice_delivery_status FROM workspace WHERE id=997001"))
+                    .isEqualTo("PAUSED");
+            assertThat(scalar(
+                            connection,
+                            "SELECT count(*) FROM connection WHERE workspace_id=997001 AND state='SUSPENDED'"))
+                    .isEqualTo("4");
+            assertThat(
+                            scalar(
+                                    connection,
+                                    "SELECT count(*) FROM artifact_signal WHERE workspace_id=997001 AND state='SUPPRESSED' AND state_reason='GATE_SKIPPED' AND job_id IS NULL"))
+                    .isEqualTo("4");
+            assertThat(scalar(
+                            connection,
+                            "SELECT to_jsonb(s)::text FROM artifact_signal s WHERE id=md5('signal:SUPPRESSED')::uuid"))
+                    .isEqualTo(terminalSignal);
             assertThat(
                             scalar(
                                     connection,
@@ -188,6 +206,11 @@ class PreviewSeedPolicyDatabaseTest {
         VALUES(997001,'Preview person','USER','ACTIVE',now(),now(),0);
         INSERT INTO identity_provider(id,type,server_url) VALUES(997001,'GITHUB','https://preview-policy.example');
         INSERT INTO "user"(id,native_id,provider_id,login) VALUES(997001,997001,997001,'preview-policy');
+        INSERT INTO artifact_signal(id,workspace_id,artifact_kind,artifact_id,signal_name,revision,
+            occurred_at,discovered_via,state,state_reason,state_changed_at)
+        SELECT md5('signal:'||state)::uuid,997001,'scm.pull_request',997001,'scm.pull_request.created',state,
+            now(),'SYNC',state,CASE WHEN state='SUPPRESSED' THEN 'GATE_SKIPPED' END,now()
+        FROM (VALUES('RECORDED'),('DEFERRED'),('PENDING'),('SUPPRESSED')) AS seed(state);
         INSERT INTO agent_job(id,workspace_id,job_type,status,delivery_status,config_snapshot,job_token,job_token_hash,
             retry_count,created_at,available_at,trace_id,worker_id,completed_at)
         SELECT md5('job:'||n)::uuid,997001,'PRACTICE_REVIEW',status,delivery,'{}',
@@ -235,9 +258,9 @@ class PreviewSeedPolicyDatabaseTest {
         VALUES(997001,997001,'PRACTICE_REVIEW',true,997001);
         INSERT INTO workspace_llm_connection(id,workspace_id,slug,display_name,base_url,api_protocol,api_key,enabled,created_at)
         VALUES(997001,997001,'preview-policy','Preview policy','https://preview-policy.example','openai-responses','fixture',true,now());
-        INSERT INTO connection(id,workspace_id,kind,instance_key,credentials_encrypted,credentials_alg,
+        INSERT INTO connection(id,workspace_id,kind,instance_key,state,credentials_encrypted,credentials_alg,
             credentials_key_version,credentials_rotation_failed_at,config)
-        SELECT 997000+n,997001,kind,'preview:'||n,'fixture'::bytea,'fixture',1,now(),'{"webhookSecret":"fixture"}'
+        SELECT 997000+n,997001,kind,'preview:'||n,CASE WHEN kind='GITLAB' THEN 'SUSPENDED' ELSE 'ACTIVE' END,'fixture'::bytea,'fixture',1,now(),'{"webhookSecret":"fixture"}'
         FROM (VALUES(1,'GITHUB'),(2,'GITLAB'),(3,'SLACK'),(4,'OUTLINE')) AS seed(n,kind);
         INSERT INTO sync_job(id,workspace_id,connection_id,kind,type,trigger_source,status,heartbeat_at)
         SELECT 997000+n,997001,997000+n,kind,'INITIAL','SYSTEM',status,now()
