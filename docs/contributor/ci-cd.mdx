@@ -498,9 +498,10 @@ A preview runs its own PostgreSQL seeded from staging and reads staging's event 
 switched off in the copy, how sign-in works, and how the sandbox is enforced are in
 [`docker/preview/README.md`](https://github.com/hephaestus-build/Hephaestus/blob/main/docker/preview/README.md).
 
-Preview controllers run only for pull requests targeting `main`. This keeps privileged
-`pull_request_target` workflows anchored to the protected branch. A stacked layer becomes eligible
-after it is retargeted to `main`.
+Same-repository pull requests can preview while targeting a stacked branch. The controller routes
+them to the default branch's Coolify application and checks their migrations against the default
+branch. The trusted workflow and admission boundary are defined in
+[ADR 0035](../decisions/0035-pull-request-previews-are-label-gated.md).
 
 ### What a preview keeps from staging
 

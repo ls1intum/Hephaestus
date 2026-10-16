@@ -303,6 +303,11 @@ void describe("preview controller admission", () => {
 		assert.equal(core.outputs.get("eligible"), "true");
 		// Coolify picks its application by this ref, and that application tracks the default branch.
 		assert.equal(core.outputs.get("base_ref"), "main");
+		for (const file of ["deploy-preview.yml", "cleanup-preview.yml"]) {
+			const workflow = parseDocument(readFileSync(`.github/workflows/${file}`, "utf8"));
+			assert.equal(workflow.hasIn(["on", "pull_request_target", "branches"]), false, file);
+			assert.equal(workflow.hasIn(["on", "pull_request_target", "branches-ignore"]), false, file);
+		}
 	});
 
 	void it("skips a pull request whose author is not a repository collaborator", async () => {
