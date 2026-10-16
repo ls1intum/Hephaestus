@@ -11,8 +11,10 @@ import de.tum.cit.aet.hephaestus.agent.job.ReviewMemberAiPolicy;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewMethodVerifier;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewRuntimeRepository;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetBlockReason;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
@@ -52,12 +54,15 @@ public class ScanBudget {
     private boolean permitsModel(ScanExecutionSnapshot scan, List<ReviewAssignmentSnapshot> selected) {
         var workspaceId = scan.review().workspaceId();
         var reviewId = scan.review().id();
+        var spent = spent(workspaceId, reviewId);
+        if (!spent.priced())
+            throw new ScanUsageUnverifiableException("The cost of earlier scan model calls is unverifiable");
         var assignmentIds = selected.stream().map(ReviewAssignmentSnapshot::id).toList();
         var binding = policy.binding(workspaceId, reviewId, assignmentIds)
                 .orElseThrow(() -> new ScanModelUnavailableException("The frozen scan model is unavailable"));
         methods.require(selected.getFirst().practice().method(), "review", binding);
         var review = admission.admit(binding);
-        if (monthly.decide(workspaceId).blocks(review.price().fundingSource())) return false;
+        if (!permitsMonthlySpend(workspaceId, review.price().fundingSource())) return false;
         var calls = callCap(selected.size());
         Integer contextWindow = review.resolved().contextWindow();
         if (contextWindow == null)
@@ -87,7 +92,7 @@ public class ScanBudget {
             if (LlmApiProtocol.COHERE_RERANK.wire().equals(model.resolved().apiProtocol())
                     && model.price().pricingState() != UsagePricingState.NO_CHARGE)
                 throw new ScanModelUnavailableException("A token price cannot reserve billed search units");
-            if (monthly.decide(workspaceId).blocks(model.price().fundingSource())) return false;
+            if (!permitsMonthlySpend(workspaceId, model.price().fundingSource())) return false;
             directRate = directRate.max(rate(model.price()));
             long context = boundedContext(model.resolved().contextWindow());
             long maxOutput = Objects.requireNonNullElse(model.resolved().maxOutputTokens(), Math.toIntExact(context));
@@ -99,8 +104,14 @@ public class ScanBudget {
         estimate = estimate.add(directRate
                 .multiply(BigDecimal.valueOf(Math.addExact(limits.directModelTokensPerAttempt(), directOvershoot)))
                 .movePointLeft(6));
-        var spent = spent(workspaceId, reviewId);
-        return spent.priced() && spent.cost().add(estimate).compareTo(scan.budgetUsd()) <= 0;
+        return spent.cost().add(estimate).compareTo(scan.budgetUsd()) <= 0;
+    }
+
+    private boolean permitsMonthlySpend(long workspaceId, UsageFundingSource fundingSource) {
+        var reason = monthly.decide(workspaceId).forFunding(fundingSource);
+        if (reason == LlmBudgetBlockReason.UNPRICED_USAGE_BLOCKED)
+            throw new ScanUsageUnverifiableException("The cost of earlier workspace model calls is unverifiable");
+        return reason == LlmBudgetBlockReason.NONE;
     }
 
     public long callCap(int practices) {
@@ -160,7 +171,7 @@ public class ScanBudget {
                     || model.priceSnapshot() == null
                     || model.priceSnapshot().pricingState() == UsagePricingState.UNPRICED
                     || used.searchUnits() > 0)
-                throw new ScanModelUnavailableException("The scan's direct spend is unverifiable");
+                throw new ScanUsageUnverifiableException("The scan's direct spend is unverifiable");
             total = total.add(Objects.requireNonNull(model.priceSnapshot()
                     .calculateCost(
                             used.inputTokens(), used.outputTokens(), used.cacheReadTokens(), used.cacheWriteTokens())

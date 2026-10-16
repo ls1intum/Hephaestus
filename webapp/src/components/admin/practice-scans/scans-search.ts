@@ -1,26 +1,12 @@
 import { z } from "zod";
 
-import {
-	type DetailStackEntry,
-	detailStackSchema,
-} from "@/components/layout/detail-drawer/detail-stack";
 import { PROBLEM_BASELINE_STATES } from "@/components/practice-vocabulary/scan-baseline-defs";
 import {
 	type ScanEntryStatus,
 	SCAN_ENTRY_STATUSES,
 } from "@/components/practice-vocabulary/scan-entry-defs";
 
-export const SCAN_LEVEL_KINDS = ["scan-new"] as const;
-export type ScanLevelKind = (typeof SCAN_LEVEL_KINDS)[number];
-
-export const GUARDED_SCAN_LEVEL_KINDS = ["scan-new"] as const satisfies readonly ScanLevelKind[];
-
-export function startScanLevel(): DetailStackEntry<ScanLevelKind> {
-	return { kind: "scan-new", id: "draft" };
-}
-
 export const scansSearchSchema = z.object({
-	...detailStackSchema(SCAN_LEVEL_KINDS).shape,
 	page: z.coerce.number().int().min(0).optional().catch(undefined),
 });
 

@@ -168,6 +168,7 @@ public class ScanQueryService {
                 recorded.withheldReasons(),
                 recorded.notReviewedReasons(),
                 recorded.removalGuard(),
+                reports.exclusions(review),
                 new ScanAvailabilityDTO(
                         expired,
                         review.getCompletedAt() == null

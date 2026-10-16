@@ -992,7 +992,7 @@ public class ReviewJobExecutor {
         boolean billed = usage.appendTo(usageRecorder, jobRepository, job.getWorkspaceId(), job, snapshot, price);
         if (billed) {
             log.info(
-                    "Recorded confirmed usage for terminated job ({}): jobId={}, calls={}",
+                    "Settled usage for terminated job ({}): jobId={}, calls={}",
                     reason,
                     job.getId(),
                     usage.totalCalls());

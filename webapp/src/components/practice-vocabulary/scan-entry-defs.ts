@@ -7,6 +7,7 @@ import {
 	RecycleIcon,
 } from "lucide-react";
 
+import type { ScanExcludedFile } from "@/api/types.gen";
 import type { StatusDef, StatusDefs } from "@/components/common/status-def";
 
 // File status describes one practice-file pair in the scan report.
@@ -38,7 +39,8 @@ export const SCAN_ENTRY_DEFS: StatusDefs<ScanEntryStatus> = {
 		label: "Withheld",
 		icon: EyeOffIcon,
 		badgeVariant: "warning",
-		description: "Not reviewed, for the recorded reason. This is not a result.",
+		description:
+			"Admission refused the candidate result for the recorded reason. No result was recorded.",
 	},
 	LISTED: {
 		label: "Waiting",
@@ -63,3 +65,9 @@ export const REMOVED_FILE_DEF: StatusDef = {
 };
 
 export const NOT_REVIEWED_SENTENCE = "The scan ended before this file was reviewed.";
+
+// Excluded files were never eligible, so they do not keep a scan from being complete.
+export const SCAN_EXCLUSION_SENTENCES = {
+	FILE_TOO_LARGE: "Larger than the 2 MiB a review can read, so no practice reviews them.",
+	BINARY_FILE: "Binary files, so no practice reviews them.",
+} as const satisfies Record<ScanExcludedFile["reason"], string>;

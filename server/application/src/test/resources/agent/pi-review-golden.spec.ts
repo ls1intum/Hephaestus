@@ -74,10 +74,25 @@ function runScenario(name: string): Map<string, string> {
 		if (name === "scan") {
 			const inputs = scan("src/healthy.ts");
 			inputs.practice.slug = "test-practice";
-			mkdirSync(nodePath.join(cwd, "repos/primary/.git"), { recursive: true });
-			mkdirSync(nodePath.join(cwd, "repos/primary/src"), { recursive: true });
-			writeFileSync(nodePath.join(cwd, "repos/primary/.git/HEAD"), "a".repeat(40));
-			writeFileSync(nodePath.join(cwd, "repos/primary/src/healthy.ts"), "const healthy = true;\n");
+			mkdirSync(nodePath.join(cwd, "context"), { recursive: true });
+			mkdirSync(nodePath.join(cwd, "repos/reviewed/src"), { recursive: true });
+			writeFileSync(nodePath.join(cwd, "context/item.json"), JSON.stringify(inputs.item));
+			writeFileSync(
+				nodePath.join(cwd, "context/inventory.json"),
+				JSON.stringify([{ path: inputs.item.path, mode: "100644", objectId: inputs.item.blobId }]),
+			);
+			writeFileSync(nodePath.join(cwd, "repos/reviewed/src/healthy.ts"), "const healthy = true;\n");
+			const task: unknown = JSON.parse(readFileSync(nodePath.join(cwd, "task.json"), "utf8"));
+			assert.ok(typeof task === "object" && task !== null);
+			writeFileSync(
+				nodePath.join(cwd, "task.json"),
+				JSON.stringify({
+					...task,
+					contextRoot: "context",
+					repositoryRoot: "repos/reviewed",
+					manifest: "INDEX.json",
+				}),
+			);
 			writeFileSync(
 				nodePath.join(cwd, PRACTICES_DIR, "test-practice.inputs.json"),
 				JSON.stringify(inputs),
@@ -95,14 +110,14 @@ function runScenario(name: string): Map<string, string> {
 				]),
 			);
 			writeFileSync(
-				nodePath.join(cwd, "evidence/manifest.json"),
+				nodePath.join(cwd, "INDEX.json"),
 				JSON.stringify({
 					itemKind: "scm.file",
 					files: [
-						{ kind: "scm.repository.tree", file: { path: "repos/primary/.git/HEAD" } },
+						{ kind: "scm.repository.tree", file: { path: "context/item.json" } },
 						{
 							kind: "scm.repository.tree",
-							file: { path: "repos/primary/.git/hephaestus-captured-refs" },
+							file: { path: "context/inventory.json" },
 						},
 					],
 					citableTexts: [
@@ -111,7 +126,7 @@ function runScenario(name: string): Map<string, string> {
 							path: "src/healthy.ts",
 							side: "NEW",
 							commit: "a".repeat(40),
-							stagedPath: "repos/primary/src/healthy.ts",
+							stagedPath: "repos/reviewed/src/healthy.ts",
 							sha256: createHash("sha256").update("const healthy = true;\n").digest("hex"),
 						},
 					],
@@ -119,7 +134,7 @@ function runScenario(name: string): Map<string, string> {
 						{
 							kind: "scm.repository.tree",
 							state: { availability: "AVAILABLE", completeness: "COMPLETE" },
-							files: [{ path: "repos/primary/.git/HEAD" }],
+							files: [{ path: "context/item.json" }],
 							citation: { side: "FORBIDDEN", commit: "OPTIONAL" },
 						},
 					],
@@ -218,12 +233,7 @@ if (scenario !== undefined && scenario !== "") {
 	const capture = (name: string, text: string) =>
 		writeFileSync(nodePath.join(cwd, "captured", name), text);
 	mkdirSync(nodePath.join(cwd, "captured"), { recursive: true });
-	await mockChange({
-		writeChangeView: () => undefined,
-		...(scenario === "scan"
-			? { readChange: () => null, checkedOutCommit: () => "a".repeat(40) }
-			: {}),
-	});
+	await mockChange({ writeChangeView: () => undefined });
 	mock.method(globalThis, "fetch", async (_input: unknown, init?: RequestInit) => {
 		assert.ok(typeof init?.body === "string");
 		const posted: unknown = JSON.parse(init.body);
@@ -328,7 +338,7 @@ if (scenario !== undefined && scenario !== "") {
 								citations: [
 									{
 										sourceKind: "scm.repository.tree",
-										sourcePath: "repos/primary/.git/HEAD",
+										sourcePath: "context/item.json",
 										path: "src/foreign.ts",
 										startLine: 1,
 										endLine: 1,
@@ -347,7 +357,7 @@ if (scenario !== undefined && scenario !== "") {
 							citations: [
 								{
 									sourceKind: "scm.repository.tree",
-									sourcePath: "repos/primary/.git/HEAD",
+									sourcePath: "context/item.json",
 									path: "src/healthy.ts",
 									startLine: 1,
 									endLine: 1,
@@ -508,6 +518,7 @@ if (scenario !== undefined && scenario !== "") {
 		const receipts: unknown = Reflect.get(result, "readReceipts");
 		assert.ok(Array.isArray(receipts) && receipts.length === 1);
 		assert.partialDeepStrictEqual(receipts[0], {
+			sourcePath: "context/item.json",
 			path: "src/healthy.ts",
 			status: "COMPLETE",
 			version: "a".repeat(40),
@@ -517,7 +528,7 @@ if (scenario !== undefined && scenario !== "") {
 		assert.deepEqual(Reflect.get(tools, "tools"), ["read", "submit_result"]);
 		assert.match(
 			captured.get("prompt-1.md") ?? "",
-			/Assigned scan file[\s\S]*const healthy = true;/u,
+			/Assigned scan file[\s\S]*Commit: a{40}[\s\S]*Source path: context\/item\.json[\s\S]*const healthy = true;/u,
 		);
 	});
 

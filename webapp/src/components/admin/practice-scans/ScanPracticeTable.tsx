@@ -46,7 +46,7 @@ export function ScanPracticeTable({ practices, progress }: ScanPracticeTableProp
 					<TableHead scope="col">Status</TableHead>
 					<TableHead scope="col">Comparison</TableHead>
 					<TableHead scope="col" className="text-right">
-						Reviewed
+						Reviewed or reused
 					</TableHead>
 					<TableHead scope="col" className="text-right">
 						Not met

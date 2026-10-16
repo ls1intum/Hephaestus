@@ -254,6 +254,20 @@ Each selected practice/file pair has durable membership before execution.
 The driver runs bounded file jobs serially.
 It freezes the full model-slot method and practice version for reuse.
 
+Reuse requires the same composed file version, which includes the assigned blob and declared context inventory.
+Complete read coverage does not establish a complete dependency set.
+The host does not record dependency receipts for script listings, searches or tree citations.
+[ADR 0056](../decisions/0056-one-practice-model-for-items-and-scans.md#dependency-based-scan-reuse) owns the prerequisite for reuse across different context inventories.
+
+The SCM adapter shares a pinned tree index across file versions and context grants.
+After the listing completes, reuse makes one pass with durable progress for each pair.
+A restarted scan continues that pass without repeating completed attempts.
+
+The SCM adapter classifies files before the driver selects practice/file pairs.
+Binary files and files above 2 MiB remain in the removal inventory with explicit exclusion reasons.
+They have no eligible membership, result or Withheld attempt.
+Pending pairs put files without a current result first, then oldest results, then paths.
+
 A complete assigned-file read is required for a Met scan result.
 A listing, quotation or search alone cannot prove a complete file read.
 Runtime failure records Withheld membership. Untouched listed work becomes Not reviewed after closure.

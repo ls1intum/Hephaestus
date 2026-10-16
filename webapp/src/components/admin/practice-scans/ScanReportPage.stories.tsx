@@ -1,15 +1,18 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn } from "storybook/test";
+import { expect, fn, screen, waitFor, within } from "storybook/test";
 
 import type { ScanReport, ScanSummary } from "@/api/types.gen";
 import { withStandardPage } from "@/stories/decorators";
+import { expectSettledVisible } from "@/stories/overlay";
 import { StatefulPatch } from "@/stories/stateful";
+import { expectGenuinelyDisabled } from "@/test/controls";
 
 import {
 	CANCELLED_REPORT,
 	CANCELLED_SCAN,
 	COMPLETE_REPORT,
 	COMPLETE_SCAN,
+	EMPTY_COUNTS,
 	FAILED_REPORT,
 	FAILED_SCAN,
 	FIRST_BASELINE_REPORT,
@@ -101,6 +104,30 @@ export const Complete: Story = {
 	},
 };
 
+export const Empty: Story = {
+	args: {
+		state: loaded(
+			{ ...COMPLETE_SCAN, counts: { ...EMPTY_COUNTS, files: 0, practiceItemPairs: 0 } },
+			{
+				...COMPLETE_REPORT,
+				counts: { ...EMPTY_COUNTS, files: 0, practiceItemPairs: 0 },
+				recordedCounts: { ...EMPTY_COUNTS, files: 0, practiceItemPairs: 0 },
+				practices: [],
+				withheldReasons: [],
+				notReviewedReasons: [],
+			},
+		),
+		problems: list([]),
+		files: list([]),
+	},
+	play: async ({ canvas }) => {
+		await expect(
+			canvas.getByRole("heading", { name: "This scan recorded no problems" }),
+		).toBeVisible();
+		await expect(canvas.queryByText("Not counted")).not.toBeInTheDocument();
+	},
+};
+
 export const Queued: Story = {
 	args: {
 		state: loaded(QUEUED_SCAN, scanReport(QUEUED_SCAN)),
@@ -123,6 +150,20 @@ export const Running: Story = {
 		).toBeVisible();
 		await expect(canvas.queryByText(/%/u)).not.toBeInTheDocument();
 		await userEvent.click(canvas.getByRole("button", { name: "Cancel scan" }));
+		const dialog = within(await screen.findByRole("alertdialog"));
+		await expectSettledVisible(
+			dialog.getByText(
+				"The scan stops and cannot be resumed. Its report keeps the results already recorded.",
+			),
+		);
+		await expect(args.cancel.onRun).not.toHaveBeenCalled();
+		await userEvent.click(dialog.getByRole("button", { name: "Keep scan running" }));
+		await waitFor(async () => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+		await expect(args.cancel.onRun).not.toHaveBeenCalled();
+		await userEvent.click(canvas.getByRole("button", { name: "Cancel scan" }));
+		await userEvent.click(
+			within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Cancel scan" }),
+		);
 		await expect(args.cancel.onRun).toHaveBeenCalledOnce();
 	},
 };
@@ -251,6 +292,47 @@ export const WithheldNoProblems: Story = {
 				"That does not mean every practice is met: 4 practice and file pairs have no result in this scan.",
 			),
 		).toBeVisible();
+	},
+};
+
+export const ExcludedFiles: Story = {
+	args: {
+		state: loaded(
+			COMPLETE_REPORT.scan,
+			scanReport(COMPLETE_REPORT.scan, {
+				exclusions: [
+					{ itemId: "901", path: "assets/video.mp4", reason: "BINARY_FILE", sizeBytes: 4_200_000 },
+					{ itemId: "902", path: "assets/logo.png", reason: "BINARY_FILE", sizeBytes: 18_000 },
+					{ itemId: "903", path: "data/dump.json", reason: "FILE_TOO_LARGE", sizeBytes: 3_100_000 },
+				],
+			}),
+		),
+	},
+	play: async ({ canvas }) => {
+		const region = canvas.getByRole("region", { name: "Files not eligible for review" });
+		await expect(region).toHaveTextContent("1 · Larger than the 2 MiB a review can read");
+		await expect(region).toHaveTextContent("2 · Binary files, so no practice reviews them.");
+	},
+};
+
+export const Expired: Story = {
+	args: {
+		state: loaded(COMPLETE_SCAN, {
+			...COMPLETE_REPORT,
+			availability: { ...COMPLETE_REPORT.availability, expired: true, expiredProofPairs: 4 },
+		}),
+		problems: { status: "error", error: { status: 410 }, onRetry: fn() },
+		files: { status: "error", error: { status: 410 }, onRetry: fn() },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Details no longer kept")).toBeVisible();
+		await expect(
+			canvas.getByText(
+				"This scan’s file and problem lists and its SARIF export are past their retention. The counts stay.",
+			),
+		).toBeVisible();
+		await expect(canvas.getByRole("region", { name: "Counts" })).toBeVisible();
+		await expectGenuinelyDisabled(canvas.getByRole("button", { name: "Export SARIF" }));
 	},
 };
 

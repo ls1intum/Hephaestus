@@ -159,12 +159,36 @@ export const ScanWithManyRuns: Story = {
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
 		panel.getByText("Scan");
+		await expect(panel.queryByText("Feedback", { exact: true })).not.toBeInTheDocument();
+		await expect(panel.queryByText(/results and feedback/u)).not.toBeInTheDocument();
 		await expect(panel.getByRole("link", { name: "Open the scan report" })).toHaveAttribute(
 			"href",
 			expect.stringContaining(`/admin/practices/scans/${reviewDetailScanManyJobs.id}`),
 		);
 		const runs = within(panel.getByRole("list", { name: "Execution" })).getAllByRole("listitem");
 		await expect(runs).toHaveLength(reviewDetailScanManyJobs.runtime?.jobs.length ?? 0);
+	},
+};
+
+export const PartialScan: Story = {
+	args: {
+		review: ready({
+			...reviewDetailScanManyJobs,
+			status: "PARTIAL",
+			practices: reviewDetailScanManyJobs.practices.slice(0, 1).map((practice) => ({
+				...practice,
+				itemCounts: { listed: 4, reviewed: 4, reused: 1, withheld: 0, notReviewed: 0 },
+			})),
+		}),
+		onRequestReview: undefined,
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		await expect(
+			panel.getByText("It ended early, so its results cover only the work it reached."),
+		).toBeVisible();
+		await expect(panel.getByText("Files: 3 reviewed, 1 reused, 4 listed")).toBeVisible();
+		await expect(panel.queryByText("Feedback", { exact: true })).not.toBeInTheDocument();
 	},
 };
 

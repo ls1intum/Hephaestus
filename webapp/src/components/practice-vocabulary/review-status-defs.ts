@@ -125,6 +125,7 @@ export const REVIEW_STOP_REASON_SENTENCES: Record<ReviewStopReason, string> = {
 	READINESS_REFUSED: "Something the review needs was not ready.",
 	SUSPECT_LISTING: "The file listing changed too much to trust, so files were not removed.",
 	BUDGET: "The scan’s budget was used up.",
+	USAGE_UNVERIFIABLE: "We could not verify the cost of earlier model calls, so the scan stopped.",
 	DEADLINE: "The scan did not finish before its deadline.",
 	CANCELLED: "It was cancelled.",
 	ENUMERATION_FAILED: "Listing the repository’s files failed.",

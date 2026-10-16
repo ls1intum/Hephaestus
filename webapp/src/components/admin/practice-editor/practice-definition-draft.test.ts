@@ -16,12 +16,11 @@ import {
 	NO_GROUP,
 	type PracticeDefinitionDraft,
 } from "./practice-definition-draft";
-import { scanDraftOf } from "./scan-settings";
 
 const reveals = { revealTechnical: vi.fn(), revealGuide: vi.fn(), revealScript: vi.fn() };
 
 function draft(overrides: Partial<PracticeDefinitionDraft> = {}): PracticeDefinitionDraft {
-	return { ...draftOf(practiceValueOf(), mockPullRequestItemType), ...overrides };
+	return { ...draftOf(practiceValueOf()), ...overrides };
 }
 
 function saved(value: PracticeDefinitionDraft) {
@@ -31,9 +30,9 @@ function saved(value: PracticeDefinitionDraft) {
 describe("definitionOfDraft", () => {
 	it("gives back an untouched practice exactly as it was loaded", () => {
 		expect(saved(draft())).toStrictEqual(practiceValueOf());
-		expect(
-			saved(draftOf(practiceValueOf({ scan: mockScan }), mockPullRequestItemType)),
-		).toStrictEqual(practiceValueOf({ scan: mockScan }));
+		expect(saved(draftOf(practiceValueOf({ scan: mockScan })))).toStrictEqual(
+			practiceValueOf({ scan: mockScan }),
+		);
 	});
 
 	it("saves a blank script as the built-in review", () => {
@@ -47,7 +46,7 @@ describe("definitionOfDraft", () => {
 		const value = saved(
 			draft({
 				script: "export default 1;",
-				scan: { enabled: true, draft: scanDraftOf(mockScan) },
+				scan: mockScan,
 				reviewedBy: {
 					by: "PEOPLE",
 					humanReason: { code: "MEETING_NOT_CAPTURED", description: " Decided in a meeting. " },
@@ -74,7 +73,7 @@ describe("definitionOfDraft", () => {
 				limits: [],
 			},
 		});
-		const value = draftOf(people, mockPullRequestItemType);
+		const value = draftOf(people);
 		expect(
 			saved({ ...value, reviewedBy: { ...value.reviewedBy, by: "HEPHAESTUS" } }).definition
 				.reviewedBy,
@@ -97,12 +96,20 @@ describe("definitionOfDraft", () => {
 		).toBe("2.1.0");
 	});
 
-	it("turns scans off without losing the draft, and saves no scan", () => {
-		const scanned = draft({ scan: { enabled: false, draft: scanDraftOf(mockScan) } });
-		expect(saved(scanned).definition.scan).toBeNull();
-		expect(
-			saved({ ...scanned, scan: { ...scanned.scan, enabled: true } }).definition.scan,
-		).toStrictEqual(mockScan);
+	it("preserves the saved scan block during an unrelated edit and a source contract update", () => {
+		const scan = {
+			...mockScan,
+			include: ["src/**/*.ts", "src/**/*.ts"],
+			reads: { ...mockScan.reads, contract: "1.0.0" },
+		};
+		const loaded = draftOf(practiceValueOf({ scan }));
+		const value = definitionOfDraft(
+			{ ...loaded, name: "Explain every change" },
+			mockPullRequestItemType,
+			"2.1.0",
+		);
+		expect(value.definition.name).toBe("Explain every change");
+		expect(value.definition.scan).toStrictEqual(scan);
 	});
 });
 
@@ -114,7 +121,7 @@ describe("clearedBySave", () => {
 	it("names what a save with Nobody removes", () => {
 		const value = draft({
 			script: "export default 1;",
-			scan: { enabled: true, draft: scanDraftOf(mockScan) },
+			scan: mockScan,
 		});
 		expect(
 			clearedBySave({ ...value, reviewedBy: { ...value.reviewedBy, by: "NOBODY" } }),
@@ -143,14 +150,6 @@ describe("draftErrors", () => {
 	it("requires a source Hephaestus must read", () => {
 		expect(errorsOf(draft({ settings: { ...draft().settings, reads: [] } }))).toStrictEqual([
 			"Set at least one source to Required. A review cannot run without one.",
-		]);
-	});
-
-	it("checks the scan only while it is turned on", () => {
-		const scan = { ...scanDraftOf(mockScan), include: "" };
-		expect(errorsOf(draft({ scan: { enabled: false, draft: scan } }))).toStrictEqual([]);
-		expect(errorsOf(draft({ scan: { enabled: true, draft: scan } }))).toStrictEqual([
-			"Include at least one path pattern, such as **/*.ts.",
 		]);
 	});
 

@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.core.auth.AccountReferenceService;
 import de.tum.cit.aet.hephaestus.core.auth.spi.ResearchParticipationQuery;
 import de.tum.cit.aet.hephaestus.integration.core.spi.MonitoredRepositoryQuery;
 import de.tum.cit.aet.hephaestus.integration.core.webhook.JetStreamPublisher;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmRepositoryItemLifecycle;
 import de.tum.cit.aet.hephaestus.integration.scm.github.lifecycle.GitHubLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.scm.github.workspace.GitHubInstallationReconciler;
 import de.tum.cit.aet.hephaestus.integration.scm.github.workspace.GitHubWorkspaceProvisioningAdapter;
@@ -87,6 +88,8 @@ class RuntimeRoleContextIntegrationTest {
                     assertThat(application).hasNotFailed();
                     assertThat(RuntimeRole.enabled(application.getEnvironment()))
                             .containsExactly(role);
+                    assertThat(application.getBeansOfType(ScmRepositoryItemLifecycle.class))
+                            .hasSize(role == RuntimeRole.SERVER ? 1 : 0);
                     if (role == RuntimeRole.SERVER) {
                         assertThat(application.getBeansWithAnnotation(WorkspaceScopedController.class))
                                 .isNotEmpty();

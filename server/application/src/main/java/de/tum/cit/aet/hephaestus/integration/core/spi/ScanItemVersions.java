@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.spi;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /** Composes a scan member version from its pinned container and declared context.
@@ -8,7 +9,7 @@ import java.util.Set;
 public interface ScanItemVersions {
     Set<ItemKind> kinds();
 
-    ItemVersion compose(ItemRef item, ItemVersion containerVersion, List<String> context);
+    Map<Long, ItemVersion> compose(List<ItemRef> items, ItemVersion containerVersion, List<String> context);
 
     /** Returns the exact context inventory only after verifying the assigned version at its pinned container. */
     List<String> contextPaths(ItemRef item, ItemVersion assignedVersion, List<String> context);

@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReasonCountDTO;
 import de.tum.cit.aet.hephaestus.practices.scan.dto.ProblemChangesDTO;
 import de.tum.cit.aet.hephaestus.practices.scan.dto.RemovalGuardDTO;
 import de.tum.cit.aet.hephaestus.practices.scan.dto.ScanCountsDTO;
+import de.tum.cit.aet.hephaestus.practices.scan.dto.ScanExcludedFileDTO;
 import de.tum.cit.aet.hephaestus.practices.scan.dto.ScanPracticeReportDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.Comparison;
 import de.tum.cit.aet.hephaestus.practices.spi.ProblemBaselineState;
@@ -95,6 +96,14 @@ public class ScanReportService {
                         && !clock.instant().isBefore(review.getCompletedAt().plus(RETENTION)))
                 || (review.getReport() != null
                         && review.getReport().path("expired").asBoolean());
+    }
+
+    public @Nullable List<ScanExcludedFileDTO> exclusions(Review review) {
+        var receipt = review.getInventoryReceipt();
+        if (expired(review) || receipt == null || !receipt.path("exclusions").isArray()) return null;
+        var excluded = new ArrayList<ScanExcludedFileDTO>();
+        for (var file : receipt.path("exclusions")) excluded.add(json.convertValue(file, ScanExcludedFileDTO.class));
+        return List.copyOf(excluded);
     }
 
     public void requireRaw(Review review) {

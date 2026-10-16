@@ -9,6 +9,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
@@ -176,7 +177,7 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
     class UnverifiableUsageLedger {
 
         @Test
-        void cancellingAClaimedRunningJob_recordsAnUnpricedLedgerEntry() {
+        void shouldWriteNoUsageWhenACancelledExecutionMadeNoModelCall() {
             ReviewJob job = createJobWithStatus(ReviewJobStatus.RUNNING);
             job.setWorkerId("worker-1");
             job.setExecutionStartedAt(Instant.now());
@@ -195,13 +196,7 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
 
             service.cancel(1L, jobId);
 
-            ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
-                    ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(usageRecorder).record(eq(1L), sample.capture());
-            assertThat(sample.getValue().measurementVerification()).isEqualTo(MeasurementVerification.UNVERIFIABLE);
-            assertThat(sample.getValue().sourceId()).isEqualTo(cancelledJob.getId());
-            assertThat(sample.getValue().sourceAttempt()).isEqualTo(cancelledJob.getAttempt());
-            assertThat(sample.getValue().inputTokens()).isZero();
+            verifyNoInteractions(usageRecorder);
         }
 
         @Test
@@ -252,13 +247,17 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
                     .thenReturn(Optional.of(job))
                     .thenReturn(Optional.of(cancelledJob));
 
+            when(jobRepository.findLlmUsageById(jobId))
+                    .thenReturn(Optional.of(new ReviewJobLlmUsage(1, 40, 10, 0, 0, 0)));
+
             ReviewJob result = service.cancel(1L, jobId);
 
             assertThat(result.getStatus()).isEqualTo(ReviewJobStatus.CANCELLED);
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
             verify(usageRecorder).record(eq(1L), sample.capture());
-            assertThat(sample.getValue().measurementVerification()).isEqualTo(MeasurementVerification.UNVERIFIABLE);
+            assertThat(sample.getValue().measurementVerification()).isEqualTo(MeasurementVerification.VERIFIED);
+            assertThat(sample.getValue().totalCalls()).isEqualTo(1);
             assertThat(sample.getValue().price().fundingSource()).isEqualTo(UsageFundingSource.INSTANCE);
             assertThat(sample.getValue().price().pricingState()).isEqualTo(UsagePricingState.UNPRICED);
         }

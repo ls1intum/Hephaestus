@@ -4,6 +4,7 @@ import type {
 	PracticeGuide,
 	PracticeItemTypeOption,
 	PracticeVisual,
+	ScanDefinition,
 } from "@/api/types.gen";
 import type { FormError } from "@/components/common/FormErrorSummary";
 import type { AboutRole } from "@/components/practice-vocabulary/about-role-labels";
@@ -26,7 +27,6 @@ import type {
 	PracticeDefinitionValue,
 } from "./PracticeDefinitionForm";
 import type { ReviewSettings } from "./PracticeReviewSettingsEditor";
-import type { ScanSettings } from "./PracticeScanSettingsEditor";
 import {
 	itemTypeFor,
 	normalizeReviewOn,
@@ -41,15 +41,6 @@ import {
 	type ReviewedByProblem,
 	reviewedByProblem,
 } from "./reviewed-by";
-import {
-	emptyScanDraft,
-	type ScanDraft,
-	scanDraftOf,
-	scanFieldId,
-	scanOf,
-	type ScanProblem,
-	scanProblem,
-} from "./scan-settings";
 
 // Base UI Select requires a string value for an unassigned group.
 export const NO_GROUP = "__none__";
@@ -68,7 +59,8 @@ export interface PracticeDefinitionDraft {
 	reviewedBy: ReviewedByDraft;
 	criteria: string;
 	script: string;
-	scan: ScanSettings;
+	/** Kept unchanged because this form does not edit scan settings. */
+	scan: ScanDefinition | null;
 	lineNotes: boolean;
 	whyItMatters: string;
 	whatGoodLooksLike: string;
@@ -93,8 +85,6 @@ export function kindDraftOf(draft: PracticeDefinitionDraft): KindDraft {
 	};
 }
 
-const NO_SCAN_DRAFT: ScanDraft = { itemKind: "", include: "", exclude: "", context: "", reads: [] };
-
 export function freshKindDraft(itemType: PracticeItemTypeOption | undefined): KindDraft {
 	return {
 		settings: {
@@ -104,10 +94,7 @@ export function freshKindDraft(itemType: PracticeItemTypeOption | undefined): Ki
 		appliesWhen: { clauses: [], otherwise: "" },
 		about: itemType?.aboutRoles[0] ?? null,
 		script: "",
-		scan: {
-			enabled: false,
-			draft: itemType ? emptyScanDraft(itemType) : NO_SCAN_DRAFT,
-		},
+		scan: null,
 	};
 }
 
@@ -129,10 +116,7 @@ export function blankDraft(itemType: PracticeItemTypeOption | undefined): Practi
 	};
 }
 
-export function draftOf(
-	value: PracticeDefinitionValue,
-	itemType: PracticeItemTypeOption | undefined,
-): PracticeDefinitionDraft {
+export function draftOf(value: PracticeDefinitionValue): PracticeDefinitionDraft {
 	const { definition } = value;
 	const { guidance } = definition;
 	return {
@@ -149,10 +133,7 @@ export function draftOf(
 		reviewedBy: reviewedByDraftOf(definition.reviewedBy),
 		criteria: definition.criteria,
 		script: definition.script ?? "",
-		scan:
-			definition.scan === null
-				? { enabled: false, draft: freshKindDraft(itemType).scan.draft }
-				: { enabled: true, draft: scanDraftOf(definition.scan) },
+		scan: definition.scan,
 		lineNotes: definition.lineNotes,
 		whyItMatters: guidance.whyItMatters ?? "",
 		whatGoodLooksLike: guidance.whatGoodLooksLike ?? "",
@@ -170,7 +151,7 @@ export function clearedBySave(draft: PracticeDefinitionDraft): string[] {
 	return [
 		draft.settings.reads.length > 0 && "the read sources",
 		hasText(draft.script.trim()) && "the practice script",
-		draft.scan.enabled && "the scan settings",
+		draft.scan !== null && "the scan settings",
 		draft.reviewedBy.limits.length > 0 && "the review limits",
 	].filter((phrase): phrase is string => phrase !== false);
 }
@@ -196,7 +177,7 @@ export function definitionOfDraft(
 		reviewedBy: reviewedByOf(draft.reviewedBy),
 		criteria: draft.criteria.trim(),
 		script: automated ? textOrNull(draft.script) : null,
-		scan: automated && draft.scan.enabled ? scanOf(draft.scan.draft, sourceContract) : null,
+		scan: automated ? draft.scan : null,
 		lineNotes: draft.lineNotes,
 		guidance: {
 			whyItMatters: textOrNull(draft.whyItMatters),
@@ -234,7 +215,6 @@ export interface DraftErrors {
 	byField: Partial<Record<string, string>>;
 	reviewedBy?: ReviewedByProblem;
 	settings?: ReviewSettingsProblem;
-	scan?: ScanProblem;
 	/**
 	 * One list, in the order the fields appear, so the summary reads down the form and the first
 	 * entry is also the field to focus.
@@ -296,14 +276,6 @@ export function draftErrors(
 				itemType,
 			)
 		: undefined;
-	const scan =
-		automated && draft.scan.enabled && itemType?.scanSupported === true
-			? scanProblem(
-					draft.scan.draft,
-					itemType,
-					itemTypeFor(definitionOptions, draft.scan.draft.itemKind)?.readSources ?? [],
-				)
-			: undefined;
 	const visualAlt =
 		hasVisual(draft.visual) && !hasText(draft.visual.alt.trim())
 			? "Describe what the visual shows."
@@ -343,7 +315,6 @@ export function draftErrors(
 			fieldId: FIELD_IDS.otherwise,
 			message: appliesWhen.otherwiseError,
 		},
-		scan && { fieldId: scanFieldId(scan.field), message: scan.message },
 		automated &&
 			draft.script.length > MAX_SCRIPT_LENGTH && {
 				fieldId: FIELD_IDS.script,
@@ -362,7 +333,6 @@ export function draftErrors(
 		byField: Object.fromEntries(summary.map((entry) => [entry.fieldId, entry.message])),
 		reviewedBy,
 		settings,
-		scan,
 		summary,
 	};
 }

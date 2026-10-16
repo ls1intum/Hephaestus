@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
@@ -337,7 +338,7 @@ class TerminalUsageTest extends BaseUnitTest {
 
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(recorder, times(2)).record(eq(7L), sample.capture());
+            verify(recorder).record(eq(7L), sample.capture());
             var embedding = sample.getValue();
             assertThat(embedding.sourceType()).isEqualTo(UsageSourceType.PRACTICE_SCRIPT_EMBEDDING);
             assertThat(embedding.totalCalls()).isEqualTo(2);
@@ -362,11 +363,35 @@ class TerminalUsageTest extends BaseUnitTest {
             assertThat(sample.getValue().inputTokens()).isEqualTo(40);
         }
 
+        @Test
+        void shouldOmitTheLedgerRowWhenNeitherSourceRecordedAModelCall() {
+            boolean settled = TerminalUsage.resolve(runner(0, 0, 0), new ReviewJobLlmUsage(0, 0, 0, 0, 0, 0), List.of())
+                    .appendTo(recorder, jobs, 7L, jobFor(UUID.randomUUID(), 1), snapshot, pricedInstance());
+
+            assertThat(settled).isTrue();
+            verifyNoInteractions(recorder);
+        }
+
+        @Test
+        void shouldKeepAnUnpricedRowWhenOnlyADirectChatCallProvesUsage() {
+            UUID jobId = UUID.randomUUID();
+            when(jobs.sumPracticeScriptUsageByKind(7L, jobId, 1))
+                    .thenReturn(List.of(new PracticeScriptKindTotal(ModelKind.CHAT, 2, 0, 0, 0, 0, 0, 0)));
+
+            assertThat(TerminalUsage.none().appendTo(recorder, jobs, 7L, jobFor(jobId, 1), snapshot, pricedInstance()))
+                    .isFalse();
+
+            var captured = ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
+            verify(recorder).record(eq(7L), captured.capture());
+            assertThat(captured.getValue().totalCalls()).isEqualTo(2);
+            assertThat(captured.getValue().measurementVerification()).isEqualTo(MeasurementVerification.UNVERIFIABLE);
+        }
+
         static Stream<Arguments> unbillable() {
             return Stream.of(
                     Arguments.argumentSet(
-                            "no tokens at no charge",
-                            TerminalUsage.none(),
+                            "calls without tokens at no charge",
+                            TerminalUsage.resolve(runner(0, 0, 2), null, List.of()),
                             new LlmPriceSnapshot(
                                     UsageFundingSource.INSTANCE,
                                     UsagePricingState.NO_CHARGE,
@@ -378,9 +403,14 @@ class TerminalUsageTest extends BaseUnitTest {
                                     null)),
                     Arguments.argumentSet(
                             "observed tokens without a price", observed(), LlmPriceSnapshot.unpricedInstance()),
-                    Arguments.argumentSet("no tokens at a price", TerminalUsage.none(), pricedInstance()),
                     Arguments.argumentSet(
-                            "no tokens without a price", TerminalUsage.none(), LlmPriceSnapshot.unpricedInstance()));
+                            "calls without tokens at a price",
+                            TerminalUsage.resolve(runner(0, 0, 2), null, List.of()),
+                            pricedInstance()),
+                    Arguments.argumentSet(
+                            "calls without tokens or a price",
+                            TerminalUsage.resolve(runner(0, 0, 2), null, List.of()),
+                            LlmPriceSnapshot.unpricedInstance()));
         }
 
         @ParameterizedTest(name = "{argumentSetName}")
@@ -500,7 +530,8 @@ class TerminalUsageTest extends BaseUnitTest {
                             new PracticeScriptKindTotal(ModelKind.CHAT, 2, 70, 20, 0, 0, 0, 2),
                             new PracticeScriptKindTotal(ModelKind.DECISION, 5, 500_000, 100_000, 0, 0, 0, 5)));
 
-            TerminalUsage.none().appendTo(recorder, jobs, 7L, jobFor(jobId, 1), snapshot, pricedInstance());
+            TerminalUsage.fromProxy(new ReviewJobLlmUsage(2, 70, 20, 0, 0, 0))
+                    .appendTo(recorder, jobs, 7L, jobFor(jobId, 1), snapshot, pricedInstance());
 
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);

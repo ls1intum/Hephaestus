@@ -142,6 +142,16 @@ class ScanDriverTest extends BaseUnitTest {
     }
 
     @Test
+    void shouldCompleteWhenEveryInventoriedFileIsAnExplicitExclusion() {
+        var state = state(0, 0, 0, 0, false);
+        when(scans.pending(anyLong(), any(), anyInt())).thenReturn(List.of());
+        when(scans.lock(1, review.id())).thenReturn(state);
+        driver.advance(state);
+        assertCompletion(ReviewStatus.COMPLETE, null);
+        verifyNoInteractions(budget, queue);
+    }
+
+    @Test
     void cancellationWaitsForItsRunningJob() {
         var job = RuntimeReviewTestData.job();
         when(jobs.findByReviewIdAndWorkspaceIdAndStatusIn(any(), anyLong(), any()))
@@ -242,11 +252,17 @@ class ScanDriverTest extends BaseUnitTest {
         when(scans.active(anyInt())).thenReturn(List.of(initial));
         when(scans.lock(1, review.id())).thenReturn(initial, initial, recorded);
         when(reviews.start(1, review.id())).thenReturn(true);
-        var prepared = new ScanService.PreparedInventory(List.of(), Map.of());
+        var prepared = new ScanService.PreparedInventory(List.of(), Map.of(), List.of());
         when(inventory.prepare(review)).thenAnswer(call -> {
             assertThat(inside).isFalse();
             return prepared;
         });
+        doAnswer(call -> {
+                    assertThat(inside).isFalse();
+                    return null;
+                })
+                .when(scans)
+                .reuseListed(1, review.id(), recorded.createdAt().plus(Duration.ofHours(1)));
         doAnswer(call -> {
                     assertThat(inside).isTrue();
                     return null;

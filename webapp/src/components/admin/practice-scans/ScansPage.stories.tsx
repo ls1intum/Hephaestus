@@ -3,7 +3,6 @@ import { expect, fn } from "storybook/test";
 
 import { withStandardPage } from "@/stories/decorators";
 
-import { levelsOpenedBy } from "@/test/detail-stack";
 import { QUEUED_SCAN, SCANS } from "./fixtures";
 
 import { ScansPage } from "./ScansPage";
@@ -16,7 +15,7 @@ const meta = {
 		workspaceSlug: "aet",
 		scans: { status: "ready", scans: SCANS, page: 0, totalPages: 1, onPageChange: fn() },
 	},
-	argTypes: { scans: { control: false }, children: { control: false } },
+	argTypes: { scans: { control: false } },
 	tags: ["autodocs"],
 } satisfies Meta<typeof ScansPage>;
 
@@ -37,9 +36,6 @@ export const Default: Story = {
 		await expect(canvas.getByText("Cancelled")).toBeVisible();
 		await expect(canvas.getByText("Scheduled")).toBeVisible();
 		await expect(canvas.getAllByText("4 of 6")).toHaveLength(2);
-		await expect(levelsOpenedBy(canvas.getByRole("link", { name: "Start scan" }))).toEqual([
-			"scan-new:draft",
-		]);
 	},
 };
 
@@ -57,9 +53,15 @@ export const Empty: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("heading", { name: "No scans yet" })).toBeVisible();
 		await expect(
-			canvas.getByText("Start a scan to review the files in a repository."),
+			canvas.getByText(
+				"Scans appear here after a repository schedule starts one. Set up a repository schedule in review settings.",
+			),
 		).toBeVisible();
-		await expect(canvas.getAllByRole("link", { name: "Start scan" })).toHaveLength(2);
+		await expect(canvas.getByRole("link", { name: "Open review settings" })).toHaveAttribute(
+			"href",
+			"/w/aet/admin/practices/review",
+		);
+		await expect(canvas.queryByRole("link", { name: "Start scan" })).not.toBeInTheDocument();
 		await expect(canvas.queryByRole("table")).not.toBeInTheDocument();
 	},
 };
@@ -69,7 +71,7 @@ export const Loading: Story = {
 	play: async ({ canvas }) => {
 		const table = canvas.getByRole("table", { name: "Scans, newest first" });
 		await expect(table).toHaveAttribute("aria-busy", "true");
-		await expect(canvas.getByRole("columnheader", { name: "Reviewed" })).toBeVisible();
+		await expect(canvas.getByRole("columnheader", { name: "Reviewed or reused" })).toBeVisible();
 	},
 };
 

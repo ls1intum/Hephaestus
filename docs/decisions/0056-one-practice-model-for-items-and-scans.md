@@ -61,6 +61,12 @@ Practice-page delivery uses the feedback record's first authenticated developer 
 GitHub and GitLab scans pin monitored default-branch inventory.
 Only one scan per workspace and one execution job per review can be active.
 Reuse needs the same practice version, composed item version and complete frozen model method.
+The composed file version includes the assigned blob and the declared context inventory.
+An unread context file can therefore invalidate reuse.
+
+Pinned inventories share a path index across selection and context grants.
+Reuse makes one durable pass after the listing completes.
+Files that cannot supply scan text remain in the inventory with an exclusion reason, outside eligible practice/file membership.
 
 Incomplete or [suspect](../contributor/practice-review-pipeline.mdx#scans) inventory removes nothing.
 File removal, marks and missed reads never prove repair or absence.
@@ -91,3 +97,25 @@ Their surviving identity, evidence and runtime constraints remain in their ownin
 Revisit when a shipped domain needs different person terms or citation coordinates.
 Measured scan size can justify another storage design.
 A new outcome needs a concrete evidence distinction that the current four cannot express.
+
+### Dependency-based scan reuse
+
+Reuse across different context inventories requires a complete dependency record from the host.
+Complete coverage alone does not establish this record.
+File-read receipts identify a path, pinned commit and content digest, but do not contain a Git blob ID.
+The server can verify staged content against these receipts.
+It must resolve the blob from the pinned tree before a blob can become a dependency.
+
+The current script host returns listings and search matches without dependency receipts.
+Tree citations also return text without a read receipt.
+Successful operations can leave complete coverage with only the assigned file in the receipt list.
+Aggregate read counts cannot distinguish a search from a repeated file read.
+The receipt contract has no whole-tree marker or assertion that the dependency set is complete.
+Thus, a missing receipt cannot establish that an input was unused.
+
+A future dependency contract must include every path whose content the execution consumed, including citation text and absent paths.
+A whole-tree listing or search must retain the declared context hash as a dependency.
+The host must combine dependencies from the script and all its review sessions before admission.
+Unknown or incomplete dependencies must retain the current version equality requirement.
+Practice version, frozen model method, marks, trusted coverage and source authorization must still gate reuse.
+The composed item version remains the identity for reports and comparison.

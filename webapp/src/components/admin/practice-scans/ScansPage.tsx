@@ -1,4 +1,5 @@
-import { FileSearchIcon, PlusIcon } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { FileSearchIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import type { ScanSummary } from "@/api/types.gen";
@@ -6,14 +7,12 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { TablePagination } from "@/components/common/TablePagination";
 import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
-import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { buttonVariants } from "@/components/ui/button";
 import { Table, TableHeader, TableRow } from "@/components/ui/table";
 
 import { ScanColumnHeads, SCAN_SKELETON_COLUMNS, ScanRows } from "./ScanRows";
-import { startScanLevel } from "./scans-search";
 
 export type ScansListState =
 	| { status: "loading" }
@@ -29,22 +28,12 @@ export type ScansListState =
 export interface ScansPageProps {
 	workspaceSlug: string;
 	scans: ScansListState;
-	children?: ReactNode;
 }
 
 const LIST_LABEL = "Scans, newest first";
 
-function StartScanLink({ className }: { className?: string }) {
-	return (
-		<DetailStackLink entry={startScanLevel()} className={className ?? buttonVariants()}>
-			<PlusIcon aria-hidden className="size-4" />
-			Start scan
-		</DetailStackLink>
-	);
-}
-
 // A failed read supplies no counts; show the error rather than zero-valued scan rows.
-export function ScansPage({ workspaceSlug, scans, children }: ScansPageProps) {
+export function ScansPage({ workspaceSlug, scans }: ScansPageProps) {
 	let body: ReactNode;
 	if (scans.status === "error") {
 		body = (
@@ -60,8 +49,16 @@ export function ScansPage({ workspaceSlug, scans, children }: ScansPageProps) {
 				icon={<FileSearchIcon />}
 				title="No scans yet"
 				headingLevel={2}
-				description="Start a scan to review the files in a repository."
-				action={<StartScanLink className={buttonVariants({ variant: "outline" })} />}
+				description="Scans appear here after a repository schedule starts one. Set up a repository schedule in review settings."
+				action={
+					<Link
+						to="/w/$workspaceSlug/admin/practices/review"
+						params={{ workspaceSlug }}
+						className={buttonVariants({ variant: "outline" })}
+					>
+						Open review settings
+					</Link>
+				}
 			/>
 		);
 	} else {
@@ -95,10 +92,8 @@ export function ScansPage({ workspaceSlug, scans, children }: ScansPageProps) {
 				icon={<FileSearchIcon />}
 				title="Scans"
 				description="A scan reviews every file of a repository’s default branch against the practices you include in scans. It sends no feedback to anyone."
-				actions={<StartScanLink />}
 			/>
 			{body}
-			{children}
 		</PageLayout>
 	);
 }

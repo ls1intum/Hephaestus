@@ -132,7 +132,8 @@ public class GitLabRepositoryMonitors {
                     monitor.setNameWithOwner(path);
                     monitor.setNativeId(nativeId);
                     monitor.setWorkspace(workspace);
-                    repositoryToMonitorRepository.save(monitor);
+                    repositoryToMonitorRepository.saveAndFlush(monitor);
+                    syncTargetProvider.reconcileSyncTargetIdentity(monitor.getId(), nativeId, path);
                     own.add(monitor);
                     created++;
                 }
@@ -151,9 +152,7 @@ public class GitLabRepositoryMonitors {
                         kept.getId());
             }
             repositoryToMonitorRepository.flush();
-            if (kept.getNativeId() == null || !path.equals(kept.getNameWithOwner())) {
-                syncTargetProvider.reconcileSyncTargetIdentity(kept.getId(), nativeId, path);
-            }
+            syncTargetProvider.reconcileSyncTargetIdentity(kept.getId(), nativeId, path);
         }
         if (created > 0) {
             log.info(

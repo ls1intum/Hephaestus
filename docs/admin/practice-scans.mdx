@@ -12,12 +12,33 @@ Scans produce admin reports, not developer feedback or personal standing.
 
 ## Start a scan
 
-1. Open Scans in workspace administration.
-2. Select Start scan.
-3. Select a monitored repository.
-4. Select the practices with scan support.
-5. Enter a budget.
-6. Start the scan.
+A workspace admin or owner can start a scan through a repository schedule or the API.
+The Scans page lists scans and their reports.
+
+1. Open **Review settings** in workspace administration.
+2. Under **Add a recurring check**, select **Repositories** in **Kind of work**.
+3. Select **How often**.
+4. Enter **Budget per run (USD)**.
+5. Select **Start checking repositories**.
+
+The schedule scans repositories in the workspace review scope.
+For an immediate scan, send a `POST /workspaces/{slug}/practices/scans` request.
+The request requires the workspace Admin role or Owner role.
+
+```bash
+curl --request POST "$HEPHAESTUS_API_URL/workspaces/acme/practices/scans" \
+  --header "Authorization: Bearer $ACCESS_TOKEN" \
+  --header 'Content-Type: application/json' \
+  --header 'Idempotency-Key: 89c54bc9-3148-42d0-9354-d0d8bd571f3a' \
+  --data '{"repositoryItemId":"123","ref":null,"expectedVersion":null,"practiceSlugs":null,"budgetUsd":"5.00","reuse":true}'
+```
+
+Set `HEPHAESTUS_API_URL` to the server API base URL.
+Use an access token for a workspace admin or owner.
+Replace `acme` with the workspace slug and `123` with the monitored repository item ID.
+A null `practiceSlugs` value selects all eligible practices with scan support.
+Use a new UUID for each new request.
+Keep its `Idempotency-Key` and body unchanged when you retry after an uncertain response.
 
 The scan pins the default-branch commit before execution.
 A different branch is refused. The branch cannot move within this scan.
@@ -29,7 +50,8 @@ A changed body with that identity is a conflict, not a second scan.
 
 Files counts distinct eligible file items.
 Outcome counts describe practice/file pairs, so a file can contribute to several practices.
-Reused pairs are included in the reviewed count.
+Reviewed counts new results from this scan. Reused counts earlier results used again.
+The tables show their combined total as **Reviewed or reused**.
 The report separates these facts:
 
 - Results judged in this scan.
@@ -37,6 +59,12 @@ The report separates these facts:
 - Withheld pairs with recorded refusal reasons.
 - Not reviewed pairs left untouched when the scan closed.
 - Listing completeness and execution completion.
+
+The report API lists binary files and files above 2 MiB as exclusions, with their paths, sizes and reasons.
+These files remain in the repository inventory.
+They do not count as eligible files or produce outcomes.
+Exclusions do not prevent completion of the eligible work.
+Null means that the scan did not record exclusions or that the raw inventory expired.
 
 Complete requires a complete listing and every selected pair judged or reused.
 Withheld or unreached work produces Partial.
@@ -57,7 +85,10 @@ A changed standard or method starts a comparison break.
 
 A reused result keeps its original producer review.
 The report links through the scan's durable membership.
-A model change or changed context requires new judgment rather than a cache hit.
+A model change or changed context requires a new judgment.
+Reuse currently requires the same assigned file blob and declared context inventory.
+A change to any file in that context prevents reuse, even if the earlier execution did not read it.
+With repository-wide context, an unrelated file change can therefore prevent reuse for every selected file.
 
 New, Unchanged and Updated describe comparable problem identities.
 Absent requires complete new proof at a changed file version.
@@ -77,7 +108,8 @@ Renaming a file creates a new file item. It is not a claimed repair.
 ## Cancel a scan
 
 1. Open the active scan.
-2. Select Cancel scan.
+2. Select **Cancel scan**.
+3. In the confirmation dialog, select **Cancel scan**.
 
 Cancellation waits for the active execution job to settle.
 The report keeps admitted work and identifies the unreached remainder.
@@ -94,7 +126,7 @@ A schedule with referenced batches cannot be deleted until those references are 
 ## Export SARIF
 
 1. Open the terminal scan report.
-2. Select Export SARIF.
+2. Select **Export SARIF**.
 
 An active scan cannot export its report.
 A partial terminal export states that execution did not complete.

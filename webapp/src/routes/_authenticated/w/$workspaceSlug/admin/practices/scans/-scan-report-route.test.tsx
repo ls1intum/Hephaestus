@@ -132,6 +132,15 @@ describe("scan report route", () => {
 
 		renderRouteAtWithRouter(REPORT_URL);
 		await user.click(await screen.findByRole("button", { name: "Cancel scan" }, ROUTE_RENDER_WAIT));
+		const dialog = within(await screen.findByRole("alertdialog"));
+		expect(patches).toStrictEqual([]);
+		await user.click(dialog.getByRole("button", { name: "Keep scan running" }));
+		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+		expect(patches).toStrictEqual([]);
+		await user.click(screen.getByRole("button", { name: "Cancel scan" }));
+		await user.click(
+			within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Cancel scan" }),
+		);
 
 		await screen.findByRole("button", { name: "Export SARIF" });
 		expect(patches).toStrictEqual([{ status: "CANCELLED" }]);
@@ -139,7 +148,7 @@ describe("scan report route", () => {
 		screen.getByText(/A workspace admin cancelled it\./u);
 	});
 
-	it("counts three files apart from six practice and file pairs, with reuse inside reviewed", async () => {
+	it("counts three files apart from six practice and file pairs, with new reviews separate from reuse", async () => {
 		serveReport({ scan: () => wireScan() });
 		const user = userEvent.setup();
 
@@ -147,7 +156,7 @@ describe("scan report route", () => {
 		const counts = await screen.findByRole("region", { name: "Counts" }, ROUTE_RENDER_WAIT);
 		expect(figure(counts, "Files")).toBe("3");
 		expect(figure(counts, "Practice and file pairs")).toBe("6");
-		expect(figure(counts, "Reviewed")).toBe("4");
+		expect(figure(counts, "Reviewed")).toBe("3");
 		expect(figure(counts, "Reused")).toBe("1");
 		expect(figure(counts, "Withheld")).toBe("1");
 		expect(figure(counts, "Not reviewed")).toBe("1");

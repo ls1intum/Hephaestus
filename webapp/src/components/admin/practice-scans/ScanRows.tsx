@@ -22,7 +22,7 @@ export const SCAN_COLUMNS = [
 	"Started by",
 	"Status",
 	"Practices",
-	"Reviewed",
+	"Reviewed or reused",
 	"Problems",
 	"Started",
 ] as const;
@@ -38,7 +38,7 @@ export const SCAN_SKELETON_COLUMNS: readonly TableSkeletonColumn[] = [
 	{ width: "w-20" },
 ];
 
-const NUMERIC_COLUMNS = new Set<string>(["Practices", "Reviewed", "Problems"]);
+const NUMERIC_COLUMNS = new Set<string>(["Practices", "Reviewed or reused", "Problems"]);
 
 export function ScanColumnHeads() {
 	return SCAN_COLUMNS.map((column) => (
@@ -57,7 +57,7 @@ export interface ScanRowsProps {
 	scans: readonly ScanSummary[];
 }
 
-// Reviewed counts practice-file pairs; listing must finish before a total can be shown.
+// Reviewed or reused counts practice-file pairs; listing must finish before a total can be shown.
 export function ScanRows({ workspaceSlug, scans }: ScanRowsProps) {
 	return (
 		<TableBody>

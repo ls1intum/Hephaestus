@@ -28,9 +28,11 @@ public record ScanReportDTO(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<ReasonCountDTO> withheldReasons,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<ReasonCountDTO> notReviewedReasons,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) RemovalGuardDTO removalGuard,
+        @Nullable List<ScanExcludedFileDTO> exclusions,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) ScanAvailabilityDTO availability) {
     public ScanReportDTO {
         practices = List.copyOf(practices);
+        exclusions = exclusions == null ? null : List.copyOf(exclusions);
         withheldReasons = List.copyOf(withheldReasons);
         notReviewedReasons = List.copyOf(notReviewedReasons);
     }

@@ -17,10 +17,7 @@ import {
 	isJsonObject as isRecord,
 } from "./work/practice-scripts/lib/core/json.ts";
 
-/**
- * The captured witness of a checkout that a repository citation names (`CandidateEvidenceVerifier.CHECKOUT_WITNESS` on
- * the server): admission verifies every quote of code against the checkout it pins.
- */
+/** A pull request's captured checkout witness. Scan trees use the task's treeSourceFile. */
 export const CHECKOUT_WITNESS = /^(?<root>repos\/[a-zA-Z0-9_-]+\/)\.git\/HEAD$/u;
 /**
  * The reviewed checkout as the server stages it (`SandboxLayout.REPO_MOUNT_RELATIVE`): a quote of the change is verified
@@ -97,6 +94,7 @@ export interface CitationSources {
 	sandboxRoot: string;
 	repositoryRoot: string;
 	headRevision: string | null;
+	treeSourceFile?: string;
 }
 
 export interface CitationRepairs {
@@ -166,7 +164,10 @@ function capturedSourceFields(
 			? fields.sourcePath
 			: [...sources.sourceFiles].find(
 					([path, kind]) =>
-						kind === proof.source && (proof.source !== TREE_SOURCE || CHECKOUT_WITNESS.test(path)),
+						kind === proof.source &&
+						(proof.source !== TREE_SOURCE ||
+							CHECKOUT_WITNESS.test(path) ||
+							path === sources.treeSourceFile),
 				)?.[0];
 	return {
 		...fields,
@@ -222,7 +223,10 @@ function sourceFields(
 		const root = file.slice(0, -".git/HEAD".length);
 		return path.startsWith(root) || sourcePath === file || sourcePath.startsWith(root);
 	});
-	const head = explicitRoot ?? `${sources.repositoryRoot.replace(/\/+$/u, "")}/.git/HEAD`;
+	const head =
+		explicitRoot ??
+		sources.treeSourceFile ??
+		`${sources.repositoryRoot.replace(/\/+$/u, "")}/.git/HEAD`;
 	// An explicit record identity must never be reinterpreted as repository text.
 	if (declared !== undefined && declared !== TREE_SOURCE) {
 		return {
@@ -248,7 +252,10 @@ function sourceFields(
 			sourceKind === TREE_SOURCE ||
 			sourcePath === path)
 	) {
-		const root = head.slice(0, -".git/HEAD".length);
+		const root =
+			head === sources.treeSourceFile
+				? `${sources.repositoryRoot.replace(/\/+$/u, "")}/`
+				: head.slice(0, -".git/HEAD".length);
 		if (path.startsWith(root)) {
 			path = path.slice(root.length);
 		}
@@ -260,7 +267,7 @@ function sourceFields(
 			sourcePath,
 			sourceKind,
 			...(resolved.commit == null &&
-			head === `${sources.repositoryRoot}/.git/HEAD` &&
+			(head === sources.treeSourceFile || head === `${sources.repositoryRoot}/.git/HEAD`) &&
 			sources.headRevision !== null
 				? { commit: sources.headRevision }
 				: {}),
@@ -290,11 +297,20 @@ function completedFromManifest(
 	return { sourcePath, sourceKind };
 }
 
+function isTreeWitness(sourcePath: string, sources: CitationSources | undefined): boolean {
+	return (
+		CHECKOUT_WITNESS.test(sourcePath) ||
+		(sources !== undefined &&
+			sourcePath === sources.treeSourceFile &&
+			sources.sourceFiles.get(sourcePath) === TREE_SOURCE)
+	);
+}
+
 /** Quotes are required and verified verbatim against captured text; coordinates alone cannot establish evidence. */
 function normalizedCitationFields(
 	raw: unknown,
 	which: string,
-	{ sourceOf, notes = [] }: CitationRepairs = {},
+	{ sourceOf, sources, notes = [] }: CitationRepairs = {},
 ): Citation {
 	const fields: Record<string, unknown> = isRecord(raw) ? raw : {};
 	const given = typeof fields.path === "string" ? fields.path : "";
@@ -328,7 +344,7 @@ function normalizedCitationFields(
 			`${which}evidence citation sourcePath is required: the staged sourceFile the lines are in`,
 		);
 	}
-	if (sourceKind === TREE_SOURCE && !CHECKOUT_WITNESS.test(sourcePath)) {
+	if (sourceKind === TREE_SOURCE && !isTreeWitness(sourcePath, sources)) {
 		throw new Error(
 			`${which}repository citations must use the captured .git/HEAD sourceFile and a repository-relative path`,
 		);

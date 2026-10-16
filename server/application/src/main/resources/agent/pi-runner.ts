@@ -53,6 +53,7 @@ import {
 	readChange,
 	readDescription,
 	readPinnedBlob,
+	safeRepositoryPath,
 	writeChangeView,
 } from "./pi-change.ts";
 import { errorText } from "./pi-error-text.ts";
@@ -136,6 +137,7 @@ import {
 import { toolArgumentValidator } from "./pi-tool-validation.ts";
 import { prepareTurnText } from "./pi-turn-context.ts";
 import { parseDiff } from "./work/practice-scripts/kits/scm/diff-parser.ts";
+import { fileRecordSchema } from "./work/practice-scripts/kits/scm/records.ts";
 import type { DiffFile } from "./work/practice-scripts/kits/scm/types.ts";
 import { MODEL_CONCURRENCY } from "./work/practice-scripts/lib/core/concurrency.ts";
 import {
@@ -1245,6 +1247,10 @@ export async function runReviewJob(): Promise<void> {
 		changeRead: boolean,
 	): Validated {
 		const notes: string[] = [];
+		const scanSources =
+			assignedInputs.get(slug)?.scope.kind === "SCAN"
+				? sourcesForPractice(slug, captureSources())
+				: null;
 		const submission = normalizeSubmission(
 			raw,
 			notes,
@@ -1255,14 +1261,19 @@ export async function runReviewJob(): Promise<void> {
 				sandboxRoot: CWD,
 				repositoryRoot: taskEnvelope.paths.repositoryRoot,
 				headRevision:
+					scanSources?.headRevision ??
 					checkedOutCommit(INPUT_PATHS.repositoryRoot) ??
 					readChange(INPUT_PATHS.contextRoot)?.head ??
 					null,
+				...(scanSources === null ? {} : { treeSourceFile: scanSources.treeSourceFile }),
 			},
 		);
 		const citations = submissionCitations(submission);
 		const assignmentScope = assignedInputs.get(slug)?.scope;
 		if (assignmentScope?.kind === "SCAN") {
+			if (citations.some((citation) => citation.commit !== scanSources?.headRevision)) {
+				throw new Error("a scan citation must cite the pinned repository commit");
+			}
 			const contextPaths = practiceIndex.find((practice) => practice.slug === slug)?.contextPaths;
 			const allowed = new Set([assignmentScope.item.path, ...(contextPaths ?? [])]);
 			if (citations.some((citation) => !allowed.has(citation.path))) {
@@ -2064,10 +2075,38 @@ export async function runReviewJob(): Promise<void> {
 		if (contextPaths === undefined || assigned === undefined) {
 			throw new UnratedError("unavailable", "scan context grants were not captured");
 		}
-		return { ...sources, permittedPaths: new Set([assigned, ...contextPaths]) };
+		const treeSourceFile = `${taskEnvelope.paths.contextRoot}/item.json`;
+		if (sourceFileSources.get(treeSourceFile) !== TREE_SOURCE) {
+			throw new UnratedError("unavailable", "the scan has no captured item source witness");
+		}
+		const capturedItem = fileRecordSchema.parse(
+			JSON.parse(readFileSync(`${INPUT_PATHS.contextRoot}/item.json`, "utf8")),
+		);
+		const assignedItem = fileRecordSchema.parse(inputs.item);
+		if (
+			!safeRepositoryPath(assigned) ||
+			capturedItem.path !== assigned ||
+			!isDeepStrictEqual(capturedItem, assignedItem)
+		) {
+			throw new UnratedError("unavailable", "the captured scan item contradicts its assignment");
+		}
+		return {
+			...sources,
+			repo: INPUT_PATHS.repositoryRoot,
+			headRevision: capturedItem.commitId,
+			treeSourceFile,
+			change: null,
+			permittedPaths: new Set([assigned, ...contextPaths]),
+		};
 	}
 
-	function jobFiles(kind: string): JobFiles | null {
+	function jobFiles(inputs: PracticeInputs, evidence: EvidenceSources): JobFiles | null {
+		if (inputs.scope.kind === "SCAN") {
+			return evidence.headRevision === null
+				? null
+				: { head: { commit: evidence.headRevision }, change: null };
+		}
+		const { kind } = inputs;
 		const sources = capturedChange();
 		const repository = INPUT_PATHS.repositoryRoot;
 		const head =
@@ -3268,7 +3307,8 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 				if (stoppedBy() !== null || pastSafety() || signal.aborted) {
 					throw new UnratedError(noResultReason(slug, signal), "the scope ended before the review");
 				}
-				const leads = await resolveLeads(options.leads ?? [], evidenceSources, signal);
+				const sources = sourcesForPractice(slug, evidenceSources);
+				const leads = await resolveLeads(options.leads ?? [], sources, signal);
 				signal.throwIfAborted();
 				const fullInput = `${REVIEW_INPUT_ROOT}/${slug}.json`;
 				const preparing =
@@ -3287,9 +3327,7 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 				const domainReads = noReceipts();
 				const assignment = assignedInputs.get(slug);
 				const isScan = assignment?.scope.kind === "SCAN";
-				const reader = isScan
-					? new EvidenceReader(sourcesForPractice(slug, evidenceSources), domainReads)
-					: undefined;
+				const reader = isScan ? new EvidenceReader(sources, domainReads) : undefined;
 				let assignedText = "";
 				if (isScan && reader !== undefined) {
 					const { path } = assignment.scope.item;
@@ -3303,7 +3341,7 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 							"the assigned file cannot be read completely",
 						);
 					}
-					assignedText = `\n## Assigned scan file\nPath: ${path}\nCommit: ${evidenceSources.headRevision ?? "unavailable"}\nSource: ${TREE_SOURCE}\nSource path: ${evidenceSources.treeSourceFile}\n${file.text}\n`;
+					assignedText = `\n## Assigned scan file\nPath: ${path}\nCommit: ${sources.headRevision ?? "unavailable"}\nSource: ${TREE_SOURCE}\nSource path: ${sources.treeSourceFile}\n${file.text}\n`;
 				}
 				const readSources = new Set(
 					practiceIndex.find((practice) => practice.slug === slug)?.readsSources,
@@ -3460,17 +3498,18 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 					},
 					Math.max(0, measureEnd - Date.now()),
 				);
+				const sources = sourcesForPractice(slug, evidenceSources);
 				const outcome = await runPracticeProgram(
 					program,
 					{
 						slug,
 						inputs: read.inputs,
-						files: jobFiles(read.inputs.kind),
+						files: jobFiles(read.inputs, sources),
 						now: new Date(PROCESS_START_MS).toISOString(),
 						deadline: measureEnd - RETURN_MS,
 					},
 					{
-						reader: new EvidenceReader(sourcesForPractice(slug, evidenceSources), programReads),
+						reader: new EvidenceReader(sources, programReads),
 						models: hostModels(boundModels, LLM_PROXY_URL, LLM_PROXY_TOKEN, slug),
 						budget: directBudget,
 						review: async (options, signal) =>

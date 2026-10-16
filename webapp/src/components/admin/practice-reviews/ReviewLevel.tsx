@@ -110,7 +110,9 @@ function firstStart(review: ReviewDetail): Date | undefined {
 
 function reviewNow(review: ReviewDetail): string | undefined {
 	if (review.status === "PARTIAL") {
-		return "It ended early, so its results and feedback cover only the work it reached.";
+		return review.kind === "SCAN"
+			? "It ended early, so its results cover only the work it reached."
+			: "It ended early, so its results and feedback cover only the work it reached.";
 	}
 	if (review.status === "FAILED" || review.status === "CANCELLED") {
 		return "Results it recorded before it stopped still stand.";
@@ -273,9 +275,11 @@ function ReviewWhat({
 				</span>
 			</ReviewFact>
 			<ReviewFact label="Results">{countsLine(resultSlots(review.results)) ?? "None"}</ReviewFact>
-			<ReviewFact label="Feedback">
-				{countsLine(feedbackSlots(review.feedback)) ?? "None"}
-			</ReviewFact>
+			{review.kind !== "SCAN" && (
+				<ReviewFact label="Feedback">
+					{countsLine(feedbackSlots(review.feedback)) ?? "None"}
+				</ReviewFact>
+			)}
 			{hasText(review.itemVersion) && (
 				<ReviewFact label="Reviewed version">
 					<code className="break-all">{review.itemVersion}</code>
@@ -355,7 +359,7 @@ function resultsLine(practice: ReviewPractice): string {
 function itemCountsLine(practice: ReviewPractice): string {
 	const { reviewed, reused, withheld, notReviewed, listed } = practice.itemCounts;
 	const counts: { count: number; label: string }[] = [
-		{ count: reviewed, label: "reviewed" },
+		{ count: reviewed - reused, label: "reviewed" },
 		{ count: reused, label: "reused" },
 		{ count: withheld, label: "withheld" },
 		{ count: notReviewed, label: "not reviewed" },

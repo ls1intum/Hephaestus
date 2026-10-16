@@ -75,4 +75,22 @@ class ScmFileVersionsTest extends BaseUnitTest {
             assertThat(ScmFileVersions.parse(new ItemVersion(value, COMMIT))).isEmpty();
         }
     }
+
+    @Test
+    void shouldKeepPreparedVersionsByteIdenticalToTheCanonicalVersionForEveryAssignedFile() {
+        var files = List.of(SELF, CONTEXT, new ScmFileVersions.Entry("src/B.java", "100755", "d".repeat(40)));
+        var inventory = new ScmGitTree.Inventory(files);
+        for (var globs : List.of(
+                List.<String>of(), List.of("**/*"), List.of("src/**", "README.md", "src/**"), List.of("missing/**"))) {
+            for (var file : files) {
+                var canonical = versions.version(file.path(), file.objectId(), file.mode(), globs, files, COMMIT);
+                assertThat(inventory.version(versions, file.path(), globs, COMMIT))
+                        .isEqualTo(canonical);
+                assertThat(inventory.contextPaths(file.path(), globs))
+                        .containsExactlyElementsOf(ScmFileVersions.contextEntries(file.path(), globs, files).stream()
+                                .map(ScmFileVersions.Entry::path)
+                                .toList());
+            }
+        }
+    }
 }

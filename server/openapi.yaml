@@ -21316,6 +21316,7 @@ components:
           - READINESS_REFUSED
           - SUSPECT_LISTING
           - BUDGET
+          - USAGE_UNVERIFIABLE
           - DEADLINE
           - CANCELLED
           - ENUMERATION_FAILED
@@ -21720,6 +21721,7 @@ components:
           - READINESS_REFUSED
           - SUSPECT_LISTING
           - BUDGET
+          - USAGE_UNVERIFIABLE
           - DEADLINE
           - CANCELLED
           - ENUMERATION_FAILED
@@ -23419,6 +23421,7 @@ components:
           - READINESS_REFUSED
           - SUSPECT_LISTING
           - BUDGET
+          - USAGE_UNVERIFIABLE
           - DEADLINE
           - CANCELLED
           - ENUMERATION_FAILED
@@ -23800,6 +23803,7 @@ components:
           - READINESS_REFUSED
           - SUSPECT_LISTING
           - BUDGET
+          - USAGE_UNVERIFIABLE
           - DEADLINE
           - CANCELLED
           - ENUMERATION_FAILED
@@ -24001,6 +24005,7 @@ components:
           - READINESS_REFUSED
           - SUSPECT_LISTING
           - BUDGET
+          - USAGE_UNVERIFIABLE
           - DEADLINE
           - CANCELLED
           - ENUMERATION_FAILED
@@ -24031,6 +24036,26 @@ components:
       - startedAt
       - status
       - stopReason
+    ScanExcludedFile:
+      type: object
+      properties:
+        itemId:
+          type: string
+        path:
+          type: string
+        reason:
+          type: string
+          enum:
+          - FILE_TOO_LARGE
+          - BINARY_FILE
+        sizeBytes:
+          type: integer
+          format: int64
+      required:
+      - itemId
+      - path
+      - reason
+      - sizeBytes
     ScanPracticeRef:
       type: object
       properties:
@@ -24160,6 +24185,12 @@ components:
           type: boolean
         counts:
           $ref: "#/components/schemas/ScanCounts"
+        exclusions:
+          type:
+          - "null"
+          - array
+          items:
+            $ref: "#/components/schemas/ScanExcludedFile"
         listingComplete:
           type: boolean
         notReviewedReasons:
@@ -24190,6 +24221,7 @@ components:
       - comparison
       - complete
       - counts
+      - exclusions
       - listingComplete
       - notReviewedReasons
       - practices
@@ -24371,6 +24403,7 @@ components:
           - READINESS_REFUSED
           - SUSPECT_LISTING
           - BUDGET
+          - USAGE_UNVERIFIABLE
           - DEADLINE
           - CANCELLED
           - ENUMERATION_FAILED

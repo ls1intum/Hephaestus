@@ -18,6 +18,7 @@ A term has one definition in one of these pages.
 | **Event**           | A recorded change to an item, such as a pull request merged.                                                         | item_event                                          |
 | **Review**          | One operation that checks practices against an item at a version and can record results.                             | review                                              |
 | **Scan**            | A review of the items held by another item at a version. The holder is a repository on its monitored default branch. | review.kind = SCAN                                  |
+| **Scan exclusion**  | A listed file that cannot supply scan text. It stays in the inventory and has no eligible practice/file pairs. | inventory_receipt.exclusions |
 | **Origin**          | How a review started: an event, a request, a schedule or a backfill.                                                 | review.origin                                       |
 | **Review scope**    | The repositories and people that a workspace permits Hephaestus to review.                                           | review_scope_repository, membership.review_selected |
 | **Role**            | The developer's role a practice concerns: author, reviewer, assignee or merger. The editor label is About.           | definition.about                                    |
@@ -105,6 +106,10 @@ The [runtime guide](./practice-review-runtime.mdx) owns execution, retries and r
 The [workspace ABI](./agent/workspace-abi.mdx) owns file paths and capture records.
 The [source contract](./item-source-contract.mdx) owns capture states.
 The [data model](./practice-feedback-schema.md) owns durable keys and guards.
+
+`USAGE_UNVERIFIABLE` stops a scan because the cost of earlier model calls cannot be verified.
+It does not mean that the scan used up its budget.
+An execution that made no model call adds no usage row.
 
 ## Standard terms
 

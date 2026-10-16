@@ -279,6 +279,7 @@ export function scanReport(scan: ScanSummary, overrides: Partial<ScanReport> = {
 			scan.counts.notReviewed > 0
 				? [{ reason: "DEADLINE", description: "deadline", count: 1 }]
 				: [],
+		exclusions: terminal ? [] : null,
 		removalGuard: { state: "NOT_NEEDED", previousFiles: 3, wouldRemove: 0 },
 		availability: {
 			expired: false,

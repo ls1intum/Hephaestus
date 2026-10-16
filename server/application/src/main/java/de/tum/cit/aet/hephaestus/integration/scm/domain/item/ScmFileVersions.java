@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.item;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
@@ -23,7 +24,16 @@ public class ScmFileVersions {
         return Optional.of(new Parsed(fields[2], fields[3]));
     }
 
-    public record Entry(String path, String mode, String objectId) {}
+    public record Entry(
+            String path,
+            String mode,
+            String objectId,
+            @JsonIgnore long sizeBytes,
+            @JsonIgnore boolean binary) {
+        public Entry(String path, String mode, String objectId) {
+            this(path, mode, objectId, 0, false);
+        }
+    }
 
     private final ObjectMapper mapper;
 
@@ -42,10 +52,16 @@ public class ScmFileVersions {
         requireObjectId(repositoryVersion);
         List<String> context = globs.stream().distinct().sorted().toList();
         List<Entry> entries = contextEntries(assignedPath, context, inventory);
+        return fromContext(new Entry(assignedPath, mode, blobId), context, entries, repositoryVersion);
+    }
+
+    ItemVersion fromContext(Entry assigned, List<String> context, List<Entry> entries, String repositoryVersion) {
+        requireObjectId(assigned.objectId());
+        requireObjectId(repositoryVersion);
         // The wire contract fixes this key order; ObjectNode preserves the insertion order.
         var canonical = mapper.createObjectNode();
         canonical.put("scheme", "scm.file:v1");
-        canonical.put("mode", mode);
+        canonical.put("mode", assigned.mode());
         var contexts = canonical.putArray("context");
         context.forEach(contexts::add);
         var rows = canonical.putArray("entries");
@@ -56,7 +72,8 @@ public class ScmFileVersions {
             row.put("objectId", entry.objectId());
         }
         byte[] bytes = mapper.writeValueAsString(canonical).getBytes(StandardCharsets.UTF_8);
-        return new ItemVersion("scm.file:v1:" + blobId + ":" + ScmVersion.contentHash(bytes), repositoryVersion);
+        return new ItemVersion(
+                "scm.file:v1:" + assigned.objectId() + ":" + ScmVersion.contentHash(bytes), repositoryVersion);
     }
 
     static List<Entry> contextEntries(String assignedPath, List<String> globs, List<Entry> inventory) {

@@ -299,6 +299,9 @@ if (scenario !== undefined && scenario !== "") {
 	);
 	assert.ok(typeof contextRoot === "string");
 	const metadataPath = `${contextRoot}/metadata.json`;
+	const recordPath = hasText(process.env.PI_HOST_SCAN_PATH)
+		? `${contextRoot}/item.json`
+		: metadataPath;
 	mkdirSync(nodePath.join(cwd, "captured"), { recursive: true });
 	const capture = (name: string, value: unknown) => {
 		appendFileSync(nodePath.join(cwd, "captured", `${name}.jsonl`), `${JSON.stringify(value)}\n`);
@@ -509,7 +512,7 @@ process.stdout.write(JSON.stringify(validateToolArguments(tool, { name: tool.nam
 							await Promise.withResolvers<never>().promise;
 						}
 						await inspectShell();
-						const readPath = behaviour === "read-change" ? "work/change/diff.patch" : metadataPath;
+						const readPath = behaviour === "read-change" ? "work/change/diff.patch" : recordPath;
 						capture("reads", { slug, path: readPath });
 						emit({
 							type: "tool_execution_start",

@@ -15,7 +15,9 @@ import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
 import de.tum.cit.aet.hephaestus.integration.core.item.Item;
 import de.tum.cit.aet.hephaestus.integration.core.item.ItemRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CandidateRefusal;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemExclusionReason;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.practices.adapter.PracticesPersonDataCatalog;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.result.ResultMarkService;
@@ -39,6 +41,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewAttemptGuard;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewBudget;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewCaptureDecision;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewCompletion;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewItemState;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewModelBindings;
@@ -49,6 +52,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewScanStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStopReason;
+import de.tum.cit.aet.hephaestus.practices.spi.ScanExcludedItem;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -526,6 +530,84 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void shouldReportAnExcludedFileWithoutWithholdingOrInventingAnOutcome() {
+        var scan = data.scan(scenario, ReviewStatus.RUNNING, Instant.now());
+        var practice = scenario.owner().practice().getId();
+        var file = scenario.file();
+        membership.deleteById(new ReviewItem.Id(scan.getId(), practice, file.getId()));
+        jdbc.sql("UPDATE review_practice SET items_listed=0 WHERE workspace_id=:ws AND review_id=:review")
+                .param("ws", scan.getWorkspaceId())
+                .param("review", scan.getId())
+                .update();
+        store.exclusions(
+                scan.getWorkspaceId(),
+                scan.getId(),
+                List.of(new ScanExcludedItem(
+                        new ItemRef(
+                                file.getWorkspaceId(),
+                                file.getId(),
+                                file.getKind(),
+                                null,
+                                file.getParentId(),
+                                file.getPath()),
+                        ItemExclusionReason.FILE_TOO_LARGE,
+                        2_097_153)));
+        data.terminal(scan, ReviewStatus.COMPLETE, null);
+        var report = query.report(scan.getWorkspaceId(), scan.getId());
+        assertThat(report.complete()).isTrue();
+        assertThat(report.counts().files()).isZero();
+        assertThat(report.counts().practiceItemPairs()).isZero();
+        assertThat(report.counts().met()).isZero();
+        assertThat(report.counts().withheld()).isZero();
+        var excluded = report.exclusions();
+        assertThat(excluded).isNotNull().hasSize(1);
+        assertThat(excluded.getFirst().reason()).isEqualTo(ItemExclusionReason.FILE_TOO_LARGE);
+        assertThat(excluded.getFirst().path()).isEqualTo(file.getPath());
+        assertThat(excluded.getFirst().sizeBytes()).isEqualTo(2_097_153);
+    }
+
+    @Test
+    void shouldPrioritizeUnreviewedThenOldestFilesBeforePathOrder() {
+        var oldFile = items.findById(scenario.file().getId()).orElseThrow();
+        var oldScenario = new ScanReportTestData.Scenario(scenario.owner(), scenario.repository(), oldFile);
+        var at = Instant.now().minusSeconds(300);
+        data.result(oldScenario, data.scan(oldScenario, ReviewStatus.COMPLETE, at));
+        var recentFile = new Item();
+        recentFile.setWorkspaceId(oldFile.getWorkspaceId());
+        recentFile.setKind(oldFile.getKind());
+        recentFile.setParentId(oldFile.getParentId());
+        recentFile.setPath("a-recent.java");
+        recentFile.setCreatedAt(at);
+        items.saveAndFlush(recentFile);
+        var recentScenario = new ScanReportTestData.Scenario(scenario.owner(), scenario.repository(), recentFile);
+        data.result(recentScenario, data.scan(recentScenario, ReviewStatus.COMPLETE, at.plusSeconds(100)));
+        var unseenFile = new Item();
+        unseenFile.setWorkspaceId(oldFile.getWorkspaceId());
+        unseenFile.setKind(oldFile.getKind());
+        unseenFile.setParentId(oldFile.getParentId());
+        unseenFile.setPath("zz-unseen.java");
+        unseenFile.setCreatedAt(at);
+        items.saveAndFlush(unseenFile);
+        var current = data.scan(oldScenario, ReviewStatus.RUNNING, at.plusSeconds(200));
+        var practice = scenario.owner().practice().getId();
+        for (var file : List.of(recentFile, unseenFile)) {
+            membership.saveAndFlush(ReviewItem.builder()
+                    .workspaceId(current.getWorkspaceId())
+                    .reviewId(current.getId())
+                    .practiceId(practice)
+                    .itemId(file.getId())
+                    .itemVersion(ScanReportTestData.version())
+                    .build());
+        }
+        assertThat(membership.pending(current.getWorkspaceId(), current.getId(), new UUID[0], PageRequest.of(0, 10)))
+                .extracting(ReviewItemRepository.PendingAssignment::getItemId)
+                .containsExactly(unseenFile.getId(), oldFile.getId(), recentFile.getId());
+        assertThat(membership.pending(
+                        current.getWorkspaceId() + 1, current.getId(), new UUID[0], PageRequest.of(0, 10)))
+                .isEmpty();
+    }
+
+    @Test
     void reusedMembershipKeepsItsOriginalProducerAndAcceptedVerdictIsReusable() {
         var original = data.scan(scenario, ReviewStatus.COMPLETE, Instant.now().minusSeconds(120));
         var result = data.result(scenario, original);
@@ -551,6 +633,36 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
         assertThat(report.counts().reviewed()).isOne();
         assertThat(report.counts().reused()).isOne();
         assertThat(report.counts().openProblems()).isZero();
+    }
+
+    @Test
+    void shouldPersistOneReusePassAndKeepReusedMembershipAfterALaterMark() {
+        var original = data.scan(scenario, ReviewStatus.COMPLETE, Instant.now().minusSeconds(120));
+        var result = data.result(scenario, original);
+        var current = data.scan(scenario, ReviewStatus.RUNNING, Instant.now().minusSeconds(10));
+        store.reuseListed(
+                current.getWorkspaceId(), current.getId(), Instant.now().plusSeconds(60));
+        var member = membership
+                .findByWorkspaceIdAndReviewIdAndPracticeIdAndItemId(
+                        current.getWorkspaceId(), current.getId(), result.getPracticeId(), result.getItemId())
+                .orElseThrow();
+        assertThat(member.getState()).isEqualTo(ReviewItemState.REUSED);
+        assertThat(member.getResultId()).isEqualTo(result.getId());
+        assertThat(reports.require(current.getWorkspaceId(), current.getId())
+                        .getChecks()
+                        .path("reuseComplete")
+                        .asBoolean())
+                .isTrue();
+        marks.create(
+                current.getWorkspaceId(),
+                result.getId(),
+                ResultMarkKind.INCORRECT,
+                scenarioAccountId,
+                "The claim is incorrect");
+        store.reuseListed(
+                current.getWorkspaceId(), current.getId(), Instant.now().plusSeconds(60));
+        var id = new ReviewAssignmentId(current.getId(), result.getPracticeId(), result.getItemId());
+        assertThat(store.reuse(current.getWorkspaceId(), id)).contains(result.getId());
     }
 
     @Test

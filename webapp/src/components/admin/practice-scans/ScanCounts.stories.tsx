@@ -25,7 +25,7 @@ export const Default: Story = {
 	play: async ({ canvasElement, canvas }) => {
 		await expect(figure(canvasElement, "Files")).toHaveTextContent("3");
 		await expect(figure(canvasElement, "Practice and file pairs")).toHaveTextContent("6");
-		await expect(figure(canvasElement, "Reviewed")).toHaveTextContent("4");
+		await expect(figure(canvasElement, "Reviewed")).toHaveTextContent("3");
 		await expect(figure(canvasElement, "Reused")).toHaveTextContent("1");
 		await expect(figure(canvasElement, "Problems")).toHaveTextContent("3 2 open");
 		await expect(

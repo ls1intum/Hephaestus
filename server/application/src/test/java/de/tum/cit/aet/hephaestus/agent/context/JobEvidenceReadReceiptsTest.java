@@ -17,10 +17,12 @@ import de.tum.cit.aet.hephaestus.evidence.capture.CaptureContribution;
 import de.tum.cit.aet.hephaestus.evidence.capture.CitableText;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ScmCitableTexts;
 import de.tum.cit.aet.hephaestus.practices.spi.ReadReceipt;
 import de.tum.cit.aet.hephaestus.practices.spi.ReadReceiptStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.util.ArrayList;
@@ -132,6 +134,38 @@ class JobEvidenceReadReceiptsTest extends BaseUnitTest {
                             SOURCE.value(), "file.txt", CitationSide.NEW, "commit-one", "repository/file.txt", DIGEST));
         } finally {
             prepared.close();
+        }
+    }
+
+    @Test
+    void shouldAuthenticateAScanReadWithItsItemRecordOutsideTheCapturedTree() throws Exception {
+        String commit = "a".repeat(40);
+        String recordPath = "context/item.json";
+        byte[] record = mapper.writeValueAsBytes(Map.of(
+                "repositoryId", "1",
+                "providerId", "1",
+                "path", "file.txt",
+                "blobId", "b".repeat(40),
+                "commitId", commit));
+        Path tree = Files.createDirectories(root.resolve("scan"));
+        Files.write(tree.resolve("file.txt"), BYTES);
+        var texts = ScmCitableTexts.tree(tree, commit);
+        var index = manifest(
+                texts,
+                List.of(new FolderSource(
+                        SOURCE,
+                        new CapturedSource(
+                                recordPath, "application/json", ProvenanceDigest.sha256Hex(record), record.length))));
+        var files = files();
+        var job = job();
+        try (var prepared = files.prepare(
+                job, new PreparedEvidence(Map.of(recordPath, record, "repos/reviewed/file.txt", BYTES), index), null)) {
+            assertThat(prepared.filesOnDisk()).doesNotContainKey("repos/reviewed/.git/HEAD");
+            var read =
+                    new ReadReceipt(SOURCE, recordPath, "file.txt", commit, ReadReceiptStatus.COMPLETE, DIGEST, 1, 2);
+            assertThat(files.registerReadReceipts(job, index, List.of(read), catalogs)
+                            .citableTexts())
+                    .containsExactlyElementsOf(texts);
         }
     }
 

@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.handler.RuntimeReviewTestData;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemExclusionReason;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLister;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemPage;
@@ -28,11 +29,13 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewScanStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshot;
+import de.tum.cit.aet.hephaestus.practices.spi.ScanExcludedItem;
 import de.tum.cit.aet.hephaestus.practices.spi.ScanListedItem;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -132,13 +135,42 @@ class ScanServiceTest extends BaseUnitTest {
         when(writer.upsert(eligible.item())).thenReturn(file);
         when(writer.upsert(excluded.item())).thenReturn(generated);
         var version = new ItemVersion("blob:one:context", null);
-        when(versions.compose(file, Objects.requireNonNull(review.version()), List.of("pom.xml")))
-                .thenReturn(version);
+        when(versions.compose(List.of(file), Objects.requireNonNull(review.version()), List.of("pom.xml")))
+                .thenReturn(Map.of(file.itemId(), version));
         var service = service(10);
         var prepared = service.prepare(review);
         verifyNoInteractions(store);
         service.record(review, prepared);
         verify(store).inventory(1, review.id(), List.of(3L, 4L), true);
         verify(store).list(1, review.id(), 31, List.of(new ScanListedItem(file, version)), true);
+    }
+
+    @Test
+    void shouldKeepIneligibleFilesInTheInventoryAndRecordExclusionsWithoutAssignments() {
+        var review = review();
+        var oversized = new ListedItem(
+                listed(1, "Large.java").item(),
+                new ItemVersion("large", null),
+                ItemExclusionReason.FILE_TOO_LARGE,
+                2_097_153);
+        var binary = new ListedItem(
+                listed(1, "Binary.java").item(), new ItemVersion("binary", null), ItemExclusionReason.BINARY_FILE, 3);
+        var largeFile = new ItemRef(1, 3, FILE, null, 2L, "Large.java");
+        var binaryFile = new ItemRef(1, 4, FILE, null, 2L, "Binary.java");
+        when(lister.list(any())).thenReturn(new ItemPage(List.of(oversized, binary), null, true, null));
+        when(writer.upsert(oversized.item())).thenReturn(largeFile);
+        when(writer.upsert(binary.item())).thenReturn(binaryFile);
+        var service = service(10);
+        var prepared = service.prepare(review);
+        service.record(review, prepared);
+        verify(store).inventory(1, review.id(), List.of(3L, 4L), true);
+        verify(store)
+                .exclusions(
+                        1,
+                        review.id(),
+                        List.of(
+                                new ScanExcludedItem(largeFile, ItemExclusionReason.FILE_TOO_LARGE, 2_097_153),
+                                new ScanExcludedItem(binaryFile, ItemExclusionReason.BINARY_FILE, 3)));
+        verify(store).list(1, review.id(), 31, List.of(), true);
     }
 }

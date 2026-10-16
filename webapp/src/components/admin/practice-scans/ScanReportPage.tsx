@@ -20,8 +20,22 @@ import {
 	REMOVAL_GUARD_DEFS,
 	SCAN_COMPARISON_DEFS,
 } from "@/components/practice-vocabulary/scan-baseline-defs";
-import type { ScanEntryStatus } from "@/components/practice-vocabulary/scan-entry-defs";
+import {
+	SCAN_EXCLUSION_SENTENCES,
+	type ScanEntryStatus,
+} from "@/components/practice-vocabulary/scan-entry-defs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+	AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
@@ -159,15 +173,35 @@ function LoadedReport({
 					</div>
 					<div className="flex flex-col items-end gap-2">
 						{active ? (
-							<Button
-								type="button"
-								variant="outline"
-								disabled={cancel.pending}
-								onClick={cancel.onRun}
-							>
-								{cancel.pending ? <Spinner /> : <OctagonXIcon aria-hidden />}
-								{cancel.pending ? "Cancelling scan…" : "Cancel scan"}
-							</Button>
+							<AlertDialog>
+								<AlertDialogTrigger
+									render={
+										<Button type="button" variant="outline" disabled={cancel.pending}>
+											{cancel.pending ? <Spinner /> : <OctagonXIcon aria-hidden />}
+											{cancel.pending ? "Cancelling scan…" : "Cancel scan"}
+										</Button>
+									}
+								/>
+								<AlertDialogContent>
+									<AlertDialogHeader>
+										<AlertDialogTitle>Cancel this scan?</AlertDialogTitle>
+										<AlertDialogDescription>
+											The scan stops and cannot be resumed. Its report keeps the results already
+											recorded.
+										</AlertDialogDescription>
+									</AlertDialogHeader>
+									<AlertDialogFooter>
+										<AlertDialogCancel>Keep scan running</AlertDialogCancel>
+										<AlertDialogAction
+											variant="destructive"
+											disabled={cancel.pending}
+											onClick={cancel.onRun}
+										>
+											Cancel scan
+										</AlertDialogAction>
+									</AlertDialogFooter>
+								</AlertDialogContent>
+							</AlertDialog>
 						) : (
 							<Button
 								type="button"
@@ -345,6 +379,15 @@ function ReportNotes({
 						sentence: withheldSentence(reason.reason),
 						count: reason.count,
 					}))}
+				/>
+			)}
+			{report.exclusions !== null && report.exclusions.length > 0 && (
+				<ReasonList
+					title="Files not eligible for review"
+					reasons={Object.entries(SCAN_EXCLUSION_SENTENCES).flatMap(([reason, sentence]) => {
+						const count = report.exclusions?.filter((file) => file.reason === reason).length ?? 0;
+						return count > 0 ? [{ key: reason, sentence, count }] : [];
+					})}
 				/>
 			)}
 			{report.notReviewedReasons.length > 0 && progress !== "active" && (

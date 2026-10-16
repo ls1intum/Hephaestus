@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.workspace.adapter;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.cit.aet.hephaestus.core.event.RepositoryMonitoringChangedEvent;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.CredentialUnreadableException;
@@ -31,6 +32,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,6 +46,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
     private final WorkspaceScopeFilter workspaceScopeFilter;
     private final ConnectionService connectionService;
     private final NatsConnectionProperties natsProperties;
+    private final ApplicationEventPublisher eventPublisher;
 
     // Absent under the webhook runtime role — reconcile then skips the consumer refresh.
     private final ObjectProvider<IntegrationNatsConsumer> natsConsumerService;
@@ -57,12 +60,14 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             ConnectionService connectionService,
             NatsConnectionProperties natsProperties,
             ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
-            ReviewScopeRepositoryRepository practiceReviewRepositoryTargetRepository) {
+            ReviewScopeRepositoryRepository practiceReviewRepositoryTargetRepository,
+            ApplicationEventPublisher eventPublisher) {
         this.workspaceRepository = workspaceRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.workspaceScopeFilter = workspaceScopeFilter;
         this.connectionService = connectionService;
         this.natsProperties = natsProperties;
+        this.eventPublisher = eventPublisher;
         this.natsConsumerService = natsConsumerService;
         this.practiceReviewRepositoryTargetRepository = practiceReviewRepositoryTargetRepository;
     }
@@ -382,10 +387,15 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
         // holds it would be persisted again at flush, so it is removed from that set as well.
         repositoryToMonitorRepository.findById(syncTargetId).ifPresent(monitor -> {
             Workspace workspace = monitor.getWorkspace();
+            List<Long> repositoryIds = repositoryToMonitorRepository.findSourceRepositoryIdsOfMonitor(syncTargetId);
             if (workspace != null) {
                 workspace.getRepositoriesToMonitor().remove(monitor);
             }
             repositoryToMonitorRepository.delete(monitor);
+            repositoryToMonitorRepository.flush();
+            if (workspace != null) {
+                eventPublisher.publishEvent(new RepositoryMonitoringChangedEvent(workspace.getId(), repositoryIds));
+            }
         });
     }
 
@@ -480,7 +490,12 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             }
 
             if (dirty) {
-                repositoryToMonitorRepository.save(rtm);
+                repositoryToMonitorRepository.saveAndFlush(rtm);
+            }
+            if (rtm.getWorkspace() != null) {
+                eventPublisher.publishEvent(new RepositoryMonitoringChangedEvent(
+                        rtm.getWorkspace().getId(),
+                        repositoryToMonitorRepository.findSourceRepositoryIdsOfMonitor(syncTargetId)));
             }
 
             // A name change moves the repo's NATS subject; rebuild the workspace

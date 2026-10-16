@@ -42,7 +42,7 @@ export const noReceipts = (): Receipts => ({ reads: 0, truncatedReads: 0, failed
 export interface EvidenceSources {
 	repo: string | null;
 	headRevision: string | null;
-	/** The workspace path of the captured tree's sourceFile, `<repository>/.git/HEAD`. */
+	/** The workspace path of the captured tree's source witness. */
 	treeSourceFile: string;
 	/** The absolute path of the captured context folder; null when nothing was captured. */
 	contextDir: string | null;

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.spi;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -14,7 +15,12 @@ public interface ReviewScanStore {
 
     void inventory(long workspaceId, UUID reviewId, List<Long> presentItemIds, boolean complete);
 
+    void exclusions(long workspaceId, UUID reviewId, List<ScanExcludedItem> exclusions);
+
     void list(long workspaceId, UUID reviewId, long practiceId, List<ScanListedItem> members, boolean complete);
+
+    /** Attempts each listed pair once, with durable progress, outside the driver's review transaction. */
+    void reuseListed(long workspaceId, UUID reviewId, Instant deadline);
 
     Optional<UUID> reuse(long workspaceId, ReviewAssignmentId assignment);
 }

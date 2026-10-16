@@ -5,11 +5,13 @@ import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemListRequest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLister;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ListedItem;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScanItemVersions;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewScanStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStopReason;
+import de.tum.cit.aet.hephaestus.practices.spi.ScanExcludedItem;
 import de.tum.cit.aet.hephaestus.practices.spi.ScanListedItem;
 import java.io.Serial;
 import java.nio.charset.StandardCharsets;
@@ -95,26 +97,40 @@ public class ScanService {
             if (cursor == null || !cursors.add(cursor))
                 throw new EnumerationFailure(ReviewStopReason.ENUMERATION_FAILED);
         } while (true);
-        List<ItemRef> files =
-                inventory.stream().map(entry -> writer.upsert(entry.item())).toList();
+        var files = new ArrayList<ItemRef>();
+        var eligible = new ArrayList<ItemRef>();
+        var exclusions = new ArrayList<ScanExcludedItem>();
+        for (var entry : inventory) {
+            var file = writer.upsert(entry.item());
+            files.add(file);
+            if (entry.exclusion() == null) eligible.add(file);
+            else exclusions.add(new ScanExcludedItem(file, entry.exclusion(), entry.sizeBytes()));
+        }
         var selections = new LinkedHashMap<Long, List<ScanListedItem>>();
         var matcher = new AntPathMatcher("/");
         for (var practice : review.practices()) {
             var definition = Objects.requireNonNull(practice.definition().scan());
-            var selected = new ArrayList<ScanListedItem>();
-            for (var file : files) {
+            var selected = new ArrayList<ItemRef>();
+            for (var file : eligible) {
                 if (!clock.instant().isBefore(deadline))
                     throw new EnumerationFailure(ReviewStopReason.ENUMERATION_LIMIT);
                 String path = Objects.requireNonNull(file.path());
                 if (definition.include().stream().anyMatch(glob -> matcher.match(glob, path))
                         && definition.exclude().stream().noneMatch(glob -> matcher.match(glob, path))) {
-                    selected.add(
-                            new ScanListedItem(file, composer.getFirst().compose(file, pinned, definition.context())));
+                    selected.add(file);
                 }
             }
-            selections.put(practice.practiceId(), List.copyOf(selected));
+            var composed = selected.isEmpty()
+                    ? Map.<Long, ItemVersion>of()
+                    : composer.getFirst().compose(selected, pinned, definition.context());
+            if (!clock.instant().isBefore(deadline)) throw new EnumerationFailure(ReviewStopReason.ENUMERATION_LIMIT);
+            selections.put(
+                    practice.practiceId(),
+                    selected.stream()
+                            .map(file -> new ScanListedItem(file, Objects.requireNonNull(composed.get(file.itemId()))))
+                            .toList());
         }
-        return new PreparedInventory(files, selections);
+        return new PreparedInventory(files, selections, exclusions);
     }
 
     public void record(ReviewSnapshot review, PreparedInventory prepared) {
@@ -123,6 +139,7 @@ public class ScanService {
                 review.id(),
                 prepared.files().stream().map(ItemRef::itemId).toList(),
                 true);
+        store.exclusions(review.workspaceId(), review.id(), prepared.exclusions());
         for (var selection : prepared.selections().entrySet()) {
             var selected = selection.getValue();
             if (selected.isEmpty()) store.list(review.workspaceId(), review.id(), selection.getKey(), List.of(), true);
@@ -139,10 +156,12 @@ public class ScanService {
         }
     }
 
-    public record PreparedInventory(List<ItemRef> files, Map<Long, List<ScanListedItem>> selections) {
+    public record PreparedInventory(
+            List<ItemRef> files, Map<Long, List<ScanListedItem>> selections, List<ScanExcludedItem> exclusions) {
         public PreparedInventory {
             files = List.copyOf(files);
             selections = Map.copyOf(selections);
+            exclusions = List.copyOf(exclusions);
         }
     }
 

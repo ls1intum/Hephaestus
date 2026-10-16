@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.item;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemExclusionReason;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemListRequest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLister;
@@ -90,7 +91,11 @@ public class ScmItemLister implements ItemLister {
                                 entry.mode(),
                                 List.of(),
                                 List.of(),
-                                pinned.version().value())))
+                                pinned.version().value()),
+                        entry.sizeBytes() > ScmGitTree.MAX_FILE_BYTES
+                                ? ItemExclusionReason.FILE_TOO_LARGE
+                                : entry.binary() ? ItemExclusionReason.BINARY_FILE : null,
+                        entry.sizeBytes()))
                 .toList();
         boolean complete = end == inventory.size();
         String cursor = complete

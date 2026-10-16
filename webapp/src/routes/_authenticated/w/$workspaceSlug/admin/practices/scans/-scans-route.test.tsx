@@ -125,7 +125,7 @@ describe("scans list route", () => {
 		expect(screen.queryByText("We could not load scans")).toBeNull();
 	});
 
-	it("offers to start a scan when there is none", async () => {
+	it("points to repository schedules when there is no scan", async () => {
 		server.use(
 			...adminHandlers(),
 			http.get("*/workspaces/:workspaceSlug/practices/scans", () =>
@@ -138,36 +138,32 @@ describe("scans list route", () => {
 		const title = await screen.findByRole("heading", { name: "No scans yet" }, ROUTE_RENDER_WAIT);
 		const empty = title.closest("[data-slot=empty]");
 		expect(empty?.textContent).toContain(
-			"No scans yetStart a scan to review the files in a repository.",
+			"No scans yetScans appear here after a repository schedule starts one.",
 		);
-		const starts = screen.getAllByRole("link", { name: "Start scan" });
-		expect(starts).toHaveLength(2);
-		for (const start of starts) {
-			expect(start.getAttribute("href")).toBe(`${LIST}?detail=scan-new:draft`);
-		}
+		expect(screen.queryByRole("link", { name: "Start scan" })).toBeNull();
+		expect(screen.getByRole("link", { name: "Open review settings" }).getAttribute("href")).toBe(
+			"/w/acme/admin/practices/review",
+		);
 	});
 });
 
 describe("scan routes under the admin gate", () => {
-	it.each([LIST, `${LIST}/${SCAN_ID}`, `${LIST}?detail=scan-new:draft`])(
-		"redirects a MEMBER away from %s",
-		async (url) => {
-			server.use(
-				http.get("*/workspaces", () =>
-					HttpResponse.json([workspaceListItem("acme", { practicesEnabled: true })]),
-				),
-				http.get("*/workspaces/:workspaceSlug/members/me", () =>
-					HttpResponse.json(ownMembership("MEMBER")),
-				),
-			);
-			const router = createRouter({
-				...ROUTER_SEARCH,
-				routeTree,
-				history: createMemoryHistory({ initialEntries: [url] }),
-				context: { queryClient: new QueryClient(), auth: undefined },
-			});
-			await router.load();
-			await waitFor(() => expect(router.state.location.pathname).toBe("/w/acme/practice-profile"));
-		},
-	);
+	it.each([LIST, `${LIST}/${SCAN_ID}`])("redirects a MEMBER away from %s", async (url) => {
+		server.use(
+			http.get("*/workspaces", () =>
+				HttpResponse.json([workspaceListItem("acme", { practicesEnabled: true })]),
+			),
+			http.get("*/workspaces/:workspaceSlug/members/me", () =>
+				HttpResponse.json(ownMembership("MEMBER")),
+			),
+		);
+		const router = createRouter({
+			...ROUTER_SEARCH,
+			routeTree,
+			history: createMemoryHistory({ initialEntries: [url] }),
+			context: { queryClient: new QueryClient(), auth: undefined },
+		});
+		await router.load();
+		await waitFor(() => expect(router.state.location.pathname).toBe("/w/acme/practice-profile"));
+	});
 });

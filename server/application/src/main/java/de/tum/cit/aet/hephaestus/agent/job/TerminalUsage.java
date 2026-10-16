@@ -106,8 +106,8 @@ record TerminalUsage(
      * @param snapshot the admitted snapshot, which names the models and prices the practice script rows;
      *     {@code null} when it cannot be read, which leaves the practice script rows UNPRICED
      * @param price the price of the attempt's own row
-     * @return true when the attempt's own row was billed at its frozen price, false when it was appended
-     *     UNPRICED
+     * @return true when the attempt's own calls were billed at their frozen price or no calls occurred,
+     *     false when they were appended UNPRICED
      */
     boolean appendTo(
             LlmUsageRecorder recorder,
@@ -120,29 +120,37 @@ record TerminalUsage(
         Instant occurredAt = Instant.now();
         List<PracticeScriptKindTotal> practiceScript =
                 jobs.sumPracticeScriptUsageByKind(workspaceId, job.getId(), job.getAttempt());
-        boolean billed = append(
-                recorder,
-                workspaceId,
-                new LlmUsageRecorder.LlmUsageSample(
-                        job.getReviewId(),
-                        "PRACTICE_REVIEW",
-                        UsageSourceType.REVIEW_JOB,
-                        job.getId(),
-                        job.getAttempt(),
-                        snapshot == null ? null : snapshot.model().upstreamModelId(),
-                        inputTokens,
-                        outputTokens,
-                        cacheReadTokens,
-                        cacheWriteTokens,
-                        reasoningTokens,
-                        0L,
-                        totalCalls,
-                        price,
-                        provenance,
-                        verifiable && chatUsageReported(practiceScript)
-                                ? MeasurementVerification.VERIFIED
-                                : MeasurementVerification.UNVERIFIABLE,
-                        occurredAt));
+        long chatCalls = practiceScript.stream()
+                .filter(total -> total.modelKind() == ModelKind.CHAT)
+                .mapToLong(PracticeScriptKindTotal::calls)
+                .sum();
+        // Missing token reports do not establish a call. Direct chat calls can prove one even when
+        // neither the runner nor the proxy's token accumulators recorded it.
+        int calls = (int) Math.min(Integer.MAX_VALUE, Math.max(totalCalls, chatCalls));
+        boolean billed = calls == 0
+                || append(
+                        recorder,
+                        workspaceId,
+                        new LlmUsageRecorder.LlmUsageSample(
+                                job.getReviewId(),
+                                "PRACTICE_REVIEW",
+                                UsageSourceType.REVIEW_JOB,
+                                job.getId(),
+                                job.getAttempt(),
+                                snapshot == null ? null : snapshot.model().upstreamModelId(),
+                                inputTokens,
+                                outputTokens,
+                                cacheReadTokens,
+                                cacheWriteTokens,
+                                reasoningTokens,
+                                0L,
+                                calls,
+                                price,
+                                provenance,
+                                verifiable && chatUsageReported(practiceScript)
+                                        ? MeasurementVerification.VERIFIED
+                                        : MeasurementVerification.UNVERIFIABLE,
+                                occurredAt));
         for (PracticeScriptKindTotal total : practiceScript) {
             if (total.modelKind() == ModelKind.CHAT) {
                 continue;

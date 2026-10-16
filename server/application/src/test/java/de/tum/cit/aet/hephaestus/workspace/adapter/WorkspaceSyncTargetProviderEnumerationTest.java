@@ -35,6 +35,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationEventPublisher;
 
 class WorkspaceSyncTargetProviderEnumerationTest extends BaseUnitTest {
 
@@ -72,7 +73,8 @@ class WorkspaceSyncTargetProviderEnumerationTest extends BaseUnitTest {
                 connectionService,
                 new NatsConnectionProperties(true, "nats://localhost:4222", null, null),
                 natsConsumerService,
-                mock(ReviewScopeRepositoryRepository.class));
+                mock(ReviewScopeRepositoryRepository.class),
+                mock(ApplicationEventPublisher.class));
         lenient()
                 .when(workspaceScopeFilter.isRepositoryAllowed(any(RepositoryToMonitor.class)))
                 .thenReturn(true);

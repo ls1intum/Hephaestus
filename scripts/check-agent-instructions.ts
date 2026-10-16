@@ -156,6 +156,11 @@ const INTENTIONALLY_MISSING_PATHS = [
 	},
 	{
 		document: "docs/contributor/agent/workspace-abi.mdx",
+		value: "context/item.json",
+		reason: "the pinned scan item record, written into the agent workspace",
+	},
+	{
+		document: "docs/contributor/agent/workspace-abi.mdx",
 		value: "inputs/history/results.json",
 		reason: "the staged history record, written into the agent workspace",
 	},

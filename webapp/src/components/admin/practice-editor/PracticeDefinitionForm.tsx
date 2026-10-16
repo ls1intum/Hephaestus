@@ -65,7 +65,6 @@ import { PracticeAppliesWhenEditor } from "./PracticeAppliesWhenEditor";
 import { PracticeGuideEditor, type PracticeGuideView } from "./PracticeGuideEditor";
 import { PracticeReviewedByEditor } from "./PracticeReviewedByEditor";
 import { PracticeReviewSettingsEditor } from "./PracticeReviewSettingsEditor";
-import { PracticeScanSettingsEditor } from "./PracticeScanSettingsEditor";
 import { PracticeVisualEditor } from "./PracticeVisualEditor";
 import { itemTypeFor, orderedItemTypes } from "./review-settings";
 
@@ -138,7 +137,7 @@ function initialDraft(
 	initialData: PracticeDefinitionValue | undefined,
 ): PracticeDefinitionDraft {
 	if (initialData) {
-		return draftOf(initialData, itemTypeFor(definitionOptions, initialData.kind));
+		return draftOf(initialData);
 	}
 	return blankDraft(orderedItemTypes(definitionOptions)[0]);
 }
@@ -505,27 +504,6 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 								/>
 							)}
 						</section>
-
-						{automated && itemType && (itemType.scanSupported || draft.scan.enabled) && (
-							<>
-								<Separator />
-								<section className="space-y-4" aria-labelledby="practice-scan-heading">
-									<h2 id="practice-scan-heading" className="text-lg font-semibold">
-										Scans
-									</h2>
-									<PracticeScanSettingsEditor
-										itemType={itemType}
-										value={draft.scan}
-										onChange={(scan) => update({ scan })}
-										readSources={
-											itemTypeFor(definitionOptions, draft.scan.draft.itemKind)?.readSources ?? []
-										}
-										problem={shown?.scan}
-										disabled={formDisabled}
-									/>
-								</section>
-							</>
-						)}
 
 						{automated && (
 							<>

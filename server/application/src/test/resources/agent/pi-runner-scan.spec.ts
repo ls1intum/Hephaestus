@@ -1,10 +1,9 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { deflateSync } from "node:zlib";
 
 import { isJsonObject } from "../../../../../../docker/agents/practice-scripts/lib/core/json.ts";
 import { scan } from "../../../../../../docker/agents/practice-scripts/run-bundled.ts";
@@ -15,56 +14,61 @@ const FILE = "Auth.ts";
 const TEXT = "insecure();\n";
 const CONTEXT_FILE = "Context.ts";
 const CONTEXT_TEXT = "checked(token);\n";
-const SOURCE_PATH = "repos/primary/.git/HEAD";
-const CAPTURED_REFS = "repos/primary/.git/hephaestus-captured-refs";
+const SOURCE_PATH = "context/item.json";
+const REPOSITORY = "repos/reviewed";
+
+function gitBlobId(text: string): string {
+	return createHash("sha1")
+		.update(`blob ${Buffer.byteLength(text)}\0`)
+		.update(text)
+		.digest("hex");
+}
 
 function stageScan(cwd: string, includeContext = false): string {
 	stagePractices(cwd, [{ slug: "auth-review" }]);
-	rmSync(path.join(cwd, "evidence/change.json"));
-	const git = path.join(cwd, "repos/primary/.git");
-	const object = (kind: string, bytes: Buffer) => {
-		const content = Buffer.concat([Buffer.from(`${kind} ${bytes.length}\0`), bytes]);
-		const id = createHash("sha1").update(content).digest("hex");
-		const folder = path.join(git, "objects", id.slice(0, 2));
-		mkdirSync(folder, { recursive: true });
-		writeFileSync(path.join(folder, id.slice(2)), deflateSync(content));
-		return id;
-	};
-	const blob = object("blob", Buffer.from(TEXT));
-	const tree = object(
-		"tree",
-		Buffer.concat([
-			Buffer.from(`100644 ${FILE}\0`),
-			Buffer.from(blob, "hex"),
-			...(includeContext
-				? [
-						Buffer.from(`100644 ${CONTEXT_FILE}\0`),
-						Buffer.from(object("blob", Buffer.from(CONTEXT_TEXT)), "hex"),
-					]
-				: []),
-		]),
+	rmSync(path.join(cwd, "evidence"), { recursive: true });
+	mkdirSync(path.join(cwd, "context"));
+	mkdirSync(path.join(cwd, REPOSITORY), { recursive: true });
+	const task: unknown = JSON.parse(readFileSync(path.join(cwd, "task.json"), "utf8"));
+	assert.ok(isJsonObject(task));
+	writeFileSync(
+		path.join(cwd, "task.json"),
+		JSON.stringify({
+			...task,
+			contextRoot: "context",
+			repositoryRoot: REPOSITORY,
+			manifest: "INDEX.json",
+		}),
 	);
-	const commit = object(
-		"commit",
-		Buffer.from(
-			`tree ${tree}\nauthor Test <test@example.org> 0 +0000\ncommitter Test <test@example.org> 0 +0000\n\nScan fixture\n`,
-		),
-	);
-	mkdirSync(path.join(git, "refs"), { recursive: true });
-	writeFileSync(path.join(git, "HEAD"), `${commit}\n`);
-	writeFileSync(path.join(cwd, CAPTURED_REFS), `${commit} HEAD\n`);
-	writeFileSync(path.join(cwd, "repos/primary", FILE), TEXT);
-	if (includeContext) {
-		writeFileSync(path.join(cwd, "repos/primary", CONTEXT_FILE), CONTEXT_TEXT);
+	const commit = "a".repeat(40);
+
+	const files = [
+		{ path: FILE, text: TEXT },
+		...(includeContext ? [{ path: CONTEXT_FILE, text: CONTEXT_TEXT }] : []),
+	];
+	for (const file of files) {
+		writeFileSync(path.join(cwd, REPOSITORY, file.path), file.text);
 	}
 	const inputs = scan(FILE);
+	const item = { ...inputs.item, commitId: commit, blobId: gitBlobId(TEXT) };
+	writeFileSync(path.join(cwd, SOURCE_PATH), JSON.stringify(item));
+	writeFileSync(
+		path.join(cwd, "context/inventory.json"),
+		JSON.stringify(
+			files.map((file) => ({
+				path: file.path,
+				mode: "100644",
+				objectId: gitBlobId(file.text),
+			})),
+		),
+	);
 	writeFileSync(
 		path.join(cwd, PRACTICES_DIR, "auth-review.inputs.json"),
 		JSON.stringify({
 			...inputs,
-			item: { ...inputs.item, commitId: commit, blobId: blob },
+			item,
 			practice: { ...inputs.practice, slug: "auth-review" },
-			scope: { ...inputs.scope, version: `scm.file:v1:${commit}:${"b".repeat(64)}` },
+			scope: { ...inputs.scope, version: `scm.file:v1:${item.blobId}:${"b".repeat(64)}` },
 		}),
 	);
 	writeFileSync(
@@ -82,28 +86,48 @@ function stageScan(cwd: string, includeContext = false): string {
 		]),
 	);
 	writeFileSync(
-		path.join(cwd, "evidence/manifest.json"),
+		path.join(cwd, "INDEX.json"),
 		JSON.stringify({
 			itemKind: "scm.file",
-			files: [SOURCE_PATH, CAPTURED_REFS].map((witness) => ({
+			files: [SOURCE_PATH, "context/inventory.json"].map((witness) => ({
 				kind: "scm.repository.tree",
-				file: { path: witness },
+				file: {
+					path: witness,
+					sha256: createHash("sha256")
+						.update(readFileSync(path.join(cwd, witness)))
+						.digest("hex"),
+				},
 			})),
 			sources: [
 				{
 					kind: "scm.repository.tree",
 					citation: { side: "FORBIDDEN", commit: "OPTIONAL" },
 					state: { availability: "AVAILABLE" },
-					files: [{ path: SOURCE_PATH }],
+					files: [{ path: SOURCE_PATH }, { path: "context/inventory.json" }],
 				},
 			],
+			citableTexts: files.flatMap((file) =>
+				[commit, null].map((version) => ({
+					source: "scm.repository.tree",
+					path: file.path,
+					side: "NEW",
+					commit: version,
+					stagedPath: `${REPOSITORY}/${file.path}`,
+					sha256: createHash("sha256").update(file.text).digest("hex"),
+				})),
+			),
 		}),
 	);
+	assert.equal(existsSync(path.join(cwd, REPOSITORY, ".git")), false);
 	return commit;
 }
 
-for (const basis of ["state", "introduced"] as const) {
-	void test(`SCAN ${basis === "state" ? "admits state with complete pinned-file receipts" : "rejects introduced basis"} through tool validation`, async () => {
+for (const [basis, explicitCommit] of [
+	["state", true],
+	["state", false],
+	["introduced", true],
+] as const) {
+	void test(`SCAN ${basis === "state" ? "admits state with complete pinned-file receipts" : "rejects introduced basis"} through tool validation (explicit commit=${explicitCommit})`, async () => {
 		const cwd = mkdtempSync(path.join(tmpdir(), "pi-runner-scan-"));
 		try {
 			const commit = stageScan(cwd);
@@ -123,7 +147,7 @@ for (const basis of ["state", "introduced"] as const) {
 								sourceKind: "scm.repository.tree",
 								sourcePath: SOURCE_PATH,
 								path: FILE,
-								commit,
+								...(explicitCommit ? { commit } : {}),
 								startLine: 1,
 								endLine: 1,
 								quote: "insecure();",
@@ -169,7 +193,13 @@ for (const basis of ["state", "introduced"] as const) {
 			const submitted = field(results[0], "candidate");
 			assert.ok(isJsonObject(submitted));
 			const { coverage, ...measured } = submitted;
-			assert.deepEqual(measured, candidate);
+			assert.deepEqual(measured, {
+				...candidate,
+				problems: candidate.problems.map((problem) => ({
+					...problem,
+					citations: problem.citations.map((citation) => ({ ...citation, commit })),
+				})),
+			});
 			assert.partialDeepStrictEqual(coverage, {
 				source: "host",
 				reads: 2,
@@ -246,3 +276,80 @@ for (const readContext of [false, true]) {
 		}
 	});
 }
+
+for (const [fieldName, value] of [
+	["path", "Other.ts"],
+	["blobId", "d".repeat(40)],
+	["commitId", "d".repeat(40)],
+	["commitId", "HEAD"],
+	["providerId", "2"],
+	["repositoryId", "2"],
+] as const) {
+	void test(`scan refuses a conflicting captured ${fieldName} (${value}) before a model session starts`, async (t) => {
+		const cwd = mkdtempSync(path.join(tmpdir(), "pi-scan-conflict-"));
+		t.after(() => rmSync(cwd, { recursive: true, force: true }));
+		stageScan(cwd);
+		const record: unknown = JSON.parse(readFileSync(path.join(cwd, SOURCE_PATH), "utf8"));
+		assert.ok(isJsonObject(record));
+		writeFileSync(path.join(cwd, SOURCE_PATH), JSON.stringify({ ...record, [fieldName]: value }));
+		const exit = await runRunner(cwd, {}, { PI_HOST_SCAN_PATH: FILE });
+		assert.equal(exit.status, 2, exit.stderr);
+		assert.match(
+			exit.stderr,
+			value === "HEAD" ? /Invalid string/u : /captured scan item contradicts its assignment/u,
+		);
+		assert.deepEqual(capturedLines(cwd, "prompts"), []);
+		assert.deepEqual(capturedLines(cwd, "admission"), []);
+	});
+}
+
+void test("a scan script receives the pinned tree and returns a citation without Git metadata", async (t) => {
+	const cwd = mkdtempSync(path.join(tmpdir(), "pi-scan-script-"));
+	t.after(() => rmSync(cwd, { recursive: true, force: true }));
+	const commit = stageScan(cwd);
+	writeFileSync(
+		path.join(cwd, PRACTICES_DIR, "auth-review.ts"),
+		`
+import assert from "node:assert/strict";
+import { definePracticeScript } from "../lib/core/practice-script.ts";
+import { scm } from "../kits/scm/index.ts";
+export default definePracticeScript({
+	meta: {},
+	async run(input) {
+		const ctx = scm(input);
+		assert.ok(ctx.files);
+		assert.equal(ctx.files.head.commit, ctx.item.commitId);
+		assert.equal(ctx.files.change, null);
+		const file = await ctx.files.head.read(ctx.scope.item.path);
+		assert.deepEqual(file, { status: "FOUND", text: ${JSON.stringify(TEXT)}, truncated: false });
+		return {
+			outcome: "MET",
+			summary: "The file has captured source",
+			explanation: "The assigned source is readable at its pinned commit.",
+			citations: [await ctx.files.head.cite(ctx.scope.item.path, 1)],
+			evidence: {},
+			coverage: { source: "claimed", selected: 1, checked: 1, total: 1, complete: true },
+		};
+	},
+});
+`,
+	);
+	const exit = await runRunner(cwd, {});
+	assert.equal(exit.status, 0, exit.stderr);
+	const [request] = capturedLines(cwd, "admission");
+	const results = field(field(request, "body"), "results");
+	assert.ok(Array.isArray(results));
+	assert.partialDeepStrictEqual(field(results[0], "candidate"), {
+		outcome: "MET",
+		citations: [
+			{
+				sourceKind: "scm.repository.tree",
+				sourcePath: SOURCE_PATH,
+				path: FILE,
+				commit,
+				quote: "insecure();",
+			},
+		],
+		coverage: { complete: true },
+	});
+});

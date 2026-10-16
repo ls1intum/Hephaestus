@@ -62,6 +62,11 @@ The host supplies trusted receipts separately from the returned candidate.
 A search, listing or isolated quotation cannot establish a full assigned-file read.
 A failed read is unavailable, not proved absence.
 
+For SCAN, `repos/reviewed/` contains the pinned files without Git metadata.
+`context/item.json` identifies the assigned path, blob and repository commit.
+The runner checks this record against the frozen assignment before it reads the tree.
+The record is the `scm.repository.tree` source witness for scan read receipts and citations.
+
 The server fills verified citation coordinates from captured text.
 The capture manifest maps source, path, side and version to staged bytes and their digest.
 Core reads those bytes again and checks their digest before accepting the quote.

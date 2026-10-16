@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.scan;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemExclusionReason;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScanExport;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScanExportLocation;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScanExportProblem;
@@ -181,6 +182,20 @@ public class ScanExportService {
         exportCounts.put("reused", (long) counts.reused());
         exportCounts.put("withheld", (long) counts.withheld());
         exportCounts.put("notReviewed", (long) counts.notReviewed());
+        var exclusions = reports.exclusions(review);
+        if (exclusions != null) {
+            exportCounts.put("excludedFiles", (long) exclusions.size());
+            exportCounts.put(
+                    "excludedTooLarge",
+                    exclusions.stream()
+                            .filter(e -> e.reason() == ItemExclusionReason.FILE_TOO_LARGE)
+                            .count());
+            exportCounts.put(
+                    "excludedBinary",
+                    exclusions.stream()
+                            .filter(e -> e.reason() == ItemExclusionReason.BINARY_FILE)
+                            .count());
+        }
         exportCounts.put("openProblems", (long) counts.openProblems());
         exportCounts.put("recordedProblems", (long) recordedCount.problems());
         exportCounts.put("exportedProblems", (long) exported.size());

@@ -4,6 +4,7 @@ import static de.tum.cit.aet.hephaestus.core.TransactionCallbacks.afterCommit;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.core.event.RepositoryMonitoringChangedEvent;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceNamespace;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
@@ -212,7 +213,9 @@ public class WorkspaceRepositoryMonitorService {
             created.setNativeId(repository.getNativeId());
             created.setWorkspace(owner);
             owner.getRepositoriesToMonitor().add(created);
-            return repositoryToMonitorRepository.saveAndFlush(created);
+            RepositoryToMonitor saved = repositoryToMonitorRepository.saveAndFlush(created);
+            publishRepositoryMonitoringChanged(owner, saved);
+            return saved;
         });
         log.info(
                 "Added repository to monitor: nameWithOwner={}, workspaceId={}",
@@ -285,7 +288,9 @@ public class WorkspaceRepositoryMonitorService {
             created.setNativeId(nativeId);
             created.setWorkspace(owner);
             owner.getRepositoriesToMonitor().add(created);
-            return repositoryToMonitorRepository.saveAndFlush(created);
+            RepositoryToMonitor saved = repositoryToMonitorRepository.saveAndFlush(created);
+            publishRepositoryMonitoringChanged(owner, saved);
+            return saved;
         });
         log.info(
                 "Added repository to monitor: nameWithOwner={}, workspaceId={}",
@@ -626,7 +631,13 @@ public class WorkspaceRepositoryMonitorService {
         repositoryToMonitorRepository.saveAndFlush(monitor);
         workspace.getRepositoriesToMonitor().add(monitor);
         workspaceRepository.save(workspace);
+        publishRepositoryMonitoringChanged(workspace, monitor);
         announceRepositoryMonitor(workspace, monitor, deferSync);
+    }
+
+    private void publishRepositoryMonitoringChanged(Workspace workspace, RepositoryToMonitor monitor) {
+        eventPublisher.publishEvent(new RepositoryMonitoringChangedEvent(
+                workspace.getId(), repositoryToMonitorRepository.findSourceRepositoryIdsOfMonitor(monitor.getId())));
     }
 
     // Consumers read committed monitors; refresh only after commit, never after rollback.
@@ -664,9 +675,11 @@ public class WorkspaceRepositoryMonitorService {
     }
 
     private void deleteRepositoryMonitor(Workspace workspace, RepositoryToMonitor monitor) {
+        List<Long> repositoryIds = repositoryToMonitorRepository.findSourceRepositoryIdsOfMonitor(monitor.getId());
         // Remove from collection first - orphanRemoval=true will handle deletion
         workspace.getRepositoriesToMonitor().remove(monitor);
         workspaceRepository.saveAndFlush(workspace);
+        eventPublisher.publishEvent(new RepositoryMonitoringChangedEvent(workspace.getId(), repositoryIds));
         if (shouldUseNats(workspace)) {
             // Like announceRepositoryMonitor, the refresh waits for the commit that removes the
             // monitor.
@@ -681,7 +694,10 @@ public class WorkspaceRepositoryMonitorService {
             return Optional.ofNullable(workspace);
         }
 
-        if (repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(workspace.getId(), nameWithOwner)) {
+        var existing =
+                repositoryToMonitorRepository.findByWorkspaceIdAndNameWithOwner(workspace.getId(), nameWithOwner);
+        if (existing.isPresent()) {
+            publishRepositoryMonitoringChanged(workspace, existing.get());
             return Optional.of(workspace);
         }
 

@@ -53,7 +53,10 @@ export function ScanCounts({ counts, recorded, progress, countedNothing }: ScanC
 				<Figure label="Practice and file pairs" value={counts.practiceItemPairs ?? unknown} />
 			</dl>
 			<dl className="grid grid-cols-2 gap-4 border-t pt-4 sm:grid-cols-4 lg:grid-cols-6">
-				<Figure label={SCAN_ENTRY_DEFS.JUDGED.label} value={figure(counts.reviewed)} />
+				<Figure
+					label={SCAN_ENTRY_DEFS.JUDGED.label}
+					value={figure(counts.reviewed - counts.reused)}
+				/>
 				<Figure label={OUTCOME_DEFS.MET.label} value={figure(counts.met)} />
 				<Figure label={OUTCOME_DEFS.NOT_MET.label} value={figure(counts.notMet)} />
 				<Figure label={OUTCOME_DEFS.DOES_NOT_APPLY.label} value={figure(counts.doesNotApply)} />
@@ -73,7 +76,7 @@ export function ScanCounts({ counts, recorded, progress, countedNothing }: ScanC
 			<p className="text-sm text-muted-foreground">
 				{countedNothing
 					? "The scan stopped before it reviewed any file, so it has no counts."
-					: `Each file can be reviewed against more than one practice. Reviewed, withheld and not reviewed count practice and file pairs. Reused results are included in reviewed.${recorded ? " As recorded when the scan closed." : ""}`}
+					: `Each file can be reviewed against more than one practice. Reviewed, reused, withheld and not reviewed count practice and file pairs. Reviewed counts only new results from this scan.${recorded ? " As recorded when the scan closed." : ""}`}
 			</p>
 		</section>
 	);

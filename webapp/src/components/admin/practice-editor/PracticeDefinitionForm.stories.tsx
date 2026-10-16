@@ -190,33 +190,18 @@ export const GoingWell: Story = {
 	},
 };
 
-export const ScanEnabled: Story = {
-	args: editing(practiceValueOf({ scan: mockScan })),
-	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("switch", { name: "Include in scans" })).toBeChecked();
-		await expect(canvas.getByRole("textbox", { name: /^Include/u })).toHaveValue(
-			"**/*.ts\n**/*.tsx",
-		);
-	},
-};
-
-export const ScanDisabled: Story = {
-	args: editing(),
-	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("switch", { name: "Include in scans" })).not.toBeChecked();
-		await expect(canvas.queryByRole("textbox", { name: /^Include/u })).toBeNull();
-	},
-};
-
-export const ScanInvalid: Story = {
+export const SavedScan: Story = {
 	args: editing(practiceValueOf({ scan: mockScan })),
 	play: async ({ canvas, userEvent }) => {
-		const include = canvas.getByRole("textbox", { name: /^Include/u });
-		await userEvent.clear(include);
-		await userEvent.type(include, "../outside/**");
+		await expect(
+			canvas.queryByRole("switch", { name: "Include in scans" }),
+		).not.toBeInTheDocument();
+		const name = canvas.getByRole("textbox", { name: /^Name/u });
+		await userEvent.clear(name);
+		await userEvent.type(name, "Explain every change");
 		await userEvent.click(canvas.getByRole("button", { name: "Save changes" }));
-		await expect(include).toHaveAccessibleDescription(/A pattern cannot leave the repository/u);
-		await expect(submit).not.toHaveBeenCalled();
+		await waitFor(async () => expect(submit).toHaveBeenCalledOnce());
+		await expect(lastSaved()?.definition.scan).toEqual(mockScan);
 	},
 };
 

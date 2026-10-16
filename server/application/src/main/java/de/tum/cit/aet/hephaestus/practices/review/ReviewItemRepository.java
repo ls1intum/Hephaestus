@@ -44,11 +44,22 @@ public interface ReviewItemRepository extends JpaRepository<ReviewItem, ReviewIt
 
     @Query(value = """
         SELECT m.practice_id AS practiceId,m.item_id AS itemId FROM review_item m JOIN item i ON i.id=m.item_id
-        AND i.workspace_id=m.workspace_id WHERE m.workspace_id=:workspaceId AND m.review_id=:reviewId
+        AND i.workspace_id=m.workspace_id
+        LEFT JOIN result r ON r.workspace_id=m.workspace_id AND r.item_id=m.item_id
+          AND r.practice_id=m.practice_id AND r.developer_id IS NULL AND r.ended_at IS NULL
+        WHERE m.workspace_id=:workspaceId AND m.review_id=:reviewId
         AND m.state='LISTED' AND (m.job_id IS NULL OR m.job_id<>ALL(CAST(:active AS uuid[])))
-        ORDER BY i.path,m.item_id,m.practice_id
+        ORDER BY r.recorded_at ASC NULLS FIRST,i.path,m.item_id,m.practice_id
         """, nativeQuery = true)
     List<PendingAssignment> pending(long workspaceId, UUID reviewId, UUID[] active, Pageable page);
+
+    @Query(value = """
+        SELECT m.* FROM review_item m WHERE m.workspace_id=:workspaceId AND m.review_id=:reviewId
+        AND m.state='LISTED' AND m.job_id IS NULL
+        AND NOT COALESCE((m.detail->>'reuseAttempted')::boolean,false)
+        ORDER BY m.item_id,m.practice_id
+        """, nativeQuery = true)
+    List<ReviewItem> pendingReuse(long workspaceId, UUID reviewId, Pageable page);
 
     @Query(value = """
         SELECT COUNT(*) AS listed,COUNT(*) FILTER(WHERE state='JUDGED') AS judged,

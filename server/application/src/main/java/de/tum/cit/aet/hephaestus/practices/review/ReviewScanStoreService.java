@@ -16,9 +16,11 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewPracticeStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewScanStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshotQuery;
+import de.tum.cit.aet.hephaestus.practices.spi.ScanExcludedItem;
 import de.tum.cit.aet.hephaestus.practices.spi.ScanExecutionSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ScanListedItem;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -31,6 +33,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -50,6 +53,7 @@ public class ReviewScanStoreService implements ReviewScanStore {
     private final Clock clock;
     private final ReviewSnapshotQuery snapshots;
     private final ReviewRuntimeQuery runtime;
+    private final TransactionTemplate transactions;
 
     @Override
     @Transactional(readOnly = true)
@@ -150,6 +154,33 @@ public class ReviewScanStoreService implements ReviewScanStore {
 
     @Override
     @Transactional
+    public void exclusions(long workspaceId, UUID reviewId, List<ScanExcludedItem> exclusions) {
+        var review = active(workspaceId, reviewId);
+        var inventory = review.getInventoryReceipt();
+        if (inventory == null) throw new IllegalStateException("Capture the inventory before its exclusions.");
+        var recorded = json.createArrayNode();
+        for (var excluded : exclusions) {
+            var item = excluded.item();
+            if (item.workspaceId() != workspaceId
+                    || !Long.valueOf(review.getItemId()).equals(item.parentId())
+                    || !item.kind().value().equals("scm.file")
+                    || excluded.sizeBytes() < 0)
+                throw new IllegalArgumentException("The exclusion is outside the pinned repository inventory.");
+            recorded.addObject()
+                    .put("itemId", Long.toString(item.itemId()))
+                    .put("path", Objects.requireNonNull(item.path()))
+                    .put("reason", excluded.reason().name())
+                    .put("sizeBytes", excluded.sizeBytes());
+        }
+        if (inventory.has("exclusions") && !inventory.path("exclusions").equals(recorded))
+            throw new IllegalStateException("Recorded exclusions cannot change.");
+        var receipt = (ObjectNode) inventory.deepCopy();
+        receipt.set("exclusions", recorded);
+        review.setInventoryReceipt(receipt);
+    }
+
+    @Override
+    @Transactional
     public void list(long workspaceId, UUID reviewId, long practiceId, List<ScanListedItem> members, boolean complete) {
         var review = active(workspaceId, reviewId);
         if (review.getInventoryReceipt() == null)
@@ -192,21 +223,66 @@ public class ReviewScanStoreService implements ReviewScanStore {
     }
 
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public void reuseListed(long workspaceId, UUID reviewId, Instant deadline) {
+        var review = reviews.findByIdAndWorkspaceId(reviewId, workspaceId).orElseThrow();
+        if (!acceptsReuse(review) || review.getChecks().path("reuseComplete").asBoolean()) return;
+        if (review.getInventoryReceipt() == null
+                || !review.getInventoryReceipt().path("complete").asBoolean()
+                || practices.findByWorkspaceIdAndReviewIdOrderByPracticeIdAsc(workspaceId, reviewId).stream()
+                        .anyMatch(p -> !Boolean.TRUE.equals(p.getListingComplete()))) return;
+        while (clock.instant().isBefore(deadline)) {
+            var pending = items.pendingReuse(workspaceId, reviewId, PageRequest.of(0, 1000));
+            if (pending.isEmpty()) {
+                transactions.executeWithoutResult(status -> {
+                    var locked = reviews.lockByIdAndWorkspaceId(reviewId, workspaceId)
+                            .orElseThrow();
+                    if (!acceptsReuse(locked)) return;
+                    var checks = (ObjectNode) locked.getChecks().deepCopy();
+                    checks.put("reuseComplete", true);
+                    locked.setChecks(checks);
+                });
+                return;
+            }
+            for (var member : pending) {
+                if (!clock.instant().isBefore(deadline)) return;
+                boolean continued = Boolean.TRUE.equals(transactions.execute(status -> {
+                    var locked = reviews.lockByIdAndWorkspaceId(reviewId, workspaceId)
+                            .orElseThrow();
+                    if (!acceptsReuse(locked)) return false;
+                    reuse(workspaceId, new ReviewAssignmentId(reviewId, member.getPracticeId(), member.getItemId()));
+                    return true;
+                }));
+                if (!continued) return;
+            }
+        }
+    }
+
+    private static boolean acceptsReuse(Review review) {
+        return review.getKind() == ReviewKind.SCAN
+                && !review.getStatus().isTerminal()
+                && !review.getChecks().path("cancellationRequested").asBoolean();
+    }
+
+    @Override
     @Transactional
     public Optional<UUID> reuse(long workspaceId, ReviewAssignmentId id) {
         var review = active(workspaceId, id.reviewId());
-        if (!review.getChecks().path("reuse").asBoolean(true)) return Optional.empty();
         var member = items.lockAssignment(workspaceId, id.reviewId(), id.practiceId(), id.itemId())
                 .orElseThrow();
         if (member.getState() == ReviewItemState.REUSED) return Optional.ofNullable(member.getResultId());
         if (member.getState() != ReviewItemState.LISTED || member.getJobId() != null) return Optional.empty();
+        var detail = member.getDetail() == null
+                ? json.createObjectNode()
+                : (ObjectNode) member.getDetail().deepCopy();
+        if (detail.path("reuseAttempted").asBoolean()) return Optional.empty();
+        detail.put("reuseAttempted", true);
+        member.setDetail(detail);
+        if (!review.getChecks().path("reuse").asBoolean(true)) return Optional.empty();
         var candidate = reuseCandidates.find(workspaceId, id);
         if (candidate.isEmpty()) return Optional.empty();
         var result = candidate.orElseThrow().result();
         var captured = candidate.orElseThrow().custody();
-        var detail = member.getDetail() == null
-                ? json.createObjectNode()
-                : (ObjectNode) member.getDetail().deepCopy();
         detail.set("custody", json.valueToTree(captured));
         member.setDetail(detail);
         member.setState(ReviewItemState.REUSED);

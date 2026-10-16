@@ -17,7 +17,6 @@ import de.tum.cit.aet.hephaestus.practices.spi.ScanExecutionSnapshot;
 import java.time.Clock;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
@@ -82,12 +81,14 @@ public class ScanDriver {
                         if (!state.cancellationRequested()
                                 && clock.instant().isBefore(state.createdAt().plus(limits.scanDeadline())))
                             inventory.record(state.review(), prepared);
-                        advance(scans.lock(
-                                state.review().workspaceId(), state.review().id()));
                     });
-                } else
-                    transactions.executeWithoutResult(status -> advance(scans.lock(
-                            candidate.review().workspaceId(), candidate.review().id())));
+                }
+                scans.reuseListed(
+                        candidate.review().workspaceId(),
+                        candidate.review().id(),
+                        candidate.createdAt().plus(limits.scanDeadline()));
+                transactions.executeWithoutResult(status -> advance(scans.lock(
+                        candidate.review().workspaceId(), candidate.review().id())));
             } catch (ScanService.EnumerationFailure failure) {
                 closeAfterFailure(candidate, failure.reason());
             } catch (RuntimeException failure) {
@@ -121,9 +122,6 @@ public class ScanDriver {
                 || state.listedPracticeIds().size() != review.practices().size())
             throw new ScanService.EnumerationFailure(ReviewStopReason.ENUMERATION_FAILED);
         var pending = scans.pending(review.workspaceId(), review.id(), ScanService.PAGE_SIZE);
-        var attempted = pending.stream().map(assignment -> assignment.id()).collect(Collectors.toSet());
-        for (var assignment : pending) scans.reuse(review.workspaceId(), assignment.id());
-        pending = scans.pending(review.workspaceId(), review.id(), ScanService.PAGE_SIZE);
         if (pending.isEmpty()) {
             var settled = scans.lock(review.workspaceId(), review.id());
             boolean complete = settled.judged() + settled.reused() == settled.listed() && settled.withheld() == 0;
@@ -137,7 +135,6 @@ public class ScanDriver {
                                     : ReviewStopReason.EXECUTION_INCOMPLETE);
             return;
         }
-        if (!attempted.contains(pending.getFirst().id())) return;
         long item = pending.getFirst().item().itemId();
         var selected = pending.stream()
                 .filter(assignment -> assignment.item().itemId() == item)
@@ -145,6 +142,9 @@ public class ScanDriver {
         boolean permits;
         try {
             permits = budget.permits(state, selected);
+        } catch (ScanUsageUnverifiableException unverifiable) {
+            close(state, ReviewStatus.PARTIAL, ReviewStopReason.USAGE_UNVERIFIABLE);
+            return;
         } catch (ReviewJobStateConflictException changed) {
             close(state, ReviewStatus.PARTIAL, ReviewStopReason.MODEL_CHANGED);
             return;

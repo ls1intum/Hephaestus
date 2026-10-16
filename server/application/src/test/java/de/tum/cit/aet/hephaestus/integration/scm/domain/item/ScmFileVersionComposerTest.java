@@ -3,6 +3,8 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.item;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
@@ -14,7 +16,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.RepositoryKey;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.LongStream;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
@@ -36,11 +40,12 @@ class ScmFileVersionComposerTest extends BaseUnitTest {
         var self = new ScmFileVersions.Entry("src/a.ts", "100644", "b".repeat(40));
         var context = new ScmFileVersions.Entry("src/b.ts", "100644", "c".repeat(40));
         var unrelated = new ScmFileVersions.Entry("README.md", "100644", "d".repeat(40));
-        when(tree.inventory(key, pinned.value())).thenReturn(List.of(self, context, unrelated));
+        when(tree.index(key, pinned.value())).thenReturn(new ScmGitTree.Inventory(List.of(self, context, unrelated)));
         var composer =
                 new ScmFileVersionComposer(items, access, repositories, tree, new ScmFileVersions(new ObjectMapper()));
         assertThat(composer.kinds()).containsExactly(ScmItemEvents.FILE);
-        var original = composer.compose(file, pinned, List.of("src/**"));
+        var original = Objects.requireNonNull(
+                composer.compose(List.of(file), pinned, List.of("src/**")).get(file.itemId()));
         assertThat(original.baseVersion()).isEqualTo(pinned.value());
         assertThat(composer.contextPaths(file, original, List.of("src/**"))).containsExactly("src/b.ts");
         assertThatThrownBy(() -> composer.contextPaths(file, original, List.of("README.md")))
@@ -54,18 +59,56 @@ class ScmFileVersionComposerTest extends BaseUnitTest {
                             ItemCaptureException.class,
                             failure -> assertThat(failure.code()).isEqualTo(ItemCaptureCode.VERSION_UNAVAILABLE));
         }
-        when(tree.inventory(key, pinned.value()))
-                .thenReturn(List.of(
-                        self, context, new ScmFileVersions.Entry(unrelated.path(), unrelated.mode(), "e".repeat(40))));
-        assertThat(composer.compose(file, pinned, List.of("src/**"))).isEqualTo(original);
+        when(tree.index(key, pinned.value()))
+                .thenReturn(new ScmGitTree.Inventory(List.of(
+                        self, context, new ScmFileVersions.Entry(unrelated.path(), unrelated.mode(), "e".repeat(40)))));
+        assertThat(Objects.requireNonNull(composer.compose(List.of(file), pinned, List.of("src/**"))
+                        .get(file.itemId())))
+                .isEqualTo(original);
         assertThat(composer.contextPaths(file, original, List.of("src/**"))).containsExactly("src/b.ts");
-        when(tree.inventory(key, pinned.value()))
-                .thenReturn(List.of(
-                        self, new ScmFileVersions.Entry(context.path(), context.mode(), "f".repeat(40)), unrelated));
-        assertThat(composer.compose(file, pinned, List.of("src/**"))).isNotEqualTo(original);
+        when(tree.index(key, pinned.value()))
+                .thenReturn(new ScmGitTree.Inventory(List.of(
+                        self, new ScmFileVersions.Entry(context.path(), context.mode(), "f".repeat(40)), unrelated)));
+        assertThat(Objects.requireNonNull(composer.compose(List.of(file), pinned, List.of("src/**"))
+                        .get(file.itemId())))
+                .isNotEqualTo(original);
         assertThatThrownBy(() -> composer.contextPaths(file, original, List.of("src/**")))
                 .isInstanceOfSatisfying(
                         ItemCaptureException.class,
                         failure -> assertThat(failure.code()).isEqualTo(ItemCaptureCode.VERSION_UNAVAILABLE));
+    }
+
+    @Test
+    void shouldComposeLargeSelectionsFromOnePreparedRepositoryAndIndex() {
+        var items = mock(ScmItemAccess.class);
+        var access = mock(ScmRepositoryAccess.class);
+        var repositories = mock(RepositoryRepository.class);
+        var tree = mock(ScmGitTree.class);
+        var selected = LongStream.range(10, 2011)
+                .mapToObj(id -> new ItemRef(1, id, ScmItemEvents.FILE, null, 3L, "src/" + id + ".ts"))
+                .toList();
+        var first = selected.getFirst();
+        var parent = new ItemRef(1, 3, ScmItemEvents.REPOSITORY, 4L, null, null);
+        var repository = new Repository();
+        var key = new RepositoryKey(1, 4);
+        var pinned = new ItemVersion("a".repeat(40), null);
+        when(items.parent(first, ScmItemEvents.REPOSITORY)).thenReturn(parent);
+        when(repositories.findById(4L)).thenReturn(Optional.of(repository));
+        when(access.prepare(1, repository)).thenReturn(key);
+        when(tree.index(key, pinned.value()))
+                .thenReturn(new ScmGitTree.Inventory(selected.stream()
+                        .map(file -> new ScmFileVersions.Entry(
+                                Objects.requireNonNull(file.path()), "100644", "b".repeat(40)))
+                        .toList()));
+        var composer =
+                new ScmFileVersionComposer(items, access, repositories, tree, new ScmFileVersions(new ObjectMapper()));
+        assertThat(composer.compose(selected, pinned, List.of()).keySet())
+                .containsExactlyInAnyOrderElementsOf(
+                        selected.stream().map(ItemRef::itemId).toList());
+        verify(items).requireAll(1, selected.subList(0, 1000));
+        verify(items).requireAll(1, selected.subList(1000, 2000));
+        verify(items).requireAll(1, selected.subList(2000, 2001));
+        verify(access, times(1)).prepare(1, repository);
+        verify(tree, times(1)).index(key, pinned.value());
     }
 }

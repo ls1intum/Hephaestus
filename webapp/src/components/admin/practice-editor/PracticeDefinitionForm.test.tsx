@@ -84,6 +84,17 @@ describe("the definition an edit submits", () => {
 		expect(submitted(onSubmit)).toStrictEqual(practiceValueOf({ scan: mockScan }));
 	});
 
+	it("preserves saved scan settings after a name change without showing scan controls", async () => {
+		const scan = { ...mockScan, reads: { ...mockScan.reads, contract: "1.0.0" } };
+		const onSubmit = vi.fn<Submit>();
+		await renderEditForm(onSubmit, practiceValueOf({ scan }));
+		expect(screen.queryByRole("switch", { name: "Include in scans" })).toBeNull();
+		fireEvent.change(nameField(), { target: { value: "Explain every change" } });
+		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+		await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
+		expect(submitted(onSubmit).definition.scan).toStrictEqual(scan);
+	});
+
 	it("shows the kind of an existing practice without offering to change it", async () => {
 		await renderEditForm(vi.fn());
 		expect(screen.queryByRole("radio", { name: /^Issue/u })).toBeNull();
@@ -228,39 +239,6 @@ describe("the kind a practice is created for", () => {
 		expect(screen.getByRole("combobox", { name: "Source 1" }).textContent).toContain(
 			"Review threads and decisions",
 		);
-	});
-});
-
-describe("scans", () => {
-	it("keeps the scan draft while scans are off, and saves no scan", async () => {
-		const onSubmit = vi.fn<Submit>();
-		await renderEditForm(onSubmit, practiceValueOf({ scan: mockScan }));
-		const toggle = screen.getByRole("switch", { name: "Include in scans" });
-		fireEvent.click(toggle);
-		expect(screen.queryByRole("textbox", { name: /^Include/u })).toBeNull();
-		fireEvent.click(toggle);
-		expect(screen.getByRole<HTMLTextAreaElement>("textbox", { name: /^Include/u }).value).toBe(
-			mockScan.include.join("\n"),
-		);
-		fireEvent.click(toggle);
-		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
-		await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
-		expect(submitted(onSubmit).definition.scan).toBeNull();
-	});
-
-	it("refuses a pattern that leaves the repository", async () => {
-		const onSubmit = vi.fn<Submit>();
-		await renderEditForm(onSubmit, practiceValueOf({ scan: mockScan }));
-		fireEvent.change(screen.getByRole("textbox", { name: /^Include/u }), {
-			target: { value: "../outside/**" },
-		});
-		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
-		expect(onSubmit).not.toHaveBeenCalled();
-		expect(
-			screen.getAllByText(
-				"A pattern cannot leave the repository: remove “..” from “../outside/**”.",
-			).length,
-		).toBeGreaterThan(0);
 	});
 });
 

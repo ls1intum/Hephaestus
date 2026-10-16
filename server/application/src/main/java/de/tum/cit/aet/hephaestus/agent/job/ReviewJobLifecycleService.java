@@ -140,13 +140,10 @@ public class ReviewJobLifecycleService {
                 : LlmPriceSnapshot.unpricedInstance();
         // The terminal update holds the row lock and prevents further proxy accumulations.
         // Read its committed counters directly; the entity can predate a proxy response.
-        // No token evidence stays unknown.
+        // Calls without token evidence stay unknown. No calls add no ledger row.
         boolean billed = TerminalUsage.fromProxy(
                         jobRepository.findLlmUsageById(job.getId()).orElse(null))
                 .appendTo(usageRecorder, jobRepository, workspaceId, job, snap, price);
-        log.info(
-                "Recorded {} usage ledger entry (user-cancel): jobId={}",
-                billed ? "a confirmed" : "an UNPRICED",
-                job.getId());
+        log.info("Settled job usage (user-cancel): priced={}, jobId={}", billed, job.getId());
     }
 }
