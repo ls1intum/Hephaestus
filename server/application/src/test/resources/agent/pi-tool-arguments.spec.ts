@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
+import { ProblemDrafts } from "../../../main/resources/agent/pi-problem-drafts.ts";
+import { normalizeSubmission } from "../../../main/resources/agent/pi-result-normalize.ts";
+import { buildResultTools } from "../../../main/resources/agent/pi-result-tools.ts";
 import {
 	prepareResultArguments,
 	validateResultEvidence,
@@ -512,4 +515,113 @@ void test("malformed JSON envelopes show a complete result shape instead of gues
 			);
 		}
 	}
+});
+
+/** The registered submit tool and shared Candidate parser, without admitting anything. */
+function prepareSubmittedResult(raw: unknown) {
+	const drafts = new ProblemDrafts();
+	const tool = buildResultTools({
+		sourceKinds: ["scm.pull-request.diff", "scm.repository.tree"],
+		contextRoot: "context",
+		drafts: () => drafts,
+		validateProblem: () => {
+			throw new Error("This inline submission does not use a draft Problem");
+		},
+		submit: async () => ({ content: [], details: {} }),
+	}).find((entry) => entry.name === "submit_result");
+	assert.ok(tool?.prepareArguments);
+	return normalizeSubmission(tool.prepareArguments(raw));
+}
+
+void test("a NOT_MET evidence correction resubmits without inventing an optional question", () => {
+	for (const openQuestions of [[], null]) {
+		// The live refusal carried both an unknown lookedFor and an empty optional list.
+		const sent = {
+			...result,
+			evidence: {
+				search,
+				lookedFor: "Calls that grant access without checking authentication",
+				sourceKind: "scm.pull-request.diff",
+				openQuestions,
+			},
+		};
+		let refusal: unknown;
+		try {
+			prepareSubmittedResult(sent);
+		} catch (error) {
+			refusal = error;
+		}
+		assert.ok(refusal instanceof Error);
+		const start = "Corrected call example: ";
+		const end = ". Example shows shape only;";
+		assert.ok(refusal.message.includes(start));
+		const correction: unknown = JSON.parse(
+			refusal.message.slice(
+				refusal.message.indexOf(start) + start.length,
+				refusal.message.indexOf(end),
+			),
+		);
+		assert.deepEqual(correction, { ...result, evidence: { search } });
+		const resubmitted = prepareSubmittedResult(correction);
+		assert.equal(resubmitted.outcome, "NOT_MET");
+		assert.deepEqual(resubmitted.problems, result.problems);
+		assert.deepEqual(resubmitted.evidence, { search });
+	}
+});
+
+void test("only an absent optional NOT_MET question list is omitted; substantive questions remain", () => {
+	for (const openQuestions of [[], null, "[]"]) {
+		const sent = { ...result, evidence: { search, openQuestions } };
+		assert.deepEqual(prepareSubmittedResult(sent).evidence, { search });
+		assert.deepEqual(
+			sent.evidence.openQuestions,
+			openQuestions,
+			"the original call is not changed",
+		);
+	}
+	assert.deepEqual(prepareSubmittedResult(result).evidence, result.evidence);
+	for (const openQuestions of ["", {}, "not a question list", false]) {
+		assert.throws(() => prepareSubmittedResult({ ...result, evidence: { openQuestions } }));
+	}
+});
+
+void test("required outcome warrants and NOT_MET problems are never optionalized", () => {
+	for (const openQuestions of [undefined, null, []]) {
+		assert.throws(() =>
+			prepareSubmittedResult({
+				...result,
+				outcome: "COULD_NOT_DETERMINE",
+				problems: [],
+				example: null,
+				evidence: { openQuestions },
+			}),
+		);
+	}
+	for (const problems of [undefined, null, []]) {
+		assert.throws(() => prepareSubmittedResult({ ...result, problems, evidence: {} }));
+	}
+	assert.equal(
+		prepareSubmittedResult({
+			...result,
+			outcome: "COULD_NOT_DETERMINE",
+			problems: [],
+			example: null,
+		}).outcome,
+		"COULD_NOT_DETERMINE",
+	);
+	assert.equal(
+		prepareSubmittedResult({
+			...result,
+			outcome: "DOES_NOT_APPLY",
+			problems: [],
+			example: null,
+			evidence: { inapplicability },
+		}).outcome,
+		"DOES_NOT_APPLY",
+	);
+	assert.equal(
+		prepareSubmittedResult({ ...result, outcome: "MET", problems: [], evidence: { search } })
+			.outcome,
+		"MET",
+	);
 });

@@ -138,6 +138,11 @@ function empty(value: unknown): boolean {
 	);
 }
 
+/** Only explicit absence or an empty list carries no optional question. */
+function absentQuestions(value: unknown): boolean {
+	return value == null || (Array.isArray(value) && value.length === 0);
+}
+
 /** Prepare one Problem body using the same transport rules as inline problems. */
 export function prepareProblemArguments(raw: unknown): unknown {
 	const problem = object(raw);
@@ -284,6 +289,9 @@ function prepareEvidence(result: Record<string, unknown>): Record<string, unknow
 					!empty(value),
 			),
 	);
+	if (result.outcome === "NOT_MET" && absentQuestions(list(evidence.openQuestions))) {
+		delete evidence.openQuestions;
+	}
 	if (result.outcome === "DOES_NOT_APPLY" && empty(evidence.inapplicability)) {
 		delete evidence.inapplicability;
 	}
@@ -369,7 +377,7 @@ export function validateResultEvidence(
 		case "NOT_MET": {
 			corrected = {
 				search: sent.search ?? search,
-				...(sent.openQuestions === undefined ? {} : { openQuestions: sent.openQuestions }),
+				...(absentQuestions(sent.openQuestions) ? {} : { openQuestions: sent.openQuestions }),
 			};
 			if (result.problems === null) {
 				throw new Error(

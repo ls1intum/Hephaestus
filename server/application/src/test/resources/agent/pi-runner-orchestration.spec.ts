@@ -4917,6 +4917,7 @@ for (const item of [
   { ...base, summary: "x".repeat(10000) },
   without(base, "evidence"),
   without(base, "explanation"),
+  { ...base, problems: null },
   { ...base, problems: [] },
   { ...base, problems: [without(problem, "basis")] },
   { ...base, problems: [{ ...problem, basis: { ...problem.basis, type: "unknown" } }] },
@@ -4957,11 +4958,12 @@ for (const item of nullableCases) {
   assert.deepEqual(validate(item), prepareResultArguments(item));
   assert.deepEqual(validateToolArguments({ ...tool, parameters: responseDeclaration.parameters }, { name: tool.name, arguments: item }), item);
 }
-// Invalid primitives must not become null before outcome and citation validation sees them.
+// Optional empty lists are absent; invalid primitives still reach outcome and citation validation.
 for (const value of ["", false, true, 0, []]) {
   for (const branch of Object.keys(absent)) {
     const sent = { ...base, evidence: { [branch]: value } };
-    if (branch === "inapplicability" && (value === "" || Array.isArray(value))) {
+    if ((branch === "inapplicability" && (value === "" || Array.isArray(value))) ||
+        (branch === "openQuestions" && Array.isArray(value))) {
       assert.deepEqual(validate(sent), { ...base, evidence: {} });
     } else {
       assert.throws(() => validate(sent));
@@ -4977,6 +4979,9 @@ for (const [field, invalid] of [
 }
 for (const item of [
   { ...decided, outcome: "DOES_NOT_APPLY", evidence: { inapplicability: {} } },
+  { ...decided, outcome: "COULD_NOT_DETERMINE", evidence: {} },
+  { ...decided, outcome: "COULD_NOT_DETERMINE", evidence: { openQuestions: null } },
+  { ...decided, outcome: "COULD_NOT_DETERMINE", evidence: { openQuestions: [] } },
   { ...decided, outcome: "COULD_NOT_DETERMINE", evidence: { openQuestions: [{}] } },
   { ...base, evidence: { search: {} } },
 ]) {
