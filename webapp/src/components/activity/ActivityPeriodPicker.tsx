@@ -54,7 +54,8 @@ export function ActivityPeriodPicker({
 						</Button>
 					}
 				/>
-				<PopoverContent className="w-auto p-0" align="end">
+				{/* Capped at the space Base UI measures between the trigger and the screen edge, so on a short screen the months scroll and Apply stays on screen. */}
+				<PopoverContent className="max-h-(--available-height) w-auto p-0" align="end">
 					<PopoverTitle className="sr-only">Choose the days to count</PopoverTitle>
 					<CustomRange
 						initial={custom}
@@ -82,19 +83,21 @@ function CustomRange({
 	const from = draft?.from;
 	return (
 		<>
-			<Calendar
-				// oxlint-disable-next-line jsx-a11y/no-autofocus -- The popover holds this calendar and its button, so opening it puts the arrow keys on the day grid.
-				autoFocus
-				mode="range"
-				defaultMonth={initial?.from ?? today}
-				selected={draft}
-				onSelect={setDraft}
-				startMonth={EARLIEST_CUSTOM_DAY}
-				endMonth={today}
-				disabled={{ before: EARLIEST_CUSTOM_DAY, after: today }}
-				excludeDisabled
-				numberOfMonths={2}
-			/>
+			<div className="min-h-0 overflow-y-auto">
+				<Calendar
+					// oxlint-disable-next-line jsx-a11y/no-autofocus -- The popover holds this calendar and its button, so opening it puts the arrow keys on the day grid.
+					autoFocus
+					mode="range"
+					defaultMonth={initial?.from ?? today}
+					selected={draft}
+					onSelect={setDraft}
+					startMonth={EARLIEST_CUSTOM_DAY}
+					endMonth={today}
+					disabled={{ before: EARLIEST_CUSTOM_DAY, after: today }}
+					excludeDisabled
+					numberOfMonths={2}
+				/>
+			</div>
 			<Separator />
 			<div className="flex items-center justify-between gap-3 p-2">
 				<p className="text-xs text-muted-foreground" aria-live="polite">
