@@ -43,17 +43,21 @@ export const Route = createFileRoute("/_authenticated/admin/settings")({
 
 function WorkspaceSettingsPage() {
 	const queryClient = useQueryClient();
-	const settingsQuery = useQuery(adminGetInstanceSettingsOptions());
+	const settingsOptions = adminGetInstanceSettingsOptions();
+	const settingsQuery = useQuery(settingsOptions);
+	useQueryReadRefusal(settingsOptions.queryKey, settingsQuery.isError, settingsQuery.error);
 
 	const silentModeMutation = useMutation({
 		...adminUpdateSilentModeMutation(),
-		onSuccess: (data) => {
-			queryClient.setQueryData(adminGetInstanceSettingsQueryKey(), data);
+		onSuccess: async (data) => {
 			toast.success(
 				data.silentModeEngaged
 					? "Silent mode is on. Workspace feedback and messages are withheld."
 					: "Silent mode is off. Workspace feedback and messages can go out again.",
 			);
+			// Like the public activity setting below, the saved state reaches the page only through a
+			// fresh read.
+			await queryClient.invalidateQueries({ queryKey: adminGetInstanceSettingsQueryKey() });
 		},
 		onError: async (error) => {
 			if (problemStatusOf(error) === 412) {
@@ -137,8 +141,12 @@ function WorkspaceSettingsPage() {
 		publicActivity = { status: "error", error: policyQuery.error, onRetry: retryPolicy };
 	}
 
+	const settings =
+		settingsQuery.isError && !queryErrorIsRetryable(settingsQuery.error)
+			? undefined
+			: settingsQuery.data;
 	let body: ReactNode;
-	if (settingsQuery.data) {
+	if (settings !== undefined) {
 		body = (
 			<div className="space-y-4">
 				{settingsQuery.isError ? (
@@ -151,14 +159,14 @@ function WorkspaceSettingsPage() {
 					/>
 				) : null}
 				<SilentModeCard
-					key={settingsQuery.data.etag}
-					settings={settingsQuery.data}
+					key={settings.etag}
+					settings={settings}
 					isPending={silentModeMutation.isPending}
 					releaseDisabled={settingsQuery.isError}
 					onEngage={(reason) => silentModeMutation.mutate({ body: { engaged: true, reason } })}
 					onRelease={() =>
 						silentModeMutation.mutate({
-							headers: { "If-Match": settingsQuery.data.etag },
+							headers: { "If-Match": settings.etag },
 							body: { engaged: false },
 						})
 					}
