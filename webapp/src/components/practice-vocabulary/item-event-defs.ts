@@ -76,6 +76,8 @@ export const ITEM_EVENT_REASON_SENTENCES: Record<ItemEventReason, string> = {
 	VERSION_SUPERSEDED: "The work changed before this version could be reviewed.",
 	PENDING_DEADLINE_EXCEEDED: "The review did not start before its deadline.",
 	ITEM_GONE: "The work no longer exists.",
+	LEGACY_REVIEW_UNBOUND:
+		"An earlier version recorded this review without naming which review it was, so it cannot start.",
 };
 
 // Event discovery determines timestamp precision; shared origins use the review-origin wording.

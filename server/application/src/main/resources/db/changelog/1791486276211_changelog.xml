@@ -841,7 +841,7 @@ CREATE TABLE item_event (
   CONSTRAINT ck_item_event_state CHECK(state IN ('RECORDED','WAITING','STARTED','WITHHELD','EXPIRED')),
   CONSTRAINT ck_item_event_name CHECK(name ~ '^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$'),
   CONSTRAINT ck_item_event_version CHECK(btrim(item_version) <> ''),
- CONSTRAINT ck_item_event_reason CHECK(reason IS NULL OR reason IN ('GATE_WITHHELD','COOLDOWN_ACTIVE','REQUEST_COOLDOWN_ACTIVE','REQUESTER_QUOTA_EXHAUSTED','CONCURRENT_DUPLICATE','COALESCED','OUT_OF_REVIEW_SCOPE','BOT_AUTHOR','BOT_REVIEWER','STALE_ROLLOUT_REVISION','WORKSPACE_INACTIVE','PRACTICES_DISABLED','NO_ACTIVE_PRACTICE','REVIEW_MODEL_UNBOUND','MEMBER_AI_DECLINED','PERSON_DATA_ERASED','FEEDBACK_MODE_OFF','SUBJECT_UNLINKED','MERGE_ACTOR_UNAVAILABLE','MODEL_UNAVAILABLE','BUDGET_EXHAUSTED','ITEM_NOT_VISIBLE','PENDING_DEADLINE_EXCEEDED','ITEM_GONE','VERSION_SUPERSEDED'))
+ CONSTRAINT ck_item_event_reason CHECK(reason IS NULL OR reason IN ('GATE_WITHHELD','COOLDOWN_ACTIVE','REQUEST_COOLDOWN_ACTIVE','REQUESTER_QUOTA_EXHAUSTED','CONCURRENT_DUPLICATE','COALESCED','OUT_OF_REVIEW_SCOPE','BOT_AUTHOR','BOT_REVIEWER','STALE_ROLLOUT_REVISION','WORKSPACE_INACTIVE','PRACTICES_DISABLED','NO_ACTIVE_PRACTICE','REVIEW_MODEL_UNBOUND','MEMBER_AI_DECLINED','PERSON_DATA_ERASED','FEEDBACK_MODE_OFF','SUBJECT_UNLINKED','MERGE_ACTOR_UNAVAILABLE','MODEL_UNAVAILABLE','BUDGET_EXHAUSTED','ITEM_NOT_VISIBLE','PENDING_DEADLINE_EXCEEDED','ITEM_GONE','LEGACY_REVIEW_UNBOUND','VERSION_SUPERSEDED'))
 );
 
 
@@ -1552,8 +1552,12 @@ DO $$ BEGIN
  IF EXISTS(SELECT 1 FROM _cutover_old_observation WHERE evidence ? 'undecidability'
            AND jsonb_typeof(evidence->'undecidability') NOT IN ('object','array','null')) THEN
    RAISE EXCEPTION 'invalid released open-question warrant'; END IF;
+ -- An earlier release keyed this signal by the pull request head (sha~), not by a review.
+ -- Only that job-free pull request family is kept as unbound history; every other shape stays refused.
  IF EXISTS(SELECT 1 FROM _cutover_old_artifact_signal WHERE signal_name='scm.pull_request.reviewed'
-           AND revision !~ '^event~[1-9][0-9]*$') THEN
+           AND revision !~ '^event~[1-9][0-9]*$'
+           AND NOT (revision ~ '^sha~([0-9a-f]{40}|[0-9a-f]{64})$' AND artifact_kind='scm.pull_request'
+                    AND job_id IS NULL AND state IN ('SUPPRESSED','RECORDED'))) THEN
    RAISE EXCEPTION 'reviewer event has no exact pull request review id'; END IF;
  IF EXISTS(SELECT 1 FROM _cutover_old_identity_link GROUP BY provider_id,subject,COALESCE(team_id,'')
            HAVING count(DISTINCT account_id)>1) THEN
@@ -1994,7 +1998,7 @@ INSERT INTO _work_ref
  UNION SELECT workspace_id,pg_temp.cutover_kind(artifact_kind),cursor_artifact_id FROM _cutover_old_review_backfill_run WHERE cursor_artifact_id IS NOT NULL;
 INSERT INTO _work_ref
  SELECT workspace_id,'scm.pull_request_review',substring(revision FROM 7)::bigint
- FROM _cutover_old_artifact_signal WHERE signal_name='scm.pull_request.reviewed'
+ FROM _cutover_old_artifact_signal WHERE signal_name='scm.pull_request.reviewed' AND revision LIKE 'event~%'
  ON CONFLICT DO NOTHING;
 -- Recover immutable ancestry from exact released references even when a provider mirror was removed.
 CREATE TEMP TABLE _cutover_review_parent_candidate(workspace_id bigint,review_source_id bigint,parent_source_id bigint) ON COMMIT DROP;
@@ -2004,6 +2008,7 @@ INSERT INTO _cutover_review_parent_candidate
  WHERE p.pull_request_id IS NOT NULL
  UNION ALL SELECT s.workspace_id,substring(s.revision FROM 7)::bigint,s.artifact_id
  FROM _cutover_old_artifact_signal s WHERE s.signal_name='scm.pull_request.reviewed' AND s.artifact_kind='scm.pull_request'
+ AND s.revision LIKE 'event~%'
  UNION ALL SELECT w.workspace_id,w.source_id,NULLIF(j.metadata->>'pull_request_id','')::bigint
  FROM _job_work w JOIN _cutover_old_agent_job j ON j.id=w.job_id
  WHERE w.kind='scm.pull_request_review' AND NULLIF(j.metadata->>'pull_request_id','') IS NOT NULL
@@ -2039,10 +2044,31 @@ CREATE TEMP TABLE _cutover_monitor ON COMMIT DROP AS
   SELECT 1 FROM connection c WHERE c.workspace_id=w.id AND c.kind IN ('GITHUB','GITLAB') AND c.kind=p.type
    AND rtrim(COALESCE(c.config->>'serverUrl',CASE c.kind WHEN 'GITHUB' THEN 'https://github.com' ELSE 'https://gitlab.com' END),'/')=rtrim(p.server_url,'/')))
  JOIN repository r ON r.provider_id=p.id AND ((m.native_id IS NOT NULL AND r.native_id=m.native_id) OR (m.native_id IS NULL AND r.name_with_owner=m.name_with_owner));
+-- Released GitHub sync promoted a comment-created issue stub to its pull request in place. A stub is
+-- recognized only when every issue-kind reference to it is a terminal, job-free scm.issue.opened signal.
+CREATE TEMP TABLE _cutover_promoted_stub ON COMMIT DROP AS
+SELECT DISTINCT s.workspace_id,s.artifact_id AS source_id FROM _cutover_old_artifact_signal s
+ JOIN issue i ON i.id=s.artifact_id AND i.issue_type='PULL_REQUEST'
+ JOIN identity_provider ip ON ip.id=i.provider_id AND ip.type='GITHUB'
+ WHERE pg_temp.cutover_kind(s.artifact_kind)='scm.issue'
+ AND NOT EXISTS(SELECT 1 FROM _cutover_old_artifact_signal o WHERE o.workspace_id=s.workspace_id
+   AND pg_temp.cutover_kind(o.artifact_kind)='scm.issue' AND o.artifact_id=s.artifact_id
+   AND NOT (o.signal_name='scm.issue.opened' AND o.state IN ('SUPPRESSED','LAPSED') AND o.job_id IS NULL))
+ AND NOT EXISTS(SELECT 1 FROM _job_work w WHERE w.workspace_id=s.workspace_id AND w.kind='scm.issue' AND w.source_id=s.artifact_id)
+ AND NOT EXISTS(SELECT 1 FROM _cutover_old_observation o WHERE o.workspace_id=s.workspace_id
+   AND pg_temp.cutover_kind(o.artifact_kind)='scm.issue' AND o.artifact_id=s.artifact_id)
+ AND NOT EXISTS(SELECT 1 FROM _cutover_old_feedback f WHERE f.workspace_id=s.workspace_id
+   AND pg_temp.cutover_kind(f.artifact_kind)='scm.issue' AND f.artifact_id=s.artifact_id)
+ AND NOT EXISTS(SELECT 1 FROM _cutover_old_review_backfill_run b WHERE b.workspace_id=s.workspace_id
+   AND pg_temp.cutover_kind(b.artifact_kind)='scm.issue' AND b.cursor_artifact_id=s.artifact_id);
 DO $$ BEGIN
  IF EXISTS(SELECT 1 FROM _cutover_monitor GROUP BY monitor_id HAVING count(*)>1) THEN RAISE EXCEPTION 'monitor provider/source is ambiguous'; END IF;
  IF EXISTS(SELECT 1 FROM _work_ref WHERE kind NOT IN ('scm.repository','scm.pull_request','scm.issue','scm.pull_request_review','chat.thread','docs.document')) THEN RAISE EXCEPTION 'unknown released item kind'; END IF;
- IF EXISTS(SELECT 1 FROM _work_ref x JOIN issue i ON i.id=x.source_id WHERE (x.kind='scm.pull_request' AND i.issue_type<>'PULL_REQUEST') OR (x.kind='scm.issue' AND i.issue_type<>'ISSUE')) THEN RAISE EXCEPTION 'item kind disagrees with provider mirror'; END IF;
+ IF EXISTS(SELECT 1 FROM _work_ref x JOIN issue i ON i.id=x.source_id
+           WHERE (x.kind='scm.pull_request' AND i.issue_type<>'PULL_REQUEST')
+              OR (x.kind='scm.issue' AND i.issue_type<>'ISSUE' AND NOT EXISTS(SELECT 1 FROM _cutover_promoted_stub p
+                  WHERE p.workspace_id=x.workspace_id AND p.source_id=x.source_id))) THEN
+   RAISE EXCEPTION 'item kind disagrees with provider mirror'; END IF;
  IF EXISTS(SELECT 1 FROM _work_ref x JOIN slack_thread t ON x.kind='chat.thread' AND t.id=x.source_id WHERE x.workspace_id<>t.workspace_id) OR EXISTS(SELECT 1 FROM _work_ref x JOIN outline_document d ON x.kind='docs.document' AND d.id=x.source_id WHERE x.workspace_id<>d.workspace_id) THEN RAISE EXCEPTION 'source crosses workspace'; END IF;
 END $$;
 INSERT INTO _work_ref SELECT workspace_id,'scm.repository',repository_id FROM _cutover_monitor ON CONFLICT DO NOTHING;
@@ -2053,8 +2079,9 @@ INSERT INTO item(workspace_id,kind,source_id,created_at,removed_at)
  CROSS JOIN _cutover_clock c WHERE x.kind='scm.repository';
 INSERT INTO item(workspace_id,kind,source_id,parent_id,created_at,removed_at)
  SELECT x.workspace_id,x.kind,x.source_id,p.id,COALESCE(i.created_at,c.at),
-        COALESCE(i.deleted_at,CASE WHEN i.id IS NULL THEN c.at END)
+        CASE WHEN st.source_id IS NOT NULL THEN c.at ELSE COALESCE(i.deleted_at,CASE WHEN i.id IS NULL THEN c.at END) END
  FROM _work_ref x LEFT JOIN issue i ON i.id=x.source_id
+ LEFT JOIN _cutover_promoted_stub st ON x.kind='scm.issue' AND st.workspace_id=x.workspace_id AND st.source_id=x.source_id
  LEFT JOIN item p ON p.workspace_id=x.workspace_id AND p.kind='scm.repository' AND p.source_id=i.repository_id
  CROSS JOIN _cutover_clock c WHERE x.kind IN ('scm.pull_request','scm.issue');
 INSERT INTO item(workspace_id,kind,source_id,parent_id,created_at,removed_at)
@@ -2092,24 +2119,34 @@ INSERT INTO review_batch(id,version,workspace_id,kind,origin,schedule_id,from_at
 INSERT INTO item_event(id,workspace_id,item_id,name,item_version,occurred_at,found_by,
  actor_user_id,requested_by_id,state,reason,decided_at,last_attempted_at,retry_at)
 SELECT s.id,s.workspace_id,m.item_id,
- CASE WHEN s.signal_name='scm.pull_request.reviewed' THEN 'scm.pull_request_review.submitted'
+ CASE WHEN u.unbound THEN s.signal_name
+      WHEN s.signal_name='scm.pull_request.reviewed' THEN 'scm.pull_request_review.submitted'
  ELSE regexp_replace(s.signal_name,'^chat\.conversation_thread\.','chat.thread.') END,
  s.revision,s.occurred_at,
  CASE s.discovered_via WHEN 'EVENT' THEN 'WEBHOOK' WHEN 'SYNC' THEN 'SYNC'
       WHEN 'MANUAL' THEN 'REQUEST' WHEN 'BACKFILL' THEN 'BACKFILL' WHEN 'SWEEP' THEN 'SCHEDULE' END,
  s.actor_user_id,p.account_id,
+ CASE WHEN u.unbound THEN 'WITHHELD' ELSE
  CASE s.state WHEN 'RECORDED' THEN 'RECORDED' WHEN 'DEFERRED' THEN 'WAITING'
       WHEN 'TRIGGERED' THEN 'STARTED' WHEN 'SUPPRESSED' THEN 'WITHHELD'
-      WHEN 'PENDING' THEN 'WAITING' WHEN 'LAPSED' THEN 'EXPIRED' END,
+      WHEN 'PENDING' THEN 'WAITING' WHEN 'LAPSED' THEN 'EXPIRED' END END,
+ CASE WHEN u.unbound AND s.state='RECORDED' THEN 'LEGACY_REVIEW_UNBOUND' ELSE
  CASE s.state_reason WHEN 'GATE_SKIPPED' THEN 'GATE_WITHHELD' WHEN 'PRACTICE_AUTONOMY_OFF' THEN 'FEEDBACK_MODE_OFF'
-      WHEN 'ARTIFACT_NOT_VISIBLE' THEN 'ITEM_NOT_VISIBLE' WHEN 'ARTIFACT_GONE' THEN 'ITEM_GONE' ELSE s.state_reason END,
- s.state_changed_at,s.last_attempted_at,
- CASE WHEN s.state IN ('RECORDED','DEFERRED','PENDING') THEN c.at END
+      WHEN 'ARTIFACT_NOT_VISIBLE' THEN 'ITEM_NOT_VISIBLE' WHEN 'ARTIFACT_GONE' THEN 'ITEM_GONE' ELSE s.state_reason END END,
+ CASE WHEN u.unbound AND s.state='RECORDED' THEN c.at ELSE s.state_changed_at END,s.last_attempted_at,
+ CASE WHEN NOT u.unbound AND s.state IN ('RECORDED','DEFERRED','PENDING') THEN c.at END
 FROM _cutover_old_artifact_signal s
+-- A head-keyed review signal names no review: it stays on its pull request and can never be due.
+CROSS JOIN LATERAL (SELECT s.signal_name='scm.pull_request.reviewed' AND s.revision LIKE 'sha~%' AS unbound) u
 JOIN _item_map m ON m.workspace_id=s.workspace_id
- AND m.kind=CASE WHEN s.signal_name='scm.pull_request.reviewed' THEN 'scm.pull_request_review' ELSE s.artifact_kind END
- AND m.source_id=CASE WHEN s.signal_name='scm.pull_request.reviewed' THEN substring(s.revision FROM 7)::bigint ELSE s.artifact_id END
+ AND m.kind=CASE WHEN s.signal_name='scm.pull_request.reviewed' AND NOT u.unbound THEN 'scm.pull_request_review' ELSE s.artifact_kind END
+ AND m.source_id=CASE WHEN s.signal_name='scm.pull_request.reviewed' AND NOT u.unbound THEN substring(s.revision FROM 7)::bigint ELSE s.artifact_id END
 LEFT JOIN _person_map p ON p.user_id=s.requested_by_user_id CROSS JOIN _cutover_clock c;
+DO $$ BEGIN
+ IF EXISTS(SELECT 1 FROM _cutover_old_artifact_signal s WHERE s.signal_name='scm.pull_request.reviewed'
+           AND s.revision LIKE 'sha~%' AND NOT EXISTS(SELECT 1 FROM item_event e WHERE e.id=s.id)) THEN
+   RAISE EXCEPTION 'unbound released review signal has no pull request item'; END IF;
+END $$;
 
 CREATE TEMP TABLE _job_transition ON COMMIT DROP AS
 -- A job occasion is independent of the population on any individual observation.
@@ -2194,18 +2231,33 @@ SELECT j.id,j.id,j.workspace_id,j.created_at,CASE WHEN j.status IN ('QUEUED','RU
  j.available_at,j.hold_reason,CASE WHEN j.status IN ('QUEUED','RUNNING') THEN NULL ELSE j.worker_id END,j.idempotency_key,j.trace_id,jsonb_build_object('reviewId',j.id,'itemId',r.item_id::text),j.config_snapshot,
  j.evidence_snapshot-'reviewedWork'-'practices'-'answeredPractices',j.output,j.exit_code,j.error_message,CASE WHEN j.status IN ('QUEUED','RUNNING') THEN 'CONTRACT_CHANGED' ELSE CASE WHEN j.cancellation_reason IN('DRAIN_GRACEFUL','DRAIN_IMMEDIATE','BUDGET_EXHAUSTED','MODEL_UNAVAILABLE','MEMBER_AI_DECLINED','PERSON_DATA_ERASED','CANCELLED_BY_ADMIN','CANCELLED_BY_REQUESTER','CONTRACT_CHANGED') THEN j.cancellation_reason END END,
  j.in_chat_prepared_at,j.in_app_prepared_at,p.review_digest,
- COALESCE(p.admission_attempt,NULLIF(j.metadata->>'observation_admission_attempt','')::integer),
- COALESCE(p.admission_digest,NULLIF(j.metadata->>'observation_admission_digest','')),
+ CASE WHEN a.completion_pair THEN p.admission_attempt WHEN a.metadata_pair THEN a.metadata_attempt::integer END,
+ CASE WHEN a.completion_pair THEN p.admission_digest WHEN a.metadata_pair THEN a.metadata_digest END,
  COALESCE(j.llm_total_calls,0),COALESCE(j.llm_total_input_tokens,0),COALESCE(j.llm_total_output_tokens,0),
  COALESCE(j.llm_total_reasoning_tokens,0),COALESCE(j.llm_cache_read_tokens,0),COALESCE(j.llm_cache_write_tokens,0),
  j.started_at,j.execution_started_at,CASE WHEN j.status IN ('QUEUED','RUNNING') THEN c.at ELSE j.completed_at END
 FROM _cutover_old_agent_job j JOIN review r ON r.id=j.id
-LEFT JOIN _cutover_old_public_review_completion p ON p.job_id=j.id AND p.workspace_id=j.workspace_id CROSS JOIN _cutover_clock c;
+LEFT JOIN _cutover_old_public_review_completion p ON p.job_id=j.id AND p.workspace_id=j.workspace_id
+-- An admission is one attempt with its digest. Take a complete pair, never one half from each source;
+-- releases that recorded only the digest keep it in the review's migration facts instead.
+CROSS JOIN LATERAL (SELECT p.admission_attempt IS NOT NULL AND p.admission_digest IS NOT NULL AS completion_pair,
+ NULLIF(j.metadata->>'observation_admission_attempt','') IS NOT NULL
+  AND NULLIF(j.metadata->>'observation_admission_digest','') IS NOT NULL AS metadata_pair,
+ NULLIF(j.metadata->>'observation_admission_attempt','') AS metadata_attempt,
+ NULLIF(j.metadata->>'observation_admission_digest','') AS metadata_digest) a
+CROSS JOIN _cutover_clock c;
 
 
 UPDATE review r SET checks=jsonb_build_object('MIGRATION',jsonb_build_object(
  'jobStatus',j.status,'processingStatus',j.delivery_status,'triggerMode',j.practice_trigger_mode,
- 'cancellationReason',j.cancellation_reason,'deliveryAttempts',j.delivery_attempts)) FROM _cutover_old_agent_job j WHERE j.id=r.id;
+ 'cancellationReason',j.cancellation_reason,'deliveryAttempts',j.delivery_attempts)
+ || CASE WHEN rj.admission_digest IS NULL
+      AND (jsonb_exists(j.metadata,'observation_admission_attempt') OR jsonb_exists(j.metadata,'observation_admission_digest'))
+    THEN jsonb_build_object('admission',jsonb_strip_nulls(jsonb_build_object(
+      'observationAdmissionAttempt',j.metadata->'observation_admission_attempt',
+      'observationAdmissionDigest',j.metadata->'observation_admission_digest')))
+    ELSE '{}'::jsonb END)
+ FROM _cutover_old_agent_job j JOIN review_job rj ON rj.id=j.id WHERE j.id=r.id;
 INSERT INTO review_composition_basis(job_id,workspace_id,admission_attempt,admission_digest,basis_digest,basis_version,copy_id,expires_at,payload)
 SELECT job_id,workspace_id,admission_attempt,admission_digest,basis_digest,basis_version,copy_id,expires_at,payload FROM _cutover_old_review_composition_basis;
 ALTER TABLE llm_usage_event ADD COLUMN review_id uuid,ADD COLUMN search_units bigint NOT NULL DEFAULT 0,ADD COLUMN unreported_calls integer NOT NULL DEFAULT 0;
@@ -2417,11 +2469,18 @@ INSERT INTO _cutover_send_parent
  LEFT JOIN LATERAL(SELECT x.id,x.recipient_user_id FROM _cutover_old_feedback x WHERE x.agent_job_id=d.agent_job_id AND x.workspace_id=d.workspace_id AND x.channel='IN_CONTEXT' AND x.position IN(0,5000) ORDER BY (x.position=0) DESC,x.created_at,x.id LIMIT 1) f ON d.feedback_id IS NULL
  LEFT JOIN _cutover_old_feedback approved ON approved.id=d.feedback_id
  LEFT JOIN _cutover_person p ON p.user_id=coalesce(approved.recipient_user_id,f.recipient_user_id);
+-- Released projection retired a finished send by clearing its stored payload after copying it into the ledger.
+CREATE TEMP TABLE _cutover_projected_dispatch ON COMMIT DROP AS
+ SELECT id FROM _cutover_old_feedback_dispatch
+ WHERE state IN ('SENT','SUPPRESSED') AND projected_at IS NOT NULL AND body='' AND practice_slugs='[]'::jsonb
+   AND package_content='{}'::jsonb AND projection_owner IS NULL AND projection_expires_at IS NULL;
+CREATE UNIQUE INDEX ON _cutover_projected_dispatch(id);
 DO $$ BEGIN
  IF EXISTS(SELECT 1 FROM _cutover_send_parent GROUP BY feedback_id HAVING count(*)>1) THEN RAISE EXCEPTION 'multiple physical sends resolve to one feedback'; END IF;
  IF EXISTS(SELECT 1 FROM _cutover_old_feedback f LEFT JOIN _cutover_person p ON p.user_id=f.recipient_user_id LEFT JOIN _cutover_person subject ON subject.user_id=f.about_user_id WHERE p.account_id IS NULL OR p.account_id IS DISTINCT FROM subject.account_id) THEN RAISE EXCEPTION 'feedback person is ambiguous'; END IF;
  IF EXISTS(SELECT 1 FROM _cutover_old_feedback_dispatch d WHERE NOT EXISTS(SELECT 1 FROM _cutover_send_parent p WHERE p.dispatch_id=d.id)) THEN RAISE EXCEPTION 'send cannot resolve its review/person'; END IF;
- IF EXISTS(SELECT 1 FROM _cutover_old_feedback_dispatch d JOIN _cutover_old_feedback f ON f.id=d.feedback_id WHERE d.body IS DISTINCT FROM coalesce(f.body,'')) THEN RAISE EXCEPTION 'approved summary text differs from its released proposal'; END IF;
+ IF EXISTS(SELECT 1 FROM _cutover_old_feedback_dispatch d JOIN _cutover_old_feedback f ON f.id=d.feedback_id WHERE d.body IS DISTINCT FROM coalesce(f.body,'')
+           AND NOT EXISTS(SELECT 1 FROM _cutover_projected_dispatch x WHERE x.id=d.id)) THEN RAISE EXCEPTION 'approved summary text differs from its released proposal'; END IF;
  IF EXISTS(SELECT 1 FROM _cutover_old_feedback_dispatch d WHERE d.package_content->>'inlineMarker' IS NOT NULL AND d.package_content->>'inlineMarker' IS DISTINCT FROM CASE WHEN d.feedback_id IS NOT NULL THEN '<!-- hephaestus-approved-package:'||d.feedback_id||' -->' ELSE '<!-- hephaestus-review-package:'||d.agent_job_id||' -->' END) THEN RAISE EXCEPTION 'sealed marker differs from its released package'; END IF;
 END $$;
 -- Partial appearance retains its receipt without claiming that every copy was delivered.
@@ -2566,28 +2625,47 @@ INSERT INTO _cutover_copy_candidate(feedback_id,source,source_order,kind,body,pa
 CREATE TEMP TABLE _cutover_physical_copy(LIKE feedback_copy INCLUDING DEFAULTS) ON COMMIT DROP;
 CREATE UNIQUE INDEX ON _cutover_physical_copy(id);
 CREATE INDEX ON _cutover_physical_copy(feedback_id);
-ALTER TABLE _cutover_physical_copy ADD COLUMN plan_order bigint;
+ALTER TABLE _cutover_physical_copy ADD COLUMN plan_order bigint,ADD COLUMN sources text[] NOT NULL DEFAULT '{}';
 DO $$ DECLARE r record; existing _cutover_physical_copy%ROWTYPE; n bigint; chosen uuid; BEGIN
- FOR r IN SELECT * FROM _cutover_copy_candidate ORDER BY CASE source WHEN 'PLACEMENT' THEN 0 WHEN 'SUMMARY' THEN 1 WHEN 'PACKAGE' THEN 2 WHEN 'PROPOSED' THEN 3 ELSE 4 END,source_order,candidate_id LOOP
-  SELECT count(*),(array_agg(c.id ORDER BY c.id::text))[1] INTO n,chosen FROM _cutover_physical_copy c WHERE c.feedback_id=r.feedback_id AND
-   ((r.external_ref IS NOT NULL AND c.external_ref=r.external_ref) OR (r.write_key IS NOT NULL AND c.write_key=r.write_key) OR
-    (r.kind='SUMMARY' AND c.kind='SUMMARY') OR (r.kind='CHAT_TURN' AND c.kind='CHAT_TURN' AND c.chat_message_id=r.chat_message_id) OR
-    (r.kind IN('LINE_NOTE','FILE_NOTE') AND c.kind IN('LINE_NOTE','FILE_NOTE') AND c.path=r.path AND c.start_line IS NOT DISTINCT FROM r.start_line AND c.end_line IS NOT DISTINCT FROM r.end_line));
+ FOR r IN SELECT * FROM _cutover_copy_candidate ORDER BY CASE source WHEN 'PLACEMENT' THEN 0 WHEN 'RECEIPT' THEN 1 WHEN 'SUMMARY' THEN 2 WHEN 'PACKAGE' THEN 3 WHEN 'PROPOSED' THEN 4 ELSE 5 END,source_order,candidate_id LOOP
+  -- A provider identity names one physical copy; a location does not. Released placements are seeded by their own
+  -- id. Other candidates join by provider reference, write key or chat message first, and by kind and location
+  -- only when nothing names them and exactly one compatible copy exists: no conflicting known reference, key or
+  -- side, and no earlier entry of the same released list (entries of one list are distinct by position).
+  IF r.source='PLACEMENT' THEN
+   IF EXISTS(SELECT 1 FROM _cutover_physical_copy c WHERE c.feedback_id=r.feedback_id AND
+    ((r.external_ref IS NOT NULL AND c.external_ref=r.external_ref) OR (r.chat_message_id IS NOT NULL AND c.chat_message_id=r.chat_message_id))) THEN
+    RAISE EXCEPTION 'two released copy ids describe one physical copy'; END IF;
+   n:=0;
+  ELSE
+   SELECT count(*),(array_agg(c.id ORDER BY c.id::text))[1] INTO n,chosen FROM _cutover_physical_copy c WHERE c.feedback_id=r.feedback_id AND
+    ((r.external_ref IS NOT NULL AND c.external_ref=r.external_ref) OR (r.write_key IS NOT NULL AND c.write_key=r.write_key) OR
+     (r.kind='CHAT_TURN' AND c.kind='CHAT_TURN' AND c.chat_message_id=r.chat_message_id));
+   IF n=0 THEN
+    SELECT count(*),(array_agg(c.id ORDER BY c.id::text))[1] INTO n,chosen FROM _cutover_physical_copy c WHERE c.feedback_id=r.feedback_id
+     AND NOT (r.external_ref IS NOT NULL AND c.external_ref IS NOT NULL) AND NOT (r.write_key IS NOT NULL AND c.write_key IS NOT NULL)
+     AND NOT (r.side IS NOT NULL AND c.side IS NOT NULL AND r.side<>c.side) AND NOT (r.source=ANY(c.sources)) AND
+     ((r.kind='SUMMARY' AND c.kind='SUMMARY') OR
+      (r.kind IN('LINE_NOTE','FILE_NOTE') AND c.kind IN('LINE_NOTE','FILE_NOTE') AND c.path=r.path AND c.start_line IS NOT DISTINCT FROM r.start_line AND c.end_line IS NOT DISTINCT FROM r.end_line));
+   END IF;
+  END IF;
   IF n>1 THEN RAISE EXCEPTION 'ambiguous physical copy reconciliation for %',r.feedback_id; END IF;
   IF n=0 THEN
-   INSERT INTO _cutover_physical_copy(id,workspace_id,feedback_id,kind,position,body,path,start_line,end_line,side,state,write_started_at,write_key,write_marker,external_ref,external_url,chat_message_id,created_at,posted_at,plan_order,stop_reason,last_error)
-    SELECT coalesce(r.old_copy_id,gen_random_uuid()),f.workspace_id,r.feedback_id,r.kind,0,r.body,r.path,r.start_line,r.end_line,r.side,r.state,r.write_started_at,r.write_key,r.write_marker,r.external_ref,r.external_url,r.chat_message_id,r.created_at,r.posted_at,r.source_order,r.stop_reason,r.last_error FROM feedback f WHERE f.id=r.feedback_id;
+   INSERT INTO _cutover_physical_copy(id,workspace_id,feedback_id,kind,position,body,path,start_line,end_line,side,state,write_started_at,write_key,write_marker,external_ref,external_url,chat_message_id,created_at,posted_at,plan_order,stop_reason,last_error,sources)
+    SELECT coalesce(r.old_copy_id,gen_random_uuid()),f.workspace_id,r.feedback_id,r.kind,0,r.body,r.path,r.start_line,r.end_line,r.side,r.state,r.write_started_at,r.write_key,r.write_marker,r.external_ref,r.external_url,r.chat_message_id,r.created_at,r.posted_at,r.source_order,r.stop_reason,r.last_error,ARRAY[r.source] FROM feedback f WHERE f.id=r.feedback_id;
   ELSE
    SELECT * INTO existing FROM _cutover_physical_copy WHERE id=chosen;
    IF r.old_copy_id IS NOT NULL AND r.old_copy_id<>chosen THEN RAISE EXCEPTION 'two released copy ids describe one physical copy'; END IF;
    IF r.external_ref IS NOT NULL AND existing.external_ref IS NOT NULL AND r.external_ref<>existing.external_ref THEN RAISE EXCEPTION 'conflicting provider receipt'; END IF;
    IF r.body IS NOT NULL AND existing.body IS NOT NULL AND r.body<>existing.body THEN RAISE EXCEPTION 'approved/sealed copy text mismatch'; END IF;
    IF r.write_key IS NOT NULL AND existing.write_key IS NOT NULL AND r.write_key<>existing.write_key THEN RAISE EXCEPTION 'copy write identity mismatch'; END IF;
+   IF r.side IS NOT NULL AND existing.side IS NOT NULL AND r.side<>existing.side THEN RAISE EXCEPTION 'copy side mismatch'; END IF;
    UPDATE _cutover_physical_copy SET body=coalesce(existing.body,r.body),side=coalesce(existing.side,r.side),write_key=coalesce(existing.write_key,r.write_key),write_marker=coalesce(existing.write_marker,r.write_marker),
     state=CASE WHEN existing.state='POSTED' OR r.state='POSTED' THEN 'POSTED' WHEN existing.state='WRITE_STARTED' OR r.state='WRITE_STARTED' THEN 'WRITE_STARTED' WHEN existing.state='WITHHELD' THEN 'WITHHELD' WHEN r.state='FAILED' THEN 'FAILED' ELSE existing.state END,
     kind=CASE WHEN existing.kind='FILE_NOTE' OR r.kind='FILE_NOTE' THEN 'FILE_NOTE' ELSE existing.kind END,
     write_started_at=coalesce(existing.write_started_at,r.write_started_at),external_ref=coalesce(existing.external_ref,r.external_ref),external_url=coalesce(existing.external_url,r.external_url),posted_at=coalesce(existing.posted_at,r.posted_at),
-    plan_order=CASE WHEN r.source IN('PACKAGE','PROPOSED') THEN r.source_order ELSE existing.plan_order END,stop_reason=coalesce(existing.stop_reason,r.stop_reason),last_error=coalesce(existing.last_error,r.last_error) WHERE id=chosen;
+    plan_order=CASE WHEN r.source IN('PACKAGE','PROPOSED') THEN r.source_order ELSE existing.plan_order END,stop_reason=coalesce(existing.stop_reason,r.stop_reason),last_error=coalesce(existing.last_error,r.last_error),
+    sources=existing.sources||r.source WHERE id=chosen;
   END IF;
  END LOOP;
 END $$;
@@ -2646,6 +2724,9 @@ BEGIN
  RETURN encode(sha256(convert_to(to_jsonb(p_digests)::text,'UTF8')),'hex')::varchar(64);
 END $$;
 UPDATE feedback f SET checks=jsonb_set(f.checks,'{MIGRATION,approvalDigest}',to_jsonb(a.content_digest)) FROM _cutover_old_feedback_approval a WHERE a.feedback_id=f.id;
+UPDATE feedback f SET checks=jsonb_set(f.checks,'{MIGRATION,dispatch}',jsonb_build_object('dispatchId',d.id,'state',d.state,
+ 'projectedAt',d.projected_at,'payloadCleared',true,'inlineWriteStarted',d.inline_write_started))
+ FROM _cutover_old_feedback_dispatch d JOIN _cutover_projected_dispatch x ON x.id=d.id WHERE d.feedback_id=f.id;
 INSERT INTO feedback_decision(id,workspace_id,feedback_id,action,actor_account_id,reason,note,content_digest,decided_at)
  SELECT a.id,a.workspace_id,a.feedback_id,CASE a.decision WHEN 'APPROVED' THEN 'APPROVE' WHEN 'REJECTED' THEN 'REJECT' END,account.id,a.rejection_reason,a.rejection_note,feedback_content_digest(a.feedback_id),a.decided_at
  FROM _cutover_old_feedback_approval a LEFT JOIN account ON account.id=a.actor_account_id;

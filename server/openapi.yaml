@@ -16007,6 +16007,7 @@ components:
           - VERSION_SUPERSEDED
           - PENDING_DEADLINE_EXCEEDED
           - ITEM_GONE
+          - LEGACY_REVIEW_UNBOUND
           - null
         reviewId:
           type:
@@ -22875,6 +22876,7 @@ components:
           - VERSION_SUPERSEDED
           - PENDING_DEADLINE_EXCEEDED
           - ITEM_GONE
+          - LEGACY_REVIEW_UNBOUND
           - null
         reviewId:
           type:

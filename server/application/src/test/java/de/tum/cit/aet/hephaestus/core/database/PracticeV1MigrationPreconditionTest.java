@@ -36,6 +36,84 @@ class PracticeV1MigrationPreconditionTest {
                     "UPDATE artifact_signal SET revision='event~992119' WHERE"
                             + " id='00000000-0000-0000-0000-000000992181'"),
             new Corruption(
+                    "UPDATE artifact_signal SET revision='sha~'||repeat('a',40) WHERE"
+                            + " id='00000000-0000-0000-0000-000000992181'",
+                    "reviewer event has no exact pull request review id",
+                    "UPDATE artifact_signal SET revision='event~992119' WHERE"
+                            + " id='00000000-0000-0000-0000-000000992181'"),
+            new Corruption(
+                    "UPDATE artifact_signal SET revision='sha~not-a-head' WHERE"
+                            + " id='00000000-0000-0000-0000-000000992186'",
+                    "reviewer event has no exact pull request review id",
+                    "UPDATE artifact_signal SET revision='sha~'||repeat('2',40) WHERE"
+                            + " id='00000000-0000-0000-0000-000000992186'"),
+            new Corruption(
+                    "UPDATE artifact_signal SET artifact_kind='scm.issue' WHERE"
+                            + " id='00000000-0000-0000-0000-000000992186'",
+                    "reviewer event has no exact pull request review id",
+                    "UPDATE artifact_signal SET artifact_kind='scm.pull_request' WHERE"
+                            + " id='00000000-0000-0000-0000-000000992186'"),
+            new Corruption(
+                    "INSERT INTO issue(id,native_id,provider_id,issue_type,number,repository_id,title,comments_count,"
+                            + "is_locked,created_at) VALUES(992790,790,992702,'PULL_REQUEST',1,992705,'GitLab change',0,"
+                            + "false,'2026-01-01T00:00:00Z');"
+                            + " INSERT INTO artifact_signal(id,workspace_id,artifact_kind,artifact_id,signal_name,revision,"
+                            + "occurred_at,discovered_via,state,state_reason,state_changed_at)"
+                            + " VALUES('00000000-0000-0000-0000-000000992790',992201,'scm.issue',992790,'scm.issue.opened',"
+                            + "'dig~gitlab','2026-01-01T00:00:00Z','EVENT','SUPPRESSED','GATE_SKIPPED','2026-01-01T00:00:01Z')",
+                    "item kind disagrees with provider mirror",
+                    "DELETE FROM artifact_signal WHERE id='00000000-0000-0000-0000-000000992790';"
+                            + " DELETE FROM issue WHERE id=992790"),
+            new Corruption(
+                    "INSERT INTO issue(id,native_id,provider_id,issue_type,number,repository_id,title,comments_count,"
+                            + "is_locked,created_at) VALUES(992791,791,992102,'ISSUE',2,992108,'Plain issue',0,"
+                            + "false,'2026-01-01T00:00:00Z');"
+                            + " INSERT INTO artifact_signal(id,workspace_id,artifact_kind,artifact_id,signal_name,revision,"
+                            + "occurred_at,discovered_via,state,state_reason,state_changed_at)"
+                            + " VALUES('00000000-0000-0000-0000-000000992791',992101,'scm.pull_request',992791,"
+                            + "'scm.pull_request.opened','sha~'||repeat('c',40),'2026-01-01T00:00:00Z','EVENT','SUPPRESSED',"
+                            + "'GATE_SKIPPED','2026-01-01T00:00:01Z')",
+                    "item kind disagrees with provider mirror",
+                    "DELETE FROM artifact_signal WHERE id='00000000-0000-0000-0000-000000992791';"
+                            + " DELETE FROM issue WHERE id=992791"),
+            new Corruption(
+                    "UPDATE artifact_signal SET state='RECORDED',state_reason=NULL WHERE"
+                            + " id='00000000-0000-0000-0000-000000992187'",
+                    "item kind disagrees with provider mirror",
+                    "UPDATE artifact_signal SET state='SUPPRESSED',state_reason='GATE_SKIPPED' WHERE"
+                            + " id='00000000-0000-0000-0000-000000992187'"),
+            new Corruption(
+                    "UPDATE artifact_signal SET job_id='00000000-0000-0000-0000-000000992112' WHERE"
+                            + " id='00000000-0000-0000-0000-000000992188'",
+                    "item kind disagrees with provider mirror",
+                    "UPDATE artifact_signal SET job_id=NULL WHERE id='00000000-0000-0000-0000-000000992188'"),
+            new Corruption(
+                    "INSERT INTO review_backfill_run(id,workspace_id,artifact_kind,from_at,to_at,status,"
+                            + "estimated_artifacts,requested_by_account_id,cursor_artifact_id,created_at,updated_at)"
+                            + " VALUES('00000000-0000-0000-0000-000000992274',992101,'scm.issue','2026-01-01T00:00:00Z',"
+                            + "'2026-01-02T00:00:00Z','CANCELLED',1,992106,992109,'2026-01-01T00:00:00Z','2026-01-01T00:00:00Z')",
+                    "item kind disagrees with provider mirror",
+                    "DELETE FROM review_backfill_run WHERE id='00000000-0000-0000-0000-000000992274'"),
+            new Corruption(
+                    "UPDATE feedback_dispatch SET body='Different text.' WHERE"
+                            + " id='00000000-0000-0000-0000-000000992359'",
+                    "approved summary text differs from its released proposal",
+                    "UPDATE feedback_dispatch SET body='' WHERE id='00000000-0000-0000-0000-000000992359'"),
+            new Corruption(
+                    "UPDATE feedback_dispatch SET delivered_placements=jsonb_set(delivered_placements,'{1,deliveryKey}',"
+                            + "'\"approved:00000000-0000-0000-0000-000000992320:0\"') WHERE"
+                            + " id='00000000-0000-0000-0000-000000992360'",
+                    "ambiguous physical copy reconciliation",
+                    "UPDATE feedback_dispatch SET delivered_placements=jsonb_set(delivered_placements,'{1,deliveryKey}',"
+                            + "'\"approved:00000000-0000-0000-0000-000000992320:1\"') WHERE"
+                            + " id='00000000-0000-0000-0000-000000992360'"),
+            new Corruption(
+                    "UPDATE feedback SET proposed_placements='[{\"type\":\"LOCATION_COMMENT\",\"body\":\"Check the timeout.\","
+                            + "\"path\":\"src/retry.ts\",\"startLine\":1,\"endLine\":1}]' WHERE"
+                            + " id='00000000-0000-0000-0000-000000992320'",
+                    "ambiguous physical copy reconciliation",
+                    "UPDATE feedback SET proposed_placements='[]' WHERE id='00000000-0000-0000-0000-000000992320'"),
+            new Corruption(
                     "INSERT INTO person_suppression(id,provider_id,subject,team_key)"
                             + " VALUES('00000000-0000-0000-0000-000000999999',992102,'103','')",
                     "person-owned data remains for an erased identity",

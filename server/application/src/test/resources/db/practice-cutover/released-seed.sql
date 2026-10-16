@@ -40,6 +40,26 @@ VALUES('00000000-0000-0000-0000-000000992181',992101,'scm.pull_request',992109,
     'scm.pull_request.reviewed','event~992119','2026-01-02T00:00:00Z','EVENT','TRIGGERED',
     '00000000-0000-0000-0000-000000992112','2026-01-02T00:00:00Z',992104);
 
+-- Releases keyed this signal by the pull request head before they keyed it by review; no job ran.
+INSERT INTO artifact_signal(id,workspace_id,artifact_kind,artifact_id,signal_name,revision,occurred_at,
+    discovered_via,state,state_reason,state_changed_at,last_attempted_at)
+VALUES('00000000-0000-0000-0000-000000992185',992101,'scm.pull_request',992109,
+    'scm.pull_request.reviewed','sha~1111111111111111111111111111111111111111','2025-12-30T00:00:00Z',
+    'EVENT','SUPPRESSED','GATE_SKIPPED','2025-12-30T00:00:05Z','2025-12-30T00:00:04Z'),
+('00000000-0000-0000-0000-000000992186',992101,'scm.pull_request',992109,
+    'scm.pull_request.reviewed','sha~2222222222222222222222222222222222222222','2025-12-31T00:00:00Z',
+    'SYNC','RECORDED',NULL,'2025-12-31T00:00:05Z',NULL);
+
+-- A comment created an issue stub that GitHub sync later promoted in place to pull request 992109.
+INSERT INTO artifact_signal(id,workspace_id,artifact_kind,artifact_id,signal_name,revision,occurred_at,
+    discovered_via,state,state_reason,state_changed_at)
+VALUES('00000000-0000-0000-0000-000000992187',992101,'scm.issue',992109,
+    'scm.issue.opened','dig~stub-opened','2025-12-29T00:00:00Z','EVENT','SUPPRESSED','GATE_SKIPPED',
+    '2025-12-29T00:00:05Z'),
+('00000000-0000-0000-0000-000000992188',992101,'scm.issue',992109,
+    'scm.issue.opened','dig~stub-edited','2025-12-29T01:00:00Z','EVENT','LAPSED','ARTIFACT_GONE',
+    '2025-12-29T01:00:05Z');
+
 INSERT INTO chat_thread(id,user_id,workspace_id,surface,created_at)
 VALUES('00000000-0000-0000-0000-000000992191',992103,992101,'WEB','2026-01-01T00:03:00Z');
 INSERT INTO chat_message(id,thread_id,role,status,parts,created_at)
@@ -86,6 +106,9 @@ INSERT INTO feedback_withdrawal(id,feedback_id,workspace_id,reason,restoration_r
 VALUES('00000000-0000-0000-0000-000000992262','00000000-0000-0000-0000-000000992161',992101,'Scope correction','Scope confirmed','2026-01-01T00:02:30Z',992106,'2026-01-01T00:02:00Z',992106);
 INSERT INTO reaction(id,reactor_user_id,action,explanation,created_at,feedback_id,usefulness)
 VALUES('00000000-0000-0000-0000-000000992263',992103,'ADDRESSED','Added the purpose.','2026-01-01T00:03:00Z','00000000-0000-0000-0000-000000992161','HELPFUL');
+-- Releases before the admission attempt existed recorded only the admission digest.
+UPDATE agent_job SET metadata=metadata||jsonb_build_object('observation_admission_digest',repeat('d',64))
+ WHERE id='00000000-0000-0000-0000-000000992113';
 INSERT INTO delivery_policy_evaluation(id,workspace_id,agent_job_id,feedback_id,admitted_revision,evaluated_revision,resolver_version,surface,stage,allowed,decisive_reason,checks,facts,evaluated_at)
 VALUES('00000000-0000-0000-0000-000000992264',992101,'00000000-0000-0000-0000-000000992111','00000000-0000-0000-0000-000000992161',3,4,'released-v1','IN_CONTEXT','EGRESS',false,'OUTSIDE_CURRENT_COVERAGE','{}','{}','2026-01-01T00:01:00Z');
 INSERT INTO public_review_completion(job_id,workspace_id,accepted_at,accepted_attempt,accepted_worker_id,admission_attempt,admission_digest,contract_version,review,review_digest)
@@ -158,6 +181,70 @@ UPDATE feedback_dispatch SET
     package_content=package_content||'{"diffNotes":[{"body":"Check the timeout.","filePath":"src/retry.ts","startLine":1,"endLine":1,"deliveryKey":"approved:00000000-0000-0000-0000-000000992314:0"}]}',
     delivered_placements='[{"deliveryKey":"approved:00000000-0000-0000-0000-000000992314:0","path":"src/retry.ts","startLine":1,"endLine":1,"disposition":"FAILED","writeMayHaveStarted":false,"placement":"INLINE"}]'
 WHERE feedback_id='00000000-0000-0000-0000-000000992314';
+-- Released projection retired a sent approved package: its stored payload was cleared after the ledger copy.
+INSERT INTO feedback(id,workspace_id,agent_job_id,recipient_user_id,about_user_id,channel,position,
+    delivery_state,source,body,proposed_placements,created_at,delivered_at)
+VALUES('00000000-0000-0000-0000-000000992319',992101,'00000000-0000-0000-0000-000000992111',992103,992103,
+    'IN_CONTEXT',8000,'DELIVERED','AGENT','Explain this change.','[{"type":"SUMMARY"}]',
+    '2026-01-01T00:01:00Z','2026-01-01T00:01:30Z');
+INSERT INTO feedback_observation(feedback_id,observation_id,role,ordinal)
+VALUES('00000000-0000-0000-0000-000000992319','00000000-0000-0000-0000-000000992306','PRIMARY',0);
+INSERT INTO feedback_placement(id,feedback_id,placement_type,posted_comment_ref,created_at)
+VALUES('00000000-0000-0000-0000-000000992339','00000000-0000-0000-0000-000000992319','SUMMARY','provider:retired',
+    '2026-01-01T00:01:30Z');
+INSERT INTO feedback_approval(id,feedback_id,workspace_id,actor_account_id,decision,content_digest,decided_at)
+VALUES('00000000-0000-0000-0000-000000992369','00000000-0000-0000-0000-000000992319',992101,992106,'APPROVED',
+    repeat('f',64),'2026-01-01T00:01:10Z');
+INSERT INTO feedback_dispatch(id,destination_key,workspace_id,agent_job_id,feedback_id,destination,state,body,
+    practice_slugs,package_content,delivered_placements,write_started,inline_write_started,delivered_external_ref,
+    projected_at,next_attempt_at,attempt_count,created_at,updated_at)
+VALUES('00000000-0000-0000-0000-000000992359','send-case-992319',992101,'00000000-0000-0000-0000-000000992111',
+    '00000000-0000-0000-0000-000000992319','APPROVED_REVIEW_PACKAGE','SENT','','[]','{}','[]',true,NULL,
+    'provider:retired','2026-01-01T00:02:00Z','2026-01-01T00:01:30Z',1,'2026-01-01T00:01:00Z','2026-01-01T00:02:00Z');
+-- Two real file comments at the same anchor: distinct provider identities, not one copy.
+INSERT INTO feedback(id,workspace_id,agent_job_id,recipient_user_id,about_user_id,channel,position,
+    delivery_state,source,body,created_at,delivered_at)
+VALUES('00000000-0000-0000-0000-000000992320',992101,'00000000-0000-0000-0000-000000992111',992103,992103,
+    'IN_CONTEXT',220,'DELIVERED','AGENT','Explain this change.','2026-01-01T00:01:00Z','2026-01-01T00:01:30Z');
+INSERT INTO feedback_observation(feedback_id,observation_id,role,ordinal)
+VALUES('00000000-0000-0000-0000-000000992320','00000000-0000-0000-0000-000000992306','PRIMARY',0);
+INSERT INTO feedback_placement(id,feedback_id,placement_type,posted_comment_ref,posted_comment_url,
+    anchor_kind,anchor_path,anchor_start_line,anchor_end_line,anchor_side,created_at)
+VALUES('00000000-0000-0000-0000-000000992340','00000000-0000-0000-0000-000000992320','LOCATION_COMMENT',
+    'provider:file-a','https://practice-v1.example/file-a','LINE','src/retry.ts',1,1,'NEW','2026-01-01T00:01:30Z'),
+('00000000-0000-0000-0000-000000992341','00000000-0000-0000-0000-000000992320','LOCATION_COMMENT',
+    'provider:file-b','https://practice-v1.example/file-b','LINE','src/retry.ts',1,1,'NEW','2026-01-01T00:01:30Z');
+INSERT INTO feedback_dispatch(id,destination_key,workspace_id,agent_job_id,feedback_id,destination,state,body,
+    practice_slugs,package_content,delivered_placements,write_started,inline_write_started,
+    next_attempt_at,attempt_count,created_at,updated_at)
+VALUES('00000000-0000-0000-0000-000000992360','send-case-992320',992101,'00000000-0000-0000-0000-000000992111',
+    '00000000-0000-0000-0000-000000992320','APPROVED_REVIEW_PACKAGE','SENT','Explain this change.','["explains-why"]','{}',
+    '[{"deliveryKey":"approved:00000000-0000-0000-0000-000000992320:0","path":"src/retry.ts","startLine":1,"endLine":1,"disposition":"POSTED","externalRef":"provider:file-a","externalUrl":"https://practice-v1.example/file-a","writeMayHaveStarted":true,"placement":"LOCATION_COMMENT"},
+      {"deliveryKey":"approved:00000000-0000-0000-0000-000000992320:1","path":"src/retry.ts","startLine":1,"endLine":1,"disposition":"POSTED","externalRef":"provider:file-b","externalUrl":"https://practice-v1.example/file-b","writeMayHaveStarted":true,"placement":"LOCATION_COMMENT"}]',
+    false,true,'2026-01-01T00:01:30Z',1,'2026-01-01T00:01:00Z','2026-01-01T00:01:30Z');
+-- Synthetic: the same approved package also planned both notes, keyed but without a provider reference.
+UPDATE feedback_dispatch SET package_content='{"diffNotes":[{"body":"Check the timeout.","filePath":"src/retry.ts","startLine":1,"endLine":1},
+    {"body":"Check the retry limit.","filePath":"src/retry.ts","startLine":1,"endLine":1}]}'
+ WHERE id='00000000-0000-0000-0000-000000992360';
+-- Synthetic: an accepted review placed two inline notes on the same lines, one on each side of the diff.
+INSERT INTO agent_job(id,workspace_id,job_type,status,config_snapshot,job_token,retry_count,
+    created_at,completed_at,available_at,trace_id,metadata,delivery_status)
+VALUES('00000000-0000-0000-0000-000000992621',992101,'PULL_REQUEST_REVIEW','COMPLETED','{}','completion-sides',0,
+    '2025-11-01','2025-11-01T00:01:00Z','2025-11-01',repeat('9',32),
+    '{"pull_request_id":992109,"about_user_id":992103,"observation_origin":"LIVE"}','DELIVERED');
+INSERT INTO observation(id,occurrence_key,agent_job_id,workspace_id,practice_id,practice_revision_id,
+    artifact_kind,artifact_id,about_user_id,summary,outcome,severity,evidence,evidence_rationale,
+    observed_at,superseded_at)
+VALUES('00000000-0000-0000-0000-000000992631','completion-sides','00000000-0000-0000-0000-000000992621',992101,
+    992121,992131,'scm.pull_request',992109,992103,'Check both sides of the change.','NOT_MET','INFO',
+    '{"citations":[{"sourceKind":"scm.pull-request.core","artifactPath":"context/description.md","revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","path":"src/retry.ts","startLine":1,"endLine":1,"side":"OLD","quote":"Add retry"},
+      {"sourceKind":"scm.pull-request.core","artifactPath":"context/description.md","revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","path":"src/retry.ts","startLine":1,"endLine":1,"side":"NEW","quote":"Add retry"}]}',
+    'The removed and the added line both need a reason.','2025-11-01T00:00:30Z','2025-11-02');
+INSERT INTO public_review_completion(job_id,workspace_id,accepted_at,accepted_attempt,accepted_worker_id,
+    admission_attempt,admission_digest,contract_version,review,review_digest)
+VALUES('00000000-0000-0000-0000-000000992621',992101,'2025-11-01T00:01:00Z',0,'released-worker',0,repeat('c',64),2,
+    '{"summary":null,"inline":[{"anchor":{"observationId":"completion-sides","citationIndex":0},"body":"Explain the removed line."},
+      {"anchor":{"observationId":"completion-sides","citationIndex":1},"body":"Explain the added line."}]}',repeat('e',64));
 INSERT INTO observation_invalidation(id,workspace_id,observation_id,reason,invalidated_at,
     invalidated_by_account_id,provider_copy,provider_copy_retry_at)
 SELECT ('00000000-0000-0000-0000-000000'||(n+60))::uuid,992101,
@@ -225,6 +312,9 @@ SELECT ('00000000-0000-0000-0000-000000'||n)::uuid,992101,'PULL_REQUEST_REVIEW',
     'DELIVERED',CASE WHEN n=992606 THEN 'MANUAL' ELSE 'AUTO' END
 FROM (VALUES (992601,'LIVE'),(992602,'MANUAL'),(992603,'BACKFILL'),(992604,'BACKFILL'),
     (992605,'LIVE'),(992606,NULL::text)) f(n,origin);
+-- A later release recorded the complete admission pair in job metadata.
+UPDATE agent_job SET metadata=metadata||jsonb_build_object('observation_admission_attempt',1,
+    'observation_admission_digest',repeat('e',64)) WHERE id='00000000-0000-0000-0000-000000992602';
 INSERT INTO artifact_signal(id,workspace_id,artifact_kind,artifact_id,signal_name,revision,occurred_at,
     discovered_via,state,job_id,state_changed_at,actor_user_id,requested_by_user_id)
 SELECT ('00000000-0000-0000-0000-000000'||(n+10))::uuid,992101,'scm.pull_request',992109,

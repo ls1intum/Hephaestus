@@ -281,6 +281,49 @@ class PracticeV1CutoverMigrationTest {
                         "SELECT status || '|' || processing_status FROM review_job WHERE"
                                 + " id='00000000-0000-0000-0000-000000992113'"))
                 .containsExactly("COMPLETED|FAILED");
+        // An admission is taken as one pair, from the completion or from metadata; a lone digest is kept as a fact.
+        assertThat(column(database, """
+            SELECT right(j.id::text, 6) || '|' || coalesce(j.admission_attempt::text, '-') || '|'
+                || coalesce(left(j.admission_digest, 3), '-') || '|'
+                || coalesce((r.checks->'MIGRATION'->'admission')::text, '-')
+            FROM review_job j JOIN review r ON r.id=j.id
+            WHERE j.id IN ('00000000-0000-0000-0000-000000992111','00000000-0000-0000-0000-000000992113',
+                           '00000000-0000-0000-0000-000000992602')
+            ORDER BY j.id
+            """))
+                .containsExactly(
+                        "992111|0|aaa|-",
+                        "992113|-|-|{\"observationAdmissionDigest\": \"" + "d".repeat(64) + "\"}",
+                        "992602|1|eee|-");
+        // A send that released projection retired keeps its approved text, posted reference and approval history.
+        assertThat(column(database, """
+            SELECT f.state || '|' || f.body || '|' || c.state || '|' || (c.body IS NULL) || '|' || c.external_ref
+                || '|' || s.state || '|' || (h.facts->'dispatch'->>'payloadCleared')
+                || '|' || (h.facts->>'approvalDigest' = repeat('f', 64))
+                || '|' || (SELECT count(*) FROM feedback_decision d WHERE d.feedback_id=f.id AND d.action='APPROVE')
+            FROM feedback f JOIN feedback_copy c ON c.feedback_id=f.id AND c.kind='SUMMARY'
+            JOIN feedback_send s ON s.feedback_id=f.id JOIN review r ON r.id=f.review_id
+            CROSS JOIN LATERAL (SELECT r.checks->'MIGRATION'->'feedback'->(f.id::text)->'MIGRATION' AS facts) h
+            WHERE f.id='00000000-0000-0000-0000-000000992319'
+            """))
+                .containsExactly("DELIVERED|Explain this change.|POSTED|true|provider:retired|DONE|true|true|1");
+        // Two comments at one anchor keep their own ids and references; each receipt joins its comment by reference.
+        assertThat(column(database, """
+            SELECT right(c.id::text, 6) || '|' || c.kind || '|' || c.external_ref || '|' || c.write_key || '|' || c.state
+            FROM feedback_copy c WHERE c.feedback_id='00000000-0000-0000-0000-000000992320' ORDER BY c.position
+            """))
+                .containsExactly(
+                        "992340|FILE_NOTE|provider:file-a|approved:00000000-0000-0000-0000-000000992320:0|POSTED",
+                        "992341|FILE_NOTE|provider:file-b|approved:00000000-0000-0000-0000-000000992320:1|POSTED");
+        assertThat(column(database, """
+            SELECT c.body FROM feedback_copy c WHERE c.feedback_id='00000000-0000-0000-0000-000000992320' ORDER BY c.position
+            """)).containsExactly("Check the timeout.", "Check the retry limit.");
+        // Two accepted notes on the same lines but opposite sides stay two copies.
+        assertThat(column(database, """
+            SELECT c.side || '|' || c.body || '|' || c.state FROM feedback_copy c JOIN feedback f ON f.id=c.feedback_id
+            WHERE f.review_id='00000000-0000-0000-0000-000000992621' AND c.kind='LINE_NOTE' ORDER BY c.position
+            """))
+                .containsExactly("OLD|Explain the removed line.|WITHHELD", "NEW|Explain the added line.|WITHHELD");
     }
 
     @ParameterizedTest
@@ -308,6 +351,55 @@ class PracticeV1CutoverMigrationTest {
                 AND i.kind='scm.pull_request' AND i.source_id=992109
             WHERE e.id='00000000-0000-0000-0000-000000992184'
             """)).containsExactly("WAITING|true|pending-head|true|true|992103");
+        assertThat(column(database, """
+            SELECT e.id || '|' || e.name || '|' || e.item_version || '|' || i.kind || '|' || i.source_id || '|'
+                || (e.occurred_at = CASE WHEN e.found_by='WEBHOOK' THEN '2025-12-30T00:00:00Z'
+                                         ELSE '2025-12-31T00:00:00Z' END::timestamptz) || '|'
+                || e.found_by || '|' || e.state || '|' || e.reason || '|'
+                || (e.decided_at = '2025-12-30T00:00:05Z'::timestamptz) || '|'
+                || (e.decided_at > '2025-12-31T00:00:05Z'::timestamptz) || '|'
+                || coalesce((e.last_attempted_at = '2025-12-30T00:00:04Z'::timestamptz)::text, 'none') || '|'
+                || (e.retry_at IS NULL) || '|' || (e.actor_user_id IS NULL) || '|' || (e.requested_by_id IS NULL)
+            FROM item_event e JOIN item i ON i.id=e.item_id AND i.workspace_id=e.workspace_id
+            WHERE e.id IN ('00000000-0000-0000-0000-000000992185','00000000-0000-0000-0000-000000992186')
+            ORDER BY e.id
+            """))
+                .containsExactly(
+                        "00000000-0000-0000-0000-000000992185|scm.pull_request.reviewed"
+                                + "|sha~1111111111111111111111111111111111111111|scm.pull_request|992109|true"
+                                + "|WEBHOOK|WITHHELD|GATE_WITHHELD|true|false|true|true|true|true",
+                        "00000000-0000-0000-0000-000000992186|scm.pull_request.reviewed"
+                                + "|sha~2222222222222222222222222222222222222222|scm.pull_request|992109|true"
+                                + "|SYNC|WITHHELD|LEGACY_REVIEW_UNBOUND|false|true|none|true|true|true");
+        // A head-keyed review signal names no review: no review starts from it and nothing can claim it.
+        assertThat(column(database, """
+            SELECT (SELECT count(*) FROM review
+                     WHERE event_id IN ('00000000-0000-0000-0000-000000992185','00000000-0000-0000-0000-000000992186'))
+                || '|' || (SELECT count(*) FROM item_event
+                     WHERE id IN ('00000000-0000-0000-0000-000000992185','00000000-0000-0000-0000-000000992186')
+                       AND state IN ('RECORDED','WAITING') AND (retry_at IS NULL OR retry_at <= now()))
+            """)).containsExactly("0|0");
+        // A promoted GitHub issue stub keeps its own removed issue item beside the live pull request item.
+        assertThat(column(database, """
+            SELECT i.kind || '|' || (i.removed_at IS NOT NULL) || '|' || p.kind || '|' || p.source_id
+            FROM item i JOIN item p ON p.id=i.parent_id
+            WHERE i.workspace_id=992101 AND i.source_id=992109 AND i.kind IN ('scm.issue','scm.pull_request')
+            ORDER BY i.kind
+            """))
+                .containsExactly(
+                        "scm.issue|true|scm.repository|992108", "scm.pull_request|false|scm.repository|992108");
+        assertThat(column(database, """
+            SELECT e.id || '|' || e.name || '|' || e.item_version || '|' || i.kind || '|' || e.state || '|' || e.reason
+                || '|' || (e.decided_at = e.occurred_at + interval '5 seconds') || '|' || (e.retry_at IS NULL)
+            FROM item_event e JOIN item i ON i.id=e.item_id AND i.workspace_id=e.workspace_id
+            WHERE e.id IN ('00000000-0000-0000-0000-000000992187','00000000-0000-0000-0000-000000992188')
+            ORDER BY e.id
+            """))
+                .containsExactly(
+                        "00000000-0000-0000-0000-000000992187|scm.issue.opened|dig~stub-opened|scm.issue|WITHHELD"
+                                + "|GATE_WITHHELD|true|true",
+                        "00000000-0000-0000-0000-000000992188|scm.issue.opened|dig~stub-edited|scm.issue|EXPIRED"
+                                + "|ITEM_GONE|true|true");
     }
 
     @ParameterizedTest

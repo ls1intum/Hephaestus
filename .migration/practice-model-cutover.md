@@ -74,6 +74,14 @@ The [legacy history reasons](https://docs.hephaestus.build/contributor/practice-
 The diagnosis map still applies to conflicting versions, tenants, contributors and receipts.
 Existing retention can later remove ended results without feedback support.
 
+Released review signals keyed by the pull request head (`sha~`) stay as pull request history.
+They have no job and no review identity, so recorded ones are withheld with LEGACY_REVIEW_UNBOUND.
+
+GitHub sync once created an issue stub from a comment and later turned it into its pull request.
+Such a stub qualifies only if each issue fact on it is a finished "opened" event without a job.
+Those facts stay on a removed issue item beside the pull request.
+Any other disagreement between an item kind and the provider mirror still stops the migration.
+
 The migration does not post migrated feedback again.
 Historical unknown visibility stays Unconfirmed. A confirmed sibling copy keeps its delivery time.
 

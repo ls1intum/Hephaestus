@@ -25,5 +25,7 @@ public enum ReviewRequestReason {
     ITEM_NOT_VISIBLE,
     VERSION_SUPERSEDED,
     PENDING_DEADLINE_EXCEEDED,
-    ITEM_GONE;
+    ITEM_GONE,
+    /** A released review signal keyed by the pull request head; it names no review to resume. */
+    LEGACY_REVIEW_UNBOUND;
 }
