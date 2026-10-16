@@ -11,6 +11,7 @@ import {
 	listConnectionSyncJobsQueryKey,
 	listConnectionSyncResourcesQueryKey,
 	listSlackChannelsQueryKey,
+	getWorkspaceQueryKey,
 } from "@/api/@tanstack/react-query.gen";
 import type {
 	ConnectionSyncStatus,
@@ -1683,4 +1684,204 @@ describe("Slack channel management reads", () => {
 			activation.resolve();
 		}
 	});
+});
+
+const slackEntry: Wire<IntegrationCatalogEntry> = {
+	kind: "SLACK",
+	displayName: "Slack",
+	connected: true,
+	connectionId: 7,
+	connectionState: "ACTIVE",
+};
+
+/** A Slack connection whose workspace and catalog reads the test controls, monitoring #team-standup. */
+function serveSlackConnection(catalog: SlackRead<Wire<IntegrationCatalogEntry>[]>) {
+	const { workspace } = mockConnection("GITHUB");
+	const slackWorkspace = { ...workspace, hasSlackToken: true, slackConnectionId: 7 };
+	const slack = serveSlackChannels(
+		{ status: 200, body: [standupChannel] },
+		{ status: 200, body: [] },
+	);
+	return {
+		...slack,
+		slackWorkspace,
+		workspace: serveSlackRead("*/workspaces/acme", { status: 200, body: slackWorkspace }),
+		catalog: serveSlackRead("*/workspaces/acme/connections/catalog", catalog),
+	};
+}
+
+describe("Slack connection reads", () => {
+	const workspaceKey = getWorkspaceQueryKey({ path: { workspaceSlug: "acme" } });
+	const catalogKey = getIntegrationCatalogQueryKey({ path: { workspaceSlug: "acme" } });
+
+	it("keeps a pending Add and its draft through a connection lookup outage, then retries the lookup", async () => {
+		const slack = serveSlackConnection({ status: 200, body: [slackEntry] });
+		const added = deferred<201 | 503>();
+		const adds = holdSlackAdds([added]);
+		const { queryClient } = renderRouteAtWithRouter("/w/acme/admin/integrations/slack");
+		const recorded = recordWrites();
+		const user = userEvent.setup();
+		try {
+			await screen.findByText("#team-standup", undefined, ROUTE_RENDER_WAIT);
+			await user.click(screen.getByRole("button", { name: "Add channel" }));
+			const dialog = await screen.findByRole("dialog");
+			const reference = within(dialog).getByLabelText("Paste a channel link or ID");
+			await user.type(reference, "C0974LJBPBK");
+			await user.click(within(dialog).getByRole("button", { name: "Add channel" }));
+			await waitFor(() => expect(adds.bodies).toStrictEqual([{ slackChannelId: "C0974LJBPBK" }]));
+			const catalogReads = slack.catalog.reads.count;
+			const workspaceReads = slack.workspace.reads.count;
+
+			slack.catalog.answer({ status: 503 });
+			await reread(queryClient, catalogKey);
+			await screen.findByText("We could not load the Slack connection");
+			expect(slack.catalog.reads.count).toBe(catalogReads + 1);
+			expect(screen.getByRole("dialog")).toBe(dialog);
+			expect(reference).toHaveProperty("value", "C0974LJBPBK");
+			expect(within(dialog).getByRole("button", { name: "Adding…" })).toHaveProperty(
+				"disabled",
+				true,
+			);
+
+			slack.workspace.answer({ status: 503 });
+			await reread(queryClient, workspaceKey);
+			expect(slack.workspace.reads.count).toBe(workspaceReads + 1);
+			expect(queryClient.getQueryState(workspaceKey)?.status).toBe("error");
+			screen.getByText("We could not load the Slack connection");
+			expect(screen.getByRole("dialog")).toBe(dialog);
+			expect(reference).toHaveProperty("value", "C0974LJBPBK");
+			expect(within(dialog).getByRole("button", { name: "Adding…" })).toHaveProperty(
+				"disabled",
+				true,
+			);
+			expect(recorded.writes).toStrictEqual(["POST /workspaces/acme/slack/channels"]);
+
+			added.resolve(503);
+			const retryAdd = await within(dialog).findByRole("button", { name: "Add channel" });
+			expect(retryAdd).toHaveProperty("disabled", false);
+			expect(reference).toHaveProperty("value", "C0974LJBPBK");
+			expect(screen.getByRole("dialog")).toBe(dialog);
+			expect(adds.bodies).toHaveLength(1);
+
+			await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+			await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+			slack.workspace.answer({ status: 200, body: slack.slackWorkspace });
+			slack.catalog.answer({ status: 200, body: [slackEntry] });
+			await user.click(screen.getByRole("button", { name: "Retry" }));
+			await waitFor(() =>
+				expect(screen.queryByText("We could not load the Slack connection")).toBeNull(),
+			);
+			expect(slack.catalog.reads.count).toBe(catalogReads + 2);
+			expect(slack.workspace.reads.count).toBe(workspaceReads + 2);
+			screen.getByText("Connected");
+			screen.getByText("#team-standup");
+			expect(screen.queryByRole("dialog")).toBeNull();
+			expect(recorded.writes).toStrictEqual(["POST /workspaces/acme/slack/channels"]);
+		} finally {
+			added.resolve(503);
+			recorded.stop();
+		}
+	});
+
+	it.each(["catalog", "workspace"] as const)(
+		"withdraws the open Remove and sync evidence when the %s read is refused, and an outage does not bring them back",
+		async (owner) => {
+			const syncedAt = "2026-10-15T08:00:00Z";
+			const slack = serveSlackConnection({ status: 503 });
+			const owning = {
+				catalog: { read: slack.catalog, key: catalogKey },
+				workspace: { read: slack.workspace, key: workspaceKey },
+			}[owner];
+			serveSyncReads({
+				status: 200,
+				resources: [
+					{
+						id: 5,
+						externalId: "C06ARCHIVE6",
+						name: "team-archive",
+						type: "CHANNEL",
+						counts: [{ key: "messages", label: "Messages", count: 4242, lastSyncedAt: syncedAt }],
+						state: "SYNCED",
+						lastSyncedAt: syncedAt,
+						itemCount: 4242,
+					},
+				],
+				jobs: [
+					{
+						id: 51,
+						type: "RECONCILIATION",
+						trigger: "MANUAL",
+						status: "SUCCEEDED",
+						cancelRequested: false,
+						createdAt: syncedAt,
+						itemsProcessed: 31_337,
+					},
+				],
+			});
+			const { queryClient } = renderRouteAtWithRouter("/w/acme/admin/integrations/slack");
+			const recorded = recordWrites();
+			const user = userEvent.setup();
+			try {
+				await screen.findByText(
+					"We could not load the Slack connection",
+					undefined,
+					ROUTE_RENDER_WAIT,
+				);
+				expect(screen.queryByText("Slack channel monitoring")).toBeNull();
+				expect(screen.queryByText("team-archive")).toBeNull();
+
+				slack.catalog.answer({ status: 200, body: [slackEntry] });
+				await user.click(screen.getByRole("button", { name: "Retry" }));
+				await screen.findByText("team-archive");
+				await screen.findByText("31,337");
+				const removal = await openSlackRemove(user, "team-standup");
+				await user.type(within(removal).getByLabelText(/to confirm/u), "C02ACTIVE002");
+				const owningReads = owning.read.reads.count;
+
+				owning.read.answer({ status: 403 });
+				await reread(queryClient, owning.key);
+				await screen.findByText("You do not have access to the Slack connection");
+				expect(owning.read.reads.count).toBe(owningReads + 1);
+				expect(screen.queryByText("team-archive")).toBeNull();
+				expect(screen.queryByText("31,337")).toBeNull();
+				expect(screen.queryByRole("alertdialog")).toBeNull();
+				expect(screen.queryByText("#team-standup")).toBeNull();
+				expect(screen.queryByRole("button", { name: "Add channel" })).toBeNull();
+				expect(
+					screen.queryByRole("button", { name: /^(?:Reconnect|Disconnect) Slack/u }),
+				).toBeNull();
+				expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+
+				owning.read.answer({ status: 503 });
+				await reread(queryClient, owning.key);
+				await screen.findByText("We could not load the Slack connection");
+				expect(owning.read.reads.count).toBe(owningReads + 2);
+				expect(screen.queryByText("team-archive")).toBeNull();
+				expect(screen.queryByText("31,337")).toBeNull();
+				expect(screen.queryByRole("alertdialog")).toBeNull();
+				expect(screen.queryByText("#team-standup")).toBeNull();
+				expect(screen.queryByRole("button", { name: "Add channel" })).toBeNull();
+				expect(
+					screen.queryByRole("button", { name: /^(?:Reconnect|Disconnect) Slack/u }),
+				).toBeNull();
+
+				slack.workspace.answer({ status: 200, body: slack.slackWorkspace });
+				slack.catalog.answer({
+					status: 200,
+					body: [{ ...slackEntry, credentialsUnreadableSince: syncedAt }],
+				});
+				await user.click(screen.getByRole("button", { name: "Retry" }));
+				await screen.findByText("Token unreadable");
+				screen.getByText("#team-standup");
+				await screen.findByText("team-archive");
+				expect(screen.queryByText("We could not load the Slack connection")).toBeNull();
+				expect(screen.queryByRole("alertdialog")).toBeNull();
+				expect(owning.read.reads.count).toBe(owningReads + 3);
+				expect(slack.changes).toStrictEqual([]);
+				expect(recorded.writes).toStrictEqual([]);
+			} finally {
+				recorded.stop();
+			}
+		},
+	);
 });
