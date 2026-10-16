@@ -5,6 +5,7 @@ import static de.tum.cit.aet.hephaestus.agent.practice.live.PracticeCriteriaCase
 
 import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
 import de.tum.cit.aet.hephaestus.agent.handler.EvidenceSnapshotFixtures;
+import de.tum.cit.aet.hephaestus.agent.handler.PracticeCatalogInjector;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeScriptInputs;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeAgentRequest;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticePiAdapter;
@@ -42,6 +43,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -301,6 +303,8 @@ final class LiveRunnerWorkspace {
         var index = MAPPER.readTree(
                 workspace.resolve(SandboxLayout.PRACTICES_PREFIX + "index.json").toFile());
         long practiceId = 0;
+        var assignments = new ArrayList<ReviewAssignmentSnapshot>();
+        var staged = new LinkedHashMap<String, byte[]>();
         for (var entry : index) {
             practiceId++;
             var definition =
@@ -315,6 +319,7 @@ final class LiveRunnerWorkspace {
                     definition.about() == null ? null : 1L,
                     entry.path("slug").asString(),
                     pinned);
+            assignments.add(assignment);
             var review = new ReviewSnapshot(
                     task.reviewId(),
                     item.workspaceId(),
@@ -324,12 +329,13 @@ final class LiveRunnerWorkspace {
                     ReviewOrigin.REQUEST,
                     1,
                     List.of(pinned));
-            var inputs = new PracticeScriptInputs(MAPPER).stage(review, assignment, work, LiveWorkRecords.AT, null);
-            for (var file : inputs.entrySet()) {
-                Path path = workspace.resolve(file.getKey());
-                Files.createDirectories(path.getParent());
-                Files.write(path, file.getValue());
-            }
+            staged.putAll(new PracticeScriptInputs(MAPPER).stage(review, assignment, work, LiveWorkRecords.AT, null));
+        }
+        new PracticeCatalogInjector(MAPPER).inject(staged, assignments, ReviewKind.ITEM, Map.of());
+        for (var file : staged.entrySet()) {
+            Path path = workspace.resolve(file.getKey());
+            Files.createDirectories(path.getParent());
+            Files.write(path, file.getValue());
         }
     }
 

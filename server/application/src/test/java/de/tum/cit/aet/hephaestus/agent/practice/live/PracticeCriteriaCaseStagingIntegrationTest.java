@@ -39,7 +39,20 @@ class PracticeCriteriaCaseStagingIntegrationTest {
         for (String sidecar : List.of("pi-change.ts", "pi-task-paths.ts")) {
             Files.copy(Path.of("src/main/resources/agent", sidecar), workspace.resolve(sidecar));
         }
-        PracticeCriteriaCaseFixtures.stage(workspace, scenario);
+        var definitions = PracticeCriteriaCaseFixtures.stage(workspace, scenario);
+        LiveRunnerWorkspace.stageFixtureInputs(
+                workspace,
+                scenario.path("workType").asString().equals("issue") ? "scm.issue" : "scm.pull_request",
+                definitions);
+        for (var entry : definitions.entrySet()) {
+            Path script = workspace.resolve(SandboxLayout.PRACTICE_SCRIPT_PRACTICES_PREFIX + entry.getKey() + ".ts");
+            var program = entry.getValue().path("script");
+            if (program.isNull()) {
+                assertThat(script).doesNotExist();
+            } else {
+                assertThat(script).as("bundled program for %s", entry.getKey()).hasContent(program.asString());
+            }
+        }
         var practiceIndex = mapper.readTree(
                 workspace.resolve(SandboxLayout.PRACTICES_PREFIX + "index.json").toFile());
         assertThat(practiceIndex)
