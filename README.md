@@ -85,11 +85,11 @@ People keep responsibility for the harder judgment and the relationships.
   practices. Other workspaces open on Activity.
 - **Puts admins in control.** They configure repositories, practices, members, integrations, the AI
   model through any OpenAI-compatible endpoint, and a monthly spending cap.
-- **Shows what happened, without ranking anyone.** Activity shows work that needs you, such as review requests and returned pull requests.
+- **Shows what happened.** Activity shows work that needs you, such as review requests and returned pull requests.
   It summarizes your pull requests, reviews, comments, and issues over a time range.
   It keeps a timeline of the work.
   Workspace activity does the same for everyone or one team.
-  It lists members by name and never ranks them.
+  You can sort its people table by name or activity counts.
 
 ## How feedback works
 
