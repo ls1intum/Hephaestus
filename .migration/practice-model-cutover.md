@@ -68,6 +68,12 @@ To restore standing for recent work at once, start a review of past work under *
 Its estimate shows the work and the model cost before it starts.
 History views can show retained text when source access and privacy checks permit it.
 
+Multiple historical results for the same review, practice and item no longer stop the migration.
+Their assignment is withheld with LEGACY_AMBIGUOUS_RESULTS.
+The [legacy history reasons](https://docs.hephaestus.build/contributor/practice-review-glossary#legacy-history-reasons) define this state and ambiguous reuse.
+The diagnosis map still applies to conflicting versions, tenants, contributors and receipts.
+Existing retention can later remove ended results without feedback support.
+
 The migration does not post migrated feedback again.
 Historical unknown visibility stays Unconfirmed. A confirmed sibling copy keeps its delivery time.
 
@@ -75,6 +81,8 @@ Historical unknown visibility stays Unconfirmed. A confirmed sibling copy keeps 
 Practice definitions are stored on practice versions.
 The new definition has reviewOn, appliesWhen, about, reads, reviewedBy, criteria, script, scan, lineNotes and guidance.
 The source contract stays in reads.contract.
+A customized practice linked to a bundled catalog entry keeps that entry's positive phrase when guidance.goingWell is null.
+The migration preserves a supplied phrase and does not derive one from an unlinked practice's slug.
 Human review explanations and limits stay in reviewedBy.
 The role MERGER remains supported.
 
@@ -98,7 +106,7 @@ A script is a default export of definePracticeScript with meta and run(ctx).
 run returns one candidate result for the supplied item. The script contract is version 3.
 
 A null script uses the built-in script. A changed invalid script does not.
-The migration transforms only exact audited bundled scripts.
+The migration transforms only exact audited historical scripts.
 An unsupported script stops the migration, including a script retained in a catalog comparison base.
 Rewriting a custom script before upgrade does not add its source to the audited map.
 The refusal names the practice ID or catalog slug and identifies a comparison base when it applies.

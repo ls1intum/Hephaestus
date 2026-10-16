@@ -24,6 +24,7 @@ import { FOUND_BY_DESCRIPTIONS, FOUND_BY_LABELS } from "@/components/practice-tr
 import { REVIEW_ORIGIN_DEFS } from "@/components/practice-vocabulary/review-origin-defs";
 import {
 	isActiveReview,
+	reviewReasonSentence,
 	REVIEW_JOB_PROCESSING_DEFS,
 	REVIEW_JOB_STATUS_DEFS,
 	REVIEW_PRACTICE_STATUS_DEFS,
@@ -376,7 +377,7 @@ function practiceReason(practice: ReviewPractice): string {
 		return resultsLine(practice);
 	}
 	return hasText(practice.reason)
-		? practice.reason
+		? (reviewReasonSentence(practice.reason) ?? practice.reason)
 		: REVIEW_PRACTICE_STATUS_DEFS[practice.status].description;
 }
 

@@ -1,16 +1,17 @@
 package de.tum.cit.aet.hephaestus.core.database;
 
+import static de.tum.cit.aet.hephaestus.core.database.PracticeMigrationFixture.seedBundledPractice;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.testconfig.PostgreSQLTestContainer.TestDatabase;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.Objects;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -19,6 +20,96 @@ import tools.jackson.databind.json.JsonMapper;
 
 @Tag("database")
 class PracticeV1DefinitionMigrationTest {
+    @ParameterizedTest
+    @ValueSource(strings = {"prod", "dev"})
+    void shouldConvertEveryMappedProgramWithoutChangingItsSyntheticOwnerCriteria(String context) throws Exception {
+        var mapped = PracticeMigrationFixture.mappedPrograms();
+        var programs = new ArrayList<PracticeMigrationFixture.ProgramMapping>();
+        try (var input = Objects.requireNonNull(
+                getClass().getResourceAsStream("/db/practice-cutover/mapped-program-targets.json"))) {
+            var bindings = Objects.requireNonNull(JsonMapper.builder().build().readTree(input));
+            assertThat(bindings.size()).isEqualTo(55);
+            for (var binding : bindings) {
+                var mapping = Objects.requireNonNull(
+                        mapped.get(binding.path("sourceSha256").asString()));
+                try (var target = Objects.requireNonNull(getClass()
+                        .getResourceAsStream(binding.path("targetResource").asString()))) {
+                    assertThat(mapping.target()).isEqualTo(new String(target.readAllBytes(), StandardCharsets.UTF_8));
+                }
+                programs.add(mapping);
+            }
+        }
+        assertThat(programs.stream()
+                        .map(PracticeMigrationFixture.ProgramMapping::sourceSha256)
+                        .distinct())
+                .hasSize(55);
+        var database = PracticeMigrationFixture.releasedDatabase(context);
+        PracticeMigrationFixture.seedMappedPrograms(database, programs);
+        PracticeMigrationFixture.upgrade(database, context);
+        for (int index = 0; index < programs.size(); index++) {
+            long practiceId = 1600000L + index;
+            var mapping = programs.get(index);
+            String owners = " FROM practice p JOIN practice_version v ON v.id=p.current_version_id"
+                    + " JOIN catalog_entry c ON c.entry_type='PRACTICE' AND c.slug=p.catalog_slug WHERE p.id="
+                    + practiceId;
+            assertThat(PracticeMigrationFixture.column(
+                            database,
+                            "SELECT v.definition->>'script'" + owners
+                                    + " UNION ALL SELECT p.catalog_base#>>'{definition,script}'" + owners
+                                    + " UNION ALL SELECT c.definition#>>'{definition,script}'" + owners
+                                    + " UNION ALL SELECT c.base#>>'{definition,script}'" + owners))
+                    .as("source %s on workspace/instance current and base paths", mapping.sourceSha256())
+                    .containsExactly(mapping.target(), mapping.target(), mapping.target(), mapping.target());
+            assertThat(PracticeMigrationFixture.column(
+                            database,
+                            "SELECT v.definition->>'criteria'" + owners
+                                    + " UNION ALL SELECT p.catalog_base#>>'{definition,criteria}'" + owners
+                                    + " UNION ALL SELECT c.definition#>>'{definition,criteria}'" + owners
+                                    + " UNION ALL SELECT c.base#>>'{definition,criteria}'" + owners))
+                    .containsExactly(
+                            "Workspace customized criterion.\n  Keep exact whitespace.\n",
+                            "Workspace comparison criterion.\n  Keep exact whitespace.\n",
+                            "Instance customized criterion.\n  Keep exact whitespace.\n",
+                            "Instance comparison criterion.\n  Keep exact whitespace.\n");
+            assertThat(PracticeMigrationFixture.column(
+                            database,
+                            "SELECT p.catalog_slug || '|' || v.number || '|' || (v.definition#>>'{reads,contract}')"
+                                    + owners))
+                    .containsExactly("synthetic-mapping-" + index + "|2|2.0.0");
+            assertThat(PracticeMigrationFixture.column(
+                            database,
+                            "SELECT definition->>'script' FROM practice_version WHERE id=" + (1700000L + index)))
+                    .containsExactly(mapping.source());
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"prod", "dev"})
+    void shouldRefuseAOneByteChangeToAnExactlyMappedProgram(String context) throws Exception {
+        final String sourceSha;
+        try (var input = Objects.requireNonNull(
+                getClass().getResourceAsStream("/db/practice-cutover/mapped-program-targets.json"))) {
+            sourceSha = Objects.requireNonNull(JsonMapper.builder().build().readTree(input))
+                    .get(0)
+                    .path("sourceSha256")
+                    .asString();
+        }
+        var source = Objects.requireNonNull(
+                        PracticeMigrationFixture.mappedPrograms().get(sourceSha))
+                .source();
+        var database = PracticeMigrationFixture.releasedDatabase(context);
+        installProgram(database, source + " ");
+        assertThatThrownBy(() -> PracticeMigrationFixture.upgrade(database, context))
+                .hasMessageContaining("practice 992121 has an unsupported custom program");
+        assertThat(PracticeMigrationFixture.column(database, "SELECT precompute_script FROM practice WHERE id=992121"))
+                .containsExactly(source + " ");
+        assertThat(
+                        PracticeMigrationFixture.column(
+                                database,
+                                "SELECT count(*)::text FROM information_schema.tables WHERE table_schema='public' AND table_name='result'"))
+                .containsExactly("0");
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"prod", "dev"})
     void shouldTransformEverySupportedProgramWithoutChangingItsPinnedSource(String context) throws Exception {
@@ -337,50 +428,6 @@ class PracticeV1DefinitionMigrationTest {
             SELECT definition->>'criteria' FROM practice_version WHERE id=1400100
             """))
                 .containsExactly("The workspace's customized standard.");
-    }
-
-    private static void seedBundledPractice(
-            Connection connection, long practiceId, long versionId, JsonNode entry, @Nullable String customizedCriteria)
-            throws SQLException {
-        try (var statement = connection.prepareStatement("""
-            INSERT INTO practice(id,workspace_id,slug,name,criteria,applies_to,subject,signals,
-                evidence_requirements,review_when,automated_review_policy,delivery_behavior,precondition,
-                precompute_script,why_it_matters,what_good_looks_like,visual,guide,
-                source_curated_slug,source_curated_fingerprint,created_at,updated_at)
-            SELECT ?,992101,?,d->>'name',coalesce(?,d->>'criteria'),?,d->>'subject',d->'signals',
-                d->'evidenceRequirements',d->'reviewWhen',d->'automatedReviewPolicy',d->'deliveryBehavior',nullif(d->'precondition','null'::jsonb),
-                d->>'precomputeScript',d->>'whyItMatters',d->>'whatGoodLooksLike',nullif(d->'visual','null'::jsonb),nullif(d->'guide','null'::jsonb),?,?,
-                '2026-01-01T00:00:00Z','2026-01-01T00:00:00Z' FROM (SELECT ?::jsonb AS d) authored
-            """)) {
-            statement.setLong(1, practiceId);
-            statement.setString(
-                    2,
-                    (customizedCriteria == null ? "bundle-" : "custom-")
-                            + entry.path("slug").asString());
-            statement.setString(3, customizedCriteria);
-            statement.setString(4, entry.path("kind").asString());
-            statement.setString(5, entry.path("slug").asString());
-            statement.setString(6, entry.path("oldReviewFingerprint").asString());
-            statement.setString(7, entry.path("oldDefinition").toString());
-            statement.executeUpdate();
-        }
-        try (var statement = connection.prepareStatement("""
-            INSERT INTO practice_revision(id,practice_id,revision_number,slug,name,applies_to,subject,
-                signals,evidence_requirements,review_when,criteria,automated_review_policy,delivery_behavior,
-                precondition,precompute_script,why_it_matters,what_good_looks_like,visual,guide,created_at)
-            SELECT ?,id,1,slug,name,applies_to,subject,signals,evidence_requirements,review_when,criteria,
-                automated_review_policy,delivery_behavior,precondition,precompute_script,why_it_matters,
-                what_good_looks_like,visual,guide,'2026-01-01T00:00:00Z' FROM practice WHERE id=?
-            """)) {
-            statement.setLong(1, versionId);
-            statement.setLong(2, practiceId);
-            statement.executeUpdate();
-        }
-        try (var statement = connection.prepareStatement("UPDATE practice SET current_revision_id=? WHERE id=?")) {
-            statement.setLong(1, versionId);
-            statement.setLong(2, practiceId);
-            statement.executeUpdate();
-        }
     }
 
     private String shippedProgramSha(JsonNode program) throws Exception {

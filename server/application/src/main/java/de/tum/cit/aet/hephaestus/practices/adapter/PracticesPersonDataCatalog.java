@@ -41,8 +41,10 @@ import tools.jackson.databind.ObjectMapper;
     "review_schedule"
 })
 public class PracticesPersonDataCatalog implements PersonDataCatalog, PersonConversationCopySource {
+    // Migrated review IDs preserve producer job IDs after runtime retention removes the job pointer.
     private static final String RESULT_IDS =
-            "SELECT id FROM result WHERE developer_id=:account OR id IN(SELECT result_id FROM review_item WHERE"
+            "SELECT id FROM result WHERE developer_id=:account OR (evidence_version=0 AND review_id=ANY(:derivedJobs))"
+                    + " OR id IN(SELECT result_id FROM review_item WHERE"
                     + " result_id IS NOT NULL AND (job_id=ANY(:derivedJobs) OR EXISTS(SELECT 1 FROM"
                     + " jsonb_array_elements_text(COALESCE(detail->'custody'->'sourceJobIds','[]'::jsonb)) source(value)"
                     + " WHERE source.value::uuid=ANY(:derivedJobs))))";

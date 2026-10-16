@@ -74,9 +74,9 @@ export const Default: Story = {
 		await expect(screen.getByLabelText("Timeframe")).toHaveTextContent("All time");
 		await expect(screen.getByText("Review 2")).toBeVisible();
 		await expect(screen.getByText("Thin controllers")).toBeVisible();
-		await expect(screen.getByText("one practice met, one could not be determined")).toBeVisible();
+		await expect(screen.getByText("one result met, one could not be determined")).toBeVisible();
 		await expect(screen.getByText("Explain each change, Keep the diff reviewable")).toBeVisible();
-		await expect(screen.getByText("one practice did not apply")).toBeVisible();
+		await expect(screen.getByText("one result did not apply")).toBeVisible();
 		await expect(screen.getByText("Stopped before it finished")).toBeVisible();
 		await expect(screen.getAllByText("Nothing to improve")).toHaveLength(2);
 

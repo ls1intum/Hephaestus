@@ -4,23 +4,124 @@ import static de.tum.cit.aet.hephaestus.core.database.PracticeMigrationFixture.c
 import static de.tum.cit.aet.hephaestus.core.database.PracticeMigrationFixture.execute;
 import static de.tum.cit.aet.hephaestus.core.database.PracticeMigrationFixture.migratedDatabase;
 import static de.tum.cit.aet.hephaestus.core.database.PracticeMigrationFixture.releasedDatabase;
+import static de.tum.cit.aet.hephaestus.core.database.PracticeMigrationFixture.seedBundledPractice;
 import static de.tum.cit.aet.hephaestus.core.database.PracticeMigrationFixture.upgrade;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.charset.StandardCharsets;
+import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Objects;
+import java.util.stream.StreamSupport;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 @Tag("database")
 class PracticeV1CutoverMigrationTest {
     private static final String RESULT = "00000000-0000-0000-0000-000000992141";
     private static final String FEEDBACK = "00000000-0000-0000-0000-000000992161";
+
+    @ParameterizedTest
+    @ValueSource(strings = {"prod", "dev"})
+    void shouldPreserveLinkedGoingWellWithoutReplacingCustomizedDefinitions(String context) throws Exception {
+        final JsonNode entry;
+        try (var input =
+                Objects.requireNonNull(getClass().getResourceAsStream("/db/practice-cutover/released-catalog.json"))) {
+            var entries = Objects.requireNonNull(JsonMapper.builder().build().readTree(input));
+            entry = StreamSupport.stream(entries.spliterator(), false)
+                    .filter(candidate ->
+                            candidate.path("slug").asString().equals("keeps-functions-small-and-single-purpose"))
+                    .findFirst()
+                    .orElseThrow();
+        }
+        var database = releasedDatabase(context);
+        try (var connection =
+                DriverManager.getConnection(database.jdbcUrl(), database.username(), database.password())) {
+            connection.setAutoCommit(false);
+            seedBundledPractice(connection, 1500000, 1510000, entry, null);
+            seedBundledPractice(connection, 1500001, 1510001, entry, "Keep this exact workspace criterion.");
+            try (var statement = connection.createStatement()) {
+                statement.executeUpdate("UPDATE practice SET slug='renamed-workspace-practice',name='Workspace name',"
+                        + "why_it_matters='Workspace purpose',what_good_looks_like='Workspace example',"
+                        + "visual='{\"svg\":\"<svg/>\",\"alt\":\"Workspace visual\"}'::jsonb,"
+                        + "guide='{\"markdown\":\"Workspace guide\",\"figures\":{}}'::jsonb WHERE id=1500001");
+            }
+            seedBundledPractice(connection, 1500002, 1510002, entry, "Unlinked custom criterion.");
+            try (var statement = connection.createStatement()) {
+                statement.executeUpdate("UPDATE practice SET slug='keeps-functions-small-and-single-purpose',"
+                        + "source_curated_slug=NULL,source_curated_fingerprint=NULL WHERE id=1500002");
+            }
+            seedBundledPractice(connection, 1500003, 1510003, entry, "Another custom criterion.");
+            try (var statement = connection.prepareStatement(
+                    "UPDATE practice SET adopted_base_source='EXACT_ADOPTION',adopted_base="
+                            + "jsonb_set(?::jsonb,'{holdsAs}',to_jsonb('Supplied positive phrase'::text)),slug='supplied-phrase' WHERE id=1500003")) {
+                statement.setString(1, entry.path("oldDefinition").toString());
+                statement.executeUpdate();
+            }
+            // A comparison base can carry JSON null, while authored columns have no positive-phrase field.
+            seedBundledPractice(connection, 1500004, 1510004, entry, "JSON-null base criterion.");
+            try (var statement =
+                    connection.prepareStatement("UPDATE practice SET adopted_base_source='EXACT_ADOPTION',adopted_base="
+                            + "jsonb_set(?::jsonb,'{holdsAs}','null'::jsonb) WHERE id=1500004")) {
+                statement.setString(1, entry.path("oldDefinition").toString());
+                statement.executeUpdate();
+            }
+            try (var statement = connection.createStatement()) {
+                statement.executeUpdate("""
+                    INSERT INTO practice_revision(id,practice_id,revision_number,slug,name,applies_to,subject,
+                        signals,evidence_requirements,review_when,criteria,automated_review_policy,delivery_behavior,
+                        precondition,precompute_script,why_it_matters,what_good_looks_like,visual,guide,created_at)
+                    SELECT current_revision_id+100,id,2,slug,name,applies_to,subject,signals,evidence_requirements,
+                        review_when,criteria,automated_review_policy,delivery_behavior,precondition,precompute_script,
+                        why_it_matters,what_good_looks_like,visual,guide,'2026-01-02T00:00:00Z'
+                    FROM practice WHERE id IN(1500001,1500002,1500003)
+                    """);
+                statement.executeUpdate("UPDATE practice SET current_revision_id=current_revision_id+100"
+                        + " WHERE id IN(1500001,1500002,1500003)");
+            }
+            connection.commit();
+        }
+        upgrade(database, context);
+        String phrase = entry.path("goingWell").asString();
+        assertThat(column(database, """
+            SELECT p.catalog_slug || '|' || (v.definition->>'name') || '|' || (v.definition->>'criteria')
+            FROM practice p JOIN practice_version v ON v.id=p.current_version_id WHERE p.id=1500001
+            """))
+                .containsExactly(
+                        "keeps-functions-small-and-single-purpose|Workspace name|Keep this exact workspace criterion.");
+        assertThat(column(database, """
+            SELECT (v.definition#>>'{guidance,goingWell}') || '|' || (v.definition#>>'{guidance,whyItMatters}')
+                || '|' || (v.definition#>>'{guidance,whatGoodLooksLike}') || '|' || (v.definition#>>'{guidance,visual,svg}')
+                || '|' || (v.definition#>>'{guidance,visual,alt}') || '|' || (v.definition#>>'{guidance,guide,markdown}')
+                || '|' || (v.definition#>>'{reads,contract}') || '|' || (v.definition->'script'='null'::jsonb)
+                || '|' || (v.definition->'scan'='null'::jsonb)
+            FROM practice p JOIN practice_version v ON v.id=p.current_version_id WHERE p.id=1500001
+            """))
+                .containsExactly(
+                        phrase
+                                + "|Workspace purpose|Workspace example|<svg/>|Workspace visual|Workspace guide|2.0.0|true|true");
+        assertThat(column(database, """
+            SELECT (p.catalog_slug IS NULL)::text || '|' || (v.definition#>'{guidance,goingWell}'='null'::jsonb)
+                || '|' || (v.definition->>'criteria')
+            FROM practice p JOIN practice_version v ON v.id=p.current_version_id WHERE p.id=1500002
+            """)).containsExactly("true|true|Unlinked custom criterion.");
+        assertThat(column(database, """
+            SELECT (v.definition#>>'{guidance,goingWell}') || '|' || (v.definition#>>'{scan,itemKind}')
+            FROM practice p JOIN practice_version v ON v.id=p.current_version_id WHERE p.id=1500000
+            """)).containsExactly(phrase + "|scm.file");
+        assertThat(column(database, """
+            SELECT catalog_base#>>'{definition,guidance,goingWell}' FROM practice WHERE id IN(1500003,1500004) ORDER BY id
+            """)).containsExactly("Supplied positive phrase", phrase);
+        assertThat(column(database, """
+            SELECT definition#>'{guidance,goingWell}' FROM practice_version WHERE id=1510001
+            """)).containsExactly("null");
+    }
 
     @ParameterizedTest
     @ValueSource(strings = {"prod", "dev"})
@@ -528,5 +629,92 @@ class PracticeV1CutoverMigrationTest {
                 .isInstanceOf(SQLException.class)
                 .extracting(error -> ((SQLException) error).getSQLState())
                 .isEqualTo("23514");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"prod", "dev"})
+    void shouldKeepEveryLegacySiblingAndWithholdAmbiguousAssignments(String context) throws Exception {
+        var database = releasedDatabase(context);
+        PracticeMigrationFixture.seedDuplicateHistory(database);
+        upgrade(database, context);
+        assertThat(column(database, """
+            SELECT right(id::text,6)||'|'||outcome||'|'||summary||'|'||explanation||'|'||evidence_version
+            FROM result WHERE right(id::text,6) IN ('996141','996142','996143') ORDER BY id
+            """))
+                .containsExactly(
+                        "996141|NOT_MET|Retained summary 996141|Retained explanation 996141|0",
+                        "996142|MET|Retained summary 996142|Retained explanation 996142|0",
+                        "996143|NOT_MET|Retained summary 996143|Retained explanation 996143|0");
+        assertThat(column(database, """
+            SELECT count(*)::text FROM result WHERE right(id::text,6) IN ('996141','996142','996143')
+                AND recorded_at='2026-01-06T00:00:30Z'
+            """)).containsExactly("3");
+        assertThat(column(database, """
+            SELECT end_reason||'|'||ended_at::date FROM result WHERE id='00000000-0000-0000-0000-000000996143'
+            """)).containsExactly("WORK_CHANGED|2026-01-07");
+        assertThat(column(database, """
+            SELECT right(r.id::text,6)||'|'||p.summary||'|'||p.explanation||'|'||(p.citations->0->>'quote')
+            FROM result r JOIN problem p ON p.result_id=r.id WHERE right(r.id::text,6) IN ('996141','996143')
+            ORDER BY r.id
+            """))
+                .containsExactly(
+                        "996141|Retained summary 996141|Retained explanation 996141|Quote 996141",
+                        "996143|Retained summary 996143|Retained explanation 996143|Quote 996143");
+        assertThat(column(database, """
+            SELECT evidence->'citations'->0->>'quote' FROM result
+            WHERE id='00000000-0000-0000-0000-000000996142'
+            """)).containsExactly("Quote 996142");
+        assertThat(column(database, """
+            SELECT state||'|'||(result_id IS NULL)||'|'||reason||'|'||right(job_id::text,6)||'|'||detail::text
+            FROM review_item WHERE review_id='00000000-0000-0000-0000-000000996111'
+            """))
+                .containsExactly("WITHHELD|true|LEGACY_AMBIGUOUS_RESULTS|996111|{\"legacyResults\": 3}");
+        assertThat(column(database, """
+            SELECT status||'|'||reason FROM review_practice
+            WHERE review_id='00000000-0000-0000-0000-000000996111'
+            """)).containsExactly("WITHHELD|LEGACY_AMBIGUOUS_RESULTS");
+        assertThat(column(database, """
+            SELECT right(id::text,6) FROM result WHERE practice_id=992121 AND developer_id=992106
+                AND item_id=(SELECT item_id FROM review WHERE id='00000000-0000-0000-0000-000000996111')
+                AND ended_at IS NULL
+            """)).containsExactly("996144");
+        assertThat(column(database, """
+            SELECT right(f.id::text,6)||'|'||f.body||'|'||right(b.result_id::text,6)||'|'||
+                coalesce(p.summary,'none')||'|'||right(c.id::text,6)||'|'||c.external_ref
+            FROM feedback f JOIN feedback_basis b ON b.feedback_id=f.id
+            LEFT JOIN problem p ON p.id=b.problem_id JOIN feedback_copy c ON c.feedback_id=f.id
+            WHERE right(f.id::text,6) IN ('996161','996162','996163') ORDER BY f.id
+            """))
+                .containsExactly(
+                        "996161|Retained advice 996161|996141|Retained summary 996141|996171|provider:996161",
+                        "996162|Retained advice 996162|996142|none|996172|provider:996162",
+                        "996163|Retained advice 996163|996143|Retained summary 996143|996173|provider:996163");
+        assertThat(column(database, """
+            SELECT right(review_id::text,6)||'|'||state||'|'||coalesce(right(result_id::text,6),reason)
+            FROM review_item WHERE right(review_id::text,6) IN ('996114','996115') ORDER BY review_id
+            """))
+                .containsExactly("996114|WITHHELD|LEGACY_REUSE_UNBOUND", "996115|REUSED|996145");
+        assertThat(column(database, """
+            SELECT status||'|'||stop_reason FROM review WHERE id='00000000-0000-0000-0000-000000996114'
+            """)).containsExactly("PARTIAL|RESULT_WITHHELD");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"prod", "dev"})
+    void shouldRankEqualTimeLegacySiblingsWithoutChoosingAnAssignmentWinner(String context) throws Exception {
+        var database = releasedDatabase(context);
+        PracticeMigrationFixture.seedDuplicateHistory(database);
+        execute(database, """
+            DELETE FROM observation WHERE id='00000000-0000-0000-0000-000000996144';
+            DELETE FROM agent_job WHERE id='00000000-0000-0000-0000-000000996112';
+            """);
+        upgrade(database, context);
+        assertThat(column(database, """
+            SELECT right(id::text,6) FROM result WHERE practice_id=992121 AND developer_id=992106 AND ended_at IS NULL
+            """)).containsExactly("996142");
+        assertThat(column(database, """
+            SELECT state||'|'||(result_id IS NULL) FROM review_item
+            WHERE review_id='00000000-0000-0000-0000-000000996111'
+            """)).containsExactly("WITHHELD|true");
     }
 }

@@ -5,6 +5,7 @@ import path from "node:path";
 import addFormats from "ajv-formats";
 import Ajv2020 from "ajv/dist/2020.js";
 import { asArray, asRecord, asString, at, isRecord, parseJson, readJsonFile } from "./lib/json.ts";
+import { migrationOwnedPracticeScripts } from "./lib/migration-practice-scripts.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
 const contractsRoot = path.join(root, "server/application/src/main/resources/contracts/source-use");
@@ -347,9 +348,21 @@ for (const practice of practices) {
 	}
 	referencedPracticeScripts.add(expected);
 }
-for (const script of practiceScripts) {
-	if (!referencedPracticeScripts.has(script)) {
-		throw new Error(`practice script '${script}' is not named by any bundled practice`);
+const unreferencedScripts = new Set(
+	[...practiceScripts].filter((script) => !referencedPracticeScripts.has(script)),
+);
+const migrationScripts =
+	unreferencedScripts.size === 0
+		? new Set<string>()
+		: await migrationOwnedPracticeScripts(
+				path.join(root, "server/application/src/main/resources"),
+				unreferencedScripts,
+			);
+for (const script of unreferencedScripts) {
+	if (!migrationScripts.has(script)) {
+		throw new Error(
+			`practice script '${script}' has no bundled practice or verified migration owner`,
+		);
 	}
 }
 

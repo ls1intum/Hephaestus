@@ -534,3 +534,100 @@ void describe("every bundled practice script", async () => {
 		assert.equal(outcome.error.name, "UnratedError");
 	});
 });
+
+void describe("migrated authored practice programs", () => {
+	void it("keeps branch names and the captured range separate from integration ancestry", async () => {
+		const result = await runBundled("branches-from-the-integration-branch", {
+			item: { source_branch: "feature/export", target_branch: "release/2026" },
+			context: {
+				"commits.json": {
+					commits: [{ sha: "b".repeat(40), message: "Export", parents: [], files: [] }],
+				},
+			},
+		});
+		assert.deepEqual(result.facts, { capturedCommitCount: 1 });
+		const said = result.directions?.join(" ") ?? "";
+		assert.match(said, /feature\/export.*release\/2026/u);
+		assert.match(said, /not a count of commits ahead of the integration branch/u);
+		assert.match(said, /does not establish where this branch was created/u);
+	});
+
+	void it("does not replace an uncaptured commit range with a captured empty one", async () => {
+		for (const captured of [false, true]) {
+			const result = await runBundled("branches-from-the-integration-branch", {
+				context: captured ? { "commits.json": { commits: [] } } : {},
+			});
+			assert.equal(result.facts?.capturedCommitCount, captured ? 0 : undefined);
+			assert.match(
+				result.directions?.join(" ") ?? "",
+				captured ? /contains 0 commit/u : /size is unknown, not zero/u,
+			);
+		}
+	});
+
+	void it("carries routing metadata without deciding its accuracy or taxonomy", async () => {
+		const result = await runBundled("triages-the-issue-with-labels-and-ownership", {
+			inputs: requested("scm.issue"),
+			item: { labels: ["ui", "help wanted"], assignees: ["maintainer"], milestone: "October" },
+		});
+		assert.deepEqual(result.facts, { labelCount: 2, assigneeCount: 1, hasMilestone: 1 });
+		const said = result.directions?.join(" ") ?? "";
+		assert.match(said, /ui, help wanted.*maintainer.*October/u);
+		assert.match(said, /not proof that a label is useful or correct/u);
+	});
+
+	void it("does not review absent routing fields as an empty captured set", async () => {
+		const result = await runBundledProgram("triages-the-issue-with-labels-and-ownership", {
+			inputs: requested("scm.issue"),
+			item: { labels: undefined },
+		});
+		assert.equal(result.reviews.length, 0);
+		assert.ok("error" in result.outcome);
+	});
+
+	void it("keeps closing disposition, checklist and stored-child scope visible without dating them", async () => {
+		const result = await runBundled("issue-closed-with-unmet-outcome", {
+			inputs: requested("scm.issue"),
+			item: {
+				state: "CLOSED",
+				state_reason: "not_planned",
+				closed_at: "2026-10-12T10:00:00Z",
+				body: "- [x] Explain\n- [ ] Follow up",
+				sub_issues_total: 2,
+				sub_issues_completed: 2,
+				sub_issues_source: "children",
+			},
+		});
+		assert.deepEqual(result.facts, {
+			issueClosed: 1,
+			checkedBoxes: 1,
+			uncheckedBoxes: 1,
+			subIssuesTotal: 2,
+			subIssuesCompleted: 2,
+		});
+		const said = result.directions?.join(" ") ?? "";
+		assert.match(said, /not_planned/u);
+		assert.match(said, /stored at capture.*may omit other children/u);
+		assert.match(said, /not necessarily the moment of closing/u);
+	});
+
+	void it("keeps unknown closure and rollup apart from explicit open state and reported zero", async () => {
+		for (const known of [false, true]) {
+			const result = await runBundled("issue-closed-with-unmet-outcome", {
+				inputs: requested("scm.issue"),
+				item: {
+					state: known ? "OPEN" : "UNKNOWN",
+					sub_issues_total: known ? 0 : null,
+					sub_issues_completed: known ? 0 : null,
+					...(known ? { sub_issues_source: "provider" } : {}),
+				},
+			});
+			assert.equal(result.facts?.issueClosed, known ? 0 : undefined);
+			assert.equal(result.facts?.subIssuesTotal, known ? 0 : undefined);
+			assert.match(
+				result.directions?.join(" ") ?? "",
+				known ? /0 sub-issue.*provider reports/u : /unknown, not zero/u,
+			);
+		}
+	});
+});

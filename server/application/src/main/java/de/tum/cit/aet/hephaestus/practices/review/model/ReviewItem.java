@@ -38,6 +38,7 @@ import tools.jackson.databind.JsonNode;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ReviewItem {
+    public static final String LEGACY_AMBIGUOUS_RESULTS = "LEGACY_AMBIGUOUS_RESULTS";
 
     @Column(name = "workspace_id", nullable = false)
     private long workspaceId;

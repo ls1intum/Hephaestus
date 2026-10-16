@@ -16,9 +16,11 @@ import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.review.ProductItemQuery;
 import de.tum.cit.aet.hephaestus.practices.review.ProductItemRepository;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewItemRepository;
+import de.tum.cit.aet.hephaestus.practices.review.model.ReviewItem;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustody;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustodyQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultProofAccess;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewItemState;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -49,7 +51,10 @@ public class ResultSourceAuthorization implements ResultProofAccess {
         var producer = assignments
                 .findByWorkspaceIdAndReviewIdAndPracticeIdAndItemId(
                         result.getWorkspaceId(), result.getReviewId(), result.getPracticeId(), result.getItemId())
-                .filter(m -> result.getId().equals(m.getResultId()));
+                .filter(m -> result.getId().equals(m.getResultId())
+                        || (result.getEvidenceVersion() == 0
+                                && m.getState() == ReviewItemState.WITHHELD
+                                && ReviewItem.LEGACY_AMBIGUOUS_RESULTS.equals(m.getReason())));
         var retained = assignments
                 .findByWorkspaceIdAndResultIdOrderByReviewIdAscPracticeIdAscItemIdAsc(
                         result.getWorkspaceId(), result.getId())

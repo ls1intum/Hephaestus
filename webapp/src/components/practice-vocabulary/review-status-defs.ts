@@ -138,6 +138,20 @@ export const REVIEW_STOP_REASON_SENTENCES: Record<ReviewStopReason, string> = {
 	CONTRACT_CHANGED: "Hephaestus was upgraded while it waited, so it stopped.",
 };
 
+const REVIEW_WITHHELD_REASON_SENTENCES: Readonly<Record<string, string>> = {
+	...REVIEW_STOP_REASON_SENTENCES,
+	LEGACY_AMBIGUOUS_RESULTS:
+		"This review keeps several historical results for the same practice and work without choosing one as its answer.",
+	LEGACY_REUSE_UNBOUND:
+		"This review referred to an earlier result that could not be identified exactly.",
+};
+
+export function reviewReasonSentence(code: string | null): string | undefined {
+	return code !== null && Object.hasOwn(REVIEW_WITHHELD_REASON_SENTENCES, code)
+		? REVIEW_WITHHELD_REASON_SENTENCES[code]
+		: undefined;
+}
+
 /** Where one practice stands inside one review. Withheld is a decision with a reason, not a result. */
 export const REVIEW_PRACTICE_STATUS_DEFS: StatusDefs<ReviewPracticeStatus> = {
 	QUEUED: {

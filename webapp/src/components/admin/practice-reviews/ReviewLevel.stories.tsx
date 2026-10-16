@@ -348,3 +348,32 @@ export const NoPracticeResultsRecordedYet: Story = {
 		await expect(panel.queryByRole("list", { name: "Every practice in this review" })).toBeNull();
 	},
 };
+
+export const AmbiguousHistoricalResults: Story = {
+	args: {
+		review: ready({
+			...reviewDetailCompleted,
+			status: "PARTIAL",
+			stopReason: "RESULT_WITHHELD",
+			results: { met: 1, notMet: 1, doesNotApply: 0, couldNotDetermine: 0 },
+			practices: reviewDetailCompleted.practices.slice(0, 1).map((practice) => ({
+				...practice,
+				status: "WITHHELD",
+				reason: "LEGACY_AMBIGUOUS_RESULTS",
+				results: { met: 1, notMet: 1, doesNotApply: 0, couldNotDetermine: 0 },
+				itemCounts: { listed: 1, reviewed: 0, reused: 0, withheld: 1, notReviewed: 0 },
+			})),
+		}),
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		const list = within(panel.getByRole("list", { name: "Every practice in this review" }));
+		await expect(list.getByText("Withheld")).toBeVisible();
+		await expect(
+			list.getByText(
+				"This review keeps several historical results for the same practice and work without choosing one as its answer.",
+			),
+		).toBeVisible();
+		await expect(list.queryByText("LEGACY_AMBIGUOUS_RESULTS")).toBeNull();
+	},
+};

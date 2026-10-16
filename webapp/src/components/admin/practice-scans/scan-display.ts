@@ -3,8 +3,7 @@ import { accountName } from "@/components/admin/users/account-labels";
 import { REVIEW_ORIGIN_DEFS } from "@/components/practice-vocabulary/review-origin-defs";
 import {
 	isActiveReview,
-	REVIEW_STOP_REASON_SENTENCES,
-	type ReviewStopReason,
+	reviewReasonSentence,
 } from "@/components/practice-vocabulary/review-status-defs";
 
 import { NOT_REVIEWED_SENTENCE } from "@/components/practice-vocabulary/scan-entry-defs";
@@ -49,14 +48,11 @@ export function ofTotal(count: number, total: number | null): string {
 	return total === null ? String(count) : `${count} of ${total}`;
 }
 
-const isStopReason = (code: string): code is ReviewStopReason =>
-	Object.hasOwn(REVIEW_STOP_REASON_SENTENCES, code);
-
 const WITHHELD_FALLBACK = "Withheld for a recorded reason that this page cannot describe yet.";
 
 // Unknown reason codes must not become UI copy; use the generic explanation.
 export function knownReasonSentence(code: string | null): string | undefined {
-	return code !== null && isStopReason(code) ? REVIEW_STOP_REASON_SENTENCES[code] : undefined;
+	return reviewReasonSentence(code);
 }
 
 export function withheldSentence(code: string | null): string {

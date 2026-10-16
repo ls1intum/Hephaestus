@@ -82,6 +82,16 @@ Changing a setting does not approve an older proposal.
 Delivery pause and the developer's external-feedback preference remain separate checks.
 The [operator guide](/admin/practice-review) owns their scope and controls.
 
+## Legacy history reasons
+
+`LEGACY_AMBIGUOUS_RESULTS` marks a withheld assignment with multiple migrated results for the same review, practice and item.
+Its result pointer is null. At cutover, the assignment records the producing job and the number of results.
+All original results remain separate history with evidence version 0. No sibling is selected as the assignment's answer.
+Existing source permissions, custody, privacy controls and retention still apply.
+
+`LEGACY_REUSE_UNBOUND` marks a historical reuse whose reference does not identify exactly one result.
+The assignment is withheld and has no result pointer.
+
 ## Runtime terms
 
 | Term                           | Meaning                                                                                     | Identifier                     |

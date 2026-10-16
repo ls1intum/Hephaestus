@@ -70,7 +70,7 @@ A clean query does not prove that every guard in its category passes.
 | Unsupported job purpose | A retained job has a non-null purpose other than `PRACTICE_REVIEW`. Use the [purpose query](#dispatch-ownership-and-job-purpose). | Keep the old release and escalate with job IDs and purpose values. Stopping containers does not convert retained jobs. |
 | People and ownership | A person reference is missing, erased, nonhuman, or assigned to conflicting accounts. A sync requester can also be invalid. Use [person diagnostics](#people). | Use the old release's supported identity or erasure workflow only when authoritative records establish the action. For ambiguous ownership or residual erased-person history, keep the old release and escalate. |
 | Item routing and reviewer ancestry | An exact reviewer ID/parent is absent, keys disagree, a provider namespace is ambiguous, or a source crosses workspaces. Use [item diagnostics](#items-and-reviewers). | Reconcile mutable provider mirrors through supported source sync where authoritative facts remain. For absent or conflicting historical facts, keep the old release and escalate. Never assign a guessed reviewer or workspace. |
-| Proof, capture, and reuse | Outcomes, evidence, duplicate results, pinned versions, capture/reuse references, or chat links cannot convert safely. Use [proof diagnostics](#proof-and-feedback). | Reproduce on the restore. Keep the old release and escalate with affected IDs. Obtain a supported conversion before retry. Do not rewrite immutable proof. |
+| Proof, capture, and reuse | Outcomes, evidence, pinned versions, capture/reuse references, or chat links cannot convert safely. Use [proof diagnostics](#proof-and-feedback). | Reproduce on the restore. Keep the old release and escalate with affected IDs. Obtain a supported conversion before retry. Do not rewrite immutable proof. |
 | Feedback support and copies | Support, copies, approved text, receipts, write keys, or accepted inline anchors disagree. Use [feedback diagnostics](#proof-and-feedback). | Compare retained proposals and actual provider writes under authorized read access. Keep uncertain copies fenced. Without a supported reconciliation, keep the old release and escalate. Never delete receipts or invent text. |
 | Scripts and current definitions | An active/catalog/comparison-base script is unsupported, or the current definition is incomplete. The refusal identifies a practice ID or catalog slug. | Follow **Custom practice scripts** in the migration guide. Save complete definitions first. For an incomplete definition without authoritative content, keep the old release and escalate. |
 | Native objects, preservation, and locks | An auth partition template is absent, a native constraint/preservation assertion fails, or lock acquisition exceeds 30 seconds. Use [native-object diagnostics](#native-objects-and-locks). | Keep writers stopped. For lock contention, identify remaining writers and repeat the rehearsal after a normal drain. For schema or preservation failures, keep the old release and escalate through [failed-migration recovery](./production-operations-runbook#if-migration-fails). |
@@ -175,6 +175,10 @@ For monitor ambiguity, compare `repository_to_monitor` with `repository.provider
 For Slack/Outline failures, compare the referenced thread/document workspace with the released result, feedback, or event workspace.
 
 ### Proof and feedback
+
+The first query lists groups with multiple historical results. These groups do not stop the migration.
+See [legacy history reasons](/contributor/practice-review-glossary#legacy-history-reasons) for the assignment state and retention rules.
+Other queries identify proof or feedback conflicts that still need diagnosis.
 
 ```sql
 BEGIN READ ONLY;

@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.practices.curated.BundledPracticeCatalogLoader;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -63,6 +64,21 @@ class CatalogCriteriaShapeTest extends BaseUnitTest {
         assertThat(failures)
                 .as("bundled practices off the decision-procedure shape")
                 .isEmpty();
+    }
+
+    @Test
+    void shouldUseTheSwiftApiNameAcrossStructuredConcurrencyInstructions() {
+        var definition = catalogue().practices().stream()
+                .filter(entry -> entry.slug().equals("uses-structured-concurrency-safely"))
+                .findFirst()
+                .orElseThrow()
+                .definition()
+                .definition();
+        assertThat(definition.criteria()).contains("`DispatchQueue`").doesNotContain("delivery queue");
+        assertThat(Objects.requireNonNull(definition.guidance().guide()).markdown())
+                .contains("`DispatchQueue`")
+                .doesNotContain("delivery queue");
+        assertThat(definition.script()).contains("DispatchQueue").doesNotContain("delivery queue");
     }
 
     private static String sectionOf(String criteria, String heading) {
