@@ -149,6 +149,8 @@ services:
         END';
 
         -- 1. Silence: a clone must not act.
+        UPDATE instance_settings SET silent_mode_engaged = TRUE;
+
         UPDATE workspace
            SET practice_review_auto_trigger_enabled = FALSE,
                practice_review_manual_trigger_enabled = FALSE;
@@ -158,24 +160,75 @@ services:
                updated_at = NOW()
          WHERE purpose = 'PRACTICE_REVIEW';
 
-        UPDATE review_sweep_schedule
-           SET enabled = FALSE,
-               updated_at = NOW();
+        DO 'BEGIN
+          IF to_regclass(''public.review_job'') IS NOT NULL THEN
+            UPDATE review_schedule SET enabled = FALSE, updated_at = NOW();
+            UPDATE item_event
+               SET state = ''WITHHELD'', reason = ''GATE_WITHHELD'', decided_at = NOW(), retry_at = NULL
+             WHERE state IN (''RECORDED'', ''WAITING'');
+            UPDATE review_batch
+               SET status = ''CANCELLED'', pause_reason = NULL,
+                   finished_at = COALESCE(finished_at, NOW()), updated_at = NOW()
+             WHERE status IN (''AWAITING_CONFIRMATION'', ''RUNNING'', ''PAUSED'');
+            -- Targets have no independent state. Their batch must be terminal.
+            UPDATE review
+               SET status = ''CANCELLED'', stop_reason = ''CANCELLED_BY_ADMIN'',
+                   completed_at = NOW()
+             WHERE status IN (''QUEUED'', ''RUNNING'');
+            UPDATE review_job
+               SET status = ''CANCELLED'', completed_at = COALESCE(completed_at, NOW()),
+                   worker_id = NULL, cancellation_reason = ''CANCELLED_BY_ADMIN'',
+                   error_message = ''Cancelled when staging data was cloned into a preview.''
+             WHERE status IN (''QUEUED'', ''RUNNING'');
+            UPDATE review_job
+               SET processing_status = ''FAILED'',
+                   error_message = CONCAT_WS(E''\n'', NULLIF(error_message, ''''),
+                       ''Processing paused when staging data was cloned into a preview.'')
+             WHERE processing_status = ''PENDING'';
+            UPDATE feedback_send
+               SET state = ''DONE'', lease_owner = NULL, lease_expires_at = NULL,
+                   last_error = ''Send stopped when staging data was cloned into a preview.'', updated_at = NOW()
+             WHERE state IN (''PENDING'', ''SENDING'', ''UNCERTAIN'');
+          ELSE
+            UPDATE review_sweep_schedule
+               SET enabled = FALSE,
+                   updated_at = NOW();
 
-        UPDATE agent_job
-           SET status = 'CANCELLED',
-               completed_at = COALESCE(completed_at, NOW()),
-               worker_id = NULL,
-               error_message = 'Cancelled when staging data was cloned into a preview.',
-               cancellation_reason = NULL
-         WHERE status IN ('QUEUED', 'RUNNING');
+            UPDATE agent_job
+               SET status = ''CANCELLED'',
+                   completed_at = COALESCE(completed_at, NOW()),
+                   worker_id = NULL,
+                   error_message = ''Cancelled when staging data was cloned into a preview.'',
+                   cancellation_reason = NULL
+             WHERE status IN (''QUEUED'', ''RUNNING'');
 
-        UPDATE agent_job
-           SET delivery_status = 'FAILED',
-               error_message = CONCAT_WS(E'\n', NULLIF(error_message, ''),
-                   'Delivery paused when staging data was cloned into a preview.')
-         WHERE status = 'COMPLETED'
-           AND delivery_status = 'PENDING';
+            UPDATE agent_job
+               SET delivery_status = ''FAILED'',
+                   error_message = CONCAT_WS(E''\n'', NULLIF(error_message, ''''),
+                       ''Delivery paused when staging data was cloned into a preview.'')
+             WHERE status = ''COMPLETED''
+               AND delivery_status = ''PENDING'';
+
+            UPDATE feedback_dispatch
+               SET state = ''FAILED'', lease_owner = NULL, lease_expires_at = NULL,
+                   last_error = ''Send stopped when staging data was cloned into a preview.'', updated_at = NOW()
+             WHERE state IN (''PENDING'', ''UNCERTAIN'', ''CLAIMED'');
+
+            UPDATE feedback_dispatch SET projection_owner = NULL, projection_expires_at = NULL
+             WHERE projection_owner IS NOT NULL OR projection_expires_at IS NOT NULL;
+
+            -- No terminal provider-copy value preserves an unknown outcome. Park the retry without
+            -- claiming that the provider was updated or that no copy exists.
+            UPDATE observation_invalidation
+               SET provider_copy = ''UNRESOLVED'', provider_copy_retry_at = ''infinity''::timestamptz
+             WHERE provider_copy = ''PENDING''
+                OR (provider_copy = ''UNRESOLVED'' AND provider_copy_retry_at <> ''infinity''::timestamptz);
+
+            -- A job token is a credential staging minted. The unique column needs a marker per row.
+            UPDATE agent_job SET job_token = ''cleared-by-preview-clone:'' || id, job_token_hash = NULL
+             WHERE job_token NOT LIKE ''cleared-by-preview-clone:%'';
+          END IF;
+        END';
 
         UPDATE sync_job
            SET status = 'CANCELLED',
@@ -187,7 +240,7 @@ services:
 
         -- 2. Re-home: a clone must not keep the source instance's identity. login_provider and
         -- jwt_signing_key are reseeded from this deployment's own config on boot; issued_jwt is
-        -- simply dropped. Accounts survive — identity_link keys on identity_provider.
+        -- simply dropped. Accounts and provider identities survive.
         DELETE FROM issued_jwt;
         DELETE FROM jwt_signing_key;
         DELETE FROM login_provider;
@@ -209,26 +262,43 @@ services:
          WHERE credentials_encrypted IS NOT NULL OR credentials_alg IS NOT NULL
             OR credentials_key_version IS NOT NULL OR credentials_rotation_failed_at IS NOT NULL
             OR config ? 'webhookSecret';
-        -- A job token is a credential staging minted; the jobs are cancelled or finished, so the
-        -- token has nothing left to authorise. The column is unique, hence a marker per row.
-        UPDATE agent_job SET job_token = 'cleared-by-preview-clone:' || id, job_token_hash = NULL
-         WHERE job_token NOT LIKE 'cleared-by-preview-clone:%';
         SQL
 
         # Every statement above succeeds when it matches nothing, so the marker is earned by
         # counting rather than by psql's exit status.
         echo "Verifying the preview policy took effect"
+        # Only the selected query text is parsed, so the other schema's tables can be absent.
+        # Keep the counts in this single SELECT for JDBC consumers and the policy/table gate.
         LIVE=$$(psql -h "$$TARGET" -U hephaestus -d hephaestus -tAX -v ON_ERROR_STOP=1 -c "
           SELECT (SELECT count(*) FROM workspace
                    WHERE practice_review_auto_trigger_enabled OR practice_review_manual_trigger_enabled
                       OR coalesce(to_jsonb(workspace)->>'public_activity_enabled', 'false') = 'true')
                + (SELECT count(*) FROM instance_settings settings
-                   WHERE coalesce(to_jsonb(settings)->>'public_activity_allowed', 'false') = 'true')
+                   WHERE NOT silent_mode_engaged
+                      OR coalesce(to_jsonb(settings)->>'public_activity_allowed', 'false') = 'true')
+               + CASE WHEN EXISTS (SELECT 1 FROM instance_settings WHERE id = 1) THEN 0 ELSE 1 END
                + (SELECT count(*) FROM workspace_agent_binding WHERE enabled AND purpose = 'PRACTICE_REVIEW')
-               + (SELECT count(*) FROM review_sweep_schedule WHERE enabled)
-               + (SELECT count(*) FROM agent_job WHERE status IN ('QUEUED', 'RUNNING'))
-               + (SELECT count(*) FROM agent_job
-                   WHERE status = 'COMPLETED' AND delivery_status = 'PENDING')
+               + ((xpath('/row/live/text()', query_to_xml(
+                   CASE WHEN to_regclass('public.review_job') IS NOT NULL THEN
+                     'SELECT (SELECT count(*) FROM review_schedule WHERE enabled)
+                 + (SELECT count(*) FROM item_event WHERE state IN (''RECORDED'', ''WAITING''))
+                 + (SELECT count(*) FROM review_batch WHERE status IN (''AWAITING_CONFIRMATION'', ''RUNNING'', ''PAUSED''))
+                 + (SELECT count(*) FROM review WHERE status IN (''QUEUED'', ''RUNNING''))
+                 + (SELECT count(*) FROM review_job
+                     WHERE status IN (''QUEUED'', ''RUNNING'') OR processing_status = ''PENDING'')
+                 + (SELECT count(*) FROM feedback_send WHERE state IN (''PENDING'', ''SENDING'', ''UNCERTAIN'')) AS live'
+                   ELSE
+                     'SELECT (SELECT count(*) FROM review_sweep_schedule WHERE enabled)
+                 + (SELECT count(*) FROM feedback_dispatch WHERE state IN (''PENDING'', ''UNCERTAIN'', ''CLAIMED''))
+                 + (SELECT count(*) FROM feedback_dispatch WHERE projection_owner IS NOT NULL OR projection_expires_at IS NOT NULL)
+                 + (SELECT count(*) FROM observation_invalidation WHERE provider_copy = ''PENDING''
+                     OR (provider_copy = ''UNRESOLVED'' AND provider_copy_retry_at <> ''infinity''::timestamptz))
+                 + (SELECT count(*) FROM agent_job WHERE status IN (''QUEUED'', ''RUNNING''))
+                 + (SELECT count(*) FROM agent_job
+                     WHERE status = ''COMPLETED'' AND delivery_status = ''PENDING'')
+                 + (SELECT count(*) FROM agent_job
+                     WHERE job_token NOT LIKE ''cleared-by-preview-clone:%'' OR job_token_hash IS NOT NULL) AS live'
+                   END, FALSE, TRUE, '')))[1]::text)::bigint
                + (SELECT count(*) FROM sync_job WHERE status IN ('PENDING', 'RUNNING'))
                + (SELECT count(*) FROM login_provider)
                + (SELECT count(*) FROM jwt_signing_key)
@@ -238,9 +308,7 @@ services:
                + (SELECT count(*) FROM connection
                    WHERE credentials_encrypted IS NOT NULL OR credentials_alg IS NOT NULL
                       OR credentials_key_version IS NOT NULL OR credentials_rotation_failed_at IS NOT NULL
-                      OR config ? 'webhookSecret')
-               + (SELECT count(*) FROM agent_job
-                   WHERE job_token NOT LIKE 'cleared-by-preview-clone:%' OR job_token_hash IS NOT NULL)")
+                      OR config ? 'webhookSecret')")
         if [ "$$LIVE" != "0" ]; then
           echo "Preview policy did not take effect ($$LIVE rows still live); refusing to mark this preview seeded"
           exit 1

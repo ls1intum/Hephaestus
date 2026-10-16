@@ -28,15 +28,24 @@ hold, each enforced before Coolify is asked to deploy:
 - The database is this preview's own, seeded from staging so it starts with real data. The clone is
   taken with `pg_dump` — staging's data volume is never mounted — and the preview policy runs before
   the application server is allowed to boot: every review trigger, agent binding and sweep schedule
-  is disabled, queued jobs are cancelled, pending deliveries are failed, and the instance identity
-  (`login_provider`, `jwt_signing_key`, `issued_jwt`) is dropped so the preview signs its own tokens.
+  is disabled. Open review jobs, batches, and scans are cancelled. Pending feedback sends stop without
+  a claim that a provider copy changed.
+  Released provider corrections keep their original reasons and stay unresolved with an infinite retry date.
+  The clone clears send and projection leases without changing terminal dispatch content.
+
+  The clone engages Silent Mode. The delivery guard refuses provider delivery writes while this mode remains engaged.
+  Migrations or local recovery can create due sends after boot. Silent Mode refuses their outbound writes.
+  Cleared provider credentials remain a second barrier.
+
+  The instance identity (`login_provider`, `jwt_signing_key`, `issued_jwt`) is dropped so the preview signs its own tokens.
   The seed loader verifies that against the database and refuses to mark the preview seeded
   otherwise, so a policy that silently did not apply leaves the preview un-booted rather than live.
 - Staging's provider credentials do not survive the clone either: the instance and workspace AI
   catalog keys are cleared and those connections disabled, every integration connection loses its
   credential bundle and the webhook signing secret its config carries, and the job tokens staging
-  minted for its own review jobs are replaced. The same verification covers all of them, so a
-  preview that would hold something able to act as staging never boots.
+  minted for its own review jobs are replaced. The policy reads the cloned schema before migrations
+  run. It handles both the released review tables and the tables after the review cutover.
+  The same verification covers all of them, so a preview that would hold something able to act as staging never boots.
 - The application server reads staging's JetStream, so a preview sees the events a shared GitHub App
   delivers there. Its durable is named per deploy, so previews never compete for one consumer, and
   it expires 72h after the preview stops reading — a preview is deleted, not shut down, so it never
