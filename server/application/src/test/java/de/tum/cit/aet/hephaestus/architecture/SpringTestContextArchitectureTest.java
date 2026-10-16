@@ -140,7 +140,8 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             Map.entry("outline-enabled", "enabled Outline integration wiring"),
             Map.entry(
                     "practice-upgrade-history",
-                    "authenticated HTTP reads against populated released history after the production migration"),
+                    "authenticated HTTP reads and sibling custody/erasure against populated released history"
+                            + " after the production migration"),
             Map.entry(
                     "practice-script-live",
                     "worker role with the real LLM proxy on a free sandbox gateway port," + " calling live models"),
@@ -256,6 +257,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
     private static final Set<String> DIRTY_CONTEXT_TESTS = Set.of();
 
     private static final Set<String> MOCKITO_BEAN_TESTS = names(
+            "core.database.PracticeV1ReviewJobsIntegrationTest",
             "agent.adapter.EvidenceDeliveryAuthorizationIntegrationTest",
             "practices.result.MigratedHistoryReadIntegrationTest",
             "agent.mentor.chat.MentorWorkerSplitIntegrationTest",
