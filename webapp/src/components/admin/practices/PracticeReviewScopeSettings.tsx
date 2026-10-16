@@ -41,18 +41,42 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Spinner } from "@/components/ui/spinner";
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
+import type { MorePages } from "@/runtime/tanstack-query/infinite-list";
 
 type ScopeOptionState<TOption> =
 	| { status: "loading" }
 	| { status: "error"; error: unknown; onRetry: () => void }
 	| { status: "ready"; options: TOption[] };
 
+/** A repository item of this workspace, as the item directory records it — current or retained. */
 export interface RepositoryOption {
 	itemId: string;
 	name: string;
+	/** When the workspace removed it; a removed repository keeps its item and its history. */
+	removedAt?: Date | null;
+	/** False where no repository record names the item, so `name` is only the kind's word. */
+	nameKnown?: boolean;
 }
 
-export type RepositoryScopeOptions = ScopeOptionState<RepositoryOption>;
+/**
+ * The repositories loaded so far. The directory is paged, so an item missing here may be on a page
+ * not yet loaded; `more` says whether one is.
+ */
+export type RepositoryScopeOptions =
+	| { status: "loading" }
+	| { status: "error"; error: unknown; onRetry: () => void }
+	| { status: "ready"; options: RepositoryOption[]; total?: number; more?: MorePages };
+
+export function isRemoved(option: Pick<RepositoryOption, "removedAt">): boolean {
+	return option.removedAt !== undefined && option.removedAt !== null;
+}
+
+/** How a repository reads where its record may lack a name: never the bare kind's word twice. */
+export function repositoryLabel(
+	option: Pick<RepositoryOption, "itemId" | "name" | "nameKnown">,
+): string {
+	return option.nameKnown === false ? `Repository ${option.itemId}` : option.name;
+}
 /** Members by account id. An unclaimed account is a member like any other. */
 export type PeopleScopeOptions = ScopeOptionState<FacetOption>;
 
@@ -117,10 +141,12 @@ export function PracticeReviewScopeSettings({
 		description: "Your review scope draft will be lost if you leave.",
 	});
 
-	const repositoryName = (itemId: string) =>
+	const repositoryOf = (itemId: string) =>
 		repositories.status === "ready"
-			? repositories.options.find((option) => option.itemId === itemId)?.name
+			? repositories.options.find((option) => option.itemId === itemId)
 			: undefined;
+	// Every page loaded: an item missing from them is in no repository record of this workspace.
+	const listComplete = repositories.status === "ready" && repositories.more?.hasMore !== true;
 	const repositoryIds = draft.selectedRepositories.map((repository) => repository.repositoryItemId);
 	const repositoryOptions = withPersistedOptions(
 		repositories.status === "ready"
@@ -128,13 +154,18 @@ export function PracticeReviewScopeSettings({
 					status: "ready",
 					options: repositories.options.map((option) => ({
 						value: option.itemId,
-						label: option.name,
+						label: isRemoved(option)
+							? `${repositoryLabel(option)} (removed)`
+							: repositoryLabel(option),
 					})),
 				}
 			: repositories,
 		repositoryIds,
 		(id) => ({ value: id, label: `Repository ${id}` }),
-		(id) => ({ value: id, label: `Repository ${id} (unavailable)` }),
+		(id) => ({
+			value: id,
+			label: listComplete ? `Repository ${id} (source unavailable)` : `Repository ${id}`,
+		}),
 	);
 	const personOptions = withPersistedOptions(
 		people,
@@ -143,13 +174,12 @@ export function PracticeReviewScopeSettings({
 		(id) => ({ value: id, label: `Member ${id} (unavailable)` }),
 	);
 
-	const monitored = (itemId: string) =>
-		repositories.status !== "ready" ||
-		repositories.options.some((option) => option.itemId === itemId);
+	// A selection counts as selected whatever its repository's state: the server decides what of it
+	// is reviewed, and the reader can see and remove every entry.
 	const selectedRepositories =
 		draft.repositories === "ALL"
 			? settings.scopeSummary.monitoredRepositories
-			: repositoryIds.filter(monitored).length;
+			: repositoryIds.length;
 	const eligible = (id: string) =>
 		people.status !== "ready" || people.options.some((option) => option.value === id);
 	const selectedPeople =
@@ -250,9 +280,9 @@ export function PracticeReviewScopeSettings({
 				<ScopeLabel
 					id={`${repositoryScopeId}-label`}
 					label="Repositories"
-					selected={selectedRepositories}
-					total={settings.scopeSummary.monitoredRepositories}
-					noun="monitored repositories"
+					// A selection can hold repositories the workspace no longer monitors, so it is not a
+					// share of the monitored ones.
+					summary={`${String(selectedRepositories)} selected · ${String(settings.scopeSummary.monitoredRepositories)} monitored repositories`}
 				/>
 				<RadioGroup
 					aria-labelledby={`${repositoryScopeId}-label`}
@@ -299,7 +329,7 @@ export function PracticeReviewScopeSettings({
 								});
 							}}
 							disabled={busy || repositories.status !== "ready"}
-							emptyLabel="No monitored repositories"
+							emptyLabel="No repositories"
 						/>
 						{draft.selectedRepositories.length === 0 ? (
 							<EmptySelection noun="repositories" allLabel="all monitored repositories" />
@@ -308,12 +338,15 @@ export function PracticeReviewScopeSettings({
 								{draft.selectedRepositories.map((repository) => (
 									<RepositoryScopeRow
 										key={repository.repositoryItemId}
-										name={
-											repositoryName(repository.repositoryItemId) ??
-											`Repository ${repository.repositoryItemId}`
-										}
+										name={repositoryLabel(
+											repositoryOf(repository.repositoryItemId) ?? {
+												itemId: repository.repositoryItemId,
+												name: "",
+												nameKnown: false,
+											},
+										)}
 										baseBranches={repository.baseBranches}
-										monitored={monitored(repository.repositoryItemId)}
+										record={recordState(repositoryOf(repository.repositoryItemId), listComplete)}
 										disabled={busy}
 										onChange={(baseBranches) =>
 											setDraft({
@@ -337,9 +370,7 @@ export function PracticeReviewScopeSettings({
 				<ScopeLabel
 					id={`${personScopeId}-label`}
 					label="People"
-					selected={selectedPeople}
-					total={settings.scopeSummary.eligiblePeople}
-					noun="eligible people"
+					summary={`${String(selectedPeople)} of ${String(settings.scopeSummary.eligiblePeople)} eligible people`}
 				/>
 				<FieldDescription>
 					Only eligible human members can be selected, including members who have not signed in yet.
@@ -548,33 +579,54 @@ function EmptySelection({ noun, allLabel }: { noun: "repositories" | "people"; a
 	);
 }
 
-function ScopeLabel({
-	id,
-	label,
-	selected,
-	total,
-	noun,
-}: {
-	id: string;
-	label: string;
-	selected: number;
-	total: number;
-	noun: string;
-}) {
+function ScopeLabel({ id, label, summary }: { id: string; label: string; summary: string }) {
 	return (
 		<div className="flex items-baseline justify-between gap-3">
 			<FieldTitle id={id}>{label}</FieldTitle>
-			<span className="text-sm text-muted-foreground">
-				{selected} of {total} {noun}
-			</span>
+			<span className="text-sm text-muted-foreground">{summary}</span>
 		</div>
 	);
 }
 
-function scopeDescription(monitored: boolean, baseBranches: string[]): string {
-	if (!monitored) {
-		return "This workspace no longer syncs this repository, so nothing in it is reviewed.";
+/** What the loaded repository records say about a selected item, and nothing they do not. */
+type RepositoryRecordState = "listed" | "removed" | "unnamed" | "unlisted" | "not-loaded";
+
+function recordState(
+	option: RepositoryOption | undefined,
+	listComplete: boolean,
+): RepositoryRecordState {
+	if (option === undefined) {
+		return listComplete ? "unlisted" : "not-loaded";
 	}
+	if (isRemoved(option)) {
+		return "removed";
+	}
+	return option.nameKnown === false ? "unnamed" : "listed";
+}
+
+const RECORD_NOTES: Record<RepositoryRecordState, string | undefined> = {
+	listed: undefined,
+	removed: "The workspace removed this repository.",
+	unnamed: "No repository record names this item.",
+	unlisted: "No repository record of this workspace has this item.",
+	"not-loaded": "Not among the repositories loaded so far.",
+};
+
+const RECORD_BADGES: Record<RepositoryRecordState, string | undefined> = {
+	listed: undefined,
+	removed: "Removed",
+	unnamed: "Name unavailable",
+	unlisted: "Source unavailable",
+	"not-loaded": undefined,
+};
+
+function scopeDescription(record: RepositoryRecordState, baseBranches: string[]): string {
+	const branches = branchesDescription(baseBranches);
+	const note = RECORD_NOTES[record];
+	return note === undefined ? branches : `${note} ${branches}.`;
+}
+
+function branchesDescription(baseBranches: string[]): string {
 	if (baseBranches.length === 0) {
 		return "Every base branch";
 	}
@@ -584,13 +636,13 @@ function scopeDescription(monitored: boolean, baseBranches: string[]): string {
 function RepositoryScopeRow({
 	name,
 	baseBranches,
-	monitored,
+	record,
 	disabled,
 	onChange,
 }: {
 	name: string;
 	baseBranches: string[];
-	monitored: boolean;
+	record: RepositoryRecordState;
 	disabled: boolean;
 	onChange: (next: string[]) => void;
 }) {
@@ -603,10 +655,12 @@ function RepositoryScopeRow({
 						<span className="truncate font-mono" title={name}>
 							{name}
 						</span>
-						{monitored ? null : <Badge variant="warning">Not monitored</Badge>}
+						{RECORD_BADGES[record] === undefined ? null : (
+							<Badge variant="outline">{RECORD_BADGES[record]}</Badge>
+						)}
 					</ItemTitle>
 					<ItemDescription className="break-all">
-						{scopeDescription(monitored, baseBranches)}
+						{scopeDescription(record, baseBranches)}
 					</ItemDescription>
 				</ItemContent>
 				<ItemActions>

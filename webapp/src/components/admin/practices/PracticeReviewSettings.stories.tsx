@@ -115,7 +115,7 @@ export const SelectedModelTurnedOff: Story = {
 export const SelectedScope: Story = {
 	args: { policy: { ...policy, settings: selectedSettings } },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("1 of 3 monitored repositories")).toBeVisible();
+		await expect(canvas.getByText("1 selected · 3 monitored repositories")).toBeVisible();
 		await expect(canvas.getByText("1 of 8 eligible people")).toBeVisible();
 	},
 };
@@ -135,7 +135,7 @@ export const SelectedNobody: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("0 of 3 monitored repositories")).toBeVisible();
+		await expect(canvas.getByText("0 selected · 3 monitored repositories")).toBeVisible();
 		await expect(canvas.getByText("0 of 8 eligible people")).toBeVisible();
 		await expect(canvas.getByText("No people are selected")).toBeVisible();
 		await expect(canvas.getByText("No repositories are selected")).toBeVisible();
@@ -196,7 +196,7 @@ export const PersistedTargetsNoLongerAvailable: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("Not monitored")).toBeVisible();
+		await expect(canvas.getByText("Source unavailable")).toBeVisible();
 		await expect(canvas.getByTitle("Member 99 (unavailable)")).toBeVisible();
 	},
 };
@@ -212,7 +212,7 @@ export const OptionsLoadingKeepsPersistedTargetsNeutral: Story = {
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("Repository 101")).toBeVisible();
-		await expect(canvas.queryByText("Not monitored")).not.toBeInTheDocument();
+		await expect(canvas.queryByText("Source unavailable")).not.toBeInTheDocument();
 		await expect(canvas.getByRole("combobox", { name: "Choose repositories" })).toBeDisabled();
 	},
 };
@@ -229,7 +229,7 @@ export const OptionLoadFailure: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("We could not load repositories")).toBeVisible();
 		await expect(canvas.getByText("We could not load eligible members")).toBeVisible();
-		await expect(canvas.queryByText("Not monitored")).not.toBeInTheDocument();
+		await expect(canvas.queryByText("Source unavailable")).not.toBeInTheDocument();
 	},
 };
 

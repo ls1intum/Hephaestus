@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { InfoIcon } from "lucide-react";
 import type { ReactNode } from "react";
@@ -16,7 +16,7 @@ import {
 	listPracticesOptions,
 	listReviewBatchesOptions,
 	listReviewBatchesQueryKey,
-	listReviewItemsOptions,
+	listReviewItemsInfiniteOptions,
 	listReviewSchedulesOptions,
 	listReviewSchedulesQueryKey,
 	previewReviewScopeMutation,
@@ -63,6 +63,9 @@ import { workspaceAdminHead } from "@/lib/page-title";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
 import { useSearchState } from "@/lib/search-params";
 import { hasText } from "@/lib/text";
+import { pagedListState } from "@/runtime/tanstack-query/infinite-list";
+import { springPageParams } from "@/runtime/tanstack-query/spring-page";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/review")({
 	head: workspaceAdminHead("Review settings"),
@@ -246,11 +249,15 @@ function AutomatedReviewSection({ workspaceSlug }: { workspaceSlug: string }) {
 	const settingsReviewModel = reviewModelOf(bindingsQuery);
 	const workspaceQuery = useQuery(getWorkspaceOptions({ path: { workspaceSlug } }));
 	const schedulesQuery = useQuery(listReviewSchedulesOptions({ path: { workspaceSlug } }));
-	const repositoriesQuery = useQuery(
-		listReviewItemsOptions({
-			path: { workspaceSlug },
-			query: { itemKind: ITEM_KIND.repository, size: PICKER_PAGE_SIZE },
-		}),
+	const repositoriesOptions = listReviewItemsInfiniteOptions({
+		path: { workspaceSlug },
+		query: { itemKind: ITEM_KIND.repository, size: PICKER_PAGE_SIZE },
+	});
+	const repositoriesQuery = useInfiniteQuery({ ...repositoriesOptions, ...springPageParams });
+	useQueryReadRefusal(
+		repositoriesOptions.queryKey,
+		repositoriesQuery.isError,
+		repositoriesQuery.error,
 	);
 	const membersQuery = useQuery(
 		listMembershipsOptions({ path: { workspaceSlug }, query: { size: PICKER_PAGE_SIZE } }),
@@ -320,25 +327,24 @@ function AutomatedReviewSection({ workspaceSlug }: { workspaceSlug: string }) {
 	const isLoading = reviewSettingsQuery.isPending || workspaceQuery.isPending;
 	const error = reviewSettingsQuery.error ?? workspaceQuery.error;
 
+	const repositoryRows = pagedListState(repositoriesQuery, (repository) => repository.id);
 	let repositoryOptions: RepositoryScopeOptions;
-	if (repositoriesQuery.isPending) {
-		repositoryOptions = { status: "loading" };
-	} else if (repositoriesQuery.isError) {
+	if (repositoryRows.status === "ready") {
+		const { status, rows, total, ...more } = repositoryRows;
 		repositoryOptions = {
-			status: "error",
-			error: repositoriesQuery.error,
-			onRetry: () => {
-				void repositoriesQuery.refetch();
-			},
-		};
-	} else {
-		repositoryOptions = {
-			status: "ready",
-			options: repositoriesQuery.data.content.map((repository) => ({
+			status,
+			// A repository with no record behind it carries only the kind's word and no provider.
+			options: rows.map((repository) => ({
 				itemId: repository.id,
 				name: repository.label,
+				removedAt: repository.removedAt,
+				nameKnown: repository.provider !== null,
 			})),
+			total,
+			more,
 		};
+	} else {
+		repositoryOptions = repositoryRows;
 	}
 
 	let peopleOptions: PeopleScopeOptions;
@@ -442,6 +448,7 @@ function AutomatedReviewSection({ workspaceSlug }: { workspaceSlug: string }) {
 			)}
 			{reviewSettings}
 			<PracticeReviewSchedule
+				workspaceSlug={workspaceSlug}
 				schedules={schedulesQuery.data ?? []}
 				isLoading={schedulesQuery.isLoading}
 				isError={schedulesQuery.isError}

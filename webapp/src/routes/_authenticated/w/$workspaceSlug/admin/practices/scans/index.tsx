@@ -12,10 +12,21 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/pra
 
 function ScansRoute() {
 	const { workspaceSlug } = Route.useParams();
-	const { page = 0 } = Route.useSearch();
+	const { page = 0, status, repositoryItemId } = Route.useSearch();
 	const setSearch = useSearchState();
-	const scans = useScanList(workspaceSlug, page, (next) => {
+	const filters = { status, repositoryItemId };
+	const scans = useScanList(workspaceSlug, page, filters, (next) => {
 		void setSearch((previous) => ({ ...previous, page: pageParam(next) }));
 	});
-	return <ScansPage workspaceSlug={workspaceSlug} scans={scans} />;
+	return (
+		<ScansPage
+			workspaceSlug={workspaceSlug}
+			scans={scans}
+			filters={filters}
+			// A new filter lists its scans from the first page.
+			onFiltersChange={(next) => {
+				void setSearch((previous) => ({ ...previous, ...next, page: undefined }));
+			}}
+		/>
+	);
 }

@@ -15,6 +15,7 @@ import {
 	shortVersion,
 } from "./scan-display";
 import { NotCounted } from "./ScanCounts";
+import type { ScanListFilters } from "./scans-search";
 
 export const SCAN_COLUMNS = [
 	"Repository",
@@ -55,10 +56,12 @@ export function ScanColumnHeads() {
 export interface ScanRowsProps {
 	workspaceSlug: string;
 	scans: readonly ScanSummary[];
+	/** The list's filters: a row offers to narrow them to its repository unless they already are. */
+	filters?: ScanListFilters;
 }
 
 // Reviewed or reused counts practice-file pairs; listing must finish before a total can be shown.
-export function ScanRows({ workspaceSlug, scans }: ScanRowsProps) {
+export function ScanRows({ workspaceSlug, scans, filters }: ScanRowsProps) {
 	return (
 		<TableBody>
 			{scans.map((scan) => {
@@ -73,6 +76,17 @@ export function ScanRows({ workspaceSlug, scans }: ScanRowsProps) {
 							>
 								{repositoryName(scan.repository)}
 							</Link>
+							{scan.repository.id !== filters?.repositoryItemId && (
+								<Link
+									to="/w/$workspaceSlug/admin/practices/scans"
+									params={{ workspaceSlug }}
+									search={{ status: filters?.status, repositoryItemId: scan.repository.id }}
+									aria-label={`Show only scans of ${repositoryName(scan.repository)}`}
+									className="text-xs text-muted-foreground hover:underline"
+								>
+									Only this repository
+								</Link>
+							)}
 						</TableCell>
 						<TableCell className="text-sm whitespace-nowrap">
 							{scan.ref}

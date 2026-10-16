@@ -324,6 +324,50 @@ describe("review route", () => {
 		expect(screen.queryByRole("alertdialog")).toBeNull();
 	});
 
+	it("keeps every selected repository listed and counted, saying only what its record shows", async () => {
+		const settings = stubSettings(
+			reviewSettings({
+				reviewScope: {
+					people: "ALL",
+					repositories: "SELECTED",
+					accountIds: [],
+					selectedRepositories: [
+						{ repositoryItemId: "101", baseBranches: ["main"] },
+						{ repositoryItemId: "999", baseBranches: [] },
+					],
+				},
+			}),
+		);
+		stubWorkspace([
+			...settings.handlers(false),
+			http.get("*/workspaces/:workspaceSlug/practices/items", () =>
+				HttpResponse.json(
+					repositoryPage(
+						[repositoryItem("101", { label: "owner/retired", removedAt: "2026-09-01T00:00:00Z" })],
+						{ number: 0, last: true, totalElements: 1 },
+					),
+				),
+			),
+		]);
+		renderRouteAt("/w/acme/admin/practices/review?section=automated-review");
+
+		const heading = await screen.findByRole("heading", { name: "Review scope" }, ROUTE_RENDER_WAIT);
+		const scope = heading.closest("section");
+		assert(scope);
+		// A removed repository and one no record has are still selected, shown and counted.
+		await within(scope).findByText(
+			"2 selected · 3 monitored repositories",
+			undefined,
+			ROUTE_RENDER_WAIT,
+		);
+		const removed = within(scope).getByText("owner/retired").closest('[role="listitem"]');
+		const unlisted = within(scope).getByText("Repository 999").closest('[role="listitem"]');
+		expect(removed?.textContent).toContain("Removed");
+		expect(unlisted?.textContent).toContain("Source unavailable");
+		expect(within(scope).queryByText("Not monitored")).toBeNull();
+		expect(within(scope).queryByText(/no longer syncs/u)).toBeNull();
+	});
+
 	it("widens the review scope only after the preview is confirmed, with the read ETag", async () => {
 		const persisted = reviewSettings({
 			etag: '"7"',
@@ -452,38 +496,25 @@ describe("review route", () => {
 		stubWorkspace([
 			...settings.handlers(false),
 			http.get("*/workspaces/:workspaceSlug/practices/items", () =>
-				HttpResponse.json({
-					content: ["101", "102"].map((id) => ({
-						id,
-						kind: "scm.repository",
-						label: "Repository",
-						title: null,
-						container: null,
-						parentId: null,
-						path: null,
-						provider: null,
-						removedAt: null,
-						url: null,
-					})),
-				}),
+				HttpResponse.json(
+					repositoryPage(
+						["101", "102"].map((id) => repositoryItem(id, { label: "Repository", unnamed: true })),
+						{ number: 0, last: true, totalElements: 2 },
+					),
+				),
 			),
 		]);
 		renderRouteAt("/w/acme/admin/practices/review?section=automated-review");
-		const [first, second] = await screen.findAllByRole(
-			"textbox",
-			{ name: "Repository" },
-			ROUTE_RENDER_WAIT,
-		);
-		assert(first !== undefined);
-		assert(second !== undefined);
+		// No repository record names either item, so each is named by its item ID, not "Repository" twice.
+		const first = await screen.findByRole("textbox", { name: "Repository 101" }, ROUTE_RENDER_WAIT);
+		const second = screen.getByRole("textbox", { name: "Repository 102" });
 		expect(first).toHaveProperty("value", "first/**");
 		expect(second).toHaveProperty("value", "second/**");
 		await userEvent.clear(first);
 		await userEvent.type(first, "updated/**");
-		const [saveFirst] = screen.getAllByRole("button", {
-			name: "Save generated paths for Repository",
+		const saveFirst = screen.getByRole("button", {
+			name: "Save generated paths for Repository 101",
 		});
-		assert(saveFirst !== undefined);
 		await userEvent.click(saveFirst);
 		await waitFor(() =>
 			expect(settings.patches).toStrictEqual([
@@ -518,4 +549,79 @@ describe("review route", () => {
 		expect(second).toHaveProperty("value", "second/**");
 		expect(saveFirst).toHaveProperty("disabled", false);
 	});
+
+	it("loads the next page of repositories on request and marks a removed one", async () => {
+		const settings = stubSettings(reviewSettings({ generatedPaths: {} }));
+		const pages: string[] = [];
+		stubWorkspace([
+			...settings.handlers(false),
+			http.get("*/workspaces/:workspaceSlug/practices/items", ({ request }) => {
+				const page = pageOf(request);
+				pages.push(page);
+				return HttpResponse.json(twoRepositoryPages(page));
+			}),
+		]);
+		renderRouteAt("/w/acme/admin/practices/review?section=automated-review");
+		await screen.findByText("1 of 2 repositories loaded", { exact: false }, ROUTE_RENDER_WAIT);
+		await userEvent.click(screen.getByRole("button", { name: "Show more repositories" }));
+
+		await screen.findByRole(
+			"button",
+			{ name: "Generated paths for owner/retired" },
+			ROUTE_RENDER_WAIT,
+		);
+		expect(pages).toStrictEqual(["0", "1"]);
+		screen.getByRole("button", { name: "Generated paths for owner/current" });
+		screen.getByText("Removed");
+		expect(screen.queryByRole("button", { name: "Show more repositories" })).toBeNull();
+	});
 });
+
+function repositoryItem(id: string, fields: { label: string; unnamed?: true; removedAt?: string }) {
+	return {
+		id,
+		kind: "scm.repository",
+		label: fields.label,
+		title: null,
+		container: null,
+		parentId: null,
+		path: null,
+		provider: fields.unnamed === true ? null : "GITHUB",
+		removedAt: fields.removedAt ?? null,
+		url: null,
+	};
+}
+
+function repositoryPage(
+	content: readonly ReturnType<typeof repositoryItem>[],
+	page: { number: number; last: boolean; totalElements: number },
+) {
+	return {
+		content,
+		...page,
+		first: page.number === 0,
+		empty: content.length === 0,
+		numberOfElements: content.length,
+		size: 100,
+		totalPages: page.last ? page.number + 1 : page.number + 2,
+	};
+}
+
+/** A current repository on the first page and a removed one on the second. */
+function twoRepositoryPages(page: string) {
+	return page === "0"
+		? repositoryPage([repositoryItem("101", { label: "owner/current" })], {
+				number: 0,
+				last: false,
+				totalElements: 2,
+			})
+		: repositoryPage(
+				[repositoryItem("102", { label: "owner/retired", removedAt: "2026-09-01T00:00:00Z" })],
+				{ number: 1, last: true, totalElements: 2 },
+			);
+}
+
+/** The page a list read asks for; the first when it names none. */
+function pageOf(request: Request): string {
+	return new URL(request.url).searchParams.get("page") ?? "0";
+}

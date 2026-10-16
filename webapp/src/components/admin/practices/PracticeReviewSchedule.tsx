@@ -1,8 +1,10 @@
+import { Link } from "@tanstack/react-router";
 import { format } from "date-fns";
 import { AlertCircle, CalendarClock } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
 
 import type { ReviewSchedule, ReviewScheduleInput } from "@/api/types.gen";
+import { InlineLink } from "@/components/common/InlineLink";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,6 +41,8 @@ import { formatCapUsd } from "@/lib/money";
 import { hasText } from "@/lib/text";
 
 export interface PracticeReviewScheduleProps {
+	/** Where its repository scans are listed. */
+	workspaceSlug: string;
 	schedules: ReviewSchedule[];
 	isLoading: boolean;
 	isError: boolean;
@@ -102,6 +106,7 @@ const formatMoment = (value: Date | null) => {
 };
 
 export function PracticeReviewSchedule({
+	workspaceSlug,
 	schedules,
 	isLoading,
 	isError,
@@ -171,6 +176,15 @@ export function PracticeReviewSchedule({
 					arrives, and nothing records the review that did not happen. A recurring check looks again
 					over the last few days, so anything missed still gets reviewed. A repository schedule
 					scans each repository instead. Scans never send feedback to developers.
+				</p>
+				<p className="text-sm">
+					<InlineLink
+						render={
+							<Link to="/w/$workspaceSlug/admin/practices/scans" params={{ workspaceSlug }} />
+						}
+					>
+						View scans
+					</InlineLink>
 				</p>
 			</div>
 			{isError ? (

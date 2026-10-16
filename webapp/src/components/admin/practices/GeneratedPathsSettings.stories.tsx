@@ -57,6 +57,8 @@ export const FailedRepositories: Story = {
 export const Saving: Story = {
 	args: { onSave: fn(pending) },
 	play: async ({ canvas }) => {
+		// Nothing is saved for it, so its row starts closed.
+		await userEvent.click(canvas.getByRole("button", { name: "Generated paths for owner/repo" }));
 		await userEvent.type(canvas.getByRole("textbox", { name: "owner/repo" }), "generated/**");
 		await userEvent.click(
 			canvas.getByRole("button", { name: "Save generated paths for owner/repo" }),
@@ -72,6 +74,8 @@ export const SaveFailed: Story = {
 		}),
 	},
 	play: async ({ canvas }) => {
+		// Nothing is saved for it, so its row starts closed.
+		await userEvent.click(canvas.getByRole("button", { name: "Generated paths for owner/repo" }));
 		await userEvent.type(canvas.getByRole("textbox", { name: "owner/repo" }), "generated/**");
 		await userEvent.click(
 			canvas.getByRole("button", { name: "Save generated paths for owner/repo" }),
@@ -82,6 +86,8 @@ export const SaveFailed: Story = {
 };
 export const InvalidPatternLength: Story = {
 	play: async ({ canvas }) => {
+		// Nothing is saved for it, so its row starts closed.
+		await userEvent.click(canvas.getByRole("button", { name: "Generated paths for owner/repo" }));
 		await userEvent.type(canvas.getByRole("textbox", { name: "owner/repo" }), "a".repeat(513));
 		await expect(
 			canvas.getByText("Use at most 100 patterns, each no longer than 512 characters."),
@@ -114,6 +120,8 @@ export const SavedPatternsChanged: Story = {
 		</Stateful>
 	),
 	play: async ({ canvas }) => {
+		// Nothing is saved for it, so its row starts closed.
+		await userEvent.click(canvas.getByRole("button", { name: "Generated paths for owner/repo" }));
 		await userEvent.type(canvas.getByRole("textbox", { name: "owner/repo" }), "draft/**");
 		await userEvent.click(canvas.getByRole("button", { name: "Update saved patterns" }));
 		await expect(canvas.getByRole("textbox", { name: "owner/repo" })).toHaveValue("draft/**");
@@ -127,5 +135,42 @@ export const SavedPatternsChanged: Story = {
 		).toBeDisabled();
 		await userEvent.click(canvas.getByRole("button", { name: "Use saved patterns" }));
 		await expect(canvas.getByRole("textbox", { name: "owner/repo" })).toHaveValue("other/**");
+	},
+};
+
+const RETAINED = Array.from({ length: 74 }, (_, index) => ({
+	itemId: String(200 + index),
+	name: "Repository",
+	nameKnown: false,
+	removedAt: index % 3 === 0 ? new Date("2026-09-01T00:00:00Z") : null,
+}));
+
+/**
+ * One repository with saved patterns among 74 retained items with no repository record: only the
+ * saved one opens, every other row is a closed line named by its item ID, and a search finds one.
+ */
+export const ManyRetainedRepositories: Story = {
+	args: {
+		settings: reviewSettings({ generatedPaths: { "101": ["client/**"] } }),
+		repositories: {
+			status: "ready",
+			options: [{ itemId: "101", name: "owner/repo" }, ...RETAINED],
+			total: 75,
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText(/^75 repositories loaded/u)).toBeVisible();
+		await expect(canvas.getByRole("textbox", { name: "owner/repo" })).toHaveValue("client/**");
+		await expect(canvas.queryByRole("textbox", { name: "Repository 201" })).toBeNull();
+		await expect(canvas.getAllByText("Name unavailable")).toHaveLength(74);
+
+		await userEvent.type(canvas.getByRole("searchbox", { name: "Search repositories" }), "273");
+		await expect(canvas.getByText(/^1 of 75 loaded repositories match/u)).toBeVisible();
+		await expect(
+			canvas.getByRole("button", { name: "Generated paths for Repository 273" }),
+		).toBeVisible();
+		await expect(
+			canvas.queryByRole("button", { name: "Generated paths for Repository 201" }),
+		).toBeNull();
 	},
 };

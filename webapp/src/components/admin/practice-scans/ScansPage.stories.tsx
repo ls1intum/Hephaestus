@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn } from "storybook/test";
+import { expect, fn, within } from "storybook/test";
 
 import { withStandardPage } from "@/stories/decorators";
 
@@ -14,6 +14,8 @@ const meta = {
 	args: {
 		workspaceSlug: "aet",
 		scans: { status: "ready", scans: SCANS, page: 0, totalPages: 1, onPageChange: fn() },
+		filters: { status: undefined, repositoryItemId: undefined },
+		onFiltersChange: fn(),
 	},
 	argTypes: { scans: { control: false } },
 	tags: ["autodocs"],
@@ -31,11 +33,13 @@ export const Default: Story = {
 			"href",
 			"/w/aet/admin/practices/scans/a0000000-0000-4000-8000-000000000002",
 		);
-		await expect(canvas.getByText("Running")).toBeVisible();
-		await expect(canvas.getByText("Partial")).toBeVisible();
-		await expect(canvas.getByText("Cancelled")).toBeVisible();
-		await expect(canvas.getByText("Scheduled")).toBeVisible();
-		await expect(canvas.getAllByText("4 of 6")).toHaveLength(2);
+		// The rows' statuses, apart from the status filter's words.
+		const rows = within(table);
+		await expect(rows.getByText("Running")).toBeVisible();
+		await expect(rows.getByText("Partial")).toBeVisible();
+		await expect(rows.getByText("Cancelled")).toBeVisible();
+		await expect(rows.getByText("Scheduled")).toBeVisible();
+		await expect(rows.getAllByText("4 of 6")).toHaveLength(2);
 	},
 };
 
@@ -44,7 +48,9 @@ export const Queued: Story = {
 		scans: { status: "ready", scans: [QUEUED_SCAN], page: 0, totalPages: 1, onPageChange: fn() },
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("Queued")).toBeVisible();
+		await expect(
+			within(canvas.getByRole("table", { name: "Scans, newest first" })).getByText("Queued"),
+		).toBeVisible();
 	},
 };
 
@@ -57,12 +63,63 @@ export const Empty: Story = {
 				"Scans appear here after a repository schedule starts one. Set up a repository schedule in review settings.",
 			),
 		).toBeVisible();
-		await expect(canvas.getByRole("link", { name: "Open review settings" })).toHaveAttribute(
+		// Straight to the schedule, not to the settings page's first section.
+		await expect(
+			canvas.getByRole("link", { name: "Set up a repository schedule" }),
+		).toHaveAttribute(
 			"href",
-			"/w/aet/admin/practices/review",
+			"/w/aet/admin/practices/review?section=automated-review#schedule-heading",
 		);
 		await expect(canvas.queryByRole("link", { name: "Start scan" })).not.toBeInTheDocument();
 		await expect(canvas.queryByRole("table")).not.toBeInTheDocument();
+	},
+};
+
+/** Filters that match nothing are not "no scans yet": the list offers to clear them. */
+export const FilteredToNothing: Story = {
+	args: {
+		scans: { status: "ready", scans: [], page: 0, totalPages: 0, onPageChange: fn() },
+		filters: { status: "FAILED", repositoryItemId: "42" },
+	},
+	play: async ({ args, canvas, userEvent }) => {
+		await expect(
+			canvas.getByRole("heading", { name: "No scans match these filters" }),
+		).toBeVisible();
+		await expect(canvas.queryByRole("heading", { name: "No scans yet" })).not.toBeInTheDocument();
+		// No scan names the repository, so the filter says its item ID rather than a guessed name.
+		await expect(canvas.getByText("Repository: item 42")).toBeVisible();
+		await userEvent.click(canvas.getByRole("button", { name: "Clear filters" }));
+		await expect(args.onFiltersChange).toHaveBeenCalledWith({
+			status: undefined,
+			repositoryItemId: undefined,
+		});
+	},
+};
+
+/** One repository's scans: the filter names it as its scans do, and removing it lists every scan. */
+export const OneRepository: Story = {
+	args: { filters: { status: undefined, repositoryItemId: SCANS[0]?.repository.id } },
+	play: async ({ args, canvas, userEvent }) => {
+		await expect(
+			canvas.getByText(`Repository: ${String(SCANS[0]?.repository.label)}`),
+		).toBeVisible();
+		await userEvent.click(canvas.getByRole("button", { name: "Show scans of every repository" }));
+		await expect(args.onFiltersChange).toHaveBeenCalledWith({
+			status: undefined,
+			repositoryItemId: undefined,
+		});
+	},
+};
+
+/** The status filter keeps the repository filter and asks for one status. */
+export const FilterByStatus: Story = {
+	play: async ({ args, canvas, userEvent }) => {
+		const toolbar = canvas.getByRole("toolbar", { name: "Status" });
+		await userEvent.click(within(toolbar).getByRole("button", { name: "Failed" }));
+		await expect(args.onFiltersChange).toHaveBeenCalledWith({
+			status: "FAILED",
+			repositoryItemId: undefined,
+		});
 	},
 };
 

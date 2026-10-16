@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+import { positiveIdParam } from "@/components/admin/practice-reviews/review-selection";
+import { statusValues } from "@/components/common/status-def";
+import { REVIEW_STATUS_DEFS } from "@/components/practice-vocabulary/review-status-defs";
 import { PROBLEM_BASELINE_STATES } from "@/components/practice-vocabulary/scan-baseline-defs";
 import {
 	type ScanEntryStatus,
@@ -8,7 +11,16 @@ import {
 
 export const scansSearchSchema = z.object({
 	page: z.coerce.number().int().min(0).optional().catch(undefined),
+	status: z.enum(statusValues(REVIEW_STATUS_DEFS)).optional().catch(undefined),
+	/** The workspace item of the repository, as the scan list's own filter takes it. */
+	repositoryItemId: positiveIdParam,
 });
+
+/** The server's own scan-list filters; a filter left out lists every scan. */
+export type ScanListFilters = Pick<
+	z.infer<typeof scansSearchSchema>,
+	"status" | "repositoryItemId"
+>;
 
 export const SCAN_REPORT_TABS = ["problems", "files", "practices"] as const;
 export type ScanReportTab = (typeof SCAN_REPORT_TABS)[number];

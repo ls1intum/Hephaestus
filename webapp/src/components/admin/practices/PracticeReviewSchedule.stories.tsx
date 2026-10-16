@@ -15,6 +15,7 @@ const meta = {
 	},
 	tags: ["autodocs"],
 	args: {
+		workspaceSlug: "aet",
 		schedules: [],
 		isLoading: false,
 		isError: false,
@@ -50,6 +51,11 @@ export const Empty: Story = {
 			canvas.getByRole("button", { name: "Start checking pull or merge requests" }),
 		).toBeVisible();
 		await expect(canvas.getByText(/not just the first/iu)).toBeVisible();
+		// The scans a repository schedule starts are one link away.
+		await expect(canvas.getByRole("link", { name: "View scans" })).toHaveAttribute(
+			"href",
+			"/w/aet/admin/practices/scans",
+		);
 		await expectNoPageOverflow();
 	},
 };

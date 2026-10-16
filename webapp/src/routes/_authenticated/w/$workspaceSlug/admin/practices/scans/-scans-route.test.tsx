@@ -19,6 +19,7 @@ import {
 	RUNNING_COUNTS,
 	SCAN_ID,
 	scanPage,
+	wireRepository,
 	wireScan,
 } from "./-scan-server";
 
@@ -141,9 +142,111 @@ describe("scans list route", () => {
 			"No scans yetScans appear here after a repository schedule starts one.",
 		);
 		expect(screen.queryByRole("link", { name: "Start scan" })).toBeNull();
-		expect(screen.getByRole("link", { name: "Open review settings" }).getAttribute("href")).toBe(
-			"/w/acme/admin/practices/review",
+		// Straight to the schedule section and its heading, not the settings page's first section.
+		expect(
+			screen.getByRole("link", { name: "Set up a repository schedule" }).getAttribute("href"),
+		).toBe("/w/acme/admin/practices/review?section=automated-review#schedule-heading");
+	});
+});
+
+describe("scans list filters", () => {
+	it("asks the server for the filtered page and restarts at the first page on a new filter", async () => {
+		const requests: URL[] = [];
+		server.use(
+			...adminHandlers(),
+			http.get("*/workspaces/:workspaceSlug/practices/scans", ({ request }) => {
+				requests.push(new URL(request.url));
+				return HttpResponse.json(
+					scanPage([wireScan({ repository: wireRepository("42", "artemis") })]),
+				);
+			}),
 		);
+
+		const { router } = renderRouteAtWithRouter(`${LIST}?repositoryItemId=42&page=2`);
+
+		await screen.findByText("Repository: ls1intum/artemis", undefined, ROUTE_RENDER_WAIT);
+		expect(requests.at(-1)?.searchParams.get("repositoryItemId")).toBe("42");
+		expect(requests.at(-1)?.searchParams.get("page")).toBe("2");
+
+		await userEvent.click(
+			within(screen.getByRole("toolbar", { name: "Status" })).getByRole("button", {
+				name: "Failed",
+			}),
+		);
+		await waitFor(() => expect(requests.at(-1)?.searchParams.get("status")).toBe("FAILED"));
+		expect(requests.at(-1)?.searchParams.get("repositoryItemId")).toBe("42");
+		expect(requests.at(-1)?.searchParams.get("page")).toBe("0");
+		expect(router.state.location.search).not.toHaveProperty("page");
+	});
+
+	it("narrows the list to a row's own repository by its item ID", async () => {
+		server.use(
+			...adminHandlers(),
+			http.get("*/workspaces/:workspaceSlug/practices/scans", () =>
+				HttpResponse.json(scanPage([wireScan({ repository: wireRepository("42", "artemis") })])),
+			),
+		);
+
+		const { router } = renderRouteAtWithRouter(LIST);
+
+		await userEvent.click(
+			await screen.findByRole(
+				"link",
+				{ name: "Show only scans of ls1intum/artemis" },
+				ROUTE_RENDER_WAIT,
+			),
+		);
+		await waitFor(() =>
+			expect(router.state.location.search).toMatchObject({ repositoryItemId: "42" }),
+		);
+	});
+
+	it("drops a repository filter that is not a workspace item ID", async () => {
+		const requests: URL[] = [];
+		server.use(
+			...adminHandlers(),
+			http.get("*/workspaces/:workspaceSlug/practices/scans", ({ request }) => {
+				requests.push(new URL(request.url));
+				return HttpResponse.json(scanPage([wireScan()]));
+			}),
+		);
+
+		renderRouteAtWithRouter(`${LIST}?repositoryItemId=a0000000-0000-4000-8000-000000000002`);
+
+		await screen.findByRole("link", { name: "ls1intum/hephaestus" }, ROUTE_RENDER_WAIT);
+		expect(requests.at(-1)?.searchParams.has("repositoryItemId")).toBe(false);
+	});
+
+	it("says a filter matched nothing, apart from a workspace with no scans", async () => {
+		server.use(
+			...adminHandlers(),
+			http.get("*/workspaces/:workspaceSlug/practices/scans", () =>
+				HttpResponse.json(scanPage([])),
+			),
+		);
+
+		renderRouteAtWithRouter(`${LIST}?status=FAILED`);
+
+		await screen.findByRole("heading", { name: "No scans match these filters" }, ROUTE_RENDER_WAIT);
+		expect(screen.queryByRole("heading", { name: "No scans yet" })).toBeNull();
+		await userEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+		await screen.findByRole("heading", { name: "No scans yet" }, ROUTE_RENDER_WAIT);
+	});
+
+	it("offers no filters over a refused list", async () => {
+		server.use(
+			...adminHandlers(),
+			http.get("*/workspaces/:workspaceSlug/practices/scans", () =>
+				HttpResponse.json({ status: 403 }, { status: 403 }),
+			),
+		);
+
+		renderRouteAtWithRouter(`${LIST}?repositoryItemId=42`);
+
+		await screen.findByText("You do not have access to scans", undefined, ROUTE_RENDER_WAIT);
+		expect(screen.queryByRole("toolbar", { name: "Status" })).toBeNull();
+		expect(screen.queryByText(/^Repository:/u)).toBeNull();
+		expect(screen.queryByRole("table")).toBeNull();
 	});
 });
 

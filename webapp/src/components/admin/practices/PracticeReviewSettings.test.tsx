@@ -360,7 +360,7 @@ describe("PracticeReviewSettings", () => {
 		});
 
 		await screen.findByText("Repository 199");
-		expect(screen.queryByText("Not monitored")).toBeNull();
+		expect(screen.queryByText("Source unavailable")).toBeNull();
 		expect(screen.queryByTitle(/unavailable/u)).toBeNull();
 	});
 
@@ -381,7 +381,7 @@ describe("PracticeReviewSettings", () => {
 			},
 		});
 
-		await screen.findByText("Not monitored");
+		await screen.findByText("Source unavailable");
 		screen.getByTitle("Member 99 (unavailable)");
 	});
 
