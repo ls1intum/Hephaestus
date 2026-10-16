@@ -464,7 +464,7 @@ public class GitRepositoryManager {
         return List.copyOf(changes);
     }
 
-    public GitTreeSnapshot readScanSnapshot(RepositoryKey repository, String sha) {
+    public GitTreeSnapshot readScanSnapshot(RepositoryKey repository, String sha, Set<String> paths) {
         if (!isEnabled()) throw new IllegalStateException("Repository capture is disabled");
         if (!ObjectId.isId(sha)) throw new GitOperationException("Invalid scan commit", new IOException());
         return locks.withReadLock(repository, () -> {
@@ -480,13 +480,15 @@ public class GitRepositoryManager {
                 staging = Files.createTempDirectory(layout.root(), EvidenceSpool.currentPrefix());
                 long bytes = 0, files = 0;
                 Set<String> limitations = new TreeSet<>();
+                Set<String> missing = new TreeSet<>(paths);
                 while (tree.next()) {
                     checkInterrupted();
+                    String name = tree.getPathString();
+                    if (!paths.contains(name)) continue;
                     FileMode mode = tree.getFileMode(0);
                     if (!mode.equals(FileMode.REGULAR_FILE) && !mode.equals(FileMode.EXECUTABLE_FILE)) {
                         continue;
                     }
-                    String name = tree.getPathString();
                     Path target = staging.resolve(name).normalize();
                     if (name.contains("\\")
                             || !target.startsWith(staging)
@@ -504,7 +506,9 @@ public class GitRepositoryManager {
                         object.copyTo(output);
                     }
                     files++;
+                    missing.remove(name);
                 }
+                if (!missing.isEmpty()) limitations.add("SCAN_PATH_UNAVAILABLE");
                 return new GitTreeSnapshot(
                         staging, sha, commit.getTree().getName(), bytes, files, limitations.isEmpty(), limitations);
             } catch (IOException | RuntimeException e) {

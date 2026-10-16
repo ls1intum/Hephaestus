@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.item;
 
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
+import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
@@ -45,7 +46,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -57,10 +61,14 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 @Service
+@Slf4j
 @ConditionalOnCaptureRole
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ScmItemService implements ItemSource {
+    // Bound both blob volume and manifest entries before the runner loads them into its fixed heap.
+    static final long MAX_SCAN_BYTES = 8 * 1024 * 1024;
+    static final int MAX_SCAN_FILES = 2_000;
     private final ScmItemAccess items;
     private final ScmRepositoryAccess repositories;
     private final RepositoryRepository repositoryRows;
@@ -365,7 +373,22 @@ public class ScmItemService implements ItemSource {
         String sha = pinned.item().kind().equals(ScmItemEvents.FILE)
                 ? Objects.requireNonNull(pinned.version().baseVersion())
                 : pinned.version().value();
-        var inventory = tree.inventory(key, sha);
+        var scanPaths = request.scanPaths();
+        var inventory = tree.inventory(key, sha).stream()
+                .filter(entry -> scanPaths == null || scanPaths.contains(entry.path()))
+                .toList();
+        long bytes =
+                inventory.stream().mapToLong(ScmFileVersions.Entry::sizeBytes).sum();
+        if (inventory.size() > MAX_SCAN_FILES || bytes > MAX_SCAN_BYTES) {
+            log.warn(
+                    "Scan capture exceeds limit: jobId={}, files={}, bytes={}, maxFiles={}, maxBytes={}",
+                    request.jobId(),
+                    inventory.size(),
+                    bytes,
+                    MAX_SCAN_FILES,
+                    MAX_SCAN_BYTES);
+            return CaptureContribution.unavailable(Set.of(source), SourceAbsenceReason.CONTENT_EVICTED);
+        }
         var record = mapper.createObjectNode();
         record.put("repositoryId", Long.toString(repository.getId()));
         record.put(
@@ -383,10 +406,11 @@ public class ScmItemService implements ItemSource {
         }
         record.put("commitId", sha);
         byte[] recordBytes = mapper.writeValueAsBytes(record);
-        byte[] inventoryBytes = mapper.writeValueAsBytes(inventory);
-        var snapshot = tree.snapshot(key, sha);
-        var metadataFiles =
-                new LinkedHashMap<>(Map.of("context/inventory.json", inventoryBytes, "context/item.json", recordBytes));
+        var paths = scanPaths == null
+                ? inventory.stream().map(ScmFileVersions.Entry::path).collect(Collectors.toSet())
+                : scanPaths;
+        var snapshot = tree.snapshot(key, sha, paths);
+        var metadataFiles = new LinkedHashMap<>(Map.of("context/item.json", recordBytes));
         List<CitableText> citable;
         try {
             citable = new ArrayList<>(ScmCitableTexts.tree(snapshot.stagingDir(), sha));

@@ -20,7 +20,6 @@ import de.tum.cit.aet.hephaestus.practices.spi.ScanExcludedItem;
 import de.tum.cit.aet.hephaestus.practices.spi.ScanExecutionSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ScanListedItem;
 import java.time.Clock;
-import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -33,7 +32,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -53,7 +51,6 @@ public class ReviewScanStoreService implements ReviewScanStore {
     private final Clock clock;
     private final ReviewSnapshotQuery snapshots;
     private final ReviewRuntimeQuery runtime;
-    private final TransactionTemplate transactions;
 
     @Override
     @Transactional(readOnly = true)
@@ -220,48 +217,6 @@ public class ReviewScanStoreService implements ReviewScanStore {
         practice.setListingComplete(complete);
         if (complete && Integer.valueOf(0).equals(practice.getItemsListed()))
             practice.setStatus(ReviewPracticeStatus.DONE);
-    }
-
-    @Override
-    @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    public void reuseListed(long workspaceId, UUID reviewId, Instant deadline) {
-        var review = reviews.findByIdAndWorkspaceId(reviewId, workspaceId).orElseThrow();
-        if (!acceptsReuse(review) || review.getChecks().path("reuseComplete").asBoolean()) return;
-        if (review.getInventoryReceipt() == null
-                || !review.getInventoryReceipt().path("complete").asBoolean()
-                || practices.findByWorkspaceIdAndReviewIdOrderByPracticeIdAsc(workspaceId, reviewId).stream()
-                        .anyMatch(p -> !Boolean.TRUE.equals(p.getListingComplete()))) return;
-        while (clock.instant().isBefore(deadline)) {
-            var pending = items.pendingReuse(workspaceId, reviewId, PageRequest.of(0, 1000));
-            if (pending.isEmpty()) {
-                transactions.executeWithoutResult(status -> {
-                    var locked = reviews.lockByIdAndWorkspaceId(reviewId, workspaceId)
-                            .orElseThrow();
-                    if (!acceptsReuse(locked)) return;
-                    var checks = (ObjectNode) locked.getChecks().deepCopy();
-                    checks.put("reuseComplete", true);
-                    locked.setChecks(checks);
-                });
-                return;
-            }
-            for (var member : pending) {
-                if (!clock.instant().isBefore(deadline)) return;
-                boolean continued = Boolean.TRUE.equals(transactions.execute(status -> {
-                    var locked = reviews.lockByIdAndWorkspaceId(reviewId, workspaceId)
-                            .orElseThrow();
-                    if (!acceptsReuse(locked)) return false;
-                    reuse(workspaceId, new ReviewAssignmentId(reviewId, member.getPracticeId(), member.getItemId()));
-                    return true;
-                }));
-                if (!continued) return;
-            }
-        }
-    }
-
-    private static boolean acceptsReuse(Review review) {
-        return review.getKind() == ReviewKind.SCAN
-                && !review.getStatus().isTerminal()
-                && !review.getChecks().path("cancellationRequested").asBoolean();
     }
 
     @Override

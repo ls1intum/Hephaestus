@@ -77,10 +77,7 @@ function runScenario(name: string): Map<string, string> {
 			mkdirSync(nodePath.join(cwd, "context"), { recursive: true });
 			mkdirSync(nodePath.join(cwd, "repos/reviewed/src"), { recursive: true });
 			writeFileSync(nodePath.join(cwd, "context/item.json"), JSON.stringify(inputs.item));
-			writeFileSync(
-				nodePath.join(cwd, "context/inventory.json"),
-				JSON.stringify([{ path: inputs.item.path, mode: "100644", objectId: inputs.item.blobId }]),
-			);
+
 			writeFileSync(nodePath.join(cwd, "repos/reviewed/src/healthy.ts"), "const healthy = true;\n");
 			const task: unknown = JSON.parse(readFileSync(nodePath.join(cwd, "task.json"), "utf8"));
 			assert.ok(typeof task === "object" && task !== null);
@@ -113,13 +110,7 @@ function runScenario(name: string): Map<string, string> {
 				nodePath.join(cwd, "INDEX.json"),
 				JSON.stringify({
 					itemKind: "scm.file",
-					files: [
-						{ kind: "scm.repository.tree", file: { path: "context/item.json" } },
-						{
-							kind: "scm.repository.tree",
-							file: { path: "context/inventory.json" },
-						},
-					],
+					files: [{ kind: "scm.repository.tree", file: { path: "context/item.json" } }],
 					citableTexts: [
 						{
 							source: "scm.repository.tree",

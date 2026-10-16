@@ -211,14 +211,29 @@ class GitRepositoryManagerTest extends BaseUnitTest {
             commit(git, "Later changes");
             prepare();
             Path staged;
-            try (var snapshot = manager.readScanSnapshot(KEY, pinned)) {
+            try (var snapshot = manager.readScanSnapshot(KEY, pinned, Set.of("scan.txt"))) {
                 staged = snapshot.stagingDir();
                 assertThat(Files.readString(staged.resolve("scan.txt"))).isEqualTo("first\n");
                 assertThat(staged.resolve(".git")).doesNotExist();
+                assertThat(staged.resolve("README.md")).doesNotExist();
+                assertThat(snapshot.visitedFiles()).isEqualTo(1);
                 assertThat(snapshot.commitSha()).isEqualTo(pinned);
                 assertThat(snapshot.complete()).isTrue();
             }
             assertThat(staged).doesNotExist();
+        }
+    }
+
+    @Test
+    void shouldReportAnUnavailablePermittedScanPathAsPartial() throws Exception {
+        try (Git git = repository()) {
+            String pinned = head(git);
+            prepare();
+            try (var snapshot = manager.readScanSnapshot(KEY, pinned, Set.of("README.md", "missing.txt"))) {
+                assertThat(snapshot.complete()).isFalse();
+                assertThat(snapshot.limitations()).containsExactly("SCAN_PATH_UNAVAILABLE");
+                assertThat(snapshot.visitedFiles()).isEqualTo(1);
+            }
         }
     }
 

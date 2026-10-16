@@ -1,12 +1,15 @@
 package de.tum.cit.aet.hephaestus.practices.spi;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
 public interface ReviewRuntimeQuery {
     Optional<ReviewRuntimeSnapshot> runtime(long workspaceId, UUID reviewId);
+
+    Map<ReviewJobStatus, Long> jobCounts(long workspaceId, UUID reviewId);
 
     Set<UUID> activeJobIds(long workspaceId, UUID reviewId);
 

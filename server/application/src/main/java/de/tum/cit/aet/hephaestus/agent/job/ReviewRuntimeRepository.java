@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewUsageAttempt;
 import java.math.BigDecimal;
@@ -19,6 +20,22 @@ import org.springframework.transaction.annotation.Transactional;
 @ConditionalOnCaptureRole
 @Transactional(readOnly = true)
 public interface ReviewRuntimeRepository extends Repository<ReviewJob, UUID> {
+    // Runtime reads must not hydrate the capture, input, config snapshot, or output JSON.
+    @Query("""
+        SELECT new de.tum.cit.aet.hephaestus.practices.spi.ReviewJobSnapshot(
+          j.id,j.status,j.attempt,j.processingStatus,j.availableAt,j.startedAt,j.completedAt,
+          j.exitCode,j.errorMessage,j.traceId)
+        FROM ReviewJob j WHERE j.workspaceId=:workspaceId AND j.reviewId=:reviewId
+        ORDER BY j.availableAt,j.id
+        """)
+    List<ReviewJobSnapshot> snapshots(@Param("workspaceId") long workspaceId, @Param("reviewId") UUID reviewId);
+
+    @Query("""
+        SELECT new de.tum.cit.aet.hephaestus.agent.job.ReviewRuntimeRepository$JobStateCount(j.status,COUNT(j))
+        FROM ReviewJob j WHERE j.workspaceId=:workspaceId AND j.reviewId=:reviewId GROUP BY j.status
+        """)
+    List<JobStateCount> jobCounts(@Param("workspaceId") long workspaceId, @Param("reviewId") UUID reviewId);
+
     @Query(value = """
         SELECT id FROM review_job WHERE workspace_id=:workspaceId AND review_id=:reviewId
           AND status NOT IN ('QUEUED','RUNNING') AND processing_status IN ('NONE','PENDING')
@@ -94,6 +111,8 @@ public interface ReviewRuntimeRepository extends Repository<ReviewJob, UUID> {
         FROM llm_usage_event WHERE workspace_id=:workspaceId AND review_id=:reviewId
         """, nativeQuery = true)
     Spend spent(@Param("workspaceId") long workspaceId, @Param("reviewId") UUID reviewId);
+
+    record JobStateCount(ReviewJobStatus status, long count) {}
 
     record UsageRow(
             UUID sourceId,

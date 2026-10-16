@@ -42,6 +42,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewedByKind;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
@@ -126,6 +127,15 @@ public class DefaultReviewExecutionHandler {
                                         .context()));
         }
         var snapshot = source.pin(item, pinned.getFirst().version());
+        Set<String> scanPaths = null;
+        if (review.kind() == ReviewKind.SCAN) {
+            scanPaths = new HashSet<>();
+            for (var assignment : pinned) {
+                var path = assignment.item().path();
+                if (path != null) scanPaths.add(path);
+                scanPaths.addAll(Objects.requireNonNull(grantedContext.get(assignment.id())));
+            }
+        }
         files.beginPersonCapture(job);
         try {
             var evidence = context.prepare(
@@ -136,7 +146,8 @@ public class DefaultReviewExecutionHandler {
                             job.getAttempt(),
                             required,
                             contracts.getFirst(),
-                            SandboxLayout.PRACTICE_CONTRACT_VERSION));
+                            SandboxLayout.PRACTICE_CONTRACT_VERSION,
+                            scanPaths));
             try {
                 var manifest = Objects.requireNonNull(evidence.manifest());
                 var now = clock.instant();

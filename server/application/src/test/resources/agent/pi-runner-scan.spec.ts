@@ -52,16 +52,7 @@ function stageScan(cwd: string, includeContext = false): string {
 	const inputs = scan(FILE);
 	const item = { ...inputs.item, commitId: commit, blobId: gitBlobId(TEXT) };
 	writeFileSync(path.join(cwd, SOURCE_PATH), JSON.stringify(item));
-	writeFileSync(
-		path.join(cwd, "context/inventory.json"),
-		JSON.stringify(
-			files.map((file) => ({
-				path: file.path,
-				mode: "100644",
-				objectId: gitBlobId(file.text),
-			})),
-		),
-	);
+
 	writeFileSync(
 		path.join(cwd, PRACTICES_DIR, "auth-review.inputs.json"),
 		JSON.stringify({
@@ -89,7 +80,7 @@ function stageScan(cwd: string, includeContext = false): string {
 		path.join(cwd, "INDEX.json"),
 		JSON.stringify({
 			itemKind: "scm.file",
-			files: [SOURCE_PATH, "context/inventory.json"].map((witness) => ({
+			files: [SOURCE_PATH].map((witness) => ({
 				kind: "scm.repository.tree",
 				file: {
 					path: witness,
@@ -103,7 +94,7 @@ function stageScan(cwd: string, includeContext = false): string {
 					kind: "scm.repository.tree",
 					citation: { side: "FORBIDDEN", commit: "OPTIONAL" },
 					state: { availability: "AVAILABLE" },
-					files: [{ path: SOURCE_PATH }, { path: "context/inventory.json" }],
+					files: [{ path: SOURCE_PATH }],
 				},
 			],
 			citableTexts: files.flatMap((file) =>
@@ -119,6 +110,7 @@ function stageScan(cwd: string, includeContext = false): string {
 		}),
 	);
 	assert.equal(existsSync(path.join(cwd, REPOSITORY, ".git")), false);
+	assert.equal(existsSync(path.join(cwd, "context/inventory.json")), false);
 	return commit;
 }
 

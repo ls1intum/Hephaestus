@@ -105,7 +105,8 @@ public class WorkspaceContextBuilder {
                                                 request.attempt(),
                                                 Set.of(kind),
                                                 request.sourceContractVersion(),
-                                                request.scriptContractVersion()))
+                                                request.scriptContractVersion(),
+                                                request.scanPaths()))
                         : CaptureContribution.unavailable(Set.of(kind), SourceAbsenceReason.GOVERNANCE_NOT_EFFECTIVE);
                 contributions.put(kind, contribution);
             }

@@ -33,6 +33,13 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
     Optional<ReviewJob> findByReviewIdAndWorkspaceIdAndStatusIn(
             UUID reviewId, long workspaceId, Collection<ReviewJobStatus> statuses);
 
+    @Query(
+            "SELECT j.id FROM ReviewJob j WHERE j.reviewId=:reviewId AND j.workspaceId=:workspaceId AND j.status IN :statuses")
+    Optional<UUID> findActiveId(
+            @Param("reviewId") UUID reviewId,
+            @Param("workspaceId") long workspaceId,
+            @Param("statuses") Collection<ReviewJobStatus> statuses);
+
     @Modifying(flushAutomatically = true)
     @Query("DELETE FROM ReviewJob j WHERE j.workspaceId = :workspaceId")
     int deleteAllByWorkspaceId(@Param("workspaceId") Long workspaceId);

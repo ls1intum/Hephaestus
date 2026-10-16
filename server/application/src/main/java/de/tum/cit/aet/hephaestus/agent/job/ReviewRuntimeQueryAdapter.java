@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.agent.job;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentQuery;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewQueueJob;
@@ -47,29 +46,21 @@ public class ReviewRuntimeQueryAdapter implements ReviewRuntimeQuery {
 
     @Override
     public Optional<ReviewRuntimeSnapshot> runtime(long workspaceId, UUID reviewId) {
-        var rows = jobs.findByReviewIdAndWorkspaceIdOrderByAvailableAtAsc(reviewId, workspaceId);
-        return rows.isEmpty()
-                ? Optional.empty()
-                : Optional.of(new ReviewRuntimeSnapshot(rows.stream()
-                        .map(job -> new ReviewJobSnapshot(
-                                job.getId(),
-                                job.getStatus(),
-                                job.getAttempt(),
-                                job.getProcessingStatus(),
-                                job.getAvailableAt(),
-                                job.getStartedAt(),
-                                job.getCompletedAt(),
-                                job.getExitCode(),
-                                job.getErrorMessage(),
-                                job.getTraceId()))
-                        .toList()));
+        var rows = runtime.snapshots(workspaceId, reviewId);
+        return rows.isEmpty() ? Optional.empty() : Optional.of(new ReviewRuntimeSnapshot(rows));
+    }
+
+    @Override
+    public Map<ReviewJobStatus, Long> jobCounts(long workspaceId, UUID reviewId) {
+        return runtime.jobCounts(workspaceId, reviewId).stream()
+                .collect(Collectors.toMap(
+                        ReviewRuntimeRepository.JobStateCount::status, ReviewRuntimeRepository.JobStateCount::count));
     }
 
     @Override
     public Set<UUID> activeJobIds(long workspaceId, UUID reviewId) {
-        return jobs.findByReviewIdAndWorkspaceIdAndStatusIn(
-                        reviewId, workspaceId, Set.of(ReviewJobStatus.QUEUED, ReviewJobStatus.RUNNING))
-                .map(job -> Set.of(job.getId()))
+        return jobs.findActiveId(reviewId, workspaceId, Set.of(ReviewJobStatus.QUEUED, ReviewJobStatus.RUNNING))
+                .map(Set::of)
                 .orElseGet(Set::of);
     }
 

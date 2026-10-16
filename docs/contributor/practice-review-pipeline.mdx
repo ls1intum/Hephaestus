@@ -257,11 +257,18 @@ It freezes the full model-slot method and practice version for reuse.
 Reuse requires the same composed file version, which includes the assigned blob and declared context inventory.
 Complete read coverage does not establish a complete dependency set.
 The host does not record dependency receipts for script listings, searches or tree citations.
-[ADR 0056](../decisions/0056-one-practice-model-for-items-and-scans.md#dependency-based-scan-reuse) owns the prerequisite for reuse across different context inventories.
+[ADR 0056](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0056-one-practice-model-for-items-and-scans.md#dependency-based-scan-reuse) owns the prerequisite for reuse across different context inventories.
 
 The SCM adapter shares a pinned tree index across file versions and context grants.
 After the listing completes, reuse makes one pass with durable progress for each pair.
 A restarted scan continues that pass without repeating completed attempts.
+
+Each file job captures only its assigned files and the union of its practices' frozen context paths.
+The capture contains no repository inventory record.
+The COMPLETE flag applies to that permitted set.
+Broad context grants still capture every permitted file.
+Captures above 2,000 files or 8 MiB are unavailable with `CONTENT_EVICTED` before the runner starts.
+The capture log records the measured file count and byte count.
 
 The SCM adapter classifies files before the driver selects practice/file pairs.
 Binary files and files above 2 MiB remain in the removal inventory with explicit exclusion reasons.

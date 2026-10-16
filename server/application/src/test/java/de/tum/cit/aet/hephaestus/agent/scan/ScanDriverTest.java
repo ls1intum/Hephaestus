@@ -19,6 +19,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewCompletion;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewQueue;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewScanReuse;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewScanStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshot;
@@ -48,6 +49,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 class ScanDriverTest extends BaseUnitTest {
     private static final Instant NOW = Instant.parse("2026-10-14T10:00:00Z");
     private final ReviewScanStore scans = mock(ReviewScanStore.class);
+    private final ReviewScanReuse reuse = mock(ReviewScanReuse.class);
     private final ReviewService reviews = mock(ReviewService.class);
     private final ScanService inventory = mock(ScanService.class);
     private final ScanBudget budget = mock(ScanBudget.class);
@@ -58,6 +60,7 @@ class ScanDriverTest extends BaseUnitTest {
     private final ReviewSnapshot review = RuntimeReviewTestData.review(ReviewKind.SCAN, assignment);
     private final ScanDriver driver = new ScanDriver(
             scans,
+            reuse,
             reviews,
             inventory,
             budget,
@@ -70,8 +73,7 @@ class ScanDriverTest extends BaseUnitTest {
 
     @BeforeEach
     void setup() {
-        when(jobs.findByReviewIdAndWorkspaceIdAndStatusIn(any(), anyLong(), any()))
-                .thenReturn(Optional.empty());
+        when(jobs.findActiveId(any(), anyLong(), any())).thenReturn(Optional.empty());
         when(scans.pending(anyLong(), any(), anyInt())).thenReturn(List.of(assignment));
     }
 
@@ -93,8 +95,8 @@ class ScanDriverTest extends BaseUnitTest {
 
     @Test
     void waitsForTheActiveInvocation() {
-        when(jobs.findByReviewIdAndWorkspaceIdAndStatusIn(any(), anyLong(), any()))
-                .thenReturn(Optional.of(RuntimeReviewTestData.job()));
+        when(jobs.findActiveId(any(), anyLong(), any()))
+                .thenReturn(Optional.of(RuntimeReviewTestData.job().getId()));
         driver.advance(state(1, 0, 0, 0, false));
         verifyNoInteractions(budget, queue, scans, reviews);
     }
@@ -154,8 +156,7 @@ class ScanDriverTest extends BaseUnitTest {
     @Test
     void cancellationWaitsForItsRunningJob() {
         var job = RuntimeReviewTestData.job();
-        when(jobs.findByReviewIdAndWorkspaceIdAndStatusIn(any(), anyLong(), any()))
-                .thenReturn(Optional.of(job));
+        when(jobs.findActiveId(any(), anyLong(), any())).thenReturn(Optional.of(job.getId()));
         driver.advance(state(1, 0, 0, 0, true));
         verify(lifecycle).cancel(1L, job.getId());
         verifyNoInteractions(reviews, queue);
@@ -261,7 +262,7 @@ class ScanDriverTest extends BaseUnitTest {
                     assertThat(inside).isFalse();
                     return null;
                 })
-                .when(scans)
+                .when(reuse)
                 .reuseListed(1, review.id(), recorded.createdAt().plus(Duration.ofHours(1)));
         doAnswer(call -> {
                     assertThat(inside).isTrue();
@@ -271,6 +272,7 @@ class ScanDriverTest extends BaseUnitTest {
                 .record(review, prepared);
         new ScanDriver(
                         scans,
+                        reuse,
                         reviews,
                         inventory,
                         budget,

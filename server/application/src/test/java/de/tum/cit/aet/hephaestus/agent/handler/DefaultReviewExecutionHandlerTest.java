@@ -32,6 +32,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.SourceReadinessReason;
+import de.tum.cit.aet.hephaestus.evidence.capture.CaptureRequest;
 import de.tum.cit.aet.hephaestus.integration.core.framework.ItemDescriptorRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
@@ -245,6 +246,9 @@ class DefaultReviewExecutionHandlerTest extends BaseUnitTest {
         var index = mapper.readTree(staged.get(SandboxLayout.PRACTICES_PREFIX + "index.json"))
                 .get(0);
         assertThat(index.path("contextPaths")).isEqualTo(mapper.valueToTree(List.of("docs/rules.md")));
+        ArgumentCaptor<CaptureRequest> request = ArgumentCaptor.captor();
+        verify(context).prepare(any(), request.capture());
+        assertThat(request.getValue().scanPaths()).containsExactly("docs/rules.md");
         var script =
                 mapper.readTree(staged.get(SandboxLayout.PRACTICE_SCRIPT_PRACTICES_PREFIX + "clear-names.inputs.json"));
         assertThat(script.path("scope").path("version").asString())

@@ -199,7 +199,8 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
                 2,
                 Set.of(kind),
                 catalog.current().version().value(),
-                3);
+                3,
+                Set.of("frozen/context.md"));
         if (permitted) when(owner.capture(snapshot, capture)).thenReturn(CaptureContribution.empty());
         var contexts = new WorkspaceContextBuilder(
                 List.of(), List.of(owner), registry, new JobFolderIndexBuilder(registry, mapper, Clock.systemUTC()));

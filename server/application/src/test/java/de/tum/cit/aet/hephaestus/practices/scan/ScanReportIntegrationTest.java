@@ -6,12 +6,20 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewRuntimeQueryAdapter;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewRuntimeRepository;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonCopyIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentityResolver;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
+import de.tum.cit.aet.hephaestus.core.tenancy.WorkspaceStatementInspector;
 import de.tum.cit.aet.hephaestus.integration.core.item.Item;
 import de.tum.cit.aet.hephaestus.integration.core.item.ItemRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CandidateRefusal;
@@ -36,6 +44,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ProcessingStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.RemovalGuardState;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultMarkKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAttemptGuard;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewBudget;
@@ -48,10 +57,12 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewModelBindings;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewPracticeStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeSnapshot;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewScanReuse;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewScanStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStopReason;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewTimingFactsQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ScanExcludedItem;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.sql.Timestamp;
@@ -68,12 +79,14 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -101,6 +114,9 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     ReviewScanStore store;
+
+    @Autowired
+    ReviewScanReuse reuse;
 
     @Autowired
     ReviewAssignmentStore assignments;
@@ -155,6 +171,15 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
 
     @MockitoBean
     PersonIdentityResolver people;
+
+    @Autowired
+    ReviewRuntimeRepository runtimeRows;
+
+    @Autowired
+    ReviewJobRepository jobs;
+
+    @MockitoSpyBean
+    WorkspaceStatementInspector statements;
 
     ScanReportTestData.Scenario scenario;
 
@@ -224,6 +249,92 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
                     assertThat(summary.counts().openProblems()).isZero();
                     assertThat(summary.counts().problems()).isEqualTo(2);
                 });
+    }
+
+    @Test
+    void shouldReadScanProgressAndReportsWithoutSelectingJobPayloads() {
+        var scan = data.scan(scenario, ReviewStatus.RUNNING, Instant.now());
+        var result = data.result(scenario, scan);
+        var completed = Objects.requireNonNull(membership
+                .findByWorkspaceIdAndReviewIdAndPracticeIdAndItemId(
+                        scan.getWorkspaceId(), scan.getId(), result.getPracticeId(), result.getItemId())
+                .orElseThrow()
+                .getJobId());
+        var active = invocation(scan.getWorkspaceId(), scan.getId(), ReviewJobStatus.RUNNING);
+        var failed = invocation(scan.getWorkspaceId(), scan.getId(), ReviewJobStatus.FAILED);
+        jdbc.sql("UPDATE review_job SET capture=jsonb_build_object('tree',repeat('x',1048576))"
+                        + " WHERE workspace_id=:ws AND review_id=:review")
+                .param("ws", scan.getWorkspaceId())
+                .param("review", scan.getId())
+                .update();
+        var adapter = new ReviewRuntimeQueryAdapter(
+                jobs, mock(ReviewAssignmentQuery.class), runtimeRows, mock(ReviewTimingFactsQuery.class));
+        when(runtime.jobCounts(scan.getWorkspaceId(), scan.getId()))
+                .thenAnswer(call -> adapter.jobCounts(scan.getWorkspaceId(), scan.getId()));
+        when(runtime.usage(scan.getWorkspaceId(), scan.getId()))
+                .thenAnswer(call -> adapter.usage(scan.getWorkspaceId(), scan.getId()));
+        clearInvocations(statements);
+
+        assertThat(adapter.runtime(scan.getWorkspaceId(), scan.getId())
+                        .orElseThrow()
+                        .jobs())
+                .extracting(ReviewJobSnapshot::id)
+                .containsExactlyInAnyOrder(active, failed, completed);
+        assertThat(adapter.activeJobIds(scan.getWorkspaceId(), scan.getId())).containsExactly(active);
+        assertThat(jobs.findActiveId(scan.getId(), scan.getWorkspaceId(), Set.of(ReviewJobStatus.RUNNING)))
+                .contains(active);
+        assertThat(adapter.jobCounts(scan.getWorkspaceId(), scan.getId()))
+                .containsExactlyInAnyOrderEntriesOf(
+                        Map.of(ReviewJobStatus.RUNNING, 1L, ReviewJobStatus.FAILED, 1L, ReviewJobStatus.COMPLETED, 1L));
+        assertThat(adapter.jobCounts(scan.getWorkspaceId() + 1, scan.getId())).isEmpty();
+        assertThat(adapter.runtime(scan.getWorkspaceId() + 1, scan.getId())).isEmpty();
+        assertThat(adapter.activeJobIds(scan.getWorkspaceId() + 1, scan.getId()))
+                .isEmpty();
+        var progress = query.detail(scan.getWorkspaceId(), scan.getId()).progress();
+        assertThat(progress.activeJobs()).isOne();
+        assertThat(progress.queuedJobs()).isZero();
+        jdbc.sql("UPDATE review_job SET status='QUEUED' WHERE workspace_id=:ws AND id=:id")
+                .param("ws", scan.getWorkspaceId())
+                .param("id", active)
+                .update();
+        var queued = query.detail(scan.getWorkspaceId(), scan.getId()).progress();
+        assertThat(queued.activeJobs()).isZero();
+        assertThat(queued.queuedJobs()).isOne();
+        assertThat(query.list(scan.getWorkspaceId(), null, null, PageRequest.of(0, 20))
+                        .getContent())
+                .extracting(summary -> summary.id())
+                .contains(scan.getId());
+        assertThat(query.report(scan.getWorkspaceId(), scan.getId()).counts().reviewed())
+                .isOne();
+        assertThat(reportItems
+                        .items(
+                                scan.getWorkspaceId(),
+                                scan.getId(),
+                                null,
+                                20,
+                                new ScanMembershipQueries.ItemFilter(null, null, null, null, null))
+                        .content())
+                .hasSize(1);
+        assertThat(reportItems
+                        .problems(
+                                scan.getWorkspaceId(),
+                                scan.getId(),
+                                null,
+                                20,
+                                new ScanMembershipQueries.ProblemFilter(null, null, null, null, false))
+                        .content())
+                .hasSize(2);
+
+        var sql = ArgumentCaptor.forClass(String.class);
+        verify(statements, atLeastOnce()).inspect(sql.capture());
+        var jobReads = sql.getAllValues().stream()
+                .filter(statement -> statement.contains("review_job"))
+                .toList();
+        assertThat(jobReads)
+                .isNotEmpty()
+                .allSatisfy(statement -> assertThat(statement)
+                        .doesNotContainPattern("(?i)\\b(capture|input|config_snapshot|output)\\b")
+                        .doesNotContain("select *"));
     }
 
     @Test
@@ -640,7 +751,7 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
         var original = data.scan(scenario, ReviewStatus.COMPLETE, Instant.now().minusSeconds(120));
         var result = data.result(scenario, original);
         var current = data.scan(scenario, ReviewStatus.RUNNING, Instant.now().minusSeconds(10));
-        store.reuseListed(
+        reuse.reuseListed(
                 current.getWorkspaceId(), current.getId(), Instant.now().plusSeconds(60));
         var member = membership
                 .findByWorkspaceIdAndReviewIdAndPracticeIdAndItemId(
@@ -659,7 +770,7 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
                 ResultMarkKind.INCORRECT,
                 scenarioAccountId,
                 "The claim is incorrect");
-        store.reuseListed(
+        reuse.reuseListed(
                 current.getWorkspaceId(), current.getId(), Instant.now().plusSeconds(60));
         var id = new ReviewAssignmentId(current.getId(), result.getPracticeId(), result.getItemId());
         assertThat(store.reuse(current.getWorkspaceId(), id)).contains(result.getId());

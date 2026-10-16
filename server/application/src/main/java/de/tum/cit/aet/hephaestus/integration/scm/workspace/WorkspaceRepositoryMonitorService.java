@@ -214,7 +214,8 @@ public class WorkspaceRepositoryMonitorService {
             created.setWorkspace(owner);
             owner.getRepositoriesToMonitor().add(created);
             RepositoryToMonitor saved = repositoryToMonitorRepository.saveAndFlush(created);
-            publishRepositoryMonitoringChanged(owner, saved);
+            eventPublisher.publishEvent(new RepositoryMonitoringChangedEvent(
+                    owner.getId(), repositoryToMonitorRepository.findSourceRepositoryIdsOfMonitor(saved.getId())));
             return saved;
         });
         log.info(
@@ -289,7 +290,8 @@ public class WorkspaceRepositoryMonitorService {
             created.setWorkspace(owner);
             owner.getRepositoriesToMonitor().add(created);
             RepositoryToMonitor saved = repositoryToMonitorRepository.saveAndFlush(created);
-            publishRepositoryMonitoringChanged(owner, saved);
+            eventPublisher.publishEvent(new RepositoryMonitoringChangedEvent(
+                    owner.getId(), repositoryToMonitorRepository.findSourceRepositoryIdsOfMonitor(saved.getId())));
             return saved;
         });
         log.info(
@@ -631,13 +633,9 @@ public class WorkspaceRepositoryMonitorService {
         repositoryToMonitorRepository.saveAndFlush(monitor);
         workspace.getRepositoriesToMonitor().add(monitor);
         workspaceRepository.save(workspace);
-        publishRepositoryMonitoringChanged(workspace, monitor);
-        announceRepositoryMonitor(workspace, monitor, deferSync);
-    }
-
-    private void publishRepositoryMonitoringChanged(Workspace workspace, RepositoryToMonitor monitor) {
         eventPublisher.publishEvent(new RepositoryMonitoringChangedEvent(
                 workspace.getId(), repositoryToMonitorRepository.findSourceRepositoryIdsOfMonitor(monitor.getId())));
+        announceRepositoryMonitor(workspace, monitor, deferSync);
     }
 
     // Consumers read committed monitors; refresh only after commit, never after rollback.
@@ -697,7 +695,10 @@ public class WorkspaceRepositoryMonitorService {
         var existing =
                 repositoryToMonitorRepository.findByWorkspaceIdAndNameWithOwner(workspace.getId(), nameWithOwner);
         if (existing.isPresent()) {
-            publishRepositoryMonitoringChanged(workspace, existing.get());
+            eventPublisher.publishEvent(new RepositoryMonitoringChangedEvent(
+                    workspace.getId(),
+                    repositoryToMonitorRepository.findSourceRepositoryIdsOfMonitor(
+                            existing.get().getId())));
             return Optional.of(workspace);
         }
 

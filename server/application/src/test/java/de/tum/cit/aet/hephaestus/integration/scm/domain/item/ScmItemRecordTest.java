@@ -2,15 +2,22 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.item;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.JobFolderIndexBuilder;
 import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
+import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
+import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.capture.CaptureRequest;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
@@ -23,20 +30,28 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.RepositoryTreeCo
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryLockManager;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.RepositoryKey;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.testconfig.GitTestFixtures;
 import de.tum.cit.aet.hephaestus.testconfig.ItemFixtures;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import org.eclipse.jgit.api.Git;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -73,7 +88,7 @@ class ScmItemRecordTest extends BaseUnitTest {
             Clock.systemUTC());
 
     @Test
-    void shouldStageTheScanRecordInventoryAndPinnedTextWithoutGitMetadata() throws Exception {
+    void shouldStageTheScanRecordAndPinnedTextWithoutInventoryOrGitMetadata() throws Exception {
         var pinned = snapshot("scm.file");
         var holder = new ItemRef(1, 4, ScmItemEvents.REPOSITORY, 3L, null, null);
         var repository = new Repository();
@@ -94,7 +109,7 @@ class ScmItemRecordTest extends BaseUnitTest {
         when(access.prepare(1, repository)).thenReturn(key);
         when(tree.inventory(key, HEAD)).thenReturn(List.of(entry));
         when(tree.content(key, entry)).thenReturn(bytes);
-        when(tree.snapshot(key, HEAD))
+        when(tree.snapshot(key, HEAD, Set.of("src/a.ts")))
                 .thenReturn(new GitRepositoryManager.GitTreeSnapshot(
                         staging, HEAD, "d".repeat(40), bytes.length, 1, true, Set.of()));
         var source = RepositoryTreeContentSource.KIND;
@@ -112,7 +127,7 @@ class ScmItemRecordTest extends BaseUnitTest {
             assertThat(record.path("path").asString()).isEqualTo("src/a.ts");
             assertThat(record.path("blobId").asString()).isEqualTo(BLOB);
             assertThat(record.path("commitId").asString()).isEqualTo(HEAD);
-            assertThat(prepared.files()).containsKey("context/inventory.json");
+            assertThat(prepared.files()).doesNotContainKey("context/inventory.json");
             assertThat(prepared.directories()).singleElement().satisfies(directory -> {
                 assertThat(directory.target()).isEqualTo("repos/reviewed/");
                 assertThat(directory.source().resolve(".git")).doesNotExist();
@@ -125,6 +140,128 @@ class ScmItemRecordTest extends BaseUnitTest {
                 assertThat(text.stagedPath()).isEqualTo("repos/reviewed/src/a.ts");
             });
         }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void shouldStageExactlyTheFrozenScanGrantIncludingBroadContexts(boolean broadContext) throws Exception {
+        var original = snapshot("scm.file");
+        var source = RepositoryTreeContentSource.KIND;
+        var key = new RepositoryKey(1, 3);
+        var manager = new GitRepositoryManager(
+                new GitRepositoryProperties(true, 2, 64 * 1024 * 1024),
+                new GitRepositoryLockManager(),
+                new FabricLayout(root.resolve("fabric").toString()));
+        var gitTree = new ScmGitTree(manager);
+        var versions = new ScmFileVersions(mapper);
+        ReflectionTestUtils.setField(service, "tree", gitTree);
+        ReflectionTestUtils.setField(service, "fileVersions", versions);
+        Path work = Files.createDirectories(root.resolve("source"));
+        String commit;
+        try (var git = Git.init().setDirectory(work.toFile()).call()) {
+            GitTestFixtures.disableSigning(git.getRepository());
+            for (var path : List.of("src/a.ts", "docs/rules.md", "config/style.json", "unrelated.ts")) {
+                Files.createDirectories(work.resolve(path).getParent());
+                Files.writeString(work.resolve(path), "content for " + path + "\n");
+            }
+            if (!broadContext)
+                Files.writeString(work.resolve("large.txt"), "x".repeat((int) ScmItemService.MAX_SCAN_BYTES + 1));
+            git.add().addFilepattern(".").call();
+            commit = git.commit()
+                    .setSign(false)
+                    .setMessage("Fixture")
+                    .setAuthor("Test", "test@example.org")
+                    .setCommitter("Test", "test@example.org")
+                    .call()
+                    .name();
+        }
+        manager.ensureRepository(key, work.toUri().toString(), null);
+        var inventory = gitTree.inventory(key, commit);
+        var assigned = gitTree.index(key, commit).assigned("src/a.ts");
+        var version =
+                versions.version(assigned.path(), assigned.objectId(), assigned.mode(), List.of(), List.of(), commit);
+        var pinned = new ItemSnapshot(
+                original.item(), version, original.integration(), Map.of(), List.of(), original.label());
+        var repository = new Repository();
+        repository.setId(3L);
+        repository.setNameWithOwner("owner/repository");
+        var provider = new IdentityProvider(IdentityProviderType.GITHUB, "https://github.example");
+        provider.setId(5L);
+        repository.setProvider(provider);
+        when(items.parent(pinned.item(), ScmItemEvents.REPOSITORY))
+                .thenReturn(new ItemRef(1, 4, ScmItemEvents.REPOSITORY, 3L, null, null));
+        when(repositories.findById(3L)).thenReturn(Optional.of(repository));
+        when(access.authorize(1, repository)).thenReturn(pinned.integration());
+        when(access.prepare(1, repository)).thenReturn(key);
+        var permitted = new HashSet<>(gitTree.index(key, commit)
+                .contextPaths("src/a.ts", broadContext ? List.of("**/*") : List.of("docs/*.md", "config/*.json")));
+        permitted.add("src/a.ts");
+        var contribution = service.capture(
+                pinned,
+                new CaptureRequest(UUID.randomUUID(), UUID.randomUUID(), 0, Set.of(source), "2.0.0", 3, permitted));
+        var catalogs = new ClasspathSourceCatalogRegistry(mapper, Clock.systemUTC());
+        try (var prepared = new JobFolderIndexBuilder(catalogs, mapper, Clock.systemUTC())
+                .build(ScmItemEvents.FILE, Map.of(source, contribution))) {
+            var manifest = Objects.requireNonNull(prepared.manifest());
+            assertThat(inventory).hasSize(broadContext ? 4 : 5);
+            assertThat(contribution.completeness()).containsEntry(source, SourceCompleteness.COMPLETE);
+            Path staged = prepared.directories().getFirst().source();
+            try (var files = Files.walk(staged)) {
+                assertThat(files.filter(Files::isRegularFile)
+                                .map(staged::relativize)
+                                .map(Path::toString))
+                        .containsExactlyInAnyOrderElementsOf(permitted);
+            }
+            assertThat(manifest.citableTexts().stream()
+                            .filter(text -> text.stagedPath().startsWith("repos/reviewed/"))
+                            .map(text -> text.path()))
+                    .containsExactlyInAnyOrderElementsOf(permitted.stream()
+                            .flatMap(path -> Stream.of(path, path))
+                            .toList());
+            assertThat(prepared.files()).doesNotContainKey("context/inventory.json");
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void shouldWithholdOversizedScanCapturesBeforeStaging(boolean exceedsBytes) {
+        var pinned = snapshot("scm.file");
+        var repository = new Repository();
+        repository.setId(3L);
+        repository.setNameWithOwner("owner/repository");
+        when(items.parent(pinned.item(), ScmItemEvents.REPOSITORY))
+                .thenReturn(new ItemRef(1, 4, ScmItemEvents.REPOSITORY, 3L, null, null));
+        when(repositories.findById(3L)).thenReturn(Optional.of(repository));
+        when(access.authorize(1, repository)).thenReturn(pinned.integration());
+        var key = new RepositoryKey(1, 3);
+        when(access.prepare(1, repository)).thenReturn(key);
+        var inventory = new ArrayList<ScmFileVersions.Entry>();
+        inventory.add(new ScmFileVersions.Entry("src/a.ts", "100644", BLOB));
+        if (exceedsBytes) {
+            inventory.add(
+                    new ScmFileVersions.Entry("large.txt", "100644", BLOB, ScmItemService.MAX_SCAN_BYTES + 1, false));
+        } else {
+            for (int i = 0; i < ScmItemService.MAX_SCAN_FILES; i++)
+                inventory.add(new ScmFileVersions.Entry("file-" + i, "100644", BLOB));
+        }
+        when(tree.inventory(key, HEAD)).thenReturn(inventory);
+        var source = RepositoryTreeContentSource.KIND;
+        var contribution = service.capture(
+                pinned,
+                new CaptureRequest(
+                        UUID.randomUUID(),
+                        UUID.randomUUID(),
+                        0,
+                        Set.of(source),
+                        "2.0.0",
+                        3,
+                        inventory.stream().map(ScmFileVersions.Entry::path).collect(Collectors.toSet())));
+        assertThat(contribution.stateOverrides())
+                .containsEntry(source, new SourceCaptureState.Unavailable(SourceAbsenceReason.CONTENT_EVICTED));
+        assertThat(contribution.files()).isEmpty();
+        assertThat(contribution.citableTexts()).isEmpty();
+        assertThat(contribution.directories()).isEmpty();
+        verify(tree, never()).snapshot(any(), any(), any());
     }
 
     @ParameterizedTest

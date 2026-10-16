@@ -18,7 +18,6 @@ import de.tum.cit.aet.hephaestus.practices.scan.dto.ScanSummaryDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeQuery;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
 import java.time.Instant;
@@ -114,9 +113,7 @@ public class ScanQueryService {
         var summary = summary(review);
         var report = reports.recorded(review);
         var usage = runtime.usage(workspaceId, id);
-        var jobs = runtime.runtime(workspaceId, id)
-                .map(ReviewRuntimeSnapshot::jobs)
-                .orElse(List.of());
+        var jobs = runtime.jobCounts(workspaceId, id);
         return new ScanDetailDTO(
                 summary,
                 report.practices().stream()
@@ -133,12 +130,8 @@ public class ScanQueryService {
                 new ScanProgressDTO(
                         summary.counts().practiceItemPairs(),
                         summary.counts().reviewed() + summary.counts().withheld(),
-                        (int) jobs.stream()
-                                .filter(j -> j.status() == ReviewJobStatus.RUNNING)
-                                .count(),
-                        (int) jobs.stream()
-                                .filter(j -> j.status() == ReviewJobStatus.QUEUED)
-                                .count()));
+                        Math.toIntExact(jobs.getOrDefault(ReviewJobStatus.RUNNING, 0L)),
+                        Math.toIntExact(jobs.getOrDefault(ReviewJobStatus.QUEUED, 0L))));
     }
 
     @Transactional

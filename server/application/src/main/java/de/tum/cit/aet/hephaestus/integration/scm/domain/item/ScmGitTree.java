@@ -13,6 +13,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -94,8 +95,8 @@ public class ScmGitTree {
         }
     }
 
-    public GitRepositoryManager.GitTreeSnapshot snapshot(RepositoryKey key, String sha) {
-        return git.readScanSnapshot(key, sha);
+    public GitRepositoryManager.GitTreeSnapshot snapshot(RepositoryKey key, String sha, Set<String> paths) {
+        return git.readScanSnapshot(key, sha, paths);
     }
 
     public String resolve(RepositoryKey key, String ref) {

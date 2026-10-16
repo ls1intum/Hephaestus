@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewCompletion;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewQueue;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewScanReuse;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewScanStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
@@ -36,6 +37,7 @@ public class ScanDriver {
     private static final int ACTIVE_SCAN_LIMIT = 20;
     private static final Set<ReviewJobStatus> ACTIVE = Set.of(ReviewJobStatus.QUEUED, ReviewJobStatus.RUNNING);
     private final ReviewScanStore scans;
+    private final ReviewScanReuse reuse;
     private final ReviewService reviews;
     private final ScanService inventory;
     private final ScanBudget budget;
@@ -83,7 +85,7 @@ public class ScanDriver {
                             inventory.record(state.review(), prepared);
                     });
                 }
-                scans.reuseListed(
+                reuse.reuseListed(
                         candidate.review().workspaceId(),
                         candidate.review().id(),
                         candidate.createdAt().plus(limits.scanDeadline()));
@@ -101,11 +103,11 @@ public class ScanDriver {
     public void advance(ScanExecutionSnapshot state) {
         if (state.status() != ReviewStatus.QUEUED && state.status() != ReviewStatus.RUNNING) return;
         var review = state.review();
-        var active = jobs.findByReviewIdAndWorkspaceIdAndStatusIn(review.id(), review.workspaceId(), ACTIVE);
+        var active = jobs.findActiveId(review.id(), review.workspaceId(), ACTIVE);
         if (active.isPresent()) {
             if (state.cancellationRequested()
                     || !clock.instant().isBefore(state.createdAt().plus(limits.scanDeadline())))
-                lifecycle.cancel(review.workspaceId(), active.get().getId());
+                lifecycle.cancel(review.workspaceId(), active.get());
             return;
         }
         if (jobs.hasUnsettledInvocation(review.workspaceId(), review.id())) return;
@@ -171,8 +173,7 @@ public class ScanDriver {
             var state = scans.lock(
                     candidate.review().workspaceId(), candidate.review().id());
             if (state.status() != ReviewStatus.QUEUED && state.status() != ReviewStatus.RUNNING) return;
-            if (jobs.findByReviewIdAndWorkspaceIdAndStatusIn(
-                            state.review().id(), state.review().workspaceId(), ACTIVE)
+            if (jobs.findActiveId(state.review().id(), state.review().workspaceId(), ACTIVE)
                     .isEmpty())
                 close(state, state.inventoryRecorded() ? ReviewStatus.PARTIAL : ReviewStatus.FAILED, reason);
         });
