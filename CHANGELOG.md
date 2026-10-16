@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.93.5
+
+### Patch Changes
+
+- On a phone, the custom range calendar on activity pages now fits on the screen. Its months scroll inside it, and Apply stays in view, so you can apply a range without scrolling the page to find the button.
+
+## 0.93.4
+
+### Patch Changes
+
+- The Teams page in workspace administration no longer clears your teams and closes an open label picker when a refresh fails for a reason that can pass. It keeps them on screen, says that teams could not be refreshed, and offers Retry. If you lose access to the teams, the page stops showing them and shows them again only after a new read succeeds.
+- Webhook backlog metrics now count the deployment's current consumer names without including older names or another deployment whose name starts with the same prefix. Unconsumed current consumers remain visible. No stored messages or consumers are removed.
+- The instance's public activity setting no longer shows an old answer and an active switch when you lose access to it. It says that you do not have access and shows the switch again only after a new read succeeds. If a refresh fails for a reason that can pass, the last setting stays, with a note that it may be out of date and a Retry.
+- On the Login providers page, turning a provider on or off no longer closes another provider's open edit form or discards what you typed. A save that you sent from a form you have since closed no longer closes the form that is open now, or keeps you from saving it. When you lose access to the provider list, an open edit form and Delete confirmation close and do not come back by themselves, and a Delete confirmation always names the provider as the latest list shows it. A provider you are still adding keeps your entries.
+- Source-control management closes its forms and hides cached connection details when workspace access is refused. A temporary refresh failure keeps your drafts and monitored repositories available.
+- When an admin loses access to the instance settings, the admin pages stop showing the silent mode banner, its reason and who turned it on, and the silent mode controls. They show the refusal instead, and show the settings again only after a new read succeeds. During a temporary outage, the last known state, the banner and Turn on silent mode stay available, and Turn off still waits for the current settings.
+- Slack settings no longer close a channel you are adding, or other open Slack controls, when the Slack connection briefly fails to load again. The failure appears with Retry, and the open work stays in place. If you lose access to the connection, its controls and sync activity disappear at once and do not return until it loads again.
+
 ## 0.93.3
 
 ### Patch Changes
