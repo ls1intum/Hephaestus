@@ -193,6 +193,8 @@ jobs:
               - 'webapp/src/components/practice-vocabulary/**'
               - 'webapp/src/components/ui/skeleton.tsx'
               - 'webapp/src/components/ui/spinner.tsx'
+              - 'webapp/src/lib/artifact-kind-slugs.ts'
+              - 'webapp/src/lib/artifact-kinds.ts'
               - 'webapp/src/lib/item-kinds.ts'
               - 'webapp/src/lib/sign-in-providers.ts'
               - 'webapp/src/lib/text.ts'
@@ -236,7 +238,6 @@ jobs:
               - 'pnpm-workspace.yaml'
             application-server:
               - 'server/**'
-              # E2eIdentitySeedDatabaseTest runs the real TypeScript seeder against the migrated schema.
               - 'scripts/e2e-identity-seed-database.ts'
               - 'scripts/e2e-setup.ts'
               - 'scripts/lib/json.ts'
@@ -348,6 +349,8 @@ jobs:
               - 'webapp/src/components/practice-vocabulary/**'
               - 'webapp/src/components/ui/skeleton.tsx'
               - 'webapp/src/components/ui/spinner.tsx'
+              - 'webapp/src/lib/artifact-kind-slugs.ts'
+              - 'webapp/src/lib/artifact-kinds.ts'
               - 'webapp/src/lib/item-kinds.ts'
               - 'webapp/src/lib/sign-in-providers.ts'
               - 'webapp/src/lib/text.ts'

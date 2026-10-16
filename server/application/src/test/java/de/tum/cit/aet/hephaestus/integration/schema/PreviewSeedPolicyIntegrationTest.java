@@ -174,11 +174,25 @@ class PreviewSeedPolicyIntegrationTest {
                             "COMPLETED",
                             "processing_status",
                             "PENDING"));
+            UUID feedbackId = UUID.randomUUID();
+            seeder.insert(
+                    "feedback",
+                    Map.of(
+                            "id",
+                            feedbackId,
+                            "workspace_id",
+                            workspaceId,
+                            "destination",
+                            "ON_WORK",
+                            "state",
+                            "READY",
+                            "item_id",
+                            9_100_006L));
             seeder.insert(
                     "feedback_send",
                     Map.of(
                             "feedback_id",
-                            UUID.randomUUID(),
+                            feedbackId,
                             "workspace_id",
                             workspaceId,
                             "action",
@@ -228,6 +242,12 @@ class PreviewSeedPolicyIntegrationTest {
             assertThat(scalar("SELECT processing_status FROM review_job WHERE id = '" + jobId + "'"))
                     .isEqualTo("FAILED");
             assertThat(scalar("SELECT count(*)::text FROM feedback_send WHERE workspace_id = " + workspaceId))
+                    .as("the clone retains stopped send history")
+                    .isEqualTo("1");
+            assertThat(scalar("SELECT state FROM feedback_send WHERE workspace_id = " + workspaceId))
+                    .isEqualTo("DONE");
+            assertThat(scalar("SELECT count(*)::text FROM feedback_send WHERE workspace_id = " + workspaceId
+                            + " AND (lease_owner IS NOT NULL OR lease_expires_at IS NOT NULL)"))
                     .isEqualTo("0");
         }
         assertThat(residualCredentials())

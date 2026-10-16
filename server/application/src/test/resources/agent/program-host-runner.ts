@@ -227,6 +227,7 @@ export async function runRunner(
 	sessions: Record<string, SessionBehaviour>,
 	env: Record<string, string> = {},
 ): Promise<RunnerExit> {
+	const firstCompletion = env.PI_HOST_FIRST_COMPLETION;
 	const child = spawn(
 		process.execPath,
 		["--experimental-test-module-mocks", import.meta.filename],
@@ -245,13 +246,30 @@ export async function runRunner(
 				LLM_PROXY_TOKEN: "job-token",
 				...env,
 			},
-			stdio: ["ignore", "ignore", "pipe"],
+			stdio: [
+				"ignore",
+				"ignore",
+				"pipe",
+				...(firstCompletion === undefined ? [] : ["ipc" as const]),
+			],
 		},
 	);
 	let stderr = "";
+	let released = false;
+	assert.ok(child.stderr !== null);
 	child.stderr.setEncoding("utf8");
 	child.stderr.on("data", (chunk: string) => {
 		stderr += chunk;
+		if (
+			firstCompletion !== undefined &&
+			!released &&
+			["built-in", "custom"].some((kind) =>
+				stderr.includes(`[pi-runner] ${firstCompletion}: ${kind} program `),
+			)
+		) {
+			released = true;
+			child.send("first-program-completed");
+		}
 	});
 	const timer = setTimeout(() => {
 		child.kill("SIGKILL");
@@ -288,6 +306,30 @@ export function capturedLines(cwd: string, name: string): unknown[] {
 
 const scenario = process.env.PI_HOST_SCENARIO;
 if (scenario !== undefined && scenario !== "") {
+	const firstCompletion = process.env.PI_HOST_FIRST_COMPLETION;
+	if (firstCompletion !== undefined) {
+		const released = Promise.withResolvers<undefined>();
+		process.once("message", (message) => {
+			assert.equal(message, "first-program-completed");
+			process.disconnect();
+			released.resolve(undefined);
+		});
+		const host =
+			await import("../../../../../../docker/agents/practice-scripts/lib/core/program-host.ts");
+		mock.module(nodePath.join(LIB, "core/program-host.ts"), {
+			namedExports: {
+				...host,
+				runPracticeProgram: async (...args: Parameters<typeof host.runPracticeProgram>) => {
+					const outcome = await host.runPracticeProgram(...args);
+					// Keep both programs real; release the later outcome only after the first completed.
+					if (args[1].slug !== firstCompletion) {
+						await released.promise;
+					}
+					return outcome;
+				},
+			},
+		});
+	}
 	const cwd = process.env.PI_RUNNER_CWD;
 	assert.ok(cwd !== undefined && cwd !== "");
 	const sessions: unknown = JSON.parse(scenario);

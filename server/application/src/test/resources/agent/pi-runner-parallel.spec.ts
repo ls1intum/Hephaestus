@@ -82,14 +82,12 @@ void test("three isolated model sessions overlap, retain each candidate and rece
 });
 
 for (const ownership of ["opening", "native-read", "sibling-only", "claimed-only"] as const) {
-	void test(`swapped completion delays preserve candidates and non-results with change evidence owned by ${ownership}`, async () => {
+	void test(`swapped completion orders preserve candidates and non-results with change evidence owned by ${ownership}`, async () => {
 		const admissions: unknown[] = [];
 		for (const earlier of ["sibling", "native"] as const) {
 			const cwd = mkdtempSync(nodePath.join(tmpdir(), "pi-parallel-evidence-"));
 			try {
-				const program = directProgram(
-					`await ctx.evidence.record("change.json"); await new Promise(resolve => setTimeout(resolve, ${earlier === "native" ? 1200 : 0}));`,
-				).replace(
+				const program = directProgram(`await ctx.evidence.record("change.json");`).replace(
 					'consulted: ["scm.pull-request.core"]',
 					'consulted: ["scm.pull-request.core", "scm.pull-request.diff"]',
 				);
@@ -122,7 +120,7 @@ for (const ownership of ["opening", "native-read", "sibling-only", "claimed-only
 					ownership === "native-read" ? { "a-native": "read-change" } : {},
 					{
 						PI_PRACTICE_CONCURRENCY: "2",
-						PI_HOST_DELAYS: JSON.stringify({ "a-native": earlier === "sibling" ? 1200 : 0 }),
+						PI_HOST_FIRST_COMPLETION: earlier === "sibling" ? "b-sibling" : "a-native",
 						PI_HOST_SESSION_CANDIDATE: JSON.stringify(candidate),
 					},
 				);
