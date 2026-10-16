@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 
-import { bashRead, bashReadRanges, bashPaths } from "./pi-bash-reads.ts";
+import { bashRead, bashReadRanges } from "./pi-bash-reads.ts";
 
 import type { CitableText } from "./pi-folder-index.ts";
 import type { BriefSource } from "./pi-review-brief.ts";
@@ -20,7 +20,6 @@ import { isJsonObject as isRecord } from "./work/practice-scripts/lib/core/json.
 import { ReadRanges } from "./work/practice-scripts/lib/core/read-ranges.ts";
 
 const READ_TOOLS = new Set(["read", "grep", "find", "ls", "bash"]);
-const ABSENT_PATH = /\bENOENT\b|^Path not found: /u;
 const textOf = (result: unknown): string =>
 	isRecord(result) && Array.isArray(result.content)
 		? result.content
@@ -32,16 +31,16 @@ const textOf = (result: unknown): string =>
 				.join("\n")
 		: "";
 
-/** Host observations include supplied brief sources, continuous file ranges, and unknown shell access. */
+/** Host observations retain all reads; coverage checks only required and cited source content. */
 export class SessionReads {
 	reads = 0;
 	readonly ranges = new ReadRanges();
 	readonly cutSearches: string[] = [];
 	readonly failed: string[] = [];
 	readonly unknown: string[] = [];
-	readonly #unknownPaths = new Set<string>();
+	readonly #required = new Set<string>();
+	readonly #supplied = new Set<string>();
 	readonly pending = new Map<string, unknown>();
-	readonly #supplied: boolean;
 	readonly #observedContent = new Set<string>();
 	readonly #opened = new Set<string>();
 	readonly #coveredBy = new Map<string, Set<string>>();
@@ -86,11 +85,12 @@ export class SessionReads {
 			}
 			this.#coveredBy.set(key, copies);
 		}
-		this.#supplied = sources.some((source) => source.supplied && source.lines !== undefined);
 		for (const source of sources) {
 			const key = this.#key(source.path);
+			this.#required.add(key);
 			this.ranges.expect(key);
 			if (source.supplied && source.lines !== undefined) {
+				this.#supplied.add(key);
 				this.ranges.add(key, 1, source.lines, source.lines);
 				this.#observedContent.add(key);
 			}
@@ -121,9 +121,7 @@ export class SessionReads {
 			return;
 		}
 		if (event.isError) {
-			if (!ABSENT_PATH.test(text)) {
-				this.failed.push(named);
-			}
+			this.failed.push(named);
 			return;
 		}
 		const result: unknown = event.result;
@@ -174,7 +172,9 @@ export class SessionReads {
 		const target = read === undefined ? undefined : this.#key(read.path);
 		if (target !== undefined) {
 			this.ranges.expect(target);
-			this.#opened.add(target);
+			if (!isError || noMatches) {
+				this.#opened.add(target);
+			}
 		}
 		if (isError && !noMatches) {
 			this.failed.push(target ?? "bash");
@@ -194,13 +194,7 @@ export class SessionReads {
 				// A receipt cannot rely on output that differs from the pinned source.
 			}
 		}
-		const paths = read === undefined ? bashPaths(this.#root, command) : [read.path];
-		if (read === undefined || paths.length === 0) {
-			this.unknown.push(`bash: ${command}`);
-		}
-		for (const file of paths) {
-			this.#unknownPaths.add(this.#key(file));
-		}
+		this.unknown.push(target ?? `bash: ${command}`);
 	}
 
 	/** Content supplied in this session's opening or returned by its native reader. */
@@ -209,7 +203,7 @@ export class SessionReads {
 	}
 
 	#complete(key: string, visited = new Set<string>()): boolean {
-		if (this.ranges.complete(key)) {
+		if (this.#supplied.has(key) || this.ranges.complete(key)) {
 			return true;
 		}
 		if (visited.has(key)) {
@@ -217,6 +211,11 @@ export class SessionReads {
 		}
 		visited.add(key);
 		return [...(this.#coveredBy.get(key) ?? [])].some((copy) => this.#complete(copy, visited));
+	}
+
+	/** Complete source content, including equivalent captured copies supplied in the brief. */
+	hasCompleteRead(target: string): boolean {
+		return this.#complete(this.#key(target));
 	}
 
 	get #incomplete(): string[] {
@@ -235,8 +234,15 @@ export class SessionReads {
 	coverage(
 		reader?: EvidenceReader,
 		domainReads: Receipts = noReceipts(),
+		citedPaths: readonly string[] = [],
 	): Extract<Coverage, { source: "host" }> {
-		const native = this.receipts;
+		const required = new Set([...this.#required, ...citedPaths.map((file) => this.#key(file))]);
+		const incomplete = [...required].filter((file) => !this.#complete(file));
+		const failed = incomplete.filter((file) => this.failed.includes(file));
+		const truncated = incomplete.filter((file) => !failed.includes(file) && this.#opened.has(file));
+		const unavailable = incomplete.filter(
+			(file) => !failed.includes(file) && !this.#opened.has(file),
+		);
 		const omitted: Omission[] = [];
 		const omit = (what: string, items: string[], reason: Omission["reason"]) => {
 			if (items.length > 0) {
@@ -250,29 +256,15 @@ export class SessionReads {
 				});
 			}
 		};
-		omit(
-			"reads cut short at the tool's output limit",
-			[...this.#incomplete.filter((file) => this.#opened.has(file)), ...this.cutSearches],
-			"truncated",
-		);
-		omit(
-			"relevant sources not supplied or read",
-			this.#incomplete.filter((file) => !this.#opened.has(file)),
-			"unavailable",
-		);
-		omit("reads that failed", this.failed, "unavailable");
-		omit(
-			"evidence coverage is unknown",
-			[...this.unknown, ...[...this.#unknownPaths].filter((key) => !this.#complete(key))],
-			"unavailable",
-		);
-		omit("evidence reads still running", [...this.pending.keys()], "unavailable");
-		if (!this.#supplied && this.#observedContent.size === 0 && domainReads.reads === 0) {
-			omit(
-				"no relevant source was supplied or read",
-				["read the sources needed by the criterion"],
-				"unavailable",
-			);
+		omit("required or cited sources with unread ranges", truncated, "truncated");
+		omit("relevant sources not supplied or read", unavailable, "unavailable");
+		omit("reads that failed", failed, "unavailable");
+		if (required.size === 0 && this.#observedContent.size === 0 && domainReads.reads === 0) {
+			omitted.push({
+				what: "no relevant source was supplied or read",
+				count: 1,
+				reason: "unavailable",
+			});
 		}
 		if (domainReads.truncatedReads > 0) {
 			omitted.push({
@@ -290,9 +282,9 @@ export class SessionReads {
 		}
 		const receipts = {
 			source: "host" as const,
-			reads: native.reads + domainReads.reads,
-			truncatedReads: native.truncatedReads + domainReads.truncatedReads,
-			failedReads: native.failedReads + domainReads.failedReads,
+			reads: this.reads + domainReads.reads,
+			truncatedReads: truncated.length + domainReads.truncatedReads,
+			failedReads: failed.length + domainReads.failedReads,
 			receipts: reader?.readReceipts ?? [],
 		};
 		const [first, ...rest] = omitted;

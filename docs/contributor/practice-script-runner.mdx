@@ -65,8 +65,17 @@ An example can appear only on Met or Not met and cannot overlap a problem.
 
 Coverage distinguishes host read receipts from a script's claimed counts.
 Claimed completeness is not a trusted complete file read.
-Host coverage can remain unknown without a failed or truncated read.
-Its omissions name material that was not supplied or read.
+
+Host coverage checks the practice's required sources and the sources that its result cites.
+A source supplied in full by the opening brief needs no duplicate read.
+Other required or cited sources need continuous reads from line 1 through EOF.
+A partial window remains incomplete until further reads cover the whole source.
+Its omissions name only unresolved gaps in these sources.
+
+Exploration does not expand the required sources.
+Listings, metadata, history queries and failed reads of optional paths do not prevent complete coverage.
+Session diagnostics retain all observed reads.
+Candidate failure counts describe only unresolved gaps in required or cited sources.
 A scan Met needs a COMPLETE receipt for its assigned file at the pinned commit.
 An unavailable required read withholds the result instead of producing an outcome.
 

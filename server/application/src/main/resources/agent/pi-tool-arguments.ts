@@ -1,20 +1,49 @@
+import { isDeepStrictEqual } from "node:util";
+
 import { unwrapToolArguments } from "./pi-tool-validation.ts";
 
 import { isJsonObject as isRecord } from "./work/practice-scripts/lib/core/json.ts";
 
-/** Decode only JSON containers. Invalid text and scalar values stay unchanged for validation. */
+/** Decode complete JSON containers. A repeated closing delimiter carries no additional content. */
 function container(value: unknown, kind: "object" | "array"): unknown {
 	let decoded = value;
 	if (typeof value === "string") {
 		try {
 			decoded = JSON.parse(value);
 		} catch {
-			return value;
+			const text = value.trim();
+			if (
+				!(text.startsWith("{") && text.endsWith("}}")) &&
+				!(text.startsWith("[") && text.endsWith("]]"))
+			) {
+				return value;
+			}
+			try {
+				decoded = JSON.parse(text.slice(0, -1));
+			} catch {
+				return value;
+			}
 		}
 	}
 	return (kind === "array" ? Array.isArray(decoded) : isRecord(decoded) && !Array.isArray(decoded))
 		? decoded
 		: value;
+}
+
+/** Unknown empty fields and exact copies carry no additional claim. */
+function harmlessExtras(fields: Record<string, unknown>, allowed: readonly string[]) {
+	return Object.fromEntries(
+		Object.entries(fields).filter(([key, value]) => {
+			if (allowed.includes(key)) {
+				return true;
+			}
+			const original = key.replace(/\d+$/u, "");
+			return (
+				!empty(object(value)) &&
+				!(allowed.includes(original) && isDeepStrictEqual(value, fields[original]))
+			);
+		}),
+	);
 }
 
 /** Keep line coordinates intact when they arrive as numbers copied from a numbered view. */
@@ -44,10 +73,20 @@ function object(value: unknown): unknown {
 }
 
 function citation(value: unknown, where: string): unknown {
-	const fields = object(value);
-	if (!isRecord(fields) || Array.isArray(fields)) {
+	const decoded = object(value);
+	if (!isRecord(decoded) || Array.isArray(decoded)) {
 		return value;
 	}
+	const fields = harmlessExtras(decoded, [
+		"sourceKind",
+		"sourcePath",
+		"path",
+		"side",
+		"commit",
+		"startLine",
+		"endLine",
+		"quote",
+	]);
 	for (const field of ["side", "commit", "quote"]) {
 		const text = fields[field];
 		if (text != null && typeof text !== "string") {
@@ -102,10 +141,32 @@ function empty(value: unknown): boolean {
 /**
  * Normalize transport spelling before strict validation without inferring claims or changing source text.
  * Decode JSON containers and decimal line coordinates. Wrap a single list item.
- * A non-object root becomes an empty object for required-field validation.
+ * One transport envelope may contain a JSON object string; other roots stay typed.
  */
 export function prepareResultArguments(args: unknown): Record<string, unknown> {
-	const input = unwrapToolArguments(args);
+	const root = args;
+	const envelope =
+		isRecord(root) && Object.keys(root).length === 1
+			? Object.fromEntries(
+					Object.entries(root).map(([key, value]) => [
+						key,
+						["args", "arguments", "input"].includes(key) ? object(value) : value,
+					]),
+				)
+			: root;
+	if (isRecord(envelope) && Object.keys(envelope).length === 1) {
+		const entry = Object.entries(envelope)[0];
+		if (
+			entry !== undefined &&
+			["args", "arguments", "input"].includes(entry[0]) &&
+			typeof entry[1] === "string"
+		) {
+			throw new Error(
+				`${entry[0]}: expected a complete result object or its JSON encoding. The string is not a complete JSON object. Corrected call example: ${JSON.stringify({ [entry[0]]: { outcome: "<MET | NOT_MET | DOES_NOT_APPLY | COULD_NOT_DETERMINE>", summary: "<copy your summary>", explanation: "<copy your explanation>", citations: [], evidence: {} } })}. Copy your original claims and citations. Choose the outcome and its evidence shape; no content or outcome was inferred.`,
+			);
+		}
+	}
+	const input = unwrapToolArguments(envelope);
 	if (!isRecord(input) || Array.isArray(input)) {
 		return {};
 	}
@@ -163,19 +224,64 @@ export function prepareResultArguments(args: unknown): Record<string, unknown> {
 				? { ...example, citation: citation(example.citation, "example citation") }
 				: example;
 	}
-	const rawEvidence = object(result.evidence);
+	return prepareEvidence(result);
+}
+
+function removeWarrantCopies(evidence: Record<string, unknown>) {
+	return Object.fromEntries(
+		Object.entries(evidence).filter(
+			([key, value]) =>
+				!["search", "inapplicability"].some((branch) => {
+					const warrant = object(evidence[branch]);
+					return (
+						["consulted", "lookedFor", "boundary", "prerequisite", "ruledOutBy"].includes(key) &&
+						isRecord(warrant) &&
+						!Array.isArray(warrant) &&
+						key in warrant &&
+						isDeepStrictEqual(value, warrant[key])
+					);
+				}),
+		),
+	);
+}
+
+function prepareWarrant(key: string, value: unknown): unknown {
+	const fields = object(value);
+	if (!isRecord(fields) || Array.isArray(fields)) {
+		return value;
+	}
+	if (key === "search") {
+		return harmlessExtras(fields, ["consulted", "lookedFor", "boundary"]);
+	}
+	if (key === "inapplicability") {
+		return harmlessExtras(fields, ["consulted", "prerequisite", "ruledOutBy"]);
+	}
+	return value;
+}
+
+function prepareEvidence(result: Record<string, unknown>): Record<string, unknown> {
+	const decodedEvidence = object(result.evidence);
+	const rawEvidence =
+		decodedEvidence === null && (result.outcome === "MET" || result.outcome === "NOT_MET")
+			? {}
+			: decodedEvidence;
 	if (!isRecord(rawEvidence) || Array.isArray(rawEvidence)) {
 		return result;
 	}
+	const groupedEvidence = removeWarrantCopies(rawEvidence);
 	const used = typeof result.outcome === "string" ? EVIDENCE_FIELDS.get(result.outcome) : undefined;
 	const evidence = Object.fromEntries(
-		Object.entries(rawEvidence).filter(
-			([key, value]) =>
-				used === undefined ||
-				used.includes(key) ||
-				!["search", "inapplicability", "openQuestions"].includes(key) ||
-				!empty(value),
-		),
+		Object.entries(
+			harmlessExtras(groupedEvidence, ["search", "inapplicability", "openQuestions", "citations"]),
+		)
+			.map(([key, value]) => [key, prepareWarrant(key, value)] as const)
+			.filter(
+				([key, value]) =>
+					used === undefined ||
+					used.includes(key) ||
+					!["search", "inapplicability", "openQuestions"].includes(key) ||
+					!empty(value),
+			),
 	);
 	if (result.outcome === "DOES_NOT_APPLY" && empty(evidence.inapplicability)) {
 		delete evidence.inapplicability;
@@ -213,6 +319,11 @@ export function prepareResultArguments(args: unknown): Record<string, unknown> {
 						openQuestions: Array.isArray(questions)
 							? questions.map((raw: unknown) => {
 									const question = object(raw);
+									if (typeof question === "string") {
+										throw new Error(
+											`evidence.openQuestions: each question requires openQuestion and wouldSettleIt. Corrected call example: ${JSON.stringify({ ...result, evidence: { ...evidence, openQuestions: questions.map((item: unknown) => (typeof item === "string" ? { openQuestion: item, wouldSettleIt: "<existing evidence that would settle this question>" } : item)) } })}. Name the evidence; no answer was inferred.`,
+										);
+									}
 									return isRecord(question) && !Array.isArray(question) && question.citation != null
 										? {
 												...question,
@@ -290,7 +401,8 @@ export function validateResultEvidence(
 							},
 						]
 					: sent.openQuestions,
-				...(sent.lookedFor === undefined ? {} : { search }),
+				...(sent.search === undefined ? {} : { search: sent.search }),
+				...(sent.search === undefined && sent.lookedFor !== undefined ? { search } : {}),
 			};
 			break;
 		}

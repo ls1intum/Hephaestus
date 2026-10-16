@@ -2630,7 +2630,7 @@ if (scenario !== undefined && scenario !== "") {
 								}
 								return;
 							}
-							if (scenario === "met-coverage") {
+							if (scenario === "met-coverage" || scenario === "met-coverage-repair") {
 								emit({
 									type: "tool_execution_start",
 									toolCallId: "r-cut",
@@ -2655,6 +2655,39 @@ if (scenario !== undefined && scenario !== "") {
 									);
 								record(`met-refused:${JSON.stringify(strength)}`);
 								record(`met-notes:${JSON.stringify(notesText())}`);
+								if (scenario === "met-coverage-repair") {
+									const lines = readFileSync(
+										nodePath.join(cwd, "work/change/diff.patch"),
+										"utf8",
+									).split("\n");
+									for (let offset = 1; offset <= lines.length; offset += 2000) {
+										const toolCallId = `r-page-${offset}`;
+										emit({
+											type: "tool_execution_start",
+											toolCallId,
+											toolName: "read",
+											args: { path: "work/change/diff.patch", offset, limit: 2000 },
+										});
+										emit({
+											type: "tool_execution_end",
+											toolCallId,
+											toolName: "read",
+											isError: false,
+											result: {
+												content: [
+													{ type: "text", text: lines.slice(offset - 1, offset + 1999).join("\n") },
+												],
+												details: {},
+											},
+										});
+									}
+									const repaired = await report.execute(
+										"o-met-repaired",
+										met("Added call goes through the checked helper"),
+									);
+									record(`met-repaired:${JSON.stringify(repaired)}`);
+									return;
+								}
 								const problem = await report.execute(
 									"o-not-met",
 									notMet("Unsafe authentication call"),
@@ -3165,6 +3198,7 @@ if (scenario !== undefined && scenario !== "") {
 		"refusal-cap",
 		"repeat",
 		"met-coverage",
+		"met-coverage-repair",
 		"tree-citation",
 		"compose-private-complete-error",
 		"compose-private-budget",
@@ -3340,6 +3374,8 @@ if (scenario !== undefined && scenario !== "") {
 				repeat: "nudges a turn that repeats one call and ends it when the call keeps coming",
 				"met-coverage":
 					"refuses a MET whose session cut a read short, with the coverage it lacks, and stores the NOT_MET submitted after it",
+				"met-coverage-repair":
+					"accepts the same MET after its missing source content is read completely",
 				"tree-citation":
 					"verifies a HEAD repository citation against the checkout and finalizes out/",
 				compose:
@@ -3464,6 +3500,13 @@ if (scenario !== undefined && scenario !== "") {
 						nodePath.join(cwd, "work/change/diff.patch"),
 						"diff --git a/src/Auth.java b/src/Auth.java\n--- a/src/Auth.java\n+++ b/src/Auth.java\n@@ -10,0 +10,1 @@\n[L10] + insecure();\n",
 					);
+					if (stage === "met-coverage" || stage === "met-coverage-repair") {
+						const changePath = nodePath.join(cwd, "work/change/diff.patch");
+						writeFileSync(
+							changePath,
+							readFileSync(changePath, "utf8") + " unchanged context\n".repeat(4000),
+						);
+					}
 					if (stage === "replacement-witness" || stage === "comment-undecided") {
 						const changePath = nodePath.join(cwd, "work/change/diff.patch");
 						writeFileSync(
@@ -4990,21 +5033,38 @@ for (const item of nullableCases) {
 							ran({ "test-practice": "failed (off-format)" });
 							break;
 						}
-						case "met-coverage": {
+						case "met-coverage":
+						case "met-coverage-repair": {
 							assert.equal(child.status, 0, child.stderr);
 							const refused = events.find((event) => event.startsWith("met-refused:")) ?? "";
 							assert.match(
 								refused,
-								/a MET result needs complete coverage, and this session's reads did not complete: 1 reads cut short at the tool's output limit \(work\/change\/diff\.patch\)/u,
+								/a MET result needs complete coverage of its required and cited sources: required or cited sources with unread ranges \(work\/change\/diff\.patch\)/u,
 							);
 							assert.match(
-								refused,
-								/NOT_MET for a problem it proves, or COULD_NOT_DETERMINE with the open question/u,
+								refused.replaceAll(String.raw`\"`, '"'),
+								/read\(\{"path":"work\/change\/diff\.patch","offset":1,"limit":2000\}\)/u,
 							);
 							assert.match(
 								events.find((event) => event.startsWith("met-notes:")) ?? "",
 								/Nothing recorded yet/u,
 							);
+							if (stage === "met-coverage-repair") {
+								assert.match(
+									events.find((event) => event.startsWith("met-repaired:")) ?? "",
+									/test-practice: stored/u,
+								);
+								const result = candidatesIn(nodePath.join(cwd, "out/result.json")).get(
+									"test-practice",
+								);
+								assert.equal(result?.outcome, "MET");
+								const repairedCoverage = recordOf(result.coverage);
+								assert.equal(repairedCoverage.complete, true);
+								assert.equal(repairedCoverage.reads, 4);
+								assert.equal(repairedCoverage.truncatedReads, 0);
+								reached({ "test-practice": "EVALUATED" });
+								break;
+							}
 							assert.match(
 								events.find((event) => event.startsWith("not-met-stored:")) ?? "",
 								/test-practice: stored \(negative\)/u,
@@ -5022,7 +5082,7 @@ for (const item of nullableCases) {
 								complete: false,
 								omitted: [
 									{
-										what: "reads cut short at the tool's output limit",
+										what: "required or cited sources with unread ranges",
 										count: 1,
 										reason: "truncated",
 										items: ["work/change/diff.patch"],

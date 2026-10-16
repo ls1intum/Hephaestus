@@ -1,4 +1,4 @@
-import { readFileSync, statSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 
 /** Only literal words are accepted. Shell syntax is never interpreted by the receipt parser. */
@@ -32,7 +32,8 @@ export interface BashRead {
 }
 
 export function bashRead(command: string): BashRead | undefined {
-	const tokens = words(command);
+	// Suppressing stderr does not change the file content or its displayed range.
+	const tokens = words(command.replace(/\s+2>\s*\/dev\/null\s*$/u, ""));
 	if (tokens === undefined) {
 		return undefined;
 	}
@@ -70,23 +71,6 @@ export function bashRead(command: string): BashRead | undefined {
 		}
 	}
 	return undefined;
-}
-
-/** Recover named files for repair guidance only. This does not grant any coverage. */
-export function bashPaths(root: string, command: string): string[] {
-	const tokens = command.match(/'[^'\n]*'|"[^"\n]*"|[^\s|;&<>]+/gu) ?? [];
-	return [
-		...new Set(
-			tokens.flatMap((token) => {
-				const file = /^['"]/u.test(token) ? token.slice(1, -1) : token;
-				try {
-					return statSync(path.resolve(root, file)).isFile() ? [file] : [];
-				} catch {
-					return [];
-				}
-			}),
-		),
-	];
 }
 
 /** Verify returned text against the pinned file before granting the exact displayed extents. */

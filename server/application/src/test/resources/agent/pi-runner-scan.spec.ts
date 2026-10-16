@@ -13,10 +13,12 @@ import { capturedLines, field, runRunner, stagePractices } from "./program-host-
 
 const FILE = "Auth.ts";
 const TEXT = "insecure();\n";
+const CONTEXT_FILE = "Context.ts";
+const CONTEXT_TEXT = "checked(token);\n";
 const SOURCE_PATH = "repos/primary/.git/HEAD";
 const CAPTURED_REFS = "repos/primary/.git/hephaestus-captured-refs";
 
-function stageScan(cwd: string): string {
+function stageScan(cwd: string, includeContext = false): string {
 	stagePractices(cwd, [{ slug: "auth-review" }]);
 	rmSync(path.join(cwd, "evidence/change.json"));
 	const git = path.join(cwd, "repos/primary/.git");
@@ -31,7 +33,16 @@ function stageScan(cwd: string): string {
 	const blob = object("blob", Buffer.from(TEXT));
 	const tree = object(
 		"tree",
-		Buffer.concat([Buffer.from(`100644 ${FILE}\0`), Buffer.from(blob, "hex")]),
+		Buffer.concat([
+			Buffer.from(`100644 ${FILE}\0`),
+			Buffer.from(blob, "hex"),
+			...(includeContext
+				? [
+						Buffer.from(`100644 ${CONTEXT_FILE}\0`),
+						Buffer.from(object("blob", Buffer.from(CONTEXT_TEXT)), "hex"),
+					]
+				: []),
+		]),
 	);
 	const commit = object(
 		"commit",
@@ -43,6 +54,9 @@ function stageScan(cwd: string): string {
 	writeFileSync(path.join(git, "HEAD"), `${commit}\n`);
 	writeFileSync(path.join(cwd, CAPTURED_REFS), `${commit} HEAD\n`);
 	writeFileSync(path.join(cwd, "repos/primary", FILE), TEXT);
+	if (includeContext) {
+		writeFileSync(path.join(cwd, "repos/primary", CONTEXT_FILE), CONTEXT_TEXT);
+	}
 	const inputs = scan(FILE);
 	writeFileSync(
 		path.join(cwd, PRACTICES_DIR, "auth-review.inputs.json"),
@@ -63,7 +77,7 @@ function stageScan(cwd: string): string {
 				versionId: "1",
 				readsSources: ["scm.repository.tree"],
 				exhaustiveSources: ["scm.repository.tree"],
-				contextPaths: [],
+				contextPaths: includeContext ? [CONTEXT_FILE] : [],
 			},
 		]),
 	);
@@ -181,6 +195,54 @@ for (const basis of ["state", "introduced"] as const) {
 			}
 		} finally {
 			rmSync(cwd, { recursive: true, force: true });
+		}
+	});
+}
+
+for (const readContext of [false, true]) {
+	void test(`scan MET needs a complete read of cited context (read=${readContext})`, async (t) => {
+		const cwd = mkdtempSync(path.join(tmpdir(), "pi-scan-context-coverage-"));
+		t.after(() => rmSync(cwd, { recursive: true, force: true }));
+		const commit = stageScan(cwd, true);
+		const candidate = {
+			outcome: "MET",
+			summary: "The file uses checked authentication",
+			explanation: "The context supplies the checked authentication helper.",
+			citations: [
+				{
+					sourceKind: "scm.repository.tree",
+					sourcePath: SOURCE_PATH,
+					path: CONTEXT_FILE,
+					commit,
+					startLine: 1,
+					endLine: 1,
+					quote: "checked(token);",
+				},
+			],
+			evidence: {},
+		};
+		const exit = await runRunner(
+			cwd,
+			{},
+			{
+				PI_HOST_SCAN_PATH: readContext ? CONTEXT_FILE : FILE,
+				PI_HOST_SESSION_CANDIDATE: JSON.stringify(candidate),
+			},
+		);
+		assert.equal(exit.status, readContext ? 0 : 1, exit.stderr);
+		if (readContext) {
+			const [request] = capturedLines(cwd, "admission");
+			const results = field(field(request, "body"), "results");
+			assert.ok(Array.isArray(results));
+			assert.equal(field(field(field(results[0], "candidate"), "coverage"), "complete"), true);
+		} else {
+			assert.ok(
+				exit.stderr.includes(
+					`read(${JSON.stringify({ path: CONTEXT_FILE, offset: 1, limit: 2000 })})`,
+				),
+				exit.stderr,
+			);
+			assert.deepEqual(capturedLines(cwd, "admission"), []);
 		}
 	});
 }

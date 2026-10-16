@@ -41,7 +41,11 @@ function read(
 }
 
 void test("an EOF slice leaves the middle gap until continuous coverage reaches EOF", () => {
-	const reads = new SessionReads("/workspace", [], () => 10_000);
+	const reads = new SessionReads(
+		"/workspace",
+		[{ path: "file.ts", supplied: false }],
+		() => 10_000,
+	);
 	read(reads, 1, 10_000, 2000, true);
 	read(reads, 9999, 2);
 	assert.equal(reads.coverage().complete, false);
@@ -52,7 +56,11 @@ void test("an EOF slice leaves the middle gap until continuous coverage reaches 
 });
 
 void test("an initial tail read and a forged continuation notice cannot prove full coverage", () => {
-	const reads = new SessionReads("/workspace", [], () => 10_000);
+	const reads = new SessionReads(
+		"/workspace",
+		[{ path: "file.ts", supplied: false }],
+		() => 10_000,
+	);
 	read(
 		reads,
 		9999,
@@ -71,6 +79,19 @@ void test("complete relevant brief sources permit a result without redundant too
 	assert.equal(reads.coverage().complete, true);
 	assert.equal(reads.coverage().reads, 0);
 	assert.equal(new SessionReads("/workspace").coverage().complete, false);
+});
+
+void test("a later partial read cannot revoke complete content supplied in the brief", () => {
+	// The brief omits the final empty line, while host line counts include it.
+	const reads = new SessionReads(
+		"/workspace",
+		[{ path: "file.ts", supplied: true, lines: 3 }],
+		() => 4,
+	);
+	read(reads, 1, 1);
+	assert.equal(reads.coverage().complete, true);
+	assert.equal(reads.hasCompleteRead("file.ts"), true);
+	assert.equal(reads.receipts.truncatedReads, 0);
 });
 
 void test("a relevant source omitted from the brief needs full reading even when another source was supplied", () => {
@@ -108,27 +129,12 @@ void test("absolute and relative paths cover the same pinned file", () => {
 });
 
 for (const isError of [false, true]) {
-	void test(`shell access has unknown coverage when isError=${isError}`, () => {
+	void test(`an ambiguous shell command cannot erase supplied coverage when isError=${isError}`, () => {
 		const reads = new SessionReads("/workspace", [{ path: "file.ts", supplied: true, lines: 1 }]);
-		reads.note({
-			type: "tool_execution_start",
-			toolCallId: "s",
-			toolName: "bash",
-			args: { command: "rg pattern file.ts | head" },
-		});
-		reads.note({
-			type: "tool_execution_end",
-			toolCallId: "s",
-			toolName: "bash",
-			isError,
-			result: { content: [{ type: "text", text: "one hit" }], details: {} },
-		});
-		const coverage = reads.coverage();
-		assert.equal(coverage.complete, false);
-		assert.equal(coverage.failedReads, isError ? 1 : 0);
-		assert.ok(
-			coverage.omitted.some((omission) => omission.what === "evidence coverage is unknown"),
-		);
+		bash(reads, "rg pattern file.ts | head", "one hit", false, isError ? 2 : 0);
+		assert.equal(reads.coverage().complete, true);
+		assert.equal(reads.receipts.failedReads, isError ? 1 : 0);
+		assert.equal(reads.coverage().failedReads, 0);
 	});
 }
 
@@ -193,8 +199,11 @@ void test("discovery and search alone do not imply that relevant content was rev
 	}
 });
 
-void test("pending evidence work prevents complete coverage", () => {
-	const reads = new SessionReads("/workspace", [{ path: "file.ts", supplied: true, lines: 1 }]);
+void test("a required source stays incomplete while its read is pending", () => {
+	const reads = new SessionReads("/workspace", [
+		{ path: "file.ts", supplied: true, lines: 1 },
+		{ path: "other.ts", supplied: false },
+	]);
 	reads.note({
 		type: "tool_execution_start",
 		toolCallId: "r",
@@ -387,12 +396,13 @@ void test("ambiguous, truncated, failed and forged shell reads cannot certify co
 		["rg -n one file.ts", "2:one\n", false, 0],
 		["grep one file.ts", "one\n", false, 0],
 	] as const) {
-		const reads = new SessionReads(root);
+		const reads = new SessionReads(root, [{ path: "file.ts", supplied: false }]);
 		bash(reads, command, output, cut, exit);
 		const coverage = reads.coverage();
 		assert.equal(coverage.complete, false, command);
-		assert.ok(
-			coverage.omitted.some((omission) => omission.what === "evidence coverage is unknown"),
+		assert.deepEqual(
+			coverage.omitted.flatMap((omission) => omission.items ?? []),
+			["file.ts"],
 			command,
 		);
 	}
@@ -404,8 +414,8 @@ void test("ambiguous, truncated, failed and forged shell reads cannot certify co
 	bash(ambiguous, "cat file.ts | head", "one\n");
 	assert.equal(
 		ambiguous.coverage().complete,
-		false,
-		"known content cannot certify an ambiguous command's other access",
+		true,
+		"an ambiguous command does not erase already supplied content",
 	);
 });
 
@@ -451,4 +461,97 @@ void test("native bash output receives receipts for each supported single-file f
 		});
 		assert.equal(reads.coverage().complete, true, `${command}: ${JSON.stringify(result)}`);
 	}
+});
+
+for (const command of [
+	"ls",
+	"ls context/ && ls work/ 2>/dev/null",
+	"find . -name '*.md' | head -10",
+	"git -C repos/reviewed log --oneline -5",
+	"git rev-parse HEAD",
+	"pwd",
+	"cat .gitignore 2>/dev/null",
+	"echo ---; ls; echo ---",
+]) {
+	void test(`exploration does not block MET over complete required content: ${command}`, () => {
+		const reads = new SessionReads("/workspace", [{ path: "file.ts", supplied: true, lines: 1 }]);
+		bash(reads, command, "discovery output", true, command.startsWith("cat") ? 1 : 0);
+		const coverage = reads.coverage();
+		assert.equal(coverage.complete, true);
+		assert.equal(coverage.reads, 1);
+		assert.equal(coverage.truncatedReads, 0);
+		assert.equal(coverage.failedReads, 0);
+		assert.ok(!("omitted" in coverage));
+	});
+}
+
+void test("a failed native optional read leaves complete coverage, but a required absent file blocks", () => {
+	for (const required of [false, true]) {
+		const reads = new SessionReads("/workspace", [
+			{ path: "file.ts", supplied: true, lines: 1 },
+			...(required ? [{ path: ".gitignore", supplied: false }] : []),
+		]);
+		reads.note({
+			type: "tool_execution_start",
+			toolCallId: "missing",
+			toolName: "read",
+			args: { path: ".gitignore" },
+		});
+		reads.note({
+			type: "tool_execution_end",
+			toolCallId: "missing",
+			toolName: "read",
+			isError: true,
+			result: { content: [{ type: "text", text: "ENOENT: .gitignore" }] },
+		});
+		assert.equal(reads.receipts.failedReads, 1);
+		const coverage = reads.coverage();
+		assert.equal(coverage.complete, !required);
+		assert.equal(coverage.failedReads, required ? 1 : 0);
+		if (!coverage.complete) {
+			assert.deepEqual(coverage.omitted[0].items, [".gitignore"]);
+		}
+	}
+});
+
+void test("a truncated INDEX is incidental until cited, while a required diff always blocks", (t) => {
+	const root = mkdtempSync(path.join(tmpdir(), "scoped-read-coverage-"));
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+	writeFileSync(path.join(root, "INDEX.json"), "one\ntwo\nthree");
+	writeFileSync(path.join(root, "diff.patch"), "first\nsecond\nthird");
+	const reads = new SessionReads(root, [{ path: "diff.patch", supplied: false }]);
+	bash(reads, "cat INDEX.json", "one\n", true);
+	bash(reads, "cat diff.patch", "first\n", true);
+	let coverage = reads.coverage();
+	assert.equal(coverage.complete, false);
+	assert.deepEqual(
+		coverage.omitted.flatMap((omission) => omission.items ?? []),
+		["diff.patch"],
+	);
+	bash(reads, "cat diff.patch", "first\nsecond\nthird");
+	assert.equal(reads.coverage().complete, true);
+	assert.equal(
+		reads.receipts.truncatedReads,
+		1,
+		"session diagnostics retain the incidental truncation",
+	);
+	coverage = reads.coverage(undefined, undefined, ["INDEX.json"]);
+	assert.equal(coverage.complete, false);
+	assert.deepEqual(
+		coverage.omitted.flatMap((omission) => omission.items ?? []),
+		["INDEX.json"],
+	);
+	bash(reads, "cat INDEX.json", "one\ntwo\nthree");
+	assert.equal(reads.coverage(undefined, undefined, ["INDEX.json"]).complete, true);
+});
+
+void test("a required head window is settled by a full read, including harmless stderr redirection", (t) => {
+	const root = mkdtempSync(path.join(tmpdir(), "head-read-coverage-"));
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+	writeFileSync(path.join(root, "file.ts"), "one\ntwo\nthree");
+	const reads = new SessionReads(root, [{ path: "file.ts", supplied: false }]);
+	bash(reads, "head -n 1 file.ts 2>/dev/null", "one\n");
+	assert.equal(reads.coverage().complete, false);
+	bash(reads, "cat file.ts 2>/dev/null", "one\ntwo\nthree");
+	assert.equal(reads.coverage().complete, true);
 });

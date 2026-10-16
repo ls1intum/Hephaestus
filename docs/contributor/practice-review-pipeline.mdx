@@ -122,13 +122,18 @@ An invalid custom script stops its practice without fallback.
 Only the final candidate returned by the script reaches admission.
 
 The host supplies assignment identity and trusted read receipts.
-ITEM coverage includes relevant sources supplied or omitted by the opening brief.
-A brief-only decision can be complete when all relevant records were supplied.
-An omitted record requires continuous reads from line 1 through EOF.
+ITEM coverage includes the practice's required sources and the sources that its result cites.
+A brief-only decision can be complete when the opening brief supplied all these sources.
+An omitted source requires continuous reads from line 1 through EOF.
+A failed read or an unread range of a required or cited source prevents complete coverage.
+A later complete read can close the gap.
 
 The same range accounting governs ITEM file reads and SCAN reads.
-Shell access has unknown coverage because it supplies no governed receipt.
-No observed read failure does not establish complete coverage.
+Simple literal shell reads receive coverage only when their output matches the pinned source.
+Other shell commands grant no coverage.
+Listings, metadata, history queries and failed reads of optional paths do not prevent complete coverage.
+Session diagnostics retain all observed reads.
+Candidate omissions and failure counts describe only gaps in the sources needed by that result.
 
 The server verifies shape, outcome requirements, quotations, source permission and claim basis.
 One invalid problem, example or citation withholds the complete candidate.

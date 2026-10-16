@@ -334,36 +334,15 @@ interface Validated {
 }
 
 function incompleteCoverageText(coverage: Coverage): string {
-	const omitted = coverage.complete
-		? []
-		: coverage.omitted.map(
-				(omission) =>
-					`${omission.count} ${omission.what}${omission.items === undefined ? "" : ` (${omission.items.join(", ")})`}`,
-			);
-	const paths = coverage.complete
-		? []
-		: [
-				...new Set(
-					coverage.omitted.flatMap((omission) =>
-						[
-							"reads cut short at the tool's output limit",
-							"relevant sources not supplied or read",
-							"evidence coverage is unknown",
-						].includes(omission.what)
-							? (omission.items ?? []).filter((item) => !item.startsWith("bash:"))
-							: [],
-					),
-				),
-			];
+	const omissions = coverage.complete ? [] : coverage.omitted;
+	const paths = [...new Set(omissions.flatMap((omission) => omission.items ?? []))];
 	const repair = paths
-		.slice(0, 2)
 		.map((target) => `read(${JSON.stringify({ path: target, offset: 1, limit: 2000 })})`)
 		.join("; ");
 	return (
-		`a MET result needs complete coverage, and this session's reads did not complete: ${omitted.join("; ")}. ` +
-		"Read the rest of what was cut short, with an offset or a narrower search, and submit again; or submit what the " +
-		"evidence supports: NOT_MET for a problem it proves, or COULD_NOT_DETERMINE with the open question. " +
-		`Read calls for the named paths: ${repair || "read the relevant captured sources with read({path: <source path>})"}. Continue from each returned offset until EOF. Ambiguous shell access stays unknown. A required read failure produces no result.`
+		`a MET result needs complete coverage of its required and cited sources: ${omissions.map((omission) => `${omission.what}${omission.items === undefined ? "" : ` (${omission.items.join(", ")})`}`).join("; ")}. ` +
+		`Read these sources: ${repair || "read the captured sources needed by the criterion"}. ` +
+		"Continue from each returned offset until EOF, then submit again. A required source that remains unavailable produces no result."
 	);
 }
 
@@ -1262,7 +1241,7 @@ export async function runReviewJob(): Promise<void> {
 	function validateSubmission(
 		raw: unknown,
 		slug: string,
-		coverage: Coverage,
+		measureCoverage: (citations: readonly Citation[]) => Coverage,
 		changeRead: boolean,
 	): Validated {
 		const notes: string[] = [];
@@ -1342,6 +1321,7 @@ export async function runReviewJob(): Promise<void> {
 			readChange(INPUT_PATHS.contextRoot),
 		);
 		validateConversationAttribution(submission, assignment);
+		const coverage = measureCoverage(citations);
 		const parsed = parseCandidate({ ...submission, coverage });
 		if (!parsed.ok) {
 			throw new Error(
@@ -1750,13 +1730,66 @@ export async function runReviewJob(): Promise<void> {
 			validated = validateSubmission(
 				raw,
 				slug,
-				review.reads.coverage(review.reader, review.domainReads),
+				(citations) => {
+					const citedPaths = citations.flatMap((citation) => {
+						// Governed scan reads already carry a pinned, complete file receipt.
+						if (
+							review.reader?.readReceipts.some(
+								(receipt) =>
+									receipt.status === "COMPLETE" &&
+									receipt.sourceKind === citation.sourceKind &&
+									receipt.sourcePath === citation.sourcePath &&
+									receipt.path === citation.path &&
+									(citation.commit === undefined || receipt.version === citation.commit),
+							) === true
+						) {
+							return [];
+						}
+						if (assignedInputs.get(slug)?.scope.kind === "SCAN") {
+							return [citation.path];
+						}
+						if (citation.sourceKind === DIFF_SOURCE) {
+							return [`${CHANGE_ROOT}/diff.patch`];
+						}
+						const matches = capturedTexts.filter(
+							(entry) =>
+								entry.source === citation.sourceKind &&
+								entry.path === citation.path &&
+								entry.side === (citation.side ?? "NEW") &&
+								(citation.commit === undefined || entry.commit === citation.commit),
+						);
+						const proof = matches.length > 1 ? reviewedVersion(citation, matches) : matches[0];
+						const sourcePath =
+							citation.sourceKind === TREE_SOURCE
+								? nodePath.relative(
+										CWD,
+										nodePath.resolve(citationRepository(citation), citation.path),
+									)
+								: citation.sourcePath;
+						// The checkout can cover a captured copy only when the complete bytes match.
+						if (
+							citation.sourceKind === TREE_SOURCE &&
+							proof !== undefined &&
+							review.reads.hasCompleteRead(sourcePath) &&
+							createHash("sha256")
+								.update(readFileSync(nodePath.resolve(CWD, sourcePath)))
+								.digest("hex") === proof.sha256
+						) {
+							return [sourcePath];
+						}
+						return [proof?.stagedPath ?? sourcePath];
+					});
+					return review.reads.coverage(review.reader, review.domainReads, citedPaths);
+				},
 				review.reads.hasRead(`${CHANGE_ROOT}/diff.patch`),
 			);
 		} catch (error) {
 			countRefusal(slug);
 			const reason = errorText(error);
-			sessionState().refusedItems.set(sent, { reason, resent: 0 });
+			// A later source read can settle coverage without changing the submitted result.
+			if (!reason.startsWith("a MET result needs complete coverage")) {
+				sessionState().refusedItems.set(sent, { reason, resent: 0 });
+			}
 			return { kind: "refused", slug, reason };
 		}
 		const { candidate, notes } = validated;
@@ -1898,6 +1931,10 @@ export async function runReviewJob(): Promise<void> {
 			exposure: "model-only",
 			label: "Submit Result",
 			description:
+				"Choose one outcome and its evidence shape. MET: evidence:{} or evidence.search; " +
+				"NOT_MET: problems plus optional evidence.search and evidence.openQuestions; " +
+				"DOES_NOT_APPLY: evidence.inapplicability only; COULD_NOT_DETERMINE: evidence.openQuestions, with optional evidence.search. " +
+				"Omit unused fields. Each open question requires openQuestion and wouldSettleIt. " +
 				`Submit the one complete evidenced result of this session's practice: its outcome, the explanation, the ` +
 				`citations it rests on, and for NOT_MET each problem with its severity, citations and basis. The host adds ` +
 				`the coverage it measured from your reads and keeps the result for server admission after measuring. To ` +

@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { prepareResultArguments } from "../../../main/resources/agent/pi-tool-arguments.ts";
+import {
+	prepareResultArguments,
+	validateResultEvidence,
+} from "../../../main/resources/agent/pi-tool-arguments.ts";
 
 const changeCitation = {
 	sourceKind: "scm.pull-request.diff",
@@ -50,7 +53,7 @@ void test("a result in its declared form is kept as it is, and preparing it agai
 	assert.deepEqual(prepareResultArguments(prepared), prepared);
 });
 
-void test("JSON-encoded lists and objects are decoded at every level, while the root stays typed", () => {
+void test("JSON-encoded lists and objects are decoded at every level", () => {
 	const encoded = {
 		...result,
 		citations: JSON.stringify([treeCitation]),
@@ -297,4 +300,216 @@ void test("argument envelopes neither discard sibling fields nor unwrap a second
 	const withSibling = { args: result, confidence: 1 };
 	assert.deepEqual(prepareResultArguments(withSibling), withSibling);
 	assert.deepEqual(prepareResultArguments({ args: { input: result } }), { input: result });
+});
+
+const search = {
+	consulted: ["scm.pull-request.diff"],
+	lookedFor: "Unchecked authentication calls",
+	boundary: "Captured change only",
+};
+const inapplicability = {
+	consulted: ["scm.pull-request.diff"],
+	prerequisite: "UI changes",
+	ruledOutBy: "Only a server test changed.",
+};
+
+void test("one JSON-encoded envelope retains every claim", () => {
+	for (const key of ["args", "arguments", "input"]) {
+		assert.deepEqual(prepareResultArguments({ [key]: JSON.stringify(result) }), result);
+		assert.deepEqual(prepareResultArguments({ [key]: JSON.stringify({ input: result }) }), {
+			input: result,
+		});
+		const sibling = { [key]: JSON.stringify(result), confidence: 1 };
+		assert.deepEqual(prepareResultArguments(sibling), sibling);
+	}
+});
+
+void test("an extra closing brace after complete evidence carries no claim and is removed", () => {
+	for (const [outcome, evidence] of [
+		["MET", { search }],
+		["NOT_MET", { search }],
+		["DOES_NOT_APPLY", { inapplicability }],
+		["COULD_NOT_DETERMINE", { search, openQuestions: [question] }],
+	] as const) {
+		const input = { outcome, evidence: `${JSON.stringify(evidence)}}` };
+		const prepared = prepareResultArguments(input);
+		assert.deepEqual(prepared, { outcome, evidence });
+		assert.doesNotThrow(() => validateResultEvidence(prepared, []));
+		assert.deepEqual(prepareResultArguments(prepared), prepared);
+	}
+	const unicode = { ...result, explanation: 'Read "🔒" and escaped \\ delimiters: } ]' };
+	assert.deepEqual(prepareResultArguments({ args: `${JSON.stringify(unicode)}}` }), unicode);
+});
+
+void test("container repair never completes truncated JSON or discards another value", () => {
+	for (const evidence of [
+		JSON.stringify({ search }).slice(0, -1),
+		`${JSON.stringify({ search })} {"inapplicability":{}}`,
+		`${JSON.stringify({ search })},"inapplicability":{}}`,
+		`${JSON.stringify({ search })}]`,
+		'{"search":{"boundary":"unterminated}}}',
+	]) {
+		const prepared = prepareResultArguments({ outcome: "MET", evidence });
+		assert.equal(prepared.evidence, evidence);
+		assert.throws(() => validateResultEvidence(prepared, []), /Corrected call example/u);
+	}
+});
+
+void test("flat search fields need correction, while exact copies of nested fields can be omitted", () => {
+	for (const outcome of ["MET", "NOT_MET"]) {
+		assert.deepEqual(
+			prepareResultArguments({ outcome, evidence: { search, ...search } }).evidence,
+			{ search },
+		);
+		for (const evidence of [
+			search,
+			{
+				search: { consulted: search.consulted },
+				lookedFor: search.lookedFor,
+				boundary: search.boundary,
+			},
+			{ search, boundary: "A different search boundary" },
+		]) {
+			const prepared = prepareResultArguments({ outcome, evidence });
+			assert.deepEqual(prepared.evidence, evidence);
+			assert.throws(() => validateResultEvidence(prepared, []), /Corrected call example/u);
+		}
+	}
+});
+
+void test("empty or duplicate extras are removed, while different citation coordinates remain invalid", () => {
+	for (const unused of [null, [], {}, ""]) {
+		assert.deepEqual(
+			prepareResultArguments({
+				...result,
+				citations: [{ ...treeCitation, endLine2: unused }],
+				evidence: { openQuestions: [question], inapplicability: unused, spare: unused },
+			}),
+			result,
+		);
+	}
+	assert.deepEqual(
+		prepareResultArguments({
+			...result,
+			citations: [
+				{
+					...treeCitation,
+					path2: treeCitation.path,
+					startLine2: treeCitation.startLine,
+					quote2: treeCitation.quote,
+				},
+			],
+		}),
+		result,
+	);
+	const distinct = { ...treeCitation, path2: "src/Other.java", startLine2: 9, quote2: "other();" };
+	assert.deepEqual(prepareResultArguments({ ...result, citations: [distinct] }).citations, [
+		distinct,
+	]);
+	assert.deepEqual(
+		prepareResultArguments({
+			outcome: "DOES_NOT_APPLY",
+			evidence: { inapplicability: { ...inapplicability, boundary: "Different content" } },
+		}).evidence,
+		{ inapplicability: { ...inapplicability, boundary: "Different content" } },
+	);
+});
+
+void test("a warrant under the wrong outcome key is refused with a correction from the call", () => {
+	const input = {
+		outcome: "DOES_NOT_APPLY",
+		summary: "Server change",
+		explanation: "Only the server changed.",
+		evidence: { search },
+	};
+	const prepared = prepareResultArguments(input);
+	assert.deepEqual(prepared, input);
+	assert.throws(
+		() => validateResultEvidence(prepared, []),
+		/Required: inapplicability.*Corrected call example.*"summary":"Server change".*"explanation":"Only the server changed\."/u,
+	);
+
+	const met = prepareResultArguments({ outcome: "MET", evidence: { openQuestions: [question] } });
+	assert.throws(() => validateResultEvidence(met, []), /evidence.openQuestions.*only search/u);
+});
+
+void test("missing outcomes and unsupported synonyms remain decisions for the model", () => {
+	for (const outcome of [undefined, "PASS", "FAIL", "N/A", { status: "MET" }]) {
+		const prepared = prepareResultArguments({
+			outcome,
+			summary: "Authentication calls",
+			evidence: {},
+		});
+		assert.throws(
+			() => validateResultEvidence(prepared, []),
+			/Corrected call example.*Authentication calls.*no outcome was inferred/u,
+		);
+	}
+});
+
+void test("string questions require the missing settling evidence and preserve the question in the correction", () => {
+	assert.throws(
+		() =>
+			prepareResultArguments({
+				outcome: "COULD_NOT_DETERMINE",
+				evidence: { openQuestions: ["Does the caller check the token?"] },
+			}),
+		/requires openQuestion and wouldSettleIt.*Corrected call example.*"openQuestion":"Does the caller check the token\?"/u,
+	);
+});
+
+void test("sourceKind is left for captured-source resolution, never inferred from a path spelling", () => {
+	const citation = { path: "context/unknown.json", startLine: 1, quote: "captured" };
+	assert.deepEqual(prepareResultArguments({ ...result, citations: [citation] }).citations, [
+		citation,
+	]);
+});
+
+void test("null evidence is absence only when the outcome has no required warrant", () => {
+	for (const outcome of ["MET", "NOT_MET"]) {
+		assert.deepEqual(prepareResultArguments({ outcome, evidence: null }).evidence, {});
+	}
+	for (const outcome of ["DOES_NOT_APPLY", "COULD_NOT_DETERMINE"]) {
+		assert.throws(
+			() => validateResultEvidence(prepareResultArguments({ outcome, evidence: null }), []),
+			/Required:.*Corrected call example/u,
+		);
+	}
+});
+
+void test("malformed problem strings retain their content for refusal rather than receiving guessed punctuation", () => {
+	for (const problems of [
+		'[{"summary":"Unchecked call","basis":{"type":"introduced","head":0}]}',
+		'[{"summary":"Unchecked call","basis":{"type":"introduced","head":0}}',
+		'[{"summary":"Unchecked call","citations":[{"quote":"call();""sourceKind":"scm.pull-request.diff"}]}]',
+	]) {
+		assert.equal(prepareResultArguments({ ...result, problems }).problems, problems);
+	}
+	assert.deepEqual(
+		prepareResultArguments({ ...result, problems: JSON.stringify([problem]) }),
+		result,
+	);
+});
+
+void test("unused outcomes and duplicate warrant keys cannot erase a required branch", () => {
+	const nested = { search: { ...search, openQuestions: [question] }, openQuestions: [question] };
+	assert.deepEqual(
+		prepareResultArguments({ outcome: "COULD_NOT_DETERMINE", evidence: nested }).evidence,
+		nested,
+	);
+});
+
+void test("malformed JSON envelopes show a complete result shape instead of guessing an outcome", () => {
+	for (const wrapper of ["args", "arguments", "input"]) {
+		for (const text of [
+			JSON.stringify(result).slice(0, -1),
+			'"NOT_MET"',
+			'{"outcome":"MET" "evidence":{}}',
+		]) {
+			assert.throws(
+				() => prepareResultArguments({ [wrapper]: text }),
+				/expected a complete result object.*Corrected call example.*copy your summary.*no content or outcome was inferred/u,
+			);
+		}
+	}
 });
