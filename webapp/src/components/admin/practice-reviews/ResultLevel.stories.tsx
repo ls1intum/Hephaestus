@@ -210,8 +210,13 @@ export const OpenQuestions: Story = {
 		questions.getByText(
 			"Would settle it: A link to the discussion or incident that chose this order.",
 		);
-		questions.getByText("Runbook: restoring a workspace from backup", { selector: "code" });
-		await expect(questions.getAllByText(/^At/u)).toHaveLength(1);
+		await expect(
+			panel.getByRole("link", { name: /^Runbook: restoring a workspace from backup/u }),
+		).toBeVisible();
+		await expect(
+			questions.queryByText("Runbook: restoring a workspace from backup", { selector: "code" }),
+		).not.toBeInTheDocument();
+		await expect(questions.queryByText(/^At/u)).not.toBeInTheDocument();
 		await expect(panel.queryByRole("list", { name: "Problems" })).not.toBeInTheDocument();
 		await expect(panel.queryByText(/problems?$/u)).not.toBeInTheDocument();
 	},

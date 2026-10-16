@@ -86,10 +86,11 @@ function placeOf(problem: ReviewProblem) {
 		return;
 	}
 	const place = { sourceKind, path, startLine, endLine, side };
-	return {
-		location: citationLocation(place),
-		before: side === "OLD" ? citationSide(place) : undefined,
-	};
+	const location = citationLocation(place);
+	if (location === undefined) {
+		return;
+	}
+	return { location, before: side === "OLD" ? citationSide(place) : undefined };
 }
 
 export interface ProblemRowProps {

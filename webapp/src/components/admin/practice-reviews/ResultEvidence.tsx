@@ -16,7 +16,6 @@ export interface ResultEvidenceProps {
 	hidden?: boolean;
 }
 
-// Non-code coordinates refer to serialized input, so they cannot identify a location in the source app.
 export function ResultEvidence({ citations, hidden = false }: ResultEvidenceProps) {
 	if (hidden) {
 		return (
@@ -79,7 +78,7 @@ function EvidenceSourceSection({ group }: { group: EvidenceSourceGroup }) {
 					>
 						<CitationHeader citation={citation} locator={def.locator} />
 						{citation.quote === null ? (
-							<RedactedQuote />
+							<RedactedQuote located={citationLocation(citation) !== undefined} />
 						) : (
 							<pre className="overflow-x-auto p-3 text-xs break-words whitespace-pre-wrap">
 								{citation.quote}
@@ -97,14 +96,18 @@ type CitationPlace = Pick<
 	"sourceKind" | "path" | "startLine" | "endLine" | "side"
 >;
 
+/**
+ * Where a passage sits in the work. Only a code citation has such a place: any other coordinate
+ * points into the serialized input the review read, which is not a location in the source app.
+ */
 export function citationLocation(citation: CitationPlace): string | undefined {
 	const { path, startLine, endLine } = citation;
-	if (path === null) {
+	if (path === null || evidenceSourceDef(citation.sourceKind).locator !== "code") {
 		return undefined;
 	}
-	return evidenceSourceDef(citation.sourceKind).locator === "code" && startLine !== null
-		? codeCitationLocator({ path, startLine, endLine: endLine ?? undefined })
-		: path;
+	return startLine === null
+		? path
+		: codeCitationLocator({ path, startLine, endLine: endLine ?? undefined });
 }
 
 export function citationSide(citation: CitationPlace): string | undefined {
@@ -122,15 +125,18 @@ function CitationHeader({
 }) {
 	const side = citationSide(citation);
 	const location = citationLocation(citation);
+	// The source's heading already names an object source; it has no place of its own to show.
+	if (locator !== "code" && !hasText(citation.commit)) {
+		return null;
+	}
 	return (
 		<div className="flex flex-wrap items-center gap-2 border-b bg-muted/50 px-3 py-2">
-			{locator === "code" && location !== undefined ? (
-				<code className="min-w-0 text-xs break-all">{location}</code>
-			) : (
-				<p className="min-w-0 text-xs break-words text-muted-foreground">
-					{location ?? "Location not recorded"}
-				</p>
-			)}
+			{locator === "code" &&
+				(location === undefined ? (
+					<p className="min-w-0 text-xs break-words text-muted-foreground">Location not recorded</p>
+				) : (
+					<code className="min-w-0 text-xs break-all">{location}</code>
+				))}
 			{side !== undefined && (
 				<Badge variant="outline" className="shrink-0">
 					{side}
@@ -145,11 +151,13 @@ function CitationHeader({
 	);
 }
 
-function RedactedQuote() {
+function RedactedQuote({ located }: { located: boolean }) {
 	return (
 		<p className="flex items-start gap-2 p-3 text-sm text-muted-foreground">
 			<ShieldAlertIcon className="mt-0.5 size-4 shrink-0" aria-hidden />
-			Not quoted. The passage was withheld, so only its location was kept.
+			{located
+				? "Not quoted. The passage was withheld, so only its location was kept."
+				: "Not quoted. The passage was withheld."}
 		</p>
 	);
 }

@@ -159,15 +159,34 @@ export const EverySource: Story = {
 	},
 };
 
-// Object coordinates identify serialized context; only code locators expose source line numbers.
+// Object coordinates identify serialized context; only a code locator names a place in the work.
 export const LineNumbersOnlyWhereTheyAreReal: Story = {
 	args: {
-		citations: [citation("scm.repository.tree"), citation("slack.conversation.thread")],
+		citations: [
+			citation("scm.repository.tree"),
+			citation("scm.pull-request.core", { path: "context/metadata.json", quote: '"body" : null' }),
+		],
 	},
 	play: async ({ canvas }) => {
 		canvas.getByText("webapp/src/lib/item-kinds.ts:12–13");
-		canvas.getByText("Message from Ada Lovelace");
-		await expect(canvas.queryByText(/Message from Ada Lovelace:12/u)).not.toBeInTheDocument();
+		// The object passage keeps its named source and its quote, and gains no coordinate.
+		canvas.getByRole("heading", { name: "The reviewed work itself", level: 4 });
+		await expect(canvas.getByText('"body" : null')).toBeVisible();
+		await expect(canvas.queryByText(/context\/metadata\.json/u)).not.toBeInTheDocument();
+		await expect(canvas.queryByText("Location not recorded")).not.toBeInTheDocument();
+	},
+};
+
+// A withheld object passage has no location to keep, so the notice claims none.
+export const RedactedObjectQuote: Story = {
+	args: {
+		citations: [citation("scm.pull-request.core", { path: "context/metadata.json", quote: null })],
+	},
+	play: async ({ canvas, canvasElement }) => {
+		canvas.getByText("Not quoted. The passage was withheld.");
+		await expect(canvas.queryByText(/only its location was kept/u)).not.toBeInTheDocument();
+		await expect(canvas.queryByText("Location not recorded")).not.toBeInTheDocument();
+		await expect(canvasElement.querySelector("pre")).toBeNull();
 	},
 };
 

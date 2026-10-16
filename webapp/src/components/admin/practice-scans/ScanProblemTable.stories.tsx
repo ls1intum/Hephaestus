@@ -1,13 +1,32 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, within } from "storybook/test";
 
+import type { ScanReportProblem } from "@/api/types.gen";
 import { withStandardPage } from "@/stories/decorators";
 import { StatefulPatch } from "@/stories/stateful";
 
 import { PROBLEM_ENTRIES } from "./fixtures";
 import { ScanProblemTable } from "./ScanProblemTable";
 
-const ready = (entries = PROBLEM_ENTRIES) => ({
+function citedFrom(
+	entry: ScanReportProblem,
+	citation: Partial<ScanReportProblem["problem"]["citations"][number]>,
+): ScanReportProblem {
+	return {
+		...entry,
+		problem: {
+			...entry.problem,
+			citations: entry.problem.citations.map((cited) => ({ ...cited, ...citation })),
+		},
+	};
+}
+
+// A scan cites the scanned file from the repository tree, as the source catalog declares.
+const TREE_ENTRIES = PROBLEM_ENTRIES.map((entry) =>
+	citedFrom(entry, { sourceKind: "scm.repository.tree" }),
+);
+
+const ready = (entries = TREE_ENTRIES) => ({
 	status: "ready" as const,
 	entries,
 	hasNext: false,
@@ -71,6 +90,39 @@ export const Default: Story = {
 
 		await userEvent.click(canvas.getByRole("button", { name: "Absent (2)" }));
 		await expect(args.onFilterChange).toHaveBeenCalledWith("ABSENT");
+	},
+};
+
+const [first] = TREE_ENTRIES;
+if (first === undefined) {
+	throw new globalThis.Error("The scan fixtures must contain a problem");
+}
+
+/**
+ * A code citation without a path of its own stands in the scanned file and keeps its real lines; a
+ * citation into captured input names only the scanned file, with no file or line of that capture.
+ */
+export const WhereEachProblemSits: Story = {
+	args: {
+		state: ready([
+			citedFrom(first, { path: null }),
+			citedFrom(
+				{ ...first, problem: { ...first.problem, id: "p-object" } },
+				{
+					sourceKind: "hephaestus.result-history",
+					path: "context/result_history.json",
+					startLine: 7,
+					endLine: 7,
+				},
+			),
+		]),
+	},
+	play: async ({ canvas }) => {
+		const table = canvas.getByRole("table", { name: "Problems in this scan" });
+		await expect(within(table).getByText("server/src/ScanService.java:42–48")).toBeVisible();
+		await expect(within(table).getByText("server/src/ScanService.java")).toBeVisible();
+		await expect(within(table).queryByText(/result_history\.json/u)).not.toBeInTheDocument();
+		await expect(within(table).queryByText(/ScanService\.java:7/u)).not.toBeInTheDocument();
 	},
 };
 

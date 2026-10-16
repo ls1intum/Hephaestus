@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { CircleCheckIcon, CircleDashedIcon, HourglassIcon, SearchXIcon } from "lucide-react";
 
 import type { ProblemChanges, ScanReportProblem } from "@/api/types.gen";
+import { citationLocation } from "@/components/admin/practice-reviews/ResultEvidence";
 import { problemLevel } from "@/components/admin/practice-reviews/review-levels";
 import { EmptyState } from "@/components/common/EmptyState";
 import { type FilterOption, FilterToggle } from "@/components/common/FilterToggle";
@@ -63,15 +64,15 @@ function changeCount(changes: ProblemChanges, state: ProblemBaselineState): numb
 	}
 }
 
+// A code citation without a path of its own stands in the scanned file; any other citation's
+// coordinates point into captured input, so the row names the scanned file without lines.
 function citationText(entry: ScanReportProblem): string {
 	const citation = entry.problem.citations[0];
-	const path = citation?.path ?? entry.item.path ?? itemName(entry.item);
-	if (citation?.startLine == null) {
-		return path;
-	}
-	return citation.endLine == null || citation.endLine === citation.startLine
-		? `${path}:${citation.startLine}`
-		: `${path}:${citation.startLine}–${citation.endLine}`;
+	const located =
+		citation === undefined
+			? undefined
+			: citationLocation({ ...citation, path: citation.path ?? entry.item.path });
+	return located ?? entry.item.path ?? itemName(entry.item);
 }
 
 // Absence proves a fix only after another review under the same standard and method.

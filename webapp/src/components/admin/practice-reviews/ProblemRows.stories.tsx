@@ -88,7 +88,7 @@ export const Places: Story = {
 					...code,
 					id: "ffffffff-ffff-ffff-ffff-ffffffffffff",
 					sourceKind: "scm.review-threads",
-					path: "Review thread on ReviewQueryService.java",
+					path: "context/review_threads.json",
 					startLine: 3,
 					endLine: 3,
 					side: null,
@@ -101,10 +101,9 @@ export const Places: Story = {
 		within(table).getByText(`${codePath}:40`);
 		await expect(within(table).getByText("Before")).toBeVisible();
 		await expect(within(table).queryByText("After")).toBeNull();
-		within(table).getByText("Review thread on ReviewQueryService.java");
-		await expect(
-			within(table).queryByText(/Review thread on ReviewQueryService\.java:/u),
-		).toBeNull();
+		// A thread is read from the review's capture, which is no place in the work: its row names none.
+		await expect(within(table).queryByText(/review_threads\.json/u)).toBeNull();
+		await expect(within(table).getAllByRole("link", { name: /^Open problem/u })).toHaveLength(3);
 	},
 };
 
