@@ -10,6 +10,26 @@
  ],
  "customTools": [
   {
+   "name": "bash",
+   "description": "Execute a bash command in the current working directory. Returns stdout and stderr. Output is truncated to last 2000 lines or 50KB (whichever is hit first). If truncated, full output is saved to a temp file. Optionally provide a timeout in seconds. Use read or grep for source content you will rely on. Use bash for Git history and listings. Only simple literal single-file reads can receive exact read coverage; pipes, redirection, globs, substitutions, and compound commands keep coverage unknown.",
+   "parameters": {
+    "type": "object",
+    "required": [
+     "command"
+    ],
+    "properties": {
+     "command": {
+      "type": "string",
+      "description": "Shell command to execute"
+     },
+     "timeout": {
+      "type": "number",
+      "description": "Timeout in seconds (optional, no default timeout)"
+     }
+    }
+   }
+  },
+  {
    "name": "submit_result",
    "description": "Submit the one complete evidenced result of this session's practice: its outcome, the explanation, the citations it rests on, and for NOT_MET each problem with its severity, citations and basis. The host adds the coverage it measured from your reads and keeps the result for server admission after measuring. To correct it, submit the complete result again. Cite the source you read; the runner resolves source kind, manifest identity and the captured revision. Citation examples: {\"path\":\"src/Auth.java\",\"startLine\":10,\"quote\":\"insecure();\"}; {\"sourcePath\":\"work/change/diff.patch\",\"path\":\"src/Auth.java\",\"side\":\"NEW\",\"startLine\":10,\"quote\":\"+ insecure();\"}; {\"path\":\"evidence/metadata.json\",\"startLine\":1,\"quote\":\"Add login\"}. Use only text you read. Examples show the shape, not evidence for this review. Evidence examples by outcome: MET: {\"evidence\":{\"search\":{\"consulted\":[\"scm.review-threads\"],\"lookedFor\":\"unanswered requests\",\"boundary\":\"Captured threads only; no private discussion.\"}}}; DOES_NOT_APPLY: {\"evidence\":{\"inapplicability\":{\"consulted\":[\"scm.pull-request.diff\"],\"prerequisite\":\"UI changes\",\"ruledOutBy\":\"Only a server test changed.\"}}}; COULD_NOT_DETERMINE: {\"evidence\":{\"openQuestions\":[{\"openQuestion\":\"Did the named check pass?\",\"wouldSettleIt\":\"The check report linked in the description.\"}]}}; NOT_MET: {\"evidence\":{},\"problems\":[{\"severity\":\"MAJOR\",\"summary\":\"Required check is skipped\",\"explanation\":\"The captured event skips the required check.\",\"citations\":[{\"path\":\"context/events.json\",\"startLine\":2,\"quote\":\"check skipped\"}],\"basis\":{\"type\":\"duty\",\"event\":0,\"criterionQuote\":\"Run the check\",\"explanation\":\"The cited event skips the required check.\"}}]}. MET may use evidence:{} when cited positive evidence decides it. Search warrants also apply to absence claims in NOT_MET and COULD_NOT_DETERMINE. Never turn a capture failure into an outcome.",
    "parameters": {
@@ -31,7 +51,7 @@
        "DOES_NOT_APPLY",
        "COULD_NOT_DETERMINE"
       ],
-      "description": "MET — The work meets the practice in the captured evidence, and your reads covered everything the criteria ask about. Cite the evidence. A MET never rests on 'the search returned nothing' alone: an absence claim needs a bounded, complete search in evidence.search. Do not infer mastery or unseen work.\nNOT_MET — The work does not meet the practice. Submit one result for the practice and list each distinct gap in problems, each with its severity, summary, explanation, citations and basis. The problems carry the citations, so the result itself may cite nothing. Only problems carry severity.\nDOES_NOT_APPLY — A concrete fact rules out the practice's prerequisite applicability. Record the prerequisite and the exclusion in evidence.inapplicability. This is not missing or incomplete evidence.\nCOULD_NOT_DETERMINE — Relevant evidence was captured and read, but it does not settle whether the work meets the practice. Record each open question in evidence.openQuestions: the question, what would settle it, and a citation where it is located. A capture failure is a review readiness failure, not a result."
+      "description": "MET — The work meets the practice in the captured evidence, and your reads covered everything the criteria ask about. Cite the evidence. A MET never rests on 'the search returned nothing' alone: an absence claim needs a bounded, complete search in evidence.search. Do not infer mastery or unseen work.\nNOT_MET — The work does not meet the practice. Submit one result for the practice and list each distinct gap in problems, each with its severity, summary, explanation, citations and basis. The problems carry the citations, so the result itself may cite nothing. Only problems carry severity.\nDOES_NOT_APPLY — A concrete fact rules out the practice's prerequisite applicability. Record the prerequisite and the exclusion in evidence.inapplicability. This is not missing or incomplete evidence.\nCOULD_NOT_DETERMINE — Relevant evidence was captured and read, but it does not settle whether the work meets the practice. Record each open question in evidence.openQuestions: the question, what would settle it, and a citation where it is located. A capture failure is a review readiness failure, not a result. Use these exact values. Case variants, NOT_APPLICABLE for DOES_NOT_APPLY, and UNDETERMINED for COULD_NOT_DETERMINE are accepted."
      },
      "summary": {
       "type": "string",
@@ -494,7 +514,7 @@
      "evidence": {
       "type": "object",
       "additionalProperties": false,
-      "description": "An object with only these outcome-specific fields. MET: optional search warrant; DOES_NOT_APPLY: required inapplicability; COULD_NOT_DETERMINE: required openQuestions and optional search; NOT_MET: optional search and openQuestions. Put consulted, lookedFor and boundary inside search, never directly inside evidence. Omit unused fields or use null.",
+      "description": "An object with only these outcome-specific fields. MET: optional search warrant; DOES_NOT_APPLY: required inapplicability; COULD_NOT_DETERMINE: required openQuestions and optional search; NOT_MET: optional search and openQuestions. Put consulted, lookedFor and boundary inside search, never directly inside evidence. Omit unused fields; empty values in unused fields are treated as omitted.",
       "properties": {
        "search": {
         "anyOf": [

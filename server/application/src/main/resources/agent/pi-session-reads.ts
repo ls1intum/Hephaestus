@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 
+import { bashRead, bashReadRanges, bashPaths } from "./pi-bash-reads.ts";
+
 import type { CitableText } from "./pi-folder-index.ts";
 import type { BriefSource } from "./pi-review-brief.ts";
 import {
@@ -37,6 +39,7 @@ export class SessionReads {
 	readonly cutSearches: string[] = [];
 	readonly failed: string[] = [];
 	readonly unknown: string[] = [];
+	readonly #unknownPaths = new Set<string>();
 	readonly pending = new Map<string, unknown>();
 	readonly #supplied: boolean;
 	readonly #observedContent = new Set<string>();
@@ -113,9 +116,9 @@ export class SessionReads {
 			isRecord(args) && typeof args.path === "string" ? this.#key(args.path) : undefined;
 		const named = target ?? event.toolName;
 		const text = textOf(event.result);
-		// Shell commands can hide gaps, failures, and their own output cuts. They cannot certify coverage.
 		if (event.toolName === "bash") {
-			this.unknown.push("bash evidence access has no governed read receipt");
+			this.#bash(args, event.result, event.isError);
+			return;
 		}
 		if (event.isError) {
 			if (!ABSENT_PATH.test(text)) {
@@ -156,6 +159,47 @@ export class SessionReads {
 		}
 		if (cut) {
 			this.cutSearches.push(named);
+		}
+	}
+
+	#bash(args: unknown, result: unknown, isError: boolean): void {
+		const command = isRecord(args) && typeof args.command === "string" ? args.command : "";
+		const read = bashRead(command);
+		const details = isRecord(result) && isRecord(result.details) ? result.details : {};
+		const truncation = isRecord(details.truncation) ? details.truncation : {};
+		const structured =
+			isRecord(result) && isRecord(result.structuredContent) ? result.structuredContent : {};
+		const cut = truncation.truncated === true || structured.truncated === true;
+		const noMatches = read?.kind === "search" && structured.exit_code === 1;
+		const target = read === undefined ? undefined : this.#key(read.path);
+		if (target !== undefined) {
+			this.ranges.expect(target);
+			this.#opened.add(target);
+		}
+		if (isError && !noMatches) {
+			this.failed.push(target ?? "bash");
+		}
+		if (read !== undefined && target !== undefined && !cut && (!isError || noMatches)) {
+			try {
+				const output = noMatches ? "" : textOf(result);
+				const { last, ranges } = bashReadRanges(this.#root, read, output);
+				for (const range of ranges) {
+					this.ranges.add(target, range.start, range.end, last);
+					if (range.end >= range.start) {
+						this.#observedContent.add(target);
+					}
+				}
+				return;
+			} catch {
+				// A receipt cannot rely on output that differs from the pinned source.
+			}
+		}
+		const paths = read === undefined ? bashPaths(this.#root, command) : [read.path];
+		if (read === undefined || paths.length === 0) {
+			this.unknown.push(`bash: ${command}`);
+		}
+		for (const file of paths) {
+			this.#unknownPaths.add(this.#key(file));
 		}
 	}
 
@@ -217,7 +261,11 @@ export class SessionReads {
 			"unavailable",
 		);
 		omit("reads that failed", this.failed, "unavailable");
-		omit("evidence coverage is unknown", this.unknown, "unavailable");
+		omit(
+			"evidence coverage is unknown",
+			[...this.unknown, ...[...this.#unknownPaths].filter((key) => !this.#complete(key))],
+			"unavailable",
+		);
 		omit("evidence reads still running", [...this.pending.keys()], "unavailable");
 		if (!this.#supplied && this.#observedContent.size === 0 && domainReads.reads === 0) {
 			omit(

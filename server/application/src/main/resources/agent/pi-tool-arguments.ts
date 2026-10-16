@@ -83,11 +83,26 @@ function index(value: unknown): unknown {
 	return typeof value === "string" && /^\d+$/u.test(value.trim()) ? Number(value.trim()) : value;
 }
 
+const EVIDENCE_FIELDS = new Map<string, readonly string[]>([
+	["MET", ["search"]],
+	["NOT_MET", ["search", "openQuestions"]],
+	["DOES_NOT_APPLY", ["inapplicability"]],
+	["COULD_NOT_DETERMINE", ["search", "openQuestions"]],
+]);
+
+function empty(value: unknown): boolean {
+	return (
+		value == null ||
+		value === "" ||
+		(Array.isArray(value) && value.length === 0) ||
+		(isRecord(value) && Object.keys(value).length === 0)
+	);
+}
+
 /**
- * Repair transport forms of one result before Pi validates scalar types, never outcomes, quotes, paths, or
- * sides: JSON-encoded lists and objects are decoded, one object sent for a list is a list of it, and line
- * coordinates copied from a numbered view are read as numbers. The result itself is typed: a string, a list
- * or any other non-object becomes an empty object, which the required fields refuse.
+ * Normalize transport spelling before strict validation without inferring claims or changing source text.
+ * Decode JSON containers and decimal line coordinates. Wrap a single list item.
+ * A non-object root becomes an empty object for required-field validation.
  */
 export function prepareResultArguments(args: unknown): Record<string, unknown> {
 	const input = unwrapToolArguments(args);
@@ -95,11 +110,22 @@ export function prepareResultArguments(args: unknown): Record<string, unknown> {
 		return {};
 	}
 	const result: Record<string, unknown> = { ...input };
-	if (
-		result.outcome !== "NOT_MET" &&
-		(result.problems === null || (Array.isArray(result.problems) && result.problems.length === 0))
-	) {
+	if (typeof result.outcome === "string") {
+		const outcome = result.outcome.trim().toUpperCase();
+		const aliases: Record<string, string> = {
+			NOT_APPLICABLE: "DOES_NOT_APPLY",
+			UNDETERMINED: "COULD_NOT_DETERMINE",
+		};
+		result.outcome = aliases[outcome] ?? outcome;
+	}
+	if (result.outcome !== "NOT_MET" && empty(object(result.problems))) {
 		delete result.problems;
+	}
+	if (
+		(result.outcome === "DOES_NOT_APPLY" || result.outcome === "COULD_NOT_DETERMINE") &&
+		empty(object(result.example))
+	) {
+		delete result.example;
 	}
 	if (result.citations !== undefined) {
 		result.citations = citations(result.citations, "citation");
@@ -137,9 +163,25 @@ export function prepareResultArguments(args: unknown): Record<string, unknown> {
 				? { ...example, citation: citation(example.citation, "example citation") }
 				: example;
 	}
-	const evidence = object(result.evidence);
-	if (!isRecord(evidence) || Array.isArray(evidence)) {
+	const rawEvidence = object(result.evidence);
+	if (!isRecord(rawEvidence) || Array.isArray(rawEvidence)) {
 		return result;
+	}
+	const used = typeof result.outcome === "string" ? EVIDENCE_FIELDS.get(result.outcome) : undefined;
+	const evidence = Object.fromEntries(
+		Object.entries(rawEvidence).filter(
+			([key, value]) =>
+				used === undefined ||
+				used.includes(key) ||
+				!["search", "inapplicability", "openQuestions"].includes(key) ||
+				!empty(value),
+		),
+	);
+	if (result.outcome === "DOES_NOT_APPLY" && empty(evidence.inapplicability)) {
+		delete evidence.inapplicability;
+	}
+	if (result.outcome === "COULD_NOT_DETERMINE" && empty(evidence.openQuestions)) {
+		delete evidence.openQuestions;
 	}
 	// Pi may coerce an empty string or boolean to null; only explicit absence may omit a warrant.
 	for (const branch of ["search", "inapplicability"]) {
@@ -204,17 +246,15 @@ export function validateResultEvidence(
 		lookedFor: sent.lookedFor ?? "<behavior you searched for>",
 		boundary: sent.boundary ?? "<what your complete search did not cover>",
 	};
-	let allowed: string[];
+	const allowed = typeof outcome === "string" ? (EVIDENCE_FIELDS.get(outcome) ?? []) : [];
 	let required: string | undefined;
 	let corrected: Record<string, unknown>;
 	switch (outcome) {
 		case "MET": {
-			allowed = ["search"];
 			corrected = { search: sent.search ?? search };
 			break;
 		}
 		case "NOT_MET": {
-			allowed = ["search", "openQuestions"];
 			corrected = {
 				search: sent.search ?? search,
 				...(sent.openQuestions === undefined ? {} : { openQuestions: sent.openQuestions }),
@@ -227,33 +267,37 @@ export function validateResultEvidence(
 			break;
 		}
 		case "DOES_NOT_APPLY": {
-			allowed = ["inapplicability"];
 			required = "inapplicability";
 			corrected = {
-				inapplicability: sent.inapplicability ?? {
-					consulted: sent.consulted ?? [source],
-					prerequisite: "<subject the practice requires>",
-					ruledOutBy: "<captured fact that rules it out>",
-				},
+				inapplicability: empty(sent.inapplicability)
+					? {
+							consulted: sent.consulted ?? [source],
+							prerequisite: "<subject the practice requires>",
+							ruledOutBy: "<captured fact that rules it out>",
+						}
+					: sent.inapplicability,
 			};
 			break;
 		}
 		case "COULD_NOT_DETERMINE": {
-			allowed = ["search", "openQuestions"];
 			required = "openQuestions";
 			corrected = {
-				openQuestions: sent.openQuestions ?? [
-					{
-						openQuestion: "<question the captured evidence leaves open>",
-						wouldSettleIt: "<existing evidence that would settle the question>",
-					},
-				],
+				openQuestions: empty(sent.openQuestions)
+					? [
+							{
+								openQuestion: "<question the captured evidence leaves open>",
+								wouldSettleIt: "<existing evidence that would settle the question>",
+							},
+						]
+					: sent.openQuestions,
 				...(sent.lookedFor === undefined ? {} : { search }),
 			};
 			break;
 		}
 		default: {
-			return;
+			throw new Error(
+				`outcome: expected MET, NOT_MET, DOES_NOT_APPLY, or COULD_NOT_DETERMINE. Supply the outcome supported by the evidence. Corrected call example: ${JSON.stringify({ ...result, outcome: "<MET | NOT_MET | DOES_NOT_APPLY | COULD_NOT_DETERMINE>" })}. The example requires your decision; no outcome was inferred.`,
+			);
 		}
 	}
 	const unknown = Object.keys(sent).find(
@@ -264,13 +308,13 @@ export function validateResultEvidence(
 	if (
 		!isRecord(evidence) ||
 		unknown !== undefined ||
-		(required !== undefined && sent[required] == null)
+		(required !== undefined && empty(sent[required]))
 	) {
 		const field = unknown === undefined ? "evidence" : `evidence.${unknown}`;
 		const requirement =
 			required === undefined ? "Omit unused fields or use null." : `Required: ${required}.`;
 		throw new Error(
-			`${field}: expected an evidence object for ${outcome} with only ${allowed.join(", ")}. ${requirement} Corrected field example: ${JSON.stringify({ evidence: corrected })}. Example shows shape only; keep only claims supported by captured evidence. Send the complete call again.`,
+			`${field}: expected an evidence object for ${outcome} with only ${allowed.join(", ")}. ${requirement} Corrected field example: ${JSON.stringify({ evidence: corrected })}. Corrected call example: ${JSON.stringify({ ...result, evidence: corrected })}. Example shows shape only; keep only claims supported by captured evidence. Send the complete call again.`,
 		);
 	}
 }

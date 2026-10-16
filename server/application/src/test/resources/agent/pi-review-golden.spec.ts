@@ -533,6 +533,14 @@ if (scenario !== undefined && scenario !== "") {
 			assert.ok(prompt.includes("evidence/metadata.json"));
 			assert.ok(prompt.includes("[L10] + insecure();"));
 			assert.ok(prompt.includes("test-practice"));
+			assert.match(
+				captured.get("system-prompt.md") ?? "",
+				/Use `read` and `grep` for source content you will rely on\./u,
+			);
+			assert.match(
+				captured.get("system-prompt.md") ?? "",
+				/A tail slice does not clear an unread middle\./u,
+			);
 		});
 	}
 	void test("truncated leads disclose the omitted context and locate the full input", () => {

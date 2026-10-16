@@ -3,7 +3,7 @@ import { readFileSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { createReadTool } from "@earendil-works/pi-coding-agent";
+import { createReadTool, createBashTool } from "@earendil-works/pi-coding-agent";
 import { parseCandidate } from "../../../../../../docker/agents/practice-scripts/lib/core/contract.ts";
 import { isJsonObject } from "../../../../../../docker/agents/practice-scripts/lib/core/json.ts";
 import { z } from "../../../../../../docker/agents/practice-scripts/lib/core/practice-script.ts";
@@ -303,4 +303,150 @@ void test("change consultation belongs only to the session that received or read
 	assert.equal(reader.hasRead("file.ts"), true);
 	assert.equal(reader.hasRead("other.ts"), false);
 	assert.equal(sibling.hasRead("file.ts"), false);
+});
+
+function bash(reads: SessionReads, command: string, text: string, cut = false, exit = 0) {
+	reads.note({
+		type: "tool_execution_start",
+		toolCallId: "bash",
+		toolName: "bash",
+		args: { command },
+	});
+	reads.note({
+		type: "tool_execution_end",
+		toolCallId: "bash",
+		toolName: "bash",
+		isError: exit !== 0,
+		result: {
+			content: [{ type: "text", text }],
+			details: cut ? { truncation: { truncated: true } } : {},
+			structuredContent: { exit_code: exit, truncated: cut },
+		},
+	});
+}
+
+void test("literal shell reads cover only returned ranges and merge with native reads", (t) => {
+	const root = mkdtempSync(path.join(tmpdir(), "bash-coverage-"));
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+	writeFileSync(path.join(root, "file.ts"), "one\ntwo\nthree\nfour\nfive\n");
+	const reads = new SessionReads(root, [{ path: "file.ts", supplied: false }]);
+	bash(reads, "head -n 1 file.ts", "one\n");
+	bash(reads, "tail -n 1 file.ts", "five\n");
+	assert.equal(reads.coverage().complete, false);
+	bash(reads, "sed -n '2,3p' file.ts", "two\nthree\n");
+	assert.equal(reads.coverage().complete, false);
+	read(reads, 4, 1, 1, false, "four");
+	assert.equal(reads.coverage().complete, true);
+});
+
+void test("cat and nl return full coverage for exact pinned text including blank lines", (t) => {
+	const root = mkdtempSync(path.join(tmpdir(), "bash-full-coverage-"));
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+	writeFileSync(path.join(root, "file name.ts"), "one\n\nthree\n");
+	for (const [command, output] of [
+		["cat 'file name.ts'", "one\n\nthree\n"],
+		['nl "file name.ts"', "     1\tone\n       \n     2\tthree\n"],
+	] as const) {
+		const reads = new SessionReads(root, [{ path: "file name.ts", supplied: false }]);
+		bash(reads, command, output);
+		assert.equal(reads.coverage().complete, true, command);
+		assert.equal(reads.hasRead("file name.ts"), true);
+	}
+});
+
+void test("numbered shell searches cover matched lines and never fill intervening gaps", (t) => {
+	const root = mkdtempSync(path.join(tmpdir(), "bash-search-coverage-"));
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+	writeFileSync(path.join(root, "file.ts"), "one\ntwo\nthree");
+	for (const tool of ["rg", "grep"]) {
+		const reads = new SessionReads(root, [{ path: "file.ts", supplied: false }]);
+		bash(reads, `${tool} -n 'one|three' file.ts`, "1:one\n3:three\n");
+		assert.equal(reads.coverage().complete, false);
+		assert.equal(reads.hasRead("file.ts"), true);
+		bash(reads, `${tool} -n two file.ts`, "2:two\n");
+		assert.equal(reads.coverage().complete, true);
+	}
+});
+
+void test("ambiguous, truncated, failed and forged shell reads cannot certify coverage", (t) => {
+	const root = mkdtempSync(path.join(tmpdir(), "bash-unknown-coverage-"));
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+	writeFileSync(path.join(root, "file.ts"), "one\ntwo\nthree");
+	for (const [command, output, cut, exit] of [
+		["cat file.ts | head", "one\n", false, 0],
+		["cat file.ts > output", "", false, 0],
+		["cat *.ts", "one\ntwo\nthree", false, 0],
+		["cat $(echo file.ts)", "one\ntwo\nthree", false, 0],
+		["cat file.ts; ls", "one\ntwo\nthree", false, 0],
+		["cat\nfile.ts", "one\ntwo\nthree", false, 0],
+		["cat file.ts file.ts", "one\ntwo\nthree", false, 0],
+		["cat file.ts", "one\ntwo\nthree", true, 0],
+		["cat file.ts", "one", false, 2],
+		["cat file.ts", "one\n[Showing all lines]", false, 0],
+		["rg -n one file.ts", "2:one\n", false, 0],
+		["grep one file.ts", "one\n", false, 0],
+	] as const) {
+		const reads = new SessionReads(root);
+		bash(reads, command, output, cut, exit);
+		const coverage = reads.coverage();
+		assert.equal(coverage.complete, false, command);
+		assert.ok(
+			coverage.omitted.some((omission) => omission.what === "evidence coverage is unknown"),
+			command,
+		);
+	}
+	const repaired = new SessionReads(root);
+	bash(repaired, "cat file.ts", "one\n", true);
+	bash(repaired, "cat file.ts", "one\ntwo\nthree");
+	assert.equal(repaired.coverage().complete, true);
+	const ambiguous = new SessionReads(root, [{ path: "file.ts", supplied: true, lines: 3 }]);
+	bash(ambiguous, "cat file.ts | head", "one\n");
+	assert.equal(
+		ambiguous.coverage().complete,
+		false,
+		"known content cannot certify an ambiguous command's other access",
+	);
+});
+
+void test("an empty numbered search is neither a failed read nor complete file coverage", (t) => {
+	const root = mkdtempSync(path.join(tmpdir(), "bash-empty-search-"));
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+	writeFileSync(path.join(root, "file.ts"), "one\n");
+	const reads = new SessionReads(root);
+	bash(reads, "rg -n absent file.ts", "(no output)\n\nCommand exited with code 1", false, 1);
+	assert.equal(reads.coverage().complete, false);
+	assert.equal(reads.coverage().failedReads, 0);
+});
+
+void test("native bash output receives receipts for each supported single-file form", async (t) => {
+	const root = mkdtempSync(path.join(tmpdir(), "native-bash-coverage-"));
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+	writeFileSync(path.join(root, "file.ts"), "one\ntwo\nthree");
+	const tool = createBashTool(root);
+	for (const command of [
+		"cat file.ts",
+		"head -n 3 file.ts",
+		"tail -n 3 file.ts",
+		"sed -n '1,3p' file.ts",
+		"nl file.ts",
+		"rg -n '.' file.ts",
+		"grep -n '.' file.ts",
+	]) {
+		const reads = new SessionReads(root, [{ path: "file.ts", supplied: false }]);
+		reads.note({
+			type: "tool_execution_start",
+			toolCallId: "native",
+			toolName: "bash",
+			args: { command },
+		});
+		const result = await tool.execute("native", { command });
+		reads.note({
+			type: "tool_execution_end",
+			toolCallId: "native",
+			toolName: "bash",
+			result,
+			isError: false,
+		});
+		assert.equal(reads.coverage().complete, true, `${command}: ${JSON.stringify(result)}`);
+	}
 });

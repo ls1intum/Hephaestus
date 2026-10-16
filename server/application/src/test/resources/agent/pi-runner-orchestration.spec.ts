@@ -4489,10 +4489,14 @@ const { validateToolArguments } = await import(import.meta.resolve("@earendil-wo
 const { stream } = await import(import.meta.resolve("@earendil-works/pi-ai/api/openai-completions", import.meta.resolve("@earendil-works/pi-coding-agent")));
 const { stream: responsesStream } = await import(import.meta.resolve("@earendil-works/pi-ai/api/openai-responses", import.meta.resolve("@earendil-works/pi-coding-agent")));
 const { convertResponsesTools } = await import(import.meta.resolve("@earendil-works/pi-ai/api/openai-responses-shared", import.meta.resolve("@earendil-works/pi-coding-agent")));
-const { prepareResultArguments } = await import(process.argv[2]);
+const { prepareResultArguments, validateResultEvidence } = await import(process.argv[2]);
 const captured = JSON.parse(readFileSync(process.argv[1], "utf8"));
 const tool = { name: "submit_result", parameters: captured.parameters };
-const validate = (args) => validateToolArguments(tool, { name: tool.name, arguments: prepareResultArguments(args) });
+const validate = (args) => {
+  const prepared = prepareResultArguments(args);
+  validateResultEvidence(prepared, ["scm.pull-request.core", "scm.pull-request.diff"]);
+  return validateToolArguments(tool, { name: tool.name, arguments: prepared });
+};
 assert.deepEqual(validate(captured.arguments), prepareResultArguments(captured.arguments));
 // The result is the root: an encoded root, a list or a wrapper refuses the call.
 const base = prepareResultArguments(captured.arguments);
@@ -4558,7 +4562,12 @@ for (const item of nullableCases) {
 // Invalid primitives must not become null before outcome and citation validation sees them.
 for (const value of ["", false, true, 0, []]) {
   for (const branch of Object.keys(absent)) {
-    assert.throws(() => validate({ ...base, evidence: { [branch]: value } }));
+    const sent = { ...base, evidence: { [branch]: value } };
+    if (branch === "inapplicability" && (value === "" || Array.isArray(value))) {
+      assert.deepEqual(validate(sent), { ...base, evidence: {} });
+    } else {
+      assert.throws(() => validate(sent));
+    }
   }
 }
 for (const [field, invalid] of [

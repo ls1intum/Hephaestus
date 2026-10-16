@@ -85,10 +85,45 @@ async function replay(sent: unknown, corrected?: unknown) {
 }
 
 for (const [name, sent] of [
+	...[null, [], "", {}].map(
+		(empty) =>
+			[
+				`unused MET evidence ${JSON.stringify(empty)}`,
+				{
+					...uncertain,
+					outcome: "met",
+					evidence: { inapplicability: empty, openQuestions: empty },
+				},
+			] as const,
+	),
+	["lowercase negative outcome", { ...negative, outcome: "not_met" }],
+	["mixed-case uncertain outcome", { ...uncertain, outcome: "Could_Not_Determine" }],
+	["undetermined alias", { ...uncertain, outcome: "UNDETERMINED" }],
+	["not applicable alias", { ...inapplicable, outcome: "not_applicable" }],
+	...[null, [], "", {}].flatMap((empty) => [
+		[
+			`unused negative evidence ${JSON.stringify(empty)}`,
+			{ ...negative, evidence: { inapplicability: empty } },
+		] as const,
+		[
+			`unused inapplicable evidence ${JSON.stringify(empty)}`,
+			{
+				...inapplicable,
+				evidence: { ...inapplicable.evidence, search: empty, openQuestions: empty },
+			},
+		] as const,
+	]),
 	["omitted problems", uncertain],
 	["null problems", { ...uncertain, problems: null }],
 	["empty problems", { ...uncertain, problems: [] }],
 	["inapplicable null problems", { ...inapplicable, problems: null }],
+	...[null, [], "", {}].map(
+		(empty) =>
+			[
+				`unused uncertain result fields ${JSON.stringify(empty)}`,
+				{ ...uncertain, problems: empty, example: empty },
+			] as const,
+	),
 	...["args", "arguments", "input"].map(
 		(wrapper) => [`one ${wrapper} wrapper`, { [wrapper]: negative }] as const,
 	),
@@ -103,6 +138,56 @@ for (const [name, sent] of [
 const without = (value: Record<string, unknown>, key: string) =>
 	Object.fromEntries(Object.entries(value).filter(([name]) => name !== key));
 for (const [name, sent, corrected, error] of [
+	...[null, [], "", {}].flatMap((empty) => [
+		[
+			`empty inapplicability ${JSON.stringify(empty)}`,
+			{ ...inapplicable, evidence: { inapplicability: empty } },
+			inapplicable,
+			/Required: inapplicability.*Corrected call example/iu,
+		] as const,
+		[
+			`empty questions ${JSON.stringify(empty)}`,
+			{ ...uncertain, evidence: { openQuestions: empty } },
+			uncertain,
+			/Required: openQuestions.*Corrected call example/iu,
+		] as const,
+	]),
+	[
+		"missing inapplicability",
+		{ ...inapplicable, evidence: {} },
+		inapplicable,
+		/Required: inapplicability.*Corrected call example/iu,
+	],
+	[
+		"missing open questions",
+		{ ...uncertain, evidence: {} },
+		uncertain,
+		/Required: openQuestions.*Corrected call example/iu,
+	],
+	[
+		"empty open questions",
+		{ ...uncertain, evidence: { openQuestions: [] } },
+		uncertain,
+		/Required: openQuestions.*Corrected call example/iu,
+	],
+	[
+		"ambiguous PASS outcome",
+		{ ...negative, outcome: "PASS" },
+		negative,
+		/outcome.*expected.*no outcome was inferred/iu,
+	],
+	[
+		"ambiguous FAIL outcome",
+		{ ...negative, outcome: "FAIL" },
+		negative,
+		/outcome.*expected.*no outcome was inferred/iu,
+	],
+	[
+		"nonempty unused evidence",
+		{ ...negative, evidence: inapplicable.evidence },
+		negative,
+		/evidence.inapplicability.*only search, openQuestions/iu,
+	],
 	[
 		"string evidence",
 		{ ...uncertain, evidence: "The description leaves this unclear." },

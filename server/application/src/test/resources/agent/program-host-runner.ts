@@ -13,7 +13,11 @@ import nodePath from "node:path";
 import { mock } from "node:test";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import type { ExtensionFactory, ToolDefinition } from "@earendil-works/pi-coding-agent";
+import {
+	createBashToolDefinition,
+	type ExtensionFactory,
+	type ToolDefinition,
+} from "@earendil-works/pi-coding-agent";
 
 import {
 	AUTHENTICATION_PRACTICE,
@@ -47,6 +51,7 @@ export function codingAgentExports(
 ) {
 	return {
 		defineTool: (tool: unknown) => tool,
+		createBashToolDefinition,
 		estimateTokens: (message: { content: string }) => Math.ceil(message.content.length / 4),
 		createCodemodeExtension: () => () => undefined,
 		getAgentDir: () => cwd,
@@ -351,6 +356,27 @@ if (scenario !== undefined && scenario !== "") {
 			};
 			const submit = options.customTools.find((tool) => tool.name === "submit_result");
 			assert.ok(submit, "submit_result is registered");
+			async function inspectShell() {
+				const shellCommand = process.env.PI_HOST_BASH_COMMAND;
+				if (hasText(shellCommand)) {
+					const bashTool = options.customTools.find((tool) => tool.name === "bash");
+					assert.ok(bashTool);
+					emit({
+						type: "tool_execution_start",
+						toolCallId: "shell",
+						toolName: "bash",
+						args: { command: shellCommand },
+					});
+					emit({
+						type: "tool_execution_end",
+						toolCallId: "shell",
+						toolName: "bash",
+						isError: false,
+						result: await bashTool.execute("shell", { command: shellCommand }),
+					});
+				}
+			}
+
 			const submitCandidate = async (sent: unknown, slug: string, allowFailure: boolean) => {
 				try {
 					let argumentsToSubmit = submit.prepareArguments?.(sent) ?? sent;
@@ -482,6 +508,7 @@ process.stdout.write(JSON.stringify(validateToolArguments(tool, { name: tool.nam
 						if (behaviour === "hang") {
 							await Promise.withResolvers<never>().promise;
 						}
+						await inspectShell();
 						const readPath = behaviour === "read-change" ? "work/change/diff.patch" : metadataPath;
 						capture("reads", { slug, path: readPath });
 						emit({

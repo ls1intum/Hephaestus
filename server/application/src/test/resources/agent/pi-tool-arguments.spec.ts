@@ -226,10 +226,17 @@ void test("a warrant that is not an object is refused; an absent one is not", ()
 			() => prepareResultArguments({ ...result, evidence: { [branch]: "the diff" } }),
 			new RegExp(`evidence\\.${branch} must be an object or null`, "u"),
 		);
-		assert.throws(() => prepareResultArguments({ ...result, evidence: { [branch]: [] } }));
+		if (branch === "search") {
+			assert.throws(() => prepareResultArguments({ ...result, evidence: { [branch]: [] } }));
+		} else {
+			assert.deepEqual(
+				prepareResultArguments({ ...result, evidence: { [branch]: [] } }).evidence,
+				{},
+			);
+		}
 		assert.deepEqual(prepareResultArguments({ ...result, evidence: { [branch]: null } }), {
 			...result,
-			evidence: { [branch]: null },
+			evidence: branch === "search" ? { [branch]: null } : {},
 		});
 	}
 });
@@ -280,7 +287,7 @@ void test("review prompts and bundled practices do not require write or edit too
 void test("all outcomes without problems accept null and empty lists without changing evidence", () => {
 	for (const outcome of ["MET", "DOES_NOT_APPLY", "COULD_NOT_DETERMINE"]) {
 		const { problems: _problems, ...withoutProblems } = { ...result, outcome };
-		for (const problems of [null, []]) {
+		for (const problems of [null, [], "", {}]) {
 			assert.deepEqual(prepareResultArguments({ ...withoutProblems, problems }), withoutProblems);
 		}
 	}

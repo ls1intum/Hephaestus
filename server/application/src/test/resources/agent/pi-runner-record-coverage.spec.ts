@@ -83,3 +83,41 @@ for (const gap of [false, true]) {
 		}
 	});
 }
+
+for (const command of [
+	"cat evidence/shell.txt",
+	"head -n 1 evidence/shell.txt",
+	"tail -n 1 evidence/shell.txt",
+	"sed -n '2,2p' evidence/shell.txt",
+	"cat evidence/shell.txt | head -n 1",
+]) {
+	void test(`the runner records exact shell coverage or gives a read repair for ${command}`, async (t) => {
+		const cwd = mkdtempSync(path.join(tmpdir(), "pi-shell-replay-"));
+		t.after(() => rmSync(cwd, { recursive: true, force: true }));
+		stagePractices(cwd, [{ slug: "test-practice" }]);
+		writeFileSync(path.join(cwd, "evidence/shell.txt"), "first fact\nsecond fact\nthird fact");
+		const candidate = {
+			...SESSION_CANDIDATE,
+			problems: undefined,
+			outcome: "MET",
+			citations: [{ path: "evidence/metadata.json", startLine: 1, quote: "Add login" }],
+			evidence: {},
+		};
+		const exit = await runRunner(
+			cwd,
+			{},
+			{ PI_HOST_SESSION_CANDIDATE: JSON.stringify(candidate), PI_HOST_BASH_COMMAND: command },
+		);
+		const complete = command === "cat evidence/shell.txt";
+		assert.equal(exit.status, complete ? 0 : 1, exit.stderr);
+		if (complete) {
+			assert.equal(capturedLines(cwd, "submitted").length, 1);
+		} else {
+			assert.match(exit.stderr, /evidence\/shell\.txt/u);
+			assert.ok(
+				exit.stderr.includes('read({"path":"evidence/shell.txt","offset":1,"limit":2000})'),
+				exit.stderr,
+			);
+		}
+	});
+}

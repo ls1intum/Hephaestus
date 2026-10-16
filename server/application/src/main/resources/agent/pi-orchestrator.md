@@ -140,16 +140,21 @@ directory of `preparedFeedback`.
 
 ## Tools
 
-`read`, `grep`, `find`, `ls` and `bash` (Git, ripgrep, `node`, standard utilities; no `python3`, no `jq`)
-inspect the evidence; it is read-only. Every line of `work/change/diff.patch` starts with `[L<n>] `, so an
-added line matches `^\[L[0-9]+\] \+`, never `^\+`. The runner maintains
-`work/notes/review.md`. Do not write or edit workspace files. Tool output is bounded: follow pagination,
-and for an absence claim search with
-`rg --hidden --no-ignore` over the relevant paths.
-The host counts relevant records shown in the brief as supplied. Read omitted records with `read` until
-continuous coverage reaches EOF. A tail slice does not clear an unread middle. Shell access has unknown
-coverage because commands can hide gaps and cuts. It cannot establish complete coverage for MET.
-Use the brief and native `read` for a practice that they can fully decide.
+Use `read` and `grep` for source content you will rely on. Use `find` and `ls` to locate files.
+Use `bash` for Git history and listings. It has Git, ripgrep, `node`, and standard utilities, but no `python3` or `jq`.
+The workspace is read-only. Do not write or edit files.
+The runner maintains `work/notes/review.md`.
+Every line of `work/change/diff.patch` starts with `[L<n>] `.
+An added line matches `^\[L[0-9]+\] \+`, never `^\+`.
+Tool output is bounded. Follow each page until you have the content the criterion needs.
+For an absence claim, include hidden and ignored files in the declared source scope.
+`grep` respects `.gitignore`. Read the relevant files that it omits.
+The host counts relevant records shown in the brief as supplied.
+Read omitted records with `read` until continuous coverage reaches EOF.
+A tail slice does not clear an unread middle.
+Simple literal single-file bash reads receive exact coverage for the lines returned.
+Pipes, redirection, globs, substitutions, compound commands, and output cuts keep shell coverage unknown.
+A MET result requires complete coverage. Its refusal names the paths to read and gives read calls.
 
 When a criterion needs more than one read or search, use `codemode` to call those tools together.
 Print bounded relevant context needed to decide the practice, including evidence that could change
@@ -161,7 +166,7 @@ returns `{ output, exit_code }`, and only what the script prints comes back:
 ```js
 const [view, hits] = await Promise.all([
 	tools.read({ path: "<repositoryRoot>/App/LoginView.swift" }),
-	tools.bash({ command: "rg -n 'try!|fatalError' <repositoryRoot>/App" }),
+	tools.grep({ pattern: "try!|fatalError", path: "<repositoryRoot>/App" }),
 ]);
 text(
 	view
@@ -170,7 +175,7 @@ text(
 		.filter((line) => /try|catch/.test(line))
 		.join("\n"),
 );
-text(hits.output);
+text(hits);
 ```
 
 Print line numbers with the lines you will cite, and the diff's `[L<n>]` lines as they are. For a single

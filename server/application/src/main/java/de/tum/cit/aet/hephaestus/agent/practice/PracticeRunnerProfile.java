@@ -37,6 +37,7 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
             "pi-feedback-preparation.ts",
             "pi-session-lifecycle.ts",
             "pi-session-reads.ts",
+            "pi-bash-reads.ts",
             SandboxLayout.PROVIDER_HELPER_FILENAME);
 
     private static final List<String> PROMPTS = List.of(

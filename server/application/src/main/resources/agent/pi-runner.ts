@@ -32,6 +32,7 @@ import {
 	type AgentSessionEvent,
 	type AgentToolResult,
 	createAgentSession,
+	createBashToolDefinition,
 	createCodemodeExtension,
 	DefaultResourceLoader,
 	defineTool,
@@ -339,11 +340,30 @@ function incompleteCoverageText(coverage: Coverage): string {
 				(omission) =>
 					`${omission.count} ${omission.what}${omission.items === undefined ? "" : ` (${omission.items.join(", ")})`}`,
 			);
+	const paths = coverage.complete
+		? []
+		: [
+				...new Set(
+					coverage.omitted.flatMap((omission) =>
+						[
+							"reads cut short at the tool's output limit",
+							"relevant sources not supplied or read",
+							"evidence coverage is unknown",
+						].includes(omission.what)
+							? (omission.items ?? []).filter((item) => !item.startsWith("bash:"))
+							: [],
+					),
+				),
+			];
+	const repair = paths
+		.slice(0, 2)
+		.map((target) => `read(${JSON.stringify({ path: target, offset: 1, limit: 2000 })})`)
+		.join("; ");
 	return (
 		`a MET result needs complete coverage, and this session's reads did not complete: ${omitted.join("; ")}. ` +
 		"Read the rest of what was cut short, with an offset or a narrower search, and submit again; or submit what the " +
 		"evidence supports: NOT_MET for a problem it proves, or COULD_NOT_DETERMINE with the open question. " +
-		"Shell access has unknown coverage and cannot establish MET. A required read failure produces no result."
+		`Read calls for the named paths: ${repair || "read the relevant captured sources with read({path: <source path>})"}. Continue from each returned offset until EOF. Ambiguous shell access stays unknown. A required read failure produces no result.`
 	);
 }
 
@@ -1035,7 +1055,7 @@ export async function runReviewJob(): Promise<void> {
 			outcome: {
 				type: "string",
 				enum: OUTCOMES,
-				description: describeVocabulary(OUTCOMES, OUTCOME_DESCRIPTIONS),
+				description: `${describeVocabulary(OUTCOMES, OUTCOME_DESCRIPTIONS)} Use these exact values. Case variants, NOT_APPLICABLE for DOES_NOT_APPLY, and UNDETERMINED for COULD_NOT_DETERMINE are accepted.`,
 			},
 			summary: {
 				type: "string",
@@ -1093,7 +1113,7 @@ export async function runReviewJob(): Promise<void> {
 				description:
 					"An object with only these outcome-specific fields. MET: optional search warrant; DOES_NOT_APPLY: required inapplicability; " +
 					"COULD_NOT_DETERMINE: required openQuestions and optional search; NOT_MET: optional search and openQuestions. " +
-					"Put consulted, lookedFor and boundary inside search, never directly inside evidence. Omit unused fields or use null.",
+					"Put consulted, lookedFor and boundary inside search, never directly inside evidence. Omit unused fields; empty values in unused fields are treated as omitted.",
 				properties: {
 					search: { anyOf: [searchSchema, { type: "null" }] },
 					inapplicability: { anyOf: [inapplicabilitySchema, { type: "null" }] },
@@ -2956,11 +2976,24 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 			customTools: SessionOptions["customTools"],
 			resourceLoader?: SessionOptions["resourceLoader"],
 		) {
+			const bash = createBashToolDefinition(CWD);
+			const sessionTools: SessionOptions["customTools"] = tools.includes("bash")
+				? [
+						defineTool({
+							...bash,
+							description: `${bash.description} Use read or grep for source content you will rely on. Use bash for Git history and listings. Only simple literal single-file reads can receive exact read coverage; pipes, redirection, globs, substitutions, and compound commands keep coverage unknown.`,
+							promptGuidelines: [
+								"Use read or grep for evidence content. Use bash for Git history and listings.",
+							],
+						}),
+						...(customTools ?? []),
+					]
+				: customTools;
 			const { session: fresh, extensionsResult } = await createAgentSession({
 				cwd: CWD,
 				agentDir: AGENT_DIR,
 				tools,
-				customTools: customTools?.map((tool) => ({
+				customTools: sessionTools?.map((tool) => ({
 					...tool,
 					execute: AsyncLocalStorage.bind(async (...args: Parameters<typeof tool.execute>) =>
 						tool.execute(...args),
