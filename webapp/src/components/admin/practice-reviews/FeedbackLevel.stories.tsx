@@ -97,8 +97,12 @@ export const Withheld: Story = {
 				.map((heading) => heading.textContent)
 				.filter((text) => sections.includes(text)),
 		).toStrictEqual(sections);
+		// A sheet links its own relatives only: the results and problems the feedback rests on. A
+		// reference with nowhere to go has no address.
 		for (const link of panel.queryAllByRole("link")) {
-			await expect(String(link.getAttribute("href"))).not.toMatch(/detail=|\/reviews\//u);
+			await expect(String(link.getAttribute("href"))).toMatch(
+				/^(?:https:\/\/|null$)|\?detail=(?:result|problem):[^&]+$/u,
+			);
 		}
 		history(panelElement).getByText(
 			"Found while reviewing past work, which is measured but never sent.",

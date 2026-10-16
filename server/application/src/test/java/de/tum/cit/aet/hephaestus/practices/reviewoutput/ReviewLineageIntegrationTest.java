@@ -1,15 +1,29 @@
 package de.tum.cit.aet.hephaestus.practices.reviewoutput;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackBasis;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackBasisRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Problem;
+import de.tum.cit.aet.hephaestus.practices.model.Result;
+import de.tum.cit.aet.hephaestus.practices.result.ProblemRepository;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData.Scenario;
+import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewLineageEdgeDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
 import de.tum.cit.aet.hephaestus.practices.spi.LineageKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.time.Instant;
+import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,6 +59,76 @@ class ReviewLineageIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     ReviewLineageService lineage;
+
+    @Autowired
+    ProblemRepository problems;
+
+    @Autowired
+    FeedbackRepository feedback;
+
+    @Autowired
+    FeedbackBasisRepository basis;
+
+    @Test
+    void shouldRetainExactProblemBasisWithoutAttributingFeedbackToItsSibling() {
+        var result = data.result(scenario, ResultOutcome.NOT_MET, Instant.now());
+        var problem = problems.findByWorkspaceIdAndResultIdOrderByPositionAsc(result.getWorkspaceId(), result.getId())
+                .getFirst();
+        var sibling = problems.saveAndFlush(Problem.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(result.getWorkspaceId())
+                .resultId(result.getId())
+                .position(1)
+                .key("problem-2")
+                .severity(problem.getSeverity())
+                .summary("A different problem")
+                .explanation(problem.getExplanation())
+                .citations(problem.getCitations())
+                .basis(problem.getBasis())
+                .build());
+        var specific = feedbackFrom(result, problem.getId());
+        var wholeResult = feedbackFrom(result, null);
+
+        var graph = lineage.graph(
+                result.getWorkspaceId(),
+                new ReviewLineageFilterParams(LineageKind.PROBLEM, null, null, null, problem.getId(), null));
+
+        assertThat(graph.edges())
+                .contains(
+                        new ReviewLineageEdgeDTO("problem:" + problem.getId(), "feedback:" + specific, "BASIS"),
+                        new ReviewLineageEdgeDTO("result:" + result.getId(), "feedback:" + specific, "BASIS"),
+                        new ReviewLineageEdgeDTO("result:" + result.getId(), "feedback:" + wholeResult, "BASIS"));
+        assertThat(graph.edges())
+                .noneMatch(edge -> edge.relation().equals("BASIS")
+                        && (edge.from().equals("problem:" + sibling.getId())
+                                || (edge.from().equals("problem:" + problem.getId())
+                                        && edge.to().equals("feedback:" + wholeResult))));
+    }
+
+    private UUID feedbackFrom(Result result, @Nullable UUID problemId) {
+        var developerId = requireNonNull(scenario.account().getId());
+        var piece = feedback.saveAndFlush(Feedback.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(result.getWorkspaceId())
+                .reviewId(result.getReviewId())
+                .itemId(result.getItemId())
+                .developerId(developerId)
+                .destination(FeedbackDestination.ON_WORK)
+                .state(FeedbackState.WITHHELD)
+                .stopReason(FeedbackStopReason.WORKSPACE_DELIVERY_PAUSED)
+                .createdAt(result.getRecordedAt())
+                .build());
+        basis.saveAndFlush(FeedbackBasis.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(result.getWorkspaceId())
+                .feedbackId(piece.getId())
+                .resultId(result.getId())
+                .problemId(problemId)
+                .developerId(developerId)
+                .ordinal(0)
+                .build());
+        return piece.getId();
+    }
 
     @Test
     void resultLineageUsesDurableReviewAndProblemIds() {

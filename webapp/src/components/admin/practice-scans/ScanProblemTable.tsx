@@ -1,11 +1,15 @@
+import { Link } from "@tanstack/react-router";
 import { CircleCheckIcon, CircleDashedIcon, HourglassIcon, SearchXIcon } from "lucide-react";
 
 import type { ProblemChanges, ScanReportProblem } from "@/api/types.gen";
+import { problemLevel } from "@/components/admin/practice-reviews/review-levels";
 import { EmptyState } from "@/components/common/EmptyState";
 import { type FilterOption, FilterToggle } from "@/components/common/FilterToggle";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
+import { detailSearch } from "@/components/layout/detail-drawer/detail-stack";
+import { PracticeTableRow } from "@/components/practice-vocabulary/PracticeTable";
 import {
 	baselineDef,
 	PROBLEM_BASELINE_STATES,
@@ -29,6 +33,8 @@ import { ScanListMore, type ScanListState } from "./scan-list-state";
 type BaselineFilter = ProblemBaselineState | "ALL";
 
 export interface ScanProblemTableProps {
+	/** Each row opens its problem in Practice reviews in this workspace. */
+	workspaceSlug: string;
 	state: ScanListState<ScanReportProblem>;
 	filter: ProblemBaselineState | undefined;
 	onFilterChange: (filter: ProblemBaselineState | undefined) => void;
@@ -38,7 +44,7 @@ export interface ScanProblemTableProps {
 	progress: ScanProgress;
 }
 
-const SKELETON_COLUMNS = ["w-64", "w-48", "w-32", "w-20"] as const;
+const SKELETON_COLUMNS = ["w-64", "w-48", "w-32", "w-20", null] as const;
 
 function changeCount(changes: ProblemChanges, state: ProblemBaselineState): number {
 	switch (state) {
@@ -70,6 +76,7 @@ function citationText(entry: ScanReportProblem): string {
 
 // Absence proves a fix only after another review under the same standard and method.
 export function ScanProblemTable({
+	workspaceSlug,
 	state,
 	filter,
 	onFilterChange,
@@ -93,6 +100,7 @@ export function ScanProblemTable({
 				onChange={(next) => onFilterChange(next === "ALL" ? undefined : next)}
 			/>
 			<ScanProblemResults
+				workspaceSlug={workspaceSlug}
 				state={state}
 				filtered={filter !== undefined}
 				pairsWithoutResult={pairsWithoutResult}
@@ -103,11 +111,13 @@ export function ScanProblemTable({
 }
 
 function ScanProblemResults({
+	workspaceSlug,
 	state,
 	filtered,
 	pairsWithoutResult,
 	progress,
 }: {
+	workspaceSlug: string;
 	state: ScanListState<ScanReportProblem>;
 	filtered: boolean;
 	pairsWithoutResult: number;
@@ -170,6 +180,9 @@ function ScanProblemResults({
 						<TableHead scope="col">File</TableHead>
 						<TableHead scope="col">Practice</TableHead>
 						<TableHead scope="col">Compared</TableHead>
+						<TableHead scope="col" className="w-32">
+							<span className="sr-only">Open</span>
+						</TableHead>
 					</TableRow>
 				</TableHeader>
 				{state.status === "loading" ? (
@@ -182,7 +195,20 @@ function ScanProblemResults({
 									? undefined
 									: baselineDef(entry.baselineState, entry.absentReason);
 							return (
-								<TableRow key={entry.problem.id}>
+								<PracticeTableRow
+									key={entry.problem.id}
+									link={{
+										text: "Open problem",
+										name: `${entry.problem.summary}, ${citationText(entry)}, ${entry.practiceName}`,
+										render: (
+											<Link
+												to="/w/$workspaceSlug/admin/practices/reviews/problems"
+												params={{ workspaceSlug }}
+												search={detailSearch(problemLevel(entry.problem.id))}
+											/>
+										),
+									}}
+								>
 									<TableCell className="max-w-md">
 										<div className="flex flex-wrap items-start gap-2">
 											<StatusBadge def={SEVERITY_DEFS[entry.problem.severity]} />
@@ -207,7 +233,7 @@ function ScanProblemResults({
 											</div>
 										)}
 									</TableCell>
-								</TableRow>
+								</PracticeTableRow>
 							);
 						})}
 					</TableBody>

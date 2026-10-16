@@ -2,6 +2,7 @@ import { EyeOffIcon, Undo2Icon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import type {
+	FeedbackBasis,
 	FeedbackCopy,
 	FeedbackDecision,
 	FeedbackSend,
@@ -13,6 +14,7 @@ import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
+import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { Section } from "@/components/layout/Section";
 import { FeedbackChecks } from "@/components/practice-trace/FeedbackChecks";
 import { UNVERIFIED_HISTORY_NOTE } from "@/components/practice-vocabulary/claim-currentness";
@@ -65,8 +67,10 @@ import {
 	SheetTechnical,
 	type TechnicalFact,
 } from "./RecordSheet";
+import { resultSummary } from "./result-words";
 import { developerLabel } from "./review-format";
-import { ReviewStatusMark } from "./ReviewBadges";
+import { problemLevel, resultLevel } from "./review-levels";
+import { ResultOutcome, ReviewStatusMark } from "./ReviewBadges";
 import { ReviewDayTime } from "./ReviewDayTime";
 import { ReviewFact, ReviewFactGrid } from "./ReviewFactGrid";
 import { ReviewItemLink } from "./ReviewItem";
@@ -210,6 +214,11 @@ export function FeedbackLevel({
 						)}
 					</SheetSection>
 				)}
+				{record.basis.length > 0 && (
+					<Section level={3} title="Based on" className="min-w-0">
+						<FeedbackBasisList basis={record.basis} />
+					</Section>
+				)}
 				{record.checks.length > 0 && (
 					<Section level={3} title="Checks" className="min-w-0">
 						<FeedbackChecks checks={record.checks} />
@@ -272,6 +281,51 @@ function FeedbackWhat({ feedback }: { feedback: FeedbackRecord }) {
 				</ReviewFact>
 			)}
 		</ReviewFactGrid>
+	);
+}
+
+/**
+ * The results this feedback was written from, in the order it names them, and whether it rests on a
+ * whole result or on one of its problems. Each opens in this sheet's place; Back returns here.
+ */
+function FeedbackBasisList({ basis }: { basis: readonly FeedbackBasis[] }) {
+	return (
+		<ul aria-label="Based on" className="flex min-w-0 flex-col gap-3">
+			{[...basis]
+				.sort((a, b) => a.ordinal - b.ordinal)
+				.map((entry) => {
+					const summary = resultSummary(entry.result);
+					return (
+						<li key={`${entry.resultId}:${entry.problemId ?? ""}`} className="min-w-0 space-y-1">
+							<ResultOutcome result={entry.result} />
+							<p className="text-sm font-medium break-words">
+								<DetailStackLink
+									entry={resultLevel(entry.resultId)}
+									single
+									className="underline-offset-4 hover:underline"
+								>
+									{summary}
+								</DetailStackLink>
+							</p>
+							<p className="text-xs text-muted-foreground">
+								{entry.result.practiceName} ·{" "}
+								{entry.problemId === null ? (
+									"The whole result"
+								) : (
+									<DetailStackLink
+										entry={problemLevel(entry.problemId)}
+										single
+										aria-label={`The problem of ${summary} it rests on`}
+										className="underline-offset-4 hover:underline"
+									>
+										One problem of this result
+									</DetailStackLink>
+								)}
+							</p>
+						</li>
+					);
+				})}
+		</ul>
 	);
 }
 
@@ -563,6 +617,23 @@ function feedbackTechnical(feedback: FeedbackRecord): TechnicalFact[] {
 			value: <code>{feedback.replacesId}</code>,
 			copy: feedback.replacesId,
 		});
+	}
+	for (const [index, entry] of [...feedback.basis]
+		.sort((a, b) => a.ordinal - b.ordinal)
+		.entries()) {
+		const number = feedback.basis.length === 1 ? "" : ` ${String(index + 1)}`;
+		facts.push({
+			label: `Basis result${number}`,
+			value: <code>{entry.resultId}</code>,
+			copy: entry.resultId,
+		});
+		if (entry.problemId !== null) {
+			facts.push({
+				label: `Basis problem${number}`,
+				value: <code>{entry.problemId}</code>,
+				copy: entry.problemId,
+			});
+		}
 	}
 	const copies = inOrder(feedback.copies);
 	for (const copy of copies) {

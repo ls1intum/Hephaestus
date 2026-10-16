@@ -160,7 +160,7 @@ RUN mkdir -p /workspace/work /workspace/out /workspace/.pi /workspace/.sessions 
     chown -R 1000:1000 /workspace/work /workspace/out /workspace/.pi /workspace/.sessions && \
     ln -s /opt/pi-sdk/node_modules /workspace/node_modules
 
-LABEL hephaestus.agent.runtime-contract=6
+LABEL hephaestus.agent.runtime-contract=7
 LABEL hephaestus.agent.node-version=${NODE_VERSION}
 LABEL hephaestus.agent.pi-version=${PI_VERSION}
 

@@ -138,11 +138,11 @@ interface ReviewLineageRepository extends Repository<Feedback, UUID> {
     List<UUID> findFeedbackIdsOfReview(@Param("workspaceId") long workspaceId, @Param("reviewId") UUID reviewId);
 
     @Query(value = """
-        SELECT b.feedback_id AS "feedbackId", b.result_id AS "resultId"
+        SELECT b.feedback_id AS "feedbackId", b.result_id AS "resultId", b.problem_id AS "problemId"
         FROM feedback_basis b JOIN feedback f ON f.id = b.feedback_id AND f.workspace_id = b.workspace_id
         WHERE b.workspace_id = :workspaceId AND b.feedback_id IN (:feedbackIds)
-        GROUP BY b.feedback_id, b.result_id
-        ORDER BY b.feedback_id, min(b.ordinal), b.result_id
+        GROUP BY b.feedback_id, b.result_id, b.problem_id
+        ORDER BY b.feedback_id, min(b.ordinal), b.result_id, b.problem_id
         """, nativeQuery = true)
     List<BindingRow> findBindings(
             @Param("workspaceId") long workspaceId, @Param("feedbackIds") Collection<UUID> feedbackIds);
@@ -151,6 +151,9 @@ interface ReviewLineageRepository extends Repository<Feedback, UUID> {
         UUID getFeedbackId();
 
         UUID getResultId();
+
+        @Nullable
+        UUID getProblemId();
     }
 
     @Query(value = """

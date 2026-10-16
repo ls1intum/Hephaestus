@@ -80,6 +80,7 @@ export interface LineageResult extends ReviewBoundResult {
 
 export interface LineageFeedback extends ReviewBoundFeedback {
 	basis: string[];
+	problemBasis: string[];
 }
 
 export interface LineageRecords {
@@ -121,7 +122,10 @@ export function lineageRecords(lineage: ReviewLineage): LineageRecords {
 			const basis = sources(node.id, "RESULT")
 				.map((entry) => entry?.result?.id)
 				.filter((entry) => entry !== undefined);
-			feedback.push({ ...node.feedback, basis });
+			const problemBasis = sources(node.id, "PROBLEM")
+				.map((entry) => entry?.problem?.id)
+				.filter((entry) => entry !== undefined);
+			feedback.push({ ...node.feedback, basis, problemBasis });
 		}
 	}
 	return { root: byKey.get(lineage.rootId), item, reviews, results, feedback };

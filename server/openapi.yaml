@@ -18994,7 +18994,7 @@ components:
             items:
               type: string
           description: "Repository-root Ant-style generated-path patterns, keyed by\
-            \ monitored repository name"
+            \ monitored repository item ID"
         reviewScope:
           $ref: "#/components/schemas/WorkspaceReviewScope"
           description: Explicit all-or-selected repository and person coverage. Selected-empty

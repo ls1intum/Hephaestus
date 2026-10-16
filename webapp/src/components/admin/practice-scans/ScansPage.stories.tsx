@@ -96,3 +96,21 @@ export const Error: Story = {
 export const Reflow: Story = {
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
 };
+
+export const RefreshFailed: Story = {
+	args: {
+		scans: {
+			status: "ready",
+			scans: SCANS,
+			page: 0,
+			totalPages: 1,
+			onPageChange: fn(),
+			refreshFailure: { error: { status: 503 }, pending: false, onRetry: fn() },
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("table", { name: "Scans, newest first" })).toBeVisible();
+		await expect(canvas.getByText("Scans may be out of date")).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Retry" })).toBeEnabled();
+	},
+};

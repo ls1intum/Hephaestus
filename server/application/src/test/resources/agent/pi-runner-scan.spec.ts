@@ -114,12 +114,14 @@ function stageScan(cwd: string, includeContext = false): string {
 	return commit;
 }
 
-for (const [basis, explicitCommit] of [
+for (const [basis, explicitCommit, incremental = false] of [
 	["state", true],
 	["state", false],
 	["introduced", true],
+	["state", false, true],
+	["introduced", true, true],
 ] as const) {
-	void test(`SCAN ${basis === "state" ? "admits state with complete pinned-file receipts" : "rejects introduced basis"} through tool validation (explicit commit=${explicitCommit})`, async () => {
+	void test(`SCAN ${basis === "state" ? "admits state with complete pinned-file receipts" : "rejects introduced basis"} through tool validation (explicit commit=${explicitCommit}, incremental=${incremental})`, async () => {
 		const cwd = mkdtempSync(path.join(tmpdir(), "pi-runner-scan-"));
 		try {
 			const commit = stageScan(cwd);
@@ -131,6 +133,7 @@ for (const [basis, explicitCommit] of [
 				evidence: {},
 				problems: [
 					{
+						...(incremental ? { key: "insecure-call" } : {}),
 						severity: "MAJOR",
 						summary: "Authentication uses an insecure call",
 						explanation: "The source calls insecure() without checked().",
@@ -158,6 +161,7 @@ for (const [basis, explicitCommit] of [
 				{},
 				{
 					PI_HOST_SCAN_PATH: FILE,
+					PI_HOST_PROBLEM_DRAFTS: String(incremental),
 					PI_HOST_SESSION_CANDIDATE: JSON.stringify(candidate),
 					PI_PRACTICE_CONCURRENCY: "3",
 				},

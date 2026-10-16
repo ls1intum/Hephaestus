@@ -516,7 +516,13 @@ if (scenario !== undefined && scenario !== "") {
 		});
 		const tools: unknown = JSON.parse(captured.get("tools.json") ?? "null");
 		assert.ok(typeof tools === "object" && tools !== null);
-		assert.deepEqual(Reflect.get(tools, "tools"), ["read", "submit_result"]);
+		assert.deepEqual(Reflect.get(tools, "tools"), [
+			"read",
+			"upsert_problem",
+			"remove_problem",
+			"read_problem",
+			"submit_result",
+		]);
 		assert.match(
 			captured.get("prompt-1.md") ?? "",
 			/Assigned scan file[\s\S]*Commit: a{40}[\s\S]*Source path: context\/item\.json[\s\S]*const healthy = true;/u,

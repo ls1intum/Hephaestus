@@ -169,11 +169,13 @@ public class ReviewLineageService {
                                     f.getWithdrawn())));
         }
         if (!feedbackIds.isEmpty())
-            lineage.findBindings(ws, feedbackIds)
-                    .forEach(row -> edges.add(new ReviewLineageEdgeDTO(
-                            key(LineageKind.RESULT, row.getResultId()),
-                            key(LineageKind.FEEDBACK, row.getFeedbackId()),
-                            "BASIS")));
+            lineage.findBindings(ws, feedbackIds).forEach(row -> {
+                var feedbackKey = key(LineageKind.FEEDBACK, row.getFeedbackId());
+                edges.add(new ReviewLineageEdgeDTO(key(LineageKind.RESULT, row.getResultId()), feedbackKey, "BASIS"));
+                var boundProblemId = row.getProblemId();
+                if (boundProblemId != null)
+                    edges.add(new ReviewLineageEdgeDTO(key(LineageKind.PROBLEM, boundProblemId), feedbackKey, "BASIS"));
+            });
         return new ReviewLineageDTO(
                 key(kind, root),
                 List.copyOf(nodes.values()),

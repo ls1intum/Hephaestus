@@ -138,6 +138,29 @@ function empty(value: unknown): boolean {
 	);
 }
 
+/** Prepare one Problem body using the same transport rules as inline problems. */
+export function prepareProblemArguments(raw: unknown): unknown {
+	const problem = object(raw);
+	if (!isRecord(problem) || Array.isArray(problem)) {
+		return raw;
+	}
+	const basis = object(problem.basis);
+	return {
+		...problem,
+		citations: citations(problem.citations, "problem citation"),
+		...(isRecord(basis) && !Array.isArray(basis)
+			? {
+					basis: Object.fromEntries(
+						Object.entries(basis).map(([key, field]) => [
+							key,
+							key === "head" || key === "base" || key === "event" ? index(field) : field,
+						]),
+					),
+				}
+			: {}),
+	};
+}
+
 /**
  * Normalize transport spelling before strict validation without inferring claims or changing source text.
  * Decode JSON containers and decimal line coordinates. Wrap a single list item.
@@ -193,29 +216,7 @@ export function prepareResultArguments(args: unknown): Record<string, unknown> {
 	}
 	if (result.problems != null) {
 		const problems = list(result.problems);
-		result.problems = Array.isArray(problems)
-			? problems.map((raw: unknown) => {
-					const problem = object(raw);
-					if (!isRecord(problem) || Array.isArray(problem)) {
-						return raw;
-					}
-					const basis = object(problem.basis);
-					return {
-						...problem,
-						citations: citations(problem.citations, "problem citation"),
-						...(isRecord(basis) && !Array.isArray(basis)
-							? {
-									basis: Object.fromEntries(
-										Object.entries(basis).map(([key, field]) => [
-											key,
-											key === "head" || key === "base" || key === "event" ? index(field) : field,
-										]),
-									),
-								}
-							: {}),
-					};
-				})
-			: problems;
+		result.problems = Array.isArray(problems) ? problems.map(prepareProblemArguments) : problems;
 	}
 	if (result.example != null) {
 		const example = object(result.example);

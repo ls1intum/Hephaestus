@@ -1,7 +1,7 @@
 import { ChevronRightIcon } from "lucide-react";
 
 import { cn } from "cn";
-import type { ReviewLineage } from "@/api/types.gen";
+import type { ProblemSummary, ReviewLineage } from "@/api/types.gen";
 import type { BadgeVariant } from "@/components/common/status-def";
 import { OUTCOME_DEFS } from "@/components/practice-vocabulary/outcome-defs";
 import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
@@ -306,6 +306,9 @@ function ResultRow({
 				row
 				node={{ kind: "result", id: result.id }}
 				className={cn(traceRowGrid("results", display.times), "px-1.5 py-1.5")}
+				after={
+					result.problems.length > 0 && <TraceProblems problems={result.problems} number={number} />
+				}
 			>
 				<LineageResultChip
 					result={result}
@@ -356,5 +359,57 @@ function ResultRow({
 				</span>
 			</StoryNode>
 		</li>
+	);
+}
+
+/**
+ * The problems a Not met result records, in recorded order, each with its severity. The row above
+ * opens the result; each problem opens its own sheet over the trace.
+ */
+function TraceProblems({
+	problems,
+	number,
+}: {
+	problems: readonly ProblemSummary[];
+	number: number;
+}) {
+	const { open } = useStory();
+	return (
+		<ul
+			aria-label={`Problems of result ${String(number)}`}
+			className="flex min-w-0 flex-col gap-0.5 pb-1.5 pl-9 text-xs"
+		>
+			{problems.map((problem, index) => {
+				const severity = SEVERITY_DEFS[problem.severity];
+				// Results can share a summary, so each name says which result and which of its problems.
+				const name = `Problem ${String(index + 1)} of result ${String(number)}: ${severity.label}, ${problem.summary}`;
+				const words = (
+					<>
+						<ToneIcon def={severity} className="size-3 shrink-0" />
+						<span className="shrink-0">{severity.label}</span>
+						<span className="min-w-0 break-words text-muted-foreground">{problem.summary}</span>
+					</>
+				);
+				return (
+					<li key={problem.id} className="min-w-0">
+						{open === undefined ? (
+							<span className="flex min-w-0 items-baseline gap-1.5 px-1 py-0.5">{words}</span>
+						) : (
+							<button
+								type="button"
+								title="Open its sheet"
+								aria-label={name}
+								onClick={() => {
+									open({ kind: "problem", id: problem.id });
+								}}
+								className="flex w-full min-w-0 items-baseline gap-1.5 rounded-sm px-1 py-0.5 text-left outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring"
+							>
+								{words}
+							</button>
+						)}
+					</li>
+				);
+			})}
+		</ul>
 	);
 }

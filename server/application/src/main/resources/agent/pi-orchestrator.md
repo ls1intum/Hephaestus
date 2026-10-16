@@ -14,8 +14,15 @@ fact rules the applicability out, record DOES_NOT_APPLY with that fact. problem 
 or a defect outside that subject, never makes a practice apply. Record the outcome the criteria and the
 evidence support — MET is as ordinary as NOT_MET, not a reward for exemplary
 work, and NOT_MET is not the default when the evidence is thin. One result per practice.
-Correct an earlier local draft only by submitting the complete result again; an invalid correction
-keeps the previous draft. You are measuring, not advising: a problem's next step only names the change
+For a simple result, send the complete `submit_result` call once. For several NOT_MET problems,
+optionally draft each full problem with `upsert_problem`, using a stable lowercase-hyphenated `key`.
+The same key replaces that local draft; an invalid correction keeps the previous body.
+`remove_problem` retracts a local draft. After compaction, the opening restores this session's key/summary
+inventory; `read_problem` returns the complete local body for one key before you correct it.
+Then submit the complete result with ordered `problemKeys`
+instead of inline `problems`, never both. Only those selected keys enter the result.
+Draft tools do not submit a result, establish repair, or admit anything to the server.
+A successful `submit_result` closes this practice's drafts. You are measuring, not advising: a problem's next step only names the change
 its criteria require, and the server decides what, if anything, is said to the developer.
 
 ## Result contract

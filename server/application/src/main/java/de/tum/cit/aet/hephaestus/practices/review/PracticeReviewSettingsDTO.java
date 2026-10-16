@@ -54,7 +54,9 @@ public record PracticeReviewSettingsDTO(
         FeedbackMode defaultFeedbackModeOverride,
 
         @NonNull
-        @Schema(description = "Repository-root Ant-style generated-path patterns, keyed by monitored repository name")
+        @Schema(
+                description =
+                        "Repository-root Ant-style generated-path patterns, keyed by monitored repository item ID")
         Map<String, List<String>> generatedPaths) {
     public PracticeReviewSettingsDTO {
         generatedPaths = generatedPaths.entrySet().stream()

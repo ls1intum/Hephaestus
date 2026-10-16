@@ -12,6 +12,8 @@ import { PageLayout } from "@/components/layout/PageLayout";
 import { buttonVariants } from "@/components/ui/button";
 import { Table, TableHeader, TableRow } from "@/components/ui/table";
 
+import type { RefreshFailure } from "@/runtime/tanstack-query/infinite-list";
+
 import { ScanColumnHeads, SCAN_SKELETON_COLUMNS, ScanRows } from "./ScanRows";
 
 export type ScansListState =
@@ -20,6 +22,7 @@ export type ScansListState =
 	| {
 			status: "ready";
 			scans: readonly ScanSummary[];
+			refreshFailure?: RefreshFailure;
 			page: number;
 			totalPages: number;
 			onPageChange: (page: number) => void;
@@ -93,6 +96,9 @@ export function ScansPage({ workspaceSlug, scans }: ScansPageProps) {
 				title="Scans"
 				description="A scan reviews every file of a repository’s default branch against the practices you include in scans. It sends no feedback to anyone."
 			/>
+			{scans.status === "ready" && scans.refreshFailure !== undefined && (
+				<QueryErrorAlert title="Scans may be out of date" {...scans.refreshFailure} />
+			)}
 			{body}
 		</PageLayout>
 	);

@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
-import type { RepositoryScopeOptions } from "./PracticeReviewScopeSettings";
+import type { RepositoryOption, RepositoryScopeOptions } from "./PracticeReviewScopeSettings";
 
 export interface GeneratedPathsSettingsProps {
 	settings: PracticeReviewSettings;
@@ -26,7 +26,8 @@ export function GeneratedPathsSettings(props: GeneratedPathsSettingsProps) {
 				</h2>
 				<p className="text-sm text-muted-foreground">
 					Mark intentionally committed generated output for each repository. Reviews and scans treat
-					it as generated content, not hand-written work. Review scope changes do not clear these
+					it as generated content, not hand-written work. You can save generated paths only for
+					repositories this workspace currently monitors. Review scope changes do not clear these
 					settings.
 				</p>
 			</div>
@@ -39,14 +40,11 @@ export function GeneratedPathsSettings(props: GeneratedPathsSettingsProps) {
 				/>
 			)}
 			{repositories.status === "ready" && repositories.options.length === 0 && (
-				<p className="text-sm text-muted-foreground">
-					No repositories are monitored yet. Each monitored repository gets its own generated paths
-					here.
-				</p>
+				<p className="text-sm text-muted-foreground">No repositories are available in this list.</p>
 			)}
 			{repositories.status === "ready" &&
 				repositories.options.map((option) => (
-					<RepositoryGeneratedPaths key={option.itemId} {...props} repository={option.name} />
+					<RepositoryGeneratedPaths key={option.itemId} {...props} repository={option} />
 				))}
 		</section>
 	);
@@ -57,9 +55,9 @@ function RepositoryGeneratedPaths({
 	repository,
 	isSaving,
 	onSave,
-}: GeneratedPathsSettingsProps & { repository: string }) {
+}: GeneratedPathsSettingsProps & { repository: RepositoryOption }) {
 	const id = useId();
-	const persisted = (settings.generatedPaths[repository] ?? []).join("\n");
+	const persisted = (settings.generatedPaths[repository.itemId] ?? []).join("\n");
 	const [stored, setStored] = useState({ text: persisted, base: persisted, etag: settings.etag });
 	const [state, setState] = useState<"editing" | "saving" | "error">("editing");
 	const unmerged = stored.text !== stored.base && stored.text !== persisted;
@@ -88,7 +86,7 @@ function RepositoryGeneratedPaths({
 	const save = async () => {
 		setState("saving");
 		try {
-			await onSave({ generatedPaths: { [repository]: patterns } }, sourceEtag);
+			await onSave({ generatedPaths: { [repository.itemId]: patterns } }, sourceEtag);
 			setStored({ text, base: text, etag: settings.etag });
 			setState("editing");
 		} catch {
@@ -99,7 +97,7 @@ function RepositoryGeneratedPaths({
 		<>
 			<Field data-invalid={invalid || undefined}>
 				<FieldLabel htmlFor={id} className="break-all">
-					{repository}
+					{repository.name}
 				</FieldLabel>
 				<Textarea
 					id={id}
@@ -144,7 +142,9 @@ function RepositoryGeneratedPaths({
 					<Button
 						variant="outline"
 						size="sm"
-						aria-label={state === "saving" ? undefined : `Save generated paths for ${repository}`}
+						aria-label={
+							state === "saving" ? undefined : `Save generated paths for ${repository.name}`
+						}
 						disabled={busy || !dirty || invalid || conflicted}
 						onClick={() => {
 							save().catch(() => setState("error"));

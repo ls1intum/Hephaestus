@@ -35,6 +35,16 @@ export function ReviewListLink({ workspaceSlug, destination, ...props }: ReviewL
 				/>
 			);
 		}
+		case "problems": {
+			return (
+				<Link
+					{...props}
+					to="/w/$workspaceSlug/admin/practices/reviews/problems"
+					params={{ workspaceSlug }}
+					search={destination.search}
+				/>
+			);
+		}
 		case "feedback": {
 			return (
 				<Link

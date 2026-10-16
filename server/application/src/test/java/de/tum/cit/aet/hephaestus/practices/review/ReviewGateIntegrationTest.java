@@ -6,14 +6,17 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewRequestReason;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData.Scenario;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.ItemFixtures;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,6 +52,22 @@ class ReviewGateIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     ReviewGate gate;
+
+    @Autowired
+    ReviewRequestPolicy requests;
+
+    @Autowired
+    WorkspaceRepository workspaces;
+
+    @Test
+    void shouldRefuseRequestedReviewsWhenTheirWorkspaceSwitchIsOff() {
+        long ws = scenario.workspace().getId();
+        long account = Objects.requireNonNull(scenario.account().getId());
+        assertThat(requests.refusal(ws, scenario.item().getId(), account)).isEmpty();
+        scenario.workspace().getFeatures().setPracticeReviewManualTriggerEnabled(false);
+        workspaces.saveAndFlush(scenario.workspace());
+        assertThat(requests.refusal(ws, scenario.item().getId(), account)).contains(ReviewRequestReason.GATE_WITHHELD);
+    }
 
     @Autowired
     PracticeRepository practices;

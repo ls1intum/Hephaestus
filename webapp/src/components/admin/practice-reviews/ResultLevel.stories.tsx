@@ -111,8 +111,12 @@ export const Default: Story = {
 			panel.queryByRole("group", { name: "How this came about" }),
 		).not.toBeInTheDocument();
 		const links = panel.queryAllByRole("link");
+		// A sheet links its own relatives only: the result's problems. A reference with nowhere to go
+		// has no address.
 		for (const link of links) {
-			await expect(String(link.getAttribute("href"))).not.toMatch(/detail=|\/reviews\//u);
+			await expect(String(link.getAttribute("href"))).toMatch(
+				/^(?:https:\/\/|null$)|\?detail=problem:[^&]+$/u,
+			);
 		}
 		await expect(
 			panel.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent),

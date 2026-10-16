@@ -146,11 +146,39 @@ async function frontSheet(levels: number) {
 	}, ROUTE_RENDER_WAIT);
 }
 
-/** A sheet links out to the provider or to a setting, never to another record of Practice reviews. */
+/** The `detail` levels a link opens, as the router writes them: repeated, or one JSON list. */
+function linkedLevels(url: URL): string[] {
+	return url.searchParams
+		.getAll("detail")
+		.flatMap((raw) => stackInSearch(raw.startsWith("[") ? (JSON.parse(raw) as unknown) : raw));
+}
+
+/**
+ * A sheet links out to the provider or to a setting, and inside Practice reviews only to its own
+ * relatives: one result or problem level in its place (a result's problems, a problem's result,
+ * the results and problems a feedback rests on), or one of its own lists scoped to its review. It
+ * never opens a trace: the wider history is told there, not on a sheet.
+ */
 function expectNoRecordLinks(sheet: HTMLElement) {
-	for (const link of within(sheet).queryAllByRole("link")) {
-		expect(String(link.getAttribute("href"))).not.toMatch(/\/admin\/practices\/reviews/u);
-	}
+	expect(strayRecordLinks(sheet)).toStrictEqual([]);
+}
+
+/** The links of a sheet into Practice reviews that open neither a relative nor its own list. */
+function strayRecordLinks(sheet: HTMLElement): string[] {
+	return within(sheet)
+		.queryAllByRole("link")
+		.map((link) => String(link.getAttribute("href")))
+		.filter((href) => {
+			const url = new URL(href, "https://hephaestus.invalid");
+			if (!url.pathname.includes("/admin/practices/reviews")) {
+				return false;
+			}
+			// A trace may stay under the level a link opens, as the sheet's own layer; never in front.
+			const front = linkedLevels(url).at(-1);
+			return front === undefined
+				? !url.searchParams.has("reviewId")
+				: !/^(?:result|problem):/u.test(front);
+		});
 }
 
 /** Escape where focus is, as a reader presses it. */
@@ -590,7 +618,7 @@ describe("what the trace shows", () => {
 describe("a record's sheet is the record alone", () => {
 	/**
 	 * The trace is the one place a record's story is told: no sheet, opened from a row or over a
-	 * trace, renders a story, a verdict, a way to the whole review or a Trace action.
+	 * trace, renders a story, a verdict or a Trace action. It links only its own relatives.
 	 */
 	it.each([
 		["review", `review:${REVIEW}`],
@@ -618,14 +646,18 @@ describe("a record's sheet is the record alone", () => {
  * renders of the same sheet.
  */
 function sheetMarkup(sheet: HTMLElement): string {
-	return [
-		// The title: a practice sheet's introduction has headings of its own.
-		sheet.querySelector('[data-slot="drawer-title"]')?.textContent ?? "",
-		sheet.querySelector('[data-slot="drawer-body"]')?.outerHTML ?? "",
-		sheet.querySelector('[data-slot="drawer-footer"]')?.outerHTML ?? "",
-	]
-		.join("\n")
-		.replaceAll(/ (?:id|for|aria-labelledby|aria-describedby|aria-controls)="[^"]*"/gu, "");
+	return (
+		[
+			// The title: a practice sheet's introduction has headings of its own.
+			sheet.querySelector('[data-slot="drawer-title"]')?.textContent ?? "",
+			sheet.querySelector('[data-slot="drawer-body"]')?.outerHTML ?? "",
+			sheet.querySelector('[data-slot="drawer-footer"]')?.outerHTML ?? "",
+		]
+			.join("\n")
+			.replaceAll(/ (?:id|for|aria-labelledby|aria-describedby|aria-controls)="[^"]*"/gu, "")
+			// A link to a relative opens it on the sheet's own layer, so its address names that layer.
+			.replaceAll(/ href="[^"]*detail=[^"]*"/gu, "")
+	);
 }
 
 /** The sheet in front once it has settled: its record read and nothing left loading. */

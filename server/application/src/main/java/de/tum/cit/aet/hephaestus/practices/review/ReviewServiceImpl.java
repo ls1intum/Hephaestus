@@ -93,6 +93,10 @@ public class ReviewServiceImpl implements ReviewService {
         if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE)
             throw new ReviewRequestRejected(
                     ReviewRequestRejected.Reason.WORKSPACE_INACTIVE, "The workspace is inactive.");
+        gate.refusal(workspace, request.origin()).ifPresent(skip -> {
+            throw new ReviewRequestRejected(
+                    ReviewRequestRejected.Reason.ITEM_INELIGIBLE, skip.reason(), skip.eventReason());
+        });
         if (request.kind() == ReviewKind.SCAN) {
             var active = reviews.findFirstByWorkspaceIdAndKindAndStatusInOrderByCreatedAtAsc(
                     request.workspaceId(), ReviewKind.SCAN, List.of(ReviewStatus.QUEUED, ReviewStatus.RUNNING));

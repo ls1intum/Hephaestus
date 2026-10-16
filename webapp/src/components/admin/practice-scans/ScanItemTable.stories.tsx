@@ -18,7 +18,13 @@ const ready = (entries = ITEM_ENTRIES, hasNext = false) => ({
 const meta = {
 	component: ScanItemTable,
 	decorators: [withStandardPage],
-	args: { state: ready(), filter: undefined, onFilterChange: fn(), progress: "complete" },
+	args: {
+		workspaceSlug: "aet",
+		state: ready(),
+		filter: undefined,
+		onFilterChange: fn(),
+		progress: "complete",
+	},
 	argTypes: { state: { control: false } },
 	render: (args) => (
 		<StatefulPatch initial={{ filter: args.filter }}>
@@ -61,6 +67,19 @@ export const Default: Story = {
 			within(notReviewed).getByText(/Earlier evidence, not from this scan/u),
 		).toBeVisible();
 		await expect(within(removed).getByText("Removed")).toBeVisible();
+
+		// A row with this scan's result opens it over Practice reviews; earlier evidence opens nothing.
+		await expect(
+			within(judged).getByRole("link", {
+				name: "Open result server/src/ScanService.java, Errors are handled where they occur",
+			}),
+		).toHaveAttribute("href", "/w/aet/admin/practices/reviews/results?detail=result:r-1");
+		await expect(within(reused).getByRole("link", { name: /^Open result /u })).toHaveAttribute(
+			"href",
+			"/w/aet/admin/practices/reviews/results?detail=result:r-2",
+		);
+		await expect(within(withheld).queryByRole("link")).not.toBeInTheDocument();
+		await expect(within(notReviewed).queryByRole("link")).not.toBeInTheDocument();
 
 		await userEvent.click(canvas.getByRole("button", { name: "Withheld" }));
 		await expect(args.onFilterChange).toHaveBeenCalledWith("WITHHELD");

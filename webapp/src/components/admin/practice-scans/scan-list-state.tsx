@@ -2,12 +2,15 @@ import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
+import type { RefreshFailure } from "@/runtime/tanstack-query/infinite-list";
+
 export type ScanListState<TEntry> =
 	| { status: "loading" }
 	| { status: "error"; error: unknown; onRetry: () => void }
 	| {
 			status: "ready";
 			entries: readonly TEntry[];
+			refreshFailure?: RefreshFailure;
 			hasNext: boolean;
 			loadingMore: boolean;
 			/** Why the last "Show more" read failed. The rows already shown stay. */

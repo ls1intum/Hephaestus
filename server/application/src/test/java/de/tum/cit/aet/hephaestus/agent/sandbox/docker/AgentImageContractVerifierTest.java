@@ -42,6 +42,14 @@ class AgentImageContractVerifierTest extends BaseUnitTest {
     }
 
     @Test
+    void shouldReportPreviouslyPublishedRuntimeSixAsMismatched() {
+        var outcome = verifyWithLabels(Optional.of(Map.of(SandboxLayout.RUNTIME_CONTRACT_LABEL, "6")));
+
+        assertThat(outcome).isEqualTo(AgentImageContractVerifier.ResultOutcome.MISMATCH);
+        assertThat(counter(AgentImageContractVerifier.ResultOutcome.MISMATCH)).isEqualTo(1d);
+    }
+
+    @Test
     void shouldReportAnImageThatPredatesTheContract() {
         var outcome = verifyWithLabels(Optional.of(Map.of("hephaestus.component", "agent-pi")));
 

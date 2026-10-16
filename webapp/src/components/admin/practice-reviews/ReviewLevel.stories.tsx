@@ -98,8 +98,12 @@ export const Default: Story = {
 		panel.getByText("Started by");
 		panel.getByText(/Marked ready for review/u);
 		panel.getByText("Review ID");
+		// Inside Practice reviews the sheet links only its own lists, scoped to this review.
 		for (const link of panel.queryAllByRole("link")) {
-			await expect(String(link.getAttribute("href"))).not.toMatch(/\/admin\/practices\/reviews/u);
+			const href = String(link.getAttribute("href"));
+			if (href.includes("/admin/practices/reviews")) {
+				await expect(href).toContain(`reviewId=${reviewDetailCompleted.id}`);
+			}
 		}
 		await userEvent.click(panel.getByRole("button", { name: "Request another review" }));
 		await expect(args.onRequestReview).not.toHaveBeenCalled();
@@ -284,6 +288,29 @@ export const WithPracticeScripts: Story = {
 			"href",
 			"/w/demo/admin/usage",
 		);
+	},
+};
+
+/** A practice whose script already returned is no longer "next": the script's own line says how it ran. */
+export const ReadyAfterItsScriptRan: Story = {
+	args: {
+		review: ready({
+			...withScripts,
+			practices: withScripts.practices.map((practice) =>
+				practice.practiceSlug === "thin-controllers"
+					? { ...practice, status: "READY", reason: null }
+					: practice,
+			),
+		}),
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		const list = panel.getByRole("list", { name: "Every practice in this review" });
+		const row = list.querySelector('[data-practice-status="READY"]');
+		await expect(row).not.toBeNull();
+		await expect(row).toHaveTextContent("Ready");
+		await expect(row).not.toHaveTextContent(/It runs next/u);
+		await expect(row).toHaveTextContent(/returned a result/u);
 	},
 };
 

@@ -464,6 +464,45 @@ process.stdout.write(JSON.stringify(validateToolArguments(tool, { name: tool.nam
 				}
 			};
 
+			async function submitSessionResult(slug: string): Promise<void> {
+				const candidate: unknown = hasText(process.env.PI_HOST_SESSION_CANDIDATE)
+					? parseJson(process.env.PI_HOST_SESSION_CANDIDATE)
+					: SESSION_CANDIDATE;
+				const correction = process.env.PI_HOST_SESSION_CORRECTION;
+				const candidates = hasText(correction) ? [candidate, parseJson(correction)] : [candidate];
+				if (process.env.PI_HOST_PROBLEM_DRAFTS === "true") {
+					assert.ok(typeof candidate === "object" && candidate !== null);
+					const problems = field(candidate, "problems");
+					assert.ok(Array.isArray(problems));
+					const upsert = options.customTools.find((tool) => tool.name === "upsert_problem");
+					assert.ok(upsert);
+					for (const problem of problems) {
+						const reply = await upsert.execute(
+							"draft",
+							upsert.prepareArguments?.(problem) ?? problem,
+						);
+						capture("problem-drafts", { slug, reply });
+					}
+					const keyed = Object.fromEntries(
+						Object.entries(candidate).filter(([key]) => key !== "problems"),
+					);
+					await submitCandidate(
+						{
+							...keyed,
+							problemKeys: problems.map((problem: unknown) => field(problem, "key")),
+						},
+						slug,
+						false,
+					);
+					capture("model-finish", { slug, at: Date.now() });
+					return;
+				}
+				for (const sent of candidates) {
+					await submitCandidate(sent, slug, hasText(correction));
+					capture("model-finish", { slug, at: Date.now() });
+				}
+			}
+
 			let sessionSlug: string | undefined;
 			let aborted = false;
 			const isAborted = () => aborted;
@@ -610,17 +649,7 @@ process.stdout.write(JSON.stringify(validateToolArguments(tool, { name: tool.nam
 						});
 						emit({ type: "turn_end" });
 						if (submits) {
-							const candidate: unknown = hasText(process.env.PI_HOST_SESSION_CANDIDATE)
-								? parseJson(process.env.PI_HOST_SESSION_CANDIDATE)
-								: SESSION_CANDIDATE;
-							const correction = process.env.PI_HOST_SESSION_CORRECTION;
-							const candidates = hasText(correction)
-								? [candidate, parseJson(correction)]
-								: [candidate];
-							for (const sent of candidates) {
-								await submitCandidate(sent, slug, hasText(correction));
-								capture("model-finish", { slug, at: Date.now() });
-							}
+							await submitSessionResult(slug);
 						}
 					},
 				},

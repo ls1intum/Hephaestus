@@ -3409,7 +3409,7 @@ export type PracticeReviewSettings = {
      */
     etag: string;
     /**
-     * Repository-root Ant-style generated-path patterns, keyed by monitored repository name
+     * Repository-root Ant-style generated-path patterns, keyed by monitored repository item ID
      */
     generatedPaths: {
         [key: string]: Array<string>;

@@ -170,9 +170,9 @@ function QueueFigures({ workspaceSlug, queue }: { workspaceSlug: string; queue: 
 			key: "held",
 			term: "on hold for budget",
 			value: (
-				<Problem show={queue.heldForBudget > 0} broken>
+				<QueueHold show={queue.heldForBudget > 0} broken>
 					{queue.heldForBudget}
-				</Problem>
+				</QueueHold>
 			),
 			none: queue.heldForBudget === 0,
 		},
@@ -184,7 +184,7 @@ function QueueFigures({ workspaceSlug, queue }: { workspaceSlug: string; queue: 
 			term: "oldest wait",
 			value: (
 				<OldestWait queue={queue}>
-					<Problem show={waitsLong(queue)}>{durationText(oldest)}</Problem>
+					<QueueHold show={waitsLong(queue)}>{durationText(oldest)}</QueueHold>
 				</OldestWait>
 			),
 		});
@@ -278,7 +278,7 @@ function OldestWait({ queue, children }: { queue: ReviewQueue; children: ReactNo
  * which hears neither. By the overview's colour rule (`review-attention-thresholds.ts`), only a
  * broken figure, reviews held for budget, is red; a long wait is advice, in the text's colour.
  */
-function Problem({
+function QueueHold({
 	show,
 	broken = false,
 	children,

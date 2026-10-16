@@ -107,7 +107,7 @@ export const ObjectSourceNamesTheSource: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("The pull request itself")).toBeVisible();
+		await expect(canvas.getByText("The reviewed work itself")).toBeVisible();
 		await expect(canvas.queryByText("inputs/context/metadata.json")).toBeNull();
 		await expect(canvas.queryByText("line 9")).toBeNull();
 		await expect(canvas.getByText('"body" : ""')).toBeVisible();
@@ -210,7 +210,7 @@ export const FoldedObjectSource: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getAllByText("The pull request itself")).toHaveLength(1);
+		await expect(canvas.getAllByText("The reviewed work itself")).toHaveLength(1);
 		await expect(canvas.getByText('"title" : "Page size"')).toBeVisible();
 		await expect(canvas.getByText('"body" : ""')).toBeVisible();
 		// An object locator points into the runner's own file, so no line number is shown for either.

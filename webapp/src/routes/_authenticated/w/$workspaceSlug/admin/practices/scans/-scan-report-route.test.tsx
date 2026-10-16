@@ -5,8 +5,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ScanReport, ScanSummary } from "@/api/types.gen";
 import { SCAN_POLL_MS } from "@/components/admin/practice-scans/scan-display";
+import { stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
 import type { Wire } from "@/lib/dates";
 import { server } from "@/mocks/server";
+import { reviewHandlers } from "@/routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/-reviews-server";
+import { ObserverStub } from "@/test/observers";
 import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter } from "@/test/router-harness";
 
 import {
@@ -205,6 +208,30 @@ describe("scan report route", () => {
 		await screen.findByText("No problems match this filter");
 		await user.click(screen.getByRole("button", { name: "New (1)" }));
 		await screen.findByText("A failed upload is logged and then ignored.");
+	});
+
+	it("opens a problem's level over Practice reviews from its row", async () => {
+		vi.stubGlobal("IntersectionObserver", ObserverStub);
+		server.use(...reviewHandlers());
+		serveReport({ scan: () => wireScan() });
+		const user = userEvent.setup();
+
+		const { router } = renderRouteAtWithRouter(REPORT_URL);
+		const table = await screen.findByRole(
+			"table",
+			{ name: "Problems in this scan" },
+			ROUTE_RENDER_WAIT,
+		);
+		await user.click(
+			await within(table).findByRole("link", {
+				name: /^Open problem A failed upload is logged and then ignored\./u,
+			}),
+		);
+
+		await waitFor(() =>
+			expect(router.state.location.pathname).toBe("/w/acme/admin/practices/reviews/problems"),
+		);
+		expect(stackInSearch(router.state.location.search.detail)).toStrictEqual(["problem:p-1"]);
 	});
 
 	it.each([

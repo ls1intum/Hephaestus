@@ -138,9 +138,9 @@ export const EverySource: Story = {
 				.sort(),
 		).toEqual(
 			[
-				"The pull request itself",
+				"The reviewed work itself",
 				"The code changes",
-				"Comments on the pull request",
+				"Comments on the reviewed work",
 				"Files and history in the repository",
 				"The issue itself",
 				"Comments on the issue",

@@ -411,11 +411,12 @@ describe("review route", () => {
 	});
 
 	it("saves and clears generated patterns through the settings API with its ETag", async () => {
-		const settings = stubSettings(reviewSettings({ generatedPaths: { "owner/repo": ["old/**"] } }));
+		const settings = stubSettings(reviewSettings({ generatedPaths: { "101": ["old/**"] } }));
 		stubWorkspace(settings.handlers(false));
 
 		renderRouteAt("/w/acme/admin/practices/review?section=automated-review");
 		const input = await screen.findByRole("textbox", { name: "owner/repo" }, ROUTE_RENDER_WAIT);
+		expect(input).toHaveProperty("value", "old/**");
 		await userEvent.clear(input);
 		await userEvent.type(input, "generated/**");
 		await userEvent.click(
@@ -424,7 +425,7 @@ describe("review route", () => {
 		await waitFor(
 			() =>
 				expect(settings.patches).toStrictEqual([
-					{ body: { generatedPaths: { "owner/repo": ["generated/**"] } }, etag: '"0"' },
+					{ body: { generatedPaths: { "101": ["generated/**"] } }, etag: '"0"' },
 				]),
 			ROUTE_RENDER_WAIT,
 		);
@@ -439,9 +440,82 @@ describe("review route", () => {
 		);
 		await waitFor(() =>
 			expect(settings.patches[1]).toStrictEqual({
-				body: { generatedPaths: { "owner/repo": [] } },
+				body: { generatedPaths: { "101": [] } },
 				etag: '"1"',
 			}),
 		);
+	});
+	it("keeps same-label repository patterns separate through item-ID writes, reset and a refused save", async () => {
+		const settings = stubSettings(
+			reviewSettings({ generatedPaths: { "101": ["first/**"], "102": ["second/**"] } }),
+		);
+		stubWorkspace([
+			...settings.handlers(false),
+			http.get("*/workspaces/:workspaceSlug/practices/items", () =>
+				HttpResponse.json({
+					content: ["101", "102"].map((id) => ({
+						id,
+						kind: "scm.repository",
+						label: "Repository",
+						title: null,
+						container: null,
+						parentId: null,
+						path: null,
+						provider: null,
+						removedAt: null,
+						url: null,
+					})),
+				}),
+			),
+		]);
+		renderRouteAt("/w/acme/admin/practices/review?section=automated-review");
+		const [first, second] = await screen.findAllByRole(
+			"textbox",
+			{ name: "Repository" },
+			ROUTE_RENDER_WAIT,
+		);
+		assert(first !== undefined);
+		assert(second !== undefined);
+		expect(first).toHaveProperty("value", "first/**");
+		expect(second).toHaveProperty("value", "second/**");
+		await userEvent.clear(first);
+		await userEvent.type(first, "updated/**");
+		const [saveFirst] = screen.getAllByRole("button", {
+			name: "Save generated paths for Repository",
+		});
+		assert(saveFirst !== undefined);
+		await userEvent.click(saveFirst);
+		await waitFor(() =>
+			expect(settings.patches).toStrictEqual([
+				{ body: { generatedPaths: { "101": ["updated/**"] } }, etag: '"0"' },
+			]),
+		);
+		await waitFor(() => expect(saveFirst).toHaveProperty("disabled", true));
+		expect(second).toHaveProperty("value", "second/**");
+		await userEvent.clear(first);
+		await userEvent.click(saveFirst);
+		await waitFor(() =>
+			expect(settings.patches[1]).toStrictEqual({
+				body: { generatedPaths: { "101": [] } },
+				etag: '"1"',
+			}),
+		);
+		await waitFor(() => expect(saveFirst).toHaveProperty("disabled", true));
+		expect(first).toHaveProperty("value", "");
+		expect(second).toHaveProperty("value", "second/**");
+		server.use(
+			http.patch("*/workspaces/:workspaceSlug/practices/review-settings", () =>
+				HttpResponse.json(
+					{ status: 400, detail: "Select a repository this workspace monitors." },
+					{ status: 400 },
+				),
+			),
+		);
+		await userEvent.type(first, "unsaved/**");
+		await userEvent.click(saveFirst);
+		await screen.findByText("We could not save generated paths. Check the patterns and try again.");
+		expect(first).toHaveProperty("value", "unsaved/**");
+		expect(second).toHaveProperty("value", "second/**");
+		expect(saveFirst).toHaveProperty("disabled", false);
 	});
 });

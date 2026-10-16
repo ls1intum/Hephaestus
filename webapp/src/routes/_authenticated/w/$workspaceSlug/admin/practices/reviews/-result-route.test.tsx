@@ -11,6 +11,7 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import type { ResultMark, ReviewResultDetail } from "@/api/types.gen";
 import { reviewResultDetail } from "@/components/admin/practice-reviews/fixtures";
+import { stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
 import { server } from "@/mocks/server";
 import { reviewHandlers } from "@/routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/-reviews-server";
 import { ObserverStub } from "@/test/observers";
@@ -91,6 +92,36 @@ describe("result level", () => {
 		problems.getByText("Trivial");
 		expect(within(level).queryByText(/maps every error in one handler/u)).toBeNull();
 		expect(within(level).queryByText("Example from this work")).toBeNull();
+	});
+
+	it("opens a problem of the result in the result's place, and Back returns to the result", async () => {
+		const [problem] = reviewResultDetail.problems;
+		assert(problem);
+		assert(reviewResultDetail.summary !== null);
+		stub();
+		const { router } = renderRouteAtWithRouter(RESULT_LEVEL);
+
+		const level = await screen.findByRole(
+			"dialog",
+			{ name: reviewResultDetail.summary },
+			ROUTE_RENDER_WAIT,
+		);
+		const problems = await within(level).findByRole(
+			"list",
+			{ name: "Problems" },
+			ROUTE_RENDER_WAIT,
+		);
+		await userEvent.click(within(problems).getByRole("link", { name: problem.summary.trim() }));
+
+		await screen.findByRole("dialog", { name: problem.summary.trim() }, ROUTE_RENDER_WAIT);
+		expect(stackInSearch(router.state.location.search.detail)).toStrictEqual([
+			`problem:${problem.id}`,
+		]);
+		router.history.back();
+		await screen.findByRole("dialog", { name: reviewResultDetail.summary }, ROUTE_RENDER_WAIT);
+		expect(stackInSearch(router.state.location.search.detail)).toStrictEqual([
+			`result:${reviewResultDetail.id}`,
+		]);
 	});
 
 	it("marks the result incorrect and refreshes only this workspace's reads", async () => {

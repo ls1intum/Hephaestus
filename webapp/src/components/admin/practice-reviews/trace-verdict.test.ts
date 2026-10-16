@@ -58,7 +58,7 @@ describe("traceVerdict on a review", () => {
 			"This review waits in the queue and has recorded nothing yet.",
 		);
 		expect(verdictOf("running")).toMatchObject({
-			sentence: "This review still runs and has recorded 2 results so far.",
+			sentence: "This review remains open and has recorded 2 results so far.",
 			end: { kind: "open", label: "Open" },
 		});
 	});

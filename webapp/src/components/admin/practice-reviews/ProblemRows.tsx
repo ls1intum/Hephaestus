@@ -19,7 +19,7 @@ import { RecordResults, type RecordResultsWords } from "./RecordResults";
 import { RecordRowActions, ROW_OPEN_COLUMN, rowActionsColumn } from "./RecordRowActions";
 import { citationLocation, citationSide } from "./ResultEvidence";
 import { ResultExceptions } from "./ResultRows";
-import { resultLevel } from "./review-levels";
+import { problemLevel } from "./review-levels";
 import { ReviewPerson } from "./ReviewPerson";
 import { ReviewPracticeName } from "./ReviewPracticeLink";
 import { useTracked } from "./use-tracked";
@@ -47,7 +47,7 @@ const PROBLEM_WORDS: RecordResultsWords = {
 	icon: CircleAlertIcon,
 	emptyTitle: "No problems yet",
 	filteredTitle: "No problems match these filters",
-	emptyDescription: "A problem appears when a review records a not met result.",
+	emptyDescription: "Problems appear here when a Not met result records them.",
 };
 
 const HIDDEN_SUMMARY = "Details hidden";
@@ -107,9 +107,9 @@ export function ProblemRow({ problem }: ProblemRowProps) {
 	return (
 		<PracticeTableRow
 			link={{
-				text: "Open result",
+				text: "Open problem",
 				name,
-				render: <DetailStackLink entry={resultLevel(problem.resultId)} single />,
+				render: <DetailStackLink entry={problemLevel(problem.id)} single />,
 			}}
 			variant={tracked ? "highlighted" : undefined}
 			action={

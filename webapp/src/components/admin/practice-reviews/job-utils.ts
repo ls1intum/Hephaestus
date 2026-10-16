@@ -18,6 +18,22 @@ const IN_PROGRESS = "In progress";
 const NOT_STARTED = "Not started";
 const NOT_RECORDED = "Not recorded";
 
+/** The last recorded worker invocation ended; future scan work is not known here. */
+export function invocationCompletedAt(
+	jobs: readonly Pick<ReviewJob, "status" | "completedAt">[],
+): Date | undefined {
+	if (
+		jobs.length === 0 ||
+		jobs.some((job) => job.status === "QUEUED" || job.status === "RUNNING")
+	) {
+		return undefined;
+	}
+	const completed = jobs.map((job) => asDate(job.completedAt)).filter((at) => at !== undefined);
+	return completed.length === jobs.length
+		? new Date(Math.max(...completed.map((at) => at.getTime())))
+		: undefined;
+}
+
 function elapsed(from: Date | undefined, to: Date | undefined): string {
 	if (!from || !to || to.getTime() < from.getTime()) {
 		return NOT_RECORDED;

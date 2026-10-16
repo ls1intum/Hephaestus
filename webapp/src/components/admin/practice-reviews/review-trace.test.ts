@@ -66,6 +66,29 @@ describe("the review a chain tells", () => {
 });
 
 describe("the path a pinned node draws strong", () => {
+	it("keeps a problem-specific basis separate from its owning result and sibling problems", () => {
+		const problem = wholeReview.nodes.find((node) => node.problem !== null);
+		assert(problem !== undefined);
+		assert(problem.problem !== null);
+		const linked = lineageRecords({
+			...wholeReview,
+			edges: [
+				...wholeReview.edges,
+				{ from: problem.id, to: `feedback:${LINEAGE_FEEDBACK.onGitHub}`, relation: "BASIS" },
+				{ from: "problem:absent", to: `feedback:${LINEAGE_FEEDBACK.onGitHub}`, relation: "BASIS" },
+			],
+		});
+		expect(
+			linked.feedback.find((entry) => entry.id === LINEAGE_FEEDBACK.onGitHub)?.problemBasis,
+		).toStrictEqual([problem.problem.id]);
+		expect(
+			linked.feedback.find((entry) => entry.id === LINEAGE_FEEDBACK.praise)?.problemBasis,
+		).toStrictEqual([]);
+		expect(
+			linked.feedback.find((entry) => entry.id === LINEAGE_FEEDBACK.onGitHub)?.basis,
+		).toStrictEqual(whole.feedback.find((entry) => entry.id === LINEAGE_FEEDBACK.onGitHub)?.basis);
+	});
+
 	it("runs from a result to the feedback written from it", () => {
 		const traced = tracedBy(whole, { kind: "result", id: LINEAGE_RESULT.cache404 });
 		expect(traced?.results).toStrictEqual(new Set([LINEAGE_RESULT.cache404]));

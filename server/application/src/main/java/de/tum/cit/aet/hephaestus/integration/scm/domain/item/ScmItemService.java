@@ -117,7 +117,15 @@ public class ScmItemService implements ItemSource {
         if (item.kind().equals(ScmItemEvents.REPOSITORY)) snapshot = repository(item, requested);
         else if (item.kind().equals(ScmItemEvents.FILE)) snapshot = file(item, requested);
         else snapshot = work(item);
-        if (requested != null && !requested.equals(snapshot.version())) throw versionUnavailable();
+        if (requested != null) {
+            var actual = snapshot.version();
+            boolean omitsRedundantBase = requested.baseVersion() == null
+                    && (item.kind().equals(ScmItemEvents.PULL_REQUEST)
+                            || item.kind().equals(ScmItemEvents.PULL_REQUEST_REVIEW));
+            if (!requested.value().equals(actual.value())
+                    || (!omitsRedundantBase && !Objects.equals(requested.baseVersion(), actual.baseVersion())))
+                throw versionUnavailable();
+        }
         return snapshot;
     }
 

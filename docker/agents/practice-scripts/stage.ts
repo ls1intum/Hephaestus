@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { INPUTS_FILE_SUFFIX } from "./lib/core/contract.ts";
@@ -56,7 +56,7 @@ export async function stagePracticeScripts(
 	scripts: Record<string, string | null>,
 	inputs: StagedInputs = REQUESTED_PULL_REQUEST,
 ): Promise<StagedPracticeScripts> {
-	const root = await mkdtemp(path.join(tmpdir(), "practice-script-"));
+	const root = await realpath(await mkdtemp(path.join(tmpdir(), "practice-script-")));
 	const stage = path.join(root, "stage");
 	const practices = path.join(stage, "practices");
 	await mkdir(practices, { recursive: true });

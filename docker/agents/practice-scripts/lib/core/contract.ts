@@ -768,6 +768,10 @@ function outcomeRefusal(
 	return undefined;
 }
 
+function unsupportedProblemCitation(problem: Problem): number | undefined {
+	return basisIndices(problem.basis).find((at) => at >= problem.citations.length);
+}
+
 function problemRefusal(sent: Omit<Superset, "coverage">): Refusal | undefined {
 	const { example, outcome } = sent;
 	const problems = sent.problems ?? [];
@@ -775,7 +779,7 @@ function problemRefusal(sent: Omit<Superset, "coverage">): Refusal | undefined {
 		return refuse("example_outcome_mismatch", `a ${outcome} result has no example`);
 	}
 	for (const [index, problem] of problems.entries()) {
-		const out = basisIndices(problem.basis).find((at) => at >= problem.citations.length);
+		const out = unsupportedProblemCitation(problem);
 		if (out !== undefined) {
 			return refuse(
 				"basis_citation_out_of_range",
@@ -788,6 +792,18 @@ function problemRefusal(sent: Omit<Superset, "coverage">): Refusal | undefined {
 		? undefined
 		: refuse("duplicate_problem_key", "two problems share a key");
 }
+
+/** A local problem draft uses the same shape and citation indexes as a complete candidate. */
+export const sessionProblemSchema = problemShape.superRefine((problem, ctx) => {
+	const out = unsupportedProblemCitation(problem);
+	if (out !== undefined) {
+		ctx.addIssue({
+			code: "custom",
+			path: ["basis"],
+			message: `its basis names citation ${out}, and it has ${problem.citations.length}; use a zero-based index of a citation that supports the claim`,
+		});
+	}
+});
 
 /** Session structure and outcome rules share the program candidate's authoritative schemas. */
 export const sessionCandidateSchema = supersetShape

@@ -96,6 +96,55 @@ function detailOf(key: string, overrides: Partial<ReviewDetail> = {}): ReviewDet
 }
 
 describe("traceBottleneck for the review itself", () => {
+	it("keeps returned worker time separate from an open review awaiting finalization", () => {
+		const { lineage } = lineageStateCase("running");
+		const detail = detailOf("running", {
+			runtime: {
+				jobs: [
+					job({
+						startedAt: at("16:41:00"),
+						completedAt: at("16:44:00"),
+						processingStatus: "PENDING",
+					}),
+				],
+			},
+		});
+		expect(traceBottleneck(lineage, REVIEW, detail, NOW)).toMatchObject({
+			kind: "waiting",
+			title: "Awaiting finalization",
+		});
+		expect(traceSpans(lineage, REVIEW, detail).find((entry) => entry.kind === "run")).toMatchObject(
+			{ text: "3 min", to: at("16:44:00") },
+		);
+		expect(detail.status).toBe("RUNNING");
+	});
+
+	it.each(["QUEUED", "RUNNING"] as const)(
+		"keeps execution open when a sibling invocation is %s",
+		(status) => {
+			const { lineage } = lineageStateCase("running");
+			const detail = detailOf("running", {
+				runtime: {
+					jobs: [job({ processingStatus: "PENDING" }), job({ status, completedAt: null })],
+				},
+			});
+			expect(traceBottleneck(lineage, REVIEW, detail, NOW).title).not.toBe("Awaiting finalization");
+			expect(traceSpans(lineage, REVIEW, detail).some((entry) => entry.kind === "run")).toBe(false);
+		},
+	);
+
+	it("keeps failed invocation processing distinct from review success", () => {
+		const { lineage } = lineageStateCase("running");
+		const detail = detailOf("running", {
+			runtime: { jobs: [job({ status: "FAILED", processingStatus: "FAILED" })] },
+		});
+		expect(traceBottleneck(lineage, REVIEW, detail, NOW)).toMatchObject({
+			kind: "waiting",
+			title: "Processing failed",
+		});
+		expect(detail.status).toBe("RUNNING");
+	});
+
 	it("says why a failed review stopped", () => {
 		expect(bottleneckOf("failed")).toMatchObject({
 			kind: "failed",
@@ -275,7 +324,7 @@ describe("traceSpans", () => {
 		expect(spans.map((entry) => [entry.kind, entry.label, entry.text, entry.slow])).toStrictEqual([
 			["asked", "Until asked", "10 s", false],
 			["queue", "Queue", "1 min", false],
-			["run", "Run", "8 min", false],
+			["run", "Run", "7 min", false],
 			["delivery", "To developer", "36 min", true],
 		]);
 		expect(traceBottleneck(lineage, PIECE, detailOf("complete"), NOW)).toMatchObject({

@@ -7,6 +7,8 @@ import { DIFF_SOURCE, TREE_SOURCE } from "./work/practice-scripts/kits/scm/sourc
 import {
 	CANDIDATE_LIMITS,
 	sessionCandidateSchema,
+	sessionProblemSchema,
+	type Problem,
 	type ParsedSessionCandidate,
 	type Citation,
 	type Outcome,
@@ -467,15 +469,9 @@ const TRIMMED_FIELDS = new Set([
 	"key",
 ]);
 
-/** Repair transport coordinates and whitespace, then validate the one shared session contract. */
-export function normalizeSubmission(
-	raw: unknown,
-	notes: string[] = [],
-	sourceOf?: (sourcePath: string) => string | undefined,
-	sources?: CitationSources,
-): NormalizedSubmission {
+/** Repair only transport coordinates and whitespace; never invent an outcome or evidence. */
+function repairedFields(raw: unknown, repairs: CitationRepairs) {
 	const errors: string[] = [];
-	const repairs: CitationRepairs = { sourceOf, sources, notes };
 	const citation = (value: unknown, path: string): unknown => {
 		try {
 			return normalizeCitation(value, "", repairs);
@@ -525,10 +521,39 @@ export function normalizeSubmission(
 		}
 		return TRIMMED_FIELDS.has(field) ? value.trim() : value;
 	};
+	return { value: repair(raw), errors };
+}
+
+/** Normalize an independent local Problem without inventing a temporary Result. */
+export function normalizeProblem(raw: unknown, notes: string[], sources: CitationSources): Problem {
+	const { value, errors } = repairedFields(raw, {
+		notes,
+		sources,
+		sourceOf: (path) => sources.sourceFiles.get(path),
+	});
+	const parsed = sessionProblemSchema.safeParse(value);
+	if (!parsed.success || errors.length > 0) {
+		const issue = parsed.error?.issues[0];
+		throw new Error(
+			errors[0] ??
+				`${issue === undefined || issue.path.length === 0 ? "problem" : issue.path.map(String).join(".")}: ${issue?.message ?? "expected a complete Problem"}`,
+		);
+	}
+	return parsed.data;
+}
+
+/** Repair transport coordinates and whitespace, then validate the one shared session contract. */
+export function normalizeSubmission(
+	raw: unknown,
+	notes: string[] = [],
+	sourceOf?: (sourcePath: string) => string | undefined,
+	sources?: CitationSources,
+): NormalizedSubmission {
 	const input = isRecord(raw)
 		? { ...raw, citations: raw.citations ?? [], evidence: raw.evidence ?? {} }
 		: raw;
-	const parsed = sessionCandidateSchema.safeParse(repair(input));
+	const { value, errors } = repairedFields(input, { sourceOf, sources, notes });
+	const parsed = sessionCandidateSchema.safeParse(value);
 	if (!parsed.success) {
 		errors.push(
 			...parsed.error.issues.map(
@@ -574,7 +599,21 @@ export function validateEvidenceSources(
 	sourceFileSources: ReadonlyMap<string, string> = new Map(),
 	reviewedCheckout = REVIEWED_CHECKOUT,
 ): void {
-	for (const citation of submissionCitations(submission)) {
+	validateCitationSources(
+		submissionCitations(submission),
+		availableSourceKinds,
+		sourceFileSources,
+		reviewedCheckout,
+	);
+}
+
+export function validateCitationSources(
+	citations: readonly Citation[],
+	availableSourceKinds: ReadonlySet<string>,
+	sourceFileSources: ReadonlyMap<string, string>,
+	reviewedCheckout: string,
+): void {
+	for (const citation of citations) {
 		const { sourceKind } = citation;
 		if (!availableSourceKinds.has(sourceKind)) {
 			throw new Error(
@@ -902,7 +941,7 @@ function resolveQuoteText(
 /** Changed-line custody bounds a code claim; it does not establish the claimed consequence. */
 export function validateChangeBasis(
 	submission: {
-		outcome: Outcome;
+		outcome?: Outcome;
 		problems?: readonly NonNullable<NormalizedSubmission["problems"]>[number][];
 	},
 	diff: string,

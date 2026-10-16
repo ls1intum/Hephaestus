@@ -2,7 +2,7 @@ import { BadgeCheckIcon, CircleSlashIcon, Undo2Icon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { cn } from "cn";
-import type { OpenQuestion, Problem, ResultMark, ReviewResultDetail } from "@/api/types.gen";
+import type { OpenQuestion, ResultMark, ReviewResultDetail } from "@/api/types.gen";
 import { accountName } from "@/components/admin/users/account-labels";
 import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
@@ -10,6 +10,7 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { UNTRUSTED_MARKDOWN_PROSE, UntrustedMarkdown } from "@/components/common/UntrustedMarkdown";
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
 import { Section } from "@/components/layout/Section";
+import { ProblemList } from "@/components/practice-problems/ProblemList";
 import { NON_CURRENT } from "@/components/practice-vocabulary/claim-currentness";
 import { FEEDBACK_DESTINATION_DEFS } from "@/components/practice-vocabulary/feedback-destination-defs";
 import {
@@ -20,7 +21,6 @@ import {
 	type ResultMarkKind,
 } from "@/components/practice-vocabulary/result-mark-defs";
 import { REVIEW_ORIGIN_DEFS } from "@/components/practice-vocabulary/review-origin-defs";
-import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
 import { Badge } from "@/components/ui/badge";
 import { DrawerBody, DrawerFooter } from "@/components/ui/drawer";
 import { hasText } from "@/lib/text";
@@ -37,6 +37,7 @@ import {
 } from "./RecordSheet";
 import { RESULT_WORDS_UNAVAILABLE, resultSummary } from "./result-words";
 import { citationLocation, ResultEvidence } from "./ResultEvidence";
+import { problemLevel } from "./review-levels";
 import { ResultOutcome } from "./ReviewBadges";
 import { ReviewFact, ReviewFactGrid } from "./ReviewFactGrid";
 import { ReviewItemLink } from "./ReviewItem";
@@ -134,7 +135,7 @@ export function ResultLevel({
 	}
 
 	const { result: record } = state;
-	const problems = [...record.problems].sort((a, b) => a.position - b.position);
+	const { problems } = record;
 	const citations = record.evidence?.citations ?? [];
 	const openQuestions = record.evidence?.openQuestions ?? [];
 	const incorrect = activeMark(record, "INCORRECT");
@@ -184,15 +185,13 @@ export function ResultLevel({
 						)}
 						{problems.length > 0 && (
 							<Section level={4} size="sm" title="Problems">
-								<ol aria-label="Problems" className="space-y-8">
-									{problems.map((problem) => (
-										<ProblemItem
-											key={problem.id}
-											problem={problem}
-											hidden={record.evidenceHidden}
-										/>
-									))}
-								</ol>
+								<ProblemList
+									problems={problems}
+									open={problemLevel}
+									evidence={(problem) => (
+										<ResultEvidence citations={problem.citations} hidden={record.evidenceHidden} />
+									)}
+								/>
 							</Section>
 						)}
 						{openQuestions.length > 0 && (
@@ -336,31 +335,6 @@ function resultNow(result: ReviewResultDetail): ReactNode {
 		return NON_CURRENT[result.currentness].description;
 	}
 	return undefined;
-}
-
-function ProblemItem({ problem, hidden }: { problem: Problem; hidden: boolean }) {
-	return (
-		<li className="space-y-3">
-			<div className="flex flex-wrap items-start gap-2">
-				<StatusBadge def={SEVERITY_DEFS[problem.severity]} />
-				<p className="min-w-0 flex-1 basis-48 text-sm font-medium break-words">{problem.summary}</p>
-			</div>
-			{hasText(problem.explanation) && (
-				<div className={cn(UNTRUSTED_MARKDOWN_PROSE, "text-sm")}>
-					<UntrustedMarkdown>{problem.explanation}</UntrustedMarkdown>
-				</div>
-			)}
-			<ResultEvidence citations={problem.citations} hidden={hidden} />
-			{hasText(problem.nextStep) && (
-				<div className="space-y-1 text-sm">
-					<p className="font-medium">Next step</p>
-					<div className={UNTRUSTED_MARKDOWN_PROSE}>
-						<UntrustedMarkdown>{problem.nextStep}</UntrustedMarkdown>
-					</div>
-				</div>
-			)}
-		</li>
-	);
 }
 
 // Open questions identify uncertainty; they cannot become feedback claims.

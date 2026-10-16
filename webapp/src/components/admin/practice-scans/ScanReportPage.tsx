@@ -41,6 +41,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { formatDate } from "@/lib/dates";
 import { problemDetailOf } from "@/lib/problem-detail";
+import type { RefreshFailure } from "@/runtime/tanstack-query/infinite-list";
 
 import {
 	countedNothing,
@@ -63,7 +64,7 @@ import { SCAN_REPORT_TABS, type ScanReportTab } from "./scans-search";
 export type ScanReportState =
 	| { status: "loading" }
 	| { status: "error"; error: unknown; onRetry: () => void }
-	| { status: "ready"; scan: ScanDetail; report: ScanReport };
+	| { status: "ready"; scan: ScanDetail; report: ScanReport; refreshFailure?: RefreshFailure };
 
 export interface ScanAction {
 	pending: boolean;
@@ -112,7 +113,14 @@ export function ScanReportPage(props: ScanReportPageProps) {
 			</PageLayout>
 		);
 	}
-	return <LoadedReport {...props} scan={state.scan} report={state.report} />;
+	return (
+		<LoadedReport
+			{...props}
+			scan={state.scan}
+			report={state.report}
+			refreshFailure={state.refreshFailure}
+		/>
+	);
 }
 
 function BackToScans({ workspaceSlug }: { workspaceSlug: string }) {
@@ -129,11 +137,13 @@ function BackToScans({ workspaceSlug }: { workspaceSlug: string }) {
 }
 
 interface LoadedReportProps extends ScanReportPageProps {
+	refreshFailure?: RefreshFailure;
 	scan: ScanDetail;
 	report: ScanReport;
 }
 
 function LoadedReport({
+	refreshFailure,
 	workspaceSlug,
 	scan,
 	report,
@@ -223,6 +233,9 @@ function LoadedReport({
 				)}
 			</div>
 
+			{refreshFailure !== undefined && (
+				<QueryErrorAlert title="Scan details may be out of date" {...refreshFailure} />
+			)}
 			<ReportNotes
 				scan={scan}
 				report={report}
@@ -257,7 +270,11 @@ function LoadedReport({
 					</PracticeTabsList>
 				</PracticeTabsRail>
 				<TabsContent value="problems">
+					{problems.status === "ready" && problems.refreshFailure !== undefined && (
+						<QueryErrorAlert title="Problems may be out of date" {...problems.refreshFailure} />
+					)}
 					<ScanProblemTable
+						workspaceSlug={workspaceSlug}
 						state={problems}
 						filter={problemFilter}
 						onFilterChange={onProblemFilterChange}
@@ -267,7 +284,14 @@ function LoadedReport({
 					/>
 				</TabsContent>
 				<TabsContent value="files">
+					{files.status === "ready" && files.refreshFailure !== undefined && (
+						<QueryErrorAlert
+							title="Files and practices may be out of date"
+							{...files.refreshFailure}
+						/>
+					)}
 					<ScanItemTable
+						workspaceSlug={workspaceSlug}
 						state={files}
 						filter={fileFilter}
 						onFilterChange={onFileFilterChange}

@@ -139,6 +139,54 @@ class ScanReviewIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void shouldExcludeMigratedHistoryBeforeLimitingCompletionCandidatesAcrossWorkspaces() {
+        var firstWorkspace = workspaces.saveAndFlush(WorkspaceTestFixtures.activeWorkspace("completion-native-first"));
+        var secondWorkspace =
+                workspaces.saveAndFlush(WorkspaceTestFixtures.activeWorkspace("completion-native-second"));
+        var historyAt = Instant.parse("2000-01-01T00:00:00Z");
+        var modernAt = historyAt.plusSeconds(60);
+        var historical = job(firstWorkspace.getId(), UUID.randomUUID());
+        historical.setId(historical.getReviewId());
+        historical.setStatus(ReviewJobStatus.COMPLETED);
+        historical.setCompletedAt(historyAt);
+        historical.setProcessingStatus(ProcessingStatus.NONE);
+        RuntimeJobTestData.persistParent(jdbc, historical);
+        jobs.saveAndFlush(historical);
+        jdbc.update(
+                "UPDATE review SET checks=CAST(? AS jsonb) WHERE id=? AND workspace_id=?",
+                "{\"MIGRATION\":{\"jobStatus\":\"COMPLETED\",\"processingStatus\":\"NONE\"}}",
+                historical.getReviewId(),
+                firstWorkspace.getId());
+
+        var nativeNone = job(firstWorkspace.getId(), historical.getReviewId());
+        nativeNone.setInput(historical.getInput());
+        nativeNone.setStatus(ReviewJobStatus.FAILED);
+        nativeNone.setCompletedAt(modernAt);
+        RuntimeJobTestData.persistParent(jdbc, nativeNone);
+        jobs.saveAndFlush(nativeNone);
+        var nativePending = job(secondWorkspace.getId(), UUID.randomUUID());
+        nativePending.setStatus(ReviewJobStatus.COMPLETED);
+        nativePending.setCompletedAt(modernAt.plusSeconds(1));
+        nativePending.setProcessingStatus(ProcessingStatus.PENDING);
+        RuntimeJobTestData.persistParent(jdbc, nativePending);
+        jobs.saveAndFlush(nativePending);
+
+        var candidates = jobs.findTerminalForProcessing(2);
+        assertThat(candidates)
+                .extracting(ReviewJobRepository.CompletionCandidate::getId)
+                .containsExactly(nativeNone.getId(), nativePending.getId());
+        assertThat(candidates)
+                .extracting(ReviewJobRepository.CompletionCandidate::getWorkspaceId)
+                .containsExactly(firstWorkspace.getId(), secondWorkspace.getId());
+        assertThat(jobs.findByIdAndWorkspaceId(historical.getId(), firstWorkspace.getId()))
+                .get()
+                .extracting(ReviewJob::getStatus, ReviewJob::getProcessingStatus)
+                .containsExactly(ReviewJobStatus.COMPLETED, ProcessingStatus.NONE);
+        assertThat(jobs.findByIdAndWorkspaceId(nativePending.getId(), firstWorkspace.getId()))
+                .isEmpty();
+    }
+
+    @Test
     void timingUsesPinnedProductCohortsAndSeparatesPublicFromPrivateCompletion() {
         var workspace = workspaces.saveAndFlush(WorkspaceTestFixtures.activeWorkspace("runtime-timing-cohort"));
         var at = Instant.parse("2026-10-14T10:00:00Z");

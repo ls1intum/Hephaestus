@@ -19,6 +19,7 @@ const meta = {
 	component: ScanProblemTable,
 	decorators: [withStandardPage],
 	args: {
+		workspaceSlug: "aet",
 		state: ready(),
 		filter: undefined,
 		onFilterChange: fn(),
@@ -57,6 +58,16 @@ export const Default: Story = {
 		await expect(within(table).getAllByText("Now met")).toHaveLength(1);
 		await expect(within(table).getByText(/That alone does not prove a fix\./u)).toBeVisible();
 		await expect(within(table).getAllByText("server/src/ScanService.java:42–48")[0]).toBeVisible();
+
+		// Each row opens its problem over Practice reviews.
+		const open = within(table).getByRole("link", {
+			name: "Open problem A failed upload is logged and then ignored., server/src/ScanService.java:42–48, Errors are handled where they occur",
+		});
+		await expect(open).toHaveAttribute(
+			"href",
+			"/w/aet/admin/practices/reviews/problems?detail=problem:p-1",
+		);
+		await expect(within(table).getAllByRole("link", { name: /^Open problem /u })).toHaveLength(5);
 
 		await userEvent.click(canvas.getByRole("button", { name: "Absent (2)" }));
 		await expect(args.onFilterChange).toHaveBeenCalledWith("ABSENT");

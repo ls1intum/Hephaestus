@@ -17,12 +17,13 @@ import {
 } from "@/components/practice-vocabulary/review-status-defs";
 import { toDayParam } from "@/lib/date-range-search";
 
-import type { FeedbackSearch, ResultsSearch, ReviewsSearch } from "./review-search";
+import type { FeedbackSearch, ProblemsSearch, ResultsSearch, ReviewsSearch } from "./review-search";
 
 /** A list tab, filtered: where a count opens. */
 export type ReviewListTarget =
 	| { list: "reviews"; search: Partial<ReviewsSearch> }
 	| { list: "results"; search: Partial<ResultsSearch> }
+	| { list: "problems"; search: Partial<ProblemsSearch> }
 	| { list: "feedback"; search: Partial<FeedbackSearch> };
 
 /**

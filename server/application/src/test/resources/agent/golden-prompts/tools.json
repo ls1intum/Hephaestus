@@ -6,6 +6,9 @@
   "ls",
   "bash",
   "codemode",
+  "upsert_problem",
+  "remove_problem",
+  "read_problem",
   "submit_result"
  ],
  "customTools": [
@@ -30,8 +33,292 @@
    }
   },
   {
+   "name": "upsert_problem",
+   "description": "Add or replace one local problem draft by stable key. Send its complete body; an invalid replacement leaves the previous draft unchanged. Same key and body changes nothing. This does not submit a result or end review. Use submit_result with ordered problemKeys to publish the complete candidate for server admission. Prefer a single inline submit_result for simple results.",
+   "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "severity",
+     "summary",
+     "explanation",
+     "citations",
+     "basis",
+     "key"
+    ],
+    "properties": {
+     "key": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+      "description": "Stable short lowercase-hyphenated name, unique within this practice result."
+     },
+     "severity": {
+      "type": "string",
+      "enum": [
+       "CRITICAL",
+       "MAJOR",
+       "MINOR",
+       "TRIVIAL"
+      ],
+      "description": "From the practice's Severity section. CRITICAL — The consequence is expensive or impossible to undo once this merges — a leaked credential, data loss, a security hole. Differs from MAJOR by whether the damage can still be taken back.\nMAJOR — A real defect to fix before merging, whose consequence is contained and correctable. Differs from MINOR by whether a reader of this change would be wrong about how it behaves.\nMINOR — A craft-level improvement worth making that nobody would block a merge on. Differs from TRIVIAL by whether there is a specific edit to make.\nTRIVIAL — A real gap with trivial impact. Still a problem of a NOT_MET result; a strength is never a problem."
+     },
+     "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "description": "One line of at most 160 characters naming this one problem, such as 'Debug print left in the request handler'."
+     },
+     "explanation": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4000,
+      "description": "What the cited evidence shows about this one problem and its consequence. Evidence, not advice, intent, confidence, or hidden chain-of-thought."
+     },
+     "citations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": {
+       "type": "object",
+       "additionalProperties": false,
+       "required": [
+        "path",
+        "startLine",
+        "quote"
+       ],
+       "properties": {
+        "sourceKind": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "enum": [
+          "scm.pull-request.core",
+          "scm.pull-request.diff",
+          null
+         ],
+         "description": "Optional. The runner resolves the source kind from the path you read."
+        },
+        "sourcePath": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "minLength": 1,
+         "maxLength": 4096,
+         "description": "Optional. The source you read, such as work/change/diff.patch or a captured record. The runner resolves its manifest identity."
+        },
+        "path": {
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 4096,
+         "description": "The file you read: a repository-relative path, a sandbox path, work/change/diff.patch, or a captured record path."
+        },
+        "side": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "enum": [
+          "OLD",
+          "NEW",
+          null
+         ],
+         "description": "For a diff quote, OLD selects removed lines and NEW selects added lines. Omission lets the runner resolve the side from the exact quote."
+        },
+        "commit": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "minLength": 1,
+         "maxLength": 1024,
+         "description": "Optional full commit SHA for historical repository text. Omission selects the captured HEAD automatically. Do not use a branch name."
+        },
+        "startLine": {
+         "type": "integer",
+         "minimum": 1,
+         "maximum": 2147483647,
+         "description": "The 1-based line you read. For a diff, use its [L<n>] file coordinate or the physical line number of diff.patch."
+        },
+        "endLine": {
+         "type": [
+          "integer",
+          "null"
+         ],
+         "minimum": 1,
+         "maximum": 2147483647,
+         "description": "The last line of the quote, at least startLine; omitted means one line."
+        },
+        "quote": {
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 4000,
+         "description": "Required verbatim text at those lines. For repository text and records, a fragment is enough. For a diff, copy each whole line. Diff markers and [L<n>] prefixes are accepted."
+        }
+       }
+      },
+      "description": "The lines that show this problem."
+     },
+     "basis": {
+      "description": "All indexes are zero-based positions in THIS problem's citations array: with one citation, use 0. Why the problem belongs to this work. introduced: the change adds it (head: the index of a citation of the NEW side or the reviewed head). worsened: the change makes it worse (base: the index of the OLD side's citation, head: the NEW side's). duty: the criteria require an event that this work lacks (criterionQuote: the criteria's exact words, event: the index of the citation that shows the event). state: the problem exists in the pinned file; its citations witness that state at the reviewed version.",
+      "anyOf": [
+       {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+         "type",
+         "head",
+         "explanation"
+        ],
+        "properties": {
+         "type": {
+          "type": "string",
+          "enum": [
+           "introduced"
+          ]
+         },
+         "head": {
+          "type": "integer",
+          "minimum": 0
+         },
+         "explanation": {
+          "type": "string",
+          "minLength": 1
+         }
+        }
+       },
+       {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+         "type",
+         "base",
+         "head",
+         "explanation"
+        ],
+        "properties": {
+         "type": {
+          "type": "string",
+          "enum": [
+           "worsened"
+          ]
+         },
+         "base": {
+          "type": "integer",
+          "minimum": 0
+         },
+         "head": {
+          "type": "integer",
+          "minimum": 0
+         },
+         "explanation": {
+          "type": "string",
+          "minLength": 1
+         }
+        }
+       },
+       {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+         "type",
+         "event",
+         "criterionQuote",
+         "explanation"
+        ],
+        "properties": {
+         "type": {
+          "type": "string",
+          "enum": [
+           "duty"
+          ]
+         },
+         "event": {
+          "type": "integer",
+          "minimum": 0
+         },
+         "criterionQuote": {
+          "type": "string",
+          "minLength": 1
+         },
+         "explanation": {
+          "type": "string",
+          "minLength": 1
+         }
+        }
+       },
+       {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+         "type",
+         "explanation"
+        ],
+        "properties": {
+         "type": {
+          "type": "string",
+          "enum": [
+           "state"
+          ]
+         },
+         "explanation": {
+          "type": "string",
+          "minLength": 1
+         }
+        }
+       }
+      ]
+     },
+     "nextStep": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "Optional: the one change that would resolve this problem, when the criteria name it."
+     }
+    }
+   }
+  },
+  {
+   "name": "remove_problem",
+   "description": "Remove a local problem draft by key before submitting the result. An unknown key changes nothing. This does not delete an admitted Problem or establish repair.",
+   "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "key"
+    ],
+    "properties": {
+     "key": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+      "description": "Stable short lowercase-hyphenated name, unique within this practice result."
+     }
+    }
+   }
+  },
+  {
+   "name": "read_problem",
+   "description": "Read one complete local problem draft by its key, for example after compaction before correcting it. The key belongs only to this practice session. This is not an admitted product Problem. A submitted result's drafts are closed.",
+   "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "key"
+    ],
+    "properties": {
+     "key": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+      "description": "Stable short lowercase-hyphenated name, unique within this practice result."
+     }
+    }
+   }
+  },
+  {
    "name": "submit_result",
-   "description": "Choose one outcome and its evidence shape. MET: evidence:{} or evidence.search; NOT_MET: problems plus optional evidence.search and evidence.openQuestions; DOES_NOT_APPLY: evidence.inapplicability only; COULD_NOT_DETERMINE: evidence.openQuestions, with optional evidence.search. Omit unused fields. Each open question requires openQuestion and wouldSettleIt. Submit the one complete evidenced result of this session's practice: its outcome, the explanation, the citations it rests on, and for NOT_MET each problem with its severity, citations and basis. The host adds the coverage it measured from your reads and keeps the result for server admission after measuring. To correct it, submit the complete result again. Cite the source you read; the runner resolves source kind, manifest identity and the captured revision. Citation examples: {\"path\":\"src/Auth.java\",\"startLine\":10,\"quote\":\"insecure();\"}; {\"sourcePath\":\"work/change/diff.patch\",\"path\":\"src/Auth.java\",\"side\":\"NEW\",\"startLine\":10,\"quote\":\"+ insecure();\"}; {\"path\":\"evidence/metadata.json\",\"startLine\":1,\"quote\":\"Add login\"}. Use only text you read. Examples show the shape, not evidence for this review. Evidence examples by outcome: MET: {\"evidence\":{\"search\":{\"consulted\":[\"scm.review-threads\"],\"lookedFor\":\"unanswered requests\",\"boundary\":\"Captured threads only; no private discussion.\"}}}; DOES_NOT_APPLY: {\"evidence\":{\"inapplicability\":{\"consulted\":[\"scm.pull-request.diff\"],\"prerequisite\":\"UI changes\",\"ruledOutBy\":\"Only a server test changed.\"}}}; COULD_NOT_DETERMINE: {\"evidence\":{\"openQuestions\":[{\"openQuestion\":\"Did the named check pass?\",\"wouldSettleIt\":\"The check report linked in the description.\"}]}}; NOT_MET: {\"evidence\":{},\"problems\":[{\"severity\":\"MAJOR\",\"summary\":\"Required check is skipped\",\"explanation\":\"The captured event skips the required check.\",\"citations\":[{\"path\":\"context/events.json\",\"startLine\":2,\"quote\":\"check skipped\"}],\"basis\":{\"type\":\"duty\",\"event\":0,\"criterionQuote\":\"Run the check\",\"explanation\":\"The cited event skips the required check.\"}}]}. MET may use evidence:{} when cited positive evidence decides it. Search warrants also apply to absence claims in NOT_MET and COULD_NOT_DETERMINE. Never turn a capture failure into an outcome.",
+   "description": "Choose one outcome and its evidence shape. MET: evidence:{} or evidence.search; NOT_MET: problems plus optional evidence.search and evidence.openQuestions; DOES_NOT_APPLY: evidence.inapplicability only; COULD_NOT_DETERMINE: evidence.openQuestions, with optional evidence.search. Omit unused fields. Each open question requires openQuestion and wouldSettleIt. Submit the one complete evidenced result of this session's practice: its outcome, the explanation, the citations it rests on, and for NOT_MET each problem with its severity, citations and basis. The host adds the coverage it measured from your reads and keeps the result for server admission after measuring. For a large NOT_MET, optionally draft individual problems with upsert_problem and select their ordered problemKeys instead of inline problems. Never supply both. A draft is not an admitted Problem. Cite the source you read; the runner resolves source kind, manifest identity and the captured revision. Citation examples: {\"path\":\"src/Auth.java\",\"startLine\":10,\"quote\":\"insecure();\"}; {\"sourcePath\":\"work/change/diff.patch\",\"path\":\"src/Auth.java\",\"side\":\"NEW\",\"startLine\":10,\"quote\":\"+ insecure();\"}; {\"path\":\"evidence/metadata.json\",\"startLine\":1,\"quote\":\"Add login\"}. Use only text you read. Examples show the shape, not evidence for this review. Evidence examples by outcome: MET: {\"evidence\":{\"search\":{\"consulted\":[\"scm.review-threads\"],\"lookedFor\":\"unanswered requests\",\"boundary\":\"Captured threads only; no private discussion.\"}}}; DOES_NOT_APPLY: {\"evidence\":{\"inapplicability\":{\"consulted\":[\"scm.pull-request.diff\"],\"prerequisite\":\"UI changes\",\"ruledOutBy\":\"Only a server test changed.\"}}}; COULD_NOT_DETERMINE: {\"evidence\":{\"openQuestions\":[{\"openQuestion\":\"Did the named check pass?\",\"wouldSettleIt\":\"The check report linked in the description.\"}]}}; NOT_MET: {\"evidence\":{},\"problems\":[{\"severity\":\"MAJOR\",\"summary\":\"Required check is skipped\",\"explanation\":\"The captured event skips the required check.\",\"citations\":[{\"path\":\"context/events.json\",\"startLine\":2,\"quote\":\"check skipped\"}],\"basis\":{\"type\":\"duty\",\"event\":0,\"criterionQuote\":\"Run the check\",\"explanation\":\"The cited event skips the required check.\"}}]}. MET may use evidence:{} when cited positive evidence decides it. Search warrants also apply to absence claims in NOT_MET and COULD_NOT_DETERMINE. Never turn a capture failure into an outcome.",
    "parameters": {
     "type": "object",
     "additionalProperties": false,
@@ -717,6 +1004,18 @@
         ]
        }
       }
+     },
+     "problemKeys": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 50,
+      "uniqueItems": true,
+      "items": {
+       "type": "string",
+       "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+       "description": "Stable short lowercase-hyphenated name, unique within this practice result."
+      },
+      "description": "NOT_MET only: ordered keys of local problem drafts to include instead of inline problems. Never supply both. Unselected drafts are not submitted."
      }
     }
    }

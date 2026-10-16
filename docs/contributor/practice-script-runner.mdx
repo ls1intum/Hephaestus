@@ -7,7 +7,7 @@ description: How the review runner hosts the program of each practice, what a pr
 # Practice script runner
 
 A practice script returns one candidate for one assigned practice and item.
-The strict contract is version 3. The runtime image contract is version 6.
+The strict contract is version 3. The runtime image contract is version 7.
 The host and server validate the same result shape.
 
 ## Define a script
@@ -113,6 +113,19 @@ Non-code source records cannot borrow diff-side semantics.
 A scan state problem must cite its own file or an authorized inventory witness.
 Context from another file cannot replace that witness.
 The [source contract](./item-source-contract.mdx) owns source citation capabilities.
+
+## Revise problems in a model session
+
+`submit_result` accepts a complete result in one call.
+For a result with several problems, the model can instead use `upsert_problem` to save each complete problem under a stable local key.
+Replacing a key validates the new body before changing the draft.
+`remove_problem` discards a draft, and `read_problem` retrieves its complete body after context compaction.
+
+The final `submit_result` selects ordered `problemKeys` or supplies inline `problems`, never both.
+Both paths use the same candidate and evidence checks.
+Drafts belong to one practice session and create no product records.
+Only the complete candidate returned by the script reaches admission.
+Removing a draft does not repair or remove a recorded Problem.
 
 ## Models and limits
 

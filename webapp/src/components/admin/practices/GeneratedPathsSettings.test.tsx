@@ -17,7 +17,7 @@ const repositories = {
 function SettingsHarness() {
 	const [settings, setSettings] = useState(
 		reviewSettings({
-			generatedPaths: { "owner/repo": ["generated/**"], "group/nested/project": ["client/**"] },
+			generatedPaths: { "101": ["generated/**"], "102": ["client/**"] },
 		}),
 	);
 	const save = async (patch: UpdatePracticeReviewSettingsRequest, etag?: string) => {
@@ -41,6 +41,17 @@ function SettingsHarness() {
 }
 
 describe("GeneratedPathsSettings", () => {
+	it("reads each repository's saved patterns by its item identity", async () => {
+		await renderWithRouter(<SettingsHarness />, "/w/acme/admin/practices");
+		expect(screen.getByRole("textbox", { name: "owner/repo" })).toHaveProperty(
+			"value",
+			"generated/**",
+		);
+		expect(screen.getByRole("textbox", { name: "group/nested/project" })).toHaveProperty(
+			"value",
+			"client/**",
+		);
+	});
 	it("clears one repository without changing another repository", async () => {
 		await renderWithRouter(<SettingsHarness />, "/w/acme/admin/practices");
 		fireEvent.change(screen.getByRole("textbox", { name: "owner/repo" }), {

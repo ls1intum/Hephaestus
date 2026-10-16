@@ -12,10 +12,14 @@ import {
 
 import type { ReviewBoundFeedback, ReviewDetail, ReviewLineage, ReviewRef } from "@/api/types.gen";
 import type { BadgeVariant } from "@/components/common/status-def";
-import { REVIEW_STOP_REASON_SENTENCES } from "@/components/practice-vocabulary/review-status-defs";
+import {
+	REVIEW_JOB_PROCESSING_DEFS,
+	REVIEW_STOP_REASON_SENTENCES,
+} from "@/components/practice-vocabulary/review-status-defs";
 import { durationBetween } from "@/lib/dates";
 import { hasText } from "@/lib/text";
 
+import { invocationCompletedAt } from "./job-utils";
 import {
 	countOf,
 	feedbackOf,
@@ -179,9 +183,9 @@ export function traceSpans(
 		),
 		span(
 			"run",
-			"From when a worker picked the review up to when it finished",
+			"From the first worker pickup to when all recorded worker invocations ended",
 			pickedUp,
-			review.completedAt,
+			invocationCompletedAt(detail?.runtime?.jobs ?? []),
 		),
 		span(
 			"delivery",
@@ -352,11 +356,43 @@ function reviewBottleneck(
 			};
 		}
 		case "RUNNING": {
+			const jobs = detail?.runtime?.jobs ?? [];
+			if (invocationCompletedAt(jobs) !== undefined) {
+				const failed = jobs.some((job) => job.processingStatus === "FAILED");
+				const pending = jobs.some(
+					(job) => job.processingStatus === "NONE" || job.processingStatus === "PENDING",
+				);
+				let title = "Review still open";
+				let text = "The recorded worker invocations ended; this review has not closed.";
+				if (failed) {
+					title = REVIEW_JOB_PROCESSING_DEFS.FAILED.label;
+					text = `${REVIEW_JOB_PROCESSING_DEFS.FAILED.description} The review remains open.`;
+				} else if (pending) {
+					title = "Awaiting finalization";
+					text = "The recorded worker invocations ended; the server has not finalized this review.";
+				}
+				return {
+					kind: "waiting",
+					stage: "review",
+					title,
+					text,
+					tone: failed ? "warning" : "secondary",
+					icon: HourglassIcon,
+				};
+			}
+			const [running] = jobs
+				.filter((job) => job.status === "RUNNING")
+				.map((job) => job.startedAt)
+				.filter((startedAt) => startedAt !== null)
+				.sort((a, b) => a.getTime() - b.getTime());
 			return {
 				kind: "waiting",
 				stage: "review",
-				title: "Running",
-				text: `It has run ${durationBetween(pickedUpAt(detail) ?? review.createdAt, now)} so far.`,
+				title: running === undefined ? "Review still open" : "Running",
+				text:
+					running === undefined
+						? "The review remains open; no worker execution duration is known here."
+						: `A worker invocation has been running for ${durationBetween(running, now)}.`,
 				tone: "secondary",
 				icon: HourglassIcon,
 				span: "run",

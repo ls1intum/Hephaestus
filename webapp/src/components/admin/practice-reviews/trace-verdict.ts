@@ -362,8 +362,8 @@ function resultVerdict(records: LineageRecords, result: LineageResult): TraceVer
 		case "NOT_MET": {
 			if (isRunning(review)) {
 				return {
-					sentence: "This result has led to no feedback yet, because the review still runs.",
-					end: end("open", "the review still runs", { since: review?.createdAt }),
+					sentence: "This result has led to no feedback yet, and the review remains open.",
+					end: end("open", "the review remains open", { since: review?.createdAt }),
 				};
 			}
 			if (review?.status === "FAILED" || review?.status === "CANCELLED") {
@@ -442,9 +442,9 @@ function reviewVerdict(records: LineageRecords): TraceVerdict {
 		return {
 			sentence:
 				results.length === 0
-					? "This review still runs and has recorded no result yet."
-					: `This review still runs and has recorded ${recorded} so far.`,
-			end: end("open", "the review still runs", { since: review.createdAt }),
+					? "This review remains open and has recorded no result yet."
+					: `This review remains open and has recorded ${recorded} so far.`,
+			end: end("open", "the review remains open", { since: review.createdAt }),
 		};
 	}
 	const how = STOPPED[review.status];

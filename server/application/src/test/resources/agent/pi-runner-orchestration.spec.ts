@@ -15,7 +15,10 @@ import { tmpdir } from "node:os";
 import nodePath from "node:path";
 import { mock, test } from "node:test";
 
-import { compositionRequestSchema } from "../../../main/resources/agent/work/practice-scripts/lib/core/contract.ts";
+import {
+	CANDIDATE_LIMITS,
+	compositionRequestSchema,
+} from "../../../main/resources/agent/work/practice-scripts/lib/core/contract.ts";
 
 import type {
 	AgentSession,
@@ -29,6 +32,7 @@ import {
 	addModelCall,
 	newModelCallTiming,
 } from "../../../main/resources/agent/pi-model-failure.ts";
+import { z } from "../../../main/resources/agent/work/practice-scripts/lib/core/practice-script.ts";
 import { GOLDEN_INPUTS, PRACTICES_DIR } from "./golden-review-workspace.ts";
 
 // Each child process mocks the SDK and drives one isolated review through runReviewJob.
@@ -581,6 +585,83 @@ function submitCall(
 	return { type: "toolCall" as const, id, name: "submit_result", arguments: args };
 }
 
+function modelToolCall(name: string, id: string, args: Parameters<typeof submitCall>[1]) {
+	return { type: "toolCall" as const, name, id, arguments: args };
+}
+
+function problemReplyText(reply: Record<string, unknown> | undefined): string {
+	assert.ok(reply);
+	const [part] = listOf(recordOf(reply.result).content).map(recordOf);
+	assert.ok(typeof part?.text === "string");
+	return part.text;
+}
+
+function assertDraftCandidate(
+	stage: string,
+	session: number,
+	slug: string,
+	candidate: Record<string, unknown>,
+	replies: Record<string, unknown>[],
+): void {
+	if (stage === "scope-native-problem-isolation") {
+		assert.equal(candidate.outcome, "MET");
+		assert.equal(candidate.problems, undefined);
+		if (session === 2) {
+			const missing = problemReplyText(replies.find((reply) => reply.id === "sibling-key"));
+			assert.match(missing, /Unknown local problem key/u);
+			assert.ok(missing.includes("Available local drafts: []"));
+			assert.equal(missing.includes("First gap of test-practice"), false);
+		}
+		return;
+	}
+	const problems = listOf(candidate.problems).map(recordOf);
+	assert.deepEqual(
+		problems.map((problem) => problem.key),
+		stage === "scope-native-problem-drafts" ? ["third-gap", "first-gap"] : ["first-gap"],
+	);
+	assert.equal(
+		problems.at(-1)?.summary,
+		`${stage === "scope-native-problem-drafts" ? "Updated" : "First"} gap of ${slug}`,
+	);
+	if (stage === "scope-native-problem-drafts") {
+		assert.equal(problems.at(-1)?.severity, "MINOR");
+		const late = replies.find((reply) => reply.id === "late-edit");
+		assert.equal(late?.isError, true);
+		assert.match(JSON.stringify(late), /already submitted/u);
+		assert.ok(replies.some((reply) => JSON.stringify(reply).includes('"action":"unchanged"')));
+		assert.ok(replies.some((reply) => JSON.stringify(reply).includes('"action":"removed"')));
+		for (const [id, action, key, problemCount] of [
+			["add-a", "added", "first-gap", 1],
+			["add-b", "added", "second-gap", 2],
+			["edit-a", "updated", "first-gap", 2],
+			["remove-b", "removed", "second-gap", 1],
+			["remove-missing", "unchanged", "missing-gap", 1],
+			["same-a", "unchanged", "first-gap", 2],
+		] as const) {
+			const text = problemReplyText(replies.find((reply) => reply.id === id));
+			assert.deepEqual(JSON.parse(text), { state: "local-draft", action, key, problemCount });
+			assert.equal(text.includes(`gap of ${slug}`), false);
+		}
+		return;
+	}
+	for (const id of [
+		"wrong-quote",
+		"wrong-index",
+		"unknown-key",
+		"unknown-read",
+		"over-limit",
+		"both-forms",
+		"duplicate-keys",
+	]) {
+		assert.equal(replies.find((reply) => reply.id === id)?.isError, true, id);
+	}
+	const inventory = JSON.stringify([{ key: "first-gap", summary: `First gap of ${slug}` }]);
+	for (const id of ["unknown-key", "unknown-read"]) {
+		const text = problemReplyText(replies.find((reply) => reply.id === id));
+		assert.ok(text.includes(`Available local drafts: ${inventory}`), text);
+	}
+}
+
 const scenario = process.env.PI_ORCHESTRATION_SCENARIO;
 const nativeSdk =
 	scenario !== undefined && scenario.startsWith("scope-native-")
@@ -1075,6 +1156,8 @@ if (scenario !== undefined && scenario !== "") {
 	};
 	const sessionLoaders = new Set<object>();
 	let sessions = 0;
+	const firstProblemSaved = Promise.withResolvers<undefined>();
+	const siblingSelectionFinished = Promise.withResolvers<undefined>();
 	let prompts = 0;
 	let measuredTool: CustomTool | undefined;
 	let firstTool: CustomTool | undefined;
@@ -1115,6 +1198,7 @@ if (scenario !== undefined && scenario !== "") {
 		cwd,
 		manager,
 		{
+			...(nativeSdk ? { estimateTokens: nativeSdk.estimateTokens } : {}),
 			async createAgentSession(options: {
 				tools: string[];
 				customTools: CustomTool[];
@@ -1169,7 +1253,10 @@ if (scenario !== undefined && scenario !== "") {
 					assert.ok(model);
 					const settingsManager = nativeSdk.SettingsManager.inMemory(
 						{
-							compaction: { enabled: false },
+							compaction: {
+								enabled: false,
+								...(scenario === "scope-native-problem-compaction" ? { keepRecentTokens: 10 } : {}),
+							},
 							cacheWarming: "off",
 						},
 						{ projectTrusted: false },
@@ -1182,7 +1269,23 @@ if (scenario !== undefined && scenario !== "") {
 						noExtensions: true,
 						noSkills: true,
 						noPromptTemplates: true,
-						extensionFactories: reviewExtensions,
+						extensionFactories: [
+							...reviewExtensions,
+							...(scenario === "scope-native-problem-compaction"
+								? [
+										(api: Parameters<ExtensionFactory>[0]) => {
+											api.on("session_before_compact", (event) => ({
+												compaction: {
+													summary:
+														"Earlier evidence was reviewed. Consult the host's restored draft inventory before finishing.",
+													firstKeptEntryId: event.preparation.firstKeptEntryId,
+													tokensBefore: event.preparation.tokensBefore,
+												},
+											}));
+										},
+									]
+								: []),
+						],
 					});
 					await resourceLoader.reload();
 					const opened = await nativeSdk.createAgentSession({
@@ -1207,6 +1310,10 @@ if (scenario !== undefined && scenario !== "") {
 					);
 					const makeStream = nativeAi.createAssistantMessageEventStream;
 					let requests = 0;
+					if (scenario === "scope-native-problem-compaction") {
+						opened.session.agent.finishTurn = async () =>
+							requests === 1 ? { action: "end" } : undefined;
+					}
 
 					opened.session.agent.streamFunction = async (streamModel, context, streamOptions) => {
 						requests += 1;
@@ -1235,7 +1342,152 @@ if (scenario !== undefined && scenario !== "") {
 									: { type: "function", function: { name: "submit_result" } },
 							);
 						}
-						if (scenario === "scope-native-submit-nudge") {
+						if (scenario.startsWith("scope-native-problem-")) {
+							const candidate = notMet(`Drafted ${slug}`);
+							const original = candidate.problems[0];
+							assert.ok(original);
+							const a = { ...original, key: "first-gap", summary: `First gap of ${slug}` };
+							const b = { ...original, key: "second-gap", summary: `Second gap of ${slug}` };
+							const c = { ...original, key: "third-gap", summary: `Third gap of ${slug}` };
+							const revised = { ...a, severity: "MINOR", summary: `Updated gap of ${slug}` };
+							const { problems: _inline, ...result } = candidate;
+							if (requests === 1) {
+								content.push(modelToolCall("read", "read", { path: "work/change/diff.patch" }));
+							}
+							if (scenario === "scope-native-problem-compaction") {
+								if (requests === 1) {
+									content.push(modelToolCall("upsert_problem", "before-compact", a));
+								} else if (requests === 2) {
+									const restored = context.messages
+										.filter((message) => message.role === "user")
+										.map((message) => JSON.stringify(message.content))
+										.join("\n");
+									assert.match(restored, /Local problem drafts/u);
+									assert.ok(restored.includes(a.summary));
+									content.push(modelToolCall("read_problem", "recover", { key: a.key }));
+								} else {
+									assert.equal(requests, 3);
+									const reply = context.messages.findLast(
+										(message) =>
+											message.role === "toolResult" && message.toolName === "read_problem",
+									);
+									assert.ok(reply?.role === "toolResult");
+									const text = reply.content.find((part) => part.type === "text");
+									assert.ok(text?.type === "text");
+									const body = z
+										.record(z.string(), z.json())
+										.parse(recordOf(JSON.parse(text.text)).problem);
+									assert.equal(body.summary, a.summary);
+									content.push(
+										modelToolCall("upsert_problem", "after-compact", {
+											...body,
+											summary: `Recovered gap of ${slug}`,
+										}),
+										submitCall("recovered-result", { ...result, problemKeys: [a.key] }),
+									);
+								}
+							} else if (scenario === "scope-native-problem-drafts") {
+								assert.equal(
+									requests,
+									1,
+									"drafting and submission in one sequential native batch should settle",
+								);
+								content.push(
+									modelToolCall("upsert_problem", "add-a", a),
+									modelToolCall("upsert_problem", "add-b", b),
+									modelToolCall("upsert_problem", "edit-a", revised),
+									modelToolCall("remove_problem", "remove-b", { key: b.key }),
+									modelToolCall("remove_problem", "remove-missing", { key: "missing-gap" }),
+									modelToolCall("upsert_problem", "add-c", c),
+									modelToolCall("upsert_problem", "same-a", revised),
+									submitCall("select", { ...result, problemKeys: [c.key, a.key] }),
+									modelToolCall("upsert_problem", "late-edit", a),
+								);
+							} else if (scenario === "scope-native-problem-repair") {
+								if (requests === 1) {
+									content.push(
+										modelToolCall("upsert_problem", "valid-a", a),
+										modelToolCall("upsert_problem", "wrong-quote", {
+											...a,
+											citations: [{ ...changeCitation, quote: "+ neverCaptured();" }],
+										}),
+										modelToolCall("upsert_problem", "wrong-index", {
+											...a,
+											basis: { ...a.basis, head: 9 },
+										}),
+									);
+								} else if (requests === 2) {
+									const errors = context.messages.filter(
+										(message) => message.role === "toolResult" && message.isError,
+									);
+									assert.ok(
+										errors.some((error) =>
+											JSON.stringify(error.content).includes("citation does not match"),
+										),
+									);
+									assert.ok(
+										errors.some((error) => JSON.stringify(error.content).includes("basis")),
+									);
+									content.push(
+										submitCall("unknown-key", { ...result, problemKeys: ["unknown-gap"] }),
+										modelToolCall("read_problem", "unknown-read", { key: "unknown-gap" }),
+									);
+								} else if (requests === 3) {
+									content.push(
+										submitCall("over-limit", {
+											...result,
+											problemKeys: Array.from(
+												{ length: CANDIDATE_LIMITS.problems + 1 },
+												() => a.key,
+											),
+										}),
+										submitCall("both-forms", { ...candidate, problemKeys: [a.key] }),
+									);
+								} else if (requests === 4) {
+									content.push(
+										submitCall("duplicate-keys", { ...result, problemKeys: [a.key, a.key] }),
+									);
+								} else {
+									assert.equal(requests, 5);
+									content.push(submitCall("corrected", { ...result, problemKeys: [a.key] }));
+								}
+							} else if (scenario === "scope-native-problem-no-submit") {
+								if (sessionNumber === 2) {
+									content.push(submitCall("healthy-sibling", candidate));
+								} else if (requests === 1) {
+									content.push(modelToolCall("upsert_problem", "unsubmitted-a", a));
+								} else {
+									content.push({
+										type: "text",
+										text: "Evidence remains unresolved; no result was submitted.",
+									});
+								}
+							} else {
+								if (requests === 1) {
+									if (sessionNumber === 2) {
+										await firstProblemSaved.promise;
+										content.push(submitCall("sibling-key", { ...result, problemKeys: [a.key] }));
+									} else {
+										content.push(modelToolCall("upsert_problem", "unused-a", a));
+									}
+								} else {
+									assert.equal(requests, 2);
+									if (sessionNumber === 1) {
+										firstProblemSaved.resolve(undefined);
+										await siblingSelectionFinished.promise;
+									}
+									content.push(
+										submitCall("met-no-leak", {
+											outcome: "MET",
+											summary: `Checked authentication of ${slug}`,
+											explanation: "The captured change supplies the checked work.",
+											citations: [changeCitation],
+											evidence: {},
+										}),
+									);
+								}
+							}
+						} else if (scenario === "scope-native-submit-nudge") {
 							if (requests === 1) {
 								content.push({ type: "text", text: "The review is complete." });
 							} else {
@@ -1363,12 +1615,25 @@ if (scenario !== undefined && scenario !== "") {
 					let nudged = false;
 					opened.session.subscribe((event) => {
 						if (
+							scenario.startsWith("scope-native-problem-") &&
+							event.type === "tool_execution_end"
+						) {
+							if (event.toolCallId === "sibling-key") {
+								siblingSelectionFinished.resolve(undefined);
+							}
+							const result: unknown = event.result;
+							record(
+								`native-problem-reply:${sessionNumber}:${JSON.stringify({ tool: event.toolName, id: event.toolCallId, isError: event.isError, result })}`,
+							);
+						}
+						if (
 							event.type === "message_end" &&
 							event.message.role === "assistant" &&
 							!nudged &&
 							scenario !== "scope-native-submission-repair" &&
 							scenario !== "scope-native-submit-nudge" &&
-							scenario !== "scope-native-schema-cap"
+							scenario !== "scope-native-schema-cap" &&
+							!scenario.startsWith("scope-native-problem-")
 						) {
 							nudged = true;
 							void (async () => {
@@ -1381,6 +1646,15 @@ if (scenario !== undefined && scenario !== "") {
 					const prompt = opened.session.prompt.bind(opened.session);
 					opened.session.prompt = async (...args) => {
 						await prompt(...args);
+						if (scenario === "scope-native-problem-compaction" && requests === 1) {
+							await opened.session.compact();
+							assert.ok(
+								opened.session.sessionManager
+									.buildSessionProjection()
+									.messages.some((message) => message.role === "compactionSummary"),
+							);
+							record(`native-problem-compacted:${sessionNumber}`);
+						}
 						record(`native-pending:${sessionNumber}:${opened.session.pendingMessageCount}`);
 					};
 					return opened;
@@ -1406,15 +1680,11 @@ if (scenario !== undefined && scenario !== "") {
 								handlers.delete(handler);
 								if (scenario === "scope-stop-hangs") {
 									const before = [stateText(), notesText()];
-									const reply = await tool("submit_result").execute(
-										"late",
-										notMet("Late overwrite of the result"),
+									await assert.rejects(
+										async () =>
+											tool("submit_result").execute("late", notMet("Late overwrite of the result")),
+										/Measurement is closed/u,
 									);
-									assert.ok(isRecord(reply));
-									assert.ok(isRecord(reply.details));
-									assert.equal(reply.details.inserted, 0);
-									assert.equal(reply.details.revised, 0);
-									assert.equal(reply.details.refused, 0);
 									assert.deepEqual([stateText(), notesText()], before);
 									record("late-record-closed");
 								}
@@ -2159,13 +2429,15 @@ if (scenario !== undefined && scenario !== "") {
 								if (scenario === "draft-commit") {
 									assert.ok(!options.customTools.some((item) => item.name === "submit_result"));
 									assert.ok(measuredTool);
+									const closedTool = measuredTool;
 									const before = [stateText(), notesText()];
-									const closed = await measuredTool.execute(
-										"after-admission",
-										notMet("Forbidden late replacement"),
+									await assert.rejects(
+										async () =>
+											closedTool.execute("after-admission", notMet("Forbidden late replacement")),
+										/Measurement is closed/u,
 									);
 									assert.deepEqual([stateText(), notesText()], before);
-									record(`draft-closed:${JSON.stringify(closed)}`);
+									record("draft-closed:Measurement is closed; result and notes unchanged");
 									return;
 								}
 								// Private composition has its own session.
@@ -2522,12 +2794,24 @@ if (scenario !== undefined && scenario !== "") {
 							}
 							if (scenario === "scope-ownership") {
 								firstTool ??= report;
+								const originalTool = firstTool;
 								const sibling =
 									currentSlug === "test-practice" ? "second-practice" : "test-practice";
 								const before = stateText();
+								if (firstTool !== report) {
+									await assert.rejects(
+										async () =>
+											originalTool.execute(
+												"stale-owner",
+												notMet("Old callback must not borrow the next practice"),
+											),
+										/Measurement is closed/u,
+									);
+									assert.equal(stateText(), before);
+								}
 								for (let attempt = 0; attempt < 6; attempt += 1) {
 									await assert.rejects(
-										firstTool.execute(
+										report.execute(
 											`refused-${attempt}`,
 											notMet(`Refused attempt ${attempt}`, {
 												...changeCitation,
@@ -2538,13 +2822,13 @@ if (scenario !== undefined && scenario !== "") {
 									);
 								}
 								await assert.rejects(
-									firstTool.execute("foreign", {
+									report.execute("foreign", {
 										...notMet(`Own ${currentSlug}`),
 										practiceSlug: sibling,
 									}),
 									/(?:unknown|Unrecognized).*practiceSlug/u,
 								);
-								const own = await firstTool.execute("own", notMet(`Own ${currentSlug}`));
+								const own = await report.execute("own", notMet(`Own ${currentSlug}`));
 								assert.equal(stateText(), before);
 								record(`own:${currentSlug}:${JSON.stringify(own)}`);
 								return;
@@ -3152,6 +3436,11 @@ if (scenario !== undefined && scenario !== "") {
 	await runReviewJob();
 } else {
 	for (const fixture of [
+		"scope-native-problem-drafts",
+		"scope-native-problem-repair",
+		"scope-native-problem-isolation",
+		"scope-native-problem-no-submit",
+		"scope-native-problem-compaction",
 		"scope-native-completion",
 		"scope-native-commit",
 		"scope-native-batch-correction",
@@ -3293,6 +3582,16 @@ if (scenario !== undefined && scenario !== "") {
 			]).get(fixture) ?? fixture;
 		void test(
 			{
+				"scope-native-problem-drafts":
+					"native keyed problem drafts edit, remove and select ordered problems without admitting late edits",
+				"scope-native-problem-repair":
+					"native refused problem corrections and key selections keep the earlier valid draft repairable",
+				"scope-native-problem-compaction":
+					"native compaction restores only the owning problem inventory and read_problem recovers a full body for correction",
+				"scope-native-problem-no-submit":
+					"native unsubmitted problem drafts stay non-results while a healthy sibling still reaches admission",
+				"scope-native-problem-isolation":
+					"native sibling sessions cannot select each other's drafts and a later MET leaks no staged problems",
 				"scope-native-completion":
 					"native mixed report and read ends each recorded practice before another model request",
 				"scope-native-commit":
@@ -3794,10 +4093,13 @@ if (scenario !== undefined && scenario !== "") {
 								PI_PRACTICE_MODEL_CALLS:
 									new Map([
 										["scope-native-schema-cap", "12"],
+										["scope-native-problem-repair", "8"],
+										["scope-native-problem-isolation", "4"],
+										["scope-native-problem-compaction", "5"],
 										["scope-native-submission-repair", "4"],
 										["scope-native-read-correction", "4"],
 									]).get(stage) ?? "2",
-								PI_PRACTICE_CONCURRENCY: "1",
+								PI_PRACTICE_CONCURRENCY: stage === "scope-native-problem-isolation" ? "2" : "1",
 								PI_PRACTICE_OUTPUT_TOKENS: "8000",
 								PI_DIRECT_MODEL_TOKENS: "1000",
 								LLM_PROXY_URL: "https://unused.invalid",
@@ -4049,6 +4351,59 @@ if (scenario !== undefined && scenario !== "") {
 						return;
 					}
 					switch (stage) {
+						case "scope-native-problem-compaction": {
+							assert.equal(child.status, 0, child.stderr);
+							const candidates = candidatesIn(nodePath.join(cwd, "out/result.json"));
+							for (const [session, slug] of [
+								[1, "test-practice"],
+								[2, "second-practice"],
+							] as const) {
+								assert.ok(events.includes(`native-problem-compacted:${session}`));
+								const problems = listOf(candidates.get(slug)?.problems).map(recordOf);
+								assert.equal(problems.length, 1);
+								assert.equal(problems[0]?.summary, `Recovered gap of ${slug}`);
+							}
+							assert.equal(events.filter((event) => event === "admit").length, 1);
+							reached({ "test-practice": "EVALUATED", "second-practice": "EVALUATED" });
+							break;
+						}
+						case "scope-native-problem-no-submit": {
+							assert.equal(child.status, 0, child.stderr);
+							const candidates = candidatesIn(nodePath.join(cwd, "out/result.json"));
+							assert.equal(candidates.has("test-practice"), false);
+							assert.equal(candidates.get("second-practice")?.outcome, "NOT_MET");
+							const request = recordOf(
+								JSON.parse(readFileSync(nodePath.join(cwd, "admission.json"), "utf8")),
+							);
+							assert.deepEqual(request.nonResults, [
+								{ practiceSlug: "test-practice", reason: "EXECUTION_FAILED" },
+							]);
+							assert.equal(events.filter((event) => event === "admit").length, 1);
+							reached({ "test-practice": "NOT_REACHED", "second-practice": "EVALUATED" });
+							break;
+						}
+						case "scope-native-problem-drafts":
+						case "scope-native-problem-repair":
+						case "scope-native-problem-isolation": {
+							assert.equal(child.status, 0, child.stderr);
+							const candidates = candidatesIn(nodePath.join(cwd, "out/result.json"));
+							for (const [session, slug] of [
+								[1, "test-practice"],
+								[2, "second-practice"],
+							] as const) {
+								const candidate = candidates.get(slug);
+								assert.ok(candidate);
+								const replies = events
+									.filter((event) => event.startsWith(`native-problem-reply:${session}:`))
+									.map((event) =>
+										recordOf(JSON.parse(event.slice(`native-problem-reply:${session}:`.length))),
+									);
+								assertDraftCandidate(stage, session, slug, candidate, replies);
+							}
+							assert.equal(events.filter((event) => event === "admit").length, 1);
+							reached({ "test-practice": "EVALUATED", "second-practice": "EVALUATED" });
+							break;
+						}
 						case "scope-native-submit-nudge": {
 							assert.equal(child.status, 0, child.stderr);
 							assert.deepEqual(
@@ -4677,7 +5032,7 @@ for (const item of nullableCases) {
 							assert.equal(child.status, 0, child.stderr);
 							assert.match(
 								events.find((event) => event.startsWith("draft-first:")) ?? "",
-								/test-practice: stored\. A later complete submission replaces it/u,
+								/test-practice: stored\. This is a local result awaiting server admission/u,
 								child.stderr,
 							);
 							assert.match(
@@ -4714,7 +5069,7 @@ for (const item of nullableCases) {
 							assert.ok(!JSON.stringify(admission).includes("Authentication call goes through"));
 							assert.match(
 								events.find((event) => event.startsWith("draft-closed:")) ?? "",
-								/Measurement is closed[\s\S]*"inserted":0,"revised":0,"duplicates":0,"refused":0/u,
+								/Measurement is closed; result and notes unchanged/u,
 							);
 							const notes = readFileSync(nodePath.join(cwd, "work/notes/review.md"), "utf8");
 							assert.match(notes, /test-practice: NOT_MET/u);
@@ -4810,8 +5165,8 @@ for (const item of nullableCases) {
 							);
 							assert.match(reply, /"terminate":true/u);
 							assert.deepEqual(measuringSessions, [
-								"create:session tools=read,grep,find,ls,bash,codemode,submit_result",
-								"create:session tools=read,grep,find,ls,bash,codemode,submit_result",
+								"create:session tools=read,grep,find,ls,bash,codemode,upsert_problem,remove_problem,read_problem,submit_result",
+								"create:session tools=read,grep,find,ls,bash,codemode,upsert_problem,remove_problem,read_problem,submit_result",
 							]);
 							assert.ok(events.includes("exposure:submit_result=model-only"), events.join("\n"));
 							const first = readFileSync(nodePath.join(cwd, "prompt-1.md"), "utf8");
@@ -5004,7 +5359,9 @@ for (const item of nullableCases) {
 							);
 							assert.deepEqual(
 								events.filter((event) => event.startsWith("create:session")),
-								["create:session tools=read,grep,find,ls,bash,codemode,submit_result"],
+								[
+									"create:session tools=read,grep,find,ls,bash,codemode,upsert_problem,remove_problem,read_problem,submit_result",
+								],
 							);
 							assert.ok(events.includes("exposure:submit_result=model-only"), events.join("\n"));
 							const request = readFileSync(nodePath.join(cwd, "prompt-2.md"), "utf8");

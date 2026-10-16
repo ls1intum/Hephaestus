@@ -8,6 +8,7 @@ import type { ReviewDetail, ReviewLineage, ReviewResult } from "@/api/types.gen"
 import {
 	feedbackDetail,
 	practiceCounts,
+	problemDetail,
 	resultDetail,
 	reviewDetail,
 	reviewFeedback,
@@ -26,6 +27,7 @@ import {
 import { RESULT_WORDS_UNAVAILABLE } from "@/components/admin/practice-reviews/result-words";
 import { ACTIVE_REVIEW_POLL_MS } from "@/components/admin/practice-reviews/review-search";
 import { stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
+import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
 import { browserTimeZone } from "@/lib/dates";
 import { itemName } from "@/lib/item-kinds";
 import { server } from "@/mocks/server";
@@ -78,6 +80,11 @@ afterEach(() => {
 	server.events.removeListener("request:start", record);
 });
 
+/** A review of work, not a scan, that recorded a Not met result. */
+function reviewWithNotMet() {
+	return reviews.find((row) => row.results.notMet > 0 && row.kind !== "SCAN");
+}
+
 function openRow(kind: string, name: string) {
 	return { name: (accessibleName: string) => accessibleName.startsWith(`Open ${kind} ${name},`) };
 }
@@ -121,25 +128,136 @@ describe("practice review levels", () => {
 		screen.getByRole("link", openRow("result", result.summary));
 	});
 
-	it("opens the result of a problem over the problems list", async () => {
-		const [problem] = reviewProblems;
+	/**
+	 * One record sheet stands at a time (`layeredStack`), so a problem's result opens in the
+	 * problem's place as a step of its own: Back returns to the problem, and Escape then closes to the
+	 * list with focus on the row the problem was opened from.
+	 */
+	it("opens a problem from its row and its result in its place; Back and Escape step out", async () => {
+		const problem = reviewProblems.find((row) => !row.evidenceHidden);
 		assert(problem);
+		const resultName = problemDetail(problem.id).result.summary;
+		assert(resultName !== null);
 		const { router } = renderRouteAtWithRouter(`${REVIEWS}/problems`);
+		const stack = () => stackInSearch(router.state.location.search.detail);
 
 		await userEvent.click(
-			await screen.findByRole("link", openRow("result", problem.summary), ROUTE_RENDER_WAIT),
+			await screen.findByRole("link", openRow("problem", problem.summary), ROUTE_RENDER_WAIT),
 		);
-
-		await screen.findByRole("dialog", undefined, ROUTE_RENDER_WAIT);
-		expect(stackInSearch(router.state.location.search.detail)).toStrictEqual([
-			`result:${problem.resultId}`,
-		]);
-		fireEvent.keyDown(document.body, { key: "Escape" });
-		await waitFor(
-			() => expect(router.state.location.search).not.toHaveProperty("detail"),
+		const problemSheet = await screen.findByRole(
+			"dialog",
+			{ name: problem.summary },
 			ROUTE_RENDER_WAIT,
 		);
+		expect(stack()).toStrictEqual([`problem:${problem.id}`]);
+
+		await userEvent.click(within(problemSheet).getByRole("link", { name: resultName }));
+		const resultSheet = await screen.findByRole("dialog", { name: resultName }, ROUTE_RENDER_WAIT);
+		within(resultSheet).getByRole("list", { name: "Problems" });
+		expect(stack()).toStrictEqual([`result:${problem.resultId}`]);
+		await waitFor(
+			() => expect(screen.queryByRole("dialog", { name: problem.summary })).toBeNull(),
+			ROUTE_RENDER_WAIT,
+		);
+
+		router.history.back();
+		const again = await screen.findByRole("dialog", { name: problem.summary }, ROUTE_RENDER_WAIT);
+		expect(stack()).toStrictEqual([`problem:${problem.id}`]);
+		await waitFor(
+			() => expect(screen.queryByRole("dialog", { name: resultName })).toBeNull(),
+			ROUTE_RENDER_WAIT,
+		);
+		await waitFor(() => expect(again.contains(document.activeElement)).toBe(true));
+
+		await userEvent.keyboard("{Escape}");
+		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull(), ROUTE_RENDER_WAIT);
+		expect(router.state.location.search).not.toHaveProperty("detail");
 		expect(router.state.location.pathname).toBe(`${REVIEWS}/problems`);
+		await waitFor(() =>
+			expect(document.activeElement).toBe(
+				screen.getByRole("link", openRow("problem", problem.summary)),
+			),
+		);
+	});
+
+	it("traces a problem from the result that records it, and says so", async () => {
+		const problem = reviewProblems.find((row) => !row.evidenceHidden);
+		assert(problem);
+		renderRouteAtWithRouter(`${REVIEWS}/problems?detail=trace:problem:${problem.id}`);
+
+		const story = await screen.findByRole(
+			"group",
+			{ name: "How this came about" },
+			ROUTE_RENDER_WAIT,
+		);
+		const sheet = story.closest<HTMLElement>('[role="dialog"]');
+		assert(sheet);
+		// The step marked "You started here" is the one whose control is current.
+		await waitFor(
+			() =>
+				expect(
+					sheet.querySelector<HTMLElement>('[data-step-key]:has(> [aria-current="step"])')?.dataset
+						.stepKey,
+				).toBe(`result:${problem.resultId}`),
+			ROUTE_RENDER_WAIT,
+		);
+		within(sheet).getByText(/The trace of the result that records this problem\./u);
+	});
+
+	it("opens a review's results by outcome and its problems from the review's sheet", async () => {
+		const review = reviewWithNotMet();
+		assert(review);
+		const { router } = renderRouteAtWithRouter(`${REVIEWS}?detail=review:${review.id}`);
+		const sheet = await screen.findByRole("dialog", undefined, ROUTE_RENDER_WAIT);
+
+		const notMet = await within(sheet).findByRole(
+			"link",
+			{ name: `${String(review.results.notMet)} not met` },
+			ROUTE_RENDER_WAIT,
+		);
+		const results = new URL(String(notMet.getAttribute("href")), "https://hephaestus.invalid");
+		expect(results.pathname).toBe(`${REVIEWS}/results`);
+		expect(results.searchParams.get("reviewId")).toBe(review.id);
+		expect(results.searchParams.has("detail")).toBe(false);
+
+		await userEvent.click(within(sheet).getByRole("link", { name: "View problems" }));
+		await waitFor(
+			() => expect(router.state.location.pathname).toBe(`${REVIEWS}/problems`),
+			ROUTE_RENDER_WAIT,
+		);
+		expect(router.state.location.search).toMatchObject({ reviewId: review.id });
+		expect(router.state.location.search).not.toHaveProperty("detail");
+	});
+
+	it("lists each result's problems with their severity in the trace, and opens one over it", async () => {
+		const problem = reviewProblems.find((row) => !row.evidenceHidden);
+		assert(problem);
+		const { router } = renderRouteAtWithRouter(
+			`${REVIEWS}/problems?detail=trace:problem:${problem.id}`,
+		);
+		const story = await screen.findByRole(
+			"group",
+			{ name: "How this came about" },
+			ROUTE_RENDER_WAIT,
+		);
+		const sheet = story.closest<HTMLElement>('[role="dialog"]');
+		assert(sheet);
+		const listed = await waitFor(() => {
+			const found = within(sheet)
+				.getAllByRole("list", { name: /^Problems of result \d+$/u })
+				.find((list) => list.textContent.includes(problem.summary));
+			assert(found);
+			return found;
+		}, ROUTE_RENDER_WAIT);
+		const entry = within(listed).getByRole("button", { name: new RegExp(problem.summary, "u") });
+		expect(entry.textContent).toContain(SEVERITY_DEFS[problem.severity].label);
+
+		await userEvent.click(entry);
+		await screen.findByRole("dialog", { name: problem.summary }, ROUTE_RENDER_WAIT);
+		expect(stackInSearch(router.state.location.search.detail)).toStrictEqual([
+			`trace:problem:${problem.id}`,
+			`problem:${problem.id}`,
+		]);
 	});
 
 	/** Closing the level gives focus back to the row it was opened from, so the reader goes on there. */

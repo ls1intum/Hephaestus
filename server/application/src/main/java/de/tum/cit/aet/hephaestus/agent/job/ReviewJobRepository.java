@@ -63,12 +63,19 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
         """, nativeQuery = true)
     long countRunningByWorkspaceIdAndDataHandlingTier(Long workspaceId, DataHandlingTier tier);
 
+    /** Migrated invocations retain their processing history, not work for the current completion pass. */
     @WorkspaceAgnostic("Bounded server completion pass; each selected job is reloaded under its own workspace")
-    @Query(
-            value = "SELECT id,workspace_id AS \"workspaceId\",review_id AS \"reviewId\" FROM review_job WHERE status"
-                    + " NOT IN ('QUEUED','RUNNING') AND processing_status IN ('NONE','PENDING') ORDER BY"
-                    + " completed_at,id LIMIT :limit",
-            nativeQuery = true)
+    @Query(value = """
+        SELECT j.id,j.workspace_id AS "workspaceId",j.review_id AS "reviewId"
+        FROM review_job j
+        WHERE j.status NOT IN ('QUEUED','RUNNING') AND j.processing_status IN ('NONE','PENDING')
+          AND NOT EXISTS (
+              SELECT 1 FROM review r
+              WHERE r.id=j.review_id AND r.workspace_id=j.workspace_id AND r.id=j.id
+                AND jsonb_exists(r.checks,'MIGRATION')
+          )
+        ORDER BY j.completed_at,j.id LIMIT :limit
+        """, nativeQuery = true)
     List<CompletionCandidate> findTerminalForProcessing(@Param("limit") int limit);
 
     interface CompletionCandidate {

@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventName;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewRequestReason;
 import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
@@ -29,6 +30,8 @@ import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import tools.jackson.databind.json.JsonMapper;
 
 @Tag("unit")
@@ -36,6 +39,24 @@ class ReviewGateTest {
     private final PracticeRepository practices = mock(PracticeRepository.class);
     private final ReviewGate gate = new ReviewGate(practices, new JsonMapper());
     private final Workspace workspace = workspace();
+
+    @ParameterizedTest
+    @EnumSource(ReviewOrigin.class)
+    void shouldRefuseOnlyTheDisabledWayToStartAReview(ReviewOrigin origin) {
+        when(practices.findByWorkspaceIdAndKind(1L, new ItemKind("scm.pull_request")))
+                .thenReturn(List.of(practice(1, DefinitionTestFixtures.definition())));
+        workspace.getFeatures().setPracticeReviewAutoTriggerEnabled(origin != ReviewOrigin.EVENT);
+        workspace.getFeatures().setPracticeReviewManualTriggerEnabled(origin == ReviewOrigin.EVENT);
+        var event = new ItemEventName("scm.pull_request.opened");
+        assertThat(gate.evaluate(workspace, snapshot(Map.of()), origin, event, List.of()))
+                .isInstanceOfSatisfying(
+                        GateDecision.Skip.class,
+                        skip -> assertThat(skip.eventReason()).isEqualTo(ReviewRequestReason.GATE_WITHHELD));
+        workspace.getFeatures().setPracticeReviewAutoTriggerEnabled(origin == ReviewOrigin.EVENT);
+        workspace.getFeatures().setPracticeReviewManualTriggerEnabled(origin != ReviewOrigin.EVENT);
+        assertThat(gate.evaluate(workspace, snapshot(Map.of()), origin, event, List.of()))
+                .isInstanceOf(GateDecision.Run.class);
+    }
 
     @Test
     void feedbackModeOffStillAdmitsTheReview() {

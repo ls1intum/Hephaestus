@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
@@ -35,10 +36,8 @@ public class ReviewGate {
             Collection<Long> selected) {
         if (!Objects.equals(workspace.getId(), item.item().workspaceId()))
             throw new IllegalArgumentException("The item belongs to another workspace.");
-        if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE)
-            return new GateDecision.Skip("The workspace is inactive.", ReviewRequestReason.WORKSPACE_INACTIVE);
-        if (!Boolean.TRUE.equals(workspace.getFeatures().getPracticesEnabled()))
-            return new GateDecision.Skip("Practice reviews are disabled.", ReviewRequestReason.PRACTICES_DISABLED);
+        var refusal = refusal(workspace, origin);
+        if (refusal.isPresent()) return refusal.orElseThrow();
         var matched = practices
                 .findByWorkspaceIdAndKind(workspace.getId(), item.item().kind())
                 .stream()
@@ -49,6 +48,26 @@ public class ReviewGate {
             return new GateDecision.Skip("No practice can review this item.", ReviewRequestReason.NO_ACTIVE_PRACTICE);
         return new GateDecision.Run(
                 workspace, matched, workspace.getReviewSettings().getRolloutRevision(), origin);
+    }
+
+    Optional<GateDecision.Skip> refusal(Workspace workspace, ReviewOrigin origin) {
+        if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE)
+            return Optional.of(
+                    new GateDecision.Skip("The workspace is inactive.", ReviewRequestReason.WORKSPACE_INACTIVE));
+        if (!Boolean.TRUE.equals(workspace.getFeatures().getPracticesEnabled()))
+            return Optional.of(
+                    new GateDecision.Skip("Practice reviews are disabled.", ReviewRequestReason.PRACTICES_DISABLED));
+        boolean enabled = Boolean.TRUE.equals(
+                origin == ReviewOrigin.EVENT
+                        ? workspace.getFeatures().getPracticeReviewAutoTriggerEnabled()
+                        : workspace.getFeatures().getPracticeReviewManualTriggerEnabled());
+        if (!enabled)
+            return Optional.of(new GateDecision.Skip(
+                    origin == ReviewOrigin.EVENT
+                            ? "Reviews from work activity are disabled."
+                            : "Requested reviews are disabled.",
+                    ReviewRequestReason.GATE_WITHHELD));
+        return Optional.empty();
     }
 
     private boolean runnable(

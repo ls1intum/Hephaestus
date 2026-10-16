@@ -605,3 +605,43 @@ describe("feedback approval level", () => {
 		});
 	});
 });
+
+describe("what feedback is based on", () => {
+	it("names each result it was written from, and whether one problem of it or the whole", async () => {
+		const detail = feedbackDetail("99999999-6666-6666-6666-666666666666");
+		const [basis] = detail.basis;
+		assert(basis !== undefined);
+		assert(basis.problemId !== null);
+		const { summary } = basis.result;
+		assert(summary !== null);
+		server.use(
+			...feedbackCountHandlers(),
+			http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId", () =>
+				HttpResponse.json(detail),
+			),
+			...reviewHandlers(),
+		);
+		const { router } = renderRouteAtWithRouter(
+			`/w/acme/admin/practices/reviews/feedback?detail=feedback:${detail.id}`,
+		);
+
+		const list = await screen.findByRole("list", { name: "Based on" }, ROUTE_RENDER_WAIT);
+		const entries = within(list).getAllByRole("listitem");
+		expect(entries).toHaveLength(detail.basis.length);
+		const [first] = entries;
+		assert(first);
+		expect(first.textContent).toContain(
+			`${basis.result.practiceName} · One problem of this result`,
+		);
+		// Each basis opens in the feedback's place: its result, and the problem it rests on.
+		const problemLink = within(first).getByRole("link", {
+			name: `The problem of ${summary} it rests on`,
+		});
+		expect(problemLink.getAttribute("href")).toContain(`problem:${basis.problemId}`);
+		await userEvent.click(within(first).getByRole("link", { name: summary }));
+		await screen.findByRole("dialog", { name: summary }, ROUTE_RENDER_WAIT);
+		expect(stackInSearch(router.state.location.search.detail)).toStrictEqual([
+			`result:${basis.resultId}`,
+		]);
+	});
+});

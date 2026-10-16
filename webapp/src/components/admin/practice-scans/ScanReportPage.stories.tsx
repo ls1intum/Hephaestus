@@ -397,3 +397,18 @@ export const NotFound: Story = {
 export const Reflow: Story = {
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
 };
+
+export const RefreshFailed: Story = {
+	args: {
+		state: {
+			...loaded(COMPLETE_SCAN, COMPLETE_REPORT),
+			refreshFailure: { error: { status: 503 }, pending: false, onRetry: fn() },
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("heading", { name: "ls1intum/hephaestus" })).toBeVisible();
+		await expect(canvas.getByRole("table", { name: "Problems in this scan" })).toBeVisible();
+		await expect(canvas.getByText("Scan details may be out of date")).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Retry" })).toBeEnabled();
+	},
+};

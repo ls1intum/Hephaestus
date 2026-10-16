@@ -209,8 +209,10 @@ export const ResultTable: Story = {
 		await expect(table()).toBeNull();
 		await userEvent.click(canvas.getByRole("button", { name: "Show all 4 results in the table" }));
 		await expect(showToggle(canvasElement, "Siblings")).toHaveAttribute("aria-pressed", "false");
-		const rows = within(canvas.getByRole("list", { name: "Results of this review" }));
-		await expect(rows.getAllByRole("listitem")).toHaveLength(4);
+		// The table's own rows; a Not met row lists its problems under it.
+		await expect(
+			canvas.getByRole("list", { name: "Results of this review" }).querySelectorAll(":scope > li"),
+		).toHaveLength(4);
 		await expect(
 			table()?.querySelector(`[data-lineage-node="result:${LINEAGE_RESULT.cache404}"]`),
 		).toHaveTextContent(/Not met.*Major.*B, C, E/u);

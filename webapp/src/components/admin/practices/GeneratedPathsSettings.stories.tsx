@@ -35,8 +35,8 @@ export const Configured: Story = {
 	args: {
 		settings: reviewSettings({
 			generatedPaths: {
-				"owner/repo": ["webapp/src/api/**", "**/*.generated.ts"],
-				"group/nested/project": ["client/**"],
+				"101": ["webapp/src/api/**", "**/*.generated.ts"],
+				"102": ["client/**"],
 			},
 		}),
 	},
@@ -103,7 +103,7 @@ export const SavedPatternsChanged: Story = {
 							setSettings({
 								...settings,
 								etag: '"1"',
-								generatedPaths: { ...settings.generatedPaths, "owner/repo": ["other/**"] },
+								generatedPaths: { ...settings.generatedPaths, "101": ["other/**"] },
 							})
 						}
 					>

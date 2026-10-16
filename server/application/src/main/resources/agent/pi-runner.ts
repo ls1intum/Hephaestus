@@ -39,7 +39,6 @@ import {
 	ModelRuntime,
 	SessionManager,
 	SettingsManager,
-	type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 
 import {
@@ -69,6 +68,7 @@ import {
 } from "./pi-model-failure.ts";
 import { PracticeCoverageLedger } from "./pi-practice-coverage.ts";
 import { executionReport } from "./pi-practice-scripts-report.ts";
+import { ProblemDrafts } from "./pi-problem-drafts.ts";
 import {
 	loadProviderConfig,
 	reasoningSetting,
@@ -78,12 +78,11 @@ import {
 import {
 	CONVERSATION_THREAD,
 	citationCorrectionExample,
-	MAX_SUMMARY_CHARS,
-	OUTCOME_DESCRIPTIONS,
-	SEVERITY_DESCRIPTIONS,
 	citesReviewedTurn,
-	describeVocabulary,
 	normalizeSubmission,
+	normalizeProblem,
+	validateCitationSources,
+	type CitationSources,
 	resolveQuote,
 	resolveCapturedText,
 	submissionCitations,
@@ -91,8 +90,8 @@ import {
 	validateEvidenceSources,
 	validateInapplicabilityScope,
 	validateSearchScope,
-	type NormalizedSubmission,
 } from "./pi-result-normalize.ts";
+import { buildResultTools, RESULT_TOOL_NAMES } from "./pi-result-tools.ts";
 import { buildBrief } from "./pi-review-brief.ts";
 import {
 	type Work,
@@ -129,12 +128,6 @@ import {
 import { SessionReads } from "./pi-session-reads.ts";
 import { SUPPORTED_SCHEMA_VERSION, taskPaths, resolveTaskPaths } from "./pi-task-paths.ts";
 import { hasText, isBlank } from "./pi-text.ts";
-import {
-	prepareResultArguments,
-	validateResultEvidence,
-	RESULT_EVIDENCE_EXAMPLES,
-} from "./pi-tool-arguments.ts";
-import { toolArgumentValidator } from "./pi-tool-validation.ts";
 import { prepareTurnText } from "./pi-turn-context.ts";
 import { parseDiff } from "./work/practice-scripts/kits/scm/diff-parser.ts";
 import { fileRecordSchema } from "./work/practice-scripts/kits/scm/records.ts";
@@ -142,12 +135,10 @@ import type { DiffFile } from "./work/practice-scripts/kits/scm/types.ts";
 import { MODEL_CONCURRENCY } from "./work/practice-scripts/lib/core/concurrency.ts";
 import {
 	boundModelsSchema,
-	CANDIDATE_LIMITS,
-	OUTCOMES,
 	parseCandidate,
-	SEVERITIES,
 	type BoundModels,
 	type Candidate,
+	type Problem,
 	type Citation,
 	type Coverage,
 	type PracticeInputs,
@@ -349,7 +340,7 @@ function incompleteCoverageText(coverage: Coverage): string {
 }
 
 function validateDomainBasis(
-	submission: NormalizedSubmission,
+	submission: { problems?: readonly Problem[] },
 	assignment: PracticeInputs | undefined,
 ): void {
 	const scan = assignment?.scope.kind === "SCAN";
@@ -420,6 +411,7 @@ function problemsIn(result: unknown): number {
 interface ActiveReview {
 	slug: string;
 	draft: Candidate | null;
+	problems: ProblemDrafts;
 	requireSubmission: boolean;
 	reads: SessionReads;
 	reader?: EvidenceReader;
@@ -805,315 +797,6 @@ export async function runReviewJob(): Promise<void> {
 		};
 	}
 
-	const searchSchema = {
-		type: "object",
-		additionalProperties: false,
-		required: ["consulted", "lookedFor", "boundary"],
-		properties: {
-			consulted: {
-				type: "array",
-				minItems: 1,
-				items: { type: "string", enum: availableSourceKindValues },
-				description: "Evidence source kinds you actually searched, e.g. scm.review-threads.",
-			},
-			lookedFor: {
-				type: "string",
-				minLength: 1,
-				description:
-					"The specific behavior whose absence you report, matching the behavior assessed in the summary and explanation.",
-			},
-			boundary: {
-				type: "string",
-				minLength: 1,
-				description:
-					"What this search did NOT cover, so a reader can judge how far the absence reaches.",
-			},
-		},
-	} as const;
-	const inapplicabilitySchema = {
-		type: "object",
-		additionalProperties: false,
-		required: ["consulted", "prerequisite", "ruledOutBy"],
-		properties: {
-			consulted: {
-				type: "array",
-				minItems: 1,
-				items: { type: "string", enum: availableSourceKindValues },
-				description:
-					"Evidence source kinds you read to reach this conclusion, e.g. scm.pull-request.diff.",
-			},
-			prerequisite: {
-				type: "string",
-				minLength: 1,
-				description: "The subject this practice's criteria judge.",
-			},
-			ruledOutBy: {
-				type: "string",
-				minLength: 1,
-				description: "The fact about THIS work that rules out that subject.",
-			},
-		},
-	} as const;
-	const citationSchema = {
-		type: "object",
-		additionalProperties: false,
-		required: ["path", "startLine", "quote"],
-		properties: {
-			sourceKind: {
-				type: ["string", "null"],
-				enum: [...availableSourceKindValues, null],
-				description: "Optional. The runner resolves the source kind from the path you read.",
-			},
-			// Validate source membership at submission; large enums can exceed the SDK schema compiler's capacity.
-			sourcePath: {
-				type: ["string", "null"],
-				minLength: 1,
-				maxLength: CANDIDATE_LIMITS.pathChars,
-				description:
-					"Optional. The source you read, such as work/change/diff.patch or a captured record. The runner resolves its manifest identity.",
-			},
-			path: {
-				type: "string",
-				minLength: 1,
-				maxLength: CANDIDATE_LIMITS.pathChars,
-				description:
-					"The file you read: a repository-relative path, a sandbox path, work/change/diff.patch, or a captured record path.",
-			},
-			side: {
-				type: ["string", "null"],
-				enum: ["OLD", "NEW", null],
-				description:
-					"For a diff quote, OLD selects removed lines and NEW selects added lines. Omission lets the runner resolve the side from the exact quote.",
-			},
-			commit: {
-				type: ["string", "null"],
-				minLength: 1,
-				maxLength: 1024,
-				description:
-					"Optional full commit SHA for historical repository text. Omission selects the captured HEAD automatically. Do not use a branch name.",
-			},
-			startLine: {
-				type: "integer",
-				minimum: 1,
-				maximum: 2_147_483_647,
-				description:
-					"The 1-based line you read. For a diff, use its [L<n>] file coordinate or the physical line number of diff.patch.",
-			},
-			endLine: {
-				type: ["integer", "null"],
-				minimum: 1,
-				maximum: 2_147_483_647,
-				description: "The last line of the quote, at least startLine; omitted means one line.",
-			},
-			quote: {
-				type: "string",
-				minLength: 1,
-				maxLength: CANDIDATE_LIMITS.quoteChars,
-				description:
-					"Required verbatim text at those lines. For repository text and records, a fragment is enough. For a diff, copy each whole line. Diff markers and [L<n>] prefixes are accepted.",
-			},
-		},
-	} as const;
-	const openQuestionSchema = {
-		type: "object",
-		additionalProperties: false,
-		required: ["openQuestion", "wouldSettleIt"],
-		properties: {
-			openQuestion: {
-				type: "string",
-				minLength: 1,
-				description: "The question the evidence you actually read left open, in one sentence.",
-			},
-			wouldSettleIt: {
-				type: "string",
-				minLength: 1,
-				description:
-					"The EVIDENCE that would have decided it — something that already exists and you could not " +
-					"read, named concretely: 'the body of issue #7', 'the test file the description says covers " +
-					"this'. NOT what the author should have written: advice belongs to a later step, and " +
-					"answering with it leaves nobody any wiser about which source this practice is missing.",
-			},
-			citation: {
-				anyOf: [citationSchema, { type: "null" }],
-				description: "Where the question arises, when one place of the work does.",
-			},
-		},
-	} as const;
-	const problemSchema = {
-		type: "object",
-		additionalProperties: false,
-		required: ["severity", "summary", "explanation", "citations", "basis"],
-		properties: {
-			key: {
-				type: ["string", "null"],
-				description:
-					"Optional: a short lowercase-hyphenated name for this problem, unique within the result.",
-			},
-			severity: {
-				type: "string",
-				enum: SEVERITIES,
-				description: `From the practice's Severity section. ${describeVocabulary(SEVERITIES, SEVERITY_DESCRIPTIONS)}`,
-			},
-			summary: {
-				type: "string",
-				minLength: 1,
-				maxLength: MAX_SUMMARY_CHARS,
-				description: `One line of at most ${MAX_SUMMARY_CHARS} characters naming this one problem, such as 'Debug print left in the request handler'.`,
-			},
-			explanation: {
-				type: "string",
-				minLength: 1,
-				maxLength: CANDIDATE_LIMITS.problemExplanationChars,
-				description:
-					"What the cited evidence shows about this one problem and its consequence. Evidence, not advice, intent, confidence, or hidden chain-of-thought.",
-			},
-			citations: {
-				type: "array",
-				minItems: 1,
-				maxItems: CANDIDATE_LIMITS.citationsPerProblem,
-				items: citationSchema,
-				description: "The lines that show this problem.",
-			},
-			basis: {
-				description:
-					"All indexes are zero-based positions in THIS problem's citations array: with one citation, use 0. Why the problem belongs to this work. introduced: the change adds it (head: the index of a citation of the NEW side or the reviewed head). worsened: the change makes it worse (base: the index of the OLD side's citation, head: the NEW side's). duty: the criteria require an event that this work lacks (criterionQuote: the criteria's exact words, event: the index of the citation that shows the event). state: the problem exists in the pinned file; its citations witness that state at the reviewed version.",
-				anyOf: [
-					{
-						type: "object",
-						additionalProperties: false,
-						required: ["type", "head", "explanation"],
-						properties: {
-							type: { type: "string", enum: ["introduced"] },
-							head: { type: "integer", minimum: 0 },
-							explanation: { type: "string", minLength: 1 },
-						},
-					},
-					{
-						type: "object",
-						additionalProperties: false,
-						required: ["type", "base", "head", "explanation"],
-						properties: {
-							type: { type: "string", enum: ["worsened"] },
-							base: { type: "integer", minimum: 0 },
-							head: { type: "integer", minimum: 0 },
-							explanation: { type: "string", minLength: 1 },
-						},
-					},
-					{
-						type: "object",
-						additionalProperties: false,
-						required: ["type", "event", "criterionQuote", "explanation"],
-						properties: {
-							type: { type: "string", enum: ["duty"] },
-							event: { type: "integer", minimum: 0 },
-							criterionQuote: { type: "string", minLength: 1 },
-							explanation: { type: "string", minLength: 1 },
-						},
-					},
-					{
-						type: "object",
-						additionalProperties: false,
-						required: ["type", "explanation"],
-						properties: {
-							type: { type: "string", enum: ["state"] },
-							explanation: { type: "string", minLength: 1 },
-						},
-					},
-				],
-			},
-			nextStep: {
-				type: ["string", "null"],
-				description:
-					"Optional: the one change that would resolve this problem, when the criteria name it.",
-			},
-		},
-	} as const;
-	const resultSchema: ToolDefinition["parameters"] = {
-		type: "object",
-		additionalProperties: false,
-		required: ["outcome", "summary", "explanation", "citations", "evidence"],
-		properties: {
-			outcome: {
-				type: "string",
-				enum: OUTCOMES,
-				description: `${describeVocabulary(OUTCOMES, OUTCOME_DESCRIPTIONS)} Use these exact values. Case variants, NOT_APPLICABLE for DOES_NOT_APPLY, and UNDETERMINED for COULD_NOT_DETERMINE are accepted.`,
-			},
-			summary: {
-				type: "string",
-				minLength: 1,
-				maxLength: MAX_SUMMARY_CHARS,
-				description:
-					`A short phrase of at most ${MAX_SUMMARY_CHARS} characters identifying the specific behavior whose conformance to the practice standard you assess, such as 'Debug print left in the request handler'. ` +
-					"Never a single word and never the practice's own name; the reasons, titles and quotes go in explanation. " +
-					"A longer summary is refused, not shortened.",
-			},
-			explanation: {
-				type: "string",
-				minLength: 1,
-				maxLength: CANDIDATE_LIMITS.explanationChars,
-				description:
-					"A concise explanation a developer can read: the source facts that decide whether this work holds " +
-					"this criterion's subject and applicability, then, when it does, how the cited evidence meets or falls " +
-					"short of what this criterion judges, leaving to other practices what it assigns to them. Describe " +
-					"evidence, not advice, intent, confidence, or hidden chain-of-thought.",
-			},
-			citations: {
-				type: "array",
-				maxItems: CANDIDATE_LIMITS.resultCitations,
-				items: citationSchema,
-				description:
-					"The lines that decide the outcome. Required for MET, DOES_NOT_APPLY and COULD_NOT_DETERMINE; a NOT_MET result may leave it empty, since each problem cites its own lines.",
-			},
-			problems: {
-				anyOf: [
-					{ type: "array", minItems: 1, maxItems: CANDIDATE_LIMITS.problems, items: problemSchema },
-					{ type: "null" },
-				],
-				description:
-					"NOT_MET requires a nonempty array: each problem has severity, summary, explanation, citations and basis. For every other outcome, omit problems or use null or [].",
-			},
-			example: {
-				anyOf: [
-					{
-						type: "object",
-						additionalProperties: false,
-						required: ["citation", "note"],
-						properties: {
-							citation: citationSchema,
-							note: { type: "string", minLength: 1, maxLength: CANDIDATE_LIMITS.exampleNoteChars },
-						},
-					},
-					{ type: "null" },
-				],
-				description:
-					"Optional, MET or NOT_MET only: one place of this work that shows the practice as the criteria ask, when the evidence holds one; never on the lines of a problem. null otherwise.",
-			},
-			evidence: {
-				type: "object",
-				additionalProperties: false,
-				description:
-					"An object with only these outcome-specific fields. MET: optional search warrant; DOES_NOT_APPLY: required inapplicability; " +
-					"COULD_NOT_DETERMINE: required openQuestions and optional search; NOT_MET: optional search and openQuestions. " +
-					"Put consulted, lookedFor and boundary inside search, never directly inside evidence. Omit unused fields; empty values in unused fields are treated as omitted.",
-				properties: {
-					search: { anyOf: [searchSchema, { type: "null" }] },
-					inapplicability: { anyOf: [inapplicabilitySchema, { type: "null" }] },
-					openQuestions: {
-						anyOf: [
-							{
-								type: "array",
-								minItems: 1,
-								maxItems: CANDIDATE_LIMITS.openQuestions,
-								items: openQuestionSchema,
-							},
-							{ type: "null" },
-						],
-					},
-				},
-			},
-		},
-	} as const;
-
 	function persistUsage() {
 		writeFileSync(USAGE_PATH, JSON.stringify(usageTotals, null, 2));
 	}
@@ -1214,16 +897,11 @@ export async function runReviewJob(): Promise<void> {
 	}
 
 	function validateConversationAttribution(
-		submission: NormalizedSubmission,
+		submission: { problems?: readonly Problem[] },
 		assignment: PracticeInputs | undefined,
 	): void {
 		const thread = `${CWD}/${CONVERSATION_THREAD}`;
-		if (
-			submission.outcome === "NOT_MET" &&
-			assignment?.kind === "chat.thread" &&
-			assignment.about !== null &&
-			existsSync(thread)
-		) {
+		if (assignment?.kind === "chat.thread" && assignment.about !== null && existsSync(thread)) {
 			const turns = readFileSync(thread, "utf8");
 			const { developerId } = assignment.about;
 			if (
@@ -1240,6 +918,76 @@ export async function runReviewJob(): Promise<void> {
 		}
 	}
 
+	function citationSources(slug: string): CitationSources {
+		const scan =
+			assignedInputs.get(slug)?.scope.kind === "SCAN"
+				? sourcesForPractice(slug, captureSources())
+				: null;
+		return {
+			sourceFiles: sourceFileSources,
+			capturedTexts,
+			sandboxRoot: CWD,
+			repositoryRoot: taskEnvelope.paths.repositoryRoot,
+			headRevision:
+				scan?.headRevision ??
+				checkedOutCommit(INPUT_PATHS.repositoryRoot) ??
+				readChange(INPUT_PATHS.contextRoot)?.head ??
+				null,
+			...(scan === null ? {} : { treeSourceFile: scan.treeSourceFile }),
+		};
+	}
+
+	function validateCitationScope(citations: readonly Citation[], slug: string): void {
+		const scope = assignedInputs.get(slug)?.scope;
+		if (scope?.kind !== "SCAN") {
+			return;
+		}
+		const head = citationSources(slug).headRevision;
+		if (citations.some((citation) => citation.commit !== head)) {
+			throw new Error("a scan citation must cite the pinned repository commit");
+		}
+		const contextPaths = practiceIndex.find((practice) => practice.slug === slug)?.contextPaths;
+		const allowed = new Set([scope.item.path, ...(contextPaths ?? [])]);
+		if (citations.some((citation) => !allowed.has(citation.path))) {
+			throw new Error(
+				`a scan citation is outside its frozen context. Correction example: read(${JSON.stringify({ path: scope.item.path })}), then cite the exact text from the assigned file.`,
+			);
+		}
+	}
+
+	function validateProblemClaims(problems: readonly Problem[], slug: string): void {
+		const submission = { problems };
+		validateDomainBasis(submission, assignedInputs.get(slug));
+		validateChangeBasis(
+			submission,
+			existsSync(`${CWD}/${CHANGE_ROOT}/diff.patch`)
+				? readFileSync(`${CWD}/${CHANGE_ROOT}/diff.patch`, "utf8")
+				: "",
+			readChange(INPUT_PATHS.contextRoot),
+		);
+		validateConversationAttribution(submission, assignedInputs.get(slug));
+	}
+
+	function validateProblemDraft(raw: unknown, slug: string): Problem & { key: string } {
+		const notes: string[] = [];
+		const problem = normalizeProblem(raw, notes, citationSources(slug));
+		if (problem.key === undefined) {
+			throw new Error("A local problem draft requires a stable key.");
+		}
+		validateCitationScope(problem.citations, slug);
+		validateCitationSources(
+			problem.citations,
+			availableSourceKinds,
+			sourceFileSources,
+			`${taskEnvelope.paths.repositoryRoot.replace(/\/+$/u, "")}/`,
+		);
+		for (const citation of problem.citations) {
+			verifySubmissionCitation(citation, notes);
+		}
+		validateProblemClaims([problem], slug);
+		return { ...problem, key: problem.key };
+	}
+
 	function validateSubmission(
 		raw: unknown,
 		slug: string,
@@ -1247,41 +995,14 @@ export async function runReviewJob(): Promise<void> {
 		changeRead: boolean,
 	): Validated {
 		const notes: string[] = [];
-		const scanSources =
-			assignedInputs.get(slug)?.scope.kind === "SCAN"
-				? sourcesForPractice(slug, captureSources())
-				: null;
 		const submission = normalizeSubmission(
 			raw,
 			notes,
 			(sourceFile) => sourceFileSources.get(sourceFile),
-			{
-				sourceFiles: sourceFileSources,
-				capturedTexts,
-				sandboxRoot: CWD,
-				repositoryRoot: taskEnvelope.paths.repositoryRoot,
-				headRevision:
-					scanSources?.headRevision ??
-					checkedOutCommit(INPUT_PATHS.repositoryRoot) ??
-					readChange(INPUT_PATHS.contextRoot)?.head ??
-					null,
-				...(scanSources === null ? {} : { treeSourceFile: scanSources.treeSourceFile }),
-			},
+			citationSources(slug),
 		);
 		const citations = submissionCitations(submission);
-		const assignmentScope = assignedInputs.get(slug)?.scope;
-		if (assignmentScope?.kind === "SCAN") {
-			if (citations.some((citation) => citation.commit !== scanSources?.headRevision)) {
-				throw new Error("a scan citation must cite the pinned repository commit");
-			}
-			const contextPaths = practiceIndex.find((practice) => practice.slug === slug)?.contextPaths;
-			const allowed = new Set([assignmentScope.item.path, ...(contextPaths ?? [])]);
-			if (citations.some((citation) => !allowed.has(citation.path))) {
-				throw new Error(
-					`a scan citation is outside its frozen context. Correction example: read(${JSON.stringify({ path: assignmentScope.item.path })}), then cite the exact text from the assigned file.`,
-				);
-			}
-		}
+		validateCitationScope(citations, slug);
 
 		try {
 			validateEvidenceSources(
@@ -1323,15 +1044,7 @@ export async function runReviewJob(): Promise<void> {
 		for (const citation of citations) {
 			verifySubmissionCitation(citation, notes);
 		}
-		validateDomainBasis(submission, assignment);
-		validateChangeBasis(
-			submission,
-			existsSync(`${CWD}/${CHANGE_ROOT}/diff.patch`)
-				? readFileSync(`${CWD}/${CHANGE_ROOT}/diff.patch`, "utf8")
-				: "",
-			readChange(INPUT_PATHS.contextRoot),
-		);
-		validateConversationAttribution(submission, assignment);
+		validateProblemClaims(submission.problems ?? [], slug);
 		const coverage = measureCoverage(citations);
 		const parsed = parseCandidate({ ...submission, coverage });
 		if (!parsed.ok) {
@@ -1935,43 +1648,23 @@ export async function runReviewJob(): Promise<void> {
 		return out;
 	}
 
-	function buildSubmitResultTool() {
-		const validateArguments = toolArgumentValidator(resultSchema);
-		return defineTool({
-			name: "submit_result",
-			exposure: "model-only",
-			label: "Submit Result",
-			description:
-				"Choose one outcome and its evidence shape. MET: evidence:{} or evidence.search; " +
-				"NOT_MET: problems plus optional evidence.search and evidence.openQuestions; " +
-				"DOES_NOT_APPLY: evidence.inapplicability only; COULD_NOT_DETERMINE: evidence.openQuestions, with optional evidence.search. " +
-				"Omit unused fields. Each open question requires openQuestion and wouldSettleIt. " +
-				`Submit the one complete evidenced result of this session's practice: its outcome, the explanation, the ` +
-				`citations it rests on, and for NOT_MET each problem with its severity, citations and basis. The host adds ` +
-				`the coverage it measured from your reads and keeps the result for server admission after measuring. To ` +
-				`correct it, submit the complete result again. Cite the source you read; the runner resolves source kind, ` +
-				`manifest identity and the captured revision. Citation examples: ` +
-				`{"path":"src/Auth.java","startLine":10,"quote":"insecure();"}; ` +
-				`{"sourcePath":"work/change/diff.patch","path":"src/Auth.java","side":"NEW","startLine":10,"quote":"+ insecure();"}; ` +
-				`{"path":"${taskEnvelope.paths.contextRoot}/metadata.json","startLine":1,"quote":"Add login"}. ` +
-				`Use only text you read. Examples show the shape, not evidence for this review. ${
-					RESULT_EVIDENCE_EXAMPLES
-				}`,
-			parameters: resultSchema,
-			prepareArguments: (raw) => {
-				const prepared = prepareResultArguments(raw);
-				validateResultEvidence(prepared, availableSourceKindValues);
-				return validateArguments(prepared);
-			},
-			execute: async (toolCallId, params): Promise<AgentToolResult<SubmitResultDetails>> => {
+	function requireOpenReview(expected: ActiveReview): ActiveReview {
+		const review = sessionState().activeReview;
+		if (measurementClosed || review === null || review !== expected) {
+			throw new Error("Measurement is closed; no local result or problem draft can change.");
+		}
+		return review;
+	}
+
+	function buildReviewResultTools(review: ActiveReview) {
+		return buildResultTools({
+			sourceKinds: availableSourceKindValues,
+			contextRoot: taskEnvelope.paths.contextRoot,
+			drafts: () => requireOpenReview(review).problems,
+			validateProblem: (raw) => validateProblemDraft(raw, requireOpenReview(review).slug),
+			submit: async (toolCallId, params): Promise<AgentToolResult<SubmitResultDetails>> => {
 				const state = sessionState();
-				if (measurementClosed || state.activeReview === null) {
-					const text = "Measurement is closed; this turn may only compose feedback.";
-					return {
-						content: [{ type: "text", text }],
-						details: { inserted: 0, revised: 0, duplicates: 0, refused: 0 },
-					};
-				}
+				requireOpenReview(review);
 				if (!isRecord(params) || Array.isArray(params)) {
 					const reason = "the arguments must be one result object";
 					logRefusal("(not an object)", reason);
@@ -1992,7 +1685,7 @@ export async function runReviewJob(): Promise<void> {
 				const head = `${outcome.slug}:`;
 				let text: string;
 				if (outcome.kind === "stored" || outcome.kind === "revised") {
-					text = `${head} ${outcome.kind}${outcome.negative ? " (negative)" : ""}. A later complete submission replaces it.${outcome.filled.map((line) => `\n   ${line}`).join("")}`;
+					text = `${head} ${outcome.kind}${outcome.negative ? " (negative)" : ""}. This is a local result awaiting server admission.${outcome.filled.map((line) => `\n   ${line}`).join("")}`;
 				} else if (outcome.kind === "duplicate") {
 					text = `${head} already submitted; this result changed nothing, so do not send it again.`;
 				} else {
@@ -2622,14 +2315,16 @@ export async function runReviewJob(): Promise<void> {
 		if (sessionState().openingInContext) {
 			return "";
 		}
-		const ownDrafts = sessionState().activeReview?.draft != null;
+		const review = sessionState().activeReview;
+		const problemDrafts = review?.problems.inventory() ?? [];
+		const ownDrafts = review?.draft != null;
 		return composing
 			? assessmentOpening(brief)
 			: `${assessmentOpening(brief)}${
 					ownDrafts
 						? `## Recorded so far\n${recordedSoFar(sessionState().currentTurnSlugs)}\n\n`
 						: ""
-				}`;
+				}${problemDrafts.length === 0 ? "" : `## Local problem drafts (not admitted)\n${JSON.stringify(problemDrafts)}\nUse read_problem with one key to recover its complete local body before correcting it. Select keys explicitly with submit_result; unselected drafts are not submitted.\n\n`}`;
 	}
 
 	const RESULT_EXAMPLE = (() => {
@@ -2730,7 +2425,7 @@ ${example.map((result) => `\`\`\`json\n${JSON.stringify(result, null, 1)}\n\`\`\
 
 ${criteriaOf([slug])}${illustrations}${preparedSectionOf(slug, prepared)}
 
-Submit one result for ${slug} with submit_result: the outcome its criterion above decides through its applicability, Judge and Defer, as the evidence supports it, DOES_NOT_APPLY and COULD_NOT_DETERMINE included. What the brief shows is yours to quote; read more when the criterion needs evidence beyond it. This session submits and corrects only this practice's result.`;
+Submit one result for ${slug} with submit_result: the outcome its criterion above decides through its applicability, Judge and Defer, as the evidence supports it, DOES_NOT_APPLY and COULD_NOT_DETERMINE included. What the brief shows is yours to quote; read more when the criterion needs evidence beyond it. This session submits only this practice's result. For several NOT_MET problems, optionally use upsert_problem with a stable key for each full problem body; remove_problem retracts a draft. Then submit_result selects the ordered problemKeys instead of inline problems. Nothing is admitted until the complete result passes server admission.`;
 	}
 
 	function compositionBudget(notMet: number): Work {
@@ -2946,7 +2641,6 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 			);
 		}
 
-		const submitResultTool = buildSubmitResultTool();
 		if (tooLate) {
 			logPracticeCoverage();
 			finalizeOutput();
@@ -3360,12 +3054,14 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 				const review: ActiveReview = {
 					slug,
 					draft: null,
+					problems: new ProblemDrafts(),
 					requireSubmission: false,
 					reads: new SessionReads(CWD, relevantBrief, undefined, capturedTexts),
 					reader,
 					domainReads,
 				};
 				sessionState().activeReview = review;
+				const resultTools = buildReviewResultTools(review);
 				sessionState().activePractice = slug;
 				sessionState().currentTurnSlugs = [slug];
 				trace.askedToRecord = false;
@@ -3373,10 +3069,8 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 				try {
 					opened = await openSession(
 						"practice",
-						isScan ? ["read", "submit_result"] : [...PRACTICE_TOOLS, "submit_result"],
-						reader === undefined
-							? [submitResultTool]
-							: [submitResultTool, governedScanRead(reader)],
+						isScan ? ["read", ...RESULT_TOOL_NAMES] : [...PRACTICE_TOOLS, ...RESULT_TOOL_NAMES],
+						reader === undefined ? resultTools : [...resultTools, governedScanRead(reader)],
 					);
 				} catch (error) {
 					sessionState().activeReview = null;

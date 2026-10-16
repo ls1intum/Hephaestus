@@ -4,7 +4,6 @@ import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewRequestReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
-import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Clock;
 import java.time.Duration;
@@ -23,14 +22,13 @@ public class ReviewRequestPolicy {
     private final PracticeReviewProperties properties;
     private final PracticeReviewCoverageService coverage;
     private final Clock clock;
+    private final ReviewGate gate;
 
     @Transactional
     public Optional<ReviewRequestReason> refusal(long workspaceId, long itemId, long accountId) {
         var workspace = workspaces.findByIdForUpdate(workspaceId).orElseThrow();
-        if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE)
-            return Optional.of(ReviewRequestReason.WORKSPACE_INACTIVE);
-        if (!Boolean.TRUE.equals(workspace.getFeatures().getPracticesEnabled()))
-            return Optional.of(ReviewRequestReason.PRACTICES_DISABLED);
+        var refusal = gate.refusal(workspace, ReviewOrigin.REQUEST);
+        if (refusal.isPresent()) return Optional.of(refusal.orElseThrow().eventReason());
         if (!coverage.eligibleAccountIds(workspaceId).contains(accountId))
             return Optional.of(ReviewRequestReason.MEMBER_AI_DECLINED);
         var now = clock.instant();

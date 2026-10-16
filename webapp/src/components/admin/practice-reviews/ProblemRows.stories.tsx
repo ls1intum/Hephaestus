@@ -50,7 +50,7 @@ type Story = StoryObj<typeof meta>;
 export const Ready: Story = {
 	play: async ({ canvas }) => {
 		const table = canvas.getByRole("table", TABLE);
-		await expect(within(table).getAllByRole("link", { name: /^Open result/u })).toHaveLength(
+		await expect(within(table).getAllByRole("link", { name: /^Open problem/u })).toHaveLength(
 			reviewProblems.length,
 		);
 		within(table).getByText(
@@ -126,7 +126,7 @@ export const EvidenceHidden: Story = {
 		const table = canvas.getByRole("table", TABLE);
 		await expect(within(table).getAllByText("Details hidden")).toHaveLength(2);
 		for (const [role, name] of [
-			["link", /^Open result Details hidden/u],
+			["link", /^Open problem Details hidden/u],
 			["button", /^Track result Details hidden/u],
 			["link", /^Trace result Details hidden/u],
 		] as const) {

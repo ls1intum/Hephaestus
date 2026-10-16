@@ -204,7 +204,22 @@ function practiceName(practice: Practice): string | undefined {
 // The trace
 // ------------------------------------------------------------------------------------------------
 
-function hereOf(record: RecordRef, newestResult: string | undefined): TraceNode | undefined {
+/** The result that records a problem, from the edge the lineage draws to it. */
+function recordingResult(
+	lineage: ReviewLineage | undefined,
+	problemId: string,
+): string | undefined {
+	const from = lineage?.edges.find(
+		(edge) => edge.relation === "RECORDS" && edge.to === `problem:${problemId}`,
+	)?.from;
+	return from?.startsWith("result:") === true ? from.slice("result:".length) : undefined;
+}
+
+function hereOf(
+	record: RecordRef,
+	newestResult: string | undefined,
+	lineage: ReviewLineage | undefined,
+): TraceNode | undefined {
 	switch (record.kind) {
 		case "review": {
 			return { kind: "review" };
@@ -217,7 +232,9 @@ function hereOf(record: RecordRef, newestResult: string | undefined): TraceNode 
 			return { kind: record.kind, id: record.id };
 		}
 		case "problem": {
-			return undefined;
+			// A trace has no step per problem, so it stands on the result that records it.
+			const result = recordingResult(lineage, record.id);
+			return result === undefined ? undefined : { kind: "result", id: result };
 		}
 		case "practice": {
 			return newestResult === undefined ? undefined : { kind: "result", id: newestResult };
@@ -247,6 +264,23 @@ function lineageTarget(
 		}
 		case "practice": {
 			return newestResult === undefined ? undefined : { kind: "RESULT", resultId: newestResult };
+		}
+	}
+}
+
+function traceDescription(record: RecordRef): string | undefined {
+	switch (record.kind) {
+		case "practice": {
+			return "The trace of its newest result, narrowed to the practice.";
+		}
+		case "problem": {
+			return "The trace of the result that records this problem. Feedback shows under that result; open a feedback to see which problem it rests on.";
+		}
+		case "review":
+		case "result":
+		case "feedback":
+		case "item": {
+			return undefined;
 		}
 	}
 }
@@ -418,13 +452,9 @@ function TraceLevelRead({
 				ready,
 				(practice && practiceName(practice)) ?? newest?.practiceName,
 			)}
-			description={
-				record.kind === "practice"
-					? "The trace of its newest result, narrowed to the practice."
-					: undefined
-			}
+			description={traceDescription(record)}
 			chain={chain}
-			here={hereOf(record, newest?.id)}
+			here={hereOf(record, newest?.id, ready)}
 			onOpen={onOpen}
 			display={display}
 			onDisplayChange={setDisplay}

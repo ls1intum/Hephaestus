@@ -5,8 +5,6 @@ import { Fragment, type ReactNode } from "react";
 import type {
 	EvidenceCitation,
 	OpenQuestion,
-	Problem,
-	ProblemSummary,
 	ResultDetail,
 	ResultExample,
 	ResultList,
@@ -16,6 +14,7 @@ import { SectionLabel } from "@/components/common/SectionLabel";
 import { statusToneClass } from "@/components/common/status-def";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { UNTRUSTED_MARKDOWN_PROSE, UntrustedMarkdown } from "@/components/common/UntrustedMarkdown";
+import { ProblemList } from "@/components/practice-problems/ProblemList";
 import { claimCurrentnessNote } from "@/components/practice-vocabulary/claim-currentness";
 import { OUTCOME_DEFS, outcomeLabel } from "@/components/practice-vocabulary/outcome-defs";
 import { PracticePill } from "@/components/practice-vocabulary/PracticePill";
@@ -24,7 +23,7 @@ import { REVIEW_ORIGIN_DEFS } from "@/components/practice-vocabulary/review-orig
 import { StatusTooltip } from "@/components/practice-vocabulary/StatusTooltip";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { rendersContent } from "@/lib/react-node";
-import { capitalise, hasText } from "@/lib/text";
+import { hasText } from "@/lib/text";
 
 import {
 	type EvidenceCheck,
@@ -124,7 +123,11 @@ function ReasonSections({ reasons }: { reasons: ResultReasons }) {
 			)}
 			{reasons.problems.length > 0 && (
 				<DetailSection label="Problems" className="gap-1.5">
-					<ProblemList problems={reasons.problems} />
+					<ProblemList
+						problems={reasons.problems}
+						evidence={(problem) => <CitationBlocks citations={problem.citations} />}
+						severity="omitted"
+					/>
 				</DetailSection>
 			)}
 			{reasons.openQuestions.length > 0 && (
@@ -293,27 +296,6 @@ function CitationBlocks({ citations }: { citations: EvidenceCitation[] }) {
 }
 
 const ITEM_CLASS = "flex min-w-0 flex-col gap-1.5 rounded-xl border bg-background p-3";
-
-function ProblemList({ problems }: { problems: (ProblemSummary | Problem)[] }) {
-	return (
-		<ol aria-label="Problems" className="flex min-w-0 flex-col gap-2">
-			{problems.map((problem) => {
-				const full = "citations" in problem ? problem : undefined;
-				const problemNextStep = capitalise(full?.nextStep ?? "");
-				return (
-					<li key={problem.id} className={ITEM_CLASS}>
-						<span className="text-sm font-medium text-pretty">{problem.summary.trim()}</span>
-						{hasText(full?.explanation) && <ReviewerText>{full.explanation}</ReviewerText>}
-						<CitationBlocks citations={full?.citations ?? []} />
-						{hasText(problemNextStep) && (
-							<TermList pairs={[{ term: "Next step", detail: problemNextStep }]} />
-						)}
-					</li>
-				);
-			})}
-		</ol>
-	);
-}
 
 // Open questions describe uncertainty, so they cannot become feedback claims.
 function OpenQuestionList({ questions }: { questions: OpenQuestion[] }) {

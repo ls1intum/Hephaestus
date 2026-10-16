@@ -1,12 +1,13 @@
 import { Link } from "@tanstack/react-router";
 import { cn } from "cn";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
 import type {
 	FeedbackCheck,
 	ReviewDetail,
 	ReviewJob,
 	ReviewPractice,
+	ReviewResultCounts,
 	ReviewUsage,
 	ReviewUsageAttempt,
 } from "@/api/types.gen";
@@ -21,6 +22,7 @@ import { Section } from "@/components/layout/Section";
 import { FeedbackChecks } from "@/components/practice-trace/FeedbackChecks";
 import { PracticeScriptTraceLine } from "@/components/practice-trace/PracticeScriptTraceLine";
 import { FOUND_BY_DESCRIPTIONS, FOUND_BY_LABELS } from "@/components/practice-trace/trace-format";
+import { OUTCOME_DEFS, type Outcome } from "@/components/practice-vocabulary/outcome-defs";
 import { REVIEW_ORIGIN_DEFS } from "@/components/practice-vocabulary/review-origin-defs";
 import {
 	isActiveReview,
@@ -56,6 +58,7 @@ import { ReviewDayTime } from "./ReviewDayTime";
 import { ReviewFact, ReviewFactGrid } from "./ReviewFactGrid";
 import { ReviewItemLink } from "./ReviewItem";
 import { ReviewLevelHeader } from "./ReviewLevelHeader";
+import { ReviewListLink } from "./ReviewListLink";
 import { ReviewPracticeScriptTable } from "./ReviewPracticeScriptTable";
 
 export interface ReviewLevelProps {
@@ -245,6 +248,69 @@ function ReviewStatusLine({ review }: { review: ReviewDetail }) {
 	);
 }
 
+const RESULT_OUTCOMES = [
+	["MET", "met"],
+	["NOT_MET", "notMet"],
+	["DOES_NOT_APPLY", "doesNotApply"],
+	["COULD_NOT_DETERMINE", "couldNotDetermine"],
+] as const satisfies readonly (readonly [Outcome, keyof ReviewResultCounts])[];
+
+/**
+ * The review's results by outcome, each opening the Results tab at exactly those results. The fact is
+ * labelled Results, so the words name only the outcome. Problems sit under Not met results and are
+ * not counted here: the link opens them without a figure the sheet does not hold.
+ */
+function ResultCountLinks({
+	workspaceSlug,
+	review,
+}: {
+	workspaceSlug: string;
+	review: ReviewDetail;
+}) {
+	const counted = RESULT_OUTCOMES.filter(([, key]) => review.results[key] > 0);
+	if (counted.length === 0) {
+		return "None";
+	}
+	return (
+		<span>
+			{counted.map(([outcome, key], index) => (
+				<Fragment key={outcome}>
+					{index > 0 && ", "}
+					<InlineLink
+						tone="count"
+						render={
+							<ReviewListLink
+								workspaceSlug={workspaceSlug}
+								destination={{
+									list: "results",
+									search: { reviewId: review.id, outcome: [outcome] },
+								}}
+							/>
+						}
+					>
+						{`${String(review.results[key])} ${OUTCOME_DEFS[outcome].label.toLowerCase()}`}
+					</InlineLink>
+				</Fragment>
+			))}
+			{review.results.notMet > 0 && (
+				<>
+					{" · "}
+					<InlineLink
+						render={
+							<ReviewListLink
+								workspaceSlug={workspaceSlug}
+								destination={{ list: "problems", search: { reviewId: review.id } }}
+							/>
+						}
+					>
+						View problems
+					</InlineLink>
+				</>
+			)}
+		</span>
+	);
+}
+
 function ReviewWhat({
 	workspaceSlug,
 	review,
@@ -275,7 +341,9 @@ function ReviewWhat({
 					)}
 				</span>
 			</ReviewFact>
-			<ReviewFact label="Results">{countsLine(resultSlots(review.results)) ?? "None"}</ReviewFact>
+			<ReviewFact label="Results">
+				<ResultCountLinks workspaceSlug={workspaceSlug} review={review} />
+			</ReviewFact>
 			{review.kind !== "SCAN" && (
 				<ReviewFact label="Feedback">
 					{countsLine(feedbackSlots(review.feedback)) ?? "None"}
@@ -372,13 +440,18 @@ function itemCountsLine(practice: ReviewPractice): string {
 		.join(", ");
 }
 
-function practiceReason(practice: ReviewPractice): string {
+function practiceReason(practice: ReviewPractice): string | undefined {
 	if (practice.status === "DONE") {
 		return resultsLine(practice);
 	}
-	return hasText(practice.reason)
-		? (reviewReasonSentence(practice.reason) ?? practice.reason)
-		: REVIEW_PRACTICE_STATUS_DEFS[practice.status].description;
+	if (hasText(practice.reason)) {
+		return reviewReasonSentence(practice.reason) ?? practice.reason;
+	}
+	// Once its script has a run, the trace line under it says how that run went; the status's own
+	// sentence ("It runs next") describes a practice whose script has not started.
+	return practice.script === null
+		? REVIEW_PRACTICE_STATUS_DEFS[practice.status].description
+		: undefined;
 }
 
 function ReviewPracticeList({
@@ -422,7 +495,7 @@ function ReviewPracticeList({
 						)}
 						<span className="font-medium break-words">{practice.practiceName}</span>
 						<span className="flex min-w-0 flex-col gap-1 text-pretty text-muted-foreground">
-							<span>{practiceReason(practice)}</span>
+							{practiceReason(practice) !== undefined && <span>{practiceReason(practice)}</span>}
 							{review.kind === "SCAN" && itemCountsLine(practice) !== "" && (
 								<span className="text-xs">Files: {itemCountsLine(practice)}</span>
 							)}
