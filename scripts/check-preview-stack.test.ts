@@ -464,7 +464,7 @@ void describe("owned preview reviews", () => {
 			{ PREVIEW_FRESH_REVIEW_ENABLED: "yes" },
 			{ PREVIEW_WORKER_BIND_HOST: "0.0.0.0" },
 			{ PREVIEW_WORKER_REGISTRATION_TOKEN: "" },
-			{ PREVIEW_AGENT_IMAGE_REFERENCE: "ghcr.io/hephaestus-build/agent-pi:latest" },
+			{ PREVIEW_AGENT_IMAGE_REFERENCE: "ghcr.io/hephaestus-build/agent-pi:mutable" },
 			{
 				PREVIEW_AGENT_IMAGE_REFERENCE: `ghcrXio/hephaestus-build/agent-pi@sha256:${"b".repeat(64)}`,
 			},
