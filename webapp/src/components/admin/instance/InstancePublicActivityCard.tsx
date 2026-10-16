@@ -7,11 +7,18 @@ import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
+import type { RefreshFailure } from "@/runtime/tanstack-query/infinite-list";
 
 export type InstancePublicActivityState =
 	| { status: "loading" }
 	| { status: "error"; error: unknown; onRetry: () => void }
-	| { status: "ready"; allowed: boolean; pending: boolean };
+	| {
+			status: "ready";
+			allowed: boolean;
+			pending: boolean;
+			/** Set when the latest read failed, so `allowed` is the last known setting. */
+			refreshFailure?: RefreshFailure;
+	  };
 
 export interface InstancePublicActivityCardProps {
 	state: InstancePublicActivityState;
@@ -47,23 +54,28 @@ export function InstancePublicActivityCard({
 					/>
 				)}
 				{state.status === "ready" && (
-					<Field orientation="horizontal">
-						<FieldContent>
-							<FieldLabel htmlFor={id}>Allow public activity pages</FieldLabel>
-							<FieldDescription>
-								{state.allowed
-									? "On. Workspaces can publish their page."
-									: "Off. No workspace can publish a page."}
-							</FieldDescription>
-						</FieldContent>
-						{state.pending && <Spinner />}
-						<Switch
-							id={id}
-							checked={state.allowed}
-							onCheckedChange={(next) => onAllowedChange(next)}
-							readOnly={state.pending}
-						/>
-					</Field>
+					<div className="flex flex-col gap-3">
+						{state.refreshFailure !== undefined && (
+							<QueryErrorAlert title="This setting may be out of date" {...state.refreshFailure} />
+						)}
+						<Field orientation="horizontal">
+							<FieldContent>
+								<FieldLabel htmlFor={id}>Allow public activity pages</FieldLabel>
+								<FieldDescription>
+									{state.allowed
+										? "On. Workspaces can publish their page."
+										: "Off. No workspace can publish a page."}
+								</FieldDescription>
+							</FieldContent>
+							{state.pending && <Spinner />}
+							<Switch
+								id={id}
+								checked={state.allowed}
+								onCheckedChange={(next) => onAllowedChange(next)}
+								readOnly={state.pending}
+							/>
+						</Field>
+					</div>
 				)}
 			</CardContent>
 		</Card>
