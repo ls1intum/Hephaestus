@@ -1,6 +1,6 @@
 {
 	"name": "hephaestus",
-	"version": "0.93.3",
+	"version": "0.93.4",
 	"private": true,
 	"type": "module",
 	"scripts": {
