@@ -34,6 +34,23 @@ export const OffersTheFixToAnAdmin: Story = {
 	},
 };
 
+// A start switch turned off is a setting, so the alert says so and an admin gets the settings page.
+export const WithheldByTheWorkspaceSettings: Story = {
+	args: {
+		refusal: { status: "REFUSED", reviewId: null, reason: "GATE_WITHHELD" },
+		fix: <RefusalFixLink workspaceSlug="demo" reason="GATE_WITHHELD" />,
+	},
+	play: async ({ canvas }) => {
+		const alert = within(canvas.getByRole("alert"));
+		await expect(
+			alert.getByText("The workspace’s settings did not allow a review to start."),
+		).toBeVisible();
+		await expect(
+			alert.getByRole("link", { name: "Open Review: Automated review" }),
+		).toHaveAttribute("href", "/w/demo/admin/practices/review?section=automated-review");
+	},
+};
+
 // Members cannot use admin fix links; an alert must not send them to an inaccessible page.
 export const WithoutAFix: Story = {
 	args: { fix: undefined },

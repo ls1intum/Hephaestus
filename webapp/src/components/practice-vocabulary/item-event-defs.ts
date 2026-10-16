@@ -51,7 +51,9 @@ export const ITEM_EVENT_STATE_DEFS: StatusDefs<ItemEventState> = {
 };
 
 export const ITEM_EVENT_REASON_SENTENCES: Record<ItemEventReason, string> = {
-	GATE_WITHHELD: "A review check withheld it.",
+	// One code for a start switch turned off and for older records of no usable model or
+	// practice, so it names the settings without saying which one.
+	GATE_WITHHELD: "The workspace’s settings did not allow a review to start.",
 	COOLDOWN_ACTIVE: "The work was reviewed recently, so it waits before another review.",
 	REQUEST_COOLDOWN_ACTIVE: "A review was requested recently, so another request waits.",
 	REQUESTER_QUOTA_EXHAUSTED: "The person who asked has used their review requests for now.",
