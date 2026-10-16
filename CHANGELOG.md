@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.93.5
+
+### Patch Changes
+
+- On a phone, the custom range calendar on activity pages now fits on the screen. Its months scroll inside it, and Apply stays in view, so you can apply a range without scrolling the page to find the button.
+
 ## 0.93.4
 
 ### Patch Changes
