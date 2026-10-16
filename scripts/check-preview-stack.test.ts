@@ -110,6 +110,11 @@ void describe("the API path and the OAuth prefix", () => {
 void describe("preview stack sandbox", () => {
 	void test("accepts the stack as this repository ships it", () => {
 		assert.deepEqual(findViolations(sandboxed), []);
+		const compose: unknown = parse(readFileSync("docker/preview/compose.app.yaml", "utf8"));
+		assert.ok(isRecord(compose) && isRecord(compose.services));
+		const { appserver } = compose.services;
+		assert.ok(isRecord(appserver) && isRecord(appserver.environment));
+		assert.equal(appserver.environment.MANAGEMENT_SERVER_ADDRESS, "127.0.0.1");
 	});
 
 	void test("rejects every documented way out of the sandbox", () => {

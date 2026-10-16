@@ -398,8 +398,8 @@ services:
       HEPHAESTUS_WORKER_HUB_TOKEN_REGISTRATION_TOKEN: ${PREVIEW_WORKER_REGISTRATION_TOKEN:-}
       # This server has no durable checkout volume. Its mirrors are disposable across recreations.
       HEPHAESTUS_FABRIC_ROOT: /tmp/hephaestus-preview-git-repos
+      MANAGEMENT_SERVER_ADDRESS: "127.0.0.1"
       # Read by the static thc binary the health-checker buildpack installs at /workspace/health-check.
-      MANAGEMENT_SERVER_ADDRESS: "$${HOSTNAME}.shared-network"
       THC_PORT: "8080"
       THC_PATH: /livez
       HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED: "false"
