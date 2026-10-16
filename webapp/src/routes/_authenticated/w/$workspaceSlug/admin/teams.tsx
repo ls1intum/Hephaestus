@@ -19,10 +19,12 @@ import type {
 } from "@/api/types.gen";
 import { WorkspaceTeamsTable } from "@/components/admin/teams/WorkspaceTeamsTable";
 import { NoWorkspace } from "@/components/common/NoWorkspace";
+import { queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { workspaceAdminHead } from "@/lib/page-title";
 import { problemDetailOf } from "@/lib/problem-detail";
 import { hasText } from "@/lib/text";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/teams")({
 	head: workspaceAdminHead("Teams"),
@@ -40,10 +42,9 @@ function AdminTeamsContainer() {
 	const slug = workspaceSlug ?? "";
 	const hasWorkspace = Boolean(workspaceSlug);
 
-	const teamsQuery = useQuery({
-		...getAllTeamsOptions({ path: { workspaceSlug: slug } }),
-		enabled: hasWorkspace,
-	});
+	const teamsOptions = getAllTeamsOptions({ path: { workspaceSlug: slug } });
+	const teamsQuery = useQuery({ ...teamsOptions, enabled: hasWorkspace });
+	useQueryReadRefusal(teamsOptions.queryKey, teamsQuery.isError, teamsQuery.error);
 
 	const updateTeamVisibility = useMutation({
 		...updateTeamVisibilityMutation(),
@@ -226,18 +227,28 @@ function AdminTeamsContainer() {
 		return <NoWorkspace />;
 	}
 
+	const retry = () => {
+		void teamsQuery.refetch();
+	};
+	// A refresh that failed and may pass on retry keeps the teams; anything else is the read's error.
+	const refreshFailed =
+		teamsQuery.isError && teamsQuery.data !== undefined && queryErrorIsRetryable(teamsQuery.error);
+
 	return (
 		<WorkspaceTeamsTable
 			teams={teamsQuery.data ?? []}
 			isLoading={isWorkspaceLoading || teamsQuery.isLoading || !hasText(workspaceSlug)}
-			error={teamsQuery.error}
+			error={refreshFailed ? undefined : teamsQuery.error}
+			refreshFailure={
+				refreshFailed
+					? { error: teamsQuery.error, pending: teamsQuery.isFetching, onRetry: retry }
+					: undefined
+			}
 			search={search.q ?? ""}
 			onSearchChange={(q) => {
 				void navigate({ search: { q: q || undefined }, replace: true });
 			}}
-			onRetry={() => {
-				void teamsQuery.refetch();
-			}}
+			onRetry={retry}
 			onHideTeam={handleHideTeam}
 			onToggleRepositoryVisibility={handleToggleRepositoryVisibility}
 			onAddLabelToTeam={handleAddLabelToTeam}
