@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { readFileSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -429,7 +430,8 @@ void test("native bash output receives receipts for each supported single-file f
 		"tail -n 3 file.ts",
 		"sed -n '1,3p' file.ts",
 		"nl file.ts",
-		"rg -n '.' file.ts",
+		// The review sandbox ships ripgrep; a host without it still covers the other forms.
+		...(spawnSync("rg", ["--version"]).status === 0 ? ["rg -n '.' file.ts"] : []),
 		"grep -n '.' file.ts",
 	]) {
 		const reads = new SessionReads(root, [{ path: "file.ts", supplied: false }]);
