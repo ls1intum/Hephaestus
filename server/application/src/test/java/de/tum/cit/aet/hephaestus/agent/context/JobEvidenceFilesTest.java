@@ -59,10 +59,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.eclipse.jgit.api.Git;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Answers;
 import org.mockito.Mockito;
@@ -693,7 +695,7 @@ class JobEvidenceFilesTest extends BaseUnitTest {
         {"schemaVersion":1,"budgetBytes":1,"model":"Jane Roe","sessions":[
           {"file":"people/jane-roe.jsonl","bytes":120,"redacted":"Jane Roe","partialLineDropped":false,
            "omitted":"Jane Roe","error":"Jane Roe <jane@example.com>",
-           "summary":{"phase":"practice","practiceRevisionId":12,"practiceSlug":"jane-roe","entries":6,
+           "summary":{"phase":"practice","practiceVersionId":"9007199254740993","practiceSlug":"jane-roe","entries":6,
              "assistantCalls":1e30,"toolErrors":-1,"compactions":1.5,
              "usage":{"input":100,"output":"Jane Roe","cacheRead":9007199254740993,"cacheWrite":5,"note":"Jane Roe"},
              "stopReasons":{"toolUse":1,"Jane Roe":2},
@@ -753,6 +755,10 @@ class JobEvidenceFilesTest extends BaseUnitTest {
         var copies = personCopies();
         var job = launched();
         when(copies.traceCustody(job.getId(), 1L, 0)).thenReturn(custody);
+        job.setConfigSnapshot(new JsonMapper().readTree("""
+            {"schemaVersion":8,"model":{"upstreamModelId":"Qwen/Qwen3.8-27B"},
+             "upstreamModelId":"legacy-root-model"}
+            """));
         var files = new JobEvidenceFiles(layout, jobs, clock, copies);
         var upload = files.bind(job.getId(), 0, IMAGE);
         // Cancelled while it ran: the upload that still arrived is the attempt's.
@@ -769,6 +775,7 @@ class JobEvidenceFilesTest extends BaseUnitTest {
                 assertThat(trace.resolve("0001.jsonl")).hasContent("{\"type\":\"session\",\"cwd\":\"Jane Roe\"}\n");
                 var record = new JsonMapper().readTree(Files.readString(trace.resolve("record.json")));
                 assertThat(record.path("retention").asString()).isEqualTo("NATIVE_TRANSCRIPT");
+                assertThat(record.path("model").asString()).isEqualTo("Qwen/Qwen3.8-27B");
                 assertThat(record.has("contentUnavailable")).isFalse();
                 assertThat(record.path("attempt").asInt()).isZero();
                 assertThat(record.path("image").asString()).isEqualTo(IMAGE);
@@ -787,12 +794,14 @@ class JobEvidenceFilesTest extends BaseUnitTest {
                 }
                 var record = new JsonMapper().readTree(text);
                 assertThat(record.path("retention").asString()).isEqualTo("METADATA_ONLY");
+                assertThat(record.path("model").asString()).isEqualTo("Qwen/Qwen3.8-27B");
+                assertThat(text).doesNotContain("legacy-root-model");
                 assertThat(record.path("contentUnavailable").asString()).isEqualTo("OWNERSHIP_INCOMPLETE");
                 assertThat(record.path("sessions"))
-                        .as("rebuilt from owned enums, flags and bounded integers only")
+                        .as("rebuilt from owned enums, flags, bounded integers and version identifiers only")
                         .isEqualTo(new JsonMapper().readTree("""
                             [{"copied":true,"bytes":120,"partialLineDropped":false,
-                              "summary":{"phase":"practice","practiceRevisionId":12,"entries":6,
+                              "summary":{"phase":"practice","practiceVersionId":"9007199254740993","entries":6,
                                 "usage":{"input":100,"cacheWrite":5},
                                 "stopReasons":{"toolUse":1},
                                 "toolCalls":{"read":2,"upsert_problem":3,"remove_problem":1,"read_problem":2,"other":1},
@@ -815,6 +824,71 @@ class JobEvidenceFilesTest extends BaseUnitTest {
                         .doesNotExist();
         }
         assertThat(job.getStatus()).isEqualTo(ReviewJobStatus.CANCELLED);
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "{}",
+                "{\"practiceRevisionId\":12}",
+                "{\"practiceVersionId\":null}",
+                "{\"practiceVersionId\":12}",
+                "{\"practiceVersionId\":\"0\"}",
+                "{\"practiceVersionId\":\"01\"}",
+                "{\"practiceVersionId\":\"-1\"}",
+                "{\"practiceVersionId\":\"+1\"}",
+                "{\"practiceVersionId\":\"1.5\"}",
+                "{\"practiceVersionId\":\"1e3\"}",
+                "{\"practiceVersionId\":\" 12\"}",
+                "{\"practiceVersionId\":\"12\\n\"}",
+                "{\"practiceVersionId\":\"9223372036854775808\"}",
+                "{\"practiceVersionId\":\"100000000000000000000\"}",
+                "{\"practiceVersionId\":\"Jane Roe\"}"
+            })
+    void shouldNotKeepAnInvalidOrLegacyVersionAsCurrentTraceMetadata(String summary) throws Exception {
+        var record = metadataTrace("{\"sessions\":[{\"summary\":" + summary + "}]}", null);
+        var kept = new JsonMapper().readTree(record).path("sessions").path(0).path("summary");
+        assertThat(kept.has("practiceVersionId")).isFalse();
+        assertThat(kept.has("practiceRevisionId")).isFalse();
+        assertThat(record).doesNotContain("Jane", "jane", "people/", "/workspace");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"1", "9007199254740993", "9223372036854775807"})
+    void shouldPreserveTheExactCurrentVersionStringInTraceMetadata(String version) throws Exception {
+        var record = metadataTrace("{\"sessions\":[{\"summary\":{\"practiceVersionId\":\"" + version + "\"}}]}", null);
+        var kept = new JsonMapper().readTree(record).path("sessions").path(0).path("summary");
+        assertThat(kept.path("practiceVersionId").isString()).isTrue();
+        assertThat(kept.path("practiceVersionId").asString()).isEqualTo(version);
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"{}", "{\"model\":null}", "{\"model\":{}}", "{\"upstreamModelId\":\"legacy-root-model\"}"})
+    void shouldLeaveTheTraceModelUnknownWithoutTheSelectedNestedModel(@Nullable String snapshot) throws Exception {
+        var record = metadataTrace(FORGED_MANIFEST, snapshot);
+        assertThat(new JsonMapper().readTree(record).path("model").isNull()).isTrue();
+        assertThat(record).doesNotContain("legacy-root-model", "Jane", "jane");
+    }
+
+    private String metadataTrace(String manifest, @Nullable String snapshot) throws Exception {
+        var layout = new FabricLayout(root.toString());
+        var copies = personCopies();
+        var job = launched();
+        when(copies.traceCustody(job.getId(), 1L, 0))
+                .thenReturn(EvidenceFolderPersonDataCatalog.TraceCustody.UNINDEXED_DEPENDENCY);
+        if (snapshot != null) job.setConfigSnapshot(new JsonMapper().readTree(snapshot));
+        var files = new JobEvidenceFiles(layout, jobs, clock, copies);
+        var upload = files.bind(job.getId(), 0, IMAGE);
+        var traced = new HashMap<>(TRACED_UPLOAD);
+        traced.put("traces/manifest.json", manifest.getBytes(StandardCharsets.UTF_8));
+        var lease = runtimeLease(layout, job);
+        try (lease) {
+            upload.accept(traced);
+        }
+        Path trace = traceOf(layout, job, 0);
+        assertThat(trace.resolve("0001.jsonl")).doesNotExist();
+        return Files.readString(trace.resolve("record.json"));
     }
 
     @Test

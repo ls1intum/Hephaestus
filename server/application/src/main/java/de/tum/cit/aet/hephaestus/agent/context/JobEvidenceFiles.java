@@ -635,6 +635,7 @@ public class JobEvidenceFiles implements SandboxResultListener {
                         job.getConfigSnapshot() == null
                                 ? null
                                 : job.getConfigSnapshot()
+                                        .path("model")
                                         .path("upstreamModelId")
                                         .asString(null),
                         job.getCapture() == null
@@ -961,7 +962,8 @@ public class JobEvidenceFiles implements SandboxResultListener {
 
     /**
      * The collector's manifest is sandbox output: what a METADATA_ONLY record keeps is rebuilt here from it, field by
-     * field, as owned enums, booleans and bounded counts. Nothing the manifest carries is copied as written.
+     * field, as owned enums, booleans, bounded counts and numeric identifiers. Nothing the manifest carries is copied
+     * as written.
      */
     private static final class TraceSummary {
         private static final JsonMapper MANIFESTS = new JsonMapper();
@@ -972,7 +974,6 @@ public class JobEvidenceFiles implements SandboxResultListener {
         private static final long MAX_COUNT = 1_000_000;
         private static final long MAX_TOKENS = 1_000_000_000_000L;
         private static final long MAX_BYTES = TRACE_BYTE_BUDGET;
-        private static final long MAX_REVISION = (1L << 53) - 1;
         private static final Set<String> PHASES = Set.of("practice", "public-review", "private-feedback");
         private static final Set<String> OMISSIONS = Set.of("oversize", "budget", "unreadable");
         private static final Set<String> STOP_REASONS =
@@ -1044,7 +1045,7 @@ public class JobEvidenceFiles implements SandboxResultListener {
                 if (!summary.isObject()) continue;
                 ObjectNode facts = kept.putObject("summary");
                 putOwned(facts, "phase", summary.path("phase"), PHASES);
-                putBounded(facts, "practiceRevisionId", summary.path("practiceRevisionId"), MAX_REVISION);
+                putPracticeVersionId(facts, summary.path("practiceVersionId"));
                 for (String count : List.of(
                         "entries", "assistantCalls", "toolErrors", "compactions", "unattributedModelFailures")) {
                     putBounded(facts, count, summary.path(count), MAX_COUNT);
@@ -1070,6 +1071,15 @@ public class JobEvidenceFiles implements SandboxResultListener {
                 }
             }
             return sessions;
+        }
+
+        private static void putPracticeVersionId(ObjectNode facts, JsonNode value) {
+            if (!value.isString()) return;
+            String version = value.asString();
+            if (version.matches("[1-9][0-9]{0,18}")
+                    && (version.length() < 19 || version.compareTo(Long.toString(Long.MAX_VALUE)) <= 0)) {
+                facts.put("practiceVersionId", version);
+            }
         }
 
         /** Only an owned kind keeps a final failure; its phase, status (HTTP_ERROR only) and time each on their own. */
