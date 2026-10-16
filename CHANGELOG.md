@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.93.3
+
+### Patch Changes
+
+- Connected accounts in User settings now offers each GitLab or Outline instance that you have not connected yet. If you connected GitLab.com, you can still connect your organization's own GitLab from there. If you connected one Outline, you can still connect another.
+- On the source-control page, retrying after the connection could not load now says that the workspace has no connection when none is found, instead of reporting that its sync status could not load.
+- In instance administration, the Workspaces list now stays visible when a refresh fails, with a note and a Retry button. If you lose access to the list, the workspaces disappear at once and the page says that you do not have access, instead of asking you to reload.
+- On the Outline integration page, a collection's Remove confirmation now closes when you lose access to the mirrored collections, and it does not come back by itself. It always names the collection and document count from the latest list. If the mirrored collections cannot be refreshed, the last list stays visible with a note and a Retry button.
+- API and webhook requests now return a service-unavailable response when their backend route is absent, instead of the web application page.
+- On the source-control page, losing access to the connection now closes an open Stop and clears its repository and token forms, and a later outage does not bring them back. When the monitored repositories cannot refresh for a moment, the list and an open Stop stay, with a warning that they may be out of date and a Retry. While the list cannot be read at all, Add waits for it, and a repository path you already typed is kept for when it reads again.
+- The Timeline's team and repository filters no longer offer options after access to them is refused, and a later temporary failure does not bring them back. During a temporary outage, the filters keep their last options beside the failure and offer Retry. The timeline itself stays visible, and a filter chosen in the address can still be cleared.
+- The bundled reverse proxy now uses Traefik 3.7.15, which fixes the Go HTTP/2, byte-range and TLS vulnerabilities tracked for the previous image. The temporary security exceptions for that image are removed.
+
+## 0.93.2
+
+### Patch Changes
+
+- Workspace activity loads faster when it reads contributors’ first contribution dates across a long activity history.
+- The reference deployment no longer publishes direct host ports for the webapp, application server, or PostgreSQL.
+  Web traffic uses the reverse proxy, and internal services use the Docker network.
+
+  Apply the update during a maintenance window after draining writers.
+  Compose recreates the affected containers, including PostgreSQL.
+
+- Pages stop retrying access-denied and not-found problem responses. Cached information is removed after that refusal, and a later temporary error cannot restore it. Connection failures and busy-server responses retain their retry budgets.
+
 ## 0.93.1
 
 ### Patch Changes

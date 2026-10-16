@@ -208,7 +208,9 @@ export function useConnectionSync({
 		isCancelling: cancelJob.isPending,
 		onRetry: () => {
 			retryConnection();
-			void statusQuery.refetch();
+			if (hasConnection) {
+				void statusQuery.refetch();
+			}
 		},
 		onSync: () => triggerSyncOfType("RECONCILIATION"),
 		onBackfill: () => triggerSyncOfType("BACKFILL"),

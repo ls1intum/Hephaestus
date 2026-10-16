@@ -7,11 +7,13 @@ import { z } from "zod";
 import { adminListWorkspacesOptions } from "@/api/@tanstack/react-query.gen";
 import type { AdminWorkspaceView } from "@/api/types.gen";
 import { AdminWorkspacesTable } from "@/components/admin/workspaces/AdminWorkspacesTable";
+import { queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
 import { instanceAdminHead } from "@/lib/page-title";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 export const Route = createFileRoute("/_authenticated/admin/workspaces")({
 	head: instanceAdminHead("Workspaces"),
@@ -24,8 +26,21 @@ function AdminWorkspacesPage() {
 	const search = Route.useSearch().q ?? "";
 	const deferredSearch = useDeferredValue(search);
 
-	const listQuery = useQuery(adminListWorkspacesOptions());
-	const all: AdminWorkspaceView[] = listQuery.data ?? [];
+	const listOptions = adminListWorkspacesOptions();
+	const listQuery = useQuery(listOptions);
+	useQueryReadRefusal(listOptions.queryKey, listQuery.isError, listQuery.error);
+	// A retryable failed refresh keeps the workspaces this key last read, with the failure beside
+	// them. A refusal, or a read that never succeeded, shows none.
+	const retained = listQuery.isRefetchError && queryErrorIsRetryable(listQuery.error);
+	const failed = listQuery.isError && !retained;
+	const failure = {
+		error: listQuery.error,
+		pending: listQuery.isFetching,
+		onRetry: () => {
+			void listQuery.refetch();
+		},
+	};
+	const all: AdminWorkspaceView[] = failed ? [] : (listQuery.data ?? []);
 
 	const term = deferredSearch.trim().toLowerCase();
 	const workspaces = term
@@ -75,7 +90,8 @@ function AdminWorkspacesPage() {
 			<AdminWorkspacesTable
 				workspaces={workspaces}
 				isLoading={listQuery.isLoading}
-				isError={listQuery.isError}
+				loadFailure={failed ? failure : undefined}
+				refreshFailure={retained ? failure : undefined}
 				hasSearch={term.length > 0}
 				onViewUsers={(workspace) => {
 					void navigate({

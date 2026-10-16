@@ -122,13 +122,18 @@ export function useActivityFacets({ enabled = true, ...scope }: ActivityRequest)
 		select: ({ teams, repositories }: ActivityPeople) => ({ teams, repositories }),
 		enabled,
 	});
+	const facetsOptions = getActivityFacetsOptions({ path: { workspaceSlug } });
 	const facets = useQuery({
-		...getActivityFacetsOptions({ path: { workspaceSlug } }),
+		...facetsOptions,
 		enabled: !enabled && people.data === undefined,
 	});
+	useQueryReadRefusal(facetsOptions.queryKey, facets.isError, facets.error);
 	const query = enabled || people.data !== undefined ? people : facets;
+	// A failed refresh that can be retried keeps the options beside its failure; a refused one does
+	// not, even before its cache entry is evicted.
+	const readable = !query.isError || (query.isRefetchError && queryErrorIsRetryable(query.error));
 	return {
-		data: query.data,
+		data: readable ? query.data : undefined,
 		error:
 			!enabled && query.isError
 				? {

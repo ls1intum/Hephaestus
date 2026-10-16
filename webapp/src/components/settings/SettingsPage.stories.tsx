@@ -74,6 +74,7 @@ const defaultLinkedAccountsProps = {
 		{ registrationId: "gitlab", displayName: "GitLab", providerType: "GITLAB" },
 		{ registrationId: "slack", displayName: "Slack", providerType: "SLACK" },
 	],
+	linkedProviders: [{ type: "GITHUB", serverUrl: "https://api.github.com" }],
 	onLink: fn(),
 	onUnlink: fn(),
 };

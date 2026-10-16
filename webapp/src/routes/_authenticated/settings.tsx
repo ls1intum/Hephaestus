@@ -63,7 +63,7 @@ export const Route = createFileRoute("/_authenticated/settings")({
 
 function RouteComponent() {
 	const queryClient = useQueryClient();
-	const { logout, linkAccount, isAppAdmin } = useAuth();
+	const { logout, linkAccount, isAppAdmin, linkedProviders } = useAuth();
 	const userSettingsQueryKey = getUserSettingsQueryKey();
 	const consentQuery = useQuery(getConsentStatusOptions({}));
 	const accountConsent = consentQuery.data;
@@ -326,6 +326,7 @@ function RouteComponent() {
 	const linkedAccountsProps: LinkedAccountsSectionProps = {
 		identities: linkedIdentitiesQuery.data ?? [],
 		providers: identityProvidersQuery.data ?? [],
+		linkedProviders,
 		onLink: (registrationId) => linkAccount(registrationId, "/settings"),
 		// Guard against a double-submit: the trigger uses aria-disabled (kept focusable for the
 		// busy announcement), which does not block clicks, so a mid-flight re-confirm would fire a

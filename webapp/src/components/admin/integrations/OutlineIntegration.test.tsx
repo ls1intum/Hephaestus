@@ -1,14 +1,17 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { HttpResponse, http, type PathParams } from "msw";
 import { toast } from "sonner";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { listOutlineCollectionsQueryKey } from "@/api/@tanstack/react-query.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useOutlineIntegration } from "@/hooks/use-outline-integration";
 import { SyncLivenessProvider } from "@/hooks/use-sync-liveness";
 import { server } from "@/mocks/server";
+import { type Deferred, deferred } from "@/test/async";
 
 import { ConnectionStateNotice } from "./ConnectionStateNotice";
 import { OutlineCollectionsSection } from "./outline/OutlineCollectionsSection";
@@ -24,13 +27,14 @@ function renderContainer({ livePushUnavailable = false } = {}) {
 	const queryClient = new QueryClient({
 		defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
 	});
-	return render(
+	render(
 		<QueryClientProvider client={queryClient}>
 			<SyncLivenessProvider livePushUnavailable={livePushUnavailable}>
 				<OutlineIntegrationTestContainer />
 			</SyncLivenessProvider>
 		</QueryClientProvider>,
 	);
+	return { queryClient };
 }
 
 function OutlineIntegrationTestContainer() {
@@ -552,6 +556,226 @@ describe("Outline integration — per-collection sync ledger", () => {
 		screen.getByText("12");
 		// The freshness column exists here and nowhere else on the page.
 		screen.getByRole("columnheader", { name: "Last synced" });
+	});
+});
+
+const COLLECTIONS_FAILURE = {
+	403: "You cannot manage this workspace's Outline collections.",
+	503: "Outline is temporarily unavailable.",
+} as const;
+
+/**
+ * Serves the managed collections. Each GET answers with the status the test last chose, after any
+ * hold. A DELETE waits for its own answer, and only a completed DELETE removes the row it names.
+ */
+function serveManagedCollections(
+	rows: (typeof engineering)[],
+	removalAnswers: Deferred<void>[] = [],
+) {
+	const served = {
+		rows,
+		status: 200 as 200 | 403 | 503,
+		hold: undefined as Promise<void> | undefined,
+		reads: 0,
+		removals: [] as { workspaceSlug: string; collectionId: string }[],
+	};
+	server.use(
+		http.get("*/workspaces/demo/outline/collections", async () => {
+			served.reads += 1;
+			await served.hold;
+			const { status } = served;
+			return status === 200
+				? HttpResponse.json(served.rows)
+				: HttpResponse.json(
+						{ status, title: "Outline read failed", detail: COLLECTIONS_FAILURE[status] },
+						{ status },
+					);
+		}),
+		http.delete(
+			"*/workspaces/:workspaceSlug/outline/collections/:collectionId",
+			async ({ params }) => {
+				const answer = removalAnswers[served.removals.length];
+				const collectionId = String(params.collectionId);
+				served.removals.push({ workspaceSlug: String(params.workspaceSlug), collectionId });
+				await answer?.promise;
+				served.rows = served.rows.filter((row) => row.collectionId !== collectionId);
+				return new HttpResponse(null, { status: 204 });
+			},
+		),
+	);
+	return served;
+}
+
+/** Reads the managed collections again through their own key, as a finished sync run does. */
+async function rereadCollections(queryClient: QueryClient) {
+	await act(async () => {
+		await queryClient.invalidateQueries({
+			queryKey: listOutlineCollectionsQueryKey({ path: { workspaceSlug: "demo" } }),
+		});
+	});
+}
+
+async function openRemove(user: ReturnType<typeof userEvent.setup>, name: string) {
+	await user.click(await screen.findByRole("button", { name: `Actions for ${name}` }));
+	await user.click(await screen.findByRole("menuitem", { name: "Remove and erase…" }));
+	return screen.findByRole("alertdialog", { name: `Remove “${name}” and erase its mirror?` });
+}
+
+describe("Outline integration — managed collections read and Remove", () => {
+	const decisions = {
+		...engineering,
+		id: 2,
+		collectionId: "col-arch",
+		name: "Architecture Decisions",
+		urlId: "adr-9kQ2p",
+		documentCount: 4,
+	};
+
+	it("closes a refused collection's Remove and does not reopen it when the collections read again", async () => {
+		useConnectedHandlers({ current: [engineering] });
+		const collections = serveManagedCollections([engineering]);
+		const { queryClient } = renderContainer();
+		const user = userEvent.setup();
+		const removal = await openRemove(user, "Engineering");
+		expect(removal.textContent).toMatch(/all 12 mirrored documents/u);
+		const readsBefore = collections.reads;
+
+		collections.status = 403;
+		await rereadCollections(queryClient);
+		expect(collections.reads).toBe(readsBefore + 1);
+		await screen.findByText("You do not have access to the mirrored collections");
+		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+		expect(screen.queryByText("Engineering")).toBeNull();
+		expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+
+		collections.status = 503;
+		await rereadCollections(queryClient);
+		await screen.findByText("We could not load the mirrored collections");
+		expect(screen.queryByText("Engineering")).toBeNull();
+		expect(screen.queryByText("The mirrored collections may be out of date")).toBeNull();
+		expect(screen.queryByRole("alertdialog")).toBeNull();
+
+		collections.status = 200;
+		collections.rows = [{ ...engineering, documentCount: 40 }];
+		await user.click(screen.getByRole("button", { name: "Retry" }));
+		await screen.findByText("Engineering");
+		expect(screen.queryByRole("alertdialog")).toBeNull();
+		expect(collections.reads).toBe(readsBefore + 3);
+
+		const reopened = await openRemove(user, "Engineering");
+		expect(reopened.textContent).toMatch(/all 40 mirrored documents/u);
+		expect(collections.removals).toStrictEqual([]);
+	});
+
+	it("keeps the listed collections and an open Remove through a failed refresh, then retries", async () => {
+		useConnectedHandlers({ current: [engineering] });
+		const collections = serveManagedCollections([engineering]);
+		const { queryClient } = renderContainer();
+		const user = userEvent.setup();
+		const retry = deferred();
+		try {
+			await openRemove(user, "Engineering");
+			const readsBefore = collections.reads;
+
+			collections.status = 503;
+			await rereadCollections(queryClient);
+			expect(collections.reads).toBe(readsBefore + 1);
+			await screen.findByText("The mirrored collections may be out of date");
+			screen.getByText("Engineering");
+			expect(screen.queryByText("We could not load the mirrored collections")).toBeNull();
+			expect(screen.queryByText("No collections mirrored yet")).toBeNull();
+			const kept = screen.getByRole("alertdialog", {
+				name: "Remove “Engineering” and erase its mirror?",
+			});
+			expect(kept.textContent).toMatch(/all 12 mirrored documents/u);
+			await user.click(within(kept).getByRole("button", { name: "Cancel" }));
+			await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+
+			collections.hold = retry.promise;
+			await user.click(screen.getByRole("button", { name: "Retry" }));
+			const retrying = await screen.findByRole("button", { name: "Retrying…" });
+			expect(retrying).toHaveProperty("disabled", true);
+			await waitFor(() => expect(collections.reads).toBe(readsBefore + 2));
+			screen.getByText("Engineering");
+
+			collections.status = 200;
+			collections.rows = [{ ...engineering, documentCount: 30 }];
+			retry.resolve();
+			await waitFor(() =>
+				expect(screen.queryByText("The mirrored collections may be out of date")).toBeNull(),
+			);
+			collections.hold = undefined;
+			const reopened = await openRemove(user, "Engineering");
+			expect(reopened.textContent).toMatch(/all 30 mirrored documents/u);
+
+			collections.rows = [{ ...engineering, name: "Engineering Handbook", documentCount: 1 }];
+			await rereadCollections(queryClient);
+			const renamed = await screen.findByRole("alertdialog", {
+				name: "Remove “Engineering Handbook” and erase its mirror?",
+			});
+			expect(renamed.textContent).toMatch(/its 1 mirrored document\s/u);
+			expect(collections.reads).toBe(readsBefore + 3);
+			expect(collections.removals).toStrictEqual([]);
+		} finally {
+			retry.resolve();
+		}
+	});
+
+	it("leaves a Remove opened after a refusal to its own answer when the refused Remove completes", async () => {
+		useConnectedHandlers({ current: [engineering, decisions] });
+		const refusedRemoval = deferred();
+		const collections = serveManagedCollections([engineering, decisions], [refusedRemoval]);
+		const { queryClient } = renderContainer();
+		const user = userEvent.setup();
+		try {
+			const refused = await openRemove(user, "Engineering");
+			await user.click(within(refused).getByRole("button", { name: "Remove and erase" }));
+			await waitFor(() =>
+				expect(collections.removals).toStrictEqual([
+					{ workspaceSlug: "demo", collectionId: "col-eng" },
+				]),
+			);
+			await user.keyboard("{Escape}");
+			const pending = screen.getByRole("alertdialog", {
+				name: "Remove “Engineering” and erase its mirror?",
+			});
+			expect(within(pending).getByRole("button", { name: "Removing…" })).toHaveProperty(
+				"disabled",
+				true,
+			);
+			const readsBefore = collections.reads;
+
+			collections.status = 403;
+			await rereadCollections(queryClient);
+			await screen.findByText("You do not have access to the mirrored collections");
+			await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+
+			collections.status = 200;
+			await rereadCollections(queryClient);
+			await openRemove(user, "Architecture Decisions");
+
+			refusedRemoval.resolve();
+			await waitFor(() => expect(screen.queryByText("Engineering")).toBeNull());
+			expect(collections.reads).toBe(readsBefore + 3);
+			expect(toast.success).toHaveBeenCalledWith(
+				"Collection removed and its mirrored documents erased",
+			);
+			const stillOpen = screen.getByRole("alertdialog", {
+				name: "Remove “Architecture Decisions” and erase its mirror?",
+			});
+			expect(within(stillOpen).getByRole("button", { name: "Remove and erase" })).toHaveProperty(
+				"disabled",
+				false,
+			);
+
+			await user.click(within(stillOpen).getByRole("button", { name: "Cancel" }));
+			await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+			expect(collections.removals).toStrictEqual([
+				{ workspaceSlug: "demo", collectionId: "col-eng" },
+			]);
+		} finally {
+			refusedRemoval.resolve();
+		}
 	});
 });
 

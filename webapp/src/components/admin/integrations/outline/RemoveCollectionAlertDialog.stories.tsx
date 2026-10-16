@@ -3,6 +3,7 @@ import { expect, fn, screen, userEvent, within } from "storybook/test";
 
 import type { OutlineCollection } from "@/api/types.gen";
 import { expectSettledVisible } from "@/stories/overlay";
+import { pending } from "@/test/async";
 
 import { RemoveCollectionAlertDialog } from "./RemoveCollectionAlertDialog";
 
@@ -38,6 +39,7 @@ const meta = {
 	tags: ["autodocs"],
 	args: {
 		collection,
+		open: true,
 		onOpenChange: fn(),
 		onConfirm: fn(),
 	},
@@ -80,9 +82,27 @@ export const Rejected: Story = {
 	},
 };
 
-/** Closed — nothing is rendered until a collection is selected for removal. */
+/**
+ * A removal in flight owns the dialog until its answer. Escape does not close it, so a later answer
+ * cannot close a confirmation that was opened after this one.
+ */
+export const Removing: Story = {
+	args: { onConfirm: fn(async (): Promise<void> => pending()) },
+	play: async ({ args }) => {
+		const dialog = within(await screen.findByRole("alertdialog"));
+		await userEvent.click(dialog.getByRole("button", { name: /remove and erase/iu }));
+		await expect(dialog.getByRole("button", { name: "Removing…" })).toBeDisabled();
+		await expect(dialog.getByRole("button", { name: "Cancel" })).toBeDisabled();
+
+		await userEvent.keyboard("{Escape}");
+		await expectSettledVisible(await screen.findByRole("alertdialog"));
+		await expect(args.onOpenChange).not.toHaveBeenCalled();
+	},
+};
+
+/** Closed — nothing is rendered until the row's Remove opens it. */
 export const Closed: Story = {
-	args: { collection: null },
+	args: { open: false },
 	play: async () => {
 		await expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
 	},

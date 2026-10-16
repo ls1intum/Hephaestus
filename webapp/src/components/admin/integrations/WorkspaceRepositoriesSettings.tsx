@@ -34,6 +34,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { problemDetailOf } from "@/lib/problem-detail";
+import type { RefreshFailure } from "@/runtime/tanstack-query/infinite-list";
 
 import { IntegrationCardHeading } from "./IntegrationCardHeading";
 
@@ -134,6 +135,8 @@ interface WorkspaceRepositoriesSettingsProps {
 	providerLabel?: string;
 	isLoading: boolean;
 	error: unknown;
+	/** Reading the repositories again failed; the repositories last read stay, with the failure above them. */
+	refreshFailure?: RefreshFailure;
 	addRepositoryError: unknown;
 	isAddingRepository: boolean;
 	isRemovingRepository: boolean;
@@ -149,6 +152,7 @@ export function WorkspaceRepositoriesSettings({
 	providerLabel = "GitHub or GitLab",
 	isLoading,
 	error,
+	refreshFailure,
 	addRepositoryError,
 	isAddingRepository,
 	isRemovingRepository,
@@ -172,6 +176,9 @@ export function WorkspaceRepositoriesSettings({
 
 	const hasRepositories = repositories.length > 0;
 	const failed = error != null;
+	// Add is offered beside a list that reads, even an empty one. The path typed into it stays while
+	// the list cannot be read, for when it reads again.
+	const canAdd = !isLoading && !failed;
 
 	let list: ReactNode;
 	if (isLoading) {
@@ -242,38 +249,46 @@ export function WorkspaceRepositoriesSettings({
 				</CardHeader>
 
 				<CardContent className="space-y-4">
+					{refreshFailure !== undefined && (
+						<QueryErrorAlert
+							title="The monitored repositories may be out of date"
+							{...refreshFailure}
+						/>
+					)}
 					{list}
 
-					<Field data-invalid={Boolean(addRepositoryError)}>
-						<FieldLabel htmlFor="add-repository">Add a repository</FieldLabel>
-						<InputGroup>
-							<InputGroupInput
-								id="add-repository"
-								value={repositoryInput}
-								onChange={(e) => setRepositoryInput(e.target.value)}
-								disabled={isAddingRepository}
-								autoComplete="off"
-								aria-invalid={Boolean(addRepositoryError)}
-							/>
-							<InputGroupAddon align="inline-end">
-								<InputGroupButton
-									variant="default"
-									onClick={() => {
-										void handleAddRepository();
-									}}
-									disabled={!isValidInput || isAddingRepository}
-								>
-									Add repository
-								</InputGroupButton>
-							</InputGroupAddon>
-						</InputGroup>
-						<FieldDescription>
-							Enter the repository as <code>owner/name</code>.
-						</FieldDescription>
-						{addRepositoryError != null && (
-							<FieldError>{problemDetailOf(addRepositoryError)}</FieldError>
-						)}
-					</Field>
+					{canAdd && (
+						<Field data-invalid={Boolean(addRepositoryError)}>
+							<FieldLabel htmlFor="add-repository">Add a repository</FieldLabel>
+							<InputGroup>
+								<InputGroupInput
+									id="add-repository"
+									value={repositoryInput}
+									onChange={(e) => setRepositoryInput(e.target.value)}
+									disabled={isAddingRepository}
+									autoComplete="off"
+									aria-invalid={Boolean(addRepositoryError)}
+								/>
+								<InputGroupAddon align="inline-end">
+									<InputGroupButton
+										variant="default"
+										onClick={() => {
+											void handleAddRepository();
+										}}
+										disabled={!isValidInput || isAddingRepository}
+									>
+										Add repository
+									</InputGroupButton>
+								</InputGroupAddon>
+							</InputGroup>
+							<FieldDescription>
+								Enter the repository as <code>owner/name</code>.
+							</FieldDescription>
+							{addRepositoryError != null && (
+								<FieldError>{problemDetailOf(addRepositoryError)}</FieldError>
+							)}
+						</Field>
+					)}
 				</CardContent>
 			</Card>
 		</div>

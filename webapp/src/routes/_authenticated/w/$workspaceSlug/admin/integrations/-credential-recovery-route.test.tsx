@@ -1,4 +1,4 @@
-import type { QueryClient } from "@tanstack/react-query";
+import type { QueryClient, QueryKey } from "@tanstack/react-query";
 import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http, type JsonBodyType } from "msw";
@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
 	getIntegrationCatalogQueryKey,
+	getRepositoriesToMonitorQueryKey,
 	listConnectionSyncJobsQueryKey,
 	listConnectionSyncResourcesQueryKey,
 	listSlackChannelsQueryKey,
@@ -418,6 +419,387 @@ describe("monitored repositories", () => {
 		expect(description.textContent).toContain("To sync it again, add it below.");
 		expect(description.textContent).not.toContain("stays stopped");
 		expect(description.textContent).not.toContain("permanently");
+	});
+});
+
+/** The answer a source-control read gets until the test chooses another. */
+type ScmRead<TBody> = { status: 200; body: TBody } | { status: 403 | 503 };
+
+const SCM_READ_FAILURE = {
+	403: "You cannot manage this workspace's source control.",
+	503: "Source control is temporarily unavailable.",
+} as const;
+
+/** Serves one source-control GET with the answer the test last chose, counting each read. A held answer waits for `hold`. */
+function serveScmRead<TBody extends JsonBodyType>(url: string, initial: ScmRead<TBody>) {
+	const reads = { count: 0 };
+	const current = { answer: initial, hold: Promise.resolve() };
+	server.use(
+		http.get(url, async () => {
+			reads.count += 1;
+			await current.hold;
+			const { answer } = current;
+			return answer.status === 200
+				? HttpResponse.json(answer.body)
+				: HttpResponse.json(
+						{
+							status: answer.status,
+							title: "Source control read failed",
+							detail: SCM_READ_FAILURE[answer.status],
+						},
+						{ status: answer.status },
+					);
+		}),
+	);
+	return {
+		reads,
+		answer: (next: ScmRead<TBody>, hold = Promise.resolve()) => {
+			current.answer = next;
+			current.hold = hold;
+		},
+	};
+}
+
+/** Records every write the page sends until `stop`, as `METHOD path`. */
+function recordWrites() {
+	const writes: string[] = [];
+	const record = ({ request }: { request: Request }) => {
+		if (request.method !== "GET") {
+			writes.push(`${request.method} ${new URL(request.url).pathname}`);
+		}
+	};
+	server.events.on("request:start", record);
+	return { writes, stop: () => server.events.removeListener("request:start", record) };
+}
+
+/** Reads queries again through their own generated keys, as a poll or another tab's change does. */
+async function reread(queryClient: QueryClient, ...queryKeys: QueryKey[]) {
+	await act(async () => {
+		await Promise.all(
+			queryKeys.map(async (queryKey) => queryClient.invalidateQueries({ queryKey })),
+		);
+	});
+}
+
+describe("source-control management reads", () => {
+	const catalogKey = getIntegrationCatalogQueryKey({ path: { workspaceSlug: "acme" } });
+	const repositoriesKey = getRepositoriesToMonitorQueryKey({ path: { workspaceSlug: "acme" } });
+
+	/** An active GitLab connection whose catalog and monitored repositories the test answers. */
+	function serveGitLabReads(monitored: string[]) {
+		const { entry } = mockConnection("GITLAB");
+		entry.credentialsUnreadableSince = undefined;
+		return {
+			entry,
+			catalog: serveScmRead("*/workspaces/acme/connections/catalog", {
+				status: 200,
+				body: [entry],
+			}),
+			repositories: serveScmRead("*/workspaces/acme/repositories", {
+				status: 200,
+				body: monitored,
+			}),
+		};
+	}
+
+	it("withdraws a refused GitLab connection's open Stop and drafts, and an outage does not bring them back", async () => {
+		const { entry, catalog, repositories } = serveGitLabReads(["acme/platform/api"]);
+		const { queryClient } = renderRouteAtWithRouter("/w/acme/admin/integrations/scm");
+		const recorded = recordWrites();
+		try {
+			const user = userEvent.setup();
+			await user.type(
+				await screen.findByLabelText("Add a repository", undefined, ROUTE_RENDER_WAIT),
+				"acme/platform/web",
+			);
+			await user.type(screen.getByLabelText("New personal access token"), "draft-token");
+			await user.click(screen.getByRole("button", { name: "Stop monitoring acme/platform/api" }));
+			await screen.findByRole("alertdialog", { name: "Stop monitoring acme/platform/api?" });
+			const catalogReads = catalog.reads.count;
+			const repositoryReads = repositories.reads.count;
+
+			catalog.answer({ status: 403 });
+			await reread(queryClient, catalogKey);
+			await screen.findByText("You do not have access to the GitLab connection");
+			expect(catalog.reads.count).toBe(catalogReads + 1);
+			expect(screen.queryByRole("alertdialog")).toBeNull();
+			expect(screen.queryByRole("button", { name: /^Stop monitoring/u })).toBeNull();
+			expect(screen.queryByLabelText("Add a repository")).toBeNull();
+			expect(screen.queryByLabelText("New personal access token")).toBeNull();
+			expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+
+			catalog.answer({ status: 503 });
+			await reread(queryClient, catalogKey);
+			await screen.findByText("We could not load the GitLab connection");
+			expect(catalog.reads.count).toBe(catalogReads + 2);
+			screen.getByRole("button", { name: "Retry" });
+			expect(screen.queryByRole("alertdialog")).toBeNull();
+			expect(screen.queryByText("acme/platform/api")).toBeNull();
+			expect(screen.queryByLabelText("Add a repository")).toBeNull();
+			expect(screen.queryByLabelText("New personal access token")).toBeNull();
+
+			repositories.answer({ status: 200, body: ["acme/platform/web"] });
+			catalog.answer({ status: 200, body: [entry] });
+			await reread(queryClient, repositoriesKey, catalogKey);
+			await screen.findByRole("button", { name: "Stop monitoring acme/platform/web" });
+			expect(screen.queryByText("acme/platform/api")).toBeNull();
+			expect(screen.queryByRole("alertdialog")).toBeNull();
+			expect(screen.getByLabelText("Add a repository")).toHaveProperty("value", "");
+			expect(screen.getByLabelText("New personal access token")).toHaveProperty("value", "");
+			expect(screen.queryByText("We could not load the GitLab connection")).toBeNull();
+			expect(catalog.reads.count).toBe(catalogReads + 3);
+			expect(repositories.reads.count).toBe(repositoryReads + 1);
+			expect(recorded.writes).toStrictEqual([]);
+		} finally {
+			recorded.stop();
+		}
+	});
+
+	it("keeps a GitLab connection's open Stop and Add draft through a lookup outage", async () => {
+		const { catalog } = serveGitLabReads(["acme/platform/api"]);
+		const { queryClient } = renderRouteAtWithRouter("/w/acme/admin/integrations/scm");
+		const recorded = recordWrites();
+		try {
+			const user = userEvent.setup();
+			const input = await screen.findByLabelText("Add a repository", undefined, ROUTE_RENDER_WAIT);
+			await user.type(input, "acme/platform/web");
+			await user.click(screen.getByRole("button", { name: "Stop monitoring acme/platform/api" }));
+			await screen.findByRole("alertdialog", { name: "Stop monitoring acme/platform/api?" });
+			const catalogReads = catalog.reads.count;
+
+			catalog.answer({ status: 503 });
+			await reread(queryClient, catalogKey);
+			await screen.findByText("We could not load the GitLab connection");
+			expect(catalog.reads.count).toBe(catalogReads + 1);
+			const dialog = screen.getByRole("alertdialog", {
+				name: "Stop monitoring acme/platform/api?",
+			});
+			expect(within(dialog).getByRole("button", { name: "Stop monitoring" })).toHaveProperty(
+				"disabled",
+				false,
+			);
+			expect(input).toHaveProperty("value", "acme/platform/web");
+			expect(recorded.writes).toStrictEqual([]);
+		} finally {
+			recorded.stop();
+		}
+	});
+
+	it("keeps a GitLab repository and its open Stop through a failed list refresh, then retries", async () => {
+		const { repositories } = serveGitLabReads(["acme/platform/api"]);
+		const { queryClient } = renderRouteAtWithRouter("/w/acme/admin/integrations/scm");
+		const recorded = recordWrites();
+		try {
+			const user = userEvent.setup();
+			await user.click(
+				await screen.findByRole(
+					"button",
+					{ name: "Stop monitoring acme/platform/api" },
+					ROUTE_RENDER_WAIT,
+				),
+			);
+			await screen.findByRole("alertdialog", { name: "Stop monitoring acme/platform/api?" });
+			const repositoryReads = repositories.reads.count;
+
+			repositories.answer({ status: 503 });
+			await reread(queryClient, repositoriesKey);
+			await screen.findByText(/the monitored repositories/iu);
+			expect(repositories.reads.count).toBe(repositoryReads + 1);
+			const dialog = screen.getByRole("alertdialog", {
+				name: "Stop monitoring acme/platform/api?",
+			});
+			expect(within(dialog).getByRole("button", { name: "Stop monitoring" })).toHaveProperty(
+				"disabled",
+				false,
+			);
+			screen.getByText("The monitored repositories may be out of date");
+			expect(screen.queryByText("We could not load the monitored repositories")).toBeNull();
+
+			await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+			await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+			const response = deferred();
+			repositories.answer({ status: 200, body: ["acme/platform/web"] }, response.promise);
+			try {
+				await user.click(screen.getByRole("button", { name: "Retry" }));
+				await waitFor(() => expect(repositories.reads.count).toBe(repositoryReads + 2));
+				expect(screen.getByRole("button", { name: "Retrying…" })).toHaveProperty("disabled", true);
+				await user.click(screen.getByRole("button", { name: "Stop monitoring acme/platform/api" }));
+				await screen.findByRole("alertdialog", { name: "Stop monitoring acme/platform/api?" });
+			} finally {
+				response.resolve();
+			}
+
+			await screen.findByRole("button", { name: "Stop monitoring acme/platform/web" });
+			expect(screen.queryByRole("alertdialog")).toBeNull();
+			expect(screen.queryByText("acme/platform/api")).toBeNull();
+			expect(screen.queryByText("The monitored repositories may be out of date")).toBeNull();
+			expect(recorded.writes).toStrictEqual([]);
+		} finally {
+			recorded.stop();
+		}
+	});
+
+	it("offers no refused repositories and no Add until the list reads again, then adds the path typed before", async () => {
+		const { repositories } = serveGitLabReads(["acme/platform/api"]);
+		const added: string[] = [];
+		server.use(
+			http.post("*/workspaces/acme/repositories", ({ request }) => {
+				const names = new URL(request.url).searchParams.getAll("nameWithOwner");
+				added.push(...names);
+				repositories.answer({ status: 200, body: ["acme/platform/web", ...names] });
+				return new HttpResponse(null, { status: 201 });
+			}),
+		);
+		const { queryClient } = renderRouteAtWithRouter("/w/acme/admin/integrations/scm");
+		const recorded = recordWrites();
+		try {
+			const user = userEvent.setup();
+			await user.type(
+				await screen.findByLabelText("Add a repository", undefined, ROUTE_RENDER_WAIT),
+				"acme/platform/docs",
+			);
+			screen.getByRole("button", { name: "Stop monitoring acme/platform/api" });
+			const repositoryReads = repositories.reads.count;
+
+			repositories.answer({ status: 403 });
+			await reread(queryClient, repositoriesKey);
+			await screen.findByText("You do not have access to the monitored repositories");
+			expect(screen.queryByText("acme/platform/api")).toBeNull();
+			expect(screen.queryByLabelText("Add a repository")).toBeNull();
+			expect(screen.queryByRole("button", { name: "Add repository" })).toBeNull();
+			expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+
+			repositories.answer({ status: 503 });
+			await reread(queryClient, repositoriesKey);
+			await screen.findByText("We could not load the monitored repositories");
+			expect(screen.queryByText("acme/platform/api")).toBeNull();
+			expect(screen.queryByText("The monitored repositories may be out of date")).toBeNull();
+			expect(screen.queryByLabelText("Add a repository")).toBeNull();
+			expect(screen.queryByRole("button", { name: "Add repository" })).toBeNull();
+			expect(added).toStrictEqual([]);
+
+			repositories.answer({ status: 200, body: ["acme/platform/web"] });
+			await user.click(screen.getByRole("button", { name: "Retry" }));
+			await screen.findByRole("button", { name: "Stop monitoring acme/platform/web" });
+			expect(screen.queryByText("acme/platform/api")).toBeNull();
+			expect(repositories.reads.count).toBe(repositoryReads + 3);
+			const input = screen.getByLabelText("Add a repository");
+			expect(input).toHaveProperty("value", "acme/platform/docs");
+			expect(added).toStrictEqual([]);
+
+			await user.click(screen.getByRole("button", { name: "Add repository" }));
+			await screen.findByRole("button", { name: "Stop monitoring acme/platform/docs" });
+			await waitFor(() => expect(input).toHaveProperty("value", ""));
+			expect(added).toStrictEqual(["acme/platform/docs"]);
+			expect(recorded.writes).toStrictEqual(["POST /workspaces/acme/repositories"]);
+			expect(repositories.reads.count).toBe(repositoryReads + 4);
+			screen.getByRole("button", { name: "Stop monitoring acme/platform/web" });
+		} finally {
+			recorded.stop();
+		}
+	});
+});
+
+/** Serves the connection catalog, unavailable until the test makes it available, recording each answer. */
+function serveConnectionLookup(entries: JsonBodyType, available: boolean) {
+	const answers: number[] = [];
+	const lookup = { available };
+	server.use(
+		http.get("*/workspaces/acme/connections/catalog", () => {
+			if (!lookup.available) {
+				answers.push(503);
+				return HttpResponse.json(
+					{
+						status: 503,
+						title: "Service Unavailable",
+						detail: "The connections are temporarily unavailable.",
+					},
+					{ status: 503 },
+				);
+			}
+			answers.push(200);
+			return HttpResponse.json(entries);
+		}),
+	);
+	return { answers, lookup };
+}
+
+/**
+ * Records the connection id of every sync status read. Connection 7 is unavailable until the test
+ * recovers it; an id that names no connection gets the server's answer for that, a 500.
+ */
+function serveStatusReads(status: ConnectionSyncStatus) {
+	const connectionIds: string[] = [];
+	const connection = { recovered: false };
+	server.use(
+		http.get("*/workspaces/acme/connections/:connectionId/sync", ({ params }) => {
+			const connectionId = String(params.connectionId);
+			connectionIds.push(connectionId);
+			if (connectionId !== "7") {
+				return HttpResponse.json(
+					{
+						status: 500,
+						title: "Internal server error",
+						detail:
+							"We could not finish that. Try again. If it keeps failing, contact your instance operator.",
+					},
+					{ status: 500 },
+				);
+			}
+			if (!connection.recovered) {
+				return HttpResponse.json(
+					{ status: 503, title: "Service Unavailable", detail: "Sync status is unavailable." },
+					{ status: 503 },
+				);
+			}
+			return HttpResponse.json(status);
+		}),
+	);
+	return { connectionIds, connection };
+}
+
+describe("source-control connection Retry", () => {
+	it("shows no GitLab connection when a retried lookup finds none, without reading a sync status", async () => {
+		const { status } = mockConnection("GITLAB");
+		const lookups = serveConnectionLookup([], false);
+		const statusReads = serveStatusReads(status);
+		renderRouteAt("/w/acme/admin/integrations/scm");
+		await screen.findByText(
+			"We could not load the GitLab connection",
+			undefined,
+			ROUTE_RENDER_WAIT,
+		);
+		expect(lookups.answers).toStrictEqual([503]);
+
+		lookups.lookup.available = true;
+		await userEvent.setup().click(screen.getByRole("button", { name: "Retry" }));
+		await waitFor(() => expect(lookups.answers).toStrictEqual([503, 200]));
+		const header = await screen.findByText(
+			/^(?:No GitLab connection found for this workspace\.|We could not load GitLab sync status)$/u,
+		);
+		expect({ header: header.textContent, statusReads: statusReads.connectionIds }).toStrictEqual({
+			header: "No GitLab connection found for this workspace.",
+			statusReads: [],
+		});
+		expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+	});
+
+	it("reads a GitLab connection's status again on Retry and shows it once it loads", async () => {
+		const { entry, status } = mockConnection("GITLAB");
+		entry.credentialsUnreadableSince = undefined;
+		const lookups = serveConnectionLookup([entry], true);
+		const statusReads = serveStatusReads(status);
+		renderRouteAt("/w/acme/admin/integrations/scm");
+		await screen.findByText("We could not load GitLab sync status", undefined, ROUTE_RENDER_WAIT);
+		expect(statusReads.connectionIds).toStrictEqual(["7"]);
+		const lookupsBefore = lookups.answers.length;
+
+		statusReads.connection.recovered = true;
+		await userEvent.setup().click(screen.getByRole("button", { name: "Retry" }));
+		await screen.findByRole("button", { name: "Sync now" });
+		expect(screen.queryByText("We could not load GitLab sync status")).toBeNull();
+		expect(statusReads.connectionIds).toStrictEqual(["7", "7"]);
+		expect(lookups.answers).toHaveLength(lookupsBefore + 1);
 	});
 });
 
