@@ -51,7 +51,6 @@ const DELIBERATELY_OMITTED = new Set([
 	"HEPHAESTUS_RELEASE_COMMIT",
 	"HEPHAESTUS_IMAGE_APPLICATION_SERVER",
 	"HEPHAESTUS_RELEASE_CHECK_ENABLED",
-	"GITLAB_DEFAULT_SERVER_URL",
 	"GITLAB_OAUTH_BASE_URL",
 	"GITLAB_OAUTH_CLIENT_ID",
 	"GITLAB_OAUTH_CLIENT_SECRET",
@@ -69,18 +68,15 @@ const DELIBERATELY_OMITTED = new Set([
 	"GH_APP_CLIENT_SECRET",
 	// GitHub App authentication is disabled, so no private key is mounted.
 	"GH_APP_PRIVATE_KEY_LOCATION",
-	// The agent sandbox is off, so nothing reads its runtime, limits or image override.
-	"HEPHAESTUS_AGENT_IMAGE_REFERENCE",
-	// Git checkout is off, so no repository is mirrored or ingested.
+	// Preview checkout uses the defaults for ingestion limits.
 	"GIT_MAX_CONCURRENT_INGESTIONS",
 	"GIT_MAX_SNAPSHOT_BYTES",
-	"HEPHAESTUS_FABRIC_ROOT",
 	"HEPHAESTUS_LLM_DISPLAY_CURRENCY",
 	"HEPHAESTUS_LLM_EGRESS_ALLOW_LOOPBACK",
 	"HEPHAESTUS_LLM_FX_DAILY_URL",
 	// A preview is torn down long before any spend-ledger row reaches the retention window.
 	"HEPHAESTUS_LLM_USAGE_RETENTION",
-	// A preview runs with GitLab and the webhook receiver off, so it neither registers nor accepts GitLab hooks and
+	// The preview webhook receiver and external URL stay off, so it neither registers nor accepts GitLab hooks and
 	// has no hook signed with a previous routing key; the current key stays required by the readiness check.
 	"WEBHOOK_ROUTING_PREVIOUS_SECRET",
 	"SANDBOX_API_MAX_REQUEST_BYTES",
@@ -94,7 +90,6 @@ const DELIBERATELY_OMITTED = new Set([
 	"SANDBOX_DOCKER_TLS_VERIFY",
 	"SANDBOX_MAX_CONCURRENT",
 	"SANDBOX_MEMORY_BYTES",
-	"HEPHAESTUS_WORKER_HUB_TOKEN_REGISTRATION_TOKEN",
 	// Sync is disabled outright, so its tuning knobs are inert.
 	"MONITORING_BACKFILL_BATCH_SIZE",
 	"MONITORING_BACKFILL_INTERVAL_SECONDS",
@@ -204,6 +199,11 @@ const RENDER_ENV: Record<string, string> = {
 	HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef",
 	NATS_USERNAME: "ci-not-a-real-nats-user",
 	NATS_PASSWORD: "ci-not-a-real-nats-password",
+	PREVIEW_FRESH_REVIEW_ENABLED: "false",
+	PREVIEW_FRESH_REVIEW_PR: "",
+	PREVIEW_WORKER_BIND_HOST: "127.0.0.1",
+	PREVIEW_WORKER_REGISTRATION_TOKEN: "",
+	PREVIEW_AGENT_IMAGE_REFERENCE: "",
 	HEPHAESTUS_TRUSTED_PROXIES: "172.(1[6-9]|2[0-9]|3[01]).[0-9]{1,3}.[0-9]{1,3}",
 	SERVICE_FQDN_WEBAPP: "pr1.example.com",
 };
@@ -234,6 +234,7 @@ export const REQUIRED_SWITCHES: Record<string, string> = {
 	AGENT_ENABLED: "false",
 	GIT_CHECKOUT_ENABLED: "false",
 	GITLAB_ENABLED: "false",
+	GITLAB_WORKSPACE_CREATION: "false",
 	HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: "false",
 	HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED: "false",
 	HEPHAESTUS_INTEGRATION_SLACK_ENABLED: "false",
@@ -242,7 +243,16 @@ export const REQUIRED_SWITCHES: Record<string, string> = {
 	MONITORING_BACKFILL_ENABLED: "false",
 	MONITORING_RUN_ON_STARTUP: "false",
 	MONITORING_SYNC_CRON: "-",
+	WEBHOOK_EXTERNAL_URL: "",
 };
+
+const FRESH_REVIEW_SWITCHES = new Set([
+	"AGENT_ENABLED",
+	"GIT_CHECKOUT_ENABLED",
+	"GITLAB_ENABLED",
+	"GITLAB_WORKSPACE_CREATION",
+	"HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST",
+]);
 
 function records(value: unknown): [string, Record<string, unknown>][] {
 	if (!isRecord(value)) {
@@ -338,14 +348,43 @@ function privilegeViolations(name: string, service: Record<string, unknown>): st
 	return violations;
 }
 
-function isolationViolations(name: string, service: Record<string, unknown>): string[] {
+const PRIVATE_PORTS: Record<string, number> = { postgres: 5432, appserver: 8080 };
+
+function portViolations(name: string, published: unknown, freshReview: boolean): string[] {
+	const violations: string[] = [];
+	const ports = Array.isArray(published) ? published : [];
+	const target = PRIVATE_PORTS[name];
+	const host = freshReview ? "172.19.0.1" : "127.0.0.1";
+	if (target === undefined ? ports.length > 0 : ports.length !== 1) {
+		violations.push(
+			`${name} must publish ${target === undefined ? "no ports" : `only dynamic ${host}:${target}`}`,
+		);
+	}
+	for (const port of ports) {
+		if (
+			!isRecord(port) ||
+			target === undefined ||
+			port.target !== target ||
+			port.host_ip !== host ||
+			port.protocol !== "tcp" ||
+			(port.published !== undefined && port.published !== "0" && port.published !== 0)
+		) {
+			violations.push(`${name} publishes a port outside its approved dynamic private binding`);
+		}
+	}
+	return violations;
+}
+
+function isolationViolations(
+	name: string,
+	service: Record<string, unknown>,
+	freshReview: boolean,
+): string[] {
 	const violations: string[] = [];
 	if (service.network_mode !== undefined) {
 		violations.push(`${name} sets network_mode and escapes its own networks`);
 	}
-	if (Array.isArray(service.ports) && service.ports.length > 0) {
-		violations.push(`${name} publishes a port on the shared host`);
-	}
+	violations.push(...portViolations(name, service.ports, freshReview));
 	const deploy = isRecord(service.deploy) ? service.deploy : {};
 	const resources = isRecord(deploy.resources) ? deploy.resources : {};
 	const limits = isRecord(resources.limits) ? resources.limits : {};
@@ -356,23 +395,48 @@ function isolationViolations(name: string, service: Record<string, unknown>): st
 }
 
 /** What every service in the stack must hold to, whatever it runs. */
-function findServiceViolations(name: string, service: Record<string, unknown>): string[] {
+function findServiceViolations(
+	name: string,
+	service: Record<string, unknown>,
+	freshReview: boolean,
+): string[] {
 	return [
 		...mountViolations(name, service),
 		...imageViolations(name, service),
 		...privilegeViolations(name, service),
-		...isolationViolations(name, service),
+		...isolationViolations(name, service, freshReview),
 	];
 }
 
-function switchViolations(name: string, service: Record<string, unknown>): string[] {
+function switchViolations(
+	name: string,
+	service: Record<string, unknown>,
+	freshReview: boolean,
+): string[] {
 	const violations: string[] = [];
 	const environment = isRecord(service.environment) ? service.environment : {};
-	for (const [key, expected] of Object.entries(REQUIRED_SWITCHES)) {
+	for (const [key, defaultValue] of Object.entries(REQUIRED_SWITCHES)) {
+		const expected = freshReview && FRESH_REVIEW_SWITCHES.has(key) ? "true" : defaultValue;
 		const actual = environment[key];
 		if (actual !== expected) {
 			const shown = typeof actual === "string" ? actual : "«unset»";
 			violations.push(`${name} sets ${key}=${shown}, expected ${expected}`);
+		}
+	}
+	if (freshReview) {
+		if (
+			typeof environment.HEPHAESTUS_WORKER_HUB_TOKEN_REGISTRATION_TOKEN !== "string" ||
+			environment.HEPHAESTUS_WORKER_HUB_TOKEN_REGISTRATION_TOKEN.trim() === ""
+		) {
+			violations.push(`${name} has no private worker registration token`);
+		}
+		if (
+			typeof environment.HEPHAESTUS_AGENT_IMAGE_REFERENCE !== "string" ||
+			!/^ghcr\.io\/hephaestus-build\/agent-pi@sha256:[a-f0-9]{64}$/u.test(
+				environment.HEPHAESTUS_AGENT_IMAGE_REFERENCE,
+			)
+		) {
+			violations.push(`${name} has no digest-pinned agent image`);
 		}
 	}
 	for (const key of REQUIRED_NON_EMPTY) {
@@ -437,7 +501,7 @@ function networkViolations(networks: unknown): string[] {
 	return violations;
 }
 
-export function findViolations(stack: unknown): string[] {
+export function findViolations(stack: unknown, freshReview = false): string[] {
 	if (!isRecord(stack)) {
 		return ["the rendered stack is not an object"];
 	}
@@ -448,9 +512,9 @@ export function findViolations(stack: unknown): string[] {
 	}
 
 	for (const [name, service] of services) {
-		violations.push(...findServiceViolations(name, service));
+		violations.push(...findServiceViolations(name, service, freshReview));
 		if (name === "appserver") {
-			violations.push(...switchViolations(name, service));
+			violations.push(...switchViolations(name, service, freshReview));
 		}
 	}
 
@@ -462,7 +526,7 @@ export function findViolations(stack: unknown): string[] {
 	return violations;
 }
 
-export function renderStack(): unknown {
+export function renderStack(freshReview = false): unknown {
 	// The preview stack ships no env file — Coolify supplies every value per pull request — so an
 	// inherited COMPOSE_ENV_FILES only ever points Compose at a file this project directory does not
 	// have. Drop it so the render means the same thing in CI and on a laptop.
@@ -473,7 +537,23 @@ export function renderStack(): unknown {
 		// against. Rendering without it resolves them under docker/preview/ and checks a stack that
 		// would never be deployed.
 		["compose", "-f", COMPOSE_FILE, "--project-directory", ".", "config", "--format", "json"],
-		{ encoding: "utf8", env: { ...ambient, ...RENDER_ENV }, maxBuffer: CAPTURE_LIMIT_BYTES },
+		{
+			encoding: "utf8",
+			env: {
+				...ambient,
+				...RENDER_ENV,
+				...(freshReview
+					? {
+							PREVIEW_FRESH_REVIEW_ENABLED: "true",
+							PREVIEW_FRESH_REVIEW_PR: "1",
+							PREVIEW_WORKER_BIND_HOST: "172.19.0.1",
+							PREVIEW_WORKER_REGISTRATION_TOKEN: "ci-not-a-real-registration-token",
+							PREVIEW_AGENT_IMAGE_REFERENCE: `ghcr.io/hephaestus-build/agent-pi@sha256:${"b".repeat(64)}`,
+						}
+					: {}),
+			},
+			maxBuffer: CAPTURE_LIMIT_BYTES,
+		},
 	);
 	if (result.status !== 0) {
 		const unavailable =
@@ -506,18 +586,22 @@ if (import.meta.main) {
 			process.exitCode = 1;
 		}
 
-		const stack = renderStack();
-		if (stack === undefined) {
-			console.log(`${COMPOSE_FILE}: skipped, no Docker daemon to render it with.`);
-		} else {
-			const violations = findViolations(stack);
+		for (const freshReview of [false, true]) {
+			const stack = renderStack(freshReview);
+			if (stack === undefined) {
+				console.log(`${COMPOSE_FILE}: skipped, no Docker daemon to render it with.`);
+				continue;
+			}
+			const violations = findViolations(stack, freshReview);
 			for (const violation of violations) {
 				console.error(`error: ${COMPOSE_FILE}: ${violation}`);
 			}
 			if (violations.length > 0) {
 				process.exitCode = 1;
 			} else {
-				console.log(`${COMPOSE_FILE}: stack renders and stays sandboxed.`);
+				console.log(
+					`${COMPOSE_FILE}: ${freshReview ? "owned review" : "default"} stack renders and stays sandboxed.`,
+				);
 			}
 		}
 	} catch (error) {
