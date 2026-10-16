@@ -46,7 +46,9 @@ export function useScmIntegration(workspaceSlug: string) {
 
 	const workspaceQueryOptions = getWorkspaceOptions({ path: { workspaceSlug } });
 	const workspaceQuery = useQuery(workspaceQueryOptions);
-	const workspaceData = workspaceQuery.data;
+	useQueryReadRefusal(workspaceQueryOptions.queryKey, workspaceQuery.isError, workspaceQuery.error);
+	const workspaceData =
+		!workspaceQuery.isError || refreshRetryable(workspaceQuery) ? workspaceQuery.data : undefined;
 	const { kind, label } = scmProviderOf(workspaceData);
 	const isAppInstallationWorkspace = kind === "GITHUB" && workspaceData?.installationId != null;
 
