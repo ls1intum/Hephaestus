@@ -7,6 +7,7 @@ import { parseAdmission } from "../../../main/resources/agent/pi-admitted-result
 import {
 	createReviewRecorder,
 	buildReviewTool,
+	buildFeedbackTool,
 	closeUnroutedPrivateDestinations,
 	persistComposedFeedback,
 	type ComposedFeedback,
@@ -120,6 +121,119 @@ void test("missing private routing closes only that destination and records its 
 	assert.deepEqual(feedback.compositionFailures, [
 		{ phase: "PRIVATE_FEEDBACK", reason: "RUNTIME_ERROR" },
 	]);
+});
+
+void test("private copy has soft targets, refuses excess with an example, and accepts a corrected piece", async () => {
+	const admission = parseAdmission(
+		JSON.parse(readFileSync(new URL("admission-response.json", import.meta.url), "utf8")),
+	);
+	const result = admission.results[0];
+	assert.ok(result);
+	const card = {
+		destination: "PRACTICE_PAGE",
+		practiceSlug: result.practiceSlug,
+		basedOn: [result.resultId],
+		action: "NEW",
+		title: "Keep failure context",
+		body: "Failures lose their context across these changes. This makes the cause hard to trace.",
+		nextStep: "Before returning an error, check that its context reaches the caller.",
+	};
+	const conversation = {
+		destination: "CONVERSATION",
+		practiceSlug: result.practiceSlug,
+		basedOn: [result.resultId],
+		action: "NEW",
+		title: "Keep failure context",
+		notes: {
+			situation: "Errors lose their context before they reach the caller.",
+			capability: "The developer can trace which failure details reach a caller.",
+			evidenceSummary: "The catch in ‘Handle failed requests’ returns without the error details.",
+			inConversationLearning:
+				"The developer explains which details a caller needs to identify the cause.",
+			alreadySaid: "Earlier practice-page feedback asked for failure context.",
+		},
+	};
+	for (const [field, target] of [
+		["body", 600],
+		["nextStep", 300],
+		["situation", 300],
+		["capability", 300],
+		["evidenceSummary", 600],
+		["inConversationLearning", 300],
+		["alreadySaid", 300],
+	] as const) {
+		for (const length of [target, target + 1, target * 2, target * 2 + 1]) {
+			const feedback: ComposedFeedback = {
+				contractVersion: 3,
+				admissionDigest: admission.digest,
+				compositionFailures: [],
+				preparedTargets: [],
+				preparation: null,
+				results: [],
+				review: null,
+				feedback: [],
+			};
+			const tool = buildFeedbackTool(
+				[result.practiceSlug],
+				{
+					contractVersion: 3,
+					destinations: { PRACTICE_PAGE: { maxPieces: 1 }, CONVERSATION: { maxPieces: 1 } },
+					minDistinctItems: 2,
+					onWorkCopyForms: [],
+				},
+				[result],
+				[],
+				new Set(),
+				{
+					feedback,
+					admitted: () => true,
+					routes: () => ["PRACTICE_PAGE", "CONVERSATION"],
+					destinationRefusal: () => "",
+					negativeItems: () => 2,
+					documentedShape: (schema) => schema,
+					listSchema: (items) => ({ type: "array", items }),
+					submittedList: (value) =>
+						Array.isArray(value) ? { items: value } : { error: "Expected list" },
+					refusal: async (_id, text) => ({
+						content: [{ type: "text", text }],
+						details: { stored: 0 },
+					}),
+					persist: () => undefined,
+					paid: () => true,
+					onStored: () => undefined,
+				},
+			);
+			const text = "x".repeat(length);
+			const isCard = field === "body" || field === "nextStep";
+			const piece = isCard
+				? { ...card, [field]: text }
+				: { ...conversation, notes: { ...conversation.notes, [field]: text } };
+			const send = async (value: unknown) => {
+				const reply: unknown = await Reflect.apply(tool.execute.bind(tool), tool, [
+					"copy",
+					tool.prepareArguments?.({ feedback: [value] }),
+				]);
+				return reply;
+			};
+			const reply: unknown = await send(piece);
+			if (length > target * 2) {
+				assert.deepEqual(feedback.feedback, []);
+				assert.match(JSON.stringify(reply), /Corrected text example \(synthetic/u);
+				assert.ok(!JSON.stringify(reply).includes(text));
+				await send(isCard ? card : conversation);
+			}
+			const stored = feedback.feedback[0];
+			assert.ok(stored, `${field} at ${length}: ${JSON.stringify(reply)}`);
+			assert.deepEqual(stored.basedOn, [{ resultId: result.resultId }]);
+			if (length <= target * 2) {
+				assert.equal(isCard ? stored[field] : stored.notes?.[field], text);
+			} else if (isCard) {
+				assert.equal(stored.title, card.title);
+				assert.equal(stored.body, card.body);
+				assert.equal(stored.nextStep, card.nextStep);
+			}
+		}
+	}
 });
 
 void test("preparation retains exact copy support, the second citation, quiet witnesses and page fields", async (t) => {
@@ -287,7 +401,7 @@ void test("a refused private package preserves accepted public feedback", async 
 });
 
 void test("the card tool and preparation share the server's title/body/nextStep fixture", async (t) => {
-	const { buildFeedbackTool, prepareComposedFeedback } =
+	const { prepareComposedFeedback } =
 		await import("../../../main/resources/agent/pi-composition-stage.ts");
 	const fixture: unknown = JSON.parse(
 		readFileSync(new URL("composer-card.json", import.meta.url), "utf8"),

@@ -12,6 +12,7 @@ import {
 	type ComposedFeedbackEnvelope,
 	type ComposedFeedbackPiece,
 	REVIEW_LIMITS,
+	REVIEW_TARGETS,
 	DISPOSITIONS,
 	type ReviewedResult,
 	STANDARD_REFERENCE,
@@ -840,8 +841,65 @@ void test("a text is refused for what only the server writes, never for its word
 		errorsOf({
 			summary: { body: "x".repeat(REVIEW_LIMITS.summaryChars + 1), basedOn: ["why"] },
 		}).join("\n"),
-		/at most 8000 characters/u,
+		/at most 1200 characters[\s\S]*Aim for 600 characters[\s\S]*Corrected text example/u,
 	);
+});
+
+void test("summary and line-note targets leave room for qualifications but refuse excessive text whole", () => {
+	const base = wholeReview(["why"]);
+	const firstNote = base.inline[0];
+	assert.ok(firstNote);
+	for (const [field, charTarget, limit] of [
+		["summary", REVIEW_TARGETS.summaryChars, REVIEW_LIMITS.summaryChars],
+		["inline", REVIEW_TARGETS.inlineChars, REVIEW_LIMITS.inlineChars],
+	] as const) {
+		for (const length of [charTarget, charTarget + 1, limit, limit + 1]) {
+			const body = "x".repeat(length);
+			const input = {
+				...base,
+				...(field === "summary"
+					? { summary: { body, basedOn: ["why"] } }
+					: { inline: [{ ...firstNote, body }] }),
+			};
+			const read = readReview(input, results, true, reviewContext);
+			if (length <= limit) {
+				assert.ok("review" in read, JSON.stringify(read));
+				assert.equal(
+					field === "summary" ? read.review.summary?.body : read.review.inline[0]?.body,
+					body,
+				);
+			} else {
+				assert.ok("errors" in read);
+				assert.equal(read.errors.length, 1);
+				assert.match(read.errors[0] ?? "", /Corrected text example \(synthetic/u);
+				assert.ok(!read.errors.join("\n").includes(body));
+			}
+		}
+	}
+});
+
+void test("a concise review keeps natural evidence references and exact support outside the prose", () => {
+	const body =
+		"The description’s closing line names the screen but gives no reason for it. Add the purpose so reviewers can judge the scope.";
+	const noteBody =
+		"This fixed color loses contrast in dark mode. Use an adaptive color so the label stays readable.";
+	const read = readReview(
+		{
+			...wholeReview(["why-reason"]),
+			summary: { body, basedOn: ["why-reason"] },
+			inline: [{ ...note(0), body: noteBody }],
+		},
+		results,
+		true,
+		reviewContext,
+	);
+	assert.ok("review" in read, JSON.stringify(read));
+	assert.equal(read.review.summary?.body, body);
+	assert.deepEqual(read.review.summary.basedOn, [{ resultId: "why", problemId: "why-reason" }]);
+	const storedNote = read.review.inline[0];
+	assert.ok(storedNote);
+	assert.equal(storedNote.body, noteBody);
+	assert.deepEqual(storedNote.anchor, { problemId: "colors-fill", citationIndex: 0 });
 });
 
 void test("a review over the line-note bound is refused whole, not cut", () => {

@@ -101,10 +101,21 @@ results and problems it rests on.
 
 The opening turn ends with how to write the review and where each point goes; write by it. Use a line note only
 when a point is genuinely local and useful; an available anchor alone is no reason to comment. Group repeated instances of the same problem into one note. Each note makes one point, explains its consequence,
-and gives one useful action. Keep it short. Include a small code example only when it makes the action clearer.
+and gives one useful action. Aim for at most 300 characters per line note, including any code example.
+Use at most two short sentences: what is wrong, then why it matters or what to do next.
+Include a small code example only when it makes the action clearer.
 Select the citation on the changed lines that the note discusses. Keep the tone kind and focused on the work.
 If the point is too weak or minor to justify the interruption, withhold it as BELOW_BAR. The summary does not review the work anew, retell its history, say that
 a note was posted, or say that every practice was checked.
+
+Aim for at most 600 characters in the whole summary and at most three points, most important first.
+Each point uses at most two short sentences: what is wrong, then why it matters or what to do next.
+Keep the grounding and its qualifications. Cut repetition and withhold lesser concerns rather than compressing away a material limit.
+Do not fill the space with praise or add points to reach three.
+
+Write plain prose or a short list, without headings or internal labels such as "Situation:", "Capability:" or "Evidence:".
+Refer to "the description’s closing line" or a short exact quote, not "description L2", "description L16" or citation indices.
+The support fields and anchors identify the exact evidence; the delivered words do not repeat its coordinates.
 
 ## What you send
 

@@ -106,6 +106,13 @@ on its own, so write the card and name no target.
 
 ## Wording rules for these destinations
 
+- Keep one concern per piece. A small point needs no long explanation. Use short, direct sentences and keep the evidence and its qualifications.
+- Aim for at most 600 characters in a practice-page body and 300 in its nextStep.
+  Keep title, body and nextStep separate; the UI renders their layout. Do not repeat the title or nextStep in the body.
+- Conversation notes stay structured for the mentor. Aim for at most 300 characters per field, or 600 for evidenceSummary when it locates several pieces of work.
+- Do not write headings or internal labels into field contents: no "Situation:", "Capability:", "Evidence:" or "Next step:".
+  Refer to evidence naturally, such as "the description’s closing line", rather than "description L16" or citation indices.
+  Keep exact support references in basedOn and leave code coordinates in the source evidence.
 - Never quote a line of code on a card. The line is on the work, where it can be read in context.
 - Name a set of pieces of work as evidence, never a count as a score. Do not use grading words: presence,
   assessment, severity, confidence, criteria or thresholds.

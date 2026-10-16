@@ -234,25 +234,73 @@ export function notMetPractices(
 	].toSorted();
 }
 
-const FEEDBACK_TEXT_BOUNDS = {
-	title: 255,
-	body: 8000,
-	nextStep: 2000,
-	supersedesThreadKey: 64,
-	situation: 4000,
-	capability: 2000,
-	evidenceSummary: 4000,
-	inConversationLearning: 2000,
-	alreadySaid: 2000,
+const FEEDBACK_TEXT_GUIDANCE = {
+	body: {
+		target: 600,
+		example:
+			"Both changes name the new behavior but leave its purpose unstated. Reviewers cannot judge the scope from that alone.",
+	},
+	nextStep: {
+		target: 300,
+		example:
+			"Before your next review request, check that the description explains why the change is needed.",
+	},
+	situation: {
+		target: 300,
+		example:
+			"The developer names changes without explaining their purpose across two review requests.",
+	},
+	capability: {
+		target: 300,
+		example:
+			"The developer can distinguish a description of changed behavior from a reason for the change.",
+	},
+	evidenceSummary: {
+		target: 600,
+		example:
+			"The descriptions of ‘Update sign-in’ and ‘Add search’ name the changes but give no reason for them.",
+	},
+	inConversationLearning: {
+		target: 300,
+		example:
+			"The developer explains which decision a reviewer cannot assess without knowing the change’s purpose.",
+	},
+	alreadySaid: {
+		target: 300,
+		example: "Earlier practice-page feedback asked for the reason behind each change.",
+	},
 } as const;
 
-const optionalFeedbackText = (field: keyof typeof FEEDBACK_TEXT_BOUNDS) =>
-	z
+const FEEDBACK_TEXT_BOUNDS = {
+	title: 255,
+	body: FEEDBACK_TEXT_GUIDANCE.body.target * 2,
+	nextStep: FEEDBACK_TEXT_GUIDANCE.nextStep.target * 2,
+	supersedesThreadKey: 64,
+	situation: FEEDBACK_TEXT_GUIDANCE.situation.target * 2,
+	capability: FEEDBACK_TEXT_GUIDANCE.capability.target * 2,
+	evidenceSummary: FEEDBACK_TEXT_GUIDANCE.evidenceSummary.target * 2,
+	inConversationLearning: FEEDBACK_TEXT_GUIDANCE.inConversationLearning.target * 2,
+	alreadySaid: FEEDBACK_TEXT_GUIDANCE.alreadySaid.target * 2,
+} as const;
+
+const optionalFeedbackText = (field: keyof typeof FEEDBACK_TEXT_BOUNDS) => {
+	const guidance =
+		field === "title" || field === "supersedesThreadKey"
+			? undefined
+			: FEEDBACK_TEXT_GUIDANCE[field];
+	const lengthError =
+		guidance === undefined
+			? undefined
+			: `Aim for at most ${guidance.target} characters; more than ${FEEDBACK_TEXT_BOUNDS[field]} is refused. ` +
+				`Keep the evidence and its qualifications; remove repetition. ` +
+				`Corrected text example (synthetic; use this developer's supported facts): ${JSON.stringify(guidance.example)}. Send this piece again`;
+	return z
 		.string()
 		.trim()
-		.max(FEEDBACK_TEXT_BOUNDS[field])
+		.max(FEEDBACK_TEXT_BOUNDS[field], lengthError)
 		.nullish()
 		.transform((value) => (value === "" ? undefined : (value ?? undefined)));
+};
 const feedbackPieceSchema = z.strictObject({
 	destination: z.enum(PRIVATE_DESTINATIONS),
 	practiceSlug: z.string().trim().min(1),
@@ -299,9 +347,6 @@ function readFeedbackPiece(
 			.filter((result) => result.practiceSlug === piece.practiceSlug)
 			.map((result) => result.resultId);
 		return `basedOn is required: the admitted result or problem id(s) this piece rests on (${piece.practiceSlug}'s results: ${ids.join(", ")}); skipped.`;
-	}
-	if (piece.action === "NEW" && feedbackBody(piece).length > 8000) {
-		return "the complete feedback text must be at most 8000 characters; shorten it and send it again";
 	}
 	return piece;
 }
@@ -621,13 +666,15 @@ export function buildFeedbackTool(
 			type: "string",
 			maxLength: FEEDBACK_TEXT_BOUNDS.body,
 			description:
-				"PRACTICE_PAGE only: the evidenced pattern across the work and why it matters; the future way of working belongs to nextStep. Grounded in current results and their problems; never quote a line or claim change over time from the pre-run history. Markdown, read verbatim.",
+				`PRACTICE_PAGE only: aim for at most ${FEEDBACK_TEXT_GUIDANCE.body.target} characters. ` +
+				"The evidenced pattern across the work and why it matters; the future way of working belongs to nextStep. Grounded in current results and their problems; never quote a line or claim change over time from the pre-run history. Markdown, read verbatim, without headings or internal labels. The UI renders the title and next step separately.",
 		},
 		nextStep: {
 			type: "string",
 			maxLength: FEEDBACK_TEXT_BOUNDS.nextStep,
 			description:
-				"PRACTICE_PAGE only: the one repeatable way of working for the next piece of work; the body does not state it. Name the missing decision, not a heading/template unless the practice requires one; never provide paste-ready prose.",
+				`PRACTICE_PAGE only: aim for at most ${FEEDBACK_TEXT_GUIDANCE.nextStep.target} characters. ` +
+				"The one repeatable way of working for the next piece of work; the body does not state it. No heading or label. Name the missing decision, not a heading/template unless the practice requires one; never provide paste-ready prose.",
 		},
 		notes: {
 			type: "object",
@@ -637,7 +684,9 @@ export function buildFeedbackTool(
 				"CONVERSATION only. Notes TO the mentor, which composes the whole turn itself, later, " +
 				"with the live conversation in front of it. Write what it needs to know, never a " +
 				"sentence for it to say: anything phrased as a line of dialogue will be spoken, and " +
-				"will sound like a script.",
+				"will sound like a script. " +
+				`Aim for at most ${FEEDBACK_TEXT_GUIDANCE.situation.target} characters per field, ` +
+				`or ${FEEDBACK_TEXT_GUIDANCE.evidenceSummary.target} for evidenceSummary. No headings or internal labels in field contents; each field adds its own fact.`,
 			properties: {
 				situation: {
 					type: "string",
@@ -730,6 +779,10 @@ export function buildFeedbackTool(
 			"its own, with the reason, and a skipped piece can be sent again corrected without re-sending the " +
 			"stored ones. This is an intervention, not a measurement: it takes no outcome, severity or " +
 			"confidence, and no citation you typed yourself. " +
+			`Aim for at most ${FEEDBACK_TEXT_GUIDANCE.body.target} characters in a card body, ${FEEDBACK_TEXT_GUIDANCE.nextStep.target} in its nextStep; keep title/body/nextStep separate. ` +
+			`Mentor notes aim for ${FEEDBACK_TEXT_GUIDANCE.situation.target} per field, ${FEEDBACK_TEXT_GUIDANCE.evidenceSummary.target} for evidenceSummary. ` +
+			"More than twice a field's target is refused with a correction example, never truncated. " +
+			"Keep the evidence and its qualifications. No headings or internal labels in field contents. Use natural evidence references, never internal coordinates. " +
 			'Input example for a practice page: {"feedback":[{"destination":"PRACTICE_PAGE","practiceSlug":"<admitted practice slug>","basedOn":["<its NOT_MET resultId or problemId>"],"action":"NEW","title":"Name the concern","body":"Explain the supported concern.","nextStep":"One action that addresses it."}]}. ' +
 			'For WITHHOLD, send destination, practiceSlug, basedOn, action:"WITHHOLD", withholdReason and witnessIds:[]; omit title, body, nextStep and notes.',
 		parameters,

@@ -5396,7 +5396,7 @@ for (const item of nullableCases) {
 							assert.match(reply, /#3: piece: Unrecognized key: .*verdict/u);
 							assert.match(
 								reply,
-								/#4: (?:body: Too big|the complete feedback text must be at most 8000 characters)/u,
+								/#4: body: Aim for at most 600 characters[\s\S]*Corrected text example/u,
 							);
 							assert.match(reply, /#5: withholdReason: Invalid option/u);
 							assert.match(

@@ -30,8 +30,14 @@ export const PRIOR_ADVICE_REASONS: ReadonlySet<WithholdReason> = new Set([
 /** ComposedReview.CONTRACT_VERSION: the server delivers no review from an envelope without it. */
 export const REVIEW_CONTRACT_VERSION = 3;
 
-/** ComposedReview's bounds; a review over them is refused so the composer can correct it, never cut. */
-export const REVIEW_LIMITS = { summaryChars: 8000, inlineChars: 2000, inlineNotes: 30 } as const;
+export const REVIEW_TARGETS = { summaryChars: 600, inlineChars: 300, summaryPoints: 3 } as const;
+
+/** Leave room for necessary qualifications; refuse excessive text for correction, never cut it. */
+export const REVIEW_LIMITS = {
+	summaryChars: REVIEW_TARGETS.summaryChars * 2,
+	inlineChars: REVIEW_TARGETS.inlineChars * 2,
+	inlineNotes: 30,
+} as const;
 
 /** Partial view for coherence checks; pi-runner.ts owns the complete tool schema. */
 export interface ComposedFeedbackPiece {
@@ -488,12 +494,16 @@ const NOT_AN_ID_LIST =
 
 type Named = ReadonlyMap<string, NamedEvidence<ReviewedResult>>;
 
-function textProblem(value: unknown, limit: number): string | null {
+function textProblem(value: unknown, target: number, example: string): string | null {
 	if (typeof value !== "string" || value.trim() === "") {
 		return "body is required: the complete text, as the developer will read it";
 	}
-	if (value.length > limit) {
-		return `body must be at most ${limit} characters; this one is ${value.length}. Shorten it`;
+	if (value.length > target * 2) {
+		return (
+			`body must be at most ${target * 2} characters; this one is ${value.length}. Aim for ${target} characters. ` +
+			`Keep the supported concern, evidence, qualifications and next action; remove repetition. ` +
+			`Corrected text example (synthetic; use this work's facts): ${JSON.stringify(example)}. Send the whole review again`
+		);
 	}
 	if (value.includes(RESERVED_MARKER)) {
 		return "body may not contain an HTML comment (`<!--`); the server writes its own markers there";
@@ -674,7 +684,11 @@ function readSummary(
 	}
 	const { body, basedOn } = value;
 	const problems = [
-		textProblem(body, REVIEW_LIMITS.summaryChars),
+		textProblem(
+			body,
+			REVIEW_TARGETS.summaryChars,
+			"The description names the change but omits its purpose. Add the reason so reviewers can judge the scope.",
+		),
 		supportProblem(basedOn, named),
 	].filter((problem): problem is string => problem !== null);
 	if (problems.length > 0) {
@@ -773,7 +787,11 @@ export function readReview(
 			anchor: { problemId, citationIndex },
 		} = raw;
 		const problems = [
-			textProblem(body, REVIEW_LIMITS.inlineChars),
+			textProblem(
+				body,
+				REVIEW_TARGETS.inlineChars,
+				"This branch uses the token without a check. Validate it before use so an invalid token cannot reach the request.",
+			),
 			supportProblem(basedOn, named),
 		].filter((problem): problem is string => problem !== null);
 		const placementProblem = inlineSupportProblem(basedOn, named);
@@ -1046,6 +1064,10 @@ export const REVIEW_TOOL_DESCRIPTION =
 	"assembled from fragments. An accepted call is final and ends the composition. A missing or contradicted decision, " +
 	"invalid support, eligibility or location, or a witness that cannot stand as the advice refuses the whole " +
 	"review, with every reason, so it can be corrected and sent again. " +
+	`Aim for at most ${REVIEW_TARGETS.summaryChars} characters and ${REVIEW_TARGETS.summaryPoints} points in the summary, ` +
+	`${REVIEW_TARGETS.inlineChars} characters and one local point per line note. Each point uses at most two short sentences: what, then why or next action. ` +
+	"No headings, internal labels or citation coordinates in the published text; refer to evidence in natural words or a short exact quote. " +
+	`A summary over ${REVIEW_LIMITS.summaryChars} characters or a note over ${REVIEW_LIMITS.inlineChars} is refused for correction, never truncated. ` +
 	'Input example: {"decisions":[{"resultId":"<admitted NOT_MET resultId>","disposition":"RAISE"}],"summary":{"basedOn":["<same resultId>"],"body":"Explain the supported concern and its remedy."},"inline":[]}. ' +
 	"For a quiet review, use summary:null, inline:[] and a supported withholding decision for each result. Unused inline and witnessIds lists may be null or omitted.";
 
@@ -1061,6 +1083,13 @@ export const WRITE_CONTRACT =
 	"You are not told whether the work is ready, so do not approve it, call it ready or blocked, or set conditions " +
 	"for merging it. Timing the evidence itself warrants is fine: a committed secret is removed and rotated before " +
 	"anyone relies on the history.\n\n" +
+	`Aim for at most ${REVIEW_TARGETS.summaryChars} characters in the whole summary, with at most ${REVIEW_TARGETS.summaryPoints} points, ` +
+	`and ${REVIEW_TARGETS.inlineChars} characters per line note. Each point uses at most two short sentences: what is wrong, ` +
+	"then why it matters or what to do next. A small point needs a short explanation. Keep the evidence and its qualifications; " +
+	"cut repetition and withhold lesser concerns rather than dropping a material limit to fit. " +
+	"Write plain prose or a short list without headings or internal labels such as Situation:, Capability: or Evidence:. " +
+	"Say ‘the description’s closing line’ or use a short exact quote, not ‘description L2’, ‘description L16’ or citation indices. " +
+	"Use basedOn and anchors to identify the exact evidence; leave its coordinates in the source evidence.\n\n" +
 	"Make each point fully once in this review:\n" +
 	"- A line note is one self-contained point about the code at its anchor: that local concern with its action and " +
 	"evidence. It is read alone, so it says its point completely. Several practices " +
@@ -1287,7 +1316,8 @@ export function reviewToolParameters(
 						minLength: 1,
 						maxLength: REVIEW_LIMITS.summaryChars,
 						description:
-							"The whole comment in Markdown, written from the results and problems in basedOn.",
+							`The whole comment in Markdown, from the results and problems in basedOn. Aim for at most ${REVIEW_TARGETS.summaryChars} characters ` +
+							`and ${REVIEW_TARGETS.summaryPoints} points; at most two short sentences per point: what, then why or next action. No headings, internal labels or citation coordinates.`,
 					},
 				},
 			},
@@ -1311,7 +1341,8 @@ export function reviewToolParameters(
 							minLength: 1,
 							maxLength: REVIEW_LIMITS.inlineChars,
 							description:
-								"The whole note in Markdown, written from the results and problems in basedOn.",
+								`The whole note in Markdown, from the results and problems in basedOn. Aim for at most ${REVIEW_TARGETS.inlineChars} characters, ` +
+								"one point about this line, at most two short sentences: what, then why or next action. No headings, internal labels or citation coordinates.",
 						},
 						anchor: {
 							type: "object",
