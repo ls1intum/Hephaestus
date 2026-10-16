@@ -4,7 +4,10 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 
-import { getPublicActivityPolicyQueryKey } from "@/api/@tanstack/react-query.gen";
+import {
+	adminGetInstanceSettingsQueryKey,
+	getPublicActivityPolicyQueryKey,
+} from "@/api/@tanstack/react-query.gen";
 import { server } from "@/mocks/server";
 import { deferred } from "@/test/async";
 import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
@@ -360,4 +363,194 @@ describe("instance settings route", () => {
 			expect(screen.queryByRole("button", { name: "Retry" }) !== null).toBe(retry);
 		},
 	);
+});
+
+const off = (revision: number, accountId: number) => ({
+	silentModeEngaged: false,
+	etag: `"${revision}"`,
+	silentModeChangedAt: "2026-08-04T09:00:00Z",
+	silentModeChangedByAccountId: accountId,
+});
+
+type SettingsAnswer =
+	| { status: 200; body: ReturnType<typeof settings> | ReturnType<typeof off> }
+	| { status: 403 | 503 };
+
+/** Answers the instance settings GET with the answer the test last chose, counting each read. */
+function serveSettings(initial: SettingsAnswer) {
+	const read = { count: 0, answer: initial };
+	server.use(
+		http.get("*/admin/settings", () => {
+			read.count += 1;
+			const { answer } = read;
+			return answer.status === 200
+				? HttpResponse.json(answer.body)
+				: HttpResponse.json(
+						{ status: answer.status, title: "Request failed" },
+						{ status: answer.status },
+					);
+		}),
+		http.get("*/admin/settings/public-activity", () => HttpResponse.json({ allowed: false })),
+	);
+	return read;
+}
+
+/** Reads the instance settings again through their generated key, as a returning admin does. */
+async function rereadSettings(queryClient: QueryClient) {
+	await act(async () => {
+		await queryClient.invalidateQueries({ queryKey: adminGetInstanceSettingsQueryKey() });
+	});
+}
+
+/** Nothing the refused `settings(…)` read said, and no control that acts on it, stays on screen. */
+function expectSettingsWithdrawn() {
+	expect(screen.queryByText("Silent mode is on: workspace delivery is blocked")).toBeNull();
+	expect(screen.queryAllByText(/incident/u)).toStrictEqual([]);
+	expect(screen.queryAllByText(/account #42/u)).toStrictEqual([]);
+	expect(screen.queryByRole("button", { name: /silent mode…/u })).toBeNull();
+	expect(screen.queryByRole("alertdialog")).toBeNull();
+	expect(screen.queryByRole("dialog")).toBeNull();
+}
+
+describe("silent mode settings read", () => {
+	it("withdraws refused settings from the page and the banner, also through a later outage, and shows only a fresh read", async () => {
+		const read = serveSettings({ status: 200, body: settings(1) });
+		const user = userEvent.setup();
+		const queryClient = renderRouteAt("/admin/settings");
+		await user.click(
+			await screen.findByRole("button", { name: "Turn off silent mode…" }, ROUTE_RENDER_WAIT),
+		);
+		await screen.findByRole("alertdialog");
+		screen.getByText("Silent mode is on: workspace delivery is blocked");
+
+		read.answer = { status: 403 };
+		await rereadSettings(queryClient);
+		expect(read.count).toBe(2);
+		await screen.findByText("You do not have access to instance settings");
+		expectSettingsWithdrawn();
+		expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+		screen.getByRole("button", { name: "Send test email" });
+		await screen.findByRole("switch", { name: "Allow public activity pages" });
+
+		read.answer = { status: 503 };
+		await rereadSettings(queryClient);
+		expect(read.count).toBe(3);
+		await screen.findByText("We could not load instance settings");
+		expectSettingsWithdrawn();
+		expect(screen.queryByText("We could not verify the current instance settings")).toBeNull();
+
+		read.answer = { status: 200, body: off(2, 7) };
+		await user.click(screen.getByRole("button", { name: "Retry" }));
+		await screen.findByRole("button", { name: "Turn on silent mode…" });
+		screen.getByText(/last changed by account #7/u);
+		expect(screen.queryByText("Silent mode is on: workspace delivery is blocked")).toBeNull();
+		expect(read.count).toBe(4);
+	});
+
+	it("withdraws a refused banner on another admin page, also through a later outage", async () => {
+		const read = serveSettings({ status: 200, body: settings(1) });
+		const user = userEvent.setup();
+		const queryClient = renderRouteAt("/admin/users");
+		await screen.findByText(
+			"Silent mode is on: workspace delivery is blocked",
+			undefined,
+			ROUTE_RENDER_WAIT,
+		);
+
+		read.answer = { status: 403 };
+		await rereadSettings(queryClient);
+		await screen.findByText("You do not have access to the instance delivery state");
+		expectSettingsWithdrawn();
+		expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+
+		read.answer = { status: 503 };
+		await rereadSettings(queryClient);
+		await screen.findByText("We could not load the instance delivery state");
+		expectSettingsWithdrawn();
+
+		read.answer = { status: 200, body: settings(2) };
+		await user.click(screen.getByRole("button", { name: "Retry" }));
+		await screen.findByText("Silent mode is on: workspace delivery is blocked");
+		expect(read.count).toBe(4);
+	});
+
+	it("keeps refused settings refused when an earlier change is accepted, and shows only a fresh read", async () => {
+		const read = serveSettings({ status: 200, body: off(1, 7) });
+		const accepted = deferred();
+		const patches: unknown[] = [];
+		server.use(
+			http.patch("*/admin/settings/silent-mode", async ({ request }) => {
+				patches.push(await request.json());
+				await accepted.promise;
+				return HttpResponse.json(settings(2));
+			}),
+		);
+		const user = userEvent.setup();
+		const queryClient = renderRouteAt("/admin/settings");
+		try {
+			await user.click(
+				await screen.findByRole("button", { name: "Turn on silent mode…" }, ROUTE_RENDER_WAIT),
+			);
+			const dialog = await screen.findByRole("dialog", { name: "Turn on silent mode" });
+			await user.type(
+				within(dialog).getByLabelText("Why are you silencing the instance?"),
+				"incident",
+			);
+			await user.click(within(dialog).getByRole("button", { name: "Turn on silent mode" }));
+			await waitFor(() => expect(patches).toStrictEqual([{ engaged: true, reason: "incident" }]));
+
+			read.answer = { status: 403 };
+			await rereadSettings(queryClient);
+			await screen.findByText("You do not have access to instance settings");
+			expectSettingsWithdrawn();
+
+			accepted.resolve();
+			await waitFor(() => expect(queryClient.isMutating()).toBe(0));
+			expectSettingsWithdrawn();
+			screen.getByText("You do not have access to instance settings");
+
+			read.answer = { status: 200, body: settings(3) };
+			await rereadSettings(queryClient);
+			await screen.findByText("Silent mode is on: workspace delivery is blocked");
+			await screen.findByRole("button", { name: "Turn off silent mode…" });
+			expect(patches).toHaveLength(1);
+		} finally {
+			accepted.resolve();
+		}
+	});
+
+	it("keeps the last settings, a drafted reason and Turn on beside a failed refresh", async () => {
+		const read = serveSettings({ status: 200, body: off(1, 7) });
+		const patches: unknown[] = [];
+		server.use(
+			http.patch("*/admin/settings/silent-mode", async ({ request }) => {
+				patches.push(await request.json());
+				read.answer = { status: 200, body: settings(2) };
+				return HttpResponse.json(settings(2));
+			}),
+		);
+		const user = userEvent.setup();
+		const queryClient = renderRouteAt("/admin/settings");
+		await user.click(
+			await screen.findByRole("button", { name: "Turn on silent mode…" }, ROUTE_RENDER_WAIT),
+		);
+		const dialog = await screen.findByRole("dialog", { name: "Turn on silent mode" });
+		const reason = within(dialog).getByLabelText<HTMLTextAreaElement>(
+			"Why are you silencing the instance?",
+		);
+		await user.type(reason, "outage");
+
+		read.answer = { status: 503 };
+		await rereadSettings(queryClient);
+		expect(read.count).toBe(2);
+		await screen.findByText("We could not verify the current instance settings");
+		// The open modal dialog sets aria-hidden on the page behind it, which includes its Retry.
+		screen.getByRole("button", { name: "Retry", hidden: true });
+		screen.getByText(/last changed by account #7/u);
+		expect(reason.value).toBe("outage");
+
+		await user.click(within(dialog).getByRole("button", { name: "Turn on silent mode" }));
+		await screen.findByText("Silent mode is on: workspace delivery is blocked");
+		expect(patches).toStrictEqual([{ engaged: true, reason: "outage" }]);
+	});
 });
