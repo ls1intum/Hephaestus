@@ -65,6 +65,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             assignment("practices.adapter.ConversationFeedbackErasureIntegrationTest", "review-fixture"),
             assignment("practices.adapter.PracticesWorkspacePurgeAdapterTest", "review-fixture"),
             assignment("practices.feedback.AbstractFeedbackDeliveryIntegrationTest", "review-feedbackdelivery"),
+            assignment("agent.adapter.EvidenceDeliveryAuthorizationIntegrationTest", "review-delivery-authorization"),
             assignment("practices.feedback.FeedbackGateIntegrationTest", "review-feedbackgate"),
             assignment("practices.feedback.FeedbackPreparationReceiptIntegrationTest", "review-preparation-receipt"),
             assignment("practices.feedback.FeedbackHistoryQueryIntegrationTest", "review-feedbackhistoryquery"),
@@ -147,6 +148,9 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             Map.entry(
                     "review-disabled-integrations",
                     "persisted mixed-provider history and real timing reads with Slack and Outline adapters disabled"),
+            Map.entry(
+                    "review-delivery-authorization",
+                    "real stored result and problem proof with only current source access controlled"),
             Map.entry(
                     "review-evidence",
                     "shared review fixture with the neutral evidence authorization boundary"
@@ -252,6 +256,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
     private static final Set<String> DIRTY_CONTEXT_TESTS = Set.of();
 
     private static final Set<String> MOCKITO_BEAN_TESTS = names(
+            "agent.adapter.EvidenceDeliveryAuthorizationIntegrationTest",
             "practices.result.MigratedHistoryReadIntegrationTest",
             "agent.mentor.chat.MentorWorkerSplitIntegrationTest",
             "integration.scm.gitlab.credentials.GitLabTokenLifecycleIntegrationTest",
