@@ -52,6 +52,9 @@ function SlackIntegrationPage() {
 	const slack = useSlackIntegration(slug);
 	const { hasConnection } = slack;
 	const ready = !slack.isLoading && !slack.loadError;
+	// A failed refresh that kept the connection leaves its management, and the drafts and pending
+	// requests open in it, mounted beside the failure.
+	const manageable = ready || slack.connectionRetained;
 
 	return (
 		<PageLayout>
@@ -95,9 +98,9 @@ function SlackIntegrationPage() {
 				</Card>
 			)}
 
-			{ready && <WorkspaceSlackConnectionSettings {...slack.connectionSettingsProps} />}
+			{manageable && <WorkspaceSlackConnectionSettings {...slack.connectionSettingsProps} />}
 
-			{ready && <WorkspaceSlackChannelsSettings {...slack.channelsSettingsProps} />}
+			{manageable && <WorkspaceSlackChannelsSettings {...slack.channelsSettingsProps} />}
 
 			{hasConnection && <JobHistoryCard {...slack.jobHistoryProps} />}
 		</PageLayout>

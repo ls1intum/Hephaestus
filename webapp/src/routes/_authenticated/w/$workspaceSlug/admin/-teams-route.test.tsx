@@ -357,3 +357,150 @@ describe("a team change belongs to its workspace", () => {
 		}
 	});
 });
+
+/**
+ * Acme's teams answer with the status the test last chose, from `state`, after `hold` settles. Every
+ * change the admin sends is recorded, so a read that changes nothing can show it sent nothing.
+ */
+function serveAcmeRead(state: AcmeState) {
+	serveTwoWorkspaces(state);
+	const read: { count: number; status: 200 | 403 | 503; hold: Promise<unknown> } = {
+		count: 0,
+		status: 200,
+		hold: Promise.resolve(),
+	};
+	const changes: string[] = [];
+	const record: HttpResponseResolver = ({ request }) => {
+		changes.push(`${request.method} ${new URL(request.url).pathname}`);
+		return new HttpResponse(null, { status: 200 });
+	};
+	server.use(
+		http.get("*/workspaces/acme/team", async () => {
+			read.count += 1;
+			await read.hold;
+			return read.status === 200
+				? HttpResponse.json(acmeTeams(state))
+				: HttpResponse.json(
+						{ status: read.status, title: "Request failed" },
+						{ status: read.status },
+					);
+		}),
+		http.post("*/workspaces/acme/*", record),
+		http.delete("*/workspaces/acme/*", record),
+	);
+	return { read, changes };
+}
+
+/** Reads acme's teams again through their generated key, as a returning admin does. */
+async function rereadAcme(queryClient: QueryClient) {
+	await act(async () => {
+		await queryClient.invalidateQueries({
+			queryKey: getAllTeamsQueryKey({ path: { workspaceSlug: "acme" } }),
+		});
+	});
+}
+
+/** Nothing the refused read said, and no control that acts on it, stays on screen. */
+function expectTeamsWithdrawn() {
+	expect(screen.queryByRole("heading", { name: "Frontend Team" })).toBeNull();
+	expect(screen.queryByRole("button", { name: "Add bug label" })).toBeNull();
+	expect(screen.queryByRole("button", { name: "Configure labels for acme/web" })).toBeNull();
+	expect(
+		screen.queryByRole("button", { name: "Hide Frontend Team from workspace activity" }),
+	).toBeNull();
+	expect(screen.queryByText("We could not refresh teams")).toBeNull();
+	expect(screen.queryByText("No teams found")).toBeNull();
+}
+
+describe("a read of a workspace's teams", () => {
+	it("keeps the teams, the open label picker and the search beside a failed refresh, until a read replaces them", async () => {
+		const user = userEvent.setup();
+		const state = { teamHidden: false, repositoryHidden: false, labelled: false };
+		const { read, changes } = serveAcmeRead(state);
+		const { queryClient } = renderRouteAtWithRouter(
+			"/w/acme/admin/teams?q=Frontend",
+			productionClient(),
+		);
+		await screen.findByRole("heading", { name: "Frontend Team" }, ROUTE_RENDER_WAIT);
+		await openLabels(user);
+		await screen.findByRole("button", { name: "Add bug label" });
+
+		read.status = 503;
+		await rereadAcme(queryClient);
+		await screen.findByText("We could not refresh teams", undefined, SETTLE);
+		screen.getByRole("heading", { name: "Frontend Team" });
+		screen.getByRole("button", { name: "Add bug label" });
+		expect(screen.getByLabelText<HTMLInputElement>("Search teams").value).toBe("Frontend");
+		screen.getByRole("button", { name: "Retry" });
+		expect(screen.queryByText("We could not load teams")).toBeNull();
+
+		const held = deferred();
+		read.hold = held.promise;
+		read.status = 200;
+		state.labelled = true;
+		const readsBeforeRefresh = read.count;
+		void queryClient.refetchQueries({
+			queryKey: getAllTeamsQueryKey({ path: { workspaceSlug: "acme" } }),
+		});
+		const retrying = await screen.findByRole("button", { name: "Retrying…" }, SETTLE);
+		expect(retrying.hasAttribute("disabled")).toBe(true);
+		screen.getByRole("heading", { name: "Frontend Team" });
+		screen.getByRole("button", { name: "Add bug label" });
+		expect(screen.getByLabelText<HTMLInputElement>("Search teams").value).toBe("Frontend");
+
+		await act(async () => {
+			held.resolve();
+		});
+		await screen.findByRole("button", { name: "Remove bug label" }, SETTLE);
+		expect(screen.queryByText("We could not refresh teams")).toBeNull();
+		screen.getByRole("heading", { name: "Frontend Team" });
+		expect(read.count).toBe(readsBeforeRefresh + 1);
+		expect(changes).toStrictEqual([]);
+	});
+
+	it("withdraws refused teams and their open label picker, also through a later outage, and shows only a fresh read", async () => {
+		const user = userEvent.setup();
+		const state = { teamHidden: false, repositoryHidden: false, labelled: false };
+		const { read, changes } = serveAcmeRead(state);
+		const { queryClient } = renderRouteAtWithRouter("/w/acme/admin/teams", productionClient());
+		await screen.findByRole("heading", { name: "Frontend Team" }, ROUTE_RENDER_WAIT);
+		await openLabels(user);
+		await screen.findByRole("button", { name: "Add bug label" });
+
+		read.status = 403;
+		await rereadAcme(queryClient);
+		await screen.findByText("You do not have access to teams", undefined, SETTLE);
+		expectTeamsWithdrawn();
+		expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+
+		read.status = 503;
+		await rereadAcme(queryClient);
+		await screen.findByText("We could not load teams", undefined, SETTLE);
+		expectTeamsWithdrawn();
+
+		read.status = 200;
+		state.repositoryHidden = true;
+		await user.click(screen.getByRole("button", { name: "Retry" }));
+		await screen.findByRole("heading", { name: "Frontend Team" }, SETTLE);
+		screen.getByText("Hidden in contributions");
+		expect(screen.queryByRole("button", { name: "Add bug label" })).toBeNull();
+		expect(read.count).toBe(4);
+		expect(changes).toStrictEqual([]);
+	});
+
+	it("says the teams could not be read, not that there are none, when the first read fails", async () => {
+		const user = userEvent.setup();
+		const { read } = serveAcmeRead({ teamHidden: false, repositoryHidden: false, labelled: false });
+		read.status = 503;
+		renderRouteAtWithRouter("/w/acme/admin/teams", productionClient());
+
+		await screen.findByText("We could not load teams", undefined, ROUTE_RENDER_WAIT);
+		expect(screen.queryByText("No teams found")).toBeNull();
+		expect(screen.queryByRole("heading", { name: "Frontend Team" })).toBeNull();
+
+		read.status = 200;
+		await user.click(screen.getByRole("button", { name: "Retry" }));
+		await screen.findByRole("heading", { name: "Frontend Team" }, SETTLE);
+		expect(screen.queryByText("We could not load teams")).toBeNull();
+	});
+});

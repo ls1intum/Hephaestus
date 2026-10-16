@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "storybook/test";
+import { expect, fn } from "storybook/test";
 
 import type { LabelInfo, RepositoryInfo, TeamInfo } from "@/api/types.gen";
 import { withStandardPage } from "@/stories/decorators";
@@ -142,6 +142,36 @@ export type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 export const Loading: Story = { args: { isLoading: true, teams: [] } };
+
+export const Empty: Story = {
+	args: { teams: [] },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("This workspace has no teams.")).toBeVisible();
+	},
+};
+
+/** A read that never succeeded says so, and never claims the workspace has no teams. */
+export const Failed: Story = {
+	args: { teams: [], error: { status: 503 }, onRetry: fn() },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("We could not load teams")).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Retry" })).toBeEnabled();
+		await expect(canvas.queryByText("No teams found")).toBeNull();
+	},
+};
+
+/** A failed refresh keeps the last teams and their controls, says so, and offers Retry. */
+export const RefreshFailed: Story = {
+	args: { refreshFailure: { error: { status: 503 }, onRetry: fn(), pending: false } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("We could not refresh teams")).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Retry" })).toBeEnabled();
+		await expect(canvas.getByRole("heading", { name: "Frontend" })).toBeVisible();
+		await expect(
+			canvas.getByRole("button", { name: "Configure labels for org/hephaestus" }),
+		).toBeEnabled();
+	},
+};
 
 export const MobileReflow: Story = {
 	parameters: {

@@ -31,18 +31,33 @@ export function useSlackIntegration(workspaceSlug: string) {
 
 	const workspaceQueryOptions = getWorkspaceOptions({ path: { workspaceSlug } });
 	const workspaceQuery = useQuery(workspaceQueryOptions);
-	const workspaceData = workspaceQuery.data;
+	useQueryReadRefusal(workspaceQueryOptions.queryKey, workspaceQuery.isError, workspaceQuery.error);
+	// A failed refresh that can be retried keeps the workspace and connection each key last read, and
+	// what is open on them, beside the failure. A refusal withdraws them at once, before its entry is
+	// evicted, so nothing the connection owns stays actionable.
+	const workspaceRetained =
+		workspaceQuery.isRefetchError && queryErrorIsRetryable(workspaceQuery.error);
+	const workspaceData =
+		!workspaceQuery.isError || workspaceRetained ? workspaceQuery.data : undefined;
 	const hasSlackCredentials = workspaceData?.hasSlackToken === true;
 
 	const catalogQueryOptions = getIntegrationCatalogOptions({ path: { workspaceSlug } });
 	const catalogQuery = useQuery(catalogQueryOptions);
-	const entry = catalogQuery.data?.find((e) => e.kind === "SLACK");
+	useQueryReadRefusal(catalogQueryOptions.queryKey, catalogQuery.isError, catalogQuery.error);
+	const catalogRetained = catalogQuery.isRefetchError && queryErrorIsRetryable(catalogQuery.error);
+	const catalog = !catalogQuery.isError || catalogRetained ? catalogQuery.data : undefined;
+	// The connection stands only while both reads that own it do.
+	const entry = workspaceData === undefined ? undefined : catalog?.find((e) => e.kind === "SLACK");
 	const hasConnection = entry?.connected === true;
 	const isConnectionActive = entry?.connectionState === "ACTIVE" && hasSlackCredentials;
 	const connectionId = hasConnection ? entry.connectionId : undefined;
 
 	const isLoading = workspaceQuery.isLoading || catalogQuery.isLoading;
 	const loadError = workspaceQuery.error ?? catalogQuery.error;
+	const connectionRetained =
+		loadError != null &&
+		(!workspaceQuery.isError || workspaceRetained) &&
+		(!catalogQuery.isError || catalogRetained);
 	const retryLoad = () => {
 		void workspaceQuery.refetch();
 		void catalogQuery.refetch();
@@ -221,6 +236,7 @@ export function useSlackIntegration(workspaceSlug: string) {
 		credentialsUnreadableSince: entry?.credentialsUnreadableSince,
 		isLoading,
 		loadError,
+		connectionRetained,
 		retryLoad,
 		syncStatusHeaderProps: sync.syncStatusHeaderProps,
 		syncResourcesProps: sync.syncResourcesProps,

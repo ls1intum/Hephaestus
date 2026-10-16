@@ -85,6 +85,26 @@ class WebhookStreamMonitorTest extends BaseUnitTest {
     }
 
     @Test
+    void shouldCountOnlyCurrentDeploymentNamesWhileKeepingUnconsumedScopesVisible() throws Exception {
+        WebhookStreamMonitor monitor = monitor();
+        give(
+                1_000,
+                consumer(scope(1), 900, 4, 2, 1),
+                consumer(scope(999), 950, 6, 3, 0),
+                consumer(ConsumerSubjectMath.installationConsumerName(DURABLE_BASE), 970, 1, 1, 1),
+                consumer(DURABLE_BASE + "-preview-scope-1-github", 10, 1_000, 100, 0),
+                consumer(DURABLE_BASE + "-preview-installation", 10, 2_000, 100, 0),
+                consumer(DURABLE_BASE + "-scope-8", 10, 3_000, 100, 0),
+                consumer(DURABLE_BASE + "-scope-9-gitlab", 10, 4_000, 100, 0));
+
+        monitor.poll();
+
+        assertThat(pending()).isEqualTo(11d);
+        assertThat(ackPending()).isEqualTo(6d);
+        assertThat(withoutPullRequests()).isEqualTo(1d);
+    }
+
+    @Test
     void followsTheDurablesThatExistNowOnOneSeriesPerStream() throws Exception {
         WebhookStreamMonitor monitor = monitor();
         give(1_000, consumer(scope(2), 800, 30, 0, 0), consumer(scope(1), 900, 5, 0, 1));
@@ -265,7 +285,7 @@ class WebhookStreamMonitorTest extends BaseUnitTest {
     }
 
     private static String scope(long scopeId) {
-        return ConsumerSubjectMath.scopeConsumerName(DURABLE_BASE, scopeId) + "-github";
+        return ConsumerSubjectMath.scopeConsumerName(DURABLE_BASE, scopeId, "github");
     }
 
     /** A durable with a pull request waiting and nothing matching its filter left to read. */

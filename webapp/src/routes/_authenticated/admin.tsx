@@ -4,8 +4,9 @@ import type { ReactNode } from "react";
 
 import { adminGetInstanceSettingsOptions } from "@/api/@tanstack/react-query.gen";
 import { SilentModeBanner } from "@/components/admin/instance/SilentModeBanner";
-import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { QueryErrorAlert, queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
 import { isAppAdmin, resolveCurrentUser } from "@/runtime/auth/guard";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 /**
  * The client is not a security boundary — every `/admin` endpoint is enforced server-side by
@@ -25,12 +26,18 @@ export const Route = createFileRoute("/_authenticated/admin")({
 });
 
 function AdminLayout() {
-	const settingsQuery = useQuery(adminGetInstanceSettingsOptions());
+	const settingsOptions = adminGetInstanceSettingsOptions();
+	const settingsQuery = useQuery(settingsOptions);
+	useQueryReadRefusal(settingsOptions.queryKey, settingsQuery.isError, settingsQuery.error);
+	const settings =
+		settingsQuery.isError && !queryErrorIsRetryable(settingsQuery.error)
+			? undefined
+			: settingsQuery.data;
 	// The settings page owns this query's error; a second alert here would just stack on it.
 	const onSettingsPage = useMatchRoute()({ to: "/admin/settings" }) !== false;
 	let topStrip: ReactNode = null;
-	if (settingsQuery.data?.silentModeEngaged === true) {
-		topStrip = <SilentModeBanner settings={settingsQuery.data} />;
+	if (settings?.silentModeEngaged === true) {
+		topStrip = <SilentModeBanner settings={settings} />;
 	} else if (settingsQuery.isError && !onSettingsPage) {
 		// Unknown delivery state is not "delivering": say so rather than silently showing nothing.
 		topStrip = (

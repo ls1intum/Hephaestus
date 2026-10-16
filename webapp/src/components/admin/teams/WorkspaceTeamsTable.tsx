@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { RefreshFailure } from "@/runtime/tanstack-query/infinite-list";
 
 import { TeamTree } from "./TeamTree";
 
@@ -14,6 +15,8 @@ export interface TeamsTableProps {
 	isLoading?: boolean;
 	error?: unknown;
 	onRetry?: () => void;
+	/** Set when the latest read failed, so `teams` are the last known ones. */
+	refreshFailure?: RefreshFailure;
 	search: string;
 	onSearchChange: (search: string) => void;
 	onHideTeam: (teamId: number, hidden: boolean) => Promise<void>;
@@ -82,6 +85,7 @@ export function WorkspaceTeamsTable({
 	isLoading = false,
 	error,
 	onRetry,
+	refreshFailure,
 	search,
 	onSearchChange,
 	onHideTeam,
@@ -167,6 +171,9 @@ export function WorkspaceTeamsTable({
 	return (
 		<PageLayout>
 			{header}
+			{refreshFailure !== undefined && (
+				<QueryErrorAlert title="We could not refresh teams" {...refreshFailure} />
+			)}
 			<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 				<InputGroup className="w-full sm:max-w-md">
 					<InputGroupAddon>

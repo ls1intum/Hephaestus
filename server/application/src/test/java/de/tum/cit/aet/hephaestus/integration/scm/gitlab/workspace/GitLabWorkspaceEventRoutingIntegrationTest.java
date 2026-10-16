@@ -505,9 +505,7 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
                 STREAM,
                 ConsumerConfiguration.builder()
                         .durable(ConsumerSubjectMath.scopeConsumerName(
-                                        natsConnectionProperties.durableConsumerName(), restarted.getId())
-                                + "-"
-                                + STREAM)
+                                natsConnectionProperties.durableConsumerName(), restarted.getId(), STREAM))
                         .filterSubjects(legacyFilter().toArray(String[]::new))
                         .deliverPolicy(DeliverPolicy.New)
                         .build());

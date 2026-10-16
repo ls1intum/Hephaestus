@@ -11,6 +11,7 @@ import {
 	listConnectionSyncJobsQueryKey,
 	listConnectionSyncResourcesQueryKey,
 	listSlackChannelsQueryKey,
+	getWorkspaceQueryKey,
 } from "@/api/@tanstack/react-query.gen";
 import type {
 	ConnectionSyncStatus,
@@ -1683,4 +1684,305 @@ describe("Slack channel management reads", () => {
 			activation.resolve();
 		}
 	});
+});
+
+const slackEntry: Wire<IntegrationCatalogEntry> = {
+	kind: "SLACK",
+	displayName: "Slack",
+	connected: true,
+	connectionId: 7,
+	connectionState: "ACTIVE",
+};
+
+/** A Slack connection whose workspace and catalog reads the test controls, monitoring #team-standup. */
+function serveSlackConnection(catalog: SlackRead<Wire<IntegrationCatalogEntry>[]>) {
+	const { workspace } = mockConnection("GITHUB");
+	const slackWorkspace = { ...workspace, hasSlackToken: true, slackConnectionId: 7 };
+	const slack = serveSlackChannels(
+		{ status: 200, body: [standupChannel] },
+		{ status: 200, body: [] },
+	);
+	return {
+		...slack,
+		slackWorkspace,
+		workspace: serveSlackRead("*/workspaces/acme", { status: 200, body: slackWorkspace }),
+		catalog: serveSlackRead("*/workspaces/acme/connections/catalog", catalog),
+	};
+}
+
+describe("Slack connection reads", () => {
+	const workspaceKey = getWorkspaceQueryKey({ path: { workspaceSlug: "acme" } });
+	const catalogKey = getIntegrationCatalogQueryKey({ path: { workspaceSlug: "acme" } });
+
+	it("keeps a pending Add and its draft through a connection lookup outage, then retries the lookup", async () => {
+		const slack = serveSlackConnection({ status: 200, body: [slackEntry] });
+		const added = deferred<201 | 503>();
+		const adds = holdSlackAdds([added]);
+		const { queryClient } = renderRouteAtWithRouter("/w/acme/admin/integrations/slack");
+		const recorded = recordWrites();
+		const user = userEvent.setup();
+		try {
+			await screen.findByText("#team-standup", undefined, ROUTE_RENDER_WAIT);
+			await user.click(screen.getByRole("button", { name: "Add channel" }));
+			const dialog = await screen.findByRole("dialog");
+			const reference = within(dialog).getByLabelText("Paste a channel link or ID");
+			await user.type(reference, "C0974LJBPBK");
+			await user.click(within(dialog).getByRole("button", { name: "Add channel" }));
+			await waitFor(() => expect(adds.bodies).toStrictEqual([{ slackChannelId: "C0974LJBPBK" }]));
+			const catalogReads = slack.catalog.reads.count;
+			const workspaceReads = slack.workspace.reads.count;
+
+			slack.catalog.answer({ status: 503 });
+			await reread(queryClient, catalogKey);
+			await screen.findByText("We could not load the Slack connection");
+			expect(slack.catalog.reads.count).toBe(catalogReads + 1);
+			expect(screen.getByRole("dialog")).toBe(dialog);
+			expect(reference).toHaveProperty("value", "C0974LJBPBK");
+			expect(within(dialog).getByRole("button", { name: "Adding…" })).toHaveProperty(
+				"disabled",
+				true,
+			);
+
+			slack.workspace.answer({ status: 503 });
+			await reread(queryClient, workspaceKey);
+			expect(slack.workspace.reads.count).toBe(workspaceReads + 1);
+			expect(queryClient.getQueryState(workspaceKey)?.status).toBe("error");
+			screen.getByText("We could not load the Slack connection");
+			expect(screen.getByRole("dialog")).toBe(dialog);
+			expect(reference).toHaveProperty("value", "C0974LJBPBK");
+			expect(within(dialog).getByRole("button", { name: "Adding…" })).toHaveProperty(
+				"disabled",
+				true,
+			);
+			expect(recorded.writes).toStrictEqual(["POST /workspaces/acme/slack/channels"]);
+
+			added.resolve(503);
+			const retryAdd = await within(dialog).findByRole("button", { name: "Add channel" });
+			expect(retryAdd).toHaveProperty("disabled", false);
+			expect(reference).toHaveProperty("value", "C0974LJBPBK");
+			expect(screen.getByRole("dialog")).toBe(dialog);
+			expect(adds.bodies).toHaveLength(1);
+
+			await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+			await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+			slack.workspace.answer({ status: 200, body: slack.slackWorkspace });
+			slack.catalog.answer({ status: 200, body: [slackEntry] });
+			await user.click(screen.getByRole("button", { name: "Retry" }));
+			await waitFor(() =>
+				expect(screen.queryByText("We could not load the Slack connection")).toBeNull(),
+			);
+			expect(slack.catalog.reads.count).toBe(catalogReads + 2);
+			expect(slack.workspace.reads.count).toBe(workspaceReads + 2);
+			screen.getByText("Connected");
+			screen.getByText("#team-standup");
+			expect(screen.queryByRole("dialog")).toBeNull();
+			expect(recorded.writes).toStrictEqual(["POST /workspaces/acme/slack/channels"]);
+		} finally {
+			added.resolve(503);
+			recorded.stop();
+		}
+	});
+
+	it.each(["catalog", "workspace"] as const)(
+		"withdraws the open Remove and sync evidence when the %s read is refused, and an outage does not bring them back",
+		async (owner) => {
+			const syncedAt = "2026-10-15T08:00:00Z";
+			const slack = serveSlackConnection({ status: 503 });
+			const owning = {
+				catalog: { read: slack.catalog, key: catalogKey },
+				workspace: { read: slack.workspace, key: workspaceKey },
+			}[owner];
+			serveSyncReads({
+				status: 200,
+				resources: [
+					{
+						id: 5,
+						externalId: "C06ARCHIVE6",
+						name: "team-archive",
+						type: "CHANNEL",
+						counts: [{ key: "messages", label: "Messages", count: 4242, lastSyncedAt: syncedAt }],
+						state: "SYNCED",
+						lastSyncedAt: syncedAt,
+						itemCount: 4242,
+					},
+				],
+				jobs: [
+					{
+						id: 51,
+						type: "RECONCILIATION",
+						trigger: "MANUAL",
+						status: "SUCCEEDED",
+						cancelRequested: false,
+						createdAt: syncedAt,
+						itemsProcessed: 31_337,
+					},
+				],
+			});
+			const { queryClient } = renderRouteAtWithRouter("/w/acme/admin/integrations/slack");
+			const recorded = recordWrites();
+			const user = userEvent.setup();
+			try {
+				await screen.findByText(
+					"We could not load the Slack connection",
+					undefined,
+					ROUTE_RENDER_WAIT,
+				);
+				expect(screen.queryByText("Slack channel monitoring")).toBeNull();
+				expect(screen.queryByText("team-archive")).toBeNull();
+
+				slack.catalog.answer({ status: 200, body: [slackEntry] });
+				await user.click(screen.getByRole("button", { name: "Retry" }));
+				await screen.findByText("team-archive");
+				await screen.findByText("31,337");
+				const removal = await openSlackRemove(user, "team-standup");
+				await user.type(within(removal).getByLabelText(/to confirm/u), "C02ACTIVE002");
+				const owningReads = owning.read.reads.count;
+
+				owning.read.answer({ status: 403 });
+				await reread(queryClient, owning.key);
+				await screen.findByText("You do not have access to the Slack connection");
+				expect(owning.read.reads.count).toBe(owningReads + 1);
+				expect(screen.queryByText("team-archive")).toBeNull();
+				expect(screen.queryByText("31,337")).toBeNull();
+				expect(screen.queryByRole("alertdialog")).toBeNull();
+				expect(screen.queryByText("#team-standup")).toBeNull();
+				expect(screen.queryByRole("button", { name: "Add channel" })).toBeNull();
+				expect(
+					screen.queryByRole("button", { name: /^(?:Reconnect|Disconnect) Slack/u }),
+				).toBeNull();
+				expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+
+				owning.read.answer({ status: 503 });
+				await reread(queryClient, owning.key);
+				await screen.findByText("We could not load the Slack connection");
+				expect(owning.read.reads.count).toBe(owningReads + 2);
+				expect(screen.queryByText("team-archive")).toBeNull();
+				expect(screen.queryByText("31,337")).toBeNull();
+				expect(screen.queryByRole("alertdialog")).toBeNull();
+				expect(screen.queryByText("#team-standup")).toBeNull();
+				expect(screen.queryByRole("button", { name: "Add channel" })).toBeNull();
+				expect(
+					screen.queryByRole("button", { name: /^(?:Reconnect|Disconnect) Slack/u }),
+				).toBeNull();
+
+				slack.workspace.answer({ status: 200, body: slack.slackWorkspace });
+				slack.catalog.answer({
+					status: 200,
+					body: [{ ...slackEntry, credentialsUnreadableSince: syncedAt }],
+				});
+				await user.click(screen.getByRole("button", { name: "Retry" }));
+				await screen.findByText("Token unreadable");
+				screen.getByText("#team-standup");
+				await screen.findByText("team-archive");
+				expect(screen.queryByText("We could not load the Slack connection")).toBeNull();
+				expect(screen.queryByRole("alertdialog")).toBeNull();
+				expect(owning.read.reads.count).toBe(owningReads + 3);
+				expect(slack.changes).toStrictEqual([]);
+				expect(recorded.writes).toStrictEqual([]);
+			} finally {
+				recorded.stop();
+			}
+		},
+	);
+});
+
+describe("source-control owning workspace reads", () => {
+	const workspaceKey = getWorkspaceQueryKey({ path: { workspaceSlug: "acme" } });
+
+	it.each(["GITHUB", "GITLAB"] as const)(
+		"withdraws %s management when its workspace read is refused and keeps it withdrawn through an outage",
+		async (kind) => {
+			const { workspace } = mockConnection(kind);
+			const owning = serveScmRead("*/workspaces/acme", { status: 200, body: workspace });
+			serveScmRead("*/workspaces/acme/repositories", {
+				status: 200,
+				body: ["acme/platform/api"],
+			});
+			const { queryClient } = renderRouteAtWithRouter("/w/acme/admin/integrations/scm");
+			const user = userEvent.setup();
+			const recorded = recordWrites();
+			try {
+				await user.type(
+					await screen.findByLabelText("Add a repository", undefined, ROUTE_RENDER_WAIT),
+					"acme/platform/web",
+				);
+				await user.type(screen.getByLabelText("New personal access token"), "draft-token");
+				await user.click(screen.getByRole("button", { name: "Stop monitoring acme/platform/api" }));
+				await screen.findByRole("alertdialog", { name: "Stop monitoring acme/platform/api?" });
+
+				owning.answer({ status: 403 });
+				await reread(queryClient, workspaceKey);
+				await screen.findByText(/You do not have access to the .+ connection/u);
+				await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+				expect(screen.queryByLabelText("New personal access token")).toBeNull();
+				expect(screen.queryByLabelText("Add a repository")).toBeNull();
+				expect(screen.queryByText("Repository sync state")).toBeNull();
+				expect(screen.queryByRole("button", { name: /^Stop monitoring/u })).toBeNull();
+
+				owning.answer({ status: 503 });
+				await reread(queryClient, workspaceKey);
+				await screen.findByText(/We could not load the .+ connection/u);
+				expect(screen.queryByRole("alertdialog")).toBeNull();
+				expect(screen.queryByLabelText("New personal access token")).toBeNull();
+				expect(screen.queryByLabelText("Add a repository")).toBeNull();
+				expect(screen.queryByText("acme/platform/api")).toBeNull();
+				expect(screen.queryByText("Repository sync state")).toBeNull();
+
+				owning.answer({ status: 200, body: workspace });
+				await reread(queryClient, workspaceKey);
+				await screen.findByRole("button", { name: "Stop monitoring acme/platform/api" });
+				expect(screen.queryByRole("alertdialog")).toBeNull();
+				expect(screen.getByLabelText("Add a repository")).toHaveProperty("value", "");
+				expect(screen.getByLabelText("New personal access token")).toHaveProperty("value", "");
+				expect(recorded.writes).toStrictEqual([]);
+			} finally {
+				recorded.stop();
+			}
+		},
+	);
+
+	it("keeps a GitLab token draft and open Stop through a recoverable workspace refresh", async () => {
+		const { workspace } = mockConnection("GITLAB");
+		const owning = serveScmRead("*/workspaces/acme", { status: 200, body: workspace });
+		serveScmRead("*/workspaces/acme/repositories", { status: 200, body: ["acme/platform/api"] });
+		const { queryClient } = renderRouteAtWithRouter("/w/acme/admin/integrations/scm");
+		const user = userEvent.setup();
+		await user.type(
+			await screen.findByLabelText("Add a repository", undefined, ROUTE_RENDER_WAIT),
+			"acme/platform/web",
+		);
+		await user.type(screen.getByLabelText("New personal access token"), "draft-token");
+		await user.click(screen.getByRole("button", { name: "Stop monitoring acme/platform/api" }));
+		const dialog = await screen.findByRole("alertdialog");
+
+		owning.answer({ status: 503 });
+		await reread(queryClient, workspaceKey);
+		await screen.findByText("We could not load the GitLab connection");
+		expect(screen.getByRole("alertdialog")).toBe(dialog);
+		expect(within(dialog).getByRole("button", { name: "Stop monitoring" })).toHaveProperty(
+			"disabled",
+			false,
+		);
+		expect(screen.getByLabelText("Add a repository")).toHaveProperty("value", "acme/platform/web");
+		expect(screen.getByLabelText("New personal access token")).toHaveProperty(
+			"value",
+			"draft-token",
+		);
+	});
+
+	it.each([
+		{ status: 403, message: "You do not have access to the Source control connection" },
+		{ status: 503, message: "We could not load the Source control connection" },
+	] as const)(
+		"does not infer a source-control provider from a cached catalog when the first workspace read is $status",
+		async ({ status, message }) => {
+			mockConnection("GITLAB");
+			serveScmRead("*/workspaces/acme", { status });
+			renderRouteAt("/w/acme/admin/integrations/scm");
+			await screen.findByText(message, undefined, ROUTE_RENDER_WAIT);
+			expect(screen.queryByLabelText("New personal access token")).toBeNull();
+			expect(screen.queryByLabelText("Add a repository")).toBeNull();
+			expect(screen.queryByText("Repository sync state")).toBeNull();
+		},
+	);
 });
