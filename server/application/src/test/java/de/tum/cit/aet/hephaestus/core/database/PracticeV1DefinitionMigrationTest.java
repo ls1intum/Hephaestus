@@ -28,7 +28,7 @@ class PracticeV1DefinitionMigrationTest {
         try (var input = Objects.requireNonNull(
                 getClass().getResourceAsStream("/db/practice-cutover/mapped-program-targets.json"))) {
             var bindings = Objects.requireNonNull(JsonMapper.builder().build().readTree(input));
-            assertThat(bindings.size()).isEqualTo(55);
+            assertThat(bindings.size()).isEqualTo(85);
             for (var binding : bindings) {
                 var mapping = Objects.requireNonNull(
                         mapped.get(binding.path("sourceSha256").asString()));
@@ -42,7 +42,7 @@ class PracticeV1DefinitionMigrationTest {
         assertThat(programs.stream()
                         .map(PracticeMigrationFixture.ProgramMapping::sourceSha256)
                         .distinct())
-                .hasSize(55);
+                .hasSize(85);
         var database = PracticeMigrationFixture.releasedDatabase(context);
         PracticeMigrationFixture.seedMappedPrograms(database, programs);
         PracticeMigrationFixture.upgrade(database, context);

@@ -218,5 +218,125 @@
   {
     "sourceSha256": "e891338cd518e6a87a940d54c369c7963daf03315e9426b0ef79955a77521607",
     "targetResource": "/practices/scripts/issue-closed-with-unmet-outcome.ts"
+  },
+  {
+    "sourceSha256": "0b095e48030e5db36448ccc2cf1dffbc8ca812c661a78ee3a17b39ba4f89fbff",
+    "targetResource": "/practices/scripts/issue-scoped-to-single-concern.ts"
+  },
+  {
+    "sourceSha256": "0bd59dd1a090fd9dff67306e1d2280cfc23a44cf57e9c08f6dad57790efc3867",
+    "targetResource": "/practices/scripts/changes-dependencies-deliberately.ts"
+  },
+  {
+    "sourceSha256": "281e886961839f68797f267d475b005e661201cc3d7241a8637382032e99b857",
+    "targetResource": "/practices/scripts/documents-public-api-and-behaviour-changes.ts"
+  },
+  {
+    "sourceSha256": "321da0cb39d0d90de07411abbff9cf4e8ffccc552dade33303b5717212f3567e",
+    "targetResource": "/practices/scripts/leaves-the-code-clean-with-intent-revealing-comments.ts"
+  },
+  {
+    "sourceSha256": "3c3a9c44ddf56599ed841a54f1c93fa40d15d1c53ee5c127bfe13718e71c7b91",
+    "targetResource": "/practices/scripts/breaks-large-work-into-trackable-subtasks.ts"
+  },
+  {
+    "sourceSha256": "4d3fdaf437ae11874328db5dacf8dc267e3a240807b89a808e6082e3f8987605",
+    "targetResource": "/practices/scripts/validates-inputs-and-edge-cases-at-the-boundary.ts"
+  },
+  {
+    "sourceSha256": "53f909a8ebc44d849b24811b68485ca18721aa46a0b208dd40c30540cb86c54d",
+    "targetResource": "/practices/scripts/triages-the-issue-with-labels-and-ownership.ts"
+  },
+  {
+    "sourceSha256": "769b2a53b00dc769e497ccd1a849af2232fc2824e49782e1fd9202becfed43fd",
+    "targetResource": "/practices/scripts/ready-and-traceable-handoff.ts"
+  },
+  {
+    "sourceSha256": "ad2c03e9ace0b8640233a2516e32b66f6a6b136d80c25d995110b1007d786078",
+    "targetResource": "/practices/scripts/issue-has-checkable-outcome.ts"
+  },
+  {
+    "sourceSha256": "c56dc26d2e5e168eb15f3c2146bbb816715ab9945dc555bbedc33b87530fe3a4",
+    "targetResource": "/practices/scripts/validates-and-escapes-untrusted-input.ts"
+  },
+  {
+    "sourceSha256": "d8203668853e48d7367139fcbe8aa71f1cc0ce1a240f3205ce5ddafe458b705c",
+    "targetResource": "/practices/scripts/issue-closed-with-unmet-outcome.ts"
+  },
+  {
+    "sourceSha256": "db40481aa26d40d01aabbadea8c4a96aebff10dba55a9c002889e73d01d579e4",
+    "targetResource": "/practices/scripts/ships-tests-with-the-change.ts"
+  },
+  {
+    "sourceSha256": "f554d7264cd3bd987b37cf58ec1b3fe064100a9b406824497775dd8e93aa8d36",
+    "targetResource": "/practices/scripts/issue-states-an-actionable-problem.ts"
+  },
+  {
+    "sourceSha256": "f589d99dfbb6b1147feab0253f965715a47efe0f2f62a920a2ce31e168228b53",
+    "targetResource": "/practices/scripts/avoids-unsafe-panics-and-chosen-crashes.ts"
+  },
+  {
+    "sourceSha256": "fb94a7c0d83403e92c7e7b8bf4e4347dd87da68a9365ab12f9e0500ce294f1a7",
+    "targetResource": "/practices/scripts/honours-linked-issue-acceptance-criteria.ts"
+  },
+  {
+    "sourceSha256": "fe658bde406544750957439d9432d5669e782e0353e6b42339074783af06a335",
+    "targetResource": "/practices/scripts/avoids-insecure-defaults-and-over-broad-permissions.ts"
+  },
+  {
+    "sourceSha256": "ff2a8b3a87d411bae2af4ff058d7fe3fed4c68bb3d8631c8079b0c6f14dbda86",
+    "targetResource": "/practices/scripts/handles-errors-instead-of-swallowing-them.ts"
+  },
+  {
+    "sourceSha256": "3218c12e62693757ae70ebcfa8b162dc1202798f30e013246d4a5c4da2fa4842",
+    "targetResource": "/practices/scripts/covers-complex-views-with-previews.ts"
+  },
+  {
+    "sourceSha256": "370579fd136ffd67d01bc20b4764fee23881288ef9057271f3a2b1b41e09f0ab",
+    "targetResource": "/practices/scripts/gives-swiftui-state-one-clear-owner.ts"
+  },
+  {
+    "sourceSha256": "504e107c25c719cefd03e1d5af94b6fa0964e8c570121720b5d2b34497f32f31",
+    "targetResource": "/practices/scripts/keeps-credentials-out-of-source.ts"
+  },
+  {
+    "sourceSha256": "6b33d2af048c983da3f7f00f805103e1f4fcfc99b9e5529d7f64cf7d6c273818",
+    "targetResource": "/practices/scripts/keeps-swiftui-view-bodies-small.ts"
+  },
+  {
+    "sourceSha256": "6dce868eb9feea720a9de0b93415b3085ef6418f057864b2636102ef9687d4a5",
+    "targetResource": "/practices/scripts/removes-debug-output-and-leftover-code.ts"
+  },
+  {
+    "sourceSha256": "784aabb1a9411929d18663e170f0bc39d4d1e311ffd83270e4e8c0e4403b31f4",
+    "targetResource": "/practices/scripts/names-swift-identifiers-by-convention.ts"
+  },
+  {
+    "sourceSha256": "7ee23e88f16ee308370b2e9f7c30241e5b4ed370c3024bc7868eeb9943ff39b3",
+    "targetResource": "/practices/scripts/shows-loading-and-error-states-for-fetched-data.ts"
+  },
+  {
+    "sourceSha256": "8f520e8a8e80045eebb4b785210840cc8c41ad17d0cfbe54137893ff45bc8df0",
+    "targetResource": "/practices/scripts/describes-the-change-beyond-the-template.ts"
+  },
+  {
+    "sourceSha256": "9276125f2390b2a8c2773e7bc5a0bcefc1b592c6063819e0a1ebcb11db982ec2",
+    "targetResource": "/practices/scripts/surfaces-failures-instead-of-silencing-them.ts"
+  },
+  {
+    "sourceSha256": "a4221221409234182e85f2436654de0d2999bb62c5663a95ae3f60c9342eb5ea",
+    "targetResource": "/practices/scripts/keeps-io-and-domain-logic-out-of-views.ts"
+  },
+  {
+    "sourceSha256": "aae3121ef31b12de58ccc4d01fe1d22928e9590e9a76bf43cddad158d757cf67",
+    "targetResource": "/practices/scripts/avoids-crash-prone-swift-shortcuts.ts"
+  },
+  {
+    "sourceSha256": "da494369344dffccdf03552d73b94cc8b126d7eb4cff763e2079ee7285c4b94a",
+    "targetResource": "/practices/scripts/labels-images-and-taps-for-assistive-technology.ts"
+  },
+  {
+    "sourceSha256": "edeea9d2a80bf773d7433845ecd6a2b788ce3eba59536c5c354b7d356cc34b5f",
+    "targetResource": "/practices/scripts/titles-commits-and-requests-by-their-change.ts"
   }
 ]

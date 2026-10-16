@@ -148,6 +148,8 @@ final class PracticeMigrationFixture {
     }
 
     static void seedMappedPrograms(TestDatabase database, List<ProgramMapping> programs) throws SQLException {
+        long first = 1600000L;
+        long last = first + programs.size() - 1;
         try (var connection = dataSource(database).getConnection()) {
             connection.setAutoCommit(false);
             try (var statement = connection.prepareStatement("""
@@ -169,35 +171,46 @@ final class PracticeMigrationFixture {
                 FROM practice p CROSS JOIN supplied s WHERE p.id=992121
                 """)) {
                 for (int index = 0; index < programs.size(); index++) {
-                    statement.setLong(1, 1600000L + index);
+                    statement.setLong(1, first + index);
                     statement.setString(2, "synthetic-mapping-" + index);
                     statement.setString(3, programs.get(index).source());
                     statement.addBatch();
                 }
                 assertThat(statement.executeBatch()).hasSize(programs.size());
             }
-            try (var statement = connection.createStatement()) {
-                statement.executeUpdate("""
-                    INSERT INTO practice_revision(id,practice_id,revision_number,slug,name,applies_to,subject,
-                        signals,evidence_requirements,review_when,criteria,automated_review_policy,delivery_behavior,
-                        precompute_script,created_at)
-                    SELECT id+100000,id,1,slug,name,applies_to,subject,signals,evidence_requirements,review_when,
-                        criteria,automated_review_policy,delivery_behavior,precompute_script,'2026-01-01T00:00:00Z'
-                    FROM practice WHERE id BETWEEN 1600000 AND 1600054
-                    """);
-                statement.executeUpdate(
-                        "UPDATE practice SET current_revision_id=id+100000" + " WHERE id BETWEEN 1600000 AND 1600054");
-                statement.executeUpdate("""
-                    INSERT INTO curated_practice_override(slug,name,applies_to,subject,signals,evidence_requirements,
-                        review_when,criteria,automated_review_policy,delivery_behavior,precompute_script,
-                        adopted_base,adopted_base_source,position,version,created_at,updated_at)
-                    SELECT source_curated_slug,'Synthetic instance practice',applies_to,subject,signals,
-                        evidence_requirements,review_when,E'Instance customized criterion.\\n  Keep exact whitespace.\\n',
-                        automated_review_policy,delivery_behavior,precompute_script,
-                        jsonb_set(adopted_base,'{criteria}',to_jsonb(E'Instance comparison criterion.\\n  Keep exact whitespace.\\n'::text)),
-                        'EXACT_ADOPTION',id-1600000,1,'2026-01-01T00:00:00Z','2026-01-01T00:00:00Z'
-                    FROM practice WHERE id BETWEEN 1600000 AND 1600054
-                    """);
+            try (var statement = connection.prepareStatement("""
+                INSERT INTO practice_revision(id,practice_id,revision_number,slug,name,applies_to,subject,
+                    signals,evidence_requirements,review_when,criteria,automated_review_policy,delivery_behavior,
+                    precompute_script,created_at)
+                SELECT id+100000,id,1,slug,name,applies_to,subject,signals,evidence_requirements,review_when,
+                    criteria,automated_review_policy,delivery_behavior,precompute_script,'2026-01-01T00:00:00Z'
+                FROM practice WHERE id BETWEEN ? AND ?
+                """)) {
+                statement.setLong(1, first);
+                statement.setLong(2, last);
+                assertThat(statement.executeUpdate()).isEqualTo(programs.size());
+            }
+            try (var statement = connection.prepareStatement(
+                    "UPDATE practice SET current_revision_id=id+100000 WHERE id BETWEEN ? AND ?")) {
+                statement.setLong(1, first);
+                statement.setLong(2, last);
+                assertThat(statement.executeUpdate()).isEqualTo(programs.size());
+            }
+            try (var statement = connection.prepareStatement("""
+                INSERT INTO curated_practice_override(slug,name,applies_to,subject,signals,evidence_requirements,
+                    review_when,criteria,automated_review_policy,delivery_behavior,precompute_script,
+                    adopted_base,adopted_base_source,position,version,created_at,updated_at)
+                SELECT source_curated_slug,'Synthetic instance practice',applies_to,subject,signals,
+                    evidence_requirements,review_when,E'Instance customized criterion.\\n  Keep exact whitespace.\\n',
+                    automated_review_policy,delivery_behavior,precompute_script,
+                    jsonb_set(adopted_base,'{criteria}',to_jsonb(E'Instance comparison criterion.\\n  Keep exact whitespace.\\n'::text)),
+                    'EXACT_ADOPTION',id-?,1,'2026-01-01T00:00:00Z','2026-01-01T00:00:00Z'
+                FROM practice WHERE id BETWEEN ? AND ?
+                """)) {
+                statement.setLong(1, first);
+                statement.setLong(2, first);
+                statement.setLong(3, last);
+                assertThat(statement.executeUpdate()).isEqualTo(programs.size());
             }
             connection.commit();
         }

@@ -99,6 +99,11 @@ export interface Loader {
 		assert.equal(languageOf("README.md"), null);
 		assert.equal(isTestPath("AppTests/EventListTests.swift"), true);
 		assert.equal(isTestPath("src/store.test.ts"), true);
+		assert.equal(isTestPath("src/FooSpec.ts"), true);
+		assert.equal(isTestPath("App/FooSpec.swift"), true);
+		assert.equal(isTestPath("src/FooSPEC.TS"), true);
+		assert.equal(isTestPath("src/Specification.ts"), false);
+		assert.equal(isTestPath("App/Specimen.swift"), false);
 		assert.equal(isTestPath("App/Views/EventList.swift"), false);
 		assert.equal(isTestPath("CourseUITests/Smoke.swift"), true);
 		assert.equal(isTestPath("App/Latest.swift"), false);

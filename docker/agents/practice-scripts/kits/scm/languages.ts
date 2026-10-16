@@ -40,6 +40,7 @@ export function isTestPath(path: string): boolean {
 	return (
 		/(?:^|\/)(?:tests?|__tests__|spec|specs|uitests?|androidTest|testing)\//iu.test(path) ||
 		/(?:^|\/)\w+Tests\//u.test(path) ||
-		/(?:\.test|\.spec|Tests?|_test|_spec)\.[a-z]+$/u.test(path)
+		/(?:\.test|\.spec|Tests?|_test|_spec)\.[a-z]+$/u.test(path) ||
+		/Spec\.[a-z0-9]+$/iu.test(path)
 	);
 }

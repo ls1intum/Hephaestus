@@ -631,3 +631,416 @@ void describe("migrated authored practice programs", () => {
 		}
 	});
 });
+
+/** A change that adds every line of each file. */
+function addedSources(files: Record<string, string>): RunInputs {
+	return {
+		repo: files,
+		change: new Map(
+			Object.entries(files).map(([file, text]) => [
+				file,
+				{
+					path: file,
+					addedLines: new Map(text.split("\n").map((line, index) => [index + 1, line])),
+					removedLines: new Map(),
+					hunks: [],
+				},
+			]),
+		),
+	};
+}
+
+function complexView(previews: string): string {
+	return `struct Screen: View {\n@State private var a = 0\n@State private var b = 0\n@State private var c = 0\n@State private var d = 0\nvar body: some View { switch a { default: Text("") } }\n}\n${previews}`;
+}
+
+function commit(message: string, index: number) {
+	return { sha: String(index).repeat(40), message, parents: [], files: [] };
+}
+
+const STATE_SOURCE = [
+	"final class Store: ObservableObject {",
+	"@Published var items: [String] = []",
+	"}",
+	"struct Screen: View {",
+	"@ObservedObject var store = Store()",
+	"@State private var count = 0 {",
+	"didSet { print(count) }",
+	"}",
+	'var body: some View { Text("") }',
+	"@State var selection: Store",
+	"}",
+	"#Preview { @State var preview = 1 }",
+].join("\n");
+
+void describe("migrated workspace practice programs", () => {
+	void it("names complex changed views by their preview count", async () => {
+		const result = await runBundled(
+			"covers-complex-views-with-previews",
+			addedSources({
+				"App/None.swift": complexView(""),
+				"App/One.swift": complexView("#Preview { Screen() }"),
+				"App/Two.swift": complexView('#Preview { Screen() }\n#Preview("Empty") { Screen() }'),
+				"App/Plain.swift": 'struct Plain: View {\nvar body: some View { Text("") }\n}',
+			}),
+		);
+		assert.deepEqual(result.facts, {
+			viewFiles: 4,
+			complexWithoutPreview: 1,
+			complexWithOnePreview: 1,
+		});
+		assert.deepEqual(
+			result.leads?.map((lead) => [
+				"file" in lead.at ? lead.at.file : "",
+				lead.facts?.previewBlocks,
+			]),
+			[
+				["App/None.swift", 0],
+				["App/One.swift", 1],
+			],
+		);
+	});
+
+	void it("reads state ownership cues on changed lines only", async () => {
+		const result = await runBundled(
+			"gives-swiftui-state-one-clear-owner",
+			addedSources({ "App/Screen.swift": STATE_SOURCE }),
+		);
+		assert.deepEqual(result.facts, {
+			observableObject: 1,
+			published: 1,
+			observedObjectCreates: 1,
+			stateObserver: 1,
+			stateNotPrivate: 1,
+			stateWithoutDefault: 1,
+			stateReferenceType: 1,
+		});
+		const said = result.directions?.join(" ") ?? "";
+		assert.match(said, /recreated whenever the parent rebuilds/u);
+		assert.match(said, /keeps its first value/u);
+
+		const unchanged = await runBundled("gives-swiftui-state-one-clear-owner", {
+			repo: { "App/Screen.swift": STATE_SOURCE },
+			change: new Map([
+				[
+					"App/Screen.swift",
+					{
+						path: "App/Screen.swift",
+						addedLines: new Map([[9, 'var body: some View { Text("") }']]),
+						removedLines: new Map(),
+						hunks: [],
+					},
+				],
+			]),
+		});
+		assert.deepEqual(unchanged.facts, {});
+	});
+
+	void it("marks credential-shaped lines without repeating their values", async () => {
+		const key = ["AKIA", "IOSFODNN7EXAMPLE"].join("");
+		const assigned = ["q8Zr2LmX", "9vTn4KpW"].join("");
+		const result = await runBundled(
+			"keeps-credentials-out-of-source",
+			addedSources({
+				"App/Keys.swift": `let id = "${key}"\nlet apiKey = "${assigned}"\nlet token = "YOUR_TOKEN_HERE_123"`,
+				"logo.png": "\u0000binary",
+			}),
+		);
+		assert.deepEqual(result.facts, { knownPrefix: 1, secretAssignment: 1 });
+		assert.deepEqual(
+			result.leads?.map((lead) => lead.at.line),
+			[1, 2],
+		);
+		const text = JSON.stringify(result);
+		assert.ok(!text.includes(key) && !text.includes(assigned));
+		assert.match(result.directions?.join(" ") ?? "", /Never repeat a suspected value/u);
+	});
+
+	void it("measures long changed view bodies and a repeated refresh", async () => {
+		const filler = Array.from({ length: 52 }, () => 'Text("row")').join("\n");
+		const result = await runBundled(
+			"keeps-swiftui-view-bodies-small",
+			addedSources({
+				"App/Long.swift": `struct Long: View {\nvar body: some View {\nVStack {\n${filler}\n}\n.task { await model.load(page: 1) }\n.refreshable { await model.load(page: 1) }\n}\n}`,
+				"App/Short.swift": 'struct Short: View {\nvar body: some View {\nText("")\n}\n}',
+			}),
+		);
+		assert.equal(result.facts?.viewBodies, 1);
+		assert.equal(result.facts.bodiesOver50Lines, 1);
+		assert.equal(result.facts.bodiesOver80Lines, 0);
+		assert.equal(result.facts.sameTaskAndRefresh, 1);
+		assert.equal(result.leads?.length, 1);
+		assert.equal(result.leads[0]?.facts?.bodyLines, 56);
+	});
+
+	void it("finds leftover output and commented code but leaves catch-block prints alone", async () => {
+		const result = await runBundled(
+			"removes-debug-output-and-leftover-code",
+			addedSources({
+				"App/Load.swift": [
+					'print("loaded")',
+					"// let old = 1",
+					"// return old",
+					'NSLog("x")',
+					"// TODO: tidy",
+					"",
+					"do {",
+					"try run()",
+					"} catch {",
+					"print(error)",
+					"}",
+				].join("\n"),
+			}),
+		);
+		assert.deepEqual(result.facts, { print: 1, commentedCode: 1, nslog: 1, todo: 1 });
+	});
+
+	void it("names identifiers that break the Swift naming conventions", async () => {
+		const result = await runBundled(
+			"names-swift-identifiers-by-convention",
+			addedSources({
+				"App/Profile.swift":
+					'let user_name = ""\nlet URLPath = ""\nvar nameString = ""\nstruct Account {}',
+				"AppTests/Profile.swift": 'let user_name = ""',
+			}),
+		);
+		assert.deepEqual(result.facts, {
+			snakeCaseProperty: 1,
+			acronymCasing: 1,
+			typeInName: 1,
+			fileTypeMismatch: 1,
+		});
+	});
+
+	void it("tells which loading and error states a fetching view has", async () => {
+		const result = await runBundled(
+			"shows-loading-and-error-states-for-fetched-data",
+			addedSources({
+				"App/Feed.swift":
+					"struct Feed: View {\nvar body: some View { ProgressView() }\nfunc load() async { _ = try? await URLSession.shared.data(from: url) }\n}",
+				"App/Static.swift": 'struct Static: View {\nvar body: some View { Text("") }\n}',
+			}),
+		);
+		assert.deepEqual(result.facts, {
+			fetchingViews: 1,
+			withoutLoadingOrError: 0,
+			withoutLoading: 0,
+			withoutError: 1,
+			spinnerWithoutError: 1,
+			rawErrorText: 0,
+		});
+		assert.deepEqual(result.leads?.[0]?.facts, {
+			source: "URLSession",
+			hasLoadingState: true,
+			hasErrorState: false,
+			hasProgressView: true,
+		});
+	});
+
+	void it("separates the description's own words from its template", async () => {
+		const checklist = await runBundled("describes-the-change-beyond-the-template", {
+			item: {
+				title: "Add export",
+				body: "## Description\n- [ ] Tests\n- [x] Docs\nCloses #12",
+				changed_files: 8,
+			},
+			context: { "commits.json": { commits: [] } },
+		});
+		assert.equal(checklist.facts?.checklistOnly, true);
+		assert.equal(checklist.facts.emptyBody, undefined);
+		assert.equal(checklist.facts.descriptionWords, 0);
+		assert.equal(checklist.facts.checkboxes, 2);
+
+		const empty = await runBundled("describes-the-change-beyond-the-template", {
+			item: { title: "update", body: "", changed_files: 1 },
+		});
+		assert.equal(empty.facts?.emptyBody, true);
+		assert.equal(empty.facts.genericTitle, true);
+		const said = empty.directions?.join(" ") ?? "";
+		assert.match(said, /^The description is empty\. The title is a generic word/u);
+		assert.match(said, /was not captured/u);
+	});
+
+	void it("keeps an uncaptured title and description unknown, apart from a captured empty one", async () => {
+		const context = { "commits.json": { commits: [commit("Add CSV export", 1)] } };
+		const omitted = await runBundled("describes-the-change-beyond-the-template", {
+			item: { title: undefined, body: undefined, changed_files: 8 },
+			context,
+		});
+		assert.deepEqual(omitted.facts, { changedFiles: 8, capturedCommits: 1 });
+		assert.match(
+			omitted.directions?.[0] ?? "",
+			/^Not captured, so unknown rather than empty: description, title\./u,
+		);
+		const omittedSaid = omitted.directions?.join(" ") ?? "";
+		assert.match(
+			omittedSaid,
+			/description was not captured, so it was not compared with the 1 captured/u,
+		);
+		assert.doesNotMatch(omittedSaid, /is compared with/u);
+
+		const known = await runBundled("describes-the-change-beyond-the-template", {
+			item: { title: "update", body: null, changed_files: 8 },
+			context,
+		});
+		assert.equal(known.facts?.emptyBody, true);
+		assert.equal(known.facts.genericTitle, true);
+		assert.equal(known.facts.descriptionWords, 0);
+		const knownSaid = known.directions?.join(" ") ?? "";
+		assert.doesNotMatch(knownSaid, /Not captured|was not compared/u);
+		assert.match(knownSaid, /is compared with the 1 captured commit subject/u);
+
+		const untitled = await runBundled("describes-the-change-beyond-the-template", {
+			item: {
+				title: undefined,
+				body: "Exports the report table as CSV for finance.",
+				changed_files: 2,
+			},
+			context,
+		});
+		assert.equal(untitled.facts?.descriptionWords, 8);
+		assert.equal(untitled.facts.bodyRepeatsTitle, undefined);
+		assert.match(untitled.directions?.[0] ?? "", /unknown rather than empty: title\./u);
+	});
+
+	void it("reads commit subjects when the title was not captured", async () => {
+		const result = await runBundled("titles-commits-and-requests-by-their-change", {
+			item: { title: undefined },
+			context: { "commits.json": { commits: ["wip", "Add CSV export"].map(commit) } },
+		});
+		assert.ok(result.facts !== undefined);
+		assert.equal(result.facts.titleLength, undefined);
+		assert.equal(result.facts.titleCues, undefined);
+		assert.equal(result.facts.authoredCommits, 2);
+		assert.equal(result.facts.vagueSubjects, 1);
+		assert.match(
+			result.directions?.[0] ?? "",
+			/^The title was not captured, so it is unknown, not empty/u,
+		);
+	});
+
+	void it("reads what a changed catch block and an optional try do with the failure", async () => {
+		const result = await runBundled(
+			"surfaces-failures-instead-of-silencing-them",
+			addedSources({
+				"App/Store.swift": [
+					"func load() {",
+					"do {",
+					"try run()",
+					"} catch {",
+					"}",
+					"do {",
+					"try run()",
+					"} catch {",
+					"errorMessage = error.localizedDescription",
+					"}",
+					"do {",
+					"try run()",
+					"} catch {",
+					"Logger().error(error)",
+					"cleanUp()",
+					"retry()",
+					"}",
+					"let data = try? await URLSession.shared.data(from: url)",
+					"}",
+					"func save() {",
+					"}",
+				].join("\n"),
+			}),
+		);
+		assert.deepEqual(result.facts, {
+			emptyCatch: 1,
+			optionalTryNetwork: 1,
+			emptyStatefulFunction: 1,
+		});
+	});
+
+	void it("finds I/O on changed lines of view files only", async () => {
+		const result = await runBundled(
+			"keeps-io-and-domain-logic-out-of-views",
+			addedSources({
+				"App/Feed.swift": [
+					"struct Feed: View {",
+					'var body: some View { Text("") }',
+					"func load() async throws {",
+					"let (data, _) = try await URLSession.shared.data(from: url)",
+					"let item = try JSONDecoder().decode(Item.self, from: data)",
+					'UserDefaults.standard.set(item.id, forKey: "last")',
+					"}",
+					"}",
+				].join("\n"),
+				"App/Client.swift": "final class Client {\nlet session = URLSession.shared\n}",
+			}),
+		);
+		assert.deepEqual(result.facts, { networking: 1, jsonCoding: 1, userDefaults: 1 });
+		assert.equal(result.leads?.[0]?.facts?.view, "Feed");
+	});
+
+	void it("lists crash-prone shortcuts and marks those in tests", async () => {
+		const source = [
+			'let value = dict["a"]!',
+			"let loaded = try! load()",
+			'fatalError("unreachable")',
+			"let head = items[0]",
+			"let cell = view as! Cell",
+		].join("\n");
+		const result = await runBundled(
+			"avoids-crash-prone-swift-shortcuts",
+			addedSources({
+				"App/Store.swift": source,
+				"AppTests/StoreTests.swift": "let loaded = try! load()",
+			}),
+		);
+		assert.deepEqual(result.facts, {
+			forceUnwrap: 1,
+			forcedTry: 2,
+			fatalError: 1,
+			firstElementIndex: 1,
+			forcedCast: 1,
+			inPreviewOrTest: 1,
+		});
+	});
+
+	void it("finds unlabelled icons, fixed font sizes and silent tap targets", async () => {
+		const result = await runBundled(
+			"labels-images-and-taps-for-assistive-technology",
+			addedSources({
+				"App/Icon.swift":
+					'struct Icon: View {\nvar body: some View { Image(systemName: "star") }\n}',
+				"App/Row.swift":
+					'struct Row: View {\nvar body: some View { Text("Tap").font(.system(size: 14)).onTapGesture { } }\n}',
+				"App/Labelled.swift":
+					'struct Labelled: View {\nvar body: some View { Image(systemName: "gear")\n.accessibilityLabel("Settings") }\n}',
+			}),
+		);
+		assert.deepEqual(result.facts, { unlabeledImage: 1, fixedFontSize: 1, tapWithoutTraits: 1 });
+	});
+
+	void it("reads title and commit subjects, and does not read an uncaptured range as clean", async () => {
+		const result = await runBundled("titles-commits-and-requests-by-their-change", {
+			item: { title: "update", source_branch: "feature/export-csv" },
+			context: {
+				"commits.json": {
+					commits: ["wip", "Add CSV export for reports", "wip"].map(commit),
+				},
+			},
+		});
+		assert.equal(result.facts?.authoredCommits, 3);
+		assert.equal(result.facts.vagueSubjects, 2);
+		assert.equal(result.facts.repeatedSubjects, 1);
+		assert.equal(result.facts.titleCues, 1);
+		assert.deepEqual(
+			result.leads?.map((lead) => lead.facts?.category),
+			["meaningless", "meaningless"],
+		);
+		const said = result.directions?.join(" ") ?? "";
+		assert.match(said, /^The title is a verb with no subject/u);
+		assert.match(said, /Half or more/u);
+
+		const uncaptured = await runBundled("titles-commits-and-requests-by-their-change", {
+			item: { title: "Export reports as CSV" },
+		});
+		assert.equal(uncaptured.facts?.authoredCommits, undefined);
+		assert.match(uncaptured.directions?.join(" ") ?? "", /unknown, not clean/u);
+	});
+});
