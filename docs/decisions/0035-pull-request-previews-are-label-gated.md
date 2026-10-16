@@ -1,6 +1,6 @@
 # ADR 0035: Pull request previews are label-gated and driven from the default branch
 
-**Status:** Accepted (amended 2026-09-03 #1719 — agent execution host superseded by [0041](0041-compose-1x-kubernetes-2.md); 2026-09-17 — previews only for pull requests targeting `main`, and the concurrency groups)
+**Status:** Accepted (amended 2026-09-03 #1719 — agent execution host superseded by [0041](0041-compose-1x-kubernetes-2.md); 2026-09-17 — previews only for pull requests targeting `main`, and the concurrency groups; 2026-10-16 — stacked previews restored)
 **Date:** 2026-08-28
 **Authors:** Felix T.J. Dietrich
 **Builds on:** [ADR 0037](0037-node-24-and-pnpm-12-are-the-javascript-toolchain.md) (the runtime the controller is written for)
@@ -225,3 +225,18 @@ read. Clone delivery is paused, active connections suspended and pending histori
 The operator configures only a new owned test workspace for a trial. Both rendered modes retain the existing
 privilege, image and network checks. The operator steps and teardown live in
 [`docker/preview/README.md`](../../docker/preview/README.md#fresh-reviews-in-an-owned-test-workspace).
+
+## Update — 2026-10-16: stacked previews
+
+Supersedes only the base-branch restriction in the September 17 update. Its concurrency decision stands.
+
+Deployment and cleanup have no pull request base-branch filter. A labelled same-repository stacked
+layer can preview before it targets `main`; closing it or removing the label also starts cleanup.
+The controller still routes Coolify through the default branch and compares migrations and protected
+files against that branch.
+
+[GitHub executes `pull_request_target` workflows and resolves `github.sha` from the default branch,
+regardless of the pull request's base](https://github.blog/changelog/2025-11-07-actions-pull_request_target-and-environment-branch-protections-changes/).
+The removed filter therefore did not protect the controller checkout. Fork exclusion, label admission,
+immutable image verification, schema and protected-file checks, and the final head recheck remain
+unchanged. No pull request controller code executes beside deployment secrets.
