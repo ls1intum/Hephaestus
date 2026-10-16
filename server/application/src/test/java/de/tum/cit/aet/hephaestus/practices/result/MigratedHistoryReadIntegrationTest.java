@@ -22,6 +22,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -86,6 +87,48 @@ class MigratedHistoryReadIntegrationTest extends BaseIntegrationTest {
                 .uri("/workspaces/" + scenario.workspace().getWorkspaceSlug() + path)
                 .headers(h -> h.setBearerAuth(ReviewIntegrationData.memberToken(scenario)))
                 .exchange();
+    }
+
+    @Test
+    void shouldHideSemanticProblemKeysWhenSourceUseIsRefused() {
+        var result = data.result(scenario, ResultOutcome.NOT_MET, Instant.now());
+        migrated(result, Objects.requireNonNull(result.getEvidence()).toString());
+        String semanticKey = "private-authentication-credential";
+        jdbc.update(
+                "UPDATE problem SET key = ? WHERE workspace_id = ? AND result_id = ?",
+                semanticKey,
+                scenario.workspace().getId(),
+                result.getId());
+        var problemId = Objects.requireNonNull(jdbc.queryForObject(
+                "SELECT id FROM problem WHERE workspace_id = ? AND result_id = ?",
+                UUID.class,
+                scenario.workspace().getId(),
+                result.getId()));
+        var paths = Map.of(
+                "/practices/results/" + result.getId(), "$.problems[0].key",
+                "/practices/reviews/results/" + result.getId(), "$.problems[0].key",
+                "/practices/reviews/problems/" + problemId, "$.problem.key");
+        for (var entry : paths.entrySet()) {
+            get(entry.getKey())
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath(entry.getValue())
+                    .isEqualTo(semanticKey)
+                    .jsonPath(entry.getValue().replace(".key", ".summary"))
+                    .isEqualTo("A recorded problem");
+        }
+        when(source.permits(any(), any())).thenReturn(false);
+        for (var entry : paths.entrySet()) {
+            get(entry.getKey())
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath(entry.getValue())
+                    .value(value -> assertThat(value).isNull())
+                    .jsonPath(entry.getValue().replace(".key", ".summary"))
+                    .isEqualTo("Evidence hidden");
+        }
     }
 
     @Test

@@ -81,7 +81,7 @@ public class ResultPresentation {
                 permitted ? child.getSummary() : "Evidence hidden",
                 child.getResultId(),
                 child.getPosition(),
-                child.getKey(),
+                permitted ? child.getKey() : null,
                 permitted ? child.getExplanation() : null,
                 permitted
                         ? json.convertValue(child.getCitations(), new TypeReference<List<EvidenceCitationDTO>>() {})
