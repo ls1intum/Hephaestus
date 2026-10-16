@@ -1885,3 +1885,104 @@ describe("Slack connection reads", () => {
 		},
 	);
 });
+
+describe("source-control owning workspace reads", () => {
+	const workspaceKey = getWorkspaceQueryKey({ path: { workspaceSlug: "acme" } });
+
+	it.each(["GITHUB", "GITLAB"] as const)(
+		"withdraws %s management when its workspace read is refused and keeps it withdrawn through an outage",
+		async (kind) => {
+			const { workspace } = mockConnection(kind);
+			const owning = serveScmRead("*/workspaces/acme", { status: 200, body: workspace });
+			serveScmRead("*/workspaces/acme/repositories", {
+				status: 200,
+				body: ["acme/platform/api"],
+			});
+			const { queryClient } = renderRouteAtWithRouter("/w/acme/admin/integrations/scm");
+			const user = userEvent.setup();
+			const recorded = recordWrites();
+			try {
+				await user.type(
+					await screen.findByLabelText("Add a repository", undefined, ROUTE_RENDER_WAIT),
+					"acme/platform/web",
+				);
+				await user.type(screen.getByLabelText("New personal access token"), "draft-token");
+				await user.click(screen.getByRole("button", { name: "Stop monitoring acme/platform/api" }));
+				await screen.findByRole("alertdialog", { name: "Stop monitoring acme/platform/api?" });
+
+				owning.answer({ status: 403 });
+				await reread(queryClient, workspaceKey);
+				await screen.findByText(/You do not have access to the .+ connection/u);
+				await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+				expect(screen.queryByLabelText("New personal access token")).toBeNull();
+				expect(screen.queryByLabelText("Add a repository")).toBeNull();
+				expect(screen.queryByText("Repository sync state")).toBeNull();
+				expect(screen.queryByRole("button", { name: /^Stop monitoring/u })).toBeNull();
+
+				owning.answer({ status: 503 });
+				await reread(queryClient, workspaceKey);
+				await screen.findByText(/We could not load the .+ connection/u);
+				expect(screen.queryByRole("alertdialog")).toBeNull();
+				expect(screen.queryByLabelText("New personal access token")).toBeNull();
+				expect(screen.queryByLabelText("Add a repository")).toBeNull();
+				expect(screen.queryByText("acme/platform/api")).toBeNull();
+				expect(screen.queryByText("Repository sync state")).toBeNull();
+
+				owning.answer({ status: 200, body: workspace });
+				await reread(queryClient, workspaceKey);
+				await screen.findByRole("button", { name: "Stop monitoring acme/platform/api" });
+				expect(screen.queryByRole("alertdialog")).toBeNull();
+				expect(screen.getByLabelText("Add a repository")).toHaveProperty("value", "");
+				expect(screen.getByLabelText("New personal access token")).toHaveProperty("value", "");
+				expect(recorded.writes).toStrictEqual([]);
+			} finally {
+				recorded.stop();
+			}
+		},
+	);
+
+	it("keeps a GitLab token draft and open Stop through a recoverable workspace refresh", async () => {
+		const { workspace } = mockConnection("GITLAB");
+		const owning = serveScmRead("*/workspaces/acme", { status: 200, body: workspace });
+		serveScmRead("*/workspaces/acme/repositories", { status: 200, body: ["acme/platform/api"] });
+		const { queryClient } = renderRouteAtWithRouter("/w/acme/admin/integrations/scm");
+		const user = userEvent.setup();
+		await user.type(
+			await screen.findByLabelText("Add a repository", undefined, ROUTE_RENDER_WAIT),
+			"acme/platform/web",
+		);
+		await user.type(screen.getByLabelText("New personal access token"), "draft-token");
+		await user.click(screen.getByRole("button", { name: "Stop monitoring acme/platform/api" }));
+		const dialog = await screen.findByRole("alertdialog");
+
+		owning.answer({ status: 503 });
+		await reread(queryClient, workspaceKey);
+		await screen.findByText("We could not load the GitLab connection");
+		expect(screen.getByRole("alertdialog")).toBe(dialog);
+		expect(within(dialog).getByRole("button", { name: "Stop monitoring" })).toHaveProperty(
+			"disabled",
+			false,
+		);
+		expect(screen.getByLabelText("Add a repository")).toHaveProperty("value", "acme/platform/web");
+		expect(screen.getByLabelText("New personal access token")).toHaveProperty(
+			"value",
+			"draft-token",
+		);
+	});
+
+	it.each([
+		{ status: 403, message: "You do not have access to the Source control connection" },
+		{ status: 503, message: "We could not load the Source control connection" },
+	] as const)(
+		"does not infer a source-control provider from a cached catalog when the first workspace read is $status",
+		async ({ status, message }) => {
+			mockConnection("GITLAB");
+			serveScmRead("*/workspaces/acme", { status });
+			renderRouteAt("/w/acme/admin/integrations/scm");
+			await screen.findByText(message, undefined, ROUTE_RENDER_WAIT);
+			expect(screen.queryByLabelText("New personal access token")).toBeNull();
+			expect(screen.queryByLabelText("Add a repository")).toBeNull();
+			expect(screen.queryByText("Repository sync state")).toBeNull();
+		},
+	);
+});
