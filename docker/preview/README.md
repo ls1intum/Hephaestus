@@ -197,6 +197,10 @@ Create one Docker Compose application for `hephaestus-build/Hephaestus` on branc
    starts. Keep database, state-cookie, encryption, webhook and signing identity private to the
    preview. The broker and seed-role credentials must match staging. Approved GitHub OAuth client
    credentials may come from staging when the callback coverage above is already configured.
+   PR application code can read its OAuth client secret. Sharing a client means trusting every
+   eligible preview branch and its later pushes with that secret; wildcard matching does not
+   isolate it. If that trust does not hold, use one preview-only client covering all controlled
+   preview hosts. No client needs to be registered per PR.
    Do not copy the source instance's environment or other credentials.
 5. Leave `SOURCE_COMMIT`, `COOLIFY_BRANCH`, and the `SERVICE_*` variables to Coolify. Define nothing
    on this application beyond `.env.example`; anything else does not belong here.
