@@ -21,6 +21,10 @@ services:
       POSTGRES_DB: hephaestus
       POSTGRES_USER: hephaestus
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    ports:
+      - target: 5432
+        host_ip: ${PREVIEW_WORKER_BIND_HOST:-127.0.0.1}
+        protocol: tcp
     volumes:
       - postgres-data:/var/lib/postgresql
     security_opt:
@@ -67,6 +71,11 @@ services:
       SERVICE_NAME_POSTGRES: ${SERVICE_NAME_POSTGRES:-postgres}
       SERVICE_FQDN_WEBAPP: ${SERVICE_FQDN_WEBAPP:-}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      PREVIEW_FRESH_REVIEW_ENABLED: ${PREVIEW_FRESH_REVIEW_ENABLED:-false}
+      PREVIEW_FRESH_REVIEW_PR: ${PREVIEW_FRESH_REVIEW_PR:-}
+      PREVIEW_WORKER_BIND_HOST: ${PREVIEW_WORKER_BIND_HOST:-127.0.0.1}
+      PREVIEW_WORKER_REGISTRATION_TOKEN: ${PREVIEW_WORKER_REGISTRATION_TOKEN:-}
+      PREVIEW_AGENT_IMAGE_REFERENCE: ${PREVIEW_AGENT_IMAGE_REFERENCE:-}
       PREVIEW_SEED_SOURCE_HOST: ${PREVIEW_SEED_SOURCE_HOST:-app-postgres-1}
       PREVIEW_SEED_SOURCE_USERNAME: ${PREVIEW_SEED_SOURCE_USERNAME:-preview_seed}
       PREVIEW_SEED_SOURCE_DATABASE: ${PREVIEW_SEED_SOURCE_DATABASE:-hephaestus}
@@ -77,6 +86,22 @@ services:
       - |
         set -eu
         trap 'rm -f /tmp/seed.dump' EXIT
+
+        # Coolify preview variables are application-wide. Refuse a different preview even when
+        # its volume already has a seed marker; this opt-in belongs to one approved PR.
+        case "$$PREVIEW_FRESH_REVIEW_ENABLED" in
+          false)
+            test "$$PREVIEW_WORKER_BIND_HOST" = "127.0.0.1" || exit 1
+            ;;
+          true)
+            echo "$$PREVIEW_FRESH_REVIEW_PR" | grep -Eq '^[1-9][0-9]*$$' || exit 1
+            test "$${SERVICE_FQDN_WEBAPP%%.*}" = "pr$$PREVIEW_FRESH_REVIEW_PR" || exit 1
+            test "$$PREVIEW_WORKER_BIND_HOST" = "172.19.0.1" || exit 1
+            test -n "$$PREVIEW_WORKER_REGISTRATION_TOKEN" || exit 1
+            echo "$$PREVIEW_AGENT_IMAGE_REFERENCE" | grep -Eq '^ghcr[.]io/hephaestus-build/agent-pi@sha256:[a-f0-9]{64}$$' || exit 1
+            ;;
+          *) exit 1 ;;
+        esac
 
         if ! echo "$${SERVICE_FQDN_WEBAPP:-}" | grep -Eq "^pr[0-9]+"; then
           echo "Skipping seed-loader: non-PR deployment detected"
@@ -94,6 +119,14 @@ services:
         MARKER=$$(PGPASSWORD="$$POSTGRES_PASSWORD" psql -h "$$TARGET" -U hephaestus -d hephaestus \
           -tAX -c "SELECT coalesce(to_regclass('public.hephaestus_preview_seeded')::text, '')")
         if [ -n "$$MARKER" ]; then
+          if [ "$$PREVIEW_FRESH_REVIEW_ENABLED" = "true" ]; then
+            POLICY=$$(PGPASSWORD="$$POSTGRES_PASSWORD" psql -h "$$TARGET" -U hephaestus -d hephaestus \
+              -tAX -v ON_ERROR_STOP=1 -c "SELECT coalesce(obj_description('public.hephaestus_preview_seeded'::regclass, 'pg_class'), '')")
+            if [ "$$POLICY" != "owned-review-policy-v1" ]; then
+              echo "This preview predates the owned-review seed policy; tear it down and recreate it"
+              exit 1
+            fi
+          fi
           echo "Skipping seed-loader: this preview has already been seeded"
           exit 0
         fi
@@ -153,7 +186,8 @@ services:
 
         UPDATE workspace
            SET practice_review_auto_trigger_enabled = FALSE,
-               practice_review_manual_trigger_enabled = FALSE;
+               practice_review_manual_trigger_enabled = FALSE,
+               practice_delivery_status = 'PAUSED';
 
         UPDATE workspace_agent_binding
            SET enabled = FALSE,
@@ -190,6 +224,9 @@ services:
                    last_error = ''Send stopped when staging data was cloned into a preview.'', updated_at = NOW()
              WHERE state IN (''PENDING'', ''SENDING'', ''UNCERTAIN'');
           ELSE
+            UPDATE artifact_signal
+               SET state = ''SUPPRESSED'', state_reason = ''GATE_SKIPPED'', state_changed_at = NOW()
+             WHERE state IN (''RECORDED'', ''DEFERRED'', ''PENDING'');
             UPDATE review_sweep_schedule
                SET enabled = FALSE,
                    updated_at = NOW();
@@ -245,12 +282,13 @@ services:
         DELETE FROM jwt_signing_key;
         DELETE FROM login_provider;
 
-        -- 3. Forget provider secrets; catalogs, integrations and their state stay as they were, so the
-        --    preview looks like staging without holding anything that can act as staging.
+        -- 3. Forget provider secrets and suspend active cloned connections. Enabling GitLab for
+        -- an owned test workspace must not give cloned integrations ingestion authority.
         UPDATE llm_connection SET api_key = NULL, enabled = FALSE, updated_at = NOW()
          WHERE api_key IS NOT NULL OR enabled;
         UPDATE workspace_llm_connection SET api_key = NULL, enabled = FALSE, updated_at = NOW()
          WHERE api_key IS NOT NULL OR enabled;
+        UPDATE connection SET state = 'SUSPENDED', updated_at = NOW() WHERE state = 'ACTIVE';
         UPDATE connection
            SET credentials_encrypted = NULL,
                credentials_alg = NULL,
@@ -272,6 +310,7 @@ services:
         LIVE=$$(psql -h "$$TARGET" -U hephaestus -d hephaestus -tAX -v ON_ERROR_STOP=1 -c "
           SELECT (SELECT count(*) FROM workspace
                    WHERE practice_review_auto_trigger_enabled OR practice_review_manual_trigger_enabled
+                      OR practice_delivery_status <> 'PAUSED'
                       OR coalesce(to_jsonb(workspace)->>'public_activity_enabled', 'false') = 'true')
                + (SELECT count(*) FROM instance_settings settings
                    WHERE NOT silent_mode_engaged
@@ -289,6 +328,7 @@ services:
                  + (SELECT count(*) FROM feedback_send WHERE state IN (''PENDING'', ''SENDING'', ''UNCERTAIN'')) AS live'
                    ELSE
                      'SELECT (SELECT count(*) FROM review_sweep_schedule WHERE enabled)
+                 + (SELECT count(*) FROM artifact_signal WHERE state IN (''RECORDED'', ''DEFERRED'', ''PENDING''))
                  + (SELECT count(*) FROM feedback_dispatch WHERE state IN (''PENDING'', ''UNCERTAIN'', ''CLAIMED''))
                  + (SELECT count(*) FROM feedback_dispatch WHERE projection_owner IS NOT NULL OR projection_expires_at IS NOT NULL)
                  + (SELECT count(*) FROM observation_invalidation WHERE provider_copy = ''PENDING''
@@ -306,7 +346,7 @@ services:
                + (SELECT count(*) FROM llm_connection WHERE api_key IS NOT NULL OR enabled)
                + (SELECT count(*) FROM workspace_llm_connection WHERE api_key IS NOT NULL OR enabled)
                + (SELECT count(*) FROM connection
-                   WHERE credentials_encrypted IS NOT NULL OR credentials_alg IS NOT NULL
+                   WHERE state = 'ACTIVE' OR credentials_encrypted IS NOT NULL OR credentials_alg IS NOT NULL
                       OR credentials_key_version IS NOT NULL OR credentials_rotation_failed_at IS NOT NULL
                       OR config ? 'webhookSecret')")
         if [ "$$LIVE" != "0" ]; then
@@ -315,7 +355,8 @@ services:
         fi
 
         psql -h "$$TARGET" -U hephaestus -d hephaestus -v ON_ERROR_STOP=1 \
-          -c 'CREATE TABLE hephaestus_preview_seeded (seeded_at timestamptz NOT NULL DEFAULT now());'
+          -c "CREATE TABLE hephaestus_preview_seeded (seeded_at timestamptz NOT NULL DEFAULT now());
+              COMMENT ON TABLE hephaestus_preview_seeded IS 'owned-review-policy-v1';"
         echo "Seed loaded; reviews are paused and the preview owns its login apps and signing key"
     security_opt:
       - no-new-privileges:true
@@ -347,13 +388,20 @@ services:
     restart: on-failure:5
     expose:
       - "8080"
+    ports:
+      - target: 8080
+        host_ip: ${PREVIEW_WORKER_BIND_HOST:-127.0.0.1}
+        protocol: tcp
     environment:
       JAVA_TOOL_OPTIONS: "-XX:MaxDirectMemorySize=${APP_MAX_DIRECT_MEMORY:-128M}"
       SPRING_PROFILES_ACTIVE: prod
       APP_VERSION: ${SOURCE_COMMIT:?Coolify supplies the deployed commit}
-      # APP_VERSION is a commit SHA, not a release tag, so ADR 0031's digest derivation has nothing
-      # to resolve. Agents are off (AGENT_ENABLED below), but the pin guard is built regardless.
-      HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: "false"
+      # Commit previews cannot derive a release pin. An opted-in review uses an explicit digest.
+      HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: ${PREVIEW_FRESH_REVIEW_ENABLED:-false}
+      HEPHAESTUS_AGENT_IMAGE_REFERENCE: ${PREVIEW_AGENT_IMAGE_REFERENCE:-}
+      HEPHAESTUS_WORKER_HUB_TOKEN_REGISTRATION_TOKEN: ${PREVIEW_WORKER_REGISTRATION_TOKEN:-}
+      # This server has no durable checkout volume. Its mirrors are disposable across recreations.
+      HEPHAESTUS_FABRIC_ROOT: /tmp/hephaestus-preview-git-repos
       # Read by the static thc binary the health-checker buildpack installs at /workspace/health-check.
       MANAGEMENT_SERVER_ADDRESS: "$${HOSTNAME}.shared-network"
       THC_PORT: "8080"
@@ -414,12 +462,13 @@ services:
       GH_APP_ID: "0"
       GH_APP_PRIVATE_KEY: ""
       GH_AUTH_TOKEN: ""
-      GITLAB_ENABLED: "false"
-      GITLAB_WORKSPACE_CREATION: "false"
+      GITLAB_DEFAULT_SERVER_URL: ${GITLAB_DEFAULT_SERVER_URL:-https://gitlab.com}
+      GITLAB_ENABLED: ${PREVIEW_FRESH_REVIEW_ENABLED:-false}
+      GITLAB_WORKSPACE_CREATION: ${PREVIEW_FRESH_REVIEW_ENABLED:-false}
       HEPHAESTUS_INTEGRATION_SLACK_ENABLED: "false"
       HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED: "false"
-      AGENT_ENABLED: "false"
-      GIT_CHECKOUT_ENABLED: "false"
+      AGENT_ENABLED: ${PREVIEW_FRESH_REVIEW_ENABLED:-false}
+      GIT_CHECKOUT_ENABLED: ${PREVIEW_FRESH_REVIEW_ENABLED:-false}
       MONITORING_RUN_ON_STARTUP: "false"
       MONITORING_SYNC_CRON: "-"
       MONITORING_BACKFILL_ENABLED: "false"

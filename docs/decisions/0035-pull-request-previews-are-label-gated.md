@@ -108,7 +108,7 @@ The gates that remain are the ones that describe *what may run*, not *who asked*
   comparison reports at most 300 files and flags nothing when it stops there. Coolify re-reads the
   Compose file from the commit it deploys, so this rule is load-bearing.
   `ci-compose-validate.yml` holds the other half: on every pull request it renders that file and fails
-  if the stack gains a way out of its sandbox — a socket, a build stage, a published port, an
+  if the stack gains a way out of its sandbox — a socket, a build stage, an unapproved host binding, an
   unbounded memory limit, a network every preview would share, or a renamed or flipped integration
   switch. `scripts/check-preview-stack.ts` is the authoritative list, and its own tests prove each
   assertion fails when that escape is present.
@@ -210,3 +210,18 @@ Supersedes two parts of § Decision; both stay standing as the record.
   `reconcile-previews.yml`) and the reconcile's inventory step in `preview-reconcile-inventory`.
   Deploy and cleanup of different pull requests may run at once; of the first revisit trigger, only
   `PREVIEW_MAX_ACTIVE` bounding the shared host stands.
+
+## Update — 2026-10-16: one operator-approved fresh-review preview
+
+The normal Coolify preview remains execution-off and holds no Docker socket. An operator may enable
+GitLab, checkout and fresh reviews for one approved PR while its worker and sandboxed review containers
+run together on a separately qualified rootless engine. This is a 1.x exception to the execution-host
+placement in the September update, not permission to give preview code the shared rootful socket.
+
+The single managed Compose file publishes only the clone database and raw application API on random
+loopback ports by default. The exception permits only the approved private worker gateway. The
+application-wide switch requires an exact native preview-hostname/PR match before the seed marker is
+read. Clone delivery is paused, active connections suspended and pending historical work terminalized.
+The operator configures only a new owned test workspace for a trial. Both rendered modes retain the existing
+privilege, image and network checks. The operator steps and teardown live in
+[`docker/preview/README.md`](../../docker/preview/README.md#fresh-reviews-in-an-owned-test-workspace).

@@ -28,7 +28,9 @@ hold, each enforced before Coolify is asked to deploy:
 - The database is this preview's own, seeded from staging so it starts with real data. The clone is
   taken with `pg_dump` — staging's data volume is never mounted — and the preview policy runs before
   the application server is allowed to boot: every review trigger, agent binding and sweep schedule
-  is disabled. Open review jobs, batches, and scans are cancelled. Pending feedback sends stop without
+  is disabled, workspace delivery is paused, and active integration connections are suspended.
+  Open review jobs, batches, and scans are cancelled. Pending legacy artifact signals are suppressed
+  with the existing settings-gate reason so enabling an owned review cannot replay them. Pending feedback sends stop without
   a claim that a provider copy changed.
   Released provider corrections keep their original reasons and stay unresolved with an infinite retry date.
   The clone clears send and projection leases without changing terminal dispatch content.
@@ -40,6 +42,7 @@ hold, each enforced before Coolify is asked to deploy:
   The instance identity (`login_provider`, `jwt_signing_key`, `issued_jwt`) is dropped so the preview signs its own tokens.
   The seed loader verifies that against the database and refuses to mark the preview seeded
   otherwise, so a policy that silently did not apply leaves the preview un-booted rather than live.
+
 - Staging's provider credentials do not survive the clone either: the instance and workspace AI
   catalog keys are cleared and those connections disabled, every integration connection loses its
   credential bundle and the webhook signing secret its config carries, and the job tokens staging
@@ -50,8 +53,8 @@ hold, each enforced before Coolify is asked to deploy:
   delivers there. Its durable is named per deploy, so previews never compete for one consumer, and
   it expires 72h after the preview stops reading — a preview is deleted, not shut down, so it never
   removes its own.
-- Agent execution, repository checkout, inbound webhooks and recurring sync stay disabled, which is
-  what keeps a stack holding real data from acting on it.
+- Agent execution, GitLab and repository checkout are off by default. The operator opt-in below
+  permits fresh reviews in one owned test workspace. Inbound webhooks and recurring sync stay off.
 
 No container here holds the Docker socket. A `:ro` socket mount restricts the file and not the API —
 a container holding one can still create containers, and from there mount the host — so there is no
@@ -65,7 +68,12 @@ Coolify runs every preview of this application under one Compose project named a
 UUID, so a network defined here would be `<uuid>_backend` for all of them at once, private-looking
 and shared. `staging-shared` is joined by name, which makes it a decision rather than a side effect.
 
-PostgreSQL keeps a PR-specific volume; nothing else in the stack keeps state.
+PostgreSQL keeps a PR-specific volume. Nothing else in the stack keeps durable state. The application
+server's checkout cache is under `/tmp` and disappears when its container is recreated.
+
+The database and raw application API each publish one random TCP host port, bound to loopback by
+default. The fresh-review opt-in permits the private worker gateway below instead. No webapp,
+management, broker or additional port is published. No service in this stack mounts a Docker socket.
 
 Deployment authority is deliberately the same as push authority;
 [ADR 0035](../../docs/decisions/0035-pull-request-previews-are-label-gated.md) records why, and what
@@ -79,8 +87,9 @@ pull request's own copy of it defines that pull request's stack. Two rules hold 
 works alone: the controller refuses to deploy a head that introduces changes anywhere under
 `docker/preview/` — compared against the default branch, so a stacked layer cannot inherit an edit
 from the layer below — and `ci-compose-validate.yml` renders the file on every pull request and fails if
-the stack gains a way out of its sandbox — a socket, a build stage, a published port, an unbounded
-memory limit, a network every preview would share, or a flipped integration switch.
+the stack gains a way out of its sandbox — a socket, a build stage, an unapproved host binding, an
+unbounded memory limit, a network every preview would share, or a flipped integration switch.
+Both the default and opted-in render are checked.
 `scripts/check-preview-stack.ts` is the authoritative list; this paragraph is not.
 
 ## Host capacity
@@ -94,6 +103,60 @@ memory per slot in whatever staging is not already using — check `free -g` on 
 it, and move previews to their own destination rather than raising it much further. At the cap the
 controller refuses the next preview and names the pull requests holding the slots. Deployments are
 serialized through one Actions concurrency group, so previews never start at once.
+
+## Fresh reviews in an owned test workspace
+
+This is an explicit operator exception for one trusted pull request, using the normal preview URL,
+login and cloned database. Reuse approved GitHub sign-in when its existing callback covers the
+controlled preview namespace, as described below. GitLab workspace creation still requires an actual linked identity
+at the configured GitLab origin. It does not enable reviews for cloned course workspaces or install a
+worker in this Compose stack. First qualify a separate rootless Docker engine for the worker and
+its sandboxed review containers. Never mount the host's rootful Docker socket into a preview.
+
+Coolify's preview variables apply to the whole application. Set these preview-scoped variables only
+for the approved trial:
+
+| Variable                            | Value                                                          |
+| ----------------------------------- | -------------------------------------------------------------- |
+| `PREVIEW_FRESH_REVIEW_ENABLED`      | `true`                                                         |
+| `PREVIEW_FRESH_REVIEW_PR`           | The approved pull request number                               |
+| `PREVIEW_WORKER_BIND_HOST`          | `172.19.0.1`, the approved private host gateway                |
+| `PREVIEW_WORKER_REGISTRATION_TOKEN` | A new private token shared only with this worker               |
+| `PREVIEW_AGENT_IMAGE_REFERENCE`     | The qualified `agent-pi` image at its immutable SHA-256 digest |
+
+The seed loader checks that the native preview hostname starts with the exact `pr<number>.` label,
+including on an already-seeded database. A missing or different PR, invalid bind, absent token or
+unpinned agent image refuses application startup. Other previews cannot start in this mode until
+the operator restores the defaults. This guard is admission at startup; changing application
+variables does not stop an already-running preview.
+
+Use normal label teardown and recreation for a preview seeded before this policy change, or after
+branch-only migration changes. The marker table's policy comment must attest the strengthened seed policy before an opt-in may
+reuse it. The marker contains no row with a seeding timestamp. Do not clear checksums or edit the source database to reuse an old volume.
+
+Read the two actual random bindings from the generated deployment. Connect the isolated worker to
+this preview's PostgreSQL at `172.19.0.1:<postgres-port>` and to the raw application endpoint at
+`ws://172.19.0.1:<appserver-port>/api/workers/connect`. Its token exchange endpoint is the same raw
+origin at `/api/workers/exchange`. Use the preview database user and password, matching credential
+encryption key/version, registration token and agent digest. Do not use the seed role, source database
+or public edge for worker control. The worker's database transport must be TLS or use the existing
+explicit insecure-remote opt-in for this same-host private bridge. The worker and its sandboxes must
+use the same isolated engine and private checkout volume. This stack supplies neither a worker nor
+rootful socket access.
+
+Keep Silent Mode engaged and cloned connections suspended, model keys absent, bindings disabled,
+delivery paused and schedules/triggers off. Through the normal UI, create a new owned GitLab test
+workspace, connect its scoped token, configure its model and consent, and enable only its manual
+review binding. Do not reactivate a cloned course workspace. The worker polls the preview database
+without a workspace allowlist, so the seed policy is part of this boundary. GitLab is enabled for
+manual setup and sync, but the blank external webhook URL prevents hook registration. Shared NATS
+uses a separate preview durable. It is not an event-isolation boundary. Suspended cloned connections
+do not acquire active subscriptions.
+
+After the trial, stop the owned worker, restore `PREVIEW_FRESH_REVIEW_ENABLED=false`,
+`PREVIEW_WORKER_BIND_HOST=127.0.0.1`, and clear the selector, registration token and agent image.
+Recreate the preview to apply those defaults and remove its fixture through the normal teardown.
+Keep the application's ordinary preview policy execution-off.
 
 ## Coolify configuration
 
@@ -122,13 +185,23 @@ Create one Docker Compose application for `hephaestus-build/Hephaestus` on branc
      own record, so a preview created under the old sibling-hostname layout keeps sending `/api`
      requests to the webapp until its record is updated or the preview is torn down and re-created
      through the label.
-   - **Any configured GitHub OAuth app.** Its callback becomes
-     `https://pr<id>.<preview zone>/api/login/oauth2/code/<registrationId>`. Moving the proxy does
-     not update that registration, and sign-in fails until it does.
+   - **Configured GitHub sign-in.** Reuse one approved OAuth app, including staging's, when an
+     existing callback has wildcard matching enabled and covers the controlled preview hosts.
+     The root domain and port must match. The preview's `/api/login/oauth2/code/github` path must
+     match the callback path or fall below it. This needs no app or callback registration per PR.
+     Moving the proxy does not update that coverage. Verify it against
+     [GitHub's redirect URL contract](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps#redirect-urls).
+     Use wildcard matching only for subdomains and paths the operator controls.
+
 4. Set every value in `.env.example`. Compose rejects a blank required value before any container
-   starts. Generate new database, state-cookie, encryption, and webhook secrets for this preview;
-   the broker and seed-role credentials must match staging. A GitHub OAuth app is optional, but if
-   configured it must be preview-only.
+   starts. Keep database, state-cookie, encryption, webhook and signing identity private to the
+   preview. The broker and seed-role credentials must match staging. Approved GitHub OAuth client
+   credentials may come from staging when the callback coverage above is already configured.
+   PR application code can read its OAuth client secret. Sharing a client means trusting every
+   eligible preview branch and its later pushes with that secret; wildcard matching does not
+   isolate it. If that trust does not hold, use one preview-only client covering all controlled
+   preview hosts. No client needs to be registered per PR.
+   Do not copy the source instance's environment or other credentials.
 5. Leave `SOURCE_COMMIT`, `COOLIFY_BRANCH`, and the `SERVICE_*` variables to Coolify. Define nothing
    on this application beyond `.env.example`; anything else does not belong here.
 6. Disable **Connect to predefined network**. Coolify attaches its proxy to each generated preview
@@ -158,19 +231,19 @@ that says so.
 
 Set these repository variables:
 
-| Variable | Purpose |
-|---|---|
-| `COOLIFY_URL` | Coolify HTTPS origin |
-| `COOLIFY_APP_UUID` | Preview application UUID |
-| `COOLIFY_PREVIEW_URL_TEMPLATE` | Public web URL containing `{pr}` |
-| `PREVIEW_MAX_ACTIVE` | Concurrent preview limit (optional; defaults to 3) |
+| Variable                       | Purpose                                            |
+| ------------------------------ | -------------------------------------------------- |
+| `COOLIFY_URL`                  | Coolify HTTPS origin                               |
+| `COOLIFY_APP_UUID`             | Preview application UUID                           |
+| `COOLIFY_PREVIEW_URL_TEMPLATE` | Public web URL containing `{pr}`                   |
+| `PREVIEW_MAX_ACTIVE`           | Concurrent preview limit (optional; defaults to 3) |
 
 Set two repository secrets:
 
-| Secret | Scope |
-|---|---|
+| Secret                           | Scope                                                                    |
+| -------------------------------- | ------------------------------------------------------------------------ |
 | `COOLIFY_PREVIEW_WEBHOOK_SECRET` | Must equal this application's Coolify **Manual Webhook Secret (GitHub)** |
-| `COOLIFY_PREVIEW_READ_TOKEN` | Coolify API token with the `read` ability |
+| `COOLIFY_PREVIEW_READ_TOKEN`     | Coolify API token with the `read` ability                                |
 
 The controller needs no Coolify mutation token: the HMAC-authenticated webhook queues deployments and
 requests preview cleanup, and the read token only follows deployment status.
