@@ -53,7 +53,6 @@ jobs:
       build-config: ${{ steps.filter.outputs.build-config }}
       test-config: ${{ steps.filter.outputs.test-config }}
       security-config: ${{ steps.filter.outputs.security-config }}
-      dependency-review: ${{ steps.filter.outputs.dependency-review }}
       release-images: ${{ steps.filter.outputs.release-images }}
       docker-config: ${{ steps.filter.outputs.docker-config }}
       pmd-canary: ${{ steps.filter.outputs.pmd-canary }}
@@ -433,16 +432,9 @@ jobs:
               - '.github/workflows/ci-tests.yml'
               - '.github/actions/setup-toolchain/**'
               - '.github/actions/setup-caches/**'
-            # Documentation and release-note prose cannot change a dependency graph.
-            dependency-review:
-              - '**'
-              - '!docs/**/*.md'
-              - '!docs/**/*.mdx'
-              - '!.changeset/*.md'
             security-config:
               - '.github/workflows/cicd.yml'
               - '.github/workflows/ci-security-scan.yml'
-              - '.github/dependency-review-config.yml'
               # A suppression has to re-run the gate it suppresses.
               - 'security/trivy-dependency-ignore.yaml'
             release-images:
@@ -829,7 +821,6 @@ jobs:
       security-events: write
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
-      dependency_review_changed: ${{ needs.detect-changes.outputs.dependency-review != 'false' }}
 
   Test:
     uses: ./.github/workflows/ci-tests.yml

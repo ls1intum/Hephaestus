@@ -2848,35 +2848,83 @@ void describe("CI contract", () => {
 		);
 	});
 
-	void test("dependency reporting excludes documentation and release-note prose and defaults to running", async () => {
-		const orchestrator = parseDocument(await readFile(".github/workflows/cicd.yml", "utf8"));
-		const filter = step(orchestrator, ["jobs", "detect-changes"], "dorny/paths-filter");
-		assert.equal(filter.get("predicate-quantifier"), "some-with-excludes");
-		const filters = parseDocument(String(filter.get("filters")));
-		const patterns = filters.get("dependency-review");
-		assert.ok(isSeq(patterns));
-		const globs = asArray(patterns.toJSON(), "dependency review patterns").map((pattern) =>
-			asString(pattern, "dependency review pattern"),
+	void test("informational dependency reporting cannot delay required CI or release", async () => {
+		const security = parseDocument(
+			await readFile(".github/workflows/ci-security-scan.yml", "utf8"),
 		);
-		const included = globs.filter((pattern) => !pattern.startsWith("!"));
-		const excluded = globs.filter((pattern) => pattern.startsWith("!"));
-		// The action uses dot matching: any inclusion and no exclusion must match each file.
-		const requiresReview = (files: readonly string[]) =>
-			files.some(
-				(file) =>
-					included.some((pattern) => minimatch(file, pattern, { dot: true })) &&
-					!excluded.some((pattern) => minimatch(file, pattern.slice(1), { dot: true })),
+		const securityJobs = security.get("jobs");
+		assert.ok(isMap(securityJobs));
+		assert.deepEqual(
+			securityJobs.items.map((entry) => String(entry.key)),
+			["security-scan"],
+			"The required Security workflow must not wait for the informational dependency report",
+		);
+		assert.equal(security.getIn(["jobs", "security-scan", "if"]), "inputs.should_skip != 'true'");
+		const orchestratorSource = await readFile(".github/workflows/cicd.yml", "utf8");
+		const orchestrator = parseDocument(orchestratorSource);
+		assert.equal(
+			orchestrator.getIn(["jobs", "Security", "uses"]),
+			"./.github/workflows/ci-security-scan.yml",
+		);
+		assertNeeds(orchestratorSource, "all-ci-passed", "Security", "Release-preflight");
+		assert.doesNotMatch(
+			orchestratorSource,
+			/outputs\.dependency-review|dependency_review_changed|^ {12}dependency-review:/mu,
+		);
+		assert.equal(
+			security.hasIn(["on", "workflow_call", "inputs", "dependency_review_changed"]),
+			false,
+		);
+		const report = parseDocument(await readFile(".github/workflows/dependency-review.yml", "utf8"));
+		const triggers = report.get("on");
+		assert.ok(isMap(triggers));
+		assert.deepEqual(
+			triggers.items.map((entry) => String(entry.key)),
+			["pull_request"],
+		);
+		const workflowPermissions = report.get("permissions");
+		assert.ok(isMap(workflowPermissions));
+		assert.deepEqual(workflowPermissions.toJSON(), {});
+		assert.equal(report.getIn(["jobs", "dependency-review", "permissions", "contents"]), "read");
+		const permissions = report.getIn(["jobs", "dependency-review", "permissions"]);
+		assert.ok(isMap(permissions));
+		assert.deepEqual(permissions.toJSON(), { contents: "read" });
+		for (const [file, source] of await workflowSources()) {
+			assert.doesNotMatch(
+				source,
+				/uses: \.\/\.github\/workflows\/dependency-review\.yml/u,
+				`${file} must not wait for the standalone report`,
 			);
+		}
+		const release = parseDocument(await readFile(".github/workflows/release.yml", "utf8"));
+		const upstream = release.getIn(["on", "workflow_run", "workflows"]);
+		assert.ok(isSeq(upstream));
+		assert.deepEqual(upstream.toJSON(), ["CI/CD"]);
+	});
+
+	void test("dependency reporting excludes only documentation and release-note prose", async () => {
+		const workflow = parseDocument(
+			await readFile(".github/workflows/dependency-review.yml", "utf8"),
+		);
+		assert.equal(workflow.hasIn(["on", "pull_request", "branches"]), false);
+		assert.equal(workflow.hasIn(["on", "pull_request", "branches-ignore"]), false);
+		assert.equal(workflow.hasIn(["on", "pull_request", "paths"]), false);
+		const patterns = workflow.getIn(["on", "pull_request", "paths-ignore"]);
+		assert.ok(isSeq(patterns));
+		const globs = asArray(patterns.toJSON(), "dependency report exclusions").map((pattern) =>
+			asString(pattern, "dependency report exclusion"),
+		);
+		assert.deepEqual(globs, ["docs/**/*.md", "docs/**/*.mdx", ".changeset/*.md"]);
+		const requiresReport = (files: readonly string[]) =>
+			files.some((file) => !globs.some((pattern) => minimatch(file, pattern, { dot: true })));
 		for (const [files, expected] of [
 			[[".changeset/review-progress.md"], false],
 			[[".changeset/review-progress.md", "docs/user/reviews.mdx"], false],
+			[["docs/contributor/reviews.md"], false],
 			[[".changeset/review-progress.md", "package.json"], true],
 			[[".changeset/review-progress.md", "pnpm-lock.yaml"], true],
 			[[".changeset/review-progress.md", "server/build.gradle.kts"], true],
-			[
-				[".changeset/review-progress.md", "server/application/src/main/resources/application.yml"],
-				true,
-			],
+			[["docs/user/reviews.mdx", "server/application/src/main/resources/application.yml"], true],
 			[[".changeset/review-progress.md", ".github/workflows/cicd.yml"], true],
 			[[".changeset/config.json"], true],
 			[[".changeset/tool.ts"], true],
@@ -2884,74 +2932,13 @@ void describe("CI contract", () => {
 			[["docs/config.json"], true],
 			[["unknown-file"], true],
 		] as const) {
-			assert.equal(requiresReview(files), expected, files.join(", "));
+			assert.equal(requiresReport(files), expected, files.join(", "));
 		}
-
-		const caller = asString(
-			orchestrator.getIn(["jobs", "Security", "with", "dependency_review_changed"]),
-			"dependency review applicability",
-		);
-		const expression = /^\$\{\{(?<body>[\s\S]+)\}\}$/u.exec(caller)?.groups?.body;
-		assert.ok(isSet(expression));
-		const parsed = new Parser(new Lexer(expression).lex().tokens, ["needs"], []).parse();
-		for (const [value, expected] of [
-			["false", false],
-			["true", true],
-			["", true],
-			["unknown", true],
-		] as const) {
-			const context: unknown = JSON.parse(
-				JSON.stringify({
-					needs: { "detect-changes": { outputs: { "dependency-review": value } } },
-				}),
-				data.reviver,
-			);
-			assert.ok(context instanceof data.Dictionary);
-			assert.equal(new Evaluator(parsed, context).evaluate().coerceString(), String(expected));
-		}
-
-		const workflow = parseDocument(
-			await readFile(".github/workflows/ci-security-scan.yml", "utf8"),
-		);
-		assert.equal(
-			workflow.getIn(["on", "workflow_call", "inputs", "dependency_review_changed", "default"]),
-			true,
-		);
-		const condition = asString(
-			workflow.getIn(["jobs", "dependency-review", "if"]),
-			"dependency review condition",
-		);
-		const jobCondition = new Parser(
-			new Lexer(condition).lex().tokens,
-			["inputs", "github"],
-			[],
-		).parse();
-		for (const [event, changed, skipped, expected] of [
-			["pull_request", false, "false", false],
-			["pull_request", true, "false", true],
-			["pull_request", true, "true", false],
-			["merge_group", true, "false", false],
-		] as const) {
-			const context: unknown = JSON.parse(
-				JSON.stringify({
-					inputs: { should_skip: skipped, dependency_review_changed: changed },
-					github: { event_name: event },
-				}),
-				data.reviver,
-			);
-			assert.ok(context instanceof data.Dictionary);
-			assert.equal(
-				new Evaluator(jobCondition, context).evaluate().coerceString(),
-				String(expected),
-			);
-		}
-		assert.equal(workflow.getIn(["jobs", "security-scan", "if"]), "inputs.should_skip != 'true'");
 	});
 
 	void test("blocks dependency regressions across the release trust boundary", async () => {
 		const orchestrator = await readFile(".github/workflows/cicd.yml", "utf8");
 		const securityConfig = pathFilter(orchestrator, "security-config");
-		assert.match(securityConfig, /- '\.github\/dependency-review-config\.yml'/u);
 		assert.match(
 			securityConfig,
 			/- 'security\/trivy-dependency-ignore\.yaml'/u,
@@ -2960,11 +2947,19 @@ void describe("CI contract", () => {
 		const workflow = parseDocument(
 			await readFile(".github/workflows/ci-security-scan.yml", "utf8"),
 		);
-		const reviewPath = ["jobs", "dependency-review"];
-		assert.ok(
-			String(workflow.getIn([...reviewPath, "if"])).includes("github.event_name == 'pull_request'"),
+		const reportWorkflow = parseDocument(
+			await readFile(".github/workflows/dependency-review.yml", "utf8"),
 		);
-		const review = step(workflow, reviewPath, "actions/dependency-review-action");
+		const reviewPath = ["jobs", "dependency-review"];
+		assert.equal(reportWorkflow.getIn([...reviewPath, "timeout-minutes"]), 15);
+		const checkout = step(reportWorkflow, reviewPath, "actions/checkout");
+		assert.equal(checkout.get("fetch-depth"), 1);
+		assert.equal(checkout.get("persist-credentials"), false);
+		assert.equal(
+			namedStep(reportWorkflow, reviewPath, "Review dependency changes").get("uses"),
+			"actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294",
+		);
+		const review = step(reportWorkflow, reviewPath, "actions/dependency-review-action");
 		assert.equal(review.get("config-file"), "./.github/dependency-review-config.yml");
 		assert.equal(review.get("retry-on-snapshot-warnings"), true);
 		assert.equal(review.get("retry-on-snapshot-warnings-timeout"), 600);
