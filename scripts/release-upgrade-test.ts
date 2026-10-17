@@ -7,9 +7,11 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { asArray, asRecord, asString } from "./lib/json.ts";
 import { CAPTURE_LIMIT_BYTES } from "./lib/process.ts";
 import {
+	PEOPLE_LAYOUT_SQL,
+	peopleLayout,
 	preservationSql,
+	type PeopleLayout,
 	type PreservedPeopleIds,
-	type UpgradeSchema,
 } from "./lib/release-upgrade-fingerprint.ts";
 import { researchConsentFields } from "./lib/research-consent.ts";
 
@@ -354,16 +356,19 @@ async function assertInstalledCatalog(port: number, session: Session): Promise<v
 	}
 }
 
-function linkWorkspaceIdentity(): void {
-	docker(
-		"exec",
-		postgres,
-		"psql",
-		"--username=root",
-		"--dbname=hephaestus",
-		"--set=ON_ERROR_STOP=1",
-		"--command",
-		`WITH fixture AS (
+function linkWorkspaceIdentity(layout: PeopleLayout): void {
+	// Native entity initializers and @CreationTimestamp are not database defaults, so every
+	// non-null identity column is written.
+	const link =
+		layout === "legacy"
+			? `INSERT INTO identity_link
+		   (account_id, provider_id, subject, external_actor_id, username_at_signup, linked_via)
+		 SELECT fixture.account_id, created.provider_id, created.native_id::text, created.id,
+		        'account:' || fixture.account_id, 'MANUAL_LINK'`
+			: `INSERT INTO identity
+		   (account_id, provider_id, provider_user_key, team_key, linked_at, linked_via)
+		 SELECT fixture.account_id, created.provider_id, created.native_id::text, '', now(), 'MANUAL'`;
+	const linked = query(`WITH fixture AS (
 		   SELECT account.id AS account_id, identity_provider.id AS provider_id
 		   FROM account CROSS JOIN identity_provider
 		   WHERE account.primary_email = 'alice@dev.invalid'
@@ -375,12 +380,13 @@ function linkWorkspaceIdentity(): void {
 		   FROM fixture
 		   RETURNING id, provider_id, native_id
 		 )
-		 INSERT INTO identity_link
-		   (account_id, provider_id, subject, external_actor_id, username_at_signup, linked_via)
-		 SELECT fixture.account_id, created.provider_id, created.native_id::text, created.id,
-		        'account:' || fixture.account_id, 'MANUAL_LINK'
-		 FROM fixture CROSS JOIN created;`,
-	);
+		 ${link}
+		 FROM fixture CROSS JOIN created
+		 RETURNING id;`);
+	// A fixture that matches nothing inserts nothing without an error.
+	if (!/^[1-9][0-9]*$/u.test(linked)) {
+		throw new Error(`Fixture identity link must insert exactly one row, received: ${linked}`);
+	}
 }
 
 function query(sql: string): string {
@@ -391,6 +397,8 @@ function query(sql: string): string {
 		"--username=root",
 		"--dbname=hephaestus",
 		"--set=ON_ERROR_STOP=1",
+		// Without it a write's command tag follows the rows it returns.
+		"--quiet",
 		"--tuples-only",
 		"--no-align",
 		"--command",
@@ -398,19 +406,19 @@ function query(sql: string): string {
 	);
 }
 
-function dataFingerprint(
-	schema: UpgradeSchema = "released",
-	preserved?: PreservedPeopleIds,
-): string {
-	return query(preservationSql(schema, preserved));
+function dataFingerprint(layout: PeopleLayout, preserved?: PreservedPeopleIds): string {
+	return query(preservationSql(layout, preserved));
 }
 
-function preservedPeople(): PreservedPeopleIds {
+function preservedPeople(layout: PeopleLayout): PreservedPeopleIds {
 	const rows = (table: string) => {
 		const value = query(`SELECT id FROM ${table} ORDER BY id`);
 		return value === "" ? [] : value.split("\n");
 	};
-	return { accounts: rows("account"), identities: rows("identity_link") };
+	return {
+		accounts: rows("account"),
+		identities: rows(layout === "legacy" ? "identity_link" : "identity"),
+	};
 }
 
 function executeFixture(name: "released-seed.sql" | "assert-migrated.sql"): void {
@@ -535,7 +543,7 @@ async function assertRefusal(image: string, seededData: string): Promise<void> {
 		throw new Error(`Expected cut-point refusal from changeLogSyncToTag:
 ${result.stdout}${result.stderr}`);
 	}
-	if (historyFingerprint() !== history || dataFingerprint() !== seededData) {
+	if (historyFingerprint() !== history || dataFingerprint("legacy") !== seededData) {
 		throw new Error("Refused synchronization changed migration history or seeded data");
 	}
 
@@ -554,7 +562,7 @@ ${result.stdout}${result.stderr}`);
 		throw new Error(`Expected cut-point refusal at startup (exit ${exitCode}):
 ${logs}`);
 	}
-	if (historyFingerprint() !== history || dataFingerprint() !== seededData) {
+	if (historyFingerprint() !== history || dataFingerprint("legacy") !== seededData) {
 		throw new Error("Refused startup changed migration history or seeded data");
 	}
 	if (count("SELECT count(*) FROM databasechangeloglock WHERE locked;") !== 0) {
@@ -634,22 +642,33 @@ try {
 	let port = startApplication(application, previousImage);
 	// A previous release without the management port answers readiness only on the actuator path.
 	await waitUntilReady(application, port, ["/readyz", "/actuator/health/readiness"]);
+	const layout = peopleLayout(query(PEOPLE_LAYOUT_SQL));
+	console.log(`Previous release people layout: ${layout}.`);
+	if (upgradePath !== "latest" && layout !== "legacy") {
+		throw new Error(
+			`The pinned ${upgradePath} path requires the legacy people layout, found ${layout}`,
+		);
+	}
 	const previousSession = await login(port, "alice");
 	await completeTransparencyNotice(port, previousSession);
 	await login(port, "root");
-	linkWorkspaceIdentity();
+	linkWorkspaceIdentity(layout);
 	await seedWorkspace(port, previousSession, WORKSPACE_SLUG);
 	await assertCoreReads(port, previousSession);
 	docker("stop", "--time", "30", application);
 	docker("rm", application);
+	// The released-schema marker survives the cutover, so only a legacy layout takes the seed.
 	const exactMainSource =
 		upgradePath === "latest" &&
+		layout === "legacy" &&
 		count("SELECT count(*) FROM databasechangelog WHERE id='1791941746633-2'") === 1;
 	if (exactMainSource) {
 		executeFixture("released-seed.sql");
 	}
-	const preserved = preservedPeople();
-	const seededData = dataFingerprint();
+	const preserved = preservedPeople(layout);
+	// Legacy stays unfiltered so a refused start that adds people is still detected.
+	const seededData =
+		layout === "legacy" ? dataFingerprint("legacy") : dataFingerprint("native", preserved);
 	for (const kind of ["account", "identity", "user", "workspace", "membership", "connection"]) {
 		if (!seededData.includes(`${kind}|`)) {
 			throw new Error(`Previous release did not seed ${kind} data`);
@@ -671,7 +690,10 @@ try {
 		application = `${runId}-candidate`;
 		port = startApplication(application, candidateImage);
 		await waitUntilReady(application, port);
-		const upgradedData = dataFingerprint("candidate", preserved);
+		if (peopleLayout(query(PEOPLE_LAYOUT_SQL)) !== "native") {
+			throw new Error("Candidate did not reach the native people layout");
+		}
+		const upgradedData = dataFingerprint("native", preserved);
 		executeFixture("assert-migrated.sql");
 		if (upgradedData !== seededData) {
 			throw new Error("Seeded application data changed during upgrade");
@@ -721,7 +743,8 @@ try {
 	}
 	throw error;
 } finally {
-	spawnSync("docker", ["rm", "--force", application, `${runId}-sync`, postgres], {
+	// --volumes removes only these containers' anonymous volumes, such as PostgreSQL's data.
+	spawnSync("docker", ["rm", "--force", "--volumes", application, `${runId}-sync`, postgres], {
 		stdio: "ignore",
 	});
 	spawnSync("docker", ["network", "rm", network], { stdio: "ignore" });
