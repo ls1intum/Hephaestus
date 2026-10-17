@@ -1,18 +1,21 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier.Category;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier.ClassificationResult;
@@ -29,6 +32,7 @@ import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -73,6 +77,9 @@ class GitHubIssueCommentSyncServiceTest extends BaseUnitTest {
     @Mock
     private RequestSpec requestSpec;
 
+    @Mock
+    private RepositoryRepository repositoryRepository;
+
     private GitHubIssueCommentSyncService service;
 
     private static final Long SCOPE_ID = 100L;
@@ -90,8 +97,17 @@ class GitHubIssueCommentSyncServiceTest extends BaseUnitTest {
         lenient().when(graphQlClientProvider.getRateLimitRemaining(SCOPE_ID)).thenReturn(5000);
         lenient().when(graphQlClientProvider.isRateLimitCritical(SCOPE_ID)).thenReturn(false);
 
+        lenient()
+                .when(repositoryRepository.findByIdWithOrganization(REPO_ID))
+                .thenReturn(Optional.of(createRepository()));
+
         service = new GitHubIssueCommentSyncService(
-                graphQlClientProvider, commentProcessor, syncProperties, exceptionClassifier, graphQlSyncHelper);
+                graphQlClientProvider,
+                commentProcessor,
+                syncProperties,
+                exceptionClassifier,
+                graphQlSyncHelper,
+                repositoryRepository);
     }
 
     // Helper methods
@@ -134,6 +150,19 @@ class GitHubIssueCommentSyncServiceTest extends BaseUnitTest {
         when(response.field(fieldPath)).thenReturn(field);
         when(field.toEntity(GHIssueCommentConnection.class)).thenReturn(connection);
         when(requestSpec.execute()).thenReturn(Mono.just(response));
+    }
+
+    @Test
+    void shouldRefuseMissingRepositoryBeforeFetchingRemainingComments() {
+        Issue issue = new Issue();
+        issue.setNumber(NUMBER);
+        issue.setRepository(createRepository());
+        when(repositoryRepository.findByIdWithOrganization(REPO_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.syncRemainingComments(SCOPE_ID, issue, "embedded-page"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Repository no longer exists during comment sync");
+        verifyNoInteractions(graphQlClient);
     }
 
     @Nested
