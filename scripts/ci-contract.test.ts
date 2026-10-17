@@ -2246,13 +2246,15 @@ void describe("CI contract", () => {
 		const capture = job(release, "tag-images");
 		const checksumCreation = capture.indexOf("sha256sum -- * > SHA256SUMS");
 		const checksumSigning = capture.indexOf(
-			"cosign sign-blob --yes --bundle evidence/SHA256SUMS.sigstore.json evidence/SHA256SUMS",
+			"node scripts/keyless-sign.ts sign-blob --yes --bundle evidence/SHA256SUMS.sigstore.json evidence/SHA256SUMS",
 		);
 		assert.ok(checksumCreation !== -1 && checksumSigning > checksumCreation);
 		assert.ok(
 			capture.indexOf("node scripts/verify-release-evidence.ts evidence --verify-signatures") >
 				checksumSigning,
 		);
+		assert.equal((capture.match(/node scripts\/keyless-sign\.ts /gu) ?? []).length, 3);
+		assert.doesNotMatch(capture, /(?:^|\n)\s*cosign (?:attest|sign-blob) /u);
 		const verifier = await readFile("scripts/verify-release-evidence.ts", "utf8");
 		// Template literals are elided so this test can quote the source lines it expects without
 		// carrying interpolations of its own.

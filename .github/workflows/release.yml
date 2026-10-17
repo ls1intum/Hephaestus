@@ -199,10 +199,10 @@ jobs:
           jq -er '.subjects[] | select(.provenance == "first-party") | [.repository, .digest, .image, .platform] | @tsv' evidence/manifest.json |
           while IFS=$'\t' read -r repository digest image platform; do
             suffix=${platform//\//-}
-            cosign attest --yes --type spdxjson --predicate "evidence/$image-$suffix.spdx.json" "$repository@$digest"
+            node scripts/keyless-sign.ts attest --yes --type spdxjson --predicate "evidence/$image-$suffix.spdx.json" "$repository@$digest"
           done
           (cd evidence && sha256sum -- * > SHA256SUMS)
-          cosign sign-blob --yes --bundle evidence/SHA256SUMS.sigstore.json evidence/SHA256SUMS
+          node scripts/keyless-sign.ts sign-blob --yes --bundle evidence/SHA256SUMS.sigstore.json evidence/SHA256SUMS
 
       - name: Verify evidence from registry subjects
         env:
@@ -256,7 +256,7 @@ jobs:
           ASSET: ${{ steps.pin.outputs.asset-path }}
         run: |
           set -euo pipefail
-          cosign sign-blob --yes --bundle "${ASSET}.sigstore.json" "$ASSET"
+          node scripts/keyless-sign.ts sign-blob --yes --bundle "${ASSET}.sigstore.json" "$ASSET"
 
       - name: Verify signature with the deploy-side identity (fail fast)
         env:
