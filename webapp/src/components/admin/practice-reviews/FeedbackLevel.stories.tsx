@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, waitFor, within } from "storybook/test";
 
-import type { ReviewFeedbackDetail } from "@/api/types.gen";
+import type { FeedbackBasis, ReviewFeedbackDetail } from "@/api/types.gen";
 import { withPageBehind } from "@/stories/decorators";
 import { InLevelStack } from "@/stories/level-stack";
 import { expectSettledVisible, settledDrawerPanel } from "@/stories/overlay";
@@ -30,6 +30,7 @@ import {
 	withdrawnFeedbackDetail,
 } from "./fixtures";
 import { SHEET_SECTIONS } from "./RecordSheet";
+import { resultSummary } from "./result-words";
 import { feedbackLevel } from "./review-levels";
 
 const ready = (feedback: ReviewFeedbackDetail) => ({ status: "ready" as const, feedback });
@@ -678,5 +679,139 @@ export const HiddenSource: Story = {
 		panel.getByRole("heading", { level: 2, name: "Feedback text hidden" });
 		panel.getByText("Feedback text is hidden because access to its sources could not be verified.");
 		await expect(panel.queryByText(/No feedback text is recorded/u)).toBeNull();
+	},
+};
+
+const [basisSource] = reviewFeedbackDetail.basis;
+if (basisSource === undefined) {
+	throw new Error("The feedback fixtures must rest on a result");
+}
+const RESULT_ID = basisSource.resultId;
+const SUMMARY = resultSummary(basisSource.result);
+const PRACTICE = basisSource.result.practiceName;
+const OTHER_RESULT_ID = "cccccccc-0000-4000-8000-000000000001";
+const UNAVAILABLE_RESULT_ID = "cccccccc-0000-4000-8000-000000000002";
+const PROBLEM_ID = "dddddddd-0000-4000-8000-000000000001";
+const SECOND_PROBLEM_ID = "dddddddd-0000-4000-8000-000000000002";
+const OTHER_PROBLEM_ID = "dddddddd-0000-4000-8000-000000000003";
+
+/** The feedback, resting on each basis in the order given. */
+function restingOn(basis: Omit<FeedbackBasis, "ordinal">[]): ReviewFeedbackDetail {
+	return { ...reviewFeedbackDetail, basis: basis.map((entry, ordinal) => ({ ...entry, ordinal })) };
+}
+
+function basisEntries(panel: HTMLElement): HTMLElement[] {
+	return within(within(panel).getByRole("list", { name: "Based on" })).getAllByRole("listitem");
+}
+
+/**
+ * Feedback that rests on a whole result and on one problem of the same result names that result
+ * once, with both bases under it. The technical facts still list each basis.
+ */
+export const BasedOnAResultAndOneOfItsProblems: Story = {
+	args: {
+		feedback: ready(
+			restingOn([
+				{ resultId: RESULT_ID, problemId: null, result: basisSource.result },
+				{ resultId: RESULT_ID, problemId: PROBLEM_ID, result: basisSource.result },
+			]),
+		),
+	},
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		const [entry, ...others] = basisEntries(panelElement);
+		if (entry === undefined) {
+			throw new Error("The feedback names no result it rests on");
+		}
+		await expect(others).toHaveLength(0);
+		const result = within(entry);
+		await expect(result.getAllByRole("link", { name: SUMMARY })).toHaveLength(1);
+		await expect(entry).toHaveTextContent(
+			`${PRACTICE} · The whole result · One problem of this result`,
+		);
+		await expect(levelsOpenedBy(result.getByRole("link", { name: SUMMARY }))).toEqual([
+			`result:${RESULT_ID}`,
+		]);
+		await expect(
+			levelsOpenedBy(result.getByRole("link", { name: `One problem of this result: ${SUMMARY}` })),
+		).toEqual([`problem:${PROBLEM_ID}`]);
+		const panel = within(panelElement);
+		await expect(panel.getByRole("button", { name: "Copy basis result 1" })).toBeVisible();
+		await expect(panel.getByRole("button", { name: "Copy basis result 2" })).toBeVisible();
+		await expect(panel.getByRole("button", { name: "Copy basis problem 2" })).toBeVisible();
+		await expect(panel.getByText(PROBLEM_ID)).toBeVisible();
+	},
+};
+
+/**
+ * Each result once, in the order the feedback first names it: several problems of one result each
+ * open their own, another result with the same summary keeps its own entry, and a result whose text
+ * is unavailable still opens.
+ */
+export const BasedOnSeveralResults: Story = {
+	args: {
+		feedback: ready(
+			restingOn([
+				{ resultId: RESULT_ID, problemId: PROBLEM_ID, result: basisSource.result },
+				{
+					resultId: OTHER_RESULT_ID,
+					problemId: OTHER_PROBLEM_ID,
+					result: { ...basisSource.result, id: OTHER_RESULT_ID },
+				},
+				{ resultId: RESULT_ID, problemId: null, result: basisSource.result },
+				{ resultId: RESULT_ID, problemId: SECOND_PROBLEM_ID, result: basisSource.result },
+				{
+					resultId: UNAVAILABLE_RESULT_ID,
+					problemId: null,
+					result: { ...basisSource.result, id: UNAVAILABLE_RESULT_ID, summary: null },
+				},
+			]),
+		),
+	},
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		const [first, second, third, ...others] = basisEntries(panelElement);
+		if (first === undefined || second === undefined || third === undefined) {
+			throw new Error("The feedback names fewer than three results");
+		}
+		await expect(others).toHaveLength(0);
+
+		// Two results with the same summary are still two entries, each opening its own result.
+		await expect(
+			within(panelElement)
+				.getAllByRole("link", { name: SUMMARY })
+				.map((link) => levelsOpenedBy(link)),
+		).toEqual([[`result:${RESULT_ID}`], [`result:${OTHER_RESULT_ID}`]]);
+
+		const result = within(first);
+		await expect(result.getAllByRole("link", { name: SUMMARY })).toHaveLength(1);
+		await expect(first).toHaveTextContent(
+			`${PRACTICE} · The whole result · One problem of this result · Another problem of this result`,
+		);
+		for (const [name, problemId] of [
+			[`One problem of this result: ${SUMMARY} (reference 1 of 2)`, PROBLEM_ID],
+			[`Another problem of this result: ${SUMMARY} (reference 2 of 2)`, SECOND_PROBLEM_ID],
+		] as const) {
+			await expect(levelsOpenedBy(result.getByRole("link", { name }))).toEqual([
+				`problem:${problemId}`,
+			]);
+		}
+
+		const other = within(second);
+		await expect(other.getAllByRole("link", { name: SUMMARY })).toHaveLength(1);
+		await expect(second).toHaveTextContent(`${PRACTICE} · One problem of this result`);
+		await expect(second).not.toHaveTextContent("The whole result");
+		await expect(second).not.toHaveTextContent("Another problem of this result");
+		await expect(
+			levelsOpenedBy(other.getByRole("link", { name: `One problem of this result: ${SUMMARY}` })),
+		).toEqual([`problem:${OTHER_PROBLEM_ID}`]);
+
+		const unavailable = within(third);
+		await expect(third).toHaveTextContent(`${PRACTICE} · The whole result`);
+		await expect(unavailable.getAllByRole("link")).toHaveLength(1);
+		await expect(
+			levelsOpenedBy(unavailable.getByRole("link", { name: "Result text unavailable" })),
+		).toEqual([`result:${UNAVAILABLE_RESULT_ID}`]);
+		await expectNoPanelOverflow(panelElement);
 	},
 };

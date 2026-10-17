@@ -1,5 +1,5 @@
 import { EyeOffIcon, Undo2Icon } from "lucide-react";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
 import type {
 	FeedbackBasis,
@@ -284,47 +284,84 @@ function FeedbackWhat({ feedback }: { feedback: FeedbackRecord }) {
 	);
 }
 
+interface BasisResult {
+	resultId: string;
+	result: FeedbackBasis["result"];
+	whole: boolean;
+	problemIds: string[];
+}
+
+// Resting on a whole result and on problems of it are separate bases of one result, so the result
+// is named once with each of them under it, in the order the feedback first names that result.
+function basisByResult(basis: readonly FeedbackBasis[]): BasisResult[] {
+	const results = new Map<string, BasisResult>();
+	for (const entry of [...basis].sort((a, b) => a.ordinal - b.ordinal)) {
+		const group = results.get(entry.resultId) ?? {
+			resultId: entry.resultId,
+			result: entry.result,
+			whole: false,
+			problemIds: [],
+		};
+		results.set(entry.resultId, group);
+		if (entry.problemId === null) {
+			group.whole = true;
+		} else if (!group.problemIds.includes(entry.problemId)) {
+			group.problemIds.push(entry.problemId);
+		}
+	}
+	return [...results.values()];
+}
+
 /**
- * The results this feedback was written from, in the order it names them, and whether it rests on a
- * whole result or on one of its problems. Each opens in this sheet's place; Back returns here.
+ * The results this feedback was written from, and whether it rests on the whole of each, on
+ * problems of it, or on both. Each opens in this sheet's place; Back returns here.
  */
 function FeedbackBasisList({ basis }: { basis: readonly FeedbackBasis[] }) {
 	return (
 		<ul aria-label="Based on" className="flex min-w-0 flex-col gap-3">
-			{[...basis]
-				.sort((a, b) => a.ordinal - b.ordinal)
-				.map((entry) => {
-					const summary = resultSummary(entry.result);
-					return (
-						<li key={`${entry.resultId}:${entry.problemId ?? ""}`} className="min-w-0 space-y-1">
-							<ResultOutcome result={entry.result} />
-							<p className="text-sm font-medium break-words">
-								<DetailStackLink
-									entry={resultLevel(entry.resultId)}
-									single
-									className="underline-offset-4 hover:underline"
-								>
-									{summary}
-								</DetailStackLink>
-							</p>
-							<p className="text-xs text-muted-foreground">
-								{entry.result.practiceName} ·{" "}
-								{entry.problemId === null ? (
-									"The whole result"
-								) : (
-									<DetailStackLink
-										entry={problemLevel(entry.problemId)}
-										single
-										aria-label={`The problem of ${summary} it rests on`}
-										className="underline-offset-4 hover:underline"
-									>
-										One problem of this result
-									</DetailStackLink>
-								)}
-							</p>
-						</li>
-					);
-				})}
+			{basisByResult(basis).map(({ resultId, result, whole, problemIds }) => {
+				const summary = resultSummary(result);
+				return (
+					<li key={resultId} className="min-w-0 space-y-1">
+						<ResultOutcome result={result} />
+						<p className="text-sm font-medium break-words">
+							<DetailStackLink
+								entry={resultLevel(resultId)}
+								single
+								className="underline-offset-4 hover:underline"
+							>
+								{summary}
+							</DetailStackLink>
+						</p>
+						<p className="text-xs text-muted-foreground">
+							{result.practiceName}
+							{whole && " · The whole result"}
+							{problemIds.map((problemId, index) => {
+								const label =
+									index === 0 ? "One problem of this result" : "Another problem of this result";
+								// Counts the problems this feedback rests on, not their place in the result.
+								const reference =
+									problemIds.length === 1
+										? ""
+										: ` (reference ${String(index + 1)} of ${String(problemIds.length)})`;
+								return (
+									<Fragment key={problemId}>
+										{" · "}
+										<DetailStackLink
+											entry={problemLevel(problemId)}
+											single
+											aria-label={`${label}: ${summary}${reference}`}
+											className="underline-offset-4 hover:underline"
+										>
+											{label}
+										</DetailStackLink>
+									</Fragment>
+								);
+							})}
+						</p>
+					</li>
+				);
+			})}
 		</ul>
 	);
 }

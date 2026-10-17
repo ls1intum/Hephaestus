@@ -635,7 +635,7 @@ describe("what feedback is based on", () => {
 		);
 		// Each basis opens in the feedback's place: its result, and the problem it rests on.
 		const problemLink = within(first).getByRole("link", {
-			name: `The problem of ${summary} it rests on`,
+			name: `One problem of this result: ${summary}`,
 		});
 		expect(problemLink.getAttribute("href")).toContain(`problem:${basis.problemId}`);
 		await userEvent.click(within(first).getByRole("link", { name: summary }));
