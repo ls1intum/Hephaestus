@@ -88,6 +88,10 @@ function startApplication(name: string, image: string): number {
 		"HEPHAESTUS_SECURITY_ENCRYPTION_KEY=upgradeTestEncryptionKey01234567",
 		image,
 	);
+	return publishedPort(name);
+}
+
+function publishedPort(name: string): number {
 	const mapping = docker("port", name, "8080/tcp");
 	const port = Number(mapping.slice(mapping.lastIndexOf(":") + 1));
 	if (!Number.isInteger(port)) {
@@ -297,8 +301,9 @@ async function seedWorkspace(port: number, session: Session, workspaceSlug: stri
 	}
 }
 
-async function createCatalogDerivedPractice(port: number, session: Session): Promise<void> {
+async function assertInstalledCatalog(port: number, session: Session): Promise<void> {
 	const root = await login(port, "root");
+	await completeTransparencyNotice(port, root);
 	const response = await fetchWithTimeout(`http://127.0.0.1:${port}/admin/practice-catalog`, {
 		headers: { cookie: root.cookie },
 	});
@@ -306,34 +311,46 @@ async function createCatalogDerivedPractice(port: number, session: Session): Pro
 		throw new Error(`Instance catalog returned ${response.status}`);
 	}
 	const catalog = asRecord(await response.json(), "Instance catalog");
-	const practices = asArray(catalog.practices, "Instance catalog.practices");
-	const first = practices.find((entry) => asRecord(entry, "Catalog practice").excluded === false);
-	if (first === undefined) {
-		throw new Error("Instance catalog has no included practice");
+	const offered = asArray(catalog.practices, "Instance catalog.practices")
+		.map((entry) => asRecord(entry, "Catalog practice"))
+		.filter((practice) => practice.offered === true)
+		.map((practice) => asString(practice.slug, "Catalog practice.slug"))
+		.toSorted();
+	if (offered.length === 0) {
+		throw new Error("Instance catalog has no offered practices");
 	}
-	const practice = asRecord(first, "Catalog practice");
-	const created = await fetchWithTimeout(
+	const installedResponse = await fetchWithTimeout(
 		`http://127.0.0.1:${port}/workspaces/${ADOPTION_WORKSPACE_SLUG}/practices`,
-		{
-			method: "POST",
-			headers: {
-				cookie: session.cookie,
-				"content-type": "application/json",
-				...session.writeHeaders,
-			},
-			body: JSON.stringify({
-				slug: asString(practice.slug, "Catalog practice.slug"),
-				kind: asString(practice.kind, "Catalog practice.kind"),
-				definition: asRecord(practice.definition, "Catalog practice.definition"),
-				groupSlug: null,
-				position: null,
-			}),
-		},
+		{ headers: { cookie: session.cookie } },
 	);
-	if (created.status !== 201) {
-		throw new Error(
-			`Creating a catalog-derived practice returned ${created.status}: ${await created.text()}`,
-		);
+	if (!installedResponse.ok) {
+		throw new Error(`Workspace practices returned ${installedResponse.status}`);
+	}
+	const installed = asArray(await installedResponse.json(), "Workspace practices")
+		.map((entry) => asString(asRecord(entry, "Workspace practice").slug, "Workspace practice.slug"))
+		.toSorted();
+	if (
+		workspacePracticeCount(ADOPTION_WORKSPACE_SLUG) !== offered.length ||
+		JSON.stringify(installed) !== JSON.stringify(offered)
+	) {
+		throw new Error("New workspace practices do not match the offered instance catalog");
+	}
+	if (
+		count(`SELECT count(*) FROM workspace w
+		WHERE coalesce(to_jsonb(w)->>'workspace_slug', to_jsonb(w)->>'slug') = '${ADOPTION_WORKSPACE_SLUG}'
+		AND w.practice_catalog_installed_at IS NOT NULL`) !== 1
+	) {
+		throw new Error("New workspace has no completed catalog installation");
+	}
+	if (
+		count(`SELECT count(*) FROM practice p JOIN workspace w ON w.id = p.workspace_id
+		LEFT JOIN practice_version v ON v.id = p.current_version_id
+		WHERE coalesce(to_jsonb(w)->>'workspace_slug', to_jsonb(w)->>'slug') = '${ADOPTION_WORKSPACE_SLUG}'
+		AND (v.id IS NULL OR v.practice_id <> p.id OR v.workspace_id <> p.workspace_id
+			OR v.number <> 1 OR (SELECT count(*) FROM practice_version x WHERE x.practice_id = p.id) <> 1)`) !==
+		0
+	) {
+		throw new Error("New workspace practices do not have one valid initial version each");
 	}
 }
 
@@ -414,6 +431,8 @@ function executeFixture(name: "released-seed.sql" | "assert-migrated.sql"): void
 			"--username=root",
 			"--dbname=hephaestus",
 			"--set=ON_ERROR_STOP=1",
+			"--single-transaction",
+			"--file=-",
 		],
 		{ input, encoding: "utf8", maxBuffer: CAPTURE_LIMIT_BYTES },
 	);
@@ -674,16 +693,18 @@ try {
 		await assertCoreReads(port, candidateSession);
 
 		await seedWorkspace(port, candidateSession, ADOPTION_WORKSPACE_SLUG);
-		const practicesBeforeAdoption = workspacePracticeCount(ADOPTION_WORKSPACE_SLUG);
-		if (practicesBeforeAdoption !== 0) {
-			throw new Error(
-				`New workspace unexpectedly started with ${practicesBeforeAdoption} practices`,
-			);
-		}
-		await createCatalogDerivedPractice(port, candidateSession);
-		const practicesAfterAdoption = workspacePracticeCount(ADOPTION_WORKSPACE_SLUG);
-		if (practicesAfterAdoption !== 1) {
-			throw new Error(`Adoption created ${practicesAfterAdoption} practices instead of one`);
+		await assertInstalledCatalog(port, candidateSession);
+		const installedPractices = workspacePracticeCount(ADOPTION_WORKSPACE_SLUG);
+		docker("restart", "--time", "30", application);
+		port = publishedPort(application);
+		await waitUntilReady(application, port);
+		const restartedSession = await login(port, "alice");
+		await assertInstalledCatalog(port, restartedSession);
+		if (
+			workspacePracticeCount(WORKSPACE_SLUG) !== upgradedPractices ||
+			workspacePracticeCount(ADOPTION_WORKSPACE_SLUG) !== installedPractices
+		) {
+			throw new Error("Workspace practice counts changed after restart");
 		}
 
 		console.log(
