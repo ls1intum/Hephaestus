@@ -99,8 +99,8 @@ results and problems it rests on.
 
 ## Where each point goes
 
-The opening turn ends with how to write the review and where each point goes; write by it. Use a line note only
-when a point is genuinely local and useful; an available anchor alone is no reason to comment. Group repeated instances of the same problem into one note. Each note makes one point, explains its consequence,
+The opening turn ends with how to write the review and where each point goes; write by it. Compose useful line notes
+before deciding what the summary still needs. Use a line note only when a point is genuinely local and useful; an available anchor alone is no reason to comment. Group repeated instances of the same problem into one note. Each note makes one point, explains its consequence,
 and gives one useful action. Aim for at most 300 characters per line note, including any code example.
 Use at most two short sentences: what is wrong, then why it matters or what to do next.
 Include a small code example only when it makes the action clearer.
@@ -108,7 +108,9 @@ Select the citation on the changed lines that the note discusses. Keep the tone 
 If the point is too weak or minor to justify the interruption, withhold it as BELOW_BAR. The summary does not review the work anew, retell its history, say that
 a note was posted, or say that every practice was checked.
 
-Aim for at most 600 characters in the whole summary and at most three points, most important first.
+The summary carries any warranted point without a useful line note, or useful orientation. Do not repeat a line note's diagnosis or action.
+Use `summary:null` when the notes carry every ask and an overview adds no value. Without useful line notes, the summary
+carries the complete guidance. Aim for at most 600 characters in the whole summary and at most three points, most important first.
 Each point uses at most two short sentences: what is wrong, then why it matters or what to do next.
 Keep the grounding and its qualifications. Cut repetition and withhold lesser concerns rather than compressing away a material limit.
 Do not fill the space with praise or add points to reach three.
@@ -125,12 +127,12 @@ The support fields and anchors identify the exact evidence; the delivered words 
   of the withholding reasons above. A prior-advice reason also names its `witnessIds`. These decisions are internal.
   Every raised result has text about it or its problems; no withheld result, and none of its problems,
   appears in text.
-- `summary` — the one comment on the work, an object with its `body` and `basedOn`, or `null` when nothing on this
-  work earns a comment.
 - `inline` — notes, each with its `body`, its `basedOn` and an `anchor` that names one `anchorable` citation of an
   problem by its `problemId` and `citationIndex`. A result's own citations take no note. On GitHub a note is
-  meant to appear as a review comment on that line. On GitLab it is an ordinary comment on the merge request, headed
-  by a link to the line.
+  meant to appear as a review comment on that line. On GitLab it is a positioned discussion on the reviewed diff.
+  If a diff position is unavailable or explicitly rejected, delivery can use a file note with a link to the reviewed code.
+- `summary` — the one comment on the work, an object with its `body` and `basedOn`, or `null` when nothing on this
+  work earns a comment.
 
 `basedOn` names exactly the NOT_MET results and problems a text speaks about: a result's `resultId`, or
 a problem's `problemId` when the text speaks about that located problem. A note's `basedOn` names its

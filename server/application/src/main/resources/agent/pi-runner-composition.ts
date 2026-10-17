@@ -1058,8 +1058,10 @@ export function priorAdviceWitnesses(
 /** What report_review tells the model it does. The rules are applied by readReview, with every reason at once. */
 export const REVIEW_TOOL_DESCRIPTION =
 	"Store the final review on this piece of work. First decide each NOT_MET result: RAISE it, or withhold it " +
-	"with your reason and, for advice this work already received, the statement that gave it. Then write the summary " +
-	"comment and any notes placed on lines of the change: they speak about every raised result, itself or through " +
+	"with your reason and, for advice this work already received, the statement that gave it. Write useful local notes first, " +
+	"then use the summary for a warranted point without a useful line note, or useful orientation. Do not repeat a note's diagnosis or action. " +
+	"Use summary:null when it adds nothing; without useful line notes, put the complete guidance in the summary. " +
+	"Together the texts speak about every raised result, itself or through " +
 	"its problems, and no withheld one. Each body is published whole as written, with provider safety formatting and a fixed disclosure; nothing is " +
 	"assembled from fragments. An accepted call is final and ends the composition. A missing or contradicted decision, " +
 	"invalid support, eligibility or location, or a witness that cannot stand as the advice refuses the whole " +
@@ -1068,7 +1070,7 @@ export const REVIEW_TOOL_DESCRIPTION =
 	`${REVIEW_TARGETS.inlineChars} characters and one local point per line note. Each point uses at most two short sentences: what, then why or next action. ` +
 	"No headings, internal labels or citation coordinates in the published text; refer to evidence in natural words or a short exact quote. " +
 	`A summary over ${REVIEW_LIMITS.summaryChars} characters or a note over ${REVIEW_LIMITS.inlineChars} is refused for correction, never truncated. ` +
-	'Input example: {"decisions":[{"resultId":"<admitted NOT_MET resultId>","disposition":"RAISE"}],"summary":{"basedOn":["<same resultId>"],"body":"Explain the supported concern and its remedy."},"inline":[]}. ' +
+	'Input example with one useful line note: {"decisions":[{"resultId":"<admitted NOT_MET resultId>","disposition":"RAISE"}],"inline":[{"basedOn":["<its problemId>"],"body":"Explain the local concern and its remedy.","anchor":{"problemId":"<same problemId>","citationIndex":0}}],"summary":null}. ' +
 	"For a quiet review, use summary:null, inline:[] and a supported withholding decision for each result. Unused inline and witnessIds lists may be null or omitted.";
 
 /**
@@ -1090,7 +1092,7 @@ export const WRITE_CONTRACT =
 	"Write plain prose or a short list without headings or internal labels such as Situation:, Capability: or Evidence:. " +
 	"Say ‘the description’s closing line’ or use a short exact quote, not ‘description L2’, ‘description L16’ or citation indices. " +
 	"Use basedOn and anchors to identify the exact evidence; leave its coordinates in the source evidence.\n\n" +
-	"Make each point fully once in this review:\n" +
+	"Make each point fully once in this review. Write useful line notes before deciding what the summary still needs:\n" +
 	"- A line note is one self-contained point about the code at its anchor: that local concern with its action and " +
 	"evidence. It is read alone, so it says its point completely. Several practices " +
 	"may support it when they describe that one event; it does not collect the review's other points.\n" +
@@ -1099,7 +1101,8 @@ export const WRITE_CONTRACT =
 	"about one place in the code, such as the description, a reply to a reviewer or a work-wide change, unless it " +
 	"forms one point with the code at a line. When a point has no useful line note, the summary carries that point " +
 	"completely. It may name or locate a line note's topic, and then names that note's " +
-	"results or problems in basedOn, but it does not restate the note's diagnosis or action.\n" +
+	"results or problems in basedOn, but it does not restate the note's diagnosis or action. " +
+	"Use summary:null when the notes carry every ask and an overview adds no useful orientation.\n" +
 	"- The review speaks only about NOT_MET results and their problems. It never acknowledges or praises a MET " +
 	"result, and it does not use praise to cushion a concern. When no NOT_MET result is raised, the review says " +
 	"nothing: the summary is null and there are no line notes.\n\n" +
@@ -1298,29 +1301,6 @@ export function reviewToolParameters(
 					},
 				},
 			},
-			summary: {
-				type: ["object", "null"],
-				additionalProperties: false,
-				required: ["basedOn", "body"],
-				description:
-					"The one overview comment on the work: the guidance its raised NOT_MET results warrant, and " +
-					"points not carried by line notes. It never acknowledges a MET result. Send null when nothing " +
-					"on this work earns a comment of its own.",
-				properties: {
-					basedOn: idList(
-						restable,
-						`${SUPPORT_FIRST} If any of them may not go out, the whole comment stays unsaid.`,
-					),
-					body: {
-						type: "string",
-						minLength: 1,
-						maxLength: REVIEW_LIMITS.summaryChars,
-						description:
-							`The whole comment in Markdown, from the results and problems in basedOn. Aim for at most ${REVIEW_TARGETS.summaryChars} characters ` +
-							`and ${REVIEW_TARGETS.summaryPoints} points; at most two short sentences per point: what, then why or next action. No headings, internal labels or citation coordinates.`,
-					},
-				},
-			},
 			inline: {
 				type: "array",
 				maxItems: anchorable.length > 0 ? REVIEW_LIMITS.inlineNotes : 0,
@@ -1357,6 +1337,29 @@ export function reviewToolParameters(
 								citationIndex: { type: "integer", minimum: 0 },
 							},
 						},
+					},
+				},
+			},
+			summary: {
+				type: ["object", "null"],
+				additionalProperties: false,
+				required: ["basedOn", "body"],
+				description:
+					"Write after the useful line notes: guidance without a useful line note, or brief orientation, without " +
+					"repeating their diagnosis or action. With no useful line notes, carry the complete guidance here. " +
+					"It never acknowledges a MET result. Send null when it adds no useful comment of its own.",
+				properties: {
+					basedOn: idList(
+						restable,
+						`${SUPPORT_FIRST} If any of them may not go out, the whole comment stays unsaid.`,
+					),
+					body: {
+						type: "string",
+						minLength: 1,
+						maxLength: REVIEW_LIMITS.summaryChars,
+						description:
+							`The whole comment in Markdown, from the results and problems in basedOn. Aim for at most ${REVIEW_TARGETS.summaryChars} characters ` +
+							`and ${REVIEW_TARGETS.summaryPoints} points; at most two short sentences per point: what, then why or next action. No headings, internal labels or citation coordinates.`,
 					},
 				},
 			},
@@ -1414,8 +1417,9 @@ ${JSON.stringify({ results: input.qualifications }, null, 1)}
 	const location = input.lineNotes
 		? "- Line notes: a note's `anchor` names one citation marked `anchorable` of a problem, by the " +
 			"problem's `problemId` and the citation's `citationIndex`; a result's own citations take no note. " +
-			"On GitHub it is a review comment on that line; on GitLab it is its own comment " +
-			"headed by a link to the line. Each body stands on its own, and each location can fail independently.\n"
+			"On GitHub it is a review comment on that line; on GitLab it is a positioned discussion on the reviewed diff. " +
+			"If a diff position is unavailable or explicitly rejected, delivery can use a file note with a link to the reviewed code. " +
+			"Each body stands on its own, and each location can fail independently.\n"
 		: "- This work has no lines a note can sit on; everything goes in the summary.\n";
 	const concerns = notMetReference(
 		input.results,

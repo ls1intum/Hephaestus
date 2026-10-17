@@ -22,9 +22,24 @@ async function run(
 	citation: Record<string, unknown>,
 	absolute = false,
 	extraTexts: { commit: string; content: string }[] = [],
+	prepared = false,
 ) {
 	const cwd = mkdtempSync(nodePath.join(tmpdir(), "pi-citation-"));
-	stagePractices(cwd, [{ slug: "test-practice" }]);
+	stagePractices(cwd, [
+		{
+			slug: "test-practice",
+			...(prepared
+				? {
+						program: `import { definePracticeScript } from "../lib/core/practice-script.ts";
+export default definePracticeScript({
+    meta: {},
+    async run(ctx) { return ctx.review({ facts: { commitSubject: "Add authentication" } }); },
+});
+`,
+					}
+				: {}),
+		},
+	]);
 	const write = (path: string, content: string) => {
 		mkdirSync(nodePath.dirname(nodePath.join(cwd, path)), { recursive: true });
 		writeFileSync(nodePath.join(cwd, path), content);
@@ -125,7 +140,11 @@ async function run(
 		const results = existsSync(nodePath.join(cwd, "out/result.json"))
 			? field(readJsonFile(cwd, "out/result.json"), "results")
 			: [];
-		return { ...exit, results, replies: capturedLines(cwd, "submitted") };
+		return {
+			...exit,
+			results,
+			replies: capturedLines(cwd, "submitted"),
+		};
 	} finally {
 		rmSync(cwd, { recursive: true, force: true });
 	}
@@ -249,6 +268,67 @@ void test("the live Git-log-as-HEAD shape is refused with an exact captured comm
 	const accepted = await run({ ...corrected });
 	assert.equal(accepted.status, 0, accepted.stderr);
 	assert.ok(Array.isArray(accepted.results) && accepted.results.length === 1, accepted.stderr);
+});
+
+void test("generated practice input redirects citations to captured evidence without admitting it", async () => {
+	const result = await run(
+		{
+			path: "work/review-input/test-practice.json",
+			startLine: 3,
+			quote: '"commitSubject": "Add authentication"',
+		},
+		false,
+		[],
+		true,
+	);
+	assert.match(result.stderr, /generated practice preparation, not captured evidence/u);
+	assert.match(result.stderr, /read\(\{"path":"evidence\/manifest\.json"\}\)/u);
+	assert.doesNotMatch(result.stderr, /no such file at commit/u);
+	assert.deepEqual(result.results, []);
+
+	const captured = await run(
+		{
+			path: "evidence/commits.json",
+			startLine: 4,
+			quote: '"message": "Add authentication"',
+		},
+		false,
+		[],
+		true,
+	);
+	assert.equal(captured.status, 0, captured.stderr);
+	assert.ok(Array.isArray(captured.results) && captured.results.length === 1, captured.stderr);
+	assert.match(JSON.stringify(captured.replies), /stored/u);
+});
+
+void test("an absolute generated-input citation receives the same captured-source correction", async () => {
+	const result = await run(
+		{
+			path: "work/review-input/test-practice.json",
+			startLine: 3,
+			quote: '"commitSubject": "Add authentication"',
+		},
+		true,
+		[],
+		true,
+	);
+	assert.match(result.stderr, /generated practice preparation, not captured evidence/u);
+	assert.match(result.stderr, /read\(\{"path":"evidence\/manifest\.json"\}\)/u);
+	assert.doesNotMatch(result.stderr, /no such file at commit/u);
+	assert.deepEqual(result.results, []);
+});
+
+void test("a missing repository file keeps the normal citation mismatch", async () => {
+	const result = await run(
+		{ path: "src/Missing.java", startLine: 1, quote: "missing();" },
+		false,
+		[],
+		true,
+	);
+	assert.match(result.stderr, /citation does not match src\/Missing\.java/u);
+	assert.match(result.stderr, /no such file at commit/u);
+	assert.doesNotMatch(result.stderr, /generated practice preparation/u);
+	assert.deepEqual(result.results, []);
 });
 
 void test("a wrong repository quotation is refused and its corrected citation verifies", async () => {

@@ -550,7 +550,7 @@ async function settleSession(
 function preparedSectionOf(slug: string, section: string): string {
 	const shown = section.trim();
 	return shown
-		? `\n\n#### Leads from the practice script for \`${slug}\` — starting points to check against the criteria, not verdicts\n${shown}`
+		? `\n\n#### Leads from the practice script for \`${slug}\` — starting points to check against the criteria, not verdicts\nThe full input is generated preparation, not citable evidence. Cite the captured source paths and exact text in the review brief.\n${shown}`
 		: "";
 }
 
@@ -1058,6 +1058,17 @@ export async function runReviewJob(): Promise<void> {
 	}
 
 	function verifySubmissionCitation(citation: Citation, notes: string[]): void {
+		const slug = sessionState().activeReview?.slug;
+		const preparedInput = slug === undefined ? null : `${REVIEW_INPUT_ROOT}/${slug}.json`;
+		if (
+			preparedInput !== null &&
+			citation.path === preparedInput &&
+			existsSync(`${CWD}/${preparedInput}`)
+		) {
+			throw new Error(
+				`${citation.path} is generated practice preparation, not captured evidence. Read the captured source paths in the review brief, or read(${JSON.stringify({ path: taskEnvelope.paths.manifest })}), then cite a captured source listed there.`,
+			);
+		}
 		if (citation.sourceKind !== DIFF_SOURCE) {
 			requireCitationCapabilities(citation);
 		}
