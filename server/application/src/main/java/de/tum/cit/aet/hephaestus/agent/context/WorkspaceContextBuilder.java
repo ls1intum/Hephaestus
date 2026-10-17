@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
@@ -86,16 +87,20 @@ public class WorkspaceContextBuilder {
             throw new IllegalStateException("The item must have exactly one installed capture source");
         var contributions = new LinkedHashMap<SourceKind, CaptureContribution>();
         try {
-            for (var kind : request.sources().stream()
+            var kinds = request.sources().stream()
                     .sorted(Comparator.comparing(SourceKind::value))
-                    .toList()) {
-                var version = catalogs.current().version();
-                if (!version.value().equals(request.sourceContractVersion())
+                    .toList();
+            for (var kind : kinds) {
+                if (!catalogs.current().version().value().equals(request.sourceContractVersion())
                         || !catalogs.requireSource(kind)
-                                .appliesTo(item.item().kind().value())) {
+                                .appliesTo(item.item().kind().value()))
                     throw new IllegalArgumentException("The requested source contract does not match the item");
-                }
-                var contribution = catalogs.isSourceUsePermitted(kind, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)
+            }
+            var permitted = kinds.stream()
+                    .filter(kind -> catalogs.isSourceUsePermitted(kind, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))
+                    .collect(Collectors.toUnmodifiableSet());
+            for (var kind : kinds) {
+                var contribution = permitted.contains(kind)
                         ? matching.getFirst()
                                 .capture(
                                         item,
@@ -106,7 +111,8 @@ public class WorkspaceContextBuilder {
                                                 Set.of(kind),
                                                 request.sourceContractVersion(),
                                                 request.scriptContractVersion(),
-                                                request.scanPaths()))
+                                                request.scanPaths(),
+                                                permitted))
                         : CaptureContribution.unavailable(Set.of(kind), SourceAbsenceReason.GOVERNANCE_NOT_EFFECTIVE);
                 contributions.put(kind, contribution);
             }

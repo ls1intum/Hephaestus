@@ -120,7 +120,9 @@ public class PullRequestContentSource {
             return CaptureContribution.unavailable(selectedKinds, SourceAbsenceReason.NOT_FOUND);
         }
         ReviewRepositoryPreparer.PreparedReview prepared = null;
-        boolean cloneRequested = readsClone(selectedKinds);
+        boolean cloneRequested = readsClone(selectedKinds)
+                || (selectedKinds.contains(CORE)
+                        && request.request().permittedSources().contains(DIFF));
         boolean cloneEnabled = cloneRequested && gitRepositoryManager.isEnabled();
         if (cloneEnabled) {
             prepared = request.preparation().prepare(repositoryPreparer, capture);
@@ -134,11 +136,12 @@ public class PullRequestContentSource {
         Map<SourceKind, List<String>> limitations = new HashMap<>();
         List<CitableText> citable = new ArrayList<>();
 
-        Map<SourceKind, SourceCaptureState> states = cloneRequested && !cloneEnabled
+        Map<SourceKind, SourceCaptureState> states = selectedKinds.contains(DIFF) && !cloneEnabled
                 ? Map.of(DIFF, new SourceCaptureState.NotCollected(SourceAbsenceReason.DISABLED))
                 : Map.of();
         var unavailable = request.preparation().unavailableReason();
-        if (cloneEnabled && unavailable != null) states = Map.of(DIFF, new SourceCaptureState.Unavailable(unavailable));
+        if (selectedKinds.contains(DIFF) && unavailable != null)
+            states = Map.of(DIFF, new SourceCaptureState.Unavailable(unavailable));
         if (prepared != null) {
             ensureRepositoryAvailable(new RepositoryKey(capture.workspaceId(), repositoryId));
         }
@@ -169,12 +172,13 @@ public class PullRequestContentSource {
                     COMMENTS, comments.comments().isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY);
         }
         if (prepared != null) {
+            // Commit words stay personal CORE records; the authorized DIFF plan supplies their pinned range.
+            if (selectedKinds.contains(CORE)) storeCommits(files, prepared);
             String range = prepared.target() + ":" + prepared.head();
             if (selectedKinds.contains(DIFF)) {
                 var changedPaths =
                         gitRepositoryManager.changedPaths(prepared.key(), prepared.target(), prepared.head());
                 storeChange(files, prepared, changedPaths);
-                if (selectedKinds.contains(CORE)) storeCommits(files, prepared);
                 citable.addAll(ScmCitableTexts.changed(gitRepositoryManager, prepared, files));
                 completeness.put(DIFF, SourceCompleteness.COMPLETE);
                 identities.put(DIFF, range);

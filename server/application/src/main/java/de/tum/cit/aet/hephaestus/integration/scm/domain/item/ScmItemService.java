@@ -23,6 +23,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSource;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RoleHolder;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.LinkedWorkItemContentSource;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.PullRequestContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.RepositoryTreeContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ScmCaptureContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ScmCapturePreparation;
@@ -41,6 +42,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -303,6 +305,24 @@ public class ScmItemService implements ItemSource {
                             Objects.requireNonNull(pinned.item().sourceId()))
                     .orElseThrow(ScmItemService::gone);
         contributors.require(work, review, request.sources());
+        var permittedRequest = request;
+        if (request.sources().contains(PullRequestContentSource.CORE)
+                && !request.sources().contains(PullRequestContentSource.DIFF)
+                && request.permittedSources().contains(PullRequestContentSource.DIFF)
+                && !contributors.permitsCommitRecords(work, review)) {
+            // Withheld commit words do not withdraw the separately permitted pull request metadata.
+            var permitted = new HashSet<>(request.permittedSources());
+            permitted.remove(PullRequestContentSource.DIFF);
+            permittedRequest = new CaptureRequest(
+                    request.reviewId(),
+                    request.jobId(),
+                    request.attempt(),
+                    request.sources(),
+                    request.sourceContractVersion(),
+                    request.scriptContractVersion(),
+                    request.scanPaths(),
+                    permitted);
+        }
         Repository repository = Objects.requireNonNull(work.getRepository());
         PullRequest pull = work instanceof PullRequest p ? p : null;
         ScmCapturedWork frozen = new ScmCapturedWork(
@@ -322,7 +342,7 @@ public class ScmItemService implements ItemSource {
                         ? null
                         : review.getAuthor().getId());
         ScmCaptureContext context =
-                new ScmCaptureContext(pinned, request, frozen, new ScmCapturePreparation(), clock.instant());
+                new ScmCaptureContext(pinned, permittedRequest, frozen, new ScmCapturePreparation(), clock.instant());
         return workCapture.capture(context);
     }
 

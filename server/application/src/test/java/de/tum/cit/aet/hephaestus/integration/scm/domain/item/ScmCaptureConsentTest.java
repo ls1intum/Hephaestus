@@ -2,7 +2,10 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.item;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -13,18 +16,41 @@ import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCopyRecorder;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentityResolver;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonProcessingSuppression;
+import de.tum.cit.aet.hephaestus.evidence.capture.CaptureRequest;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.spi.DeliveredPullRequestCommentLookup;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.PullRequestContentSource;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ReviewRepositoryPreparer;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ScmCaptureContext;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewCommentRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.databind.ObjectMapper;
 
 class ScmCaptureConsentTest extends BaseUnitTest {
     @Test
@@ -117,6 +143,110 @@ class ScmCaptureConsentTest extends BaseUnitTest {
                         ItemCaptureException.class,
                         e -> assertThat(e.code()).isEqualTo(ItemCaptureCode.CONSENT_WITHHELD));
         verifyNoInteractions(copies);
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldKeepCoreMetadataButNotCommitWordsWhenACommitContributorWithholdsConsent(IdentityProviderType kind) {
+        var identities = mock(PersonIdentityResolver.class);
+        var accounts = mock(AccountDirectory.class);
+        var suppression = mock(PersonProcessingSuppression.class);
+        var provider = new IdentityProvider(kind, "https://scm.example");
+        provider.setId(1L);
+        var author = person(provider, 11);
+        author.setId(11L);
+        var contributor = person(provider, 22);
+        when(identities.accountFor(new PersonIdentity(1L, "11", null))).thenReturn(Optional.of(101L));
+        when(identities.accountFor(new PersonIdentity(1L, "22", null))).thenReturn(Optional.of(102L));
+        when(accounts.find(101))
+                .thenReturn(Optional.of(new AccountDirectory.AccountView(
+                        101, Account.Status.ACTIVE, "Author", AiChoice.CLOUD, Instant.now(), true)));
+        when(accounts.find(102))
+                .thenReturn(Optional.of(new AccountDirectory.AccountView(
+                        102, Account.Status.ACTIVE, "Contributor", AiChoice.NO_AI, Instant.now(), true)));
+        var users = mock(UserRepository.class);
+        when(users.findAllById(List.<Long>of())).thenReturn(List.of());
+        when(users.findAllById(List.of(22L))).thenReturn(List.of(contributor));
+        var queries = mock(ScmContributorQueryRepository.class);
+        when(queries.diffContributors(456)).thenReturn(List.of(22L));
+        var consent = new ScmCaptureContributors(
+                users,
+                new ScmCaptureConsent(identities, accounts, suppression, mock(PersonDataCopyRecorder.class)),
+                queries);
+        var repository = new Repository();
+        repository.setId(123L);
+        repository.setNameWithOwner("owner/repo");
+        repository.setProvider(provider);
+        var work = new PullRequest();
+        work.setId(456L);
+        work.setAuthor(author);
+        work.setRepository(repository);
+        work.setTitle("Explain the change");
+        work.setBody("This change repairs the example.");
+        work.setNumber(42);
+        work.setState(Issue.State.OPEN);
+        work.setBaseRefName("main");
+        work.setHeadRefName("feature");
+        work.setHeadRefOid("b".repeat(40));
+        work.setBaseRefOid("a".repeat(40));
+        work.setHtmlUrl("https://scm.example/owner/repo/pull/42");
+        var mapper = new ObjectMapper();
+        var item = new ItemRef(99, 456, ScmItemEvents.PULL_REQUEST, 456L, null, null);
+        var items = mock(ScmItemAccess.class);
+        when(items.parent(item, ScmItemEvents.REPOSITORY))
+                .thenReturn(new ItemRef(99, 123, ScmItemEvents.REPOSITORY, 123L, null, null));
+        var access = mock(ScmRepositoryAccess.class);
+        when(access.authorize(99, repository))
+                .thenReturn(new IntegrationRef(IntegrationKind.valueOf(kind.name()), 99, null));
+        var lookup = mock(ScmWorkLookup.class);
+        when(lookup.find(item.kind(), 456L)).thenReturn(Optional.of(work));
+        var pullRequests = mock(PullRequestRepository.class);
+        when(pullRequests.findByIdForReviewContext(456L)).thenReturn(Optional.of(work));
+        var git = mock(GitRepositoryManager.class);
+        var preparer = mock(ReviewRepositoryPreparer.class);
+        var content = new PullRequestContentSource(
+                mapper,
+                git,
+                pullRequests,
+                mock(PullRequestReviewCommentRepository.class),
+                preparer,
+                mock(DeliveredPullRequestCommentLookup.class));
+        var capture = mock(ScmWorkCapture.class);
+        when(capture.capture(any())).thenAnswer(invocation -> {
+            ScmCaptureContext context = invocation.getArgument(0);
+            return content.capture(context, context.request().sources());
+        });
+        var service = new ScmItemService(
+                items,
+                access,
+                mock(RepositoryRepository.class),
+                lookup,
+                mock(PullRequestReviewRepository.class),
+                mock(IssueEvidenceVersion.class),
+                mock(ScmGitTree.class),
+                mock(ScmFileVersions.class),
+                mapper,
+                capture,
+                consent,
+                Clock.systemUTC());
+        var pinned = service.pin(item, null);
+        var core = PullRequestContentSource.CORE;
+        var diff = PullRequestContentSource.DIFF;
+        var request = new CaptureRequest(
+                UUID.randomUUID(), UUID.randomUUID(), 0, Set.of(core), "2.0.0", 3, null, Set.of(core, diff));
+        var captured = service.capture(pinned, request);
+        assertThat(captured.files())
+                .containsKey("context/metadata.json")
+                .doesNotContainKey(PullRequestContentSource.COMMITS_FILE);
+        verify(preparer, never()).prepare(any());
+        verifyNoInteractions(git);
+        var diffRequest = new CaptureRequest(request.reviewId(), request.jobId(), 0, Set.of(diff), "2.0.0", 3);
+        assertThatThrownBy(() -> service.capture(pinned, diffRequest))
+                .isInstanceOfSatisfying(
+                        ItemCaptureException.class,
+                        error -> assertThat(error.code()).isEqualTo(ItemCaptureCode.CONSENT_WITHHELD));
     }
 
     private User person(IdentityProvider provider, long nativeId) {

@@ -288,4 +288,36 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         assertThat(failure.getSuppressed())
                 .containsExactly(cleanupFails ? new Throwable[] {cleanupFailure} : new Throwable[0]);
     }
+
+    @Test
+    void shouldValidateTheEntirePlanBeforeCapturingAnySource() {
+        var mapper = new JsonMapper();
+        var registry = new ClasspathSourceCatalogRegistry(mapper, Clock.systemUTC());
+        var snapshot = mock(ItemSnapshot.class);
+        var item = new ItemRef(1, 2, new ItemKind("scm.pull_request"), 20L, null, null);
+        when(snapshot.item()).thenReturn(item);
+        var owner = mock(ItemSource.class);
+        when(owner.supports(item)).thenReturn(true);
+        var capture = new CaptureRequest(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                0,
+                Set.of(new SourceKind("scm.pull-request.core"), new SourceKind("zz.uninstalled.source")),
+                "2.0.0",
+                3);
+        var contexts = new WorkspaceContextBuilder(
+                List.of(), List.of(owner), registry, new JobFolderIndexBuilder(registry, mapper, Clock.systemUTC()));
+        assertThatThrownBy(() -> contexts.prepare(snapshot, capture)).isInstanceOf(IllegalArgumentException.class);
+        verify(owner, never()).capture(any(), any());
+    }
+
+    @Test
+    void shouldRejectASelectedSourceOutsideThePermittedPlan() {
+        var core = new SourceKind("scm.pull-request.core");
+        var diff = new SourceKind("scm.pull-request.diff");
+        assertThatThrownBy(() -> new CaptureRequest(
+                        UUID.randomUUID(), UUID.randomUUID(), 0, Set.of(diff), "2.0.0", 3, null, Set.of(core)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Selected capture sources are outside the permitted plan");
+    }
 }

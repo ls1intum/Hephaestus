@@ -7,18 +7,29 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.context.JobFolderIndexBuilder;
+import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
+import de.tum.cit.aet.hephaestus.evidence.capture.CaptureRequest;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.DeliveredPullRequestCommentLookup;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitDetails;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitFileChange.ChangeType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -39,13 +50,16 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.RepositoryKey;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.testconfig.ItemFixtures;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Consumer;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,10 +67,12 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.springframework.test.util.ReflectionTestUtils;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 class PullRequestContentSourceTest extends BaseUnitTest {
@@ -571,8 +587,152 @@ class PullRequestContentSourceTest extends BaseUnitTest {
         }
     }
 
+    private ScmCaptureContext coreWithDiffPlan() {
+        var original = request(sampleMetadata());
+        var plan = new CaptureRequest(
+                UUID.randomUUID(), UUID.randomUUID(), 0, Set.of(CORE), "2.0.0", 3, null, Set.of(CORE, DIFF));
+        return new ScmCaptureContext(
+                original.pinned(), plan, original.work(), new ScmCapturePreparation(), original.capturedAt());
+    }
+
     @Nested
     class Commits {
+
+        @ParameterizedTest
+        @ValueSource(strings = {"GITHUB", "GITLAB"})
+        void shouldCaptureCommitRecordsThroughTheSingletonSourcePlan(String providerKind) throws Exception {
+            stubGit();
+            emitCommit("Explain the exact change");
+            var original = request(sampleMetadata());
+            var integration = new IntegrationRef(IntegrationKind.valueOf(providerKind), WORKSPACE_ID, null);
+            var pinned = ItemFixtures.snapshot(
+                            original.pinned().item(), original.pinned().state())
+                    .version(original.pinned().version())
+                    .integration(integration)
+                    .roles(original.pinned().roles())
+                    .label(original.pinned().label())
+                    .build();
+            var owner = mock(ItemSource.class);
+            when(owner.supports(pinned.item())).thenReturn(true);
+            when(owner.capture(eq(pinned), any())).thenAnswer(invocation -> {
+                CaptureRequest selected = invocation.getArgument(1);
+                assertThat(selected.sources()).hasSize(1);
+                var context = new ScmCaptureContext(
+                        pinned, selected, original.work(), new ScmCapturePreparation(), original.capturedAt());
+                return provider.capture(context, selected.sources());
+            });
+            var mapper = new JsonMapper();
+            var registry = new ClasspathSourceCatalogRegistry(mapper, Clock.systemUTC());
+            var builder = new WorkspaceContextBuilder(
+                    List.of(),
+                    List.of(owner),
+                    registry,
+                    new JobFolderIndexBuilder(registry, mapper, Clock.systemUTC()));
+            var plan = new CaptureRequest(UUID.randomUUID(), UUID.randomUUID(), 0, Set.of(CORE, DIFF), "2.0.0", 3);
+            try (var captured = builder.prepare(pinned, plan)) {
+                assertThat(captured.files()).containsKey(PullRequestContentSource.COMMITS_FILE);
+                var commits = objectMapper
+                        .readTree(Objects.requireNonNull(captured.files().get(PullRequestContentSource.COMMITS_FILE)))
+                        .path("commits");
+                assertThat(commits.size()).isEqualTo(1);
+                assertThat(commits.path(0).path("sha").asString()).isEqualTo(HEAD);
+                assertThat(commits.path(0).path("message").asString()).isEqualTo("Explain the exact change");
+                assertThat(Objects.requireNonNull(captured.manifest()).citableTexts())
+                        .anySatisfy(text -> {
+                            assertThat(text.source()).isEqualTo(CORE.value());
+                            assertThat(text.path())
+                                    .isEqualTo(PullRequestContentSource.COMMITS_FILE + "#/commits/0/message");
+                        });
+            }
+        }
+
+        @Test
+        void shouldKeepCoreMetadataWithoutPreparingARepositoryWhenDiffIsNotInThePlan() {
+            var captured = provider.capture(request(sampleMetadata()), Set.of(CORE));
+            assertThat(captured.files())
+                    .containsKey("context/metadata.json")
+                    .doesNotContainKey(PullRequestContentSource.COMMITS_FILE);
+            assertThat(captured.completeness()).containsEntry(CORE, SourceCompleteness.COMPLETE);
+            verify(repositoryPreparer, never()).prepare(any());
+        }
+
+        @Test
+        void shouldKeepCoreMetadataWhenThePlannedRepositoryCaptureIsDisabled() {
+            var captured = provider.capture(coreWithDiffPlan(), Set.of(CORE));
+            assertThat(captured.files())
+                    .containsKey("context/metadata.json")
+                    .doesNotContainKey(PullRequestContentSource.COMMITS_FILE);
+            assertThat(captured.completeness()).containsEntry(CORE, SourceCompleteness.COMPLETE);
+            assertThat(captured.stateOverrides()).isEmpty();
+            verify(repositoryPreparer, never()).prepare(any());
+        }
+
+        @Test
+        void shouldKeepCoreMetadataWhenThePinnedRangeIsUnavailable() {
+            stubGit();
+            when(repositoryPreparer.prepare(any()))
+                    .thenThrow(
+                            new ItemCaptureException(ItemCaptureCode.VERSION_UNAVAILABLE, "Pinned range unavailable"));
+            var captured = provider.capture(coreWithDiffPlan(), Set.of(CORE));
+            assertThat(captured.files())
+                    .containsKey("context/metadata.json")
+                    .doesNotContainKey(PullRequestContentSource.COMMITS_FILE);
+            assertThat(captured.completeness()).containsEntry(CORE, SourceCompleteness.COMPLETE);
+            assertThat(captured.stateOverrides()).isEmpty();
+            var unavailable = provider.capture(request(sampleMetadata()), Set.of(DIFF));
+            assertThat(unavailable.stateOverrides())
+                    .containsEntry(
+                            DIFF, new SourceCaptureState.Unavailable(SourceAbsenceReason.REVIEW_VERSION_UNAVAILABLE));
+        }
+
+        @Test
+        void shouldNotPrepareCommitRecordsWhenDiffGovernanceIsBlocked() {
+            stubGit();
+            var original = request(sampleMetadata());
+            var owner = mock(ItemSource.class);
+            when(owner.supports(original.pinned().item())).thenReturn(true);
+            when(owner.capture(eq(original.pinned()), any())).thenAnswer(invocation -> {
+                CaptureRequest selected = invocation.getArgument(1);
+                assertThat(selected.sources()).containsExactly(CORE);
+                assertThat(selected.permittedSources()).containsExactly(CORE);
+                return provider.capture(
+                        new ScmCaptureContext(
+                                original.pinned(),
+                                selected,
+                                original.work(),
+                                new ScmCapturePreparation(),
+                                original.capturedAt()),
+                        selected.sources());
+            });
+            var mapper = new JsonMapper();
+            var catalog = new ClasspathSourceCatalogRegistry(mapper, Clock.systemUTC());
+            var registry = mock(ClasspathSourceCatalogRegistry.class);
+            when(registry.current()).thenReturn(catalog.current());
+            when(registry.catalogDigest()).thenReturn(catalog.catalogDigest());
+            when(registry.requireSource(CORE)).thenReturn(catalog.requireSource(CORE));
+            when(registry.requireSource(DIFF)).thenReturn(catalog.requireSource(DIFF));
+            when(registry.isSourceUsePermitted(CORE, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))
+                    .thenReturn(true);
+            var builder = new WorkspaceContextBuilder(
+                    List.of(),
+                    List.of(owner),
+                    registry,
+                    new JobFolderIndexBuilder(registry, mapper, Clock.systemUTC()));
+            var plan = new CaptureRequest(UUID.randomUUID(), UUID.randomUUID(), 0, Set.of(CORE, DIFF), "2.0.0", 3);
+            try (var captured = builder.prepare(original.pinned(), plan)) {
+                assertThat(captured.files())
+                        .containsKey("context/metadata.json")
+                        .doesNotContainKey(PullRequestContentSource.COMMITS_FILE);
+                assertThat(Objects.requireNonNull(captured.manifest()).sources())
+                        .anySatisfy(source -> {
+                            assertThat(source.kind()).isEqualTo(DIFF);
+                            assertThat(source.state())
+                                    .isEqualTo(new SourceCaptureState.Unavailable(
+                                            SourceAbsenceReason.GOVERNANCE_NOT_EFFECTIVE));
+                        });
+            }
+            verify(repositoryPreparer, never()).prepare(any());
+        }
 
         @Test
         void shouldCaptureTheExactCommitMessageParentsAndFileChangesAsCitableText() throws Exception {

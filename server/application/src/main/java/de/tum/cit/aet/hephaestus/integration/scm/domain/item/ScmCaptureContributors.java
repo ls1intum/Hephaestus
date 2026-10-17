@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.item;
 
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.GeneralReviewCommentContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.IssueContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.PullRequestContentSource;
@@ -28,6 +30,16 @@ public class ScmCaptureContributors {
     private final UserRepository users;
     private final ScmCaptureConsent consent;
     private final ScmContributorQueryRepository queries;
+
+    boolean permitsCommitRecords(Issue work, @Nullable PullRequestReview review) {
+        try {
+            require(work, review, Set.of(PullRequestContentSource.DIFF));
+            return true;
+        } catch (ItemCaptureException failure) {
+            if (failure.code() != ItemCaptureCode.CONSENT_WITHHELD) throw failure;
+            return false;
+        }
+    }
 
     void require(Issue work, @Nullable PullRequestReview review, Set<SourceKind> selected) {
         List<User> contributors = new ArrayList<>(work.getAssignees());
