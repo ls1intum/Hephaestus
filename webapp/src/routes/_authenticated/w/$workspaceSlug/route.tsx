@@ -1,12 +1,17 @@
 import { createFileRoute, Outlet, redirect, useMatch } from "@tanstack/react-router";
 import { hasText } from "@/lib/text";
 
-import { getMemberOnboardingOptions, listWorkspacesOptions } from "@/api/@tanstack/react-query.gen";
+import {
+	getMemberOnboardingOptions,
+	getWorkspaceOptions,
+	listWorkspacesOptions,
+} from "@/api/@tanstack/react-query.gen";
 import { PublicActivityOnboardingDialog } from "@/components/onboarding/PublicActivityOnboardingDialog";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { usePublicActivityOnboarding } from "@/hooks/use-public-activity-onboarding";
 import { toScmProviderType } from "@/lib/provider/provider-terms";
 import { useAuth } from "@/runtime/auth/AuthContext";
+import { isAppAdmin, resolveCurrentUser } from "@/runtime/auth/guard";
 import { getUserViewSession } from "@/runtime/user-view/session";
 
 /** Workspace gate: a directory layout, so every route under `w/$workspaceSlug/` inherits it. */
@@ -23,7 +28,7 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug")({
 		// A list that cannot be fetched is not revoked access: keep the route rather than evicting
 		// the reader on a network error.
 		if (!workspaces) {
-			return { workspace: undefined };
+			return { workspace: undefined, administrationWorkspace: undefined };
 		}
 		const workspace = workspaces.find(
 			(candidate) => candidate.workspaceSlug === params.workspaceSlug,
@@ -37,7 +42,7 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug")({
 				location.pathname === `${base}/onboarding` ||
 				location.pathname.startsWith(`${base}/admin`)
 			) {
-				return { workspace };
+				return { workspace, administrationWorkspace: undefined };
 			}
 			const onboarding = await context.queryClient
 				.query({
@@ -53,7 +58,22 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug")({
 					replace: true,
 				});
 			}
-			return { workspace };
+			return { workspace, administrationWorkspace: undefined };
+		}
+
+		const adminPath = `/w/${encodeURIComponent(params.workspaceSlug)}/admin`;
+		if (
+			getUserViewSession() === undefined &&
+			(location.pathname === adminPath || location.pathname.startsWith(`${adminPath}/`)) &&
+			isAppAdmin(await resolveCurrentUser(context.queryClient))
+		) {
+			// This verifies the target through the server's audited ADMIN elevation, not a membership.
+			const administrationWorkspace = await context.queryClient.query({
+				...getWorkspaceOptions({ path: { workspaceSlug: params.workspaceSlug } }),
+				staleTime: 0,
+				retry: false,
+			});
+			return { workspace: undefined, administrationWorkspace };
 		}
 
 		const fallbackSlug = workspaces[0]?.workspaceSlug;
