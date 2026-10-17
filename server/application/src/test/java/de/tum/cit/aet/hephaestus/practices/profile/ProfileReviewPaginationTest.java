@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ResultView;
 import de.tum.cit.aet.hephaestus.practices.result.ResultViewQuery;
 import de.tum.cit.aet.hephaestus.practices.result.dto.ResultListDTO;
+import de.tum.cit.aet.hephaestus.practices.review.ProductItemRepository;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewSummaryQueryService;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewTestData;
 import de.tum.cit.aet.hephaestus.practices.review.dto.ReviewRefDTO;
@@ -47,7 +48,14 @@ class ProfileReviewPaginationTest extends BaseUnitTest {
     final ReviewSummaryQueryService reviews = mock(ReviewSummaryQueryService.class);
     final EvidenceAuthorization authorization = mock(EvidenceAuthorization.class);
     final PracticeProfileReviewService service = new PracticeProfileReviewService(
-            developer, results, views, presentation, reviews, mock(OwnItemTraceQueryService.class), authorization);
+            developer,
+            results,
+            views,
+            presentation,
+            reviews,
+            mock(OwnItemTraceQueryService.class),
+            authorization,
+            mock(ProductItemRepository.class));
 
     @Test
     void shouldKeepReviewsWithHiddenTextInsidePageBoundaries() {

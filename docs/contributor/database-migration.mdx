@@ -193,12 +193,13 @@ Neither release can run against the schema of the other, so all components upgra
 [ADR 0056](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0056-one-practice-model-for-items-and-scans.md) owns the decision.
 The [operator migration guide](https://github.com/hephaestus-build/Hephaestus/blob/main/MIGRATION.md) owns what the upgrade preserves.
 
-### Removed settings and redundant data
+### Removed settings and diagnostic data
 
 | Released data | Cutover behavior |
 |---|---|
 | `workspace.practice_skip_drafts` | Reviews include draft work when a practice's `reviewOn` declaration permits it. `practice_skip_drafts` is removed. The migration preserves each pinned practice version. |
 | `consent_decision.notice_sha256` | The duplicate hash is removed. Each decision keeps its immutable `notice_version`. The referenced `consent_notice` keeps the exact notice text and hash. |
+| Legacy job diagnostics: `container_logs`, `prompt_digest`, `inputs_digest`, `model_labels`, and unmapped `metadata` | These database values are not copied into the new practice records. Retain the pre-upgrade backup when this diagnostic history is needed. |
 
 ## Prove the released-state upgrade
 

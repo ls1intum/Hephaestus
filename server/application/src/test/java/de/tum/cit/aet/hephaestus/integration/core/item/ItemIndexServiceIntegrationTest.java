@@ -63,6 +63,25 @@ class ItemIndexServiceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void shouldResolveSourceIdentityWithinItsWorkspaceAndKindAfterRemoval() {
+        long workspace = workspace();
+        long foreign = workspace();
+        long sourceId = 900000001L;
+        var pull =
+                writer.upsert(new ItemRegistration(workspace, new ItemKind("scm.pull_request"), sourceId, null, null));
+        var issue = writer.upsert(new ItemRegistration(workspace, new ItemKind("scm.issue"), sourceId, null, null));
+        var other =
+                writer.upsert(new ItemRegistration(foreign, new ItemKind("scm.pull_request"), sourceId, null, null));
+        assertThat(pull.itemId()).isNotEqualTo(sourceId);
+        assertThat(writer.remove(workspace, pull.itemId(), Instant.now())).isTrue();
+        assertThat(writer.findSource(workspace, "scm.pull_request", sourceId)).contains(pull);
+        assertThat(writer.findSource(workspace, "scm.issue", sourceId)).contains(issue);
+        assertThat(writer.findSource(foreign, "scm.pull_request", sourceId)).contains(other);
+        assertThat(writer.findSource(workspace, "scm.pull_request", sourceId + 1))
+                .isEmpty();
+    }
+
+    @Test
     void shouldKeepIdentityAcrossRemoveAndRestore() {
         long workspace = workspace();
         var registration = new ItemRegistration(workspace, new ItemKind("scm.repository"), 1L, null, null);

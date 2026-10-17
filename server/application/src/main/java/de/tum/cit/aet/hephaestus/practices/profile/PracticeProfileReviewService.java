@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.practices.result.ResultPresentation;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ResultView;
 import de.tum.cit.aet.hephaestus.practices.result.ResultViewQuery;
+import de.tum.cit.aet.hephaestus.practices.review.ProductItemRepository;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewSummaryQueryService;
 import de.tum.cit.aet.hephaestus.practices.review.dto.OutcomeVectorDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.CurrentDeveloperLookup;
@@ -43,6 +44,7 @@ public class PracticeProfileReviewService {
     private final ReviewSummaryQueryService reviews;
     private final OwnItemTraceQueryService traces;
     private final EvidenceAuthorization authorization;
+    private final ProductItemRepository items;
 
     public Page<ProfileReviewDTO> list(
             WorkspaceContext ws,
@@ -56,10 +58,17 @@ public class PracticeProfileReviewService {
         var rows = results.forDevelopersSince(
                 ws.id(), List.of(account.get()), since == null ? Instant.EPOCH : since, false);
         var permitted = authorization.permitsAll(ws.id(), rows, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
+        boolean includeReviewChildren = itemId != null
+                && items.items(ws.id(), List.of(itemId)).stream()
+                        .anyMatch(item -> item.getKind().equals("scm.pull_request"));
         var byReview = new LinkedHashMap<UUID, List<ResultView>>();
         views.views(ws.id(), rows).stream()
                 .filter(v -> itemKind == null || v.item().kind().equals(itemKind))
-                .filter(v -> itemId == null || v.result().getItemId() == itemId)
+                .filter(v -> itemId == null
+                        || v.result().getItemId() == itemId
+                        || (includeReviewChildren
+                                && v.item().kind().equals("scm.pull_request_review")
+                                && Long.toString(itemId).equals(v.item().parentId())))
                 .filter(v -> groupSlug == null
                         || (v.practice().getGroup() != null
                                 && v.practice().getGroup().getSlug().equals(groupSlug)))

@@ -76,6 +76,50 @@ function serveTwoReviewPages(): string[] {
 }
 
 describe("the page a comment on the work links to", () => {
+	it.each([
+		["scm.pull_request", "902"],
+		["scm.issue", "902"],
+		["scm.pull_request", "9007199254740993"],
+	])("resolves an already-posted %s link before reading history", async (kind, sourceId) => {
+		const resolutions: string[] = [];
+		server.use(
+			http.get(
+				"*/workspaces/:workspaceSlug/practices/items/legacy-feedback/:artifactKind/:artifactId",
+				({ params }) => {
+					resolutions.push(
+						`${String(params.workspaceSlug)}/${String(params.artifactKind)}/${String(params.artifactId)}`,
+					);
+					return HttpResponse.json({ itemId: "1902" });
+				},
+			),
+		);
+		renderRouteAt(`/w/acme/feedback/${kind}/${sourceId}`);
+		await screen.findByRole("list", { name: "Reviews" }, ROUTE_RENDER_WAIT);
+		expect(resolutions).toStrictEqual([`acme/${kind}/${sourceId}`]);
+		expect(reads[0]).toStrictEqual({ workspaceSlug: "acme", itemId: "1902" });
+	});
+
+	it("keeps unknown legacy work unavailable without guessing its item ID", async () => {
+		server.use(
+			http.get(
+				"*/workspaces/:workspaceSlug/practices/items/legacy-feedback/:artifactKind/:artifactId",
+				() => HttpResponse.json({ status: 404 }, { status: 404 }),
+			),
+		);
+		renderRouteAt("/w/acme/feedback/scm.pull_request/902");
+		await screen.findByText(/not found/iu, undefined, ROUTE_RENDER_WAIT);
+		expect(reads).toHaveLength(0);
+	});
+
+	it.each(["scm.repository/902", "scm.pull_request/0", "scm.issue/9223372036854775808"])(
+		"refuses unsupported legacy address %s",
+		async (tail) => {
+			renderRouteAt(`/w/acme/feedback/${tail}`);
+			await screen.findByText(/not found/iu, undefined, ROUTE_RENDER_WAIT);
+			expect(reads).toHaveLength(0);
+		},
+	);
+
 	it("reads the reader's reviews of exactly the linked item", async () => {
 		renderRouteAt("/w/acme/feedback/1902");
 

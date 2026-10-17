@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,11 @@ public class ItemIndexService {
     private final ItemRepository repository;
     private final ItemEventService events;
     private final Clock clock;
+
+    @Transactional(readOnly = true)
+    public Optional<ItemRef> findSource(long workspaceId, String kind, long sourceId) {
+        return repository.findSource(workspaceId, kind, sourceId).map(ItemIndexService::ref);
+    }
 
     public ItemRef upsert(ItemRegistration registration) {
         Long parentId = registration.parentId();

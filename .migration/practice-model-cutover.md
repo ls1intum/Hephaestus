@@ -46,7 +46,9 @@ Upgrade:
 
 **If the migration stops at a precondition.**
 Stop all remaining containers from the previous release before you retry.
-A precondition failure leaves the database unchanged.
+A precondition failure does not undo earlier committed changesets.
+Check the recorded changelog before retrying.
+If the cutover has committed, use [failed-migration recovery](https://docs.hephaestus.build/admin/production-operations-runbook#if-migration-fails).
 
 A recorded delivery lease or projection owner can remain after a container stops.
 Keep new reviews and provider input paused.
@@ -57,7 +59,7 @@ Do not clear delivery ownership or provider receipts by hand: the provider can a
 For any other refusal, use the [cutover diagnosis map](https://docs.hephaestus.build/admin/practice-model-cutover#diagnose-a-refused-cutover).
 It identifies source records, supported recovery actions, and cases that need escalation with the previous release retained.
 
-See [Removed settings and redundant data](https://docs.hephaestus.build/contributor/database-migration#removed-settings-and-redundant-data) for the data the cutover removes.
+See [Removed settings and diagnostic data](https://docs.hephaestus.build/contributor/database-migration#removed-settings-and-diagnostic-data) for the data the cutover removes.
 
 The migration keeps every migrated result as history, including its ID, text, citations, feedback relationships and provider receipts.
 Every migrated result has evidence version 0, regardless of outcome.
@@ -150,6 +152,11 @@ Use the practice-script guide's local test procedure before enabling the rewritt
 Remaining queued work from the previous runtime is cancelled with CONTRACT_CHANGED.
 The migration preserves its history and write receipts. It does not replay old output.
 Start a fresh review when you need another result.
+
+Pending source events remain and can start fresh reviews when their workspace policies permit them.
+Before review execution resumes, record and disable automatic and requested review policies for workspaces that must stay paused.
+Resume each workspace deliberately after the history checks and review-cost estimate.
+Silent Mode and paused feedback delivery do not stop model calls.
 
 Direct script model calls default to 200,000 tokens and 1,000 search units per attempt.
 Set PRACTICE_REVIEW_DIRECT_MODEL_TOKENS_PER_ATTEMPT to change the token limit.
