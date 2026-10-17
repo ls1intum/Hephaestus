@@ -36,19 +36,18 @@ function values(url: URL | undefined, name: string): string[] {
 		.filter(Boolean);
 }
 
-/**
- * The one-row reads behind the tab counts (`useReviewTabCounts`): they ask the same endpoints as the
- * lists, so a recorder of what a list asked for leaves them out.
- */
-function isTabCount(url: URL): boolean {
-	return url.searchParams.get("size") === "1";
+const PAGE_SIZE = 25;
+
+/** Totals and the admin navigation peek share these endpoints, but are not the full list operation. */
+function isListPage(url: URL): boolean {
+	return url.searchParams.get("size") === String(PAGE_SIZE);
 }
 
 function springPage<T>(content: T[], number = 0, totalPages = 1, totalElements = content.length) {
 	return {
 		content,
 		number,
-		size: 25,
+		size: PAGE_SIZE,
 		totalElements,
 		totalPages,
 		numberOfElements: content.length,
@@ -65,6 +64,7 @@ function pageOf<T>(rows: T[]) {
 const emptyPage = pageOf([]);
 
 function recordRequests() {
+	server.use(...reviewHandlers());
 	const reviewUrls: URL[] = [];
 	const resultUrls: URL[] = [];
 	const problemUrls: URL[] = [];
@@ -74,7 +74,7 @@ function recordRequests() {
 		(urls: URL[]) =>
 		({ request }: { request: Request }) => {
 			const url = new URL(request.url);
-			if (!isTabCount(url)) {
+			if (isListPage(url)) {
 				urls.push(url);
 			}
 			return HttpResponse.json(emptyPage);
@@ -101,7 +101,7 @@ function recordRequests() {
 function activeReviewsHandler(getReview: () => ReviewSummary, reads: URL[]) {
 	return http.get("*/workspaces/:workspaceSlug/practices/reviews", ({ request }) => {
 		const url = new URL(request.url);
-		if (!isTabCount(url)) {
+		if (isListPage(url)) {
 			reads.push(url);
 		}
 		const review = getReview();
@@ -134,7 +134,7 @@ function serveReviewPages(reviewUrls: URL[]) {
 	server.use(
 		http.get("*/workspaces/:workspaceSlug/practices/reviews", ({ request }) => {
 			const url = new URL(request.url);
-			if (!isTabCount(url)) {
+			if (isListPage(url)) {
 				reviewUrls.push(url);
 			}
 			const number = Number(url.searchParams.get("page"));
@@ -157,7 +157,7 @@ function serveTwoFlatPages(tab: string, [first, second, third]: readonly unknown
 		http.get(`*/workspaces/:workspaceSlug/practices/reviews/${tab}`, ({ request }) => {
 			const url = new URL(request.url);
 			const number = Number(url.searchParams.get("page"));
-			if (!isTabCount(url)) {
+			if (isListPage(url)) {
 				pageReads.push(String(number));
 			}
 			return HttpResponse.json(springPage(pages[number] ?? [], number, 2, 3));

@@ -13,7 +13,7 @@ import type {
 import { itemTrace } from "@/components/practice-trace/fixtures";
 import { hasText } from "@/lib/text";
 import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
-import { ownMembership } from "@/mocks/fixtures/workspaces";
+import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 
 import {
 	busyReviewQueue,
@@ -324,6 +324,13 @@ export function reviewHandlers({
 	const resultRows = results ?? reviewResults;
 	const feedbackRows = feedback ?? reviewFeedback;
 	return [
+		// The parent gate reads the member list; both workspaces are used by these review fixtures.
+		http.get("*/workspaces", () =>
+			HttpResponse.json([
+				workspaceListItem("acme", { practicesEnabled: true }),
+				workspaceListItem("other", { id: 2, practicesEnabled: true }),
+			]),
+		),
 		// One fixed range whatever `from` and `zone` asked for: the overview's counts are the server's
 		// arithmetic, and a story reads them rather than proving them.
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/overview", () =>

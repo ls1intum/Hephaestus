@@ -1,10 +1,10 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { LlmUsageByPractice, WorkspaceLlmUsageReport } from "@/api/types.gen";
 import type { Wire } from "@/lib/dates";
-import { ownMembership } from "@/mocks/fixtures/workspaces";
+import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
 import { levelsOpenedBy } from "@/test/detail-stack";
 import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
@@ -88,6 +88,10 @@ async function renderUsageRoute() {
 }
 
 const capField = () => screen.getByLabelText(/Monthly cap/iu);
+
+beforeEach(() => {
+	server.use(http.get("*/workspaces", () => HttpResponse.json([workspaceListItem("acme")])));
+});
 
 /**
  * Only what is peculiar to *this* route. Where a rejection is reported — inline while the dialog is
