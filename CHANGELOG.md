@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.94.1
+
+### Patch Changes
+
+- GitHub repository sync can continue from issue comments to pull requests when comment pagination crosses database transactions.
+- Instance administrators can open an active workspace’s administration without joining it. Its settings and navigation stay scoped to that workspace; member pages and read-only user views keep their existing access limits.
+
 ## 0.94.0
 
 ### Minor Changes
