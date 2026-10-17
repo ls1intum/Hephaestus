@@ -62,6 +62,13 @@ const TRACE = `trace:review:${REVIEW}`;
 const fixtureReview = reviews.find((review) => review.id === LINEAGE_REVIEW_ID);
 const servedReview = { ...reviewDetail(LINEAGE_REVIEW_ID), id: REVIEW };
 const ITEM = `item:${reviewItem.id}`;
+const servedResult = resultDetail(RESULT);
+const resultFeedbackLevels = servedResult.feedback.map((feedback) => `feedback:${feedback.id}`);
+const [firstResultFeedback] = servedResult.feedback;
+assert(firstResultFeedback);
+const itemReview = reviews.find((review) => review.item.id === reviewItem.id);
+assert(itemReview);
+const itemReviewLevels = itemTraceOf(itemReview).reviews.map((review) => `review:${review.id}`);
 const [fixtureResult] = reviewResults;
 const [fixtureFeedback] = reviewFeedback;
 
@@ -105,7 +112,7 @@ beforeEach(() => {
 			HttpResponse.json(reviewFeedbackChecksOf(servedReview)),
 		),
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/results/:resultId", ({ params }) =>
-			HttpResponse.json({ ...resultDetail(RESULT), id: String(params.resultId) }),
+			HttpResponse.json({ ...servedResult, id: String(params.resultId) }),
 		),
 		...feedbackCountHandlers(),
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId", ({ params }) =>
@@ -156,15 +163,25 @@ function linkedLevels(url: URL): string[] {
 /**
  * A sheet links out to the provider or to a setting, and inside Practice reviews only to its own
  * relatives: one result or problem level in its place (a result's problems, a problem's result,
- * the results and problems a feedback rests on), or one of its own lists scoped to its review. It
+ * the results and problems a feedback rests on), its own feedback or reviews, or one of its own
+ * lists scoped to its review. It
  * never opens a trace: the wider history is told there, not on a sheet.
  */
-function expectNoRecordLinks(sheet: HTMLElement) {
-	expect(strayRecordLinks(sheet)).toStrictEqual([]);
+function expectNoStrayRecordLinks(sheet: HTMLElement, relatedLevels: readonly string[] = []) {
+	expect(strayRecordLinks(sheet, relatedLevels)).toStrictEqual([]);
+	const renderedRelatedLevels = within(sheet)
+		.queryAllByRole("link")
+		.flatMap((link) =>
+			linkedLevels(new URL(String(link.getAttribute("href")), "https://hephaestus.invalid")).slice(
+				-1,
+			),
+		)
+		.filter((level) => relatedLevels.includes(level));
+	expect(new Set(renderedRelatedLevels)).toStrictEqual(new Set(relatedLevels));
 }
 
 /** The links of a sheet into Practice reviews that open neither a relative nor its own list. */
-function strayRecordLinks(sheet: HTMLElement): string[] {
+function strayRecordLinks(sheet: HTMLElement, relatedLevels: readonly string[]): string[] {
 	return within(sheet)
 		.queryAllByRole("link")
 		.map((link) => String(link.getAttribute("href")))
@@ -177,7 +194,7 @@ function strayRecordLinks(sheet: HTMLElement): string[] {
 			const front = linkedLevels(url).at(-1);
 			return front === undefined
 				? !url.searchParams.has("reviewId")
-				: !/^(?:result|problem):/u.test(front);
+				: !/^(?:result|problem):/u.test(front) && !relatedLevels.includes(front);
 		});
 }
 
@@ -212,7 +229,7 @@ describe("layer 0: a row's own record, Track and Trace", () => {
 		await within(sheet).findByRole("heading", { name: "State and history" }, ROUTE_RENDER_WAIT);
 		within(sheet).getByRole("heading", { name: "Technical" });
 		expect(within(sheet).queryByRole("group", { name: "How this came about" })).toBeNull();
-		expectNoRecordLinks(sheet);
+		expectNoStrayRecordLinks(sheet);
 	});
 
 	it("tracks a result from its row: every table narrows to it, and the bar names it", async () => {
@@ -384,7 +401,7 @@ describe("a review's sheet", () => {
 });
 
 describe("the trace and a record over it", () => {
-	it("opens an event's sheet over the trace, with no links on, and Escape closes it, then the trace", async () => {
+	it("opens a result's own feedback over the trace, Back restores it, and Escape closes each layer", async () => {
 		const { router } = renderRouteAtWithRouter(`${REVIEWS}?detail=${TRACE}`);
 		const sheet = await traceSheet();
 		const dot = within(sheet).getByRole("button", {
@@ -404,8 +421,35 @@ describe("the trace and a record over it", () => {
 			ROUTE_RENDER_WAIT,
 		);
 		expect(within(over).queryByRole("group", { name: "How this came about" })).toBeNull();
-		expectNoRecordLinks(over);
+		expectNoStrayRecordLinks(over, resultFeedbackLevels);
 		await within(over).findByRole("button", { name: "Mark incorrect" }, ROUTE_RENDER_WAIT);
+		const [feedbackLink] = within(
+			within(over).getByRole("list", { name: "Feedback written from this result" }),
+		).getAllByRole("link");
+		assert(feedbackLink);
+		await userEvent.click(feedbackLink);
+		await waitFor(() =>
+			expect(stackInSearch(router.state.location.search.detail)).toStrictEqual([
+				TRACE,
+				`feedback:${firstResultFeedback.id}`,
+			]),
+		);
+		const feedbackSheet = await screen.findByRole("dialog", { name: /^For /u }, ROUTE_RENDER_WAIT);
+		expect(requestsTo(`/practices/reviews/feedback/${firstResultFeedback.id}`)).not.toHaveLength(0);
+		expect(within(feedbackSheet).queryByRole("group", { name: "How this came about" })).toBeNull();
+		router.history.back();
+		await waitFor(() =>
+			expect(stackInSearch(router.state.location.search.detail)).toStrictEqual([
+				TRACE,
+				`result:${RESULT}`,
+			]),
+		);
+		const restored = await screen.findByRole(
+			"dialog",
+			{ name: "A cache miss and a permission failure come back as the same 404" },
+			ROUTE_RENDER_WAIT,
+		);
+		await within(restored).findByRole("button", { name: "Mark incorrect" }, ROUTE_RENDER_WAIT);
 
 		pressEscape();
 		await waitFor(
@@ -621,24 +665,27 @@ describe("a record's sheet is the record alone", () => {
 	 * trace, renders a story, a verdict or a Trace action. It links only its own relatives.
 	 */
 	it.each([
-		["review", `review:${REVIEW}`],
-		["result", `result:${RESULT_ROW}`],
-		["feedback", `feedback:${FEEDBACK_ROW}`],
-		["item", ITEM],
-		["practice", `practice:${String(practiceCounts[0]?.practiceSlug)}`],
-	])("renders no story in the %s sheet, alone or over a trace", async (_kind, level) => {
-		for (const detail of [[level], [TRACE, level]]) {
-			renderRouteAtWithRouter(`${REVIEWS}?detail=${encodeURIComponent(JSON.stringify(detail))}`);
-			const sheet = await frontSheet(detail.length);
-			await within(sheet).findAllByRole("heading", { level: 2 }, ROUTE_RENDER_WAIT);
-			expect(sheet.querySelector("[data-trace-verdict]")).toBeNull();
-			expect(sheet.querySelector("[data-step-key]")).toBeNull();
-			expect(within(sheet).queryByRole("link", { name: /^Trace /u })).toBeNull();
-			expect(within(sheet).queryByText("You started here")).toBeNull();
-			expectNoRecordLinks(sheet);
-			cleanup();
-		}
-	});
+		["review", `review:${REVIEW}`, []],
+		["result", `result:${RESULT_ROW}`, resultFeedbackLevels],
+		["feedback", `feedback:${FEEDBACK_ROW}`, []],
+		["item", ITEM, itemReviewLevels],
+		["practice", `practice:${String(practiceCounts[0]?.practiceSlug)}`, []],
+	] as const)(
+		"renders no story in the %s sheet, alone or over a trace",
+		async (_kind, level, relatedLevels) => {
+			for (const detail of [[level], [TRACE, level]]) {
+				renderRouteAtWithRouter(`${REVIEWS}?detail=${encodeURIComponent(JSON.stringify(detail))}`);
+				const sheet = await frontSheet(detail.length);
+				await within(sheet).findAllByRole("heading", { level: 2 }, ROUTE_RENDER_WAIT);
+				expect(sheet.querySelector("[data-trace-verdict]")).toBeNull();
+				expect(sheet.querySelector("[data-step-key]")).toBeNull();
+				expect(within(sheet).queryByRole("link", { name: /^Trace /u })).toBeNull();
+				expect(within(sheet).queryByText("You started here")).toBeNull();
+				expectNoStrayRecordLinks(sheet, relatedLevels);
+				cleanup();
+			}
+		},
+	);
 });
 
 /**
