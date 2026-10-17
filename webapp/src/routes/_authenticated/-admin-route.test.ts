@@ -7,7 +7,7 @@ import { isRecord } from "@/lib/is-record";
 import { ROUTER_SEARCH } from "@/lib/router-search";
 import { hasText } from "@/lib/text";
 import { currentUser } from "@/mocks/fixtures/auth";
-import { ownMembership } from "@/mocks/fixtures/workspaces";
+import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
 import { routeTree } from "@/routeTree.gen";
 
@@ -75,6 +75,7 @@ describe("admin tab titles", () => {
 	async function titleOf(url: string) {
 		mockAppRole("APP_ADMIN");
 		server.use(
+			http.get("*/workspaces", () => HttpResponse.json([workspaceListItem("hephaestus")])),
 			http.get("*/workspaces/:workspaceSlug/members/me", () =>
 				HttpResponse.json(ownMembership("ADMIN")),
 			),
