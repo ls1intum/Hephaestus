@@ -1,10 +1,37 @@
-/** Release-test projections. Production code never reads the released schema. */
+/** Release-test projections. Production code never reads the legacy people layout. */
 export interface PreservedPeopleIds {
 	accounts: readonly string[];
 	identities: readonly string[];
 }
 
-export type UpgradeSchema = "released" | "candidate";
+/** Legacy releases keep `identity_link`/`workspace_membership`; native ones `identity`/`membership`. */
+export type PeopleLayout = "legacy" | "native";
+
+const LAYOUT_TABLES: Readonly<Record<PeopleLayout, string>> = {
+	legacy: "identity_link,user,workspace_membership",
+	native: "identity,membership,user",
+};
+
+/** One people table per line; `peopleLayout` decides from the exact set, never from history. */
+export const PEOPLE_LAYOUT_SQL = `SELECT table_name FROM information_schema.tables
+	WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+	AND table_name IN ('identity', 'identity_link', 'membership', 'workspace_membership', 'user')`;
+
+/** Both, neither, or a partial set (including a missing `user` table) is refused. */
+export function peopleLayout(tables: string): PeopleLayout {
+	// Sorted here so the database collation cannot reorder names.
+	const found = tables
+		.split("\n")
+		.filter((name) => name !== "")
+		.toSorted()
+		.join(",");
+	for (const layout of ["legacy", "native"] as const) {
+		if (found === LAYOUT_TABLES[layout]) {
+			return layout;
+		}
+	}
+	throw new Error(`Unknown or ambiguous people layout: "${found}"`);
+}
 
 function ids(values: readonly string[]): string {
 	if (values.some((value) => !/^[1-9][0-9]*$/u.test(value))) {
@@ -14,14 +41,14 @@ function ids(values: readonly string[]): string {
 }
 
 /** Existing accounts/identity ids must survive; new unclaimed people may be added. */
-export function preservationSql(schema: UpgradeSchema, preserved?: PreservedPeopleIds): string {
-	if (schema === "candidate" && preserved === undefined) {
-		throw new TypeError("Candidate comparison requires the released people ids");
+export function preservationSql(layout: PeopleLayout, preserved?: PreservedPeopleIds): string {
+	if (layout === "native" && preserved === undefined) {
+		throw new TypeError("Native comparison requires the preserved people ids");
 	}
 	const accounts = preserved === undefined ? "" : ` WHERE id IN (${ids(preserved.accounts)})`;
 	const identities = preserved === undefined ? "" : ` WHERE id IN (${ids(preserved.identities)})`;
 	const identity =
-		schema === "released"
+		layout === "legacy"
 			? `SELECT 'identity', concat_ws('|', id, account_id, provider_id, subject,
 			coalesce(team_id,''), linked_at, last_login_at, disabled_at,
 			CASE linked_via WHEN 'OAUTH_LOGIN' THEN 'SIGN_IN' WHEN 'MANUAL_LINK' THEN 'MANUAL' END)
@@ -30,7 +57,7 @@ export function preservationSql(schema: UpgradeSchema, preserved?: PreservedPeop
 			team_key, linked_at, last_login_at, disabled_at, linked_via)
 			FROM identity${identities}`;
 	const memberships =
-		schema === "released"
+		layout === "legacy"
 			? `SELECT 'membership', concat_ws('|', m.workspace_id, u.provider_id, u.native_id,
 			m.role, m.hidden, 'ACTIVE')
 			FROM workspace_membership m JOIN "user" u ON u.id=m.user_id WHERE upper(u.type)='USER'`

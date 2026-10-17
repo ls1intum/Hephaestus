@@ -120,6 +120,9 @@ for (const [scenario, expectedError] of [
 	["startup-history-changed", "Refused startup changed migration history or seeded data"],
 	["startup-data-changed", "Refused startup changed migration history or seeded data"],
 	["lock-held", "Refused upgrade left the Liquibase lock held"],
+	["native-previous", "The pinned refusal path requires the legacy people layout, found native"],
+	["mixed-layout", "Unknown or ambiguous people layout"],
+	["link-missed", "Fixture identity link must insert exactly one row"],
 ] as const) {
 	await test(`refusal driver: ${scenario}`, () => {
 		const directory = mkdtempSync(path.join(tmpdir(), "upgrade-refusal-"));
@@ -177,7 +180,16 @@ mock.module("node:child_process", { exports: {
     else if (args.includes("--command")) {
       const sql = args.at(-1);
       const started = readFileSync(commands, "utf8").includes("-refused");
-      if (sql.includes("SELECT kind ||")) {
+      if (sql.includes("information_schema.tables")) {
+        stdout = scenario === "native-previous" ? "identity\\nmembership\\nuser"
+          : scenario === "mixed-layout" ? "identity\\nidentity_link\\nmembership\\nuser\\nworkspace_membership"
+          : "identity_link\\nuser\\nworkspace_membership";
+      }
+      // Like psql, print the command tag after the returned id unless asked to be quiet.
+      else if (sql.includes("INSERT INTO")) {
+        stdout = scenario === "link-missed" ? "" : args.includes("--quiet") ? "7" : "7\\nINSERT 0 1";
+      }
+      else if (sql.includes("SELECT kind ||")) {
         stdout = "account|" + (scenario === "startup-data-changed" && started ? "changed" : "1") +
           "\\nidentity|1\\nuser|1\\nworkspace|1\\nmembership|1\\nconnection|1";
       }
@@ -227,7 +239,7 @@ mock.module("node:child_process", { exports: {
 			} else {
 				assert.match(invocations, /http:\/\/127\.0\.0\.1:18080\/actuator\/health\/readiness/u);
 			}
-			assert.match(invocations, /"rm","--force".*-sync".*-postgres"/u);
+			assert.match(invocations, /"rm","--force","--volumes".*-sync".*-postgres"/u);
 			assert.match(invocations, /"network","rm"/u);
 		} finally {
 			rmSync(directory, { recursive: true, force: true });
