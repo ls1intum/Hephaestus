@@ -8,10 +8,9 @@ import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.Membership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,11 +34,11 @@ class ChatThreadVotesIntegrationTest extends AbstractWorkspaceIntegrationTest {
         User mentor = persistUser("mentor");
         User colleague = persistUser("colleague");
         Workspace workspace = createWorkspace("vote-reload", "Vote Reload", "org-vr", AccountType.ORG, mentor);
-        ensureWorkspaceMembership(workspace, mentor, WorkspaceRole.MEMBER);
-        ensureWorkspaceMembership(workspace, colleague, WorkspaceRole.MEMBER);
+        ensureMembership(workspace, mentor, WorkspaceRole.MEMBER);
+        ensureMembership(workspace, colleague, WorkspaceRole.MEMBER);
         Workspace otherWorkspace =
                 createWorkspace("vote-reload-other", "Vote Reload Other", "org-vro", AccountType.ORG, mentor);
-        ensureWorkspaceMembership(otherWorkspace, mentor, WorkspaceRole.MEMBER);
+        ensureMembership(otherWorkspace, mentor, WorkspaceRole.MEMBER);
 
         UUID threadId = UUID.randomUUID();
         UUID reply = reply(workspace, threadId, mentor);
@@ -101,8 +100,8 @@ class ChatThreadVotesIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     /** One finished turn in a new thread; returns the assistant reply's id. */
     private UUID reply(Workspace workspace, UUID threadId, User owner) {
-        ChatThread thread = persistence.ensureThread(
-                workspace.getId(), threadId, owner, Set.of(owner.getId()), "How do I link issues?");
+        ChatThread thread =
+                persistence.ensureThread(workspace.getId(), threadId, accountId(owner), "How do I link issues?");
         UUID assistantId = UUID.randomUUID();
         persistence.persistInFlight(thread, "How do I link issues?", assistantId, null, admittedMentorConfig());
         return assistantId;

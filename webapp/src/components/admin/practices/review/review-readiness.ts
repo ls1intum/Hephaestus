@@ -21,20 +21,20 @@ export function reviewModelRunnable(model: ReviewModelState): boolean {
 	return model.status === "ready" && model.binding?.ready === true && model.binding.enabled;
 }
 
-export interface ReviewRunningState {
+export interface ReviewReadinessState {
 	enabled: boolean;
 	model: ReviewModelState;
 }
 
-export type ReviewRunningTone = "running" | "checking" | "unconfirmed" | "blocked" | "off";
+export type ReviewReadinessTone = "ready" | "checking" | "unconfirmed" | "blocked" | "off";
 
-export const REVIEW_RUNNING_DEFS: StatusDefs<ReviewRunningTone> = {
-	running: {
-		label: "Reviews are running",
+export const REVIEW_READINESS_DEFS: StatusDefs<ReviewReadinessTone> = {
+	ready: {
+		label: "Reviews can start",
 		icon: CircleCheckIcon,
 		badgeVariant: "success",
 		description:
-			"Practice reviews are on and a review model is ready. Each developer’s AI choice still decides whether it runs for them.",
+			"Practice reviews are on and a review model is ready. Each developer’s AI choice still decides whether it runs for them. Feedback mode decides separately where results become feedback.",
 	},
 	checking: {
 		label: "Checking reviews",
@@ -62,7 +62,7 @@ export const REVIEW_RUNNING_DEFS: StatusDefs<ReviewRunningTone> = {
 	},
 };
 
-export function reviewRunningTone({ enabled, model }: ReviewRunningState): ReviewRunningTone {
+export function reviewReadinessTone({ enabled, model }: ReviewReadinessState): ReviewReadinessTone {
 	if (!enabled) {
 		return "off";
 	}
@@ -75,7 +75,7 @@ export function reviewRunningTone({ enabled, model }: ReviewRunningState): Revie
 	if (!reviewModelRunnable(model)) {
 		return "blocked";
 	}
-	return "running";
+	return "ready";
 }
 
 /**
@@ -83,23 +83,19 @@ export function reviewRunningTone({ enabled, model }: ReviewRunningState): Revie
  * which members it serves is decided by that tier against each developer's AI choice, so the banner
  * says which tier is in force rather than only that one is.
  */
-export function reviewRunningDescription(running: ReviewRunningState): string {
-	const tone = reviewRunningTone(running);
-	if (tone !== "running" || running.model.status !== "ready" || !running.model.binding) {
-		return REVIEW_RUNNING_DEFS[tone].description;
+export function reviewReadinessDescription(readiness: ReviewReadinessState): string {
+	const tone = reviewReadinessTone(readiness);
+	if (tone !== "ready" || readiness.model.status !== "ready" || !readiness.model.binding) {
+		return REVIEW_READINESS_DEFS[tone].description;
 	}
-	const tier = running.model.binding.dataHandlingTier;
-	const subject =
+	const tier = readiness.model.binding.dataHandlingTier;
+	const model =
 		tier === "UNDECLARED"
 			? "a review model is ready for members who have not chosen"
 			: `a review model declared as ${DATA_HANDLING_DEFS[tier].label} is ready`;
-	return `Practice reviews are on and ${subject}. Each developer’s AI choice still decides whether it runs for them.`;
+	return `Practice reviews are on and ${model}. Each developer’s AI choice still decides whether it runs for them. Feedback mode decides separately where results become feedback.`;
 }
 
-/**
- * The strictest ready review binding: it is the one within the most developers' AI choices, so it is
- * the one the banner names. Falls back to any review binding so a blocked state still has a subject.
- */
 export function availableReviewBinding(bindings: AgentBinding[]): AgentBinding | undefined {
 	const reviews = bindings.filter((binding) => binding.purpose === "PRACTICE_REVIEW");
 	const ready = reviews

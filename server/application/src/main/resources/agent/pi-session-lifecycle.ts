@@ -9,10 +9,10 @@ export type SessionPhase = "practice" | "public-review" | "private-feedback";
 export interface ReviewSessionBinding {
 	phase: SessionPhase;
 	practiceSlug: string | null;
-	practiceRevisionId: number | null;
+	practiceVersionId: string | null;
 	model: string;
 	jobId: string | null;
-	workspaceId: number | null;
+	workspaceId: string | null;
 	openedAt: string;
 }
 
@@ -25,4 +25,16 @@ export async function stopSession(session: AgentSession) {
 	} finally {
 		session.dispose();
 	}
+}
+
+export function scheduleDeadline(timeoutMs: number, onTimeout: () => void) {
+	// Read timer state through a function so TypeScript does not retain a pre-await narrowing.
+	let expired = false;
+	const { promise: elapsed, resolve: release } = Promise.withResolvers<undefined>();
+	const timer = setTimeout(() => {
+		expired = true;
+		onTimeout();
+		release(undefined);
+	}, timeoutMs);
+	return { elapsed, timer, expired: () => expired };
 }

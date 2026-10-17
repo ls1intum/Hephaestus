@@ -184,7 +184,7 @@ function repositoryWithChange() {
 	return { root, repo, base, head };
 }
 
-void test("a pinned file is read from the revision named, never from the checkout or through a link", (t) => {
+void test("a pinned file is read from the commit named, never from the checkout or through a link", (t) => {
 	const { root, repo, base, head } = repositoryWithChange();
 	t.after(() => rmSync(root, { recursive: true, force: true }));
 	symlinkSync("/etc/hostname", path.join(repo, "outside.ts"));
@@ -192,8 +192,8 @@ void test("a pinned file is read from the revision named, never from the checkou
 	git(repo, "add", "outside.ts");
 	git(repo, "commit", "-q", "-m", "Link outside");
 	const linked = git(repo, "rev-parse", "HEAD");
-	const read = (revision: string, file: string, limit = 1000) =>
-		readPinnedBlob(repo, revision, file, limit);
+	const read = (commit: string, file: string, limit = 1000) =>
+		readPinnedBlob(repo, commit, file, limit);
 
 	// The renamed file's old side exists only at the base; the working tree's edit is not what was reviewed.
 	assert.deepEqual(read(base, "app.ts"), {

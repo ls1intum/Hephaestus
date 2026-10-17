@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.workspace;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
+import de.tum.cit.aet.hephaestus.workspace.Membership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.dto.AdminWorkspaceViewDTO;
 import java.util.List;
 import org.junit.jupiter.api.Tag;
@@ -11,12 +11,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-/**
- * {@code GET /admin/workspaces} — the instance-admin (app_admin) cross-tenant workspaces overview.
- * Authenticated via the mock-decoder bearer tokens ({@code TestSecurityConfig}); the admin token now
- * carries {@code app_admin}. Verifies the authority gate (a non-admin is 403'd) and that a seeded
- * workspace is surfaced with metadata only (slug, status, owner login, member count) across tenants.
- */
 @Tag("integration")
 class WorkspaceAdminControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
@@ -30,7 +24,7 @@ class WorkspaceAdminControllerIntegrationTest extends AbstractWorkspaceIntegrati
     void adminListsWorkspacesWithMetadataOnly() {
         User owner = persistUser("acme-owner");
         Workspace ws = createWorkspace("acme-space", "Acme", "acme", AccountType.ORG, owner);
-        ensureWorkspaceMembership(ws, owner, WorkspaceRole.OWNER);
+        ensureMembership(ws, owner, WorkspaceRole.OWNER);
 
         List<AdminWorkspaceViewDTO> body = webTestClient
                 .get()
@@ -49,7 +43,7 @@ class WorkspaceAdminControllerIntegrationTest extends AbstractWorkspaceIntegrati
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("seeded workspace not in the admin overview"));
         assertThat(acme.displayName()).isEqualTo("Acme");
-        assertThat(acme.ownerLogin()).isEqualTo("acme-owner");
+        assertThat(acme.ownerLogin()).isEqualTo(owner.getName());
         assertThat(acme.memberCount()).isEqualTo(1L);
         assertThat(acme.status()).isEqualTo(Workspace.WorkspaceStatus.ACTIVE);
     }

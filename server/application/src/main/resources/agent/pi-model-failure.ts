@@ -1,3 +1,5 @@
+import { isJsonObject as isRecord } from "./work/practice-scripts/lib/core/json.ts";
+
 /**
  * The diagnostics the patched OpenAI chat-completions and Responses adapters attach to an assistant message
  * (docker/agents/pi/patches/@earendil-works__pi-ai@1.0.0.patch): `openai_completions_failure` or
@@ -46,10 +48,6 @@ export interface ModelCall {
 
 /** The largest time a JavaScript Date can hold. */
 const MAX_EPOCH_MS = 8_640_000_000_000_000;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function lastDiagnostic(message: unknown, types: string[]): unknown {
 	const diagnostics: unknown[] =

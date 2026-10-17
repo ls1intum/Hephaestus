@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { listPracticeReviewFeedbackOptions } from "@/api/@tanstack/react-query.gen";
+import { listReviewFeedbackOptions } from "@/api/@tanstack/react-query.gen";
 import {
 	type FeedbackSearch,
 	feedbackQuery,
@@ -14,7 +14,7 @@ const AWAITING_APPROVAL_PEEK_SIZE = 5;
  * owed has no range, and the one waiting longest is the one to take next.
  */
 export const AWAITING_APPROVAL_SEARCH: Partial<FeedbackSearch> = {
-	deliveryState: ["AWAITING_APPROVAL"],
+	state: ["AWAITING_APPROVAL"],
 	order: "OLDEST",
 };
 
@@ -24,7 +24,7 @@ export const AWAITING_APPROVAL_SEARCH: Partial<FeedbackSearch> = {
  * disagree; the approval queue reads the same search at a page of its own.
  */
 export function awaitingApprovalOptions(workspaceSlug: string, size = AWAITING_APPROVAL_PEEK_SIZE) {
-	return listPracticeReviewFeedbackOptions({
+	return listReviewFeedbackOptions({
 		path: { workspaceSlug },
 		query: feedbackQuery(AWAITING_APPROVAL_SEARCH, size),
 	});
@@ -43,5 +43,5 @@ export function useFeedbackAwaitingApproval(
 		...awaitingApprovalOptions(workspaceSlug ?? ""),
 		enabled: enabled && workspaceSlug !== undefined,
 	});
-	return query.data?.page?.totalElements;
+	return query.data?.totalElements;
 }

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (amended 2026-09-17 — the image installs the SDK with pnpm). Supersedes
+Accepted (amended 2026-09-17 — the image installs the SDK with pnpm; 2026-10-09 — each practice script runs in its own process). Supersedes
 [ADR 0030](0030-agent-runtime-is-typescript-on-bun.md) for the sandbox image. Repository tooling is
 governed by [ADR 0037](0037-node-24-and-pnpm-12-are-the-javascript-toolchain.md), which superseded
 [ADR 0033](0033-bun-is-the-javascript-runtime-and-package-manager.md).
@@ -71,3 +71,29 @@ runtime stage, which removes npm, npx, Corepack, Yarn and pnpm and fails the bui
 survives on the filesystem; the shipped image carries Node and no package manager. The other build
 checks, the runner flags and the runtime-contract label (`SandboxLayout.RUNTIME_CONTRACT_VERSION = 2`)
 are as decided.
+
+## Update — 2026-10-09: each practice script runs in its own process
+
+Supersedes the third paragraph of § Decision, about the separate script stage, and the last
+sentence of § Consequences. The runner is in `docker/agents/practice-scripts/`.
+
+A practice script could start a program through the stage's `--allow-child-process` grant. Node's
+filesystem grants do not confine that program, so a script could read the container environment and
+the review's job token in it. Thus, the third control of § Context did not hold for a script that a
+workspace admin wrote.
+
+The review runner hosts the practice programs, and it keeps the one job token. There is no second
+credential for practice scripts. A custom program runs in its own Node process with `--permission`.
+That process may read only the toolkit, its dependencies and the staged inputs. It has no write
+grant and no child-process grant, an empty environment, a bounded heap and its own deadline.
+
+The program reads the reviewed work, searches it with `grep`, and calls models only through the host.
+The host answers each request in its own process and holds the token. Thus, a program's process
+holds no credential. Node permissions stay defense in depth, and Docker isolation stays the outer
+boundary. [ADR 0055](0055-practice-scripts-use-one-result-contract.md) records how a program
+calls models and how its results are admitted.
+
+[Workspace ABI § Practice script validation and limits](../contributor/agent/workspace-abi.mdx#practice-script-validation-and-limits)
+owns the current grants and limits.
+[Context and trust](../contributor/practice-script-runner.mdx#context-and-trust) owns the
+threat model.

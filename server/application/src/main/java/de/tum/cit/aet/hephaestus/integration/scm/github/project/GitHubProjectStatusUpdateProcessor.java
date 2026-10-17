@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.project;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.dto.GitHubProjectStatusUpdateDTO;

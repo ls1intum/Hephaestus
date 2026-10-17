@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.slack.channel;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -13,9 +14,15 @@ import org.jspecify.annotations.Nullable;
  * surface the webapp activation panel lists, activates, pauses, revokes, and audits.
  */
 @Schema(description = "An allow-listed Slack channel with its consent state and person opt-out count")
+@JsonInclude(JsonInclude.Include.ALWAYS)
 public record SlackMonitoredChannelDTO(
-        @NonNull @Schema(description = "Internal allow-list row id")
-        Long id,
+        @NonNull
+        @Schema(
+                description = "Internal allow-list row id",
+                type = "string",
+                pattern = "^[1-9][0-9]*$",
+                requiredMode = Schema.RequiredMode.REQUIRED)
+        String id,
 
         @NonNull @Schema(description = "Slack team (workspace) id the channel belongs to")
         String slackTeamId,
@@ -40,7 +47,7 @@ public record SlackMonitoredChannelDTO(
         Instant createdAt) {
     public static SlackMonitoredChannelDTO from(SlackMonitoredChannel channel, long optedOutMemberCount) {
         return new SlackMonitoredChannelDTO(
-                channel.getId(),
+                channel.getId().toString(),
                 channel.getSlackTeamId(),
                 channel.getSlackChannelId(),
                 channel.getChannelName(),

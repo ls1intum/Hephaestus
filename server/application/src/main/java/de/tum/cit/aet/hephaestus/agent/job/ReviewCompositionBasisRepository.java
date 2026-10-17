@@ -18,8 +18,9 @@ public interface ReviewCompositionBasisRepository extends Repository<ReviewCompo
 
     record OriginalCopy(UUID copyId, int admissionAttempt, Instant expiresAt) {}
 
-    @Query(
-            "SELECT new de.tum.cit.aet.hephaestus.agent.job.ReviewCompositionBasisRepository$OriginalCopy(b.copyId,b.admissionAttempt,b.expiresAt) FROM ReviewCompositionBasis b WHERE b.workspaceId=:workspaceId AND b.jobId=:jobId")
+    @Query("SELECT new"
+            + " de.tum.cit.aet.hephaestus.agent.job.ReviewCompositionBasisRepository$OriginalCopy(b.copyId,b.admissionAttempt,b.expiresAt)"
+            + " FROM ReviewCompositionBasis b WHERE b.workspaceId=:workspaceId AND b.jobId=:jobId")
     Optional<OriginalCopy> findOriginalCopy(@Param("workspaceId") long workspaceId, @Param("jobId") UUID jobId);
 
     @Modifying
@@ -33,11 +34,11 @@ public interface ReviewCompositionBasisRepository extends Repository<ReviewCompo
     @WorkspaceAgnostic("Cross-workspace retention sweep over job-scoped rows")
     @Modifying
     @Query(value = """
-            DELETE FROM review_composition_basis WHERE job_id IN (
-              SELECT b.job_id FROM review_composition_basis b
-              JOIN agent_job j ON j.workspace_id = b.workspace_id AND j.id = b.job_id
-              WHERE b.expires_at < :now OR j.status NOT IN ('QUEUED', 'RUNNING')
-              LIMIT :limit)
-            """, nativeQuery = true)
+        DELETE FROM review_composition_basis WHERE job_id IN (
+          SELECT b.job_id FROM review_composition_basis b
+          JOIN review_job j ON j.workspace_id = b.workspace_id AND j.id = b.job_id
+          WHERE b.expires_at < :now OR j.status NOT IN ('QUEUED', 'RUNNING')
+          LIMIT :limit)
+        """, nativeQuery = true)
     int deleteUnusable(@Param("now") Instant now, @Param("limit") int limit);
 }

@@ -44,6 +44,7 @@ const mockModels: WorkspaceLlmModel[] = [
 		slug: "gpt-5-mini",
 		displayName: "GPT-5 mini",
 		upstreamModelId: "openai/gpt-5-mini",
+		brand: "OPENAI",
 		dataHandlingTier: "CLOUD",
 		operatedBy: "PROVIDER",
 		dataHandlingNote: "EU region",
@@ -63,6 +64,8 @@ const meta = {
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
 	args: {
+		providerName: "My OpenAI account",
+		connectionEnabled: true,
 		models: mockModels,
 		mutatingIds: new Set<number>(),
 		onEdit: fn(),
@@ -78,11 +81,40 @@ export const Default: Story = {
 		const rows = canvas.getAllByRole("row").slice(1);
 		const tiers = rows.map((row) => within(row).getAllByRole("cell")[1]?.textContent);
 		await expect(tiers).toStrictEqual(["In-house", "Cloud", "Not declared"]);
+		const gpt = canvas.getByRole("cell", { name: "GPT-5 mini" });
+		await expect(gpt.querySelector("img")).not.toBeNull();
+		await expect(
+			canvas.getByRole("cell", { name: "Local Llama" }).querySelector("svg"),
+		).not.toBeNull();
 	},
 };
 
 export const Empty: Story = {
 	args: { models: [] },
+	play: async ({ canvas }) => {
+		const table = canvas.getByRole("table", { name: "Models on My OpenAI account" });
+		await expect(
+			within(table).getByRole("cell", { name: "No models yet. Add a model to use this provider." }),
+		).toBeVisible();
+	},
+};
+
+export const ModelOff: Story = {
+	args: { models: mockModels.map((model, index) => ({ ...model, enabled: index !== 0 })) },
+	play: async ({ canvas }) => {
+		const rows = canvas.getAllByRole("row").slice(1);
+		const status = rows.map((row) => within(row).getAllByRole("cell")[3]?.textContent);
+		await expect(status).toStrictEqual(["Off", "Ready", "Ready"]);
+	},
+};
+
+export const ConnectionOff: Story = {
+	args: { connectionEnabled: false },
+	play: async ({ canvas }) => {
+		const rows = canvas.getAllByRole("row").slice(1);
+		const status = rows.map((row) => within(row).getAllByRole("cell")[3]?.textContent);
+		await expect(status).toStrictEqual(["Connection off", "Connection off", "Connection off"]);
+	},
 };
 
 export const DeleteConfirm: Story = {

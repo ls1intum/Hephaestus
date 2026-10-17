@@ -3,70 +3,103 @@ package de.tum.cit.aet.hephaestus.agent.handler.composition;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
-import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import java.nio.charset.StandardCharsets;
+import de.tum.cit.aet.hephaestus.integration.core.spi.CopyCapability;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import java.util.EnumSet;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.ObjectMapper;
 
-class FeedbackCompositionInputsTest extends BaseUnitTest {
-
-    private final JsonMapper objectMapper = JsonMapper.builder().build();
+@Tag("unit")
+class FeedbackCompositionInputsTest {
+    private final ObjectMapper mapper = new ObjectMapper();
 
     @Test
-    void anEventReviewOpensEveryLaneWithItsOwnCap() {
-        JsonNode request = stage(ObservationOrigin.LIVE, FeedbackCompositionInputs.EVENT_REVIEW_CHANNELS);
-
-        assertThat(request.get("enabled").asBoolean()).isTrue();
-        for (FeedbackChannel channel : FeedbackChannel.values()) {
-            JsonNode bounds = request.get("channels").get(channel.name());
-            assertThat(bounds).as("bounds for %s", channel).isNotNull();
-            assertThat(bounds.get("enabled").asBoolean()).isTrue();
-            assertThat(bounds.get("maxUnits").asInt()).isPositive();
+    void shouldStageTheSharedRequestWhenAnchoredOnWorkIsSupported() throws Exception {
+        Map<String, byte[]> files = new HashMap<>();
+        FeedbackCompositionInputs.stage(
+                files,
+                ReviewKind.ITEM,
+                ReviewOrigin.EVENT,
+                Set.of(FeedbackDestination.ON_WORK, FeedbackDestination.PRACTICE_PAGE),
+                Set.of(CopyCapability.SUMMARY, CopyCapability.LINE_NOTE),
+                mapper);
+        var input = mapper.readTree(Objects.requireNonNull(files.get(SandboxLayout.FEEDBACK_COMPOSITION_PATH)));
+        try (var fixture =
+                Objects.requireNonNull(getClass().getResourceAsStream("/agent/feedback-composition-request.json"))) {
+            assertThat(input).isEqualTo(mapper.readTree(fixture));
         }
     }
 
     @Test
-    void aLaneThisOccasionCannotReachIsNamedAndDisabledRatherThanOmitted() {
-        JsonNode channels = stage(ObservationOrigin.LIVE, EnumSet.of(FeedbackChannel.IN_APP, FeedbackChannel.IN_CHAT))
-                .get("channels");
-
-        assertThat(channels.get(FeedbackChannel.IN_CONTEXT.name())).isNotNull();
-        assertThat(channels.get(FeedbackChannel.IN_CONTEXT.name())
-                        .get("enabled")
-                        .asBoolean())
-                .isFalse();
-        assertThat(channels.get(FeedbackChannel.IN_APP.name()).get("enabled").asBoolean())
-                .isTrue();
+    void shouldAllowOnWorkSummariesWhenTheItemDoesNotSupportAnchoredNotes() {
+        Map<String, byte[]> files = new HashMap<>();
+        FeedbackCompositionInputs.stage(
+                files,
+                ReviewKind.ITEM,
+                ReviewOrigin.EVENT,
+                Set.of(FeedbackDestination.ON_WORK),
+                Set.of(CopyCapability.SUMMARY),
+                mapper);
+        var input = mapper.readTree(Objects.requireNonNull(files.get(SandboxLayout.FEEDBACK_COMPOSITION_PATH)));
+        assertThat(input.path("destinations").path("ON_WORK").path("maxPieces").asInt())
+                .isEqualTo(1);
+        assertThat(input.path("onWorkCopyForms").isArray()).isTrue();
+        assertThat(input.path("onWorkCopyForms").isEmpty()).isTrue();
     }
 
     @Test
-    void aBackfillSweepStagesNothingAtAll() {
-        Map<String, byte[]> files = new LinkedHashMap<>();
-        FeedbackCompositionInputs.stage(files, ObservationOrigin.BACKFILL);
-
-        assertThat(files).doesNotContainKey(SandboxLayout.FEEDBACK_COMPOSITION_PATH);
+    void shouldKeepPrivateDestinationsWhenTheItemDoesNotSupportOnWorkCopies() {
+        Map<String, byte[]> files = new HashMap<>();
+        FeedbackCompositionInputs.stage(
+                files,
+                ReviewKind.ITEM,
+                ReviewOrigin.EVENT,
+                EnumSet.allOf(FeedbackDestination.class),
+                Set.of(CopyCapability.PRACTICE_PAGE, CopyCapability.CONVERSATION),
+                mapper);
+        var input = mapper.readTree(Objects.requireNonNull(files.get(SandboxLayout.FEEDBACK_COMPOSITION_PATH)));
+        assertThat(input.path("destinations").has("ON_WORK")).isFalse();
+        assertThat(input.path("destinations")
+                        .path("PRACTICE_PAGE")
+                        .path("maxPieces")
+                        .asInt())
+                .isEqualTo(1);
+        assertThat(input.path("destinations")
+                        .path("CONVERSATION")
+                        .path("maxPieces")
+                        .asInt())
+                .isEqualTo(1);
+        assertThat(input.path("onWorkCopyForms").isEmpty()).isTrue();
     }
 
     @Test
-    void anOccasionThatCanReachNoLaneStagesNothingAtAll() {
-        Map<String, byte[]> files = new LinkedHashMap<>();
-        FeedbackCompositionInputs.stage(files, ObservationOrigin.LIVE, Set.of());
-
-        assertThat(files).doesNotContainKey(SandboxLayout.FEEDBACK_COMPOSITION_PATH);
-    }
-
-    private JsonNode stage(ObservationOrigin origin, Set<FeedbackChannel> channels) {
-        Map<String, byte[]> files = new LinkedHashMap<>();
-        FeedbackCompositionInputs.stage(files, origin, channels);
-        byte[] staged = files.get(SandboxLayout.FEEDBACK_COMPOSITION_PATH);
-        assertThat(staged).isNotNull();
-        return objectMapper.readTree(new String(staged, StandardCharsets.UTF_8));
+    void shouldKeepScanBackfillAndUnsupportedRequestsQuiet() {
+        Map<String, byte[]> files = new HashMap<>();
+        FeedbackCompositionInputs.stage(
+                files,
+                ReviewKind.SCAN,
+                ReviewOrigin.REQUEST,
+                Set.of(FeedbackDestination.ON_WORK),
+                Set.of(CopyCapability.SUMMARY),
+                mapper);
+        FeedbackCompositionInputs.stage(
+                files,
+                ReviewKind.ITEM,
+                ReviewOrigin.BACKFILL,
+                Set.of(FeedbackDestination.CONVERSATION),
+                Set.of(CopyCapability.CONVERSATION),
+                mapper);
+        FeedbackCompositionInputs.stage(
+                files, ReviewKind.ITEM, ReviewOrigin.EVENT, Set.of(FeedbackDestination.ON_WORK), Set.of(), mapper);
+        FeedbackCompositionInputs.stage(
+                files, ReviewKind.ITEM, ReviewOrigin.EVENT, Set.of(), Set.of(CopyCapability.SUMMARY), mapper);
+        assertThat(files).isEmpty();
     }
 }

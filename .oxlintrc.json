@@ -32,6 +32,9 @@
 
 	"env": { "node": true, "es2023": true },
 
+	// The toolkit link beside the runner (`tsconfig.agents.json#rootDirs`) is linted once, at home.
+	"ignorePatterns": ["server/application/src/main/resources/agent/work/**"],
+
 	"rules": {
 		// -- One way to write it ---------------------------------------------------------------------
 		// Declarations, because they hoist — a helper can sit below its first use — and because that
@@ -494,33 +497,36 @@
 			"rules": { "import/no-relative-parent-imports": "off" }
 		},
 		{
-			// `tsconfig.agents.json` overlays this directory with `docker/agents/precompute` through
-			// `rootDirs`, and the agent image reproduces that layout under `/opt/precompute`. `../lib/x`
-			// is the spelling both resolve; an alias would typecheck and then fail in the sandbox.
-			"files": ["server/application/src/main/resources/practices/precompute/**"],
+			// `tsconfig.agents.json` overlays this directory with `docker/agents/practice-scripts`
+			// through `rootDirs`, and the agent image reproduces that layout under
+			// `/opt/practice-scripts`. Relative imports between scripts, lib/core and domain kits must
+			// resolve in both layouts. The runner's fixtures use the same staged directories.
+			"files": [
+				"server/application/src/main/resources/practices/scripts/**",
+				"docker/agents/practice-scripts/fixtures/**",
+				"docker/agents/practice-scripts/lib/core/**",
+				"docker/agents/practice-scripts/kits/**"
+			],
 			"rules": { "import/no-relative-parent-imports": "off" }
 		},
 		{
-			// The runner and the precompute scripts execute on Node inside the agent sandbox, and a CLI
+			// The runner and the practice scripts execute on Node inside the agent sandbox, and a CLI
 			// entry point ends the process rather than returning a status nobody reads.
 			"files": [
 				"server/application/src/main/resources/agent/**",
 				"server/application/src/test/resources/agent/**",
-				"server/application/src/main/resources/practices/precompute/**",
-				"docker/agents/precompute/**",
+				"server/application/src/main/resources/practices/scripts/**",
+				"docker/agents/practice-scripts/**",
 				"scripts/**"
 			],
 			"rules": { "unicorn/no-process-exit": "off" }
 		},
 		{
-			// The runner's tools answer per item, so a validator is one guard per rule of a contract, and
-			// a precompute script is one guard per shape it recognises; at the default 20 the rule grades
-			// how many rules the contract has. Forty is the line between that and a function doing several
-			// functions' work. An orchestration scenario is one linear story per stage, and is not graded.
+			// Per-item validators branch on each contract rule; orchestration specs use a separate override.
 			"files": [
 				"server/application/src/main/resources/agent/**",
-				"server/application/src/main/resources/practices/precompute/**",
-				"docker/agents/precompute/**"
+				"server/application/src/main/resources/practices/scripts/**",
+				"docker/agents/practice-scripts/**"
 			],
 			"rules": { "complexity": ["error", { "max": 40 }] }
 		},

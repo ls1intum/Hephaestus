@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.mentor.adapter;
 
 import de.tum.cit.aet.hephaestus.core.privacy.spi.JdbcPersonDataStore;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataSelection;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
 import java.util.List;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import tools.jackson.databind.JsonNode;
@@ -19,7 +20,7 @@ final class MentorMessagePersonDataStore extends JdbcPersonDataStore {
                 mapper,
                 "chat_message",
                 "chat_message",
-                "t.thread_id IN (SELECT id FROM chat_thread WHERE user_id = ANY(:users))",
+                "t.thread_id IN (SELECT id FROM chat_thread WHERE account_id = :account)",
                 "id,created_at,metadata,role,parent_message_id,thread_id,parts,version,status,llm_total_calls,llm_total_input_tokens,llm_total_output_tokens,llm_total_reasoning_tokens,llm_cache_read_tokens,llm_cache_write_tokens",
                 "id",
                 "",
@@ -28,8 +29,8 @@ final class MentorMessagePersonDataStore extends JdbcPersonDataStore {
     }
 
     @Override
-    public List<JsonNode> export(PersonDataSelection selection) {
-        return super.export(selection).stream()
+    public List<JsonNode> export(PersonDataSelection selection, PersonScope frozenScope) {
+        return super.export(selection, frozenScope).stream()
                 .map(row -> conversationRow(mapper, row))
                 .toList();
     }

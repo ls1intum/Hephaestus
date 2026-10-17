@@ -28,6 +28,12 @@ import {
 	FETCH_CONTEXT_ALLOWED,
 	isFetchContextKey,
 	type JsonRpcId,
+	type LinkProblemEvent,
+	type LinkProblemRequest,
+	type LinkResultEvent,
+	type LinkResultRequest,
+	type ShowFeedbackEvent,
+	type ShowFeedbackRequest,
 	MENTOR_PROTOCOL_VERSION,
 	MENTOR_TOOL_NAMES,
 	type MentorErrorCode,
@@ -38,15 +44,12 @@ import {
 	type ServerCallbackRequest,
 } from "./pi-mentor-protocol.ts";
 import { loadProviderConfig, reasoningSetting, registerHephaestusProvider } from "./pi-provider.ts";
+import { isJsonObject as isRecord } from "./work/practice-scripts/lib/core/json.ts";
 
 /** The Pi SDK module, resolved from `<workspace>/node_modules` by bare specifier at runtime. */
 type PiSdk = typeof PiSdkModule;
 
-// Pi SDK is loaded lazily so the protocol layer (framing, JSON-RPC dispatch, fetch_context
-// callback plumbing) can be exercised in test environments without an LLM proxy. Set
-// `MENTOR_RUNNER_PROTOCOL_ONLY=1` to swap the SDK-backed runtime for `createStubRuntime`, which
-// satisfies the same `MentorRuntime` contract and emits deterministic events sufficient for
-// protocol tests. Production builds never set this.
+// Load Pi lazily so protocol tests do not need an LLM binding.
 const PROTOCOL_ONLY = process.env.MENTOR_RUNNER_PROTOCOL_ONLY === "1";
 
 // PROTOCOL_ONLY swaps the Pi SDK for a deterministic stub. Catching a config drift that flips
@@ -132,10 +135,6 @@ function log(...args: unknown[]) {
 }
 
 /** Narrowing predicate for anything that arrived as parsed JSON, used instead of a cast. */
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null;
-}
-
 /** Do not coerce objects or arrays into non-empty strings that pass required-field checks. */
 function jsonText(value: unknown): string {
 	if (typeof value === "string") {
@@ -195,7 +194,7 @@ function writeFrame(frame: MentorOutboundFrame) {
 	process.stdout.write(`${JSON.stringify(frame)}\n`);
 }
 
-/** Pause dispatch when stdout backs up past this size; prevents OOM under slow SSE consumers. */
+// Bound stdout buffering because a slow SSE consumer can exhaust memory.
 const STDOUT_BACKPRESSURE_THRESHOLD_BYTES = 256 * 1024;
 
 function sendResult(id: JsonRpcId | undefined, result: MentorResult) {
@@ -266,7 +265,6 @@ interface FetchContextDetails {
 
 type FetchContextToolResult = AgentToolResult<FetchContextDetails>;
 
-/** One in-flight server callback (`fetch_context`, `link_observation`), keyed by its JSON-RPC id in `ThreadState`. */
 interface PendingCallback {
 	resolve: (result: unknown) => void;
 	reject: (reason: Error) => void;
@@ -329,15 +327,14 @@ let systemPrompt: string | null = null;
 let runtimeInitFailure: { err: unknown; at: number } | null = null;
 const RUNTIME_INIT_COOLDOWN_MS = 30_000;
 
-// Serialised dispatch chain — every stdin frame AND watchdog rebind appends here so callers
-// cannot race `runtime.switchSession` against each other.
-let dispatchQueue = Promise.resolve();
+// Serialize stdin delivery and watchdog rebinding so switchSession calls cannot race.
+let sendQueue = Promise.resolve();
 
 // The tail of the chain is not a useful handle for any caller here —
 // every task is fire-and-forget and its failure is already logged below — and handing one out
 // invites an `await` that would deadlock a task queued from inside another task.
 function enqueue(fn: () => unknown): void {
-	dispatchQueue = runAfter(dispatchQueue, fn);
+	sendQueue = runAfter(sendQueue, fn);
 }
 
 async function runAfter(previous: Promise<void>, fn: () => unknown): Promise<void> {
@@ -354,7 +351,7 @@ async function runAfter(previous: Promise<void>, fn: () => unknown): Promise<voi
 		}
 		await fn();
 	} catch (error) {
-		log("dispatch queue swallowed:", errorText(error));
+		log("delivery queue swallowed:", errorText(error));
 	}
 }
 
@@ -388,7 +385,7 @@ async function createPiRuntime(sdk: PiSdk, agentDir: string): Promise<MentorRunt
 	} = sdk;
 
 	const fetchContextTool = defineFetchContextTool(sdk);
-	const linkObservationTool = defineLinkObservationTool(sdk);
+	const linkTools = LINK_TOOLS.map((link) => defineLinkTool(sdk, link));
 	// Same sandbox posture as the practice runner: this runner shares the image, the SDK and the
 	// working directory with it, so the SDK's ancestor-walking discovery hits the same denied read
 	// (pi-agent-sandbox.ts) unless a mentor session opts out of it too.
@@ -475,7 +472,7 @@ async function createPiRuntime(sdk: PiSdk, agentDir: string): Promise<MentorRunt
 			services,
 			sessionManager,
 			sessionStartEvent,
-			customTools: [fetchContextTool, linkObservationTool],
+			customTools: [fetchContextTool, ...linkTools],
 			tools: [...MENTOR_TOOL_NAMES],
 			model,
 			thinkingLevel,
@@ -574,7 +571,7 @@ async function ensureRuntime(): Promise<MentorRuntime> {
 
 const ITEM_RESOURCES =
 	"For one item, copy the `resource` value exactly as a context file gives it: a pull request's from its entry in " +
-	"recent_authored_work.json or merge_readiness.json, an observation's from its row in observations_history.json, " +
+	"recent_authored_work.json or merge_readiness.json, a result's from its row in results_history.json, " +
 	"and a pull request's or issue's reviews from its `reviewsResource`. " +
 	"Never build one from a pull request number or another id.";
 
@@ -653,21 +650,86 @@ async function askServer(
 	return { threadId, result: await promise };
 }
 
-function defineLinkObservationTool(sdk: PiSdk) {
+interface LinkTool {
+	name: "link_result" | "link_problem" | "show_feedback";
+	label: string;
+	idKey: "resultId" | "problemId" | "feedbackId";
+	noun: string;
+	purpose: string;
+	request: (
+		threadId: string,
+		id: string,
+		linkedId: string,
+	) => LinkResultRequest | LinkProblemRequest | ShowFeedbackRequest;
+	event: (linkedId: string, text: string) => LinkResultEvent | LinkProblemEvent | ShowFeedbackEvent;
+}
+
+const LINK_TOOLS = [
+	{
+		name: "link_result",
+		label: "Link Result",
+		idKey: "resultId",
+		noun: "result",
+		purpose:
+			"one Hephaestus practice result: a practice's verdict on one piece of their work. Use it when you discuss " +
+			"the verdict.",
+		request: (threadId, id, resultId) => ({
+			jsonrpc: JSONRPC_VERSION,
+			id,
+			method: "link_result",
+			params: { threadId, resultId },
+		}),
+		event: (resultId, text) => ({ type: "link_result", resultId, text }),
+	},
+	{
+		name: "link_problem",
+		label: "Link Problem",
+		idKey: "problemId",
+		noun: "problem",
+		purpose:
+			"one problem: one located problem of a NOT_MET practice result. Use it when you discuss that one problem.",
+		request: (threadId, id, problemId) => ({
+			jsonrpc: JSONRPC_VERSION,
+			id,
+			method: "link_problem",
+			params: { threadId, problemId },
+		}),
+		event: (problemId, text) => ({ type: "link_problem", problemId, text }),
+	},
+	{
+		name: "show_feedback",
+		label: "Show Feedback",
+		idKey: "feedbackId",
+		noun: "prepared feedback",
+		purpose:
+			"one prepared piece of feedback listed for this mentor thread. Use its feedbackId when you raise " +
+			"the prepared point; the server claims its copy before any words are shown.",
+		request: (threadId, id, feedbackId) => ({
+			jsonrpc: JSONRPC_VERSION,
+			id,
+			method: "show_feedback",
+			params: { threadId, feedbackId },
+		}),
+		event: (feedbackId, text) => ({ type: "show_feedback", feedbackId, text }),
+	},
+] as const satisfies readonly LinkTool[];
+
+function defineLinkTool(sdk: PiSdk, link: LinkTool) {
 	const { defineTool } = sdk;
+	const { name, idKey, noun } = link;
 	return defineTool({
-		name: "link_observation",
-		label: "Link Observation",
+		name,
+		label: link.label,
 		description:
-			"Give the developer your feedback about one Hephaestus practice observation. `text` is shown to them " +
-			"as part of your reply, exactly where you call this, so write it to them in your own words and do not " +
-			"repeat it in your answer. Only feedback shown this way counts as raised with them.",
+			`Give the developer your feedback about ${link.purpose} \`text\` is shown to them as part of your reply, ` +
+			"exactly where you call this, so write it to them in your own words and do not repeat it in your answer. " +
+			"The server confirms delivery only from the completed turn's actual transport receipt.",
 		parameters: {
 			type: "object",
 			additionalProperties: false,
-			required: ["observationId", "text"],
+			required: [idKey, "text"],
 			properties: {
-				observationId: { type: "string", minLength: 1 },
+				[idKey]: { type: "string", minLength: 1 },
 				text: { type: "string", minLength: 1 },
 			},
 		},
@@ -675,41 +737,28 @@ function defineLinkObservationTool(sdk: PiSdk) {
 			_toolCallId,
 			params,
 			signal,
-		): Promise<AgentToolResult<{ observationId: string }>> => {
-			const observationId = jsonText(params.observationId).trim();
+		): Promise<AgentToolResult<Record<string, string>>> => {
+			const linkedId = jsonText(params[idKey]).trim();
 			const text = jsonText(params.text).trim();
-			if (!observationId || !text) {
-				throw new Error("link_observation: observationId and text are required");
+			if (!linkedId || !text) {
+				throw new Error(`${name}: ${idKey} and text are required`);
 			}
-			// The server decides which observation a reply may show feedback about: nothing is shown or reported
-			// as shown until it admits this one, and a refusal fails the call.
 			const { threadId, result } = await askServer(
-				(thread, id) => ({
-					jsonrpc: JSONRPC_VERSION,
-					id,
-					method: "link_observation",
-					params: { threadId: thread, observationId },
-				}),
-				observationId,
+				(thread, id) => link.request(thread, id, linkedId),
+				linkedId,
 			);
 			if (signal?.aborted === true) {
-				throw new Error("link_observation: the turn was stopped, so nothing was shown");
+				throw new Error(`${name}: the turn was stopped, so nothing was shown`);
 			}
-			// Only an answer admitting this very observation is an admission.
-			if (!isRecord(result) || result.observationId !== observationId) {
-				throw new Error(
-					`link_observation: nothing was shown, the server did not admit observation ${observationId}`,
-				);
+			if (!isRecord(result) || result[idKey] !== linkedId) {
+				throw new Error(`${name}: nothing was shown, the server did not admit ${noun} ${linkedId}`);
 			}
-			sendEvent(threadId, { type: "link_observation", observationId, text });
+			sendEvent(threadId, link.event(linkedId, text));
 			return {
 				content: [
-					{
-						type: "text",
-						text: `Shown to the developer: feedback on observation ${observationId}`,
-					},
+					{ type: "text", text: `Shown to the developer: feedback on ${noun} ${linkedId}` },
 				],
-				details: { observationId },
+				details: { [idKey]: linkedId },
 			};
 		},
 	});
@@ -1166,11 +1215,7 @@ async function handleShutdown(id: JsonRpcId | undefined) {
 	exitWhenDrained(0);
 }
 
-// Max characters of context surfaced to the LLM per fetch_context call. Context JSONs
-// occasionally balloon (e.g. `observations.json` for a heavy reviewer); without a cap, a single
-// tool call can blow the model's context window. 200 K chars ≈ 50 K tokens at ~4 chars/token —
-// comfortably below the configured model's context window. Counted in JS string length (UTF-16 code
-// units), not bytes; context JSONs are ASCII-dominant so the variance is small.
+// Bound each context read so a large history cannot crowd the system prompt out of the model window.
 const FETCH_CONTEXT_MAX_CHARS = 200_000;
 
 /**
@@ -1409,11 +1454,6 @@ function rejectPendingCallbacks(state: ThreadState, reason: string) {
 	}
 }
 
-/**
- * The dispatch table. `satisfies Record<MentorMethod, MethodHandler>` is the contract check: a
- * method declared in pi-mentor-protocol.ts with no handler here — or a handler whose signature has
- * drifted — fails the build rather than answering Java with method_not_found at runtime.
- */
 const METHODS = {
 	hello: handleHello,
 	open_thread: handleOpenThread,
@@ -1428,7 +1468,7 @@ function isMentorMethod(method: string): method is MentorMethod {
 	return Object.hasOwn(METHODS, method);
 }
 
-async function dispatch(frame: unknown) {
+async function delivery(frame: unknown) {
 	// Java sends requests and callback responses, but no batches. Reject top-level arrays explicitly.
 	if (Array.isArray(frame)) {
 		sendError(null, ERR.INVALID_REQUEST, "batch requests are not supported on this transport");
@@ -1601,23 +1641,20 @@ function start() {
 		enqueue(async () => {
 			let frame: unknown;
 			try {
-				// The only place untrusted bytes become values. `dispatch` takes `unknown` and
-				// narrows structurally from here, so nothing downstream trusts the shape.
 				frame = JSON.parse(line);
 			} catch (error) {
 				log(`parse error: ${errorText(error)} (line len=${line.length})`);
 				return;
 			}
 			try {
-				await dispatch(frame);
+				await delivery(frame);
 			} catch (error) {
-				log("dispatch failed:", error);
+				log("delivery failed:", error);
 			}
 		});
 	});
 
 	process.stdin.on("data", (chunk) => splitter(chunk));
-	// EOF routes through the dispatch queue so SIGTERM and EOF run the same teardown.
 	process.stdin.on("end", () => {
 		log("stdin EOF — shutting down");
 		enqueue(async () => handleShutdown(undefined));

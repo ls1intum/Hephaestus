@@ -13,10 +13,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Resilience wiring for the Outline REST client, kept inside the Outline slice so the shared
- * {@code config.ResilienceConfig} carries no dependency on Outline exception types (that inbound edge
- * closed a module cycle). The circuit breaker reuses the shared {@link CircuitBreakerRegistry} bean so its
- * default thresholds and Micrometer metrics stay identical to the GitHub/GitLab breakers.
+ * The Outline REST client owns its exception policy. Its circuit breaker reuses the shared
+ * {@link CircuitBreakerRegistry} for default thresholds and Micrometer metrics.
  */
 @Configuration
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)

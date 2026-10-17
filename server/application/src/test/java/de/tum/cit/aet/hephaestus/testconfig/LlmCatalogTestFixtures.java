@@ -1,12 +1,13 @@
 package de.tum.cit.aet.hephaestus.testconfig;
 
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.ModelVisibility;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorLlmConfig;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
 import java.math.BigDecimal;
 
 /**
@@ -15,8 +16,6 @@ import java.math.BigDecimal;
  * has, and set anything else on the returned instance (both entities are fully mutable).
  */
 public final class LlmCatalogTestFixtures {
-
-    public static final String OPENAI_COMPLETIONS = "openai-completions";
 
     /**
      * A syntactically valid, deliberately non-resolvable host. {@code .example} is reserved by
@@ -34,7 +33,7 @@ public final class LlmCatalogTestFixtures {
         connection.setSlug(slug);
         connection.setDisplayName("Connection " + slug);
         connection.setBaseUrl(BASE_URL);
-        connection.setApiProtocol(OPENAI_COMPLETIONS);
+        connection.setApiProtocol(LlmApiProtocol.OPENAI_COMPLETIONS);
         connection.setEnabled(true);
         return connection;
     }
@@ -72,13 +71,13 @@ public final class LlmCatalogTestFixtures {
                 null,
                 null,
                 null,
-                FundingSource.INSTANCE,
+                UsageFundingSource.INSTANCE,
                 1L,
                 1L,
                 null,
                 new LlmPriceSnapshot(
-                        FundingSource.INSTANCE,
-                        PricingState.PRICED,
+                        UsageFundingSource.INSTANCE,
+                        UsagePricingState.PRICED,
                         12L,
                         null,
                         new BigDecimal("10"),

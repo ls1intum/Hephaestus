@@ -5,7 +5,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabWebhookService;
-import de.tum.cit.aet.hephaestus.workspace.ScmWorkspaceContentEraser;
+import de.tum.cit.aet.hephaestus.integration.scm.workspace.ScmWorkspaceContentEraser;
 import java.util.Map;
 import java.util.Optional;
 import org.springframework.stereotype.Component;

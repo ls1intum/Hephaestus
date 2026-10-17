@@ -1,0 +1,12 @@
+{
+	"extends": "../tsconfig.json",
+	"include": ["**/*.ts"],
+	// Inherited as-is, the SPA's exclusion of this tree would leave the project with no inputs.
+	"exclude": [],
+	"compilerOptions": {
+		// The oxlint plugin and its config loader run on Node, as do the `scripts/lib/` modules that the
+		// plugin shares with the prose gate. Their array API is past the browser lib the SPA targets.
+		"lib": ["ES2023"],
+		"types": ["node"]
+	}
+}

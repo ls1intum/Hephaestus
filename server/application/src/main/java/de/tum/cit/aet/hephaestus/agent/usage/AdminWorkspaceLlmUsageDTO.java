@@ -37,7 +37,17 @@ public record AdminWorkspaceLlmUsageDTO(
                         + "compared against ownProviderMonthlyBudgetUsd.")
         BigDecimal ownProviderTotalCostUsd,
 
-        @NonNull @Schema(description = "Ledger usage records (job attempts / mentor turns) this month, either purse")
+        @NonNull
+        @Schema(
+                description = "Whether this month has an own-provider purse to show for the workspace. Same rule as "
+                        + "WorkspaceLlmUsageReport.ownProviderInUse.")
+        Boolean ownProviderInUse,
+
+        @NonNull
+        @Schema(
+                description =
+                        "Runs this month, either purse: job attempts and mentor turns. Rows of models for practice"
+                                + " scripts are not runs.")
         Long events,
 
         @NonNull

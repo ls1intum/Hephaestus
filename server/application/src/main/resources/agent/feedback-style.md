@@ -1,9 +1,9 @@
 # How feedback reads
 
 Write plainly, like a colleague who read the work carefully. Name the specific thing in the work, with concrete
-subjects and verbs. For a concern, make the supported next action clear where the channel assigns it, and add only the
-context needed to locate it, understand it or choose how to do it. Keep it short where the point is simple, and give it
-the room it needs where it is not.
+subjects and verbs. For a concern, make the supported next action clear where the destination assigns it, and add only the
+context needed to locate it, understand it or choose how to do it. A small point needs a short explanation.
+Keep the evidence and its qualifications; remove repetition, background and lesser points to meet the destination's length target.
 
 A positive remark is optional. Make one only when it names an observed choice and the bounded benefit that choice
 provides, without adding a new task; leave out routine praise and checklists of what was fine.
@@ -11,8 +11,9 @@ provides, without adding a new task; leave out routine praise and checklists of 
 Describe the work, never the person. Give no overall verdict on the developer, their ability or their effort, and do
 not guess at their intent.
 
-Keep work references, file names, line numbers, quotes and identifiers exact. Say each thing only as far as its source
-establishes it, and keep every qualification and uncertainty the evidence carries:
+Keep work references, file names, quotes and identifiers exact. Locate evidence as a person would: "the description’s closing line"
+or a short exact quote, rather than "description L16" or a citation index. Use support fields and anchors to identify the exact evidence.
+Say each thing only as far as its source establishes it, and keep every qualification and uncertainty the evidence carries:
 
 - Steps for checking the work show how to check it, not that anyone did.
 - A reported result establishes what was reported, within the limits it states.
@@ -23,15 +24,18 @@ establishes it, and keep every qualification and uncertainty the evidence carrie
 
 A recorded outcome identifies the behavior that was assessed. It does not justify communicating a claim that the recorded
 evidence, read with its qualifications, and the assessed standard contradict. Read the three together to decide whether
-a claim is justified and useful, and stay quiet when it is not, with the withholding decisions the channel offers. This
-chooses what to say: it does not assess the work again, and it adds or changes no observation.
+a claim is justified and useful, and stay quiet when it is not, with the withholding decisions the destination offers. This
+chooses what to say: it does not assess the work again, and it adds or changes no result or problem.
 
 Use the reader's words rather than outcome codes, severity codes, scores or practice slugs.
 
-Let the content decide the shape. Use Markdown where it helps the reader: a short heading or a list when there are
-several independent points, plain paragraphs when there is one. No fixed sections are required, and a reason is
-needed only where it helps the reader understand or choose. Avoid the marks of a template: the same opening for every
-point, a label on every line, a closing line that repeats what came before.
+Use plain paragraphs for one point or a short list for separate points. Do not put headings or internal field labels
+in delivered text: no "Situation:", "Capability:", "Evidence:" or "Next step:". Practice-page titles and next steps stay
+in their separate fields; the UI supplies their layout. Conversation notes keep their named fields for the mentor,
+but their contents contain no labels. Avoid the same opening for every point and a closing line that repeats it.
 
-Each piece of feedback is read on its own and stands on its own. The same point may appear in more than one channel
-when it serves the reader there. On the work, the summary and its line notes form one review; they are not separate channels.
+Address the reader as you. Use active voice, common words and sentences of at most 25 words. Keep the tone kind and focused
+on the work. Conversation notes are the exception: write about the developer in the third person, as their contract requires.
+
+Each piece of feedback is read on its own and stands on its own. The same point may appear in more than one destination
+when it serves the reader there. On the work, the summary and its line notes form one review; they are not separate destinations.

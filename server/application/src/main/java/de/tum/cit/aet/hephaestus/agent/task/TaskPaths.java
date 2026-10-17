@@ -11,7 +11,7 @@ public record TaskPaths(
         String practiceIndex,
         String compositionRequest,
         String preparedFeedback,
-        String precomputeScripts) {
+        String practiceScripts) {
     public TaskPaths {
         for (String path : List.of(
                 contextRoot,
@@ -20,7 +20,7 @@ public record TaskPaths(
                 practiceIndex,
                 compositionRequest,
                 preparedFeedback,
-                precomputeScripts)) {
+                practiceScripts)) {
             if (path.matches("\\p{Z}*")
                     || path.startsWith("/")
                     || path.indexOf('\\') >= 0
@@ -44,6 +44,6 @@ public record TaskPaths(
                 SandboxLayout.PRACTICES_PREFIX + "index.json",
                 SandboxLayout.FEEDBACK_COMPOSITION_PATH,
                 SandboxLayout.HISTORY_PREFIX + "prepared.json",
-                SandboxLayout.PRECOMPUTE_PREFIX + "practices");
+                SandboxLayout.PRACTICE_SCRIPT_PRACTICES_PREFIX.replaceFirst("/$", ""));
     }
 }

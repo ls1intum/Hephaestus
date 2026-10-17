@@ -45,9 +45,9 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
             // Direct workspace relationship
             "ActivityEvent", // has Workspace field
             "RepositoryToMonitor", // has Workspace field
-            "WorkspaceMembership", // has Workspace field
+            "Membership", // has Workspace field
             "ChatThread", // has Workspace field
-            // Through repository -> Workspace.organization (JOIN)
+            // Through repository -> Workspace.organizationId (JOIN)
             "PullRequest",
             "Issue",
             "PullRequestReview",
@@ -56,20 +56,20 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
             "IssueComment",
             "Label",
             "Milestone",
-            // Through Workspace.organization (JOIN)
+            // Through Workspace.organizationId (JOIN)
             "Repository",
             "Team",
             "TeamMembership",
             // Practice catalog entities
             "Practice", // has direct Workspace field
-            "Observation", // through Practice.workspace
+            "Result", // direct workspace_id scalar
             // Through chat thread -> workspace
             "ChatMessage", // through ChatThread.workspace
             "ChatMessageVote", // through ChatMessage (via messageId) -> ChatThread.workspace
-            // Through Workspace.organization (ID-based relationship via JOIN)
-            "OrganizationMembership", // organizationId -> Workspace.organization
+            // Through Workspace.organizationId (ID-based relationship via JOIN)
+            "OrganizationMembership", // organizationId -> Workspace.organizationId
             // Through project owner (ID-based: ownerId -> Organization/Repository/User)
-            "Project", // ownerId -> Organization/Repository -> Workspace.organization
+            "Project", // ownerId -> Organization/Repository -> Workspace.organizationId
             "ProjectItem", // through Project.ownerId OR issue -> Repository
             "ProjectField", // through Project.ownerId
             "ProjectFieldValue", // through ProjectItem.project OR ProjectField.project
@@ -83,11 +83,9 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
             // Unified integration framework
             "Connection", // has direct Workspace field
             "ConnectionAudit", // through Connection.workspace
-            // Feedback synthesis seam — scoped via a raw workspace_id scalar (cross-module
-            // FK to avoid a Modulith cycle, mirrors Observation.agentJobId).
-            "Feedback", // direct workspace_id scalar column (sfk_feedback_workspace)
-            "FeedbackObservation", // through Feedback.workspace_id (and observation -> Practice.workspace)
-            "FeedbackPlacement", // through Feedback.workspace_id
+            // Product feedback and copies each carry the tenant independently.
+            "Feedback", // direct workspace_id scalar
+            "FeedbackCopy", // direct workspace_id scalar
             // Slack integration — every table carries a direct workspace_id scalar and is therefore
             // auto-classified scoped by WorkspaceScopedTables (absent from GLOBAL_TABLES). Listed here
             // so a future refactor that drops the column trips slackEntitiesCarryDirectWorkspaceId().
@@ -102,7 +100,6 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
     // Package-private so WorkspaceScopedTablesParityTest can compare it with the production allowlist.
     static final Set<String> GLOBAL_ENTITIES = Set.of(
             "User", // Users can belong to multiple workspaces
-            "UserPreferences", // Belongs to User which is global
             "NotificationSubscription", // Native account email preferences span workspaces and are erased with that
             // account
             "Organization", // Synced from GitHub, workspace is set separately
@@ -116,17 +113,15 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
             "LlmModelPrice", // Instance model price history; global pricing authority
             "InstanceLlmSettings", // Instance LLM settings singleton (egress allowlist + BYO enable + default policy);
             // global
-            "CuratedPracticeOverride", // What an instance admin said about a shipped practice; global
-            "CuratedGroupOverride", // What an instance admin said about a shipped group; global
+            "CatalogEntry",
             "FxRate", // ECB daily reference rate for display-only conversion; a world fact, not tenant data
             "WorkerTokenDenylist", // Fleet-wide JWT revocation; worker JWTs are not workspace-scoped
             // core.auth (ADR 0017) — identity is user/system-scoped, not workspace-scoped.
-            // Account ↔ Workspace association lives on WorkspaceMembership, not on these rows.
+            // Account ↔ Workspace association lives on Membership, not on these rows.
             "PersonDataRequest", // Instance-wide rights request, never a workspace endpoint
-            "PersonSuppression", // Exact provider identity processing fence spans workspaces
-            "PublicActivityObjection", // Provider identity publication preference survives account deletion
+            "IdentityRestriction", // Exact provider identity restrictions span workspaces
             "Account", // Hephaestus-native principal; spans workspaces
-            "IdentityLink", // Federated-login association; user-scoped
+            "Identity", // Federated-login association; user-scoped
             "AccountFeature", // Per-account feature opt-ins
             "AuthEvent", // Append-only auth audit; references workspace optionally, not scoped by it
             "IssuedJwt", // JWT revocation list; account-scoped
@@ -136,7 +131,6 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
             "AccountExport", // GDPR Art. 20 self-service export; account-scoped, spans workspaces
             "LoginProvider", // Instance-scoped OAuth login provider (sign-in option); not workspace-scoped
             "ConsentDecision", // Account-scoped consent evidence; spans workspaces
-            "AccountAiChoice", // The account's own AI choice; one answer for every workspace
             "WorkerRegistry", // Fleet-wide worker liveness/capacity registry; not workspace-scoped
             "InstanceSettings", // Singleton instance-wide operator settings (silent-mode brake)
             "ReleaseStart" // The releases this instance started
@@ -186,9 +180,10 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
                                 events.add(SimpleConditionEvent.violated(
                                         javaClass,
                                         String.format(
-                                                "ENTITY ISOLATION: %s is a JPA entity with no apparent workspace relationship. "
-                                                        + "Add to WORKSPACE_SCOPED_ENTITIES with relationship path, "
-                                                        + "or add to GLOBAL_ENTITIES if intentionally global.",
+                                                "ENTITY ISOLATION: %s is a JPA entity with no apparent workspace"
+                                                        + " relationship. Add to WORKSPACE_SCOPED_ENTITIES with"
+                                                        + " relationship path, or add to GLOBAL_ENTITIES if intentionally"
+                                                        + " global.",
                                                 entityName)));
                             }
                         }
@@ -229,8 +224,9 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
                         events.add(SimpleConditionEvent.violated(
                                 javaClass,
                                 String.format(
-                                        "SLACK TENANCY: %s must carry a direct workspaceId field so it stays workspace-scoped. "
-                                                + "Removing it silently un-scopes Slack PII across tenants.",
+                                        "SLACK TENANCY: %s must carry a direct workspaceId field so it stays"
+                                                + " workspace-scoped. Removing it silently un-scopes Slack PII across"
+                                                + " tenants.",
                                         javaClass.getSimpleName())));
                     }
                 }
@@ -292,8 +288,9 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
                                 events.add(SimpleConditionEvent.violated(
                                         javaClass,
                                         String.format(
-                                                "DTO LEAK RISK: %s exposes %s directly. Use projection DTOs "
-                                                        + "(e.g., UserDTO, AuthorDTO) instead to prevent cross-workspace data leakage.",
+                                                "DTO LEAK RISK: %s exposes %s directly. Use projection DTOs (e.g.,"
+                                                        + " UserDTO, AuthorDTO) instead to prevent cross-workspace data"
+                                                        + " leakage.",
                                                 javaClass.getSimpleName(), exposedDangerousTypes)));
                             }
                         }
@@ -391,8 +388,9 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
                                 events.add(SimpleConditionEvent.violated(
                                         method,
                                         String.format(
-                                                "ENTITY RETURN RISK: %s.%s returns entity type but appears unscoped. "
-                                                        + "Add workspace filtering or add to WORKSPACE_AGNOSTIC_METHODS if intentional.",
+                                                "ENTITY RETURN RISK: %s.%s returns entity type but appears unscoped."
+                                                        + " Add workspace filtering or add to WORKSPACE_AGNOSTIC_METHODS"
+                                                        + " if intentional.",
                                                 repoName, methodName)));
                             }
                         }
@@ -455,8 +453,9 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
                                     events.add(SimpleConditionEvent.violated(
                                             field,
                                             String.format(
-                                                    "CASCADE DELETE RISK: Workspace.%s has cascade delete to global entity %s. "
-                                                            + "This could delete shared data. Remove cascade or use orphanRemoval=false.",
+                                                    "CASCADE DELETE RISK: Workspace.%s has cascade delete to global"
+                                                            + " entity %s. This could delete shared data. Remove cascade"
+                                                            + " or use orphanRemoval=false.",
                                                     field.getName(), fieldType)));
                                 }
                             });

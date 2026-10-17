@@ -1,5 +1,3 @@
-import { reviewArtifactTypeSlug } from "@/lib/artifact-kind-slugs";
-
 /**
  * Addresses in the Hephaestus web app the extension links to. Every link is navigation only: the
  * page it opens has its own session, consent and confirmations, and opening it changes nothing.
@@ -9,26 +7,21 @@ export function workspaceBase(webAppOrigin: string, workspaceSlug: string): stri
 	return `${webAppOrigin}/w/${encodeURIComponent(workspaceSlug)}`;
 }
 
-/**
- * The reader's feedback page, and for an admin the reviews of this work with its sheet open, when
- * this kind has a route.
- */
+/** Web app links use server item ids; provider issue numbers cannot identify items. */
 export function workLinks(
 	webAppOrigin: string,
 	workspaceSlug: string,
-	work: { kind: string; id: string },
-	admin: boolean,
+	item: { id: string },
+	canInspectReviewDetails: boolean,
 ): { trace: string; reviewDetails?: string } {
 	const base = workspaceBase(webAppOrigin, workspaceSlug);
-	const trace = `${base}/feedback/${encodeURIComponent(work.kind)}/${encodeURIComponent(work.id)}`;
-	const kindSlug = reviewArtifactTypeSlug(work.kind);
-	return admin && kindSlug !== undefined
+	const trace = `${base}/feedback/${encodeURIComponent(item.id)}`;
+	return canInspectReviewDetails
 		? {
 				trace,
-				reviewDetails: `${base}/admin/practices/reviews/runs?${new URLSearchParams({
-					artifactKind: work.kind,
-					artifactId: work.id,
-					detail: `work:${kindSlug}:${work.id}`,
+				reviewDetails: `${base}/admin/practices/reviews/?${new URLSearchParams({
+					itemId: item.id,
+					detail: `item:${item.id}`,
 				})}`,
 			}
 		: { trace };

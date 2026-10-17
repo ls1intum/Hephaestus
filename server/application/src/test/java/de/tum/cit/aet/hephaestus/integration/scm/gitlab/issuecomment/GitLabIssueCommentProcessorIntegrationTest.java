@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
@@ -16,6 +15,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organizatio
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment.dto.GitLabNoteEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
@@ -34,14 +34,7 @@ import org.springframework.core.io.ClassPathResource;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Integration tests for {@link GitLabIssueCommentProcessor#processFromSync} covering Gap 8
- * (GitLab sync audit): {@code issue_comment.updated_at} must persist verbatim and never
- * fall back to {@code created_at}. When a subsequent sync returns a distinct
- * {@code updatedAt}, the processor must fire a {@link ScmDomainEvent.CommentUpdated}
- * carrying {@code "updatedAt"} in {@code changedFields} — downstream profile views rely on
- * this divergence to detect edits.
- */
+// Preserve updated_at independently of created_at so edits remain detectable after sync.
 @DisplayName("GitLab Issue Comment Processor — sync path")
 class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
 
@@ -275,7 +268,7 @@ class GitLabIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         workspace.setDisplayName("HephaestusTest GitLab");
         workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         workspace.setPublicActivityEnabled(true);
-        workspace.setOrganization(org);
+        workspace.setOrganizationId(org.getId());
         workspace.setAccountLogin(FIXTURE_ORG_LOGIN);
         workspace.setAccountType(AccountType.ORG);
         testWorkspace = workspaceRepository.save(workspace);

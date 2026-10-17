@@ -1,7 +1,7 @@
 import type {
-	ArtifactTrace,
 	DeliveredWorkFeedback,
-	PageResponseDtoObservationList,
+	OwnItemTrace,
+	PageResponseDtoResultList,
 	ReviewContext as ReviewContextDTO,
 	Workspace,
 	WorkspaceListItem,
@@ -9,7 +9,7 @@ import type {
 import { consentRequired, stale, WorkerError } from "~/background/errors";
 import type { InstanceConfig } from "~/background/storage";
 import {
-	type ObservationPage,
+	type ResultPage,
 	type ReadyContext,
 	type ReviewContext,
 	THE_PAGE,
@@ -34,17 +34,11 @@ export interface ContextApi {
 	workspaces: () => Promise<WorkspaceListItem[]>;
 	workspace: (slug: string) => Promise<Workspace | undefined>;
 	resolve: (slug: string, url: string) => Promise<ReviewContextDTO | undefined>;
-	trace: (slug: string, kind: string, id: number) => Promise<ArtifactTrace | null>;
+	trace: (slug: string, itemId: string) => Promise<OwnItemTrace | null>;
 }
 
-/** The reads behind the report on the work's own page: the reader's observations and comments. */
 export interface DetailsApi extends ContextApi {
-	ownObservations: (
-		slug: string,
-		kind: string,
-		id: number,
-		size: number,
-	) => Promise<PageResponseDtoObservationList>;
+	ownResults: (slug: string, itemId: string, size: number) => Promise<PageResponseDtoResultList>;
 	workFeedback: (slug: string, workUrl: string) => Promise<DeliveredWorkFeedback>;
 }
 
@@ -246,7 +240,9 @@ async function resolveLocated(
 		})),
 	);
 	await located.stillThere();
-	const matches = answers.flatMap(({ site, dto }) => (dto === undefined ? [] : [{ site, dto }]));
+	const matches = answers.flatMap(({ site, dto }) =>
+		dto === undefined || dto.item === null ? [] : [{ site, dto, item: dto.item }],
+	);
 	const workLabel = workLabelFor(page);
 	if (matches.length === 0) {
 		return { context: { status: "not-found", instanceHost, workLabel } };
@@ -260,8 +256,8 @@ async function resolveLocated(
 			context: { status: "choose-workspace", instanceHost, workLabel, candidates: choices },
 		};
 	}
-	const { site, dto } = chosen;
-	const trace = await env.api.trace(site.slug, dto.work.kind, Number(dto.work.id));
+	const { site, dto, item } = chosen;
+	const trace = await env.api.trace(site.slug, item.id);
 	await located.stillThere();
 	return {
 		located,
@@ -270,11 +266,11 @@ async function resolveLocated(
 			instanceHost,
 			workspace: { slug: site.slug, displayName: site.displayName },
 			alternatives: choices.filter((choice) => choice.slug !== site.slug),
-			work: dto.work,
-			canRequestReview: dto.canRequestReview,
+			item,
+			requestAllowed: dto.requestAllowed,
 			canInspectReviewDetails: dto.canInspectReviewDetails,
 			trace,
-			links: workLinks(env.instance.webAppOrigin, site.slug, dto.work, dto.canInspectReviewDetails),
+			links: workLinks(env.instance.webAppOrigin, site.slug, item, dto.canInspectReviewDetails),
 			pageUrl: page.canonicalUrl,
 			view: page.view,
 			fetchedAt: env.now().toISOString(),
@@ -313,41 +309,26 @@ export async function requireReady(
 	return { context, stillShowing: located.stillThere };
 }
 
-/** Whether a record the server returned is about the work the tab resolved to, exactly. */
-export function sameWork(
-	work: { kind: string; id: string | number } | undefined,
-	context: Pick<ReadyContext, "work">,
-): boolean {
-	return (
-		work !== undefined && work.kind === context.work.kind && String(work.id) === context.work.id
-	);
+export function sameItem(itemId: string | undefined, context: Pick<ReadyContext, "item">): boolean {
+	return itemId === context.item.id;
 }
 
-/** Missing metadata is unknown, not proof that a downloaded first page is the complete result. */
-function requiredTotal(total: number | undefined, returned: number): number {
-	if (
-		total === undefined ||
-		!Number.isSafeInteger(total) ||
-		total < returned ||
-		(returned === 0 && total !== 0)
-	) {
+// Invalid totals cannot prove that the downloaded page is complete.
+function requiredTotal(total: number, returned: number): number {
+	if (!Number.isSafeInteger(total) || total < returned || (returned === 0 && total !== 0)) {
 		throw new WorkerError("server", "Hephaestus returned an incomplete answer. Try again.");
 	}
 	return total;
 }
 
-/** How many observations a report lists before it points to the web app for the rest. */
-export const OBSERVATION_PAGE_SIZE = 25;
+export const RESULT_PAGE_SIZE = 25;
 
-/**
- * Refuses a list with any row about other work. A server that predates the exact-work filter ignores
- * it and answers with the reader's whole feed; that must never be shown as this work's observations.
- */
-function requireOnlyThisWork(
-	works: readonly ({ kind: string; id: string | number } | undefined)[],
+// Reject the whole answer if the server returns another item's records.
+function requireOnlyThisItem(
+	itemIds: readonly (string | undefined)[],
 	context: ReadyContext,
 ): void {
-	if (!works.every((work) => sameWork(work, context))) {
+	if (!itemIds.every((itemId) => sameItem(itemId, context))) {
 		throw new WorkerError(
 			"server",
 			"Hephaestus returned records about different work, so the extension shows none of them. Open the work in Hephaestus instead.",
@@ -356,24 +337,19 @@ function requireOnlyThisWork(
 }
 
 /**
- * The reader's own observations on the work, most severe first, projected field by field. Everyone,
+ * The reader's own results on the work, most severe first, projected field by field. Everyone,
  * admins included, reads only their own here; every developer's are the web app's.
  */
-export async function observationPage(
+export async function resultPage(
 	env: ContextEnvironment<DetailsApi>,
 	tabId: number,
 	workspaceSlug: string,
-): Promise<ObservationPage> {
+): Promise<ResultPage> {
 	const { context, stillShowing } = await requireReady(env, tabId, workspaceSlug);
-	const answer = await env.api.ownObservations(
-		workspaceSlug,
-		context.work.kind,
-		Number(context.work.id),
-		OBSERVATION_PAGE_SIZE,
-	);
-	const content = answer.content ?? [];
-	requireOnlyThisWork(
-		content.map((row) => ({ kind: row.artifactKind, id: row.artifactId })),
+	const answer = await env.api.ownResults(workspaceSlug, context.item.id, RESULT_PAGE_SIZE);
+	const { content } = answer;
+	requireOnlyThisItem(
+		content.map((row) => row.item.id),
 		context,
 	);
 	await stillShowing();
@@ -385,8 +361,13 @@ export async function observationPage(
 			summary: row.summary,
 			outcome: row.outcome,
 			severity: row.severity,
-			claimCurrentness: row.claimCurrentness,
-			observedAt: row.observedAt,
+			currentness: row.currentness,
+			recordedAt: row.recordedAt,
+			problems: row.problems.map((problem) => ({
+				id: problem.id,
+				severity: problem.severity,
+				summary: problem.summary,
+			})),
 		})),
 		total: requiredTotal(answer.totalElements, content.length),
 		fetchedAt: env.now().toISOString(),
@@ -398,11 +379,8 @@ export async function observationPage(
  * work's origin — GitLab's `issues` and `work_items` addresses of one issue both count. Anything else
  * loses its link.
  */
-function verifiedPermalink(
-	permalink: string | undefined,
-	context: ReadyContext,
-): string | undefined {
-	if (permalink === undefined) {
+function verifiedPermalink(permalink: string | null, context: ReadyContext): string | undefined {
+	if (permalink === null) {
 		return undefined;
 	}
 	let url: URL;
@@ -425,18 +403,15 @@ function verifiedPermalink(
 		: undefined;
 }
 
-function newest(a: string | undefined, b: string | undefined): string | undefined {
-	if (b === undefined || Number.isNaN(Date.parse(b))) {
-		return a;
-	}
-	return a === undefined || Date.parse(b) > Date.parse(a) ? b : a;
+function newest(a: string, b: string): string {
+	return Date.parse(b) > Date.parse(a) ? b : a;
 }
 
 /**
  * The comments Hephaestus recorded posting for the reader on the work, one per provider comment:
- * pieces of feedback that share a summary edited in place are one comment, with every practice any of
- * them named. The answer must be about this work; a comment link must lead to this work's pages. The
- * provider's comment handles stay in the worker.
+ * copies of several pieces of feedback that share a summary edited in place are one comment, with
+ * every practice any of them named. The answer must be about this work; a comment link must lead to
+ * this work's pages. The provider's comment handles stay in the worker.
  */
 export async function workFeedback(
 	env: ContextEnvironment<DetailsApi>,
@@ -446,34 +421,32 @@ export async function workFeedback(
 ): Promise<WorkFeedback> {
 	const { context, stillShowing } = await requireReady(env, tabId, workspaceSlug, subject);
 	const answer = await env.api.workFeedback(workspaceSlug, context.pageUrl);
-	requireOnlyThisWork([answer.work], context);
+	requireOnlyThisItem([answer.item?.id], context);
 	await stillShowing();
 	const comments = new Map<string, WorkComment & { names: Map<string, string> }>();
-	for (const item of answer.feedback) {
-		for (const placement of item.placements) {
-			const { type, commentRef } = placement;
-			// Only a comment on the work itself is one the reader can go to; a blank handle identifies none.
-			if (
-				(type !== "SUMMARY" && type !== "INLINE" && type !== "LOCATION_COMMENT") ||
-				commentRef.trim() === ""
-			) {
+	for (const feedback of answer.feedback) {
+		for (const copy of feedback.copies) {
+			const { kind, externalRef } = copy;
+			// Only a comment on the work itself is one the reader can go to; no handle identifies none.
+			if (kind === "CHAT_TURN" || externalRef === null || externalRef.trim() === "") {
 				continue;
 			}
-			const comment = comments.get(commentRef) ?? {
-				kind: type,
-				path: placement.path,
-				startLine: placement.startLine,
-				endLine: placement.endLine,
-				permalink: verifiedPermalink(placement.permalink, context),
+			const comment = comments.get(externalRef) ?? {
+				kind,
+				path: copy.path ?? undefined,
+				startLine: copy.startLine ?? undefined,
+				endLine: copy.endLine ?? undefined,
+				permalink: verifiedPermalink(copy.externalUrl, context),
+				postedAt: copy.postedAt,
 				practices: [],
 				names: new Map<string, string>(),
 			};
-			for (const practice of item.practices) {
+			for (const practice of feedback.practices) {
 				comment.names.set(practice.slug, practice.name);
 			}
-			comment.permalink ??= verifiedPermalink(placement.permalink, context);
-			comment.deliveredAt = newest(comment.deliveredAt, item.deliveredAt);
-			comments.set(commentRef, comment);
+			comment.permalink ??= verifiedPermalink(copy.externalUrl, context);
+			comment.postedAt = newest(comment.postedAt, copy.postedAt);
+			comments.set(externalRef, comment);
 		}
 	}
 	return {
@@ -481,7 +454,6 @@ export async function workFeedback(
 			...comment,
 			practices: [...names.values()].toSorted((a, b) => a.localeCompare(b)),
 		})),
-		more: answer.hasMore,
 		fetchedAt: env.now().toISOString(),
 	};
 }

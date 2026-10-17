@@ -122,6 +122,7 @@ function WorkspaceActivity() {
 	// A copy is headed by whose work it lists: the team, the workspace, or the person opened.
 	const timeline = useActivityWork({
 		...scope,
+		workspace: true,
 		enabled: search.view === "timeline",
 		copy: {
 			title: workspaceWorkTitle(search.team, facets.data?.teams, workspace?.displayName),

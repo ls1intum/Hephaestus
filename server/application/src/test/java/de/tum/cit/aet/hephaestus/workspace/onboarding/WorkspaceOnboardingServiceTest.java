@@ -11,19 +11,22 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountWorkspaceMembershipQuery;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountDirectory;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountMembershipQuery;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.workspace.Membership;
+import de.tum.cit.aet.hephaestus.workspace.MembershipRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
-import de.tum.cit.aet.hephaestus.workspace.spi.MemberAiChoice;
 import de.tum.cit.aet.hephaestus.workspace.spi.WorkspaceAiAvailability;
-import java.time.Clock;
 import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,13 +44,13 @@ class WorkspaceOnboardingServiceTest extends BaseUnitTest {
     private WorkspaceOnboardingSettingsRepository settings;
 
     @Mock
-    private WorkspaceMemberOnboardingRepository members;
+    private MembershipRepository members;
 
     @Mock
-    private AccountAiChoiceRepository choices;
+    private AccountDirectory choices;
 
     @Mock
-    private AccountWorkspaceMembershipQuery memberships;
+    private AccountMembershipQuery memberships;
 
     @Mock
     private WorkspaceOnboardingLinks links;
@@ -59,7 +62,7 @@ class WorkspaceOnboardingServiceTest extends BaseUnitTest {
     private ConfigAuditPort audit;
 
     private static final Instant NOW = Instant.parse("2026-09-01T12:00:00Z");
-    private final Map<Long, AccountAiChoice> savedChoices = new HashMap<>();
+    private final Map<Long, Account> savedChoices = new HashMap<>();
     private static final WorkspaceOnboardingDTO.WorkspaceOnboardingLinkDTO OPEN_SLACK =
             new WorkspaceOnboardingDTO.WorkspaceOnboardingLinkDTO(
                     9L, "Slack", "SLACK", "slack", "Team", true, true, false);
@@ -72,33 +75,48 @@ class WorkspaceOnboardingServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         service = new WorkspaceOnboardingService(
-                workspaces,
-                settings,
-                members,
-                choices,
-                memberships,
-                links,
-                availability,
-                audit,
-                Clock.fixed(NOW, ZoneOffset.UTC));
-        // The account row is read back by the same method that wrote it, so the mock keeps what it saved.
-        lenient().when(choices.save(any())).thenAnswer(invocation -> {
-            AccountAiChoice row = invocation.getArgument(0);
-            savedChoices.put(row.getAccountId(), row);
-            return row;
+                workspaces, settings, members, choices, memberships, links, availability, audit);
+        lenient().when(choices.find(anyLong())).thenAnswer(invocation -> {
+            var row = savedChoices.get(invocation.<Long>getArgument(0));
+            return row == null
+                    ? Optional.empty()
+                    : Optional.of(new AccountDirectory.AccountView(
+                            Objects.requireNonNull(row.getId()),
+                            row.getStatus(),
+                            row.getDisplayName(),
+                            row.getAiChoice(),
+                            row.getAiChoiceAt(),
+                            row.isFeedbackDeliveryEnabled()));
         });
         lenient()
-                .when(choices.findById(anyLong()))
-                .thenAnswer(invocation -> Optional.ofNullable(savedChoices.get(invocation.<Long>getArgument(0))));
+                .doAnswer(invocation -> {
+                    long id = invocation.getArgument(0);
+                    var row = savedChoices.computeIfAbsent(id, key -> {
+                        var account = new Account("Developer");
+                        account.setId(key);
+                        return account;
+                    });
+                    row.setAiChoice(invocation.getArgument(1));
+                    row.setAiChoiceAt(NOW);
+                    return null;
+                })
+                .when(choices)
+                .setAiChoice(anyLong(), any());
     }
 
     private Workspace member() {
+        var account = new Account("Onboarding developer");
+        account.setId(10L);
+        savedChoices.putIfAbsent(10L, account);
         var workspace = new Workspace();
         workspace.setId(1L);
         lenient().when(workspaces.findByIdForUpdate(1L)).thenReturn(Optional.of(workspace));
         when(memberships.membershipsForAccount(10L))
-                .thenReturn(List.of(new AccountWorkspaceMembershipQuery.WorkspaceMembershipView(
-                        1L, "engineering", "Engineering", "MEMBER", 20L)));
+                .thenReturn(List.of(new AccountMembershipQuery.MembershipView(
+                        1L, "engineering", "Engineering", AccountMembershipQuery.Role.MEMBER)));
+        var membership = new Membership();
+        membership.setWorkspace(workspace);
+        lenient().when(members.findByWorkspace_IdAndId_AccountId(1L, 10L)).thenReturn(Optional.of(membership));
         return workspace;
     }
 
@@ -117,33 +135,32 @@ class WorkspaceOnboardingServiceTest extends BaseUnitTest {
         member();
         var policy = enabledPolicy();
         policy.setRevision(0);
-        var publicStep = new WorkspaceMemberOnboarding();
-        publicStep.setAccountId(10L);
+        var publicStep = new Membership();
+
         publicStep.setPublicActivitySeen(true);
-        when(members.findByWorkspace_IdAndAccountId(1L, 10L)).thenReturn(Optional.of(publicStep));
+        when(members.findByWorkspace_IdAndId_AccountId(1L, 10L)).thenReturn(Optional.of(publicStep));
         when(links.options(1L, 10L, List.of())).thenReturn(List.of(OPEN_SLACK));
         assertThat(service.state(context, 10L).needsSetup()).isTrue();
-        chose(MemberAiChoice.NO_AI);
+        chose(AiChoice.NO_AI);
         assertThat(service.state(context, 10L).needsSetup()).isTrue();
-        publicStep.setSeenRevision(0L);
+        publicStep.setOnboardingSeenRevision(0L);
         assertThat(service.state(context, 10L).needsSetup()).isFalse();
     }
 
-    private AccountAiChoice chose(MemberAiChoice choice) {
-        var row = new AccountAiChoice();
-        row.setAccountId(10L);
+    private Account chose(AiChoice choice) {
+        var row = new Account("Choice developer");
+        row.setId(10L);
         row.setAiChoice(choice);
-        row.setUpdatedAt(NOW.minusSeconds(60));
+        row.setAiChoiceAt(NOW.minusSeconds(60));
         savedChoices.put(10L, row);
         return row;
     }
 
-    private WorkspaceMemberOnboarding seen(Workspace workspace, long revision) {
-        var row = new WorkspaceMemberOnboarding();
+    private Membership seen(Workspace workspace, long revision) {
+        var row = new Membership();
         row.setWorkspace(workspace);
-        row.setAccountId(10L);
-        row.setSeenRevision(revision);
-        when(members.findByWorkspace_IdAndAccountId(1L, 10L)).thenReturn(Optional.of(row));
+        row.setOnboardingSeenRevision(revision);
+        when(members.findByWorkspace_IdAndId_AccountId(1L, 10L)).thenReturn(Optional.of(row));
         return row;
     }
 
@@ -164,7 +181,7 @@ class WorkspaceOnboardingServiceTest extends BaseUnitTest {
         assertThat(result.needsSetup()).isTrue();
         assertThat(result.aiChoice()).isNull();
         verify(members, never()).save(any());
-        verify(choices, never()).save(any());
+        verify(choices, never()).setAiChoice(anyLong(), any());
     }
 
     @Test
@@ -173,14 +190,12 @@ class WorkspaceOnboardingServiceTest extends BaseUnitTest {
         var policy = enabledPolicy();
         policy.setRequiredConnectionIds(List.of(9L));
         when(links.options(1L, 10L, List.of(9L))).thenReturn(List.of(UNAVAILABLE_SLACK));
-        var result = service.choose(context, 10L, MemberAiChoice.NO_AI);
-        var saved = ArgumentCaptor.forClass(AccountAiChoice.class);
-        verify(choices).save(saved.capture());
-        assertThat(saved.getValue().getAiChoice()).isEqualTo(MemberAiChoice.NO_AI);
-        assertThat(saved.getValue().getAccountId()).isEqualTo(10L);
-        assertThat(saved.getValue().getUpdatedAt()).isEqualTo(NOW);
+        var result = service.choose(context, 10L, AiChoice.NO_AI);
+        verify(choices).setAiChoice(10L, AiChoice.NO_AI);
+        var savedAccount = Objects.requireNonNull(savedChoices.get(10L));
+        assertThat(savedAccount.getAiChoiceAt()).isEqualTo(NOW);
         // The page reads the answer back the same way every other workspace will.
-        assertThat(result.aiChoice()).isEqualTo(MemberAiChoice.NO_AI);
+        assertThat(result.aiChoice()).isEqualTo(AiChoice.NO_AI);
         verify(members, never()).save(any());
     }
 
@@ -189,8 +204,8 @@ class WorkspaceOnboardingServiceTest extends BaseUnitTest {
         var unanswered = service.accountChoice(10L);
         assertThat(unanswered.choice()).isNull();
         assertThat(unanswered.updatedAt()).isNull();
-        var result = service.chooseForAccount(10L, MemberAiChoice.CLOUD);
-        assertThat(result.choice()).isEqualTo(MemberAiChoice.CLOUD);
+        var result = service.chooseForAccount(10L, AiChoice.CLOUD);
+        assertThat(result.choice()).isEqualTo(AiChoice.CLOUD);
         assertThat(result.updatedAt()).isEqualTo(NOW);
         verifyNoInteractions(availability, settings, members);
     }
@@ -200,12 +215,11 @@ class WorkspaceOnboardingServiceTest extends BaseUnitTest {
         var workspace = member();
         enabledPolicy();
         var result = service.dismiss(context, 10L);
-        var saved = ArgumentCaptor.forClass(WorkspaceMemberOnboarding.class);
+        var saved = ArgumentCaptor.forClass(Membership.class);
         verify(members).save(saved.capture());
-        assertThat(saved.getValue().getSeenRevision()).isEqualTo(3);
+        assertThat(saved.getValue().getOnboardingSeenRevision()).isEqualTo(3);
         assertThat(saved.getValue().getWorkspace()).isSameAs(workspace);
-        assertThat(saved.getValue().getUpdatedAt()).isEqualTo(NOW);
-        verify(choices, never()).save(any());
+        verify(choices, never()).setAiChoice(anyLong(), any());
         assertThat(result.aiChoice()).isNull();
     }
 
@@ -215,14 +229,12 @@ class WorkspaceOnboardingServiceTest extends BaseUnitTest {
         enabledPolicy();
         when(availability.options(1L))
                 .thenReturn(List.of(
-                        new WorkspaceAiAvailability.Option(MemberAiChoice.IN_HOUSE_ONLY, false, false, List.of()),
-                        new WorkspaceAiAvailability.Option(MemberAiChoice.CLOUD, true, true, List.of())));
-        var result = service.choose(context, 10L, MemberAiChoice.IN_HOUSE_ONLY);
-        var saved = ArgumentCaptor.forClass(AccountAiChoice.class);
-        verify(choices).save(saved.capture());
-        assertThat(saved.getValue().getAiChoice()).isEqualTo(MemberAiChoice.IN_HOUSE_ONLY);
+                        new WorkspaceAiAvailability.Option(AiChoice.IN_HOUSE_ONLY, false, false, List.of()),
+                        new WorkspaceAiAvailability.Option(AiChoice.CLOUD, true, true, List.of())));
+        var result = service.choose(context, 10L, AiChoice.IN_HOUSE_ONLY);
+        verify(choices).setAiChoice(10L, AiChoice.IN_HOUSE_ONLY);
         assertThat(result.aiOptions())
-                .filteredOn(option -> option.choice() == MemberAiChoice.IN_HOUSE_ONLY)
+                .filteredOn(option -> option.choice() == AiChoice.IN_HOUSE_ONLY)
                 .allSatisfy(option -> {
                     assertThat(option.practiceReviewsReady()).isFalse();
                     assertThat(option.mentorReady()).isFalse();
@@ -233,10 +245,10 @@ class WorkspaceOnboardingServiceTest extends BaseUnitTest {
     void shouldNotAskAgainInAnotherWorkspaceOnceTheAccountHasAnswered() {
         member();
         enabledPolicy();
-        chose(MemberAiChoice.CLOUD);
+        chose(AiChoice.CLOUD);
         var result = service.state(context, 10L);
         assertThat(result.needsSetup()).isFalse();
-        assertThat(result.aiChoice()).isEqualTo(MemberAiChoice.CLOUD);
+        assertThat(result.aiChoice()).isEqualTo(AiChoice.CLOUD);
         assertThat(result.aiChoiceRequired()).isTrue();
         verify(members, never()).save(any());
     }
@@ -246,7 +258,7 @@ class WorkspaceOnboardingServiceTest extends BaseUnitTest {
         member();
         var policy = enabledPolicy();
         policy.setRequiredConnectionIds(List.of(9L));
-        chose(MemberAiChoice.CLOUD);
+        chose(AiChoice.CLOUD);
         when(links.options(1L, 10L, List.of(9L))).thenReturn(List.of(OPEN_SLACK));
         assertThat(service.state(context, 10L).needsSetup()).isTrue();
         when(links.options(1L, 10L, List.of(9L))).thenReturn(List.of(UNAVAILABLE_SLACK));
@@ -258,11 +270,11 @@ class WorkspaceOnboardingServiceTest extends BaseUnitTest {
         var workspace = member();
         var policy = enabledPolicy();
         policy.setRequiredConnectionIds(List.of(9L));
-        chose(MemberAiChoice.CLOUD);
+        chose(AiChoice.CLOUD);
         when(links.options(1L, 10L, List.of(9L))).thenReturn(List.of(OPEN_SLACK));
         var row = seen(workspace, 3);
         assertThat(service.state(context, 10L).needsSetup()).isFalse();
-        row.setSeenRevision(2L);
+        row.setOnboardingSeenRevision(2L);
         assertThat(service.state(context, 10L).needsSetup()).isTrue();
     }
 
@@ -272,7 +284,7 @@ class WorkspaceOnboardingServiceTest extends BaseUnitTest {
         enabledPolicy();
         var row = seen(workspace, 3);
         assertThat(service.state(context, 10L).needsSetup()).isFalse();
-        row.setSeenRevision(1L);
+        row.setOnboardingSeenRevision(1L);
         assertThat(service.state(context, 10L).needsSetup()).isTrue();
     }
 

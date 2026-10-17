@@ -13,4 +13,16 @@ public record PersonIdentity(
             throw new IllegalArgumentException("An exact provider id and native subject are required");
         }
     }
+
+    public static PersonIdentity of(long providerId, String subject, String teamKey) {
+        return new PersonIdentity(providerId, subject, teamKey.isEmpty() ? null : teamKey);
+    }
+
+    public String teamKey() {
+        return teamKey(teamId);
+    }
+
+    public static String teamKey(@Nullable String teamId) {
+        return teamId == null ? "" : teamId;
+    }
 }

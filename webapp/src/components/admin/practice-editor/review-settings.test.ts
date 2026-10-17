@@ -1,304 +1,148 @@
 import { describe, expect, it } from "vitest";
 
-import type { PracticeAutomatedReviewPolicy } from "@/api/types.gen";
 import {
-	type PracticeReviewFields,
-	artifactKindOfSignals,
-	artifactKindOfSignal,
+	normalizeReviewOn,
+	orderedItemTypes,
+	readNeedOf,
+	readsProblem,
+	recommendedReviewOn,
 	reviewSettingsProblem,
-	normalizeReviewSettings,
-	orderedWorkTypes,
-	recommendedReviewSettings,
-	roleOf,
-	withRole,
+	withReadNeed,
 } from "@/components/admin/practice-editor/review-settings";
-import { mockPracticeDefinitionOptions, mockPullRequestWorkType } from "@/mocks/fixtures/practice";
 
-const aiSupported = mockPullRequestWorkType.recommendedPolicy;
-const guidanceOnly: PracticeAutomatedReviewPolicy = {
-	...aiSupported,
-	automatedReview: { mode: "NONE", evidenceSufficiency: "NONE" },
-	knownLimitations: [],
-};
+import {
+	mockDefinitionOptions,
+	mockIssueItemType,
+	mockPullRequestItemType,
+	mockPullRequestReviewItemType,
+} from "./fixtures";
 
-function reviewFields(overrides: Partial<PracticeReviewFields> = {}): PracticeReviewFields {
-	return {
-		signals: ["scm.pull_request.opened"],
-		reviewWhen: {},
-		subject: "AUTHOR",
-		evidenceRequirements: [{ sourceKind: "scm.pull-request.core", stance: "REQUIRED" }],
-		...overrides,
-	};
-}
+const core = { source: "scm.pull-request.core", need: "REQUIRED" } as const;
 
-describe("artifactKindOfSignal", () => {
-	it("reads the kind off everything before the last dot, as the server does", () => {
-		expect(artifactKindOfSignal("scm.pull_request.merged")).toBe("scm.pull_request");
-		expect(artifactKindOfSignal("chat.conversation_thread.settled")).toBe(
-			"chat.conversation_thread",
-		);
-	});
-
-	it("does not invent a kind for a occasion that names no signal", () => {
-		expect(artifactKindOfSignals([])).toBeUndefined();
-	});
-});
-
-describe("normalizeReviewSettings", () => {
-	it("puts review fields in the shape the server stores them so an untouched form is not dirty", () => {
-		const normalized = normalizeReviewSettings(
-			reviewFields({
-				signals: ["scm.pull_request.ready", "scm.pull_request.opened", "scm.pull_request.ready"],
-				evidenceRequirements: [
-					{ sourceKind: "scm.pull-request.diff", stance: "REQUIRED" },
-					{ sourceKind: "scm.pull-request.core", stance: "REQUIRED" },
-				],
-			}),
-		);
-
-		expect(normalized.signals).toStrictEqual(["scm.pull_request.opened", "scm.pull_request.ready"]);
-		expect(normalized.evidenceRequirements.map((need) => need.sourceKind)).toStrictEqual([
-			"scm.pull-request.core",
-			"scm.pull-request.diff",
-		]);
-	});
-
-	it("keeps the gate and the person judged", () => {
-		const gate = {
-			skipReason: "the change has no Swift code",
-			anyOf: [{ changedPathMatches: ["**/*.swift"] }],
-		};
+describe("normalizeReviewOn", () => {
+	it("puts Review on in the shape the server stores it so an untouched form is not dirty", () => {
 		expect(
-			normalizeReviewSettings(reviewFields({ precondition: gate, subject: "REVIEWER" })),
-		).toMatchObject({
-			precondition: gate,
-			subject: "REVIEWER",
+			normalizeReviewOn({
+				events: ["scm.pull_request.ready", "scm.pull_request.opened", "scm.pull_request.ready"],
+				state: { state: ["OPEN", "CLOSED", "OPEN"], draftStatus: ["NOT_DRAFT"] },
+			}),
+		).toStrictEqual({
+			events: ["scm.pull_request.opened", "scm.pull_request.ready"],
+			state: { draftStatus: ["NOT_DRAFT"], state: ["CLOSED", "OPEN"] },
 		});
 	});
+});
 
-	it("keeps unrestricted and explicit finite review conditions", () => {
-		expect(normalizeReviewSettings(reviewFields({ reviewWhen: {} })).reviewWhen).toStrictEqual({});
-		expect(
-			normalizeReviewSettings(reviewFields({ reviewWhen: { draftStatus: ["NOT_DRAFT"] } }))
-				.reviewWhen,
-		).toStrictEqual({ draftStatus: ["NOT_DRAFT"] });
+describe("recommendedReviewOn", () => {
+	it("takes the recommended events and leaves every state open", () => {
+		expect(recommendedReviewOn(mockPullRequestItemType)).toStrictEqual({
+			events: ["scm.pull_request.opened", "scm.pull_request.ready"],
+			state: {},
+		});
 	});
 });
 
-describe("withRole", () => {
-	it("moves a source between stances without leaving the old one behind", () => {
-		const contextual = withRole(
-			reviewFields().evidenceRequirements,
-			"scm.pull-request.core",
-			"CONTEXTUAL",
-		);
-
-		expect(contextual).toStrictEqual([
-			{ sourceKind: "scm.pull-request.core", stance: "CONTEXTUAL" },
-		]);
-	});
-
-	it("drops the source when it stops being used", () => {
-		expect(
-			withRole(reviewFields().evidenceRequirements, "scm.pull-request.core", "NOT_USED"),
-		).toStrictEqual([]);
-		expect(roleOf(reviewFields().evidenceRequirements, "scm.repository.tree")).toBe("NOT_USED");
-	});
-
-	it("keeps the evidenceRequirements sorted the way the server stores them", () => {
-		const added = withRole(
-			reviewFields().evidenceRequirements,
-			"scm.pull-request.comments",
-			"CONTEXTUAL",
-		);
-
-		expect(added.map((need) => need.sourceKind)).toStrictEqual([
+describe("read needs", () => {
+	it("reads a source that is not chosen as not used, and keeps the list sorted", () => {
+		expect(readNeedOf([core], "scm.pull-request.diff")).toBe("NOT_USED");
+		const sources = withReadNeed([core], "scm.pull-request.comments", "OPTIONAL");
+		expect(sources.map((entry) => entry.source)).toStrictEqual([
 			"scm.pull-request.comments",
 			"scm.pull-request.core",
 		]);
-	});
-});
-
-describe("recommendedReviewSettings", () => {
-	it("starts a practice on the recommended moments with the recommended evidence", () => {
-		const fresh = recommendedReviewSettings(mockPullRequestWorkType);
-
-		expect(fresh.signals).toStrictEqual([
-			"scm.pull_request.opened",
-			"scm.pull_request.ready",
-			"scm.pull_request.synchronized",
-		]);
-		expect(fresh.evidenceRequirements).toStrictEqual(
-			mockPullRequestWorkType.recommendedEvidenceRequirements,
-		);
-	});
-
-	it("falls back to the first moment on a work type that recommends none", () => {
-		const nothingRecommended = {
-			...mockPullRequestWorkType,
-			signals: mockPullRequestWorkType.signals.map((option) => ({ ...option, recommended: false })),
-		};
-
-		expect(recommendedReviewSettings(nothingRecommended).signals).toStrictEqual([
-			"scm.pull_request.opened",
+		expect(withReadNeed(sources, "scm.pull-request.core", "NOT_USED")).toStrictEqual([
+			{ source: "scm.pull-request.comments", need: "OPTIONAL" },
 		]);
 	});
 
-	// The hand-asked review is carried apart from the moments on the wire, so nothing has to filter it
-	// back out here — a reviewFields seeded with it would never fire on its own.
-	it("never seeds the occasion with the hand-asked review", () => {
-		expect(recommendedReviewSettings(mockPullRequestWorkType).signals).not.toContain(
-			"scm.pull_request.manual_review",
-		);
-	});
-});
-
-describe("orderedWorkTypes", () => {
-	it("leads with the kinds this build knows, in the order it offers them", () => {
-		const shuffled = {
-			...mockPracticeDefinitionOptions,
-			workTypes: [...mockPracticeDefinitionOptions.workTypes].sort((left, right) =>
-				left.artifactKind.localeCompare(right.artifactKind),
+	it("refuses an automated review that would read only optional sources", () => {
+		expect(
+			readsProblem(
+				[{ source: "scm.repository.tree", need: "OPTIONAL" }],
+				mockPullRequestItemType.readSources,
 			),
-		};
-
-		expect(orderedWorkTypes(shuffled).map((option) => option.artifactKind)).toStrictEqual([
-			"scm.pull_request",
-			"scm.issue",
-			"chat.conversation_thread",
-			"docs.document",
-		]);
+		).toBe("Set at least one source to Required. A review cannot run without one.");
+		expect(
+			readsProblem(
+				[{ source: "scm.repository.tree", need: "COMPLETE" }],
+				mockPullRequestItemType.readSources,
+			),
+		).toBeUndefined();
 	});
 
-	it("keeps a kind it has never heard of rather than dropping it", () => {
-		const withUnknown = {
-			...mockPracticeDefinitionOptions,
-			workTypes: [
-				{ ...mockPullRequestWorkType, artifactKind: "docs.page" },
-				...mockPracticeDefinitionOptions.workTypes,
-			],
-		};
-
-		expect(orderedWorkTypes(withUnknown).map((option) => option.artifactKind)).toStrictEqual([
-			"scm.pull_request",
-			"scm.issue",
-			"chat.conversation_thread",
-			"docs.document",
-			"docs.page",
-		]);
+	it("refuses Complete on a source that cannot be captured whole", () => {
+		expect(
+			readsProblem(
+				[core, { source: "scm.linked-work-items", need: "COMPLETE" }],
+				mockPullRequestItemType.readSources,
+			),
+		).toBe("Linked work items cannot be captured whole. Change it to Required or Optional.");
 	});
 });
 
 describe("reviewSettingsProblem", () => {
-	it("accepts the shape a new practice starts in", () => {
+	const reviewOn = { events: ["scm.pull_request.opened"], state: {} };
+
+	it("accepts a practice with no event, which runs only when someone requests a review", () => {
 		expect(
 			reviewSettingsProblem(
-				recommendedReviewSettings(mockPullRequestWorkType),
-				aiSupported,
-				mockPullRequestWorkType,
+				{ events: [], state: {} },
+				[core],
+				"HEPHAESTUS",
+				mockPullRequestItemType,
 			),
 		).toBeUndefined();
 	});
 
-	it("refuses a practice with nothing to start it, before a save", () => {
-		const problem = reviewSettingsProblem(
-			reviewFields({ signals: [] }),
-			aiSupported,
-			mockPullRequestWorkType,
-		);
-
-		expect(problem?.message).toBe("Choose when this practice is reviewed.");
-		expect(problem?.focusId).toBe("practice-occasion-signals");
-	});
-
-	it("refuses a moment that belongs to another kind of work", () => {
+	it("names an event the item kind does not offer", () => {
 		expect(
 			reviewSettingsProblem(
-				reviewFields({ signals: ["scm.issue.opened"] }),
-				aiSupported,
-				mockPullRequestWorkType,
+				{ events: ["scm.pull_request.reviewed"], state: {} },
+				[core],
+				"HEPHAESTUS",
+				mockPullRequestItemType,
+			)?.focusId,
+		).toBe("practice-review-on-events");
+	});
+
+	it("refuses a state value the item kind does not offer", () => {
+		expect(
+			reviewSettingsProblem(
+				{ ...reviewOn, state: { draftStatus: ["ARCHIVED"] } },
+				[core],
+				"HEPHAESTUS",
+				mockPullRequestItemType,
 			)?.message,
-		).toBe("One of the chosen moments does not apply to this kind of work. Clear it to continue.");
+		).toBe("Choose states this kind of work offers.");
 	});
 
-	it("refuses the hand-asked review, which the wire no longer offers as a moment", () => {
+	it("checks reads only while Hephaestus reviews the practice", () => {
+		expect(
+			reviewSettingsProblem(reviewOn, [], "HEPHAESTUS", mockPullRequestItemType)?.focusId,
+		).toBe("practice-review-on-reads");
+		expect(reviewSettingsProblem(reviewOn, [], "PEOPLE", mockPullRequestItemType)).toBeUndefined();
+		expect(reviewSettingsProblem(reviewOn, [], "NOBODY", mockPullRequestItemType)).toBeUndefined();
+	});
+
+	it("refuses a source the item kind does not read", () => {
 		expect(
 			reviewSettingsProblem(
-				reviewFields({ signals: ["scm.pull_request.manual_review"] }),
-				aiSupported,
-				mockPullRequestWorkType,
+				{ events: [], state: {} },
+				[{ source: "scm.pull-request.core", need: "REQUIRED" }],
+				"HEPHAESTUS",
+				mockIssueItemType,
 			)?.message,
-		).toBe("One of the chosen moments does not apply to this kind of work. Clear it to continue.");
-	});
-
-	it("holds the review to naming evidence it cannot run without", () => {
-		const problem = reviewSettingsProblem(
-			reviewFields({
-				evidenceRequirements: [{ sourceKind: "scm.pull-request.core", stance: "CONTEXTUAL" }],
-			}),
-			aiSupported,
-			mockPullRequestWorkType,
-		);
-
-		expect(problem?.message).toBe(
-			"Set at least one source to Required. A review cannot run without one.",
-		);
-		expect(problem?.focusId).toBe("practice-occasion-evidence");
-	});
-
-	it("counts an exhaustive stance as evidence the review cannot run without", () => {
-		expect(
-			reviewSettingsProblem(
-				reviewFields({
-					evidenceRequirements: [{ sourceKind: "scm.review-threads", stance: "EXHAUSTIVE" }],
-				}),
-				aiSupported,
-				mockPullRequestWorkType,
-			),
-		).toBeUndefined();
-	});
-
-	it("refuses an absence claim resting on a source that can never be captured whole", () => {
-		expect(
-			reviewSettingsProblem(
-				reviewFields({
-					evidenceRequirements: [{ sourceKind: "scm.linked-work-items", stance: "EXHAUSTIVE" }],
-				}),
-				aiSupported,
-				mockPullRequestWorkType,
-			)?.message,
-		).toBe(
-			"One chosen source cannot be captured whole, so this review cannot claim that anything is missing from it. Change that source to Context or Off.",
-		);
-	});
-
-	it("refuses evidence on a practice that runs no automated review", () => {
-		expect(
-			reviewSettingsProblem(reviewFields(), guidanceOnly, mockPullRequestWorkType)?.message,
-		).toBe("Guidance only cannot read any evidence.");
-		expect(
-			reviewSettingsProblem(
-				reviewFields({ evidenceRequirements: [] }),
-				guidanceOnly,
-				mockPullRequestWorkType,
-			),
-		).toBeUndefined();
+		).toBe("One chosen source is not offered for this kind of work. Turn it off to continue.");
 	});
 });
 
-describe("descriptor-supported review conditions", () => {
-	it("uses descriptor recommendations and omits unrestricted dimensions", () => {
-		expect(recommendedReviewSettings(mockPullRequestWorkType).reviewWhen).toStrictEqual({
-			draftStatus: ["NOT_DRAFT"],
-		});
+describe("orderedItemTypes", () => {
+	it("lists the kinds in the order every list of kinds keeps", () => {
+		expect(
+			orderedItemTypes({
+				...mockDefinitionOptions,
+				itemTypes: [mockIssueItemType, mockPullRequestReviewItemType, mockPullRequestItemType],
+			}).map((option) => option.kind),
+		).toStrictEqual(["scm.pull_request", "scm.pull_request_review", "scm.issue"]);
 	});
-	it.each<Record<string, string[]>>([{ state: [] }, { unknown: ["OPEN"] }, { state: ["INVALID"] }])(
-		"refuses unsupported or empty selection %j",
-		(reviewWhen) => {
-			expect(
-				reviewSettingsProblem(reviewFields({ reviewWhen }), aiSupported, mockPullRequestWorkType)
-					?.message,
-			).toBe("Choose review conditions supported by this kind of work.");
-		},
-	);
 });

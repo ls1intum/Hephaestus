@@ -1,37 +1,35 @@
 import { z } from "zod";
 
-import { ARTIFACT_KIND_VALUES, type KnownArtifactKind } from "@/lib/artifact-kinds";
 import { hasText } from "@/lib/text";
 
 import type { ReviewScope, ReviewScopeSearch } from "./review-scope";
 
-/**
- * The one record the reader tracks with a row's crosshair, which every tab then narrows to: a piece
- * of work, a review, an observation or a piece of feedback with the review that recorded it, or a
- * practice. It lives in the shared scope's URL names plus `selected=true`. The same names without `selected` are a plain filter,
- * as a "See all" link or an address from before the selection writes them: the lists narrow the
- * same way, and the toolbar shows a filter pill instead of the selection bar.
- */
 export type ReviewSelection =
-	| { kind: "work"; artifactKind: KnownArtifactKind; artifactId: number }
-	| { kind: "review"; agentJobId: string }
-	| { kind: "observation"; observationId: string; agentJobId?: string }
-	| { kind: "feedback"; feedbackId: string; agentJobId?: string }
+	| { kind: "item"; itemId: string }
+	| { kind: "review"; reviewId: string }
+	| { kind: "result"; resultId: string; reviewId?: string }
+	| { kind: "feedback"; feedbackId: string; reviewId?: string }
 	| { kind: "practice"; practiceSlug: string };
 
 export type ReviewSelectionKind = ReviewSelection["kind"];
 
-/**
- * The selection's part of any route's search, read loosely: a row reads it from whichever route
- * renders it. Each tab's own schema has already dropped an id it cannot filter by.
- */
+/** Accept decimal strings and numbers from external links, then normalize workspace ids to strings. */
+export const positiveIdParam = z
+	.union([z.string(), z.number().int()])
+	.transform(String)
+	.pipe(z.string().regex(/^[1-9]\d{0,18}$/u))
+	.optional()
+	.catch(undefined);
+
+// Match the server's UUID parser with z.guid(); z.uuid() enforces a stricter RFC shape.
+export const uuidParam = z.guid().optional().catch(undefined);
+
 const selectionSearchSchema = z.object({
-	agentJobId: z.string().min(1).optional().catch(undefined),
-	observationId: z.string().min(1).optional().catch(undefined),
-	feedbackId: z.string().min(1).optional().catch(undefined),
+	reviewId: uuidParam,
+	resultId: uuidParam,
+	feedbackId: uuidParam,
+	itemId: positiveIdParam,
 	selectedPractice: z.string().min(1).optional().catch(undefined),
-	artifactKind: z.enum(ARTIFACT_KIND_VALUES).optional().catch(undefined),
-	artifactId: z.coerce.number().int().positive().optional().catch(undefined),
 	selected: z.literal(true).optional().catch(undefined),
 });
 
@@ -42,13 +40,7 @@ export function parseSelectionSearch(search: unknown): Partial<ReviewScopeSearch
 
 type RecordScope = Pick<
 	ReviewScope,
-	| "agentJobId"
-	| "observationId"
-	| "feedbackId"
-	| "selectedPractice"
-	| "artifactKind"
-	| "artifactId"
-	| "selected"
+	"reviewId" | "resultId" | "feedbackId" | "selectedPractice" | "itemId" | "selected"
 >;
 
 /** The selection the scope holds: its record, when a crosshair picked it (`selected`). */
@@ -56,26 +48,18 @@ export function readSelection(scope: RecordScope): ReviewSelection | undefined {
 	return scope.selected === true ? readScopedRecord(scope) : undefined;
 }
 
-/**
- * The one record the scope narrows to, picked or filtered. An observation names its review too, and
- * a review the work it read, so the most specific part is the record.
- */
 export function readScopedRecord(scope: RecordScope): ReviewSelection | undefined {
 	if (hasText(scope.feedbackId)) {
-		return { kind: "feedback", feedbackId: scope.feedbackId, agentJobId: scope.agentJobId };
+		return { kind: "feedback", feedbackId: scope.feedbackId, reviewId: scope.reviewId };
 	}
-	if (hasText(scope.observationId)) {
-		return {
-			kind: "observation",
-			observationId: scope.observationId,
-			agentJobId: scope.agentJobId,
-		};
+	if (hasText(scope.resultId)) {
+		return { kind: "result", resultId: scope.resultId, reviewId: scope.reviewId };
 	}
-	if (hasText(scope.agentJobId)) {
-		return { kind: "review", agentJobId: scope.agentJobId };
+	if (hasText(scope.reviewId)) {
+		return { kind: "review", reviewId: scope.reviewId };
 	}
-	if (scope.artifactKind !== undefined && scope.artifactId !== undefined) {
-		return { kind: "work", artifactKind: scope.artifactKind, artifactId: scope.artifactId };
+	if (hasText(scope.itemId)) {
+		return { kind: "item", itemId: scope.itemId };
 	}
 	if (hasText(scope.selectedPractice)) {
 		return { kind: "practice", practiceSlug: scope.selectedPractice };
@@ -84,31 +68,19 @@ export function readScopedRecord(scope: RecordScope): ReviewSelection | undefine
 }
 
 /** The search that makes `selection` the only one; `undefined` clears it. */
-export function selectionSearch(
-	selection: ReviewSelection | undefined,
-): Pick<
-	ReviewScopeSearch,
-	| "agentJobId"
-	| "observationId"
-	| "feedbackId"
-	| "selectedPractice"
-	| "artifactKind"
-	| "artifactId"
-	| "selected"
-> {
+export function selectionSearch(selection: ReviewSelection | undefined): {
+	[K in keyof Required<RecordScope>]: Required<RecordScope>[K] | undefined;
+} {
 	return {
 		selected: selection === undefined ? undefined : true,
-		agentJobId:
-			selection?.kind === "review" ||
-			selection?.kind === "observation" ||
-			selection?.kind === "feedback"
-				? selection.agentJobId
+		reviewId:
+			selection?.kind === "review" || selection?.kind === "result" || selection?.kind === "feedback"
+				? selection.reviewId
 				: undefined,
-		observationId: selection?.kind === "observation" ? selection.observationId : undefined,
+		resultId: selection?.kind === "result" ? selection.resultId : undefined,
 		feedbackId: selection?.kind === "feedback" ? selection.feedbackId : undefined,
 		selectedPractice: selection?.kind === "practice" ? selection.practiceSlug : undefined,
-		artifactKind: selection?.kind === "work" ? selection.artifactKind : undefined,
-		artifactId: selection?.kind === "work" ? selection.artifactId : undefined,
+		itemId: selection?.kind === "item" ? selection.itemId : undefined,
 	};
 }
 
@@ -120,18 +92,14 @@ export function isSameSelection(
 		return false;
 	}
 	switch (candidate.kind) {
-		case "work": {
-			return (
-				current.kind === "work" &&
-				current.artifactKind === candidate.artifactKind &&
-				current.artifactId === candidate.artifactId
-			);
+		case "item": {
+			return current.kind === "item" && current.itemId === candidate.itemId;
 		}
 		case "review": {
-			return current.kind === "review" && current.agentJobId === candidate.agentJobId;
+			return current.kind === "review" && current.reviewId === candidate.reviewId;
 		}
-		case "observation": {
-			return current.kind === "observation" && current.observationId === candidate.observationId;
+		case "result": {
+			return current.kind === "result" && current.resultId === candidate.resultId;
 		}
 		case "feedback": {
 			return current.kind === "feedback" && current.feedbackId === candidate.feedbackId;

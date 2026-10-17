@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.outline.status;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
-import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.framework.CronSchedules;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncDetails;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncStateProvider;
@@ -32,14 +32,14 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
 public class OutlineConnectionSyncStateProvider implements ConnectionSyncStateProvider {
 
-    private final ConnectionRepository connectionRepository;
+    private final ConnectionService connectionRepository;
     private final OutlineCollectionRepository collectionRepository;
     private final OutlineDocumentRepository documentRepository;
     private final ObjectProvider<OutlineRateLimitTracker> rateLimitTrackerProvider;
     private final String syncCron;
 
     public OutlineConnectionSyncStateProvider(
-            ConnectionRepository connectionRepository,
+            ConnectionService connectionRepository,
             OutlineCollectionRepository collectionRepository,
             OutlineDocumentRepository documentRepository,
             ObjectProvider<OutlineRateLimitTracker> rateLimitTrackerProvider,
@@ -59,7 +59,7 @@ public class OutlineConnectionSyncStateProvider implements ConnectionSyncStatePr
     @Override
     public ConnectionSyncDetails describe(IntegrationRef ref, long connectionId) {
         Optional<ConnectionConfig.OutlineConfig> config = connectionRepository
-                .findById(connectionId)
+                .findInWorkspace(ref.workspaceId(), connectionId)
                 .map(Connection::getConfig)
                 .filter(ConnectionConfig.OutlineConfig.class::isInstance)
                 .map(ConnectionConfig.OutlineConfig.class::cast);

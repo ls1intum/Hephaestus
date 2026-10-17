@@ -1,6 +1,6 @@
 export interface ResultCountProps {
 	total: number | undefined;
-	/** Singular and plural, in that order: `["observation", "observations"]`. */
+	/** Singular and plural, in that order: `["result", "results"]`. */
 	noun: readonly [string, string];
 	hasFilter?: boolean;
 }

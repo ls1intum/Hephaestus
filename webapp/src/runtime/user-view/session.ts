@@ -9,10 +9,13 @@ const userViewSchema = z.object({
 	operatorAccountId: z.number().int().positive(),
 	workspaceSlug: z.string().regex(/^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$/u),
 	workspaceName: z.string().min(1),
-	userId: z.number().int().positive(),
-	login: z.string().min(1),
+	/** The viewed account. A provider login never stands in for it. */
+	accountId: z.string().regex(/^[1-9][0-9]*$/u),
+	/** The account's login in this workspace, which only names its profile page. */
+	providerLogin: z.string().min(1).nullable(),
 	name: z.string().min(1),
-	hasAccount: z.boolean(),
+	/** The person has not signed in, so nothing in the view is a choice they made. */
+	unclaimed: z.boolean(),
 	reason: z.string().trim().min(1).max(500),
 });
 
@@ -36,7 +39,10 @@ export function getUserViewSession(): UserViewSession | undefined {
 
 export function startUserView(session: UserViewSession): void {
 	sessionStorage.setItem(USER_VIEW_STORAGE_KEY, JSON.stringify(userViewSchema.parse(session)));
-	const path = `/w/${session.workspaceSlug}/user/${encodeURIComponent(session.login)}`;
+	const path =
+		session.providerLogin === null
+			? `/w/${session.workspaceSlug}`
+			: `/w/${session.workspaceSlug}/user/${encodeURIComponent(session.providerLogin)}`;
 	window.location.assign(publicHref(path));
 }
 
@@ -97,7 +103,7 @@ export function userViewHeaders(session = getUserViewSession()): Record<string, 
 	}
 	return {
 		"X-User-View-Workspace": session.workspaceSlug,
-		"X-User-View-User": String(session.userId),
+		"X-User-View-Account": session.accountId,
 		"X-User-View-Reason": encodeURIComponent(session.reason),
 	};
 }

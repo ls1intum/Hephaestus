@@ -1,15 +1,16 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.testconfig.StubMentorChatStarter;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.Membership;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -18,7 +19,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
  * Fires the real filter chain so the SSE endpoint's two guards — WorkspaceContextFilter
@@ -30,12 +33,19 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
     @Autowired
     private WebTestClient webTestClient;
 
-    @Autowired
-    private StubMentorChatStarter mentorChatStarter;
+    @MockitoSpyBean
+    private MentorChatService mentorChatService;
 
     @BeforeEach
-    void resetMentorChatStarter() {
-        mentorChatStarter.reset();
+    void resetMentorChatService() {
+        doAnswer(call -> {
+                    SseEmitter emitter = call.getArgument(1);
+                    emitter.send(SseEmitter.event().data("[DONE]"));
+                    emitter.complete();
+                    return null;
+                })
+                .when(mentorChatService)
+                .start(any(), any());
     }
 
     /** Minimal valid mentor turn request body. */
@@ -96,7 +106,7 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
         User mentor = persistUser("mentor");
         User owner = persistUser("workspace-owner-for-mentor-happy");
         Workspace workspace = createWorkspace("mentor-happy-space", "Happy", "mentor-happy", AccountType.ORG, owner);
-        ensureWorkspaceMembership(workspace, mentor, WorkspaceMembership.WorkspaceRole.MEMBER);
+        ensureMembership(workspace, mentor, Membership.WorkspaceRole.MEMBER);
 
         webTestClient
                 .post()
@@ -114,8 +124,7 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
                 .valueEquals("x-vercel-ai-ui-message-stream", "v1")
                 .expectHeader()
                 .valueEquals("Cache-Control", "no-cache")
-                .expectBody(Void.class);
-
-        assertThat(mentorChatStarter.awaitInvocation()).isTrue();
+                .expectBody(String.class)
+                .value(body -> assertThat(body).contains("[DONE]"));
     }
 }

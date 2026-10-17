@@ -1,1428 +1,209 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.tuple;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.lenient;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderPersonDataCatalog;
-import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
-import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
-import de.tum.cit.aet.hephaestus.agent.context.StagedArtifactNames;
-import de.tum.cit.aet.hephaestus.agent.conversation.ConversationSourceLiveness;
-import de.tum.cit.aet.hephaestus.agent.handler.PublicReviewEligibility;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.agent.context.HistoryCopies;
+import de.tum.cit.aet.hephaestus.agent.context.HistoryCopy;
+import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
+import de.tum.cit.aet.hephaestus.agent.handler.RuntimeReviewTestData;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.PublicFeedbackHistoryDTO;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCopyRecorder;
-import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
-import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
-import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
-import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
-import de.tum.cit.aet.hephaestus.evidence.SourceKind;
-import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactIdentity;
-import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.FeedbackObservationVisibility;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackWithdrawalRepository;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.Outcome;
-import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.integration.core.framework.RegisteredItemLabels;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
+import de.tum.cit.aet.hephaestus.practices.spi.Currentness;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackHistoryEntry;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackHistoryQuery;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryEntry;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryQuery;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import java.io.IOException;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
-import org.mockito.Mock;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.node.ObjectNode;
+import org.junit.jupiter.params.provider.ValueSource;
+import tools.jackson.databind.json.JsonMapper;
 
 class ReviewHistoryContentSourceTest extends BaseUnitTest {
-
-    private static final long WORKSPACE_ID = 7L;
-    private static final long PR_ID = 42L;
-    private static final long AUTHOR_ID = 99L;
-    private static final long OBSERVED_ARTIFACT_ROW_ID = 306L;
-    private static final long DELIVERED_ARTIFACT_ROW_ID = 307L;
-    private static final int OBSERVED_ARTIFACT_NUMBER = 22;
-    private static final int DELIVERED_ARTIFACT_NUMBER = 23;
-    private static final long UNNAMEABLE_ARTIFACT_ROW_ID = 909L;
-
-    private static final Set<Long> ROW_IDS =
-            Set.of(OBSERVED_ARTIFACT_ROW_ID, DELIVERED_ARTIFACT_ROW_ID, UNNAMEABLE_ARTIFACT_ROW_ID);
-
-    private final ObjectMapper objectMapper = new ObjectMapper();
-
-    @Mock
-    private ObservationRepository observationRepository;
-
-    @Mock
-    private FeedbackRepository feedbackRepository;
-
-    @Mock
-    private FeedbackObservationRepository feedbackObservationRepository;
-
-    @Mock
-    private FeedbackWithdrawalRepository withdrawalRepository;
-
-    @Mock
-    private ObservationVisibilityPolicy visibilityPolicy;
-
-    @Mock
-    private ConversationSourceLiveness conversationLiveness;
-
-    /** Threads whose channel no longer consents; every other thread asked about is live. */
-    private final Set<Long> inactiveThreads = new HashSet<>();
-
-    @Mock
-    private PullRequestRepository pullRequestRepository;
-
-    @Mock
-    private IssueRepository issueRepository;
-
-    @Mock
-    private PublicReviewEligibility publicEligibility;
-
-    @Mock
-    private PersonDataCopyRecorder personCopies;
-
-    @Mock
-    private EvidenceFolderPersonDataCatalog copyAuthority;
-
-    private ReviewHistoryContentSource provider;
-
-    private final Map<UUID, List<Observation>> boundTo = new HashMap<>();
-
-    @BeforeEach
-    void setUp() {
-        provider = new ReviewHistoryContentSource(
-                observationRepository,
-                feedbackRepository,
-                feedbackObservationRepository,
-                withdrawalRepository,
-                visibilityPolicy,
-                conversationLiveness,
-                pullRequestRepository,
-                issueRepository,
-                new StagedArtifactNames(ReviewHistoryContentSourceTest::identitiesOf),
-                objectMapper,
-                publicEligibility,
-                personCopies,
-                copyAuthority);
-        lenient()
-                .when(copyAuthority.recordVouchedHistoricalJobs(anyLong(), any()))
-                .thenAnswer(invocation -> Set.copyOf(invocation.<Collection<UUID>>getArgument(1)));
-        lenient().when(conversationLiveness.activeThreadIds(anyLong(), any())).thenAnswer(invocation -> {
-            Collection<Long> threads = invocation.getArgument(1);
-            return threads.stream()
-                    .filter(thread -> !inactiveThreads.contains(thread))
-                    .collect(Collectors.toSet());
-        });
-        lenient().when(observationRepository.findForPersonHistory(any(), any())).thenReturn(List.of());
-        lenient()
-                .when(feedbackRepository.findDeliveredForPersonHistory(any(), any()))
-                .thenReturn(List.of());
-        lenient()
-                .when(feedbackRepository.findPreparedForRecipient(any(), any(), any()))
-                .thenReturn(List.of());
-        // Unless a test binds it, each row is bound to one current observation this review may read.
-        lenient()
-                .when(feedbackObservationRepository.findForVisibility(anyLong(), any()))
-                .thenAnswer(invocation -> {
-                    Collection<UUID> ids = invocation.getArgument(1);
-                    return ids.stream()
-                            .flatMap(id -> boundTo.getOrDefault(id, List.of(boundObservation(false))).stream()
-                                    .map(o -> (FeedbackObservationVisibility) new Binding(id, o)))
-                            .toList();
-                });
-        lenient()
-                .when(visibilityPolicy.permitsShown(anyLong(), any(), eq(SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)))
-                .thenAnswer(invocation -> {
-                    Collection<Observation> batch = invocation.getArgument(1);
-                    return batch.stream().map(Observation::getId).collect(Collectors.toSet());
-                });
-        lenient().when(visibilityPolicy.permitsAll(anyLong(), any(), any())).thenAnswer(invocation -> {
-            Collection<Observation> batch = invocation.getArgument(1);
-            return batch.stream().map(Observation::getId).collect(Collectors.toSet());
-        });
-        lenient()
-                .when(pullRequestRepository.findByIdWithAuthorAndRepository(eq(PR_ID)))
-                .thenReturn(Optional.of(pullRequestBy(AUTHOR_ID)));
+    @Test
+    void shouldAskForTheFrozenAssignmentAndCopyOnlyVouchedHistory() {
+        var results = mock(ResultHistoryQuery.class);
+        var copies = mock(HistoryCopies.class);
+        var assignment = RuntimeReviewTestData.assignment(5L, null);
+        var vouched = mock(ResultHistoryEntry.class);
+        var unknown = mock(ResultHistoryEntry.class);
+        var actual = new HistoryCopy(true, List.of(), List.of(), List.of());
+        var incomplete = new HistoryCopy(false, List.of(), List.of(), List.of());
+        when(results.forAssignment(1, assignment.id(), 20)).thenReturn(List.of(vouched, unknown));
+        when(copies.of(vouched)).thenReturn(actual);
+        when(copies.of(unknown)).thenReturn(incomplete);
+        when(copies.record(actual)).thenReturn(true);
+        var source = new ReviewHistoryContentSource(
+                results, mock(FeedbackHistoryQuery.class), copies, mock(RegisteredItemLabels.class), new JsonMapper());
+        assertThat(source.previousResults(assignment)).containsExactly(vouched);
+        verify(copies).record(actual);
+        verify(copies).record(incomplete);
     }
+
+    private final FeedbackHistoryQuery feedback = mock(FeedbackHistoryQuery.class);
+    private final RegisteredItemLabels labels = mock(RegisteredItemLabels.class);
+    private final JsonMapper mapper = new JsonMapper();
+    private final ReviewHistoryContentSource source = new ReviewHistoryContentSource(
+            mock(ResultHistoryQuery.class),
+            feedback,
+            new HistoryCopies(mock(PersonDataCopyRecorder.class)),
+            labels,
+            mapper);
+    private final Instant deliveredAt = Instant.parse("2026-10-14T00:00:00Z");
 
     @Test
-    void answersForBothHistoryKindsWithoutAnyPracticeDeclaringThem() {
-        assertThat(provider.sourceKinds())
-                .containsExactlyInAnyOrder(
-                        ReviewHistoryContentSource.OBSERVATION_HISTORY, ReviewHistoryContentSource.FEEDBACK_HISTORY);
-    }
-
-    @Nested
-    class WhenOnlyOneHalfIsAskedFor {
-
-        @Test
-        void observationHistoryAloneAnswersForObservationHistoryOnly() {
-            var captured = provider.capture(prRequest(), Set.of(ReviewHistoryContentSource.OBSERVATION_HISTORY));
-            assertThat(captured.files()).containsOnlyKeys("inputs/history/observations.json");
-            assertThat(captured.completeness()).containsOnlyKeys(ReviewHistoryContentSource.OBSERVATION_HISTORY);
-            assertThat(captured.contentStates()).containsOnlyKeys(ReviewHistoryContentSource.OBSERVATION_HISTORY);
-        }
-
-        @Test
-        void feedbackHistoryAloneAnswersForFeedbackHistoryOnly() {
-            var captured = provider.capture(prRequest(), Set.of(ReviewHistoryContentSource.FEEDBACK_HISTORY));
-
-            assertThat(captured.files())
-                    .containsOnlyKeys("inputs/history/feedback.json", "inputs/history/prepared.json");
-            assertThat(captured.completeness()).containsOnlyKeys(ReviewHistoryContentSource.FEEDBACK_HISTORY);
-            assertThat(captured.contentStates()).containsOnlyKeys(ReviewHistoryContentSource.FEEDBACK_HISTORY);
-        }
-
-        @Test
-        void theUnaskedHalfIsNotQueried() {
-            provider.capture(prRequest(), Set.of(ReviewHistoryContentSource.OBSERVATION_HISTORY));
-
-            verify(feedbackRepository, never()).findDeliveredForPersonHistory(any(), any());
-            verify(feedbackRepository, never()).findPreparedForRecipient(any(), any(), any());
-        }
-    }
-
-    @Test
-    void reviewerHistoryBelongsToTheActualSubjectRatherThanTheWorkAuthor() {
-        long reviewerId = AUTHOR_ID + 1;
-        Observation authorObservation = observationWithRationale("Author history.");
-        Observation reviewerObservation = observationWithRationale("Reviewer history.");
-        when(observationRepository.findForPersonHistory(AUTHOR_ID, WORKSPACE_ID))
-                .thenReturn(List.of(authorObservation));
-        when(observationRepository.findForPersonHistory(reviewerId, WORKSPACE_ID))
-                .thenReturn(List.of(reviewerObservation));
-        var authorRequest = prRequest();
-        ObjectNode metadata =
-                (ObjectNode) Objects.requireNonNull(authorRequest.job().getMetadata());
-        metadata.put("subject_role", "AUTHOR");
-        metadata.put("about_user_id", reviewerId);
-        JsonNode authorHistory =
-                read(provider.capture(authorRequest, Set.of(ReviewHistoryContentSource.OBSERVATION_HISTORY))
-                        .files()
-                        .get("inputs/history/observations.json"));
-        assertThat(authorHistory.path("observations")).hasSize(1);
-        assertThat(authorHistory.path("observations").get(0).path("id").asString())
-                .isEqualTo(authorObservation.getId().toString());
-        metadata.put("subject_role", "REVIEWER");
-        JsonNode reviewerHistory =
-                read(provider.capture(authorRequest, Set.of(ReviewHistoryContentSource.OBSERVATION_HISTORY))
-                        .files()
-                        .get("inputs/history/observations.json"));
-        assertThat(reviewerHistory.path("observations")).hasSize(1);
-        assertThat(reviewerHistory.path("observations").get(0).path("id").asString())
-                .isEqualTo(reviewerObservation.getId().toString());
-    }
-
-    @Test
-    void shouldKeepDeliveredFeedbackWithTheActualSubjectWhenAuthorAndReviewerHaveHistory() {
-        long reviewerId = AUTHOR_ID + 1;
-        Feedback author = deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID);
-        Feedback reviewer = deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID);
-        when(feedbackRepository.findDeliveredForPersonHistory(WORKSPACE_ID, AUTHOR_ID))
-                .thenReturn(List.of(author));
-        when(feedbackRepository.findDeliveredForPersonHistory(WORKSPACE_ID, reviewerId))
-                .thenReturn(List.of(reviewer));
-        var request = prRequest();
-        ObjectNode metadata = (ObjectNode) Objects.requireNonNull(request.job().getMetadata());
-        metadata.put("subject_role", "AUTHOR");
-        metadata.put("about_user_id", reviewerId);
-        JsonNode authorHistory = read(provider.capture(request, Set.of(ReviewHistoryContentSource.FEEDBACK_HISTORY))
-                        .files()
-                        .get("inputs/history/feedback.json"))
-                .path("feedback");
-        assertThat(authorHistory).hasSize(1);
-        assertThat(authorHistory.get(0).path("id").asString())
-                .isEqualTo(author.getId().toString());
-
-        metadata.put("subject_role", "REVIEWER");
-        JsonNode reviewerHistory = read(provider.capture(request, Set.of(ReviewHistoryContentSource.FEEDBACK_HISTORY))
-                        .files()
-                        .get("inputs/history/feedback.json"))
-                .path("feedback");
-        assertThat(reviewerHistory).hasSize(1);
-        assertThat(reviewerHistory.get(0).path("id").asString())
-                .isEqualTo(reviewer.getId().toString());
-    }
-
-    @Test
-    void aMissingOrInvalidReviewerSubjectIsUnavailableRatherThanAuthorHistory() {
-        var request = prRequest();
-        ObjectNode metadata = (ObjectNode) Objects.requireNonNull(request.job().getMetadata());
-        metadata.put("subject_role", "REVIEWER");
-        for (long subject : new long[] {0, -1}) {
-            metadata.put("about_user_id", subject);
-            var capture = provider.capture(request, provider.sourceKinds());
-            assertThat(capture.files()).isEmpty();
-            assertThat(capture.stateOverrides().values())
-                    .allMatch(state -> state instanceof SourceCaptureState.Unavailable);
-        }
-        metadata.remove("about_user_id");
-        var missing = provider.capture(request, provider.sourceKinds());
-        assertThat(missing.files()).isEmpty();
-        assertThat(missing.stateOverrides().values())
-                .allMatch(state -> state instanceof SourceCaptureState.Unavailable);
-        verifyNoInteractions(observationRepository, feedbackRepository, pullRequestRepository);
-    }
-
-    @Test
-    void aFirstEverReviewGetsAPresentAndEmptyHistory() {
-        var observationsCapture = captureObservationHistory();
-        var feedbackCapture = captureFeedbackHistory();
-
-        JsonNode observations = read(observationsCapture.files().get("inputs/history/observations.json"));
-        JsonNode feedback = read(feedbackCapture.files().get("inputs/history/feedback.json"));
-        assertThat(observations.get("observations")).isEmpty();
-        assertThat(feedback.get("feedback")).isEmpty();
-        assertThat(observationsCapture.contentStates())
-                .containsEntry(ReviewHistoryContentSource.OBSERVATION_HISTORY, SourceContentState.EMPTY);
-        assertThat(feedbackCapture.contentStates())
-                .containsEntry(ReviewHistoryContentSource.FEEDBACK_HISTORY, SourceContentState.EMPTY);
-    }
-
-    @Nested
-    class TheBoundsEachFileStates {
-
-        @Test
-        void shouldStateItsRecordsAndScopeWithoutAHistoryWindowOrRecordLimit() {
-            JsonNode observations = read(captureObservationHistory().files().get("inputs/history/observations.json"));
-            var feedbackCapture = captureFeedbackHistory();
-            JsonNode feedback = read(feedbackCapture.files().get("inputs/history/feedback.json"));
-            JsonNode prepared = read(feedbackCapture.files().get("inputs/history/prepared.json"));
-
-            assertThat(observations.propertyNames()).containsExactly("coverage", "recordRole", "observations");
-            assertThat(feedback.propertyNames()).containsExactly("coverage", "recordRole", "feedback");
-            assertThat(prepared.propertyNames()).containsExactly("coverage", "recordRole", "prepared");
-            assertThat(observations.path("recordRole").asString()).isEqualTo("RECORDED_OBSERVATIONS");
-            assertThat(feedback.path("recordRole").asString()).isEqualTo("RECORDED_DELIVERY");
-            assertThat(prepared.path("recordRole").asString()).isEqualTo("PREPARED_NOT_DELIVERED");
-            for (JsonNode file : List.of(observations, feedback, prepared)) {
-                JsonNode coverage = file.path("coverage");
-                assertThat(coverage.propertyNames()).containsExactly("scope", "workChronology", "communicationHistory");
-                assertThat(coverage.path("scope").asString()).isEqualTo("AUTHORIZED_REVIEW_RECORDS_FOR_SUBJECT");
-                assertThat(coverage.path("workChronology").asString()).isEqualTo("NOT_ESTABLISHED");
-                assertThat(coverage.path("communicationHistory").asString()).isEqualTo("NOT_ESTABLISHED");
-            }
-        }
-    }
-
-    @Test
-    void stagesTheRecordedTextAsItWasWritten() {
-        String rationale = "The practice requires a test; the assessment is BAD -> MAJOR severity band.";
-        String body = "Per the fixed bucketing this is a MINOR severity tier observation.";
-        when(observationRepository.findForPersonHistory(any(), any()))
-                .thenReturn(List.of(observationWithRationale(rationale)));
-        when(feedbackRepository.findDeliveredForPersonHistory(any(), any()))
-                .thenReturn(List.of(Feedback.builder()
-                        .agentJobId(UUID.randomUUID())
-                        .id(UUID.randomUUID())
-                        .channel(FeedbackChannel.IN_CONTEXT)
-                        .body(body)
-                        .deliveredAt(Instant.parse("2026-07-01T09:00:00Z"))
-                        .build()));
-        when(feedbackRepository.findPreparedForRecipient(any(), any(), any()))
-                .thenReturn(List.of(Feedback.builder()
-                        .agentJobId(UUID.randomUUID())
-                        .id(UUID.randomUUID())
-                        .channel(FeedbackChannel.IN_APP)
-                        .threadKey("in-app:99:swallows-errors")
-                        .body(body)
-                        .createdAt(Instant.parse("2026-07-02T09:00:00Z"))
-                        .build()));
-
-        var feedbackCapture = captureFeedbackHistory();
-
-        // History is the record of what was observed and said; rewriting it would stage a record that
-        // never existed.
-        assertThat(read(captureObservationHistory().files().get("inputs/history/observations.json"))
-                        .get("observations")
-                        .get(0)
-                        .get("summary")
-                        .asString())
-                .isEqualTo("Caught and ignored");
-        assertThat(read(feedbackCapture.files().get("inputs/history/feedback.json"))
-                        .get("feedback")
-                        .get(0)
-                        .get("body")
-                        .asString())
-                .isEqualTo(body);
-        assertThat(read(feedbackCapture.files().get("inputs/history/prepared.json"))
-                        .get("prepared")
-                        .get(0)
-                        .get("body")
-                        .asString())
-                .isEqualTo(body);
-    }
-
-    @Test
-    void shouldStageEarlierObservationsWithTheEvidenceAndRevisionTheyWereRecordedWith() {
-        String rationale =
-                "The catch block logs and continues.\nOnly the changed file was read; callers were not searched.";
-        ObjectNode evidence = objectMapper.createObjectNode();
-        ObjectNode citation = evidence.putArray("citations").addObject();
-        citation.put("sourceKind", "scm.pull-request.diff");
-        citation.put("artifactPath", "inputs/change/diff.patch");
-        citation.put("path", "src/Loader.swift");
-        citation.put("side", "NEW");
-        citation.put("startLine", 12);
-        citation.put("endLine", 14);
-        citation.put("quote", "do {\n    try load()\n} catch {}");
-        citation.put("quoteRedacted", false);
-        ObjectNode search = evidence.putObject("search");
-        search.putArray("consulted").add("scm.pull-request.diff");
-        search.put("lookedFor", "error handling");
-        search.put("boundary", "changed files only");
-        PracticeRevision recordedRevision = mock(PracticeRevision.class);
-        when(recordedRevision.getId()).thenReturn(157L);
-        when(recordedRevision.getRevisionNumber()).thenReturn(2);
-        Practice practice = new Practice();
-        practice.setSlug("swallows-errors");
-        practice.setCurrentRevision(mock(PracticeRevision.class));
-        Observation recorded = Observation.builder()
-                .agentJobId(UUID.randomUUID())
-                .id(UUID.randomUUID())
-                .practice(practice)
-                .practiceRevision(recordedRevision)
-                .recurrenceKey("rec-1")
-                .summary("Caught and ignored")
-                .outcome(Outcome.NOT_MET)
-                .observedAt(Instant.parse("2026-07-01T09:00:00Z"))
-                .evidenceRationale(rationale)
-                .evidence(evidence)
-                .build();
-        Observation unrecorded = Observation.builder()
-                .agentJobId(UUID.randomUUID())
-                .id(UUID.randomUUID())
-                .practice(practice)
-                .recurrenceKey("rec-2")
-                .summary("Missing restart check")
-                .outcome(Outcome.NOT_MET)
-                .observedAt(Instant.parse("2026-06-01T09:00:00Z"))
-                .build();
-        when(observationRepository.findForPersonHistory(any(), any())).thenReturn(List.of(recorded, unrecorded));
-
-        JsonNode records = read(captureObservationHistory().files().get("inputs/history/observations.json"))
-                .get("observations");
-
-        JsonNode staged = records.get(0);
-        assertThat(staged.path("evidenceRationale").asString()).isEqualTo(rationale);
-        assertThat(staged.get("evidence")).isEqualTo(evidence);
-        assertThat(staged.path("practiceRevision").path("id").asString()).isEqualTo("157");
-        assertThat(staged.path("practiceRevision").path("number").asInt()).isEqualTo(2);
-        // What was not recorded stays unknown; nothing current stands in for it.
-        JsonNode unknown = records.get(1);
-        assertThat(unknown.get("evidenceRationale").isNull()).isTrue();
-        assertThat(unknown.get("evidence").isNull()).isTrue();
-        assertThat(unknown.get("practiceRevision").isNull()).isTrue();
-    }
-
-    @Test
-    void stagesEarlierObservationsAsThePracticeTheVerdictAndTheSummary() {
-        Observation original = observationAgainst(ArtifactKinds.PULL_REQUEST, OBSERVED_ARTIFACT_ROW_ID);
-        when(observationRepository.findForPersonHistory(any(), any())).thenReturn(List.of(original));
-
-        var captured = captureObservationHistory();
-
-        JsonNode entry = read(captured.files().get("inputs/history/observations.json"))
-                .get("observations")
-                .get(0);
-        assertThat(entry.propertyNames())
-                .containsExactlyInAnyOrder(
-                        "id",
-                        "practiceSlug",
-                        "summary",
-                        "outcome",
-                        "severity",
-                        "evidenceRationale",
-                        "evidence",
-                        "practiceRevision",
-                        "artifact",
-                        "observedAt");
-        assertThat(entry.path("id").asString()).isEqualTo(original.getId().toString());
-        assertThat(entry.get("practiceSlug").asString()).isEqualTo("swallows-errors");
-        assertThat(entry.get("summary").asString()).isEqualTo("Caught and ignored");
-        assertThat(captured.contentStates())
-                .containsEntry(ReviewHistoryContentSource.OBSERVATION_HISTORY, SourceContentState.NON_EMPTY);
-    }
-
-    @Test
-    void shouldKeepRecordFactsWithoutUnvouchedObservationWords() {
-        Observation row = observation("swallows-errors", "unvouched", "Quoted prior discussion");
-        Observation trusted = observation("swallows-errors", "trusted", "Trusted earlier review");
-        when(observationRepository.findForPersonHistory(any(), any())).thenReturn(List.of(row, trusted));
-        doReturn(Set.of(trusted.getAgentJobId())).when(copyAuthority).recordVouchedHistoricalJobs(anyLong(), any());
-
-        var captured = captureObservationHistory();
-        JsonNode payload = read(captured.files().get("inputs/history/observations.json"));
-        JsonNode record = payload.path("observations").get(0);
-        assertThat(record.path("id").asString()).isEqualTo(row.getId().toString());
-        assertThat(record.has("summary") || record.has("evidenceRationale") || record.has("evidence"))
-                .isFalse();
-        assertThat(record.path("wordsUnavailable").asString()).isEqualTo("COPY_AUTHORITY_UNAVAILABLE");
-        assertThat(payload.path("observations").get(1).path("summary").asString())
-                .isEqualTo("Trusted earlier review");
-        assertThat(captured.completeness())
-                .containsEntry(ReviewHistoryContentSource.OBSERVATION_HISTORY, SourceCompleteness.PARTIAL);
-        assertThat(captured.contentStates())
-                .containsEntry(ReviewHistoryContentSource.OBSERVATION_HISTORY, SourceContentState.NON_EMPTY);
-    }
-
-    @Test
-    void shouldKeepTheWholePermittedHistoryOfARecurringPractice() {
-        List<Observation> newestFirst = new ArrayList<>();
-        for (int i = 0; i < 3 + 2; i++) {
-            newestFirst.add(observation("swallows-errors", "rec-" + i, "Caught and ignored " + i));
-        }
-        newestFirst.add(observation("verification-guidance", "rec-v", "Missing restart check"));
-        when(observationRepository.findForPersonHistory(any(), any())).thenReturn(newestFirst);
-
-        JsonNode records = read(captureObservationHistory().files().get("inputs/history/observations.json"))
-                .get("observations");
-
-        assertThat(records.valueStream().map(r -> r.get("summary").asString()))
-                .containsExactly(
-                        "Caught and ignored 0",
-                        "Caught and ignored 1",
-                        "Caught and ignored 2",
-                        "Caught and ignored 3",
-                        "Caught and ignored 4",
-                        "Missing restart check");
-    }
-
-    @Test
-    void stagesFeedbackThatWasAlreadyDeliveredWithItsChannel() {
-        when(feedbackRepository.findDeliveredForPersonHistory(any(), any()))
-                .thenReturn(List.of(Feedback.builder()
-                        .agentJobId(UUID.randomUUID())
-                        .id(UUID.randomUUID())
-                        .channel(FeedbackChannel.IN_CONTEXT)
-                        .body("Consider handling this error rather than logging it.")
-                        .deliveredAt(Instant.parse("2026-07-01T09:00:00Z"))
-                        .build()));
-
-        var captured = captureFeedbackHistory();
-
-        JsonNode entry = read(captured.files().get("inputs/history/feedback.json"))
-                .get("feedback")
-                .get(0);
-        assertThat(entry.get("channel").asString()).isEqualTo("IN_CONTEXT");
-        assertThat(entry.get("body").asString()).contains("rather than logging it");
-        assertThat(captured.contentStates())
-                .containsEntry(ReviewHistoryContentSource.FEEDBACK_HISTORY, SourceContentState.NON_EMPTY);
-    }
-
-    @Test
-    void stagesWhatIsQueuedAndUnreadWithTheKeyThatIdentifiesIt() {
-        when(feedbackRepository.findPreparedForRecipient(any(), any(), any()))
-                .thenReturn(List.of(Feedback.builder()
-                        .agentJobId(UUID.randomUUID())
-                        .id(UUID.randomUUID())
-                        .channel(FeedbackChannel.IN_APP)
-                        .threadKey("in-app:99:swallows-errors")
-                        .body("A way of working nobody has read yet.")
-                        .createdAt(Instant.parse("2026-07-02T09:00:00Z"))
-                        .build()));
-
-        JsonNode entry = read(captureFeedbackHistory().files().get("inputs/history/prepared.json"))
-                .get("prepared")
-                .get(0);
-
-        assertThat(entry.get("threadKey").asString()).isEqualTo("in-app:99:swallows-errors");
-        assertThat(entry.get("channel").asString()).isEqualTo("IN_APP");
-        assertThat(entry.get("body").asString()).contains("nobody has read yet");
-    }
-
-    @Test
-    void shouldPreserveSeparateBehaviorRecordsAtTheSameLocation() {
-        when(observationRepository.findForPersonHistory(any(), any()))
+    void shouldIncludeOnlyDeliveredPublicFeedbackForTheViewerFromOtherReviews() {
+        var job = RuntimeReviewTestData.job();
+        var visible = entry(5, FeedbackDestination.ON_WORK, deliveredAt, "Public feedback", UUID.randomUUID(), true);
+        when(feedback.forItem(1, 2, 5, 100))
                 .thenReturn(List.of(
-                        observation("verification-guidance", "same-location", "Missing restart check"),
-                        observation("verification-guidance", "same-location", "Misleading setup instruction")));
-
-        var files = captureObservationHistory().files();
-        assertThat(files).containsOnlyKeys("inputs/history/observations.json");
-        JsonNode records = read(files.get("inputs/history/observations.json")).get("observations");
-        assertThat(records).hasSize(2);
-        assertThat(records.get(0).get("summary").asString()).isEqualTo("Missing restart check");
-        assertThat(records.get(1).get("summary").asString()).isEqualTo("Misleading setup instruction");
+                        entry(6, FeedbackDestination.ON_WORK, deliveredAt, "Other developer", UUID.randomUUID(), false),
+                        entry(
+                                5,
+                                FeedbackDestination.CONVERSATION,
+                                deliveredAt,
+                                "Private feedback",
+                                UUID.randomUUID(),
+                                false),
+                        entry(5, FeedbackDestination.ON_WORK, null, "Undelivered feedback", UUID.randomUUID(), false),
+                        entry(5, FeedbackDestination.ON_WORK, deliveredAt, null, UUID.randomUUID(), false),
+                        entry(5, FeedbackDestination.ON_WORK, deliveredAt, "Current review", job.getReviewId(), false),
+                        visible,
+                        visible));
+        var assignment = RuntimeReviewTestData.assignment(5L, null);
+        var read = source.publicSameItemFeedback(
+                job, List.of(assignment, assignment, RuntimeReviewTestData.assignment(null, null)));
+        assertThat(read.response().contractVersion()).isEqualTo(3);
+        assertThat(read.response().history().feedback())
+                .containsExactly(mapper.treeToValue(visible.publicHistory(), PublicFeedbackHistoryDTO.Entry.class));
+        assertThat(read.copies())
+                .containsExactly(new HistoryCopy(true, List.of(), List.of(20L), visible.sourceJobIds()));
+        assertThat(read.response().history().item()).satisfies(item -> {
+            assertThat(item.id()).isEqualTo("2");
+            assertThat(item.label()).isEqualTo("docs.document");
+            assertThat(item.parentId()).isNull();
+            assertThat(item.title()).isNull();
+        });
+        verify(feedback).forItem(1, 2, 5, 100);
     }
 
     @Test
-    void neverReportsCompleteBecauseTheWindowIsBounded() {
-        assertThat(captureObservationHistory().completeness().values()).containsOnly(SourceCompleteness.COMPLETE);
-        assertThat(captureFeedbackHistory().completeness().values()).containsOnly(SourceCompleteness.COMPLETE);
-    }
-
-    @Test
-    void withholdsAnObservationTheVisibilityPolicyRefuses() {
-        when(observationRepository.findForPersonHistory(any(), any()))
-                .thenReturn(List.of(observation("swallows-errors", "rec-1", "Caught and ignored")));
-        doReturn(Set.of()).when(visibilityPolicy).permitsAll(anyLong(), any(), any());
-
-        var captured = captureObservationHistory();
-
-        assertThat(read(captured.files().get("inputs/history/observations.json"))
-                        .get("observations"))
-                .isEmpty();
-        assertThat(captured.contentStates())
-                .containsEntry(ReviewHistoryContentSource.OBSERVATION_HISTORY, SourceContentState.EMPTY);
-    }
-
-    @Test
-    void reportsUnavailableRatherThanEmptyWhenTheSubjectCannotBeResolved() {
-        when(pullRequestRepository.findByIdWithAuthorAndRepository(eq(PR_ID))).thenReturn(Optional.empty());
-
-        assertUnavailable(captureObservationHistory(), ReviewHistoryContentSource.OBSERVATION_HISTORY);
-        assertUnavailable(captureFeedbackHistory(), ReviewHistoryContentSource.FEEDBACK_HISTORY);
-        verifyNoInteractions(observationRepository, feedbackRepository);
-    }
-
-    private static void assertUnavailable(EvidenceContribution captured, SourceKind kind) {
-        assertThat(captured.files()).isEmpty();
-        assertThat(captured.stateOverrides()).containsOnlyKeys(kind);
-        assertThat(captured.stateOverrides())
-                .hasEntrySatisfying(
-                        kind,
-                        state -> assertThat(state)
-                                .isInstanceOfSatisfying(
-                                        SourceCaptureState.Unavailable.class,
-                                        unavailable -> assertThat(unavailable.reasonCode())
-                                                .isEqualTo(SourceAbsenceReason.NOT_FOUND)));
-    }
-
-    @Nested
-    class NamingTheWorkAnEntryIsAbout {
-
-        @Test
-        void anObservationCarriesTheHandleOfTheWorkItWasFiledAgainst() {
-            when(observationRepository.findForPersonHistory(any(), any()))
-                    .thenReturn(List.of(observationAgainst(ArtifactKinds.PULL_REQUEST, OBSERVED_ARTIFACT_ROW_ID)));
-
-            JsonNode artifact = read(captureObservationHistory().files().get("inputs/history/observations.json"))
-                    .get("observations")
-                    .get(0)
-                    .get("artifact");
-
-            assertThat(artifact.get("kind").asString()).isEqualTo("scm.pull_request");
-            assertThat(artifact.get("number").asInt()).isEqualTo(OBSERVED_ARTIFACT_NUMBER);
-            assertThat(artifact.get("title").asString()).isEqualTo("Batch the practice reads");
-            assertThat(artifact.get("container").asString()).isEqualTo("acme/web");
-            assertThat(artifact.get("url").asString()).endsWith("/merge_requests/" + OBSERVED_ARTIFACT_NUMBER);
-        }
-
-        @Test
-        void deliveredFeedbackCarriesTheSameHandle() {
-            when(feedbackRepository.findDeliveredForPersonHistory(any(), any()))
-                    .thenReturn(List.of(deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID)));
-
-            JsonNode artifact = read(captureFeedbackHistory().files().get("inputs/history/feedback.json"))
-                    .get("feedback")
-                    .get(0)
-                    .get("artifact");
-
-            assertThat(artifact.get("number").asInt()).isEqualTo(DELIVERED_ARTIFACT_NUMBER);
-            assertThat(artifact.get("container").asString()).isEqualTo("acme/web");
-        }
-
-        @Test
-        void workNoResolverCanNameIsStagedAsItsKindWithoutANumber() {
-            when(observationRepository.findForPersonHistory(any(), any()))
-                    .thenReturn(
-                            List.of(observationAgainst(ArtifactKinds.CONVERSATION_THREAD, UNNAMEABLE_ARTIFACT_ROW_ID)));
-
-            JsonNode artifact = read(captureObservationHistory().files().get("inputs/history/observations.json"))
-                    .get("observations")
-                    .get(0)
-                    .get("artifact");
-
-            assertThat(artifact.get("kind").asString()).isEqualTo("chat.conversation_thread");
-            assertThat(artifact.get("title").asString()).isEqualTo("Conversation thread");
-            assertThat(artifact.has("number")).isFalse();
-            assertThat(artifact.has("url")).isFalse();
-        }
-
-        @Test
-        void noHistoryFileCarriesARowIdAnywhere() {
-            when(observationRepository.findForPersonHistory(any(), any()))
-                    .thenReturn(List.of(
-                            observationAgainst(ArtifactKinds.PULL_REQUEST, OBSERVED_ARTIFACT_ROW_ID),
-                            observationAgainst(ArtifactKinds.CONVERSATION_THREAD, UNNAMEABLE_ARTIFACT_ROW_ID)));
-            when(feedbackRepository.findDeliveredForPersonHistory(any(), any()))
-                    .thenReturn(List.of(deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID)));
-            when(feedbackRepository.findPreparedForRecipient(any(), any(), any()))
-                    .thenReturn(List.of(deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID)));
-
-            var observationCapture = captureObservationHistory();
-            var feedbackCapture = captureFeedbackHistory();
-            assertCarriesNoRowId(
-                    read(observationCapture.files().get("inputs/history/observations.json")), "observations.json");
-            assertCarriesNoRowId(read(feedbackCapture.files().get("inputs/history/feedback.json")), "feedback.json");
-            assertCarriesNoRowId(read(feedbackCapture.files().get("inputs/history/prepared.json")), "prepared.json");
-        }
-    }
-
-    @Test
-    void doesNotSupportTheMentorChat() {
-        assertThat(provider.supports(new ContextRequest.MentorChatRequest(WORKSPACE_ID, AUTHOR_ID, UUID.randomUUID())))
-                .isFalse();
-        assertThat(provider.supports(prRequest())).isTrue();
-    }
-
-    private EvidenceContribution captureObservationHistory() {
-        return provider.capture(prRequest(), Set.of(ReviewHistoryContentSource.OBSERVATION_HISTORY));
-    }
-
-    @Nested
-    class FeedbackWhoseEvidenceHasMovedOn {
-
-        @Test
-        void keepsTheRecordOfWhatWasSaidButNotItsWords() {
-            Feedback note = deliveredAgainst(ArtifactKinds.ISSUE, DELIVERED_ARTIFACT_ROW_ID);
-            Feedback brief = queued("in-chat:7:subtasks", "None of the four issues has a task list.");
-            boundTo.put(note.getId(), List.of(boundObservation(true)));
-            boundTo.put(brief.getId(), List.of(boundObservation(true)));
-            when(feedbackRepository.findDeliveredForPersonHistory(any(), any())).thenReturn(List.of(note));
-            when(feedbackRepository.findPreparedForRecipient(any(), any(), any()))
-                    .thenReturn(List.of(brief));
-
-            var captured = captureFeedbackHistory();
-            JsonNode said = read(captured.files().get("inputs/history/feedback.json"))
-                    .get("feedback")
-                    .get(0);
-            JsonNode waiting = read(captured.files().get("inputs/history/prepared.json"))
-                    .get("prepared")
-                    .get(0);
-
-            assertThat(said.get("recordedClaimCurrentness").asString()).isEqualTo("STALE");
-            assertThat(said.has("body")).isFalse();
-            assertThat(said.has("bodyRole")).isFalse();
-            assertThat(said.get("channel").asString()).isEqualTo("IN_CONTEXT");
-            assertThat(said.get("deliveredAt").asString()).isNotBlank();
-            assertThat(waiting.get("recordedClaimCurrentness").asString()).isEqualTo("STALE");
-            assertThat(waiting.get("threadKey").asString()).isEqualTo("in-chat:7:subtasks");
-            assertThat(waiting.has("body")).isFalse();
-            assertThat(waiting.has("bodyRole")).isFalse();
-            assertThat(captured.contentStates())
-                    .containsEntry(ReviewHistoryContentSource.FEEDBACK_HISTORY, SourceContentState.NON_EMPTY);
-        }
-
-        @Test
-        void oneStaleObservationBehindAPieceOfFeedbackMakesItsWordsStale() {
-            Feedback card = queued("in-app:99:subtasks", "#7 and #6 still lack checkable units.");
-            boundTo.put(card.getId(), List.of(boundObservation(false), boundObservation(true)));
-            when(feedbackRepository.findPreparedForRecipient(any(), any(), any()))
-                    .thenReturn(List.of(card));
-
-            JsonNode entry = read(captureFeedbackHistory().files().get("inputs/history/prepared.json"))
-                    .get("prepared")
-                    .get(0);
-
-            assertThat(entry.get("recordedClaimCurrentness").asString()).isEqualTo("STALE");
-            assertThat(entry.has("body")).isFalse();
-        }
-
-        @Test
-        void keepsTheWordsWhileEveryObservationBehindThemIsCurrent() {
-            Feedback card = queued("in-app:99:subtasks", "#9 and #10 open as one block.");
-            boundTo.put(card.getId(), List.of(boundObservation(false), boundObservation(false)));
-            when(feedbackRepository.findPreparedForRecipient(any(), any(), any()))
-                    .thenReturn(List.of(card));
-
-            JsonNode entry = read(captureFeedbackHistory().files().get("inputs/history/prepared.json"))
-                    .get("prepared")
-                    .get(0);
-
-            assertThat(entry.get("recordedClaimCurrentness").asString()).isEqualTo("CURRENT");
-            assertThat(entry.get("body").asString()).isEqualTo("#9 and #10 open as one block.");
-        }
-
-        @Test
-        void keepsAWithdrawnCardsRecordButNotItsWordsWhileItsEvidenceIsCurrent() {
-            Feedback card = queued("in-app:99:subtasks", "Wrong words about older issues.");
-            boundTo.put(card.getId(), List.of(boundObservation(false)));
-            when(feedbackRepository.findPreparedForRecipient(any(), any(), any()))
-                    .thenReturn(List.of(card));
-            when(withdrawalRepository.withdrawnAmong(anyLong(), any())).thenReturn(Set.of(card.getId()));
-
-            JsonNode entry = read(captureFeedbackHistory().files().get("inputs/history/prepared.json"))
-                    .get("prepared")
-                    .get(0);
-
-            assertThat(entry.get("recordedClaimCurrentness").asString()).isEqualTo("CURRENT");
-            assertThat(entry.get("withdrawn").asBoolean()).isTrue();
-            assertThat(entry.has("body")).isFalse();
-            assertThat(entry.has("bodyRole")).isFalse();
-        }
-
-        @Test
-        void shouldNameWhoseWordsEachStagedBodyHolds() {
-            Instant at = Instant.parse("2026-07-01T09:00:00Z");
-            Feedback onWork = Feedback.builder()
-                    .agentJobId(UUID.randomUUID())
-                    .id(UUID.randomUUID())
-                    .channel(FeedbackChannel.IN_CONTEXT)
-                    .body("Name the failure the catch block hides.")
-                    .deliveredAt(at)
-                    .build();
-            Feedback onPage = Feedback.builder()
-                    .agentJobId(UUID.randomUUID())
-                    .id(UUID.randomUUID())
-                    .channel(FeedbackChannel.IN_APP)
-                    .body("Two issues share one failure path.")
-                    .deliveredAt(at)
-                    .build();
-            Feedback legacy = Feedback.builder()
-                    .agentJobId(UUID.randomUUID())
-                    .id(UUID.randomUUID())
-                    .body("Recorded before its channel was stored.")
-                    .deliveredAt(at)
-                    .build();
-            Feedback unwritten = Feedback.builder()
-                    .agentJobId(UUID.randomUUID())
-                    .id(UUID.randomUUID())
-                    .channel(FeedbackChannel.IN_CONTEXT)
-                    .deliveredAt(at)
-                    .build();
-            Feedback brief = queued("in-chat:7:errors", "Situation: the catch block hides failures.");
-            Feedback card = Feedback.builder()
-                    .agentJobId(UUID.randomUUID())
-                    .id(UUID.randomUUID())
-                    .channel(FeedbackChannel.IN_APP)
-                    .threadKey("in-app:7:errors")
-                    .body("Check the failure path.")
-                    .createdAt(at)
-                    .build();
-            when(feedbackRepository.findDeliveredForPersonHistory(any(), any()))
-                    .thenReturn(List.of(onWork, onPage, legacy, unwritten));
-            when(feedbackRepository.findPreparedForRecipient(any(), any(), any()))
-                    .thenReturn(List.of(brief, card));
-
-            var captured = captureFeedbackHistory();
-            JsonNode said =
-                    read(captured.files().get("inputs/history/feedback.json")).get("feedback");
-            JsonNode waiting =
-                    read(captured.files().get("inputs/history/prepared.json")).get("prepared");
-
-            assertThat(said.get(0).get("body").asString()).isEqualTo("Name the failure the catch block hides.");
-            assertThat(said.get(0).get("bodyRole").asString()).isEqualTo("COMPOSED_GUIDANCE");
-            assertThat(said.get(1).get("body").asString()).isEqualTo("Two issues share one failure path.");
-            assertThat(said.get(1).get("bodyRole").asString()).isEqualTo("COMPOSED_GUIDANCE");
-            assertThat(said.get(2).get("body").asString()).isEqualTo("Recorded before its channel was stored.");
-            assertThat(said.get(2).get("bodyRole").asString()).isEqualTo("UNKNOWN");
-            assertThat(said.get(3).get("body").isNull()).isTrue();
-            assertThat(said.get(3).has("bodyRole")).isFalse();
-            assertThat(waiting.get(0).get("body").asString()).isEqualTo("Situation: the catch block hides failures.");
-            assertThat(waiting.get(0).get("bodyRole").asString()).isEqualTo("MENTOR_NOTES");
-            assertThat(waiting.get(1).get("body").asString()).isEqualTo("Check the failure path.");
-            assertThat(waiting.get(1).get("bodyRole").asString()).isEqualTo("COMPOSED_GUIDANCE");
-        }
-
-        @Test
-        void stagesNothingAboutFeedbackWhoseEvidenceThisReviewMayNotRead() {
-            Feedback note = deliveredAgainst(ArtifactKinds.ISSUE, DELIVERED_ARTIFACT_ROW_ID);
-            Feedback brief = queued("in-chat:7:subtasks", "A brief on withheld evidence.");
-            Observation readable = boundObservation(false);
-            boundTo.put(note.getId(), List.of(readable, boundObservation(false)));
-            boundTo.put(brief.getId(), List.of(boundObservation(false)));
-            when(feedbackRepository.findDeliveredForPersonHistory(any(), any())).thenReturn(List.of(note));
-            when(feedbackRepository.findPreparedForRecipient(any(), any(), any()))
-                    .thenReturn(List.of(brief));
-            when(visibilityPolicy.permitsShown(anyLong(), any(), eq(SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)))
-                    .thenReturn(Set.of(readable.getId()));
-
-            var captured = captureFeedbackHistory();
-
-            assertThat(read(captured.files().get("inputs/history/feedback.json"))
-                            .get("feedback"))
-                    .isEmpty();
-            assertThat(read(captured.files().get("inputs/history/prepared.json"))
-                            .get("prepared"))
-                    .isEmpty();
-            assertThat(captured.contentStates())
-                    .containsEntry(ReviewHistoryContentSource.FEEDBACK_HISTORY, SourceContentState.EMPTY);
-        }
-    }
-
-    @Nested
-    class ConversationsWhoseChannelNoLongerConsents {
-
-        private static final long PAUSED_THREAD = 41L;
-        private static final long ACTIVE_THREAD = 42L;
-
-        @Test
-        void stagesNoObservationFromAConversationWhoseChannelNoLongerConsents() {
-            inactiveThreads.add(PAUSED_THREAD);
-            when(observationRepository.findForPersonHistory(any(), any()))
-                    .thenReturn(List.of(
-                            observation(
-                                    "paused-practice",
-                                    "rec-1",
-                                    "From the paused channel",
-                                    ArtifactKinds.CONVERSATION_THREAD,
-                                    PAUSED_THREAD),
-                            observation(
-                                    "active-practice",
-                                    "rec-2",
-                                    "From the active channel",
-                                    ArtifactKinds.CONVERSATION_THREAD,
-                                    ACTIVE_THREAD),
-                            observation(
-                                    "code-practice",
-                                    "rec-3",
-                                    "From the pull request",
-                                    ArtifactKinds.PULL_REQUEST,
-                                    OBSERVED_ARTIFACT_ROW_ID)));
-
-            JsonNode staged = read(captureObservationHistory().files().get("inputs/history/observations.json"));
-
-            assertThat(staged.get("observations"))
-                    .extracting(o -> o.get("summary").asString())
-                    .containsExactly("From the active channel", "From the pull request");
-            assertThat(staged.toString()).doesNotContain("paused-practice", "From the paused channel");
-        }
-
-        @Test
-        void stagesNoFeedbackBoundToOrAboutAConversationWhoseChannelNoLongerConsents() {
-            inactiveThreads.add(PAUSED_THREAD);
-            Feedback mixed = queued("in-app:1:mixed", "Bound to code and to the paused conversation.");
-            boundTo.put(mixed.getId(), List.of(boundObservation(false), boundConversation(PAUSED_THREAD)));
-            Feedback aboutPaused = Feedback.builder()
-                    .agentJobId(UUID.randomUUID())
-                    .id(UUID.randomUUID())
-                    .channel(FeedbackChannel.IN_CHAT)
-                    .artifactKind(ArtifactKinds.CONVERSATION_THREAD)
-                    .artifactId(PAUSED_THREAD)
-                    .threadKey("in-chat:1:paused")
-                    .body("About the paused conversation.")
-                    .createdAt(Instant.parse("2026-07-02T09:00:00Z"))
-                    .build();
-            Feedback threadless = Feedback.builder()
-                    .agentJobId(UUID.randomUUID())
-                    .id(UUID.randomUUID())
-                    .channel(FeedbackChannel.IN_CHAT)
-                    .artifactKind(ArtifactKinds.CONVERSATION_THREAD)
-                    .threadKey("in-chat:1:threadless")
-                    .body("About a conversation with no thread recorded.")
-                    .createdAt(Instant.parse("2026-07-02T09:00:00Z"))
-                    .build();
-            Feedback unanchored = queued("in-app:1:unanchored", "Not tied to any one piece of work.");
-            Feedback onCode = deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID);
-            Feedback onActive = queued("in-chat:1:active", "From the active conversation.");
-            boundTo.put(onActive.getId(), List.of(boundConversation(ACTIVE_THREAD)));
-            when(feedbackRepository.findDeliveredForPersonHistory(any(), any())).thenReturn(List.of(onCode));
-            when(feedbackRepository.findPreparedForRecipient(any(), any(), any()))
-                    .thenReturn(List.of(mixed, aboutPaused, threadless, unanchored, onActive));
-
-            var captured = captureFeedbackHistory();
-            JsonNode said = read(captured.files().get("inputs/history/feedback.json"));
-            JsonNode waiting = read(captured.files().get("inputs/history/prepared.json"));
-
-            assertThat(said.get("feedback"))
-                    .extracting(f -> f.get("body").asString())
-                    .containsExactly("Consider handling this error rather than logging it.");
-            assertThat(waiting.get("prepared"))
-                    .extracting(
-                            f -> f.get("threadKey").asString(),
-                            f -> f.get("body").asString())
-                    .containsExactly(
-                            tuple("in-app:1:unanchored", "Not tied to any one piece of work."),
-                            tuple("in-chat:1:active", "From the active conversation."));
-            assertThat(waiting.toString())
-                    .doesNotContain(
-                            "in-app:1:mixed", "in-chat:1:paused", "paused conversation", "in-chat:1:threadless");
-        }
-
-        private static Observation boundConversation(long threadId) {
-            Observation current = boundObservation(false);
-            return Observation.builder()
-                    .agentJobId(UUID.randomUUID())
-                    .id(current.getId())
-                    .practice(current.getPractice())
-                    .practiceRevision(current.getPracticeRevision())
-                    .artifactKind(ArtifactKinds.CONVERSATION_THREAD)
-                    .artifactId(threadId)
-                    .build();
-        }
-    }
-
-    private static Feedback queued(String threadKey, String body) {
-        return Feedback.builder()
-                .agentJobId(UUID.randomUUID())
-                .id(UUID.randomUUID())
-                .channel(FeedbackChannel.IN_CHAT)
-                .threadKey(threadKey)
-                .body(body)
-                .createdAt(Instant.parse("2026-07-02T09:00:00Z"))
-                .build();
-    }
-
-    /** An observation measured under the practice's current review rules; {@code retired} marks it superseded. */
-    private static Observation boundObservation(boolean retired) {
-        PracticeRevision revision = mock(PracticeRevision.class);
-        lenient().when(revision.getReviewRuleFingerprint()).thenReturn("v5:rules");
-        Practice practice = new Practice();
-        practice.setCurrentRevision(revision);
-        return Observation.builder()
-                .agentJobId(UUID.randomUUID())
-                .id(UUID.randomUUID())
-                .practice(practice)
-                .practiceRevision(revision)
-                .outcome(Outcome.MET)
-                .supersededAt(retired ? Instant.parse("2026-07-01T10:00:00Z") : null)
-                .build();
-    }
-
-    private record Binding(UUID feedbackId, Observation observation) implements FeedbackObservationVisibility {
-        @Override
-        public UUID getFeedbackId() {
-            return feedbackId;
-        }
-
-        @Override
-        public Observation getObservation() {
-            return observation;
-        }
-    }
-
-    /** A note a newer review replaced after it was published is history the same way a delivered one is. */
-    @ParameterizedTest
-    @EnumSource(
-            value = FeedbackDeliveryState.class,
-            names = {"DELIVERED", "SUPERSEDED"})
-    void shouldCiteHistoryFeedbackOnlyWhileItsWordsMayStillBeRead(FeedbackDeliveryState state) {
-        Feedback note = Feedback.builder()
-                .agentJobId(UUID.randomUUID())
-                .id(UUID.randomUUID())
-                .channel(FeedbackChannel.IN_CONTEXT)
-                .artifactKind(ArtifactKinds.PULL_REQUEST)
-                .artifactId(DELIVERED_ARTIFACT_ROW_ID)
-                .deliveryState(state)
-                .body("Review the failure path.")
-                .deliveredAt(Instant.parse("2026-07-01T09:00:00Z"))
-                .build();
-        when(feedbackRepository.findPersonHistoryRecord(note.getId(), WORKSPACE_ID))
-                .thenReturn(Optional.of(note));
-
-        assertThat(cites(note)).as("current and readable").isTrue();
-        boundTo.put(note.getId(), List.of(boundObservation(true)));
-        assertThat(cites(note)).as("its evidence moved on").isFalse();
-        boundTo.put(note.getId(), List.of(boundObservation(false)));
-        when(withdrawalRepository.withdrawnAmong(anyLong(), any())).thenReturn(Set.of(note.getId()));
-        assertThat(cites(note)).as("withdrawn").isFalse();
-        when(withdrawalRepository.withdrawnAmong(anyLong(), any())).thenReturn(Set.of());
-        when(visibilityPolicy.permitsShown(anyLong(), any(), eq(SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)))
-                .thenReturn(Set.of());
-        assertThat(cites(note)).as("its evidence may not be read").isFalse();
-    }
-
-    private boolean cites(Feedback note) {
-        return provider.permitsHistoryRecord(
-                WORKSPACE_ID, "feedback", note.getId(), SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW);
+    void shouldRefusePublicHistoryWhenTheOwnerCannotVouchForItsCopy() {
+        when(feedback.forItem(1, 2, 5, 100))
+                .thenReturn(List.of(entry(
+                        5, FeedbackDestination.ON_WORK, deliveredAt, "Public feedback", UUID.randomUUID(), false)));
+        assertThatThrownBy(() -> source.publicSameItemFeedback(
+                        RuntimeReviewTestData.job(), List.of(RuntimeReviewTestData.assignment(5L, null))))
+                .isInstanceOf(ResultAdmissionService.PublicHistoryRefusedException.class)
+                .hasMessage("Historical feedback has no complete copy authority");
     }
 
     @ParameterizedTest
-    @EnumSource(
-            value = FeedbackDeliveryState.class,
-            names = {"DELIVERED", "SUPERSEDED"})
-    void deliveredHistoryRetainsOriginalSupportAndRevisionWithoutCurrentSubstitution(FeedbackDeliveryState state) {
-        Feedback note = Feedback.builder()
-                .agentJobId(UUID.randomUUID())
-                .id(UUID.randomUUID())
-                .channel(FeedbackChannel.IN_CONTEXT)
-                .artifactKind(ArtifactKinds.PULL_REQUEST)
-                .artifactId(DELIVERED_ARTIFACT_ROW_ID)
-                .deliveryState(state)
-                .body("Review the failure path.")
-                .deliveredAt(Instant.parse("2026-07-01T09:00:00Z"))
-                .reviewedRevision("original-head")
-                .build();
-        Observation support = boundObservation(false);
-        support.getPractice().setSlug("review-the-change");
-        PracticeRevision original = Objects.requireNonNull(support.getPracticeRevision());
-        when(original.getId()).thenReturn(157L);
-        when(original.getRevisionNumber()).thenReturn(2);
-        PracticeRevision current = mock(PracticeRevision.class);
-        when(current.getReviewRuleFingerprint()).thenReturn("v5:rules");
-        support.getPractice().setCurrentRevision(current);
-        boundTo.put(note.getId(), List.of(support));
-        when(feedbackRepository.findDeliveredForPersonHistory(any(), any())).thenReturn(List.of(note));
-
-        JsonNode row = read(captureFeedbackHistory().files().get("inputs/history/feedback.json"))
-                .path("feedback")
-                .get(0);
-
-        assertThat(row.path("id").asString()).isEqualTo(note.getId().toString());
-        assertThat(row.path("reviewedRevision").asString()).isEqualTo("original-head");
-        assertThat(row.path("body").asString()).isEqualTo(note.getBody());
-        JsonNode capturedSupport = row.path("basedOn").get(0);
-        assertThat(capturedSupport.path("id").asString())
-                .isEqualTo(support.getId().toString());
-        assertThat(capturedSupport.path("practiceSlug").asString()).isEqualTo("review-the-change");
-        assertThat(capturedSupport.path("outcome").asString()).isEqualTo("MET");
-        assertThat(capturedSupport.path("practiceRevision").path("id").asString())
-                .isEqualTo("157");
-        assertThat(capturedSupport.path("practiceRevision").path("number").asInt())
-                .isEqualTo(2);
+    @ValueSource(booleans = {true, false})
+    void shouldUseTheProviderLabelWithAnOptionalNumber(boolean numbered) {
+        var original = RuntimeReviewTestData.assignment(null, null);
+        var item = new ItemRef(1, 2, original.item().kind(), null, 7L, "document/body");
+        var assignment = withItem(original, item);
+        when(labels.labels(1, List.of(item)))
+                .thenReturn(Map.of(
+                        2L,
+                        new ItemLabel(
+                                2,
+                                "Document",
+                                "Design",
+                                "Document",
+                                numbered ? 42 : null,
+                                "team/docs",
+                                "https://example.test/docs/2",
+                                null)));
+        var read = source.publicSameItemFeedback(RuntimeReviewTestData.job(), List.of(assignment));
+        assertThat(read.response().history().feedback()).isEmpty();
+        assertThat(read.copies()).isEmpty();
+        assertThat(read.response().history().item()).satisfies(ref -> {
+            assertThat(ref.label()).isEqualTo(numbered ? "Document #42" : "Document");
+            assertThat(ref.parentId()).isEqualTo("7");
+            assertThat(ref.title()).isEqualTo("Design");
+            assertThat(ref.url()).isEqualTo("https://example.test/docs/2");
+            assertThat(ref.container()).isEqualTo("team/docs");
+            assertThat(ref.path()).isEqualTo("document/body");
+        });
     }
 
-    private EvidenceContribution captureFeedbackHistory() {
-        return provider.capture(prRequest(), Set.of(ReviewHistoryContentSource.FEEDBACK_HISTORY));
+    @Test
+    void shouldRejectPublicHistoryAcrossDifferentItems() {
+        var first = RuntimeReviewTestData.assignment(null, null);
+        var second = withItem(first, new ItemRef(1, 3, first.item().kind(), 20L, null, null));
+        assertThatThrownBy(() -> source.publicSameItemFeedback(RuntimeReviewTestData.job(), List.of(first, second)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Public history requires one item");
     }
 
-    private JsonNode read(byte @Nullable [] bytes) {
-        assertThat(bytes).isNotNull();
-        return objectMapper.readTree(bytes);
+    private ReviewAssignmentSnapshot withItem(ReviewAssignmentSnapshot assignment, ItemRef item) {
+        return new ReviewAssignmentSnapshot(
+                assignment.id(),
+                item,
+                assignment.version(),
+                assignment.developerId(),
+                assignment.practiceSlug(),
+                assignment.practice());
     }
 
-    private ContextRequest.PracticeReviewRequest prRequest() {
-        ObjectNode metadata = objectMapper.createObjectNode();
-        metadata.put("pull_request_id", PR_ID);
-        Workspace workspace = new Workspace();
-        workspace.setId(WORKSPACE_ID);
-        AgentJob job = new AgentJob();
-        job.setWorkspace(workspace);
-        job.setMetadata(metadata);
-        return new ContextRequest.PracticeReviewRequest(job);
-    }
-
-    private static PullRequest pullRequestBy(long authorId) {
-        User author = new User();
-        author.setId(authorId);
-        PullRequest pullRequest = new PullRequest();
-        pullRequest.setAuthor(author);
-        return pullRequest;
-    }
-
-    private static Map<Long, ArtifactIdentity> identitiesOf(long workspaceId, ArtifactKind kind, Collection<Long> ids) {
-        Map<Long, ArtifactIdentity> named = new LinkedHashMap<>();
-        for (Long id : ids) {
-            named.put(id, identityOf(kind, id));
-        }
-        return named;
-    }
-
-    private static ArtifactIdentity identityOf(ArtifactKind kind, Long id) {
-        if (id == OBSERVED_ARTIFACT_ROW_ID) {
-            return mergeRequest(kind, id, OBSERVED_ARTIFACT_NUMBER, "Batch the practice reads");
-        }
-        if (id == DELIVERED_ARTIFACT_ROW_ID) {
-            return mergeRequest(kind, id, DELIVERED_ARTIFACT_NUMBER, "Drop the duplicate visibility read");
-        }
-        return ArtifactIdentity.unresolved(kind, id, "Conversation thread");
-    }
-
-    private static ArtifactIdentity mergeRequest(ArtifactKind kind, Long id, int number, String title) {
-        return new ArtifactIdentity(
-                kind,
+    private FeedbackHistoryEntry entry(
+            long developer,
+            FeedbackDestination destination,
+            @Nullable Instant delivered,
+            @Nullable String body,
+            UUID reviewId,
+            boolean complete) {
+        UUID id = UUID.randomUUID();
+        var projection = destination == FeedbackDestination.ON_WORK && delivered != null
+                ? mapper.valueToTree(new PublicFeedbackHistoryDTO.Entry(
+                        id,
+                        destination,
+                        FeedbackState.DELIVERED,
+                        delivered,
+                        "docs:one",
+                        body,
+                        body == null,
+                        Currentness.CURRENT,
+                        false,
+                        List.of(),
+                        List.of()))
+                : null;
+        return new FeedbackHistoryEntry(
                 id,
-                IntegrationKind.GITLAB,
-                number,
-                title,
-                "acme/web",
-                "https://gitlab.example.com/acme/web/-/merge_requests/" + number);
-    }
-
-    private static void assertCarriesNoRowId(JsonNode node, String path) {
-        if (node.isObject()) {
-            node.properties().forEach(entry -> {
-                assertThat(entry.getKey()).as("staged field at %s", path).isNotEqualTo("artifactId");
-                assertCarriesNoRowId(entry.getValue(), path + "." + entry.getKey());
-            });
-            return;
-        }
-        if (node.isArray()) {
-            for (int index = 0; index < node.size(); index++) {
-                assertCarriesNoRowId(node.get(index), path + "[" + index + "]");
-            }
-            return;
-        }
-        if (node.isNumber()) {
-            assertThat(ROW_IDS.contains(node.asLong()))
-                    .as("a row id reached the staged history at %s", path)
-                    .isFalse();
-        }
-    }
-
-    private static Observation observationAgainst(ArtifactKind kind, long artifactId) {
-        return observation("swallows-errors", "rec-1", "Caught and ignored", kind, artifactId);
-    }
-
-    @Test
-    void shouldKeepCommunicationFactsWhenHistoricalWordsAreUnavailable() throws IOException {
-        Feedback unavailable = Feedback.builder()
-                .id(UUID.fromString("00000000-0000-4000-8000-000000000001"))
-                .agentJobId(UUID.fromString("00000000-0000-4000-8000-000000000011"))
-                .channel(FeedbackChannel.IN_CONTEXT)
-                .artifactKind(ArtifactKinds.PULL_REQUEST)
-                .artifactId(DELIVERED_ARTIFACT_ROW_ID)
-                .body("Unvouched historical guidance must stay unavailable.")
-                .deliveredAt(Instant.parse("2026-10-07T10:00:00Z"))
-                .reviewedRevision("recorded-revision")
-                .build();
-        Feedback trusted = Feedback.builder()
-                .id(UUID.fromString("00000000-0000-4000-8000-000000000002"))
-                .agentJobId(UUID.fromString("00000000-0000-4000-8000-000000000012"))
-                .channel(FeedbackChannel.IN_CONTEXT)
-                .artifactKind(ArtifactKinds.PULL_REQUEST)
-                .artifactId(DELIVERED_ARTIFACT_ROW_ID)
-                .body("Trusted delivered guidance on this work.")
-                .deliveredAt(Instant.parse("2026-10-07T10:00:00Z"))
-                .reviewedRevision("recorded-revision")
-                .build();
-        Feedback unvouchedCurrent = Feedback.builder()
-                .id(UUID.fromString("00000000-0000-4000-8000-000000000003"))
-                .agentJobId(UUID.fromString("00000000-0000-4000-8000-000000000013"))
-                .channel(FeedbackChannel.IN_CONTEXT)
-                .artifactKind(ArtifactKinds.PULL_REQUEST)
-                .artifactId(DELIVERED_ARTIFACT_ROW_ID)
-                .body("Current unvouched guidance must stay unavailable.")
-                .deliveredAt(Instant.parse("2026-10-07T10:00:00Z"))
-                .reviewedRevision("recorded-revision")
-                .build();
-        Feedback prepared = queued("in-chat:7:subtasks", "Unavailable mentor words");
-        PracticeRevision revision = mock(PracticeRevision.class);
-        when(revision.getId()).thenReturn(31L);
-        when(revision.getRevisionNumber()).thenReturn(1);
-        when(revision.getReviewRuleFingerprint()).thenReturn("v5:rules");
-        Practice practice = new Practice();
-        practice.setSlug("test-practice");
-        practice.setCurrentRevision(revision);
-        Observation unavailableSupport = Observation.builder()
-                .id(UUID.fromString("00000000-0000-4000-8000-000000000021"))
-                .agentJobId(UUID.fromString("00000000-0000-4000-8000-000000000041"))
-                .practice(practice)
-                .practiceRevision(revision)
-                .outcome(Outcome.MET)
-                .supersededAt(Instant.parse("2026-10-07T10:30:00Z"))
-                .build();
-        Observation trustedSupport = Observation.builder()
-                .id(UUID.fromString("00000000-0000-4000-8000-000000000022"))
-                .agentJobId(UUID.fromString("00000000-0000-4000-8000-000000000042"))
-                .practice(practice)
-                .practiceRevision(revision)
-                .outcome(Outcome.MET)
-                .build();
-        boundTo.put(unavailable.getId(), List.of(unavailableSupport));
-        boundTo.put(trusted.getId(), List.of(trustedSupport));
-        boundTo.put(unvouchedCurrent.getId(), List.of(trustedSupport));
-        when(feedbackRepository.findDeliveredForPublicWorkHistory(
-                        WORKSPACE_ID, AUTHOR_ID, ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID))
-                .thenReturn(List.of(unavailable, trusted, unvouchedCurrent));
-        when(publicEligibility.permitsPublicHistory(eq(unavailable), any())).thenReturn(true);
-        when(publicEligibility.permitsPublicHistory(eq(trusted), any())).thenReturn(true);
-        when(publicEligibility.permitsPublicHistory(eq(unvouchedCurrent), any()))
-                .thenReturn(true);
-        when(feedbackRepository.findDeliveredForPersonHistory(any(), any())).thenReturn(List.of(unavailable, trusted));
-        when(feedbackRepository.findPreparedForRecipient(any(), any(), any())).thenReturn(List.of(prepared));
-        when(withdrawalRepository.withdrawnAmong(eq(WORKSPACE_ID), any()))
-                .thenReturn(Set.of(unavailable.getId(), prepared.getId()));
-        doReturn(Set.of(trusted.getAgentJobId(), trustedSupport.getAgentJobId()))
-                .when(copyAuthority)
-                .recordVouchedHistoricalJobs(anyLong(), any());
-
-        JsonNode publicHistory = provider.publicSameWorkFeedback(
-                WORKSPACE_ID, AUTHOR_ID, ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID);
-        try (var fixture = Objects.requireNonNull(
-                getClass().getResourceAsStream("/agent/fixtures/public-feedback-history-unavailable-words.json"))) {
-            assertThat(objectMapper.readTree(objectMapper.writeValueAsBytes(publicHistory)))
-                    .isEqualTo(objectMapper.readTree(fixture));
-        }
-        var captured = captureFeedbackHistory();
-        JsonNode personHistory = read(captured.files().get("inputs/history/feedback.json"));
-        JsonNode preparedHistory = read(captured.files().get("inputs/history/prepared.json"));
-        for (JsonNode history : List.of(publicHistory, personHistory, preparedHistory)) {
-            JsonNode rows = history.path(history.has("prepared") ? "prepared" : "feedback");
-            JsonNode row = rows.get(0);
-            assertThat(row.path("recordedClaimCurrentness").asString())
-                    .isEqualTo(history.has("prepared") ? "CURRENT" : "STALE");
-            assertThat(row.path("withdrawn").asBoolean()).isTrue();
-            assertThat(row.has("body") || row.has("bodyRole")).isFalse();
-            assertThat(row.path("wordsUnavailable").asString()).isEqualTo("COPY_AUTHORITY_UNAVAILABLE");
-            assertThat(history.path("wordsCoverage").asString()).isEqualTo("PARTIAL");
-        }
-        assertThat(publicHistory.path("feedback").get(1).path("body").asString())
-                .isEqualTo(trusted.getBody());
-        assertThat(personHistory.path("feedback").get(1).path("body").asString())
-                .isEqualTo(trusted.getBody());
-        assertThat(captured.completeness())
-                .containsEntry(ReviewHistoryContentSource.FEEDBACK_HISTORY, SourceCompleteness.PARTIAL);
-    }
-
-    @Test
-    void freshPublicHistoryKeepsOnlyAuthorizedPublicDeliveriesOnThisWork() {
-        Feedback author = deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID);
-        Feedback replaced = Feedback.builder()
-                .agentJobId(UUID.randomUUID())
-                .id(UUID.randomUUID())
-                .channel(FeedbackChannel.IN_CONTEXT)
-                .artifactKind(ArtifactKinds.PULL_REQUEST)
-                .artifactId(DELIVERED_ARTIFACT_ROW_ID)
-                .body("Earlier published guidance")
-                .deliveredAt(Instant.parse("2026-07-01T09:00:00Z"))
-                .deliveryState(FeedbackDeliveryState.SUPERSEDED)
-                .build();
-        Feedback reviewer = deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID);
-        when(feedbackRepository.findDeliveredForPublicWorkHistory(
-                        WORKSPACE_ID, AUTHOR_ID, ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID))
-                .thenReturn(List.of(author, replaced, reviewer));
-        when(publicEligibility.permitsPublicHistory(eq(author), any())).thenReturn(true);
-        when(publicEligibility.permitsPublicHistory(eq(replaced), any())).thenReturn(true);
-        when(withdrawalRepository.withdrawnAmong(eq(WORKSPACE_ID), any())).thenReturn(Set.of(replaced.getId()));
-
-        JsonNode rows = provider.publicSameWorkFeedback(
-                        WORKSPACE_ID, AUTHOR_ID, ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID)
-                .path("feedback");
-        assertThat(rows.size()).isEqualTo(2);
-        assertThat(rows.get(0).path("body").asString()).isEqualTo(author.getBody());
-        assertThat(rows.get(1).path("withdrawn").asBoolean()).isTrue();
-        assertThat(rows.get(1).has("body")).isFalse();
-        verify(feedbackRepository, never()).findDeliveredForPersonHistory(any(), any());
-        verify(observationRepository, never()).findForPersonHistory(any(), any());
-    }
-
-    @Test
-    void shouldKeepStaleDeliveredWordsOnlyInPublicCommunicationHistory() {
-        Feedback mixed = deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID);
-        Feedback withdrawn = deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID);
-        Feedback unreadable = deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID);
-        Feedback ineligible = deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID);
-        Observation hidden = boundObservation(true);
-        boundTo.put(mixed.getId(), List.of(boundObservation(false), boundObservation(true)));
-        boundTo.put(withdrawn.getId(), List.of(boundObservation(true)));
-        boundTo.put(unreadable.getId(), List.of(hidden));
-        boundTo.put(ineligible.getId(), List.of(boundObservation(true)));
-        when(feedbackRepository.findDeliveredForPublicWorkHistory(
-                        WORKSPACE_ID, AUTHOR_ID, ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID))
-                .thenReturn(List.of(mixed, withdrawn, unreadable, ineligible));
-        when(feedbackRepository.findDeliveredForPersonHistory(any(), any())).thenReturn(List.of(mixed));
-        when(publicEligibility.permitsPublicHistory(eq(mixed), any())).thenReturn(true);
-        when(publicEligibility.permitsPublicHistory(eq(withdrawn), any())).thenReturn(true);
-        when(publicEligibility.permitsPublicHistory(eq(ineligible), any())).thenReturn(false);
-        when(visibilityPolicy.permitsShown(anyLong(), any(), eq(SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)))
-                .thenAnswer(invocation -> {
-                    Collection<Observation> batch = invocation.getArgument(1);
-                    return batch.stream()
-                            .map(Observation::getId)
-                            .filter(id -> !id.equals(hidden.getId()))
-                            .collect(Collectors.toSet());
-                });
-        when(withdrawalRepository.withdrawnAmong(eq(WORKSPACE_ID), any())).thenReturn(Set.of(withdrawn.getId()));
-
-        JsonNode rows = provider.publicSameWorkFeedback(
-                        WORKSPACE_ID, AUTHOR_ID, ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID)
-                .path("feedback");
-        JsonNode privateRow = read(captureFeedbackHistory().files().get("inputs/history/feedback.json"))
-                .get("feedback")
-                .get(0);
-
-        // Unreadable evidence and public ineligibility still exclude a row; staleness only labels the words.
-        assertThat(rows.size()).isEqualTo(2);
-        assertThat(rows.get(0).path("id").asString()).isEqualTo(mixed.getId().toString());
-        assertThat(rows.get(0).path("recordedClaimCurrentness").asString()).isEqualTo("STALE");
-        assertThat(rows.get(0).path("body").asString()).isEqualTo(mixed.getBody());
-        assertThat(rows.get(0).path("bodyRole").asString()).isEqualTo("COMPOSED_GUIDANCE");
-        assertThat(rows.get(1).path("id").asString())
-                .isEqualTo(withdrawn.getId().toString());
-        assertThat(rows.get(1).path("recordedClaimCurrentness").asString()).isEqualTo("STALE");
-        assertThat(rows.get(1).path("withdrawn").asBoolean()).isTrue();
-        assertThat(rows.get(1).has("body")).isFalse();
-        assertThat(privateRow.path("id").asString()).isEqualTo(mixed.getId().toString());
-        assertThat(privateRow.path("recordedClaimCurrentness").asString()).isEqualTo("STALE");
-        assertThat(privateRow.has("body")).isFalse();
-    }
-
-    private static Feedback deliveredAgainst(ArtifactKind kind, long artifactId) {
-        return Feedback.builder()
-                .agentJobId(UUID.randomUUID())
-                .id(UUID.randomUUID())
-                .channel(FeedbackChannel.IN_CONTEXT)
-                .artifactKind(kind)
-                .artifactId(artifactId)
-                .body("Consider handling this error rather than logging it.")
-                .deliveredAt(Instant.parse("2026-07-01T09:00:00Z"))
-                .build();
-    }
-
-    private static Observation observation(String practiceSlug, String recurrenceKey, String title) {
-        return observation(practiceSlug, recurrenceKey, title, null, null);
-    }
-
-    private static Observation observationWithRationale(String rationale) {
-        return observation("swallows-errors", "rec-1", "Caught and ignored", null, null, rationale);
-    }
-
-    private static Observation observation(
-            String practiceSlug,
-            String recurrenceKey,
-            String title,
-            @Nullable ArtifactKind artifactKind,
-            @Nullable Long artifactId) {
-        return observation(
-                practiceSlug, recurrenceKey, title, artifactKind, artifactId, "The catch block logs and continues.");
-    }
-
-    private static Observation observation(
-            String practiceSlug,
-            String recurrenceKey,
-            String title,
-            @Nullable ArtifactKind artifactKind,
-            @Nullable Long artifactId,
-            String evidenceRationale) {
-        Practice practice = new Practice();
-        practice.setSlug(practiceSlug);
-        return Observation.builder()
-                .agentJobId(UUID.randomUUID())
-                .id(UUID.randomUUID())
-                .practice(practice)
-                .recurrenceKey(recurrenceKey)
-                .summary(title)
-                .outcome(Outcome.NOT_MET)
-                .artifactKind(artifactKind)
-                .artifactId(artifactId)
-                .observedAt(Instant.parse("2026-07-01T09:00:00Z"))
-                .evidenceRationale(evidenceRationale)
-                .build();
+                reviewId,
+                2L,
+                developer,
+                destination,
+                FeedbackState.DELIVERED,
+                body,
+                deliveredAt,
+                delivered,
+                List.of(),
+                List.of(),
+                null,
+                null,
+                List.of(UUID.randomUUID()),
+                List.of(),
+                List.of(20L),
+                null,
+                complete,
+                projection);
     }
 }

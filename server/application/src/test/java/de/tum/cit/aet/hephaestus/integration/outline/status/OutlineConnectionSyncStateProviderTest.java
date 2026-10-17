@@ -6,7 +6,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
-import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncDetails;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
@@ -37,7 +37,7 @@ class OutlineConnectionSyncStateProviderTest extends BaseUnitTest {
     private static final IntegrationRef REF = new IntegrationRef(IntegrationKind.OUTLINE, WORKSPACE, "team-1");
 
     @Mock
-    private ConnectionRepository connectionRepository;
+    private ConnectionService connectionRepository;
 
     @Mock
     private OutlineCollectionRepository collectionRepository;
@@ -69,7 +69,8 @@ class OutlineConnectionSyncStateProviderTest extends BaseUnitTest {
                 .when(connection.getConfig())
                 .thenReturn(new ConnectionConfig.OutlineConfig(
                         "https://outline.example.test", "sub-1", "secret", Set.of()));
-        when(connectionRepository.findById(CONNECTION_ID)).thenReturn(Optional.of(connection));
+        when(connectionRepository.findInWorkspace(REF.workspaceId(), CONNECTION_ID))
+                .thenReturn(Optional.of(connection));
 
         ConnectionSyncDetails details = provider().describe(REF, CONNECTION_ID);
 
@@ -85,7 +86,8 @@ class OutlineConnectionSyncStateProviderTest extends BaseUnitTest {
         lenient()
                 .when(connection.getConfig())
                 .thenReturn(new ConnectionConfig.OutlineConfig(serverUrl, "sub-1", "secret", Set.of()));
-        when(connectionRepository.findById(CONNECTION_ID)).thenReturn(Optional.of(connection));
+        when(connectionRepository.findInWorkspace(REF.workspaceId(), CONNECTION_ID))
+                .thenReturn(Optional.of(connection));
 
         RateLimitSnapshot snapshot = new RateLimitSnapshot(
                 1000, 987, Instant.parse("2026-07-17T12:00:00Z"), Instant.parse("2026-07-17T11:59:00Z"), null);
@@ -103,21 +105,24 @@ class OutlineConnectionSyncStateProviderTest extends BaseUnitTest {
                 .when(connection.getConfig())
                 .thenReturn(
                         new ConnectionConfig.OutlineConfig("https://outline.example.test", " ", "secret", Set.of()));
-        when(connectionRepository.findById(CONNECTION_ID)).thenReturn(Optional.of(connection));
+        when(connectionRepository.findInWorkspace(REF.workspaceId(), CONNECTION_ID))
+                .thenReturn(Optional.of(connection));
 
         assertThat(provider().describe(REF, CONNECTION_ID).webhookRegistered()).isFalse();
     }
 
     @Test
     void describe_connectionMissing_webhookRegisteredIsNullNotFalse() {
-        when(connectionRepository.findById(CONNECTION_ID)).thenReturn(Optional.empty());
+        when(connectionRepository.findInWorkspace(REF.workspaceId(), CONNECTION_ID))
+                .thenReturn(Optional.empty());
 
         assertThat(provider().describe(REF, CONNECTION_ID).webhookRegistered()).isNull();
     }
 
     @Test
     void describe_nextScheduledSyncAt_derivedFromTheCronExpression() {
-        when(connectionRepository.findById(CONNECTION_ID)).thenReturn(Optional.empty());
+        when(connectionRepository.findInWorkspace(REF.workspaceId(), CONNECTION_ID))
+                .thenReturn(Optional.empty());
         Instant before = Instant.now();
 
         Instant next = provider("0 0 0 * * *").describe(REF, CONNECTION_ID).nextScheduledSyncAt();
@@ -134,7 +139,8 @@ class OutlineConnectionSyncStateProviderTest extends BaseUnitTest {
 
     @Test
     void describe_invalidCron_yieldsNullNextScheduledSyncAt() {
-        when(connectionRepository.findById(CONNECTION_ID)).thenReturn(Optional.empty());
+        when(connectionRepository.findInWorkspace(REF.workspaceId(), CONNECTION_ID))
+                .thenReturn(Optional.empty());
 
         assertThat(provider("not a cron").describe(REF, CONNECTION_ID).nextScheduledSyncAt())
                 .isNull();

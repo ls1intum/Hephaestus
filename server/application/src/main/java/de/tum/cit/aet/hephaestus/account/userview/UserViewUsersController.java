@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.account.userview;
 
 import de.tum.cit.aet.hephaestus.core.UserViewRead;
+import de.tum.cit.aet.hephaestus.core.auth.validation.AccountId;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.web.PageResponseDTO;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -10,8 +11,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
@@ -30,18 +29,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 @RequiredArgsConstructor
 @Validated
 public class UserViewUsersController {
-    private final ViewedUserService users;
-
-    public record UserViewUserDTO(
-            @NonNull Long userId,
-            @NonNull String login,
-            @Nullable String name,
-            @Nullable Long accountId,
-            @Nullable String accountStatus) {}
+    private final ViewedAccountService users;
 
     @GetMapping
     @Operation(summary = "List workspace users and their linked account status", operationId = "listUserViewUsers")
-    public ResponseEntity<PageResponseDTO<UserViewUserDTO>> list(
+    public ResponseEntity<PageResponseDTO<UserViewAccountDTO>> list(
             WorkspaceContext workspace,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "25") @Min(1) @Max(100) int size) {
@@ -50,10 +42,13 @@ public class UserViewUsersController {
                 .body(PageResponseDTO.from(users.list(workspace.id(), PageRequest.of(page, size))));
     }
 
-    @GetMapping("/{userId}")
+    @GetMapping("/{accountId}")
     @UserViewRead
     @Operation(summary = "Confirm access to a workspace user", operationId = "getUserViewUser")
-    public ResponseEntity<UserViewUserDTO> get(WorkspaceContext workspace, @PathVariable Long userId) {
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(users.requireUser(workspace.id(), userId));
+    public ResponseEntity<UserViewAccountDTO> get(
+            WorkspaceContext workspace, @PathVariable @AccountId String accountId) {
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(users.requireAccount(workspace.id(), Long.parseLong(accountId)));
     }
 }

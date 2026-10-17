@@ -27,14 +27,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.view.RedirectView;
 import org.springframework.web.util.UriComponentsBuilder;
 
-/**
- * Entry point for the OAuth login dance — stamps the {@link AuthIntentCookie} with the
- * caller's intent (workspace + returnTo + mode) and 302s to Spring's standard
- * {@code /oauth2/authorization/{registrationId}} initiation endpoint.
- *
- * <p>This is the SPA's "Sign in with X" target. The intent cookie survives the round-trip
- * to the IdP and is read by the success handler to decide where to land the user post-login.
- */
 @ConditionalOnServerRole
 @RestController
 @RequestMapping("/auth")
@@ -45,16 +37,16 @@ public class AuthBeginController {
 
     private final LoginProviderService loginProviderService;
     private final AuthIntentCookie authIntentCookie;
-    private final IdentityLinkAuthentication identityLinkAuthentication;
+    private final IdentityAuthentication identityLinkAuthentication;
     private final InstalledClientRegistry installedClients;
 
-    /** Proxy-stripped API prefix re-added to the init redirect — see {@code AuthProperties#apiBasePath}. */
+    // Restore the API prefix stripped by the reverse proxy before redirecting to OAuth initiation.
     private final String apiBasePath;
 
     public AuthBeginController(
             LoginProviderService loginProviderService,
             AuthIntentCookie authIntentCookie,
-            IdentityLinkAuthentication identityLinkAuthentication,
+            IdentityAuthentication identityLinkAuthentication,
             InstalledClientRegistry installedClients,
             AuthProperties authProperties) {
         this.loginProviderService = loginProviderService;
@@ -75,7 +67,8 @@ public class AuthBeginController {
             @RequestParam(value = "mode", required = false, defaultValue = "login") String mode,
             HttpServletRequest request,
             HttpServletResponse response) {
-        // The enabled login_provider row is the authority: it backs the ClientRegistration Spring will
+        // The enabled login_provider row is the authority: it backs the ClientRegistration Spring
+        // will
         // resolve at the initiation endpoint, and its TYPE drives the link-only gate below.
         Optional<LoginProvider> provider = loginProviderService.findEnabled(registrationId);
         if (provider.isEmpty()) {
@@ -86,7 +79,8 @@ public class AuthBeginController {
         boolean linkMode = "link".equalsIgnoreCase(mode);
         // Link-only providers (Slack, Outline) can never begin a LOGIN — only the authenticated
         // account-linking flow may reach them. Classified by the row's TYPE, not by URL: Outline is
-        // self-hosted, so there is no stable host to sniff. AccountProvisioningService re-checks this
+        // self-hosted, so there is no stable host to sniff. AccountProvisioningService re-checks
+        // this
         // at the callback (defence in depth).
         if (!linkMode && provider.get().getType().isLinkOnly()) {
             return new RedirectView("/auth/error?code=link_requires_auth", false);
@@ -94,14 +88,17 @@ public class AuthBeginController {
         AuthIntentCookie.Intent intent;
         if (linkMode) {
             // Link mode MUST be initiated by an already-authenticated user (secure account linking:
-            // never auto-link to an unauthenticated context — that is the pre-account-takeover bug).
-            // The resolved sub is bound into the sealed intent so AccountProvisioningService attaches
+            // never auto-link to an unauthenticated context — that is the pre-account-takeover
+            // bug).
+            // The resolved sub is bound into the sealed intent so AccountProvisioningService
+            // attaches
             // the new identity to THIS account.
             Long currentAccountId;
             try {
                 currentAccountId = identityLinkAuthentication.resolveAuthenticatedAccountId(request);
             } catch (StepUpRequiredException e) {
-                // The dance has not started yet, so there is nothing to resume: send the browser to the
+                // The dance has not started yet, so there is nothing to resume: send the browser to
+                // the
                 // SPA's confirmation copy instead of an OAuth redirect it would have to unwind.
                 authIntentCookie.clear(response);
                 return new RedirectView(stepUpRequiredPath(safeReturnTo), false);
@@ -115,19 +112,23 @@ public class AuthBeginController {
             intent = AuthIntentCookie.Intent.login(workspaceSlug, safeReturnTo);
         }
         authIntentCookie.write(response, intent);
-        // 302 to Spring's standard initiation endpoint; the OAuth2AuthorizationRequestRedirectFilter
-        // takes over from here, building the upstream redirect with state + PKCE (see AuthSecurityConfig).
-        // apiBasePath re-adds the proxy-stripped prefix so the browser lands on the proxied init endpoint,
-        // not the SPA. (The /auth/error targets above are SPA routes at the origin root, so they keep none.)
+        // 302 to Spring's standard initiation endpoint; the
+        // OAuth2AuthorizationRequestRedirectFilter
+        // takes over from here, building the upstream redirect with state + PKCE (see
+        // AuthSecurityConfig).
+        // apiBasePath re-adds the proxy-stripped prefix so the browser lands on the proxied init
+        // endpoint,
+        // not the SPA. (The /auth/error targets above are SPA routes at the origin root, so they
+        // keep none.)
         String urlEncodedRegistration = URLEncoder.encode(registrationId, StandardCharsets.UTF_8);
         return new RedirectView(apiBasePath + OAUTH_INIT_PATH + urlEncodedRegistration, false);
     }
 
     /**
-     * An installed client's sign-in, opened in the client's own auth window. The client and its callback
-     * are checked first and exactly: until the pair is known to be registered, nothing, not even an
-     * error, is sent to the callback. After that every refusal returns there with the client's
-     * {@code state}. The browser never receives a Hephaestus session on this path.
+     * An installed client's sign-in, opened in the client's own auth window. The client and its
+     * callback are checked first and exactly: until the pair is known to be registered, nothing,
+     * not even an error, is sent to the callback. After that every refusal returns there with the
+     * client's {@code state}. The browser never receives a Hephaestus session on this path.
      */
     @GetMapping(value = "/login", params = "mode=client")
     @PreAuthorize("permitAll()")
@@ -139,7 +140,7 @@ public class AuthBeginController {
         ClientSignInStart start = ClientSignInStart.decide(installedClients, parameters);
         return switch (start) {
             case ClientSignInStart.Unregistered ignored -> {
-                log.warn("auth.begin: installed-client sign-in with an unregistered client or callback");
+                log.warn("auth.begin: installed-client sign-in with an unregistered client or" + " callback");
                 yield new RedirectView("/auth/error?code=client_not_registered", false);
             }
             case ClientSignInStart.Refused refused -> new RedirectView(refused.redirect(), false);
@@ -165,9 +166,9 @@ public class AuthBeginController {
     }
 
     /**
-     * The SPA's recent-sign-in page, carrying where linking was headed so the developer can confirm access and come
-     * back to retry it. The destination is a query value, so its own query delimiters are encoded; the fallback
-     * destination adds nothing.
+     * The SPA's recent-sign-in page, carrying where linking was headed so the developer can confirm
+     * access and come back to retry it. The destination is a query value, so its own query
+     * delimiters are encoded; the fallback destination adds nothing.
      */
     static String stepUpRequiredPath(@Nullable String returnTo) {
         String safe = ReturnToValidator.safeOrFallback(returnTo);

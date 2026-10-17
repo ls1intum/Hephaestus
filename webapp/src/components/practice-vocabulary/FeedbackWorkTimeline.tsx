@@ -1,3 +1,4 @@
+import { CircleDotIcon } from "lucide-react";
 import { type ComponentProps, Fragment, type ReactNode, useLayoutEffect, useRef } from "react";
 
 import { cn } from "cn";
@@ -13,9 +14,11 @@ import type { TimelinePiece } from "./practice-feedback-timeline";
 const OUTCOME_WORDS: Record<Outcome, string> = {
 	MET: "clean",
 	NOT_MET: "needed attention",
-	NOT_APPLICABLE: "did not apply",
-	UNDETERMINED: "not decided",
+	DOES_NOT_APPLY: "did not apply",
+	COULD_NOT_DETERMINE: "not decided",
 };
+
+const EVIDENCE_WORDS = "evidence for this feedback";
 
 /**
  * Half the thin line between two places on the timeline, from the edge of one to the middle of the
@@ -174,8 +177,8 @@ export function FeedbackWorkTimeline({
 				{pieces.map((piece, index) => {
 					// The outcome's own icon in its own tone, as the profile and the admin pages draw it. Clean
 					// work before the feedback is muted: only the work since counts towards resolving it.
-					const def = OUTCOME_DEFS[piece.outcome];
-					const Icon = def.icon;
+					const def = piece.outcome === undefined ? undefined : OUTCOME_DEFS[piece.outcome];
+					const Icon = def?.icon ?? CircleDotIcon;
 					const beforeFeedback = index < split;
 					return (
 						<Fragment key={piece.key}>
@@ -189,7 +192,7 @@ export function FeedbackWorkTimeline({
 										data-before-feedback={beforeFeedback ? "" : undefined}
 										className={cn(
 											"size-4 shrink-0",
-											beforeFeedback && piece.outcome === "MET"
+											def === undefined || (beforeFeedback && piece.outcome === "MET")
 												? "text-muted-foreground"
 												: statusToneClass(def.badgeVariant),
 										)}
@@ -198,7 +201,7 @@ export function FeedbackWorkTimeline({
 							>
 								<span className="flex flex-col leading-tight">
 									<InlineLink
-										href={piece.ref.url}
+										href={piece.ref.url ?? undefined}
 										external
 										className="text-xs font-medium whitespace-nowrap"
 									>
@@ -210,7 +213,8 @@ export function FeedbackWorkTimeline({
 									>
 										<span aria-hidden>{formatShortDay(piece.date)}</span>
 										<span className="sr-only">
-											, {formatDay(piece.date)}, {OUTCOME_WORDS[piece.outcome]}
+											, {formatDay(piece.date)},{" "}
+											{piece.outcome === undefined ? EVIDENCE_WORDS : OUTCOME_WORDS[piece.outcome]}
 											{beforeFeedback && ", before this feedback"}
 										</span>
 									</time>

@@ -15,9 +15,9 @@ import {
 	SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 
+import { isJsonObject as isRecord } from "../../../../../../docker/agents/practice-scripts/lib/core/json.ts";
 import { SANDBOX_RESOURCE_LOADER_OPTIONS } from "../../../main/resources/agent/pi-agent-sandbox.ts";
 import { assessmentCacheExtension } from "../../../main/resources/agent/pi-assessment-cache.ts";
-import { isRecord } from "../../../main/resources/agent/pi-observation-normalize.ts";
 import {
 	type ProviderConfig,
 	registerHephaestusProvider,

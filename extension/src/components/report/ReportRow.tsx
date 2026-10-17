@@ -20,7 +20,7 @@ export interface ReportRowProps {
 /**
  * The line's status, as a merge request report leads with one (Pajamas): the Hephaestus mark in a
  * tinted circle, with the tone as a small badge on it. The mark stays in every tone and at every
- * width, so a warning here never passes for the provider's own verdict; the tone's words are the
+ * width, so a warning here never passes for the provider's own status; the tone's words are the
  * line's text, so the badge is decoration.
  */
 const TONE: Record<ReportSummary["tone"], { circle: string; badge: ReactNode }> = {

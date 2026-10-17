@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.discussion.Discussion;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.discussion.DiscussionCategoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.discussion.DiscussionRepository;
@@ -17,6 +16,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organizatio
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.github.discussion.dto.GitHubDiscussionEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
@@ -37,28 +37,8 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Note: This test class does NOT use @Transactional because the discussion processing
- * chain calls GitHubUserProcessor.findOrCreate() which uses REQUIRES_NEW propagation.
- * Having @Transactional here would cause connection pool deadlocks under parallel test
- * execution as the test transaction holds a connection while REQUIRES_NEW
- * needs an additional one. We use TransactionTemplate for lazy-loading assertions.
- * <p>
- * <b>Fixture Values (discussion.created.json - Discussion #27):</b>
- * <ul>
- *   <li>ID: 9096662</li>
- *   <li>Number: 27</li>
- *   <li>Title: "Fixture discussion thread"</li>
- *   <li>State: open</li>
- *   <li>Locked: false</li>
- *   <li>HTML URL: "https://github.com/HephaestusTest/TestRepository/discussions/27"</li>
- *   <li>Created at: 2025-11-01T23:15:45Z</li>
- *   <li>Updated at: 2025-11-01T23:15:45Z</li>
- *   <li>Comments: 0</li>
- *   <li>Author: FelixTJDietrich (ID: 5898705)</li>
- *   <li>Category: General (ID: "46489461")</li>
- * </ul>
- */
+// REQUIRES_NEW user writes need a free connection; an outer test transaction can deadlock the pool.
+// Use TransactionTemplate only for lazy-loading assertions.
 class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     // IDs from the actual GitHub webhook fixtures
@@ -628,7 +608,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
         workspace.setDisplayName("Hephaestus Test");
         workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         workspace.setPublicActivityEnabled(true);
-        workspace.setOrganization(org);
+        workspace.setOrganizationId(org.getId());
         workspace.setAccountLogin(FIXTURE_ORG_LOGIN);
         workspace.setAccountType(AccountType.ORG);
         workspaceRepository.save(workspace);

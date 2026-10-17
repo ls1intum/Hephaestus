@@ -3,10 +3,12 @@ package de.tum.cit.aet.hephaestus.mentor;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
+import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.ForeignKey;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
@@ -14,6 +16,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Version;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -41,7 +44,11 @@ import tools.jackson.databind.JsonNode;
 @Entity
 @Table(
         name = "chat_message",
-        indexes = {@Index(name = "idx_chat_message_thread_created", columnList = "thread_id, created_at")})
+        indexes = {@Index(name = "idx_chat_message_thread_created", columnList = "thread_id, created_at")},
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uk_chat_message_tenant",
+                        columnNames = {"id", "workspace_id"}))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -53,12 +60,23 @@ public class ChatMessage {
     @EqualsAndHashCode.Include
     private UUID id;
 
+    @Column(name = "workspace_id", nullable = false, updatable = false)
+    private long workspaceId;
+
+    public void setThread(ChatThread thread) {
+        long scope = thread.getWorkspace().getId();
+        if (workspaceId != 0 && workspaceId != scope)
+            throw new IllegalArgumentException("A message cannot move to another workspace");
+        this.thread = thread;
+        this.workspaceId = scope;
+    }
+
     /**
      * Thread this message belongs to.
      */
     @NonNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "thread_id", nullable = false)
+    @JoinColumn(name = "thread_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     @ToString.Exclude
     @JsonIgnore
     private ChatThread thread;
@@ -68,7 +86,7 @@ public class ChatMessage {
      */
     @Nullable
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "parent_message_id")
+    @JoinColumn(name = "parent_message_id", foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     @ToString.Exclude
     @JsonIgnore
     private ChatMessage parentMessage;
@@ -149,19 +167,19 @@ public class ChatMessage {
      */
     @ColumnDefault("0")
     @Column(name = "llm_total_calls", nullable = false, insertable = false, updatable = false)
-    private int llmTotalCalls;
+    private int llmCalls;
 
     @ColumnDefault("0")
     @Column(name = "llm_total_input_tokens", nullable = false, insertable = false, updatable = false)
-    private long llmTotalInputTokens;
+    private long llmInputTokens;
 
     @ColumnDefault("0")
     @Column(name = "llm_total_output_tokens", nullable = false, insertable = false, updatable = false)
-    private long llmTotalOutputTokens;
+    private long llmOutputTokens;
 
     @ColumnDefault("0")
     @Column(name = "llm_total_reasoning_tokens", nullable = false, insertable = false, updatable = false)
-    private long llmTotalReasoningTokens;
+    private long llmReasoningTokens;
 
     @ColumnDefault("0")
     @Column(name = "llm_cache_read_tokens", nullable = false, insertable = false, updatable = false)

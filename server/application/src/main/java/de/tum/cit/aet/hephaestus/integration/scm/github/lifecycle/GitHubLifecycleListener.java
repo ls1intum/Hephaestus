@@ -1,7 +1,10 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.lifecycle;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
+import de.tum.cit.aet.hephaestus.core.auth.spi.PeopleRegistry;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceNamespace;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -20,14 +23,15 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
+import de.tum.cit.aet.hephaestus.integration.scm.workspace.ScmWorkspaceContentEraser;
+import de.tum.cit.aet.hephaestus.integration.scm.workspace.WorkspaceOrganizationLookup;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.Membership;
+import de.tum.cit.aet.hephaestus.workspace.MembershipService;
 import de.tum.cit.aet.hephaestus.workspace.RepositorySelection;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
-import de.tum.cit.aet.hephaestus.workspace.ScmWorkspaceContentEraser;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceLifecycleService;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceSlugService;
 import java.util.Locale;
@@ -47,6 +51,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Suspension and resumption use the status helpers, not installation lifecycle SPI events.
  */
 @Component
+@ConditionalOnServerRole
 public class GitHubLifecycleListener implements IntegrationLifecycleListener {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubLifecycleListener.class);
@@ -60,16 +65,14 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
     private final IdentityProviderRepository gitProviderRepository;
 
     private final WorkspaceSlugService workspaceSlugService;
-    private final WorkspaceMembershipService workspaceMembershipService;
-    /**
-     * Absent when {@code hephaestus.runtime.server.enabled=false} (e.g., the webhook-server pod)
-     * because {@link IntegrationNatsConsumer} is gated by {@code SERVER_PROPERTY}. The webhook
-     * profile never invokes the methods that consume this; it boots dead-code but doesn't crash.
-     */
+    private final MembershipService workspaceMembershipService;
+    private final PeopleRegistry people;
+
     private final ObjectProvider<IntegrationNatsConsumer> natsConsumerService;
 
     private final GitHubAppTokenService gitHubAppTokenService;
     private final OrganizationService organizationService;
+    private final WorkspaceOrganizationLookup organizations;
     private final ConnectionService connectionService;
     private final WorkspaceLifecycleService workspaceLifecycleService;
     private final IntegrationAttentionService attention;
@@ -83,14 +86,16 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
             UserRepository userRepository,
             IdentityProviderRepository gitProviderRepository,
             WorkspaceSlugService workspaceSlugService,
-            WorkspaceMembershipService workspaceMembershipService,
+            MembershipService workspaceMembershipService,
+            PeopleRegistry people,
             ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
             GitHubAppTokenService gitHubAppTokenService,
             OrganizationService organizationService,
             ConnectionService connectionService,
             WorkspaceLifecycleService workspaceLifecycleService,
             IntegrationAttentionService attention,
-            ScmWorkspaceContentEraser contentEraser) {
+            ScmWorkspaceContentEraser contentEraser,
+            WorkspaceOrganizationLookup organizations) {
         this.natsProperties = natsProperties;
         this.workspaceRepository = workspaceRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
@@ -99,9 +104,11 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
         this.gitProviderRepository = gitProviderRepository;
         this.workspaceSlugService = workspaceSlugService;
         this.workspaceMembershipService = workspaceMembershipService;
+        this.people = people;
         this.natsConsumerService = natsConsumerService;
         this.gitHubAppTokenService = gitHubAppTokenService;
         this.organizationService = organizationService;
+        this.organizations = organizations;
         this.connectionService = connectionService;
         this.workspaceLifecycleService = workspaceLifecycleService;
         this.attention = attention;
@@ -374,7 +381,7 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
                     .getId());
             Organization org =
                     organizationService.upsertIdentity(accountId, Objects.requireNonNull(accountLogin), providerId);
-            workspace.setOrganization(org);
+            workspace.setOrganizationId(org.getId());
             log.debug(
                     "Linked organization to workspace: orgId={}, orgLogin={}, workspaceId={}",
                     org.getId(),
@@ -395,7 +402,7 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
 
     private boolean matchesInstallationAccount(Workspace workspace, @Nullable Long accountId, AccountKind accountKind) {
         // Personal workspace owners can change, so memberships cannot prove the provider account.
-        Organization organization = workspace.getOrganization();
+        Organization organization = organizations.find(workspace).orElse(null);
         return accountId != null
                 && accountKind == AccountKind.ORGANIZATION
                 && organization != null
@@ -700,7 +707,17 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
         workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
 
         Workspace saved = workspaceRepository.save(workspace);
-        workspaceMembershipService.createMembership(saved, ownerUserId, WorkspaceMembership.WorkspaceRole.OWNER);
+        User owner = userRepository.findById(ownerUserId).orElseThrow();
+        if (owner.getType() == User.Type.USER) {
+            long ownerAccountId = people.ensureHuman(
+                    new PersonIdentity(
+                            Objects.requireNonNull(
+                                    owner.getProvider().getId(), "Persisted SCM provider requires an id"),
+                            Long.toString(owner.getNativeId()),
+                            null),
+                    owner.getName() == null ? owner.getLogin() : owner.getName());
+            workspaceMembershipService.createMembership(saved, ownerAccountId, Membership.WorkspaceRole.OWNER);
+        }
         return saved;
     }
 
@@ -752,7 +769,8 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
                     accountId,
                     typeStr,
                     installationId);
-            // upsertUser is a native INSERT that doesn't return the generated id; re-fetch for the PK.
+            // upsertUser is a native INSERT that doesn't return the generated id; re-fetch for the
+            // PK.
             return userRepository
                     .findByNativeIdAndProviderId(accountId, providerId)
                     .map(User::getId)

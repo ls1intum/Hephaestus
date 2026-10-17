@@ -332,6 +332,35 @@ void describe("preview seed policy", () => {
 		]);
 	});
 
+	void test("checks the review function that verifies each source schema", () => {
+		const policy = [
+			"UPDATE review_job SET processing_status = 'FAILED';",
+			"UPDATE agent_job SET delivery_status = 'FAILED';",
+			"CREATE OR REPLACE FUNCTION hephaestus_preview_review_live() RETURNS bigint",
+			"LANGUAGE plpgsql AS 'BEGIN",
+			"RETURN (SELECT count(*) FROM review_job) + (SELECT count(*) FROM agent_job);",
+			"END';",
+		].join("\n");
+		const stack = seedLoader(policy, []).replace(
+			'SELECT ")',
+			'SELECT hephaestus_preview_review_live()")',
+		);
+		assert.deepEqual(findSeedPolicyGaps(stack), []);
+		assert.deepEqual(findSeedPolicyGaps(stack.replace(" + (SELECT count(*) FROM agent_job)", "")), [
+			"the policy changes agent_job but the verification query never counts it",
+		]);
+	});
+
+	void test("rejects a missing review verification function", () => {
+		const stack = seedLoader("UPDATE review_job SET processing_status = 'FAILED';", []).replace(
+			'SELECT ")',
+			'SELECT hephaestus_preview_review_live()")',
+		);
+		assert.deepEqual(findSeedPolicyGaps(stack), [
+			"the seed loader calls a review verification function it does not define",
+		]);
+	});
+
 	void test("names a store the verification counts and the policy never clears", () => {
 		const stack = seedLoader("        UPDATE llm_connection SET api_key = NULL;", [
 			"llm_connection",

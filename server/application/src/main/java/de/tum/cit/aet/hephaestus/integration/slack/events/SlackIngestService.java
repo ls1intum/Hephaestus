@@ -1,10 +1,11 @@
 package de.tum.cit.aet.hephaestus.integration.slack.events;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackTs;
-import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
+import de.tum.cit.aet.hephaestus.integration.slack.identity.SlackRosterIdentityResolver;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure;
 import java.time.Instant;
 import java.util.List;
@@ -17,22 +18,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Persists inbound Slack channel messages as workspace-scoped content (the substrate that
- * {@code SlackConversationContentSource} exposes to the mentor). Stores rendered text only (data minimization).
- * Idempotent on {@code (workspace, channel, ts)}.
- *
- * <p>Ingestion is fail-closed behind stacked gates: the fleet-wide capability flag
- * ({@link #conversationIngestEnabled}), the per-channel consent gate ({@code ACTIVE}), the forward-only
- * announcement window, and the per-person opt-out firewall. The DM/mentor path and everything else in the Slack
- * integration are unaffected by the capability flag.
- *
- * <p>On a genuinely new message the author's Slack id is resolved to the workspace {@code User} (member) id and
- * stamped onto {@code slack_message.author_member_id} (the participant-firewall stamp), and the thread aggregate
- * is upserted (window advance + participant union). {@code message_changed}/{@code message_deleted} edit and
- * tombstone the stored row (GDPR Art. 17).
- */
+// Ingest only after active source consent and the announcement boundary; person opt-outs still apply.
 @Service
+@ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 public class SlackIngestService {
 
@@ -44,7 +32,7 @@ public class SlackIngestService {
     private final SlackParticipantConsentGate participantConsentGate;
     private final SlackMessageRepository messageRepository;
     private final SlackThreadRepository threadRepository;
-    private final SlackMentorIdentityResolver identityResolver;
+    private final SlackRosterIdentityResolver identityResolver;
     private final ConversationFeedbackErasure conversationFeedbackErasure;
 
     /**
@@ -62,7 +50,7 @@ public class SlackIngestService {
             SlackParticipantConsentGate participantConsentGate,
             SlackMessageRepository messageRepository,
             SlackThreadRepository threadRepository,
-            SlackMentorIdentityResolver identityResolver,
+            SlackRosterIdentityResolver identityResolver,
             ConversationFeedbackErasure conversationFeedbackErasure,
             @Value("${hephaestus.integration.slack.conversation-ingest.enabled:true}")
                     boolean conversationIngestEnabled) {
@@ -127,26 +115,28 @@ public class SlackIngestService {
 
         // Person firewall: an opted-out individual is never stored, even on an ACTIVE channel with the capability on.
         // Deny-if-opted-out / allow-if-absent, keyed on the author's Slack id (an unauthored/blank sender has no
-        // person to gate, so it proceeds — it stamps no member id and unions nothing into participant_member_ids).
+        // person to gate, so it proceeds — it stamps no member id and unions nothing into participant_account_ids).
         if (authorSlackUserId != null
                 && !authorSlackUserId.isBlank()
                 && !participantConsentGate.ingestionAllowed(workspaceId, authorSlackUserId)) {
             return;
         }
 
-        // Firewall stamp: the workspace member id the author links to within this workspace (null when unlinked).
-        Long authorMemberId = (authorSlackUserId == null || authorSlackUserId.isBlank())
+        // Firewall stamp: an account in this workspace. Native human lookup failure refuses the message.
+        Long authorAccountId = (authorSlackUserId == null || authorSlackUserId.isBlank())
                 ? null
                 : identityResolver
-                        .resolveMemberId(workspaceId, teamId, authorSlackUserId)
+                        .humanAccountId(workspaceId, teamId, authorSlackUserId)
                         .orElse(null);
 
+        if (authorSlackUserId != null && !authorSlackUserId.isBlank() && authorAccountId == null) return;
+
         int inserted = messageRepository.insertIfAbsent(
-                workspaceId, teamId, channelId, ts, threadTs, authorSlackUserId, authorMemberId, text);
+                workspaceId, teamId, channelId, ts, threadTs, authorSlackUserId, authorAccountId, text);
         if (inserted > 0) {
             // thread_ts := the reply's parent, or the message's own ts for a thread root.
             String aggregateThreadTs = (threadTs == null || threadTs.isBlank()) ? ts : threadTs;
-            threadRepository.upsertOnMessage(workspaceId, channelId, aggregateThreadTs, ts, authorMemberId);
+            threadRepository.upsertOnMessage(workspaceId, channelId, aggregateThreadTs, ts, authorAccountId);
             log.debug("Ingested Slack message workspace={} channel={} ts={}", workspaceId, channelId, ts);
         }
     }
@@ -231,15 +221,12 @@ public class SlackIngestService {
     /**
      * Channel erasure: flip the channel to {@code REVOKED} so ingestion stops immediately, and promptly delete the
      * channel's ingested content — its {@code slack_message} rows and its {@code slack_thread} aggregates (which
-     * hold the {@code participant_member_ids} personal data) — rather than waiting for the 180-day retention sweep,
+     * hold the {@code participant_account_ids} personal data) — rather than waiting for the 180-day retention sweep,
      * which covers messages only. Transactional and idempotent (an unknown or already-erased channel deletes 0 rows).
      *
      * <p>Derived CONVERSATION feedback is hard-deleted too (GDPR Art. 17 for the derived copies, not inert-by-gate):
-     * those rows carry {@code artifact_kind = chat.conversation_thread} + {@code artifact_id = slack_thread.id} with no
-     * FK back to {@code slack_thread}, so the channel's thread ids are collected first and passed to the
-     * practices-owned {@link ConversationFeedbackErasure} port, which deletes exactly those rows (cascading their
-     * observation/placement/reaction children) — PR/ISSUE rows and other tenants' rows are untouched. The port
-     * inverts the dependency ({@code integration.slack → practices::spi}), so no Spring Modulith cycle forms.
+     * The port resolves chat.thread items by their workspace and source id before removing product rows.
+     * Results for other item kinds and workspaces remain intact.
      */
     @Transactional
     public void eraseChannel(long workspaceId, String channelId) {

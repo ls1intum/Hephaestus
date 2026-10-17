@@ -6,7 +6,7 @@ import { assert, expect, it, vi } from "vitest";
 import type { ChatMessage } from "@/lib/types";
 import { currentUser } from "@/mocks/fixtures/auth";
 import { workspaceOnboarding } from "@/mocks/fixtures/onboarding";
-import { workspaceListItem } from "@/mocks/fixtures/workspaces";
+import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
 import { currentUserQueryOptions } from "@/runtime/auth/guard";
 import { renderRouteAtWithRouter, ROUTE_RENDER_WAIT } from "@/test/router-harness";
@@ -48,9 +48,7 @@ function mockMentor() {
 			HttpResponse.json([workspaceListItem("acme"), workspaceListItem("other")]),
 		),
 		http.get("*/user/features", () => HttpResponse.json({})),
-		http.get("*/workspaces/:workspaceSlug/members/me", () =>
-			HttpResponse.json({ role: "MEMBER", userId: 20, userLogin: "ada" }),
-		),
+		http.get("*/workspaces/:workspaceSlug/members/me", () => HttpResponse.json(ownMembership())),
 		http.get("*/workspaces/:workspaceSlug/onboarding/me", () =>
 			HttpResponse.json({
 				...workspaceOnboarding(),

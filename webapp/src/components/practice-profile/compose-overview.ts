@@ -1,22 +1,8 @@
-/**
- * The practice profile's sentences, composed from the changes the server reports, for the "All
- * practice groups" table, the group level's table and the latest-run chip. Everything here is
- * deterministic prose over structured events; no model writes any of it.
- *
- * Which event a practice is shown by is the precedence in
- * `docs/contributor/practice-review-glossary.mdx` § Practice profile overview. How a count is
- * written is `feedback-text.ts`'s. The rest are rules rather than wording choices:
- *
- * 1. Subjects that made the same move are one sentence, whichever surface says it: a column of
- *    sentences repeating one predicate reads as more news than there is.
- * 2. A standing or a trend is named with the registry's own label, verbatim, so the prose and the
- *    badges say the same words.
- */
 import type {
+	ItemRef,
 	PracticeProfileOverview,
 	ProfileChange,
-	ReviewedWorkRef,
-	ReviewRunRef,
+	ProfileReviewRef,
 } from "@/api/types.gen";
 import {
 	type FeedbackTextSegment,
@@ -30,13 +16,12 @@ import { PRACTICE_TREND_DEFS } from "@/components/practice-vocabulary/practice-t
 import { asDate, formatDay } from "@/lib/dates";
 import { capitalise, hasText } from "@/lib/text";
 
-type OverviewInput = Pick<PracticeProfileOverview, "latestRun" | "changes">;
+type OverviewInput = Pick<PracticeProfileOverview, "latestReview" | "changes">;
 
-/** The overview with nothing in it: what the page composes before the first run. */
-export const EMPTY_OVERVIEW: OverviewInput = { changes: [] };
+export const EMPTY_OVERVIEW: OverviewInput = { changes: [], latestReview: null };
 
 export interface ComposedOverview {
-	latestRun?: ReviewRunRef;
+	latestReview?: ProfileReviewRef;
 	/**
 	 * What moved in each group, for the "All practice groups" table: one sentence per bullet, keyed
 	 * by group slug. Practices that made the same move share a bullet.
@@ -68,7 +53,7 @@ interface ProfileEvent {
 	resolvedBy?: ProfileChange["resolvedBy"];
 	/** For a fall back: the clean run the count fell back from, as the wire reports it. */
 	cleanNeeded?: number;
-	evidence: ReviewedWorkRef[];
+	evidence: ItemRef[];
 	at?: Date;
 }
 
@@ -89,10 +74,9 @@ const TREND_LABELS: Record<string, string | undefined> = Object.fromEntries(
 );
 
 /** The registry's word for a standing or a trend, which the wire types as a bare string. */
-const standingLabel = (value: string | undefined) =>
-	value === undefined ? undefined : STANDING_LABELS[value];
-const trendLabel = (value: string | undefined) =>
-	value === undefined ? undefined : TREND_LABELS[value];
+const standingLabel = (value: string | null) =>
+	value === null ? undefined : STANDING_LABELS[value];
+const trendLabel = (value: string | null) => (value === null ? undefined : TREND_LABELS[value]);
 
 function changeEvent(change: ProfileChange): ChangeEvent | undefined {
 	const group = change.type === "GROUP_MOVED";
@@ -115,10 +99,10 @@ function changeEvent(change: ProfileChange): ChangeEvent | undefined {
 			return undefined;
 		}
 		case "FEEDBACK_RESET": {
-			return { ...base, kind: "reset", cleanNeeded: change.cleanNeeded };
+			return { ...base, kind: "reset", cleanNeeded: change.cleanNeeded ?? undefined };
 		}
 		case "FEEDBACK_RESOLVED": {
-			return { ...base, kind: "resolved", resolvedBy: change.resolvedBy };
+			return { ...base, kind: "resolved", resolvedBy: change.resolvedBy ?? undefined };
 		}
 		// A move into or out of a standing that is not a verdict has no direction, and reads as up:
 		// only a verdict that got worse is a slip.
@@ -132,7 +116,7 @@ function changeEvent(change: ProfileChange): ChangeEvent | undefined {
 		}
 		// A first sighting says that the practice was seen, not where it landed: the standing it
 		// arrived at is the badge beside the sentence on every surface that shows one.
-		case "FIRST_OBSERVED": {
+		case "FIRST_RECORDED": {
 			return { ...base, kind: "first" };
 		}
 		case "TREND_TURNED": {
@@ -145,11 +129,7 @@ const subjectKey = (event: ProfileEvent) => `${event.level}:${event.slug}`;
 const isGood = (event: ProfileEvent) => event.kind === "resolved";
 const isSlip = (event: ProfileEvent) => event.kind === "down" || event.kind === "reset";
 
-/**
- * One event per subject within a block. The good block (held, resolved) and the change block
- * dedupe separately, so a practice may hold and have its trend turn; it may not hold and slip,
- * and it may not move up and down in the same run.
- */
+// Deduplicate held/resolved and changed events separately so one practice can appear in both.
 function dedupe<E extends ProfileEvent>(events: E[]): E[] {
 	const best = new Map<string, E>();
 	for (const event of events) {
@@ -223,16 +203,16 @@ function capitaliseSegments(segments: FeedbackTextSegment[]): FeedbackTextSegmen
 	return opened === first.text ? segments : [text(opened), ...rest];
 }
 
-type Part = string | FeedbackTextSegment | FeedbackTextSegment[];
+type Piece = string | FeedbackTextSegment | FeedbackTextSegment[];
 
-function asSegments(part: Part): FeedbackTextSegment[] {
-	if (typeof part === "string") {
-		return [text(part)];
+function asSegments(piece: Piece): FeedbackTextSegment[] {
+	if (typeof piece === "string") {
+		return [text(piece)];
 	}
-	return Array.isArray(part) ? part : [part];
+	return Array.isArray(piece) ? piece : [piece];
 }
 
-const sentence = (...parts: Part[]) => capitaliseSegments(fold(parts.flatMap(asSegments)));
+const sentence = (...pieces: Piece[]) => capitaliseSegments(fold(pieces.flatMap(asSegments)));
 
 /** The work the event was seen on, linked and led in by `joiner`; nothing when it names none. */
 const onWork = (event: ProfileEvent, joiner: string | undefined): FeedbackTextSegment[] =>
@@ -275,9 +255,9 @@ function resolvedPredicate(event: ProfileEvent): FeedbackTextSegment[] {
 /** The words every surface says one kind of change in. */
 interface Wording {
 	/** What the subjects did, after their names and agreeing with how many there are. */
-	predicate: (event: ChangeEvent, plural: boolean) => Part;
+	predicate: (event: ChangeEvent, plural: boolean) => Piece;
 	/** The same news where the row already names the subject. */
-	alone: (event: ChangeEvent) => Part;
+	alone: (event: ChangeEvent) => Piece;
 	/** What leads into the work the event was seen on; absent where the predicate names it. */
 	seenOn?: string;
 }
@@ -348,14 +328,6 @@ const groupSlugsOf = (overview: OverviewInput): string[] => [
 const transitionKey = (event: ChangeEvent): string =>
 	[event.kind, ...predicate(event).map(segmentKey)].join("\u0000");
 
-/**
- * What happened in the group since the latest run, for the "All practice groups" table to list as
- * bullets in precedence order. Practices that made the same move are one bullet — their pills
- * listed, then what happened said once. The group's own move rides on that bullet as a tail when
- * practices in it made the same move, and is a bullet of its own only when none did; either way
- * the row already names the group, so the sentence says "the group". Nothing when nothing changed,
- * so the row shows only its badge.
- */
 function composeGroupSentences(changes: ProfileChange[]): FeedbackTextSegment[][] | undefined {
 	const deduped = changeEventsOf(changes);
 	if (deduped.length === 0) {
@@ -431,10 +403,9 @@ function composePracticeSentences(
 	return sentences;
 }
 
-/** What the page itself shows from one overview: the latest-run chip and the table's sentences. */
 export function composeOverview(overview: OverviewInput): ComposedOverview {
 	return {
-		latestRun: overview.latestRun,
+		latestReview: overview.latestReview ?? undefined,
 		groupSentences: Object.fromEntries(
 			groupSlugsOf(overview).map((slug) => [
 				slug,

@@ -196,7 +196,8 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
                 1,
                 List.of(new CommitDetails.FileChange(
                         "src/Main.java", CommitFileChange.ChangeType.MODIFIED, 10, 5, 15, null)),
-                List.of());
+                List.of(),
+                message);
     }
 
     @Nested

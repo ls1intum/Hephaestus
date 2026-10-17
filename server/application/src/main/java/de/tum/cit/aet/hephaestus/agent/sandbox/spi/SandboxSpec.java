@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.sandbox.spi;
 
-import de.tum.cit.aet.hephaestus.agent.context.EvidenceDirectory;
+import de.tum.cit.aet.hephaestus.evidence.capture.EvidenceDirectory;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;

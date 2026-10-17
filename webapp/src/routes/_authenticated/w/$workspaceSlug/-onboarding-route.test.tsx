@@ -9,7 +9,7 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import type { WorkspaceOnboarding, WorkspaceOnboardingLink } from "@/api/types.gen";
 import { workspaceOnboarding } from "@/mocks/fixtures/onboarding";
-import { workspaceListItem } from "@/mocks/fixtures/workspaces";
+import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
 import { authClient } from "@/runtime/auth/auth-client";
 import { renderRouteAtWithRouter, ROUTE_RENDER_WAIT } from "@/test/router-harness";
@@ -22,7 +22,7 @@ function mockWorkspace(data: WorkspaceOnboarding) {
 			HttpResponse.json([workspaceListItem("acme"), workspaceListItem("other")]),
 		),
 		http.get("*/workspaces/:workspaceSlug/members/me", () =>
-			HttpResponse.json({ role: "MEMBER", userId: 20, userLogin: "ada" }),
+			HttpResponse.json(ownMembership("MEMBER")),
 		),
 		http.get("*/workspaces/:workspaceSlug/onboarding/me", ({ params }) =>
 			HttpResponse.json({
@@ -519,7 +519,7 @@ describe("onboarding mutations across workspace navigation", () => {
 		let started = false;
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/members/me", () =>
-				HttpResponse.json({ role: "OWNER", userId: 20, userLogin: "ada" }),
+				HttpResponse.json(ownMembership("OWNER")),
 			),
 			http.get("*/workspaces/acme/onboarding/settings", () =>
 				HttpResponse.json({

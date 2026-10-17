@@ -3,25 +3,22 @@ package de.tum.cit.aet.hephaestus.integration.slack;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadCandidate;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobService;
-import de.tum.cit.aet.hephaestus.agent.job.ConversationReviewSubmitter;
-import de.tum.cit.aet.hephaestus.agent.job.conversation.ConversationThreadTriggerScheduler;
+import de.tum.cit.aet.hephaestus.agent.adapter.ReviewJobService;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.channel.SlackChannelConsentService;
 import de.tum.cit.aet.hephaestus.integration.slack.channel.SlackMonitoredChannelDTO;
+import de.tum.cit.aet.hephaestus.integration.slack.conversation.SlackConversationCandidateSource;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackChannelConsentEventRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel;
@@ -35,19 +32,24 @@ import de.tum.cit.aet.hephaestus.integration.slack.events.SlackParticipantConsen
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackParticipantConsentService;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackPersonErasureService;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackWorkspaceResolver;
+import de.tum.cit.aet.hephaestus.integration.slack.identity.SlackRosterIdentityResolver;
 import de.tum.cit.aet.hephaestus.integration.slack.interactivity.SlackInteractivityHandler;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.integration.slack.onboarding.SlackAppHomeService;
-import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackBasisRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewItemRepository;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewPracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
-import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
+import de.tum.cit.aet.hephaestus.workspace.Membership;
+import de.tum.cit.aet.hephaestus.workspace.MembershipService;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
@@ -63,7 +65,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
@@ -81,6 +82,24 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
     private static final String TEAM = "T1";
     private static final String C1 = "C1";
     private static final String C2 = "C2"; // sibling channel, must stay isolated from C1's erasures
+
+    @Autowired
+    private ReviewPracticeRepository assignments;
+
+    @Autowired
+    private ReviewItemRepository reviewItems;
+
+    @Autowired
+    private MembershipService memberships;
+
+    @Autowired
+    private PracticeVersionService practiceVersions;
+
+    @Autowired
+    private ReviewRepository reviews;
+
+    @Autowired
+    private ItemIndexService items;
 
     @Autowired
     private SlackMonitoredChannelRepository monitoredChannelRepository;
@@ -101,22 +120,19 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
     private ConversationFeedbackErasure conversationFeedbackErasure;
 
     @Autowired
-    private ObservationRepository observationRepository;
+    private ResultRepository practiceResultRepository;
 
     @Autowired
     private FeedbackRepository feedbackRepository;
 
     @Autowired
-    private FeedbackObservationRepository feedbackObservationRepository;
+    private FeedbackBasisRepository feedbackEvidenceRepository;
 
     @Autowired
-    private PracticeRepository practiceRepository;
+    private AccountRepository accounts;
 
     @Autowired
-    private AgentJobRepository agentJobRepository;
-
-    @Autowired
-    private UserRepository userRepository;
+    private IdentityRepository identities;
 
     @Autowired
     private WorkspaceRepository workspaceRepository;
@@ -125,19 +141,13 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
     private IdentityProviderRepository identityProviderRepository;
 
     @Autowired
-    private ConversationThreadTriggerScheduler scheduler;
-
-    @Autowired
     private PlatformTransactionManager transactionManager;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @MockitoBean
-    private AgentJobService agentJobService;
-
-    @MockitoSpyBean
-    private ConversationReviewSubmitter conversationReviewSubmitter;
+    private ReviewJobService agentJobService;
 
     private final JsonMapper mapper = JsonMapper.builder().build();
 
@@ -151,13 +161,11 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
     private long u1MemberId;
     private long u2MemberId;
     private Practice practice;
-    private AgentJob job;
 
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
         support = new SlackConversationTestSupport(jdbcTemplate);
-        support.ensureUnmappedSlackThreadColumns();
 
         IdentityProvider provider = identityProviderRepository
                 .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
@@ -165,21 +173,21 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
                         new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
         Workspace workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("slack-e2e-lifecycle"));
         workspaceId = workspace.getId();
-        u1MemberId = userRepository
-                .save(TestUserFactory.createUser(100L, "e2e-u1", provider))
-                .getId();
-        u2MemberId = userRepository
-                .save(TestUserFactory.createUser(200L, "e2e-u2", provider))
-                .getId();
+        u1MemberId = SlackConversationTestSupport.accountWithIdentity(accounts, identities, provider, 100L, "e2e-u1");
+        memberships.createMembership(workspace, u1MemberId, Membership.WorkspaceRole.MEMBER);
+        u2MemberId = SlackConversationTestSupport.accountWithIdentity(accounts, identities, provider, 200L, "e2e-u2");
+        memberships.createMembership(workspace, u2MemberId, Membership.WorkspaceRole.MEMBER);
         practice = savePractice(workspace);
-        job = newJob(workspace);
 
         SlackWorkspaceResolver workspaceResolver = mock(SlackWorkspaceResolver.class);
         when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.of(workspaceId));
         SlackMentorIdentityResolver identityResolver = mock(SlackMentorIdentityResolver.class);
-        when(identityResolver.resolveMemberId(workspaceId, TEAM, "U1")).thenReturn(Optional.of(u1MemberId));
-        when(identityResolver.resolveMemberId(workspaceId, TEAM, "U2")).thenReturn(Optional.of(u2MemberId));
-        when(identityResolver.resolveActiveMemberId(any(Long.class), any(), any()))
+        SlackRosterIdentityResolver roster = mock(SlackRosterIdentityResolver.class);
+        when(roster.humanAccountId(workspaceId, TEAM, "U1")).thenReturn(Optional.of(u1MemberId));
+        when(roster.humanAccountId(workspaceId, TEAM, "U2")).thenReturn(Optional.of(u2MemberId));
+        when(identityResolver.resolveAccountId(workspaceId, TEAM, "U1")).thenReturn(Optional.of(u1MemberId));
+        when(identityResolver.resolveAccountId(workspaceId, TEAM, "U2")).thenReturn(Optional.of(u2MemberId));
+        when(identityResolver.resolveActiveAccountId(any(Long.class), any(), any()))
                 .thenReturn(Optional.empty());
 
         slackMessageService = mock(SlackMessageService.class);
@@ -194,7 +202,7 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
                 new SlackParticipantConsentGate(participantConsentRepository),
                 messageRepository,
                 threadRepository,
-                identityResolver,
+                roster,
                 conversationFeedbackErasure,
                 /* conversationIngestEnabled */ true);
         consentService = new SlackChannelConsentService(
@@ -204,7 +212,6 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
                 ingestService,
                 slackMessageService,
                 connectionService,
-                userRepository,
                 new TransactionTemplate(transactionManager),
                 event -> {} // activation kick intentionally not asserted here
                 );
@@ -254,25 +261,24 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
         String lastTs = (baseSecond + 3) + ".000000";
         support.seedThread(workspaceId, C1, rootTs, lastTs, 4, "{" + u1MemberId + "," + u2MemberId + "}");
         for (long s = baseSecond; s <= baseSecond + 3; s++) {
-            support.seedMessage(workspaceId, C1, s + ".000000", s == baseSecond ? null : rootTs, "turn");
+            support.seedMessage(workspaceId, TEAM, C1, s + ".000000", s == baseSecond ? null : rootTs, "turn");
         }
         long settledThreadId = threadRepository
                 .findByWorkspaceIdAndSlackChannelIdAndSlackThreadTs(workspaceId, C1, rootTs)
                 .orElseThrow()
                 .getId();
         SlackConversationTestSupport.BoundConversation u1Conv = seedBoundConversation(settledThreadId, u1MemberId);
-        UUID u1Obs = u1Conv.observationId();
+        UUID u1Obs = u1Conv.resultId();
         UUID u1Fb = u1Conv.feedbackId();
         SlackConversationTestSupport.BoundConversation u2Conv = seedBoundConversation(settledThreadId, u2MemberId);
-        UUID u2Obs = u2Conv.observationId();
+        UUID u2Obs = u2Conv.resultId();
         UUID u2Fb = u2Conv.feedbackId();
 
-        doReturn(2L).when(conversationReviewSubmitter).submitAndSettle(any(), any());
-        scheduler.sweepNow();
-        ArgumentCaptor<ConversationThreadCandidate> captor = ArgumentCaptor.forClass(ConversationThreadCandidate.class);
-        verify(conversationReviewSubmitter).submitAndSettle(captor.capture(), any());
-        assertThat(captor.getValue().workspaceId()).isEqualTo(workspaceId);
-        assertThat(captor.getValue().participantMemberIds()).containsExactlyInAnyOrder(u1MemberId, u2MemberId);
+        var candidate = new SlackConversationCandidateSource(threadRepository, messageRepository)
+                .candidateById(workspaceId, settledThreadId)
+                .orElseThrow();
+        assertThat(candidate.workspaceId()).isEqualTo(workspaceId);
+        assertThat(candidate.participantAccountIds()).containsExactlyInAnyOrder(u1MemberId, u2MemberId);
 
         handler.handleBlockActions(optOut("U1"));
         assertThat(participantConsentRepository.existsByWorkspaceIdAndSlackUserIdAndIngestionOptedOutTrue(
@@ -285,14 +291,14 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
         assertThat(messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, C1, tsAfter))
                 .isFalse();
         assertThat(participantIds(settledThreadId)).containsExactly(u2MemberId);
-        assertThat(observationRepository.findById(u1Obs)).isEmpty();
+        assertThat(practiceResultRepository.findById(u1Obs)).isEmpty();
         assertThat(feedbackRepository.findById(u1Fb)).isEmpty();
-        assertThat(observationRepository.findById(u2Obs)).isPresent();
+        assertThat(practiceResultRepository.findById(u2Obs)).isPresent();
         assertThat(feedbackRepository.findById(u2Fb)).isPresent();
 
         consentService.transition(workspaceId, C2, ConsentState.ACTIVE, "sibling active");
         support.seedThread(workspaceId, C2, "700.0", "700.0", 1, "{" + u2MemberId + "}");
-        support.seedMessage(workspaceId, C2, "700.0", null, "sibling msg");
+        support.seedMessage(workspaceId, TEAM, C2, "700.0", null, "sibling msg");
 
         // This manually constructed service needs the transaction normally supplied by its Spring proxy.
         new TransactionTemplate(transactionManager)
@@ -301,7 +307,7 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
         assertThat(currentChannel(C1).getConsentState()).isEqualTo(ConsentState.REVOKED);
         assertThat(threadCount(C1)).isZero();
         assertThat(messageCount(C1)).isZero();
-        assertThat(observationRepository.findById(u2Obs)).isEmpty(); // remaining C1 derived rows erased too
+        assertThat(practiceResultRepository.findById(u2Obs)).isEmpty();
         assertThat(auditToStates(C1)).containsExactly(ConsentState.ACTIVE, ConsentState.REVOKED);
         assertThat(currentChannel(C2).getConsentState()).isEqualTo(ConsentState.ACTIVE);
         assertThat(messageCount(C2)).isEqualTo(1);
@@ -345,7 +351,7 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
 
     private List<Long> participantIds(long threadId) {
         Long[] ids = jdbcTemplate.queryForObject(
-                "SELECT participant_member_ids FROM slack_thread WHERE id = ?",
+                "SELECT participant_account_ids FROM slack_thread WHERE id = ?",
                 (rs, n) -> (Long[]) rs.getArray(1).getArray(),
                 threadId);
         return List.of(ids);
@@ -362,21 +368,20 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
 
     private SlackConversationTestSupport.BoundConversation seedBoundConversation(long threadId, long aboutUserId) {
         return SlackConversationTestSupport.seedBoundConversation(
-                observationRepository,
+                reviews,
+                assignments,
+                reviewItems,
+                items,
+                practiceResultRepository,
                 feedbackRepository,
-                feedbackObservationRepository,
+                feedbackEvidenceRepository,
                 workspaceId,
-                job.getId(),
-                practice.getId(),
+                practice,
                 threadId,
                 aboutUserId);
     }
 
     private Practice savePractice(Workspace ws) {
-        return SlackConversationTestSupport.newPractice(practiceRepository, ws, "e2e-practice");
-    }
-
-    private AgentJob newJob(Workspace ws) {
-        return SlackConversationTestSupport.newConversationReviewJob(agentJobRepository, ws);
+        return SlackConversationTestSupport.newPractice(practiceVersions, ws, "e2e-practice");
     }
 }

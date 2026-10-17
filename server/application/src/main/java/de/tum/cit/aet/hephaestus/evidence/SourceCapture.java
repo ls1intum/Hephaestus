@@ -4,21 +4,23 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 
-public record SourceCapture(SourceKind kind, SourceCaptureState state, List<SourceArtifact> artifacts) {
+public record SourceCapture(
+        SourceKind kind, SourceCaptureState state, CitationCapabilities citation, List<CapturedSource> files) {
     public SourceCapture {
         Objects.requireNonNull(kind, "kind");
         Objects.requireNonNull(state, "state");
-        artifacts = List.copyOf(Objects.requireNonNull(artifacts, "artifacts"));
-        if (new HashSet<>(artifacts.stream().map(SourceArtifact::path).toList()).size() != artifacts.size()) {
-            throw new IllegalArgumentException("Source capture cannot repeat an artifact path: " + kind);
+        Objects.requireNonNull(citation, "citation");
+        files = List.copyOf(Objects.requireNonNull(files, "files"));
+        if (new HashSet<>(files.stream().map(CapturedSource::path).toList()).size() != files.size()) {
+            throw new IllegalArgumentException("Source capture cannot repeat a file path: " + kind);
         }
-        if (!(state instanceof SourceCaptureState.Available) && !artifacts.isEmpty()) {
-            throw new IllegalArgumentException("Unavailable source cannot contain artifacts: " + kind);
+        if (!(state instanceof SourceCaptureState.Available) && !files.isEmpty()) {
+            throw new IllegalArgumentException("Unavailable source cannot contain files: " + kind);
         }
         if (state instanceof SourceCaptureState.Available available
                 && available.content() == SourceContentState.NON_EMPTY
-                && artifacts.isEmpty()) {
-            throw new IllegalArgumentException("Non-empty source must contain at least one artifact: " + kind);
+                && files.isEmpty()) {
+            throw new IllegalArgumentException("Non-empty source must contain at least one file: " + kind);
         }
     }
 }

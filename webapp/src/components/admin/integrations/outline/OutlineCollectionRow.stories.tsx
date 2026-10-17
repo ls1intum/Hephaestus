@@ -40,14 +40,19 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const base: OutlineCollection = {
-	id: 1,
+	id: "1",
 	collectionId: "col-engineering",
 	name: "Engineering",
+	description: null,
 	urlId: "engineering-4nZ3x",
+	icon: null,
 	color: "#4E5C6E",
 	state: "ENABLED",
 	syncStatus: "COMPLETE",
 	documentCount: 87,
+	documentsUpstream: null,
+	exportsSkippedForBudget: null,
+	lastSyncError: null,
 	lastSyncedAt: minutesBefore(12),
 	createdAt: daysBefore(30),
 };
@@ -71,7 +76,13 @@ export const Mirroring: Story = {
 /** Paused — syncing frozen, documents kept; the menu offers Resume instead of Pause. */
 export const Paused: Story = {
 	args: {
-		collection: { ...base, id: 2, collectionId: "col-handbook", name: "Handbook", state: "PAUSED" },
+		collection: {
+			...base,
+			id: "2",
+			collectionId: "col-handbook",
+			name: "Handbook",
+			state: "PAUSED",
+		},
 	},
 	play: async ({ canvas }) => {
 		canvas.getByText("Paused");
@@ -87,14 +98,14 @@ export const Syncing: Story = {
 	args: {
 		collection: {
 			...base,
-			id: 3,
+			id: "3",
 			collectionId: "col-decisions",
 			name: "Architecture Decisions",
-			urlId: undefined,
+			urlId: null,
 			icon: "📐",
 			syncStatus: "PENDING",
 			documentCount: 0,
-			lastSyncedAt: undefined,
+			lastSyncedAt: null,
 		},
 	},
 	play: async ({ canvas }) => {
@@ -111,10 +122,10 @@ export const SyncError: Story = {
 	args: {
 		collection: {
 			...base,
-			id: 4,
+			id: "4",
 			collectionId: "col-legacy",
 			name: "Legacy Wiki",
-			urlId: undefined,
+			urlId: null,
 			syncStatus: "PENDING",
 			documentCount: 3,
 			lastSyncError: "Outline API returned 403 for collections.info — the bot user lost access.",
@@ -135,7 +146,7 @@ export const BudgetSkipped: Story = {
 	args: {
 		collection: {
 			...base,
-			id: 5,
+			id: "5",
 			collectionId: "col-research",
 			name: "Research Notes",
 			urlId: "research-8pL4m",

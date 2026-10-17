@@ -1,6 +1,6 @@
 # ADR 0050: One practice standard, one outcome
 
-**Status:** Accepted
+**Status:** Accepted; superseded in part 2026-10-14 by [ADR 0056](0056-one-practice-model-for-items-and-scans.md)
 **Date:** 2026-10-02
 **Supersedes:** The observation axes in [ADR 0022](0022-observation-presence-assessment-and-schema-cleanup.md).
 
@@ -88,3 +88,7 @@ contracts for signals within one practice. Do not add states only to encode feed
   lifecycle as separate facts. A signal is not a substitute for either recorded fact.
 - [Slack message events](https://docs.slack.dev/reference/events/message/) do not supply a shared
   pull-request lifecycle. A descriptor exposes only state its adapter records.
+
+## Update — 2026-10-14 (#2656): the practice model cutover
+
+Superseded in part by [ADR 0056](0056-one-practice-model-for-items-and-scans.md) for result identity and current claims.

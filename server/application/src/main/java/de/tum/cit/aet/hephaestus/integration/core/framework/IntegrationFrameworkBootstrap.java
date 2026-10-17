@@ -3,15 +3,15 @@ package de.tum.cit.aet.hephaestus.integration.core.framework;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ApprovalChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ApprovalWriter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Capability;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest;
+import de.tum.cit.aet.hephaestus.integration.core.spi.LineNoteWriter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectKeyDeriver;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectParser;
-import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryWriter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.TokenRefresher;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier;
 import jakarta.annotation.PostConstruct;
@@ -46,9 +46,9 @@ public class IntegrationFrameworkBootstrap {
     private final List<SubjectParser> subjectParsers;
     private final List<ApiCredentialProvider> credentialProviders;
     private final List<TokenRefresher> tokenRefreshers;
-    private final List<SummaryChannel> feedbackChannels;
-    private final List<InlineFeedbackChannel> inlineFeedbackChannels;
-    private final List<ApprovalChannel> approvalChannels;
+    private final List<SummaryWriter> feedbackChannels;
+    private final List<LineNoteWriter> inlineFeedbackChannels;
+    private final List<ApprovalWriter> approvalChannels;
     private final List<IntegrationLifecycleListener> lifecycleListeners;
     private final ReviewContractValidator reviewContract;
     private final boolean webhookRoleEnabled;
@@ -60,9 +60,9 @@ public class IntegrationFrameworkBootstrap {
             List<SubjectParser> subjectParsers,
             List<ApiCredentialProvider> credentialProviders,
             List<TokenRefresher> tokenRefreshers,
-            List<SummaryChannel> feedbackChannels,
-            List<InlineFeedbackChannel> inlineFeedbackChannels,
-            List<ApprovalChannel> approvalChannels,
+            List<SummaryWriter> feedbackChannels,
+            List<LineNoteWriter> inlineFeedbackChannels,
+            List<ApprovalWriter> approvalChannels,
             List<IntegrationLifecycleListener> lifecycleListeners,
             ReviewContractValidator reviewContract,
             @Value("${" + RuntimeRole.WEBHOOK_PROPERTY + ":true}") boolean webhookRoleEnabled) {
@@ -83,14 +83,15 @@ public class IntegrationFrameworkBootstrap {
     @PostConstruct
     public void validate() {
         List<String> violations = new ArrayList<>();
-        // Descriptor rules first: they hold regardless of which vendors are enabled, so reporting them
-        // ahead of the per-vendor ones puts the root cause on top.
+        // Descriptor rules first: they hold regardless of which vendors are enabled, so reporting
+        // them ahead of the per-vendor ones puts the root cause on top.
         violations.addAll(reviewContract.validateDescriptors());
         for (IntegrationKind kind : manifests.registeredKinds()) {
             IntegrationManifest manifest = manifests.manifestFor(kind).orElseThrow();
             if (!manifest.enabled()) {
-                // A disabled integration wires none of the required beans, so running these checks would
-                // just report the feature flag back as violations; see IntegrationManifest#enabled().
+                // A disabled integration wires none of the required beans, so running these checks
+                // would just report the feature flag back as violations; see
+                // IntegrationManifest#enabled().
                 log.info("Integration {} is disabled; skipping its capability and provenance checks", kind);
                 continue;
             }
@@ -139,17 +140,13 @@ public class IntegrationFrameworkBootstrap {
             require(kind, "TokenRefresher", anyMatchKind(tokenRefreshers, t -> t.kind() == kind), violations);
         }
         if (declared.contains(Capability.FEEDBACK_DELIVERY)) {
-            require(kind, "SummaryChannel", anyMatchKind(feedbackChannels, f -> f.kind() == kind), violations);
+            require(kind, "SummaryWriter", anyMatchKind(feedbackChannels, f -> f.kind() == kind), violations);
         }
         if (declared.contains(Capability.INLINE_FEEDBACK)) {
-            require(
-                    kind,
-                    "InlineFeedbackChannel",
-                    anyMatchKind(inlineFeedbackChannels, f -> f.kind() == kind),
-                    violations);
+            require(kind, "LineNoteWriter", anyMatchKind(inlineFeedbackChannels, f -> f.kind() == kind), violations);
         }
         if (declared.contains(Capability.APPROVAL_WORKFLOW)) {
-            require(kind, "ApprovalChannel", anyMatchKind(approvalChannels, f -> f.kind() == kind), violations);
+            require(kind, "ApprovalWriter", anyMatchKind(approvalChannels, f -> f.kind() == kind), violations);
         }
         if (declared.contains(Capability.SCOPE_CHANGES)) {
             // SCOPE_CHANGES says "this vendor will fire onScopeChanged" — the listener
@@ -171,7 +168,8 @@ public class IntegrationFrameworkBootstrap {
         unmapped.addAll(declared);
         unmapped.removeAll(ENFORCED_CAPABILITIES);
         for (Capability cap : unmapped) {
-            violations.add(kind + " declares capability "
+            violations.add(kind
+                    + " declares capability "
                     + cap
                     + " but the bootstrap has no enforcement rule for it — add a require() branch");
         }

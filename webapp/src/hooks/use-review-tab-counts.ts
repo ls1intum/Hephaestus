@@ -1,19 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 
 import {
-	listPracticeReviewFeedbackOptions,
-	listPracticeReviewObservationsOptions,
-	listPracticeReviewsOptions,
+	listReviewFeedbackOptions,
+	listReviewProblemsOptions,
+	listReviewResultsOptions,
+	listReviewsOptions,
 } from "@/api/@tanstack/react-query.gen";
-import type { ReviewTabCounts } from "@/components/admin/practice-reviews/PracticeReviewsLayout";
-import {
-	carriedScope,
-	type ReviewScopeSearch,
-} from "@/components/admin/practice-reviews/review-scope";
+import type { ReviewScopeSearch } from "@/components/admin/practice-reviews/review-scope";
 import {
 	feedbackQuery,
-	observationsQuery,
-	runsQuery,
+	problemsQuery,
+	resultsQuery,
+	reviewsQuery,
 } from "@/components/admin/practice-reviews/review-search";
 import { retryQuery, sessionRetriesQueries } from "@/runtime/tanstack-query/query-defaults";
 
@@ -23,52 +21,43 @@ const COUNT_PAGE = 1;
 /** Count reads refresh once a minute while the page is visible. */
 const COUNT_REFRESH_MS = 60_000;
 
-const total = (page: { page?: { totalElements?: number } }) => page.page?.totalElements;
-
 /**
  * What every count read shares. Counts refresh quietly as reviews progress, including after a
  * failed read exhausts its retries. A user view repeats nothing, as every read of it is audited. A count of
  * another scope or workspace is never shown as this one's: until its own read answers, it shows nothing.
  */
 const COUNT_READ = {
-	select: total,
 	retry: retryQuery,
 	retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 8000),
 	refetchInterval: () => (sessionRetriesQueries() ? COUNT_REFRESH_MS : false),
 } as const;
 
-/**
- * How many reviews, observations and pieces of feedback each tab lists under the shared scope (the
- * developer, groups, practices, dates and the tracked record), read as the total of a one-row page of
- * the tab's own endpoint. Each read is the query the tab's list sends, built from the search the tab's
- * link carries, so a count is what the table shows before its own facets narrow it. A count shows
- * nothing until it is known for this scope (`COUNT_READ`).
- */
-export function useReviewTabCounts(
-	workspaceSlug: string,
-	search: ReviewScopeSearch,
-): ReviewTabCounts {
+export function useReviewTabCounts(workspaceSlug: string, scope: ReviewScopeSearch) {
 	const path = { workspaceSlug };
-	const runs = useQuery({
-		...listPracticeReviewsOptions({
-			path,
-			query: runsQuery(carriedScope("runs", search), COUNT_PAGE),
-		}),
+	const reviews = useQuery({
+		...listReviewsOptions({ path, query: reviewsQuery(scope, COUNT_PAGE) }),
 		...COUNT_READ,
+		select: (page) => page.totalElements,
 	});
-	const observations = useQuery({
-		...listPracticeReviewObservationsOptions({
-			path,
-			query: observationsQuery(carriedScope("observations", search), COUNT_PAGE),
-		}),
+	const results = useQuery({
+		...listReviewResultsOptions({ path, query: resultsQuery(scope, COUNT_PAGE) }),
 		...COUNT_READ,
+		select: (page) => page.totalElements,
+	});
+	const problems = useQuery({
+		...listReviewProblemsOptions({ path, query: problemsQuery(scope, COUNT_PAGE) }),
+		...COUNT_READ,
+		select: (page) => page.totalElements,
 	});
 	const feedback = useQuery({
-		...listPracticeReviewFeedbackOptions({
-			path,
-			query: feedbackQuery(carriedScope("feedback", search), COUNT_PAGE),
-		}),
+		...listReviewFeedbackOptions({ path, query: feedbackQuery(scope, COUNT_PAGE) }),
 		...COUNT_READ,
+		select: (page) => page.totalElements,
 	});
-	return { runs: runs.data, observations: observations.data, feedback: feedback.data };
+	return {
+		reviews: reviews.data,
+		results: results.data,
+		problems: problems.data,
+		feedback: feedback.data,
+	};
 }

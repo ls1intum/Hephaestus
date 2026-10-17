@@ -1,0 +1,76 @@
+{
+	"contractVersion": 3,
+	"reviewId": "10000000-0000-4000-8000-000000000001",
+	"jobId": "20000000-0000-4000-8000-000000000001",
+	"attempt": 0,
+	"admissionDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+	"admitted": [
+		{
+			"practiceSlug": "handles-errors",
+			"itemId": "42",
+			"resultId": "30000000-0000-4000-8000-000000000001",
+			"outcome": "NOT_MET",
+			"summary": "The failure is dropped",
+			"explanation": "The catch returns without recording the error.",
+			"evidence": {
+				"citations": []
+			},
+			"example": null,
+			"coverage": {
+				"source": "claimed",
+				"complete": true,
+				"selected": 1,
+				"checked": 1,
+				"total": 1
+			},
+			"problems": [
+				{
+					"id": "40000000-0000-4000-8000-000000000001",
+					"severity": "MAJOR",
+					"summary": "The failure is dropped",
+					"resultId": "30000000-0000-4000-8000-000000000001",
+					"position": 0,
+					"key": null,
+					"explanation": "The catch returns without recording the error.",
+					"citations": [],
+					"basis": null,
+					"nextStep": "Record the failure.",
+					"publicEligible": true
+				}
+			],
+			"summaryOnly": true,
+			"publicEligible": true
+		}
+	],
+	"withheld": [
+		{
+			"practiceSlug": "names-things",
+			"itemId": "42",
+			"reason": "NO_EVIDENCE"
+		}
+	],
+	"practicePageSupport": {
+		"state": "COMPLETE",
+		"readAt": "2026-10-14T00:00:00Z",
+		"practices": [
+			{
+				"practiceSlug": "handles-errors",
+				"decision": "GATE_REFUSED",
+				"stopReason": "NO_AI",
+				"occurrences": []
+			}
+		]
+	},
+	"conversationEligibility": {
+		"state": "COMPLETE",
+		"readAt": "2026-10-14T00:00:00Z",
+		"results": [
+			{
+				"resultId": "30000000-0000-4000-8000-000000000001",
+				"decision": "GATE_REFUSED",
+				"stopReason": "NO_AI"
+			}
+		]
+	},
+	"publicReviewed": false
+}

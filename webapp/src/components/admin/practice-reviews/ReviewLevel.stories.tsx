@@ -1,76 +1,71 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, within } from "storybook/test";
 
-import type { AgentJob } from "@/api/types.gen";
+import type { PracticeScriptRun, ReviewDetail } from "@/api/types.gen";
+import { eventLabel } from "@/components/practice-trace/fixtures";
 import { withPageBehind } from "@/stories/decorators";
 import { InLevelStack } from "@/stories/level-stack";
 import { settledDrawerPanel } from "@/stories/overlay";
 import { expectNoPanelOverflow } from "@/stories/reflow";
-import { levelsOpenedBy } from "@/test/detail-stack";
-import { precedes } from "@/test/dom";
+import { listOpenedBy } from "@/test/detail-stack";
 
 import {
-	mockJobCancelledOnBudget,
-	mockJobHeldOnBudget,
-	mockJobRunning,
-	mockJobUsageTwoAttempts,
-	mockJobUsageUnpriced,
-	reviewDeliveryChecksOf,
-	reviewJob,
-	reviewRuns,
-	reviewTraceOf,
+	reviewDetailBackingOff,
+	reviewDetailCancelledOnBudget,
+	reviewDetailCompleted,
+	reviewDetailExpiredRuntime,
+	reviewDetailProcessingFailed,
+	reviewDetailQueued,
+	reviewDetailRunning,
+	reviewDetailScanManyJobs,
+	reviewDetailTimedOut,
+	reviewFeedbackChecksOf,
+	reviewPracticeScripts,
+	reviewUsageTwoAttempts,
+	reviewUsageUnpriced,
 } from "./fixtures";
-import { LINEAGE_REVIEW_ID } from "./lineage-fixtures";
 import { SHEET_SECTIONS } from "./RecordSheet";
 import { REQUEST_BLOCKED } from "./RequestReviewAction";
 import { reviewLevel } from "./review-levels";
-import { ReviewLevel } from "./ReviewLevel";
+import { ReviewLevel, type ReviewLevelProps, RUNTIME_EXPIRED } from "./ReviewLevel";
 
-const job = reviewJob(LINEAGE_REVIEW_ID);
-const summary = reviewRuns.find((run) => run.id === LINEAGE_REVIEW_ID);
+const ready = (review: ReviewDetail): ReviewLevelProps["review"] => ({ status: "ready", review });
 
-/** The groups the trace fixture's practices sit in, each in its own colour. */
-const groups = (
-	[
-		["review-ready-work", "Packaging work for review", "package", "blue"],
-		["communication", "Communicating in the open", "message-circle", "violet"],
-		["testing-discipline", "Testing discipline", "flask-conical", "emerald"],
-		["acting-on-review-feedback", "Acting on review feedback", "repeat", "amber"],
-	] as const
-).map(([slug, name, icon, color]) => ({ slug, name, icon, color }));
+const SCRIPTS: Record<string, PracticeScriptRun> = {
+	"thin-controllers": reviewPracticeScripts.fromCode,
+	"errors-carry-context": reviewPracticeScripts.withModels,
+	"product-language": reviewPracticeScripts.withheld,
+};
 
-/**
- * One review's sheet, and only the review, in the order every record sheet has: a status line,
- * What it is, State and history, the practices it answered, Technical (closed) and the actions.
- * Its observations, its feedback and when that was read are its trace; the other moments and the
- * merge are the work's.
- */
+const withScripts: ReviewDetail = {
+	...reviewDetailCompleted,
+	practices: reviewDetailCompleted.practices.map((practice) => ({
+		...practice,
+		script: SCRIPTS[practice.practiceSlug] ?? null,
+	})),
+};
+
 const meta = {
 	component: ReviewLevel,
 	parameters: { layout: "fullscreen" },
 	decorators: [withPageBehind],
 	tags: ["autodocs"],
 	args: {
+		workspaceSlug: "demo",
 		path: { behind: [{ label: "Practice reviews", depth: 0 }], onClose: fn() },
-		job: { status: "ready", job },
-		summary,
-		trace: { status: "ready", trace: reviewTraceOf(job) },
-		groups,
-		deliveryChecks: { status: "ready", checks: [] },
-		usage: {
-			status: "ready",
-			usage: { ...mockJobUsageTwoAttempts, attempts: mockJobUsageTwoAttempts.attempts.slice(1) },
-		},
+		review: ready(reviewDetailCompleted),
+		eventLabel,
+		feedbackChecks: { status: "ready", checks: [] },
 		onCancel: fn(),
 		cancelPending: false,
-		onRetryResultProcessing: fn(),
-		retryResultProcessingPending: false,
 		onRequestReview: fn(),
 	},
-	argTypes: { path: { control: false } },
+	argTypes: { path: { control: false }, eventLabel: { control: false } },
 	render: (args) => (
 		<InLevelStack
-			entry={reviewLevel(args.job.status === "ready" ? args.job.job.id : job.id)}
+			entry={reviewLevel(
+				args.review.status === "ready" ? args.review.review.id : reviewDetailCompleted.id,
+			)}
 			path={args.path}
 		>
 			{(level) => <ReviewLevel {...args} {...level} />}
@@ -97,28 +92,21 @@ export const Default: Story = {
 		]);
 		// Status, duration and the finishing time once, in the status line.
 		const status = panelElement.querySelector("[data-sheet-status]");
-		await expect(status).toHaveTextContent(/Completed.*ran 5 min.*finished 28 July/u);
-		await expect(panel.getAllByText(/ran 5 min/u)).toHaveLength(1);
+		await expect(status).toHaveTextContent(/Complete.*ran .*finished/u);
 		const history = within(panel.getByRole("list", { name: "History" }));
-		history.getByText("1 min after it finished");
-		await expect(history.queryByText("Review on the work accepted")).toBeNull();
-		// The moment that started it is the review's; the other moments on the work are the work's.
+		history.getByText("Asked for");
+		history.getByText("Started");
 		panel.getByText("Started by");
-		// Technical is open by default.
+		panel.getByText(/Marked ready for review/u);
 		panel.getByText("Review ID");
-		panel.getByRole("button", { name: "Copy configuration" });
-		// This review's output kept no readable turns, which says nothing about why.
-		panel.getByRole("heading", { name: "Model activity" });
-		panel.getByText("Not available.");
-		// The review alone: no other record's facts, no link to another record.
-		await expect(panel.queryByText(/other moments on this work/u)).toBeNull();
-		await expect(panel.queryByText(/Until the developer read it/u)).toBeNull();
-		await expect(panel.queryByText(/reached the developer/u)).toBeNull();
+		// Inside Practice reviews the sheet links only its own lists, scoped to this review.
 		for (const link of panel.queryAllByRole("link")) {
-			await expect(String(link.getAttribute("href"))).not.toMatch(/\/admin\/practices\/reviews/u);
+			const href = String(link.getAttribute("href"));
+			if (href.includes("/admin/practices/reviews")) {
+				await expect(href).toContain(`reviewId=${reviewDetailCompleted.id}`);
+			}
 		}
 		await userEvent.click(panel.getByRole("button", { name: "Request another review" }));
-		// It starts an agent job, so it asks first.
 		await expect(args.onRequestReview).not.toHaveBeenCalled();
 		const confirm = await screen.findByRole("alertdialog");
 		await userEvent.click(within(confirm).getByRole("button", { name: "Request review" }));
@@ -126,573 +114,494 @@ export const Default: Story = {
 	},
 };
 
-/**
- * Every practice in colour: its state as a badge, its group in the group's colour, and the reason
- * for its state. The sheet counts no verdicts: how the review answered a practice is its trace's.
- */
-export const PracticesInColour: Story = {
+export const PracticesWithTheirState: Story = {
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
 		const list = panel.getByRole("list", { name: "Every practice in this review" });
-		const thin = within(list).getByText("Thin controllers").closest("li");
-		await expect(thin).not.toBeNull();
-		await expect(thin?.querySelector('[data-slot="badge"]')).toHaveTextContent("Reviewed");
-		await expect(thin?.querySelectorAll('[data-slot="badge"]')).toHaveLength(1);
-		await expect(thin).not.toHaveTextContent(/\d+ not met/u);
+		const withheld = list.querySelector('[data-practice-status="WITHHELD"]');
+		await expect(withheld).not.toBeNull();
+		await expect(withheld).toHaveTextContent("Withheld");
+		await expect(withheld).toHaveTextContent(/provider did not return them/u);
+		const done = list.querySelector('[data-practice-status="DONE"]');
+		await expect(done).toHaveTextContent(/Done.*1 met/u);
 	},
 };
 
-/** A running review has started and can be canceled; another would only be coalesced into it. */
+const [firstPractice, secondPractice] = reviewDetailCompleted.practices;
+if (firstPractice === undefined || secondPractice === undefined) {
+	throw new Error("The completed review must have two practices");
+}
+
+/**
+ * Each finished practice's counts open the Results tab at exactly that practice's results of this
+ * review and that outcome, and its problems where it has a Not met result. Each link is named for
+ * its practice too, since the same count can stand on several rows.
+ */
+export const PracticeCountsOpenTheirResults: Story = {
+	args: {
+		review: ready({
+			...reviewDetailCompleted,
+			practices: [
+				{
+					...firstPractice,
+					status: "DONE",
+					reason: null,
+					results: { met: 0, notMet: 2, doesNotApply: 0, couldNotDetermine: 1 },
+				},
+				{
+					...secondPractice,
+					status: "DONE",
+					reason: null,
+					results: { met: 1, notMet: 0, doesNotApply: 0, couldNotDetermine: 0 },
+				},
+			],
+		}),
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		const list = within(panel.getByRole("list", { name: "Every practice in this review" }));
+		const reviewId = reviewDetailCompleted.id;
+		for (const [name, practice, outcome] of [
+			[`2 not met, ${firstPractice.practiceName}`, firstPractice, "NOT_MET"],
+			[
+				`1 could not determine, ${firstPractice.practiceName}`,
+				firstPractice,
+				"COULD_NOT_DETERMINE",
+			],
+			[`1 met, ${secondPractice.practiceName}`, secondPractice, "MET"],
+		] as const) {
+			const opened = listOpenedBy(list.getByRole("link", { name }));
+			await expect(opened.list).toBe("results");
+			await expect(opened.search).toMatchObject({
+				reviewId,
+				practiceSlug: practice.practiceSlug,
+				outcome,
+			});
+		}
+		const problems = listOpenedBy(
+			list.getByRole("link", { name: `View problems, ${firstPractice.practiceName}` }),
+		);
+		await expect(problems.list).toBe("problems");
+		await expect(problems.search).toMatchObject({
+			reviewId,
+			practiceSlug: firstPractice.practiceSlug,
+		});
+		await expect(
+			list.queryByRole("link", { name: `View problems, ${secondPractice.practiceName}` }),
+		).toBeNull();
+	},
+};
+
+export const ResultsRecordedWhileReady: Story = {
+	args: {
+		review: ready({
+			...reviewDetailRunning,
+			results: { met: 2, notMet: 1, doesNotApply: 0, couldNotDetermine: 0 },
+			practices: [
+				{
+					...firstPractice,
+					status: "READY",
+					reason: null,
+					script: null,
+					results: { met: 1, notMet: 1, doesNotApply: 0, couldNotDetermine: 0 },
+				},
+				{
+					...secondPractice,
+					status: "READY",
+					reason: null,
+					script: null,
+					results: { met: 0, notMet: 0, doesNotApply: 0, couldNotDetermine: 0 },
+				},
+				...reviewDetailCompleted.practices
+					.filter((practice) => practice.status === "WITHHELD")
+					.map((practice) => ({
+						...practice,
+						results: { met: 1, notMet: 0, doesNotApply: 0, couldNotDetermine: 0 },
+					})),
+			],
+		}),
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		const list = panel.getByRole("list", { name: "Every practice in this review" });
+		const [recorded, captured] = list.querySelectorAll('[data-practice-status="READY"]');
+		if (!(recorded instanceof HTMLElement) || !(captured instanceof HTMLElement)) {
+			throw new Error("Both practices must remain Ready");
+		}
+		await expect(recorded).toHaveTextContent("Results recorded so far");
+		await expect(recorded).toHaveTextContent("Ready");
+		for (const [name, outcome] of [
+			["1 met", "MET"],
+			["1 not met", "NOT_MET"],
+		] as const) {
+			const opened = listOpenedBy(
+				within(recorded).getByRole("link", { name: `${name}, ${firstPractice.practiceName}` }),
+			);
+			await expect(opened.list).toBe("results");
+			await expect(opened.search).toMatchObject({
+				reviewId: reviewDetailRunning.id,
+				practiceSlug: firstPractice.practiceSlug,
+				outcome,
+			});
+		}
+		const problems = listOpenedBy(
+			within(recorded).getByRole("link", { name: `View problems, ${firstPractice.practiceName}` }),
+		);
+		await expect(problems.list).toBe("problems");
+		await expect(problems.search).toMatchObject({
+			reviewId: reviewDetailRunning.id,
+			practiceSlug: firstPractice.practiceSlug,
+		});
+		await expect(captured).toHaveTextContent("Everything it reads was captured.");
+		await expect(within(captured).queryByRole("link")).toBeNull();
+		await expect(captured).not.toHaveTextContent("Results recorded so far");
+		await expect(list).not.toHaveTextContent(/It runs next|Done/u);
+		const withheld = list.querySelector('[data-practice-status="WITHHELD"]');
+		await expect(withheld).toHaveTextContent(/provider did not return them/u);
+		await expect(withheld).toHaveTextContent("1 met");
+	},
+};
+
+export const ActiveUsageNotRecordedYet: Story = {
+	args: {
+		review: ready({
+			...reviewDetailRunning,
+			usage: {
+				attempts: [],
+				calls: 0,
+				inputTokens: 0,
+				outputTokens: 0,
+				costUsd: "0",
+				priced: true,
+			},
+		}),
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		for (const label of [
+			"Cost",
+			"Review model calls",
+			"Tokens read",
+			"Tokens written",
+			"Cache tokens",
+		]) {
+			const fact = panel.getByText(label).closest("div");
+			await expect(fact).toHaveTextContent("Not recorded yet");
+		}
+	},
+};
+
+/**
+ * The review's feedback counts open the Feedback tab at exactly this review's feedback in that
+ * delivery family, as its result counts open the Results tab. Each count carries its family's mark.
+ */
+export const FeedbackCountsOpenTheirFeedback: Story = {
+	args: {
+		review: ready({
+			...reviewDetailCompleted,
+			feedback: {
+				awaitingApproval: 0,
+				ready: 0,
+				delivered: 2,
+				unconfirmed: 0,
+				withheld: 1,
+				rejected: 1,
+				replaced: 0,
+				failed: 0,
+			},
+		}),
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		const reviewId = reviewDetailCompleted.id;
+		for (const [name, state] of [
+			["2 delivered", "DELIVERED"],
+			["2 withheld", ["WITHHELD", "REJECTED", "REPLACED"]],
+		] as const) {
+			const link = panel.getByRole("link", { name });
+			const opened = listOpenedBy(link);
+			await expect(opened.list).toBe("feedback");
+			await expect(opened.search).toMatchObject({ reviewId, state });
+			await expect(link.parentElement?.querySelector("svg[aria-hidden]")).not.toBeNull();
+		}
+	},
+};
+
 export const Running: Story = {
-	args: {
-		job: { status: "ready", job: mockJobRunning },
-		summary: undefined,
-		trace: { status: "ready", trace: reviewTraceOf(mockJobRunning) },
-	},
+	args: { review: ready(reviewDetailRunning) },
 	play: async () => {
-		const panelElement = await settledDrawerPanel();
-		const panel = within(panelElement);
-		await expect(panelElement.querySelector("[data-sheet-status]")).toHaveTextContent(
-			/Running.*started/u,
-		);
-		await expect(panel.queryByText("Not yet")).toBeNull();
-		panel.getByText("Started");
-		await expect(panel.queryByText("Review on the work accepted")).toBeNull();
-		panel.getByRole("button", { name: "Cancel review" });
+		const panel = within(await settledDrawerPanel());
+		await expect(panel.getByRole("button", { name: "Cancel review" })).toBeEnabled();
 		await expect(panel.queryByRole("button", { name: "Request another review" })).toBeNull();
-		await expect(panel.queryByRole("heading", { name: "Model activity" })).toBeNull();
 	},
 };
 
-/** Acceptance records the public decision, including a quiet one; the job can keep running. */
-export const PublicDecisionAcceptedWhileRunning: Story = {
-	args: {
-		...Running.args,
-		job: {
-			status: "ready",
-			job: {
-				...mockJobRunning,
-				publicReviewAcceptedAt: new Date(mockJobRunning.createdAt.getTime() + 120_000),
-			},
-		},
-	},
+export const Queued: Story = {
+	args: { review: ready(reviewDetailQueued) },
 	play: async () => {
 		const panelElement = await settledDrawerPanel();
-		const panel = within(panelElement);
-		const history = within(panel.getByRole("list", { name: "History" }));
-		history.getByText("Review on the work accepted");
-		history.getByText(
-			"The public decision is recorded. Each piece of feedback records its own delivery state.",
+		await expect(panelElement.querySelector("[data-sheet-status]")).toHaveTextContent(
+			/Queued.*asked for/u,
 		);
-		await expect(panelElement.querySelector("[data-sheet-status]")).toHaveTextContent(/Running/u);
-		await expect(history.queryByText("Completed")).toBeNull();
-		await expect(history.queryByText("First comment posted")).toBeNull();
-		panel.getByRole("button", { name: "Cancel review" });
+		within(panelElement).getByText("Practices appear here as the review reaches them.");
 	},
 };
 
-/** Public acceptance and posting can precede the whole review's completion. */
-export const PublicCommentBeforeCompletion: Story = {
+export const BackingOff: Story = {
+	args: { review: ready(reviewDetailBackingOff) },
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		within(panel.getByRole("list", { name: "History" })).getByText("Retry due");
+		const execution = within(panel.getByRole("list", { name: "Execution" }));
+		execution.getByText("1 of 2 · Attempt 1");
+		execution.getByText("2 of 2 · Attempt 2");
+		execution.getByText(/out of memory/u);
+	},
+};
+
+export const ScanWithManyRuns: Story = {
+	args: { review: ready(reviewDetailScanManyJobs), onRequestReview: undefined },
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		panel.getByText("Scan");
+		await expect(panel.queryByText("Feedback", { exact: true })).not.toBeInTheDocument();
+		await expect(panel.queryByText(/results and feedback/u)).not.toBeInTheDocument();
+		await expect(panel.getByRole("link", { name: "Open the scan report" })).toHaveAttribute(
+			"href",
+			expect.stringContaining(`/admin/practices/scans/${reviewDetailScanManyJobs.id}`),
+		);
+		const runs = within(panel.getByRole("list", { name: "Execution" })).getAllByRole("listitem");
+		await expect(runs).toHaveLength(reviewDetailScanManyJobs.runtime?.jobs.length ?? 0);
+	},
+};
+
+export const PartialScan: Story = {
 	args: {
-		job: {
-			status: "ready",
-			job: {
-				...job,
-				publicReviewAcceptedAt: new Date(job.createdAt.getTime() + 120_000),
-				firstFeedbackPostedAt: new Date(job.createdAt.getTime() + 150_000),
-			},
-		},
+		review: ready({
+			...reviewDetailScanManyJobs,
+			status: "PARTIAL",
+			practices: reviewDetailScanManyJobs.practices.slice(0, 1).map((practice) => ({
+				...practice,
+				itemCounts: { listed: 4, reviewed: 4, reused: 1, withheld: 0, notReviewed: 0 },
+			})),
+		}),
+		onRequestReview: undefined,
 	},
 	play: async () => {
-		const panelElement = await settledDrawerPanel();
-		const panel = within(panelElement);
-		const history = within(panel.getByRole("list", { name: "History" }));
-		const accepted = history.getByText("Review on the work accepted");
-		const posted = history.getByText("First comment posted");
-		const completed = history.getByText("Completed");
-		await expect(precedes(accepted, posted)).toBe(true);
-		await expect(precedes(posted, completed)).toBe(true);
-		history.getByText("while the review was still running");
-		await expect(history.queryByText(/after it finished/u)).toBeNull();
-		await expect(panelElement.querySelector("[data-sheet-status]")).toHaveTextContent(/Completed/u);
+		const panel = within(await settledDrawerPanel());
+		await expect(
+			panel.getByText("It ended early, so its results cover only the work it reached."),
+		).toBeVisible();
+		await expect(panel.getByText("Files: 3 reviewed, 1 reused, 4 listed")).toBeVisible();
+		await expect(panel.queryByText("Feedback", { exact: true })).not.toBeInTheDocument();
 	},
 };
 
-/** Another review of the same work waits or runs: asking again would only be coalesced into it. */
+export const RuntimeExpired: Story = {
+	args: { review: ready(reviewDetailExpiredRuntime) },
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		panel.getByText(RUNTIME_EXPIRED);
+		panel.getByRole("list", { name: "Every practice in this review" });
+	},
+};
+
+export const TimedOut: Story = {
+	args: { review: ready(reviewDetailTimedOut) },
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		within(panel.getByRole("list", { name: "History" })).getByText(
+			"It ran past the time it is allowed and was stopped.",
+		);
+		panel.getByText(/exceeded the 1200s timeout/u);
+		panel.getByText("Results it recorded before it stopped still stand.");
+	},
+};
+
+export const ProcessingFailed: Story = {
+	args: { review: ready(reviewDetailProcessingFailed) },
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		within(panel.getByRole("list", { name: "Execution" })).getByText("Processing failed");
+	},
+};
+
+export const CancelledOnBudget: Story = {
+	args: { review: ready(reviewDetailCancelledOnBudget) },
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		within(panel.getByRole("list", { name: "History" })).getByText(
+			"The scan’s budget was used up.",
+		);
+	},
+};
+
+export const CostPerAttempt: Story = {
+	args: { review: ready({ ...reviewDetailCompleted, usage: reviewUsageTwoAttempts }) },
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		panel.getByText(/over 2 attempts/u);
+		panel.getByRole("heading", { name: "Attempts" });
+	},
+};
+
+// Unknown price must not be shown as zero cost.
+export const CostNotKnown: Story = {
+	args: { review: ready({ ...reviewDetailCompleted, usage: reviewUsageUnpriced }) },
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		panel.getByText("Not known: 1 attempt has no price");
+	},
+};
+
+export const WithFeedbackChecks: Story = {
+	args: {
+		feedbackChecks: { status: "ready", checks: reviewFeedbackChecksOf(reviewDetailCompleted) },
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		panel.getByRole("heading", { name: "Feedback checks of the review" });
+	},
+};
+
+export const FeedbackChecksLoading: Story = {
+	args: { feedbackChecks: { status: "loading" } },
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		panel.getByRole("heading", { name: "Feedback checks of the review" });
+	},
+};
+
+export const FeedbackChecksFailed: Story = {
+	args: { feedbackChecks: { status: "error", error: { status: 500 }, onRetry: fn() } },
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		panel.getByText("We could not load the feedback checks");
+	},
+};
+
+export const WithPracticeScripts: Story = {
+	args: { review: ready(withScripts) },
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		panel.getByRole("heading", { name: "Practice scripts" });
+		await expect(panel.getByRole("link", { name: "AI usage" })).toHaveAttribute(
+			"href",
+			"/w/demo/admin/usage",
+		);
+	},
+};
+
+/** A practice whose script already returned is no longer "next": the script's own line says how it ran. */
+export const ReadyAfterItsScriptRan: Story = {
+	args: {
+		review: ready({
+			...withScripts,
+			practices: withScripts.practices.map((practice) =>
+				practice.practiceSlug === "thin-controllers"
+					? { ...practice, status: "READY", reason: null }
+					: practice,
+			),
+		}),
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		const list = panel.getByRole("list", { name: "Every practice in this review" });
+		const row = list.querySelector('[data-practice-status="READY"]');
+		await expect(row).not.toBeNull();
+		await expect(row).toHaveTextContent("Ready");
+		await expect(row).not.toHaveTextContent(/It runs next/u);
+		await expect(row).toHaveTextContent(/returned a result/u);
+	},
+};
+
+export const WithoutPracticeScripts: Story = {
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		await expect(panel.queryByRole("heading", { name: "Practice scripts" })).toBeNull();
+	},
+};
+
 export const AnotherReviewActive: Story = {
 	args: { requestBlocked: REQUEST_BLOCKED.active },
-	play: async ({ args }) => {
-		const panel = within(await settledDrawerPanel());
-		const request = panel.getByRole("button", { name: "Request another review" });
-		await expect(request).toHaveAttribute("aria-disabled", "true");
-		await expect(args.onRequestReview).not.toHaveBeenCalled();
-	},
-};
-
-/** The value under one fact's label in the sheet in front. */
-async function phase(label: string) {
-	const panel = within(await settledDrawerPanel());
-	return panel.getByText(label, { selector: "dt" }).nextElementSibling;
-}
-
-/**
- * The current attempt's phases beside its history: wall-clock spans between the boundaries the job
- * records. Claimed the moment it was requested, so the wait is an exact zero, not an unknown.
- */
-export const Phases: Story = {
-	play: async () => {
-		await expect(await phase("Wait to start")).toHaveTextContent("0 seconds");
-		await expect(await phase("Preparation")).toHaveTextContent("40 seconds");
-		await expect(await phase("Execution")).toHaveTextContent("4 minutes");
-	},
-};
-
-/** A running review's execution is in progress, never a figure. */
-export const PhasesWhileRunning: Story = {
-	args: Running.args,
-	play: async () => {
-		await expect(await phase("Wait to start")).toHaveTextContent("20 seconds");
-		await expect(await phase("Preparation")).toHaveTextContent("40 seconds");
-		await expect(await phase("Execution")).toHaveTextContent("In progress");
-	},
-};
-
-/** Claimed but not yet handed to the sandbox. */
-export const PhasesWhilePreparing: Story = {
-	args: {
-		...Running.args,
-		job: { status: "ready", job: { ...mockJobRunning, executionStartedAt: undefined } },
-	},
-	play: async () => {
-		await expect(await phase("Preparation")).toHaveTextContent("In progress");
-		await expect(await phase("Execution")).toHaveTextContent("Not started");
-	},
-};
-
-export const PhasesWhileQueued: Story = {
-	args: {
-		...Running.args,
-		job: {
-			status: "ready",
-			job: {
-				...mockJobRunning,
-				status: "QUEUED",
-				startedAt: undefined,
-				executionStartedAt: undefined,
-			},
-		},
-	},
-	play: async () => {
-		await expect(await phase("Wait to start")).toHaveTextContent("In progress");
-		await expect(await phase("Preparation")).toHaveTextContent("Not started");
-		await expect(await phase("Execution")).toHaveTextContent("Not started");
-	},
-};
-
-/** A retry clears the attempt's boundaries, so its wait reaches back to the original request. */
-export const PhasesAfterARetry: Story = {
-	args: {
-		job: {
-			status: "ready",
-			job: { ...job, retryCount: 2, createdAt: new Date(job.createdAt.getTime() - 20 * 60_000) },
-		},
-	},
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
-		await expect(panel.queryByText("Wait to start", { selector: "dt" })).toBeNull();
-		await expect(await phase("Request to this attempt")).toHaveTextContent(
-			"20 minutes (includes earlier attempts and retry waits)",
+		await expect(panel.getByRole("button", { name: "Request another review" })).toHaveAttribute(
+			"aria-disabled",
+			"true",
 		);
 	},
 };
 
-/** A run from before the execution boundary was recorded: its two phases are unknown, never zero. */
-export const PhasesBeforeExecutionWasRecorded: Story = {
-	args: { job: { status: "ready", job: { ...job, executionStartedAt: undefined } } },
-	play: async () => {
-		await expect(await phase("Preparation")).toHaveTextContent("Not recorded");
-		await expect(await phase("Execution")).toHaveTextContent("Not recorded");
-	},
-};
-
-/** A review on hold is the one alert: it is happening now. */
-export const OnHold: Story = {
-	args: { job: { status: "ready", job: mockJobHeldOnBudget }, summary: undefined },
+export const WithRefusal: Story = {
+	args: { requestRefusal: <p role="alert">A review of this work started a minute ago.</p> },
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
-		await expect(panel.getAllByRole("alert")).toHaveLength(1);
-	},
-};
-
-/** A failed review says what went wrong where it ended, in its history. */
-export const Failed: Story = {
-	args: {
-		job: {
-			status: "ready",
-			job: {
-				...job,
-				status: "FAILED",
-				exitCode: 1,
-				errorMessage: "Cannot compute diff: all resolution strategies failed for commit 27f4e88c.",
-				firstFeedbackPostedAt: undefined,
-				deliveryStatus: undefined,
-			},
-		},
-	},
-	play: async () => {
-		const panel = within(await settledDrawerPanel());
-		panel.getByText(/Cannot compute diff/u);
-		panel.getByText(/It ended early/u);
-		await expect(panel.queryByRole("alert")).toBeNull();
-	},
-};
-
-/** A review that assessed nothing says so, so it does not read as one that looked and found nothing. */
-export const NothingAssessed: Story = {
-	args: { job: { status: "ready", job: { ...job, reviewOutcome: "INSUFFICIENT_EVIDENCE" } } },
-	play: async () => {
-		const panelElement = await settledDrawerPanel();
-		await expect(panelElement.querySelector("[data-sheet-status]")).toHaveTextContent(
-			/Nothing assessed/u,
-		);
-	},
-};
-
-export const Coalesced: Story = {
-	args: { job: { status: "ready", job: { ...job, reviewOutcome: "COALESCED" } } },
-	play: async () => {
-		const panelElement = await settledDrawerPanel();
-		await expect(panelElement.querySelector("[data-sheet-status]")).toHaveTextContent(/Coalesced/u);
-	},
-};
-
-/**
- * A queued review a newer one replaced reads Replaced, not Completed, and says the newer review carries
- * its practices. That review's id is under Technical, and a link opens its sheet in place of this
- * one: the one link a sheet makes to another record, since the newer review is where its practices
- * are.
- */
-export const ReplacedByANewerReview: Story = {
-	args: {
-		job: {
-			status: "ready",
-			job: {
-				...job,
-				reviewOutcome: "SUPERSEDED",
-				coveringJobId: "eeeeeeee-2222-2222-2222-222222222222",
-				startedAt: undefined,
-				executionStartedAt: undefined,
-				deliveryStatus: undefined,
-			},
-		},
-	},
-	play: async () => {
-		const panelElement = await settledDrawerPanel();
-		const panel = within(panelElement);
-		await expect(panelElement.querySelector("[data-sheet-status]")).toHaveTextContent(/Replaced/u);
-		await expect(panelElement.querySelector("[data-sheet-status]")).not.toHaveTextContent(
-			/Completed/u,
-		);
-		panel.getByText(/A newer review of the same work replaced it while it waited/u);
-		panel.getByText("Replaced: a newer review of the same work carries its practices");
-		panel.getByText("eeeeeeee-2222-2222-2222-222222222222");
-		await expect(
-			levelsOpenedBy(panel.getByRole("link", { name: "Open the newer review" })),
-		).toEqual(["review:eeeeeeee-2222-2222-2222-222222222222"]);
-	},
-};
-
-/** The checks the review ran for itself are on the review, not on a piece of its feedback. */
-export const WithDeliveryChecks: Story = {
-	args: { deliveryChecks: { status: "ready", checks: reviewDeliveryChecksOf(job) } },
-	play: async () => {
-		const panel = within(await settledDrawerPanel());
-		panel.getByRole("heading", { name: "Delivery checks of the review" });
-	},
-};
-
-/** At 390px the practices reflow as a list instead of scrolling a table. */
-export const Reflow: Story = {
-	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
-	play: async () => {
-		await expectNoPanelOverflow(await settledDrawerPanel());
-	},
-};
-
-/**
- * A retried review lists what each attempt cost under Technical, with their total; a single
- * attempt is only its cost.
- */
-export const CostPerAttempt: Story = {
-	args: {
-		job: {
-			status: "ready",
-			job: { ...job, retryCount: 1, traceId: "4bf92f3577b34da6a3ce929d0e0e4736" },
-		},
-		usage: { status: "ready", usage: mockJobUsageTwoAttempts },
-	},
-	play: async () => {
-		const panel = within(await settledDrawerPanel());
-		panel.getByText("$0.04 over 2 attempts");
-		panel.getByRole("heading", { name: "Attempts" });
-		panel.getByText("Attempt 1");
-		panel.getByText("Attempt 2");
-		panel.getByText("4bf92f3577b34da6a3ce929d0e0e4736");
-		panel.getByRole("button", { name: "Copy trace id" });
-	},
-};
-
-/** One fact of one phase under Model activity. */
-async function activityFact(phaseLabel: string, label: string) {
-	const panel = within(await settledDrawerPanel());
-	const group = within(panel.getByRole("group", { name: phaseLabel }));
-	return group.getByText(label, { selector: "dt" }).nextElementSibling;
-}
-
-const recordedPhases = {
-	...job,
-	llmTotalCalls: 9,
-	reviewDiagnostics: {
-		phases: [
-			{
-				phase: "PRACTICE",
-				recordedTurns: 4,
-				assistantCalls: 6,
-				elapsedMs: 95_000,
-				modelCallTiming: {
-					timedCalls: 6,
-					respondedCalls: 6,
-					elapsedMs: 61_000,
-					failedElapsedMs: 4000,
-					maxElapsedMs: 22_000,
-					responseMs: 58_000,
-				},
-				modelFailures: [{ kind: "HTTP_ERROR", count: 2 }],
-			},
-			{
-				phase: "PUBLIC_REVIEW",
-				recordedTurns: 1,
-				assistantCalls: 2,
-				elapsedMs: 30_000,
-				modelCallTiming: {
-					timedCalls: 2,
-					respondedCalls: 2,
-					elapsedMs: 18_000,
-					failedElapsedMs: 0,
-					maxElapsedMs: 12_000,
-					responseMs: 17_000,
-				},
-				modelFailures: [],
-			},
-			{
-				phase: "PRIVATE_FEEDBACK",
-				recordedTurns: 1,
-				assistantCalls: 1,
-				elapsedMs: 12_000,
-				modelCallTiming: {
-					timedCalls: 1,
-					respondedCalls: 1,
-					elapsedMs: 8000,
-					failedElapsedMs: 0,
-					maxElapsedMs: 8000,
-					responseMs: 7600,
-				},
-				modelFailures: [],
-			},
-			{ phase: "UNKNOWN", recordedTurns: 0 },
-		],
-	},
-} satisfies AgentJob;
-
-/**
- * Model activity from the turns a finished review kept, phase by phase. Two calls failed during the
- * practice checks; the review still finished, and no last-call failure is shown, which is not proof
- * that a later call recovered.
- */
-export const ModelActivityByPhase: Story = {
-	args: { job: { status: "ready", job: recordedPhases } },
-	play: async () => {
-		await expect(await activityFact("Practice checks", "Closed turns")).toHaveTextContent(
-			"4 turns, 2 min",
-		);
-		await expect(await activityFact("Practice checks", "Model time")).toHaveTextContent(
-			"1 min over 6 of 6 calls timed, longest 22 s",
-		);
-		await expect(
-			await activityFact("Practice checks", "Request to SDK response"),
-		).toHaveTextContent("58 s over 6 calls");
-		await expect(await activityFact("Practice checks", "Failed calls")).toHaveTextContent(
-			"HTTP error: 2",
-		);
-		await expect(await activityFact("Review on the work", "Failed calls")).toHaveTextContent(
-			"None recorded",
-		);
-		const panel = within(await settledDrawerPanel());
-		panel.getByRole("group", { name: "Private feedback" });
-		await expect(panel.queryByText("Latest turn’s last call")).toBeNull();
-		// A phase with no kept turns has no row, rather than a row of zeros.
-		await expect(panel.queryByRole("group", { name: "Not assigned to a phase" })).toBeNull();
-	},
-};
-
-/**
- * Turns from before the runner tagged their phase stay unassigned, and a figure that was not
- * recorded says so rather than reading as zero.
- */
-export const ModelActivityPartlyRecorded: Story = {
-	args: {
-		job: {
-			status: "ready",
-			job: {
-				...job,
-				reviewDiagnostics: {
-					phases: [
-						{
-							phase: "PRACTICE",
-							recordedTurns: 2,
-							modelCallTiming: { timedCalls: 0, respondedCalls: 0 },
-							modelFailures: [{ kind: "CONNECTION_TIMEOUT" }],
-							finalModelFailure: {
-								kind: "HTTP_ERROR",
-								status: 503,
-								phase: "RESPONSE_BODY",
-								retryEndedUnsuccessfully: true,
-							},
-						},
-						{ phase: "PUBLIC_REVIEW", recordedTurns: 0 },
-						{ phase: "PRIVATE_FEEDBACK", recordedTurns: 0 },
-						{
-							phase: "UNKNOWN",
-							recordedTurns: 3,
-							assistantCalls: 5,
-							elapsedMs: 40_000,
-							modelCallTiming: {
-								timedCalls: 3,
-								respondedCalls: 0,
-								elapsedMs: 9000,
-								failedElapsedMs: 0,
-								maxElapsedMs: 4000,
-							},
-						},
-					],
-				},
-			},
-		},
-	},
-	play: async () => {
-		await expect(await activityFact("Practice checks", "Closed turns")).toHaveTextContent(
-			"2 turns, time not recorded",
-		);
-		await expect(await activityFact("Practice checks", "Calls recorded")).toHaveTextContent(
-			"Not recorded",
-		);
-		await expect(await activityFact("Practice checks", "Model time")).toHaveTextContent(
-			"Not recorded",
-		);
-		await expect(await activityFact("Practice checks", "Failed calls")).toHaveTextContent(
-			"Connection timed out: number not recorded",
-		);
-		await expect(
-			await activityFact("Practice checks", "Latest turn’s last call"),
-		).toHaveTextContent(
-			"Failed: HTTP error 503, while reading the response, after retries ended unsuccessfully",
-		);
-		await expect(await activityFact("Not assigned to a phase", "Model time")).toHaveTextContent(
-			"9 s over 3 of 5 calls timed, longest 4 s",
-		);
-		await expect(await activityFact("Not assigned to a phase", "Failed calls")).toHaveTextContent(
-			"Not recorded",
-		);
-		const panel = within(await settledDrawerPanel());
-		await expect(
-			within(panel.getByRole("group", { name: "Practice checks" })).queryByText(/0 s/u),
-		).toBeNull();
-		await expect(panel.queryByText("Request to SDK response")).toBeNull();
-		await expect(panel.queryByRole("group", { name: "Review on the work" })).toBeNull();
-	},
-};
-
-/** The phases reflow inside the narrow drawer like the rest of Technical. */
-export const ModelActivityReflow: Story = {
-	...Reflow,
-	args: ModelActivityByPhase.args,
-};
-
-/** A model without a price has no cost: it says so rather than $0. */
-export const CostNotKnown: Story = {
-	args: { usage: { status: "ready", usage: mockJobUsageUnpriced } },
-	play: async () => {
-		const panel = within(await settledDrawerPanel());
-		panel.getByText("Not known: 1 attempt has no confirmed cost");
-		await expect(panel.queryByText("$0")).toBeNull();
-	},
-};
-
-/** A canceled review says in its history why the server stopped it. */
-export const CanceledOnBudget: Story = {
-	args: {
-		job: { status: "ready", job: mockJobCancelledOnBudget },
-		summary: undefined,
-		trace: { status: "ready", trace: reviewTraceOf(mockJobCancelledOnBudget) },
-		usage: { status: "ready", usage: { attempts: [], unpricedAttempts: 0 } },
-	},
-	play: async () => {
-		const panel = within(await settledDrawerPanel());
-		const history = within(panel.getByRole("list", { name: "History" }));
-		history.getByText(/Reason: The model budget was used up\./u);
-		panel.getByText("No usage recorded");
-	},
-};
-
-/**
- * The job counted model calls, but its usage ledger holds no attempt: the cost says nothing was
- * recorded, not that nothing reached the model.
- */
-export const ModelCallsWithoutUsage: Story = {
-	args: {
-		job: { status: "ready", job: { ...job, llmTotalCalls: 12 } },
-		usage: { status: "ready", usage: { attempts: [], unpricedAttempts: 0 } },
-	},
-	play: async () => {
-		const panel = within(await settledDrawerPanel());
-		panel.getByText("No usage recorded");
-		await expect(panel.queryByText(/reached the model/u)).toBeNull();
-		await expect(panel.queryByText("$0")).toBeNull();
-	},
-};
-
-/** What the review cost could not be read: the rest of the sheet still stands. */
-export const CostFailed: Story = {
-	args: {
-		usage: { status: "error", error: new Error("Network down"), onRetry: fn() },
-	},
-	play: async () => {
-		const panel = within(await settledDrawerPanel());
-		panel.getByText(/what the review cost/u);
-		await expect(panel.getByRole("button", { name: "Retry" })).toBeEnabled();
+		panel.getByRole("alert");
 	},
 };
 
 export const Loading: Story = {
-	args: { job: { status: "loading" } },
+	args: { review: { status: "loading" } },
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
 		await expect(panel.queryByRole("heading", { name: SHEET_SECTIONS.what })).toBeNull();
 	},
 };
 
+export const LoadFailed: Story = {
+	args: { review: { status: "error", error: { status: 500 }, onRetry: fn() } },
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		panel.getByText("We could not load this review");
+		await expect(panel.getByRole("button", { name: "Retry" })).toBeEnabled();
+	},
+};
+
+export const Reflow: Story = {
+	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { disableSnapshot: true } },
+	play: async () => {
+		await expectNoPanelOverflow(await settledDrawerPanel());
+	},
+};
+
 export const NoPracticeResultsRecordedYet: Story = {
 	args: {
 		...Running.args,
-		trace: {
-			status: "ready",
-			trace: { ...reviewTraceOf(mockJobRunning), practices: [], signals: [] },
-		},
-		summary: undefined,
+		review: ready({ ...reviewDetailRunning, practices: [] }),
 	},
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
-		panel.getByText("No practice results have been recorded yet.");
+		panel.getByText("Practices appear here as the review reaches them.");
 		await expect(panel.queryByRole("list", { name: "Every practice in this review" })).toBeNull();
+	},
+};
+
+export const AmbiguousHistoricalResults: Story = {
+	args: {
+		review: ready({
+			...reviewDetailCompleted,
+			status: "PARTIAL",
+			stopReason: "RESULT_WITHHELD",
+			results: { met: 1, notMet: 1, doesNotApply: 0, couldNotDetermine: 0 },
+			practices: reviewDetailCompleted.practices.slice(0, 1).map((practice) => ({
+				...practice,
+				status: "WITHHELD",
+				reason: "LEGACY_AMBIGUOUS_RESULTS",
+				results: { met: 1, notMet: 1, doesNotApply: 0, couldNotDetermine: 0 },
+				itemCounts: { listed: 1, reviewed: 0, reused: 0, withheld: 1, notReviewed: 0 },
+			})),
+		}),
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		const list = within(panel.getByRole("list", { name: "Every practice in this review" }));
+		await expect(list.getByText("Withheld")).toBeVisible();
+		await expect(
+			list.getByText(
+				"This review keeps several historical results for the same practice and work without choosing one as its answer.",
+			),
+		).toBeVisible();
+		await expect(list.queryByText("LEGACY_AMBIGUOUS_RESULTS")).toBeNull();
 	},
 };

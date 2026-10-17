@@ -9,15 +9,18 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitAuthorResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlSyncCoordinator;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -61,7 +64,8 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
                 graphQlSyncCoordinator,
                 exceptionClassifier,
                 userProcessor,
-                eventPublisher);
+                eventPublisher,
+                Clock.fixed(Instant.EPOCH, ZoneOffset.UTC));
     }
 
     // Tests
@@ -222,7 +226,7 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
             // alice@example.com can be resolved by email, unknown@personal.com cannot
             when(commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(1L))
                     .thenReturn(List.of("alice@example.com", "unknown@personal.com"))
-                    .thenReturn(List.of("unknown@personal.com")); // unknown still unresolved after email
+                    .thenReturn(List.of("unknown@personal.com"));
             when(commitRepository.findDistinctUnresolvedCommitterEmailsByRepositoryId(1L))
                     .thenReturn(List.of())
                     .thenReturn(List.of());

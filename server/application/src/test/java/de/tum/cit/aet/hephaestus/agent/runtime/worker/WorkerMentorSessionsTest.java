@@ -20,7 +20,7 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.NetworkPolicy;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxIdentity;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.MentorSessionCommand;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.MentorSessionEvent;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -94,7 +94,7 @@ class WorkerMentorSessionsTest extends BaseUnitTest {
         body.set(
                 "route",
                 mapper.valueToTree(new MentorProxyCredentialRegistry.Route(
-                        "openai-completions", "https://upstream.test", FundingSource.INSTANCE, 1L, 1L, 1L)));
+                        "openai-completions", "https://upstream.test", UsageFundingSource.INSTANCE, 1L, 1L, 1L)));
         return new MentorSessionCommand(sessionId, UUID.randomUUID(), MentorSessionCommand.Operation.OPEN, body);
     }
 
@@ -108,10 +108,10 @@ class WorkerMentorSessionsTest extends BaseUnitTest {
                     assertThat(event.kind()).isEqualTo(MentorSessionEvent.Kind.ACK);
                 }));
         assertThat(capacity.snapshot().inFlightMentor()).isEqualTo(1);
-        assertThat(credentials.validate("scoped-token")).isPresent();
+        assertThat(credentials.authenticate("scoped-token")).isPresent();
         sessions.stop();
         assertThat(capacity.snapshot().inFlightMentor()).isZero();
-        assertThat(credentials.validate("scoped-token")).isEmpty();
+        assertThat(credentials.authenticate("scoped-token")).isEmpty();
         verify(attached).close(Duration.ZERO);
         assertThat(replies).anySatisfy(event -> assertThat(event.kind()).isEqualTo(MentorSessionEvent.Kind.CLOSED));
         replies.clear();
@@ -128,7 +128,7 @@ class WorkerMentorSessionsTest extends BaseUnitTest {
         doThrow(new InteractiveSandboxException("close failed")).when(attached).close(Duration.ZERO);
         assertThatCode(sessions::stop).doesNotThrowAnyException();
         assertThat(capacity.snapshot().inFlightMentor()).isZero();
-        assertThat(credentials.validate("scoped-token")).isEmpty();
+        assertThat(credentials.authenticate("scoped-token")).isEmpty();
         assertThat(replies).anySatisfy(event -> assertThat(event.kind()).isEqualTo(MentorSessionEvent.Kind.CLOSED));
     }
 
@@ -146,14 +146,14 @@ class WorkerMentorSessionsTest extends BaseUnitTest {
             sessions.handle(open(UUID.randomUUID()));
             assertThat(replies).anySatisfy(event -> assertThat(event.kind()).isEqualTo(MentorSessionEvent.Kind.BUSY));
             sessions.stop();
-            assertThat(credentials.validate("scoped-token")).isEmpty();
+            assertThat(credentials.authenticate("scoped-token")).isEmpty();
             assertThat(capacity.snapshot().inFlightMentor()).isZero();
         } finally {
             startupResult.complete(attached);
         }
         await().atMost(Duration.ofSeconds(3))
                 .untilAsserted(() -> verify(attached).close(Duration.ZERO));
-        assertThat(credentials.validate("scoped-token")).isEmpty();
+        assertThat(credentials.authenticate("scoped-token")).isEmpty();
     }
 
     @Test
@@ -164,7 +164,7 @@ class WorkerMentorSessionsTest extends BaseUnitTest {
                 .untilAsserted(() -> assertThat(replies)
                         .anySatisfy(event -> assertThat(event.kind()).isEqualTo(MentorSessionEvent.Kind.CLOSED)));
         assertThat(capacity.snapshot().inFlightMentor()).isZero();
-        assertThat(credentials.validate("scoped-token")).isEmpty();
+        assertThat(credentials.authenticate("scoped-token")).isEmpty();
     }
 
     @Test
@@ -230,7 +230,7 @@ class WorkerMentorSessionsTest extends BaseUnitTest {
             assertThat(entered.await(3, TimeUnit.SECONDS)).isTrue();
             if (close) {
                 assertThat(capacity.snapshot().inFlightMentor()).isEqualTo(1);
-                assertThat(credentials.validate("scoped-token")).isEmpty();
+                assertThat(credentials.authenticate("scoped-token")).isEmpty();
             }
             var healthy = new MentorSessionCommand(
                     spec.sessionId(),

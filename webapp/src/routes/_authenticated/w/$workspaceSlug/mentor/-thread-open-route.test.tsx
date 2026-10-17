@@ -7,7 +7,7 @@ import type { ChatThreadDetail } from "@/api/types.gen";
 import { mentorThreadOptions } from "@/hooks/use-mentor-chat";
 import type { Wire } from "@/lib/dates";
 import { workspaceOnboarding } from "@/mocks/fixtures/onboarding";
-import { workspaceListItem } from "@/mocks/fixtures/workspaces";
+import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
 import { renderRouteAt, ROUTE_RENDER_WAIT } from "@/test/router-harness";
 
@@ -48,9 +48,7 @@ beforeEach(() => {
 	server.use(
 		http.get("*/workspaces", () => HttpResponse.json([workspaceListItem("acme")])),
 		http.get("*/user/features", () => HttpResponse.json({})),
-		http.get("*/workspaces/acme/members/me", () =>
-			HttpResponse.json({ role: "MEMBER", userId: 20, userLogin: "ada" }),
-		),
+		http.get("*/workspaces/acme/members/me", () => HttpResponse.json(ownMembership("MEMBER"))),
 		http.get("*/workspaces/acme/onboarding/me", () =>
 			HttpResponse.json({
 				...workspaceOnboarding(),

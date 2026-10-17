@@ -1,8 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreview;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -12,6 +9,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRe
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.BaseGitHubProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest.dto.GitHubPullRequestDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreview.dto.GitHubPullRequestReviewEventDTO;
@@ -236,8 +236,7 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
         review.setBody(dto.body());
         PullRequestReview.State newState = mapState(Objects.requireNonNullElse(dto.state(), "COMMENTED"));
         if (newState == PullRequestReview.State.DISMISSED) {
-            // When creating a review that's already dismissed, we don't know the original state.
-            // Set state to DISMISSED and mark as dismissed. This is a best-effort for historical data.
+            // A dismissed review capture does not reveal its original state.
             review.setState(newState);
             review.setDismissed(true);
         } else {
@@ -374,8 +373,7 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
 
         PullRequest saved = prRepository.save(pr);
         log.info(
-                "Created stub PullRequest from review webhook (will be hydrated by PR webhook or sync): "
-                        + "prId={}, prNumber={}, repoName={}",
+                "Created stub PullRequest from review webhook (will be hydrated by PR webhook or sync): prId={}, prNumber={}, repoName={}",
                 saved.getId(),
                 saved.getNumber(),
                 repository.getNameWithOwner());
@@ -387,8 +385,8 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
      */
     private Issue.State convertState(String state) {
         if (state == null) {
-            log.warn("PR state is null when creating stub from review webhook, defaulting to OPEN. "
-                    + "This may indicate missing data in webhook payload.");
+            log.warn(
+                    "PR state is null when creating stub from review webhook, defaulting to OPEN. This may indicate missing data in webhook payload.");
             return Issue.State.OPEN;
         }
         return switch (state.toUpperCase(Locale.ROOT)) {

@@ -18,13 +18,6 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
 
-/**
- * nOAuth linchpin: every login {@link ClientRegistration} built from a {@code login_provider} row MUST
- * key its principal on an IdP-stable, immutable subject ({@code id}/{@code sub}) — never a mutable
- * handle (a renameable GitLab {@code username}, or an {@code email} an attacker can set on a controlled
- * IdP). {@code IdentityLink.subject} is keyed on this; a regression is the classic nOAuth takeover.
- * Also checks the GitHub vs GitLab endpoint wiring.
- */
 class LoginProviderClientRegistrationRepositoryTest extends BaseUnitTest {
 
     private static final Set<String> STABLE_SUBJECT_ATTRIBUTES = Set.of("id", "sub");

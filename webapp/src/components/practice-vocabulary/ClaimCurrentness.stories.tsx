@@ -1,43 +1,35 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
 
-import { ClaimCurrentnessAlert } from "./ClaimCurrentness";
+import { ClaimCurrentnessBadge } from "./ClaimCurrentness";
 
 const meta = {
-	component: ClaimCurrentnessAlert,
+	component: ClaimCurrentnessBadge,
 	args: { currentness: "STALE" },
-	parameters: { layout: "padded" },
+	parameters: { layout: "centered" },
 	tags: ["autodocs"],
-} satisfies Meta<typeof ClaimCurrentnessAlert>;
+} satisfies Meta<typeof ClaimCurrentnessBadge>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Stale: Story = {
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("This observation is no longer current")).toBeVisible();
+		await expect(canvas.getByText("Historical result")).toBeVisible();
 	},
 };
 
-/**
- * Worded from the reader's question — whether they can trust what they are reading — rather than
- * from the record's property, so it says what is missing, why that leaves the question open, and
- * what to do about it.
- */
 export const Unverifiable: Story = {
 	args: { currentness: "UNVERIFIABLE" },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("We cannot verify this observation")).toBeVisible();
+		await expect(canvas.getByText("Unverified result")).toBeVisible();
 	},
 };
 
-/**
- * A result on the current practice standard is the norm, and a banner saying so on every observation is a line
- * every reader learns to skip — which is what would make the exceptions above invisible.
- */
+/** A current result needs no badge: only a result that no longer holds says so. */
 export const Current: Story = {
 	args: { currentness: "CURRENT" },
 	play: async ({ canvas }) => {
-		await expect(canvas.queryByRole("alert")).toBeNull();
+		await expect(canvas.queryByText(/^(?:Historical|Unverified) result$/u)).toBeNull();
 	},
 };

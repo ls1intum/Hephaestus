@@ -4,6 +4,8 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceIdentityContributor;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceScope;
+import de.tum.cit.aet.hephaestus.integration.chat.item.ThreadEvents;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import java.util.List;
 import java.util.Set;
@@ -18,8 +20,13 @@ public class SlackPersonSourceIdentityContributor implements PersonSourceIdentit
     private final SlackThreadRepository repository;
 
     @Override
-    public Set<String> artifactKinds() {
-        return Set.of("chat.conversation_thread");
+    public PersonSourceScope scope() {
+        return PersonSourceScope.CONVERSATIONS;
+    }
+
+    @Override
+    public Set<String> itemKinds() {
+        return Set.of(ThreadEvents.THREAD.value());
     }
 
     @Override
@@ -34,8 +41,8 @@ public class SlackPersonSourceIdentityContributor implements PersonSourceIdentit
     }
 
     @Override
-    public List<PersonIdentity> identitiesForSource(long workspaceId, String artifactKind, long artifactId) {
-        return repository.findPersonSourceIdentities(workspaceId, artifactId).stream()
+    public List<PersonIdentity> identitiesForSource(long workspaceId, String itemKind, long sourceId) {
+        return repository.findPersonSourceIdentities(workspaceId, sourceId).stream()
                 .map(row -> new PersonIdentity(row.getProviderId(), row.getSubject(), row.getTeamId()))
                 .toList();
     }

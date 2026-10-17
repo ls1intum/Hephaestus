@@ -1,8 +1,9 @@
 import type { ReactElement } from "react";
+import { currentDefinition } from "@/components/admin/practices/practice-definition-fields";
 
 import type { Practice } from "@/api/types.gen";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { artifactKindLabel } from "@/lib/artifact-kinds";
+import { itemKindLabel } from "@/lib/item-kinds";
 import { hasText } from "@/lib/text";
 
 export interface PracticeDetailHoverCardProps {
@@ -22,8 +23,9 @@ export interface PracticeDetailHoverCardProps {
  * Radix's, whose docs warn it must not carry essential content for exactly that reason.
  */
 export function PracticeDetailHoverCard({ practice, children }: PracticeDetailHoverCardProps) {
-	const why = practice.whyItMatters?.trim();
-	const good = practice.whatGoodLooksLike?.trim();
+	const definition = currentDefinition(practice);
+	const why = definition.guidance.whyItMatters?.trim();
+	const good = definition.guidance.whatGoodLooksLike?.trim();
 	if (!hasText(why) && !hasText(good)) {
 		return children;
 	}
@@ -34,7 +36,7 @@ export function PracticeDetailHoverCard({ practice, children }: PracticeDetailHo
 			{/* `align="start"`: centred on a name that runs most of the row's width, the card would
 			    start somewhere the eye did not leave. */}
 			<HoverCardContent align="start" className="w-80 space-y-2">
-				<p className="font-medium">{practice.name}</p>
+				<p className="font-medium">{definition.name}</p>
 				{hasText(why) && <p className="text-muted-foreground">{why}</p>}
 				{hasText(good) && (
 					<p className="text-muted-foreground">
@@ -42,9 +44,7 @@ export function PracticeDetailHoverCard({ practice, children }: PracticeDetailHo
 						{good}
 					</p>
 				)}
-				<p className="text-xs text-muted-foreground">
-					Reviewed on: {artifactKindLabel(practice.artifactKind)}
-				</p>
+				<p className="text-xs text-muted-foreground">Reviews: {itemKindLabel(practice.kind)}</p>
 			</HoverCardContent>
 		</HoverCard>
 	);

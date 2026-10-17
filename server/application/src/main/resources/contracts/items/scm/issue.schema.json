@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hephaestus.aet.cit.tum.de/contracts/items/scm/issue.schema.json",
+  "type": "object",
+  "properties": {
+    "issue_number": {
+      "type": "integer"
+    },
+    "title": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "body": {
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "OPEN",
+        "CLOSED",
+        "UNKNOWN"
+      ]
+    },
+    "state_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "html_url": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "repository_full_name": {
+      "type": "string"
+    },
+    "repository_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "provider_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "author": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "author_id": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "issue_type": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "is_locked": {
+      "type": "boolean"
+    },
+    "sub_issues_total": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "sub_issues_completed": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "sub_issues_source": {
+      "enum": [
+        "provider",
+        "children"
+      ]
+    },
+    "milestone": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "closed_at": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "labels": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "assignees": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "issue_number",
+    "title",
+    "body",
+    "state",
+    "state_reason",
+    "html_url",
+    "repository_full_name",
+    "author",
+    "author_id",
+    "issue_type",
+    "is_locked",
+    "sub_issues_total",
+    "sub_issues_completed",
+    "milestone",
+    "closed_at",
+    "labels",
+    "assignees"
+  ],
+  "additionalProperties": true
+}

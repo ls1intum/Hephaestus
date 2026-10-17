@@ -1,4 +1,6 @@
-/** The practice and observation domain types other modules read. */
-@org.springframework.modulith.NamedInterface("model")
-@org.jspecify.annotations.NullMarked
+@NamedInterface("model")
+@NullMarked
 package de.tum.cit.aet.hephaestus.practices.model;
+
+import org.jspecify.annotations.NullMarked;
+import org.springframework.modulith.NamedInterface;

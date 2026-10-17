@@ -2,13 +2,13 @@ package de.tum.cit.aet.hephaestus.workspace.onboarding;
 
 import de.tum.cit.aet.hephaestus.core.AuditLedger;
 import de.tum.cit.aet.hephaestus.core.Audited;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
 import de.tum.cit.aet.hephaestus.core.auth.web.CurrentAccount;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireWorkspaceOwner;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
-import de.tum.cit.aet.hephaestus.workspace.spi.MemberAiChoice;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 public class WorkspaceOnboardingController {
     private final WorkspaceOnboardingService service;
 
-    public record MemberAiChoiceRequestDTO(@NonNull @NotNull MemberAiChoice choice) {}
+    public record AiChoiceRequestDTO(@NonNull @NotNull AiChoice choice) {}
 
     @GetMapping("/me")
     @PreAuthorize("isAuthenticated()")
@@ -40,8 +40,8 @@ public class WorkspaceOnboardingController {
     @PutMapping("/me/ai-choice")
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Change your AI choice without changing workspace membership")
-    public WorkspaceOnboardingDTO updateMemberAiChoice(
-            WorkspaceContext context, @Valid @RequestBody MemberAiChoiceRequestDTO request) {
+    public WorkspaceOnboardingDTO updateAiChoice(
+            WorkspaceContext context, @Valid @RequestBody AiChoiceRequestDTO request) {
         return service.choose(context, CurrentAccount.requireId(), request.choice());
     }
 
@@ -53,7 +53,8 @@ public class WorkspaceOnboardingController {
     }
 
     // Readable by every workspace admin: the model assignment page previews who the undeclared slot
-    // serves, which depends on whether the choice is required. Changing the settings stays with owners.
+    // serves, which depends on whether the choice is required. Changing the settings stays with
+    // owners.
     @GetMapping("/settings")
     @RequireAtLeastWorkspaceAdmin
     @Operation(summary = "Get this workspace's member-onboarding settings")

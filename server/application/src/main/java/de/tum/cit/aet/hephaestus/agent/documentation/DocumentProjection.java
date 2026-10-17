@@ -25,8 +25,8 @@ public interface DocumentProjection {
     List<DocumentAccess> documentAccessByReference(long workspaceId, Collection<String> documentRefs);
 
     /**
-     * Keyed on the local id because that is what the signal ledger records as the artifact — a review is
-     * occasioned by {@code docs.document.published} against a row in this workspace's mirror. Empty when
+     * Keyed on the local id because the review's item is this mirror row;
+     * {@code docs.document.published} starts the review. Empty when
      * the row is gone, which the caller must report as an unavailable subject, not a document that said
      * nothing.
      */

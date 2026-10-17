@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.runtime.PiRunnerProfile;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 public final class PracticeRunnerProfile implements PiRunnerProfile {
 
@@ -15,13 +16,16 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
             "pi-assessment-cache.ts",
             "pi-task-paths.ts",
             "pi-tool-arguments.ts",
+            "pi-tool-validation.ts",
             "pi-change.ts",
-            "pi-precompute.ts",
-            "pi-precompute.sh",
+            "pi-practice-scripts-report.ts",
             "pi-error-text.ts",
             "pi-model-failure.ts",
             "pi-text.ts",
-            "pi-observation-normalize.ts",
+            "pi-result-normalize.ts",
+            "pi-result-schema.ts",
+            "pi-result-tools.ts",
+            "pi-problem-drafts.ts",
             "pi-practice-coverage.ts",
             "pi-review-brief.ts",
             "pi-folder-index.ts",
@@ -31,8 +35,12 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
             "pi-runner-usage.ts",
             "pi-runner-retry.ts",
             "pi-runner-composition.ts",
-            "pi-public-completion.ts",
+            "pi-composition-stage.ts",
+            "pi-admitted-results.ts",
+            "pi-feedback-preparation.ts",
             "pi-session-lifecycle.ts",
+            "pi-session-reads.ts",
+            "pi-bash-reads.ts",
             SandboxLayout.PROVIDER_HELPER_FILENAME);
 
     private static final List<String> PROMPTS = List.of(
@@ -64,5 +72,14 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
     @Override
     public Map<String, String> additionalEnv() {
         return Map.of();
+    }
+
+    @Override
+    public List<String> setupCommands() {
+        return Stream.concat(
+                        PiRunnerProfile.super.setupCommands().stream(),
+                        Stream.of("ln -sfn " + SandboxLayout.PRACTICE_SCRIPT_KITS_TARGET + " "
+                                + SandboxLayout.WORKSPACE_ROOT + "/" + SandboxLayout.PRACTICE_SCRIPT_KITS_LINK))
+                .toList();
     }
 }

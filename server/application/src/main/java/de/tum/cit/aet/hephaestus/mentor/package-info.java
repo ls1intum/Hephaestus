@@ -9,12 +9,15 @@
  *
  * <h2>Key entry points</h2>
  * <ul>
- *   <li>{@link de.tum.cit.aet.hephaestus.mentor.ChatThreadController} — thread CRUD</li>
- *   <li>{@link de.tum.cit.aet.hephaestus.mentor.ChatMessageVoteController} — votes</li>
- *   <li>{@link de.tum.cit.aet.hephaestus.mentor.ChatThread} / {@link de.tum.cit.aet.hephaestus.mentor.ChatMessage}
+ *   <li>{@link ChatThreadController} — thread CRUD</li>
+ *   <li>{@link ChatMessageVoteController} — votes</li>
+ *   <li>{@link ChatThread} / {@link ChatMessage}
  *       — entities backing {@code chat_thread}, {@code chat_message}</li>
  * </ul>
  */
-@org.springframework.modulith.ApplicationModule(displayName = "Mentor")
-@org.jspecify.annotations.NullMarked
+@ApplicationModule(displayName = "Mentor")
+@NullMarked
 package de.tum.cit.aet.hephaestus.mentor;
+
+import org.jspecify.annotations.NullMarked;
+import org.springframework.modulith.ApplicationModule;

@@ -1,6 +1,6 @@
 # ADR 0021: Separate observations from feedback
 
-**Status:** Accepted (amended 2026-07-31 #1423, 2026-08-18 #1444 — rewritten in place; refined by [ADR 0022](0022-observation-presence-assessment-and-schema-cleanup.md) and [ADR 0029](0029-measurement-intervention-seam-and-channel-levels.md))  
+**Status:** Accepted (amended 2026-07-31 #1423, 2026-08-18 #1444 — rewritten in place; refined by [ADR 0022](0022-observation-presence-assessment-and-schema-cleanup.md) and [ADR 0029](0029-measurement-intervention-seam-and-channel-levels.md)); superseded 2026-10-14 by [ADR 0056](0056-one-practice-model-for-items-and-scans.md)
 **Date:** 2026-06-14  
 **Authors:** Felix T.J. Dietrich
 
@@ -107,3 +107,7 @@ This ADR owns the separation and its invariants, not field inventories. Current 
 - [Practice review pipeline](../contributor/practice-review-pipeline.mdx)
 - [ADR 0029](0029-measurement-intervention-seam-and-channel-levels.md)
 - the generated [database schema](../contributor/database-schema.mdx) and OpenAPI specification
+
+## Update — 2026-10-14 (#2656): the practice model cutover
+
+Superseded by [ADR 0056](0056-one-practice-model-for-items-and-scans.md) for result admission and feedback delivery.

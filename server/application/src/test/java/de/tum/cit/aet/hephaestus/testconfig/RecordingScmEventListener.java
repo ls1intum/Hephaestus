@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.testconfig;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEvent;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;

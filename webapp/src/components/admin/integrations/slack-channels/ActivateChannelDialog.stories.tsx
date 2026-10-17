@@ -7,12 +7,13 @@ import { expectSettledVisible } from "@/stories/overlay";
 import { ActivateChannelDialog } from "./ActivateChannelDialog";
 
 const channel: SlackMonitoredChannel = {
-	id: 1,
+	id: "1",
 	slackTeamId: "T0000000000",
 	slackChannelId: "C02PENDING02",
 	channelName: "team-standup",
 	consentState: "PENDING",
 	optedOutMemberCount: 0,
+	consentAnnouncedAt: null,
 	createdAt: new Date("2026-07-01T00:00:00Z"),
 };
 
@@ -50,7 +51,7 @@ export const Open: Story = {
 
 /** Falls back to the stable id when Slack never gave the channel a name. */
 export const NoChannelName: Story = {
-	args: { channel: { ...channel, channelName: undefined } },
+	args: { channel: { ...channel, channelName: null } },
 	play: async () => {
 		const dialog = within(await screen.findByRole("dialog"));
 		await expect(dialog.getAllByText(/#C02PENDING02/u).length).toBeGreaterThan(0);

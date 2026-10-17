@@ -26,7 +26,7 @@ import {
 	GitLabMergeRequestIcon,
 } from "@/components/icons/gitlab-icons";
 import type { IconComponent } from "@/components/icons/provider-icons";
-import { ARTIFACT_KIND, artifactKindNoun } from "@/lib/artifact-kinds";
+import { ITEM_KIND, itemKindNoun } from "@/lib/item-kinds";
 import type { ProviderType } from "@/lib/provider/provider-terms";
 import { capitalise } from "@/lib/text";
 
@@ -76,8 +76,8 @@ export interface ActivityKindDef {
 const pullRequestNoun =
 	(verb: string) =>
 	(provider: ProviderType): Noun => ({
-		one: `${artifactKindNoun(ARTIFACT_KIND.pullRequest, 1, provider)} ${verb}`,
-		many: `${artifactKindNoun(ARTIFACT_KIND.pullRequest, 2, provider)} ${verb}`,
+		one: `${itemKindNoun(ITEM_KIND.pullRequest, 1, provider)} ${verb}`,
+		many: `${itemKindNoun(ITEM_KIND.pullRequest, 2, provider)} ${verb}`,
 	});
 
 const fixedNoun = (one: string, many: string) => (): Noun => ({ one, many });
@@ -242,7 +242,7 @@ export function tallyActions(
 export function goneWork(kinds: readonly ActivityKind[], provider: ProviderType): string {
 	const work = workOf(kinds);
 	if (work === "pull-request") {
-		return `A ${artifactKindNoun(ARTIFACT_KIND.pullRequest, 1, provider)} that is no longer available`;
+		return `A ${itemKindNoun(ITEM_KIND.pullRequest, 1, provider)} that is no longer available`;
 	}
 	return work === "issue"
 		? "An issue that is no longer available"
@@ -295,7 +295,7 @@ const COMMENT_KINDS = ["COMMENTED", "CODE_COMMENTED"] as const;
 
 export const ACTIVITY_CATEGORY_DEFS = {
 	"pull-requests": {
-		label: (provider) => capitalise(artifactKindNoun(ARTIFACT_KIND.pullRequest, 2, provider)),
+		label: (provider) => capitalise(itemKindNoun(ITEM_KIND.pullRequest, 2, provider)),
 		icon: providerIcon(GitMergeIcon, GitLabMergeIcon),
 		tone: "done",
 		kinds: ["PULL_REQUEST_OPENED", "PULL_REQUEST_MERGED", "PULL_REQUEST_CLOSED"],

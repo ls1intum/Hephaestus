@@ -155,9 +155,9 @@ public class SyncJob {
     @Nullable
     private String errorSummary;
 
-    @Column(name = "triggered_by_user_id")
+    @Column(name = "triggered_by_account_id")
     @Nullable
-    private Long triggeredByUserId;
+    private Long triggeredByAccountId;
 
     public SyncJob(
             Workspace workspace,
@@ -165,13 +165,13 @@ public class SyncJob {
             IntegrationKind kind,
             SyncJobType type,
             SyncJobTrigger trigger,
-            @Nullable Long triggeredByUserId) {
+            @Nullable Long triggeredByAccountId) {
         this.workspace = workspace;
         this.connection = connection;
         this.kind = kind;
         this.type = type;
         this.trigger = trigger;
-        this.triggeredByUserId = triggeredByUserId;
+        this.triggeredByAccountId = triggeredByAccountId;
     }
 
     public Long getId() {

@@ -17,13 +17,13 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.workspace.ScmWorkspaceContentEraser;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
-import de.tum.cit.aet.hephaestus.workspace.ScmWorkspaceContentEraser;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeBlockedException;
 import java.util.ArrayList;
@@ -43,13 +43,6 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * Disconnect through the lifecycle service and admin endpoint, with real PostgreSQL erasure.
- * The provider-failure case controls the upstream boundary. Triggers make the disconnect fail
- * with a genuine SQL error, either while erasing
- * or only at commit, after every statement has succeeded. The workspace purge's strict teardown is
- * driven directly inside a purge-shaped transaction that erases the mirror first.
- */
 class ConnectionDisconnectErasureIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final String BLOCK = "test_block_disconnect";
@@ -117,9 +110,14 @@ class ConnectionDisconnectErasureIntegrationTest extends AbstractWorkspaceIntegr
     @WithAdminUser
     void shouldKeepConnectionActiveWithCredentialsWhenLocalEraseFails() {
         createBlockFunction();
-        jdbcTemplate.execute("CREATE TRIGGER " + BLOCK
-                + " BEFORE DELETE ON repository_to_monitor FOR EACH ROW WHEN (OLD.workspace_id = "
-                + workspace.getId() + ") EXECUTE FUNCTION " + BLOCK + "()");
+        jdbcTemplate.execute("CREATE TRIGGER "
+                + BLOCK
+                + " BEFORE DELETE ON repository_to_monitor FOR EACH ROW WHEN"
+                + " (OLD.workspace_id = "
+                + workspace.getId()
+                + ") EXECUTE FUNCTION "
+                + BLOCK
+                + "()");
 
         assertThat(disconnectReturningProviderWarnings()).isEmpty();
 
@@ -130,9 +128,14 @@ class ConnectionDisconnectErasureIntegrationTest extends AbstractWorkspaceIntegr
     @WithAdminUser
     void shouldLeaveProviderUntouchedWhenDisconnectFailsToCommit() {
         createBlockFunction();
-        jdbcTemplate.execute("CREATE CONSTRAINT TRIGGER " + BLOCK
-                + " AFTER INSERT ON connection_audit DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (NEW.connection_id = "
-                + connection.getId() + ") EXECUTE FUNCTION " + BLOCK + "()");
+        jdbcTemplate.execute("CREATE CONSTRAINT TRIGGER "
+                + BLOCK
+                + " AFTER INSERT ON connection_audit DEFERRABLE INITIALLY DEFERRED FOR EACH"
+                + " ROW WHEN (NEW.connection_id = "
+                + connection.getId()
+                + ") EXECUTE FUNCTION "
+                + BLOCK
+                + "()");
 
         assertThat(disconnectReturningProviderWarnings()).isEmpty();
 
@@ -198,8 +201,10 @@ class ConnectionDisconnectErasureIntegrationTest extends AbstractWorkspaceIntegr
     }
 
     private void createBlockFunction() {
-        jdbcTemplate.execute("CREATE FUNCTION " + BLOCK
-                + "() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'disconnect blocked'; END $$");
+        jdbcTemplate.execute("CREATE FUNCTION "
+                + BLOCK
+                + "() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION"
+                + " 'disconnect blocked'; END $$");
     }
 
     private void assertConnectionUntouched() {
@@ -225,7 +230,7 @@ class ConnectionDisconnectErasureIntegrationTest extends AbstractWorkspaceIntegr
     }
 
     private List<ILoggingEvent> captureProviderWarnings(Runnable disconnect) {
-        var logger = (Logger) LoggerFactory.getLogger(ConnectionService.class);
+        var logger = (Logger) LoggerFactory.getLogger(ConnectionLifecycleEffects.class);
         var events = new ListAppender<ILoggingEvent>();
         events.start();
         logger.addAppender(events);

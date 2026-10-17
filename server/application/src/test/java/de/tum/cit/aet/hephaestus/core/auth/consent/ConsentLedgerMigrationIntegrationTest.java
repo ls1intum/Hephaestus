@@ -21,32 +21,27 @@ class ConsentLedgerMigrationIntegrationTest {
     private static final TestDatabase DATABASE =
             PostgreSQLTestContainer.createMigratedDatabase("consent_ledger_migration_test");
 
-    /**
-     * The digest is what the previous release writes on every consent decision, so this release has to
-     * keep accepting one: an application-server replica running the previous image reaches this schema
-     * during a rolling upgrade, and rolling the image back has to stay possible afterwards.
-     */
     @Test
-    void shouldStillAcceptTheDigestThePreviousReleaseWrites() throws Exception {
+    void shouldKeepTheArchivedNoticeForARecordedDecision() throws Exception {
         try (Connection connection = connect()) {
             String archived = archivedDigest(connection, "2026-08-30");
             assertThat(archived)
                     .as("the archived notice is not dropped by this release")
                     .isNotNull();
 
-            long decisionId = insertDecision(connection, insertAccount(connection), "2026-08-30", archived);
+            long decisionId = insertDecision(connection, insertAccount(connection), "2026-08-30");
 
-            assertThat(digestOf(connection, decisionId)).isEqualTo(archived);
+            assertThat(noticeVersion(connection, decisionId)).isEqualTo("2026-08-30");
+            assertThat(archivedDigest(connection, "2026-08-30")).isEqualTo(archived);
         }
     }
 
     @Test
-    void shouldRecordADecisionWithoutADigest() throws Exception {
+    void shouldRecordADecisionWithTheNoticeVersion() throws Exception {
         try (Connection connection = connect()) {
-            long decisionId =
-                    insertDecision(connection, insertAccount(connection), ConsentService.WORDING_VERSION, null);
+            long decisionId = insertDecision(connection, insertAccount(connection), ConsentService.WORDING_VERSION);
 
-            assertThat(digestOf(connection, decisionId)).isNull();
+            assertThat(noticeVersion(connection, decisionId)).isEqualTo(ConsentService.WORDING_VERSION);
         }
     }
 
@@ -54,7 +49,7 @@ class ConsentLedgerMigrationIntegrationTest {
     void shouldArchiveTheOrganisationTheQuestionNamed() throws Exception {
         try (Connection connection = connect()) {
             long decisionId = insertDecision(
-                    connection, insertAccount(connection), ConsentService.WORDING_VERSION, null, "A research group");
+                    connection, insertAccount(connection), ConsentService.WORDING_VERSION, "A research group");
 
             assertThat(columnOf(connection, "research_organization", decisionId))
                     .isEqualTo("A research group");
@@ -65,17 +60,15 @@ class ConsentLedgerMigrationIntegrationTest {
     void shouldKeepTheLedgerAppendOnlyAndStillPermitErasure() throws Exception {
         try (Connection connection = connect()) {
             long accountId = insertAccount(connection);
-            long decisionId = insertDecision(connection, accountId, ConsentService.WORDING_VERSION, null);
+            long decisionId = insertDecision(connection, accountId, ConsentService.WORDING_VERSION);
 
             assertThatThrownBy(() ->
                             execute(connection, "UPDATE consent_decision SET granted = false WHERE id = " + decisionId))
-                    .hasMessageContaining("consent_decision is append-only");
+                    .hasMessageContaining("consent history is append-only");
             assertThatThrownBy(() -> execute(connection, "DELETE FROM consent_decision WHERE id = " + decisionId))
-                    .hasMessageContaining("consent_decision is append-only");
+                    .hasMessageContaining("consent history is append-only");
 
-            // Erasure clears the account and leaves the evidence that a decision was taken. The guard
-            // compares the digest too, and `NULL = NULL` is NULL, so a decision recorded without one
-            // is exactly the case a naive comparison would refuse.
+            // Erasure clears the account and retains the recorded decision and notice version.
             assertThatCode(() -> execute(
                             connection, "UPDATE consent_decision SET account_id = NULL WHERE id = " + decisionId))
                     .doesNotThrowAnyException();
@@ -92,27 +85,20 @@ class ConsentLedgerMigrationIntegrationTest {
         }
     }
 
-    private static long insertDecision(Connection connection, long accountId, String version, @Nullable String digest)
-            throws Exception {
-        return insertDecision(connection, accountId, version, digest, null);
+    private static long insertDecision(Connection connection, long accountId, String version) throws Exception {
+        return insertDecision(connection, accountId, version, null);
     }
 
     private static long insertDecision(
-            Connection connection,
-            long accountId,
-            String version,
-            @Nullable String digest,
-            @Nullable String organisation)
-            throws Exception {
+            Connection connection, long accountId, String version, @Nullable String organisation) throws Exception {
         try (PreparedStatement statement = connection.prepareStatement("INSERT INTO consent_decision "
-                + "(account_id, purpose, granted, mechanism, notice_version, notice_sha256, "
+                + "(account_id, purpose, granted, mechanism, notice_version, "
                 + "research_organization, occurred_at) "
-                + "VALUES (?, 'RESEARCH_PARTICIPATION', true, 'FIRST_LOGIN_INTERSTITIAL', ?, ?, ?, now()) "
+                + "VALUES (?, 'RESEARCH_PARTICIPATION', true, 'FIRST_LOGIN_INTERSTITIAL', ?, ?, now()) "
                 + "RETURNING id")) {
             statement.setLong(1, accountId);
             statement.setString(2, version);
-            statement.setString(3, digest);
-            statement.setString(4, organisation);
+            statement.setString(3, organisation);
             try (ResultSet rows = statement.executeQuery()) {
                 rows.next();
                 return rows.getLong(1);
@@ -128,10 +114,6 @@ class ConsentLedgerMigrationIntegrationTest {
                 return rows.next() ? rows.getString(1) : null;
             }
         }
-    }
-
-    private static @Nullable String digestOf(Connection connection, long decisionId) throws Exception {
-        return columnOf(connection, "notice_sha256", decisionId);
     }
 
     private static @Nullable String noticeVersion(Connection connection, long decisionId) throws Exception {

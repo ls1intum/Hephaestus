@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.sync.backfill;
 
-import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase;
 
 /**

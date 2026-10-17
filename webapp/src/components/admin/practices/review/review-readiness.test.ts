@@ -5,7 +5,7 @@ import type { AgentBinding } from "@/api/types.gen";
 import {
 	availableReviewBinding,
 	reviewModelRunnable,
-	reviewRunningDescription,
+	reviewReadinessDescription,
 } from "./review-readiness";
 
 const undeclared: AgentBinding = {
@@ -13,18 +13,21 @@ const undeclared: AgentBinding = {
 	dataHandlingTier: "UNDECLARED",
 	enabled: true,
 	ready: false,
+	servedTiers: [],
 };
 const inHouse: AgentBinding = {
 	purpose: "PRACTICE_REVIEW",
 	dataHandlingTier: "IN_HOUSE",
 	enabled: true,
 	ready: true,
+	servedTiers: ["IN_HOUSE"],
 };
 const cloud: AgentBinding = {
 	purpose: "PRACTICE_REVIEW",
 	dataHandlingTier: "CLOUD",
 	enabled: true,
 	ready: true,
+	servedTiers: ["CLOUD"],
 };
 
 describe("workspace review model readiness", () => {
@@ -41,24 +44,30 @@ describe("workspace review model readiness", () => {
 	it("does not mistake a ready mentor assignment for a practice-review model", () => {
 		expect(
 			availableReviewBinding([
-				{ purpose: "MENTOR", dataHandlingTier: "IN_HOUSE", enabled: true, ready: true },
+				{
+					purpose: "MENTOR",
+					dataHandlingTier: "IN_HOUSE",
+					enabled: true,
+					ready: true,
+					servedTiers: ["IN_HOUSE", "CLOUD"],
+				},
 			]),
 		).toBeUndefined();
 	});
 
 	it("says which declared tier is in force while reviews run", () => {
 		expect(
-			reviewRunningDescription({ enabled: true, model: { status: "ready", binding: inHouse } }),
+			reviewReadinessDescription({ enabled: true, model: { status: "ready", binding: inHouse } }),
 		).toBe(
-			"Practice reviews are on and a review model declared as In-house is ready. Each developer’s AI choice still decides whether it runs for them.",
+			"Practice reviews are on and a review model declared as In-house is ready. Each developer’s AI choice still decides whether it runs for them. Feedback mode decides separately where results become feedback.",
 		);
 		expect(
-			reviewRunningDescription({
+			reviewReadinessDescription({
 				enabled: true,
 				model: { status: "ready", binding: { ...undeclared, ready: true } },
 			}),
 		).toMatch(/ready for members who have not chosen/u);
-		expect(reviewRunningDescription({ enabled: true, model: { status: "ready" } })).toMatch(
+		expect(reviewReadinessDescription({ enabled: true, model: { status: "ready" } })).toMatch(
 			/no review model is ready/u,
 		);
 	});

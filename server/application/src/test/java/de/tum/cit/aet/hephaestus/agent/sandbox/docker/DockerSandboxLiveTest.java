@@ -45,6 +45,7 @@ class DockerSandboxLiveTest {
 
     private static final String AGENT_IMAGE =
             System.getenv().getOrDefault("HEPHAESTUS_AGENT_IMAGE_REFERENCE", "ghcr.io/hephaestus-build/agent-pi:dev");
+    private final String owner = "live-" + UUID.randomUUID();
     private LiveSandboxGateway gateway;
     private DockerSandboxAdapter sandboxAdapter;
     private SandboxContainerManager containerManager;
@@ -65,7 +66,7 @@ class DockerSandboxLiveTest {
     void setUp() throws Exception {
         gateway = new LiveSandboxGateway();
         SandboxProperties properties = new SandboxProperties(5, 10, 60, null);
-        var dockerProperties = new DockerSandboxProperties("unix:///var/run/docker.sock", false, null, null, "default");
+        var dockerProperties = new DockerSandboxProperties("unix:///var/run/docker.sock", false, null, null, owner);
 
         // Wrapped exactly as DockerSandboxConfiguration wraps it, so the archive tests below exercise the
         // real Apache transport this application ships rather than docker-java's default ownership.
@@ -77,8 +78,7 @@ class DockerSandboxLiveTest {
 
         dockerOps = new DockerClientOperations(dockerClient, dockerClient);
         dockerWaitExecutor = Executors.newCachedThreadPool();
-        containerManager =
-                new SandboxContainerManager(dockerOps, image -> {}, properties, "default", dockerWaitExecutor);
+        containerManager = new SandboxContainerManager(dockerOps, image -> {}, properties, owner, dockerWaitExecutor);
         networkManager = new SandboxNetworkManager(dockerOps, dockerProperties, new SandboxCreator(dockerOps));
         workspaceManager = new SandboxWorkspaceManager();
         securityPolicy = new ContainerSecurityPolicy(dockerProperties, null);
@@ -160,7 +160,7 @@ class DockerSandboxLiveTest {
 
         @Test
         void shouldCollectExactBytesWhenContainerWritesOutput() {
-            String written = "{\"observations\":[],\"schemaVersion\":1}\n";
+            String written = "{\"results\":[],\"schemaVersion\":1}\n";
 
             SandboxResult result = run("printf '%s' '" + written + "' > /workspace/out/result.json");
 

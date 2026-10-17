@@ -4,11 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorRunnerProfile;
+import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorRunnerClient;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.PiEventToUiChunkTranslator;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.TranslatorState;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiPlanSpec;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiRuntimeFactory;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.AttachedSandbox;
 import de.tum.cit.aet.hephaestus.testconfig.LiveLlmCredentials;
 import de.tum.cit.aet.hephaestus.testconfig.LiveLlmTest;
@@ -30,8 +32,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -71,6 +75,7 @@ class MentorLiveLlmTest {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private static final Duration TURN_TIMEOUT = Duration.ofSeconds(90);
+    private static final Pattern HTTP_ERROR_STATUS = Pattern.compile("\\b[45]\\d{2}\\b");
 
     private static final Path RUNNER =
             Path.of("src", "main", "resources", "agent", "pi-mentor-runner.ts").toAbsolutePath();
@@ -323,14 +328,14 @@ class MentorLiveLlmTest {
         sandbox = spawnRunner(creds, workspaceDir);
         var driver =
                 new RunnerDriver(sandbox).withContext("inputs/context/recent_authored_work.json", MAPPER.readTree("""
-                {
-                  "user": {"login": "octo", "name": "Octo Example"},
-                  "pullRequests": [
-                    {"number": 12, "title": "Proposal: Slack mentor onboarding", "url": "https://example.invalid/pr/12", "state": "OPEN", "isDraft": false, "additions": 120, "deletions": 20}
-                  ],
-                  "issues": []
-                }
-                """));
+                    {
+                      "user": {"login": "octo", "name": "Octo Example"},
+                      "pullRequests": [
+                        {"number": 12, "title": "Proposal: Slack mentor onboarding", "url": "https://example.invalid/pr/12", "state": "OPEN", "isDraft": false, "additions": 120, "deletions": 20}
+                      ],
+                      "issues": []
+                    }
+                    """));
         driver.expectRunnerReady();
         driver.helloOk();
         driver.openThread(threadId);
@@ -339,11 +344,18 @@ class MentorLiveLlmTest {
         TranslatorState state = new TranslatorState(assistantMessageId);
         List<UIMessageChunk> chunks = new ArrayList<>();
         var done = new CompletableFuture<Void>();
+        var events = new ConcurrentLinkedQueue<String>();
         sandbox.subscribe(
                 frame -> {
                     if (!isThreadEvent(frame, threadId)) return;
                     JsonNode event = frame.path("params").path("event");
-                    chunks.addAll(translator.translate(event, state));
+                    events.add(eventLabel(event));
+                    try {
+                        chunks.addAll(translator.translate(event, state));
+                    } catch (RuntimeException error) {
+                        done.completeExceptionally(error);
+                        return;
+                    }
                     if ("agent_end".equals(event.path("type").asString())) {
                         done.complete(null);
                     }
@@ -352,32 +364,16 @@ class MentorLiveLlmTest {
 
         driver.prompt(
                 threadId,
-                "Use fetch_context with path inputs/context/recent_authored_work.json, then tell me the PR number and title. "
-                        + "You MUST use fetch_context. Do NOT guess.");
-        done.get(TURN_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+                "Use fetch_context with path inputs/context/recent_authored_work.json, then tell me the PR number and"
+                        + " title. You MUST use fetch_context. Do NOT guess.");
+        awaitTurn(done, events);
 
-        // At least one tool was invoked.
-        List<UIMessageChunk.ToolInputStart> toolStarts = chunks.stream()
-                .filter(UIMessageChunk.ToolInputStart.class::isInstance)
-                .map(UIMessageChunk.ToolInputStart.class::cast)
-                .toList();
-        assertThat(toolStarts)
-                .as("Heph must invoke fetch_context to answer the question")
-                .isNotEmpty();
-
-        List<String> toolNames =
-                toolStarts.stream().map(UIMessageChunk.ToolInputStart::toolName).toList();
-        assertThat(toolNames).as("tools used should include fetch_context").contains("fetch_context");
-        System.out.printf("[tool-use] tools invoked: %s%n", toolNames);
-
-        // Tool produced output (not error).
-        List<UIMessageChunk.ToolOutputAvailable> toolOutputs = chunks.stream()
-                .filter(UIMessageChunk.ToolOutputAvailable.class::isInstance)
-                .map(UIMessageChunk.ToolOutputAvailable.class::cast)
-                .toList();
-        assertThat(toolOutputs)
-                .as("at least one tool call completed with output")
-                .isNotEmpty();
+        assertThat(driver.servedContextPaths())
+                .as(
+                        "the requested context completed through the server callback; terminal messages: %s",
+                        terminalEvents(events))
+                .contains("inputs/context/recent_authored_work.json");
+        System.out.printf("[tool-use] context served: %s%n", driver.servedContextPaths());
 
         // Heph's reply should reference the planted content.
         String text = chunks.stream()
@@ -480,13 +476,20 @@ class MentorLiveLlmTest {
         TranslatorState state = new TranslatorState(UUID.randomUUID());
         List<UIMessageChunk> chunks = new ArrayList<>();
         var done = new CompletableFuture<Void>();
+        var events = new ConcurrentLinkedQueue<String>();
         // Use a per-turn subscription so collected chunks are scoped to this turn only.
         var unsubscribe = activeSandbox()
                 .subscribe(
                         frame -> {
                             if (!isThreadEvent(frame, threadId)) return;
                             JsonNode event = frame.path("params").path("event");
-                            chunks.addAll(translator.translate(event, state));
+                            events.add(eventLabel(event));
+                            try {
+                                chunks.addAll(translator.translate(event, state));
+                            } catch (RuntimeException error) {
+                                done.completeExceptionally(error);
+                                return;
+                            }
                             if ("agent_end".equals(event.path("type").asString())) {
                                 done.complete(null);
                             }
@@ -494,14 +497,53 @@ class MentorLiveLlmTest {
                         () -> {});
         try {
             driver.prompt(threadId, prompt);
-            done.get(TURN_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
-            return chunks.stream()
+            awaitTurn(done, events);
+            String text = chunks.stream()
                     .filter(UIMessageChunk.TextDelta.class::isInstance)
                     .map(UIMessageChunk.TextDelta.class::cast)
                     .map(UIMessageChunk.TextDelta::delta)
                     .reduce("", String::concat);
+            assertThat(text)
+                    .as("mentor turn produced text; terminal messages: %s", terminalEvents(events))
+                    .isNotBlank();
+            return text;
         } finally {
             unsubscribe.dispose();
+        }
+    }
+
+    private static List<String> terminalEvents(ConcurrentLinkedQueue<String> events) {
+        return events.stream().filter(event -> event.startsWith("message_end:")).toList();
+    }
+
+    private static String eventLabel(JsonNode event) {
+        var message = event.path("message");
+        String error = message.path("errorMessage").asString("");
+        return event.path("type").asString() + ":"
+                + event.path("assistantMessageEvent").path("type").asString("")
+                + ":role=" + message.path("role").asString("")
+                + ":stop=" + message.path("stopReason").asString("")
+                + ":errorChars=" + error.length()
+                + ":errorStatuses="
+                + HTTP_ERROR_STATUS
+                        .matcher(error)
+                        .results()
+                        .map(match -> match.group())
+                        .limit(3)
+                        .toList();
+    }
+
+    private void awaitTurn(CompletableFuture<Void> done, ConcurrentLinkedQueue<String> events) throws Exception {
+        try {
+            done.get(TURN_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+        } catch (TimeoutException timeout) {
+            throw new AssertionError(
+                    "No terminal mentor event within " + TURN_TIMEOUT + "; runnerAlive="
+                            + activeSandbox().process().isAlive() + "; lastEvents="
+                            + events.stream()
+                                    .skip(Math.max(0, events.size() - 12))
+                                    .toList(),
+                    timeout);
         }
     }
 
@@ -522,6 +564,14 @@ class MentorLiveLlmTest {
         for (String sidecar : new MentorRunnerProfile().sidecarScripts()) {
             Files.copy(Path.of("src", "main", "resources", "agent", sidecar), tmp.resolve(sidecar));
         }
+
+        Path library = tmp.resolve(SandboxLayout.PRACTICE_SCRIPT_LIBRARY_LINK);
+        Files.createDirectories(library.getParent());
+        Files.createSymbolicLink(
+                library,
+                Path.of("..", "..", "docker", "agents", "practice-scripts", "lib")
+                        .toAbsolutePath()
+                        .normalize());
 
         // System prompt the runner loads from /workspace/agent/mentor/system.md. Keep it minimal —
         // the live LLM doesn't need the full production prompt to prove the round-trip works.
@@ -544,8 +594,7 @@ class MentorLiveLlmTest {
                 true,
                 300,
                 new MentorRunnerProfile(),
-                Map.of(),
-                "");
+                Map.of());
         byte[] settingsBytes = factory.buildPiSettingsJson(spec.upstreamModelId());
 
         // Pi loads its on-disk settings from `~/.pi/settings.json`; redirect with env vars so we
@@ -625,6 +674,7 @@ class MentorLiveLlmTest {
         private final ConcurrentLinkedQueue<JsonNode> responses = new ConcurrentLinkedQueue<>();
         private final ConcurrentLinkedQueue<JsonNode> readyNotifications = new ConcurrentLinkedQueue<>();
         private final ConcurrentMap<String, JsonNode> contextResponses = new ConcurrentHashMap<>();
+        private final ConcurrentLinkedQueue<String> servedContextPaths = new ConcurrentLinkedQueue<>();
         private final AtomicInteger requestIdCounter = new AtomicInteger();
 
         RunnerDriver(AttachedSandbox sandbox) {
@@ -652,6 +702,10 @@ class MentorLiveLlmTest {
             return this;
         }
 
+        List<String> servedContextPaths() {
+            return List.copyOf(servedContextPaths);
+        }
+
         void expectRunnerReady() {
             await().atMost(Duration.ofSeconds(30))
                     .pollInterval(Duration.ofMillis(50))
@@ -661,8 +715,8 @@ class MentorLiveLlmTest {
         void helloOk() {
             JsonNode response = call("hello", MAPPER.createObjectNode(), Duration.ofSeconds(10));
             assertThat(response.path("result").path("protocolVersion").asInt(0))
-                    .as("hello returns protocolVersion 1")
-                    .isEqualTo(1);
+                    .as("hello returns the server's protocolVersion")
+                    .isEqualTo(MentorRunnerClient.PROTOCOL_VERSION);
         }
 
         void openThread(UUID threadId) {
@@ -736,6 +790,7 @@ class MentorLiveLlmTest {
                 result.set("content", content);
             }
             sandbox.send(response);
+            if (content != null) servedContextPaths.add(path);
         }
     }
 }

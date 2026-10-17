@@ -100,6 +100,17 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
         """)
     List<Repository> findAllByWorkspaceMonitors(@Param("workspaceId") Long workspaceId);
 
+    /** Requires the workspace monitor's exact path, native identity and configured SCM provider. */
+    @Query("""
+        SELECT (COUNT(r) > 0) FROM Repository r
+        WHERE r.id = :repositoryId AND EXISTS (
+            SELECT 1 FROM RepositoryToMonitor m
+            WHERE m.workspace.id = :workspaceId AND m.nameWithOwner = r.nameWithOwner
+                AND monitor_covers_repository(m.workspace.id, m.nativeId, r.nativeId, r.provider.id) = true
+        )
+        """)
+    boolean isMonitored(@Param("workspaceId") long workspaceId, @Param("repositoryId") long repositoryId);
+
     /**
      * The repositories on {@code providerId} at the workspace's monitored paths. A monitor names a path, and another
      * instance can host the same path, so a caller that writes on the workspace's behalf passes the provider of its

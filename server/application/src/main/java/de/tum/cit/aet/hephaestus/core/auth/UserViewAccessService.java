@@ -3,8 +3,8 @@ package de.tum.cit.aet.hephaestus.core.auth;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.auth.spi.UserViewAccess;
 import de.tum.cit.aet.hephaestus.core.auth.stepup.RecentSignInPolicy;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
@@ -29,7 +29,7 @@ import tools.jackson.databind.ObjectMapper;
 @RequiredArgsConstructor
 @WorkspaceAgnostic("An instance administrator views across workspaces; every event records the one it read")
 public class UserViewAccessService implements UserViewAccess {
-    private final IdentityLinkRepository identityLinks;
+    private final IdentityRepository identityLinks;
     private final AuthEventLogger audit;
     private final ObjectMapper mapper;
     private final RecentSignInPolicy recentSignIn;
@@ -49,9 +49,9 @@ public class UserViewAccessService implements UserViewAccess {
                 actors.stream().map(ActorIdentity::providerId).distinct().toList();
         var subjects = actors.stream().map(ActorIdentity::subject).distinct().toList();
         Map<IdentityKey, LinkedAccount> byIdentity = new HashMap<>();
-        for (IdentityLink link : identityLinks.findActiveScmLinks(providerIds, subjects)) {
+        for (Identity link : identityLinks.findActiveScmLinks(providerIds, subjects)) {
             byIdentity.put(
-                    new IdentityKey(link.getProviderId(), link.getSubject()),
+                    new IdentityKey(link.getProviderId(), link.getProviderUserKey()),
                     new LinkedAccount(
                             Objects.requireNonNull(link.getAccount().getId()),
                             link.getAccount().getStatus().name()));
@@ -69,8 +69,10 @@ public class UserViewAccessService implements UserViewAccess {
     private record IdentityKey(long providerId, String subject) {}
 
     @Override
-    public void record(long workspaceId, long userId, @Nullable Long accountId, String reasonHeader, String read) {
-        // A header rather than a query parameter keeps the reason out of access logs and browser history.
+    public void record(
+            long workspaceId, @Nullable Long actorId, @Nullable Long accountId, String reasonHeader, String read) {
+        // A header rather than a query parameter keeps the reason out of access logs and browser
+        // history.
         final String reason;
         try {
             reason = UriUtils.decode(reasonHeader, StandardCharsets.UTF_8).trim();
@@ -83,12 +85,13 @@ public class UserViewAccessService implements UserViewAccess {
                 || reason.codePoints().anyMatch(UserViewAccessService::isInvisible)) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Give a reason of 1 to 500 characters. Do not use control or format characters.");
+                    "Give a reason of 1 to 500 characters. Do not use control or format" + " characters.");
         }
         boolean recorded = audit.event(AuthEvent.EventType.USER_VIEW, AuthEvent.Result.SUCCESS)
-                .account(accountId)
+                .account(SecurityUtils.getCurrentAccountId().orElseThrow())
                 .actingAccount(SecurityUtils.getCurrentAccountId().orElseThrow())
-                .viewedUser(userId)
+                .viewedActor(actorId)
+                .viewedAccount(accountId)
                 .workspace(workspaceId)
                 .details(mapper.writeValueAsString(Map.of("reason", reason, "read", read)))
                 .record();
@@ -96,7 +99,7 @@ public class UserViewAccessService implements UserViewAccess {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "The user view audit is not available.");
     }
 
-    /** Format characters (bidi overrides, zero-width joiners) would make the stored reason read differently. */
+    // Invisible format characters can change how a stored reason reads.
     private static boolean isInvisible(int codePoint) {
         return Character.isISOControl(codePoint) || Character.getType(codePoint) == Character.FORMAT;
     }

@@ -1,8 +1,9 @@
-import type { PracticeStanding, PracticeTrend, TrendSupport } from "@/api/types.gen";
+import type { PracticeStanding, TrendSupport } from "@/api/types.gen";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { useWorkProvider } from "@/lib/work-provider-context";
 
 import { standingDefs, type StandingScope } from "./practice-group-standing-defs";
+import type { TrendDirection } from "./practice-trend-defs";
 import { explainStanding, shownTrendDirection } from "./practice-trend-presentation";
 import { PracticeTrendChip } from "./PracticeTrendChip";
 import { StatusTooltip } from "./StatusTooltip";
@@ -46,7 +47,7 @@ export function StandingBadge({ standing, scope, support }: StandingBadgeProps) 
 }
 
 export interface TrendNoteProps {
-	direction?: PracticeTrend["direction"];
+	direction?: TrendDirection;
 	support?: TrendSupport;
 	scope: StandingScope;
 }

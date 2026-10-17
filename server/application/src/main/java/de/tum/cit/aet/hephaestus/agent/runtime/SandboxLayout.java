@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.runtime;
 
-import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import java.time.Duration;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -15,12 +15,15 @@ public final class SandboxLayout {
 
     private SandboxLayout() {}
 
+    public static final int PRACTICE_CONTRACT_VERSION = 3;
+    public static final String SOURCE_CONTRACT_VERSION = ClasspathSourceCatalogRegistry.CURRENT_VERSION_VALUE;
+
     /** Container workspace root. */
     public static final String WORKSPACE_ROOT = "/workspace";
 
     // ── Job folder (ADR 0041): read-only inputs and separate writable mounts ──────────────────────────────
     //   context/, repos/, inputs/, task.json, INDEX.* — the read-only job folder
-    //   work/    — scratch the agent + precompute write during the run; NEVER collected
+    //   work/    — scratch the agent + practice scripts write during the run; NEVER collected
     //   out/     — the ONLY directory collected back into SQL
     //   .pi/     — the Pi SDK runtime home (vendor dir)
 
@@ -59,6 +62,8 @@ public final class SandboxLayout {
     /** Workspace-relative filename of the composition stage's output, collected from {@link #OUTPUT_PATH}. */
     public static final String FEEDBACK_FILENAME = "feedback.json";
 
+    public static final String PRACTICE_SCRIPT_REPORT_FILE = "practice-scripts.json";
+
     /** Workspace-relative filename of the composition stage's instructions, staged beside the runner. */
     public static final String FEEDBACK_COMPOSER_PROMPT_FILENAME = "feedback-composer.md";
 
@@ -83,16 +88,28 @@ public final class SandboxLayout {
 
     /**
      * Workspace-relative prefix for the writable scratch region (ADR 0020). Everything the agent +
-     * precompute write during a run lives here; the sandbox makes this subtree writable by the
+     * practice script write during a run lives here; the sandbox makes this subtree writable by the
      * container uid while {@link #INPUTS_PREFIX} stays read-only. Never collected back into SQL.
      */
     public static final String WORK_PREFIX = "work/";
 
-    /** Workspace-relative prefix for per-practice precompute scripts injected from the database. */
-    public static final String PRECOMPUTE_PREFIX = WORK_PREFIX + "precompute/";
+    public static final String PRACTICE_SCRIPT_PREFIX = WORK_PREFIX + "practice-scripts/";
 
-    /** Workspace-relative prefix for runtime precompute output (logs, structured hints). */
-    public static final String PRECOMPUTE_OUT_PREFIX = WORK_PREFIX + "precompute-out/";
+    /**
+     * Workspace-relative prefix of the per-practice inputs: for every assigned practice {@code <slug>.inputs.json}, its frozen scope, standard and previous result
+     * or {@code null}; {@code <slug>.ts} only for a practice that holds its own script. {@code lib/contract.ts} owns
+     * their shape.
+     */
+    public static final String PRACTICE_SCRIPT_PRACTICES_PREFIX = PRACTICE_SCRIPT_PREFIX + "practices/";
+
+    public static final String PRACTICE_SCRIPT_LIBRARY_LINK = PRACTICE_SCRIPT_PREFIX + "lib";
+
+    public static final String PRACTICE_SCRIPT_INPUTS_SUFFIX = ".inputs.json";
+
+    public static final String PRACTICE_SCRIPT_IMAGE_ROOT = "/opt/practice-scripts";
+    public static final String PRACTICE_SCRIPT_LIBRARY_TARGET = PRACTICE_SCRIPT_IMAGE_ROOT + "/lib";
+    public static final String PRACTICE_SCRIPT_KITS_LINK = PRACTICE_SCRIPT_PREFIX + "kits";
+    public static final String PRACTICE_SCRIPT_KITS_TARGET = PRACTICE_SCRIPT_IMAGE_ROOT + "/kits";
 
     /** Workspace-relative prefix for analysis markers ({@link #ANALYSIS_PRACTICES_PREFIX} is a child). */
     public static final String ANALYSIS_PREFIX = WORK_PREFIX + "analysis/";
@@ -120,6 +137,8 @@ public final class SandboxLayout {
     public static final String PROVIDER_CONFIG_FILENAME = "pi-provider.json";
 
     public static final String NODE_PACKAGE_JSON_FILENAME = "package.json";
+
+    public static final String PRACTICE_SCRIPT_MODELS_FILE = "practice-script-models.json";
 
     /** Workspace-relative filename of the shared provider-registration ES module both runners import. */
     public static final String PROVIDER_HELPER_FILENAME = "pi-provider.ts";
@@ -167,7 +186,7 @@ public final class SandboxLayout {
     public static final String RUNTIME_CONTRACT_LABEL = "hephaestus.agent.runtime-contract";
 
     /** Runtime contract required by the staged runners. */
-    public static final int RUNTIME_CONTRACT_VERSION = 4;
+    public static final int RUNTIME_CONTRACT_VERSION = 7;
 
     /** Node major required by the staged runners. */
     public static final int NODE_MAJOR = 24;
@@ -180,6 +199,6 @@ public final class SandboxLayout {
 
     /** Exact workspace paths an adapter may pass in {@link PiPlanSpec#extraInputs()}. */
     public static Set<String> allowedExtraInputPaths() {
-        return Set.of(MENTOR_SYSTEM_PROMPT_PATH);
+        return Set.of(MENTOR_SYSTEM_PROMPT_PATH, PRACTICE_SCRIPT_MODELS_FILE);
     }
 }

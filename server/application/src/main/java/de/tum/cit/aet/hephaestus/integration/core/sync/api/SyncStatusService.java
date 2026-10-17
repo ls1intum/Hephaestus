@@ -204,7 +204,7 @@ public class SyncStatusService {
      *                                     doesn't support {@code BACKFILL} (409)
      */
     public TriggerOutcome triggerSync(
-            long workspaceId, long connectionId, SyncJobType type, @Nullable Long triggeredByUserId) {
+            long workspaceId, long connectionId, SyncJobType type, @Nullable Long triggeredByAccountId) {
         Connection connection = connectionAdminService.findInWorkspaceOrThrow(workspaceId, connectionId);
         if (connection.getState() != IntegrationState.ACTIVE) {
             throw new SyncStateConflictException(
@@ -233,7 +233,12 @@ public class SyncStatusService {
         IntegrationRef ref = connection.toRef();
         try {
             SyncJobService.Started started = syncJobService.beginJob(new SyncJobRequest(
-                    workspaceId, connectionId, connection.getKind(), type, SyncJobTrigger.MANUAL, triggeredByUserId));
+                    workspaceId,
+                    connectionId,
+                    connection.getKind(),
+                    type,
+                    SyncJobTrigger.MANUAL,
+                    triggeredByAccountId));
             try {
                 taskExecutor.execute(() -> syncJobService.executeBody(started, handle -> {
                     if (type == SyncJobType.RECONCILIATION

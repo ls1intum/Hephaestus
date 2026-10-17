@@ -1,122 +1,93 @@
 import type {
-	PracticeAutomatedReviewPolicy,
 	PracticeDefinition,
 	PracticeDefinitionOptions,
-	PracticeEvidenceRequirement,
-	PracticeWorkTypeDefinitionOptions,
+	PracticeItemTypeOption,
+	PracticeReadSource,
+	ReadSourceOption,
+	ReviewOn,
 } from "@/api/types.gen";
-import { ARTIFACT_KIND_VALUES } from "@/lib/artifact-kinds";
-import { hasText } from "@/lib/text";
+import { itemKindRank } from "@/lib/item-kinds";
 
-export type PracticeReviewFields = Pick<
-	PracticeDefinition,
-	"signals" | "evidenceRequirements" | "reviewWhen" | "subject" | "precondition"
->;
+export type ReadNeed = PracticeReadSource["need"];
+export type ReadChoice = ReadNeed | "NOT_USED";
+export type ReviewedByKind = PracticeDefinition["reviewedBy"]["by"];
 
-export type EvidenceStance = PracticeEvidenceRequirement["stance"];
-export type EvidenceRole = "NOT_USED" | EvidenceStance;
-
-export function artifactKindOfSignal(signal: string): string {
-	const lastDot = signal.lastIndexOf(".");
-	return lastDot === -1 ? signal : signal.slice(0, lastDot);
-}
-
-export function artifactKindOfSignals(signals: readonly string[]): string | undefined {
-	const signal = signals[0];
-	return hasText(signal) ? artifactKindOfSignal(signal) : undefined;
-}
-
-export const EMPTY_REVIEW_SETTINGS: PracticeReviewFields = {
-	signals: [],
-	evidenceRequirements: [],
-	reviewWhen: {},
-	subject: "AUTHOR",
-};
-
-export function normalizeReviewWhen(reviewWhen: Record<string, string[]>) {
-	return Object.fromEntries(
-		Object.entries(reviewWhen)
-			.sort(([left], [right]) => left.localeCompare(right))
-			.map(([key, values]) => [key, [...new Set(values)].sort()]),
-	);
-}
-
-export function normalizeReviewSettings(reviewFields: PracticeReviewFields) {
+/** Canonical order prevents an untouched draft from comparing unequal to the saved definition. */
+export function normalizeReviewOn(reviewOn: ReviewOn): ReviewOn {
 	return {
-		signals: [...new Set(reviewFields.signals)].sort((left, right) => left.localeCompare(right)),
-		evidenceRequirements: [...reviewFields.evidenceRequirements].sort((left, right) =>
-			left.sourceKind.localeCompare(right.sourceKind),
+		events: [...new Set(reviewOn.events)].sort((left, right) => left.localeCompare(right)),
+		state: Object.fromEntries(
+			Object.entries(reviewOn.state)
+				.sort(([left], [right]) => left.localeCompare(right))
+				.map(([key, values]) => [key, [...new Set(values)].sort()]),
 		),
-		reviewWhen: normalizeReviewWhen(reviewFields.reviewWhen),
-		subject: reviewFields.subject,
-		...(reviewFields.precondition ? { precondition: reviewFields.precondition } : {}),
 	};
 }
 
-export function roleOf(
-	evidenceRequirements: readonly PracticeEvidenceRequirement[],
-	sourceKind: string,
-): EvidenceRole {
-	return evidenceRequirements.find((need) => need.sourceKind === sourceKind)?.stance ?? "NOT_USED";
-}
-
-export function withRole(
-	evidenceRequirements: readonly PracticeEvidenceRequirement[],
-	sourceKind: string,
-	role: EvidenceRole,
-): PracticeEvidenceRequirement[] {
-	const remaining = evidenceRequirements.filter((need) => need.sourceKind !== sourceKind);
-	if (role !== "NOT_USED") {
-		remaining.push({ sourceKind, stance: role });
-	}
-	return remaining.sort((left, right) => left.sourceKind.localeCompare(right.sourceKind));
-}
-
-export function recommendedReviewSettings(
-	options: PracticeWorkTypeDefinitionOptions,
-): PracticeReviewFields {
-	const recommended = options.signals.filter((option) => option.recommended);
-	const signals = (recommended.length > 0 ? recommended : options.signals.slice(0, 1)).map(
-		(option) => option.signal,
-	);
-	return normalizeReviewSettings({
-		...EMPTY_REVIEW_SETTINGS,
-		signals,
-		evidenceRequirements: options.recommendedEvidenceRequirements,
-		reviewWhen: Object.fromEntries(
-			options.reviewWhenDimensions
-				.filter(
-					(dimension) =>
-						dimension.recommendedValues.length > 0 &&
-						dimension.recommendedValues.length < dimension.values.length,
-				)
-				.map((dimension) => [dimension.key, dimension.recommendedValues]),
-		),
+export function recommendedReviewOn(itemType: PracticeItemTypeOption): ReviewOn {
+	return normalizeReviewOn({
+		events: itemType.events.filter((option) => option.recommended).map((option) => option.name),
+		state: {},
 	});
 }
 
-export function workTypeOptionsFor(
-	definitionOptions: PracticeDefinitionOptions,
-	artifactKind: string | undefined,
-): PracticeWorkTypeDefinitionOptions | undefined {
-	return definitionOptions.workTypes.find((option) => option.artifactKind === artifactKind);
+export function readNeedOf(sources: readonly PracticeReadSource[], source: string): ReadChoice {
+	return sources.find((entry) => entry.source === source)?.need ?? "NOT_USED";
 }
 
-export function orderedWorkTypes(
+export function withReadNeed(
+	sources: readonly PracticeReadSource[],
+	source: string,
+	choice: ReadChoice,
+): PracticeReadSource[] {
+	const remaining = sources.filter((entry) => entry.source !== source);
+	if (choice !== "NOT_USED") {
+		remaining.push({ source, need: choice });
+	}
+	return remaining.sort((left, right) => left.source.localeCompare(right.source));
+}
+
+export function itemTypeFor(
 	definitionOptions: PracticeDefinitionOptions,
-): PracticeWorkTypeDefinitionOptions[] {
-	const rank = new Map(ARTIFACT_KIND_VALUES.map((kind, index) => [kind as string, index]));
-	return [...definitionOptions.workTypes].sort(
-		(left, right) =>
-			(rank.get(left.artifactKind) ?? ARTIFACT_KIND_VALUES.length) -
-			(rank.get(right.artifactKind) ?? ARTIFACT_KIND_VALUES.length),
+	kind: string | undefined,
+): PracticeItemTypeOption | undefined {
+	return definitionOptions.itemTypes.find((option) => option.kind === kind);
+}
+
+export function orderedItemTypes(
+	definitionOptions: PracticeDefinitionOptions,
+): PracticeItemTypeOption[] {
+	return [...definitionOptions.itemTypes].sort(
+		(left, right) => itemKindRank(left.kind) - itemKindRank(right.kind),
 	);
 }
 
-export const OCCASION_ID_PREFIX = "practice-occasion";
+export const REVIEW_ON_ID_PREFIX = "practice-review-on";
 
-export function occasionFieldId(field: string): string {
-	return `${OCCASION_ID_PREFIX}-${field}`;
+export function reviewOnFieldId(field: "events" | "state" | "reads"): string {
+	return `${REVIEW_ON_ID_PREFIX}-${field}`;
+}
+
+/**
+ * Why a set of read sources cannot be saved for an automated review, or undefined when it can. Shared
+ * by the practice's own reads and by a scan's reads, which the server checks the same way.
+ */
+export function readsProblem(
+	sources: readonly PracticeReadSource[],
+	offered: readonly ReadSourceOption[],
+): string | undefined {
+	for (const entry of sources) {
+		const option = offered.find((candidate) => candidate.source === entry.source);
+		if (!option) {
+			return "One chosen source is not offered for this kind of work. Turn it off to continue.";
+		}
+		if (!option.needs.includes(entry.need)) {
+			return `${option.label} cannot be captured whole. Change it to Required or Optional.`;
+		}
+	}
+	return sources.some((entry) => entry.need !== "OPTIONAL")
+		? undefined
+		: "Set at least one source to Required. A review cannot run without one.";
 }
 
 export interface ReviewSettingsProblem {
@@ -124,72 +95,40 @@ export interface ReviewSettingsProblem {
 	focusId: string;
 }
 
+/**
+ * The first reason Review on or the reads cannot be saved for this item type. Reads are checked only
+ * while Hephaestus reviews the practice: any other choice saves none.
+ */
 export function reviewSettingsProblem(
-	reviewFields: PracticeReviewFields,
-	policy: PracticeAutomatedReviewPolicy,
-	options: PracticeWorkTypeDefinitionOptions | undefined,
+	reviewOn: ReviewOn,
+	reads: readonly PracticeReadSource[],
+	by: ReviewedByKind,
+	itemType: PracticeItemTypeOption,
 ): ReviewSettingsProblem | undefined {
-	if (reviewFields.signals.length === 0) {
+	const offered = new Set(itemType.events.map((option) => option.name));
+	if (reviewOn.events.some((name) => !offered.has(name))) {
 		return {
-			message: "Choose when this practice is reviewed.",
-			focusId: occasionFieldId("signals"),
+			message:
+				"One of the chosen events is not offered for this kind of work. Clear it to continue.",
+			focusId: reviewOnFieldId("events"),
 		};
 	}
-	const declared = new Set(options?.signals.map((option) => option.signal));
-	const noAutomatedReview = policy.automatedReview.mode === "NONE";
-	for (const signal of reviewFields.signals) {
-		if (declared.size > 0 && !declared.has(signal)) {
-			return {
-				message:
-					"One of the chosen moments does not apply to this kind of work. Clear it to continue.",
-				focusId: occasionFieldId("signals"),
-			};
-		}
-	}
-	for (const [key, values] of Object.entries(reviewFields.reviewWhen)) {
-		const dimension = options?.reviewWhenDimensions.find((item) => item.key === key);
+	for (const [name, values] of Object.entries(reviewOn.state)) {
+		const dimension = itemType.reviewOnStateDimensions.find((option) => option.name === name);
 		if (
 			!dimension ||
 			values.length === 0 ||
 			values.some((value) => !dimension.values.some((option) => option.value === value))
 		) {
 			return {
-				message: "Choose review conditions supported by this kind of work.",
+				message: "Choose states this kind of work offers.",
 				focusId:
-					(options?.reviewWhenDimensions.length ?? 0) > 0
-						? occasionFieldId("reviewWhen")
-						: occasionFieldId("signals"),
+					itemType.reviewOnStateDimensions.length > 0
+						? reviewOnFieldId("state")
+						: reviewOnFieldId("events"),
 			};
 		}
 	}
-	if (noAutomatedReview && reviewFields.evidenceRequirements.length > 0) {
-		return {
-			message: "Guidance only cannot read any evidence.",
-			focusId: occasionFieldId("evidence"),
-		};
-	}
-	if (
-		!noAutomatedReview &&
-		!reviewFields.evidenceRequirements.some((need) => need.stance !== "CONTEXTUAL")
-	) {
-		return {
-			message: "Set at least one source to Required. A review cannot run without one.",
-			focusId: occasionFieldId("evidence"),
-		};
-	}
-	const exhaustiveBlocked = reviewFields.evidenceRequirements.find(
-		(need) =>
-			need.stance === "EXHAUSTIVE" &&
-			options?.allowedSources.some(
-				(source) => source.sourceKind === need.sourceKind && !source.supportsExhaustiveEvidence,
-			) === true,
-	);
-	if (exhaustiveBlocked) {
-		return {
-			message:
-				"One chosen source cannot be captured whole, so this review cannot claim that anything is missing from it. Change that source to Context or Off.",
-			focusId: occasionFieldId("evidence"),
-		};
-	}
-	return undefined;
+	const message = by === "HEPHAESTUS" ? readsProblem(reads, itemType.readSources) : undefined;
+	return message === undefined ? undefined : { message, focusId: reviewOnFieldId("reads") };
 }

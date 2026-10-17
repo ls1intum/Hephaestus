@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.slack.webhook;
 
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackAssistantEventHandler;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackMentorService;
 import de.tum.cit.aet.hephaestus.integration.slack.onboarding.SlackAppHomeService;
@@ -10,6 +11,7 @@ import tools.jackson.databind.JsonNode;
 
 /** Renders Slack App Home from the unified Slack event stream, and starts the opener's Heph sandbox. */
 @Component
+@ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 public class SlackAppHomeOpenedMessageHandler extends AbstractSlackEnvelopeHandler {
 

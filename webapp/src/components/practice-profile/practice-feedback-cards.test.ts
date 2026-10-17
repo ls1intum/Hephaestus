@@ -1,35 +1,56 @@
 import { describe, expect, it } from "vitest";
 
-import type { InAppFeedback, PracticeGroup, ReviewedWorkRef } from "@/api/types.gen";
+import type {
+	FeedbackResponse,
+	GroupRef,
+	ItemRef,
+	PracticePageCleanWork,
+	PracticePageEvidence,
+	PracticePageFeedback,
+} from "@/api/types.gen";
 
 import { toFeedbackCard } from "./practice-feedback-cards";
 
-const group: PracticeGroup = {
-	id: 1,
+const group: GroupRef = {
 	slug: "review-ready-work",
 	name: "Packaging work for review",
-	displayOrder: 0,
-	visibleInPracticeDashboards: true,
-	autonomy: { effective: "AUTOMATIC", inherited: true, source: "WORKSPACE" },
 	icon: "Package",
 	color: "sky",
-	createdAt: new Date("2026-01-01T00:00:00Z"),
 };
 
-const pullRequest = (n: number): ReviewedWorkRef => ({
+const pullRequest = (n: number): ItemRef => ({
 	id: String(n),
 	kind: "scm.pull_request",
+	parentId: null,
+	provider: "GITHUB",
 	label: `#${n}`,
+	title: null,
 	url: `https://github.example/pr/${n}`,
+	container: null,
+	path: null,
+	removedAt: null,
 });
 
-/** One clean piece of work on the wire: the ref the card links and the day it was reviewed. */
-const cleanWork = (n: number, reviewedAt: string) => ({
-	reviewedWork: pullRequest(n),
-	reviewedAt: new Date(reviewedAt),
+const recorded = (n: number) => ({
+	resultId: `0b9c6f0e-0000-4000-8000-0000000000${String(n).padStart(2, "0")}`,
+	reviewId: `5d1e2a3b-0000-4000-8000-0000000000${String(n).padStart(2, "0")}`,
 });
 
-const feedback: InAppFeedback = {
+const cleanWork = (n: number, recordedAt: string): PracticePageCleanWork => ({
+	...recorded(n),
+	item: pullRequest(n),
+	recordedAt: new Date(recordedAt),
+});
+
+const evidence = (n: number, recordedAt: string): PracticePageEvidence => ({
+	...recorded(n),
+	item: pullRequest(n),
+	recordedAt: new Date(recordedAt),
+	summary: null,
+});
+
+const feedback: PracticePageFeedback = {
+	unverifiedHistory: false,
 	id: "f1",
 	headline: "Descriptions name the what, rarely the why",
 	body: "#16 and #17 list the files touched.",
@@ -38,17 +59,17 @@ const feedback: InAppFeedback = {
 	practiceName: "Describe what changed and why",
 	groupSlug: "review-ready-work",
 	groupName: "Packaging work for review",
-	evidence: [
-		{ reviewedWork: pullRequest(6), observedAt: new Date("2026-08-19"), outcome: "NOT_MET" },
-		{
-			reviewedWork: pullRequest(7),
-			observedAt: new Date("2026-08-13"),
-			outcome: "NOT_MET",
-		},
-	],
+	evidence: [evidence(6, "2026-08-19"), evidence(7, "2026-08-13")],
 	preparedAt: new Date("2026-08-20T10:05:00Z"),
 	cleanWork: [cleanWork(8, "2026-08-25")],
 	cleanNeeded: 3,
+	closedAt: null,
+	closedBy: null,
+	readAt: null,
+	response: null,
+	whyItMatters: null,
+	whatGoodLooksLike: null,
+	withdrawn: false,
 };
 
 const RESOLVED_BY_WORK = {
@@ -58,13 +79,18 @@ const RESOLVED_BY_WORK = {
 };
 
 /** The reader's own answer, as the server records the resolution it dates. */
-const answered = (resolution: "ADDRESSED" | "NOT_APPLICABLE" | "DISPUTED") => ({
+const answered = (resolution: NonNullable<FeedbackResponse["resolution"]>) => ({
 	readAt: new Date("2026-08-21"),
-	response: { feedbackId: "f1", resolution, respondedAt: new Date("2026-09-09T14:10:00Z") },
+	response: {
+		resolution,
+		usefulness: null,
+		comment: resolution === "DISAGREE" ? "The change was one concern." : null,
+		createdAt: new Date("2026-09-09T14:10:00Z"),
+	} satisfies FeedbackResponse,
 });
 
 describe("toFeedbackCard", () => {
-	it("reads an unread card as new, with each piece of work named, linked and judged as the wire says", () => {
+	it("reads an unread card as new, with each piece of work named and linked as the wire says", () => {
 		const card = toFeedbackCard(feedback, [group]);
 		expect(card).toMatchObject({
 			feedbackId: "f1",
@@ -85,8 +111,8 @@ describe("toFeedbackCard", () => {
 			},
 		]);
 		expect(card.reviewedWork).toStrictEqual([
-			{ ref: pullRequest(6), date: new Date("2026-08-19"), outcome: "NOT_MET" },
-			{ ref: pullRequest(7), date: new Date("2026-08-13"), outcome: "NOT_MET" },
+			{ ref: pullRequest(6), date: new Date("2026-08-19") },
+			{ ref: pullRequest(7), date: new Date("2026-08-13") },
 		]);
 	});
 
@@ -155,36 +181,36 @@ describe("toFeedbackCard", () => {
 		]);
 	});
 
-	it("reads a withdrawn card as withdrawn on that day, with none of its words", () => {
+	it("reads a withdrawn card as withdrawn on the day it was written, with none of its words", () => {
 		const withdrawn = toFeedbackCard(
 			{
 				...feedback,
 				headline: feedback.practiceName,
-				body: undefined,
-				nextStep: undefined,
+				body: null,
+				nextStep: null,
 				evidence: [],
 				cleanWork: [],
 				readAt: new Date("2026-08-21"),
-				withdrawnAt: new Date("2026-09-03"),
+				withdrawn: true,
 			},
 			[group],
 		);
 		expect(withdrawn).toMatchObject({
 			state: "withdrawn",
-			timestamp: new Date("2026-09-03"),
+			timestamp: feedback.preparedAt,
 			body: "",
 			nextStep: "",
 		});
 	});
 
 	it("shows a card written without a next step with an empty band", () => {
-		expect(toFeedbackCard({ ...feedback, nextStep: undefined }, [group]).nextStep).toBe("");
+		expect(toFeedbackCard({ ...feedback, nextStep: null }, [group]).nextStep).toBe("");
 	});
 
-	it("leaves a card the reader disputed open, on the day it was written", () => {
-		// A dispute is an answer, not a closure: the server closes nothing, so the card keeps the
-		// condition that would tick it.
-		const card = toFeedbackCard({ ...feedback, ...answered("DISPUTED") }, [group]);
+	it("leaves a card the reader disagreed with open, on the day it was written", () => {
+		// A disagreement is an answer, not a closure: the server closes nothing, so the card keeps
+		// the condition that would tick it.
+		const card = toFeedbackCard({ ...feedback, ...answered("DISAGREE") }, [group]);
 		expect(card).toMatchObject({ state: "open", timestamp: new Date("2026-08-20T10:05:00Z") });
 		expect(card.condition).toStrictEqual([
 			{
@@ -205,9 +231,7 @@ describe("toFeedbackCard", () => {
 	});
 
 	it("gives a practice in no group no group at all, so nothing offers to open one", () => {
-		const card = toFeedbackCard({ ...feedback, groupSlug: undefined, groupName: undefined }, [
-			group,
-		]);
+		const card = toFeedbackCard({ ...feedback, groupSlug: null, groupName: null }, [group]);
 		expect(card.group).toBeUndefined();
 	});
 });

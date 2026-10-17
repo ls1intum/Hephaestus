@@ -4,6 +4,8 @@ import static de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures.admitt
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorTurnPersistence;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
@@ -13,7 +15,9 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRep
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import de.tum.cit.aet.hephaestus.integration.core.spi.MentorWorkQuery;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.RequestedReviewer;
@@ -26,7 +30,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.MembershipService;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -37,6 +43,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
@@ -61,7 +68,13 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
     private ConnectionService connectionService;
 
     @Autowired
-    private MentorContextQueryRepository queryRepository;
+    private MentorConversationQueryRepository conversations;
+
+    @Autowired
+    private MentorWorkQuery work;
+
+    @Autowired
+    private AccountRepository accounts;
 
     @Autowired
     private MentorTurnPersistence persistence;
@@ -85,7 +98,13 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
     private PullRequestRepository pullRequestRepository;
 
     @Autowired
+    private IssueRepository issueRepository;
+
+    @Autowired
     private PullRequestReviewRepository reviewRepository;
+
+    @Autowired
+    private MembershipService memberships;
 
     private Workspace workspace;
     private User user;
@@ -118,8 +137,8 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
         user = userRepository.save(user);
     }
 
-    private void connectSource(IntegrationKind kind, ConnectionConfig config) {
-        Connection connection = connections.saveAndFlush(new Connection(workspace, kind, kind.name(), config));
+    private void connectSource(Workspace scope, IntegrationKind kind, ConnectionConfig config) {
+        Connection connection = connections.saveAndFlush(new Connection(scope, kind, kind.name(), config));
         connectionService.transition(
                 connection,
                 new ConnectionService.TransitionRequest(
@@ -132,8 +151,8 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     private ChatThread seedThreadWithUserMessage(String firstPrompt) {
-        ChatThread thread =
-                persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, Set.of(user.getId()), firstPrompt);
+        ChatThread thread = persistence.ensureThread(
+                workspace.getId(), UUID.randomUUID(), memberships.accountIdForUser(user.getId()), firstPrompt);
         persistence.persistInFlight(thread, firstPrompt, UUID.randomUUID(), null, admittedMentorConfig());
         return thread;
     }
@@ -143,8 +162,8 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
         ChatThread t1 = seedThreadWithUserMessage("how do I structure my PR description?");
         ChatThread t2 = seedThreadWithUserMessage("what makes a good test?");
 
-        List<Object[]> rows = queryRepository.findFirstUserMessagePartsByThreadIds(
-                workspace.getId(), List.of(t1.getId(), t2.getId()));
+        List<Object[]> rows =
+                conversations.findFirstUserMessagePartsByThreadIds(workspace.getId(), List.of(t1.getId(), t2.getId()));
 
         Map<UUID, String> byThread = new HashMap<>();
         for (Object[] row : rows) {
@@ -168,10 +187,10 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
         other.setAccountType(AccountType.ORG);
         other = workspaceRepository.save(other);
         ChatThread foreign = persistence.ensureThread(
-                other.getId(), UUID.randomUUID(), user, Set.of(user.getId()), "foreign prompt");
+                other.getId(), UUID.randomUUID(), memberships.accountIdForUser(user.getId()), "foreign prompt");
         persistence.persistInFlight(foreign, "foreign prompt", UUID.randomUUID(), null, admittedMentorConfig());
 
-        List<Object[]> rows = queryRepository.findFirstUserMessagePartsByThreadIds(
+        List<Object[]> rows = conversations.findFirstUserMessagePartsByThreadIds(
                 workspace.getId(), List.of(mine.getId(), foreign.getId()));
 
         assertThat(rows).hasSize(1);
@@ -183,7 +202,7 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
     class PendingReviewRequests {
 
         /** One provider's side of the tests: a monitored repository, the reader asked to review and the author. */
-        private record Side(Repository repository, User reader, User author) {}
+        private record Side(Workspace scope, Repository repository, User reader, User author) {}
 
         private final AtomicLong nativeIds = new AtomicLong(880_000);
         private Side gitLab;
@@ -198,6 +217,7 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
                             new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
             gitHub = side(gitHubProvider, "https://github.com", person(gitHubProvider, "https://github.com", "reader"));
             connectSource(
+                    gitLab.scope(),
                     IntegrationKind.GITLAB,
                     new ConnectionConfig.GitLabConfig(
                             user.getProvider().getServerUrl(),
@@ -207,6 +227,7 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
                             Set.of(),
                             null));
             connectSource(
+                    gitHub.scope(),
                     IntegrationKind.GITHUB,
                     new ConnectionConfig.GitHubAppConfig(
                             880_000L, workspace.getAccountLogin(), gitHubProvider.getServerUrl(), Set.of()));
@@ -249,6 +270,55 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
+        void shouldResolveAccountIdentitiesInsteadOfTreatingAccountIdsAsProviderActors() {
+            var unlinked = accounts.saveAndFlush(new Account("No provider identity"));
+            long unlinkedId = Objects.requireNonNull(unlinked.getId());
+            PullRequest requested = asking(gitLab, ReviewState.UNREVIEWED);
+            long accountId = memberships.accountIdForUser(gitLab.reader().getId());
+            assertThat(work.findPendingReviewRequestPrs(gitLab.scope().getId(), accountId))
+                    .extracting(MentorWorkQuery.RequestedReview::id)
+                    .contains(requested.getId());
+            assertThat(work.findPendingReviewRequestPrs(gitLab.scope().getId(), unlinkedId))
+                    .isEmpty();
+            assertThat(work.findPendingReviewRequestPrs(gitHub.scope().getId(), accountId))
+                    .isEmpty();
+            var now = Instant.now();
+            assertThat(work.fetchUserCounts(
+                                    gitLab.scope().getId(),
+                                    unlinkedId,
+                                    now.minus(Duration.ofDays(14)),
+                                    now.minus(Duration.ofDays(7)),
+                                    now)
+                            .pendingReviewRequests())
+                    .isZero();
+        }
+
+        @Test
+        void shouldListAssignedIssuesWithoutIncludingAssignedMergeRequests() {
+            var issue = new Issue();
+            long nativeId = nativeIds.incrementAndGet();
+            issue.setNativeId(nativeId);
+            issue.setProvider(gitLab.repository().getProvider());
+            issue.setNumber((int) (nativeId % 100_000));
+            issue.setTitle("Resolve the assigned issue");
+            issue.setState(Issue.State.OPEN);
+            issue.setRepository(gitLab.repository());
+            issue.setAuthor(gitLab.author());
+            issue.getAssignees().add(gitLab.reader());
+            issue.setCreatedAt(Instant.now());
+            issueRepository.saveAndFlush(issue);
+            var mergeRequest = asking(gitLab, ReviewState.UNREVIEWED);
+            mergeRequest.getAssignees().add(gitLab.reader());
+            pullRequestRepository.saveAndFlush(mergeRequest);
+            long accountId = memberships.accountIdForUser(gitLab.reader().getId());
+            assertThat(work.findAssignedOpenIssues(gitLab.scope().getId(), accountId))
+                    .extracting(MentorWorkQuery.AssignedIssue::title)
+                    .containsExactly("Resolve the assigned issue");
+            assertThat(work.findAssignedOpenIssues(gitHub.scope().getId(), accountId))
+                    .isEmpty();
+        }
+
+        @Test
         void shouldLeaveOutADraftWhenItAsksForAReview() {
             PullRequest ready = asking(gitLab, ReviewState.UNREVIEWED);
             PullRequest drafted = asking(gitLab, ReviewState.UNREVIEWED);
@@ -259,18 +329,17 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
         }
 
         private void assertPending(Side side, Set<PullRequest> pending, Set<PullRequest> notPending) {
-            Long readerId = side.reader().getId();
-            Set<Long> listed = queryRepository.findPendingReviewRequestPrs(workspace.getId(), readerId).stream()
-                    .map(PullRequest::getId)
+            long accountId = memberships.accountIdForUser(side.reader().getId());
+            Set<Long> listed = work.findPendingReviewRequestPrs(side.scope().getId(), accountId).stream()
+                    .map(row -> row.id())
                     .collect(Collectors.toSet());
             assertThat(listed)
                     .containsAll(pending.stream().map(PullRequest::getId).toList());
             assertThat(notPending).extracting(PullRequest::getId).noneMatch(listed::contains);
             Instant now = Instant.now();
-            assertThat(queryRepository
-                            .fetchUserCounts(
-                                    workspace.getId(),
-                                    readerId,
+            assertThat(work.fetchUserCounts(
+                                    side.scope().getId(),
+                                    accountId,
                                     now.minus(Duration.ofDays(14)),
                                     now.minus(Duration.ofDays(7)),
                                     now)
@@ -289,11 +358,14 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
             repository.setHtmlUrl(serverUrl + "/" + repository.getNameWithOwner());
             repository.setDefaultBranch("main");
             repository = repositoryRepository.save(repository);
+            Workspace scope = provider.getType() == IdentityProviderType.GITLAB
+                    ? workspace
+                    : workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("mentor-github-context"));
             RepositoryToMonitor monitor = new RepositoryToMonitor();
-            monitor.setWorkspace(workspace);
+            monitor.setWorkspace(scope);
             monitor.setNameWithOwner(repository.getNameWithOwner());
             repositoryToMonitorRepository.save(monitor);
-            return new Side(repository, reader, person(provider, serverUrl, "author"));
+            return new Side(scope, repository, reader, person(provider, serverUrl, "author"));
         }
 
         private User person(IdentityProvider provider, String serverUrl, String login) {

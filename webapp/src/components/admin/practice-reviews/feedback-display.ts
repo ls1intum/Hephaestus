@@ -15,9 +15,9 @@ const LINK = String.raw`\(https?:\/\/[^\s()<>]+\)`;
 const FOOTER_LINES = [
 	[
 		"Practice review",
-		String.raw`(?: &middot; [^<>\n]+?)?\. This feedback is AI-generated and can be inaccurate\. Answer or dispute it in \[Hephaestus\]${LINK}\.`,
+		String.raw`(?: &middot; [^<>\n]+?)?\. This feedback is AI-generated and can be inaccurate\. Answer or disagree in \[Hephaestus\]${LINK}\.`,
 	],
-	["AI-generated feedback", String.raw`\. Answer or dispute it in \[Hephaestus\]${LINK}\.`],
+	["AI-generated feedback", String.raw`\. Answer or disagree in \[Hephaestus\]${LINK}\.`],
 	["[Why you see this and how to stop it]", LINK],
 ].map(([start = "", rest = ""]) => ({
 	start: `<sub>${start}`,

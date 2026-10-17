@@ -83,9 +83,10 @@ WHERE i.repository_id = :repository_id
   AND i.deleted_at IS NULL
   AND i.created_at IS NOT NULL
   AND NOT EXISTS (
-    SELECT 1 FROM person_suppression s
+    SELECT 1 FROM identity_restriction s
     WHERE s.provider_id = u.provider_id
-      AND s.subject = u.native_id::text AND s.team_key = ''
+      AND s.provider_user_key = u.native_id::text AND s.team_key = ''
+      AND s.kind = 'ERASED'
   )
   AND NOT EXISTS (
     SELECT 1 FROM activity_event e

@@ -3,5 +3,7 @@
  * {@code *FilterParams} record would otherwise carry its own copy of. Module-private: nothing outside
  * {@code practices} binds these query strings.
  */
-@org.jspecify.annotations.NullMarked
+@NullMarked
 package de.tum.cit.aet.hephaestus.practices.web;
+
+import org.jspecify.annotations.NullMarked;

@@ -40,9 +40,9 @@ export const ActionsAtReflowWidth: Story = {
 	args: {
 		actions: (
 			<>
-				<p className="text-sm whitespace-nowrap text-muted-foreground">128 observations.</p>
-				<Button variant="outline">Export observations as CSV</Button>
-				<Button variant="outline">Export observations as JSON</Button>
+				<p className="text-sm whitespace-nowrap text-muted-foreground">128 results.</p>
+				<Button variant="outline">Export results as CSV</Button>
+				<Button variant="outline">Export results as JSON</Button>
 			</>
 		),
 	},

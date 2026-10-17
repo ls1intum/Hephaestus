@@ -17,20 +17,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Caps how fast one authenticated sandbox may call the gateway. The bucket is keyed by the principal
- * {@link JobTokenAuthenticationFilter} resolved — one agent job or one mentor session — so no
- * sandbox can drain another's budget, and no workspace's mentor traffic can throttle another's.
- *
- * <p>Runs after authentication and decides nothing about it: a request that carries no
- * {@link ProxyRouting} principal is passed on for the chain's authorization rules to answer, which is
- * what keeps every response on this connector consistent.
- *
- * <p>A bucket store it cannot reach fails open. The caller is already job-token-authenticated and its
- * spend still has to pass the budget gate, so an unreachable store must not close the sandbox's only
- * door mid-review; it is counted instead, so a limiter that has stopped limiting is visible rather
- * than silent.
- */
+// Authorize before consuming rate limits, and key buckets by principal to isolate sandboxes.
+// An unavailable bucket store permits the call; authentication and budget checks still apply.
 public final class SandboxGatewayRateLimitFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(SandboxGatewayRateLimitFilter.class);
@@ -58,13 +46,13 @@ public final class SandboxGatewayRateLimitFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !(authentication.getPrincipal() instanceof ProxyRouting routing)) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof ProxyIdentity identity)) {
             chain.doFilter(request, response);
             return;
         }
 
         // The principal names a job or a session, never a token — safe at WARN.
-        String principal = routing.principalDescription();
+        String principal = identity.description();
         ConsumptionProbe probe = bucketResolver.tryConsume(KEY_PREFIX + principal, bucketConfiguration, e -> {
             accounting.recordGatewayLimiterError();
             log.warn("Sandbox gateway rate limit backend error: principal={}", principal, e);

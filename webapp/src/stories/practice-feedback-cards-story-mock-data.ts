@@ -1,8 +1,3 @@
-/**
- * Feedback cards for the stories and the tests, which install no network: what
- * `useInAppFeedback` composes from the wire, written out by hand, on the reviewed work of
- * `practice-profile-story-mock-data`.
- */
 import { EyeIcon, MessageCircleIcon, MessageSquareReplyIcon, PackageIcon } from "lucide-react";
 
 import { text, work } from "@/components/practice-vocabulary/feedback-text";
@@ -40,7 +35,6 @@ const SCOPE_ONE_CONCERN = {
 	preparedAt: inStoryYear("09-09T14:10"),
 } satisfies Partial<PracticeFeedbackCardEntry>;
 
-/** The page's first card: new, three problems in the strip, nothing clean yet. */
 export const NEW_FEEDBACK_CARD: PracticeFeedbackCardEntry = {
 	feedbackId: "scope-one-concern-new",
 	...SCOPE_ONE_CONCERN,
@@ -108,16 +102,9 @@ const OPEN_FEEDBACK_CARDS: PracticeFeedbackCardEntry[] = [
 		headline: "Two pull requests grew past what one review can hold",
 		body: "#21 touched 41 files and #22 38; both went through two rounds of review, and the second round of each reopened a file the first had already approved.",
 		reviewedWork: [
-			{
-				ref: pullRequest(19),
-				date: inStoryYear("09-06T00:00"),
-				outcome: "MET",
-			},
 			{ ref: pullRequest(21), date: inStoryYear("09-07T00:00"), outcome: "NOT_MET" },
 			{ ref: pullRequest(22), date: inStoryYear("09-09T00:00"), outcome: "NOT_MET" },
 		],
-		// A strength before the problems: the clean work it started was emptied, so nothing is clean
-		// since.
 		cleanWork: [],
 		nextStep:
 			"When a branch passes twenty files, stop and split it: land the shared groundwork first, then each behaviour change on top of it as its own pull request.",

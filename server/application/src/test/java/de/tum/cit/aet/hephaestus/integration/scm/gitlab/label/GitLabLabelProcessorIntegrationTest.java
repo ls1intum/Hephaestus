@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
@@ -14,6 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organizatio
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.label.dto.GitLabLabelDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
@@ -243,7 +243,7 @@ class GitLabLabelProcessorIntegrationTest extends BaseIntegrationTest {
         testWorkspace.setDisplayName("HephaestusTest GitLab");
         testWorkspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         testWorkspace.setPublicActivityEnabled(true);
-        testWorkspace.setOrganization(org);
+        testWorkspace.setOrganizationId(org.getId());
         testWorkspace.setAccountLogin(FIXTURE_ORG_LOGIN);
         testWorkspace.setAccountType(AccountType.ORG);
         testWorkspace = workspaceRepository.save(testWorkspace);

@@ -1,9 +1,9 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
-import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.review.dto.WorkspaceReviewScopeDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeDeliveryStatus;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewField;
-import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -31,24 +31,25 @@ public record UpdatePracticeReviewSettingsRequestDTO(
         @Schema(description = "Replaces repository and person coverage wholesale. Null leaves it unchanged.")
         @Valid
         @Nullable
-        WorkspaceReviewScope reviewScope,
+        WorkspaceReviewScopeDTO reviewScope,
 
         @Schema(description = "Pause or activate external feedback. Resume never releases work from an older revision.")
         @Nullable
         PracticeDeliveryStatus deliveryStatus,
 
         @Schema(
-                description = "How much autonomy the system has over practices and groups that hold no autonomy of "
-                        + "their own. The one decision that moves a whole workspace at once. Null leaves it "
-                        + "unchanged; name DEFAULT_AUTONOMY in 'reset' to clear it.")
+                description =
+                        "The default feedback mode. Null leaves it unchanged; DEFAULT_FEEDBACK_MODE in reset restores"
+                                + " inheritance.")
         @Nullable
-        PracticeAutonomy defaultAutonomy,
+        FeedbackMode defaultFeedbackMode,
 
         @Schema(description = "Fields to reset back to inherit") @Nullable
         Set<PracticeReviewField> reset,
 
         @Schema(
                 description =
-                        "Patch generated-path patterns per monitored repository. An empty list clears that repository. Null leaves all unchanged.")
+                        "Patch generated-path patterns per monitored repository. An empty list clears that repository."
+                                + " Null leaves all unchanged.")
         @Nullable
         Map<String, List<String>> generatedPaths) {}

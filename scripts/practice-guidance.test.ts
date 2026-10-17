@@ -208,14 +208,19 @@ const bundledPractices = asArray(
 		const practice = asRecord(entry, "practice");
 		const slug = asString(practice.slug, "practice slug");
 		const visual =
-			practice.visual === undefined ? undefined : asRecord(practice.visual, `${slug} visual`);
+			practice.visualResource === undefined
+				? undefined
+				: asRecord(practice.visualResource, `${slug} visual resource`);
 		return {
 			slug,
 			visual:
 				visual === undefined
 					? undefined
 					: { file: asString(visual.file, slug), alt: asString(visual.alt, slug) },
-			guide: practice.guide === undefined ? undefined : asString(practice.guide, `${slug} guide`),
+			guide:
+				practice.guideResource === undefined
+					? undefined
+					: asString(practice.guideResource, `${slug} guide resource`),
 		};
 	});
 

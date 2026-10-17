@@ -83,147 +83,48 @@ public void updateSettings(WorkspaceContext ctx, @RequestBody SettingsDTO dto) {
 
 ## Where membership rows come from
 
-Workspace administration or a provider access grant creates a membership. Activity and profile paths
-only read memberships.
+Workspace administration or a complete provider access grant creates account membership.
+Activity and profile paths read membership without granting access.
+Provider adapters retain exact instance, native identity and team keys.
+A complete roster can provision an UNCLAIMED human account before sign-in.
+Unaccepted invitations and bots do not become human principals.
 
-A GitLab group grants its effective roster and its teams.
-The roster (`organization_membership`) uses `relations: [DIRECT, INHERITED, SHARED_FROM_GROUPS]` (`GitLabGroupMemberResponse#EFFECTIVE_RELATIONS`).
-REST `GET /groups/:id/members/all` reads the same relations through `GroupMembersFinder`.
-Thus, a workspace on a subgroup keeps members inherited from a parent group or received from an invited group.
-Each member keeps their highest grant.
+The GitLab adapter retains effective direct, inherited and shared grants.
+Team graphs and repository collaborators use their own supported access scope.
+A failed or incomplete listing cannot remove a previous complete grant.
+A source mirror upsert does not itself grant a workspace role.
 
-Unlike REST, GraphQL also lists unaccepted email invitations with no user.
-These grant nobody access, so the handler skips them (`GitLabGroupMemberResponse#isPendingInvitation`).
-
-A team is the connected group or one of its subgroups on the same instance.
-It lists `DIRECT` and `SHARED_FROM_GROUPS` members, not `INHERITED` members.
-The team hierarchy carries inherited membership.
-It also lists WRITE/TRIAGE collaborators of projects directly in its group.
-Thus, a student who belongs to only one project is a workspace member.
-
-`WorkspaceOrganizationMembershipAdapter#reconcileWorkspaceMembers` sets `workspace_membership` to this set.
-It assigns the roster's ADMIN or MEMBER role, or MEMBER for someone listed only by a team.
-It keeps OWNER for anyone who holds that role.
-
-It runs after a complete roster listing.
-After it has reconciled a roster, it also runs after a complete team sync.
-That sync must list the graph and every team's members completely.
-
-A member event changes only one person.
-On a connection route, the credential authenticates the connection.
-The handler replaces that person's stored grant with GitLab's current lookup result, using the same relations as the listing.
-This result describes effective access to the connected group or a subgroup team.
-Without effective access to the connected group, the handler also removes the person from that group's own team.
-
-The workspace member gets the role still granted by the stored roster or a team.
-If neither grants a role, they lose membership (`WorkspaceMembershipService#applyProviderGrant`).
-
-A removal outside a connection route names one direct grant.
-It does not prove loss of an inherited or invited-group grant.
-Thus, it changes nothing until the next complete roster listing.
-
-The handler reads each GitLab listing in full before it writes any membership from it.
-It applies only a complete listing, in one short transaction.
-These conditions cause no membership or role change from that listing:
-
-- A page has GraphQL errors.
-- A page is incomplete (`GitLabGraphQlResponseHandler#isWholePage`, which rejects a `group: null` answer).
-- An entry has a user but no readable id or access level.
-- A page fails.
-
-The group roster upserts users before the role transaction.
-A failure between these operations can leave user rows, but never a grant.
-Only the authoritative scope writes the group (`GitLabWorkspaceLinkService#mayWriteGroup`).
-Its active connection must use the group's instance.
-The workspace must link to the group, or remain unlinked while no other workspace links to it.
-
-Only the workspace that owns a shared project's group and monitors the project can replace its collaborator rows.
-`GitLabWorkspaceLinkService#mayWriteRepository` checks this condition.
-Replacement requires a complete listing.
-A failed or narrower read leaves the last complete answer in place.
-
-Hiding a member only removes them from workspace activity.
-If the roster no longer lists a hidden member, the handler removes them like any other member.
-It keeps their preference in `workspace_hidden_former_member` until membership is created for the same actor again.
-The new membership takes back this preference.
-Purge clears it.
-
-`WorkspaceMembershipService#practiceReviewEligibleUserIds` defines practice-review eligibility.
-Eligible developers are human members with SCM identities on the workspace's active connection instance (`WorkspaceActorSelector#connectedProviderId`).
-Thus, the GitHub profile of a GitLab workspace's creator is a member, but not a review subject.
-Without an active connection, every human member counts.
-Coverage counts, person selection, widening, and subject admission all use this eligibility.
-
-For an ineligible author, the gate refuses work with retryable `SUBJECT_UNLINKED`.
-Thus, a merge request marked ready before member sync admits its author is offered again after admission.
-A repository or base branch outside the selection stays terminal `OUT_OF_REVIEW_SCOPE`.
-
-The GitLab deletion sweep lists with the scope's own credentials.
-Thus, it tombstones only repositories on the scope's connected instance.
-The write transaction checks again that the repository remains monitored, in this scope's owned connected group, and on that instance.
-`GitLabWorkspaceLinkService#mayWriteRepository` performs this check.
+Membership joins workspace and account, with role, hidden preference and review selection.
+Logical removal sets leftAt rather than deleting the row.
+A former member loses authorization while historical identity remains recorded.
+Assigning a role reactivates the membership after the normal admin and last-owner checks.
+The hidden preference remains on that membership.
 
 ## Account identity resolution
 
-Membership rows use SCM users as keys, not accounts. The account-keyed schema in
-[ADR 0019](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0019-workspace-membership-keyed-on-account.md) is proposed, not implemented.
-`CurrentAccountUsers` resolves an account's non-disabled identity links to existing SCM actors by
-provider id and immutable provider subject. It does not provision actors or fall back to usernames,
-display names, or cached actor references. No resolvable links means no SCM actors, not a restriction
-on the dedicated public activity endpoint or instance-admin elevation.
+The authenticated account is the workspace principal.
+A linked provider login identifies source work but does not grant membership.
+Provider usernames and display names cannot select another principal.
+An account can hold membership without an SCM mirror.
+The founder receives explicit membership, not first-identity elevation.
 
-`AccountWorkspaceMembershipQuery` uses that resolver for cross-module membership reads.
-The effective role is the strongest role across the account's linked workspace members.
-`WorkspaceActorSelector` selects a representative from actors that currently hold membership.
-It prefers the actor on the provider type and server URL configured for the workspace's active SCM connection.
-Reviewed work, observations, and feedback name the account's actor on that instance.
-An actor on another provider or instance can still hold membership, such as the workspace's creator.
+Sign-in claims the exact roster-created account.
+Only an unclaimed account can be absorbed by a verified identity-link flow.
+Overlapping memberships preserve existing authority and scope selections for that same person.
+Disabled identities cannot regain authority through roster sync.
 
-Without an active SCM connection or a member actor on its instance, selection uses the first-linked member actor in identity-link id order.
-Until sync records actors against the configured instance ([#2181](https://github.com/hephaestus-build/Hephaestus/issues/2181)), a workspace connected to a non-default instance uses link order.
-GitHub Enterprise sync still records github.com.
-This selects one actor, not an aggregate.
-Reads show only that actor's observations.
-HTTP requests and provider attribution use the same selection.
+Results and feedback identify the native account, not a chosen representative SCM user.
+AI choice and external-feedback settings belong to that account across workspaces.
+SCM actor mirrors retain their provider attribution and activity facts.
+No first-linked provider preference chooses the developer's results.
 
-Role changes and new links do not replace an eligible representative on the connected instance.
-Loss or disablement of its link or membership can change the representative.
-Reconnection to another instance can also change it.
+Slack and Outline require their exact provider/team identity plus membership in the target workspace.
+Active account and identity authority remain separate checks for outgoing conversation access.
+An elevated instance admin without membership does not inherit a developer identity from a display login.
+A view-as read keeps its audited actor and does not prove developer feedback delivery.
 
-Conversations with Heph survive this change.
-The request carries all of the account's member actor ids.
-The account can list and open a thread started through any of them.
-A new thread belongs to the selected actor.
-A continued thread moves to that actor.
-
-A failure in this cross-module query propagates instead of returning an empty membership list.
-
-Slack and Outline attribution first resolve the provider subject and provider workspace identity (Slack team or Outline team).
-Then they require membership in the target Hephaestus workspace.
-Account status and link status are separate checks:
-
-- Historical Slack/Outline attribution and account export queries require non-disabled links, but not an ACTIVE account.
-  They do not restore erased data or disabled links.
-- Slack mentor admission and account-linked App Home reads require an ACTIVE account and non-disabled links.
-  Research preference changes and outgoing feedback recipient resolution require both conditions too.
-
-Account preference exports contain the preferences of the first-linked actor that resolves through `CurrentAccountUsers`.
-If that actor has no preferences row, the export omits preferences instead of trying another actor.
-Account settings select the first active GitHub or GitLab link instead.
-They can provision its missing actor.
-Thus, these paths can select different actors before provisioning.
-Settings preserve an existing actor's provider-synced profile.
-
-A missing actor's saved signup username can belong to another native id on the same provider.
-In this case, provisioning returns `409 Conflict` instead of reassigning the username.
-A non-numeric provider subject also returns `409`.
-This path does not fetch fresh provider data.
-
-Workspace creation resolves the authenticated account's verified actors directly because there is no
-workspace context to pin yet. Workspace-scoped developer reads require the pinned actor. An elevated
-instance administrator without membership has no developer identity and never inherits one from a
-display login. GitHub installation attachment follows the immutable identity requirements documented
-in [GitHub integration](../admin/github-integration#workspace-attachment).
+The [account decision](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0019-workspace-membership-keyed-on-account.md) owns the identity model.
+The [data map](/admin/dsms/personal-data-map) owns erasure and restrictions.
 
 ## Async Work
 

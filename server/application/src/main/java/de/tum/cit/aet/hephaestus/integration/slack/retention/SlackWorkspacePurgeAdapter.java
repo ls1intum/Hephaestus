@@ -1,10 +1,12 @@
 package de.tum.cit.aet.hephaestus.integration.slack.retention;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeContributor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
+@ConditionalOnServerRole
 @RequiredArgsConstructor
 public class SlackWorkspacePurgeAdapter implements WorkspacePurgeContributor {
 

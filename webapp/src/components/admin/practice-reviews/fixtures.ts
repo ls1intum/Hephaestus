@@ -1,214 +1,285 @@
 import { addDays } from "date-fns";
 import type {
-	AgentJob,
-	AgentJobUsage,
-	ArtifactTrace,
-	AutonomyAssignment,
-	DeliveryPolicyTrace,
+	AccountRef,
 	EvidenceCitation,
+	FeedbackBasis,
+	FeedbackCheck,
+	FeedbackCheckFacts,
+	FeedbackCopy,
+	FeedbackCopyCounts,
+	FeedbackDecision,
+	FeedbackDisagreement,
+	FeedbackResponse,
+	FeedbackSend,
+	ItemEvent,
+	ItemFacts,
+	ItemRef,
+	ItemTrace,
+	OpenQuestion,
 	Practice,
-	PracticeReviewBucket,
-	PracticeReviewCounts,
-	PracticeReviewOverview,
-	PracticeReviewQueue,
-	PracticeReviewQueueItem,
-	PracticeReviewTiming,
-	PracticeRevision,
-	ReviewedWorkRef,
+	PracticeGroup,
+	PracticeScriptRun,
+	PracticeVersion,
+	Problem,
+	ReasonCount,
+	ResultExample,
+	ResultMark,
+	ReviewBoundFeedback,
+	ReviewBoundResult,
+	ReviewBucket,
+	ReviewDetail,
+	ReviewDeveloper,
 	ReviewFeedback,
 	ReviewFeedbackCounts,
 	ReviewFeedbackDetail,
-	ReviewFeedbackLocationCounts,
-	ReviewFeedbackReasonCount,
-	ReviewObservation,
-	ReviewObservationCounts,
-	ReviewObservationDetail,
-	ReviewRunSummary,
-	ReviewRunTarget,
-	ReviewSubject,
-	ReviewWorkFacts,
+	ReviewJob,
+	ReviewOverview,
+	ReviewPractice,
+	ReviewPracticeCounts,
+	ReviewProblem,
+	ReviewProblemDetail,
+	ReviewQueue,
+	ReviewQueueItem,
+	ReviewRef,
+	ReviewResult,
+	ReviewResultCounts,
+	ReviewResultDetail,
+	ReviewSummary,
+	ReviewTiming,
+	ReviewUsage,
 	WorkspaceMembership,
 } from "@/api/types.gen";
-import { EMPTY_REVIEW_SETTINGS } from "@/components/admin/practice-editor/review-settings";
+import { definitionOf } from "@/components/admin/practice-editor/fixtures";
+import {
+	chosenFeedbackMode,
+	mockPracticeOf,
+	OWN_ORIGIN,
+	practiceVersion,
+} from "@/components/admin/practices/fixtures";
 
 import {
 	REVIEW_RANGE_DEFS,
 	reviewRangeStart,
 } from "@/components/admin/practice-reviews/review-range";
-import {
-	artifactTrace,
-	deniedDeliveryPolicyEvaluation,
-} from "@/components/practice-trace/fixtures";
-import { OPERATOR_WITHHELD_TEXT } from "@/components/practice-vocabulary/delivery-place-defs";
-import { ARTIFACT_KIND, type KnownArtifactKind } from "@/lib/artifact-kinds";
+import { deniedFeedbackCheck, itemTrace } from "@/components/practice-trace/fixtures";
+import { ADMIN_WITHHELD_TEXT } from "@/components/practice-vocabulary/feedback-destination-defs";
+import { FEEDBACK_LOCATION_DEFS } from "@/components/practice-vocabulary/feedback-location-defs";
+import { withholdingReasonSentence } from "@/components/practice-vocabulary/withholding-defs";
 import { toDayParam } from "@/lib/date-range-search";
+import { ITEM_KIND } from "@/lib/item-kinds";
+import type { FeedbackMode } from "@/lib/practice-feedback-mode";
 import { hasText } from "@/lib/text";
 import { minutesAfter, minutesBefore, STORY_NOW } from "@/stories/story-clock";
 
 import type { OutcomeScope } from "./review-outcomes";
 import type { OverviewRegionState } from "./review-states";
 
-// The only thing written by hand is REVIEW_FIXTURE: reviews, their observations and the feedback
-// those drove. Every count, preview, truncation flag and summary is computed from it below, so a
-// fixture whose tallies contradict the records they count is not something you can write.
+type Provider = AccountRef["identities"][number]["provider"];
 
-// ---------------------------------------------------------------------------------------------
-// People
-// ---------------------------------------------------------------------------------------------
+function account(
+	id: string,
+	displayName: string,
+	identities: readonly (readonly [Provider, string])[],
+	status: AccountRef["status"] = "ACTIVE",
+): AccountRef {
+	return {
+		id,
+		displayName,
+		avatarUrl: null,
+		status,
+		identities: identities.map(([provider, login]) => ({
+			provider,
+			login,
+			displayName,
+			avatarUrl: null,
+		})),
+	};
+}
 
-const ada: ReviewSubject = { id: 7, login: "ada", name: "Ada Lovelace" };
-const grace: ReviewSubject = { id: 9, login: "grace", name: "Grace Hopper" };
-const alan: ReviewSubject = { id: 11, login: "alan", name: "Alan Turing" };
-const katherine: ReviewSubject = { id: 14, login: "katherine", name: "Katherine Johnson" };
-const barbara: ReviewSubject = { id: 18, login: "barbara", name: "Barbara Liskov" };
+export const reviewAccounts = {
+	ada: account("7", "Ada Lovelace", [
+		["GITHUB", "ada"],
+		["GITLAB", "ada.lovelace"],
+	]),
+	grace: account("9", "Grace Hopper", [["GITHUB", "grace"]]),
+	alan: account("11", "Alan Turing", [["GITLAB", "alan"]]),
+	katherine: account("14", "Katherine Johnson", [["GITHUB", "katherine"]]),
+	barbara: account("18", "Barbara Liskov", [["GITHUB", "barbara"]]),
+	margaret: account("23", "Margaret Hamilton", [["GITHUB", "mhamilton"]], "UNCLAIMED"),
+} satisfies Record<string, AccountRef>;
 
-const membership = {
-	createdAt: new Date(STORY_NOW),
-	hidden: false,
-	eligibleForPracticeReview: true,
+function developerOf(owner: AccountRef): ReviewDeveloper {
+	return {
+		accountId: owner.id,
+		displayName: owner.displayName,
+		avatarUrl: null,
+		providerLogin: owner.identities[0]?.login ?? null,
+	};
+}
+
+export const reviewDevelopers = {
+	ada: developerOf(reviewAccounts.ada),
+	grace: developerOf(reviewAccounts.grace),
+	alan: developerOf(reviewAccounts.alan),
+	katherine: developerOf(reviewAccounts.katherine),
+	barbara: developerOf(reviewAccounts.barbara),
+	margaret: developerOf(reviewAccounts.margaret),
+} satisfies Record<keyof typeof reviewAccounts, ReviewDeveloper>;
+
+const { ada, grace, alan, katherine, barbara } = reviewDevelopers;
+
+const ADMIN_ROLE: Partial<Record<keyof typeof reviewAccounts, WorkspaceMembership["role"]>> = {
+	grace: "ADMIN",
 };
 
-export const workspaceMembers: WorkspaceMembership[] = [
-	{ ...membership, userId: ada.id, userLogin: ada.login, userName: ada.name, role: "MEMBER" },
-	{ ...membership, userId: grace.id, userLogin: grace.login, userName: grace.name, role: "ADMIN" },
-	{ ...membership, userId: alan.id, userLogin: alan.login, userName: alan.name, role: "MEMBER" },
-	{
-		...membership,
-		userId: katherine.id,
-		userLogin: katherine.login,
-		userName: katherine.name,
-		role: "MEMBER",
-	},
-	{
-		...membership,
-		userId: barbara.id,
-		userLogin: barbara.login,
-		userName: barbara.name,
-		role: "MEMBER",
-	},
-];
+export const workspaceMembers: WorkspaceMembership[] = Object.entries(reviewAccounts).map(
+	([key, member]) => ({
+		account: member,
+		accountId: member.id,
+		role: key in ADMIN_ROLE ? "ADMIN" : "MEMBER",
+		joinedAt: new Date("2026-01-01T00:00:00Z"),
+		leftAt: null,
+		hidden: false,
+		reviewSelected: true,
+		eligibleForPracticeReview: true,
+	}),
+);
 
-// ---------------------------------------------------------------------------------------------
-// The work under review
-// ---------------------------------------------------------------------------------------------
-
-/**
- * A run's target, written once per piece of work. The ref an observation or a piece of feedback
- * carries is `reviewedWork`, labelled the way the server's `ReviewedWorkLabels` labels it: `#22` for
- * a pull request or an issue, `!425` for a merge request, `#channel` for a conversation, its title
- * for a document.
- */
-export type ReviewWork = ReviewRunTarget & {
-	reviewedWork: ReviewedWorkRef & { kind: KnownArtifactKind };
-};
-
-const reviewOf = (
-	provider: ReviewedWorkRef["provider"],
-	title: string,
-	reviewedWork: ReviewWork["reviewedWork"],
-): ReviewWork => ({
-	type: reviewedWork.kind,
-	title,
-	// The server names the work on the ref as well, provider included. A conversation thread has no
-	// title of its own, and a document's title is already its label, so neither carries one.
-	reviewedWork:
-		reviewedWork.kind === ARTIFACT_KIND.conversationThread ||
-		reviewedWork.kind === ARTIFACT_KIND.document
-			? { ...reviewedWork, provider }
-			: { ...reviewedWork, provider, title },
-});
+export function itemRef(
+	fields: Pick<ItemRef, "id" | "kind" | "label"> & Partial<ItemRef>,
+): ItemRef {
+	return {
+		parentId: null,
+		provider: null,
+		title: null,
+		url: null,
+		container: null,
+		path: null,
+		removedAt: null,
+		...fields,
+	};
+}
 
 // Every list row and every detail header draws its glyph from the provider and its words from the
 // kind, so a fixture on a single provider would let a wrong mark or a missing label ship.
-export const reviewArtifact = reviewOf(
-	"GITHUB",
-	"Cache the workspace member lookup on the review path",
-	{
-		id: "42",
-		kind: ARTIFACT_KIND.pullRequest,
-		label: "#1423",
-		container: "ls1intum/Hephaestus",
-		url: "https://github.com/ls1intum/Hephaestus/pull/1423",
-	},
-);
 
-export const gitlabMergeRequest = reviewOf(
-	"GITLAB",
-	"Move invoice numbering behind the billing boundary",
-	{
-		id: "43",
-		kind: ARTIFACT_KIND.pullRequest,
-		label: "!88",
-		container: "platform/billing-service",
-		url: "https://gitlab.example.com/platform/billing-service/-/merge_requests/88",
-	},
-);
+export const reviewItem = itemRef({
+	id: "42",
+	kind: ITEM_KIND.pullRequest,
+	provider: "GITHUB",
+	label: "#1423",
+	title: "Cache the workspace member lookup on the review path",
+	container: "ls1intum/Hephaestus",
+	url: "https://github.com/ls1intum/Hephaestus/pull/1423",
+});
 
-export const slackConversation = reviewOf(
-	"SLACK",
-	"How should we roll back the pricing migration?",
-	{
-		id: "81",
-		kind: ARTIFACT_KIND.conversationThread,
-		label: "#engineering",
-		url: "https://example.slack.com/archives/C01/p1721400000",
-	},
-);
+export const gitlabMergeRequest = itemRef({
+	id: "43",
+	kind: ITEM_KIND.pullRequest,
+	provider: "GITLAB",
+	label: "!88",
+	title: "Move invoice numbering behind the billing boundary",
+	container: "platform/billing-service",
+	url: "https://gitlab.example.com/platform/billing-service/-/merge_requests/88",
+});
 
-export const outlineDocument = reviewOf("OUTLINE", "Runbook: restoring a workspace from backup", {
+export const slackConversation = itemRef({
+	id: "81",
+	kind: ITEM_KIND.thread,
+	provider: "SLACK",
+	label: "#engineering",
+	title: "How should we roll back the pricing migration?",
+	url: "https://example.slack.com/archives/C01/p1721400000",
+});
+
+export const outlineDocument = itemRef({
 	id: "96",
-	kind: ARTIFACT_KIND.document,
+	kind: ITEM_KIND.document,
+	provider: "OUTLINE",
 	label: "Runbook: restoring a workspace from backup",
 	url: "https://docs.example.com/doc/runbook-restore",
 });
 
-/**
- * No review in the fixture reaches an issue, but `scm.issue` is a kind this build has copy and a
- * glyph for, so something has to render it.
- */
-export const trackerIssue = reviewOf(
-	"GITHUB",
-	"Reviews of documents do not record which revision they read",
-	{
-		id: "204",
-		kind: ARTIFACT_KIND.issue,
-		label: "#204",
-		container: "ls1intum/Hephaestus",
-		url: "https://github.com/ls1intum/Hephaestus/issues/204",
-	},
-);
+export const trackerIssue = itemRef({
+	id: "204",
+	kind: ITEM_KIND.issue,
+	provider: "GITHUB",
+	label: "#204",
+	title: "Reviews of documents do not record which version they read",
+	container: "ls1intum/Hephaestus",
+	url: "https://github.com/ls1intum/Hephaestus/issues/204",
+});
 
-const webhookRetryPullRequest = reviewOf(
-	"GITHUB",
-	"Retry webhook deliveries with backoff instead of dropping them",
-	{
-		id: "44",
-		kind: ARTIFACT_KIND.pullRequest,
-		label: "#1431",
-		container: "ls1intum/Hephaestus",
-		url: "https://github.com/ls1intum/Hephaestus/pull/1431",
-	},
-);
+export const pullRequestReviewItem = itemRef({
+	id: "47",
+	kind: ITEM_KIND.pullRequestReview,
+	provider: "GITHUB",
+	parentId: reviewItem.id,
+	label: "Review on #1423",
+	container: "ls1intum/Hephaestus",
+	url: "https://github.com/ls1intum/Hephaestus/pull/1423#pullrequestreview-2481001",
+});
 
-const leagueColumnsPullRequest = reviewOf("GITHUB", "Drop the unused league columns", {
+export const scannedRepository = itemRef({
+	id: "300",
+	kind: ITEM_KIND.repository,
+	provider: "GITHUB",
+	label: "ls1intum/Hephaestus",
+	url: "https://github.com/ls1intum/Hephaestus",
+});
+
+const scannedFile = (id: string, path: string) =>
+	itemRef({
+		id,
+		kind: ITEM_KIND.file,
+		provider: "GITHUB",
+		parentId: scannedRepository.id,
+		label: path.slice(path.lastIndexOf("/") + 1),
+		path,
+		container: "ls1intum/Hephaestus",
+		url: `https://github.com/ls1intum/Hephaestus/blob/main/${path}`,
+	});
+
+export const scannedFiles = [
+	scannedFile(
+		"301",
+		"server/application/src/main/java/de/tum/cit/aet/hephaestus/integration/core/webhook/WebhookRetryPolicy.java",
+	),
+	scannedFile(
+		"302",
+		"server/application/src/main/java/de/tum/cit/aet/hephaestus/practices/reviewoutput/ReviewQueryService.java",
+	),
+] as const;
+
+const webhookRetryPullRequest = itemRef({
+	id: "44",
+	kind: ITEM_KIND.pullRequest,
+	provider: "GITHUB",
+	label: "#1431",
+	title: "Retry webhook deliveries with backoff instead of dropping them",
+	container: "ls1intum/Hephaestus",
+	url: "https://github.com/ls1intum/Hephaestus/pull/1431",
+});
+
+const leagueColumnsPullRequest = itemRef({
 	id: "45",
-	kind: ARTIFACT_KIND.pullRequest,
+	kind: ITEM_KIND.pullRequest,
+	provider: "GITHUB",
 	label: "#1436",
+	title: "Drop the unused league columns",
 	container: "ls1intum/Hephaestus",
 	url: "https://github.com/ls1intum/Hephaestus/pull/1436",
 });
 
-const invoiceBackfillMergeRequest = reviewOf("GITLAB", "Backfill the invoice sequence table", {
+const invoiceBackfillMergeRequest = itemRef({
 	id: "46",
-	kind: ARTIFACT_KIND.pullRequest,
+	kind: ITEM_KIND.pullRequest,
+	provider: "GITLAB",
 	label: "!91",
+	title: "Backfill the invoice sequence table",
 	container: "platform/billing-service",
 	url: "https://gitlab.example.com/platform/billing-service/-/merge_requests/91",
 });
-
-// ---------------------------------------------------------------------------------------------
-// The catalogue
-// ---------------------------------------------------------------------------------------------
 
 const groupNames = {
 	"code-quality": "Code quality",
@@ -220,186 +291,281 @@ const groupNames = {
 
 type GroupSlug = keyof typeof groupNames;
 
-const group = (slug: GroupSlug) => ({ slug, name: groupNames[slug] });
-
-export const practiceGroups = Object.entries(groupNames).map(([slug, name], index) => ({
-	id: index + 1,
-	slug,
-	name,
-	active: true,
-	displayOrder: index,
-	createdAt: new Date("2026-01-01T00:00:00Z"),
-}));
-
-/**
- * Fills in the governance fields no review surface reads, so a fixture spells out only what it
- * varies. `whyItMatters` and `whatGoodLooksLike` are the prose `PracticeDetailHoverCard` shows: a
- * fixture without them renders a bare link and its story passes while proving nothing.
- */
-function practiceFixture(
-	practice: Pick<
-		Practice,
-		"id" | "slug" | "name" | "groupSlug" | "criteria" | "whyItMatters" | "whatGoodLooksLike"
-	> & { displayOrder: number; autonomy: AutonomyAssignment["effective"] },
-): Practice {
-	const { autonomy, ...rest } = practice;
-	return {
-		...rest,
-		artifactKind: "scm.pull_request",
+export const practiceGroups: PracticeGroup[] = Object.entries(groupNames).map(
+	([slug, name], position) => ({
+		id: String(position + 1),
+		slug,
+		name,
+		description: null,
+		icon: null,
+		color: null,
+		shownToDevelopers: true,
+		position,
+		feedbackMode: chosenFeedbackMode("AUTOMATIC", "GROUP"),
+		catalogOrigin: OWN_ORIGIN,
 		createdAt: new Date("2026-01-01T00:00:00Z"),
-		updatedAt: new Date("2026-06-01T00:00:00Z"),
-		...EMPTY_REVIEW_SETTINGS,
-		autonomy: { effective: autonomy, inherited: false, source: "PRACTICE" },
-		deliveryBehavior: { summaryOnly: false },
-		automatedReviewPolicy: {
-			automatedReview: {
-				evidenceSufficiency: "SUFFICIENT_WHEN_REQUIREMENTS_MET",
-				mode: "LANGUAGE_MODEL",
-			},
-			knownLimitations: [],
-			sourceContractVersion: "1.2.0",
-			whenEvidenceIsInsufficient: "SKIP_AUTOMATED_REVIEW",
-		},
-		automatedReviewValidation: {
-			policyDigest: "sha256:0",
-			reviewRuleFingerprint: "rule:1",
-			sourceContractVersion: "1.2.0",
-			status: "AUTHOR_DECLARED",
-		},
-	};
+		updatedAt: null,
+	}),
+);
+
+interface PracticeSpec {
+	id: string;
+	slug: string;
+	name: string;
+	kind: string;
+	group: GroupSlug;
+	criteria: string;
+	whyItMatters: string;
+	whatGoodLooksLike: string;
+	feedbackMode: FeedbackMode;
 }
 
-export const workspacePractices: Practice[] = [
-	practiceFixture({
-		id: 1,
+function practiceFixture(spec: PracticeSpec, position: number): Practice {
+	return mockPracticeOf({
+		id: spec.id,
+		slug: spec.slug,
+		kind: spec.kind,
+		groupSlug: spec.group,
+		position,
+		feedbackMode: chosenFeedbackMode(spec.feedbackMode),
+		definition: definitionOf({
+			name: spec.name,
+			criteria: spec.criteria,
+			guidance: {
+				whyItMatters: spec.whyItMatters,
+				whatGoodLooksLike: spec.whatGoodLooksLike,
+				goingWell: null,
+				visual: null,
+				guide: null,
+			},
+		}),
+	});
+}
+
+const PRACTICE_SPECS: PracticeSpec[] = [
+	{
+		id: "1",
 		slug: "thin-controllers",
 		name: "Thin controllers",
-		groupSlug: "code-quality",
+		kind: ITEM_KIND.pullRequest,
+		group: "code-quality",
 		criteria: "A controller validates its input, delegates, and maps the result. Nothing else.",
 		whyItMatters:
 			"Logic that lives in a controller can only be tested through HTTP, so it tends not to be tested at all.",
 		whatGoodLooksLike:
 			"The controller method reads as a list of three steps and names a service that does the work.",
-		displayOrder: 0,
-		autonomy: "HUMAN_APPROVAL",
-	}),
-	practiceFixture({
-		id: 2,
+		feedbackMode: "APPROVE_FIRST",
+	},
+	{
+		id: "2",
 		slug: "product-language",
 		name: "Product language",
-		groupSlug: "architecture",
+		kind: ITEM_KIND.pullRequest,
+		group: "architecture",
 		criteria: "Names in the code are the names the people using it would use.",
 		whyItMatters:
 			"A boundary named after its storage stops matching the product the day the storage changes, and every reader after that has to translate.",
 		whatGoodLooksLike:
 			"A route, a class or a column could be read aloud in a planning meeting without explanation.",
-		displayOrder: 1,
-		autonomy: "AUTOMATIC",
-	}),
-	practiceFixture({
-		id: 3,
+		feedbackMode: "AUTOMATIC",
+	},
+	{
+		id: "3",
 		slug: "errors-carry-context",
 		name: "Errors carry their context",
-		groupSlug: "code-quality",
+		kind: ITEM_KIND.pullRequest,
+		group: "code-quality",
 		criteria:
 			"A failure reports which operation failed and on what, not only that something went wrong.",
 		whyItMatters:
 			"An error that says only what went wrong sends the next person to the logs to work out where, and at three in the morning that is the whole incident.",
 		whatGoodLooksLike:
 			"The message names the thing being acted on and the action attempted, and two different causes do not share one status code.",
-		displayOrder: 2,
-		autonomy: "AUTOMATIC",
-	}),
-	practiceFixture({
-		id: 4,
+		feedbackMode: "AUTOMATIC",
+	},
+	{
+		id: "4",
 		slug: "tests-name-the-behaviour",
 		name: "Tests name the behaviour",
-		groupSlug: "testing",
+		kind: ITEM_KIND.pullRequest,
+		group: "testing",
 		criteria: "A test's name states the behaviour it pins down, not the method it calls.",
 		whyItMatters:
 			"A red build should say what broke before anyone opens the file; a name like testCache2 makes the reader run the test to find out.",
 		whatGoodLooksLike: "The failure line of a broken build reads as a sentence about the system.",
-		displayOrder: 3,
-		autonomy: "HUMAN_APPROVAL",
-	}),
-	practiceFixture({
-		id: 5,
+		feedbackMode: "APPROVE_FIRST",
+	},
+	{
+		id: "5",
 		slug: "the-change-explains-itself",
 		name: "The change explains itself",
-		groupSlug: "documentation",
+		kind: ITEM_KIND.pullRequest,
+		group: "documentation",
 		criteria: "The description says why the change was made, not only what it does.",
 		whyItMatters:
 			"Six months later the diff still says what changed. Nothing else records why, so the next person reverses the decision without knowing there was one.",
 		whatGoodLooksLike:
 			"A reviewer who was not in the room can tell what problem the change is answering.",
-		displayOrder: 4,
-		autonomy: "HUMAN_APPROVAL",
-	}),
-	practiceFixture({
-		id: 6,
+		feedbackMode: "APPROVE_FIRST",
+	},
+	{
+		id: "6",
 		slug: "decisions-are-written-down",
 		name: "Decisions are written down",
-		groupSlug: "collaboration",
+		kind: ITEM_KIND.thread,
+		group: "collaboration",
 		criteria:
 			"A decision reached in a discussion ends up somewhere durable before the thread ends.",
 		whyItMatters:
 			"A choice that only exists in a chat thread is re-argued every time somebody new joins, and nobody can tell a decision from an opinion.",
 		whatGoodLooksLike:
 			"The thread ends with what was chosen, who chose it, and a link to where it now lives.",
-		displayOrder: 5,
-		autonomy: "AUTOMATIC",
-	}),
+		feedbackMode: "AUTOMATIC",
+	},
+	{
+		id: "7",
+		slug: "review-comments-explain",
+		name: "Review comments explain the ask",
+		kind: ITEM_KIND.pullRequestReview,
+		group: "collaboration",
+		criteria: "Each review comment says what to change and why.",
+		whyItMatters:
+			"A comment that only says what to change starts an argument; one that says why lets the author agree or push back on the reason.",
+		whatGoodLooksLike: "Every requested change names the risk it removes.",
+		feedbackMode: "OFF",
+	},
 ];
 
-// ---------------------------------------------------------------------------------------------
-// The spec
-// ---------------------------------------------------------------------------------------------
+export const workspacePractices: Practice[] = PRACTICE_SPECS.map(practiceFixture);
+
+function practiceOf(slug: string): Practice {
+	const practice = workspacePractices.find((entry) => entry.slug === slug);
+	if (!practice) {
+		throw new Error(`No practice named ${slug} in the fixture catalog`);
+	}
+	return practice;
+}
+
+export function practiceNameOf(slug: string): string {
+	const { currentVersion } = practiceOf(slug);
+	return currentVersion.name ?? currentVersion.definition?.name ?? slug;
+}
+
+function groupRefOf(practiceSlug: string) {
+	const practice = practiceOf(practiceSlug);
+	const found = practiceGroups.find((entry) => entry.slug === practice.groupSlug);
+	return found === undefined
+		? null
+		: { slug: found.slug, name: found.name, icon: found.icon, color: found.color };
+}
+
+type FeedbackState = ReviewFeedback["state"];
+type StopReason = NonNullable<ReviewFeedback["stopReason"]>;
+type Severity = Problem["severity"];
+
+interface CopySpec {
+	kind: FeedbackCopy["kind"];
+	state: FeedbackCopy["state"];
+	body?: string;
+	at?: { path: string; startLine: number; endLine: number };
+	lastError?: string;
+}
+
+interface DecisionSpec {
+	action: FeedbackDecision["action"];
+	by: AccountRef | null;
+	at: string;
+	reasonCode?: NonNullable<FeedbackDecision["reasonCode"]>;
+	note?: string;
+}
+
+interface ResponseSpec {
+	resolution: FeedbackResponse["resolution"];
+	usefulness?: FeedbackResponse["usefulness"];
+	comment?: string;
+	at: string;
+}
 
 interface FeedbackSpec {
 	id: string;
-	/** The composed body exactly as the server stores it: Markdown, headings and all. The list's
-	 * preview and truncation flag are derived from it. */
 	body?: string;
-	channel: ReviewFeedback["channel"];
-	/** Where a conversation raised it; absent, delivered conversation feedback reads as the app's. */
+	destination: ReviewFeedback["destination"];
 	conversation?: "HEPH" | "SLACK";
-	outcome: ReviewFeedback["deliveryState"];
-	withheldFor?: ReviewFeedback["suppressionReason"];
-	recipient: ReviewSubject;
+	state: FeedbackState;
+	stopReason?: StopReason;
 	composedAt: string;
 	deliveredAt?: string;
 	/** The feedback this one took the place of. */
 	replaces?: string;
-	/** Where an inline note landed. Absent means it was posted as a summary on the work. */
 	anchoredAt?: { path: string; startLine: number; endLine: number };
-	/** Observations it draws on, in render order; the first leads it. */
 	from: string[];
+	fromProblem?: Partial<Record<string, number>>;
+	copies?: CopySpec[];
+	decisions?: DecisionSpec[];
+	response?: ResponseSpec;
+	withdrawn?: boolean;
 }
 
-interface ObservationSpec {
-	outcome: ReviewObservation["outcome"];
-	id: string;
+interface ProblemSpec {
+	severity: Severity;
 	summary: string;
-	evidenceRationale: string;
-	practiceSlug: string;
-	group: GroupSlug;
-	severity?: ReviewObservation["severity"];
-	claimCurrentness?: ReviewObservation["claimCurrentness"];
-	observedAt: string;
-	evidence?: EvidenceCitation[];
+	explanation: string;
+	citations: EvidenceCitation[];
+	nextStep?: string;
+	basis?: Problem["basis"];
 }
 
-interface RunSpec {
+interface MarkSpec {
+	kind: ResultMark["kind"];
+	reason: string;
+	by: AccountRef | null;
+	at: string;
+	removed?: { by: AccountRef | null; at: string; reason: string };
+}
+
+interface ResultSpec {
 	id: string;
-	work: ReviewWork;
-	status: ReviewRunSummary["status"];
+	outcome: ReviewResult["outcome"];
+	summary: string | null;
+	explanation: string;
+	practiceSlug: string;
+	currentness?: ReviewResult["currentness"];
+	recordedAt: string;
+	item?: ItemRef;
+	aboutTheWork?: true;
+	/** Denied evidence hides text and citations without changing problem counts. */
+	evidenceHidden?: true;
+	unknownProof?: true;
+	evidence?: EvidenceCitation[];
+	problems?: ProblemSpec[];
+	openQuestions?: OpenQuestion[];
+	example?: ResultExample;
+	coverage?: ReviewResultDetail["coverage"];
+	inapplicability?: { prerequisite: string; ruledOutBy: string; consulted: string[] };
+	marks?: MarkSpec[];
+}
+
+interface ReviewSpec {
+	id: string;
+	item: ItemRef;
+	kind?: ReviewSummary["kind"];
+	status: ReviewSummary["status"];
+	stopReason?: NonNullable<ReviewSummary["stopReason"]>;
 	startedAt: string;
-	/** Whose work this review was about; every observation and every recipient inherits it. */
-	developer: ReviewSubject;
-	origin?: ReviewObservation["origin"];
-	observations: ObservationSpec[];
+	developer: ReviewDeveloper | null;
+	origin?: ReviewSummary["origin"];
+	event?: string;
+	requestedBy?: AccountRef;
+	batchId?: string;
+	pending?: string[];
+	withheld?: { practiceSlug: string; reason: string }[];
+	jobs?: number;
+	runtimeExpired?: true;
+	results: ResultSpec[];
 	feedback: FeedbackSpec[];
 }
+
+const ITEM_VERSION = "27f4e88c9f5a";
 
 const diff = (
 	path: string,
@@ -408,31 +574,32 @@ const diff = (
 	quote: string,
 ): EvidenceCitation => ({
 	sourceKind: "scm.pull-request.diff",
-	artifactPath: "inputs/context/change.json",
+	sourcePath: "inputs/context/change.json",
 	path,
 	side: "NEW",
+	commit: ITEM_VERSION,
 	startLine,
 	endLine,
 	quote,
-	quoteRedacted: false,
+	verification: {
+		status: "VERIFIED",
+		itemSha256: "8f14e45fceea167a5a36dedd4bea2543",
+		quoteSha256: "c9f0f895fb98ab9159f51fd0297e236d",
+	},
 });
 
 const cited = (sourceKind: string, path: string, quote: string, line = 1): EvidenceCitation => ({
 	sourceKind,
-	artifactPath: `inputs/context/${sourceKind.replaceAll(".", "-")}.json`,
+	sourcePath: `inputs/context/${sourceKind.replaceAll(".", "-")}.json`,
 	path,
+	side: null,
+	commit: null,
 	startLine: line,
 	endLine: line,
 	quote,
-	quoteRedacted: false,
+	verification: null,
 });
 
-/**
- * A summary comment exactly as Hephaestus posts it on a pull request
- * (`PracticeFeedbackCommentFormatter`): the hidden marker, the composer's text, a rule, and the
- * `<sub>` footer with its two links. The stored body is this text, so every page that shows it
- * must render the HTML the way GitHub does.
- */
 export const POSTED_SUMMARY_COMMENT = [
 	"<!-- hephaestus:practice-review:774b9e9b-2c40-4d6b-9e76-7094dda3a7a2 -->",
 	"The description needs its purpose and coverage. Use the description to name the need behind this change and identify which of the linked item's Done-when points it covers or defers.",
@@ -440,12 +607,11 @@ export const POSTED_SUMMARY_COMMENT = [
 	"The title names the app-problem and user-story task, but the authored description only references issue #3 and gives no reason.",
 	"",
 	"---",
-	"<sub>Practice review &middot; gpt-6-luna. This feedback is AI-generated and can be inaccurate. Answer or dispute it in [Hephaestus](https://hephaestus.example/w/aet/feedback/scm.pull_request/42).</sub>",
+	"<sub>Practice review &middot; gpt-6-luna. This feedback is AI-generated and can be inaccurate. Answer or disagree in [Hephaestus](https://hephaestus.example/w/aet/feedback/42).</sub>",
 	"<sub>[Why you see this and how to stop it](https://hephaestus.example/settings#practice-feedback)</sub>",
 	"",
 ].join("\n");
 
-/** Match DeliveryComposer formatting, with the preview cut inside the first code fence. */
 const LONG_BODY = [
 	"2 issues to tighten in this change, plus one thing worth keeping.",
 	"",
@@ -459,7 +625,7 @@ const LONG_BODY = [
 	"```",
 	"",
 	"`findVisible` returns empty both when the row is not there and when the caller may not see it.",
-	"Callers get one 404 for two very different situations, so an operator debugging a support ticket",
+	"Callers get one 404 for two very different situations, so an admin debugging a support ticket",
 	"cannot tell a stale link from a missing grant without reading the query.",
 	"",
 	"Separate the lookup from the check: fetch the row, then decide whether this caller may have it, and",
@@ -486,102 +652,239 @@ const LONG_BODY = [
 	"without HTTP.",
 ].join("\n");
 
-/**
- * Spans every conclusion a review can reach and every outcome a piece of feedback can have, with a
- * withheld piece under each family an operator can filter by. Deliberately ordinary otherwise: a set
- * that is mostly failures and empties teaches a reader that the product mostly does not work.
- */
-export const REVIEW_FIXTURE: RunSpec[] = [
+// Include private practice-page text to prove admin surfaces withhold it.
+export const PRIVATE_FEEDBACK_TEXT =
+	"Private to Barbara: the runbook's first step is the one a tired reader most needs.";
+
+const DISAGREEMENT = "The two cases share a cause, so one status is right here.";
+
+export const REVIEW_FIXTURE: ReviewSpec[] = [
 	{
 		id: "11111111-1111-1111-1111-111111111111",
-		work: reviewArtifact,
-		status: "COMPLETED",
+		item: reviewItem,
+		status: "COMPLETE",
 		startedAt: "2026-07-28T13:35:00Z",
 		developer: ada,
-		observations: [
+		event: "scm.pull_request.ready",
+		withheld: [
+			{
+				practiceSlug: "product-language",
+				reason: "The practice reads the review threads, and the provider did not return them.",
+			},
+		],
+		results: [
 			{
 				id: "55555555-5555-5555-5555-555555555555",
 				summary: "The controller delegates before it does anything else",
-				evidenceRationale:
+				explanation:
 					"The handler is three statements long: it binds the request, calls ReviewQueryService and maps the result. The caching decision that arrived with this change sits entirely inside the service, so it can be exercised without standing up HTTP.",
 				practiceSlug: "thin-controllers",
-				group: "code-quality",
 				outcome: "MET",
-				observedAt: "2026-07-28T13:40:00Z",
+				recordedAt: "2026-07-28T13:40:00Z",
 				evidence: [
 					diff(
 						"server/application/src/main/java/de/tum/cit/aet/hephaestus/practices/reviewoutput/ReviewQueryController.java",
 						61,
 						64,
-						"var page = reviewQueryService.observations(workspaceSlug, filter, pageable);\nreturn ResponseEntity.ok(page.map(ReviewObservationDTO::from));",
+						"var page = reviewQueryService.results(workspaceSlug, filter, pageable);\nreturn ResponseEntity.ok(page.map(ReviewResultDTO::from));",
 					),
 				],
 			},
 			{
 				id: "66666666-6666-6666-6666-666666666666",
 				summary: "A cache miss and a permission failure come back as the same 404",
-				evidenceRationale:
+				explanation:
 					"findVisible returns an empty Optional both when the row does not exist and when the caller has no grant on the workspace, and the only caller turns either into a NotFoundException. Two situations that need different answers — retry the link, or ask for access — arrive as one.",
 				practiceSlug: "errors-carry-context",
-				group: "code-quality",
 				outcome: "NOT_MET",
-				severity: "MAJOR",
-				observedAt: "2026-07-28T13:39:00Z",
+				recordedAt: "2026-07-28T13:39:00Z",
+				coverage: {
+					source: "HostCoverage",
+					complete: true,
+					reads: 4,
+					failedReads: 0,
+					truncatedReads: 0,
+					omitted: [],
+					receipts: [
+						{
+							sourceKind: "scm.pull-request.diff",
+							path: "ReviewQueryService.java",
+							status: "COMPLETE",
+							version: ITEM_VERSION,
+						},
+					],
+				},
 				evidence: [
-					diff(
-						"server/application/src/main/java/de/tum/cit/aet/hephaestus/practices/reviewoutput/ReviewQueryService.java",
-						116,
-						119,
-						"return repository.findVisible(workspaceId, id)\n    .orElseThrow(() -> new NotFoundException());",
-					),
-					cited(
-						"scm.repository.tree",
-						"server/application/src/main/java/de/tum/cit/aet/hephaestus/core/security/WorkspaceGuard.java",
-						'throw new ForbiddenException("No grant on workspace " + slug);',
-						88,
-					),
 					cited(
 						"scm.review-threads",
 						"Review thread on ReviewQueryService.java",
 						"Do we lose the difference between 'gone' and 'not yours' here?",
 					),
 				],
+				problems: [
+					{
+						severity: "MAJOR",
+						summary: "A missing row and a missing grant both become a 404",
+						explanation:
+							"`findVisible` returns an empty `Optional` in both cases, and `orElseThrow` turns either into a `NotFoundException`.",
+						citations: [
+							diff(
+								"server/application/src/main/java/de/tum/cit/aet/hephaestus/practices/reviewoutput/ReviewQueryService.java",
+								116,
+								119,
+								"return repository.findVisible(workspaceId, id)\n    .orElseThrow(() -> new NotFoundException());",
+							),
+						],
+						nextStep:
+							"Fetch the row first, then check the grant, and answer 403 when the caller may not read it.",
+						basis: {
+							type: "IntroducedBasis",
+							explanation: "The change added this lookup.",
+						},
+					},
+					{
+						severity: "MINOR",
+						summary: "The guard’s 403 never reaches this endpoint",
+						explanation:
+							"`WorkspaceGuard` already throws a `ForbiddenException` with the workspace in its message, but this lookup runs before the guard is asked.",
+						citations: [
+							cited(
+								"scm.repository.tree",
+								"server/application/src/main/java/de/tum/cit/aet/hephaestus/core/security/WorkspaceGuard.java",
+								'throw new ForbiddenException("No grant on workspace " + slug);',
+								88,
+							),
+							diff(
+								"server/application/src/main/java/de/tum/cit/aet/hephaestus/practices/reviewoutput/ReviewQueryService.java",
+								112,
+								112,
+								"var workspaceId = workspaces.idOf(workspaceSlug);",
+							),
+						],
+					},
+					{
+						severity: "TRIVIAL",
+						summary: "The NotFoundException carries no message",
+						explanation: "The log line says only that something was not found, not which review.",
+						citations: [
+							diff(
+								"server/application/src/main/java/de/tum/cit/aet/hephaestus/practices/reviewoutput/ReviewQueryService.java",
+								119,
+								119,
+								"    .orElseThrow(() -> new NotFoundException());",
+							),
+						],
+						nextStep: "Name the review id in the exception.",
+					},
+				],
+				example: {
+					note: "The controller maps every error in one handler, so the split costs one new branch there.",
+					citation: diff(
+						"server/application/src/main/java/de/tum/cit/aet/hephaestus/practices/reviewoutput/ReviewQueryController.java",
+						88,
+						90,
+						"@ExceptionHandler(NotFoundException.class)\nResponseEntity<ProblemDetail> notFound(NotFoundException e) {",
+					),
+				},
 			},
 			{
 				id: "77777777-7777-7777-7777-777777777777",
 				summary: "Three of the new tests are named after the method they call",
-				evidenceRationale:
+				explanation:
 					"testCache1, testCache2 and testCache3 pin down a cold read, a warm read and an eviction after a membership change. The names carry none of that, so a red build names a file and a number rather than the behaviour that broke.",
 				practiceSlug: "tests-name-the-behaviour",
-				group: "testing",
 				outcome: "NOT_MET",
-				severity: "MINOR",
-				observedAt: "2026-07-28T13:38:00Z",
-				evidence: [
-					diff(
-						"server/application/src/test/java/de/tum/cit/aet/hephaestus/practices/reviewoutput/ReviewQueryServiceTest.java",
-						44,
-						46,
-						"@Test\nvoid testCache1() {",
-					),
+				recordedAt: "2026-07-28T13:38:00Z",
+				coverage: {
+					source: "ClaimedCoverage",
+					complete: false,
+					checked: 2,
+					selected: 3,
+					total: 3,
+					omitted: [{ reason: "budget", what: "test files", count: 1 }],
+				},
+				marks: [
+					{
+						kind: "INCORRECT",
+						reason: "The names follow the module's convention for cache tests.",
+						by: reviewAccounts.grace,
+						at: "2026-07-28T14:10:00Z",
+						removed: {
+							by: reviewAccounts.grace,
+							at: "2026-07-28T15:02:00Z",
+							reason: "The convention was retired last month; the result stands.",
+						},
+					},
+					{
+						kind: "ACCEPTED",
+						reason: "Checked against the three tests; each name hides its behaviour.",
+						by: reviewAccounts.grace,
+						at: "2026-07-28T15:03:00Z",
+					},
+				],
+				problems: [
+					{
+						severity: "MINOR",
+						summary: "testCache1 and testCache2 name the method, not the read they pin down",
+						explanation:
+							"One is a cold read and one a warm read. A red build names a number, not the behaviour that broke.",
+						citations: [
+							diff(
+								"server/application/src/test/java/de/tum/cit/aet/hephaestus/practices/reviewoutput/ReviewQueryServiceTest.java",
+								44,
+								46,
+								"@Test\nvoid testCache1() {",
+							),
+						],
+						nextStep: "Rename them for the read: `returnsTheCachedMembersOnASecondRead`.",
+					},
+					{
+						severity: "TRIVIAL",
+						summary: "testCache3 does not say that a membership change evicts",
+						explanation:
+							"The eviction is the most surprising rule of the three, and its name hides it.",
+						citations: [
+							diff(
+								"server/application/src/test/java/de/tum/cit/aet/hephaestus/practices/reviewoutput/ReviewQueryServiceTest.java",
+								71,
+								72,
+								"@Test\nvoid testCache3() {",
+							),
+						],
+					},
 				],
 			},
 			{
 				id: "88888888-8888-8888-8888-888888888888",
 				summary: "The description lists the files touched and stops there",
-				evidenceRationale:
+				explanation:
 					"The body of the pull request is a bullet per changed file. Nothing in it says what was slow, how slow, or why a cache was the answer rather than a narrower query — the questions a reviewer who was not in that conversation has to ask before they can agree.",
 				practiceSlug: "the-change-explains-itself",
-				group: "documentation",
 				outcome: "NOT_MET",
-				severity: "INFO",
-				observedAt: "2026-07-28T13:37:00Z",
-				evidence: [
-					cited(
-						"scm.pull-request.core",
-						"Pull request description",
-						"- ReviewQueryService.java\n- ReviewQueryController.java\n- ReviewQueryServiceTest.java",
-					),
+				recordedAt: "2026-07-28T13:37:00Z",
+				marks: [
+					{
+						kind: "INCORRECT",
+						reason: "The linked issue carries the reasoning, and the description links it.",
+						by: reviewAccounts.grace,
+						at: "2026-07-28T13:58:00Z",
+					},
+				],
+				problems: [
+					{
+						severity: "TRIVIAL",
+						summary: "The description does not say what was slow",
+						explanation:
+							"It lists the changed files. A reviewer cannot tell why a cache was the answer rather than a narrower query.",
+						citations: [
+							cited(
+								"scm.pull-request.core",
+								"Pull request description",
+								"- ReviewQueryService.java\n- ReviewQueryController.java\n- ReviewQueryServiceTest.java",
+							),
+						],
+						nextStep: "Add one sentence on what was slow and how slow.",
+					},
 				],
 			},
 		],
@@ -589,30 +892,51 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 			{
 				id: "33333333-3333-3333-3333-333333333333",
 				body: "You kept the controller focused and moved the caching decision into the service, which is what lets the rest of this be tested without HTTP.",
-				channel: "IN_CONTEXT",
-				outcome: "DELIVERED",
-				recipient: ada,
+				destination: "ON_WORK",
+				state: "DELIVERED",
 				composedAt: "2026-07-28T13:42:00Z",
 				deliveredAt: "2026-07-28T13:43:00Z",
 				from: ["55555555-5555-5555-5555-555555555555"],
+				decisions: [{ action: "APPROVE", by: reviewAccounts.grace, at: "2026-07-28T13:42:40Z" }],
+				response: { resolution: null, usefulness: "HELPFUL", at: "2026-07-28T15:20:00Z" },
 			},
 			{
 				id: "44444444-4444-4444-4444-444444444444",
 				body: LONG_BODY,
-				channel: "IN_CONTEXT",
-				outcome: "DELIVERED",
-				recipient: ada,
+				destination: "ON_WORK",
+				state: "DELIVERED",
 				composedAt: "2026-07-28T13:41:00Z",
 				deliveredAt: "2026-07-28T13:41:30Z",
 				replaces: "99999999-3333-3333-3333-333333333333",
 				from: ["66666666-6666-6666-6666-666666666666", "77777777-7777-7777-7777-777777777777"],
+				copies: [
+					{ kind: "SUMMARY", state: "POSTED" },
+					{
+						kind: "LINE_NOTE",
+						state: "FAILED",
+						body: "Fetch the row first, then check the grant, and answer 403 when the caller may not read it.",
+						at: { path: "ReviewQueryService.java", startLine: 116, endLine: 119 },
+						lastError: "GitHub answered 422: the line is no longer part of the diff.",
+					},
+					{
+						kind: "LINE_NOTE",
+						state: "FAILED",
+						body: "Rename this for the read it pins down: `returnsTheCachedMembersOnASecondRead`.",
+						at: { path: "ReviewQueryServiceTest.java", startLine: 44, endLine: 46 },
+						lastError: "GitHub answered 422: the line is no longer part of the diff.",
+					},
+				],
+				response: {
+					resolution: "DISAGREE",
+					comment: DISAGREEMENT,
+					at: "2026-07-28T16:05:00Z",
+				},
 			},
 			{
 				id: "99999999-3333-3333-3333-333333333333",
 				body: "The lookup collapses two different failures into one 404. Worth splitting before this merges.",
-				channel: "IN_CONTEXT",
-				outcome: "SUPERSEDED",
-				recipient: ada,
+				destination: "ON_WORK",
+				state: "REPLACED",
 				composedAt: "2026-07-28T09:12:00Z",
 				deliveredAt: "2026-07-28T09:12:20Z",
 				from: ["66666666-6666-6666-6666-666666666666"],
@@ -620,42 +944,125 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 			{
 				id: "aaaaaaaa-3333-3333-3333-333333333333",
 				body: "The description could say what was slow before the cache went in.",
-				channel: "IN_CONTEXT",
-				outcome: "SUPPRESSED",
-				withheldFor: "COMPOSER_DEDUPED",
-				recipient: ada,
+				destination: "ON_WORK",
+				state: "WITHHELD",
+				stopReason: "NOTHING_NEW",
 				composedAt: "2026-07-28T13:41:00Z",
+				from: ["88888888-8888-8888-8888-888888888888"],
+			},
+			{
+				id: "bbbbbbbb-3333-3333-3333-333333333333",
+				body: "Two failures share one status code here; the card names the split.",
+				destination: "PRACTICE_PAGE",
+				state: "DELIVERED",
+				composedAt: "2026-07-28T13:42:10Z",
+				deliveredAt: "2026-07-29T08:14:00Z",
+				from: ["66666666-6666-6666-6666-666666666666"],
+				withdrawn: true,
+				decisions: [
+					{
+						action: "WITHDRAW",
+						by: reviewAccounts.grace,
+						at: "2026-07-29T10:00:00Z",
+						reasonCode: "DUPLICATE",
+						note: "The comment on the pull request already says this.",
+					},
+				],
+			},
+			{
+				id: "cccccccc-3333-3333-3333-333333333333",
+				body: "Three test names hide the behaviour they pin down.",
+				destination: "PRACTICE_PAGE",
+				state: "DELIVERED",
+				composedAt: "2026-07-28T13:42:20Z",
+				deliveredAt: "2026-07-29T08:14:00Z",
+				from: ["77777777-7777-7777-7777-777777777777"],
+				decisions: [
+					{
+						action: "WITHDRAW",
+						by: reviewAccounts.grace,
+						at: "2026-07-28T14:10:30Z",
+						reasonCode: "INCORRECT",
+					},
+					{
+						action: "RESTORE",
+						by: reviewAccounts.grace,
+						at: "2026-07-28T15:02:30Z",
+						note: "The result stands after all, so the card can show again.",
+					},
+				],
+			},
+			{
+				id: "dddddddd-3333-3333-3333-333333333333",
+				body: "Rename the three cache tests for what they check.",
+				destination: "ON_WORK",
+				state: "REJECTED",
+				composedAt: "2026-07-28T13:41:20Z",
+				from: ["77777777-7777-7777-7777-777777777777"],
+				decisions: [
+					{
+						action: "REJECT",
+						by: reviewAccounts.grace,
+						at: "2026-07-28T14:05:00Z",
+						reasonCode: "UNHELPFUL",
+						note: "The long comment already covers the test names.",
+					},
+				],
+			},
+			{
+				id: "eeeeeeee-3333-3333-3333-333333333333",
+				body: "The description lists files without saying why.",
+				destination: "PRACTICE_PAGE",
+				state: "WITHHELD",
+				stopReason: "RESULT_MARKED_INCORRECT",
+				composedAt: "2026-07-28T13:42:30Z",
 				from: ["88888888-8888-8888-8888-888888888888"],
 			},
 		],
 	},
 	{
 		id: "22222222-2222-2222-2222-222222222222",
-		work: gitlabMergeRequest,
-		status: "COMPLETED",
+		item: gitlabMergeRequest,
+		status: "COMPLETE",
 		startedAt: "2026-07-27T09:10:00Z",
 		developer: alan,
-		// A confirmed campaign over work that already existed, so nothing from it is spoken aloud.
 		origin: "BACKFILL",
-		observations: [
+		batchId: "0b0b0b0b-1111-4111-8111-111111111111",
+		results: [
 			{
 				id: "bbbbbbbb-2222-2222-2222-222222222222",
 				summary: "Invoice numbering leaks the ledger’s table name into the public API",
-				evidenceRationale:
+				explanation:
 					"The response field is called ledgerSeqNo, which is the column the number is stored in. Callers outside billing have to learn the storage layout to read an invoice, and the day the ledger is replaced the field is either wrong or frozen.",
 				practiceSlug: "product-language",
-				group: "architecture",
 				outcome: "NOT_MET",
-				severity: "CRITICAL",
-				claimCurrentness: "STALE",
-				observedAt: "2026-07-27T09:15:00Z",
+				currentness: "STALE",
+				recordedAt: "2026-07-27T09:15:00Z",
+				problems: [
+					{
+						severity: "CRITICAL",
+						summary: "The public invoice response names a ledger column",
+						explanation:
+							"Callers outside billing must learn the storage layout to read an invoice.",
+						citations: [
+							diff(
+								"src/main/java/platform/billing/api/InvoiceResponse.java",
+								22,
+								22,
+								"private Long ledgerSeqNo;",
+							),
+						],
+						nextStep: "Call the field `invoiceNumber` before any caller depends on it.",
+					},
+					{
+						severity: "MINOR",
+						summary: "The changelog repeats the column name",
+						explanation:
+							"The release note tells callers to read `ledgerSeqNo`, which fixes the name in their code.",
+						citations: [diff("CHANGELOG.md", 7, 7, "- Invoices now expose `ledgerSeqNo`.")],
+					},
+				],
 				evidence: [
-					diff(
-						"src/main/java/platform/billing/api/InvoiceResponse.java",
-						22,
-						22,
-						"private Long ledgerSeqNo;",
-					),
 					cited(
 						"outline.documents",
 						"Naming guideline",
@@ -667,12 +1074,16 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 			{
 				id: "cccccccc-2222-2222-2222-222222222222",
 				summary: "The change touches no controller",
-				evidenceRationale:
+				explanation:
 					"Everything in the merge request sits under the billing domain package. There is no request handler in the diff, so this practice has nothing to look at here.",
 				practiceSlug: "thin-controllers",
-				group: "code-quality",
-				outcome: "NOT_APPLICABLE",
-				observedAt: "2026-07-27T09:14:00Z",
+				outcome: "DOES_NOT_APPLY",
+				recordedAt: "2026-07-27T09:14:00Z",
+				inapplicability: {
+					prerequisite: "The change adds or edits a request handler.",
+					ruledOutBy: "No file in the diff declares a controller.",
+					consulted: ["scm.pull-request.diff", "scm.repository.tree"],
+				},
 				evidence: [
 					cited(
 						"scm.repository.tree",
@@ -687,10 +1098,9 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 			{
 				id: "dddddddd-2222-2222-2222-222222222222",
 				body: "The public response exposes a name from the ledger schema. Renaming it now costs one migration; later it costs every caller, and the callers are other teams.",
-				channel: "IN_CONTEXT",
-				outcome: "SUPPRESSED",
-				withheldFor: "BACKFILL_QUIET",
-				recipient: alan,
+				destination: "ON_WORK",
+				state: "WITHHELD",
+				stopReason: "BACKFILL_QUIET",
 				composedAt: "2026-07-27T09:20:00Z",
 				from: ["bbbbbbbb-2222-2222-2222-222222222222"],
 			},
@@ -698,46 +1108,54 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 	},
 	{
 		id: "33333333-3333-3333-3333-333333333333",
-		work: slackConversation,
-		status: "COMPLETED",
+		item: slackConversation,
+		status: "COMPLETE",
 		startedAt: "2026-07-26T16:00:00Z",
 		developer: grace,
-		origin: "MANUAL",
-		observations: [
+		origin: "REQUEST",
+		requestedBy: reviewAccounts.grace,
+		results: [
 			{
 				id: "eeeeeeee-3333-3333-3333-333333333333",
 				summary: "The thread ends without naming what was chosen",
-				evidenceRationale:
+				explanation:
 					"Four people weighed two rollback strategies over eleven messages and the last one is a thumbs-up. Nothing in the thread states which strategy won, so a reader arriving tomorrow cannot tell agreement from the end of the working day.",
 				practiceSlug: "decisions-are-written-down",
-				group: "collaboration",
 				outcome: "NOT_MET",
-				severity: "MINOR",
-				claimCurrentness: "UNVERIFIABLE",
-				observedAt: "2026-07-26T16:02:00Z",
+				currentness: "UNVERIFIABLE",
+				recordedAt: "2026-07-26T16:02:00Z",
+				problems: [
+					{
+						severity: "MINOR",
+						summary: "The last message leaves the choice to the on-call",
+						explanation: "Nobody names the strategy that won, so the thread reads as unfinished.",
+						citations: [
+							cited(
+								"slack.conversation.thread",
+								"Message from Grace Hopper, 16:41",
+								"either works honestly, whatever the on-call prefers",
+								11,
+							),
+						],
+						nextStep: "Post the chosen strategy and who chose it.",
+					},
+				],
 				evidence: [
 					cited(
-						"slack.conversation.thread",
-						"Message from Grace Hopper, 16:41",
-						"either works honestly, whatever the on-call prefers",
-						11,
-					),
-					cited(
-						"hephaestus.observation-history",
-						"Earlier observation on this practice",
-						"An earlier thread in the same channel also closed without a written decision.",
+						"hephaestus.result-history",
+						"Earlier result on this practice",
+						"An earlier thread in #engineering also closed without a written decision.",
 					),
 				],
 			},
 			{
 				id: "ffffffff-3333-3333-3333-333333333333",
-				summary: "The rollback is described in the words the on-call would use",
-				evidenceRationale:
+				summary: null,
+				explanation:
 					"Every message names the customer-visible effect — prices reverting, invoices reissuing — rather than the tables involved. Somebody paged at two in the morning could act on this thread without opening the schema.",
 				practiceSlug: "product-language",
-				group: "architecture",
 				outcome: "MET",
-				observedAt: "2026-07-26T16:01:00Z",
+				recordedAt: "2026-07-26T16:01:00Z",
 				evidence: [
 					cited(
 						"slack.conversation.thread",
@@ -752,41 +1170,49 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 			{
 				id: "11111111-4444-4444-4444-444444444444",
 				body: "Before this thread scrolls away, drop the chosen strategy and who chose it into the runbook — a reader tomorrow cannot tell the thumbs-up from the end of the day.",
-				channel: "IN_CHAT",
-				outcome: "PREPARED",
-				recipient: grace,
+				destination: "CONVERSATION",
+				state: "READY",
 				composedAt: "2026-07-26T16:05:00Z",
 				from: ["eeeeeeee-3333-3333-3333-333333333333"],
 			},
 			{
 				id: "22222222-4444-4444-4444-444444444444",
 				body: "You described the rollback in terms of what a customer would see rather than which tables move. That is the version somebody paged at 2am can act on.",
-				channel: "IN_CHAT",
+				destination: "CONVERSATION",
 				conversation: "SLACK",
-				outcome: "DELIVERED",
-				recipient: grace,
+				state: "DELIVERED",
 				composedAt: "2026-07-26T16:06:00Z",
 				deliveredAt: "2026-07-26T18:40:00Z",
+				from: ["ffffffff-3333-3333-3333-333333333333"],
+			},
+			{
+				id: "33333333-4444-4444-4444-444444444444",
+				body: "The thread reads like the incident it is about, which makes it easy to follow.",
+				destination: "CONVERSATION",
+				state: "UNCONFIRMED",
+				stopReason: "DELIVERY_UNCONFIRMED",
+				composedAt: "2026-07-26T16:07:00Z",
 				from: ["ffffffff-3333-3333-3333-333333333333"],
 			},
 		],
 	},
 	{
 		id: "44444444-4444-4444-4444-444444444444",
-		work: outlineDocument,
-		status: "COMPLETED",
+		item: outlineDocument,
+		status: "COMPLETE",
 		startedAt: "2026-07-25T11:25:00Z",
 		developer: barbara,
-		observations: [
+		event: "docs.document.published",
+		results: [
 			{
 				id: "11111111-5555-5555-5555-555555555555",
 				summary: "The runbook opens with the one step that cannot be undone",
-				evidenceRationale:
+				explanation:
 					"Step one puts the workspace into maintenance before anything is restored, and the page says so in the first line rather than in a note at the bottom. A reader following the page top to bottom does the irreversible thing at the point where it is still safe.",
 				practiceSlug: "the-change-explains-itself",
-				group: "documentation",
 				outcome: "MET",
-				observedAt: "2026-07-25T11:30:00Z",
+				recordedAt: "2026-07-25T11:30:00Z",
+				unknownProof: true,
 				evidence: [
 					cited(
 						"docs.document.core",
@@ -796,25 +1222,48 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 					),
 				],
 			},
+			{
+				id: "22222222-5555-5555-5555-555555555555",
+				summary: "Whether the restore order was agreed cannot be told from the page",
+				explanation:
+					"The runbook states an order of steps, and nothing on the page or linked from it records who chose that order or why.",
+				practiceSlug: "decisions-are-written-down",
+				outcome: "COULD_NOT_DETERMINE",
+				recordedAt: "2026-07-25T11:29:00Z",
+				openQuestions: [
+					{
+						openQuestion: "Was the restore order agreed with the on-call team?",
+						wouldSettleIt: "A link to the discussion or incident that chose this order.",
+						citation: cited(
+							"docs.document.core",
+							"Runbook: restoring a workspace from backup",
+							"1. Put the workspace into maintenance.",
+							5,
+						),
+					},
+					{
+						openQuestion: "Does the runbook replace the older restore page?",
+						wouldSettleIt: "A note on either page that names the one in force.",
+						citation: null,
+					},
+				],
+			},
 		],
 		feedback: [
 			{
 				id: "33333333-5555-5555-5555-555555555555",
 				body: "The runbook puts the irreversible step first and says why, which is the order somebody under pressure will actually follow.",
-				channel: "IN_CONTEXT",
-				outcome: "FAILED",
-				recipient: barbara,
+				destination: "ON_WORK",
+				state: "FAILED",
 				composedAt: "2026-07-25T11:32:00Z",
 				from: ["11111111-5555-5555-5555-555555555555"],
 			},
 			{
-				// A card on the developer's own practice pages. The server never sends its text to an
-				// operator; it is written here so a story can prove no surface shows it.
+				// Supply private text deliberately; the story must prove it stays hidden.
 				id: "44444444-5555-5555-5555-555555555555",
-				body: "Private to Barbara: the runbook's first step is the one a tired reader most needs.",
-				channel: "IN_APP",
-				outcome: "DELIVERED",
-				recipient: barbara,
+				body: PRIVATE_FEEDBACK_TEXT,
+				destination: "PRACTICE_PAGE",
+				state: "DELIVERED",
 				composedAt: "2026-07-25T11:33:00Z",
 				deliveredAt: "2026-07-25T11:33:00Z",
 				from: ["11111111-5555-5555-5555-555555555555"],
@@ -823,28 +1272,51 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 	},
 	{
 		id: "55555555-6666-6666-6666-666666666666",
-		work: webhookRetryPullRequest,
-		status: "COMPLETED",
+		item: webhookRetryPullRequest,
+		status: "COMPLETE",
 		startedAt: "2026-07-29T08:05:00Z",
 		developer: katherine,
-		observations: [
+		event: "scm.pull_request.synchronized",
+		results: [
 			{
 				id: "44444444-6666-6666-6666-666666666666",
 				summary: "A dropped delivery is logged at debug and never counted",
-				evidenceRationale:
-					"When the backoff gives up, the handler writes a debug line and returns. Nothing increments a counter and nothing reaches the dead-letter subject, so a provider outage looks identical to a quiet afternoon on every dashboard the team has.",
+				explanation:
+					"When the backoff gives up, the handler writes a debug line and returns. Nothing increments a counter and nothing reaches the dead-letter queue, so a provider outage looks identical to a quiet afternoon on every dashboard the team has.",
 				practiceSlug: "errors-carry-context",
-				group: "code-quality",
 				outcome: "NOT_MET",
-				severity: "MAJOR",
-				observedAt: "2026-07-29T08:12:00Z",
+				recordedAt: "2026-07-29T08:12:00Z",
+				problems: [
+					{
+						severity: "MAJOR",
+						summary: "Giving up on a delivery increments no counter",
+						explanation: "A provider outage looks like a quiet afternoon on every dashboard.",
+						citations: [
+							diff(
+								"server/application/src/main/java/de/tum/cit/aet/hephaestus/integration/core/webhook/WebhookRetryPolicy.java",
+								74,
+								75,
+								'log.debug("giving up on {} after {} attempts", event, attempts);\nreturn;',
+							),
+						],
+						nextStep: "Count the dropped delivery with a Micrometer counter.",
+					},
+					{
+						severity: "MINOR",
+						summary: "The dropped delivery is logged at debug",
+						explanation:
+							"Production logs at info, so the line is never written where anyone reads it.",
+						citations: [
+							diff(
+								"server/application/src/main/java/de/tum/cit/aet/hephaestus/integration/core/webhook/WebhookRetryPolicy.java",
+								74,
+								74,
+								'log.debug("giving up on {} after {} attempts", event, attempts);',
+							),
+						],
+					},
+				],
 				evidence: [
-					diff(
-						"server/application/src/main/java/de/tum/cit/aet/hephaestus/integration/core/webhook/WebhookRetryPolicy.java",
-						74,
-						75,
-						'log.debug("giving up on {} after {} attempts", subject, attempts);\nreturn;',
-					),
 					cited(
 						"workspace.project-inventory",
 						"Observability stack",
@@ -855,12 +1327,11 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 			{
 				id: "55555555-7777-7777-7777-777777777777",
 				summary: "The retry tests read as sentences about the backoff",
-				evidenceRationale:
+				explanation:
 					"Each of the four new tests is named for the behaviour it fixes in place — that the delay doubles, that it stops at the ceiling, that a success resets it, that a 4xx is not retried. A red build points straight at which of the four rules broke.",
 				practiceSlug: "tests-name-the-behaviour",
-				group: "testing",
 				outcome: "MET",
-				observedAt: "2026-07-29T08:11:00Z",
+				recordedAt: "2026-07-29T08:11:00Z",
 				evidence: [
 					diff(
 						"server/application/src/test/java/de/tum/cit/aet/hephaestus/integration/core/webhook/WebhookRetryPolicyTest.java",
@@ -873,20 +1344,28 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 			{
 				id: "66666666-7777-7777-7777-777777777777",
 				summary: "The queue is called the outbox everywhere except in the config",
-				evidenceRationale:
-					"The class, the metric and the log lines all say outbox. The property is hephaestus.webhook.retry-buffer.*, so an operator reading a dashboard and an operator editing configuration are looking for two different words for one thing.",
+				explanation:
+					"The class, the metric and the log lines all say outbox. The property is hephaestus.webhook.retry-buffer.*, so an admin reading a dashboard and an admin editing configuration are looking for two different words for one thing.",
 				practiceSlug: "product-language",
-				group: "architecture",
 				outcome: "NOT_MET",
-				severity: "MINOR",
-				observedAt: "2026-07-29T08:10:00Z",
-				evidence: [
-					diff(
-						"server/application/src/main/resources/application.yml",
-						118,
-						118,
-						"retry-buffer:\n  capacity: 5000",
-					),
+				recordedAt: "2026-07-29T08:10:00Z",
+				evidenceHidden: true,
+				problems: [
+					{
+						severity: "MINOR",
+						summary: "The property says retry-buffer where everything else says outbox",
+						explanation:
+							"An admin reading a dashboard and one editing configuration look for two words.",
+						citations: [
+							diff(
+								"server/application/src/main/resources/application.yml",
+								118,
+								118,
+								"retry-buffer:\n  capacity: 5000",
+							),
+						],
+						nextStep: "Rename the property to `hephaestus.webhook.outbox.*`.",
+					},
 				],
 			},
 		],
@@ -894,29 +1373,26 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 			{
 				id: "77777777-6666-6666-6666-666666666666",
 				body: "Giving up on a delivery is the one moment worth counting. A debug line means a provider outage and a quiet afternoon look the same on every dashboard you have.",
-				channel: "IN_CONTEXT",
-				outcome: "SUPPRESSED",
-				withheldFor: "ARTIFACT_MERGED",
-				recipient: katherine,
+				destination: "ON_WORK",
+				state: "WITHHELD",
+				stopReason: "ITEM_MERGED",
 				composedAt: "2026-07-29T08:20:00Z",
 				from: ["44444444-6666-6666-6666-666666666666"],
 			},
 			{
 				id: "88888888-6666-6666-6666-666666666666",
 				body: "Each retry test is named for the rule it pins down, so a red build points at which of the four broke.",
-				channel: "IN_CONTEXT",
-				outcome: "SUPPRESSED",
-				withheldFor: "RECIPIENT_OPTED_OUT",
-				recipient: katherine,
+				destination: "ON_WORK",
+				state: "WITHHELD",
+				stopReason: "PERSON_SUPPRESSED",
 				composedAt: "2026-07-29T08:19:00Z",
 				from: ["55555555-7777-7777-7777-777777777777"],
 			},
 			{
 				id: "99999999-6666-6666-6666-666666666666",
-				body: "The dashboard says outbox and the config says retry-buffer. Picking one and using it in both places would save the next operator a search.",
-				channel: "IN_CONTEXT",
-				outcome: "DELIVERED",
-				recipient: katherine,
+				body: "The dashboard says outbox and the config says retry-buffer. Picking one and using it in both places would save the next admin a search.",
+				destination: "ON_WORK",
+				state: "DELIVERED",
 				composedAt: "2026-07-29T08:18:00Z",
 				deliveredAt: "2026-07-29T08:18:40Z",
 				anchoredAt: {
@@ -925,99 +1401,262 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 					endLine: 120,
 				},
 				from: ["66666666-7777-7777-7777-777777777777"],
+				fromProblem: { "66666666-7777-7777-7777-777777777777": 0 },
+			},
+			{
+				id: "aaaaaaaa-6666-6666-6666-666666666666",
+				body: "The four retry tests are named for the rules they pin down. Keep that shape for the next ones.",
+				destination: "ON_WORK",
+				state: "AWAITING_APPROVAL",
+				stopReason: "PRACTICE_REQUIRES_APPROVAL",
+				composedAt: "2026-07-29T08:21:00Z",
+				from: ["55555555-7777-7777-7777-777777777777"],
+				copies: [
+					{ kind: "SUMMARY", state: "PLANNED" },
+					{
+						kind: "LINE_NOTE",
+						state: "PLANNED",
+						body: "This name says the delay doubles, which is the rule a reader needs when the test goes red.",
+						at: {
+							path: "server/application/src/test/java/de/tum/cit/aet/hephaestus/integration/core/webhook/WebhookRetryPolicyTest.java",
+							startLine: 31,
+							endLine: 32,
+						},
+					},
+					{
+						kind: "FILE_NOTE",
+						state: "PLANNED",
+						body: "Every test in this file states its rule in its name.",
+						at: {
+							path: "server/application/src/test/java/de/tum/cit/aet/hephaestus/integration/core/webhook/WebhookRetryPolicyTest.java",
+							startLine: 1,
+							endLine: 1,
+						},
+					},
+				],
+			},
+			{
+				id: "bbbbbbbb-6666-6666-6666-666666666666",
+				body: "The outbox naming split also shows up in the metric tags.",
+				destination: "ON_WORK",
+				state: "READY",
+				composedAt: "2026-07-29T08:22:00Z",
+				from: ["66666666-7777-7777-7777-777777777777"],
+				copies: [{ kind: "SUMMARY", state: "WRITE_STARTED" }],
 			},
 		],
 	},
 	{
 		id: "aaaaaaaa-8888-8888-8888-888888888888",
-		work: leagueColumnsPullRequest,
+		item: leagueColumnsPullRequest,
 		status: "RUNNING",
 		startedAt: "2026-07-29T09:40:00Z",
 		developer: grace,
-		observations: [],
+		event: "scm.pull_request.opened",
+		pending: ["thin-controllers", "errors-carry-context"],
+		results: [],
 		feedback: [],
 	},
 	{
 		id: "bbbbbbbb-8888-8888-8888-888888888888",
-		work: invoiceBackfillMergeRequest,
+		item: invoiceBackfillMergeRequest,
 		status: "FAILED",
+		stopReason: "EXECUTION_FAILED",
 		startedAt: "2026-07-24T15:02:00Z",
 		developer: alan,
-		observations: [],
+		event: "scm.pull_request.ready",
+		pending: ["product-language"],
+		runtimeExpired: true,
+		results: [],
+		feedback: [],
+	},
+	{
+		id: "cccccccc-8888-8888-8888-888888888888",
+		item: pullRequestReviewItem,
+		status: "COMPLETE",
+		startedAt: "2026-07-28T17:05:00Z",
+		developer: grace,
+		event: "scm.pull_request_review.submitted",
+		results: [
+			{
+				id: "dddddddd-8888-8888-8888-888888888888",
+				summary: "Each comment says what to change and why",
+				explanation:
+					"All four comments name the risk the change removes, so Ada can agree with the reason or argue with it.",
+				practiceSlug: "review-comments-explain",
+				outcome: "MET",
+				recordedAt: "2026-07-28T17:08:00Z",
+				evidence: [
+					cited(
+						"scm.review-threads",
+						"Comment on ReviewQueryService.java",
+						"Splitting these lets support tell a stale link from a missing grant.",
+					),
+				],
+			},
+		],
+		feedback: [
+			{
+				id: "eeeeeeee-8888-8888-8888-888888888888",
+				body: "Your review explains why each change matters.",
+				destination: "PRACTICE_PAGE",
+				state: "WITHHELD",
+				stopReason: "FEEDBACK_OFF",
+				composedAt: "2026-07-28T17:09:00Z",
+				from: ["dddddddd-8888-8888-8888-888888888888"],
+			},
+		],
+	},
+	{
+		id: "dddddddd-9999-9999-9999-999999999999",
+		item: scannedRepository,
+		kind: "SCAN",
+		status: "PARTIAL",
+		stopReason: "BUDGET",
+		startedAt: "2026-07-27T20:00:00Z",
+		developer: null,
+		origin: "REQUEST",
+		requestedBy: reviewAccounts.grace,
+		jobs: 4,
+		results: [
+			{
+				id: "eeeeeeee-9999-9999-9999-999999999999",
+				summary: "Giving up on a delivery names neither the event nor the provider",
+				explanation:
+					"The retry policy's last log line names the attempt count and nothing that would let an admin find the delivery it dropped.",
+				practiceSlug: "errors-carry-context",
+				outcome: "NOT_MET",
+				recordedAt: "2026-07-27T20:12:00Z",
+				item: scannedFiles[0],
+				aboutTheWork: true,
+				problems: [
+					{
+						severity: "MAJOR",
+						summary: "The give-up line names no event",
+						explanation: "An admin cannot tell which delivery was dropped.",
+						citations: [
+							cited(
+								"scm.repository.file",
+								scannedFiles[0].path ?? "",
+								'log.debug("giving up after {} attempts", attempts);',
+								74,
+							),
+						],
+					},
+				],
+			},
+			{
+				id: "ffffffff-9999-9999-9999-999999999999",
+				summary: "Every lookup failure names the review it was looking for",
+				explanation: "Each exception in the file is built with the id it failed on.",
+				practiceSlug: "errors-carry-context",
+				outcome: "MET",
+				recordedAt: "2026-07-27T20:14:00Z",
+				item: scannedFiles[1],
+				aboutTheWork: true,
+			},
+		],
 		feedback: [],
 	},
 ];
 
-// ---------------------------------------------------------------------------------------------
-// Derivations
-// ---------------------------------------------------------------------------------------------
-
-/** The cut the server applies to `bodyPreview`, mirrored here so `bodyTruncated` cannot claim
- * something the preview beside it contradicts. */
+// Preview bounds must match the server so bodyTruncated agrees with bodyPreview.
 const BODY_PREVIEW_LENGTH = 320;
 
-/**
- * The text the server lets an operator read: none for a private place (`OPERATOR_WITHHELD_TEXT`),
- * whose text the fixture still writes so a story can prove it never reaches the screen.
- */
-function operatorBody(spec: FeedbackSpec): string | undefined {
-	return OPERATOR_WITHHELD_TEXT[spec.channel] === undefined ? spec.body : undefined;
+const MINUTE = 60_000;
+
+function adminBody(spec: FeedbackSpec): string | null {
+	return ADMIN_WITHHELD_TEXT[spec.destination] === undefined ? (spec.body ?? null) : null;
 }
 
 function preview(spec: FeedbackSpec) {
-	const body = operatorBody(spec);
+	const body = adminBody(spec);
 	return {
-		bodyPreview: body?.slice(0, BODY_PREVIEW_LENGTH),
+		bodyPreview: body?.slice(0, BODY_PREVIEW_LENGTH) ?? null,
 		bodyTruncated: (body?.length ?? 0) > BODY_PREVIEW_LENGTH,
+		textHidden: ADMIN_WITHHELD_TEXT[spec.destination] !== undefined,
+		unverifiedHistory: false,
 	};
 }
 
-const allRuns = REVIEW_FIXTURE;
-const allObservationSpecs = allRuns.flatMap((run) =>
-	run.observations.map((observation) => ({ run, observation })),
-);
-const allFeedbackSpecs = allRuns.flatMap((run) => run.feedback.map((item) => ({ run, item })));
+const at = (iso: string | undefined): Date | null => (hasText(iso) ? new Date(iso) : null);
 
-/** The ids of the feedback written from one observation, as the feedback list filters by it. */
-export function feedbackIdsFrom(observationId: string): ReadonlySet<string> {
-	return new Set(feedbackFor(observationId).map(({ item }) => item.id));
+const allReviews = REVIEW_FIXTURE;
+const allResultSpecs = allReviews.flatMap((review) =>
+	review.results.map((result) => ({ review, result })),
+);
+const allFeedbackSpecs = allReviews.flatMap((review) =>
+	review.feedback.map((item) => ({ review, item })),
+);
+
+function reviewSpec(reviewId: string): ReviewSpec {
+	const found = allReviews.find((entry) => entry.id === reviewId);
+	if (!found) {
+		throw new Error(`No review ${reviewId} in the fixture`);
+	}
+	return found;
 }
 
-/** The feedback drawing on one observation, newest first, as the detail surfaces list it. */
-function feedbackFor(observationId: string) {
+function resultSpec(resultId: string) {
+	const found = allResultSpecs.find(({ result }) => result.id === resultId);
+	if (!found) {
+		throw new Error(`No result ${resultId} in the fixture`);
+	}
+	return found;
+}
+
+function feedbackSpec(feedbackId: string) {
+	const found = allFeedbackSpecs.find(({ item }) => item.id === feedbackId);
+	if (!found) {
+		throw new Error(`No feedback ${feedbackId} in the fixture`);
+	}
+	return found;
+}
+
+function feedbackFor(resultId: string) {
 	return allFeedbackSpecs
-		.filter(({ item }) => item.from.includes(observationId))
+		.filter(({ item }) => item.from.includes(resultId))
 		.sort((a, b) => b.item.composedAt.localeCompare(a.item.composedAt));
 }
 
-/** One count per delivery state, as the server reports a review's or an observation's feedback. */
-const COUNT_OF: Record<ReviewFeedback["deliveryState"], keyof ReviewFeedbackCounts> = {
+export function feedbackIdsFrom(resultId: string): ReadonlySet<string> {
+	return new Set(feedbackFor(resultId).map(({ item }) => item.id));
+}
+
+const SEVERITY_RANK: Record<Severity, number> = { CRITICAL: 0, MAJOR: 1, MINOR: 2, TRIVIAL: 3 };
+
+function severityOf(spec: ResultSpec): Severity | null {
+	const [worst] = (spec.problems ?? [])
+		.map((problem) => problem.severity)
+		.sort((a, b) => SEVERITY_RANK[a] - SEVERITY_RANK[b]);
+	return worst ?? null;
+}
+
+export function problemIdOf(resultId: string, position: number): string {
+	return `${resultId.slice(0, -2)}${String(position).padStart(2, "0")}`;
+}
+
+const COUNT_OF: Record<FeedbackState, keyof ReviewFeedbackCounts> = {
 	AWAITING_APPROVAL: "awaitingApproval",
+	READY: "ready",
 	DELIVERED: "delivered",
-	DISCARDED: "discarded",
-	FAILED: "failed",
-	PARTIALLY_DELIVERED: "partiallyDelivered",
-	PARTIALLY_FAILED: "partiallyFailed",
-	PREPARED: "prepared",
-	SUPERSEDED: "superseded",
-	SUPPRESSED: "suppressed",
 	UNCONFIRMED: "unconfirmed",
+	WITHHELD: "withheld",
+	REJECTED: "rejected",
+	REPLACED: "replaced",
+	FAILED: "failed",
 };
 
-export function feedbackCounts(
-	states: readonly ReviewFeedback["deliveryState"][],
-): ReviewFeedbackCounts {
+export function feedbackCounts(states: readonly FeedbackState[]): ReviewFeedbackCounts {
 	const counts: ReviewFeedbackCounts = {
 		awaitingApproval: 0,
+		ready: 0,
 		delivered: 0,
-		discarded: 0,
-		failed: 0,
-		partiallyDelivered: 0,
-		partiallyFailed: 0,
-		prepared: 0,
-		superseded: 0,
-		suppressed: 0,
 		unconfirmed: 0,
+		withheld: 0,
+		rejected: 0,
+		replaced: 0,
+		failed: 0,
 	};
 	for (const state of states) {
 		counts[COUNT_OF[state]] += 1;
@@ -1025,431 +1664,1034 @@ export function feedbackCounts(
 	return counts;
 }
 
-/** What the counts by reason return for these rows: the rows with a reason, by it. */
-export function reasonCounts(rows: readonly ReviewFeedback[]): ReviewFeedbackReasonCount[] {
-	const counts = new Map<NonNullable<ReviewFeedback["suppressionReason"]>, number>();
-	for (const row of rows) {
-		if (row.suppressionReason !== undefined) {
-			counts.set(row.suppressionReason, (counts.get(row.suppressionReason) ?? 0) + 1);
-		}
-	}
-	return [...counts].map(([reason, count]) => ({ reason, count }));
-}
+const ZERO_FEEDBACK = feedbackCounts([]);
 
-/** What the counts endpoint returns for these rows: by location, in the order the server sorts them. */
-export function locationCounts(rows: readonly ReviewFeedback[]): ReviewFeedbackLocationCounts[] {
-	const order: ReviewFeedback["location"][] = [
-		"GITHUB",
-		"GITLAB",
-		"OTHER_WORK",
-		"HEPH",
-		"SLACK",
-		"NEXT_CONVERSATION",
-		"PRACTICE_PAGES",
-	];
-	return order.flatMap((at) => {
-		const states = rows.filter((row) => row.location === at).map((row) => row.deliveryState);
-		return states.length === 0 ? [] : [{ location: at, feedback: feedbackCounts(states) }];
-	});
-}
-
-function disposition(observationId: string): ReviewFeedbackCounts {
-	return feedbackCounts(feedbackFor(observationId).map(({ item }) => item.outcome));
-}
-
-function toObservation(run: RunSpec, spec: ObservationSpec): ReviewObservation {
-	const practice = workspacePractices.find((entry) => entry.slug === spec.practiceSlug);
-	if (!practice) {
-		throw new Error(`No practice named ${spec.practiceSlug} in the fixture catalogue`);
-	}
+export function resultCounts(outcomes: readonly ReviewResult["outcome"][]): ReviewResultCounts {
 	return {
-		id: spec.id,
-		agentJobId: run.id,
-		reviewedWork: run.work.reviewedWork,
-		group: group(spec.group),
-		claimCurrentness: spec.claimCurrentness ?? "CURRENT",
-		outcome: spec.outcome,
-		feedback: disposition(spec.id),
-		observedAt: new Date(spec.observedAt),
-		origin: run.origin ?? "LIVE",
-		practiceName: practice.name,
-		practiceSlug: practice.slug,
-		severity: spec.severity,
-		subject: run.developer,
-		summary: spec.summary,
+		met: outcomes.filter((outcome) => outcome === "MET").length,
+		notMet: outcomes.filter((outcome) => outcome === "NOT_MET").length,
+		doesNotApply: outcomes.filter((outcome) => outcome === "DOES_NOT_APPLY").length,
+		couldNotDetermine: outcomes.filter((outcome) => outcome === "COULD_NOT_DETERMINE").length,
 	};
 }
 
-/** The location the server derives: the channel, split by the work's provider or the conversation's. */
-function locationOf(run: RunSpec, spec: FeedbackSpec): ReviewFeedback["location"] {
-	switch (spec.channel) {
-		case "IN_APP": {
+export function reasonCounts(rows: readonly ReviewFeedback[]): ReasonCount[] {
+	const counts = new Map<StopReason, number>();
+	for (const row of rows) {
+		if (row.stopReason !== null) {
+			counts.set(row.stopReason, (counts.get(row.stopReason) ?? 0) + 1);
+		}
+	}
+	return [...counts].map(([reason, count]) => ({
+		reason,
+		description: withholdingReasonSentence(reason),
+		count,
+	}));
+}
+
+const LOCATION_ORDER: ReviewFeedback["location"][] = [
+	"GITHUB",
+	"GITLAB",
+	"OTHER_WORK",
+	"HEPH",
+	"SLACK",
+	"NEXT_CONVERSATION",
+	"PRACTICE_PAGES",
+];
+
+export function locationCounts(rows: readonly ReviewFeedback[]): ReasonCount[] {
+	return LOCATION_ORDER.flatMap((location) => {
+		const count = rows.filter((row) => row.location === location).length;
+		return count === 0
+			? []
+			: [{ reason: location, description: FEEDBACK_LOCATION_DEFS[location].label, count }];
+	});
+}
+
+function markId(resultId: string, index: number): string {
+	return `${resultId.slice(0, -3)}a${String(index).padStart(2, "0")}`;
+}
+
+function marksOf(resultId: string, spec: ResultSpec): ResultMark[] {
+	return (spec.marks ?? []).map((mark, index) => ({
+		id: markId(resultId, index),
+		resultId,
+		kind: mark.kind,
+		reason: mark.reason,
+		createdBy: mark.by,
+		createdAt: new Date(mark.at),
+		removedBy: mark.removed?.by ?? null,
+		removedAt: at(mark.removed?.at),
+		removalReason: mark.removed?.reason ?? null,
+	}));
+}
+
+export function resultMarks(resultId: string): ResultMark[] {
+	return marksOf(resultId, resultSpec(resultId).result);
+}
+
+function activeMarkAt(spec: ResultSpec, kind: ResultMark["kind"]): Date | null {
+	const active = (spec.marks ?? []).find(
+		(mark) => mark.kind === kind && mark.removed === undefined,
+	);
+	return at(active?.at);
+}
+
+function disagreementsOf(resultId: string): FeedbackDisagreement[] {
+	return feedbackFor(resultId).flatMap(({ item }) =>
+		item.response?.resolution === "DISAGREE"
+			? [
+					{
+						feedbackId: item.id,
+						destination: item.destination,
+						comment: item.response.comment ?? "",
+						respondedAt: new Date(item.response.at),
+					},
+				]
+			: [],
+	);
+}
+
+export function disagreedResultIds(): ReadonlySet<string> {
+	return new Set(
+		allResultSpecs
+			.filter(({ result }) => disagreementsOf(result.id).length > 0)
+			.map(({ result }) => result.id),
+	);
+}
+
+function disagreedAt(resultId: string): Date | null {
+	return disagreementsOf(resultId)[0]?.respondedAt ?? null;
+}
+
+function itemOf(review: ReviewSpec, spec: ResultSpec): ItemRef {
+	return spec.item ?? review.item;
+}
+
+function originOf(review: ReviewSpec): ReviewSummary["origin"] {
+	return review.origin ?? "EVENT";
+}
+
+function toResult(review: ReviewSpec, spec: ResultSpec): ReviewResult {
+	const problems = spec.problems ?? [];
+	return {
+		id: spec.id,
+		reviewId: review.id,
+		item: itemOf(review, spec),
+		developer: spec.aboutTheWork === true ? null : review.developer,
+		practiceSlug: spec.practiceSlug,
+		practiceName: practiceNameOf(spec.practiceSlug),
+		outcome: spec.outcome,
+		severity: severityOf(spec),
+		summary: spec.summary,
+		origin: originOf(review),
+		recordedAt: new Date(spec.recordedAt),
+		currentness: spec.currentness ?? "CURRENT",
+		markedIncorrectAt: activeMarkAt(spec, "INCORRECT"),
+		acceptedAt: activeMarkAt(spec, "ACCEPTED"),
+		problemCount: problems.length,
+		problems: problems.map((problem, position) => ({
+			id: problemIdOf(spec.id, position),
+			severity: problem.severity,
+			summary: problem.summary,
+		})),
+		feedback: feedbackCounts(feedbackFor(spec.id).map(({ item }) => item.state)),
+	};
+}
+
+export function boundResultOf(result: ReviewBoundResult): ReviewBoundResult {
+	return {
+		id: result.id,
+		reviewId: result.reviewId,
+		item: result.item,
+		developer: result.developer,
+		practiceSlug: result.practiceSlug,
+		practiceName: result.practiceName,
+		outcome: result.outcome,
+		severity: result.severity,
+		summary: result.summary,
+		recordedAt: result.recordedAt,
+		currentness: result.currentness,
+	};
+}
+
+function toProblems(spec: ResultSpec): Problem[] {
+	const hidden = spec.evidenceHidden === true;
+	return (spec.problems ?? []).map((problem, position) => ({
+		id: problemIdOf(spec.id, position),
+		resultId: spec.id,
+		position,
+		key: `${spec.practiceSlug}:${position}`,
+		severity: problem.severity,
+		summary: problem.summary,
+		explanation: hidden ? null : problem.explanation,
+		citations: hidden ? [] : problem.citations,
+		basis: problem.basis ?? null,
+		nextStep: hidden ? null : (problem.nextStep ?? null),
+	}));
+}
+
+function toProblemRows(review: ReviewSpec, spec: ResultSpec): ReviewProblem[] {
+	const result = toResult(review, spec);
+	const hidden = spec.evidenceHidden === true;
+	return (spec.problems ?? []).map((problem, position) => {
+		const [place] = problem.citations;
+		return {
+			id: problemIdOf(spec.id, position),
+			resultId: result.id,
+			reviewId: result.reviewId,
+			item: result.item,
+			developer: result.developer,
+			practiceSlug: result.practiceSlug,
+			practiceName: result.practiceName,
+			group: groupRefOf(result.practiceSlug),
+			severity: problem.severity,
+			summary: problem.summary,
+			path: hidden ? null : (place?.path ?? null),
+			startLine: hidden ? null : (place?.startLine ?? null),
+			endLine: hidden ? null : (place?.endLine ?? null),
+			side: hidden ? null : (place?.side ?? null),
+			sourceKind: hidden ? null : (place?.sourceKind ?? null),
+			evidenceHidden: hidden,
+			currentness: result.currentness,
+			markedIncorrectAt: result.markedIncorrectAt,
+			acceptedAt: result.acceptedAt,
+			disagreedAt: disagreedAt(result.id),
+			recordedAt: result.recordedAt,
+		};
+	});
+}
+
+export const reviewResults: ReviewResult[] = allResultSpecs
+	.map(({ review, result }) => toResult(review, result))
+	.sort((a, b) => b.recordedAt.getTime() - a.recordedAt.getTime());
+
+export const reviewProblems: ReviewProblem[] = allResultSpecs
+	.flatMap(({ review, result }) => toProblemRows(review, result))
+	.sort((a, b) => b.recordedAt.getTime() - a.recordedAt.getTime());
+
+function locationOf(review: ReviewSpec, spec: FeedbackSpec): ReviewFeedback["location"] {
+	switch (spec.destination) {
+		case "PRACTICE_PAGE": {
 			return "PRACTICE_PAGES";
 		}
-		case "IN_CONTEXT": {
-			const { provider } = run.work.reviewedWork;
+		case "ON_WORK": {
+			const { provider } = review.item;
 			return provider === "GITHUB" || provider === "GITLAB" ? provider : "OTHER_WORK";
 		}
-		case "IN_CHAT": {
-			return spec.outcome === "DELIVERED" || spec.outcome === "UNCONFIRMED"
+		case "CONVERSATION": {
+			return spec.state === "DELIVERED" || spec.state === "UNCONFIRMED"
 				? (spec.conversation ?? "HEPH")
 				: "NEXT_CONVERSATION";
 		}
 	}
 }
 
-function toFeedback(run: RunSpec, spec: FeedbackSpec): ReviewFeedback {
-	return {
-		id: spec.id,
-		agentJobId: run.id,
-		reviewedWork: run.work.reviewedWork,
-		...preview(spec),
-		channel: spec.channel,
-		location: locationOf(run, spec),
-		createdAt: new Date(spec.composedAt),
-		deliveredAt: hasText(spec.deliveredAt) ? new Date(spec.deliveredAt) : undefined,
-		deliveryState: spec.outcome,
-		observationCount: spec.from.length,
-		recipient: spec.recipient,
-		replacesId: spec.replaces,
-		subject: run.developer,
-		suppressionReason: spec.withheldFor,
-	};
-}
-
-/** Newest first, as the list endpoint returns them. */
-export const reviewObservations: ReviewObservation[] = allObservationSpecs
-	.map(({ run, observation }) => toObservation(run, observation))
-	.sort((a, b) => b.observedAt.getTime() - a.observedAt.getTime());
-
-/** Newest first, as the list endpoint returns them. */
-export const reviewFeedback: ReviewFeedback[] = allFeedbackSpecs
-	.map(({ run, item }) => toFeedback(run, item))
-	.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-
-/** Both tallies counted from the records they summarise, so a run card cannot claim a number the
- * list under it contradicts. */
-export const reviewRuns: ReviewRunSummary[] = allRuns
-	.map((run) => ({
-		id: run.id,
-		status: run.status,
-		reviewOutcome: "REVIEWED" as const,
-		target: run.work,
-		createdAt: new Date(run.startedAt),
-		observations: {
-			met: run.observations.filter((o) => o.outcome === "MET").length,
-			notMet: run.observations.filter((o) => o.outcome === "NOT_MET").length,
-			notApplicable: run.observations.filter((o) => o.outcome === "NOT_APPLICABLE").length,
-			undetermined: run.observations.filter((o) => o.outcome === "UNDETERMINED").length,
-		},
-		feedback: feedbackCounts(run.feedback.map((f) => f.outcome)),
-		origin: run.origin ?? "LIVE",
-		developers: [run.developer],
-		...practiceVerdicts(run),
-		positionOnWork: allRuns.filter(
-			(other) =>
-				other.work.reviewedWork.kind === run.work.reviewedWork.kind &&
-				other.work.reviewedWork.id === run.work.reviewedWork.id &&
-				other.startedAt <= run.startedAt,
-		).length,
-		reviewsOnWork: allRuns.filter(
-			(other) =>
-				other.work.reviewedWork.kind === run.work.reviewedWork.kind &&
-				other.work.reviewedWork.id === run.work.reviewedWork.id,
-		).length,
-		finishedAfterMerge: false,
-		finishedAfterMergeStartedByMerge: false,
-	}))
-	.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-
-/**
- * One verdict per practice, as the server tallies a run: any not met outweighs a met, and a
- * practice whose every observation did not apply did not apply. A finished run reached every
- * practice it observed.
- */
-function practiceVerdicts(
-	run: RunSpec,
-): Pick<ReviewRunSummary, "practices" | "slippedPractices" | "practicesEvaluated"> {
-	const bySlug = new Map<string, ObservationSpec[]>();
-	for (const observation of run.observations) {
-		bySlug.set(observation.practiceSlug, [
-			...(bySlug.get(observation.practiceSlug) ?? []),
-			observation,
-		]);
-	}
-	const practices = { notMet: 0, met: 0, notApplicable: 0, undetermined: 0 };
-	const slippedPractices: ReviewRunSummary["slippedPractices"] = [];
-	for (const [practiceSlug, observed] of bySlug) {
-		const outcomes = observed.map((observation) => observation.outcome);
-		if (outcomes.includes("NOT_MET")) {
-			practices.notMet += 1;
-			const practiceName =
-				workspacePractices.find((practice) => practice.slug === practiceSlug)?.name ?? practiceSlug;
-			slippedPractices.push({ practiceSlug, practiceName });
-		} else if (outcomes.includes("MET")) {
-			practices.met += 1;
-		} else if (outcomes.every((outcome) => outcome === "NOT_APPLICABLE")) {
-			practices.notApplicable += 1;
-		} else {
-			practices.undetermined += 1;
-		}
-	}
-	slippedPractices.sort((a, b) => a.practiceName.localeCompare(b.practiceName));
-	return {
-		practices,
-		slippedPractices,
-		practicesEvaluated: run.status === "COMPLETED" ? bySlug.size : undefined,
-	};
-}
-
-const JOB_TYPE_BY_ARTIFACT: Record<KnownArtifactKind, AgentJob["jobType"]> = {
-	[ARTIFACT_KIND.pullRequest]: "PULL_REQUEST_REVIEW",
-	[ARTIFACT_KIND.issue]: "ISSUE_REVIEW",
-	[ARTIFACT_KIND.conversationThread]: "CONVERSATION_REVIEW",
-	[ARTIFACT_KIND.document]: "DOCUMENT_REVIEW",
+const COPY_STATE_OF: Record<FeedbackState, FeedbackCopy["state"]> = {
+	AWAITING_APPROVAL: "PLANNED",
+	READY: "PLANNED",
+	DELIVERED: "POSTED",
+	REPLACED: "POSTED",
+	UNCONFIRMED: "WRITE_STARTED",
+	WITHHELD: "WITHHELD",
+	REJECTED: "WITHHELD",
+	FAILED: "FAILED",
 };
 
-/**
- * The job record behind one review, derived from the same spec as its rows. A review detail page
- * takes its heading from the *job's* target and its rows from the review endpoints, so a job served
- * from an unrelated fixture makes the header name one pull request and every row underneath another.
- */
-export function reviewJob(runId: string): AgentJob {
-	const run = allRuns.find((entry) => entry.id === runId);
-	if (!run) {
-		throw new Error(`No review ${runId} in the fixture`);
+function copySpecsOf(spec: FeedbackSpec): CopySpec[] {
+	if (spec.copies) {
+		return spec.copies;
 	}
-	const started = new Date(run.startedAt);
-	const finished = run.status === "RUNNING" ? undefined : new Date(started.getTime() + 5 * 60_000);
+	const state =
+		spec.withdrawn === true && spec.state === "DELIVERED" ? "RETRACTED" : COPY_STATE_OF[spec.state];
+	switch (spec.destination) {
+		case "CONVERSATION": {
+			return [{ kind: "CHAT_TURN", state }];
+		}
+		case "PRACTICE_PAGE": {
+			return [{ kind: "SUMMARY", state }];
+		}
+		case "ON_WORK": {
+			return spec.anchoredAt
+				? [{ kind: "LINE_NOTE", state, body: spec.body, at: spec.anchoredAt }]
+				: [
+						{
+							kind: "SUMMARY",
+							state,
+							lastError:
+								state === "FAILED"
+									? "The provider answered 403: Resource not accessible by integration."
+									: undefined,
+						},
+					];
+		}
+	}
+}
+
+function copiesOf(review: ReviewSpec, spec: FeedbackSpec): FeedbackCopy[] {
+	const composed = new Date(spec.composedAt);
+	const delivered = at(spec.deliveredAt) ?? new Date(composed.getTime() + 30_000);
+	return copySpecsOf(spec).map((copy, position) => {
+		const started = copy.state !== "PLANNED" && copy.state !== "WITHHELD";
+		const posted = copy.state === "POSTED" || copy.state === "RETRACTED";
+		const onWork = spec.destination === "ON_WORK";
+		const ref = String(2_481_933 + position);
+		return {
+			id: `${spec.id.slice(0, -3)}c${String(position).padStart(2, "0")}`,
+			kind: copy.kind,
+			position,
+			body: onWork ? (copy.body ?? (copy.kind === "SUMMARY" ? (spec.body ?? null) : null)) : null,
+			path: copy.at?.path ?? null,
+			startLine: copy.at?.startLine ?? null,
+			endLine: copy.at?.endLine ?? null,
+			side: copy.at === undefined ? null : "NEW",
+			state: copy.state,
+			writeStartedAt: started ? composed : null,
+			postedAt: posted ? delivered : null,
+			externalRef: posted && onWork ? ref : null,
+			externalUrl:
+				posted && onWork && hasText(review.item.url)
+					? `${review.item.url}#issuecomment-${ref}`
+					: null,
+			chatMessageId:
+				copy.kind === "CHAT_TURN" && copy.state !== "PLANNED"
+					? `${spec.id.slice(0, -3)}f${String(position).padStart(2, "0")}`
+					: null,
+			stopReason: copy.state === "WITHHELD" ? (spec.stopReason ?? null) : null,
+			lastError: copy.lastError ?? null,
+			readback: null,
+		};
+	});
+}
+
+function copyCountsOf(copies: readonly FeedbackCopy[]): FeedbackCopyCounts {
+	const count = (state: FeedbackCopy["state"]) =>
+		copies.filter((copy) => copy.state === state).length;
 	return {
-		id: run.id,
-		jobType: JOB_TYPE_BY_ARTIFACT[run.work.reviewedWork.kind],
-		reviewOutcome: "REVIEWED",
-		target: run.work,
-		status: run.status,
-		model: "gpt-5.4-mini",
-		configSnapshot: { name: "Default reviewer", llmProvider: "OPENAI" },
-		createdAt: started,
-		availableAt: started,
-		startedAt: started,
-		// Forty seconds preparing, the rest of the five minutes with the model, a minute until the
-		// first comment was posted, and three hours until the developer read the feedback.
-		executionStartedAt: new Date(started.getTime() + 40_000),
-		completedAt: finished,
-		firstFeedbackPostedAt:
-			run.status === "COMPLETED" && finished !== undefined
-				? new Date(finished.getTime() + 60_000)
-				: undefined,
-		firstFeedbackReadAt:
-			run.status === "COMPLETED" && finished !== undefined
-				? new Date(finished.getTime() + 3 * 3_600_000)
-				: undefined,
-		deliveryStatus: run.status === "COMPLETED" ? "DELIVERED" : undefined,
-		llmModel: "openai/gpt-oss-120b",
-		llmTotalInputTokens: 24_000,
-		llmTotalOutputTokens: 914,
-		llmTotalReasoningTokens: 120,
-		llmTotalCalls: 7,
-		retryCount: 0,
-		exitCode: run.status === "FAILED" ? 1 : 0,
-		errorMessage:
-			run.status === "FAILED"
-				? "Cannot compute diff: all resolution strategies failed for commit 27f4e88c."
-				: undefined,
+		planned: count("PLANNED"),
+		writeStarted: count("WRITE_STARTED"),
+		posted: count("POSTED"),
+		failed: count("FAILED"),
+		withheld: count("WITHHELD"),
+		retracted: count("RETRACTED"),
 	};
 }
 
-export function observationDetail(observationId: string): ReviewObservationDetail {
-	const found = allObservationSpecs.find(({ observation }) => observation.id === observationId);
-	if (!found) {
-		throw new Error(`No observation ${observationId} in the fixture`);
-	}
-	const { run, observation } = found;
-	// The detail replaces the tally with the feedback records the tally was counting.
-	const { feedback: _tally, ...shared } = toObservation(run, observation);
-	return {
-		...shared,
-		evidence: observation.evidence ? { citations: observation.evidence } : undefined,
-		feedback: feedbackFor(observationId).map(({ item }) => ({
-			feedbackId: item.id,
-			agentJobId: run.id,
-			channel: item.channel,
-			createdAt: new Date(item.composedAt),
-			deliveredAt: hasText(item.deliveredAt) ? new Date(item.deliveredAt) : undefined,
-			deliveryState: item.outcome,
-			role: item.from[0] === observationId ? "PRIMARY" : "SUPPORTING",
-			suppressionReason: item.withheldFor,
-		})),
-		evidenceRationale: observation.evidenceRationale,
-		invalidations: [],
-		disputes: [],
-	};
-}
-
-function feedbackPlacements(item: FeedbackSpec): ReviewFeedbackDetail["placements"] {
-	if (item.outcome !== "DELIVERED" || item.channel !== "IN_CONTEXT") {
+function sendsOf(spec: FeedbackSpec, copies: readonly FeedbackCopy[]): FeedbackSend[] {
+	if (spec.destination !== "ON_WORK") {
 		return [];
 	}
-	if (item.anchoredAt) {
+	const createdAt = new Date(spec.composedAt);
+	const base = {
+		feedbackId: spec.id,
+		createdAt,
+		nextAttemptAt: new Date(createdAt.getTime() + 10 * MINUTE),
+		lastError: null,
+	};
+	const has = (state: FeedbackCopy["state"]) => copies.some((copy) => copy.state === state);
+	if (spec.withdrawn === true) {
+		return [{ ...base, action: "RETRACT", state: "DONE", attemptCount: 1, updatedAt: createdAt }];
+	}
+	if (has("WRITE_STARTED")) {
 		return [
 			{
-				id: `${item.id}-inline`,
-				placementType: "INLINE",
-				anchorKind: "RANGE",
-				anchorSide: "NEW",
-				anchorPath: item.anchoredAt.path,
-				anchorStartLine: item.anchoredAt.startLine,
-				anchorEndLine: item.anchoredAt.endLine,
-				postedCommentRef: "2481944",
+				...base,
+				action: "POST",
+				state: "UNCERTAIN",
+				attemptCount: 1,
+				updatedAt: new Date(createdAt.getTime() + MINUTE),
+				lastError: "The connection closed before GitHub answered.",
 			},
 		];
 	}
-	return [{ id: `${item.id}-summary`, placementType: "SUMMARY", postedCommentRef: "2481933" }];
+	if (has("FAILED") && has("POSTED")) {
+		return [
+			{
+				...base,
+				action: "POST",
+				state: "PENDING",
+				attemptCount: 2,
+				updatedAt: new Date(createdAt.getTime() + 2 * MINUTE),
+				lastError: "GitHub answered 422 for both line notes.",
+			},
+		];
+	}
+	if (has("FAILED")) {
+		return [
+			{
+				...base,
+				action: "POST",
+				state: "DONE",
+				attemptCount: 5,
+				updatedAt: new Date(createdAt.getTime() + 40 * MINUTE),
+				lastError: "The provider answered 403: Resource not accessible by integration.",
+			},
+		];
+	}
+	if (has("POSTED")) {
+		return [
+			{
+				...base,
+				action: "POST",
+				state: "DONE",
+				attemptCount: 1,
+				updatedAt: at(spec.deliveredAt) ?? createdAt,
+			},
+		];
+	}
+	if (spec.state === "READY") {
+		return [{ ...base, action: "POST", state: "PENDING", attemptCount: 0, updatedAt: createdAt }];
+	}
+	return [];
 }
 
-/**
- * The deliveries a piece of feedback on the work went out in: one sent, one being retried after a
- * provider error, one that gave up. Feedback that waits, was withheld or goes elsewhere has none.
- */
-function feedbackDispatches(run: RunSpec, item: FeedbackSpec): ReviewFeedbackDetail["dispatches"] {
-	if (item.channel !== "IN_CONTEXT") {
-		return [];
-	}
-	const createdAt = new Date(item.composedAt);
-	const base = {
-		id: `${item.id.slice(0, 8)}-0000-4000-8000-00000000d15c`,
-		destination: "AUTOMATIC_REVIEW_PACKAGE" as const,
-		createdAt,
-	};
-	switch (item.outcome) {
-		case "DELIVERED":
-		case "SUPERSEDED": {
-			return [
-				{
-					...base,
-					state: "SENT",
-					attemptCount: 1,
-					updatedAt: hasText(item.deliveredAt) ? new Date(item.deliveredAt) : createdAt,
-					deliveredExternalRef: "2481933",
-					deliveredExternalUrl: `${run.work.reviewedWork.url ?? "https://github.com/acme/app/pull/1423"}#issuecomment-2481933`,
-				},
-			];
-		}
-		case "PREPARED":
-		case "PARTIALLY_DELIVERED":
-		case "UNCONFIRMED": {
-			return [
-				{
-					...base,
-					state: item.outcome === "UNCONFIRMED" ? "UNCERTAIN" : "PENDING",
-					attemptCount: 2,
-					updatedAt: new Date(createdAt.getTime() + 2 * 60_000),
-					nextAttemptAt: new Date(createdAt.getTime() + 10 * 60_000),
-					lastError: "GitHub answered 502 Bad Gateway while the summary comment was posted.",
-				},
-			];
-		}
-		case "FAILED":
-		case "PARTIALLY_FAILED": {
-			return [
-				{
-					...base,
-					state: "FAILED",
-					attemptCount: 5,
-					updatedAt: new Date(createdAt.getTime() + 40 * 60_000),
-					lastError: "GitHub answered 403: Resource not accessible by integration.",
-				},
-			];
-		}
-		case "AWAITING_APPROVAL":
-		case "DISCARDED":
-		case "SUPPRESSED": {
-			return [];
-		}
-	}
+function contentDigestOf(spec: FeedbackSpec): string | null {
+	return spec.destination === "CONVERSATION" ? null : `sha256:${spec.id.slice(0, 8)}`;
 }
 
-export function feedbackDetail(feedbackId: string): ReviewFeedbackDetail {
-	const found = allFeedbackSpecs.find(({ item }) => item.id === feedbackId);
-	if (!found) {
-		throw new Error(`No feedback ${feedbackId} in the fixture`);
+function decisionsOf(spec: FeedbackSpec): FeedbackDecision[] {
+	return (spec.decisions ?? []).map((decision, index) => ({
+		id: `${spec.id.slice(0, -3)}d${String(index).padStart(2, "0")}`,
+		feedbackId: spec.id,
+		action: decision.action,
+		actor: decision.by,
+		reasonCode: decision.reasonCode ?? null,
+		note: decision.note ?? null,
+		contentDigest: contentDigestOf(spec),
+		decidedAt: new Date(decision.at),
+	}));
+}
+
+export function feedbackDecisions(feedbackId: string): FeedbackDecision[] {
+	return decisionsOf(feedbackSpec(feedbackId).item);
+}
+
+const ALLOWED_FACTS: FeedbackCheckFacts = {
+	admittedRolloutRevision: "5",
+	evaluatedRolloutRevision: "5",
+	inScope: true,
+	evidenceAllowed: true,
+	modelAllowed: true,
+	deliveryEnabled: true,
+	incorrectBasis: false,
+	currentVersion: true,
+	approvalCurrent: true,
+	writeStarted: false,
+};
+
+function checksOf(spec: FeedbackSpec): FeedbackCheck[] {
+	const composed = new Date(spec.composedAt);
+	const check = (
+		stage: FeedbackCheck["stage"],
+		offsetSeconds: number,
+		reason: StopReason | null = null,
+		facts: Partial<FeedbackCheckFacts> = {},
+	): FeedbackCheck => ({
+		stage,
+		allowed: reason === null,
+		reason,
+		checkedAt: new Date(composed.getTime() + offsetSeconds * 1000),
+		facts: { ...ALLOWED_FACTS, ...facts },
+	});
+	const checks = [check("COMPOSITION", 0)];
+	if (spec.state === "WITHHELD" && spec.stopReason !== undefined) {
+		checks.push(
+			check("AUTOMATIC", 5, spec.stopReason, {
+				incorrectBasis: spec.stopReason === "RESULT_MARKED_INCORRECT",
+				deliveryEnabled: spec.stopReason !== "FEEDBACK_OFF",
+			}),
+		);
+		return checks;
 	}
-	const { run, item } = found;
-	return {
-		id: item.id,
-		agentJobId: run.id,
-		reviewedWork: run.work.reviewedWork,
-		body: operatorBody(item),
-		channel: item.channel,
-		location: locationOf(run, item),
-		createdAt: new Date(item.composedAt),
-		deliveredAt: hasText(item.deliveredAt) ? new Date(item.deliveredAt) : undefined,
-		deliveryState: item.outcome,
-		observations: item.from.map((observationId, ordinal) => {
-			const source = observationDetail(observationId);
-			return {
-				observationId,
-				outcome: source.outcome,
-				group: source.group,
-				claimCurrentness: source.claimCurrentness,
-				observedAt: source.observedAt,
-				ordinal,
-				practiceName: source.practiceName,
-				practiceSlug: source.practiceSlug,
-				role: ordinal === 0 ? "PRIMARY" : "SUPPORTING",
-				severity: source.severity,
-				summary: source.summary,
+	if (spec.state === "AWAITING_APPROVAL") {
+		checks.push(check("AUTOMATIC", 5, "PRACTICE_REQUIRES_APPROVAL"));
+		return checks;
+	}
+	checks.push(check("AUTOMATIC", 5));
+	if (spec.decisions?.some((decision) => decision.action === "APPROVE") === true) {
+		checks.push(check("APPROVED", 40));
+	}
+	if (spec.state !== "READY" && spec.state !== "REJECTED") {
+		checks.push(check("EGRESS", 50, null, { writeStarted: true }));
+	}
+	return checks;
+}
+
+function responseOf(spec: FeedbackSpec): FeedbackResponse | null {
+	return spec.response === undefined
+		? null
+		: {
+				resolution: spec.response.resolution,
+				usefulness: spec.response.usefulness ?? null,
+				comment: spec.response.comment ?? null,
+				createdAt: new Date(spec.response.at),
 			};
-		}),
-		placements: feedbackPlacements(item),
-		dispatches: feedbackDispatches(run, item),
-		proposedPlacements:
-			item.outcome === "AWAITING_APPROVAL" && item.channel === "IN_CONTEXT"
-				? [
-						{ type: "SUMMARY", body: item.body ?? "" },
-						{
-							type: "INLINE",
-							body: "This fallback catches every exception and hides whether the retry is safe. Catch the expected transport error and let programming errors surface.",
-							path: "src/main/java/example/RetryService.java",
-							startLine: 48,
-						},
-						{
-							type: "INLINE",
-							body: "The new branch changes behavior but the description does not explain why. Add the reason so a future maintainer can distinguish intent from accident.",
-							path: "src/main/java/example/ReviewHandler.java",
-							startLine: 91,
-							endLine: 94,
-						},
-					]
-				: [],
-		recipient: item.recipient,
-		replacesId: item.replaces,
-		reviewedRevision: item.outcome === "AWAITING_APPROVAL" ? "27f4e88c9f5a" : undefined,
-		subject: run.developer,
-		suppressionReason: item.withheldFor,
-		deliveryPolicy: [],
-		withdrawals: [],
+}
+
+function developerOfFeedback(review: ReviewSpec): ReviewDeveloper {
+	if (review.developer === null) {
+		throw new Error(`Review ${review.id} has no developer, so it cannot write feedback`);
+	}
+	return review.developer;
+}
+
+function toFeedback(review: ReviewSpec, spec: FeedbackSpec): ReviewFeedback {
+	return {
+		id: spec.id,
+		reviewId: review.id,
+		item: review.item,
+		developer: developerOfFeedback(review),
+		destination: spec.destination,
+		state: spec.state,
+		stopReason: spec.stopReason ?? null,
+		location: locationOf(review, spec),
+		replacesId: spec.replaces ?? null,
+		createdAt: new Date(spec.composedAt),
+		deliveredAt: at(spec.deliveredAt),
+		...preview(spec),
+		resultCount: spec.from.length,
+		copyCounts: copyCountsOf(copiesOf(review, spec)),
+		withdrawn: spec.withdrawn === true,
+		disagreedAt: spec.response?.resolution === "DISAGREE" ? new Date(spec.response.at) : null,
 	};
 }
 
-/** The withheld piece of feedback the detail stories open by default. */
-export const reviewFeedbackDetail: ReviewFeedbackDetail = feedbackDetail(
-	"dddddddd-2222-2222-2222-222222222222",
-);
+export const reviewFeedback: ReviewFeedback[] = allFeedbackSpecs
+	.map(({ review, item }) => toFeedback(review, item))
+	.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
-/** The long, multi-observation note. */
+export function feedbackPracticeSlugs(feedbackId: string): string[] {
+	const found = allFeedbackSpecs.find(({ item }) => item.id === feedbackId);
+	return (found?.item.from ?? []).map((resultId) => resultSpec(resultId).result.practiceSlug);
+}
+
+export function practiceGroupSlug(practiceSlug: string): string | null {
+	return practiceOf(practiceSlug).groupSlug;
+}
+
+export function feedbackDetail(
+	input: string | Partial<ReviewFeedbackDetail> = {},
+): ReviewFeedbackDetail {
+	const feedbackId = typeof input === "string" ? input : "dddddddd-2222-2222-2222-222222222222";
+	const { review, item } = feedbackSpec(feedbackId);
+	const copies = copiesOf(review, item);
+	const basis: FeedbackBasis[] = item.from.map((resultId, ordinal) => {
+		const source = resultSpec(resultId);
+		const position = item.fromProblem?.[resultId];
+		return {
+			resultId,
+			problemId: position === undefined ? null : problemIdOf(resultId, position),
+			ordinal,
+			result: boundResultOf(toResult(source.review, source.result)),
+		};
+	});
+	return {
+		...toFeedback(review, item),
+		body: adminBody(item),
+		basis,
+		copies,
+		sends: sendsOf(item, copies),
+		decisions: decisionsOf(item),
+		response: responseOf(item),
+		checks: checksOf(item),
+		contentDigest: contentDigestOf(item),
+		...(typeof input === "string" ? {} : input),
+	};
+}
+
+export const reviewFeedbackDetail = feedbackDetail();
+
 export const longFeedbackDetail: ReviewFeedbackDetail = feedbackDetail(
 	"44444444-4444-4444-4444-444444444444",
 );
 
-/** An observation whose evidence spans a diff, a repository file and a human review thread. */
-export const reviewObservationDetail: ReviewObservationDetail = observationDetail(
-	"66666666-6666-6666-6666-666666666666",
+export const partialPackageFeedbackDetail: ReviewFeedbackDetail = longFeedbackDetail;
+
+export const awaitingApprovalFeedbackDetail: ReviewFeedbackDetail = feedbackDetail(
+	"aaaaaaaa-6666-6666-6666-666666666666",
 );
 
-// ---------------------------------------------------------------------------------------------
-// A page that does not fit on one page
-// ---------------------------------------------------------------------------------------------
+export const uncertainWriteFeedbackDetail: ReviewFeedbackDetail = feedbackDetail(
+	"bbbbbbbb-6666-6666-6666-666666666666",
+);
+
+export const approvedFeedbackDetail: ReviewFeedbackDetail = feedbackDetail(
+	"33333333-3333-3333-3333-333333333333",
+);
+
+export const rejectedFeedbackDetail: ReviewFeedbackDetail = feedbackDetail(
+	"dddddddd-3333-3333-3333-333333333333",
+);
+
+export const withdrawnFeedbackDetail: ReviewFeedbackDetail = feedbackDetail(
+	"bbbbbbbb-3333-3333-3333-333333333333",
+);
+
+export const restoredFeedbackDetail: ReviewFeedbackDetail = feedbackDetail(
+	"cccccccc-3333-3333-3333-333333333333",
+);
+
+export const replacedFeedbackDetail: ReviewFeedbackDetail = feedbackDetail(
+	"99999999-3333-3333-3333-333333333333",
+);
+
+export const failedFeedbackDetail: ReviewFeedbackDetail = feedbackDetail(
+	"33333333-5555-5555-5555-555555555555",
+);
+
+export const unconfirmedFeedbackDetail: ReviewFeedbackDetail = feedbackDetail(
+	"33333333-4444-4444-4444-444444444444",
+);
+
+export const markedIncorrectFeedbackDetail: ReviewFeedbackDetail = feedbackDetail(
+	"eeeeeeee-3333-3333-3333-333333333333",
+);
+
+export function boundFeedbackOf(feedback: ReviewFeedback): ReviewBoundFeedback {
+	return {
+		id: feedback.id,
+		destination: feedback.destination,
+		state: feedback.state,
+		deliveredAt: feedback.deliveredAt,
+		withdrawn: feedback.withdrawn,
+	};
+}
+
+export function resultDetail(input: string | Partial<ReviewResultDetail> = {}): ReviewResultDetail {
+	const resultId = typeof input === "string" ? input : "66666666-6666-6666-6666-666666666666";
+	const { review, result: spec } = resultSpec(resultId);
+	const {
+		feedback: _tally,
+		problemCount: _count,
+		problems: _summaries,
+		...shared
+	} = toResult(review, spec);
+	const hidden = spec.evidenceHidden === true;
+	const practice = practiceOf(spec.practiceSlug);
+	return {
+		...shared,
+		practiceVersionId: practice.currentVersion.id,
+		practiceVersionNumber: practice.currentVersion.number,
+		itemVersion: review.item.kind === ITEM_KIND.pullRequest ? ITEM_VERSION : null,
+		explanation: hidden ? null : spec.explanation,
+		evidence: hidden
+			? null
+			: {
+					citations: spec.evidence ?? [],
+					openQuestions: spec.openQuestions ?? [],
+					inapplicability: spec.inapplicability ?? null,
+					search: null,
+				},
+		evidenceHidden: hidden,
+		evidenceVersion: spec.unknownProof === true ? 0 : 1,
+		problems: toProblems(spec),
+		example: hidden ? null : (spec.example ?? null),
+		coverage: spec.coverage ?? null,
+		endedAt: null,
+		endReason: null,
+		marks: marksOf(resultId, spec),
+		disagreements: disagreementsOf(resultId),
+		feedback: feedbackFor(resultId).map(({ review: owner, item }) =>
+			boundFeedbackOf(toFeedback(owner, item)),
+		),
+		...(typeof input === "string" ? {} : input),
+	};
+}
+
+export const reviewResultDetail = resultDetail();
+
+export function problemDetail(problemId: string): ReviewProblemDetail {
+	for (const { review, result } of allResultSpecs) {
+		const row = toProblemRows(review, result).find((entry) => entry.id === problemId);
+		const problem = toProblems(result).find((entry) => entry.id === problemId);
+		if (row !== undefined && problem !== undefined) {
+			return { ...row, problem, result: boundResultOf(toResult(review, result)) };
+		}
+	}
+	throw new Error(`No problem ${problemId} in the fixture`);
+}
+
+export const reviewProblemDetail: ReviewProblemDetail = problemDetail(
+	problemIdOf("66666666-6666-6666-6666-666666666666", 1),
+);
+
+export const evidenceHiddenProblemDetail: ReviewProblemDetail = problemDetail(
+	problemIdOf("66666666-7777-7777-7777-777777777777", 0),
+);
+
+const MODEL = "openai/gpt-oss-120b";
+
+function finishedAt(review: ReviewSpec): Date | null {
+	return review.status === "RUNNING" || review.status === "QUEUED"
+		? null
+		: new Date(new Date(review.startedAt).getTime() + 5 * MINUTE);
+}
+
+const PRACTICE_STATUS_OF: Record<ReviewSummary["status"], ReviewPractice["status"]> = {
+	QUEUED: "QUEUED",
+	RUNNING: "RUNNING",
+	COMPLETE: "DONE",
+	PARTIAL: "DONE",
+	FAILED: "FAILED",
+	CANCELLED: "FAILED",
+};
+
+function practicesOf(review: ReviewSpec): ReviewPractice[] {
+	const slugs = [
+		...new Set([...review.results.map((result) => result.practiceSlug), ...(review.pending ?? [])]),
+	];
+	const reviewed = slugs.map((practiceSlug): ReviewPractice => {
+		const practice = practiceOf(practiceSlug);
+		const results = review.results.filter((result) => result.practiceSlug === practiceSlug);
+		const items = new Set(results.map((result) => itemOf(review, result).id)).size;
+		return {
+			practiceSlug,
+			practiceName: practiceNameOf(practiceSlug),
+			practiceVersionId: practice.currentVersion.id,
+			number: practice.currentVersion.number,
+			status: results.length > 0 ? "DONE" : PRACTICE_STATUS_OF[review.status],
+			reason: null,
+			itemCounts: {
+				listed: Math.max(items, 1),
+				reviewed: items,
+				reused: 0,
+				withheld: 0,
+				notReviewed: results.length === 0 && review.status !== "RUNNING" ? 1 : 0,
+			},
+			results: resultCounts(results.map((result) => result.outcome)),
+			script: null,
+		};
+	});
+	const withheld = (review.withheld ?? []).map(({ practiceSlug, reason }): ReviewPractice => ({
+		practiceSlug,
+		practiceName: practiceNameOf(practiceSlug),
+		practiceVersionId: practiceOf(practiceSlug).currentVersion.id,
+		number: practiceOf(practiceSlug).currentVersion.number,
+		status: "WITHHELD",
+		reason,
+		itemCounts: { listed: 1, reviewed: 0, reused: 0, withheld: 1, notReviewed: 0 },
+		results: resultCounts([]),
+		script: null,
+	}));
+	return [...reviewed, ...withheld];
+}
+
+function startedByOf(review: ReviewSpec): ItemEvent | null {
+	if (!hasText(review.event)) {
+		return null;
+	}
+	const occurredAt = new Date(new Date(review.startedAt).getTime() - 20_000);
+	return {
+		id: `${review.id.slice(0, -3)}e00`,
+		itemId: review.item.id,
+		name: review.event,
+		itemVersion: review.item.kind === ITEM_KIND.pullRequest ? ITEM_VERSION : null,
+		occurredAt,
+		foundBy: "WEBHOOK",
+		state: "STARTED",
+		reason: null,
+		decidedAt: occurredAt,
+		reviewId: review.id,
+	};
+}
+
+function toReview(review: ReviewSpec): ReviewSummary {
+	const createdAt = new Date(review.startedAt);
+	return {
+		id: review.id,
+		kind: review.kind ?? "ITEM",
+		item: review.item,
+		itemVersion: review.item.kind === ITEM_KIND.pullRequest ? ITEM_VERSION : null,
+		origin: originOf(review),
+		status: review.status,
+		stopReason: review.stopReason ?? null,
+		startedBy: startedByOf(review),
+		requestedBy: review.requestedBy ?? null,
+		batchId: review.batchId ?? null,
+		createdAt,
+		orderedAt: createdAt,
+		completedAt: finishedAt(review),
+		practices: practicesOf(review),
+		results: resultCounts(review.results.map((result) => result.outcome)),
+		feedback: feedbackCounts(review.feedback.map((item) => item.state)),
+		jobCount: review.jobs ?? 1,
+		activeJobCount: review.status === "RUNNING" || review.status === "QUEUED" ? 1 : 0,
+		model: MODEL,
+	};
+}
+
+export const reviews: ReviewSummary[] = allReviews
+	.map(toReview)
+	.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+export function reviewDeveloperOf(reviewId: string): ReviewDeveloper | null {
+	return allReviews.find((entry) => entry.id === reviewId)?.developer ?? null;
+}
+
+export function reviewRefOf(review: ReviewSummary): ReviewRef {
+	return {
+		id: review.id,
+		kind: review.kind,
+		item: review.item,
+		itemVersion: review.itemVersion,
+		origin: review.origin,
+		status: review.status,
+		createdAt: review.createdAt,
+		completedAt: review.completedAt,
+	};
+}
+
+const JOB_STATUS_OF: Record<ReviewSummary["status"], ReviewJob["status"]> = {
+	QUEUED: "QUEUED",
+	RUNNING: "RUNNING",
+	COMPLETE: "COMPLETED",
+	PARTIAL: "COMPLETED",
+	FAILED: "FAILED",
+	CANCELLED: "CANCELLED",
+};
+
+function processingOf(status: ReviewJob["status"]): ReviewJob["processingStatus"] {
+	if (status === "COMPLETED") {
+		return "DONE";
+	}
+	return status === "RUNNING" || status === "QUEUED" ? "PENDING" : "NONE";
+}
+
+function exitCodeOf(status: ReviewJob["status"]): number | null {
+	if (status === "RUNNING" || status === "QUEUED") {
+		return null;
+	}
+	return status === "FAILED" ? 1 : 0;
+}
+
+function jobsOf(summary: ReviewSummary, count: number): ReviewJob[] {
+	const started = summary.createdAt.getTime();
+	const status = JOB_STATUS_OF[summary.status];
+	return Array.from({ length: count }, (_, index) => {
+		const startedAt = new Date(started + 40_000 + index * 70_000);
+		const last = index === count - 1;
+		const jobStatus = summary.status === "PARTIAL" && last ? "CANCELLED" : status;
+		const ended = jobStatus !== "RUNNING" && jobStatus !== "QUEUED";
+		return {
+			id: `${summary.id.slice(0, -3)}${String(index).padStart(3, "0")}`,
+			attempt: 1,
+			status: jobStatus,
+			processingStatus: processingOf(jobStatus),
+			availableAt: summary.createdAt,
+			startedAt: jobStatus === "QUEUED" ? null : startedAt,
+			completedAt: ended ? new Date(startedAt.getTime() + 60_000) : null,
+			exitCode: exitCodeOf(jobStatus),
+			errorMessage:
+				jobStatus === "FAILED"
+					? "Cannot compute diff: all resolution strategies failed for commit 27f4e88c."
+					: null,
+			traceId: `4bf92f3577b34da6a3ce929d0e0e47${String(index).padStart(2, "0")}`,
+		};
+	});
+}
+
+function usageOf(jobs: readonly ReviewJob[]): ReviewUsage {
+	const attempts = jobs
+		.filter((job) => job.startedAt !== null)
+		.map((job) => ({
+			attempt: job.attempt,
+			jobId: job.id,
+			pricingState: "PRICED" as const,
+			costUsd: "0.0125",
+			calls: 3,
+			inputTokens: 11_000,
+			outputTokens: 300,
+			reasoningTokens: 40,
+			cacheReadTokens: 0,
+			cacheWriteTokens: 0,
+		}));
+	return {
+		attempts,
+		calls: attempts.length * 3,
+		inputTokens: attempts.length * 11_000,
+		outputTokens: attempts.length * 300,
+		costUsd: (attempts.length * 0.0125).toFixed(4),
+		priced: true,
+	};
+}
+
+function detailOf(summary: ReviewSummary, jobs: ReviewJob[] | null): ReviewDetail {
+	return {
+		...summary,
+		runtime: jobs === null ? null : { jobs },
+		usage: usageOf(jobs ?? []),
+		stageTiming: (jobs ?? []).map((job) => ({
+			stage: "RUN",
+			startedAt: job.startedAt,
+			completedAt: job.completedAt,
+			durationMs:
+				job.startedAt === null || job.completedAt === null
+					? null
+					: job.completedAt.getTime() - job.startedAt.getTime(),
+		})),
+		generatedPaths: null,
+	};
+}
+
+export function reviewDetail(input: string | Partial<ReviewDetail> = {}): ReviewDetail {
+	const reviewId = typeof input === "string" ? input : "11111111-1111-1111-1111-111111111111";
+	const spec = reviewSpec(reviewId);
+	const summary = toReview(spec);
+	return {
+		...detailOf(summary, spec.runtimeExpired === true ? null : jobsOf(summary, spec.jobs ?? 1)),
+		...(typeof input === "string" ? {} : input),
+	};
+}
+
+export const reviewDetailCompleted = reviewDetail();
+
+export const reviewDetailRunning: ReviewDetail = reviewDetail(
+	"aaaaaaaa-8888-8888-8888-888888888888",
+);
+
+export const reviewDetailScanManyJobs: ReviewDetail = reviewDetail(
+	"dddddddd-9999-9999-9999-999999999999",
+);
+
+export const reviewDetailExpiredRuntime: ReviewDetail = reviewDetail(
+	"bbbbbbbb-8888-8888-8888-888888888888",
+);
+
+function standaloneReview(
+	id: string,
+	overrides: Partial<ReviewSummary>,
+	jobs: (summary: ReviewSummary) => ReviewJob[],
+): ReviewDetail {
+	const summary: ReviewSummary = {
+		...toReview(reviewSpec("11111111-1111-1111-1111-111111111111")),
+		id,
+		results: resultCounts([]),
+		feedback: ZERO_FEEDBACK,
+		practices: [],
+		...overrides,
+	};
+	const runtime = jobs(summary);
+	return { ...detailOf(summary, runtime), jobCount: runtime.length };
+}
+
+export const reviewDetailQueued: ReviewDetail = standaloneReview(
+	"0a0a0a0a-1111-4111-8111-000000000001",
+	{
+		status: "QUEUED",
+		createdAt: minutesBefore(2),
+		orderedAt: minutesBefore(2),
+		completedAt: null,
+		activeJobCount: 1,
+	},
+	(summary) => jobsOf(summary, 1),
+);
+
+export const reviewDetailBackingOff: ReviewDetail = standaloneReview(
+	"0a0a0a0a-1111-4111-8111-000000000002",
+	{
+		status: "QUEUED",
+		createdAt: minutesBefore(20),
+		orderedAt: minutesBefore(20),
+		completedAt: null,
+		activeJobCount: 1,
+	},
+	(summary) => {
+		const [first] = jobsOf({ ...summary, status: "FAILED" }, 1);
+		const [retry] = jobsOf(summary, 1);
+		if (first === undefined || retry === undefined) {
+			throw new Error("A backing-off review needs two jobs");
+		}
+		return [
+			{ ...first, errorMessage: "Runner exited with code 137 (out of memory).", exitCode: 137 },
+			{ ...retry, id: `${retry.id.slice(0, -1)}1`, attempt: 2, availableAt: minutesAfter(3) },
+		];
+	},
+);
+
+export const reviewDetailTimedOut: ReviewDetail = standaloneReview(
+	"0a0a0a0a-1111-4111-8111-000000000003",
+	{ status: "FAILED", stopReason: "TIMED_OUT" },
+	(summary) =>
+		jobsOf({ ...summary, status: "FAILED" }, 1).map((job) => ({
+			...job,
+			status: "TIMED_OUT",
+			exitCode: 124,
+			errorMessage: "The agent exceeded the 1200s timeout and was stopped.",
+		})),
+);
+
+export const reviewDetailProcessingFailed: ReviewDetail = standaloneReview(
+	"0a0a0a0a-1111-4111-8111-000000000004",
+	{ status: "FAILED", stopReason: "PROCESSING_FAILED" },
+	(summary) =>
+		jobsOf({ ...summary, status: "COMPLETE" }, 1).map((job) => ({
+			...job,
+			processingStatus: "FAILED",
+			errorMessage: "Review result processing failed.",
+		})),
+);
+
+export const reviewDetailCancelledOnBudget: ReviewDetail = standaloneReview(
+	"0a0a0a0a-1111-4111-8111-000000000005",
+	{ status: "CANCELLED", stopReason: "BUDGET" },
+	(summary) => jobsOf(summary, 1).map((job) => ({ ...job, startedAt: null, exitCode: null })),
+);
+
+export const reviewUsageTwoAttempts: ReviewUsage = {
+	attempts: [
+		{
+			attempt: 1,
+			jobId: "11111111-1111-1111-1111-111111111000",
+			pricingState: "PRICED",
+			costUsd: "0.0125",
+			calls: 3,
+			inputTokens: 11_000,
+			outputTokens: 300,
+			reasoningTokens: 40,
+			cacheReadTokens: 0,
+			cacheWriteTokens: 0,
+		},
+		{
+			attempt: 2,
+			jobId: "11111111-1111-1111-1111-111111111001",
+			pricingState: "PRICED",
+			costUsd: "0.0300",
+			calls: 4,
+			inputTokens: 13_000,
+			outputTokens: 614,
+			reasoningTokens: 80,
+			cacheReadTokens: 2000,
+			cacheWriteTokens: 0,
+		},
+	],
+	calls: 7,
+	inputTokens: 24_000,
+	outputTokens: 914,
+	costUsd: "0.0425",
+	priced: true,
+};
+
+export const reviewUsageUnpriced: ReviewUsage = {
+	attempts: [
+		{
+			attempt: 1,
+			jobId: "11111111-1111-1111-1111-111111111000",
+			pricingState: "UNPRICED",
+			costUsd: null,
+			calls: 7,
+			inputTokens: 24_000,
+			outputTokens: 914,
+			reasoningTokens: 120,
+			cacheReadTokens: 0,
+			cacheWriteTokens: 0,
+		},
+	],
+	calls: 7,
+	inputTokens: 24_000,
+	outputTokens: 914,
+	costUsd: null,
+	priced: false,
+};
 
 function cycled<T>(specs: readonly T[], index: number): T {
 	const spec = specs[index % specs.length];
@@ -1459,13 +2701,12 @@ function cycled<T>(specs: readonly T[], index: number): T {
 	return spec;
 }
 
-/**
- * The fixture's observations restated across as many days as it takes to fill `count` rows. Cycling
- * the real specs keeps every row a record the server could have produced, unlike a generated
- * `Observation #17`.
- */
-export function manyObservations(count: number): ReviewObservation[] {
-	const base = reviewObservations;
+function cycledId(id: string, cycle: number): string {
+	return `${id.slice(0, -2)}${(10 + cycle).toString(16).padStart(2, "0")}`;
+}
+
+export function manyResults(count: number): ReviewResult[] {
+	const base = reviewResults;
 	const rows = Array.from({ length: count }, (_, index) => {
 		const source = cycled(base, index);
 		const cycle = Math.floor(index / base.length);
@@ -1474,18 +2715,14 @@ export function manyObservations(count: number): ReviewObservation[] {
 		}
 		return {
 			...source,
-			id: `${source.id.slice(0, -2)}${(10 + cycle).toString(36)}`,
-			observedAt: new Date(source.observedAt.getTime() - cycle * 86_400_000),
+			id: cycledId(source.id, cycle),
+			recordedAt: new Date(source.recordedAt.getTime() - cycle * 86_400_000),
 		};
 	});
 	// Newest first, as the server sends them, so each day's rows stay together under one heading.
-	return rows.sort((a, b) => b.observedAt.getTime() - a.observedAt.getTime());
+	return rows.sort((a, b) => b.recordedAt.getTime() - a.recordedAt.getTime());
 }
 
-/**
- * A workspace large enough that the person facet, which filters one fetched page in the browser
- * because the endpoint takes no name, cannot reach everybody.
- */
 export function manyMembers(count: number): WorkspaceMembership[] {
 	return Array.from({ length: count }, (_, index) => {
 		const source = cycled(workspaceMembers, index);
@@ -1493,11 +2730,19 @@ export function manyMembers(count: number): WorkspaceMembership[] {
 		if (cycle === 0) {
 			return source;
 		}
+		const accountId = String(Number(source.account.id) + cycle * 100);
 		return {
 			...source,
-			userId: source.userId + cycle * 100,
-			userLogin: `${source.userLogin}-${cycle}`,
-			userName: source.userName === undefined ? undefined : `${source.userName} ${cycle}`,
+			account: {
+				...source.account,
+				id: accountId,
+				displayName:
+					source.account.displayName === null ? null : `${source.account.displayName} ${cycle}`,
+				identities: source.account.identities.map((identity) => ({
+					...identity,
+					login: identity.login === null ? null : `${identity.login}-${cycle}`,
+				})),
+			},
 		};
 	});
 }
@@ -1512,7 +2757,7 @@ export function manyFeedback(count: number): ReviewFeedback[] {
 		}
 		return {
 			...source,
-			id: `${source.id.slice(0, -2)}${(10 + cycle).toString(36)}`,
+			id: cycledId(source.id, cycle),
 			createdAt: new Date(source.createdAt.getTime() - cycle * 86_400_000),
 		};
 	});
@@ -1520,319 +2765,62 @@ export function manyFeedback(count: number): ReviewFeedback[] {
 	return rows.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
 
-const pullRequestTarget: AgentJob["target"] = {
-	type: "scm.pull_request",
-	title: "Make practice review output visible",
-	reviewedWork: {
-		id: "42",
-		kind: "scm.pull_request",
-		provider: "GITHUB",
-		label: "#1423",
-		container: "ls1intum/Hephaestus",
-		url: "https://github.com/ls1intum/Hephaestus/pull/1423",
-	},
-};
-const issueTarget: AgentJob["target"] = {
-	type: "scm.issue",
-	title: "Admin read surface for observations and prepared feedback",
-	reviewedWork: {
-		id: "43",
-		kind: "scm.issue",
-		provider: "GITHUB",
-		label: "#1420",
-		container: "ls1intum/Hephaestus",
-	},
-};
-
-export const mockJobCompleted: AgentJob = {
-	id: "job-completed-1",
-	jobType: "PULL_REQUEST_REVIEW",
-	reviewOutcome: "REVIEWED",
-	target: pullRequestTarget,
-	status: "COMPLETED",
-	model: "gpt-5.4-mini",
-	configSnapshot: { name: "Default reviewer", llmProvider: "OPENAI" },
-	createdAt: new Date("2026-05-20T10:00:00Z"),
-	availableAt: new Date("2026-05-20T10:00:00Z"),
-	completedAt: new Date("2026-05-20T10:05:00Z"),
-	deliveryStatus: "DELIVERED",
-	llmModel: "openai/gpt-oss-120b",
-	llmTotalInputTokens: 24_000,
-	llmTotalOutputTokens: 914,
-	llmTotalReasoningTokens: 120,
-	llmTotalCalls: 7,
-	retryCount: 0,
-	exitCode: 0,
-	traceId: "4bf92f3577b34da6a3ce929d0e0e4736",
-};
-
-/** A review the server stopped before it started, because its budget was used up. */
-export const mockJobCancelledOnBudget: AgentJob = {
-	id: "job-cancelled-budget-1",
-	jobType: "PULL_REQUEST_REVIEW",
-	reviewOutcome: "REVIEWED",
-	target: pullRequestTarget,
-	status: "CANCELLED",
-	model: "gpt-5.4-mini",
-	configSnapshot: { name: "Default reviewer" },
-	createdAt: new Date("2026-05-20T07:00:00Z"),
-	availableAt: new Date("2026-05-20T07:00:00Z"),
-	completedAt: new Date("2026-05-20T07:00:04Z"),
-	cancellationReason: "BUDGET_EXHAUSTED",
-	retryCount: 0,
-	traceId: "0af7651916cd43dd8448eb211c80319c",
-};
-
-/** What a review spent on the model: a first attempt that failed and the retry that finished. */
-export const mockJobUsageTwoAttempts: AgentJobUsage = {
-	attempts: [
-		{
-			attempt: 0,
-			occurredAt: new Date("2026-05-20T10:02:00Z"),
-			model: "openai/gpt-oss-120b",
-			pricingState: "PRICED",
-			fundingSource: "INSTANCE",
-			costUsd: 0.0125,
-			totalCalls: 3,
-			inputTokens: 11_000,
-			outputTokens: 300,
-			reasoningTokens: 40,
-			cacheReadTokens: 0,
-			cacheWriteTokens: 0,
-		},
-		{
-			attempt: 1,
-			occurredAt: new Date("2026-05-20T10:05:00Z"),
-			model: "openai/gpt-oss-120b",
-			pricingState: "PRICED",
-			fundingSource: "INSTANCE",
-			costUsd: 0.03,
-			totalCalls: 4,
-			inputTokens: 13_000,
-			outputTokens: 614,
-			reasoningTokens: 80,
-			cacheReadTokens: 2000,
-			cacheWriteTokens: 0,
-		},
-	],
-	totalCostUsd: 0.0425,
-	unpricedAttempts: 0,
-};
-
-/** One attempt on a model the workspace set up without a price. */
-export const mockJobUsageUnpriced: AgentJobUsage = {
-	attempts: [
-		{
-			attempt: 0,
-			occurredAt: new Date("2026-05-20T10:05:00Z"),
-			model: "acme/house-model",
-			pricingState: "UNPRICED",
-			fundingSource: "WORKSPACE",
-			totalCalls: 7,
-			inputTokens: 24_000,
-			outputTokens: 914,
-			reasoningTokens: 120,
-			cacheReadTokens: 0,
-			cacheWriteTokens: 0,
-		},
-	],
-	unpricedAttempts: 1,
-};
-
-export const mockJobRunning: AgentJob = {
-	id: "job-running-1",
-	jobType: "PULL_REQUEST_REVIEW",
-	reviewOutcome: "REVIEWED",
-	target: pullRequestTarget,
-	status: "RUNNING",
-	model: "openai/gpt-oss-120b",
-	configSnapshot: { name: "GPU gateway (OpenAI)", llmProvider: "OPENAI" },
-	createdAt: new Date("2026-05-20T11:58:00Z"),
-	availableAt: new Date("2026-05-20T11:58:00Z"),
-	// Running means it left the queue: a running review without a start would contradict itself.
-	startedAt: new Date("2026-05-20T11:58:20Z"),
-	executionStartedAt: new Date("2026-05-20T11:59:00Z"),
-	retryCount: 0,
-};
-
-export const mockJobFailedResultProcessing: AgentJob = {
-	id: "job-failed-delivery-1",
-	jobType: "PULL_REQUEST_REVIEW",
-	reviewOutcome: "REVIEWED",
-	target: pullRequestTarget,
-	status: "COMPLETED",
-	model: "gpt-5.4-mini",
-	configSnapshot: { name: "Default reviewer" },
-	createdAt: new Date("2026-05-20T09:00:00Z"),
-	availableAt: new Date("2026-05-20T09:02:00Z"),
-	completedAt: new Date("2026-05-20T09:05:00Z"),
-	deliveryStatus: "FAILED",
-	errorMessage: "Review result processing failed.",
-	llmModel: "openai/gpt-oss-120b",
-	llmTotalInputTokens: 31_000,
-	llmTotalOutputTokens: 1200,
-	retryCount: 1,
-	exitCode: 0,
-};
-
-export const mockJobQueued: AgentJob = {
-	id: "job-queued-1",
-	jobType: "PULL_REQUEST_REVIEW",
-	reviewOutcome: "REVIEWED",
-	target: pullRequestTarget,
-	status: "QUEUED",
-	model: "gpt-5.4-mini",
-	configSnapshot: { name: "Default reviewer" },
-	createdAt: new Date("2026-05-20T12:00:00Z"),
-	availableAt: new Date("2026-05-20T12:00:00Z"),
-	retryCount: 0,
-};
-
-/**
- * A run waiting on the clock anchors `availableAt` to the story clock, not to the otherwise fixed
- * scene date: an `availableAt` in the past renders the "due …" phrase as history.
- */
-export const mockJobHeldOnBudget: AgentJob = {
-	id: "job-held-budget-1",
-	jobType: "PULL_REQUEST_REVIEW",
-	reviewOutcome: "REVIEWED",
-	target: pullRequestTarget,
-	status: "QUEUED",
-	model: "gpt-5.4-nano",
-	configSnapshot: { name: "Default reviewer" },
-	createdAt: new Date("2026-05-20T12:01:00Z"),
-	availableAt: minutesAfter(5),
-	holdReason: "BUDGET",
-	retryCount: 0,
-};
-
-/** A reason this client has never heard of, which still has to read as English. */
-export const mockJobHeldForUnknownReason: AgentJob = {
-	id: "job-held-unknown-1",
-	jobType: "ISSUE_REVIEW",
-	reviewOutcome: "REVIEWED",
-	target: issueTarget,
-	status: "QUEUED",
-	model: "gpt-5.4-nano",
-	configSnapshot: { name: "Default reviewer" },
-	createdAt: new Date("2026-05-20T12:02:00Z"),
-	availableAt: minutesAfter(9),
-	holdReason: "MODEL_UNAVAILABLE",
-	retryCount: 0,
-};
-
-export const mockJobBackingOff: AgentJob = {
-	id: "job-backoff-1",
-	jobType: "PULL_REQUEST_REVIEW",
-	reviewOutcome: "REVIEWED",
-	target: pullRequestTarget,
-	status: "QUEUED",
-	model: "openai/gpt-oss-20b",
-	configSnapshot: { name: "GPU gateway (OpenAI)", llmProvider: "OPENAI" },
-	createdAt: new Date("2026-05-20T11:00:00Z"),
-	availableAt: minutesAfter(3),
-	errorMessage: "Runner exited with code 137 (out of memory).",
-	retryCount: 2,
-};
-
-export const mockJobTimedOut: AgentJob = {
-	id: "job-timed-out-1",
-	jobType: "PULL_REQUEST_REVIEW",
-	reviewOutcome: "REVIEWED",
-	target: pullRequestTarget,
-	status: "TIMED_OUT",
-	model: "openai/gpt-oss-120b",
-	configSnapshot: { name: "GPU gateway (OpenAI)", llmProvider: "OPENAI" },
-	createdAt: new Date("2026-05-20T08:00:00Z"),
-	availableAt: new Date("2026-05-20T08:03:00Z"),
-	completedAt: new Date("2026-05-20T08:20:00Z"),
-	errorMessage: "Agent exceeded the 1200s timeout and was stopped.",
-	llmModel: "gpt-oss-120b",
-	retryCount: 1,
-	exitCode: 124,
-};
-
-export const mockJobs: AgentJob[] = [
-	mockJobCompleted,
-	mockJobRunning,
-	mockJobQueued,
-	mockJobHeldOnBudget,
-	mockJobFailedResultProcessing,
-	mockJobTimedOut,
-];
-
 /**
  * A story applies the server's facet filtering over its pool of rows; an unset or empty facet
  * selects every row.
  */
-export function selects(selected: string[] | undefined, actual: string | undefined): boolean {
+export function selects(
+	selected: readonly string[] | undefined,
+	actual: string | null | undefined,
+): boolean {
 	return (
 		selected === undefined ||
 		selected.length === 0 ||
-		(actual !== undefined && selected.includes(actual))
+		(hasText(actual) && selected.includes(actual))
 	);
 }
 
-// ---------------------------------------------------------------------------------------------
-// The overview: thirty days of reviews, counted
-// ---------------------------------------------------------------------------------------------
-
-const ZERO_FEEDBACK = feedbackCounts([]);
-
-const observationCounts = (
+const outcomeCounts = (
 	met: number,
 	notMet: number,
-	notApplicable: number,
-	undetermined: number,
-): ReviewObservationCounts => ({ met, notMet, notApplicable, undetermined });
+	doesNotApply: number,
+	couldNotDetermine: number,
+): ReviewResultCounts => ({ met, notMet, doesNotApply, couldNotDetermine });
 
 const countsOf = (
 	practiceSlug: string,
-	observations: ReviewObservationCounts,
+	results: ReviewResultCounts,
 	feedback: Partial<ReviewFeedbackCounts>,
-	observationsInvalidated = 0,
-): PracticeReviewCounts => {
-	const practice = workspacePractices.find((entry) => entry.slug === practiceSlug);
-	const practiceGroup = practiceGroups.find((entry) => entry.slug === practice?.groupSlug);
-	if (!practice || !practiceGroup) {
-		throw new Error(`No grouped practice named ${practiceSlug} in the fixture catalogue`);
-	}
-	return {
-		practiceSlug,
-		practiceName: practice.name,
-		group: { slug: practiceGroup.slug, name: practiceGroup.name },
-		observations,
-		feedback: { ...ZERO_FEEDBACK, ...feedback },
-		observationsInvalidated,
-	};
-};
+	resultsMarkedIncorrect = 0,
+): ReviewPracticeCounts => ({
+	practiceSlug,
+	practiceName: practiceNameOf(practiceSlug),
+	group: groupRefOf(practiceSlug),
+	results,
+	feedback: { ...ZERO_FEEDBACK, ...feedback },
+	resultsMarkedIncorrect,
+});
 
-/**
- * Skewed the way a real workspace is: one practice carries most of the volume and most of the
- * strengths, one is mostly problems, one fires twice and says nothing useful, and "Decisions are
- * written down" is not checked at all — so the busiest-first ranking and the not-checked level both
- * have something to show.
- */
-export const practiceCounts: PracticeReviewCounts[] = [
+export const practiceCounts: ReviewPracticeCounts[] = [
 	countsOf(
 		"thin-controllers",
-		observationCounts(18, 9, 4, 2),
-		{ delivered: 7, awaitingApproval: 2, suppressed: 2, failed: 1 },
+		outcomeCounts(18, 9, 4, 2),
+		{ delivered: 7, awaitingApproval: 2, withheld: 2, failed: 1 },
 		1,
 	),
 	countsOf(
 		"errors-carry-context",
-		observationCounts(6, 11, 1, 3),
-		{ delivered: 6, prepared: 1, discarded: 1, superseded: 1 },
+		outcomeCounts(6, 11, 1, 3),
+		{ delivered: 6, ready: 1, rejected: 1, replaced: 1 },
 		2,
 	),
-	countsOf("tests-name-the-behaviour", observationCounts(9, 2, 3, 0), { delivered: 2 }),
-	countsOf("the-change-explains-itself", observationCounts(2, 4, 1, 1), {
+	countsOf("tests-name-the-behaviour", outcomeCounts(9, 2, 3, 0), { delivered: 2 }),
+	countsOf("the-change-explains-itself", outcomeCounts(2, 4, 1, 1), {
 		delivered: 1,
 		awaitingApproval: 1,
-		suppressed: 1,
+		withheld: 1,
 	}),
-	countsOf("product-language", observationCounts(0, 1, 1, 0), {}),
+	countsOf("product-language", outcomeCounts(0, 1, 1, 0), {}),
 ];
 
 const OVERVIEW_DAYS = REVIEW_RANGE_DEFS["30d"].days;
@@ -1846,7 +2834,7 @@ const PER_DAY = {
 	reviews: [
 		0, 2, 0, 3, 2, 0, 0, 3, 0, 2, 1, 3, 0, 0, 2, 3, 0, 1, 4, 0, 2, 0, 0, 1, 3, 1, 0, 3, 0, 2,
 	],
-	observations: [
+	results: [
 		0, 5, 3, 0, 0, 6, 1, 4, 3, 7, 0, 0, 4, 5, 0, 2, 8, 1, 4, 0, 0, 2, 6, 2, 1, 5, 0, 4, 1, 4,
 	],
 	feedback: [
@@ -1855,74 +2843,66 @@ const PER_DAY = {
 } as const;
 
 function overviewBuckets(perDay: Record<keyof typeof PER_DAY, readonly number[]>) {
-	return Array.from({ length: OVERVIEW_DAYS }, (_, day): PracticeReviewBucket => ({
+	return Array.from({ length: OVERVIEW_DAYS }, (_, day): ReviewBucket => ({
 		start: addDays(OVERVIEW_FROM, day),
 		reviews: perDay.reviews[day] ?? 0,
-		observations: perDay.observations[day] ?? 0,
+		results: perDay.results[day] ?? 0,
 		feedback: perDay.feedback[day] ?? 0,
 	}));
 }
 
 const NOTHING_PER_DAY = Array.from({ length: OVERVIEW_DAYS }, () => 0);
 
-/** Thirty days of a busy workspace, day by day, as `GET …/practices/reviews/overview` returns it. */
-export const practiceReviewOverview: PracticeReviewOverview = {
+export const practiceReviewOverview: ReviewOverview = {
 	from: OVERVIEW_FROM,
 	to: new Date(STORY_NOW),
 	bucket: "DAY",
 	buckets: overviewBuckets(PER_DAY),
-	reviews: { completed: 31, failed: 2, timedOut: 1, cancelled: 1, running: 1, queued: 2 },
-	// Every observation is of one practice, so the practices' counts add up to these.
-	observations: observationCounts(35, 27, 10, 6),
-	observationsInvalidated: 3,
+	reviews: { complete: 31, partial: 1, failed: 3, cancelled: 1, running: 1, queued: 2 },
+	results: outcomeCounts(35, 27, 10, 6),
+	resultsMarkedIncorrect: 3,
 	// One piece of feedback citing two practices counts for each, so these are not the practices' sum.
 	feedback: {
 		...ZERO_FEEDBACK,
 		delivered: 14,
 		awaitingApproval: 3,
-		suppressed: 3,
+		withheld: 3,
 		failed: 1,
-		prepared: 1,
-		discarded: 1,
-		superseded: 1,
+		ready: 1,
+		rejected: 1,
+		replaced: 1,
+		unconfirmed: 1,
 	},
 	practices: practiceCounts,
 };
 
-/**
- * The overview's 14 delivered pieces by channel, as the counts by location return them for the
- * delivered states: on GitHub, on the developers' practice pages, and with Heph in Slack.
- */
-export const deliveredByChannelCounts: ReviewFeedbackLocationCounts[] = [
-	{ location: "GITHUB", feedback: { ...ZERO_FEEDBACK, delivered: 7, partiallyDelivered: 1 } },
-	{ location: "SLACK", feedback: { ...ZERO_FEEDBACK, delivered: 2 } },
-	{ location: "PRACTICE_PAGES", feedback: { ...ZERO_FEEDBACK, delivered: 4 } },
+export const deliveredByLocationCounts: ReasonCount[] = [
+	{ reason: "GITHUB", description: FEEDBACK_LOCATION_DEFS.GITHUB.label, count: 8 },
+	{ reason: "SLACK", description: FEEDBACK_LOCATION_DEFS.SLACK.label, count: 2 },
+	{ reason: "PRACTICE_PAGES", description: FEEDBACK_LOCATION_DEFS.PRACTICE_PAGES.label, count: 4 },
 ];
 
-/** The overview's 3 withheld pieces by reason: 2 as the work was merged, 1 over the limit. */
-export const withheldByReasonCounts: ReviewFeedbackReasonCount[] = [
-	{ reason: "VOLUME_CAPPED", count: 1 },
-	{ reason: "ARTIFACT_MERGED", count: 2 },
+export const withheldByReasonCounts: ReasonCount[] = [
+	{ reason: "VOLUME_CAPPED", description: withholdingReasonSentence("VOLUME_CAPPED"), count: 1 },
+	{ reason: "ITEM_MERGED", description: withholdingReasonSentence("ITEM_MERGED"), count: 2 },
 ];
 
-/** Thirty days in which nothing was reviewed: every bucket present, and every one of them zero. */
-export const quietPracticeReviewOverview: PracticeReviewOverview = {
+export const quietPracticeReviewOverview: ReviewOverview = {
 	...practiceReviewOverview,
 	buckets: overviewBuckets({
 		reviews: NOTHING_PER_DAY,
-		observations: NOTHING_PER_DAY,
+		results: NOTHING_PER_DAY,
 		feedback: NOTHING_PER_DAY,
 	}),
-	reviews: { completed: 0, failed: 0, timedOut: 0, cancelled: 0, running: 0, queued: 0 },
-	observations: observationCounts(0, 0, 0, 0),
-	observationsInvalidated: 0,
+	reviews: { complete: 0, partial: 0, failed: 0, cancelled: 0, running: 0, queued: 0 },
+	results: outcomeCounts(0, 0, 0, 0),
+	resultsMarkedIncorrect: 0,
 	feedback: ZERO_FEEDBACK,
 	practices: [],
 };
 
-/** The overview once it is in and current. */
 export function readyReviewOverview(
-	overview: PracticeReviewOverview = practiceReviewOverview,
+	overview: ReviewOverview = practiceReviewOverview,
 ): OverviewRegionState {
 	return { status: "ready", overview, stale: false };
 }
@@ -1933,17 +2913,7 @@ export const reviewOverviewScope: OutcomeScope = {
 	to: toDayParam(new Date(STORY_NOW)),
 };
 
-// ---------------------------------------------------------------------------------------------
-// Where the time of the overview's reviews went
-// ---------------------------------------------------------------------------------------------
-
-/**
- * The thirty days' reviews as the local data had them: a typical review took 9 min 20 s from the
- * request to its comment, almost all of it with the model, and the slowest 1 in 10 took 19 min or
- * longer. Nine reviews started before the merge and
- * finished after it.
- */
-export const practiceReviewTiming: PracticeReviewTiming = {
+export const practiceReviewTiming: ReviewTiming = {
 	from: OVERVIEW_FROM,
 	to: new Date(STORY_NOW),
 	asked: { count: 40, medianSeconds: 120, p90Seconds: 600 },
@@ -1951,7 +2921,6 @@ export const practiceReviewTiming: PracticeReviewTiming = {
 	preparation: { count: 51, medianSeconds: 20, p90Seconds: 40 },
 	model: { count: 51, medianSeconds: 700, p90Seconds: 1080 },
 	posted: { count: 14, medianSeconds: 12, p90Seconds: 30 },
-	// Until asked 2 min, Queue 26 s, Run 12 min, To developer 12 s: they add up to the median.
 	total: { count: 14, medianSeconds: 878, p90Seconds: 1500 },
 	totalShares: {
 		asked: 120 / 878,
@@ -1968,6 +2937,7 @@ export const practiceReviewTiming: PracticeReviewTiming = {
 		preparation: 20 / 866,
 		model: 700 / 866,
 		runUnsplit: 0,
+		posted: null,
 	},
 	read: { count: 11, medianSeconds: 67_020, p90Seconds: 90_000 },
 	waitingLong: 0,
@@ -1976,179 +2946,255 @@ export const practiceReviewTiming: PracticeReviewTiming = {
 	feedbackWithheldAsMerged: 0,
 };
 
-// ---------------------------------------------------------------------------------------------
-// The queue right now
-// ---------------------------------------------------------------------------------------------
-
 const queueItem = (
-	id: string,
+	index: number,
 	state: "running" | "waiting" | "held",
-	work: ReviewWork,
-	developer: ReviewSubject,
+	item: ItemRef,
+	developer: ReviewDeveloper | null,
 	minutes: number,
-): PracticeReviewQueueItem => ({
-	id,
+): ReviewQueueItem => ({
+	reviewId: `0c0c0c0c-0000-4000-8000-${String(index).padStart(12, "0")}`,
+	jobId: `0d0d0d0d-0000-4000-8000-${String(index).padStart(12, "0")}`,
 	status: state === "running" ? "RUNNING" : "QUEUED",
 	heldForBudget: state === "held",
-	target: work,
+	item,
 	developer,
 	since: minutesBefore(minutes),
 });
 
-/** The busy queue's head, by name, for a story to rearrange. */
 export const reviewQueueHead = {
-	runningLong: queueItem("queue-run-1", "running", reviewArtifact, ada, 3),
-	runningShort: queueItem("queue-run-2", "running", gitlabMergeRequest, grace, 1),
-	waitingLong: queueItem("queue-wait-1", "waiting", webhookRetryPullRequest, alan, 4),
-	waitingShort: queueItem("queue-wait-2", "waiting", leagueColumnsPullRequest, katherine, 2),
-	waitingNew: queueItem("queue-wait-3", "waiting", invoiceBackfillMergeRequest, barbara, 1),
+	runningLong: queueItem(1, "running", reviewItem, ada, 3),
+	runningShort: queueItem(2, "running", gitlabMergeRequest, grace, 1),
+	waitingLong: queueItem(3, "waiting", webhookRetryPullRequest, alan, 4),
+	waitingShort: queueItem(4, "waiting", leagueColumnsPullRequest, katherine, 2),
+	waitingNew: queueItem(5, "waiting", invoiceBackfillMergeRequest, barbara, 1),
+	scanJob: queueItem(6, "held", scannedRepository, null, 1),
 };
 
-/** Nothing waits or runs; twelve reviews finished in the last hour. */
-export const idleReviewQueue: PracticeReviewQueue = {
+export const idleReviewQueue: ReviewQueue = {
 	asOf: new Date(STORY_NOW),
 	running: 0,
 	activeWorkers: 0,
 	waiting: 0,
 	heldForBudget: 0,
+	oldestWaitingSince: null,
 	head: [],
 	finishedLastHour: 12,
 	finishedLastDay: 96,
 	finishedPerHourLastDay: 4,
 };
 
-/** Two running on two workers, five waiting, the oldest for four minutes: busy, not stuck. */
-export const busyReviewQueue: PracticeReviewQueue = {
+export const busyReviewQueue: ReviewQueue = {
 	...idleReviewQueue,
 	running: 2,
 	activeWorkers: 2,
-	waiting: 5,
+	waiting: 4,
+	heldForBudget: 1,
 	oldestWaitingSince: minutesBefore(4),
 	head: Object.values(reviewQueueHead),
 };
 
-// ---------------------------------------------------------------------------------------------
-// What the overview says needs an admin// ---------------------------------------------------------------------------------------------
-// What the overview says needs an admin
-// ---------------------------------------------------------------------------------------------
-
-/**
- * Feedback held for a decision. Restated from delivered and withheld rows rather than written
- * afresh, so each one still names a real review, work and developer.
- */
 export const awaitingApprovalFeedback: ReviewFeedback[] = reviewFeedback
-	.filter((item) => item.deliveryState === "DELIVERED" || item.deliveryState === "SUPPRESSED")
+	.filter((item) => item.state === "DELIVERED" || item.state === "WITHHELD")
 	.slice(0, 3)
 	.map((item) => ({
 		...item,
-		deliveryState: "AWAITING_APPROVAL",
-		deliveredAt: undefined,
-		suppressionReason: undefined,
+		state: "AWAITING_APPROVAL",
+		deliveredAt: null,
+		stopReason: "PRACTICE_REQUIRES_APPROVAL",
+		withdrawn: false,
 	}));
 
-/**
- * The trace of the work a review fixture looked at, told so it agrees with that review: the moment
- * that started it happened two minutes before it was asked for, the other moments before that, and
- * the practices it answered name it. A trace taken from another review would put the moment that
- * started this one after it finished.
- */
-export function reviewTraceOf(job: AgentJob): ArtifactTrace {
-	const asked = job.createdAt.getTime();
-	const starting = artifactTrace.signals.find((signal) => signal.reviewId === LINEAGE_TRACE_REVIEW);
+export function itemEventsOf(review: ReviewSummary): ItemEvent[] {
+	const asked = review.createdAt.getTime();
+	const event = (
+		suffix: string,
+		name: string,
+		offsetMinutes: number,
+		state: ItemEvent["state"],
+		reason: ItemEvent["reason"],
+	): ItemEvent => {
+		const occurredAt = new Date(asked + offsetMinutes * MINUTE);
+		return {
+			id: `${review.id.slice(0, -3)}${suffix}`,
+			itemId: review.item.id,
+			name,
+			itemVersion: review.itemVersion,
+			occurredAt,
+			foundBy: "WEBHOOK",
+			state,
+			reason,
+			decidedAt: occurredAt,
+			reviewId: null,
+		};
+	};
+	return [
+		event("e01", "scm.pull_request.opened", -90, "WITHHELD", "COOLDOWN_ACTIVE"),
+		...(review.startedBy === null ? [] : [review.startedBy]),
+		event("e02", "scm.pull_request.synchronized", 30, "WAITING", "MODEL_UNAVAILABLE"),
+	];
+}
+
+export function itemTraceOf(review: ReviewSummary): ItemTrace {
+	const ref = reviewRefOf(review);
 	return {
-		...artifactTrace,
-		signals: artifactTrace.signals.map((signal, index) =>
-			signal === starting
-				? { ...signal, reviewId: job.id, occurredAt: new Date(asked - 2 * 60_000) }
-				: {
-						...signal,
-						reviewId: signal.reviewId === undefined ? undefined : `earlier-${index}`,
-						occurredAt: new Date(asked - (index + 1) * 3_600_000),
-					},
-		),
-		practices: artifactTrace.practices.map((entry) =>
-			entry.reviewId === LINEAGE_TRACE_REVIEW ? { ...entry, reviewId: job.id } : entry,
+		...itemTrace,
+		item: review.item,
+		events: itemEventsOf(review),
+		reviews: [ref],
+		practices: itemTrace.practices.map((entry) =>
+			entry.review === null ? entry : { ...entry, review: ref },
 		),
 	};
 }
 
-/** The review whose answers the shared work trace fixture lists. */
-const LINEAGE_TRACE_REVIEW = "11111111-1111-1111-1111-111111111111";
-
-/** A check the review ran for itself, which its sheet lists and a piece of feedback does not. */
-export function reviewDeliveryChecksOf(job: AgentJob): DeliveryPolicyTrace[] {
-	return [
-		{
-			...deniedDeliveryPolicyEvaluation,
-			reviewId: job.id,
-			evaluatedAt: new Date((job.completedAt ?? job.createdAt).getTime() + 30_000),
-		},
-	];
+export function reviewFeedbackChecksOf(review: ReviewSummary): FeedbackCheck[] {
+	const own = allFeedbackSpecs
+		.filter(({ review: owner }) => owner.id === review.id)
+		.flatMap(({ item }) => checksOf(item));
+	const end = review.completedAt ?? review.createdAt;
+	return [...own, { ...deniedFeedbackCheck, checkedAt: new Date(end.getTime() + 30_000) }];
 }
 
-// ---------------------------------------------------------------------------------------------
-// What the provider reported about a piece of work, and a practice's versions
-// ---------------------------------------------------------------------------------------------
-
-/** A merged pull request whose head failed its checks. */
-export const mergedPullRequestFacts: ReviewWorkFacts = {
-	artifactKind: "scm.pull_request",
-	artifactId: 1423,
-	author: { id: 7, login: "jdoe", name: "Jane Doe" },
-	state: "MERGED",
-	draft: false,
-	sourceBranch: "feature/retry-service",
-	targetBranch: "main",
-	headRevision: "27f4e88c9f5a1b2c3d4e5f60718293a4b5c6d7e8",
-	createdAt: new Date("2026-08-05T09:12:00Z"),
-	updatedAt: new Date("2026-08-07T10:05:00Z"),
-	mergedAt: new Date("2026-08-07T10:02:00Z"),
-	closedAt: new Date("2026-08-07T10:02:00Z"),
-	additions: 120,
-	deletions: 30,
-	changedFiles: 7,
-	commits: 3,
-	checkState: "FAILURE",
-	checkObservedAt: new Date("2026-08-07T09:58:00Z"),
-	lastSyncAt: new Date("2026-08-07T10:06:00Z"),
+export const mergedPullRequestFacts: ItemFacts = {
+	item: reviewItem,
+	facts: [
+		{ name: "State", value: "Merged", url: null },
+		{ name: "Author", value: "ada", url: "https://github.com/ada" },
+		{ name: "Branch", value: "feature/retry-service → main", url: null },
+		{ name: "Head", value: "27f4e88c", url: `${reviewItem.url ?? ""}/commits/27f4e88c` },
+		{ name: "Size", value: "+120 −30 in 7 files", url: null },
+		{ name: "Commits", value: "3", url: null },
+		{ name: "Checks", value: "Failing", url: `${reviewItem.url ?? ""}/checks` },
+		{ name: "Merged", value: "7 Aug 2026, 10:02", url: null },
+	],
 };
 
-/** An issue still open, with no branches, size or checks. */
-export const openIssueFacts: ReviewWorkFacts = {
-	artifactKind: "scm.issue",
-	artifactId: 1430,
-	author: { id: 8, login: "asmith", name: "Alex Smith" },
-	state: "OPEN",
-	createdAt: new Date("2026-08-03T14:00:00Z"),
-	updatedAt: new Date("2026-08-06T08:30:00Z"),
-	lastSyncAt: new Date("2026-08-06T08:31:00Z"),
+export const openIssueFacts: ItemFacts = {
+	item: trackerIssue,
+	facts: [
+		{ name: "State", value: "Open", url: null },
+		{ name: "Author", value: "grace", url: "https://github.com/grace" },
+		{ name: "Labels", value: null, url: null },
+	],
 };
 
-/** Three versions of a practice: the first, a wording change, and a change to what it checks. */
-export const practiceRevisions: PracticeRevision[] = [
-	{
-		id: 303,
-		revisionNumber: 3,
+export const practiceVersions: PracticeVersion[] = [
+	practiceVersion(definitionOf({ name: "Thin controllers" }), {
+		id: "303",
+		number: 3,
 		createdAt: new Date("2026-08-02T09:00:00Z"),
-		changed: ["CRITERIA", "EVIDENCE_REQUIREMENTS"],
-		reviewRulesChanged: true,
-	},
-	{
-		id: 302,
-		revisionNumber: 2,
+		changed: ["CRITERIA", "READS"],
+		reviewChanged: true,
+	}),
+	practiceVersion(definitionOf({ name: "Thin controllers" }), {
+		id: "302",
+		number: 2,
 		createdAt: new Date("2026-07-20T09:00:00Z"),
-		changed: ["WHY_IT_MATTERS"],
-		reviewRulesChanged: false,
-	},
-	{
-		id: 301,
-		revisionNumber: 1,
+		changed: ["GUIDANCE"],
+		reviewChanged: false,
+	}),
+	practiceVersion(definitionOf({ name: "Thin controllers" }), {
+		id: "301",
+		number: 1,
 		createdAt: new Date("2026-07-01T09:00:00Z"),
 		changed: [],
-		reviewRulesChanged: false,
-	},
+		reviewChanged: false,
+	}),
 ];
 
-/** The card on a developer's own practice pages, whose text the fixture writes and no surface may show. */
-export const PRIVATE_FEEDBACK_TEXT =
-	"Private to Barbara: the runbook's first step is the one a tired reader most needs.";
+const scriptRun = (
+	practiceSlug: string,
+	fields: Pick<PracticeScriptRun, "scriptKind" | "status"> & Partial<PracticeScriptRun>,
+): PracticeScriptRun => {
+	const practice = workspacePractices.find((entry) => entry.slug === practiceSlug);
+	return {
+		jobId: "11111111-1111-1111-1111-111111111000",
+		attempt: 1,
+		practiceId: practice?.id ?? "999",
+		practiceVersionId: practice?.currentVersion.id ?? "99901",
+		stopReason: null,
+		finishedAt: new Date("2026-07-28T13:39:30Z"),
+		durationMs: 4200,
+		error: null,
+		models: [],
+		...fields,
+	};
+};
+
+const decisionModel = (calls: number, tier: "IN_HOUSE" | "CLOUD") => ({
+	kind: "DECISION" as const,
+	modelId: tier === "CLOUD" ? "gpt-5-mini" : "acme/house-model",
+	dataHandlingTier: tier,
+	calls,
+	inputTokens: calls * 3000,
+	outputTokens: calls * 150,
+	cacheReadTokens: 0,
+	cacheWriteTokens: 0,
+});
+
+export const reviewPracticeScripts = {
+	fromCode: scriptRun("thin-controllers", {
+		scriptKind: "CUSTOM",
+		status: "OK",
+		models: [decisionModel(12, "CLOUD")],
+	}),
+	withModels: scriptRun("errors-carry-context", {
+		scriptKind: "CUSTOM",
+		status: "OK",
+		durationMs: 12_840,
+		models: [
+			decisionModel(9, "IN_HOUSE"),
+			{
+				kind: "EMBEDDING",
+				modelId: "acme/embed",
+				dataHandlingTier: "IN_HOUSE",
+				calls: 2,
+				inputTokens: 4000,
+				outputTokens: 0,
+				cacheReadTokens: 0,
+				cacheWriteTokens: 0,
+			},
+		],
+	}),
+	builtIn: scriptRun("the-change-explains-itself", {
+		scriptKind: "BUILTIN",
+		status: "OK",
+		durationMs: 900,
+	}),
+	withheld: scriptRun("product-language", {
+		scriptKind: "CUSTOM",
+		status: "WITHHELD",
+		stopReason: "UNAVAILABLE",
+		durationMs: null,
+	}),
+	failed: scriptRun("tests-name-the-behaviour", {
+		scriptKind: "CUSTOM",
+		status: "FAILED",
+		stopReason: "ERROR",
+		durationMs: 40,
+		error: "TypeError: change.files is not iterable at run (tests-name-the-behaviour.ts:14:23)",
+	}),
+	outOfTime: scriptRun("review-comments-explain", {
+		scriptKind: "CUSTOM",
+		status: "FAILED",
+		stopReason: "DEADLINE",
+		durationMs: 15_000,
+	}),
+	notFinished: scriptRun("decisions-are-written-down", {
+		scriptKind: "CUSTOM",
+		status: "NOT_FINISHED",
+		durationMs: null,
+	}),
+	notReached: scriptRun("decisions-are-written-down", {
+		scriptKind: "CUSTOM",
+		status: "NOT_REACHED",
+		durationMs: null,
+	}),
+	removedPractice: scriptRun("retired-practice", {
+		scriptKind: "CUSTOM",
+		status: "FAILED",
+		stopReason: "DEADLINE",
+		durationMs: 15_000,
+	}),
+} satisfies Record<string, PracticeScriptRun>;

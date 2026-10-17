@@ -26,8 +26,10 @@ import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
@@ -278,6 +280,7 @@ class GitLabNoteReconciliationIntegrationTest extends AbstractWorkspaceIntegrati
                                 : exchange.exchange(request)),
                 links,
                 events,
+                Clock.fixed(Instant.EPOCH, ZoneOffset.UTC),
                 projectAdmission);
     }
 

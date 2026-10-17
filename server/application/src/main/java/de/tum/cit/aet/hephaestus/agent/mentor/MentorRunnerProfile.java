@@ -34,7 +34,9 @@ public final class MentorRunnerProfile implements PiRunnerProfile {
 
     @Override
     public List<String> runtimeFlags() {
-        return Stream.concat(PiRunnerProfile.super.runtimeFlags().stream(), Stream.of("--expose-gc"))
+        return Stream.concat(
+                        PiRunnerProfile.super.runtimeFlags().stream(),
+                        Stream.of("--expose-gc", "--allow-fs-read=" + SandboxLayout.PRACTICE_SCRIPT_IMAGE_ROOT))
                 .toList();
     }
 

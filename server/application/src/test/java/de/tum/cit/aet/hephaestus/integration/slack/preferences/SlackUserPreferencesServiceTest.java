@@ -9,11 +9,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountWorkspaceMembershipQuery;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountMembershipQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
-import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
@@ -21,7 +21,6 @@ import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelR
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackParticipantConsentRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackParticipantConsentService;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackPersonErasureService;
-import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.spi.WorkspaceSummaryQuery;
@@ -43,13 +42,13 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
     private AccountIdentityQuery accountIdentityQuery;
 
     @Mock
-    private AccountWorkspaceMembershipQuery membershipQuery;
+    private AccountMembershipQuery membershipQuery;
 
     @Mock
     private GitProviderRegistry gitProviderRegistry;
 
     @Mock
-    private ConnectionRepository connectionRepository;
+    private ConnectionService connectionRepository;
 
     @Mock
     private SlackParticipantConsentRepository participantConsentRepository;
@@ -62,9 +61,6 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
 
     @Mock
     private SlackPersonErasureService erasureService;
-
-    @Mock
-    private SlackMentorIdentityResolver identityResolver;
 
     @Mock
     private WorkspaceSummaryQuery workspaceSummaryQuery;
@@ -82,7 +78,6 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
                 monitoredChannelRepository,
                 participantConsentService,
                 erasureService,
-                identityResolver,
                 workspaceSummaryQuery);
         when(gitProviderRegistry.resolveProviderId("SLACK", SlackUserPreferencesService.SLACK_SERVER_URL))
                 .thenReturn(SLACK_PROVIDER_ID);
@@ -91,17 +86,14 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
     @Test
     void listReturnsOnlyAccessibleSlackWorkspacesWithConsentState() {
         givenWorkspaceSummary();
-        var slackLink = link(SLACK_PROVIDER_ID, "U1", "T1", "Felix Slack");
-        var gitLabLink = link(7L, "42", null, "ga84xah");
+        var slackLink = link(SLACK_PROVIDER_ID, "U1", "T1");
+        var gitLabLink = link(7L, "42", null);
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(List.of(slackLink, gitLabLink));
         when(membershipQuery.membershipsForAccount(ACCOUNT_ID))
-                .thenReturn(List.of(new AccountWorkspaceMembershipQuery.WorkspaceMembershipView(
-                        1L, "acme", "Hephaestus", "MEMBER", 314L)));
+                .thenReturn(List.of(new AccountMembershipQuery.MembershipView(
+                        1L, "acme", "Hephaestus", AccountMembershipQuery.Role.MEMBER)));
         Connection visible = slackConnection(1L, "acme", "Hephaestus", "T1", "acme-slack");
-        Connection inaccessible = slackConnection(2L, "other", "Other", "T1", "acme-slack");
-        when(connectionRepository.findAllByKindAndInstanceKeyInAndState(
-                        IntegrationKind.SLACK, Set.of("T1"), IntegrationState.ACTIVE))
-                .thenReturn(List.of(visible, inaccessible));
+        when(connectionRepository.findActive(1L, IntegrationKind.SLACK)).thenReturn(Optional.of(visible));
         when(participantConsentRepository.existsByWorkspaceIdAndSlackUserIdAndIngestionOptedOutTrue(1L, "U1"))
                 .thenReturn(true);
         when(monitoredChannelRepository.countByWorkspaceIdAndConsentState(1L, ConsentState.ACTIVE))
@@ -114,7 +106,7 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
             assertThat(workspace.workspaceName()).isEqualTo("Hephaestus");
             assertThat(workspace.slackTeamId()).isEqualTo("T1");
             assertThat(workspace.slackTeamName()).isEqualTo("acme-slack");
-            assertThat(workspace.slackDisplayName()).isEqualTo("Felix Slack");
+            assertThat(workspace.slackDisplayName()).isNull();
             assertThat(workspace.channelMessagesAllowed()).isFalse();
             assertThat(workspace.activeMonitoredChannelCount()).isEqualTo(3L);
         });
@@ -123,30 +115,27 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
     @Test
     void updateOptOutRecordsDecisionAndErasesSlackPerson() {
         givenWorkspaceSummary();
-        when(connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-                        1L, IntegrationKind.SLACK, IntegrationState.ACTIVE))
+        when(connectionRepository.findActive(1L, IntegrationKind.SLACK))
                 .thenReturn(Optional.of(slackConnection(1L, "acme", "Hephaestus", "T1", "acme-slack")));
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID))
-                .thenReturn(List.of(link(SLACK_PROVIDER_ID, "U1", "T1", "Felix Slack")));
-        when(identityResolver.resolveMemberId(1L, "T1", "U1")).thenReturn(Optional.of(123L));
+                .thenReturn(List.of(link(SLACK_PROVIDER_ID, "U1", "T1")));
         when(monitoredChannelRepository.countByWorkspaceIdAndConsentState(1L, ConsentState.ACTIVE))
                 .thenReturn(1L);
 
         SlackUserWorkspacePreferencesDTO dto = service.updateChannelMessagesAllowed(1L, ACCOUNT_ID, false);
 
         verify(participantConsentService).recordChannelMessageOptOut(1L, "U1");
-        verify(erasureService).erasePerson(1L, 123L, "U1");
+        verify(erasureService).erasePerson(1L, ACCOUNT_ID, "U1");
         assertThat(dto.channelMessagesAllowed()).isFalse();
     }
 
     @Test
     void updateOptInDoesNotEraseData() {
         givenWorkspaceSummary();
-        when(connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-                        1L, IntegrationKind.SLACK, IntegrationState.ACTIVE))
+        when(connectionRepository.findActive(1L, IntegrationKind.SLACK))
                 .thenReturn(Optional.of(slackConnection(1L, "acme", "Hephaestus", "T1", "acme-slack")));
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID))
-                .thenReturn(List.of(link(SLACK_PROVIDER_ID, "U1", "T1", "Felix Slack")));
+                .thenReturn(List.of(link(SLACK_PROVIDER_ID, "U1", "T1")));
 
         service.updateChannelMessagesAllowed(1L, ACCOUNT_ID, true);
 
@@ -157,21 +146,18 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
 
     @Test
     void updateRejectsWorkspaceWithoutCurrentAccountSlackLink() {
-        when(connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-                        1L, IntegrationKind.SLACK, IntegrationState.ACTIVE))
+        when(connectionRepository.findActive(1L, IntegrationKind.SLACK))
                 .thenReturn(Optional.of(slackConnection(1L, "acme", "Hephaestus", "T1", "acme-slack")));
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID))
-                .thenReturn(List.of(link(SLACK_PROVIDER_ID, "U2", "T2", "Other Slack")));
+                .thenReturn(List.of(link(SLACK_PROVIDER_ID, "U2", "T2")));
 
         assertThatThrownBy(() -> service.updateChannelMessagesAllowed(1L, ACCOUNT_ID, false))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("Slack account is not linked");
     }
 
-    private static AccountIdentityQuery.IdentityLinkView link(
-            long providerId, String subject, @Nullable String teamId, String username) {
-        return new AccountIdentityQuery.IdentityLinkView(
-                1L, providerId, subject, username, username, null, null, null, teamId);
+    private static AccountIdentityQuery.IdentityView link(long providerId, String subject, @Nullable String teamId) {
+        return new AccountIdentityQuery.IdentityView(1L, providerId, subject, teamId == null ? "" : teamId);
     }
 
     private void givenWorkspaceSummary() {

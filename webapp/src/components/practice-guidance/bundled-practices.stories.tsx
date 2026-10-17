@@ -95,6 +95,12 @@ function BundledPractices({ group, guides }: BundledPracticesArgs) {
  * name under its group, so the gaps stay visible.
  */
 const meta = {
+	loaders: [
+		async () => {
+			await groupsLoading;
+			return {};
+		},
+	],
 	render: (args) => (
 		<Suspense>
 			<BundledPractices {...args} />

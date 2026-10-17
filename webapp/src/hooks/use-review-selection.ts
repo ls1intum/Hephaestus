@@ -1,15 +1,15 @@
 import { skipToken, useQuery } from "@tanstack/react-query";
-import { observationSummary } from "@/components/admin/practice-reviews/observation-words";
 
 import {
-	getAgentJobOptions,
-	getPracticeReviewFeedbackOptions,
-	getPracticeReviewObservationOptions,
+	getItemTraceOptions,
+	getReviewFeedbackOptions,
+	getReviewOptions,
+	getReviewResultOptions,
 	listPracticesOptions,
-	listTracedArtifactsOptions,
 } from "@/api/@tanstack/react-query.gen";
-import type { ReviewedWorkRef } from "@/api/types.gen";
-import { subjectLabel } from "@/components/admin/practice-reviews/review-format";
+import type { ItemRef } from "@/api/types.gen";
+import { resultSummary } from "@/components/admin/practice-reviews/result-words";
+import { developerLabel } from "@/components/admin/practice-reviews/review-format";
 import { type RecordRef, selectionRecord } from "@/components/admin/practice-reviews/review-layers";
 import type { ReviewScope } from "@/components/admin/practice-reviews/review-scope";
 import {
@@ -17,20 +17,11 @@ import {
 	readScopedRecord,
 } from "@/components/admin/practice-reviews/review-selection";
 import type { ReviewSelectionName } from "@/components/admin/practice-reviews/ReviewSelectionBar";
-import { type PanelState, panelState } from "@/components/common/panel-state";
+import { panelState } from "@/components/common/panel-state";
 import { useNow } from "@/components/common/use-now";
-import { reviewedWorkName } from "@/lib/artifact-kinds";
 import { formatDayTime } from "@/lib/dates";
+import { itemName } from "@/lib/item-kinds";
 import { hasText } from "@/lib/text";
-
-/** One piece of work, as the work list filters by it. */
-export interface SelectedWork {
-	artifactKind: string;
-	artifactId: number;
-}
-
-/** The piece of work the selection names, or `undefined` for a review that names none. */
-export type SelectedWorkState = PanelState<{ work: SelectedWork | undefined }>;
 
 export interface ReviewSelectionRead {
 	/** The record the scope narrows to, picked with a crosshair or filtered by. */
@@ -43,27 +34,13 @@ export interface ReviewSelectionRead {
 	filterName: string | undefined;
 	/** The tracked record, whose trace "Show trace" opens. */
 	trace: RecordRef | undefined;
-	/** The work the selection names, which the work list narrows to. */
-	work: SelectedWorkState;
 }
 
 type SelectionScope = Pick<
 	ReviewScope,
-	| "agentJobId"
-	| "observationId"
-	| "feedbackId"
-	| "selectedPractice"
-	| "artifactKind"
-	| "artifactId"
-	| "selected"
+	"reviewId" | "resultId" | "feedbackId" | "selectedPractice" | "itemId" | "selected"
 >;
 
-/**
- * The record the scope narrows to — the selection, or the same names set as a filter — read from its
- * own record: its name, the review its trace opens, and the work it names. A review and an observation name their work, so the work list can narrow to it
- * without a filter of its own. Every tab and the layout read the same queries, so a switch between
- * tabs asks for nothing again.
- */
 export function useReviewSelection(
 	workspaceSlug: string,
 	scope: SelectionScope,
@@ -88,24 +65,22 @@ function useRecordRead(
 	const nowMs = useNow();
 	const path = { workspaceSlug };
 
-	const observationId = selection?.kind === "observation" ? selection.observationId : undefined;
-	const observationOptions = getPracticeReviewObservationOptions({
-		path: { ...path, observationId: observationId ?? "" },
-	});
-	const observationQuery = useQuery({
-		...observationOptions,
-		queryFn: observationId === undefined ? skipToken : observationOptions.queryFn,
+	const resultId = selection?.kind === "result" ? selection.resultId : undefined;
+	const resultOptions = getReviewResultOptions({ path: { ...path, resultId: resultId ?? "" } });
+	const resultQuery = useQuery({
+		...resultOptions,
+		queryFn: resultId === undefined ? skipToken : resultOptions.queryFn,
 	});
 
-	const jobId = selection?.kind === "review" ? selection.agentJobId : undefined;
-	const jobOptions = getAgentJobOptions({ path: { ...path, jobId: jobId ?? "" } });
-	const jobQuery = useQuery({
-		...jobOptions,
-		queryFn: jobId === undefined ? skipToken : jobOptions.queryFn,
+	const reviewId = selection?.kind === "review" ? selection.reviewId : undefined;
+	const reviewOptions = getReviewOptions({ path: { ...path, reviewId: reviewId ?? "" } });
+	const reviewQuery = useQuery({
+		...reviewOptions,
+		queryFn: reviewId === undefined ? skipToken : reviewOptions.queryFn,
 	});
 
 	const feedbackId = selection?.kind === "feedback" ? selection.feedbackId : undefined;
-	const feedbackOptions = getPracticeReviewFeedbackOptions({
+	const feedbackOptions = getReviewFeedbackOptions({
 		path: { ...path, feedbackId: feedbackId ?? "" },
 	});
 	const feedbackQuery = useQuery({
@@ -119,73 +94,49 @@ function useRecordRead(
 		queryFn: selection?.kind === "practice" ? practicesOptions.queryFn : skipToken,
 	});
 
-	const work = selection?.kind === "work" ? selection : undefined;
-	const workQuery = { artifactKind: work?.artifactKind, artifactId: work?.artifactId, size: 1 };
-	const tracedOptions = listTracedArtifactsOptions({ path, query: workQuery });
-	const tracedQuery = useQuery({
-		...tracedOptions,
-		queryFn: work === undefined ? skipToken : tracedOptions.queryFn,
+	const itemId = selection?.kind === "item" ? selection.itemId : undefined;
+	const itemOptions = getItemTraceOptions({ path: { ...path, itemId: itemId ?? "" } });
+	const itemQuery = useQuery({
+		...itemOptions,
+		queryFn: itemId === undefined ? skipToken : itemOptions.queryFn,
 	});
 	const trace = selection === undefined ? undefined : selectionRecord(selection);
 
 	switch (selection?.kind) {
 		case undefined: {
-			return {
-				selection,
-				picked,
-				name: { status: "loading" },
-				trace: undefined,
-				work: { status: "ready", work: undefined },
-			};
+			return { selection, picked, name: { status: "loading" }, trace: undefined };
 		}
-		case "work": {
-			// Work nothing was recorded about has no row in the work list: the kind alone names it.
-			const named = tracedQuery.data?.content?.[0]?.reviewedWork;
+		case "item": {
 			return {
 				selection,
 				picked,
-				name: panelState(tracedQuery, () => ({
+				name: panelState(itemQuery, ({ item }) => ({
 					status: "ready" as const,
-					name:
-						named === undefined
-							? reviewedWorkName({ kind: selection.artifactKind, label: "" })
-							: workName(named),
+					name: workName(item),
 				})),
 				trace,
-				work: {
-					status: "ready",
-					work: { artifactKind: selection.artifactKind, artifactId: selection.artifactId },
-				},
 			};
 		}
 		case "review": {
 			return {
 				selection,
 				picked,
-				name: panelState(jobQuery, (job) => ({
+				name: panelState(reviewQuery, (review) => ({
 					status: "ready" as const,
-					name: `Review of ${job.target.reviewedWork?.label ?? job.target.title} · ${formatDayTime(job.createdAt, new Date(nowMs))}`,
+					name: `Review of ${review.item.label} · ${formatDayTime(review.createdAt, new Date(nowMs))}`,
 				})),
 				trace,
-				work: panelState(jobQuery, (job) => ({
-					status: "ready" as const,
-					work: workOf(job.target.reviewedWork),
-				})),
 			};
 		}
-		case "observation": {
+		case "result": {
 			return {
 				selection,
 				picked,
-				name: panelState(observationQuery, (observation) => ({
+				name: panelState(resultQuery, (result) => ({
 					status: "ready" as const,
-					name: observationSummary(observation),
+					name: resultSummary({ summary: result.summary ?? undefined }),
 				})),
 				trace,
-				work: panelState(observationQuery, (observation) => ({
-					status: "ready" as const,
-					work: workOf(observation.reviewedWork),
-				})),
 			};
 		}
 		case "feedback": {
@@ -194,40 +145,28 @@ function useRecordRead(
 				picked,
 				name: panelState(feedbackQuery, (feedback) => ({
 					status: "ready" as const,
-					name: `Feedback for ${subjectLabel(feedback.recipient)} · ${formatDayTime(feedback.createdAt, new Date(nowMs))}`,
+					name: `Feedback for ${developerLabel(feedback.developer)} · ${formatDayTime(feedback.createdAt, new Date(nowMs))}`,
 				})),
 				trace,
-				work: panelState(feedbackQuery, (feedback) => ({
-					status: "ready" as const,
-					work: workOf(feedback.reviewedWork),
-				})),
 			};
 		}
 		case "practice": {
 			return {
 				selection,
 				picked,
-				name: panelState(practicesQuery, (practices) => ({
-					status: "ready" as const,
-					name:
-						practices.find((practice) => practice.slug === selection.practiceSlug)?.name ??
-						selection.practiceSlug,
-				})),
+				name: panelState(practicesQuery, (practices) => {
+					const practice = practices.find((entry) => entry.slug === selection.practiceSlug);
+					return {
+						status: "ready" as const,
+						name: practice?.currentVersion.name ?? selection.practiceSlug,
+					};
+				}),
 				trace,
-				work: { status: "ready", work: undefined },
 			};
 		}
 	}
 }
 
-function workOf(reviewedWork: ReviewedWorkRef | undefined): SelectedWork | undefined {
-	const artifactId = Number(reviewedWork?.id);
-	return reviewedWork !== undefined && Number.isSafeInteger(artifactId) && artifactId > 0
-		? { artifactKind: reviewedWork.kind, artifactId }
-		: undefined;
-}
-
-/** "Pull request #1423 · Fix the parser", or the name alone where the work has no title. */
-function workName(reviewedWork: ReviewedWorkRef): string {
-	return [reviewedWorkName(reviewedWork), reviewedWork.title].filter(hasText).join(" · ");
+function workName(item: ItemRef): string {
+	return [itemName(item), item.title].filter(hasText).join(" · ");
 }

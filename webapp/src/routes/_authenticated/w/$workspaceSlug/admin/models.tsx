@@ -2,42 +2,80 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
+import { z } from "zod";
+import { QueryErrorAlert, queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
+import type { RefreshFailure } from "@/runtime/tanstack-query/infinite-list";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 import {
 	getLlmUsageReportOptions,
+	getLlmUsageReportQueryKey,
 	getMemberOnboardingOptions,
 	getMemberOnboardingSettingsOptions,
 	getWorkspaceOptions,
 	listAgentsOptions,
 	listAgentsQueryKey,
+	listPracticeScriptNeedsOptions,
+	listPracticeScriptNeedsQueryKey,
+	workspaceCreateLlmConnectionMutation,
+	workspaceCreateLlmModelMutation,
+	workspaceDeleteLlmConnectionMutation,
+	workspaceDeleteLlmModelMutation,
 	workspaceGetLlmSettingsOptions,
 	workspaceListAvailableLlmModelsOptions,
+	workspaceListAvailableLlmModelsQueryKey,
+	workspaceListLlmConnectionsOptions,
+	workspaceListLlmConnectionsQueryKey,
+	workspaceListLlmModelsOptions,
+	workspaceListLlmModelsQueryKey,
+	workspaceProbeLlmConnectionMutation,
+	workspaceUpdateLlmConnectionMutation,
+	workspaceUpdateLlmModelMutation,
 } from "@/api/@tanstack/react-query.gen";
 import { configureAgent, deleteAgent } from "@/api/sdk.gen";
-import type { AgentBinding, AgentBindingRequest } from "@/api/types.gen";
+import type {
+	AgentBindingRequest,
+	WorkspaceLlmConnection,
+	WorkspaceLlmModel,
+} from "@/api/types.gen";
 import { currentMonthUtc } from "@/components/admin/usage/usage-utils";
 import {
 	AgentBindingsPage,
 	type BindingTarget,
+	type BindingWrite,
 	bindingTargetKey,
-	isPurpose,
-	PURPOSE_TITLES,
 } from "@/components/admin/workspace-llm/AgentBindingsPage";
-import { WorkspaceLlmProviderPanel } from "@/components/admin/workspace-llm/WorkspaceLlmProviderPanel";
-import { queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
+import { WorkspaceLlmConnectionFormDialog } from "@/components/admin/workspace-llm/WorkspaceLlmConnectionFormDialog";
+import { WorkspaceLlmModelFormDialog } from "@/components/admin/workspace-llm/WorkspaceLlmModelFormDialog";
+import {
+	type ProviderPanelState,
+	type ProviderTestResult,
+	WorkspaceLlmProviderPanel,
+} from "@/components/admin/workspace-llm/WorkspaceLlmProviderPanel";
+import { type LoadState, panelState } from "@/components/common/panel-state";
+import {
+	AGENT_PURPOSE_DEFS,
+	AGENT_PURPOSES,
+	isAgentPurpose,
+} from "@/components/practice-vocabulary/agent-purpose-defs";
 import {
 	DATA_HANDLING_DEFS,
 	DATA_HANDLING_TIERS,
 	type DataHandlingTier,
 } from "@/components/practice-vocabulary/data-handling-defs";
-import { usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
+import { filedUnder, pathNumber, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import { isRecord } from "@/lib/is-record";
 import { workspaceAdminHead } from "@/lib/page-title";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
-import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
+import { useSearchState } from "@/lib/search-params";
+
+const modelsSearchSchema = z.object({
+	purpose: z.enum(AGENT_PURPOSES).optional().catch(undefined),
+});
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/models")({
 	head: workspaceAdminHead("AI models"),
+	validateSearch: modelsSearchSchema,
 	remountDeps: ({ params }) => params.workspaceSlug,
 	component: ModelsContainer,
 });
@@ -47,12 +85,11 @@ const AGENT_WRITE_MUTATION_KEY = ["workspaceWriteAgent"];
 const isDataHandlingTier = (value: unknown): value is DataHandlingTier =>
 	typeof value === "string" && DATA_HANDLING_TIERS.some((tier) => tier === value);
 
-/** Both writes name the row they are about, so the pending set and the caches key on it. */
-interface BindingWrite {
+interface BindingClear {
 	target: BindingTarget;
 }
 
-interface BindingSave extends BindingWrite {
+interface BindingSave extends BindingClear {
 	body: AgentBindingRequest;
 }
 
@@ -62,7 +99,7 @@ function targetKeyOf(variables: unknown): string | undefined {
 		return undefined;
 	}
 	const { purpose, tier } = variables.target;
-	return typeof purpose === "string" && isPurpose(purpose) && isDataHandlingTier(tier)
+	return typeof purpose === "string" && isAgentPurpose(purpose) && isDataHandlingTier(tier)
 		? bindingTargetKey({ purpose, tier })
 		: undefined;
 }
@@ -78,13 +115,13 @@ function slotRefusalOf(error: unknown): string {
 		: problemDetailOf(error);
 }
 
-const sameSlot = (a: AgentBinding, b: BindingTarget) =>
-	a.purpose === b.purpose && a.dataHandlingTier === b.tier;
-
 function ModelsContainer() {
 	const { workspaceSlug } = Route.useParams();
+	const { purpose: focusPurpose } = Route.useSearch();
+	const setSearch = useSearchState();
 	const queryClient = useQueryClient();
-	const agentWriteKey = [...AGENT_WRITE_MUTATION_KEY, workspaceSlug];
+	const saveKey = [...AGENT_WRITE_MUTATION_KEY, workspaceSlug, "save"];
+	const clearKey = [...AGENT_WRITE_MUTATION_KEY, workspaceSlug, "clear"];
 
 	const bindingsOptions = listAgentsOptions({ path: { workspaceSlug } });
 	const workspaceOptions = getWorkspaceOptions({ path: { workspaceSlug } });
@@ -117,11 +154,16 @@ function ModelsContainer() {
 		onboardingSettingsQuery.isError,
 		onboardingSettingsQuery.error,
 	);
+	const practiceScriptNeedsQuery = useQuery(
+		listPracticeScriptNeedsOptions({ path: { workspaceSlug } }),
+	);
 	const usageQuery = useQuery({
 		...getLlmUsageReportOptions({ path: { workspaceSlug }, query: { month: currentMonthUtc() } }),
 		staleTime: 60_000,
 	});
 
+	// The practice script needs are not among them: the page binds models without them, so their failure
+	// shows only in the section *Models for practice scripts*.
 	const pageQueries = [
 		bindingsQuery,
 		workspaceQuery,
@@ -142,27 +184,14 @@ function ModelsContainer() {
 		}
 	};
 
-	const agentsKey = listAgentsQueryKey({ path: { workspaceSlug } });
-	// Readiness per AI choice lives on the member setup, which decides whether Heph is in the navigation.
 	const invalidateBindings = async () =>
 		Promise.all([
-			queryClient.invalidateQueries({ queryKey: agentsKey }),
+			queryClient.invalidateQueries({ queryKey: listAgentsQueryKey({ path: { workspaceSlug } }) }),
 			queryClient.invalidateQueries(getMemberOnboardingOptions({ path: { workspaceSlug } })),
+			queryClient.invalidateQueries({
+				queryKey: listPracticeScriptNeedsQueryKey({ path: { workspaceSlug } }),
+			}),
 		]);
-
-	const cacheSavedBinding = (saved: AgentBinding) =>
-		queryClient.setQueryData<AgentBinding[]>(agentsKey, (current) => {
-			const bindings = current ?? [];
-			const slot = { purpose: saved.purpose, tier: saved.dataHandlingTier };
-			return bindings.some((b) => sameSlot(b, slot))
-				? bindings.map((b) => (sameSlot(b, slot) ? saved : b))
-				: [...bindings, saved];
-		});
-
-	const dropCachedBinding = (target: BindingTarget) =>
-		queryClient.setQueryData<AgentBinding[]>(agentsKey, (current) =>
-			(current ?? []).filter((b) => !sameSlot(b, target)),
-		);
 
 	const [saveRevisions, setSaveRevisions] = useState<Partial<Record<string, number>>>({});
 	const bumpSaveRevision = (target: BindingTarget) => {
@@ -174,89 +203,117 @@ function ModelsContainer() {
 	const setSaveError = (target: BindingTarget, error: string | undefined) =>
 		setSaveErrors((current) => ({ ...current, [bindingTargetKey(target)]: error }));
 
+	// A binding write changes sibling routes; wait for the whole set before reseeding forms.
 	const saveBinding = useMutation({
-		mutationKey: agentWriteKey,
+		mutationKey: saveKey,
 		mutationFn: async ({ target, body }: BindingSave) => {
-			const { data } = await configureAgent({
+			await configureAgent({
 				path: { workspaceSlug, purpose: target.purpose },
 				query: { dataHandlingTier: target.tier },
 				body,
 				throwOnError: true,
 			});
-			return data;
 		},
-		onSuccess: (saved, { target }) => {
-			cacheSavedBinding(saved);
+		onSuccess: async (_data, { target }) => {
+			await invalidateBindings();
 			bumpSaveRevision(target);
-			void invalidateBindings();
-			toast.success(`Assignment saved for ${PURPOSE_TITLES[target.purpose]}`);
+			toast.success(`Assignment saved for ${AGENT_PURPOSE_DEFS[target.purpose].title}`);
 		},
 		onError: (error, { target }) => {
-			// The slot refusal is about the row's own picker, so it stays on the row.
-			if (problemStatusOf(error) === 409) {
+			// A refusal of the row's own choice stays on the row: the slot's tier (409), or a model
+			// that cannot serve the purpose (400). Anything else is not about the choice.
+			const status = problemStatusOf(error);
+			if (status === 409) {
 				setSaveError(target, slotRefusalOf(error));
 				return;
 			}
-			toast.error(`We could not save the assignment for ${PURPOSE_TITLES[target.purpose]}`, {
-				description: problemDetailOf(error),
-			});
+			if (status === 400) {
+				setSaveError(target, problemDetailOf(error));
+				return;
+			}
+			toast.error(
+				`We could not save the assignment for ${AGENT_PURPOSE_DEFS[target.purpose].title}`,
+				{
+					description: problemDetailOf(error),
+				},
+			);
 		},
 	});
 
 	const clearBinding = useMutation({
-		mutationKey: agentWriteKey,
-		mutationFn: async ({ target }: BindingWrite) => {
+		mutationKey: clearKey,
+		mutationFn: async ({ target }: BindingClear) => {
 			await deleteAgent({
 				path: { workspaceSlug, purpose: target.purpose },
 				query: { dataHandlingTier: target.tier },
 				throwOnError: true,
 			});
 		},
-		onSuccess: (_data, { target }) => {
-			dropCachedBinding(target);
+		onSuccess: async (_data, { target }) => {
+			await invalidateBindings();
 			bumpSaveRevision(target);
-			void invalidateBindings();
-			toast.success(`Assignment cleared for ${PURPOSE_TITLES[target.purpose]}`);
+			toast.success(`Assignment cleared for ${AGENT_PURPOSE_DEFS[target.purpose].title}`);
 		},
 		onError: (error, { target }) => {
-			toast.error(`We could not clear the assignment for ${PURPOSE_TITLES[target.purpose]}`, {
-				description: problemDetailOf(error),
-			});
+			toast.error(
+				`We could not clear the assignment for ${AGENT_PURPOSE_DEFS[target.purpose].title}`,
+				{
+					description: problemDetailOf(error),
+				},
+			);
 		},
 	});
 
-	const pendingTargets = usePendingMutationIds(agentWriteKey, targetKeyOf);
+	const savingTargets = usePendingMutationIds(saveKey, targetKeyOf);
+	const clearingTargets = usePendingMutationIds(clearKey, targetKeyOf);
+	const pendingWrites = new Map<string, BindingWrite>([
+		...[...clearingTargets].map((key) => [key, "CLEAR"] as const),
+		...[...savingTargets].map((key) => [key, "SAVE"] as const),
+	]);
 
+	let pageState: LoadState = { status: "loading" };
+	if (blockingFailure) {
+		pageState = { status: "error", error: blockingFailure.error, onRetry: retryFailed };
+	} else if (loaded) {
+		pageState = { status: "ready" };
+	}
+	const refreshFailure: RefreshFailure | undefined =
+		!blockingFailure && failedQueries.length > 0
+			? {
+					error: failedQueries[0]?.error,
+					pending: failedQueries.some((q) => q.isFetching),
+					onRetry: retryFailed,
+				}
+			: undefined;
 	return (
 		<AgentBindingsPage
 			workspaceSlug={workspaceSlug}
+			state={pageState}
+			refreshFailure={refreshFailure}
 			bindings={bindingsQuery.data ?? []}
 			availableModels={availableModelsQuery.data ?? []}
 			practicesEnabled={workspaceQuery.data?.practicesEnabled ?? false}
 			aiChoiceRequired={onboardingSettingsQuery.data?.aiChoiceRequired ?? false}
+			practiceScriptNeeds={panelState(practiceScriptNeedsQuery, (summaries) => ({
+				status: "ready" as const,
+				summaries,
+			}))}
+			ownProviderAllowed={llmSettingsQuery.data?.ownProviderAllowed ?? false}
 			providerPanel={
-				<WorkspaceLlmProviderPanel
+				<WorkspaceProviders
 					workspaceSlug={workspaceSlug}
 					ownProviderAllowed={llmSettingsQuery.data?.ownProviderAllowed ?? false}
+					onWrite={invalidateBindings}
 				/>
 			}
 			usage={usageQuery.data}
-			isLoading={!loaded}
-			isError={blockingFailure !== undefined}
-			loadError={blockingFailure?.error}
-			refreshFailure={
-				blockingFailure === undefined && failedQueries.length > 0
-					? {
-							error: failedQueries[0]?.error,
-							pending: failedQueries.some((query) => query.isFetching),
-							onRetry: retryFailed,
-						}
-					: undefined
-			}
-			pendingTargets={pendingTargets}
+			focusPurpose={focusPurpose}
+			onFocusPurposeClosed={() => {
+				void setSearch((previous) => ({ ...previous, purpose: undefined }), { replace: true });
+			}}
+			pendingWrites={pendingWrites}
 			saveRevisions={saveRevisions}
 			saveErrors={saveErrors}
-			onRetry={retryFailed}
 			onSave={(target, body) => {
 				setSaveError(target, undefined);
 				saveBinding.mutate({ target, body });
@@ -266,5 +323,271 @@ function ModelsContainer() {
 				clearBinding.mutate({ target });
 			}}
 		/>
+	);
+}
+
+// Key pending writes by row so concurrent requests cannot clear another row's busy state.
+const PROBE_MUTATION_KEY = ["workspaceProbeLlmConnection"];
+const MODEL_WRITE_MUTATION_KEY = ["workspaceWriteLlmModel"];
+const CONNECTION_WRITE_MUTATION_KEY = ["workspaceWriteLlmConnection"];
+
+const idOf = (variables: unknown) => pathNumber(variables, "id");
+
+interface WorkspaceProvidersProps {
+	workspaceSlug: string;
+	ownProviderAllowed: boolean;
+	onWrite: () => Promise<unknown>;
+}
+
+function WorkspaceProviders({
+	workspaceSlug,
+	ownProviderAllowed,
+	onWrite,
+}: WorkspaceProvidersProps) {
+	const queryClient = useQueryClient();
+	const path = { workspaceSlug };
+	const modelWriteKey = [...MODEL_WRITE_MUTATION_KEY, workspaceSlug];
+	const connectionWriteKey = [...CONNECTION_WRITE_MUTATION_KEY, workspaceSlug];
+	const probeKey = [...PROBE_MUTATION_KEY, workspaceSlug];
+	const [connectionDialogOpen, setConnectionDialogOpen] = useState(false);
+	const [editingConnection, setEditingConnection] = useState<WorkspaceLlmConnection | null>(null);
+	const [modelDialogOpen, setModelDialogOpen] = useState(false);
+	const [modelConnectionId, setModelConnectionId] = useState<number | null>(null);
+	const [editingModel, setEditingModel] = useState<WorkspaceLlmModel | null>(null);
+	// The instance can withdraw registration while the page is open; a refused create says so.
+	const [registrationRefused, setRegistrationRefused] = useState(false);
+	const [testResults, setTestResults] = useState(() => new Map<number, ProviderTestResult>());
+
+	const connectionsOptions = workspaceListLlmConnectionsOptions({ path });
+	const connectionsQuery = useQuery(connectionsOptions);
+	useQueryReadRefusal(
+		connectionsOptions.queryKey,
+		connectionsQuery.isError,
+		connectionsQuery.error,
+	);
+	const connections = connectionsQuery.data ?? [];
+	const modelsOptions = workspaceListLlmModelsOptions({ path });
+	const modelsQuery = useQuery({ ...modelsOptions, enabled: connections.length > 0 });
+	useQueryReadRefusal(modelsOptions.queryKey, modelsQuery.isError, modelsQuery.error);
+	const requiredReads =
+		connections.length > 0 ? [connectionsQuery, modelsQuery] : [connectionsQuery];
+	const failedReads = requiredReads.filter((read) => read.isError);
+	const loaded =
+		connectionsQuery.data !== undefined &&
+		(connections.length === 0 || modelsQuery.data !== undefined);
+	const blockingFailure =
+		failedReads.find((read) => !queryErrorIsRetryable(read.error)) ??
+		(loaded ? undefined : failedReads[0]);
+	const retryPending = failedReads.some((read) => read.isFetching);
+	const retryFailedReads = () => {
+		for (const read of failedReads) {
+			void read.refetch();
+		}
+	};
+	if (
+		blockingFailure !== undefined &&
+		!queryErrorIsRetryable(blockingFailure.error) &&
+		(connectionDialogOpen ||
+			modelDialogOpen ||
+			editingConnection !== null ||
+			editingModel !== null ||
+			modelConnectionId !== null)
+	) {
+		setConnectionDialogOpen(false);
+		setModelDialogOpen(false);
+		setEditingConnection(null);
+		setEditingModel(null);
+		setModelConnectionId(null);
+	}
+
+	const invalidateProviders = async () =>
+		Promise.all([
+			queryClient.invalidateQueries({ queryKey: workspaceListLlmConnectionsQueryKey({ path }) }),
+			queryClient.invalidateQueries({ queryKey: workspaceListLlmModelsQueryKey({ path }) }),
+			queryClient.invalidateQueries({
+				queryKey: workspaceListAvailableLlmModelsQueryKey({ path }),
+			}),
+			queryClient.invalidateQueries({ queryKey: getLlmUsageReportQueryKey({ path }) }),
+			onWrite(),
+		]);
+
+	const createConnection = useMutation({
+		...workspaceCreateLlmConnectionMutation(),
+		onSuccess: () => {
+			void invalidateProviders();
+			setConnectionDialogOpen(false);
+			toast.success("Provider connected");
+		},
+		onError: (error) => {
+			if (problemStatusOf(error) === 403) {
+				setRegistrationRefused(true);
+			}
+			toast.error("We could not connect your provider", { description: problemDetailOf(error) });
+		},
+	});
+	const updateConnection = useMutation({
+		...filedUnder(connectionWriteKey, workspaceUpdateLlmConnectionMutation()),
+		onSuccess: () => {
+			void invalidateProviders();
+			setConnectionDialogOpen(false);
+			toast.success("Provider updated");
+		},
+		onError: (error) =>
+			toast.error("We could not update your provider", { description: problemDetailOf(error) }),
+	});
+	const deleteConnection = useMutation({
+		...filedUnder(connectionWriteKey, workspaceDeleteLlmConnectionMutation()),
+		onSuccess: () => {
+			void invalidateProviders();
+			toast.success("Provider disconnected");
+		},
+		onError: (error) =>
+			toast.error("We could not disconnect your provider", { description: problemDetailOf(error) }),
+	});
+	const setTestResult = (id: number, result: ProviderTestResult | undefined) =>
+		setTestResults((current) => {
+			const next = new Map(current);
+			if (result === undefined) {
+				next.delete(id);
+			} else {
+				next.set(id, result);
+			}
+			return next;
+		});
+	const probeConnection = useMutation({
+		...filedUnder(probeKey, workspaceProbeLlmConnectionMutation()),
+		onSuccess: (result, variables) =>
+			setTestResult(variables.path.id, { status: "answered", result }),
+		onError: (error, variables) =>
+			setTestResult(variables.path.id, {
+				status: "failed",
+				message: problemDetailOf(error, "We could not reach the provider."),
+			}),
+	});
+
+	const createModel = useMutation({
+		...workspaceCreateLlmModelMutation(),
+		onSuccess: () => {
+			void invalidateProviders();
+			setModelDialogOpen(false);
+			toast.success("Model added");
+		},
+		onError: (error) => {
+			if (problemStatusOf(error) === 403) {
+				setRegistrationRefused(true);
+			}
+			toast.error("We could not add the model", { description: problemDetailOf(error) });
+		},
+	});
+	const updateModel = useMutation({
+		...filedUnder(modelWriteKey, workspaceUpdateLlmModelMutation()),
+		onSuccess: () => {
+			void invalidateProviders();
+			setModelDialogOpen(false);
+			toast.success("Model updated");
+		},
+		onError: (error) =>
+			toast.error("We could not update the model", { description: problemDetailOf(error) }),
+	});
+	const deleteModel = useMutation({
+		...filedUnder(modelWriteKey, workspaceDeleteLlmModelMutation()),
+		onSuccess: () => {
+			void invalidateProviders();
+			toast.success("Model deleted");
+		},
+		onError: (error) =>
+			toast.error("We could not delete the model", { description: problemDetailOf(error) }),
+	});
+
+	const testingConnectionIds = usePendingMutationIds(probeKey, idOf);
+	const writingConnectionIds = usePendingMutationIds(connectionWriteKey, idOf);
+	const writingModelIds = usePendingMutationIds(modelWriteKey, idOf);
+
+	const refreshFailure: RefreshFailure | undefined =
+		blockingFailure === undefined && failedReads.length > 0
+			? { error: failedReads[0]?.error, pending: retryPending, onRetry: retryFailedReads }
+			: undefined;
+	const formOpen = connectionDialogOpen || modelDialogOpen;
+	const refreshNotice =
+		refreshFailure === undefined ? undefined : (
+			<QueryErrorAlert
+				error={refreshFailure.error}
+				title="We could not refresh your AI providers"
+				pending={refreshFailure.pending}
+				onRetry={refreshFailure.onRetry}
+			/>
+		);
+	let providersState: ProviderPanelState = { status: "loading" };
+	if (blockingFailure !== undefined) {
+		providersState = { status: "error", error: blockingFailure.error, onRetry: retryFailedReads };
+	} else if (loaded) {
+		providersState = {
+			status: "ready",
+			connections,
+			models: modelsQuery.data ?? [],
+			refreshFailure: formOpen ? undefined : refreshFailure,
+		};
+	}
+
+	return (
+		<>
+			<WorkspaceLlmProviderPanel
+				state={providersState}
+				registrationAllowed={ownProviderAllowed && !registrationRefused}
+				testResults={testResults}
+				testingConnectionIds={testingConnectionIds}
+				writingConnectionIds={writingConnectionIds}
+				writingModelIds={writingModelIds}
+				onAddConnection={() => {
+					setEditingConnection(null);
+					setConnectionDialogOpen(true);
+				}}
+				onEditConnection={(connection) => {
+					setEditingConnection(connection);
+					setConnectionDialogOpen(true);
+				}}
+				onTestConnection={(connection) => {
+					setTestResult(connection.id, undefined);
+					probeConnection.mutate({ path: { workspaceSlug, id: connection.id } });
+				}}
+				onDisconnect={(connection) =>
+					deleteConnection.mutate({ path: { workspaceSlug, id: connection.id } })
+				}
+				onAddModel={(connection) => {
+					setEditingModel(null);
+					setModelConnectionId(connection.id);
+					setModelDialogOpen(true);
+				}}
+				onEditModel={(model) => {
+					setEditingModel(model);
+					setModelConnectionId(model.connectionId);
+					setModelDialogOpen(true);
+				}}
+				onDeleteModel={(model) => deleteModel.mutate({ path: { workspaceSlug, id: model.id } })}
+			/>
+			<WorkspaceLlmConnectionFormDialog
+				open={connectionDialogOpen}
+				notice={refreshNotice}
+				onOpenChange={setConnectionDialogOpen}
+				editing={editingConnection}
+				isSubmitting={createConnection.isPending || updateConnection.isPending}
+				onCreate={(body) => createConnection.mutate({ path, body })}
+				onUpdate={(id, body) => updateConnection.mutate({ path: { workspaceSlug, id }, body })}
+			/>
+			<WorkspaceLlmModelFormDialog
+				open={modelDialogOpen}
+				notice={refreshNotice}
+				onOpenChange={setModelDialogOpen}
+				editing={editingModel}
+				isSubmitting={createModel.isPending || updateModel.isPending}
+				onCreate={(body) => {
+					if (modelConnectionId == null) {
+						return;
+					}
+					createModel.mutate({ path: { workspaceSlug, connectionId: modelConnectionId }, body });
+				}}
+				onUpdate={(id, body) => updateModel.mutate({ path: { workspaceSlug, id }, body })}
+			/>
+		</>
 	);
 }

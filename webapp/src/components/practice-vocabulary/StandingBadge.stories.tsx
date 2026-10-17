@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent, waitFor } from "storybook/test";
 
-import { ARTIFACT_KIND } from "@/lib/artifact-kinds";
+import { ITEM_KIND } from "@/lib/item-kinds";
 import { withProvider } from "@/stories/decorators";
 import { settledPopup } from "@/stories/overlay";
 
@@ -38,13 +38,13 @@ export const Default: Story = {
  * The same standing on one practice: the sentence is about that practice, not about a group of
  * them.
  */
-export const PracticeNotObserved: Story = {
+export const PracticeNotReviewed: Story = {
 	args: { standing: "NOT_OBSERVED", scope: "practice" },
 	play: async ({ canvas }) => {
-		await userEvent.hover(canvas.getByRole("button", { name: "Not observed yet" }));
+		await userEvent.hover(canvas.getByRole("button", { name: "Not reviewed" }));
 		const tooltip = await settledPopup();
 		await expect(tooltip).toHaveTextContent(
-			"No review has observed this practice in your work yet.",
+			"No review has looked at this practice in your work yet.",
 		);
 	},
 };
@@ -58,8 +58,13 @@ const fourPieces = {
 	previousOpportunities: 4,
 	standingWork: 4,
 	reviewedWork: 11,
-	reviewedWorkKind: ARTIFACT_KIND.pullRequest,
+	reviewedWorkKind: ITEM_KIND.pullRequest,
 	ropeHalfWidth: 0.15,
+	calendarSpanDays: null,
+	comparablePractices: null,
+	eligiblePractices: null,
+	firstOpportunityAt: null,
+	lastOpportunityAt: null,
 };
 
 /**

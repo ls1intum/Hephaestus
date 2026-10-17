@@ -20,7 +20,16 @@ import org.springframework.stereotype.Repository;
 @Repository
 @WorkspaceAgnostic("Crash-recovery sweep only; thread-scoped access goes through ChatThreadService")
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> {
-    @Query("SELECT m.thread.user.id FROM ChatMessage m WHERE m.id = :id AND m.thread.workspace.id = :workspaceId")
+    @Query(
+            value = "SELECT CAST(m.parts AS text) FROM chat_message m JOIN chat_thread t ON t.id = m.thread_id "
+                    + "WHERE m.id = :messageId AND t.workspace_id = :workspaceId AND t.account_id = :accountId",
+            nativeQuery = true)
+    Optional<String> findTextForMessage(
+            @Param("workspaceId") long workspaceId,
+            @Param("accountId") long accountId,
+            @Param("messageId") UUID messageId);
+
+    @Query("SELECT m.thread.accountId FROM ChatMessage m WHERE m.id = :id AND m.thread.workspace.id = :workspaceId")
     Optional<Long> findDeveloperIdByIdAndWorkspaceId(UUID id, Long workspaceId);
 
     @Query("""
@@ -28,7 +37,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
         FROM ChatMessage m
         JOIN m.thread t
         WHERE t.workspace.id = :workspaceId
-          AND t.user.id = :userId
+          AND t.accountId = :userId
           AND t.id = :threadId
           AND m.status = de.tum.cit.aet.hephaestus.mentor.ChatMessage.Status.completed
           AND m.role <> de.tum.cit.aet.hephaestus.mentor.ChatMessage.Role.SYSTEM
@@ -50,9 +59,8 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
     boolean existsByParentMessageIdAndRoleAndCreatedAtAfter(
             UUID parentMessageId, ChatMessage.Role role, Instant createdAt);
 
-    @Query(
-            "SELECT m FROM ChatMessage m JOIN FETCH m.thread t JOIN FETCH t.workspace "
-                    + "WHERE m.status = de.tum.cit.aet.hephaestus.mentor.ChatMessage.Status.in_flight AND m.createdAt < :cutoff")
+    @Query("SELECT m FROM ChatMessage m JOIN FETCH m.thread t JOIN FETCH t.workspace WHERE m.status ="
+            + " de.tum.cit.aet.hephaestus.mentor.ChatMessage.Status.in_flight AND m.createdAt < :cutoff")
     List<ChatMessage> findStaleInFlightForAccounting(@Param("cutoff") Instant cutoff);
 
     /**
@@ -91,8 +99,8 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
      * and closes {@link #accumulateLlmUsage}'s fence — only then is the total final.
      */
     @Query("SELECT new de.tum.cit.aet.hephaestus.mentor.MentorTurnLlmUsage("
-            + "m.llmTotalCalls, m.llmTotalInputTokens, m.llmTotalOutputTokens, "
-            + "m.llmTotalReasoningTokens, m.llmCacheReadTokens, m.llmCacheWriteTokens) "
+            + "m.llmCalls, m.llmInputTokens, m.llmOutputTokens, "
+            + "m.llmReasoningTokens, m.llmCacheReadTokens, m.llmCacheWriteTokens) "
             + "FROM ChatMessage m WHERE m.id = :id")
     Optional<MentorTurnLlmUsage> findLlmUsageById(@Param("id") UUID id);
 }

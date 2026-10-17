@@ -106,9 +106,7 @@ public class GitLabProjectAdmission {
                             repository.getProvider().getServerUrl(),
                             false,
                             false)) return Optional.empty();
-            return monitors.findAllWithWorkspaceByRepositoryId(repository.getId()).stream()
-                    .filter(monitor -> monitor.getWorkspace() != null
-                            && Objects.equals(monitor.getWorkspace().getId(), workspaceId))
+            return monitors.findByWorkspaceIdAndSourceRepositoryId(workspaceId, repository.getId()).stream()
                     .min(Comparator.comparing(RepositoryToMonitor::getId))
                     .map(monitor -> new ProjectRead(
                             connection.get(), repository.getId(), repository.getNativeId(), monitor.getId()));

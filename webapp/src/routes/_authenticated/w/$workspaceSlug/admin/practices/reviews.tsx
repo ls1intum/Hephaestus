@@ -20,7 +20,7 @@ import {
 	practiceReviewsHead,
 	practiceReviewsSearchSchema,
 } from "@/components/admin/practice-reviews/review-levels";
-import type { ReviewScopeSearch } from "@/components/admin/practice-reviews/review-scope";
+import { parseScopeSearch } from "@/components/admin/practice-reviews/review-search";
 import {
 	parseSelectionSearch,
 	selectionSearch,
@@ -87,7 +87,7 @@ function ReviewsLayoutRoute() {
 	const selectionScope = useSearch({ strict: false, select: parseSelectionSearch });
 	const selected = useReviewSelection(workspaceSlug, selectionScope);
 	// The shared scope is in every tab's own search too; each tab's count reads what its link carries.
-	const scope: ReviewScopeSearch = useSearch({ strict: false });
+	const scope = useSearch({ strict: false, select: parseScopeSearch });
 	const counts = useReviewTabCounts(workspaceSlug, scope);
 	const setSearch = useSearchState();
 	const matchRoute = useMatchRoute();

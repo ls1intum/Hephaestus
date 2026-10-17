@@ -18,7 +18,7 @@ import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceScopeFilter;
-import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewRepositoryTargetRepository;
+import de.tum.cit.aet.hephaestus.workspace.settings.ReviewScopeRepositoryRepository;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -27,6 +27,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationEventPublisher;
 
 /**
  * Unit tests for {@link WorkspaceSyncTargetProvider#reconcileSyncTargetIdentity}, the correctness
@@ -61,13 +62,14 @@ class WorkspaceSyncTargetProviderReconcileTest extends BaseUnitTest {
     @Mock
     private IntegrationNatsConsumer natsConsumer;
 
-    @Mock
     private Workspace workspace;
 
     private WorkspaceSyncTargetProvider provider;
 
     @BeforeEach
     void setUp() {
+        workspace = new Workspace();
+        workspace.setId(WORKSPACE_ID);
         provider = new WorkspaceSyncTargetProvider(
                 workspaceRepository,
                 repositoryToMonitorRepository,
@@ -75,7 +77,8 @@ class WorkspaceSyncTargetProviderReconcileTest extends BaseUnitTest {
                 connectionService,
                 new NatsConnectionProperties(true, "nats://localhost:4222", null, null),
                 natsConsumerService,
-                mock(PracticeReviewRepositoryTargetRepository.class));
+                mock(ReviewScopeRepositoryRepository.class),
+                mock(ApplicationEventPublisher.class));
     }
 
     private RepositoryToMonitor monitor(@Nullable Long nativeId, String nameWithOwner) {
@@ -90,7 +93,6 @@ class WorkspaceSyncTargetProviderReconcileTest extends BaseUnitTest {
     void shouldRekeyNameAndRefreshConsumerWhenIdAgreesButNameChanged() {
         RepositoryToMonitor rtm = monitor(NATIVE_ID, OLD_NAME);
         when(repositoryToMonitorRepository.findById(SYNC_TARGET_ID)).thenReturn(Optional.of(rtm));
-        when(workspace.getId()).thenReturn(WORKSPACE_ID);
         doAnswer(inv -> {
                     Consumer<IntegrationNatsConsumer> c = inv.getArgument(0);
                     c.accept(natsConsumer);
@@ -102,7 +104,7 @@ class WorkspaceSyncTargetProviderReconcileTest extends BaseUnitTest {
         provider.reconcileSyncTargetIdentity(SYNC_TARGET_ID, NATIVE_ID, NEW_NAME);
 
         assertThat(rtm.getNameWithOwner()).isEqualTo(NEW_NAME);
-        verify(repositoryToMonitorRepository).save(rtm);
+        verify(repositoryToMonitorRepository).saveAndFlush(rtm);
         verify(natsConsumer).updateScopeConsumer(WORKSPACE_ID);
     }
 
@@ -115,7 +117,7 @@ class WorkspaceSyncTargetProviderReconcileTest extends BaseUnitTest {
 
         assertThat(rtm.getNativeId()).isEqualTo(NATIVE_ID);
         assertThat(rtm.getNameWithOwner()).isEqualTo(OLD_NAME);
-        verify(repositoryToMonitorRepository).save(rtm);
+        verify(repositoryToMonitorRepository).saveAndFlush(rtm);
         // Name did not move, so no consumer rebuild.
         verify(natsConsumerService, never()).ifAvailable(any());
     }
@@ -129,7 +131,7 @@ class WorkspaceSyncTargetProviderReconcileTest extends BaseUnitTest {
 
         // A different id means a different repository — never rename by name alone.
         assertThat(rtm.getNameWithOwner()).isEqualTo(OLD_NAME);
-        verify(repositoryToMonitorRepository, never()).save(any());
+        verify(repositoryToMonitorRepository, never()).saveAndFlush(any());
         verify(natsConsumerService, never()).ifAvailable(any());
     }
 
@@ -145,7 +147,6 @@ class WorkspaceSyncTargetProviderReconcileTest extends BaseUnitTest {
                 .thenReturn(List.of(first, second));
         when(repositoryToMonitorRepository.findById(SYNC_TARGET_ID)).thenReturn(Optional.of(first));
         when(repositoryToMonitorRepository.findById(SYNC_TARGET_ID + 1)).thenReturn(Optional.of(second));
-        when(workspace.getId()).thenReturn(WORKSPACE_ID);
         doAnswer(inv -> {
                     Consumer<IntegrationNatsConsumer> c = inv.getArgument(0);
                     c.accept(natsConsumer);
@@ -166,7 +167,7 @@ class WorkspaceSyncTargetProviderReconcileTest extends BaseUnitTest {
         provider.reconcileSyncTargetsForRepository(PROVIDER_ID, null, NEW_NAME);
 
         verify(repositoryToMonitorRepository, never()).findByNativeIdOnSourceProvider(any(), any());
-        verify(repositoryToMonitorRepository, never()).save(any());
+        verify(repositoryToMonitorRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -175,7 +176,7 @@ class WorkspaceSyncTargetProviderReconcileTest extends BaseUnitTest {
 
         provider.reconcileSyncTargetIdentity(SYNC_TARGET_ID, NATIVE_ID, NEW_NAME);
 
-        verify(repositoryToMonitorRepository, never()).save(any());
+        verify(repositoryToMonitorRepository, never()).saveAndFlush(any());
         verify(natsConsumerService, never()).ifAvailable(any());
     }
 }

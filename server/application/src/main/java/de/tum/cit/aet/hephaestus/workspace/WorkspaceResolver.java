@@ -58,16 +58,6 @@ public class WorkspaceResolver {
         return resolveAll(nameWithOwner);
     }
 
-    /** Exact source authority for a mirrored Repository.id; never inferred from an owner or path. */
-    @Transactional(readOnly = true)
-    public List<Workspace> resolveAllForRepositoryId(@Nullable Long repositoryId) {
-        return repositoryId == null
-                ? List.of()
-                : repositoryToMonitorRepository.findAllWithWorkspaceByRepositoryId(repositoryId).stream()
-                        .map(monitor -> Objects.requireNonNull(monitor.getWorkspace()))
-                        .toList();
-    }
-
     private List<Workspace> resolveAll(@Nullable String nameWithOwner) {
         if (nameWithOwner == null) {
             return List.of();

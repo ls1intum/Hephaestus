@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.math.BigDecimal;
@@ -32,8 +33,9 @@ class LlmUsageRecorderTest extends BaseUnitTest {
     private static LlmUsageRecorder.LlmUsageSample sample(
             LlmPriceSnapshot price, int attempt, MeasurementVerification verification) {
         return new LlmUsageRecorder.LlmUsageSample(
-                LlmUsageJobType.PULL_REQUEST_REVIEW,
-                LlmUsageSourceType.AGENT_JOB,
+                null,
+                "PRACTICE_REVIEW",
+                UsageSourceType.REVIEW_JOB,
                 UUID.randomUUID(),
                 attempt,
                 "authoritative-model",
@@ -42,6 +44,7 @@ class LlmUsageRecorderTest extends BaseUnitTest {
                 500_000,
                 250_000,
                 900_000,
+                0,
                 1,
                 price,
                 UsageProvenance.RUNNER,
@@ -51,8 +54,8 @@ class LlmUsageRecorderTest extends BaseUnitTest {
 
     private static LlmPriceSnapshot priced() {
         return new LlmPriceSnapshot(
-                FundingSource.WORKSPACE,
-                PricingState.PRICED,
+                UsageFundingSource.WORKSPACE,
+                UsagePricingState.PRICED,
                 null,
                 42L,
                 new BigDecimal("1"),
@@ -75,7 +78,7 @@ class LlmUsageRecorderTest extends BaseUnitTest {
 
         recorder.record(7L, sample(priced(), 3));
 
-        assertThat(captured(event).sourceType()).isEqualTo("AGENT_JOB");
+        assertThat(captured(event).sourceType()).isEqualTo("REVIEW_JOB");
         assertThat(captured(event).sourceAttempt()).isEqualTo(3);
         assertThat(captured(event).model()).isEqualTo("authoritative-model");
         // 1*1 + 2*2 + .5*3 + .25*4 = 7.5. reasoning is output telemetry, not a second charge.
@@ -161,8 +164,8 @@ class LlmUsageRecorderTest extends BaseUnitTest {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         AtomicReference<LlmUsageInsert> event = new AtomicReference<>();
         LlmPriceSnapshot missingOutputRate = new LlmPriceSnapshot(
-                FundingSource.WORKSPACE,
-                PricingState.PRICED,
+                UsageFundingSource.WORKSPACE,
+                UsagePricingState.PRICED,
                 null,
                 42L,
                 new BigDecimal("1"),
@@ -223,8 +226,9 @@ class LlmUsageRecorderTest extends BaseUnitTest {
     void nonsensicalCountsAreClampedBeforeTheyReachTheLedger() {
         AtomicReference<LlmUsageInsert> event = new AtomicReference<>();
         LlmUsageRecorder.LlmUsageSample negative = new LlmUsageRecorder.LlmUsageSample(
-                LlmUsageJobType.PULL_REQUEST_REVIEW,
-                LlmUsageSourceType.AGENT_JOB,
+                null,
+                "PRACTICE_REVIEW",
+                UsageSourceType.REVIEW_JOB,
                 UUID.randomUUID(),
                 -1,
                 "authoritative-model",
@@ -233,6 +237,7 @@ class LlmUsageRecorderTest extends BaseUnitTest {
                 -7,
                 -8,
                 -9,
+                0,
                 0,
                 priced(),
                 UsageProvenance.RUNNER,
@@ -299,22 +304,31 @@ class LlmUsageRecorderTest extends BaseUnitTest {
 
     private static LlmPriceSnapshot instancePriced() {
         return new LlmPriceSnapshot(
-                FundingSource.INSTANCE, PricingState.PRICED, 40L, null, new BigDecimal("1"), null, null, null);
+                UsageFundingSource.INSTANCE,
+                UsagePricingState.PRICED,
+                40L,
+                null,
+                new BigDecimal("1"),
+                null,
+                null,
+                null);
     }
 
     private static LlmPriceSnapshot pricedWithInputRate(BigDecimal per1mInputUsd) {
         return new LlmPriceSnapshot(
-                FundingSource.WORKSPACE, PricingState.PRICED, null, 42L, per1mInputUsd, null, null, null);
+                UsageFundingSource.WORKSPACE, UsagePricingState.PRICED, null, 42L, per1mInputUsd, null, null, null);
     }
 
     private static LlmUsageRecorder.LlmUsageSample sampleOfInputTokensOnly(LlmPriceSnapshot price, long inputTokens) {
         return new LlmUsageRecorder.LlmUsageSample(
-                LlmUsageJobType.PULL_REQUEST_REVIEW,
-                LlmUsageSourceType.AGENT_JOB,
+                null,
+                "PRACTICE_REVIEW",
+                UsageSourceType.REVIEW_JOB,
                 UUID.randomUUID(),
                 1,
                 "authoritative-model",
                 inputTokens,
+                0,
                 0,
                 0,
                 0,
@@ -341,7 +355,7 @@ class LlmUsageRecorderTest extends BaseUnitTest {
     void shouldKeepUnverifiablePositiveUsageUnpricedEvenWhenTheModelIsFree() {
         AtomicReference<LlmUsageInsert> event = new AtomicReference<>();
         var free = new LlmPriceSnapshot(
-                FundingSource.WORKSPACE, PricingState.NO_CHARGE, null, 42L, null, null, null, null);
+                UsageFundingSource.WORKSPACE, UsagePricingState.NO_CHARGE, null, 42L, null, null, null, null);
 
         recorder(capturing(event)).record(7L, sample(free, 1, MeasurementVerification.UNVERIFIABLE));
 

@@ -1,28 +1,38 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { folderCitationIndex } from "../../../main/resources/agent/pi-folder-index.ts";
+import {
+	folderCitationIndex,
+	citableTextIndex,
+} from "../../../main/resources/agent/pi-folder-index.ts";
 
 await test("the full folder remains citable when a primary readiness source is absent", () => {
 	const result = folderCitationIndex({
-		sources: [{ kind: "outline.documents", state: { availability: "UNAVAILABLE" } }],
-		artifacts: [
-			{ kind: "outline.documents", artifact: { path: "context/docs/engineering/design.md" } },
-			{ kind: "scm.repository.tree", artifact: { path: "repos/42/.git/HEAD" } },
+		sources: [
+			{
+				kind: "outline.documents",
+				citation: { side: "FORBIDDEN", commit: "FORBIDDEN" },
+				state: { availability: "UNAVAILABLE" },
+			},
+		],
+		files: [
+			{ kind: "outline.documents", file: { path: "context/docs/engineering/design.md" } },
+			{ kind: "scm.repository.tree", file: { path: "repos/42/.git/HEAD" } },
 		],
 	});
 	assert.equal(
-		result.artifactSources.get("context/docs/engineering/design.md"),
+		result.sourceFileSources.get("context/docs/engineering/design.md"),
 		"outline.documents",
 	);
-	assert.equal(result.artifactSources.get("repos/42/.git/HEAD"), "scm.repository.tree");
+	assert.equal(result.sourceFileSources.get("repos/42/.git/HEAD"), "scm.repository.tree");
 	assert.equal(result.availableSourceKinds.has("outline.documents"), true);
 });
 
 await test("missing, duplicate and unsafe folder proofs fail closed", () => {
-	assert.throws(() => folderCitationIndex({ sources: [] }), /expected sources and artifacts/u);
-	const artifact = { kind: "outline.documents", artifact: { path: "context/docs/c/d.md" } };
+	assert.throws(() => folderCitationIndex({ sources: [] }), /files/u);
+	const sourceFile = { kind: "outline.documents", file: { path: "context/docs/c/d.md" } };
 	assert.throws(
-		() => folderCitationIndex({ sources: [], artifacts: [artifact, artifact] }),
+		() => folderCitationIndex({ sources: [], files: [sourceFile, sourceFile] }),
 		/duplicate/u,
 	);
 	for (const path of [
@@ -32,8 +42,8 @@ await test("missing, duplicate and unsafe folder proofs fail closed", () => {
 		String.raw`context\foreign`,
 	]) {
 		assert.throws(
-			() => folderCitationIndex({ sources: [], artifacts: [{ kind: "x", artifact: { path } }] }),
-			/invalid/u,
+			() => folderCitationIndex({ sources: [], files: [{ kind: "x", file: { path } }] }),
+			/path/u,
 		);
 	}
 });
@@ -41,13 +51,48 @@ await test("missing, duplicate and unsafe folder proofs fail closed", () => {
 await test("composed views are readable but only canonical records are citable", () => {
 	const result = folderCitationIndex({
 		sources: [],
-		artifacts: [
-			{ kind: "review.observations", artifact: { path: "inputs/history/observations.json" } },
-			{ kind: "workspace.project-inventory", artifact: { path: "context/project_inventory.json" } },
-			{ kind: "review.observations", artifact: { path: "context/people/42/observations.jsonl" } },
+		files: [
+			{ kind: "review.problems", file: { path: "inputs/history/problems.json" } },
+			{ kind: "review.problems", file: { path: "context/people/42/problems.jsonl" } },
 		],
 	});
-	assert.equal(result.artifactSources.has("inputs/history/observations.json"), false);
-	assert.equal(result.artifactSources.has("context/project_inventory.json"), false);
-	assert.equal(result.artifactSources.has("context/people/42/observations.jsonl"), true);
+	assert.equal(result.sourceFileSources.has("inputs/history/problems.json"), false);
+	assert.equal(result.sourceFileSources.has("context/people/42/problems.jsonl"), true);
+});
+
+await test("logical captured texts preserve their digest, staged path and opaque version", () => {
+	assert.deepEqual(citableTextIndex({}), []);
+	for (const invalid of [null, {}, "text"]) {
+		assert.throws(() => citableTextIndex({ citableTexts: invalid }), /citableTexts/u);
+	}
+	const text = {
+		source: "custom.text",
+		path: "thread/message",
+		side: "NEW",
+		commit: "opaque:v1",
+		stagedPath: "context/message.txt",
+		sha256: "a".repeat(64),
+	};
+	assert.deepEqual(citableTextIndex({ citableTexts: [text] }), [text]);
+	for (const invalid of [
+		{ ...text, stagedPath: "../foreign" },
+		{ ...text, sha256: "bad" },
+		{ ...text, side: "MIDDLE" },
+	]) {
+		assert.throws(() => citableTextIndex({ citableTexts: [invalid] }), /citableTexts/u);
+	}
+});
+
+await test("the shared server manifest carries the source-catalog citation capabilities unchanged", () => {
+	const { citationCapabilities } = folderCitationIndex(
+		JSON.parse(readFileSync(new URL("folder-citation-index.json", import.meta.url), "utf8")),
+	);
+	assert.deepEqual(citationCapabilities.get("scm.pull-request.diff"), {
+		side: "REQUIRED",
+		commit: "OPTIONAL",
+	});
+	assert.deepEqual(citationCapabilities.get("scm.repository.tree"), {
+		side: "FORBIDDEN",
+		commit: "OPTIONAL",
+	});
 });

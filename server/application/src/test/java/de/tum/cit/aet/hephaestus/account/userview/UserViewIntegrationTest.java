@@ -6,28 +6,35 @@ import de.tum.cit.aet.hephaestus.activity.ActivityEventRepository;
 import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
 import de.tum.cit.aet.hephaestus.activity.ActivityTargetType;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
 import de.tum.cit.aet.hephaestus.core.security.UserViewContextHolder;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
+import de.tum.cit.aet.hephaestus.practices.PracticeGuidance;
 import de.tum.cit.aet.hephaestus.practices.PracticeGuide;
-import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
+import de.tum.cit.aet.hephaestus.practices.PracticeReadSource;
+import de.tum.cit.aet.hephaestus.practices.PracticeReads;
+import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
 import de.tum.cit.aet.hephaestus.practices.PracticeVisual;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.ReviewOn;
+import de.tum.cit.aet.hephaestus.practices.ReviewedBy;
+import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewedByKind;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.Membership;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -51,6 +58,9 @@ import org.springframework.web.util.pattern.PathPattern;
 
 class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Autowired
+    private PracticeVersionService versions;
+
+    @Autowired
     private WebTestClient client;
 
     @Autowired
@@ -58,12 +68,6 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
     private ChatThreadRepository threads;
-
-    @Autowired
-    private PracticeRepository practices;
-
-    @Autowired
-    private IdentityLinkRepository identityLinks;
 
     @Autowired
     private ActivityEventRepository activityEvents;
@@ -90,17 +94,7 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     @Test
-    void shouldListTheAccountBehindEachMemberWhenOneNeverSignedIn() {
-        User signedIn = persistUser("signed-in");
-        ensureWorkspaceMembership(workspace, signedIn, WorkspaceMembership.WorkspaceRole.MEMBER);
-        Account account = persistAccount("Signed-in member");
-        IdentityLink link = new IdentityLink();
-        link.setAccount(account);
-        link.setProviderId(Objects.requireNonNull(ensureGitHubProvider().getId()));
-        link.setSubject(String.valueOf(signedIn.getNativeId()));
-        link.setExternalActorId(signedIn.getId());
-        identityLinks.save(link);
-
+    void shouldListAnUnclaimedAccountWhenItsMemberNeverSignedIn() {
         request("/user-view/users")
                 .exchange()
                 .expectStatus()
@@ -108,80 +102,58 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .expectHeader()
                 .cacheControl(CacheControl.noStore())
                 .expectBody()
-                .jsonPath("$.content[0].userId")
-                .isEqualTo(viewed.getId())
                 .jsonPath("$.content[0].accountId")
-                .doesNotExist()
-                .jsonPath("$.content[1].userId")
-                .isEqualTo(signedIn.getId())
-                .jsonPath("$.content[1].accountId")
-                .isEqualTo(account.getId())
-                .jsonPath("$.content[1].accountStatus")
-                .isEqualTo("ACTIVE");
+                .isEqualTo(Long.toString(accountId(viewed)))
+                .jsonPath("$.content[0].account.id")
+                .isEqualTo(Long.toString(accountId(viewed)))
+                .jsonPath("$.content[0].account.status")
+                .isEqualTo("UNCLAIMED")
+                .jsonPath("$.content[0].account.primaryEmail")
+                .doesNotExist();
     }
 
     @Test
-    void shouldUseProviderIdentityForTheListedAndAuditedAccountWhenActorCacheIsStale() {
-        User other = persistUser("different-member");
-        ensureWorkspaceMembership(workspace, other, WorkspaceMembership.WorkspaceRole.MEMBER);
-        Account viewedAccount = persistAccount("Viewed account");
-        Account otherAccount = persistAccount("Other account");
-        long providerId = Objects.requireNonNull(ensureGitHubProvider().getId());
-
-        IdentityLink viewedLink = new IdentityLink();
-        viewedLink.setAccount(viewedAccount);
-        viewedLink.setProviderId(providerId);
-        viewedLink.setSubject(viewed.getNativeId().toString());
-        viewedLink.setExternalActorId(other.getId());
-        identityLinks.save(viewedLink);
-        IdentityLink otherLink = new IdentityLink();
-        otherLink.setAccount(otherAccount);
-        otherLink.setProviderId(providerId);
-        otherLink.setSubject(other.getNativeId().toString());
-        otherLink.setExternalActorId(viewed.getId());
-        identityLinks.save(otherLink);
-
-        request("/user-view/users")
+    void shouldRecordTheExactAccountWhenItHasNoProviderMirror() {
+        var account = persistAccount("No mirror");
+        workspaceMembershipService.createMembership(
+                workspace, Objects.requireNonNull(account.getId()), Membership.WorkspaceRole.MEMBER);
+        request("/user-view/users/" + account.getId())
                 .exchange()
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.content[0].userId")
-                .isEqualTo(other.getId())
-                .jsonPath("$.content[0].accountId")
-                .isEqualTo(otherAccount.getId())
-                .jsonPath("$.content[1].userId")
-                .isEqualTo(viewed.getId())
-                .jsonPath("$.content[1].accountId")
-                .isEqualTo(viewedAccount.getId());
-
-        request(viewedPath()).exchange().expectStatus().isOk().expectBody(Void.class);
+                .jsonPath("$.accountId")
+                .isEqualTo(Long.toString(Objects.requireNonNull(account.getId())))
+                .jsonPath("$.account.identities.length()")
+                .isEqualTo(0);
         var audit = jdbc.queryForMap(
-                "SELECT account_id, acting_account_id FROM auth_event WHERE event_type = 'USER_VIEW' AND viewed_user_id = ?",
-                viewed.getId());
+                "SELECT viewed_actor_id,viewed_account_id,acting_account_id FROM auth_event"
+                        + " WHERE event_type='USER_VIEW' AND viewed_account_id=?",
+                account.getId());
         assertThat(audit)
-                .containsEntry("account_id", viewedAccount.getId())
+                .containsEntry("viewed_actor_id", null)
+                .containsEntry("viewed_account_id", account.getId())
                 .containsEntry("acting_account_id", administrator.getId());
     }
 
     @Test
-    void shouldPageHumanMembersOnlyWhenABotIsAMemberToo() {
-        User bot = persistUser("automation");
-        bot.setType(User.Type.BOT);
-        userRepository.save(bot);
-        ensureWorkspaceMembership(workspace, bot, WorkspaceMembership.WorkspaceRole.MEMBER);
-        ensureWorkspaceMembership(workspace, persistUser("another-member"), WorkspaceMembership.WorkspaceRole.MEMBER);
-        request("/user-view/users?size=1&page=1")
+    void shouldPageActiveHumanMembershipsWhenAFormerMemberIsRetained() {
+        var former = persistAccount("Former member");
+        var row = workspaceMembershipService.createMembership(
+                workspace, Objects.requireNonNull(former.getId()), Membership.WorkspaceRole.MEMBER);
+        row.setLeftAt(Instant.now());
+        workspaceMembershipRepository.saveAndFlush(row);
+        request("/user-view/users?size=1&page=0")
                 .exchange()
                 .expectStatus()
                 .isOk()
                 .expectBody()
                 .jsonPath("$.content.length()")
                 .isEqualTo(1)
-                .jsonPath("$.content[0].userId")
-                .isEqualTo(viewed.getId())
-                .jsonPath("$.totalPages")
-                .isEqualTo(2);
+                .jsonPath("$.content[0].accountId")
+                .isEqualTo(Long.toString(accountId(viewed)))
+                .jsonPath("$.totalElements")
+                .isEqualTo(1);
     }
 
     @Test
@@ -193,23 +165,25 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .expectHeader()
                 .cacheControl(CacheControl.noStore())
                 .expectBody()
-                .jsonPath("$.userId")
-                .isEqualTo(viewed.getId());
+                .jsonPath("$.accountId")
+                .isEqualTo(Long.toString(accountId(viewed)));
         var audit = jdbc.queryForMap(
-                "SELECT account_id, acting_account_id, workspace_id, details::text AS details FROM auth_event "
-                        + "WHERE event_type = 'USER_VIEW' AND viewed_user_id = ?",
-                viewed.getId());
+                "SELECT account_id, acting_account_id, workspace_id, details::text AS"
+                        + " details FROM auth_event WHERE event_type = 'USER_VIEW' AND"
+                        + " viewed_account_id = ?",
+                accountId(viewed));
         assertThat(audit)
-                .containsEntry("account_id", null)
+                .containsEntry("account_id", administrator.getId())
                 .containsEntry("acting_account_id", administrator.getId())
                 .containsEntry("workspace_id", workspace.getId());
-        assertThat(String.valueOf(audit.get("details"))).contains("/workspaces/acme/user-view/users/" + viewed.getId());
+        assertThat(String.valueOf(audit.get("details")))
+                .contains("/workspaces/acme/user-view/users/" + accountId(viewed));
     }
 
     @Test
     void shouldHideAUserAndRecordNothingWhenTheyAreNotAMemberOfTheWorkspace() {
         User outsider = persistUser("outside-view");
-        request("/user-view/users/" + outsider.getId())
+        request("/user-view/users/" + accountId(outsider))
                 .exchange()
                 .expectStatus()
                 .isNotFound()
@@ -220,7 +194,7 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Test
     void shouldListOnlyTheViewedUsersConversationsWhenOthersExistInAndOutsideTheWorkspace() {
         User other = persistUser("another-view-user");
-        ensureWorkspaceMembership(workspace, other, WorkspaceMembership.WorkspaceRole.MEMBER);
+        ensureMembership(workspace, other, Membership.WorkspaceRole.MEMBER);
         ChatThread own = thread(workspace, viewed, "Viewed user's conversation");
         thread(workspace, other, "Other private conversation");
         Workspace elsewhere = createWorkspace("other-view", "Other view", other.getLogin(), AccountType.USER, other);
@@ -239,7 +213,7 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Test
     void shouldNotDiscloseAConversationWhenItBelongsToAnotherMember() {
         User other = persistUser("another-view-user");
-        ensureWorkspaceMembership(workspace, other, WorkspaceMembership.WorkspaceRole.MEMBER);
+        ensureMembership(workspace, other, Membership.WorkspaceRole.MEMBER);
         ChatThread foreign = thread(workspace, other, "Other private conversation");
         sessionRequest("/workspaces/acme/mentor/threads/" + foreign.getId())
                 .exchange()
@@ -304,7 +278,9 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @ValueSource(booleans = {true, false})
     void shouldDiscloseNothingWhenTheAuditInsertFails(boolean selection) {
         jdbc.execute("ALTER TABLE auth_event ADD CONSTRAINT reject_user_view_test "
-                + "CHECK (event_type <> 'USER_VIEW' OR viewed_user_id <> " + viewed.getId() + ") NOT VALID");
+                + "CHECK (event_type <> 'USER_VIEW' OR viewed_account_id <> "
+                + accountId(viewed)
+                + ") NOT VALID");
         try {
             (selection ? request(viewedPath()) : sessionRequest("/workspaces/acme/mentor/threads"))
                     .exchange()
@@ -322,18 +298,25 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     @Test
-    void shouldReadTheNormalActivityAsTheSelectedAccountlessUser() {
+    void shouldReadOwnActivityAsTheSelectedUnclaimedMember() {
         connectActivitySource(workspace, viewed.getProvider());
         recordReview(viewed);
 
-        sessionRequest("/workspaces/acme/activity/work?login=" + viewed.getLogin())
+        sessionRequest("/workspaces/acme/activity/me/work")
                 .exchange()
                 .expectStatus()
                 .isOk()
                 .expectBody()
                 .jsonPath("$.content[0].people[0].id")
                 .isEqualTo(viewed.getId());
-        assertThat(userViewRowsFor(viewed)).isEqualTo(1);
+        sessionRequest("/workspaces/acme/activity/me")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.person.id")
+                .isEqualTo(viewed.getId());
+        assertThat(userViewRowsFor(viewed)).isEqualTo(2);
     }
 
     @Test
@@ -372,7 +355,7 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
     void shouldReadTheSelectedProviderActorWhenWorkspaceMembersShareALogin() {
         User gitLabNamesake =
                 TestUserFactory.ensureUser(userRepository, viewed.getLogin(), 700_002L, ensureGitLabProvider());
-        ensureWorkspaceMembership(workspace, gitLabNamesake, WorkspaceMembership.WorkspaceRole.MEMBER);
+        ensureMembership(workspace, gitLabNamesake, Membership.WorkspaceRole.MEMBER);
         connectActivitySource(workspace, gitLabNamesake.getProvider());
         recordReview(viewed);
         recordReview(gitLabNamesake);
@@ -380,7 +363,7 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
         sessionRequest(
                         "/workspaces/acme/activity/work?login=" + gitLabNamesake.getLogin(),
                         token(),
-                        gitLabNamesake.getId())
+                        accountId(gitLabNamesake))
                 .exchange()
                 .expectStatus()
                 .isOk()
@@ -394,7 +377,7 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Test
     void shouldReadATeammatesActivityAndRecordTheViewWhenViewingAMember() {
         User teammate = persistUser("teammate-activity");
-        ensureWorkspaceMembership(workspace, teammate, WorkspaceMembership.WorkspaceRole.MEMBER);
+        ensureMembership(workspace, teammate, Membership.WorkspaceRole.MEMBER);
         connectActivitySource(workspace, teammate.getProvider());
         recordReview(teammate);
 
@@ -450,7 +433,7 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         client.delete()
                 .uri("/workspaces/acme/mentor/threads/" + own.getId())
-                .headers(viewHeaders(token(), viewed.getId()))
+                .headers(viewHeaders(token(), accountId(viewed)))
                 .exchange()
                 .expectStatus()
                 .isForbidden()
@@ -464,7 +447,7 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
     void shouldRefuseAnOptionsRequestCarryingTheViewAndRecordNothing() {
         client.options()
                 .uri("/workspaces/acme/mentor/threads")
-                .headers(viewHeaders(token(), viewed.getId()))
+                .headers(viewHeaders(token(), accountId(viewed)))
                 .exchange()
                 .expectStatus()
                 .isForbidden()
@@ -477,7 +460,7 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
     void shouldRefuseAHeadRequestCarryingTheViewAndRecordNothing() {
         client.head()
                 .uri("/workspaces/acme/mentor/threads")
-                .headers(viewHeaders(token(), viewed.getId()))
+                .headers(viewHeaders(token(), accountId(viewed)))
                 .exchange()
                 .expectStatus()
                 .isForbidden()
@@ -520,31 +503,31 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .expectBody(Void.class);
 
         String details = jdbc.queryForObject(
-                "SELECT details::text FROM auth_event WHERE event_type = 'USER_VIEW' AND viewed_user_id = ?",
+                "SELECT details::text FROM auth_event WHERE event_type = 'USER_VIEW' AND" + " viewed_account_id = ?",
                 String.class,
-                viewed.getId());
+                accountId(viewed));
         assertThat(details).contains("Support").contains("/workspaces/acme/mentor/threads?page=0");
     }
 
     @Test
     void shouldReportTheViewedMembersOwnRoleWhenTheAdministratorViewsAMember() {
         User member = persistUser("plain-member");
-        ensureWorkspaceMembership(workspace, member, WorkspaceMembership.WorkspaceRole.MEMBER);
+        ensureMembership(workspace, member, Membership.WorkspaceRole.MEMBER);
 
-        sessionRequest("/workspaces/acme/members/me", token(), member.getId())
+        sessionRequest("/workspaces/acme/members/me", token(), accountId(member))
                 .exchange()
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.userId")
-                .isEqualTo(member.getId())
+                .jsonPath("$.account.id")
+                .isEqualTo(Long.toString(accountId(member)))
                 .jsonPath("$.role")
                 .isEqualTo("MEMBER");
     }
 
     @ParameterizedTest
     @NullSource
-    @ValueSource(strings = "not-a-user")
+    @ValueSource(strings = {"not-an-account", "0", "-1", "+1", "01", "9223372036854775808"})
     void shouldRejectAViewAndRecordNothingWhenTheViewedUserIsNotAnId(@Nullable String userHeader) {
         client.get()
                 .uri("/workspaces/acme/mentor/threads")
@@ -553,7 +536,7 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     headers.set(UserViewContextHolder.WORKSPACE_HEADER, "acme");
                     headers.set(UserViewContextHolder.REASON_HEADER, "Support");
                     if (userHeader != null) {
-                        headers.set(UserViewContextHolder.USER_HEADER, userHeader);
+                        headers.set(UserViewContextHolder.ACCOUNT_HEADER, userHeader);
                     }
                 })
                 .exchange()
@@ -577,27 +560,22 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private long userViewRowsFor(User user) {
         Long rows = jdbc.queryForObject(
-                "SELECT count(*) FROM auth_event WHERE event_type = 'USER_VIEW' AND viewed_user_id = ?",
+                "SELECT count(*) FROM auth_event WHERE event_type = 'USER_VIEW' AND" + " viewed_account_id = ?",
                 Long.class,
-                user.getId());
+                accountId(user));
         return rows == null ? 0 : rows;
     }
 
     /** The workspace owner signing in as themselves: a member, not an instance administrator. */
     private Account viewedUsersOwnAccount() {
-        Account account = persistAccount("Workspace owner");
-        IdentityLink link = new IdentityLink();
-        link.setAccount(account);
-        link.setProviderId(Objects.requireNonNull(ensureGitHubProvider().getId()));
-        link.setSubject(String.valueOf(viewed.getNativeId()));
-        link.setExternalActorId(viewed.getId());
-        identityLinks.save(link);
-        return account;
+        var account = accountRepository.findById(accountId(viewed)).orElseThrow();
+        account.setStatus(Account.Status.ACTIVE);
+        return accountRepository.saveAndFlush(account);
     }
 
     private long userViewRowsBy(Account account) {
         Long rows = jdbc.queryForObject(
-                "SELECT count(*) FROM auth_event WHERE event_type = 'USER_VIEW' AND acting_account_id = ?",
+                "SELECT count(*) FROM auth_event WHERE event_type = 'USER_VIEW' AND" + " acting_account_id = ?",
                 Long.class,
                 account.getId());
         return rows == null ? 0 : rows;
@@ -608,7 +586,7 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     private String viewedPath() {
-        return "/user-view/users/" + viewed.getId();
+        return "/user-view/users/" + accountId(viewed);
     }
 
     private WebTestClient.RequestHeadersSpec<?> request(String path) {
@@ -623,7 +601,7 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     private WebTestClient.RequestHeadersSpec<?> sessionRequest(String path, String bearer) {
-        return sessionRequest(path, bearer, viewed.getId());
+        return sessionRequest(path, bearer, accountId(viewed));
     }
 
     private WebTestClient.RequestHeadersSpec<?> sessionRequest(String path, String bearer, long userId) {
@@ -634,7 +612,7 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
         return headers -> {
             headers.setBearerAuth(bearer);
             headers.set(UserViewContextHolder.WORKSPACE_HEADER, "acme");
-            headers.set(UserViewContextHolder.USER_HEADER, String.valueOf(userId));
+            headers.set(UserViewContextHolder.ACCOUNT_HEADER, String.valueOf(userId));
             headers.set(UserViewContextHolder.REASON_HEADER, "Support");
         };
     }
@@ -670,21 +648,33 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
         ChatThread thread = new ChatThread();
         thread.setId(UUID.randomUUID());
         thread.setWorkspace(ownerWorkspace);
-        thread.setUser(owner);
+        thread.setAccountId(accountId(owner));
         thread.setTitle(title);
         return threads.save(thread);
     }
 
     private void persistGuidedPractice(Workspace ownerWorkspace) {
-        Practice practice = new Practice();
-        practice.setWorkspace(ownerWorkspace);
-        practice.setSlug("guided-practice");
-        practice.setName("Separate changes");
-        practice.setCriteria("Keep each change focused.");
-        PracticeTestEvidence.configure(practice, ArtifactKinds.PULL_REQUEST);
-        practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
-        practice.setVisual(new PracticeVisual("<svg xmlns=\"http://www.w3.org/2000/svg\"/>", "Two changes"));
-        practice.setGuide(new PracticeGuide("# Keep changes separate", Map.of()));
-        practices.save(practice);
+        var definition = new PracticeDefinition(
+                "Separate changes",
+                new ReviewOn(List.of(), Map.of()),
+                null,
+                AboutRole.AUTHOR,
+                new PracticeReads(
+                        "2.0.0",
+                        List.of(new PracticeReadSource(new SourceKind("scm.pull-request.core"), ReadNeed.REQUIRED))),
+                new ReviewedBy(ReviewedByKind.HEPHAESTUS, null, List.of()),
+                "Keep each change focused.",
+                null,
+                null,
+                false,
+                new PracticeGuidance(
+                        null,
+                        null,
+                        null,
+                        new PracticeVisual(
+                                "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 640 320\"/>", "Two changes"),
+                        new PracticeGuide("# Keep changes separate", Map.of())));
+        versions.create(new PracticeVersionService.NewPractice(
+                ownerWorkspace, "guided-practice", new ItemKind("scm.pull_request"), definition, null, 0, null));
     }
 }

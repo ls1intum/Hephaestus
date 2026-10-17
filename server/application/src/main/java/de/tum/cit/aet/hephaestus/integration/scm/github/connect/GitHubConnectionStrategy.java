@@ -12,7 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenServic
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppUserAuthorizationClient;
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppUserAuthorizationClient.UserInstallation;
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubUserAuthorizationException;
-import de.tum.cit.aet.hephaestus.workspace.ScmWorkspaceContentEraser;
+import de.tum.cit.aet.hephaestus.integration.scm.workspace.ScmWorkspaceContentEraser;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -83,23 +83,28 @@ public class GitHubConnectionStrategy implements ConnectionStrategy {
         }
         String state = oauthStateService.issue(request.workspaceId(), IntegrationKind.GITHUB, request.actorAccountId());
         String separator = installationUrl.contains("?") ? "&" : "?";
-        URI vendorUrl = URI.create(installationUrl + separator + CALLBACK_PARAM_STATE + "="
+        URI vendorUrl = URI.create(installationUrl
+                + separator
+                + CALLBACK_PARAM_STATE
+                + "="
                 + URLEncoder.encode(state, StandardCharsets.UTF_8));
         return new ConnectInitiation.RedirectToVendor(vendorUrl, state);
     }
 
     @Override
     public boolean isProviderInitiated(Map<String, String> callbackParams) {
-        // With user authorization during installation, GitHub sends every installer here — including one who
-        // installed from GitHub or from the workspace wizard, where the installation webhook creates the workspace.
+        // With user authorization during installation, GitHub sends every installer here —
+        // including one who
+        // installed from GitHub or from the workspace wizard, where the installation webhook
+        // creates the workspace.
         return callbackParams.containsKey(CALLBACK_PARAM_SETUP_ACTION);
     }
 
     @Override
     public ConnectFinalization finalizeConnect(IntegrationRef ref, Map<String, String> callbackParams) {
         if (SETUP_ACTION_REQUEST.equals(callbackParams.get(CALLBACK_PARAM_SETUP_ACTION))) {
-            return new ConnectFinalization.Failed("An owner of the GitHub account must approve the installation"
-                    + " request. When the owner approves it, connect GitHub again.");
+            return new ConnectFinalization.Failed(
+                    "An owner of the GitHub account must approve the installation request. When the owner approves it, connect GitHub again.");
         }
         Optional<Long> installationId = parseInstallationId(callbackParams.get(CALLBACK_PARAM_INSTALLATION_ID));
         if (installationId.isEmpty()) {
@@ -108,8 +113,7 @@ public class GitHubConnectionStrategy implements ConnectionStrategy {
         String code = callbackParams.get(CALLBACK_PARAM_CODE);
         if (code == null || code.isBlank()) {
             return new ConnectFinalization.Failed(
-                    "GitHub did not confirm who installed the app, so Hephaestus cannot connect the installation."
-                            + " The GitHub App must request user authorization during installation.");
+                    "GitHub did not confirm who installed the app, so Hephaestus cannot connect the installation. The GitHub App must request user authorization during installation.");
         }
         try {
             return verify(ref, installationId.get(), code);

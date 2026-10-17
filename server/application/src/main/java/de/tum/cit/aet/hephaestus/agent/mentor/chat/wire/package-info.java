@@ -3,6 +3,9 @@
  * non-{@code agent} channel adapter (e.g. the Slack streaming adapter) can pattern-match the chunk stream —
  * a package-level declaration covers {@code UIMessageChunk} and all its nested permitted records.
  */
-@org.springframework.modulith.NamedInterface("mentor-chat")
-@org.jspecify.annotations.NullMarked
+@NamedInterface("mentor-chat")
+@NullMarked
 package de.tum.cit.aet.hephaestus.agent.mentor.chat.wire;
+
+import org.jspecify.annotations.NullMarked;
+import org.springframework.modulith.NamedInterface;

@@ -5,12 +5,12 @@ import { tmpdir } from "node:os";
 import nodePath from "node:path";
 import test from "node:test";
 
+import { isJsonObject as isRecord } from "../../../../../../docker/agents/practice-scripts/lib/core/json.ts";
 import {
 	diffSections,
 	type PinnedBlob,
 	type PinnedDiff,
 } from "../../../main/resources/agent/pi-change.ts";
-import { isRecord } from "../../../main/resources/agent/pi-observation-normalize.ts";
 import {
 	buildBrief,
 	buildPrimarySourceReference,
@@ -69,7 +69,7 @@ function primaryCapture(t: { after: (cleanup: () => void) => void }) {
 	const tree = "repos/reviewed/.git/HEAD";
 	const refs = "repos/reviewed/.git/hephaestus-captured-refs";
 	const index = {
-		artifactKind: "scm.pull_request",
+		itemKind: "scm.pull_request",
 		sources: [
 			{
 				kind: "scm.repository.tree",
@@ -79,18 +79,19 @@ function primaryCapture(t: { after: (cleanup: () => void) => void }) {
 					limitations: ["Submodules are not captured."],
 					facts: { immutableIdentity: `${HEAD}:${"d".repeat(40)}` },
 				},
-				artifacts: [{ path: tree }, { path: refs }],
+				files: [{ path: tree }, { path: refs }],
 			},
 			{
 				kind: "scm.pull-request.diff",
+				citation: { side: "REQUIRED", commit: "OPTIONAL" },
 				state: { availability: "AVAILABLE", facts: { immutableIdentity: `${BASE}:${HEAD}` } },
-				artifacts: [{ path: "context/change.json" }],
+				files: [{ path: "context/change.json" }],
 			},
 		],
-		artifacts: [
-			{ kind: "scm.repository.tree", artifact: { path: tree } },
-			{ kind: "scm.repository.tree", artifact: { path: refs } },
-			{ kind: "scm.pull-request.diff", artifact: { path: "context/change.json" } },
+		files: [
+			{ kind: "scm.repository.tree", file: { path: tree } },
+			{ kind: "scm.repository.tree", file: { path: refs } },
+			{ kind: "scm.pull-request.diff", file: { path: "context/change.json" } },
 		],
 	};
 	return { root, index };
@@ -102,29 +103,30 @@ const sha = (bytes: string | Buffer) => createHash("sha256").update(bytes).diges
 function cited(
 	sourceKind: string,
 	path: string,
-	revision: string,
+	commit: string,
 	text: string | Buffer,
 	extra: Record<string, unknown> = {},
 ) {
 	return {
 		index: 0,
 		sourceKind,
-		artifactPath:
+		sourcePath:
 			sourceKind === "scm.repository.tree" ? "repos/reviewed/.git/HEAD" : "context/change.json",
 		path,
-		revision,
+		commit,
 		startLine: 1,
 		quote: "x",
-		verification: { status: "VERIFIED", scope: "EXACT_LOCATION", artifactSha256: sha(text) },
+		verification: { status: "VERIFIED", scope: "EXACT_LOCATION", sourceFileSha256: sha(text) },
 		...extra,
 	};
 }
 
 const decided = (citations: unknown[]) => ({
-	id: "o",
+	resultId: "r",
 	outcome: "NOT_MET",
 	publicEligible: true,
-	citations,
+	citations: [],
+	problems: [{ problemId: "o", citations }],
 });
 
 /** A reader over fixed blobs and one pinned diff that remembers every blob and range it was asked for. */
@@ -137,9 +139,9 @@ function blobs(
 	return {
 		asked,
 		reader: {
-			blob: (revision: string, path: string) => {
-				asked.push(`${revision}:${path}`);
-				return files[`${revision}:${path}`] ?? { kind: "absent" as const };
+			blob: (commit: string, path: string) => {
+				asked.push(`${commit}:${path}`);
+				return files[`${commit}:${path}`] ?? { kind: "absent" as const };
 			},
 			diff: (base: string, head: string) => {
 				asked.push(`diff ${base}..${head}`);
@@ -150,7 +152,7 @@ function blobs(
 	};
 }
 
-void test("cited primary code arrives whole, once per file and revision, with its complete change section", (t) => {
+void test("cited primary code arrives whole, once per file and commit, with its complete change section", (t) => {
 	const { root, index } = primaryCapture(t);
 	const model = "struct Item {}\n";
 	const legacy = "func legacy() {}\n";
@@ -165,23 +167,26 @@ void test("cited primary code arrives whole, once per file and revision, with it
 		"repos/reviewed",
 		index,
 		[
+			decided([cited("scm.pull-request.diff", "App/Loader.swift", HEAD, LOADER, { side: "NEW" })]),
 			{
-				id: "concern",
+				resultId: "second",
 				outcome: "NOT_MET",
-				publicEligible: true,
-				citations: [
-					cited("scm.pull-request.diff", "App/Loader.swift", HEAD, LOADER, { side: "NEW" }),
-				],
-			},
-			{
-				id: "strength",
-				outcome: "MET",
 				publicEligible: true,
 				citations: [
 					cited("scm.pull-request.diff", "App/Loader.swift", HEAD, LOADER, { side: "NEW" }),
 					cited("scm.repository.tree", "App/Model.swift", EARLIER, model),
 					cited("scm.pull-request.diff", "App/Legacy.swift", BASE, legacy, { side: "OLD" }),
 				],
+				problems: [],
+			},
+			{
+				resultId: "strength",
+				outcome: "MET",
+				publicEligible: true,
+				citations: [
+					cited("scm.repository.tree", "App/Strength.swift", HEAD, "struct Strength {}\n"),
+				],
+				problems: [],
 			},
 		],
 		read.reader,
@@ -198,7 +203,7 @@ void test("cited primary code arrives whole, once per file and revision, with it
 	// Only the cited files' sections of the pinned diff; the stale derived view and uncited code never appear.
 	assert.ok(!reference.includes("UNCITED-SENTINEL"), reference);
 	assert.ok(!reference.includes("STALE-SENTINEL"), reference);
-	// An explicit repository revision is read as cited; a removed file only from the base; the diff once.
+	// An explicit repository commit is read as cited; a removed file only from the base; the diff once.
 	assert.deepEqual(read.asked, [
 		`${HEAD}:App/Loader.swift`,
 		`diff ${BASE}..${HEAD}`,
@@ -206,7 +211,7 @@ void test("cited primary code arrives whole, once per file and revision, with it
 		`${BASE}:App/Legacy.swift`,
 	]);
 	assert.ok(
-		reference.includes(`\`App/Model.swift\` at \`${EARLIER}\`, the repository revision`),
+		reference.includes(`\`App/Model.swift\` at \`${EARLIER}\`, the repository commit`),
 		reference,
 	);
 	assert.ok(reference.includes(`\`App/Legacy.swift\` at \`${BASE}\`, the OLD side`), reference);
@@ -216,6 +221,54 @@ void test("cited primary code arrives whole, once per file and revision, with it
 		reference.includes("`scm.pull-request.diff` capture is of unknown completeness"),
 		reference,
 	);
+});
+
+void test("every citation of a public result is read: its own, its example's and each problem's", (t) => {
+	const { root, index } = primaryCapture(t);
+	const model = "struct Item {}\n";
+	const example = "func handled() throws {}\n";
+	const read = blobs({
+		[`${HEAD}:App/Loader.swift`]: { kind: "regular", bytes: Buffer.from(LOADER) },
+		[`${EARLIER}:App/Model.swift`]: { kind: "regular", bytes: Buffer.from(model) },
+		[`${HEAD}:App/Handled.swift`]: { kind: "regular", bytes: Buffer.from(example) },
+	});
+	const reference = buildPrimarySourceReference(
+		root,
+		"context",
+		"repos/reviewed",
+		index,
+		[
+			{
+				resultId: "r",
+				outcome: "NOT_MET",
+				publicEligible: true,
+				citations: [cited("scm.repository.tree", "App/Model.swift", EARLIER, model)],
+				example: {
+					citation: cited("scm.repository.tree", "App/Handled.swift", HEAD, example),
+					note: "This one is handled.",
+				},
+				problems: [
+					{
+						problemId: "o-1",
+						citations: [
+							cited("scm.pull-request.diff", "App/Loader.swift", HEAD, LOADER, { side: "NEW" }),
+						],
+					},
+				],
+			},
+		],
+		read.reader,
+	);
+	assert.deepEqual(read.asked, [
+		`${EARLIER}:App/Model.swift`,
+		`${HEAD}:App/Handled.swift`,
+		`${HEAD}:App/Loader.swift`,
+		`diff ${BASE}..${HEAD}`,
+	]);
+	assert.ok(reference.includes("[L1] struct Item {}"), reference);
+	assert.ok(reference.includes("[L1] func handled() throws {}"), reference);
+	assert.ok(reference.includes("[L2]     let id: Int"), reference);
+	assert.equal(reference.split(LOADER_SECTION).length, 2, reference);
 });
 
 void test("private, auxiliary, undecided or unverifiable citations never expose source", (t) => {
@@ -241,11 +294,11 @@ void test("private, auxiliary, undecided or unverifiable citations never expose 
 			},
 			{
 				...decided([cited("scm.repository.tree", "Private.swift", HEAD, text)]),
-				outcome: "UNDETERMINED",
+				outcome: "COULD_NOT_DETERMINE",
 			},
 			decided([
 				cited("scm.repository.tree", "Private.swift", HEAD, text, {
-					artifactPath: "repos/other/.git/HEAD",
+					sourcePath: "repos/other/.git/HEAD",
 				}),
 				{
 					...cited("scm.repository.tree", "Private.swift", HEAD, text),
@@ -267,14 +320,14 @@ void test("private, auxiliary, undecided or unverifiable citations never expose 
 		`\`Changed.swift\` at \`${HEAD}\`: its bytes differ from the ones admission verified`,
 		`\`Link.swift\` at \`${HEAD}\`: not a regular file`,
 		`\`Huge.swift\` at \`${HEAD}\`: too large to show here (40 KB)`,
-		`\`Missing.swift\` at \`${HEAD}\`: no such file at this revision`,
-		`\`App/Loader.swift\` at \`${EARLIER}\`: names a revision outside the pinned change`,
+		`\`Missing.swift\` at \`${HEAD}\`: no such file at this commit`,
+		`\`App/Loader.swift\` at \`${EARLIER}\`: names a commit outside the pinned change`,
 	]) {
 		assert.ok(reference.includes(reason), `${reason}\n${reference}`);
 	}
 	assert.ok(reference.includes(`\`Image.png\` at \`${HEAD}\`: binary`), reference);
 
-	// A checkout that is not the captured revision vouches for nothing it holds.
+	// A checkout that is not the captured commit vouches for nothing it holds.
 	const moved = blobs(
 		{ [`${HEAD}:Private.swift`]: { kind: "regular", bytes: Buffer.from(text) } },
 		EARLIER,
@@ -288,7 +341,7 @@ void test("private, auxiliary, undecided or unverifiable citations never expose 
 		moved.reader,
 	);
 	assert.deepEqual(moved.asked, []);
-	assert.match(unpinned, /`Private\.swift` at `a+`: the checkout is not the captured revision/u);
+	assert.match(unpinned, /`Private\.swift` at `a+`: the checkout is not the captured commit/u);
 
 	// Code of the change is read from the checkout, so a change citation also needs the checkout's capture.
 	const withoutTree = {
@@ -331,18 +384,13 @@ void test("text is shown only as valid UTF-8 and a rejected citation does not hi
 		"repos/reviewed",
 		index,
 		[
-			{
-				id: "o",
-				outcome: "NOT_MET",
-				publicEligible: true,
-				citations: [
-					cited("scm.repository.tree", "Recovered.swift", HEAD, "something else\n"),
-					cited("scm.repository.tree", "Recovered.swift", HEAD, recovered),
-					cited("scm.repository.tree", "Invalid.swift", HEAD, invalid),
-					cited("scm.repository.tree", "Marked.swift", HEAD, marked),
-					cited("scm.pull-request.diff", "App/Loader.swift", HEAD, LOADER, { side: "NEW" }),
-				],
-			},
+			decided([
+				cited("scm.repository.tree", "Recovered.swift", HEAD, "something else\n"),
+				cited("scm.repository.tree", "Recovered.swift", HEAD, recovered),
+				cited("scm.repository.tree", "Invalid.swift", HEAD, invalid),
+				cited("scm.repository.tree", "Marked.swift", HEAD, marked),
+				cited("scm.pull-request.diff", "App/Loader.swift", HEAD, LOADER, { side: "NEW" }),
+			]),
 		],
 		read.reader,
 	);
@@ -382,20 +430,13 @@ void test("a regular new file cannot expose an excluded counterpart through its 
 			HEAD,
 			diff,
 		);
-		const observations = [
-			{
-				id: "o",
-				outcome: "NOT_MET",
-				publicEligible: true,
-				citations: [cited("scm.pull-request.diff", file, HEAD, code, { side: "NEW" })],
-			},
-		];
+		const results = [decided([cited("scm.pull-request.diff", file, HEAD, code, { side: "NEW" })])];
 		const reference = buildPrimarySourceReference(
 			root,
 			"context",
 			"repos/reviewed",
 			index,
-			observations,
+			results,
 			read.reader,
 		);
 		assert.ok(reference.includes("[L1] let visible = true"), reference);
@@ -407,7 +448,7 @@ void test("a regular new file cannot expose an excluded counterpart through its 
 			"context",
 			"repos/reviewed",
 			index,
-			observations,
+			results,
 			read.reader,
 			{ filePerChars: 24_000, diffChars: 64_000, totalChars: 600 },
 		);
@@ -427,10 +468,10 @@ function pullRequestIndex(
 	const source = (kind: string, state: Record<string, unknown>, path: string) => ({
 		kind,
 		state,
-		artifacts: state.availability === "AVAILABLE" && recorded.includes(path) ? [{ path }] : [],
+		files: state.availability === "AVAILABLE" && recorded.includes(path) ? [{ path }] : [],
 	});
 	return {
-		artifactKind: "scm.pull_request",
+		itemKind: "scm.pull_request",
 		capturedAt: "2026-10-01T10:00:00Z",
 		sources: [
 			source("scm.pull-request.core", core, "context/metadata.json"),
@@ -438,10 +479,10 @@ function pullRequestIndex(
 				? []
 				: [source("scm.linked-work-items", linked, "context/linked_work_items.json")]),
 		],
-		artifacts: [
-			{ kind: "scm.pull-request.core", artifact: { path: "context/metadata.json" } },
-			{ kind: "scm.linked-work-items", artifact: { path: "context/linked_work_items.json" } },
-		].filter((entry) => recorded.includes(entry.artifact.path)),
+		files: [
+			{ kind: "scm.pull-request.core", file: { path: "context/metadata.json" } },
+			{ kind: "scm.linked-work-items", file: { path: "context/linked_work_items.json" } },
+		].filter((entry) => recorded.includes(entry.file.path)),
 	};
 }
 
@@ -737,16 +778,17 @@ void test("an issue uses only its recorded issue core", () => {
 	});
 	try {
 		const index = {
-			artifactKind: "scm.issue",
+			itemKind: "scm.issue",
 			capturedAt: "2026-10-01T10:00:00Z",
 			sources: [
 				{
 					kind: "scm.issue.core",
+					citation: { side: "FORBIDDEN", commit: "FORBIDDEN" },
 					state: { availability: "AVAILABLE", completeness: "COMPLETE" },
-					artifacts: [{ path: "context/metadata.json" }],
+					files: [{ path: "context/metadata.json" }],
 				},
 			],
-			artifacts: [{ kind: "scm.issue.core", artifact: { path: "context/metadata.json" } }],
+			files: [{ kind: "scm.issue.core", file: { path: "context/metadata.json" } }],
 		};
 		const context = buildSameWorkContext(root, "context", index, {
 			repositoryFullName: "group/repo",
@@ -758,9 +800,9 @@ void test("an issue uses only its recorded issue core", () => {
 		const mismatched = buildSameWorkContext(root, "context", index, FRAMING);
 		assert.match(mismatched, /another issue than the task/u);
 		assert.doesNotMatch(mismatched, /A capability/u);
-		const firstArtifact = index.artifacts[0];
-		assert.ok(firstArtifact);
-		firstArtifact.kind = "scm.pull-request.core";
+		const firstSourceFile = index.files[0];
+		assert.ok(firstSourceFile);
+		firstSourceFile.kind = "scm.pull-request.core";
 		assert.doesNotMatch(buildSameWorkContext(root, "context", index, FRAMING), /A capability/u);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
@@ -786,7 +828,7 @@ void test("the brief shows each captured file under its workspace path, the chan
 		"work/change/diff.patch": "diff --git a/a.ts b/a.ts\n@@ -1 +1 @@\n[L1] -x\n[L1] +y\n",
 	});
 	try {
-		const brief = buildBrief(root, paths);
+		const { text: brief } = buildBrief(root, paths);
 		const order = [
 			"### `INDEX.md`",
 			"### `context/metadata.json`",
@@ -824,7 +866,7 @@ void test("each linked issue's text file follows the linked-items record, in num
 		"context/linked_work_items/7.md": "# Seven\n\n- [x] done\n",
 	});
 	try {
-		const brief = buildBrief(root, paths);
+		const { text: brief } = buildBrief(root, paths);
 		const order = [
 			"### `context/linked_work_items.json`",
 			"### `context/linked_work_items/7.md`",
@@ -851,7 +893,7 @@ void test("a file over its bound is named with its size instead of shown, and an
 		"work/change/diff.patch": `${"+".repeat(100)}\n`.repeat(600),
 	});
 	try {
-		const brief = buildBrief(root, paths, {
+		const { text: brief } = buildBrief(root, paths, {
 			filePerChars: 1000,
 			diffChars: 2000,
 			totalChars: 10_000,
@@ -879,7 +921,7 @@ void test("the brief as a whole stays under its total bound", () => {
 		"context/review_threads.json": "z".repeat(900),
 	});
 	try {
-		const brief = buildBrief(root, paths, {
+		const { text: brief } = buildBrief(root, paths, {
 			filePerChars: 1000,
 			diffChars: 1000,
 			totalChars: 2000,
@@ -896,7 +938,7 @@ void test("the brief as a whole stays under its total bound", () => {
 void test("a backtick run inside a file cannot close its fence early", () => {
 	const root = workspace({ "context/document.md": "text with ``` inside\n" });
 	try {
-		assert.match(buildBrief(root, paths), /````markdown\n\[L1\] text with ``` inside\n````/u);
+		assert.match(buildBrief(root, paths).text, /````markdown\n\[L1\] text with ``` inside\n````/u);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
@@ -905,7 +947,7 @@ void test("a backtick run inside a file cannot close its fence early", () => {
 void test("nothing captured is an empty brief", () => {
 	const root = workspace({});
 	try {
-		assert.equal(buildBrief(root, paths), "");
+		assert.equal(buildBrief(root, paths).text, "");
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
@@ -918,7 +960,7 @@ for (const [name, content] of [
 	void test(`the file bound includes ${name}`, () => {
 		const root = workspace({ "context/document.md": content });
 		try {
-			const brief = buildBrief(root, paths, {
+			const { text: brief } = buildBrief(root, paths, {
 				filePerChars: 2000,
 				diffChars: 2000,
 				totalChars: 4000,
@@ -935,7 +977,11 @@ for (const [name, content] of [
 void test("an oversized capture index gives a complete fallback instruction within the bound", () => {
 	const root = workspace({ "context/document.md": "x".repeat(1000) });
 	try {
-		const brief = buildBrief(root, paths, { filePerChars: 100, diffChars: 100, totalChars: 128 });
+		const { text: brief } = buildBrief(root, paths, {
+			filePerChars: 100,
+			diffChars: 100,
+			totalChars: 128,
+		});
 		assert.ok(brief.length <= 128);
 		assert.match(brief, /capture index exceeds the brief limit/u);
 		assert.match(brief, /Read the capture manifest and context files/u);
@@ -954,8 +1000,9 @@ function discussionIndex(kind: string, file: string, state: Record<string, unkno
 		sources: [
 			{
 				kind: "scm.pull-request.core",
+				citation: { side: "FORBIDDEN", commit: "FORBIDDEN" },
 				state: { availability: "AVAILABLE", completeness: "COMPLETE" },
-				artifacts: [{ path: "context/metadata.json" }],
+				files: [{ path: "context/metadata.json" }],
 			},
 			{
 				kind,
@@ -965,12 +1012,12 @@ function discussionIndex(kind: string, file: string, state: Record<string, unkno
 					completeness: "PARTIAL",
 					...state,
 				},
-				artifacts: [{ path: file }],
+				files: [{ path: file }],
 			},
 		],
-		artifacts: [
-			{ kind: "scm.pull-request.core", artifact: { path: "context/metadata.json" } },
-			{ kind, artifact: { path: file } },
+		files: [
+			{ kind: "scm.pull-request.core", file: { path: "context/metadata.json" } },
+			{ kind, file: { path: file } },
 		],
 	};
 }
@@ -1026,7 +1073,7 @@ void test("captured advice keeps native identity, edits and attribution while se
 	const index = discussionIndex("scm.general-review-comments", GENERAL_PATH);
 	const history = buildPublicReviewHistory(root, "context", index, FRAMING);
 	assert.equal(history.capturedAt, DISCUSSION_CUTOFF);
-	assert.equal(history.reviewedRevision, "a".repeat(40));
+	assert.equal(history.itemVersion, "a".repeat(40));
 	assert.deepEqual(history.recipient, { author: "owner", authorId: "11" });
 	assert.deepEqual(
 		history.statements.map((row) => row.eligibleForPriorAdvice),
@@ -1328,7 +1375,7 @@ void test("native inline and review decision revisions are not replaced by the c
 		const statement = history.statements[0];
 		assert.ok(statement);
 		assert.equal(statement.eligibleForPriorAdvice, true);
-		assert.match(statement.reviewedRevision ?? "", /^original-/u);
+		assert.match(statement.itemVersion ?? "", /^original-/u);
 		if (kind === "scm.review-threads") {
 			assert.ok(
 				!("capturedId" in statement) && !("threadId" in statement) && !("inReplyToId" in statement),
@@ -1354,7 +1401,7 @@ void test("unlisted, unavailable, malformed and oversized discussion never becom
 	const index = discussionIndex("scm.general-review-comments", GENERAL_PATH);
 	for (const candidate of [
 		index,
-		{ ...index, artifacts: [] },
+		{ ...index, files: [] },
 		discussionIndex("scm.general-review-comments", GENERAL_PATH, {
 			availability: "UNAVAILABLE",
 			reasonCode: "PROVIDER_UNREACHABLE",
@@ -1379,7 +1426,7 @@ void test("unlisted, unavailable, malformed and oversized discussion never becom
 	);
 });
 
-void test("an incomplete work identity, missing code head or unavailable core supplies no revision coordinate", (t) => {
+void test("an incomplete work identity, missing code head or unavailable core supplies no commit coordinate", (t) => {
 	const root = workspace({ "context/metadata.json": discussionMetadata() });
 	t.after(() => rmSync(root, { recursive: true, force: true }));
 	const index = discussionIndex("scm.general-review-comments", GENERAL_PATH);
@@ -1388,7 +1435,7 @@ void test("an incomplete work identity, missing code head or unavailable core su
 			nodePath.join(root, "context/metadata.json"),
 			JSON.stringify({ repository_full_name: "group/repo", pr_number: 7, commit_sha: commit }),
 		);
-		assert.equal(buildPublicReviewHistory(root, "context", index, FRAMING).reviewedRevision, null);
+		assert.equal(buildPublicReviewHistory(root, "context", index, FRAMING).itemVersion, null);
 	}
 	for (const identity of [
 		{ pr_number: 7 },
@@ -1400,20 +1447,20 @@ void test("an incomplete work identity, missing code head or unavailable core su
 			nodePath.join(root, "context/metadata.json"),
 			JSON.stringify({ ...identity, commit_sha: "a".repeat(40) }),
 		);
-		assert.equal(buildPublicReviewHistory(root, "context", index, FRAMING).reviewedRevision, null);
+		assert.equal(buildPublicReviewHistory(root, "context", index, FRAMING).itemVersion, null);
 	}
 	writeFileSync(nodePath.join(root, "context/metadata.json"), discussionMetadata());
 	for (const framing of [
 		{ repositoryFullName: undefined, pullRequestNumber: 7 },
 		{ repositoryFullName: "group/repo", pullRequestNumber: undefined },
 	]) {
-		assert.equal(buildPublicReviewHistory(root, "context", index, framing).reviewedRevision, null);
+		assert.equal(buildPublicReviewHistory(root, "context", index, framing).itemVersion, null);
 	}
 	const missing = {
 		...index,
 		sources: index.sources.filter((source) => source.kind !== "scm.pull-request.core"),
 	};
-	assert.equal(buildPublicReviewHistory(root, "context", missing, FRAMING).reviewedRevision, null);
+	assert.equal(buildPublicReviewHistory(root, "context", missing, FRAMING).itemVersion, null);
 });
 
 void test("a positively mismatching core cannot lend its discussion to this work", (t) => {
@@ -1439,7 +1486,7 @@ void test("a positively mismatching core cannot lend its discussion to this work
 	);
 	assert.equal(history.statements.length, 0);
 	assert.equal(history.recipient.authorId, null);
-	assert.equal(history.reviewedRevision, null);
+	assert.equal(history.itemVersion, null);
 	assert.match(
 		history.sources.find((source) => source.path === GENERAL_PATH)?.omitted ?? "",
 		/other reviewed work/u,
@@ -1478,13 +1525,14 @@ void test("rendered and total discussion bounds omit whole sources and their wit
 			...generalIndex.sources,
 			{
 				kind: "scm.pull-request.comments",
+				citation: { side: "FORBIDDEN", commit: "FORBIDDEN" },
 				state: { availability: "AVAILABLE", content: "NON_EMPTY", completeness: "COMPLETE" },
-				artifacts: [{ path: inlinePath }],
+				files: [{ path: inlinePath }],
 			},
 		],
-		artifacts: [
-			...generalIndex.artifacts,
-			{ kind: "scm.pull-request.comments", artifact: { path: inlinePath } },
+		files: [
+			...generalIndex.files,
+			{ kind: "scm.pull-request.comments", file: { path: inlinePath } },
 		],
 	};
 	const history = buildPublicReviewHistory(root, "context", index, FRAMING, {
@@ -1528,23 +1576,25 @@ void test("an issue discussion uses its own core recipient and stored native com
 	});
 	t.after(() => rmSync(root, { recursive: true, force: true }));
 	const index = {
-		artifactKind: "scm.issue",
+		itemKind: "scm.issue",
 		capturedAt: DISCUSSION_CUTOFF,
 		sources: [
 			{
 				kind: "scm.issue.core",
+				citation: { side: "FORBIDDEN", commit: "FORBIDDEN" },
 				state: { availability: "AVAILABLE", completeness: "COMPLETE" },
-				artifacts: [{ path: "context/metadata.json" }],
+				files: [{ path: "context/metadata.json" }],
 			},
 			{
 				kind: "scm.issue.comments",
+				citation: { side: "FORBIDDEN", commit: "FORBIDDEN" },
 				state: { availability: "AVAILABLE", completeness: "COMPLETE" },
-				artifacts: [{ path: "context/comments.json" }],
+				files: [{ path: "context/comments.json" }],
 			},
 		],
-		artifacts: [
-			{ kind: "scm.issue.core", artifact: { path: "context/metadata.json" } },
-			{ kind: "scm.issue.comments", artifact: { path: "context/comments.json" } },
+		files: [
+			{ kind: "scm.issue.core", file: { path: "context/metadata.json" } },
+			{ kind: "scm.issue.comments", file: { path: "context/comments.json" } },
 		],
 	};
 	const history = buildPublicReviewHistory(root, "context", index, FRAMING);
@@ -1557,12 +1607,12 @@ void test("an issue discussion uses its own core recipient and stored native com
 	assert.equal(history.sources.length, 1);
 });
 
-void test("public discussion keeps the work author as its addressee even when the occasion concerns a reviewer", (t) => {
+void test("public discussion keeps the work author as its addressee even when the applicability concerns a reviewer", (t) => {
 	const reviewPath = "context/review_threads.json";
 	const index = discussionIndex("scm.general-review-comments", GENERAL_PATH);
 	const reviewIndex = discussionIndex("scm.review-threads", reviewPath);
 	index.sources.push(...reviewIndex.sources.slice(1));
-	index.artifacts.push(...reviewIndex.artifacts.slice(1));
+	index.files.push(...reviewIndex.files.slice(1));
 	const root = workspace({
 		"context/metadata.json": JSON.stringify({
 			repository_full_name: "group/repo",
@@ -1619,4 +1669,32 @@ void test("public discussion keeps the work author as its addressee even when th
 			[true, false],
 		);
 	}
+});
+
+void test("brief coverage names supplied, empty, and omitted sources after rendering limits", (t) => {
+	const root = workspace({
+		"context/metadata.json": '{"title":"Add login"}',
+		"context/comments.json": "",
+		"work/change/diff.patch": "x".repeat(1000),
+	});
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+	const brief = buildBrief(root, paths, {
+		filePerChars: 1000,
+		diffChars: 100,
+		totalChars: 5000,
+	});
+	assert.deepEqual(brief.sources, [
+		{ path: "context/metadata.json", supplied: true, lines: 1 },
+		{ path: "context/comments.json", supplied: true, lines: 1 },
+		{ path: "work/change/diff.patch", supplied: false },
+	]);
+	assert.match(brief.text, /Captured and empty/u);
+	assert.match(brief.text, /Too large to show here/u);
+	const unavailable = buildBrief(root, paths, {
+		filePerChars: 1000,
+		diffChars: 100,
+		totalChars: 1,
+	});
+	assert.equal(unavailable.text, "");
+	assert.ok(unavailable.sources.every((source) => !source.supplied));
 });

@@ -16,7 +16,7 @@ import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobTrigger;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.sync.GitHubDataSyncService;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepositoryMonitorService;
+import de.tum.cit.aet.hephaestus.integration.scm.workspace.WorkspaceRepositoryMonitorService;
 import java.util.Optional;
 import java.util.function.Consumer;
 import org.slf4j.Logger;

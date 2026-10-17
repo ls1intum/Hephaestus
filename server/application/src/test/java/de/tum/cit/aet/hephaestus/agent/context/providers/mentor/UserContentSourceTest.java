@@ -5,15 +5,17 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.UserContentSource.ActivityInsights;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery.AccountSummary;
+import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
+import de.tum.cit.aet.hephaestus.integration.core.spi.MentorUserCounts;
+import de.tum.cit.aet.hephaestus.integration.core.spi.MentorWorkQuery;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,10 +28,10 @@ import tools.jackson.databind.ObjectMapper;
 class UserContentSourceTest extends BaseUnitTest {
 
     @Mock
-    UserRepository userRepository;
+    AccountSummaryQuery userRepository;
 
     @Mock
-    MentorContextQueryRepository queryRepository;
+    MentorWorkQuery queryRepository;
 
     @Spy
     ObjectMapper objectMapper = new ObjectMapper();
@@ -39,10 +41,7 @@ class UserContentSourceTest extends BaseUnitTest {
 
     @Test
     void writesUserJson() throws Exception {
-        User user = new User();
-        user.setLogin("octo");
-        user.setName("Octo Cat");
-        when(userRepository.findById(eq(2L))).thenReturn(Optional.of(user));
+        when(userRepository.findAllByIds(List.of(2L))).thenReturn(Map.of(2L, new AccountSummary(2L, "Octo", null)));
         when(queryRepository.fetchUserCounts(
                         eq(1L), eq(2L), any(Instant.class), any(Instant.class), any(Instant.class)))
                 .thenReturn(new MentorUserCounts(
@@ -57,12 +56,12 @@ class UserContentSourceTest extends BaseUnitTest {
                         /* unresolvedThreads */ 1L));
 
         Map<String, byte[]> files = new HashMap<>();
-        provider.contribute(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID()), files);
+        provider.contribute(new MentorContextRequest(1L, 2L, UUID.randomUUID(), null), files);
 
         byte[] bytes = files.get("inputs/context/user.json");
         assertThat(bytes).isNotNull();
         JsonNode root = objectMapper.readTree(bytes);
-        assertThat(root.get("user").get("login").asString()).isEqualTo("octo");
+        assertThat(root.get("user").get("name").asString()).isEqualTo("Octo");
         assertThat(root.get("thisWeek").get("prsOpen").asLong()).isEqualTo(2L);
         assertThat(root.get("thisWeek").get("prsMerged").asLong()).isEqualTo(5L);
         // Distinct values per field so a positional mis-map in the 9-arg constructor projection is caught.

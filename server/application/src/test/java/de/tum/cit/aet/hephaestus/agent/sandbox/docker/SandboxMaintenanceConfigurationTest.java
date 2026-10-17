@@ -6,7 +6,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.sandbox.InteractiveSandboxProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxProperties;
@@ -38,7 +38,7 @@ import org.springframework.scheduling.config.ScheduledTaskRegistrar;
 
 class SandboxMaintenanceConfigurationTest extends BaseUnitTest {
 
-    private final AgentJobRepository jobs = mock(AgentJobRepository.class);
+    private final ReviewJobRepository jobs = mock(ReviewJobRepository.class);
     private final SandboxContainerManager containers = mock(SandboxContainerManager.class);
     private final SandboxNetworkManager networks = mock(SandboxNetworkManager.class);
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();

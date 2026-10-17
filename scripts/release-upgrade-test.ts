@@ -1,10 +1,16 @@
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { asArray, asRecord, asString } from "./lib/json.ts";
 import { CAPTURE_LIMIT_BYTES } from "./lib/process.ts";
+import {
+	preservationSql,
+	type PreservedPeopleIds,
+	type UpgradeSchema,
+} from "./lib/release-upgrade-fingerprint.ts";
 import { researchConsentFields } from "./lib/research-consent.ts";
 
 const [previousImage = "", candidateImage = "", postgresImage = "", upgradePath = "latest"] =
@@ -291,57 +297,42 @@ async function seedWorkspace(port: number, session: Session, workspaceSlug: stri
 	}
 }
 
-async function adoptCatalogPractice(port: number, session: Session): Promise<void> {
-	const catalog = `http://127.0.0.1:${port}/workspaces/${ADOPTION_WORKSPACE_SLUG}/practice-catalog/adoption`;
-	const offered = await fetchWithTimeout(catalog, {
-		headers: { cookie: session.cookie },
+async function createCatalogDerivedPractice(port: number, session: Session): Promise<void> {
+	const root = await login(port, "root");
+	const response = await fetchWithTimeout(`http://127.0.0.1:${port}/admin/practice-catalog`, {
+		headers: { cookie: root.cookie },
 	});
-	if (!offered.ok) {
-		throw new Error(`Adoptable practices returned ${offered.status}: ${await offered.text()}`);
+	if (!response.ok) {
+		throw new Error(`Instance catalog returned ${response.status}`);
 	}
-	const entries = asArray(await offered.json(), "Adoptable practices").map((entry, index) => {
-		const summary = asRecord(entry, `Adoptable practices[${index}]`);
-		const availability = asString(
-			summary.availability,
-			`Adoptable practices[${index}].availability`,
-		);
-		if (
-			availability !== "AVAILABLE" &&
-			availability !== "ADOPTED" &&
-			availability !== "SLUG_CONFLICT"
-		) {
-			throw new Error(
-				`Adoptable practices[${index}].availability has unexpected value: ${availability}`,
-			);
-		}
-		return {
-			availability,
-			slug: asString(summary.slug, `Adoptable practices[${index}].slug`),
-		};
-	});
-	const practice = entries.find((entry) => entry.availability === "AVAILABLE");
-	if (!practice) {
-		throw new Error("Candidate returned no practice available for adoption");
+	const catalog = asRecord(await response.json(), "Instance catalog");
+	const practices = asArray(catalog.practices, "Instance catalog.practices");
+	const first = practices.find((entry) => asRecord(entry, "Catalog practice").excluded === false);
+	if (first === undefined) {
+		throw new Error("Instance catalog has no included practice");
 	}
-
-	const url = `${catalog}/${encodeURIComponent(practice.slug)}`;
-	const preview = await fetchWithTimeout(url, {
-		headers: { cookie: session.cookie },
-	});
-	if (!preview.ok) {
-		throw new Error(`Adoption preview returned ${preview.status}: ${await preview.text()}`);
-	}
-	const validator = preview.headers.get("etag");
-	if (validator === null || validator === "") {
-		throw new Error("Adoption preview returned no ETag to send as If-Match");
-	}
-	const adopted = await fetchWithTimeout(url, {
-		method: "POST",
-		headers: { cookie: session.cookie, "if-match": validator, ...session.writeHeaders },
-	});
-	if (adopted.status !== 201) {
+	const practice = asRecord(first, "Catalog practice");
+	const created = await fetchWithTimeout(
+		`http://127.0.0.1:${port}/workspaces/${ADOPTION_WORKSPACE_SLUG}/practices`,
+		{
+			method: "POST",
+			headers: {
+				cookie: session.cookie,
+				"content-type": "application/json",
+				...session.writeHeaders,
+			},
+			body: JSON.stringify({
+				slug: asString(practice.slug, "Catalog practice.slug"),
+				kind: asString(practice.kind, "Catalog practice.kind"),
+				definition: asRecord(practice.definition, "Catalog practice.definition"),
+				groupSlug: null,
+				position: null,
+			}),
+		},
+	);
+	if (created.status !== 201) {
 		throw new Error(
-			`Adopting from the catalog returned ${adopted.status}: ${await adopted.text()}`,
+			`Creating a catalog-derived practice returned ${created.status}: ${await created.text()}`,
 		);
 	}
 }
@@ -375,42 +366,60 @@ function linkWorkspaceIdentity(): void {
 	);
 }
 
-function dataFingerprint(): string {
+function query(sql: string): string {
 	return docker(
 		"exec",
 		postgres,
 		"psql",
 		"--username=root",
 		"--dbname=hephaestus",
+		"--set=ON_ERROR_STOP=1",
 		"--tuples-only",
 		"--no-align",
 		"--command",
-		`SELECT kind || '|' || value
-		 FROM (
-		   SELECT 'account' AS kind,
-		          concat_ws('|', id, display_name, app_role, status) AS value
-		   FROM account
-		   UNION ALL
-		   SELECT 'identity', concat_ws('|', id, account_id, provider_id, external_actor_id,
-		          subject, username_at_signup, linked_via)
-		   FROM identity_link
-		   UNION ALL
-		   SELECT 'user', concat_ws('|', id, provider_id, native_id, login, type)
-		   FROM "user"
-		   UNION ALL
-		   SELECT 'workspace', concat_ws('|', w.id,
-		          coalesce(to_jsonb(w)->>'workspace_slug', to_jsonb(w)->>'slug'),
-		          w.display_name, w.account_login, w.account_type, w.status)
-		   FROM workspace w
-		   UNION ALL
-		   SELECT 'membership', concat_ws('|', workspace_id, user_id, role)
-		   FROM workspace_membership
-		   UNION ALL
-		   SELECT 'connection', concat_ws('|', id, workspace_id, kind, state)
-		   FROM connection
-		 ) fixture
-		 ORDER BY kind, value;`,
+		sql,
 	);
+}
+
+function dataFingerprint(
+	schema: UpgradeSchema = "released",
+	preserved?: PreservedPeopleIds,
+): string {
+	return query(preservationSql(schema, preserved));
+}
+
+function preservedPeople(): PreservedPeopleIds {
+	const rows = (table: string) => {
+		const value = query(`SELECT id FROM ${table} ORDER BY id`);
+		return value === "" ? [] : value.split("\n");
+	};
+	return { accounts: rows("account"), identities: rows("identity_link") };
+}
+
+function executeFixture(name: "released-seed.sql" | "assert-migrated.sql"): void {
+	const input = readFileSync(
+		new URL(
+			`../server/application/src/test/resources/db/practice-cutover/${name}`,
+			import.meta.url,
+		),
+		"utf8",
+	);
+	const result = spawnSync(
+		"docker",
+		[
+			"exec",
+			"--interactive",
+			postgres,
+			"psql",
+			"--username=root",
+			"--dbname=hephaestus",
+			"--set=ON_ERROR_STOP=1",
+		],
+		{ input, encoding: "utf8", maxBuffer: CAPTURE_LIMIT_BYTES },
+	);
+	if (result.status !== 0) {
+		throw new Error(`Upgrade fixture ${name} failed: ${result.stderr}`);
+	}
 }
 
 function count(sql: string): number {
@@ -612,6 +621,15 @@ try {
 	linkWorkspaceIdentity();
 	await seedWorkspace(port, previousSession, WORKSPACE_SLUG);
 	await assertCoreReads(port, previousSession);
+	docker("stop", "--time", "30", application);
+	docker("rm", application);
+	const exactMainSource =
+		upgradePath === "latest" &&
+		count("SELECT count(*) FROM databasechangelog WHERE id='1791941746633-2'") === 1;
+	if (exactMainSource) {
+		executeFixture("released-seed.sql");
+	}
+	const preserved = preservedPeople();
 	const seededData = dataFingerprint();
 	for (const kind of ["account", "identity", "user", "workspace", "membership", "connection"]) {
 		if (!seededData.includes(`${kind}|`)) {
@@ -621,8 +639,6 @@ try {
 	const previousPractices = workspacePracticeCount(WORKSPACE_SLUG);
 	const previousChanges = appliedChangeCount();
 
-	docker("stop", "--time", "30", application);
-	docker("rm", application);
 	if (upgradePath === "refusal") {
 		await assertRefusal(candidateImage, seededData);
 	} else {
@@ -636,7 +652,8 @@ try {
 		application = `${runId}-candidate`;
 		port = startApplication(application, candidateImage);
 		await waitUntilReady(application, port);
-		const upgradedData = dataFingerprint();
+		const upgradedData = dataFingerprint("candidate", preserved);
+		executeFixture("assert-migrated.sql");
 		if (upgradedData !== seededData) {
 			throw new Error("Seeded application data changed during upgrade");
 		}
@@ -663,13 +680,15 @@ try {
 				`New workspace unexpectedly started with ${practicesBeforeAdoption} practices`,
 			);
 		}
-		await adoptCatalogPractice(port, candidateSession);
+		await createCatalogDerivedPractice(port, candidateSession);
 		const practicesAfterAdoption = workspacePracticeCount(ADOPTION_WORKSPACE_SLUG);
 		if (practicesAfterAdoption !== 1) {
 			throw new Error(`Adoption created ${practicesAfterAdoption} practices instead of one`);
 		}
 
-		console.log(`Seeded ${upgradePath} release upgrade passed.`);
+		console.log(
+			`Seeded ${upgradePath} release upgrade passed (origin/main review seed: ${exactMainSource}).`,
+		);
 	}
 } catch (error) {
 	for (const name of [application, postgres]) {

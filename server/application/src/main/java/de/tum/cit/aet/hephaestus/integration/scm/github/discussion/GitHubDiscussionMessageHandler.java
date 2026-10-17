@@ -4,8 +4,8 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
@@ -78,11 +78,11 @@ public class GitHubDiscussionMessageHandler extends AbstractIntegrationMessageHa
     private void routeToProcessor(
             GitHubDiscussionEventDTO event, GitHubDiscussionDTO discussionDto, ProcessingContext context) {
         switch (event.actionType()) {
-            // A transfer moves the discussion OUT of this repository, and the payload's discussion is
-            // the source-side row. Upserting it here would re-create the very phantom the removal is
-            // meant to retire. Unlike issues, discussions have no reconciliation sweep to heal it, so
-            // the phantom would be permanent — route the transfer to the removal path instead, which
-            // hard-deletes the same as DELETED.
+            // A transfer moves the discussion OUT of this repository, and the payload's discussion
+            // is the source-side row. Upserting it here would re-create the very phantom the
+            // removal is meant to retire. Unlike issues, discussions have no reconciliation sweep
+            // to heal it, so the phantom would be permanent — route the transfer to the removal
+            // path instead, which hard-deletes the same as DELETED.
             case GitHubEventAction.Discussion.DELETED, GitHubEventAction.Discussion.TRANSFERRED ->
                 discussionProcessor.processDeleted(discussionDto, context);
             case GitHubEventAction.Discussion.CLOSED -> discussionProcessor.processClosed(discussionDto, context);
@@ -98,9 +98,7 @@ public class GitHubDiscussionMessageHandler extends AbstractIntegrationMessageHa
                     GitHubEventAction.Discussion.UNANSWERED,
                     GitHubEventAction.Discussion.LABELED,
                     GitHubEventAction.Discussion.UNLABELED -> discussionProcessor.process(discussionDto, context);
-            // Unknown/unmapped actions SKIP rather than upsert. A future action that means "removed"
-            // must not fall through to an upsert that re-creates a phantom — the explicit cases above
-            // already cover every real upsert action, so the safe default is to ack and ignore.
+            // Unknown actions must not upsert: a removal could recreate a deleted discussion.
             default -> log.debug("Skipped discussion event: reason=unhandledAction, action={}", event.action());
         }
     }

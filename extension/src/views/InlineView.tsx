@@ -24,6 +24,7 @@ import {
 import { ask } from "~/ui/rpc-client";
 import { applyTheme } from "~/ui/theme";
 import { useGeneration } from "~/ui/worker-state";
+import { EXTENSION_QUERY_KEYS } from "~/views/query-keys";
 
 /** The page that framed this one; the only window it talks to, and only about its size and theme. */
 function parentOrigin(): string | undefined {
@@ -147,10 +148,13 @@ function frameSubject(): WorkSubject {
  * switches on the same work; a fresh report starts closed until it answers.
  */
 function useRememberedView() {
-	const state = useQuery({ queryKey: ["state"], queryFn: async () => ask({ type: "get-state" }) });
+	const state = useQuery({
+		queryKey: EXTENSION_QUERY_KEYS.state,
+		queryFn: async () => ask({ type: "get-state" }),
+	});
 	const generation = state.data?.generation;
 	const remembered = useQuery({
-		queryKey: ["report-view"],
+		queryKey: EXTENSION_QUERY_KEYS.reportView,
 		queryFn: async () => ask({ type: "get-report-view" }),
 		staleTime: Number.POSITIVE_INFINITY,
 	});
@@ -188,7 +192,7 @@ function useWorkReview(subject: WorkSubject, workspaceSlug: string | undefined, 
 	// next interval.
 	const latestContext = useRef<ReviewContext>(undefined);
 	const context = useQuery({
-		queryKey: ["context", workspaceSlug],
+		queryKey: EXTENSION_QUERY_KEYS.context(workspaceSlug),
 		enabled,
 		queryFn: async () => ask({ type: "get-context", workspaceSlug, subject }),
 		refetchInterval: (query) =>
@@ -204,7 +208,7 @@ function useWorkReview(subject: WorkSubject, workspaceSlug: string | undefined, 
 			? false
 			: refreshInterval(latestContext.current);
 	const feedback = useQuery({
-		queryKey: ["work-feedback", slug],
+		queryKey: EXTENSION_QUERY_KEYS.workFeedback(slug),
 		queryFn: async () => ask({ type: "get-work-feedback", workspaceSlug: slug, subject }),
 		enabled: ready !== undefined,
 		refetchInterval,
@@ -239,7 +243,7 @@ function useWorkReview(subject: WorkSubject, workspaceSlug: string | undefined, 
 /** A list row's preview: the line, filled at once, and nothing to open. */
 function RowContent({ subject }: { subject: WorkSubject }) {
 	const webAppOrigin = useQuery({
-		queryKey: ["state"],
+		queryKey: EXTENSION_QUERY_KEYS.state,
 		queryFn: async () => ask({ type: "get-state" }),
 	}).data?.instance?.webAppOrigin;
 	const review = useWorkReview(subject, undefined, true);
@@ -256,16 +260,15 @@ function RowContent({ subject }: { subject: WorkSubject }) {
 	);
 }
 
-/** The report on the work's own page, with the reader's observations once they open it. */
 function PageContent() {
 	const view = useRememberedView();
 	const { expanded, workspaceSlug, remember, webAppOrigin } = view;
 	const review = useWorkReview(THE_PAGE, workspaceSlug, view.settled);
 	const { ready } = review;
 	const slug = ready?.workspace.slug ?? "";
-	const observations = useQuery({
-		queryKey: ["observations", slug],
-		queryFn: async () => ask({ type: "list-observations", workspaceSlug: slug }),
+	const results = useQuery({
+		queryKey: EXTENSION_QUERY_KEYS.results(slug),
+		queryFn: async () => ask({ type: "list-results", workspaceSlug: slug }),
 		enabled: ready !== undefined && expanded,
 		refetchInterval: review.refetchInterval,
 	});
@@ -283,14 +286,14 @@ function PageContent() {
 		<PageReport
 			state={review.state}
 			feedback={review.feedback}
-			observations={ready === undefined || !expanded ? undefined : loadable(observations)}
+			results={ready === undefined || !expanded ? undefined : loadable(results)}
 			activity={review.activity}
 			webAppOrigin={webAppOrigin}
 			expanded={expanded}
 			onToggle={() => remember({ expanded: !expanded, workspaceSlug })}
 			onRetry={review.retry}
-			onRetryObservations={() => {
-				void observations.refetch();
+			onRetryResults={() => {
+				void results.refetch();
 			}}
 			onOpenSettings={openSettings}
 			onChooseWorkspace={(chosen) => remember({ expanded, workspaceSlug: chosen })}

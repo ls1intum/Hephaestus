@@ -1,20 +1,27 @@
 package de.tum.cit.aet.hephaestus.agent.practice.live;
 
-import static de.tum.cit.aet.hephaestus.agent.practice.live.PracticeCriteriaCaseFixtures.CHANGE_VIEW_PREFIX;
 import static de.tum.cit.aet.hephaestus.agent.practice.live.PracticeCriteriaCaseFixtures.FIXTURE_DIR;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
-import de.tum.cit.aet.hephaestus.agent.practice.PracticeRunnerProfile;
+import de.tum.cit.aet.hephaestus.agent.practice.PracticeSandboxSpec;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmissionRequestDTO;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmissionResponseDTO;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmittedProblemDTO;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmittedResultDTO;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.ProjectedCitationDTO;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentResult;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiResultParser;
+import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
-import de.tum.cit.aet.hephaestus.agent.task.Task;
-import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
-import de.tum.cit.aet.hephaestus.practices.model.Outcome;
+import de.tum.cit.aet.hephaestus.practices.spi.ClaimBasis;
+import de.tum.cit.aet.hephaestus.practices.spi.EvidenceCitation;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultCoverage;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
+import de.tum.cit.aet.hephaestus.practices.spi.Severity;
 import de.tum.cit.aet.hephaestus.testconfig.LiveLlmCredentials;
 import de.tum.cit.aet.hephaestus.testconfig.LiveLlmTest;
 import de.tum.cit.aet.hephaestus.testconfig.PiSdkInstallation;
@@ -33,10 +40,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -46,6 +51,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -57,40 +63,21 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
-import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Live end-to-end test for the practice-review {@code pi-runner.ts} against a real LLM.
- *
- * <p>Exercises Pi SDK ↔ LLM, the runner's two-attempt loop, watchdog, custom
- * {@code report_observation} tool, and the result schema the runner emits — all without Docker.
- * The {@code DockerSandboxLiveTest} covers the sandbox SPI separately.
- *
- * <p>Mirrors {@code MentorLiveLlmTest} for the Pi SDK install and the custom provider
- * extension that bends Pi's built-in {@code openai} provider toward the configured endpoint (Pi does not
- * read {@code OPENAI_BASE_URL} natively).
- *
- * <p>Workspace staging differs from the mentor test: the practice runner hardcodes
- * {@code /workspace} as CWD and reads/writes via async fs (read tool) and {@code spawn} (bash
- * tool). Patching every fs entry point in a Node shim is fragile, so we stage at {@code
- * /workspace} directly. The harness runs as root and the directory is cleaned between tests.
- */
+// Pi does not read OPENAI_BASE_URL; the harness must configure its provider extension explicitly.
 @LiveLlmTest
 @Tag("live")
+@Slf4j
 class PracticeRunnerLiveLlmTest {
 
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
-    private static final Path RUNNER =
-            Path.of("src", "main", "resources", "agent", "pi-runner.ts").toAbsolutePath();
-
     /** The runner reads/writes here verbatim; we own the directory for the duration of one test. */
     // Somewhere writable, rather than a root-owned /workspace this harness may not be able to create.
     private static final Path WORKSPACE =
             Path.of(System.getenv().getOrDefault("PI_RUNNER_CWD", "/workspace")).toAbsolutePath();
 
-    /** Wall-clock cap for the whole runner — initial + retry budgets are derived from this. */
-    private static final long AGENT_BUDGET_MS = 240_000L;
+    private static final String PRACTICE = "avoids-insecure-defaults-and-over-broad-permissions";
 
     @BeforeAll
     static void installPiSdk() throws Exception {
@@ -115,7 +102,7 @@ class PracticeRunnerLiveLlmTest {
     }
 
     @Test
-    @Timeout(value = 300, unit = TimeUnit.SECONDS)
+    @Timeout(value = LiveRunnerWorkspace.TIMEOUT_SECONDS + 30, unit = TimeUnit.SECONDS)
     void flagsHardcodedSecret_inOneFileDiff() throws Exception {
         LiveLlmCredentials creds = LiveLlmCredentials.fromEnv();
         try (ProxyStandIn proxy = new ProxyStandIn(creds)) {
@@ -125,7 +112,7 @@ class PracticeRunnerLiveLlmTest {
 
     @ParameterizedTest(name = CriteriaCaseSelection.NAME)
     @MethodSource(CriteriaCaseSelection.SOURCE)
-    @Timeout(value = 300, unit = TimeUnit.SECONDS)
+    @Timeout(value = LiveRunnerWorkspace.TIMEOUT_SECONDS + 30, unit = TimeUnit.SECONDS)
     void shouldApplyCatalogueBoundaryWhenEvidenceMatchesCase(JsonNode scenario) throws Exception {
         LiveLlmCredentials creds = LiveLlmCredentials.fromEnv();
         try (ProxyStandIn proxy = new ProxyStandIn(creds)) {
@@ -135,29 +122,27 @@ class PracticeRunnerLiveLlmTest {
 
     private void runAndVerify(LiveLlmCredentials creds, ProxyStandIn proxy, @Nullable JsonNode scenario)
             throws Exception {
-        stageWorkspace(creds);
-        if (scenario != null) {
-            PracticeCriteriaCaseFixtures.stage(WORKSPACE, scenario);
-        }
-        // This is a measurement harness, not a delivery test. Keeping the composition request absent
-        // means the runner cannot even prepare feedback, and spawnRunner strips every ambient credential
-        // before the agent process starts. In particular, a developer's GH_TOKEN/GITHUB_TOKEN is never
-        // exposed to the model's bash tool.
+        Map<String, String> environment = stageWorkspace(creds, scenario);
+        // Live measurements run without a composition request or ambient credential to prevent provider feedback
+        // writes.
         assertThat(Files.exists(WORKSPACE.resolve(SandboxLayout.FEEDBACK_COMPOSITION_PATH)))
                 .as("live harness does not request feedback composition")
                 .isFalse();
-        Process runner = spawnRunner(proxy.baseUrl());
+        Process runner =
+                LiveRunnerWorkspace.spawn(WORKSPACE, environment, proxy.baseUrl(), "live-test-job-token", null);
 
         // Drain stdout/stderr into the JVM console with a tag so failures show what the agent said.
         Thread stdoutPump = pumpStream(runner.getInputStream(), "[practice-runner stdout]");
         Thread stderrPump = pumpStream(runner.getErrorStream(), "[practice-runner stderr]");
 
-        boolean finished = runner.waitFor(240, TimeUnit.SECONDS);
+        // The process needs the job's shutdown buffer after its own model budget ends.
+        boolean finished = runner.waitFor(LiveRunnerWorkspace.TIMEOUT_SECONDS, TimeUnit.SECONDS);
         if (!finished) {
             runner.destroyForcibly();
             stdoutPump.join(5_000);
             stderrPump.join(5_000);
-            fail("pi-runner did not exit within 240s — likely an LLM stall or watchdog miss. Check "
+            fail("pi-runner did not exit within " + LiveRunnerWorkspace.TIMEOUT_SECONDS
+                    + "s. Check "
                     + "the [practice-runner *] output above for diagnostics.");
             return;
         }
@@ -188,15 +173,16 @@ class PracticeRunnerLiveLlmTest {
                 .isNotNull();
 
         JsonNode parsed = MAPPER.readTree(rawOutput);
-        JsonNode observations = parsed.path("observations");
-        assertThat(observations.isArray())
-                .as("observations must be a JSON array")
-                .isTrue();
-        assertThat(observations.size()).as("at least one observation emitted").isGreaterThanOrEqualTo(1);
+        assertThat(parsed.path("contractVersion").asInt())
+                .as("result.json is the admission body")
+                .isEqualTo(SandboxLayout.PRACTICE_CONTRACT_VERSION);
+        JsonNode practiceResults = parsed.path("results");
+        assertThat(practiceResults.isArray()).as("results must be a JSON array").isTrue();
+        assertThat(practiceResults.size()).as("at least one result emitted").isGreaterThanOrEqualTo(1);
 
         Map<String, String> expected = new LinkedHashMap<>();
         if (scenario == null) {
-            expected.put("avoids-insecure-defaults-and-over-broad-permissions", "NOT_MET");
+            expected.put(PRACTICE, "NOT_MET");
         } else {
             scenario.path("expected")
                     .properties()
@@ -212,21 +198,27 @@ class PracticeRunnerLiveLlmTest {
         }
         Map<String, String> actual = new LinkedHashMap<>();
         Map<String, String> actualSeverity = new LinkedHashMap<>();
-        for (JsonNode observation : observations) {
-            String slug = observation.path("practiceSlug").asString();
-            assertThat(actual.put(slug, observation.path("outcome").asString()))
-                    .as("one observation per practice")
+        for (JsonNode entry : practiceResults) {
+            String slug = entry.path("practiceSlug").asString();
+            JsonNode candidate = entry.path("candidate");
+            assertThat(actual.put(slug, candidate.path("outcome").asString()))
+                    .as("one result per practice")
                     .isNull();
+            String severity = ProxyStandIn.storedSeverity(candidate);
             if (expectedSeverity.containsKey(slug)) {
-                actualSeverity.put(slug, observation.path("severity").asString());
+                actualSeverity.put(slug, String.valueOf(severity));
             }
-            if ("NOT_MET".equals(observation.path("outcome").asString())) {
-                assertThat(observation.path("severity").asString()).isIn("CRITICAL", "MAJOR", "MINOR", "INFO");
+            if ("NOT_MET".equals(candidate.path("outcome").asString())) {
+                assertThat(severity).isIn("CRITICAL", "MAJOR", "MINOR", "TRIVIAL");
+                assertThat(candidate.path("problems"))
+                        .as("a negative locates its problems")
+                        .isNotEmpty();
             } else {
-                assertThat(observation.path("severity").isNull()).isTrue();
+                assertThat(candidate.has("severity")).isFalse();
+                assertThat(candidate.has("problems")).isFalse();
             }
-            assertThat(observation.has("confidence")).isFalse();
-            assertThat(observation.path("evidence").path("citations").isArray()).isTrue();
+            assertThat(candidate.has("confidence")).isFalse();
+            assertThat(candidate.path("citations").isArray()).isTrue();
         }
         assertThat(actual)
                 .as(
@@ -253,156 +245,39 @@ class PracticeRunnerLiveLlmTest {
                     "[practice-live] usage: model=%s, input=%s, output=%s, totalCalls=%d, cost=$%s%n",
                     usage.model(), usage.inputTokens(), usage.outputTokens(), usage.totalCalls(), usage.costUsd());
         }
-        System.out.printf("[practice-live] %d observation(s)%n", observations.size());
+        System.out.printf("[practice-live] %d practiceResult(s)%n", practiceResults.size());
     }
 
-    private void stageWorkspace(LiveLlmCredentials creds) throws IOException {
-        // ESM resolution walks node_modules upward from the importing file. Production binds the
-        // global node_modules into /workspace/node_modules; the test does the same with a symlink.
-        Path nodeModulesLink = WORKSPACE.resolve("node_modules");
-        if (Files.exists(nodeModulesLink) || Files.isSymbolicLink(nodeModulesLink)) {
-            Files.delete(nodeModulesLink);
+    private Map<String, String> stageWorkspace(LiveLlmCredentials creds, @Nullable JsonNode scenario) throws Exception {
+        PracticeSandboxSpec spec = LiveRunnerWorkspace.adapter()
+                .buildSandboxSpec(LiveRunnerWorkspace.request(creds.model(), "live-test-job-token", Map.of()));
+        LiveRunnerWorkspace.stageSpec(WORKSPACE, spec.inputFiles());
+        String kind = "scm.pull_request";
+        Map<String, JsonNode> definitions;
+        if (scenario == null) {
+            LiveRunnerWorkspace.stageLoginChange(WORKSPACE);
+            definitions = Map.of(
+                    PRACTICE,
+                    LiveRunnerWorkspace.stagePractice(
+                            WORKSPACE,
+                            PRACTICE,
+                            "Hardcoded Secrets",
+                            Files.readString(FIXTURE_DIR.resolve("practices/" + PRACTICE + ".md")),
+                            1L));
+            LiveRunnerWorkspace.stageTask(
+                    WORKSPACE,
+                    "Review merge request #1 in test/fixture against " + PRACTICE + ". Follow "
+                            + SandboxLayout.ORCHESTRATOR_PATH + ".",
+                    UUID.randomUUID(),
+                    UUID.randomUUID(),
+                    0,
+                    1L);
+        } else {
+            definitions = PracticeCriteriaCaseFixtures.stage(WORKSPACE, scenario);
+            if (scenario.path("workType").asString().equals("issue")) kind = "scm.issue";
         }
-        Files.createSymbolicLink(nodeModulesLink, PiSdkInstallation.SDK_DIR.resolve("node_modules"));
-
-        // Copy the production runner verbatim — same bytes that ship to the agent container.
-        Files.copy(RUNNER, WORKSPACE.resolve("pi-runner.ts"), StandardCopyOption.REPLACE_EXISTING);
-        for (String sidecar : new PracticeRunnerProfile().sidecarScripts()) {
-            Files.copy(
-                    Path.of("src", "main", "resources", "agent", sidecar),
-                    WORKSPACE.resolve(sidecar),
-                    StandardCopyOption.REPLACE_EXISTING);
-        }
-
-        // Orchestrator instructions live at WORKSPACE/.pi/AGENTS.md — same layout production uses,
-        // with PI_CODING_AGENT_DIR pointed inside the workspace.
-        Path piDir = WORKSPACE.resolve(SandboxLayout.PI_AGENT_PREFIX);
-        Files.createDirectories(piDir);
-        Files.copy(
-                Path.of("src", "main", "resources", "agent", "pi-orchestrator.md")
-                        .toAbsolutePath(),
-                piDir.resolve(SandboxLayout.ORCHESTRATOR_FILENAME),
-                StandardCopyOption.REPLACE_EXISTING);
-
-        // The same pi-provider.json contract production uses, not a parallel models.json that could drift.
-        Files.createDirectories(WORKSPACE.resolve(".home"));
-        Files.write(piDir.resolve("settings.json"), buildSettingsJson(creds.model()));
-        Files.write(WORKSPACE.resolve("pi-provider.json"), buildProviderConfigJson(creds));
-
-        // Practice catalog under /workspace/inputs/practices/ — the agent reads index.json (slug list)
-        // and each practice's own criteria file per the orchestrator instructions.
-        Path practicesDir = WORKSPACE.resolve(SandboxLayout.PRACTICES_PREFIX);
-        Files.createDirectories(practicesDir);
-        copyFixture("practices/index.json", practicesDir.resolve("index.json"));
-        copyFixture(
-                "practices/avoids-insecure-defaults-and-over-broad-permissions.md",
-                practicesDir.resolve("avoids-insecure-defaults-and-over-broad-permissions.md"));
-
-        // Context fixture — the pinned change, metadata, comments. Mirrors what
-        // PullRequestContentSource materialises in production.
-        Path contextDir = WORKSPACE.resolve(SandboxLayout.CONTEXT_PREFIX);
-        Files.createDirectories(contextDir);
-        // The folder index: every citation is checked against it; the runner refuses to start without it.
-        copyFixture("INDEX.json", WORKSPACE.resolve(SandboxLayout.MANIFEST_PATH));
-        copyFixture("change.json", contextDir.resolve("change.json"));
-        copyFixture("metadata.json", contextDir.resolve("metadata.json"));
-        copyFixture("comments.json", contextDir.resolve("comments.json"));
-
-        // The change view pi-change.ts derives from the checkout with git before the runner starts.
-        // This harness spawns the runner alone over a repo mount that is not a git repository, so the
-        // annotated diff is a fixture staged where the runner reads a citation of the change from.
-        Path changeDir = WORKSPACE.resolve(CHANGE_VIEW_PREFIX);
-        Files.createDirectories(changeDir);
-        copyFixture("diff.patch", changeDir.resolve("diff.patch"));
-
-        // Real Swift source so the agent's read tool can pull the actual bytes when grepping the
-        // repo mount (we mount the captured repository path as a symlink to the
-        // fixture directory so grep+read work without an actual git clone).
-        Path repoLink = WORKSPACE.resolve(SandboxLayout.REPO_MOUNT_RELATIVE);
-        Files.createDirectories(repoLink.getParent());
-        if (Files.exists(repoLink) || Files.isSymbolicLink(repoLink)) {
-            Files.delete(repoLink);
-        }
-        Files.createSymbolicLink(repoLink, FIXTURE_DIR);
-
-        // Task envelope at /workspace/task.json — built via the production TaskEnvelope record so
-        // any future field addition fails this test at compile time, not at runtime.
-        TaskEnvelope envelope = TaskEnvelope.of(
-                UUID.randomUUID(),
-                1L,
-                new Task(
-                        "Review merge request #1 in test/fixture. Read inputs/practices/index.json, "
-                                + "inputs/practices/avoids-insecure-defaults-and-over-broad-permissions.md, and context/metadata.json. "
-                                + "Apply the avoids-insecure-defaults-and-over-broad-permissions practice to "
-                                + CHANGE_VIEW_PREFIX
-                                + "diff.patch. Persist each "
-                                + "justified observation via report_observation (one tool call per observation). Follow "
-                                + SandboxLayout.ORCHESTRATOR_PATH
-                                + " for the schema and review rules.",
-                        1,
-                        "test/fixture"));
-        Files.write(
-                WORKSPACE.resolve(SandboxLayout.TASK_ENVELOPE_FILENAME),
-                MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(envelope));
-    }
-
-    private static byte[] buildSettingsJson(String modelId) throws IOException {
-        // Duplicates PiRuntimeFactory.buildPiSettingsJson: this harness stages files without a PiPlan.
-        Map<String, Object> settings = new LinkedHashMap<>();
-        settings.put("defaultProvider", "hephaestus");
-        settings.put("defaultModel", modelId);
-        settings.put("transport", "sse");
-        Map<String, Object> compaction = new HashMap<>();
-        compaction.put("enabled", true);
-        compaction.put("reserveTokens", 16384);
-        settings.put("compaction", compaction);
-        return MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(settings);
-    }
-
-    private static byte[] buildProviderConfigJson(LiveLlmCredentials creds) throws IOException {
-        Map<String, Object> config = new LinkedHashMap<>();
-        config.put("apiProtocol", "openai-completions");
-        config.put("modelId", creds.model());
-        config.put("contextWindow", 131072);
-        config.put("maxOutputTokens", 4096);
-        config.put("supportsReasoning", false);
-        return MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(config);
-    }
-
-    private static void copyFixture(String relativePath, Path dest) throws IOException {
-        Files.copy(FIXTURE_DIR.resolve(relativePath), dest, StandardCopyOption.REPLACE_EXISTING);
-    }
-
-    private static Process spawnRunner(String proxyUrl) throws IOException {
-        ProcessBuilder pb = new ProcessBuilder("node", "pi-runner.ts");
-        pb.directory(WORKSPACE.toFile());
-        Map<String, String> env = pb.environment();
-        // Fail closed: the agent has a bash tool, so inheriting the developer's shell environment would
-        // also inherit SCM, cloud, database, and deployment credentials. The live test needs only the
-        // model proxy plus basic process environment. This makes an accidental GitHub write impossible
-        // even when the invoking shell is authenticated.
-        String path = env.getOrDefault("PATH", "/usr/local/bin:/usr/bin:/bin");
-        env.clear();
-        env.put("PATH", path);
-        env.put("HOME", WORKSPACE.resolve(".home").toString());
-        env.put("LANG", "C.UTF-8");
-        // The only name carried through the clear() above.
-        env.put("PI_RUNNER_CWD", WORKSPACE.toString());
-        // The stand-in holds the live key, as the server's proxy does; the runner never sees it.
-        env.put("LLM_PROXY_URL", proxyUrl);
-        env.put("LLM_PROXY_TOKEN", "live-test-job-token");
-        // PI_CODING_AGENT_DIR points Pi at the staged orchestrator and settings, away from ~/.pi.
-        env.put(
-                "PI_CODING_AGENT_DIR",
-                WORKSPACE.resolve(SandboxLayout.PI_AGENT_PREFIX).toString());
-        env.put("AGENT_BUDGET_MS", Long.toString(AGENT_BUDGET_MS));
-        // The server's defaults (PracticeReviewProperties): the work each practice is owed per turn.
-        env.put("PI_PRACTICE_MODEL_CALLS", "12");
-        env.put("PI_PRACTICE_OUTPUT_TOKENS", "16000");
-        // The runner imports the SDK via bare ESM specifiers; NODE_PATH lets Node resolve them when
-        // /workspace/node_modules is a symlink (some Node versions skip symlinked node_modules).
-        env.put("NODE_PATH", PiSdkInstallation.SDK_DIR.resolve("node_modules").toString());
-        return pb.start();
+        LiveRunnerWorkspace.stageFixtureInputs(WORKSPACE, kind, definitions);
+        return spec.environment();
     }
 
     private static Thread pumpStream(InputStream stream, String tag) {
@@ -471,8 +346,8 @@ class PracticeRunnerLiveLlmTest {
 
     /**
      * Stands in for the server's LLM proxy on one base URL, as production does: model calls are forwarded to
-     * the live endpoint with its key, and the observation admission the runner posts after measuring admits
-     * every observation it carries.
+     * the live endpoint with its key, and the result admission the runner posts after measuring admits
+     * every result it carries.
      */
     static final class ProxyStandIn implements AutoCloseable {
         /**
@@ -492,7 +367,7 @@ class PracticeRunnerLiveLlmTest {
 
         ProxyStandIn(LiveLlmCredentials creds) throws IOException {
             server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
-            server.createContext("/admit-observations", exchange -> {
+            server.createContext("/admit-results", exchange -> {
                 byte[] body = MAPPER.writeValueAsBytes(admit(MAPPER.readTree(exchange.getRequestBody())));
                 exchange.getResponseHeaders().set("content-type", "application/json");
                 exchange.sendResponseHeaders(200, body.length);
@@ -510,31 +385,95 @@ class PracticeRunnerLiveLlmTest {
             return "http://127.0.0.1:" + server.getAddress().getPort();
         }
 
-        /** Every observation admitted as sent, with the identity and citation indexes the server assigns. */
+        /**
+         * Every candidate admitted as sent, projected as the server answers it: the result and each of its problems
+         * under the ids the server assigns, every citation indexed, nothing withheld and no line anchorable.
+         */
         static ObjectNode admit(JsonNode request) {
-            ObjectNode answer = MAPPER.createObjectNode().put("schemaVersion", 1);
-            ArrayNode admitted = answer.putArray("observations");
-            for (JsonNode observation : request.path("observations")) {
-                ObjectNode copy = (ObjectNode) observation.deepCopy();
-                copy.put("id", UUID.randomUUID().toString());
-                copy.put("outcome", outcomeOf(observation));
-                ArrayNode citations = copy.putArray("citations");
-                int index = 0;
-                for (JsonNode citation : observation.path("evidence").path("citations")) {
-                    citations.add(((ObjectNode) citation.deepCopy()).put("index", index++));
+            var submitted = MAPPER.treeToValue(request, AdmissionRequestDTO.class);
+            var rows = new ArrayList<AdmittedResultDTO>();
+            for (var entry : submitted.results()) {
+                JsonNode candidate = entry.candidate();
+                UUID resultId = UUID.randomUUID();
+                var problems = new ArrayList<AdmittedProblemDTO>();
+                for (JsonNode problem : candidate.path("problems")) {
+                    problems.add(new AdmittedProblemDTO(
+                            UUID.randomUUID(),
+                            Severity.valueOf(problem.path("severity").asString()),
+                            problem.path("summary").asString(),
+                            resultId,
+                            problems.size(),
+                            null,
+                            problem.path("explanation").asString(),
+                            projected(problem.path("citations")),
+                            MAPPER.treeToValue(problem.path("basis"), ClaimBasis.class),
+                            problem.has("nextStep") ? problem.path("nextStep").asString() : null,
+                            false));
                 }
-                admitted.add(copy);
+                ObjectNode evidence = (ObjectNode) candidate.path("evidence").deepCopy();
+                evidence.set("citations", MAPPER.valueToTree(projected(candidate.path("citations"))));
+                rows.add(new AdmittedResultDTO(
+                        entry.practiceSlug(),
+                        entry.itemId(),
+                        resultId,
+                        ResultOutcome.valueOf(outcomeOf(candidate)),
+                        candidate.path("summary").asString(),
+                        candidate.path("explanation").asString(),
+                        evidence,
+                        candidate.has("example") ? candidate.get("example") : null,
+                        MAPPER.treeToValue(candidate.path("coverage"), ResultCoverage.class),
+                        problems,
+                        false,
+                        false));
             }
-            return answer.put("admissionDigest", "live-test");
+            return MAPPER.valueToTree(new AdmissionResponseDTO(
+                    SandboxLayout.PRACTICE_CONTRACT_VERSION,
+                    submitted.reviewId(),
+                    submitted.jobId(),
+                    submitted.attempt(),
+                    ProvenanceDigest.sha256Hex(MAPPER.writeValueAsBytes(request)),
+                    rows,
+                    List.of(),
+                    null,
+                    null,
+                    false));
         }
 
-        /** As admission records it: the outcome as sent, which must name an {@link Outcome}. */
-        private static String outcomeOf(JsonNode observation) {
-            JsonNode outcome = observation.path("outcome");
+        private static String outcomeOf(JsonNode candidate) {
+            JsonNode outcome = candidate.path("outcome");
             if (!outcome.isString()) {
-                throw new IllegalArgumentException("An admitted observation needs a string outcome");
+                throw new IllegalArgumentException("An admitted result needs a string outcome");
             }
-            return Outcome.valueOf(outcome.asString()).name();
+            return ResultOutcome.valueOf(outcome.asString()).name();
+        }
+
+        static @Nullable String storedSeverity(JsonNode candidate) {
+            Severity worst = null;
+            for (JsonNode problem : candidate.path("problems")) {
+                Severity severity = Severity.valueOf(problem.path("severity").asString());
+                if (worst == null || severity.rank() < worst.rank()) worst = severity;
+            }
+            return worst == null ? null : worst.name();
+        }
+
+        private static List<ProjectedCitationDTO> projected(JsonNode citations) {
+            var projected = new ArrayList<ProjectedCitationDTO>();
+            for (JsonNode value : citations) {
+                var citation = MAPPER.treeToValue(value, EvidenceCitation.class);
+                projected.add(new ProjectedCitationDTO(
+                        citation.sourceKind().value(),
+                        citation.sourcePath(),
+                        citation.path(),
+                        citation.side(),
+                        citation.commit(),
+                        citation.startLine(),
+                        citation.endLine(),
+                        citation.quote(),
+                        citation.verification(),
+                        projected.size(),
+                        false));
+            }
+            return List.copyOf(projected);
         }
 
         private void forward(HttpExchange exchange, LiveLlmCredentials creds) throws IOException {
@@ -543,6 +482,9 @@ class PracticeRunnerLiveLlmTest {
                 exchange.close();
                 return;
             }
+            int requestId = System.identityHashCode(exchange);
+            long started = System.nanoTime();
+            log.info("Live upstream request {} started", requestId);
             try (exchange) {
                 HttpRequest request = HttpRequest.newBuilder(URI.create(
                                 creds.baseUrl() + exchange.getRequestURI().getPath()))
@@ -556,6 +498,11 @@ class PracticeRunnerLiveLlmTest {
                 try {
                     HttpResponse<InputStream> response =
                             client.send(request, HttpResponse.BodyHandlers.ofInputStream());
+                    log.info(
+                            "Live upstream request {} headers: status={}, elapsedMs={}",
+                            requestId,
+                            response.statusCode(),
+                            TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
                     try (InputStream upstream = response.body()) {
                         if (!attach(forwarding, upstream)) {
                             // close() took its snapshot before this stream arrived.
@@ -575,6 +522,10 @@ class PracticeRunnerLiveLlmTest {
                     exchange.sendResponseHeaders(502, -1);
                 }
             } finally {
+                log.info(
+                        "Live upstream request {} ended: elapsedMs={}",
+                        requestId,
+                        TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
                 synchronized (lifecycle) {
                     active.remove(forwarding);
                 }

@@ -2,7 +2,7 @@ import { SplitIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { cn } from "cn";
-import type { ReviewFeedbackLocationCounts, ReviewFeedbackReasonCount } from "@/api/types.gen";
+import type { ReasonCount, ReviewFeedbackCounts } from "@/api/types.gen";
 import { STALE } from "@/components/activity/activity-tones";
 import { InfoLines, InfoTip } from "@/components/common/InfoTip";
 import { InlineLink } from "@/components/common/InlineLink";
@@ -12,7 +12,7 @@ import { statusToneClass } from "@/components/common/status-def";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
-import { type BreakdownRow, deliveredByChannel, withheldByReason } from "./delivery-breakdown";
+import { type BreakdownRow, deliveredByLocation, withheldByReason } from "./delivery-breakdown";
 import { OVERVIEW_TYPE } from "./overview-type-scale";
 import { type AttentionTone, percentText, shareOf } from "./review-attention";
 import { PROBLEM_THRESHOLDS } from "./review-attention-thresholds";
@@ -21,15 +21,14 @@ import type { OverviewRegionState, ReviewCountState } from "./review-states";
 import type { AttentionGroup, AttentionRange } from "./ReviewAttention";
 import { ReviewListLink } from "./ReviewListLink";
 
-/** Delivered feedback of the range by channel, as the Feedback table's Channel filter counts it. */
-export type DeliveredByChannelState = PanelState<{
-	counts: ReviewFeedbackLocationCounts[];
+export type DeliveredByLocationState = PanelState<{
+	counts: ReasonCount[];
 	stale: boolean;
 }>;
 
 /** Withheld feedback of the range by reason, as the table's "Why withheld" filter counts it. */
 export type WithheldByReasonState = PanelState<{
-	counts: ReviewFeedbackReasonCount[];
+	counts: ReasonCount[];
 	stale: boolean;
 }>;
 
@@ -41,22 +40,12 @@ export interface DeliveryBreakdownCardProps {
 	range: AttentionRange;
 	/** The overview of the range, whose feedback counts hold the rejected and the withheld. */
 	overview: OverviewRegionState;
-	delivered: DeliveredByChannelState;
+	delivered: DeliveredByLocationState;
 	withheld: WithheldByReasonState;
 	/** Feedback of the range that failed to deliver, out of the feedback sent in it. */
 	failedDeliveries: AttentionGroup<ReviewCountState>;
-	/** Reviews of the range whose results could not be processed or delivered, out of the completed. */
-	unprocessedResults: AttentionGroup<ReviewCountState>;
 }
 
-/**
- * Beside the Feedback tile, where the feedback of the range went: the delivered feedback split by
- * channel, the withheld feedback split by reason, each row in the words of the Feedback table's
- * filter for it and opening the table filtered to exactly the rows it counts. Under them, smaller,
- * the share of the feedback sent that failed to deliver, red above 5 %, and the share of the
- * completed reviews whose results could not be processed or delivered, plain at any share, by the
- * overview's colour rule (`review-attention-thresholds.ts`). Counts only: no text, rating or comment of any feedback.
- */
 export function DeliveryBreakdownCard({
 	workspaceSlug,
 	scope,
@@ -65,32 +54,31 @@ export function DeliveryBreakdownCard({
 	delivered,
 	withheld,
 	failedDeliveries,
-	unprocessedResults,
 }: DeliveryBreakdownCardProps) {
 	return (
-		<Card size="sm" className="w-full" role="region" aria-label="By channel and reason">
+		<Card size="sm" className="w-full" role="region" aria-label="Delivered and withheld">
 			<CardHeader>
 				<CardTitle className="flex items-center gap-2 text-sm font-medium">
 					<SplitIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-					By channel and reason
-					<InfoTip label="About channels and reasons">
+					Delivered and withheld
+					<InfoTip label="About delivered and withheld feedback">
 						<InfoLines lines={BREAKDOWN_INFO} />
 					</InfoTip>
 				</CardTitle>
 			</CardHeader>
-			{/* Two short tables side by side from a medium width, then the failure figures as the
+			{/* Two short tables side by side from a medium width, then the failure figure as the
 			    card's foot, at the bottom of the card whatever the tile beside it holds. */}
 			<CardContent className="@container flex flex-1 flex-col gap-4">
 				<div className="grid grid-cols-1 gap-x-6 gap-y-4 @md:grid-cols-2">
-					<Part
-						caption="Delivered by channel"
-						what="delivered feedback by channel"
+					<BreakdownTable
+						caption="Delivered by where it appeared"
+						what="delivered feedback by where it appeared"
 						state={delivered}
 						empty={`Nothing delivered ${range.during}`}
-						rows={(counts) => deliveredByChannel(counts, scope)}
+						rows={(counts) => deliveredByLocation(counts, scope)}
 						workspaceSlug={workspaceSlug}
 					/>
-					<Part
+					<BreakdownTable
 						caption="Withheld by reason"
 						what="withheld feedback by reason"
 						state={withheldState(withheld, overview)}
@@ -106,10 +94,9 @@ export function DeliveryBreakdownCard({
 				>
 					<RateLine
 						workspaceSlug={workspaceSlug}
-						rate={RATES.deliveries}
+						rate={DELIVERY_FAILURE_RATE}
 						group={failedDeliveries}
 					/>
-					<RateLine workspaceSlug={workspaceSlug} rate={RATES.results} group={unprocessedResults} />
 				</div>
 			</CardContent>
 		</Card>
@@ -120,7 +107,7 @@ export function DeliveryBreakdownCard({
 const BREAKDOWN_INFO = [
 	{
 		term: "Delivered",
-		text: "counts the feedback that reached the developer, by channel.",
+		text: "counts the feedback that reached the developer, by where it appeared.",
 	},
 	{
 		term: "Withheld",
@@ -128,11 +115,7 @@ const BREAKDOWN_INFO = [
 	},
 	{
 		term: "Feedback failed to deliver",
-		text: "is the share of the feedback sent that failed. Above 5 % it is red.",
-	},
-	{
-		term: "Reviews not processed or delivered",
-		text: "is the share of the completed reviews whose results failed.",
+		text: "is the share of the feedback sent that failed. Above 5% it is red.",
 	},
 	{
 		term: "Each count",
@@ -141,8 +124,8 @@ const BREAKDOWN_INFO = [
 ];
 
 interface WithheldCounts {
-	reasons: ReviewFeedbackReasonCount[];
-	feedback: { discarded: number };
+	reasons: ReasonCount[];
+	feedback: Pick<ReviewFeedbackCounts, "rejected">;
 }
 
 /** The reasons read and the overview's own count of the rejected, as one state. */
@@ -163,11 +146,7 @@ function withheldState(
 	};
 }
 
-/**
- * One split as a short table: its caption with the split's total as the head, then a row a part,
- * each its filter's icon and words and its count, the whole row a link to the rows it counts.
- */
-function Part<T>({
+function BreakdownTable<T>({
 	caption,
 	what,
 	state,
@@ -175,9 +154,7 @@ function Part<T>({
 	rows,
 	workspaceSlug,
 }: {
-	/** The head and the table's accessible name: "Delivered by channel". */
 	caption: string;
-	/** For the error alert: "We could not load delivered feedback by channel". */
 	what: string;
 	state: PanelState<{ counts: T; stale: boolean }>;
 	empty: string;
@@ -196,8 +173,8 @@ function Part<T>({
 		);
 	} else if (state.status === "loading") {
 		body = (
-			<div role="status" className="flex flex-col gap-1">
-				<span className="sr-only">Loading {what}</span>
+			<div aria-busy="true" className="flex flex-col gap-1">
+				<span className="sr-only">Loading {what}…</span>
 				<Skeleton className="h-4 w-full" />
 				<Skeleton className="h-4 w-40" />
 			</div>
@@ -233,10 +210,6 @@ function Part<T>({
 	);
 }
 
-/**
- * A part's row: its filter's icon and words, and its count, aligned on the right. The words are the
- * link, stretched over the whole row, so the row opens the rows it counts wherever it is pressed.
- */
 function BreakdownTableRow({ row, workspaceSlug }: { row: BreakdownRow; workspaceSlug: string }) {
 	const Icon = row.def.icon;
 	return (
@@ -263,41 +236,21 @@ function BreakdownTableRow({ row, workspaceSlug }: { row: BreakdownRow; workspac
 }
 
 interface RateDef {
-	/** The figure's label, naming its unit, the term of the card's (i): "Feedback failed to deliver". */
 	term: string;
 	/** For the loading and error states: "feedback that failed to deliver". */
 	what: string;
-	/** The link's words, naming what the count is out of: "1 of 15 sent", "1 of 31 completed". */
 	link: (count: number, of: number | undefined) => string;
 	tone: (share: number) => AttentionTone;
 }
 
-const RATES = {
-	deliveries: {
-		term: "Feedback failed to deliver",
-		what: "feedback that failed to deliver",
-		link: (count, of) => (of === undefined ? `${count} failed` : `${count} of ${of} sent`),
-		tone: (share) =>
-			share > PROBLEM_THRESHOLDS.deliveriesDestructiveAbove ? "destructive" : "secondary",
-	},
-	results: {
-		term: "Reviews not processed or delivered",
-		what: "reviews whose results could not be processed or delivered",
-		link: (count, of) =>
-			of === undefined
-				? `${count} ${count === 1 ? "review" : "reviews"}`
-				: `${count} of ${of} completed`,
-		// Plain at any share: the part an admin can fix, a comment not posted, is red above already.
-		tone: () => "secondary",
-	},
-} as const satisfies Record<string, RateDef>;
+const DELIVERY_FAILURE_RATE: RateDef = {
+	term: "Feedback failed to deliver",
+	what: "feedback that failed to deliver",
+	link: (count, of) => (of === undefined ? `${count} failed` : `${count} of ${of} sent`),
+	tone: (share) =>
+		share > PROBLEM_THRESHOLDS.deliveriesDestructiveAbove ? "destructive" : "secondary",
+};
 
-/**
- * A failure figure of the range, one row of the card's foot: its label and the count it comes from,
- * which opens the rows it counts, then the rate, aligned with the counts above. The share of the
- * feedback sent that failed to deliver, or of the reviews that finished whose results could not be
- * processed or delivered.
- */
 function RateLine({
 	workspaceSlug,
 	rate,
@@ -320,8 +273,8 @@ function RateLine({
 	}
 	if (state.status === "loading") {
 		return (
-			<div role="status" className="col-span-2">
-				<span className="sr-only">Loading {rate.what}</span>
+			<div aria-busy="true" className="col-span-2">
+				<span className="sr-only">Loading {rate.what}…</span>
 				<Skeleton className="h-4 w-48" />
 			</div>
 		);

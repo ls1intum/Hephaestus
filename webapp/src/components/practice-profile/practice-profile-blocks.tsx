@@ -70,7 +70,7 @@ export function GroupWithoutPractices() {
 				<EmptyMedia variant="icon">
 					<ClipboardCheckIcon />
 				</EmptyMedia>
-				<EmptyTitle>This group has no practices</EmptyTitle>
+				<EmptyTitle>No reviewed practices</EmptyTitle>
 				<EmptyDescription>
 					Nothing in it is reviewed in this workspace, so there is nothing to show yet.
 				</EmptyDescription>

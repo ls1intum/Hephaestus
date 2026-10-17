@@ -4,8 +4,13 @@ package de.tum.cit.aet.hephaestus.practices.curated.adoption;
 public enum CatalogGroupDisposition {
     /** The catalog entry names no group, so the copy lands ungrouped. */
     UNASSIGNED,
-    /** A workspace group already holds that slug and is used as-is; its name and visuals are untouched. */
+    /**
+     * A workspace group already holds that slug and is used as-is; its name and visuals are
+     * untouched.
+     */
     REUSE_EXISTING_GROUP,
-    /** No workspace group holds that slug, so adoption creates one from the catalog's definition. */
+    /**
+     * No workspace group holds that slug, so adoption creates one from the catalog's definition.
+     */
     CREATE_CATALOG_GROUP,
 }

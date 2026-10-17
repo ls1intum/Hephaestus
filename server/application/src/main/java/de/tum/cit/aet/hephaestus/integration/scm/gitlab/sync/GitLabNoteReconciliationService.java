@@ -2,9 +2,6 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.sync;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncProgress;
@@ -16,12 +13,16 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.RepositoryRef;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabWorkspaceLinkService;
+import java.time.Clock;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -60,6 +61,8 @@ public class GitLabNoteReconciliationService {
     private final WebClient client;
     private final ApplicationEventPublisher events;
 
+    private final Clock clock;
+
     public GitLabNoteReconciliationService(
             IssueRepository issues,
             IssueCommentRepository comments,
@@ -71,7 +74,9 @@ public class GitLabNoteReconciliationService {
             WebClient.Builder builder,
             GitLabWorkspaceLinkService workspaceLinks,
             ApplicationEventPublisher events,
+            Clock clock,
             GitLabProjectAdmission admission) {
+        this.clock = clock;
         this.admission = admission;
         this.workspaceLinks = workspaceLinks;
         this.events = events;
@@ -106,8 +111,8 @@ public class GitLabNoteReconciliationService {
         if (!workspaceLinks.mayWriteRepository(workspaceId, repository)) return new Outcome(0, true);
         int removed = 0;
         boolean skipped = false;
-        // Traverse local live parents, not just the incremental updated-at window: deleting a note
-        // need not update its parent. Keyset pagination also tolerates parent inserts during this pass.
+        // Note deletion need not update its parent; inspect all stored live parents.
+        // Keyset pagination tolerates parents inserted during the traversal.
         long after = 0;
         while (!cancelled(handle)) {
             List<Issue> parents = issues.findLiveNoteParents(repository.getId(), after, PageRequest.of(0, 100));
@@ -140,7 +145,7 @@ public class GitLabNoteReconciliationService {
         if (parent.getRepository() == null
                 || !parent.getRepository().getId().equals(repository.getId())
                 || !workspaceLinks.mayWriteRepository(workspaceId, repository)) return new Outcome(0, true);
-        // Capture candidates BEFORE the first network call. Never remove a concurrently inserted note.
+        // Snapshot candidates before network reads so concurrent inserts cannot be deleted.
         var localComments = comments.findNoteIdsByParentId(parent.getId());
         var localDiff = parent instanceof PullRequest
                 ? diffComments.findNoteIdsByParentId(parent.getId())
@@ -204,7 +209,8 @@ public class GitLabNoteReconciliationService {
                                 EventContext.forSync(
                                         workspaceId,
                                         Objects.requireNonNull(RepositoryRef.from(repository)),
-                                        IdentityProviderType.GITLAB)));
+                                        IdentityProviderType.GITLAB,
+                                        clock.instant())));
                     for (long id : staleDiff)
                         events.publishEvent(new ScmDomainEvent.ReviewCommentDeleted(
                                 id,
@@ -212,7 +218,8 @@ public class GitLabNoteReconciliationService {
                                 EventContext.forSync(
                                         workspaceId,
                                         Objects.requireNonNull(RepositoryRef.from(repository)),
-                                        IdentityProviderType.GITLAB)));
+                                        IdentityProviderType.GITLAB,
+                                        clock.instant())));
                 }
                 return count;
             });
@@ -229,8 +236,10 @@ public class GitLabNoteReconciliationService {
         Set<Long> ids = new HashSet<>();
         Long total = null;
         String token = tokens.getAccessToken(workspaceId);
-        String url = tokens.resolveServerUrl(workspaceId) + "/api/v4/projects/{project}/"
-                + (mergeRequest ? "merge_requests" : "issues") + "/{iid}/notes";
+        String url = tokens.resolveServerUrl(workspaceId)
+                + "/api/v4/projects/{project}/"
+                + (mergeRequest ? "merge_requests" : "issues")
+                + "/{iid}/notes";
         for (int page = 1; page <= GitLabSyncConstants.MAX_PAGINATION_PAGES; page++) {
             if (cancelled(handle) || Thread.currentThread().isInterrupted()) return null;
             var response = client.get()
@@ -246,7 +255,11 @@ public class GitLabNoteReconciliationService {
                         null,
                         SyncProgress.ofResource(
                                 SyncPhase.SWEEP,
-                                "Checking notes on " + projectPath + (mergeRequest ? "!" : "#") + iid + ", page "
+                                "Checking notes on "
+                                        + projectPath
+                                        + (mergeRequest ? "!" : "#")
+                                        + iid
+                                        + ", page "
                                         + page,
                                 projectPath,
                                 null,
@@ -278,8 +291,10 @@ public class GitLabNoteReconciliationService {
             List<Long> nativeIds,
             @Nullable SyncExecutionHandle handle) {
         String token = tokens.getAccessToken(workspaceId);
-        String url = tokens.resolveServerUrl(workspaceId) + "/api/v4/projects/{project}/"
-                + (mergeRequest ? "merge_requests" : "issues") + "/{iid}/notes/{note}";
+        String url = tokens.resolveServerUrl(workspaceId)
+                + "/api/v4/projects/{project}/"
+                + (mergeRequest ? "merge_requests" : "issues")
+                + "/{iid}/notes/{note}";
         for (Long nativeId : nativeIds) {
             if (nativeId == null
                     || nativeId <= 0

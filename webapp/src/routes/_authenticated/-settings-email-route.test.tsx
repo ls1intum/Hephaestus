@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { getNotificationPreferencesQueryKey } from "@/api/@tanstack/react-query.gen";
 import { WORDING_VERSION } from "@/components/auth/consent-wording";
 import { currentUser } from "@/mocks/fixtures/auth";
-import { workspaceListItem } from "@/mocks/fixtures/workspaces";
+import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
 import { deferred } from "@/test/async";
 import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
@@ -373,13 +373,13 @@ describe("account email choices", () => {
 		).toBe("true");
 	});
 
-	it.each(["MEMBER", "ADMIN"])(
+	it.each(["MEMBER", "ADMIN"] as const)(
 		"does not treat workspace %s access as instance administration",
 		async (role) => {
 			server.use(
 				http.get("*/workspaces", () => HttpResponse.json([workspaceListItem("acme")])),
 				http.get("*/workspaces/:workspaceSlug/members/me", () =>
-					HttpResponse.json({ role, userId: 42, userLogin: "ada", userName: "Ada" }),
+					HttpResponse.json(ownMembership(role)),
 				),
 			);
 			server.use(

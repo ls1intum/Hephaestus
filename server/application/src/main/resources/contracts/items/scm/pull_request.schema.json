@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hephaestus.aet.cit.tum.de/contracts/items/scm/pull_request.schema.json",
+  "type": "object",
+  "properties": {
+    "basis": {
+      "type": "object",
+      "properties": {
+        "admission_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "admitted_at": {
+          "type": "string"
+        },
+        "other_fields": {
+          "type": "string"
+        },
+        "mirror_synced_at": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "admission_fields",
+        "other_fields"
+      ]
+    },
+    "pr_number": {
+      "type": "integer"
+    },
+    "pr_url": {
+      "type": "string"
+    },
+    "repository_full_name": {
+      "type": "string"
+    },
+    "repository_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "provider_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "source_branch": {
+      "type": "string"
+    },
+    "target_branch": {
+      "type": "string"
+    },
+    "commit_sha": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+    },
+    "title": {
+      "type": "string"
+    },
+    "body": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "state": {
+      "enum": [
+        "OPEN",
+        "CLOSED",
+        "MERGED"
+      ]
+    },
+    "is_draft": {
+      "type": "boolean"
+    },
+    "is_merged": {
+      "type": "boolean"
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "closed_at": {
+      "type": "string"
+    },
+    "merged_at": {
+      "type": "string"
+    },
+    "additions": {
+      "type": "integer"
+    },
+    "deletions": {
+      "type": "integer"
+    },
+    "changed_files": {
+      "type": "integer"
+    },
+    "author": {
+      "type": "string"
+    },
+    "author_id": {
+      "type": "integer"
+    },
+    "author_bot": {
+      "const": true
+    },
+    "merged_by": {
+      "type": "string"
+    },
+    "labels": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "assignees": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "milestone": {
+      "type": "string"
+    },
+    "merge_state_status": {
+      "type": "string"
+    },
+    "review_decision": {
+      "type": "string"
+    },
+    "head_checks": {
+      "enum": [
+        "SUCCESS",
+        "FAILURE",
+        "PENDING",
+        "CANCELLED",
+        "NONE",
+        "NO_PIPELINE",
+        "SKIPPED"
+      ]
+    }
+  },
+  "required": [
+    "basis",
+    "pr_number",
+    "pr_url",
+    "repository_full_name",
+    "source_branch",
+    "target_branch",
+    "commit_sha",
+    "is_draft",
+    "is_merged",
+    "additions",
+    "deletions",
+    "changed_files",
+    "labels",
+    "assignees"
+  ],
+  "additionalProperties": true
+}

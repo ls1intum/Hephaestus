@@ -1,4 +1,6 @@
 import { setTimeout as delay } from "node:timers/promises";
+import { errorText } from "./pi-error-text.ts";
+import { isJsonObject as isRecord } from "./work/practice-scripts/lib/core/json.ts";
 
 export function retryDelayMs(attempt: number, baseMs = 1000): number {
 	if (!Number.isInteger(attempt) || attempt < 1) {
@@ -52,4 +54,16 @@ export async function retrying<T>(
 		}
 	}
 	return call();
+}
+
+export function causeText(error: unknown): string {
+	return error instanceof Error && error.cause !== undefined ? ` (${errorText(error.cause)})` : "";
+}
+
+export async function answerText(response: Response): Promise<string> {
+	const problem: unknown = await response.json().catch(() => null);
+	const detail = isRecord(problem) ? problem.detail : null;
+	return typeof detail === "string" && detail.length > 0
+		? detail
+		: "the server gave no problem detail";
 }

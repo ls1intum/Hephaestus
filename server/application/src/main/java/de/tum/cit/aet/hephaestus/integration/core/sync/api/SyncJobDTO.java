@@ -47,7 +47,7 @@ public record SyncJobDTO(
         String errorSummary,
 
         @Schema(description = "Account id of the admin who triggered this job, if MANUAL") @Nullable
-        Long triggeredByUserId) {
+        Long triggeredByAccountId) {
     public static SyncJobDTO from(SyncJob job) {
         return new SyncJobDTO(
                 job.getId(),
@@ -62,6 +62,6 @@ public record SyncJobDTO(
                 job.getItemsTotal(),
                 job.getProgress(),
                 job.getErrorSummary(),
-                job.getTriggeredByUserId());
+                job.getTriggeredByAccountId());
     }
 }

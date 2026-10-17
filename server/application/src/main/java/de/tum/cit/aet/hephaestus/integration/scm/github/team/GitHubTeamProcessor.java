@@ -1,11 +1,11 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.team;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.github.team.dto.GitHubTeamEventDTO;
 import java.util.Locale;
 import java.util.Objects;
@@ -44,7 +44,8 @@ public class GitHubTeamProcessor {
             return null;
         }
 
-        // First try natural key lookup (organization + name), scoped to this provider so a same-named
+        // First try natural key lookup (organization + name), scoped to this provider so a
+        // same-named
         // team in a same-named org on another provider is never adopted and overwritten.
         Optional<Team> existingTeam = Optional.empty();
         if (orgLogin != null && dto.name() != null) {
@@ -198,8 +199,7 @@ public class GitHubTeamProcessor {
             Team team, String orgLogin, GitHubTeamEventDTO.GitHubTeamDTO dto, ProcessingContext context) {
         String teamSlug = dto.slug() != null ? dto.slug() : dto.name();
 
-        // Find the team that has the conflicting slug. Provider-scoped: the rename below is destructive,
-        // and only a team on this provider can actually contend for the slug.
+        // Only teams on the same provider can contend for this slug.
         Optional<Team> conflicting = teamRepository.findByOrganizationIgnoreCaseAndSlugAndProviderId(
                 orgLogin, teamSlug, Objects.requireNonNull(context.providerId()));
         if (conflicting.isEmpty()) {

@@ -4,14 +4,13 @@ import { expect, fn, userEvent } from "storybook/test";
 import { ActionConfirmation } from "~/components/action/ActionConfirmation";
 import { READY, READY_ON_GITHUB } from "~/components/report/fixtures";
 import type { ActionPreview } from "~/shared/review-actions";
-import { workNoun } from "~/shared/work-noun";
 import { expectNoHorizontalOverflow } from "~/stories/reflow";
 
 const REQUEST: ActionPreview = {
 	action: { kind: "request-review" },
 	instanceHost: "hephaestus.build",
 	workspace: READY.workspace,
-	work: READY_ON_GITHUB.work,
+	item: READY_ON_GITHUB.item,
 };
 
 /** The extension's own confirmation window, which a provider page can neither frame nor cover. */
@@ -91,7 +90,7 @@ export const RefusedBeforeSending: Story = {
 	args: {
 		state: {
 			status: "refused",
-			preview: { ...REQUEST, work: READY.work },
+			preview: { ...REQUEST, item: READY.item },
 			message: "Your account cannot request a review of this work.",
 		},
 	},
@@ -136,10 +135,11 @@ export const Narrow: Story = {
 
 export const Dark: Story = { globals: { theme: "dark" } };
 
-export const Nouns: Story = {
-	play: async () => {
-		await expect(workNoun({ kind: "scm.pull_request", provider: "GITLAB" })).toBe("merge request");
-		await expect(workNoun({ kind: "scm.pull_request", provider: "GITHUB" })).toBe("pull request");
-		await expect(workNoun({ kind: "scm.issue", provider: "GITLAB" })).toBe("issue");
+export const OnGitLab: Story = {
+	args: { state: { status: "ready", preview: { ...REQUEST, item: READY.item } } },
+	play: async ({ canvas }) => {
+		await expect(
+			canvas.getByText(/reviews this merge request against the practices/u),
+		).toBeVisible();
 	},
 };

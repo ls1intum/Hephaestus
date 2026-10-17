@@ -3,8 +3,8 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest;
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventAction;
@@ -171,7 +171,8 @@ public class GitLabMergeRequestMessageHandler extends AbstractIntegrationMessage
                     mergeRequestProcessor.applyTerminalFacts(repository, iid, facts);
                     mergeRequestProcessor.applyReadiness(repository, iid, facts, requestedAt, stored.context());
                 }
-                // Offered whether or not the read succeeded: a merger it could not name holds the review pending.
+                // Offered whether or not the read succeeded: a merger it could not name
+                // holds the review pending.
                 mergeRequestProcessor.offerMerge(repository, iid, stored.context());
             } else if (facts != null) {
                 mergeRequestProcessor.applyReadiness(repository, iid, facts, requestedAt, stored.context());

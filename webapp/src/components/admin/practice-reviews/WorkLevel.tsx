@@ -1,26 +1,22 @@
 import type { ReactNode } from "react";
 
-import type { ReviewWorkFacts, TracedArtifact, TracedSignal } from "@/api/types.gen";
+import type { ItemEvent, ItemFact, ItemRef, ReviewRef } from "@/api/types.gen";
+import { InlineLink } from "@/components/common/InlineLink";
 import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
+import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { RefusalFixLink } from "@/components/practice-trace/RefusalFixLink";
 import {
-	DISCOVERED_VIA_DESCRIPTIONS,
-	DISCOVERED_VIA_LABELS,
-	SIGNAL_STATE_LABELS,
-} from "@/components/practice-trace/trace-format";
-import {
-	REVIEWED_WORK_CHECK_DEFS,
-	REVIEWED_WORK_STATE_DEFS,
-} from "@/components/practice-vocabulary/reviewed-work-state-defs";
-import {
-	TRACED_WORK_DEFS,
-	tracedWorkState,
-} from "@/components/practice-vocabulary/traced-work-defs";
+	ITEM_EVENT_FOUND_BY,
+	ITEM_EVENT_REASON_SENTENCES,
+	ITEM_EVENT_STATE_DEFS,
+} from "@/components/practice-vocabulary/item-event-defs";
+import { REVIEW_ORIGIN_DEFS } from "@/components/practice-vocabulary/review-origin-defs";
+import { REVIEW_STATUS_DEFS } from "@/components/practice-vocabulary/review-status-defs";
 import { DrawerBody, DrawerFooter } from "@/components/ui/drawer";
-import { artifactKindLabel, reviewedWorkName } from "@/lib/artifact-kinds";
+import { itemKindLabel, itemName } from "@/lib/item-kinds";
 import { hasText } from "@/lib/text";
 
 import { LevelBodySkeleton } from "./LevelBodySkeleton";
@@ -30,86 +26,85 @@ import {
 	SheetSection,
 	SheetStatusLine,
 	SheetTechnical,
-	type TechnicalFact,
 } from "./RecordSheet";
 import { RequestReviewAction } from "./RequestReviewAction";
-import { ReviewArtifactLink } from "./ReviewArtifact";
-import { ReviewDayTime } from "./ReviewDayTime";
+import { itemLevel, reviewLevel } from "./review-levels";
 import { ReviewFact, ReviewFactGrid } from "./ReviewFactGrid";
+import { ReviewItemLink } from "./ReviewItem";
 import { ReviewLevelHeader } from "./ReviewLevelHeader";
-import { ReviewPerson } from "./ReviewPerson";
+
+const NO_REVIEWS: readonly ReviewRef[] = [];
 
 export interface WorkLevelProps {
 	workspaceSlug: string;
 	nested?: boolean;
 	path: LevelPath;
-	/** The work as the work list has it; `undefined` for work nothing was recorded about. */
-	work: PanelState<{ work: TracedArtifact | undefined }>;
-	/** Every moment recorded on the work, as its trace has them. */
-	moments?: PanelState<{ moments: TracedSignal[] }>;
-	/**
-	 * What the provider reported about a pull request, merge request or issue; `undefined` for
-	 * other work and for work in a repository the workspace does not monitor, which also sets
-	 * `unmonitored` so the sheet says why the facts are missing, and `answer`, what the server
-	 * answered, so an admin sees the reply itself: "204 No Content from GET …".
-	 */
-	facts?: PanelState<{
-		facts: ReviewWorkFacts | undefined;
-		unmonitored?: boolean;
-		answer?: string;
-	}>;
-	/** Asks for a review of the work; offered only for the kinds a person can ask to have reviewed. */
+	item: PanelState<{ item: ItemRef }>;
+	events?: PanelState<{ events: ItemEvent[] }>;
+	reviews?: readonly ReviewRef[];
+	eventLabel: (name: string) => string;
+	facts?: PanelState<{ facts: ItemFact[] }>;
 	onRequestReview?: () => void;
 	requesting?: boolean;
-	/** Why no review can be asked for now, such as one of this work already running. */
 	requestBlocked?: string;
-	/** Why the last ask about this work started nothing, drawn by the route. */
 	refusal?: ReactNode;
 }
 
-/**
- * One piece of work's sheet, and only the work, in the order every sheet has: the status line
- * (whether any of its moments started a review, where it stands on its provider, how many moments,
- * the latest), what it is (its kind, author, branches, size and checks), its history — opened,
- * every moment recorded on it with what happened, how we came to know, in which state it stopped and
- * why, with the setting that would let it through, then merged or closed — and its technical
- * facts. Asking for a review is the footer. The reviews of the work are its trace.
- */
 export function WorkLevel({
 	workspaceSlug,
 	nested,
 	path,
-	work: state,
-	moments,
+	item: state,
+	events: eventsState,
+	reviews = NO_REVIEWS,
+	eventLabel,
 	facts: factsState,
 	onRequestReview,
 	requesting = false,
 	requestBlocked,
 	refusal,
 }: WorkLevelProps) {
-	const work = state.status === "ready" ? state.work : undefined;
-	const facts = factsState?.status === "ready" ? factsState.facts : undefined;
+	const item = state.status === "ready" ? state.item : undefined;
+	const events = eventsState?.status === "ready" ? eventsState.events : [];
+	const latest = latestEvent(events);
+	const latestReview = reviews[0];
 	const header = (
 		<ReviewLevelHeader
 			nested={nested}
 			path={path}
-			kind="work"
+			kind="item"
 			loading={state.status === "loading"}
 			chips={
-				work && (
-					<SheetStatusLine
-						status={<StatusBadge def={TRACED_WORK_DEFS[tracedWorkState(work)]} />}
-						flag={facts && <StatusBadge def={REVIEWED_WORK_STATE_DEFS[facts.state]} />}
-						figure={momentsFigure(work)}
-						at={{ label: "latest moment", date: work.lastSignalAt }}
-					/>
-				)
+				<div className="flex flex-col gap-2">
+					{state.status === "ready" && latestReview !== undefined && (
+						<SheetStatusLine
+							status={<StatusBadge def={REVIEW_STATUS_DEFS[latestReview.status]} />}
+							flag={<StatusBadge def={REVIEW_ORIGIN_DEFS[latestReview.origin]} />}
+							figure={
+								<InlineLink render={<DetailStackLink entry={reviewLevel(latestReview.id)} />}>
+									Open review
+								</InlineLink>
+							}
+							at={{
+								label: latestReview.completedAt === null ? "review created" : "review completed",
+								date: latestReview.completedAt ?? latestReview.createdAt,
+							}}
+						/>
+					)}
+					{latest && (
+						<SheetStatusLine
+							status={<StatusBadge def={ITEM_EVENT_STATE_DEFS[latest.state]} />}
+							figure={eventsFigure(events)}
+							at={{ label: "latest event", date: latest.occurredAt }}
+						/>
+					)}
+				</div>
 			}
-			title={workTitle(work, state.status === "ready")}
-			description={work && <ReviewArtifactLink reviewedWork={work.reviewedWork} />}
+			title={item && (item.title ?? item.label)}
+			description={item && <ReviewItemLink item={item} />}
 		/>
 	);
-	if (state.status !== "ready") {
+	if (state.status !== "ready" || item === undefined) {
 		return (
 			<>
 				{header}
@@ -127,20 +122,13 @@ export function WorkLevel({
 			</>
 		);
 	}
-	if (work === undefined) {
-		return (
-			<>
-				{header}
-				<DrawerBody className="pt-2">
-					<p className="text-sm text-muted-foreground">
-						Nothing was recorded about this work, so there is no moment to show.
-					</p>
-				</DrawerBody>
-			</>
-		);
-	}
-	const all =
-		moments?.status === "ready" && moments.moments.length > 0 ? moments.moments : [work.lastSignal];
+	const history: SheetEvent[] = [
+		...reviews.map((review) => reviewEvent(review)),
+		...events.map((event) => itemEvent(event, eventLabel, workspaceSlug)),
+		...(item.removedAt === null
+			? []
+			: [{ key: "removed", at: item.removedAt, title: "Removed from the provider" }]),
+	];
 	return (
 		<>
 			{header}
@@ -148,69 +136,65 @@ export function WorkLevel({
 				{refusal}
 				<SheetSection part="what">
 					<ReviewFactGrid>
-						<ReviewFact label="Kind">
-							{artifactKindLabel(work.artifactKind, 1, work.reviewedWork.provider)}
-						</ReviewFact>
-						{hasText(work.reviewedWork.container) &&
-							!work.reviewedWork.label.includes(work.reviewedWork.container) && (
-								<ReviewFact label="Where">{work.reviewedWork.container}</ReviewFact>
-							)}
-						{facts !== undefined && <WorkFactsWhat facts={facts} />}
+						<ReviewFact label="Kind">{itemKindLabel(item.kind, 1, item.provider)}</ReviewFact>
+						{hasText(item.container) && !item.label.includes(item.container) && (
+							<ReviewFact label="Where">{item.container}</ReviewFact>
+						)}
+						{hasText(item.path) && (
+							<ReviewFact label="Path">
+								<code className="break-all">{item.path}</code>
+							</ReviewFact>
+						)}
+						{hasText(item.parentId) && (
+							<ReviewFact label="Part of">
+								<InlineLink render={<DetailStackLink entry={itemLevel(item.parentId)} />}>
+									Open the work it belongs to
+								</InlineLink>
+							</ReviewFact>
+						)}
+						{factsState?.status === "ready" &&
+							factsState.facts.map((fact) => (
+								<ReviewFact key={fact.name} label={fact.name}>
+									<FactValue fact={fact} />
+								</ReviewFact>
+							))}
 					</ReviewFactGrid>
-					{factsState?.status === "ready" && factsState.unmonitored === true && (
-						<div className="flex flex-col gap-1">
-							<p className="text-sm text-muted-foreground">
-								Work details such as author, branches and checks are not available, because this
-								workspace does not monitor the repository or the work was deleted.
-							</p>
-							{hasText(factsState.answer) && (
-								<p className="font-mono text-xs break-all text-muted-foreground">
-									Server answer: {factsState.answer}
-								</p>
-							)}
-						</div>
-					)}
 					{factsState?.status === "error" && (
 						<QueryErrorAlert
 							error={factsState.error}
-							title="We could not load what the provider reported about this work"
+							title="We could not load what the provider reports about this work"
 							onRetry={factsState.onRetry}
 						/>
 					)}
 				</SheetSection>
 				<SheetSection
 					part="state"
-					description="Every moment recorded on the work and what each did, with when it was opened and merged or closed."
+					description="Reviews of this work and what became of its recorded events."
 				>
-					{moments?.status === "loading" && <LevelBodySkeleton />}
-					{moments?.status === "error" && (
+					{eventsState?.status === "loading" && <LevelBodySkeleton />}
+					{eventsState?.status === "error" && (
 						<QueryErrorAlert
-							error={moments.error}
-							title="We could not load the moments on this work"
-							onRetry={moments.onRetry}
+							error={eventsState.error}
+							title="We could not load the events on this work"
+							onRetry={eventsState.onRetry}
 						/>
 					)}
-					<SheetHistory
-						events={[
-							...all.map((moment) => momentEvent(moment, workspaceSlug)),
-							...providerEvents(facts),
-						]}
-					/>
+					{(eventsState === undefined || eventsState.status === "ready") &&
+						(history.length === 0 ? (
+							<p className="text-sm text-muted-foreground">No event was recorded on this work.</p>
+						) : (
+							<SheetHistory events={history} />
+						))}
 				</SheetSection>
 				<SheetTechnical
 					facts={[
-						{ label: "Artifact ID", value: String(work.artifactId), copy: String(work.artifactId) },
-						{ label: "Kind", value: <code>{work.artifactKind}</code> },
+						{ label: "Work ID", value: <code>{item.id}</code>, copy: item.id },
+						{ label: "Kind", value: <code>{item.kind}</code> },
 						{
-							label: "Latest revision",
-							value: hasText(work.lastSignal.revision) ? (
-								<code>{work.lastSignal.revision}</code>
-							) : (
-								"—"
-							),
-							copy: work.lastSignal.revision,
+							label: "Latest version",
+							value: hasText(latest?.itemVersion) ? <code>{latest.itemVersion}</code> : "—",
+							copy: latest?.itemVersion ?? undefined,
 						},
-						...technicalFacts(facts),
 					]}
 				/>
 			</DrawerBody>
@@ -219,7 +203,7 @@ export function WorkLevel({
 					<RequestReviewAction
 						label="Request review"
 						request={{
-							work: reviewedWorkName(work.reviewedWork),
+							work: itemName(item),
 							onRequest: onRequestReview,
 							requesting,
 							blocked: requestBlocked,
@@ -231,48 +215,56 @@ export function WorkLevel({
 	);
 }
 
-/** The work's title, or "Unknown work" for work nothing was recorded about. */
-function workTitle(work: TracedArtifact | undefined, ready: boolean): string | undefined {
-	if (work !== undefined) {
-		return work.reviewedWork.title ?? work.reviewedWork.label;
+function latestEvent(events: readonly ItemEvent[]): ItemEvent | undefined {
+	let latest: ItemEvent | undefined;
+	for (const event of events) {
+		if (latest === undefined || event.occurredAt > latest.occurredAt) {
+			latest = event;
+		}
 	}
-	return ready ? "Unknown work" : undefined;
+	return latest;
 }
 
-/** "3 moments, none started a review", "3 moments, 1 started a review". */
-function momentsFigure(work: TracedArtifact): string {
-	const moments = work.signalCount === 1 ? "1 moment" : `${work.signalCount} moments`;
-	const started = work.reviewedSignalCount === 0 ? "none" : String(work.reviewedSignalCount);
-	return `${moments}, ${started} started a review`;
+function eventsFigure(events: readonly ItemEvent[]): string {
+	const count = events.length === 1 ? "1 event" : `${events.length} events`;
+	// The same test as the state badge, so the header cannot contradict itself. A migrated event can
+	// have started a review that it no longer links to.
+	const started = events.filter((event) => event.state === "STARTED").length;
+	return `${count}, ${started === 0 ? "none" : String(started)} started a review`;
 }
 
-function momentEvent(moment: TracedSignal, workspaceSlug: string): SheetEvent {
-	const stopped = hasText(moment.stateReasonDescription) || moment.stateReason !== undefined;
+function FactValue({ fact }: { fact: ItemFact }) {
+	const value = hasText(fact.value) ? fact.value : "None";
+	return hasText(fact.url) ? (
+		<InlineLink href={fact.url} external className="break-all">
+			{value}
+		</InlineLink>
+	) : (
+		<span className="break-words">{value}</span>
+	);
+}
+
+function itemEvent(
+	event: ItemEvent,
+	eventLabel: (name: string) => string,
+	workspaceSlug: string,
+): SheetEvent {
+	const foundBy = ITEM_EVENT_FOUND_BY[event.foundBy];
 	return {
-		key: moment.id,
-		at: moment.occurredAt,
-		title: moment.displayName,
+		key: event.id,
+		at: event.occurredAt,
+		title: eventLabel(event.name),
 		detail: (
 			<>
 				<span className="block">
-					<span title={DISCOVERED_VIA_DESCRIPTIONS[moment.discoveredVia]}>
-						{DISCOVERED_VIA_LABELS[moment.discoveredVia]}
-					</span>
+					<span title={foundBy.description}>{foundBy.label}</span>
 					{" · "}
-					{hasText(moment.reviewId) ? "Started a review" : SIGNAL_STATE_LABELS[moment.state]}
+					{ITEM_EVENT_STATE_DEFS[event.state].label}
 				</span>
-				{stopped && (
+				{event.reason !== null && (
 					<span className="block">
-						{hasText(moment.stateReasonDescription) && (
-							<span>{moment.stateReasonDescription} </span>
-						)}
-						{moment.stateReason !== undefined && (
-							<RefusalFixLink
-								workspaceSlug={workspaceSlug}
-								reason={moment.stateReason}
-								canAdminister
-							/>
-						)}
+						<span>{ITEM_EVENT_REASON_SENTENCES[event.reason]} </span>
+						<RefusalFixLink workspaceSlug={workspaceSlug} reason={event.reason} />
 					</span>
 				)}
 			</>
@@ -280,96 +272,19 @@ function momentEvent(moment: TracedSignal, workspaceSlug: string): SheetEvent {
 	};
 }
 
-/** "+120 −30", "7 files", "3 commits": the size of a change, as far as the provider reported it. */
-function sizeText(facts: ReviewWorkFacts): string | undefined {
-	const parts: string[] = [];
-	if (facts.additions !== undefined && facts.deletions !== undefined) {
-		parts.push(`+${facts.additions.toLocaleString()} −${facts.deletions.toLocaleString()}`);
-	}
-	if (facts.changedFiles !== undefined) {
-		parts.push(
-			facts.changedFiles === 1 ? "1 file" : `${facts.changedFiles.toLocaleString()} files`,
-		);
-	}
-	if (facts.commits !== undefined) {
-		parts.push(facts.commits === 1 ? "1 commit" : `${facts.commits.toLocaleString()} commits`);
-	}
-	return parts.length > 0 ? parts.join(" · ") : undefined;
-}
-
-/** Who opened the work, where its changes go, how large they are and how its checks stand. */
-function WorkFactsWhat({ facts }: { facts: ReviewWorkFacts }) {
-	const size = sizeText(facts);
-	return (
-		<>
-			{facts.author !== undefined && (
-				<ReviewFact label="Author">
-					<ReviewPerson person={facts.author} />
-				</ReviewFact>
-			)}
-			{facts.draft === true && <ReviewFact label="Draft">Marked as a draft</ReviewFact>}
-			{hasText(facts.sourceBranch) && hasText(facts.targetBranch) && (
-				<ReviewFact label="Branches">
-					<span className="break-all">
-						<code>{facts.sourceBranch}</code> into <code>{facts.targetBranch}</code>
-					</span>
-				</ReviewFact>
-			)}
-			{size !== undefined && (
-				<ReviewFact label="Size">
-					<span className="tabular-nums">{size}</span>
-				</ReviewFact>
-			)}
-			{facts.checkState !== undefined && (
-				<ReviewFact label="Checks">
-					<StatusBadge def={REVIEWED_WORK_CHECK_DEFS[facts.checkState]} />
-				</ReviewFact>
-			)}
-		</>
-	);
-}
-
-/** Opened, last updated, and merged or closed, as the provider reported the work's times. */
-function providerEvents(facts: ReviewWorkFacts | undefined): SheetEvent[] {
-	if (facts === undefined) {
-		return [];
-	}
-	const events: SheetEvent[] = [];
-	if (facts.createdAt !== undefined) {
-		events.push({ key: "opened", at: facts.createdAt, title: "Opened" });
-	}
-	if (facts.mergedAt !== undefined) {
-		events.push({ key: "merged", at: facts.mergedAt, title: "Merged" });
-	} else if (facts.closedAt !== undefined) {
-		events.push({ key: "closed", at: facts.closedAt, title: "Closed" });
-	}
-	const ended = facts.mergedAt ?? facts.closedAt;
-	if (facts.updatedAt !== undefined && facts.updatedAt.getTime() !== ended?.getTime()) {
-		events.push({ key: "updated", at: facts.updatedAt, title: "Last updated on the provider" });
-	}
-	return events;
-}
-
-/** The head commit and how fresh the provider's facts are. */
-function technicalFacts(facts: ReviewWorkFacts | undefined): TechnicalFact[] {
-	if (facts === undefined) {
-		return [];
-	}
-	const technical: TechnicalFact[] = [
-		{
-			label: "Head revision",
-			value: hasText(facts.headRevision) ? <code>{facts.headRevision}</code> : "—",
-			copy: facts.headRevision,
-		},
-	];
-	if (facts.checkObservedAt !== undefined) {
-		technical.push({ label: "Checks read", value: <ReviewDayTime at={facts.checkObservedAt} /> });
-	}
-	if (facts.lastSyncAt !== undefined) {
-		technical.push({
-			label: "Last read from the provider",
-			value: <ReviewDayTime at={facts.lastSyncAt} />,
-		});
-	}
-	return technical;
+function reviewEvent(review: ReviewRef): SheetEvent {
+	return {
+		key: `review:${review.id}`,
+		at: review.createdAt,
+		title: (
+			<InlineLink render={<DetailStackLink entry={reviewLevel(review.id)} />}>
+				{REVIEW_ORIGIN_DEFS[review.origin].label} review
+			</InlineLink>
+		),
+		detail: (
+			<>
+				Current status: <StatusBadge def={REVIEW_STATUS_DEFS[review.status]} />
+			</>
+		),
+	};
 }

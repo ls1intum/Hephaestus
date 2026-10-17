@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.slack.interactivity;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWebhookRole;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackSignatureVerifier;
 import io.swagger.v3.oas.annotations.Hidden;
@@ -28,6 +29,7 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Hidden // inbound Slack webhook receiver — not part of the webapp API surface; excluded from the OpenAPI client
 @RestController
+@ConditionalOnServerRole
 @ConditionalOnWebhookRole
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 @WorkspaceAgnostic("Slack interactivity; the workspace is resolved from the payload's team_id, not the URL")

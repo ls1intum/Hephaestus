@@ -1,8 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.milestone;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
@@ -13,6 +10,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.MilestoneRepos
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.BaseGitLabProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.milestone.dto.GitLabMilestoneDTO;
@@ -113,7 +113,7 @@ public class GitLabMilestoneProcessor extends BaseGitLabProcessor {
 
         Milestone milestone = existingOpt.orElseGet(Milestone::new);
 
-        // Handle nativeId: group milestones use deterministic ID to avoid (provider_id, native_id) collisions
+        // Group milestone ids must not collide with project milestone ids on the same provider.
         if (isNew) {
             if (dto.groupMilestone()) {
                 milestone.setNativeId(generateDeterministicMilestoneId(repository.getId(), dto.iid()));
@@ -267,7 +267,10 @@ public class GitLabMilestoneProcessor extends BaseGitLabProcessor {
         }
         // Fallback: construct from repository nameWithOwner
         if (repository.getNameWithOwner() != null) {
-            return (gitLabProperties.defaultServerUrl() + "/" + repository.getNameWithOwner() + "/-/milestones/"
+            return (gitLabProperties.defaultServerUrl()
+                    + "/"
+                    + repository.getNameWithOwner()
+                    + "/-/milestones/"
                     + dto.iid());
         }
         return null;

@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { expect, fn, userEvent, within } from "storybook/test";
-import type { PracticeGroup } from "@/api/types.gen";
+import type { GroupRef } from "@/api/types.gen";
 
 import {
 	DEFAULT_PRACTICE_GROUP_SORT,
@@ -60,9 +60,9 @@ export const Default: Story = {
 			"Open group Reviewing a teammate's work constructively",
 		]);
 		await expect(canvas.getAllByRole("button", { name: "Needs attention" })).toHaveLength(2);
-		// The group no review has observed a practice of yet waits in its fold under the table.
+		// The group no review has reviewed a practice of yet waits in its fold under the table.
 		await expect(
-			canvas.getByRole("button", { name: "Practice groups not observed yet" }),
+			canvas.getByRole("button", { name: "Practice groups not reviewed" }),
 		).toBeVisible();
 		// A trend reads as words, and a group with none says so in the same place.
 		await expect(canvas.getByRole("button", { name: "More difficulties recently" })).toBeVisible();
@@ -74,7 +74,7 @@ export const Default: Story = {
 		);
 		await expect(breakdowns[0]).toStrictEqual(["2Needs attention", "1Mixed", "2Going well"]);
 		// A group with no event shows its name and nothing beneath it.
-		await expect(canvas.queryByText("Nothing new since the latest run.")).toBeNull();
+		await expect(canvas.queryByText("Nothing new since the latest review.")).toBeNull();
 		await expect(canvas.getByText("Acting on review feedback").closest("td")?.textContent).toBe(
 			"Acting on review feedback",
 		);
@@ -84,7 +84,7 @@ export const Default: Story = {
 		await expect(args.onOpenPractice).toHaveBeenCalledWith("describe-what-and-why");
 		await expect(args.onOpenGroup).not.toHaveBeenCalled();
 
-		await userEvent.click(canvas.getByRole("button", { name: "Practice groups not observed yet" }));
+		await userEvent.click(canvas.getByRole("button", { name: "Practice groups not reviewed" }));
 		await userEvent.click(canvas.getByRole("button", { name: "Open group Testing your changes" }));
 		await expect(args.onOpenGroup).toHaveBeenCalledWith(groups[4]);
 	},
@@ -264,7 +264,7 @@ const neverAppliedByGroup = Object.fromEntries(
 			? practices.map((practice) => ({
 					...practice,
 					standing: "NO_OPPORTUNITY" as const,
-					notApplicableOnly: true,
+					doesNotApplyOnly: true,
 				}))
 			: practices,
 	]),
@@ -289,14 +289,14 @@ export const NeverAppliedDark: Story = {
 };
 
 /**
- * A group no review has observed a practice of yet leaves
+ * A group no review has reviewed a practice of yet leaves
  * the table for its own folded line, apart from the groups that never applied. The group still
  * opens from the fold.
  */
-export const NotObservedGroups: Story = {
+export const NotReviewedGroups: Story = {
 	play: async ({ args, canvas }) => {
 		const trigger = canvas.getByRole("button", {
-			name: "Practice groups not observed yet",
+			name: "Practice groups not reviewed",
 		});
 		await expect(trigger).toHaveAttribute("aria-expanded", "false");
 		await expect(
@@ -306,14 +306,14 @@ export const NotObservedGroups: Story = {
 		// Opened, the fold's rows join the same table: one header, the same columns.
 		await expect(canvas.getAllByRole("table")).toHaveLength(1);
 		const folded = canvas.getByRole("rowgroup", {
-			name: "Practice groups not observed yet",
+			name: "Practice groups not reviewed",
 		});
 		await expectFoldOnTableColumns(
 			canvas.getByRole("table", { name: "All practice groups" }).querySelector("tbody tr"),
 			folded,
 		);
 		// One quiet indication per row: the badge, without trend, ring or counts.
-		await expect(within(folded).getByText("Not observed yet")).toBeVisible();
+		await expect(within(folded).getByText("Not reviewed")).toBeVisible();
 		await expect(within(folded).queryByText(/compare/u)).toBeNull();
 		await expect(within(folded).queryByRole("list", { name: "Practices by standing" })).toBeNull();
 		await userEvent.click(
@@ -323,24 +323,24 @@ export const NotObservedGroups: Story = {
 	},
 };
 
-export const NotObservedGroupsOpen: Story = {
+export const NotReviewedGroupsOpen: Story = {
 	globals: { viewport: { value: "desktop" } },
 	play: async ({ canvas }) => {
-		await userEvent.click(canvas.getByRole("button", { name: "Practice groups not observed yet" }));
+		await userEvent.click(canvas.getByRole("button", { name: "Practice groups not reviewed" }));
 		await expectFoldOnTableColumns(
 			canvas.getByRole("table", { name: "All practice groups" }).querySelector("tbody tr"),
-			canvas.getByRole("rowgroup", { name: "Practice groups not observed yet" }),
+			canvas.getByRole("rowgroup", { name: "Practice groups not reviewed" }),
 		);
 	},
 };
 
-export const NotObservedGroupsDark: Story = {
-	...NotObservedGroupsOpen,
+export const NotReviewedGroupsDark: Story = {
+	...NotReviewedGroupsOpen,
 	globals: { theme: "dark" },
 };
 
-export const NotObservedGroupsPhone: Story = {
-	...NotObservedGroupsOpen,
+export const NotReviewedGroupsPhone: Story = {
+	...NotReviewedGroupsOpen,
 	globals: { viewport: { value: "phone390" } },
 };
 
@@ -351,7 +351,7 @@ const mixedSilentByGroup = Object.fromEntries(
 		slug === mixedSilentGroup?.slug
 			? practices.map((practice, index) =>
 					index === 0
-						? { ...practice, standing: "NO_OPPORTUNITY" as const, notApplicableOnly: true }
+						? { ...practice, standing: "NO_OPPORTUNITY" as const, doesNotApplyOnly: true }
 						: { ...practice, standing: "NOT_OBSERVED" as const },
 				)
 			: practices,
@@ -359,8 +359,8 @@ const mixedSilentByGroup = Object.fromEntries(
 );
 
 /**
- * A group with one practice that never applied and the others not observed yet has nothing to
- * show either: its own level holds only folds. It joins the fold of groups not observed yet, so
+ * A group with one practice that never applied and the others not reviewed yet has nothing to
+ * show either: its own level holds only folds. It joins the fold of groups not reviewed yet, so
  * the table and the group's level agree.
  */
 export const MixedSilentGroupFolded: Story = {
@@ -371,13 +371,13 @@ export const MixedSilentGroupFolded: Story = {
 		await expect(
 			canvas.queryByRole("button", { name: "Does not apply to your work yet" }),
 		).not.toBeInTheDocument();
-		await userEvent.click(canvas.getByRole("button", { name: "Practice groups not observed yet" }));
-		const folded = canvas.getByRole("rowgroup", { name: "Practice groups not observed yet" });
+		await userEvent.click(canvas.getByRole("button", { name: "Practice groups not reviewed" }));
+		const folded = canvas.getByRole("rowgroup", { name: "Practice groups not reviewed" });
 		await expect(within(folded).getByRole("button", { name })).toBeVisible();
 	},
 };
 
-const emptyGroup: PracticeGroup = {
+const emptyGroup: GroupRef = {
 	...packagingGroup,
 	slug: "release-hygiene",
 	name: "Keeping releases tidy",
@@ -385,7 +385,7 @@ const emptyGroup: PracticeGroup = {
 
 /**
  * A group with no practice in it (none added, or all switched off) has nothing to act on, so
- * it joins the fold of groups not observed yet instead of disappearing. It still opens.
+ * it joins the fold of groups not reviewed yet instead of disappearing. It still opens.
  */
 export const EmptyGroupFolded: Story = {
 	args: {
@@ -393,7 +393,7 @@ export const EmptyGroupFolded: Story = {
 	},
 	play: async ({ args, canvas }) => {
 		const trigger = canvas.getByRole("button", {
-			name: "Practice groups not observed yet",
+			name: "Practice groups not reviewed",
 		});
 		await userEvent.click(trigger);
 		await userEvent.click(canvas.getByRole("button", { name: "Open group Keeping releases tidy" }));

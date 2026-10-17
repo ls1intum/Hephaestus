@@ -10,8 +10,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobCancellationReason;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobExecutor;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobCancellationReason;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobExecutor;
 import de.tum.cit.aet.hephaestus.agent.runtime.worker.testing.WorkerPropertiesFixtures;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CapacityReport;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.Heartbeat;
@@ -42,7 +42,7 @@ class WorkerDrainCoordinatorTest extends BaseUnitTest {
         WorkerProperties props = propsWithDrain(Duration.ofSeconds(5));
         WorkerCapacityState state = new WorkerCapacityState(props);
         WorkerControlClient client = mock(WorkerControlClient.class);
-        AgentJobExecutor executor = mock(AgentJobExecutor.class);
+        ReviewJobExecutor executor = mock(ReviewJobExecutor.class);
         when(executor.awaitInFlight(any(Duration.class))).thenReturn(true);
         ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
 
@@ -68,7 +68,7 @@ class WorkerDrainCoordinatorTest extends BaseUnitTest {
     @Test
     void gracefulOverrunCancelsRemaining() {
         WorkerProperties props = propsWithDrain(Duration.ofSeconds(5));
-        AgentJobExecutor executor = mock(AgentJobExecutor.class);
+        ReviewJobExecutor executor = mock(ReviewJobExecutor.class);
         when(executor.awaitInFlight(any(Duration.class))).thenReturn(false);
 
         WorkerDrainCoordinator coordinator = new WorkerDrainCoordinator(
@@ -82,14 +82,14 @@ class WorkerDrainCoordinatorTest extends BaseUnitTest {
         coordinator.start();
         coordinator.stop();
 
-        verify(executor).cancelInFlight(AgentJobCancellationReason.DRAIN_GRACEFUL);
+        verify(executor).cancelInFlight(ReviewJobCancellationReason.DRAIN_GRACEFUL);
     }
 
     @Test
     void shouldCompleteShutdownWithoutRepeatingCleanupWhenContainerStopsAreIncomplete() {
         WorkerProperties props = propsWithDrain(Duration.ZERO);
-        AgentJobExecutor executor = mock(AgentJobExecutor.class);
-        when(executor.cancelInFlight(AgentJobCancellationReason.DRAIN_IMMEDIATE))
+        ReviewJobExecutor executor = mock(ReviewJobExecutor.class);
+        when(executor.cancelInFlight(ReviewJobCancellationReason.DRAIN_IMMEDIATE))
                 .thenReturn(false);
         WorkerDrainCoordinator coordinator = new WorkerDrainCoordinator(
                 mock(WorkerControlClient.class),
@@ -108,13 +108,13 @@ class WorkerDrainCoordinatorTest extends BaseUnitTest {
         assertThat(completed.get()).isEqualTo(2);
         assertThat(coordinator.isRunning()).isFalse();
         assertThat(coordinator.isDraining()).isTrue();
-        verify(executor, times(1)).cancelInFlight(AgentJobCancellationReason.DRAIN_IMMEDIATE);
+        verify(executor, times(1)).cancelInFlight(ReviewJobCancellationReason.DRAIN_IMMEDIATE);
     }
 
     @Test
     void immediateDrainSkipsAwait() {
         WorkerProperties props = propsWithDrain(Duration.ZERO);
-        AgentJobExecutor executor = mock(AgentJobExecutor.class);
+        ReviewJobExecutor executor = mock(ReviewJobExecutor.class);
 
         WorkerDrainCoordinator coordinator = new WorkerDrainCoordinator(
                 mock(WorkerControlClient.class),
@@ -129,13 +129,13 @@ class WorkerDrainCoordinatorTest extends BaseUnitTest {
 
         verify(executor).stopAcceptingNewJobs();
         verify(executor, never()).awaitInFlight(any());
-        verify(executor, times(1)).cancelInFlight(AgentJobCancellationReason.DRAIN_IMMEDIATE);
+        verify(executor, times(1)).cancelInFlight(ReviewJobCancellationReason.DRAIN_IMMEDIATE);
     }
 
     @Test
     void drainIsIdempotent() {
         WorkerProperties props = propsWithDrain(Duration.ofSeconds(1));
-        AgentJobExecutor executor = mock(AgentJobExecutor.class);
+        ReviewJobExecutor executor = mock(ReviewJobExecutor.class);
         when(executor.awaitInFlight(any(Duration.class))).thenReturn(true);
 
         WorkerDrainCoordinator coordinator = new WorkerDrainCoordinator(
@@ -158,7 +158,7 @@ class WorkerDrainCoordinatorTest extends BaseUnitTest {
         WorkerProperties props = propsWithDrain(Duration.ZERO);
         WorkerControlClient throwing = mock(WorkerControlClient.class);
         doThrow(new RuntimeException("broken transport")).when(throwing).send(any());
-        AgentJobExecutor executor = mock(AgentJobExecutor.class);
+        ReviewJobExecutor executor = mock(ReviewJobExecutor.class);
         ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
 
         WorkerDrainCoordinator coordinator = new WorkerDrainCoordinator(
@@ -174,7 +174,7 @@ class WorkerDrainCoordinatorTest extends BaseUnitTest {
 
         // Even with a broken transport, the executor is still drained AND readiness was flipped
         // (kubelet would otherwise keep routing to a worker that's mid-shutdown).
-        verify(executor).cancelInFlight(AgentJobCancellationReason.DRAIN_IMMEDIATE);
+        verify(executor).cancelInFlight(ReviewJobCancellationReason.DRAIN_IMMEDIATE);
         verifyReadinessStateRefusingTrafficWasPublished(events);
     }
 

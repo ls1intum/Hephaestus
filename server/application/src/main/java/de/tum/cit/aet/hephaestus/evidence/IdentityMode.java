@@ -8,7 +8,7 @@ package de.tum.cit.aet.hephaestus.evidence;
  * since superseded", so a staleness verdict would have been a guess wearing a contract's clothes.
  */
 public enum IdentityMode {
-    /** The capture names something immutable — a commit SHA, a revision id — so it cannot drift. */
+    /** The capture names an immutable source version, so it cannot drift. */
     PINNED_IDENTITY,
     /** The capture reflects state that moves independently; no identity anchors it. */
     NOT_APPLICABLE,

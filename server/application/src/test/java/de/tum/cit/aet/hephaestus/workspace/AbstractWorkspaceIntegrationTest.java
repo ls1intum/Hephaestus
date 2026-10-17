@@ -2,7 +2,8 @@ package de.tum.cit.aet.hephaestus.workspace;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
+import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
@@ -18,6 +19,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.lifecycle.GitHubLifecycl
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
@@ -39,16 +41,19 @@ public abstract class AbstractWorkspaceIntegrationTest extends BaseIntegrationTe
     protected GitHubLifecycleListener githubLifecycleListener;
 
     @Autowired
-    protected WorkspaceMembershipService workspaceMembershipService;
+    protected MembershipService workspaceMembershipService;
 
     @Autowired
-    protected WorkspaceMembershipRepository workspaceMembershipRepository;
+    protected MembershipRepository workspaceMembershipRepository;
 
     @Autowired
     protected AccountRepository accountRepository;
 
     @Autowired
-    private IdentityLinkRepository fixtureIdentities;
+    private IdentityRepository fixtureIdentities;
+
+    @Autowired
+    private GitProviderRegistry fixtureActors;
 
     @Autowired
     private ConnectionRepository activityConnections;
@@ -63,7 +68,6 @@ public abstract class AbstractWorkspaceIntegrationTest extends BaseIntegrationTe
         databaseTestUtils.cleanDatabase();
     }
 
-    /** Register the source that makes an activity fixture's monitored repositories authoritative. */
     protected void connectActivitySource(Workspace workspace, IdentityProvider provider) {
         ConnectionConfig config =
                 switch (provider.getType()) {
@@ -82,8 +86,8 @@ public abstract class AbstractWorkspaceIntegrationTest extends BaseIntegrationTe
                 };
         IntegrationKind kind =
                 provider.getType() == IdentityProviderType.GITLAB ? IntegrationKind.GITLAB : IntegrationKind.GITHUB;
-        Connection connection =
-                activityConnections.saveAndFlush(new Connection(workspace, kind, "activity-fixture", config));
+        Connection connection = activityConnections.saveAndFlush(
+                new Connection(workspace, kind, Long.toString(workspace.getId()), config));
         activityConnectionService.transition(
                 connection,
                 new ConnectionService.TransitionRequest(
@@ -93,6 +97,10 @@ public abstract class AbstractWorkspaceIntegrationTest extends BaseIntegrationTe
                         "activity-fixture",
                         UUID.randomUUID().toString(),
                         "Source connected"));
+    }
+
+    protected GitProviderRegistry.ActorProfile actor(User user) {
+        return fixtureActors.actor(Objects.requireNonNull(user.getId())).orElseThrow();
     }
 
     protected IdentityProvider ensureGitHubProvider() {
@@ -147,22 +155,25 @@ public abstract class AbstractWorkspaceIntegrationTest extends BaseIntegrationTe
         return workspaceService.createWorkspace(slug, displayName, accountLogin, accountType, owner.getId());
     }
 
-    protected WorkspaceMembership ensureWorkspaceMembership(
-            Workspace workspace, User user, WorkspaceMembership.WorkspaceRole role) {
+    protected long accountId(User user) {
+        return workspaceMembershipService.accountIdForUser(Objects.requireNonNull(user.getId()));
+    }
+
+    protected Membership ensureMembership(Workspace workspace, User user, Membership.WorkspaceRole role) {
         return workspaceMembershipRepository
-                .findByWorkspace_IdAndUser_Id(workspace.getId(), user.getId())
-                .orElseGet(() -> workspaceMembershipService.createMembership(workspace, user.getId(), role));
+                .findByWorkspace_IdAndId_AccountId(workspace.getId(), accountId(user))
+                .orElseGet(() -> workspaceMembershipService.createMembership(workspace, accountId(user), role));
     }
 
-    protected WorkspaceMembership ensureAdminMembership(Workspace workspace) {
+    protected Membership ensureAdminMembership(Workspace workspace) {
         User adminUser = TestUserFactory.ensureUser(userRepository, "admin", 3L, ensureGitHubProvider());
         TestUserFactory.ensureAccountForUser(accountRepository, fixtureIdentities, adminUser);
-        return ensureWorkspaceMembership(workspace, adminUser, WorkspaceMembership.WorkspaceRole.ADMIN);
+        return ensureMembership(workspace, adminUser, Membership.WorkspaceRole.ADMIN);
     }
 
-    protected WorkspaceMembership ensureOwnerMembership(Workspace workspace) {
+    protected Membership ensureOwnerMembership(Workspace workspace) {
         User adminUser = TestUserFactory.ensureUser(userRepository, "admin", 3L, ensureGitHubProvider());
         TestUserFactory.ensureAccountForUser(accountRepository, fixtureIdentities, adminUser);
-        return ensureWorkspaceMembership(workspace, adminUser, WorkspaceMembership.WorkspaceRole.OWNER);
+        return ensureMembership(workspace, adminUser, Membership.WorkspaceRole.OWNER);
     }
 }

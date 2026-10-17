@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.mentor.ThreadSurface;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
+import de.tum.cit.aet.hephaestus.workspace.MembershipService;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.Set;
@@ -45,6 +46,9 @@ class DefaultMentorSlackThreadServiceIntegrationTest extends BaseIntegrationTest
     private IdentityProviderRepository identityProviderRepository;
 
     private static final AtomicLong USER_SEQ = new AtomicLong(3_000_000L);
+
+    @Autowired
+    private MembershipService memberships;
 
     private User user;
 
@@ -92,11 +96,12 @@ class DefaultMentorSlackThreadServiceIntegrationTest extends BaseIntegrationTest
         var workspaceId = workspace.getId();
         assertNotNull(workspaceId);
 
-        UUID threadId = mentorSlackThreadService.ensureSlackThread(workspaceId, null, actorId);
+        long accountId = memberships.accountIdForUser(actorId);
+        UUID threadId = mentorSlackThreadService.ensureSlackThread(workspaceId, null, accountId);
         assertThat(chatThreadRepository.findById(threadId))
                 .get()
-                .extracting(thread -> thread.getUser().getId())
-                .isEqualTo(actorId);
+                .extracting(thread -> thread.getAccountId())
+                .isEqualTo(accountId);
 
         CurrentScmIdentityHolder.set(actorId, verifiedActor.getLogin(), Set.of(actorId));
         try {
@@ -125,7 +130,7 @@ class DefaultMentorSlackThreadServiceIntegrationTest extends BaseIntegrationTest
         ChatThread thread = new ChatThread();
         thread.setId(UUID.randomUUID());
         thread.setTitle(surface + " thread");
-        thread.setUser(user);
+        thread.setAccountId(memberships.accountIdForUser(user.getId()));
         thread.setWorkspace(workspace);
         thread.setSurface(surface);
         return chatThreadRepository.save(thread).getId();

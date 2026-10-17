@@ -1,8 +1,8 @@
 import { CircleCheckIcon, CircleDashedIcon, CircleHelpIcon, WrenchIcon } from "lucide-react";
-import type { ReviewObservation } from "@/api/types.gen";
+import type { ResultList } from "@/api/types.gen";
 import type { StatusDefs } from "@/components/common/status-def";
 
-export type Outcome = ReviewObservation["outcome"];
+export type Outcome = ResultList["outcome"];
 export const OUTCOME_DEFS: StatusDefs<Outcome> = {
 	MET: {
 		label: "Met",
@@ -16,21 +16,33 @@ export const OUTCOME_DEFS: StatusDefs<Outcome> = {
 		badgeVariant: "destructive",
 		description: "The applicable practice standard is not met in the reviewed evidence.",
 	},
-	NOT_APPLICABLE: {
-		label: "Not applicable",
+	DOES_NOT_APPLY: {
+		label: "Does not apply",
 		icon: CircleDashedIcon,
 		badgeVariant: "secondary",
 		description: "Nothing in this work calls for this practice.",
 	},
-	UNDETERMINED: {
-		label: "Undetermined",
+	COULD_NOT_DETERMINE: {
+		label: "Could not determine",
 		icon: CircleHelpIcon,
 		badgeVariant: "secondary",
-		description: "The captured evidence does not settle whether the practice standard is met.",
+		description:
+			"The review read the evidence, and a question it names stayed open, so it did not decide whether the practice standard is met.",
 	},
 };
 
 export function outcomeCountNoun(outcome: Outcome, count: number): string {
 	const label = OUTCOME_DEFS[outcome].label.toLowerCase();
-	return `${label} ${count === 1 ? "observation" : "observations"}`;
+	return `${label} ${count === 1 ? "result" : "results"}`;
+}
+
+export function problemCount(count: number): string {
+	return `${count} ${count === 1 ? "problem" : "problems"}`;
+}
+
+export function outcomeLabel(outcome: Outcome, problems: number | undefined): string {
+	const { label } = OUTCOME_DEFS[outcome];
+	return outcome === "NOT_MET" && problems !== undefined && problems > 0
+		? `${label} · ${problemCount(problems)}`
+		: label;
 }

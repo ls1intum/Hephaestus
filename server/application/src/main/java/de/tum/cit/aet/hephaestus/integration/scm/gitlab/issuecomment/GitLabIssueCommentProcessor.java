@@ -1,10 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation;
@@ -20,6 +16,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.RepositoryRef;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.BaseGitLabProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabUserLookup;
@@ -28,6 +28,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment.dto.GitLabN
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment.dto.GitLabNoteEventDTO.EmbeddedMergeRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment.dto.GitLabNoteEventDTO.NoteAttributes;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.user.GitLabUserService;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Locale;
@@ -55,6 +56,8 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
     private final PullRequestRepository pullRequestRepository;
     private final ApplicationEventPublisher eventPublisher;
 
+    private final Clock clock;
+
     public GitLabIssueCommentProcessor(
             GitLabUserService gitLabUserService,
             IssueCommentRepository commentRepository,
@@ -66,7 +69,8 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
             ScopeIdResolver scopeIdResolver,
             RepositoryScopeFilter repositoryScopeFilter,
             GitLabProperties gitLabProperties,
-            ApplicationEventPublisher eventPublisher) {
+            ApplicationEventPublisher eventPublisher,
+            Clock clock) {
         super(
                 gitLabUserService,
                 userRepository,
@@ -79,6 +83,7 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
         this.issueRepository = issueRepository;
         this.pullRequestRepository = pullRequestRepository;
         this.eventPublisher = eventPublisher;
+        this.clock = clock;
     }
 
     @Transactional
@@ -163,7 +168,8 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
             return null;
         }
 
-        // Sync returns a detached parent; event references must use this transaction's relationships.
+        // Sync returns a detached parent; event references must use this transaction's
+        // relationships.
         Issue parent = issueRepository
                 .findById(Objects.requireNonNull(suppliedParent.getId()))
                 .orElseThrow(() -> new IllegalStateException("The comment's reviewed work no longer exists"));
@@ -234,7 +240,8 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
             EventContext eventCtx = EventContext.forSync(
                     scopeId,
                     Objects.requireNonNull(RepositoryRef.from(parent.getRepository())),
-                    IdentityProviderType.GITLAB);
+                    IdentityProviderType.GITLAB,
+                    clock.instant());
             eventPublisher.publishEvent(
                     new ScmDomainEvent.CommentCreated(ScmEventPayload.CommentData.from(saved), issueId, eventCtx));
             log.debug("Created comment from sync: commentId={}, parentId={}", saved.getId(), issueId);
@@ -242,7 +249,8 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
             EventContext eventCtx = EventContext.forSync(
                     scopeId,
                     Objects.requireNonNull(RepositoryRef.from(parent.getRepository())),
-                    IdentityProviderType.GITLAB);
+                    IdentityProviderType.GITLAB,
+                    clock.instant());
             eventPublisher.publishEvent(new ScmDomainEvent.CommentUpdated(
                     ScmEventPayload.CommentData.from(saved), issueId, changedFields, eventCtx));
             log.debug("Updated comment from sync: commentId={}, changed={}", saved.getId(), changedFields);
@@ -256,8 +264,7 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
         Long issueId = parent.getId();
         Optional<IssueComment> existingOpt =
                 commentRepository.findByNativeIdAndProviderId(attrs.id(), Objects.requireNonNull(context.providerId()));
-        // A note id is unique on the instance, so a note already stored under another issue or merge request is not
-        // this one's, whatever the payload says: it is never moved.
+        // Note ids are instance-wide; a stored note cannot move to another issue or merge request.
         if (existingOpt
                 .map(IssueComment::getIssue)
                 .filter(stored -> !stored.getId().equals(issueId))

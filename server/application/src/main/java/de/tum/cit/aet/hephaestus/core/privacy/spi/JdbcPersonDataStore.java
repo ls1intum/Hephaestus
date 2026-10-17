@@ -75,7 +75,7 @@ public class JdbcPersonDataStore implements PersonDataContributor {
                 new SqlArrayValue("bigint", scope.conversationIds().toArray()),
                 "documents",
                 new SqlArrayValue("bigint", scope.outlineDocumentIds().toArray()),
-                "artifacts",
+                "items",
                 new SqlArrayValue("bigint", scope.scmArtifactIds().toArray()),
                 "account",
                 Objects.requireNonNullElse(scope.accountId(), -1L),
@@ -118,7 +118,7 @@ public class JdbcPersonDataStore implements PersonDataContributor {
     }
 
     @Override
-    public List<JsonNode> export(PersonDataSelection selection) {
+    public List<JsonNode> export(PersonDataSelection selection, PersonScope frozenScope) {
         String projection = "jsonb_build_object("
                 + String.join(
                         ",",
@@ -131,12 +131,14 @@ public class JdbcPersonDataStore implements PersonDataContributor {
     }
 
     @Override
-    public long erase(PersonDataSelection selection) {
+    public long erase(PersonDataSelection selection, PersonScope frozenScope) {
         if (selection.rows().isEmpty()) return 0;
         String command = redaction.isEmpty()
                 ? "DELETE FROM " + quotedTable() + " t"
                 : "UPDATE " + quotedTable() + " t SET " + redaction;
-        return jdbc.update(command + " WHERE " + selected(), selectionParameters(selection));
+        var bindings = new LinkedHashMap<>(parameters(frozenScope, mapper));
+        bindings.putAll(selectionParameters(selection));
+        return jdbc.update(command + " WHERE " + selected(), bindings);
     }
 
     protected List<JsonNode> querySelected(String projection, String from, PersonDataSelection selection) {

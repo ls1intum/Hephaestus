@@ -54,12 +54,6 @@ import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.util.UriComponentsBuilder;
 
-/**
- * The ADR-0017 account-status gate in {@link HephaestusAuthSuccessHandler}: a SUSPENDED / DELETING /
- * DELETED account that re-authenticates gets NO cookie (see that class's onAuthenticationSuccess for
- * the full threat model). The decoder + JwtPrincipalFactory enforce the same invariant as defence-in-
- * depth, but this handler is where the login decision is made, so it must hold here independently.
- */
 class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
 
     private static final Instant NOW = Instant.parse("2026-06-01T00:00:00Z");
@@ -74,7 +68,7 @@ class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
     private AuthProperties authProperties;
     private AuthIntentCookie authIntentCookie;
     private AuthEventWriter authEventWriter;
-    private IdentityLinkAuthentication identityLinkAuthentication;
+    private IdentityAuthentication identityLinkAuthentication;
     private HephaestusAuthSuccessHandler handler;
 
     @BeforeEach
@@ -84,7 +78,7 @@ class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
         clientSessionService = mock(ClientSessionService.class);
         authIntentCookie = mock(AuthIntentCookie.class);
         authEventWriter = mock(AuthEventWriter.class);
-        identityLinkAuthentication = mock(IdentityLinkAuthentication.class);
+        identityLinkAuthentication = mock(IdentityAuthentication.class);
         authProperties = mock(AuthProperties.class);
         lenient().when(authProperties.cookieName()).thenReturn(COOKIE_NAME);
         lenient().when(authProperties.sessionMaxLifetime()).thenReturn(Duration.ofHours(12));
@@ -231,9 +225,11 @@ class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
     }
 
     @Test
-    void linkOutcomeIsAuditedAsIdentityLinkedNotLogin() throws Exception {
-        // A genuine new-identity link (provisioning reports identityLinked=true) is IDENTITY_LINKED;
-        // a LINK-mode re-affirm would report false and audit LOGIN instead (no phantom IDENTITY_LINKED).
+    void linkOutcomeIsAuditedAsIdentityedNotLogin() throws Exception {
+        // A genuine new-identity link (provisioning reports identityLinked=true) is
+        // IDENTITY_LINKED;
+        // a LINK-mode re-affirm would report false and audit LOGIN instead (no phantom
+        // IDENTITY_LINKED).
         Account account = account(Account.Status.ACTIVE);
         when(provisioningService.resolveOrProvision(any(), any(), any(), any())).thenReturn(provision(account, true));
         when(jwtIssuer.issue(any(), any(), any()))
@@ -257,7 +253,8 @@ class HephaestusAuthSuccessHandlerTest extends BaseUnitTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
         handler.onAuthenticationSuccess(githubRequest(), response, oauthToken("sub-1"));
 
-        // Linking is not a sign-in: no new cookie, so neither the session ceiling nor auth_time moves.
+        // Linking is not a sign-in: no new cookie, so neither the session ceiling nor auth_time
+        // moves.
         verify(jwtIssuer, never()).issue(any(), any(), any());
         assertThat(response.getCookie(COOKIE_NAME)).isNull();
         assertThat(response.getRedirectedUrl()).isEqualTo("/settings");

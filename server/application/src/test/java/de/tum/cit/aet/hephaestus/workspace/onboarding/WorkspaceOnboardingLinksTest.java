@@ -54,8 +54,7 @@ class WorkspaceOnboardingLinksTest extends BaseUnitTest {
 
     private void identity(String type, String server, String team) {
         when(identities.activeLinksForAccount(10L))
-                .thenReturn(List.of(
-                        new AccountIdentityQuery.IdentityLinkView(1L, 2L, "U123", null, null, null, null, null, team)));
+                .thenReturn(List.of(new AccountIdentityQuery.IdentityView(1L, 2L, "U123", team == null ? "" : team)));
         when(registry.providerTypeName(2L)).thenReturn(type);
         lenient().when(registry.providerServerUrl(2L)).thenReturn(server);
     }

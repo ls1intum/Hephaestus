@@ -3,9 +3,9 @@ package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.DisplayName;
@@ -23,8 +23,8 @@ class MentorAdmissionMetadataTest extends BaseUnitTest {
     private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
 
     private static final LlmPriceSnapshot PRICED = new LlmPriceSnapshot(
-            FundingSource.WORKSPACE,
-            PricingState.PRICED,
+            UsageFundingSource.WORKSPACE,
+            UsagePricingState.PRICED,
             7L,
             11L,
             new BigDecimal("3.500000"),
@@ -70,7 +70,7 @@ class MentorAdmissionMetadataTest extends BaseUnitTest {
 
         LlmPriceSnapshot price = MentorAdmissionMetadata.readPrice(admissionWith(rates));
 
-        assertThat(price.pricingState()).isEqualTo(PricingState.PRICED);
+        assertThat(price.pricingState()).isEqualTo(UsagePricingState.PRICED);
         assertThat(price.per1mInputUsd()).isEqualByComparingTo("2.000000");
         assertThat(price.appliedPriceId()).isNull();
         assertThat(price.per1mOutputUsd()).isNull();

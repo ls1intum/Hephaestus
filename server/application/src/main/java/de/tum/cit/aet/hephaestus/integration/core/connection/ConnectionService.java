@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.integration.core.connection;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.events.ConnectionCredentialsReplacedEvent;
-import de.tum.cit.aet.hephaestus.integration.core.events.ConnectionLifecycleEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -23,13 +22,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
-import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Connection lookups + state transitions. Transitions are guarded by
@@ -50,7 +46,7 @@ public class ConnectionService {
     private final ApplicationEventPublisher eventPublisher;
     private final SyncJobService syncJobService;
 
-    private final TransactionTemplate providerTeardownTemplate;
+    private final ConnectionLifecycleEffects lifecycleEffects;
     private final CredentialReader credentialReader;
     private final SourceProviderNamespaces sourceNamespaces;
 
@@ -70,13 +66,27 @@ public class ConnectionService {
         this.credentialConverter = credentialConverter;
         this.eventPublisher = eventPublisher;
         this.syncJobService = syncJobService;
-        this.providerTeardownTemplate = new TransactionTemplate(transactionManager);
-        this.providerTeardownTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
+        this.lifecycleEffects = new ConnectionLifecycleEffects(eventPublisher, transactionManager);
     }
 
     @Transactional(readOnly = true)
     public Optional<Connection> findActive(long workspaceId, IntegrationKind kind) {
         return connectionRepository.findActive(workspaceId, kind);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Connection> findActiveConnections(long workspaceId, IntegrationKind kind) {
+        return connectionRepository.findByWorkspaceIdAndState(workspaceId, IntegrationState.ACTIVE).stream()
+                .filter(connection -> connection.getKind() == kind)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<Long> findUniqueActiveWorkspaceId(IntegrationKind kind, String instanceKey) {
+        if (instanceKey.isBlank()) return Optional.empty();
+        var matches = connectionRepository.findWorkspaceIdsByKindAndInstanceKeyAndState(
+                kind, instanceKey, IntegrationState.ACTIVE, Limit.of(2));
+        return matches.size() == 1 ? Optional.of(matches.getFirst()) : Optional.empty();
     }
 
     /**
@@ -102,8 +112,7 @@ public class ConnectionService {
                 .isPresent();
         if (github && gitlab) {
             throw new IllegalStateException(
-                    "This workspace has active GitHub and GitLab connections, which Hephaestus does not support. "
-                            + "Ask your instance operator to fix it.");
+                    "This workspace has active GitHub and GitLab connections, which Hephaestus does not support. Ask your instance operator to fix it.");
         }
         if (github) return Optional.of(IntegrationKind.GITHUB);
         if (gitlab) return Optional.of(IntegrationKind.GITLAB);
@@ -335,7 +344,8 @@ public class ConnectionService {
             long workspaceId, IntegrationKind kind, BearerToken bundle) {
         return connectionRepository.findActive(workspaceId, kind).flatMap(c -> {
             if (c.getConfig() instanceof ConnectionConfig.GitHubAppConfig) {
-                throw new ConnectionModeConflictException("The GitHub connection of workspace " + workspaceId
+                throw new ConnectionModeConflictException("The GitHub connection of workspace "
+                        + workspaceId
                         + " is an App installation. It uses no stored token, so there is nothing to replace.");
             }
             connectionRepository.acquireLifecycleLock(c.getId(), workspaceId);
@@ -514,7 +524,7 @@ public class ConnectionService {
         return applyTransition(
                 connection,
                 req,
-                locked -> eraseAndTearDownProviderAfterCommit(locked, strategy),
+                locked -> lifecycleEffects.eraseAndTearDownProviderAfterCommit(locked, strategy),
                 /* fenceOnActiveSyncJob */ true);
     }
 
@@ -534,7 +544,7 @@ public class ConnectionService {
                 connection,
                 req,
                 locked -> {
-                    providerTeardownTemplate.executeWithoutResult(status -> revoke.run());
+                    lifecycleEffects.revoke(revoke);
                     erase.run();
                 },
                 /* fenceOnActiveSyncJob */ false);
@@ -545,7 +555,8 @@ public class ConnectionService {
             TransitionRequest req,
             @Nullable Consumer<Connection> beforeLocalTransition,
             boolean fenceOnActiveSyncJob) {
-        // For a persisted argument the row transitioned below is the one re-read under the lifecycle
+        // For a persisted argument the row transitioned below is the one re-read under the
+        // lifecycle
         // lock, never the caller's possibly-stale instance.
         Connection connection = requested;
         if (requested.getId() != null) {
@@ -610,65 +621,8 @@ public class ConnectionService {
             }
         }
         Connection saved = connectionRepository.save(connection);
-        publishLifecycleEvent(saved, current, req.next());
+        lifecycleEffects.publishLifecycleEvent(saved, current, req.next());
         return saved;
-    }
-
-    /**
-     * The teardown is prepared with this transaction suspended, so a failed credential read cannot mark
-     * the disconnect rollback-only; those reads see the committed row, credentials included, since the
-     * lifecycle lock blocks writers, not readers.
-     */
-    private void eraseAndTearDownProviderAfterCommit(Connection connection, ConnectionStrategy strategy) {
-        IntegrationRef ref = new IntegrationRef(
-                connection.getKind(),
-                connection.getWorkspace().getId(),
-                connection.getInstanceKey(),
-                connection.getId());
-        strategy.eraseLocalData(ref);
-        Optional<Runnable> teardown;
-        try {
-            teardown = Objects.requireNonNull(
-                    providerTeardownTemplate.execute(status -> strategy.prepareProviderTeardown(ref)));
-        } catch (RuntimeException e) {
-            log.warn(
-                    "Provider teardown could not be prepared on disconnect of connection={} kind={}: {} — disconnecting without it",
-                    ref.connectionId(),
-                    ref.kind(),
-                    e.toString());
-            return;
-        }
-        teardown.ifPresent(call ->
-                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                    @Override
-                    public void afterCommit() {
-                        try {
-                            call.run();
-                        } catch (RuntimeException e) {
-                            log.warn(
-                                    "Provider teardown failed after disconnect of connection={} kind={}: {} — local data already erased",
-                                    ref.connectionId(),
-                                    ref.kind(),
-                                    e.toString());
-                        }
-                    }
-                }));
-    }
-
-    /**
-     * Signal a genuine ACTIVE-boundary crossing to vendor adapters (AFTER_COMMIT listeners).
-     * Fires inside the transition transaction so a rollback also drops the event; the
-     * same-state and duplicate-correlation early returns above keep replays silent.
-     */
-    private void publishLifecycleEvent(Connection connection, IntegrationState previous, IntegrationState next) {
-        long workspaceId = connection.getWorkspace().getId();
-        if (next == IntegrationState.ACTIVE) {
-            eventPublisher.publishEvent(
-                    new ConnectionLifecycleEvent.Activated(connection.getId(), workspaceId, connection.getKind()));
-        } else if (previous == IntegrationState.ACTIVE) {
-            eventPublisher.publishEvent(
-                    new ConnectionLifecycleEvent.Deactivated(connection.getId(), workspaceId, connection.getKind()));
-        }
     }
 
     /**

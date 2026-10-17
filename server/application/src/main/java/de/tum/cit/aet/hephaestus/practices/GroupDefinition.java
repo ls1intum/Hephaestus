@@ -1,42 +1,28 @@
 package de.tum.cit.aet.hephaestus.practices;
 
-import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
+@JsonInclude(JsonInclude.Include.ALWAYS)
 public record GroupDefinition(
         String name,
         @Nullable String description,
         @Nullable String icon,
-        @Nullable String color) implements CatalogDefinition {
+        @Nullable String color) implements ClosedPracticeInput {
+    public static final int NAME_MAX_LENGTH = 128;
+    public static final int DESCRIPTION_MAX_LENGTH = 2000;
+    public static final int ICON_MAX_LENGTH = 64;
+    public static final int COLOR_MAX_LENGTH = 32;
+
     public GroupDefinition {
-        Objects.requireNonNull(name, "name");
-        description = blankToNull(description);
-        icon = blankToNull(icon);
-        color = blankToNull(color);
-    }
-
-    public static GroupDefinition from(PracticeGroup group) {
-        return new GroupDefinition(group.getName(), group.getDescription(), group.getIcon(), group.getColor());
-    }
-
-    @Override
-    public String digest(String slug) {
-        return GroupDefinitionDigest.digest(slug, this);
-    }
-
-    @Override
-    public String provenanceFingerprint(String slug) {
-        return new CanonicalDigest()
-                .add(slug)
-                .add(name)
-                .addNullable(description)
-                .addNullable(icon)
-                .addNullable(color)
-                .hex();
-    }
-
-    private static @Nullable String blankToNull(@Nullable String value) {
-        return value == null || value.isBlank() ? null : value;
+        Objects.requireNonNull(name);
+        if (name.isBlank()
+                || name.length() > NAME_MAX_LENGTH
+                || (description != null && description.length() > DESCRIPTION_MAX_LENGTH)
+                || (icon != null && icon.length() > ICON_MAX_LENGTH)
+                || (color != null && color.length() > COLOR_MAX_LENGTH)) {
+            throw new IllegalArgumentException("Use a group name and metadata within the supported lengths.");
+        }
     }
 }

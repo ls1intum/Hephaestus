@@ -134,11 +134,11 @@ class LegacyAgentConfigMigrationIntegrationTest {
                         new String[] {"MENTOR", "600", "3", "false"},
                         new String[] {"PRACTICE_DETECTION", "600", "3", "false"});
         assertThat(scalar("""
-                SELECT count(DISTINCT b.workspace_model_id)::text
-                FROM workspace_agent_binding b
-                JOIN workspace w ON w.id = b.workspace_id
-                WHERE w.slug = 'legacy-bound'
-                """))
+            SELECT count(DISTINCT b.workspace_model_id)::text
+            FROM workspace_agent_binding b
+            JOIN workspace w ON w.id = b.workspace_id
+            WHERE w.slug = 'legacy-bound'
+            """))
                 .as("both purposes point at the one model the single legacy config described")
                 .isEqualTo("1");
     }
@@ -160,8 +160,8 @@ class LegacyAgentConfigMigrationIntegrationTest {
     @Order(6)
     void aProviderWhoseEndpointWasNeverRecordedAnywhereGetsAnUnresolvablePlaceholder() throws SQLException {
         assertThat(connectionOf("legacy-nomodel")[0])
-                .as(
-                        "the reserved .invalid TLD can never resolve, so a re-enabled row fails loudly instead of leaking the key")
+                .as("the reserved .invalid TLD can never resolve, so a re-enabled row fails loudly instead of"
+                        + " leaking the key")
                 .isEqualTo("https://endpoint-not-migrated.invalid/v1");
     }
 
@@ -169,10 +169,10 @@ class LegacyAgentConfigMigrationIntegrationTest {
     @Order(7)
     void everyCarriedConnectionSpeaksTheOneProtocolTheNewSchemaAdmits() throws SQLException {
         assertThat(query("""
-                SELECT DISTINCT api_protocol, auth_mode
-                FROM workspace_llm_connection
-                WHERE slug LIKE 'legacy-%'
-                """))
+            SELECT DISTINCT api_protocol, auth_mode
+            FROM workspace_llm_connection
+            WHERE slug LIKE 'legacy-%'
+            """))
                 .as("the legacy runtime spoke OpenAI chat completions with a bearer token; nothing else is admitted")
                 .containsExactly(new String[] {"openai-completions", "BEARER"});
     }
@@ -226,13 +226,13 @@ class LegacyAgentConfigMigrationIntegrationTest {
     @Order(11)
     void nothingCarriedOverIsEnabledUntilAnAdminHasLookedAtIt() throws SQLException {
         assertThat(scalar("""
-                SELECT (
-                    (SELECT count(*) FROM workspace_llm_connection WHERE enabled)
-                  + (SELECT count(*) FROM workspace_llm_model WHERE enabled)
-                  + (SELECT count(*) FROM workspace_agent_binding WHERE enabled))::text
-                """))
-                .as(
-                        "the endpoint a PROXY-mode config really used lived in an env var, so re-enabling is a human decision")
+            SELECT (
+                (SELECT count(*) FROM workspace_llm_connection WHERE enabled)
+              + (SELECT count(*) FROM workspace_llm_model WHERE enabled)
+              + (SELECT count(*) FROM workspace_agent_binding WHERE enabled))::text
+            """))
+                .as("the endpoint a PROXY-mode config really used lived in an env var, so re-enabling is a human"
+                        + " decision")
                 .isEqualTo("0");
     }
 
@@ -268,9 +268,9 @@ class LegacyAgentConfigMigrationIntegrationTest {
     @Order(14)
     void backfilledSpendIsAttributedToTheInstancePurse() throws SQLException {
         assertThat(query("""
-                SELECT source_type, funding_source, pricing_state, cost_usd::text
-                FROM llm_usage_event ORDER BY source_type
-                """))
+            SELECT source_type, funding_source, pricing_state, cost_usd::text
+            FROM llm_usage_event ORDER BY source_type
+            """))
                 .containsExactly(
                         new String[] {"AGENT_JOB", "INSTANCE", "PRICED", "0.250000"},
                         new String[] {"MENTOR_TURN", "INSTANCE", "PRICED", "0.125000"});
@@ -291,8 +291,8 @@ class LegacyAgentConfigMigrationIntegrationTest {
                 .contains("carried over with a placeholder endpoint, model id or non-OpenAI protocol in these "
                         + "workspaces: legacy-anthropic, legacy-fanout, legacy-nomodel");
         assertThat(deployLog)
-                .as(
-                        "only legacy-fanout ran practice review on more than one config; legacy-paused had an explicit pointer")
+                .as("only legacy-fanout ran practice review on more than one config; legacy-paused had an explicit"
+                        + " pointer")
                 .contains("ran on SEVERAL configurations at once in these workspaces: legacy-fanout");
         assertThat(deployLog)
                 .as("a dropped config may hold a key worth revoking, so it is named before the table goes")
@@ -394,69 +394,69 @@ class LegacyAgentConfigMigrationIntegrationTest {
     private static void seedLegacyConfiguration() throws SQLException {
         execute(
                 """
-            INSERT INTO workspace (id, account_login, account_type, display_name, slug, status, is_publicly_viewable)
-            VALUES (9401, 'legacy-seeded',    'ORG', 'Seeded',    'legacy-seeded',    'ACTIVE', false),
-                   (9402, 'legacy-bound',     'ORG', 'Bound',     'legacy-bound',     'ACTIVE', false),
-                   (9403, 'legacy-orphan',    'ORG', 'Orphan',    'legacy-orphan',    'ACTIVE', false),
-                   (9404, 'legacy-anthropic', 'ORG', 'Anthropic', 'legacy-anthropic', 'ACTIVE', false),
-                   (9405, 'legacy-nomodel',   'ORG', 'No model',  'legacy-nomodel',   'ACTIVE', false),
-                   (9406, 'legacy-fanout',    'ORG', 'Fan-out',   'legacy-fanout',    'ACTIVE', false),
-                   (9407, 'legacy-paused',    'ORG', 'Paused',    'legacy-paused',    'ACTIVE', false)
-            """,
+                INSERT INTO workspace (id, account_login, account_type, display_name, slug, status, is_publicly_viewable)
+                VALUES (9401, 'legacy-seeded',    'ORG', 'Seeded',    'legacy-seeded',    'ACTIVE', false),
+                       (9402, 'legacy-bound',     'ORG', 'Bound',     'legacy-bound',     'ACTIVE', false),
+                       (9403, 'legacy-orphan',    'ORG', 'Orphan',    'legacy-orphan',    'ACTIVE', false),
+                       (9404, 'legacy-anthropic', 'ORG', 'Anthropic', 'legacy-anthropic', 'ACTIVE', false),
+                       (9405, 'legacy-nomodel',   'ORG', 'No model',  'legacy-nomodel',   'ACTIVE', false),
+                       (9406, 'legacy-fanout',    'ORG', 'Fan-out',   'legacy-fanout',    'ACTIVE', false),
+                       (9407, 'legacy-paused',    'ORG', 'Paused',    'legacy-paused',    'ACTIVE', false)
+                """,
                 // 9501 is the startup seeder's shape: enabled, both pointers left NULL — a default install,
                 // not a config an admin ever pointed at.
                 """
-            INSERT INTO agent_config (id, workspace_id, name, enabled, model_name, llm_api_key, llm_base_url,
-                                      llm_provider, credential_mode, timeout_seconds, max_concurrent_jobs,
-                                      allow_internet, created_at)
-            VALUES (9501, 9401, 'Default model', true, 'gpt-4o', 'encrypted-seeded-key',
-                    'https://gpu.example.invalid/v1', 'OPENAI', 'PROXY', 900, 5, true, now()),
-                   (9502, 9402, 'Bound', true, 'gpt-4.1', 'encrypted-bound-key',
-                    'https://bound.example.invalid/v1', 'OPENAI', 'PROXY', 600, 3, false, now()),
-                   (9503, 9403, 'Orphan', false, 'gpt-4o', 'encrypted-orphan-key',
-                    'https://api.openai.com/v1', 'OPENAI', 'PROXY', 600, 3, false, now()),
-                   (9504, 9404, 'Claude', true, 'claude-sonnet-4', 'encrypted-anthropic-key', NULL,
-                    'ANTHROPIC', 'PROXY', 300, 2, false, now()),
-                   (9505, 9405, 'Azure', true, NULL, 'encrypted-nomodel-key', NULL,
-                    'AZURE_OPENAI', 'PROXY', 1200, 7, true, now()),
-                   (9506, 9406, 'Fan-out older', true, 'gpt-4o-mini', 'encrypted-fanout-older-key', NULL,
-                    'OPENAI', 'PROXY', 480, 4, false, now()),
-                   (9507, 9406, 'Fan-out newer', true, 'o3', 'encrypted-fanout-newer-key',
-                    'https://second.example.invalid/v1', 'OPENAI', 'PROXY', 540, 6, true, now()),
-                   (9508, 9407, 'Paused detection', false, 'gpt-4o', 'encrypted-paused-key',
-                    'https://paused.example.invalid/v1', 'OPENAI', 'PROXY', 660, 8, false, now()),
-                   (9509, 9407, 'Live mentor', true, 'gpt-4o', 'encrypted-mentor-key',
-                    'https://mentor.example.invalid/v1', 'OPENAI', 'PROXY', 720, 9, true, now())
-            """,
+                INSERT INTO agent_config (id, workspace_id, name, enabled, model_name, llm_api_key, llm_base_url,
+                                          llm_provider, credential_mode, timeout_seconds, max_concurrent_jobs,
+                                          allow_internet, created_at)
+                VALUES (9501, 9401, 'Default model', true, 'gpt-4o', 'encrypted-seeded-key',
+                        'https://gpu.example.invalid/v1', 'OPENAI', 'PROXY', 900, 5, true, now()),
+                       (9502, 9402, 'Bound', true, 'gpt-4.1', 'encrypted-bound-key',
+                        'https://bound.example.invalid/v1', 'OPENAI', 'PROXY', 600, 3, false, now()),
+                       (9503, 9403, 'Orphan', false, 'gpt-4o', 'encrypted-orphan-key',
+                        'https://api.openai.com/v1', 'OPENAI', 'PROXY', 600, 3, false, now()),
+                       (9504, 9404, 'Claude', true, 'claude-sonnet-4', 'encrypted-anthropic-key', NULL,
+                        'ANTHROPIC', 'PROXY', 300, 2, false, now()),
+                       (9505, 9405, 'Azure', true, NULL, 'encrypted-nomodel-key', NULL,
+                        'AZURE_OPENAI', 'PROXY', 1200, 7, true, now()),
+                       (9506, 9406, 'Fan-out older', true, 'gpt-4o-mini', 'encrypted-fanout-older-key', NULL,
+                        'OPENAI', 'PROXY', 480, 4, false, now()),
+                       (9507, 9406, 'Fan-out newer', true, 'o3', 'encrypted-fanout-newer-key',
+                        'https://second.example.invalid/v1', 'OPENAI', 'PROXY', 540, 6, true, now()),
+                       (9508, 9407, 'Paused detection', false, 'gpt-4o', 'encrypted-paused-key',
+                        'https://paused.example.invalid/v1', 'OPENAI', 'PROXY', 660, 8, false, now()),
+                       (9509, 9407, 'Live mentor', true, 'gpt-4o', 'encrypted-mentor-key',
+                        'https://mentor.example.invalid/v1', 'OPENAI', 'PROXY', 720, 9, true, now())
+                """,
                 "UPDATE workspace SET practice_config_id = 9502, mentor_config_id = 9502 WHERE id = 9402",
                 "UPDATE workspace SET practice_config_id = 9508 WHERE id = 9407",
                 // A completed job with recorded spend, and a suppressed piece of feedback hanging off it so the FK
                 // this release hardens to RESTRICT has a row to refuse a cascade on.
                 "INSERT INTO \"user\" (id, native_id, provider_id) VALUES (9601, 9601, 1)",
                 """
-            INSERT INTO agent_job (id, workspace_id, config_id, job_type, status, config_snapshot, job_token,
-                                   retry_count, created_at, completed_at, llm_model, llm_total_calls,
-                                   llm_total_input_tokens, llm_total_output_tokens, llm_cost_usd)
-            VALUES ('9a000000-0000-0000-0000-000000000001', 9401, 9501, 'PRACTICE_DETECTION', 'COMPLETED',
-                    '{}'::jsonb, 'token', 0, now(), now(), 'gpt-4o', 3, 1000, 500, 0.25)
-            """,
+                INSERT INTO agent_job (id, workspace_id, config_id, job_type, status, config_snapshot, job_token,
+                                       retry_count, created_at, completed_at, llm_model, llm_total_calls,
+                                       llm_total_input_tokens, llm_total_output_tokens, llm_cost_usd)
+                VALUES ('9a000000-0000-0000-0000-000000000001', 9401, 9501, 'PRACTICE_DETECTION', 'COMPLETED',
+                        '{}'::jsonb, 'token', 0, now(), now(), 'gpt-4o', 3, 1000, 500, 0.25)
+                """,
                 """
-            INSERT INTO feedback (id, agent_job_id, workspace_id, recipient_user_id, about_user_id, channel,
-                                  position, delivery_state, suppression_reason, source, created_at)
-            VALUES ('9b000000-0000-0000-0000-000000000001', '9a000000-0000-0000-0000-000000000001', 9401,
-                    9601, 9601, 'IN_CONTEXT', 1, 'SUPPRESSED', 'VOLUME_CAPPED', 'AGENT', now())
-            """,
+                INSERT INTO feedback (id, agent_job_id, workspace_id, recipient_user_id, about_user_id, channel,
+                                      position, delivery_state, suppression_reason, source, created_at)
+                VALUES ('9b000000-0000-0000-0000-000000000001', '9a000000-0000-0000-0000-000000000001', 9401,
+                        9601, 9601, 'IN_CONTEXT', 1, 'SUPPRESSED', 'VOLUME_CAPPED', 'AGENT', now())
+                """,
                 // One mentor turn with recorded spend, so the chat_message backfill has something to classify.
                 """
-            INSERT INTO chat_thread (id, workspace_id, user_id, created_at, surface)
-            VALUES ('9c000000-0000-0000-0000-000000000001', 9401, 9601, now(), 'WEB')
-            """,
+                INSERT INTO chat_thread (id, workspace_id, user_id, created_at, surface)
+                VALUES ('9c000000-0000-0000-0000-000000000001', 9401, 9601, now(), 'WEB')
+                """,
                 """
-            INSERT INTO chat_message (id, thread_id, role, status, parts, version, created_at, metadata)
-            VALUES ('9d000000-0000-0000-0000-000000000001', '9c000000-0000-0000-0000-000000000001',
-                    'ASSISTANT', 'completed', '[]'::jsonb, 0, now(),
-                    '{"model":"gpt-4o","usage":{"input":10,"output":20},"costUsd":"0.125"}'::jsonb)
-            """);
+                INSERT INTO chat_message (id, thread_id, role, status, parts, version, created_at, metadata)
+                VALUES ('9d000000-0000-0000-0000-000000000001', '9c000000-0000-0000-0000-000000000001',
+                        'ASSISTANT', 'completed', '[]'::jsonb, 0, now(),
+                        '{"model":"gpt-4o","usage":{"input":10,"output":20},"costUsd":"0.125"}'::jsonb)
+                """);
     }
 
     /** Every carried-over connection: (workspace slug, connection slug, endpoint, key, model id). */

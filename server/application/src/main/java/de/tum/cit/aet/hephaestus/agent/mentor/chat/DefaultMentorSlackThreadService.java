@@ -1,13 +1,13 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import de.tum.cit.aet.hephaestus.mentor.ThreadSurface;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 class DefaultMentorSlackThreadService implements MentorSlackThreadService {
 
     private final ChatThreadRepository chatThreadRepository;
-    private final UserRepository userRepository;
+    private final AccountSummaryQuery accounts;
     private final WorkspaceRepository workspaceRepository;
 
     @Override
@@ -31,15 +31,15 @@ class DefaultMentorSlackThreadService implements MentorSlackThreadService {
                 return existing.get().getId();
             }
         }
-        User user = userRepository
-                .findById(developerId)
-                .orElseThrow(() -> new EntityNotFoundException("User", String.valueOf(developerId)));
+        if (!accounts.findAllByIds(List.of(developerId)).containsKey(developerId)) {
+            throw new EntityNotFoundException("Account", String.valueOf(developerId));
+        }
         Workspace workspace = workspaceRepository
                 .findById(workspaceId)
                 .orElseThrow(() -> new EntityNotFoundException("Workspace", String.valueOf(workspaceId)));
         ChatThread thread = new ChatThread();
         thread.setId(chatThreadId != null ? chatThreadId : UUID.randomUUID());
-        thread.setUser(user);
+        thread.setAccountId(developerId);
         thread.setWorkspace(workspace);
         thread.setSurface(ThreadSurface.SLACK_DM);
         return chatThreadRepository.save(thread).getId();

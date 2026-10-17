@@ -127,19 +127,21 @@ const TOOL_NAMES = new Set([
 	"ls",
 	"bash",
 	"codemode",
-	"read_practice",
-	"report_observation",
+	"upsert_problem",
+	"remove_problem",
+	"read_problem",
+	"submit_result",
 	"report_feedback",
 	"report_review",
 ]);
 
 /**
- * What one session did, as enums and numbers only. The worker keeps this alone when it cannot index every person a
- * transcript may name, so nothing here is text the session wrote: no arguments, results, prose, paths or error text.
+ * What one session did, as enums, numbers and bounded numeric identifiers. The worker keeps this alone when it
+ * cannot index every person a transcript may name: no arguments, results, prose, paths or error text.
  */
 export interface SessionSummary {
 	phase: string | null;
-	practiceRevisionId: number | null;
+	practiceVersionId: string | null;
 	entries: number;
 	assistantCalls: number;
 	stopReasons: Record<string, number>;
@@ -317,18 +319,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /** No custom entry's free-form fields enter a summary. */
 function sessionBinding(data: unknown): {
 	phase: string | null;
-	practiceRevisionId: number | null;
+	practiceVersionId: string | null;
 } {
 	if (typeof data !== "object" || data === null) {
-		return { phase: null, practiceRevisionId: null };
+		return { phase: null, practiceVersionId: null };
 	}
 	const phase = "phase" in data ? data.phase : null;
-	const revision = "practiceRevisionId" in data ? data.practiceRevisionId : null;
+	const version = "practiceVersionId" in data ? data.practiceVersionId : null;
 	return {
 		phase: typeof phase === "string" && PHASES.has(phase) ? phase : null,
-		practiceRevisionId:
-			typeof revision === "number" && Number.isSafeInteger(revision) && revision > 0
-				? revision
+		practiceVersionId:
+			typeof version === "string" &&
+			/^[1-9][0-9]{0,18}$/u.test(version) &&
+			(version.length < 19 || version <= "9223372036854775807")
+				? version
 				: null,
 	};
 }
@@ -358,11 +362,11 @@ function toolNames(contents: unknown): string[] {
 	});
 }
 
-/** Reads the native entries through the SDK's own parser; every value kept is an allowlisted enum or a number. */
+/** Reads native entries through the SDK's parser, keeping only enums, numbers and bounded numeric identifiers. */
 export function summarize(entries: FileEntry[]): SessionSummary {
 	const summary: SessionSummary = {
 		phase: null,
-		practiceRevisionId: null,
+		practiceVersionId: null,
 		entries: entries.length,
 		assistantCalls: 0,
 		stopReasons: {},
@@ -387,7 +391,7 @@ export function summarize(entries: FileEntry[]): SessionSummary {
 		if (entry.type === "custom" && entry.customType === REVIEW_SESSION_ENTRY) {
 			const binding = sessionBinding(entry.data);
 			summary.phase = binding.phase;
-			summary.practiceRevisionId = binding.practiceRevisionId;
+			summary.practiceVersionId = binding.practiceVersionId;
 		} else if (entry.type === "compaction") {
 			summary.compactions += 1;
 		} else if (entry.type === "message") {

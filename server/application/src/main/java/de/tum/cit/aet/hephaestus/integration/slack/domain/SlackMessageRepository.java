@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.slack.domain;
 
-import de.tum.cit.aet.hephaestus.integration.slack.retention.SlackRetentionSweeper;
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import jakarta.persistence.QueryHint;
 import java.time.Instant;
 import java.util.Collection;
@@ -20,25 +20,35 @@ import org.springframework.transaction.annotation.Transactional;
  * Scoped access to ingested Slack messages. Every finder carries the {@code workspace_id} predicate the tenancy
  * {@code StatementInspector} requires.
  */
-public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long>, SlackMessageAccess {
+public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long> {
 
     String MESSAGE_READ_GUARD = """
-          AND m.workspaceId=:workspaceId AND c.workspaceId=:workspaceId
+          AND m.workspaceId=:workspaceId AND c.workspaceId=:workspaceId AND m.slackTeamId=c.slackTeamId
+          AND EXISTS (SELECT 1 FROM Connection active WHERE active.workspace.id=:workspaceId
+            AND active.kind=de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.SLACK
+            AND active.state=de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState.ACTIVE
+            AND active.instanceKey=m.slackTeamId)
           AND c.consentState=de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState.ACTIVE
           AND m.deletedAt IS NULL AND NOT EXISTS
             (SELECT 1 FROM SlackParticipantConsent p WHERE p.workspaceId=:workspaceId
              AND p.slackUserId=m.authorSlackUserId AND p.ingestionOptedOut=TRUE)
           AND NOT EXISTS (
-            SELECT 1 FROM PersonSuppression s, IdentityProvider provider
-            WHERE s.providerId=provider.id
+            SELECT 1 FROM Identity i, IdentityProvider p, Account a
+            WHERE i.providerId=p.id AND i.account.id=a.id
+              AND p.type=de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType.SLACK
+              AND p.serverUrl='https://slack.com' AND i.providerUserKey=m.authorSlackUserId AND i.teamKey=m.slackTeamId
+              AND a.aiChoice=de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice.NO_AI)
+          AND NOT EXISTS (
+            SELECT 1 FROM IdentityRestriction s, IdentityProvider provider
+            WHERE s.kind=de.tum.cit.aet.hephaestus.core.privacy.IdentityRestriction.Kind.ERASED AND s.providerId=provider.id
               AND provider.type=de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType.SLACK
               AND provider.serverUrl='https://slack.com'
-              AND s.subject=m.authorSlackUserId AND s.teamKey=m.slackTeamId)
+              AND s.providerUserKey=m.authorSlackUserId AND s.teamKey=m.slackTeamId)
         """;
 
     @Query("""
         SELECT m.id AS id, m.slackChannelId AS slackChannelId, m.slackTs AS slackTs,
-          m.slackThreadTs AS slackThreadTs, m.authorMemberId AS authorMemberId, m.slackTeamId AS slackTeamId, m.authorSlackUserId AS authorSlackUserId,
+          m.slackThreadTs AS slackThreadTs, m.authorAccountId AS authorAccountId, m.slackTeamId AS slackTeamId, m.authorSlackUserId AS authorSlackUserId,
           m.text AS text, m.ingestedAt AS ingestedAt
         FROM SlackMessage m JOIN SlackMonitoredChannel c
           ON c.workspaceId=m.workspaceId AND c.slackChannelId=m.slackChannelId
@@ -64,7 +74,7 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
         String getSlackThreadTs();
 
         @Nullable
-        Long getAuthorMemberId();
+        Long getAuthorAccountId();
 
         @Nullable
         String getText();
@@ -109,15 +119,15 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
 
     /**
      * Person erasure (opt-out / account hard-delete): delete every message this workspace stored that is authored by
-     * one member — matched on the {@code author_member_id} firewall stamp, so only that individual's messages go and
+     * one member — matched on the {@code author_account_id} firewall stamp, so only that individual's messages go and
      * co-authors on the same channels/threads are untouched. Idempotent (0 when the member authored nothing).
      */
     @Modifying
     @Transactional
     @Query(
-            value = "DELETE FROM slack_message WHERE workspace_id = :workspaceId AND author_member_id = :memberId",
+            value = "DELETE FROM slack_message WHERE workspace_id = :workspaceId AND author_account_id = :memberId",
             nativeQuery = true)
-    int deleteByWorkspaceIdAndAuthorMemberId(@Param("workspaceId") long workspaceId, @Param("memberId") long memberId);
+    int deleteByWorkspaceIdAndAuthorAccountId(@Param("workspaceId") long workspaceId, @Param("memberId") long memberId);
 
     @Modifying
     @Transactional
@@ -146,8 +156,8 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
      *
      * @return one projection row per channel that has at least one stored message
      */
-    @Query("SELECT m.slackChannelId AS slackChannelId, COUNT(m) AS itemCount FROM SlackMessage m "
-            + "WHERE m.workspaceId = :workspaceId GROUP BY m.slackChannelId")
+    @Query(
+            "SELECT m.slackChannelId AS slackChannelId, COUNT(m) AS itemCount FROM SlackMessage m WHERE m.workspaceId = :workspaceId GROUP BY m.slackChannelId")
     List<ChannelItemCount> countGroupedByChannelId(@Param("workspaceId") long workspaceId);
 
     /** Projection for {@link #countGroupedByChannelId}. */
@@ -174,8 +184,8 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
     @Modifying
     @Transactional
     @Query(value = """
-        INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id, slack_ts, slack_thread_ts, author_slack_user_id, author_member_id, text, ingested_at)
-        VALUES (:workspaceId, :slackTeamId, :slackChannelId, :slackTs, :slackThreadTs, :authorSlackUserId, :authorMemberId, :text, now())
+        INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id, slack_ts, slack_thread_ts, author_slack_user_id, author_account_id, text, ingested_at)
+        VALUES (:workspaceId, :slackTeamId, :slackChannelId, :slackTs, :slackThreadTs, :authorSlackUserId, :authorAccountId, :text, now())
         ON CONFLICT (workspace_id, slack_channel_id, slack_ts) DO NOTHING
         """, nativeQuery = true)
     int insertIfAbsent(
@@ -185,7 +195,7 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
             @Param("slackTs") String slackTs,
             @Param("slackThreadTs") @Nullable String slackThreadTs,
             @Param("authorSlackUserId") @Nullable String authorSlackUserId,
-            @Param("authorMemberId") @Nullable Long authorMemberId,
+            @Param("authorAccountId") @Nullable Long authorAccountId,
             @Param("text") @Nullable String text);
 
     /**
@@ -220,9 +230,8 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
      */
     @Modifying
     @Transactional
-    @Query("UPDATE SlackMessage m SET m.text = :text, m.editedAt = :now "
-            + "WHERE m.workspaceId = :workspaceId AND m.slackChannelId = :slackChannelId AND m.slackTs = :slackTs "
-            + "AND m.deletedAt IS NULL")
+    @Query(
+            "UPDATE SlackMessage m SET m.text = :text, m.editedAt = :now WHERE m.workspaceId = :workspaceId AND m.slackChannelId = :slackChannelId AND m.slackTs = :slackTs AND m.deletedAt IS NULL")
     int applyEdit(
             @Param("workspaceId") Long workspaceId,
             @Param("slackChannelId") String slackChannelId,
@@ -233,7 +242,7 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
     /**
      * Agent-owned {@code ConversationThreadProjection} SPI: the non-tombstoned turns of one thread (root
      * {@code slack_ts = threadTs} + replies {@code slack_thread_ts = threadTs}), oldest first, with the author's
-     * linked login/name resolved via an ad-hoc {@code LEFT JOIN} on {@code User} (no FK — {@code authorMemberId} is
+     * linked login/name resolved via an ad-hoc {@code LEFT JOIN} on {@code User} (no FK — {@code authorAccountId} is
      * a scalar firewall stamp). Consent-gated on the SAME read as the message fetch (not only on a prior thread
      * scan): {@code c.consentState = ACTIVE} is a join predicate here, so a channel paused/revoked between enqueue
      * and execution — or on a retry — yields zero rows atomically with the read, never a stale/leaked message.
@@ -243,11 +252,11 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
      */
     @Query("""
         SELECT new de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadMessageRow(
-            m.slackTs, m.slackTeamId, m.authorSlackUserId, m.authorMemberId, u.login, u.name, m.text, m.editedAt
+            m.slackTs, m.slackTeamId, m.authorSlackUserId, m.authorAccountId, NULL, a.displayName, m.text, m.editedAt
         )
         FROM SlackMessage m
         JOIN SlackMonitoredChannel c ON c.workspaceId = m.workspaceId AND c.slackChannelId = m.slackChannelId
-        LEFT JOIN de.tum.cit.aet.hephaestus.integration.scm.domain.user.User u ON u.id = m.authorMemberId
+        LEFT JOIN Account a ON a.id = m.authorAccountId
         WHERE m.workspaceId = :workspaceId
           AND m.slackChannelId = :channelId
           AND (m.slackThreadTs = :threadTs OR m.slackTs = :threadTs)
@@ -258,9 +267,20 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
             @Param("threadTs") String threadTs,
             Pageable pageable);
 
+    @Query("""
+        SELECT COUNT(m) FROM SlackMessage m JOIN SlackMonitoredChannel c
+          ON c.workspaceId=m.workspaceId AND c.slackChannelId=m.slackChannelId
+        WHERE m.workspaceId=:workspaceId AND m.slackChannelId=:channelId
+          AND (m.slackThreadTs=:threadTs OR m.slackTs=:threadTs)
+        """ + MESSAGE_READ_GUARD)
+    long countReadableTurns(
+            @Param("workspaceId") long workspaceId,
+            @Param("channelId") String channelId,
+            @Param("threadTs") String threadTs);
+
     /** Agent-owned {@code ConversationCandidateSource} SPI: count of non-tombstoned turns in one thread, workspace-pinned. */
-    @Query("SELECT COUNT(m) FROM SlackMessage m WHERE m.workspaceId = :workspaceId AND m.slackChannelId = :channelId "
-            + "AND (m.slackThreadTs = :threadTs OR m.slackTs = :threadTs) AND m.deletedAt IS NULL")
+    @Query(
+            "SELECT COUNT(m) FROM SlackMessage m WHERE m.workspaceId = :workspaceId AND m.slackChannelId = :channelId AND (m.slackThreadTs = :threadTs OR m.slackTs = :threadTs) AND m.deletedAt IS NULL")
     long countLiveTurns(
             @Param("workspaceId") long workspaceId,
             @Param("channelId") String channelId,
@@ -271,12 +291,22 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
      * {@code slack_ts} is strictly greater than {@code watermark} (lexicographic — the same Slack-{@code ts}
      * ordering invariant {@link SlackThreadRepository#upsertOnMessage} relies on), workspace-pinned.
      */
-    @Query("SELECT COUNT(m) FROM SlackMessage m WHERE m.workspaceId = :workspaceId AND m.slackChannelId = :channelId "
-            + "AND (m.slackThreadTs = :threadTs OR m.slackTs = :threadTs) AND m.deletedAt IS NULL "
-            + "AND m.slackTs > :watermark")
+    @Query(
+            "SELECT COUNT(m) FROM SlackMessage m WHERE m.workspaceId = :workspaceId AND m.slackChannelId = :channelId AND (m.slackThreadTs = :threadTs OR m.slackTs = :threadTs) AND m.deletedAt IS NULL AND m.slackTs > :watermark")
     long countLiveTurnsSince(
             @Param("workspaceId") long workspaceId,
             @Param("channelId") String channelId,
             @Param("threadTs") String threadTs,
             @Param("watermark") String watermark);
+
+    @Modifying
+    @Transactional
+    @WorkspaceAgnostic("Verified account absorption moves its author references across every workspace")
+    @Query(
+            value = "UPDATE slack_message SET author_account_id=:claimed WHERE author_account_id=:unclaimed",
+            nativeQuery = true)
+    int absorbAuthorAccount(@Param("claimed") long claimedAccountId, @Param("unclaimed") long unclaimedAccountId);
+
+    @WorkspaceAgnostic("Account absorption verifies source references before removing source memberships")
+    boolean existsByAuthorAccountId(Long accountId);
 }

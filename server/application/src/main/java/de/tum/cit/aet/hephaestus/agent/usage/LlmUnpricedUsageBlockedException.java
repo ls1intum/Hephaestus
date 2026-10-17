@@ -14,15 +14,15 @@ public class LlmUnpricedUsageBlockedException extends RuntimeException {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    public LlmUnpricedUsageBlockedException(FundingSource fundingSource) {
+    public LlmUnpricedUsageBlockedException(UsageFundingSource fundingSource) {
         super(message(fundingSource));
     }
 
-    private static String message(FundingSource fundingSource) {
-        return fundingSource == FundingSource.WORKSPACE
-                ? "Some usage has no confirmed cost, so the server cannot check it against the cap. A workspace admin can "
-                        + "add missing rates for verified usage or remove the cap. Unverified measurements stay unpriced."
-                : "Some usage has no confirmed cost, so the server cannot check it against the budget. An instance admin "
-                        + "can add missing rates for verified usage or remove the budget. Unverified measurements stay unpriced.";
+    private static String message(UsageFundingSource fundingSource) {
+        return fundingSource == UsageFundingSource.WORKSPACE
+                ? "Some usage has no price, so the server cannot check it against the cap. A workspace admin can "
+                        + "add the price or remove the cap."
+                : "Some usage has no price, so the server cannot check it against the budget. An instance admin "
+                        + "can add the price or remove the budget.";
     }
 }

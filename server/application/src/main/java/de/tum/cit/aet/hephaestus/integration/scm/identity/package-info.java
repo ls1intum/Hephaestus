@@ -1,0 +1,3 @@
+@org.springframework.modulith.NamedInterface("identity")
+@org.jspecify.annotations.NullMarked
+package de.tum.cit.aet.hephaestus.integration.scm.identity;

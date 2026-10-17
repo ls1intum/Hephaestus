@@ -8,7 +8,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -18,7 +17,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @Hidden
 @RequestMapping("/internal/llm")
-@PreAuthorize("isAuthenticated()")
 @ConditionalOnWorkerRole
 class LlmProxyController {
     private final LlmProxyService proxyService;
@@ -35,5 +33,15 @@ class LlmProxyController {
             @RequestHeader HttpHeaders incomingHeaders,
             @RequestBody(required = false) byte @Nullable [] body) {
         return proxyService.proxy(request, response, incomingHeaders, body);
+    }
+
+    @PostMapping("/practice-script/{slot}/**")
+    @WorkspaceAgnostic("Authenticated practice script token carries and constrains the workspace route")
+    public @Nullable ResponseEntity<?> proxyPracticeScript(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            @RequestHeader HttpHeaders incomingHeaders,
+            @RequestBody(required = false) byte @Nullable [] body) {
+        return proxyService.proxyPracticeScript(request, response, incomingHeaders, body);
     }
 }

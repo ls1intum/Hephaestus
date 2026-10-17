@@ -2,32 +2,17 @@ import { Link } from "@tanstack/react-router";
 
 import { DEFAULT_REVIEW_SECTION } from "@/components/admin/practices/review/review-sections";
 
-import { REFUSAL_FIXES, type SignalStateReason } from "./trace-format";
+import { REFUSAL_FIXES, type RefusalReason } from "./trace-format";
 
 export interface RefusalFixLinkProps {
 	workspaceSlug: string;
-	reason: SignalStateReason;
-	/**
-	 * Every member of a workspace can open a trace, and a link into `/admin` bounces all but the
-	 * admins off the route guard back to the workspace home — losing the page they were reading.
-	 */
-	canAdminister: boolean;
+	reason: RefusalReason;
 	className?: string;
 }
 
-/**
- * The way out of a refusal, where one exists. Renders nothing at all rather than a disabled or
- * explanatory stand-in when there is no fix or no standing to apply it: the sentence beside it
- * already says everything a member can act on.
- */
-export function RefusalFixLink({
-	workspaceSlug,
-	reason,
-	canAdminister,
-	className,
-}: RefusalFixLinkProps) {
+export function RefusalFixLink({ workspaceSlug, reason, className }: RefusalFixLinkProps) {
 	const fix = REFUSAL_FIXES[reason];
-	if (!fix || !canAdminister) {
+	if (!fix) {
 		return null;
 	}
 	const linkClass = className ?? "font-medium underline underline-offset-4 hover:no-underline";

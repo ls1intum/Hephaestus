@@ -21,6 +21,12 @@ self.MonacoEnvironment = {
 	},
 };
 loader.config({ monaco });
+// The editor has no imported modules; check syntax without reporting unresolved imports.
+monaco.typescript.typescriptDefaults.setDiagnosticsOptions({
+	...monaco.typescript.typescriptDefaults.getDiagnosticsOptions(),
+	noSemanticValidation: true,
+	noSuggestionDiagnostics: true,
+});
 
 export interface CodeEditorProps {
 	value: string;

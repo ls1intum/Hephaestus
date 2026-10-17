@@ -118,7 +118,7 @@ Art. 26 GDPR (joint controllership) is equally absent: EDPB 07/2020 §§ 50–65
 
 TUM is the controller. The public TUM notice (§10) states that workspace administrators make workspace-configurable decisions under TUM's operating responsibility. An administrator acting within TUM is not a separate controller because of that role.
 
-The listed decisions cover repository selection, practices, models, automatic review triggers, Slack routing and selected Outline collections. The privacy statement sets out the responsibilities of TUM/AET and of workspace administrators.
+The listed decisions cover repository selection, practices, models, automatic review settings, Slack routing and selected Outline collections. The privacy statement sets out the responsibilities of TUM/AET and of workspace administrators.
 
 TUM/AET is the single point of contact for data-subject rights. The workspace administrator is also a contact for workspace-specific questions.
 
@@ -133,7 +133,7 @@ Amend this file, the Art. 30 record, and the privacy statement before deploying 
 - Activating browser or server Sentry. Record the exact operator, role, region, retention and transfer path. Do not assume all SaaS endpoints have the same legal entity or geography. Amend the notice and reassess the DPIA. An external processor needs an Art. 28 agreement.
 - The application adds external storage (S3, CDN) or serves a third-party font, script, image, or embed. This requires a recipient-role assessment, any applicable agreement and a privacy-statement entry.
 - Heph gains internet access or the practice-review sandbox network posture expands beyond the governed worker gateway. This triggers a re-audit under §5 of `dpia-prescreen.md`.
-- An existing processor receives a new artifact-source privacy class. Its region or provider retention changes. Product evidence gains an operator/research evaluation use. An existing DPA does not by itself authorize a new purpose or data category. Complete the [artifact-source governance gate](./artifact-source-governance.md).
+- An existing processor receives a new source privacy class. Its region or provider retention changes. Product evidence gains an operator/research evaluation use. An existing DPA does not by itself authorize a new purpose or data category. Complete the [source governance gate](./item-source-governance.md).
 - Research benchmark runs start without the agreement that "Research benchmark runs" requires.
 - Research benchmark runs use data that is not pseudonymized.
 

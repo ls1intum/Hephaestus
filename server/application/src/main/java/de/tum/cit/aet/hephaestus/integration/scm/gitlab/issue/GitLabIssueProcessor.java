@@ -1,8 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.issue;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
@@ -19,6 +16,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.BaseGitLabProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants;
@@ -111,8 +111,8 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         Long milestoneId = resolveWebhookMilestoneId(
                 attrs.milestoneId(), providerId, Objects.requireNonNull(context.repository()));
         Issue.State issueState = convertState(attrs.state());
-        // Resolved exactly as the GraphQL sync resolves them: the issue review revision digests both, so a
-        // field only one path fills would make a no-op sync look like an edit of the reviewed issue.
+        // Webhook and sync must resolve both version inputs identically.
+        // Otherwise an unchanged issue appears edited.
         String stateReason = resolveStateReason(issueState, attrs.duplicatedToId() != null);
         String issueTypeId = resolveIssueTypeId(attrs.type(), Objects.requireNonNull(context.repository()));
         Issue issue = upsertIssue(
@@ -166,8 +166,9 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         }
         int number = attrs.iid();
         long repositoryId = Objects.requireNonNull(context.repository()).getId();
-        // Issue-typed tombstone: a confidential-issue IID must never touch a live merge request that
-        // happens to share the IID — GitLab issues and MRs are separate per-project namespaces.
+        // Issue-typed tombstone: a confidential-issue IID must never touch a live merge request
+        // that happens to share the IID — GitLab issues and MRs are separate per-project
+        // namespaces.
         int tombstoned =
                 issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(repositoryId, List.of(number), Instant.now());
         if (tombstoned > 0) {
@@ -351,7 +352,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
                 issueState.name(),
                 stateReason,
                 data.webUrl(),
-                null, // locked — not available in GitLab API, null lets COALESCE preserve existing or default
+                null, // GitLab omits locking; null preserves the stored value through COALESCE.
                 parseGitLabTimestamp(data.closedAt()),
                 data.commentsCount(),
                 now,
@@ -398,9 +399,10 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             }
         }
 
-        // Emit the close event for CLOSED issues on every sync, not just on create, so a sync backfills
-        // ISSUE_CLOSED activity for issues that were already closed when first ingested. The activity_event
-        // (workspace_id, event_key) unique constraint dedupes, so replaying an existing close is a safe no-op.
+        // Emit the close event for CLOSED issues on every sync, not just on create, so a sync
+        // backfills ISSUE_CLOSED activity for issues that were already closed when first ingested.
+        // The activity_event (workspace_id, event_key) unique constraint dedupes, so replaying an
+        // existing close is a safe no-op.
         if (issueState == Issue.State.CLOSED) {
             eventPublisher.publishEvent(new ScmDomainEvent.IssueClosed(
                     ScmEventPayload.IssueData.from(issue),
@@ -559,7 +561,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
                 htmlUrl,
                 null, // locked — not in webhook, null lets COALESCE preserve existing or default
                 parseGitLabTimestamp(closedAt),
-                null, // commentsCount — not in webhook, null lets COALESCE preserve existing or default
+                null, // Webhooks omit comment counts; null preserves the stored value through COALESCE.
                 now,
                 parseGitLabTimestamp(createdAt),
                 parseGitLabTimestamp(updatedAt),

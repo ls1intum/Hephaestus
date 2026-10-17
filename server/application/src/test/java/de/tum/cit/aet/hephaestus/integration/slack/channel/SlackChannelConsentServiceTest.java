@@ -8,7 +8,6 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -18,8 +17,6 @@ import com.slack.api.model.block.LayoutBlock;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackChannelConsentEvent;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackChannelConsentEventRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel;
@@ -37,6 +34,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -45,6 +43,9 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionStatus;
@@ -79,9 +80,6 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
     @Mock
     private ConnectionService connectionService;
 
-    @Mock
-    private UserRepository userRepository;
-
     private SlackChannelConsentService service() {
         return new SlackChannelConsentService(
                 monitoredChannelRepository,
@@ -90,7 +88,6 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
                 ingestService,
                 slackMessageService,
                 connectionService,
-                userRepository,
                 inlineTransactionTemplate(),
                 eventPublisher);
     }
@@ -135,9 +132,16 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
     }
 
     private void stubActor(long actorId) {
-        User user = new User();
-        user.setId(actorId);
-        lenient().when(userRepository.getCurrentUser()).thenReturn(Optional.of(user));
+        var jwt = Jwt.withTokenValue("unit-test")
+                .header("alg", "none")
+                .subject(Long.toString(actorId))
+                .build();
+        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
+    }
+
+    @AfterEach
+    void clearAuthentication() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -165,7 +169,7 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
         SlackChannelConsentEvent event = captor.getValue();
         assertThat(event.getFromState()).isEqualTo(ConsentState.PENDING);
         assertThat(event.getToState()).isEqualTo(ConsentState.ACTIVE);
-        assertThat(event.getActorUserId()).isEqualTo(5L);
+        assertThat(event.getActorAccountId()).isEqualTo(5L);
         assertThat(event.getReason()).isEqualTo("pilot go");
     }
 
@@ -358,7 +362,11 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
                 .thenReturn(Optional.empty());
         when(connectionService.findSlackConfig(WS))
                 .thenReturn(Optional.of(new ConnectionConfig.SlackConfig("T1", null, null, Set.of())));
-        when(monitoredChannelRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(monitoredChannelRepository.save(any())).thenAnswer(inv -> {
+            SlackMonitoredChannel saved = inv.getArgument(0);
+            saved.setId(1L);
+            return saved;
+        });
 
         SlackChannelConsentService.RegistrationOutcome outcome = service().register(WS, CHANNEL, "general");
 

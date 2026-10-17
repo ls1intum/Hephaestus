@@ -1,34 +1,33 @@
 import { Link } from "@tanstack/react-router";
+import { type ReactNode, useState } from "react";
+import { currentDefinition } from "@/components/admin/practices/practice-definition-fields";
 
 import { cn } from "cn";
 import type {
 	CreatePracticeRequest,
 	Practice,
 	PracticeDefinitionOptions,
-	PracticeEvidenceOutcome,
 	PracticeGroup,
+	PracticeVersion,
 	UpdatePracticeRequest,
 } from "@/api/types.gen";
 import {
 	PracticeDefinitionForm,
 	type PracticeDefinitionValue,
 } from "@/components/admin/practice-editor/PracticeDefinitionForm";
-import { PracticeAutomatedReviewValidationSummary } from "@/components/admin/practice-editor/PracticeEvidenceSummary";
-import { normalizeReviewSettings } from "@/components/admin/practice-editor/review-settings";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { buttonVariants } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { hasText } from "@/lib/text";
 
 interface PracticeFormCreateProps {
 	mode: "create";
 	workspaceSlug: string;
 	groups: PracticeGroup[];
 	/** Rejects when the save failed, which is what keeps the unsaved-changes guard honest. */
-	onSubmit: (data: CreatePracticeRequest, groupSlug: string | null) => void | Promise<void>;
+	onSubmit: (request: CreatePracticeRequest) => void | Promise<void>;
 	isPending: boolean;
 	definitionOptions: PracticeDefinitionOptions;
 	initialData?: never;
+	notice?: never;
 }
 
 interface PracticeFormEditProps {
@@ -36,180 +35,115 @@ interface PracticeFormEditProps {
 	workspaceSlug: string;
 	initialData: Practice;
 	groups: PracticeGroup[];
-	/** Rejects when the save failed, which is what keeps the unsaved-changes guard honest. */
-	onSubmit: (
-		slug: string,
-		data: UpdatePracticeRequest,
-		groupSlug: string | null,
-	) => void | Promise<void>;
+	/**
+	 * The complete definition, pinned to the version it was edited from, and the group the form
+	 * chose. Where it sits is not part of the definition, so the host moves the practice separately.
+	 * Rejects when the save failed, which is what keeps the unsaved-changes guard honest.
+	 */
+	onSubmit: (request: UpdatePracticeRequest, groupSlug: string | null) => void | Promise<void>;
 	isPending: boolean;
 	definitionOptions: PracticeDefinitionOptions;
-	/** Absent until the practice has been reviewed at least once. */
-	evidenceOutcome?: PracticeEvidenceOutcome;
+	notice?: ReactNode;
 }
 
 interface PracticeFormHostProps {
-	/** What "leave without saving" does. The host owns it, because only the host knows where back is. */
-	cancel: React.ReactNode;
-	/** The host's alert for a read that failed to refresh while the draft stays open. */
-	refreshAlert?: React.ReactNode;
+	cancel: ReactNode;
+	/** The host’s alert for a failed refresh while the draft stays open. */
+	refreshAlert?: ReactNode;
 }
 
 export type PracticeFormProps = (PracticeFormCreateProps | PracticeFormEditProps) &
 	PracticeFormHostProps;
 
-function asDefinitionValue(practice: Practice): PracticeDefinitionValue {
+function asDefinitionValue(practice: Practice, version: PracticeVersion): PracticeDefinitionValue {
 	return {
 		slug: practice.slug,
-		name: practice.name,
-		...normalizeReviewSettings(practice),
-		criteria: practice.criteria,
-		...(hasText(practice.groupSlug) ? { groupSlug: practice.groupSlug } : {}),
-		...(hasText(practice.whyItMatters) ? { whyItMatters: practice.whyItMatters } : {}),
-		...(hasText(practice.whatGoodLooksLike)
-			? { whatGoodLooksLike: practice.whatGoodLooksLike }
-			: {}),
-		...(practice.visual ? { visual: practice.visual } : {}),
-		...(practice.guide ? { guide: practice.guide } : {}),
-		...(hasText(practice.precomputeScript) ? { precomputeScript: practice.precomputeScript } : {}),
-		automatedReviewPolicy: practice.automatedReviewPolicy,
-		deliveryBehavior: practice.deliveryBehavior,
+		kind: practice.kind,
+		groupSlug: practice.groupSlug,
+		definition: currentDefinition({ slug: practice.slug, currentVersion: version }),
 	};
 }
 
 export function PracticeForm(props: PracticeFormProps) {
-	const {
-		mode,
-		workspaceSlug,
-		groups,
-		isPending,
-		initialData,
-		definitionOptions,
-		cancel,
-		refreshAlert,
-	} = props;
-	// Passes the host's return through untouched: a `void` from `onSubmit` must stay `void`, because
-	// the unsaved-changes guard reads only a promise as a save it can wait for.
-	const submit = (value: PracticeDefinitionValue): void | Promise<void> => {
-		const { groupSlug, definitionChanges, ...definition } = value;
-		if (props.mode === "create") {
-			return props.onSubmit(definition, groupSlug ?? null);
-		}
-
-		const clear: NonNullable<UpdatePracticeRequest["clear"]> = [];
-		if (!definition.precondition) {
-			clear.push("PRECONDITION");
-		}
-		if (!hasText(definition.precomputeScript)) {
-			clear.push("PRECOMPUTE_SCRIPT");
-		}
-		if (!hasText(definition.whyItMatters)) {
-			clear.push("WHY_IT_MATTERS");
-		}
-		if (!hasText(definition.whatGoodLooksLike)) {
-			clear.push("WHAT_GOOD_LOOKS_LIKE");
-		}
-		if (!definition.visual) {
-			clear.push("VISUAL");
-		}
-		if (!definition.guide) {
-			clear.push("GUIDE");
-		}
-		return props.onSubmit(
-			props.initialData.slug,
-			{
-				name: definition.name,
-				criteria: definition.criteria,
-				signals: definition.signals,
-				evidenceRequirements: definition.evidenceRequirements,
-				reviewWhen: definition.reviewWhen,
-				subject: definition.subject,
-				precondition: definition.precondition,
-				definitionChanges:
-					definitionChanges && definitionChanges.length > 0 ? definitionChanges : undefined,
-				whyItMatters: definition.whyItMatters,
-				whatGoodLooksLike: definition.whatGoodLooksLike,
-				visual: definition.visual,
-				guide: definition.guide,
-				precomputeScript: definition.precomputeScript,
-				automatedReviewPolicy: definition.automatedReviewPolicy,
-				deliveryBehavior: definition.deliveryBehavior,
-				clear: clear.length > 0 ? clear : undefined,
-			},
-			groupSlug ?? null,
-		);
-	};
-	const withdrawal = mode === "edit" ? props.initialData.automatedReviewWithdrawal : undefined;
-	const reviewResults =
-		mode === "edit" ? (
-			<>
-				{withdrawal && (
-					<Alert variant="warning">
-						<AlertTitle>Hephaestus no longer reviews this practice</AlertTitle>
-						<AlertDescription>
-							{withdrawal.description} The catalog it came from withdrew automated review, so it
-							stays off whatever its review settings say.
-						</AlertDescription>
-					</Alert>
-				)}
-				<Separator />
-				<section className="space-y-4">
-					<div>
-						<h2 className="text-lg font-semibold">What the author declared</h2>
-						<p className="text-sm text-muted-foreground">
-							The requirements above are the author’s own claim about this practice. Nobody has
-							checked them independently, and nothing here says the observations recorded under it
-							are correct. The codes below identify the exact rules and policy that were declared,
-							so a later change to them is visible rather than silent.
-						</p>
-					</div>
-					<PracticeAutomatedReviewValidationSummary
-						validation={initialData.automatedReviewValidation}
-					/>
-				</section>
-				<Separator />
-				<section className="space-y-4">
-					<div>
-						<h2 className="text-lg font-semibold">What the reviews observed</h2>
-						<p className="text-sm text-muted-foreground">
-							How its observations turned out and what feedback cited them, with the observations
-							most worth acting on.
-						</p>
-					</div>
-					<Link
-						to="/w/$workspaceSlug/admin/practices/reviews/observations"
-						params={{ workspaceSlug }}
-						search={{ practiceSlug: [initialData.slug] }}
-						className={cn(buttonVariants({ variant: "outline" }), "w-full sm:w-auto")}
-					>
-						See review outcomes
-					</Link>
-				</section>
-			</>
-		) : undefined;
-
-	return mode === "create" ? (
+	if (props.mode === "edit") {
+		return <EditPracticeForm {...props} />;
+	}
+	const { workspaceSlug, groups, isPending, definitionOptions, cancel, refreshAlert, onSubmit } =
+		props;
+	return (
 		<PracticeDefinitionForm
+			beforeFields={refreshAlert}
 			mode="create"
 			groups={groups}
 			isPending={isPending}
 			definitionOptions={definitionOptions}
-			beforeFields={refreshAlert}
 			cancelAction={cancel}
-			onSubmit={submit}
+			practiceScriptModelsLink={modelsLink(workspaceSlug)}
+			// Preserve a void return; the unsaved-changes guard tracks only an actual save promise.
+			onSubmit={({ slug, kind, groupSlug, definition }): void | Promise<void> =>
+				onSubmit({ slug, kind, groupSlug, definition, position: null })
+			}
 		/>
-	) : (
+	);
+}
+
+function modelsLink(workspaceSlug: string) {
+	return <Link to="/w/$workspaceSlug/admin/models" params={{ workspaceSlug }} />;
+}
+
+function EditPracticeForm({
+	workspaceSlug,
+	groups,
+	isPending,
+	definitionOptions,
+	cancel,
+	refreshAlert,
+	initialData: practice,
+	onSubmit,
+	notice,
+}: PracticeFormEditProps & PracticeFormHostProps) {
+	// Pin saves to the version that seeded the draft so background refreshes cannot overwrite newer edits.
+	const [seeded] = useState(practice.currentVersion);
+	return (
 		<PracticeDefinitionForm
 			mode="edit"
-			initialData={asDefinitionValue(initialData)}
+			initialData={asDefinitionValue(practice, seeded)}
 			groups={groups}
 			isPending={isPending}
 			definitionOptions={definitionOptions}
-			beforeFields={refreshAlert}
 			cancelAction={cancel}
-			afterFields={reviewResults}
-			evidenceOutcome={props.evidenceOutcome}
-			onSubmit={submit}
+			beforeFields={
+				<>
+					{refreshAlert}
+					{notice}
+				</>
+			}
+			afterFields={
+				<>
+					<Separator />
+					<section className="space-y-4">
+						<div>
+							<h2 className="text-lg font-semibold">What the reviews recorded</h2>
+							<p className="text-sm text-muted-foreground">
+								How its results turned out and what feedback cited them, with the results most worth
+								acting on. Saving keeps them: the change becomes version {seeded.number + 1}.
+							</p>
+						</div>
+						<Link
+							to="/w/$workspaceSlug/admin/practices/reviews/results"
+							params={{ workspaceSlug }}
+							search={{ practiceSlug: [practice.slug] }}
+							className={cn(buttonVariants({ variant: "outline" }), "w-full sm:w-auto")}
+						>
+							See review outcomes
+						</Link>
+					</section>
+				</>
+			}
+			practiceScriptModelsLink={modelsLink(workspaceSlug)}
+			onSubmit={({ groupSlug, definition }): void | Promise<void> =>
+				onSubmit({ definition, expectedVersionId: seeded.id }, groupSlug)
+			}
 		/>
 	);
 }

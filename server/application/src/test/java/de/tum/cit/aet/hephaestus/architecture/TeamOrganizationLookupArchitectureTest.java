@@ -10,17 +10,7 @@ import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/**
- * Pins the set of classes allowed to enumerate teams by the bare {@code organization} string.
- * <p>
- * {@code team} carries no {@code workspace_id} and {@link TeamRepository} is {@code @WorkspaceAgnostic},
- * so the SQL statement inspector cannot catch an unscoped team read — this rule is the only automated
- * guard. Workspace read/authorization paths must scope by {@code (organization, provider_id)} via the
- * {@code *AndProviderId} finders, or better, via {@code WorkspaceTeamScope}.
- *
- * @see de.tum.cit.aet.hephaestus.workspace.WorkspaceTeamScope
- * @see AccountLoginLookupArchitectureTest the same bug class, one level up (workspace by account login)
- */
+/** Team tables are global; workspace reads must scope organization by provider because SQL tenancy inspection cannot enforce it. */
 class TeamOrganizationLookupArchitectureTest extends HephaestusArchitectureTest {
 
     /** Only the sync engines, which have already fixed the provider for the run and filter in-loop. */

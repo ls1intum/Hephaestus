@@ -52,7 +52,7 @@ the type check on its own. Lint holds tests to the web app's Vitest policy: narr
   It must be a canonical work address for the repository and list kind that the tab shows.
   After every await, the worker reads the tab again.
   Another list, filter, or page makes the request stale.
-  Observations and review requests stay the work page's own.
+  Results and review requests stay the work page's own.
 - **A review change is confirmed only in the extension's own window.**
   The provider page can cover or move the report frame.
   Thus, the frame never sends a review change. `action.html` is a top-level page that is not
@@ -62,7 +62,7 @@ the type check on its own. Lint holds tests to the web app's Vitest policy: narr
   The worker reports an unanswered request as unknown.
   It never retries that request.
   A review request is the only change.
-  Run cancellation, result retries, and feedback approval stay in the web app.
+  Review cancellation, result marks, and feedback decisions stay in the web app.
 - **Nothing private enters the provider page.** The page gets a generic host whose collapsed height is
   the same in every state. Everything the report says lives in the extension-origin frame. The page and
   frame exchange readiness, size and theme messages, correlated to one mounting. Nothing from the page can open or configure the report.
@@ -74,9 +74,10 @@ the type check on its own. Lint holds tests to the web app's Vitest policy: narr
   Everyone, including admins, sees the comments Hephaestus recorded posting on the work for them (`getOwnDeliveredWorkFeedback`).
   The extension counts each provider comment once.
   It links only to an anchor on this work's own pages.
-  When the report opens, readers also see their own observations and named own-review trace.
+  When the report opens, readers also see their own results and named own-review trace.
+  A result that is not met shows the one-line summary of each problem under it.
   No feedback body is ever read or rendered. The comment is read on
-  the provider. The provider's comment handles stay in the worker. Every developer's records, the review's delivery, and its runs stay in the web app.
+  the provider. The provider's comment handles stay in the worker. Every developer's records, the review's delivery, and its jobs stay in the web app.
   An admin reaches them through one **Review details** link.
 - **A generation guards everything shown.** Sign-in, sign-out, a rejected refresh, an instance change
   or a revoked site move it. Late results are dropped and views reset in the same tick.
@@ -84,7 +85,7 @@ the type check on its own. Lint holds tests to the web app's Vitest policy: narr
   Vite). Production serves the API under `/api` of the web app origin.
 - **Production has no `key`, no loopback, no host permission until granted.** Check the built
   `manifest.json` after touching `wxt.config.ts`.
-- **Never call `GET …/practices/feedback/in-app`** — reading it delivers feedback.
+- **Never call `GET …/practices/feedback/practice-page`** — reading it delivers feedback.
 - **Lookups start only after the reader allows the exact site.** On an allowed site, each recognized
   work page's canonical address is sent to the instance when it opens. On a repository's list, only
   the row whose Hephaestus button the reader presses. No other page, and never page content. The
@@ -99,7 +100,7 @@ the type check on its own. Lint holds tests to the web app's Vitest policy: narr
 ## Vocabulary and shared components
 
 Labels, icons and sentences come from the webapp's registries, imported by path through `@/`
-(`webapp/src/components/practice-vocabulary/*-defs.ts`, `webapp/src/lib/artifact-kind-slugs.ts`), and
+(`webapp/src/components/practice-vocabulary/*-defs.ts`, `webapp/src/lib/item-kinds.ts`), and
 so do the brand marks and the `ui/spinner` and `ui/skeleton` primitives. `@/api/*` type-checks
 against this tree's own generated client. Do not copy a registry or component here. A missing one is
 a webapp change. The glossary is `docs/contributor/practice-feedback-language.md`.

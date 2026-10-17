@@ -5,17 +5,15 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.practices.curated.CatalogEntry;
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogService;
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedPracticeReleaseService;
-import de.tum.cit.aet.hephaestus.practices.curated.EffectiveCatalog;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
+import de.tum.cit.aet.hephaestus.practices.catalog.CatalogLock;
+import de.tum.cit.aet.hephaestus.practices.catalog.CatalogService;
+import de.tum.cit.aet.hephaestus.practices.catalog.EffectiveCatalog;
+import de.tum.cit.aet.hephaestus.practices.dto.PracticeReleaseFieldDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeReleaseProposalDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
-import de.tum.cit.aet.hephaestus.practices.review.AutomatedReviewFence;
-import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
-import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
-import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.util.List;
@@ -25,35 +23,68 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.json.JsonMapper;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
+@ConditionalOnServerRole
 public class PracticeReleaseService {
-
+    private final CatalogService catalog;
+    private final PracticeReviewDigest digest;
+    private final CatalogLock catalogLock;
     private final PracticeRepository practices;
-    private final WorkspaceRepository workspaces;
-    private final CuratedCatalogService catalogService;
-    private final CuratedPracticeReleaseService instanceReleases;
+    private final PracticeGroupRepository groupRepository;
     private final PracticeGroupService groups;
-    private final PracticeDefinitionValidator validator;
-    private final PracticeRevisionService revisions;
-    private final WorkspaceReviewDefaultsProvider workspaceDefaults;
-    private final AutomatedReviewFence fence;
+    private final PracticeVersionService versions;
+    private final WorkspaceRepository workspaces;
+    private final JsonMapper mapper;
     private final ConfigAuditPort audit;
 
-    @Transactional(readOnly = true)
     public List<PracticeReleaseProposalDTO> list(WorkspaceContext ctx) {
-        EffectiveCatalog catalog = catalogService.catalog();
+        var effective = catalog.effectiveCatalog();
         return practices.findAllForCatalog(ctx.id()).stream()
-                .map(practice -> proposal(practice, catalog))
-                .filter(Objects::nonNull)
+                .filter(practice -> practice.getCatalogSlug() != null)
+                .filter(practice -> effective
+                        .practice(Objects.requireNonNull(practice.getCatalogSlug()))
+                        .map(offer -> !Objects.equals(practice.getCatalogBase(), offer.effective()))
+                        .orElse(false))
+                .map(practice -> proposal(practice, effective))
                 .toList();
     }
 
-    @Transactional(readOnly = true)
     public PracticeReleaseProposalDTO get(WorkspaceContext ctx, String slug) {
-        Practice practice = practice(ctx, slug);
-        return requireProposal(practice, catalogService.catalog());
+        return proposal(practice(ctx, slug));
+    }
+
+    private PracticeReleaseProposalDTO proposal(Practice practice) {
+        return proposal(practice, catalog.effectiveCatalog());
+    }
+
+    private PracticeReleaseProposalDTO proposal(Practice practice, EffectiveCatalog effective) {
+        var source = practice.getCatalogSlug();
+        if (source == null) throw new EntityNotFoundException("Practice release", practice.getSlug());
+        var offer =
+                effective.practice(source).orElseThrow(() -> new EntityNotFoundException("Catalog practice", source));
+        var base = practice.getCatalogBase();
+        var current = versions.definitionOf(practice.getCurrentVersion());
+        String tag = tag(practice, offer.etag());
+        return new PracticeReleaseProposalDTO(
+                practice.getSlug(),
+                Objects.requireNonNull(practice.getCurrentVersion().getId()).toString(),
+                current,
+                base == null ? null : base.definition(),
+                offer.effective().definition(),
+                digest.of(offer.effective().definition()),
+                tag,
+                PracticeDefinitionMerge.changes(
+                                base == null ? null : base.definition(),
+                                current,
+                                offer.effective().definition())
+                        .stream()
+                        .map(change -> new PracticeReleaseFieldDTO(
+                                change.field(), change.changedLocally(), change.offeredChanged(), change.conflict()))
+                        .toList());
     }
 
     @Transactional
@@ -62,70 +93,111 @@ public class PracticeReleaseService {
             String slug,
             @Nullable EntityTagPrecondition precondition,
             Map<PracticeDefinitionField, PracticeReleaseChoice> choices) {
-        // The catalogue before the workspace, as catalogue adoption and repair take them.
-        EffectiveCatalog catalog = instanceReleases.catalogForDecision();
-        Workspace workspace = lockWorkspace(ctx);
+        lock(ctx);
         Practice practice = practice(ctx, slug);
-        PracticeReleaseProposalDTO proposal = requireProposal(practice, catalog);
-        PracticeReleasePrecondition.requireCurrent(precondition, proposal);
-        PracticeDefinition merged =
-                PracticeDefinitionMerge.apply(proposal.base(), proposal.current(), proposal.offered(), choices);
-        validator.validate(merged);
-
-        Integer oldRevision = revisions.currentRevisionNumber(practice);
-        PracticeDefinitionSnapshot before = PracticeDefinitionSnapshot.of(practice, oldRevision);
-        PracticeAutonomy autonomyBefore = practice.getAutonomy();
-        PracticeAutonomy effectiveBefore = effectiveAutonomy(practice, ctx.id());
-        if (!Objects.equals(proposal.current().groupSlug(), merged.groupSlug())) {
-            groups.applyBinding(ctx, practice, merged.groupSlug());
-        }
-        PracticeService.applyDefinition(practice, merged);
-        if (!fence.effectivePolicy(practice).automatedReview().canAttemptAutomatedReview()) {
-            practice.setAutonomy(PracticeAutonomy.OFF);
-        }
-        practice.setAdoptedBase(proposal.offered());
-        practice.setAdoptedBaseSource(AdoptedBaseSource.EXACT_ADOPTION);
-        practice.setSourceCuratedFingerprint(proposal.offered().provenanceFingerprint(slug));
-        practice.setDeclinedOfferedDigest(null);
+        var proposal = proposal(practice);
+        EntityTagPrecondition.requireExact(precondition, proposal.etag());
+        var before = PracticeDefinitionSnapshot.of(practice, mapper);
+        var merged = PracticeDefinitionMerge.apply(proposal.base(), proposal.current(), proposal.offered(), choices);
+        versions.append(practice, merged, SecurityUtils.getCurrentAccountId().orElseThrow());
+        practice.setCatalogBase(catalog.practice(Objects.requireNonNull(practice.getCatalogSlug()))
+                .effective());
         practices.save(practice);
-        int revision = revisions.append(practice).getRevisionNumber();
-        audit.record(ConfigAuditEntry.updated(
-                ConfigAuditEntityType.PRACTICE_DEFINITION,
-                practice.getId(),
-                ctx.id(),
-                before,
-                PracticeDefinitionSnapshot.of(practice, revision)));
-        if (autonomyBefore != practice.getAutonomy()) {
-            audit.record(ConfigAuditEntry.updated(
-                    ConfigAuditEntityType.PRACTICE_USAGE,
-                    practice.getId(),
-                    ctx.id(),
-                    new PracticeUsageSnapshot(autonomyBefore),
-                    new PracticeUsageSnapshot(practice.getAutonomy())));
-        }
-        if (effectiveBefore != effectiveAutonomy(practice, ctx.id())) {
-            workspace.getReviewSettings().incrementRolloutRevision();
-        }
+        auditPractice(ctx, practice, before);
         return practice;
     }
 
     @Transactional
     public void decline(WorkspaceContext ctx, String slug, @Nullable EntityTagPrecondition precondition) {
-        EffectiveCatalog catalog = instanceReleases.catalogForDecision();
-        lockWorkspace(ctx);
+        lock(ctx);
         Practice practice = practice(ctx, slug);
-        PracticeReleaseProposalDTO proposal = requireProposal(practice, catalog);
-        PracticeReleasePrecondition.requireCurrent(precondition, proposal);
-        PracticeDefinitionSnapshot before =
-                PracticeDefinitionSnapshot.of(practice, revisions.currentRevisionNumber(practice));
-        practice.setDeclinedOfferedDigest(proposal.offeredDigest());
+        EntityTagPrecondition.requireExact(precondition, proposal(practice).etag());
+        var before = PracticeDefinitionSnapshot.of(practice, mapper);
+        practice.setCatalogBase(catalog.practice(Objects.requireNonNull(practice.getCatalogSlug()))
+                .effective());
         practices.save(practice);
+        auditPractice(ctx, practice, before);
+    }
+
+    @Transactional
+    public Practice reset(WorkspaceContext ctx, String slug, @Nullable EntityTagPrecondition precondition) {
+        lock(ctx);
+        Practice practice = practice(ctx, slug);
+        var proposal = proposal(practice);
+        EntityTagPrecondition.requireExact(precondition, proposal.etag());
+        var before = PracticeDefinitionSnapshot.of(practice, mapper);
+        var document = catalog.practice(Objects.requireNonNull(practice.getCatalogSlug()))
+                .effective();
+        if (!practice.getKind().equals(document.kind()))
+            throw new IllegalArgumentException("A catalog reset cannot change the practice's item kind.");
+        groups.restoreCatalogBinding(ctx, practice, document.groupSlug());
+        versions.append(
+                practice,
+                document.definition(),
+                SecurityUtils.getCurrentAccountId().orElseThrow());
+        practice.setCatalogBase(document);
+        practices.save(practice);
+        auditPractice(ctx, practice, before);
+        return practice;
+    }
+
+    @Transactional
+    public PracticeGroup resetGroup(WorkspaceContext ctx, String slug, @Nullable EntityTagPrecondition precondition) {
+        lock(ctx);
+        PracticeGroup group = groupRepository
+                .findByWorkspaceIdAndSlug(ctx.id(), slug)
+                .orElseThrow(() -> new EntityNotFoundException("Practice group", slug));
+        if (group.getCatalogSlug() == null) throw new EntityNotFoundException("Catalog group", slug);
+        var offer = catalog.group(group.getCatalogSlug());
+        EntityTagPrecondition.requireExact(precondition, groupResetTag(ctx, slug));
+        var before = PracticeGroupSnapshot.of(group);
+        var definition = offer.effective();
+        group.setName(definition.name());
+        group.setDescription(definition.description());
+        group.setIcon(definition.icon());
+        group.setColor(definition.color());
+        group.setCatalogBase(definition);
+        groupRepository.save(group);
+        audit.record(ConfigAuditEntry.updated(
+                ConfigAuditEntityType.PRACTICE_GROUP,
+                group.getId(),
+                ctx.id(),
+                before,
+                PracticeGroupSnapshot.of(group)));
+        return group;
+    }
+
+    public String groupResetTag(WorkspaceContext ctx, String slug) {
+        var group = groups.getGroup(ctx, slug);
+        var offer = group.getCatalogSlug() == null
+                ? null
+                : catalog.effectiveCatalog().group(group.getCatalogSlug()).orElse(null);
+        return new CanonicalDigest()
+                .add(group.getId().toString())
+                .add(mapper.writeValueAsString(PracticeGroupSnapshot.of(group)))
+                .addNullable(group.getCatalogBase() == null ? null : mapper.writeValueAsString(group.getCatalogBase()))
+                .addNullable(offer == null ? null : offer.etag())
+                .hex();
+    }
+
+    private void auditPractice(WorkspaceContext ctx, Practice practice, PracticeDefinitionSnapshot before) {
         audit.record(ConfigAuditEntry.updated(
                 ConfigAuditEntityType.PRACTICE_DEFINITION,
                 practice.getId(),
                 ctx.id(),
                 before,
-                PracticeDefinitionSnapshot.of(practice, revisions.currentRevisionNumber(practice))));
+                PracticeDefinitionSnapshot.of(practice, mapper)));
+    }
+
+    private String tag(Practice practice, String offeredTag) {
+        return new CanonicalDigest()
+                .add(practice.getId().toString())
+                .add(Objects.requireNonNull(practice.getCurrentVersion().getId())
+                        .toString())
+                .addNullable(
+                        practice.getCatalogBase() == null ? null : mapper.writeValueAsString(practice.getCatalogBase()))
+                .add(offeredTag)
+                .hex();
     }
 
     private Practice practice(WorkspaceContext ctx, String slug) {
@@ -134,47 +206,9 @@ public class PracticeReleaseService {
                 .orElseThrow(() -> new EntityNotFoundException("Practice", slug));
     }
 
-    private Workspace lockWorkspace(WorkspaceContext ctx) {
-        return workspaces
-                .findByIdForUpdate(ctx.id())
-                .orElseThrow(() -> new EntityNotFoundException("Workspace", ctx.slug()));
-    }
-
-    private PracticeAutonomy effectiveAutonomy(Practice practice, Long workspaceId) {
-        return AutonomyResolver.effectiveAutonomyOf(
-                practice, workspaceDefaults.forWorkspace(workspaceId).defaultAutonomy());
-    }
-
-    private PracticeReleaseProposalDTO requireProposal(Practice practice, EffectiveCatalog catalog) {
-        PracticeReleaseProposalDTO proposal = proposal(practice, catalog);
-        if (proposal == null) {
-            throw new EntityNotFoundException("Practice release", practice.getSlug());
-        }
-        return proposal;
-    }
-
-    private static @Nullable PracticeReleaseProposalDTO proposal(Practice practice, EffectiveCatalog catalog) {
-        String sourceSlug = practice.getSourceCuratedSlug();
-        PracticeDefinition base = practice.getAdoptedBase();
-        if (sourceSlug == null || base == null) {
-            return null;
-        }
-        CatalogEntry<PracticeDefinition> offer = catalog.practice(sourceSlug).orElse(null);
-        if (offer == null || base.equals(offer.effective())) {
-            return null;
-        }
-        String offeredDigest = offer.effective().exactFingerprint(sourceSlug);
-        if (offeredDigest.equals(practice.getDeclinedOfferedDigest())) {
-            return null;
-        }
-        return PracticeReleaseProposalDTO.of(
-                sourceSlug,
-                base,
-                PracticeDefinition.from(practice),
-                offer.effective(),
-                Objects.requireNonNull(practice.getAdoptedBaseSource()),
-                practice.getCurrentRevision() == null
-                        ? null
-                        : practice.getCurrentRevision().getRevisionNumber());
+    private void lock(WorkspaceContext ctx) {
+        catalogLock.acquire();
+        if (workspaces.findByIdForUpdate(ctx.id()).isEmpty())
+            throw new EntityNotFoundException("Workspace", ctx.slug());
     }
 }

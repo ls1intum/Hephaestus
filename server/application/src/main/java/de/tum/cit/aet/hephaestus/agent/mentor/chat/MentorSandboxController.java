@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
-import de.tum.cit.aet.hephaestus.core.security.CurrentScmIdentityHolder;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 /** Lets the webapp start the member's Heph sandbox when Heph opens, so the first message does not wait for it. */
+@ConditionalOnServerRole
 @WorkspaceScopedController
 @RequestMapping("/mentor/sandbox")
 @Tag(name = "Mentor Chat", description = "Heph conversations and the sandbox they run in")
@@ -28,7 +30,7 @@ public class MentorSandboxController {
             description = "Accepted; the sandbox starts unless it is already warm or Heph could not answer anyway")
     @PreAuthorize("@workspaceSecure.isMemberWithoutElevation()")
     public ResponseEntity<Void> prepareMentorSandbox(WorkspaceContext workspaceContext) {
-        CurrentScmIdentityHolder.getUserId()
+        SecurityUtils.getCurrentAccountId()
                 .ifPresent(developerId -> mentorSandboxPreparer.prepare(workspaceContext.id(), developerId));
         return ResponseEntity.accepted().build();
     }

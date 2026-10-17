@@ -16,12 +16,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
-/**
- * A user view discloses one workspace member's private content to an instance administrator. Every
- * controller mounted under {@code /user-view} is therefore workspace-scoped, instance-admin only and
- * read-only, and every handler addressed at a user carries {@link UserViewRead}, whose advisor records
- * the view from the {@code userId} it finds in the path.
- */
 class UserViewArchitectureTest extends HephaestusArchitectureTest {
 
     @Test
@@ -44,15 +38,15 @@ class UserViewArchitectureTest extends HephaestusArchitectureTest {
     }
 
     @Test
-    void everyUserViewHandlerIsAGetAndEveryHandlerAddressedAtAUserIsRecorded() {
+    void everyUserViewHandlerIsAGetAndEveryHandlerAddressedAtAnAccountIsRecorded() {
         List<String> violations = userViewControllers()
                 .flatMap(controller -> controller.getAllMethods().stream())
                 .filter(UserViewArchitectureTest::isHandler)
                 .flatMap(handler -> Stream.concat(
                         unless(handler.isAnnotatedWith(GetMapping.class), name(handler) + " is not a GET"),
                         unless(
-                                isAddressedAtAUser(handler) == handler.isAnnotatedWith(UserViewRead.class),
-                                name(handler) + " must carry @UserViewRead exactly when its path names {userId}")))
+                                isAddressedAtAnAccount(handler) == handler.isAnnotatedWith(UserViewRead.class),
+                                name(handler) + " must carry @UserViewRead exactly when its path names {accountId}")))
                 .sorted()
                 .toList();
         assertThat(violations).isEmpty();
@@ -70,9 +64,9 @@ class UserViewArchitectureTest extends HephaestusArchitectureTest {
         return AnnotatedElementUtils.hasAnnotation(method.reflect(), RequestMapping.class);
     }
 
-    private static boolean isAddressedAtAUser(JavaMethod handler) {
+    private static boolean isAddressedAtAnAccount(JavaMethod handler) {
         return Stream.concat(paths(handler.getOwner().reflect()), paths(handler.reflect()))
-                .anyMatch(path -> path.contains("{userId}"));
+                .anyMatch(path -> path.contains("{accountId}"));
     }
 
     private static Stream<String> paths(AnnotatedElement element) {

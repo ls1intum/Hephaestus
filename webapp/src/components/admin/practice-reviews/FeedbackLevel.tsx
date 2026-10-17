@@ -1,49 +1,59 @@
 import { EyeOffIcon, Undo2Icon } from "lucide-react";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
 import type {
-	GetPracticeReviewFeedbackResponse,
-	ReviewFeedbackDispatch,
-	ReviewPlacement,
+	FeedbackBasis,
+	FeedbackCopy,
+	FeedbackDecision,
+	FeedbackSend,
+	ReviewFeedbackDetail,
 } from "@/api/types.gen";
+import { accountName } from "@/components/admin/users/account-labels";
 import { InlineLink } from "@/components/common/InlineLink";
 import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
+import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { Section } from "@/components/layout/Section";
-import { DeliveryPolicyTrace } from "@/components/practice-trace/DeliveryPolicyTrace";
+import { FeedbackChecks } from "@/components/practice-trace/FeedbackChecks";
+import { UNVERIFIED_HISTORY_NOTE } from "@/components/practice-vocabulary/claim-currentness";
 import {
+	DELIVERY_STATE_DEFS,
 	deliveryOutcome,
-	isDeliveryInProgress,
-} from "@/components/practice-vocabulary/delivery-outcome-defs";
-import { OPERATOR_WITHHELD_TEXT } from "@/components/practice-vocabulary/delivery-place-defs";
+} from "@/components/practice-vocabulary/delivery-state-defs";
+import {
+	DEVELOPER_ANSWER_DEFS,
+	developerAnswer,
+} from "@/components/practice-vocabulary/developer-answer-defs";
 import { codeCitationLocator } from "@/components/practice-vocabulary/evidence-source-defs";
 import {
-	FEEDBACK_DISPATCH_DESTINATION_LABELS,
-	FEEDBACK_DISPATCH_STATE_DEFS,
-} from "@/components/practice-vocabulary/feedback-dispatch-defs";
-import { FEEDBACK_WITHDRAWN_DEF } from "@/components/practice-vocabulary/feedback-withdrawal-defs";
-import { DEVELOPER_RESPONSE_DEFS } from "@/components/practice-vocabulary/observation-dispute-defs";
+	copyCountsSentence,
+	FEEDBACK_COPY_KIND_DEFS,
+	FEEDBACK_COPY_STATE_DEFS,
+	isPartialPackage,
+} from "@/components/practice-vocabulary/feedback-copy-defs";
 import {
-	deliveredPlacementType,
-	PLACEMENT_DEFS,
-	placementLabel,
-} from "@/components/practice-vocabulary/placement-defs";
+	FEEDBACK_DECISION_DEFS,
+	type FeedbackDecisionReason,
+	feedbackDecisionReasonLabel,
+} from "@/components/practice-vocabulary/feedback-decision-defs";
+import type { FeedbackDestination } from "@/components/practice-vocabulary/feedback-destination-defs";
+import { FEEDBACK_LOCATION_DEFS } from "@/components/practice-vocabulary/feedback-location-defs";
+import { FEEDBACK_RESOLUTION_DEFS } from "@/components/practice-vocabulary/feedback-resolution-defs";
+import {
+	FEEDBACK_SEND_ACTION_LABELS,
+	FEEDBACK_SEND_STATE_DEFS,
+} from "@/components/practice-vocabulary/feedback-send-defs";
+import { FEEDBACK_USEFULNESS_DEFS } from "@/components/practice-vocabulary/feedback-usefulness-defs";
 import { WITHHOLDING_REASON_DEFS } from "@/components/practice-vocabulary/withholding-defs";
 import { DrawerBody, DrawerFooter } from "@/components/ui/drawer";
 import { hasText } from "@/lib/text";
 
-import { APPROVAL_DECISION_DEFS } from "./approval-decision-defs";
-import { CorrectionReasonPopover } from "./CorrectionReason";
-import { feedbackOpeningLine } from "./feedback-preview";
+import { CorrectionReasonPopover, type CorrectionReasonCopy } from "./CorrectionReason";
 import { FeedbackBody } from "./FeedbackBody";
 import { FeedbackLocationLabel } from "./FeedbackLocationLabel";
 import { LevelBodySkeleton } from "./LevelBodySkeleton";
-import {
-	type ProposalRejectionReason,
-	proposalRejectionReasonLabel,
-} from "./proposal-rejection-vocabulary";
 import { type ApprovalQueue, ProposalDecision, ProposalPackage } from "./ProposalDecision";
 import {
 	ERASED_ACCOUNT,
@@ -54,16 +64,18 @@ import {
 	SheetTechnical,
 	type TechnicalFact,
 } from "./RecordSheet";
-import { revisionLabel } from "./review-format";
-import { ReviewArtifactLink } from "./ReviewArtifact";
-import { ReviewStatusMark } from "./ReviewBadges";
+import { resultSummary } from "./result-words";
+import { developerLabel } from "./review-format";
+import { problemLevel, resultLevel } from "./review-levels";
+import { ResultOutcome, ReviewStatusMark } from "./ReviewBadges";
 import { ReviewDayTime } from "./ReviewDayTime";
 import { ReviewFact, ReviewFactGrid } from "./ReviewFactGrid";
+import { ReviewItemLink } from "./ReviewItem";
 import { ReviewLevelHeader } from "./ReviewLevelHeader";
 import { ReviewPackage } from "./ReviewPackage";
 import { ReviewPerson } from "./ReviewPerson";
 
-type FeedbackRecord = GetPracticeReviewFeedbackResponse;
+type FeedbackRecord = ReviewFeedbackDetail;
 
 export interface FeedbackLevelProps {
 	nested?: boolean;
@@ -71,61 +83,30 @@ export interface FeedbackLevelProps {
 	feedback: PanelState<{ feedback: FeedbackRecord }>;
 	isDeciding: boolean;
 	onApprove: () => void;
-	onReject: (reason: ProposalRejectionReason, note?: string) => void;
+	onReject: (reason: FeedbackDecisionReason, note?: string) => void;
 	/** Where this feedback sits among all awaiting approval; absent when it awaits none. */
 	queue?: ApprovalQueue;
 	/**
-	 * Withdraws (`true`) or restores (`false`) a card on the developer's practice pages, with the
-	 * admin's reason. Settles when the server has answered; the form keeps the reason until it
-	 * succeeded.
+	 * Withdraws (`true`) or restores (`false`) the feedback, with the admin's note. Settles when the
+	 * server has answered; the form keeps the note until it succeeded.
 	 */
-	onChangeWithdrawal: (withdrawn: boolean, reason: string) => Promise<unknown>;
+	onChangeWithdrawal: (withdrawn: boolean, note: string) => Promise<unknown>;
 	isChangingWithdrawal: boolean;
 }
 
-/**
- * The title a piece of feedback is known by: its first line, whole. The header wraps it to three
- * lines at most. Text on a private place is the developer's, so its place names it instead.
- */
-export function feedbackTitle(feedback: FeedbackRecord): string {
-	const summary = feedback.proposedPlacements.find((placement) => placement.type === "SUMMARY");
-	const body = feedback.body ?? summary?.body ?? feedback.proposedPlacements.at(0)?.body;
-	return (
-		OPERATOR_WITHHELD_TEXT[feedback.channel]?.title ??
-		feedbackOpeningLine(body) ??
-		(hasText(body) ? "Opens with a quote from the work…" : "No feedback text was composed")
-	);
-}
-
-/** The withdrawal in force, if any: the newest one, until it is restored. */
-function activeWithdrawal(feedback: FeedbackRecord) {
-	const latest = feedback.withdrawals.at(0);
-	return latest !== undefined && latest.restoredAt === undefined ? latest : undefined;
-}
-
-/** "1 of 2 delivered" for a package some of whose comments are confirmed, else nothing. */
-function deliveredFigure(feedback: FeedbackRecord): string | undefined {
-	const size = feedback.proposedPlacements.length;
-	if (size <= 1 || feedback.approval?.decision !== "APPROVED") {
-		return undefined;
-	}
-	const delivered = feedback.placements.filter((placement) =>
-		hasText(placement.postedCommentRef),
-	).length;
-	return `${Math.min(delivered, size)} of ${size} delivered`;
+function inOrder(copies: readonly FeedbackCopy[]): FeedbackCopy[] {
+	return [...copies].sort((a, b) => a.position - b.position);
 }
 
 /**
- * One piece of feedback's sheet, and only the feedback, in the order every sheet has: the status
- * line (what became of it, withdrawn or disputed, how much of it arrived, when), what it is (who it
- * is for, where it goes, the work and revision), its history — composed, decided, withheld with the
- * precise reason, each comment delivered with its permalink, withdrawn and restored, disputed in the
- * developer's words — what it says and its own delivery checks, and the technical facts.
- *
- * Its actions are the footer: approve or reject while it awaits approval, withdraw or restore a card
- * on the developer's practice pages otherwise. The observations it was written from, the review that
- * wrote it and when it was read are its trace.
+ * Who the feedback is for and where it goes, in the words of its row on the Feedback list. Never
+ * its text: "What it says" shows that once, and the text can be private to the developer or hidden.
  */
+function feedbackTitle(feedback: FeedbackRecord): string {
+	const where = FEEDBACK_LOCATION_DEFS[feedback.location].label;
+	return `For ${developerLabel(feedback.developer)} · ${where}`;
+}
+
 export function FeedbackLevel({
 	nested,
 	path,
@@ -138,13 +119,11 @@ export function FeedbackLevel({
 	isChangingWithdrawal,
 }: FeedbackLevelProps) {
 	const feedback = state.status === "ready" ? state.feedback : undefined;
-	const awaitingApproval = feedback?.deliveryState === "AWAITING_APPROVAL";
-	const withdrawal = feedback && activeWithdrawal(feedback);
 	let flag: ReactNode;
-	if (withdrawal !== undefined) {
-		flag = <StatusBadge def={FEEDBACK_WITHDRAWN_DEF} />;
-	} else if (feedback?.dispute !== undefined) {
-		flag = <StatusBadge def={DEVELOPER_RESPONSE_DEFS.DISPUTED} />;
+	if (feedback?.withdrawn === true) {
+		flag = <StatusBadge def={FEEDBACK_DECISION_DEFS.WITHDRAW} />;
+	} else if (feedback !== undefined && feedback.disagreedAt !== null) {
+		flag = <StatusBadge def={DEVELOPER_ANSWER_DEFS.DISAGREED} />;
 	}
 	const header = (
 		<ReviewLevelHeader
@@ -157,19 +136,24 @@ export function FeedbackLevel({
 					<SheetStatusLine
 						status={<ReviewStatusMark def={deliveryOutcome(feedback)} />}
 						flag={flag}
-						figure={deliveredFigure(feedback)}
+						figure={
+							isPartialPackage(feedback.copyCounts)
+								? copyCountsSentence(feedback.copyCounts)
+								: undefined
+						}
 						at={
-							feedback.deliveredAt === undefined
+							feedback.deliveredAt === null
 								? { label: "composed", date: feedback.createdAt }
-								: { label: "delivered", date: feedback.deliveredAt }
+								: {
+										label: feedback.state === "DELIVERED" ? "delivered" : "first appeared",
+										date: feedback.deliveredAt,
+									}
 						}
 					/>
 				)
 			}
 			title={feedback && feedbackTitle(feedback)}
-			description={
-				feedback?.reviewedWork && <ReviewArtifactLink reviewedWork={feedback.reviewedWork} />
-			}
+			description={feedback?.item && <ReviewItemLink item={feedback.item} />}
 		/>
 	);
 
@@ -193,10 +177,14 @@ export function FeedbackLevel({
 	}
 
 	const { feedback: record } = state;
+	const awaitingApproval = record.state === "AWAITING_APPROVAL";
 	return (
 		<>
 			{header}
 			<DrawerBody className="flex flex-col gap-8 pt-2">
+				{record.unverifiedHistory && (
+					<p className="text-sm text-muted-foreground">{UNVERIFIED_HISTORY_NOTE}</p>
+				)}
 				<SheetSection part="what">
 					<FeedbackWhat feedback={record} />
 				</SheetSection>
@@ -207,16 +195,21 @@ export function FeedbackLevel({
 					<ProposalPackage feedback={record} />
 				) : (
 					<SheetSection part="details" title="What it says">
-						{record.proposedPlacements.length > 0 ? (
+						{record.copies.length > 0 ? (
 							<ReviewPackage feedback={record} />
 						) : (
 							<FeedbackBody feedback={record} />
 						)}
 					</SheetSection>
 				)}
-				{record.deliveryPolicy.length > 0 && (
-					<Section level={3} title="Delivery checks" className="min-w-0">
-						<DeliveryPolicyTrace evaluations={record.deliveryPolicy} />
+				{record.basis.length > 0 && (
+					<Section level={3} title="Based on" className="min-w-0">
+						<FeedbackBasisList basis={record.basis} />
+					</Section>
+				)}
+				{record.checks.length > 0 && (
+					<Section level={3} title="Checks" className="min-w-0">
+						<FeedbackChecks checks={record.checks} />
 					</Section>
 				)}
 				<SheetTechnical facts={feedbackTechnical(record)} />
@@ -226,8 +219,8 @@ export function FeedbackLevel({
 				// package above it is read; approving it unread is what the expanded package designs out.
 				<DrawerFooter className="sm:flex-wrap sm:items-center">
 					<p className="text-xs text-muted-foreground sm:mr-auto">
-						Approval authorizes the summary and every line comment above. Delivery checks still run
-						before anything is posted.
+						Approval authorizes every copy above. Feedback checks still run before anything is
+						posted.
 					</p>
 					<div
 						role="group"
@@ -235,7 +228,7 @@ export function FeedbackLevel({
 						className="flex flex-wrap items-center justify-end gap-2"
 					>
 						<ProposalDecision
-							canApprove={record.proposedPlacements.length > 0}
+							canApprove={record.copies.length > 0}
 							isDeciding={isDeciding}
 							onApprove={onApprove}
 							onReject={onReject}
@@ -244,12 +237,15 @@ export function FeedbackLevel({
 					</div>
 				</DrawerFooter>
 			) : (
-				canWithdraw(record) && (
+				canChangeWithdrawal(record) && (
 					<DrawerFooter>
-						<WithdrawalPopover
-							withdrawn={withdrawal !== undefined}
+						<CorrectionReasonPopover
+							copy={withdrawalCopy(record)}
+							icon={record.withdrawn ? Undo2Icon : EyeOffIcon}
+							destructive={!record.withdrawn}
+							name="feedback-withdrawal-reason"
 							disabled={isChangingWithdrawal}
-							onSubmit={async (reason) => onChangeWithdrawal(withdrawal === undefined, reason)}
+							onSubmit={async (note) => onChangeWithdrawal(!record.withdrawn, note)}
 						/>
 					</DrawerFooter>
 				)
@@ -259,323 +255,367 @@ export function FeedbackLevel({
 }
 
 function FeedbackWhat({ feedback }: { feedback: FeedbackRecord }) {
-	const subjectDiffers = feedback.subject && feedback.subject.id !== feedback.recipient?.id;
 	return (
 		<ReviewFactGrid>
 			<ReviewFact label="Developer">
-				<div className="space-y-1">
-					<ReviewPerson person={feedback.recipient} />
-					{subjectDiffers === true && <ReviewPerson person={feedback.subject} prefix="About" />}
-				</div>
+				<ReviewPerson person={feedback.developer} />
 			</ReviewFact>
-			<ReviewFact label="Channel">
+			<ReviewFact label="Destination">
 				<FeedbackLocationLabel feedback={feedback} />
 			</ReviewFact>
-			{hasText(feedback.reviewedWork?.title) && (
-				<ReviewFact label="Reviewed work">
-					<span className="break-words">{feedback.reviewedWork.title}</span>
-				</ReviewFact>
-			)}
-			{feedback.deliveryState === "AWAITING_APPROVAL" && feedback.proposedPlacements.length > 0 && (
-				<ReviewFact label="Will appear as">
-					<ProposedPlaces feedback={feedback} />
-				</ReviewFact>
-			)}
-			{hasText(feedback.reviewedRevision) && (
-				<ReviewFact label="Reviewed revision">
-					<code className="text-xs break-all">{revisionLabel(feedback.reviewedRevision)}</code>
+			{hasText(feedback.item?.title) && (
+				<ReviewFact label="Work">
+					<span className="break-words">{feedback.item.title}</span>
 				</ReviewFact>
 			)}
 		</ReviewFactGrid>
 	);
 }
 
+interface BasisResult {
+	resultId: string;
+	result: FeedbackBasis["result"];
+	whole: boolean;
+	problemIds: string[];
+}
+
+// Resting on a whole result and on problems of it are separate bases of one result, so the result
+// is named once with each of them under it, in the order the feedback first names that result.
+function basisByResult(basis: readonly FeedbackBasis[]): BasisResult[] {
+	const results = new Map<string, BasisResult>();
+	for (const entry of [...basis].sort((a, b) => a.ordinal - b.ordinal)) {
+		const group = results.get(entry.resultId) ?? {
+			resultId: entry.resultId,
+			result: entry.result,
+			whole: false,
+			problemIds: [],
+		};
+		results.set(entry.resultId, group);
+		if (entry.problemId === null) {
+			group.whole = true;
+		} else if (!group.problemIds.includes(entry.problemId)) {
+			group.problemIds.push(entry.problemId);
+		}
+	}
+	return [...results.values()];
+}
+
 /**
- * Where a proposal will appear once approved. On GitLab a note proposed for some lines goes up as a
- * comment linking to them, so the place says that rather than an inline note.
+ * The results this feedback was written from, and whether it rests on the whole of each, on
+ * problems of it, or on both. Each opens in this sheet's place; Back returns here.
  */
-function ProposedPlaces({ feedback }: { feedback: FeedbackRecord }) {
-	const provider = feedback.reviewedWork?.provider;
-	const places = [
-		...new Set(
-			feedback.proposedPlacements.map((placement) =>
-				placementLabel(feedback.channel, deliveredPlacementType(placement.type, provider)),
-			),
-		),
-	];
+function FeedbackBasisList({ basis }: { basis: readonly FeedbackBasis[] }) {
 	return (
-		<ul className="space-y-0.5">
-			{places.map((place) => (
-				<li key={place}>{place}</li>
-			))}
+		<ul aria-label="Based on" className="flex min-w-0 flex-col gap-3">
+			{basisByResult(basis).map(({ resultId, result, whole, problemIds }) => {
+				const summary = resultSummary(result);
+				return (
+					<li key={resultId} className="min-w-0 space-y-1">
+						<ResultOutcome result={result} />
+						<p className="text-sm font-medium break-words">
+							<DetailStackLink
+								entry={resultLevel(resultId)}
+								single
+								className="underline-offset-4 hover:underline"
+							>
+								{summary}
+							</DetailStackLink>
+						</p>
+						<p className="text-xs text-muted-foreground">
+							{result.practiceName}
+							{whole && " · The whole result"}
+							{problemIds.map((problemId, index) => {
+								const label =
+									index === 0 ? "One problem of this result" : "Another problem of this result";
+								// Counts the problems this feedback rests on, not their place in the result.
+								const reference =
+									problemIds.length === 1
+										? ""
+										: ` (reference ${String(index + 1)} of ${String(problemIds.length)})`;
+								return (
+									<Fragment key={problemId}>
+										{" · "}
+										<DetailStackLink
+											entry={problemLevel(problemId)}
+											single
+											aria-label={`${label}: ${summary}${reference}`}
+											className="underline-offset-4 hover:underline"
+										>
+											{label}
+										</DetailStackLink>
+									</Fragment>
+								);
+							})}
+						</p>
+					</li>
+				);
+			})}
 		</ul>
 	);
 }
 
-function anchorLabel(placement: ReviewPlacement): string | undefined {
-	const { anchorPath, anchorStartLine, anchorEndLine } = placement;
-	if (!hasText(anchorPath)) {
+function copyAnchor(copy: FeedbackCopy): string | undefined {
+	if (!hasText(copy.path)) {
 		return undefined;
 	}
-	if (anchorStartLine === undefined) {
-		return anchorPath;
+	if (copy.startLine === null) {
+		return copy.path;
 	}
 	return codeCitationLocator({
-		path: anchorPath,
-		startLine: anchorStartLine,
-		endLine: anchorEndLine,
+		path: copy.path,
+		startLine: copy.startLine,
+		endLine: copy.endLine ?? undefined,
 	});
 }
 
-/**
- * Composed, decided, withheld or delivered comment by comment, each delivery to the provider with
- * its attempts and last error, withdrawn and restored, disputed: one list, oldest first. A comment's
- * permalink is the one link out, to where it was posted.
- */
-export function feedbackHistory(feedback: FeedbackRecord): SheetEvent[] {
-	const events: SheetEvent[] = [{ key: "composed", at: feedback.createdAt, title: "Composed" }];
-	const { approval } = feedback;
-	if (approval?.decision !== undefined) {
-		const def = APPROVAL_DECISION_DEFS[approval.decision];
-		const rejected = approval.decision === "REJECTED";
-		events.push({
-			key: "decided",
-			at: approval.decidedAt,
-			title: def.label,
-			by: approval.decidedBy ?? ERASED_ACCOUNT,
-			detail:
-				rejected && (approval.rejectionReason !== undefined || hasText(approval.rejectionNote)) ? (
-					<>
-						{approval.rejectionReason !== undefined && (
-							<span className="block">
-								Reason: {proposalRejectionReasonLabel(approval.rejectionReason)}
-							</span>
-						)}
-						{hasText(approval.rejectionNote) && (
-							<span className="block whitespace-pre-wrap">Note: “{approval.rejectionNote}”</span>
-						)}
-					</>
-				) : undefined,
-		});
-	}
-	if (feedback.suppressionReason !== undefined) {
-		const stopped = feedback.deliveryPolicy.find((evaluation) => !evaluation.allowed);
-		events.push({
-			key: "withheld",
-			at: stopped?.evaluatedAt,
-			title: "Withheld",
-			detail: WITHHOLDING_REASON_DEFS[feedback.suppressionReason],
-		});
-	}
-	const posted = feedback.placements.filter(
-		(placement) => hasText(placement.postedCommentRef) || placement.chatMessageId !== undefined,
+function LastError({ error }: { error: string }) {
+	return (
+		<div className="mt-1">
+			Last error:
+			<pre className="mt-1 max-h-48 overflow-auto rounded-md bg-muted/50 p-2 text-xs break-words whitespace-pre-wrap">
+				{error}
+			</pre>
+		</div>
 	);
-	const commentLinked = feedback.placements.some((placement) =>
-		hasText(placement.postedCommentUrl),
-	);
-	const delivered = posted.length > 0 || feedback.deliveredAt !== undefined;
-	// A sent delivery is the "Delivered" event itself: a second event for it said the outcome twice.
-	// What only it knows, the link to what it posted and a retry that preceded it, joins that event.
-	const sent = delivered ? feedback.dispatches.filter((dispatch) => dispatch.state === "SENT") : [];
-	const sentDetail = sent.map((dispatch) => (
-		<SentDispatchDetail key={dispatch.id} dispatch={dispatch} linked={commentLinked} />
-	));
-	if (posted.length > 0) {
+}
+
+function feedbackHistory(feedback: FeedbackRecord): SheetEvent[] {
+	const events: SheetEvent[] = [
+		{ key: "composed", at: feedback.createdAt, title: "Composed" },
+		...feedback.decisions.map(decisionEvent),
+	];
+	const { stopReason } = feedback;
+	if (stopReason !== null && feedback.state !== "AWAITING_APPROVAL") {
+		const stop = feedback.checks.find((check) => !check.allowed && check.reason === stopReason);
 		events.push({
-			key: "delivered",
-			at: feedback.deliveredAt,
-			title: feedback.deliveryState === "PARTIALLY_DELIVERED" ? "Partially delivered" : "Delivered",
-			detail: (
-				<>
-					<ul className="space-y-0.5">
-						{posted.map((placement) => {
-							const anchor = anchorLabel(placement);
-							return (
-								<li key={placement.id} className="flex flex-wrap items-center gap-x-2">
-									<span>{PLACEMENT_DEFS[placement.placementType].label}</span>
-									{anchor !== undefined && <code className="break-all">{anchor}</code>}
-									{hasText(placement.postedCommentUrl) && (
-										<InlineLink href={placement.postedCommentUrl} external>
-											Open the comment
-										</InlineLink>
-									)}
-								</li>
-							);
-						})}
-					</ul>
-					{sentDetail}
-				</>
-			),
-		});
-	} else if (feedback.deliveredAt !== undefined) {
-		events.push({
-			key: "delivered",
-			at: feedback.deliveredAt,
-			title: "Delivered",
-			detail: sentDetail.length > 0 ? sentDetail : undefined,
+			key: "stopped",
+			at: stop?.checkedAt,
+			title: DELIVERY_STATE_DEFS[feedback.state].label,
+			detail: WITHHOLDING_REASON_DEFS[stopReason],
 		});
 	}
-	for (const dispatch of feedback.dispatches) {
-		if (sent.includes(dispatch)) {
-			continue;
-		}
-		// Plain words, not a second status badge: the status line above already gives the outcome,
-		// and this event says what happened to this one delivery and why.
-		events.push({
-			key: `dispatch-${dispatch.id}`,
-			at: dispatch.updatedAt,
-			title: FEEDBACK_DISPATCH_STATE_DEFS[dispatch.state].label,
-			detail: (
-				<DispatchDetail
-					dispatch={dispatch}
-					linked={commentLinked}
-					withheldFor={feedback.suppressionReason}
-				/>
-			),
-		});
+	const onWork = feedback.destination === "ON_WORK";
+	const receipts = onWork
+		? inOrder(feedback.copies).flatMap((copy) => copyEvent(copy, stopReason) ?? [])
+		: [];
+	events.push(...receipts);
+	if (feedback.deliveredAt !== null && receipts.length === 0) {
+		events.push({ key: "delivered", at: feedback.deliveredAt, title: "Delivered" });
 	}
-	for (const withdrawal of feedback.withdrawals) {
-		events.push({
-			key: withdrawal.id,
-			at: withdrawal.withdrawnAt,
-			title: "Withdrawn",
-			by: withdrawal.withdrawnBy ?? ERASED_ACCOUNT,
-			detail: `Reason: “${withdrawal.reason}”`,
-		});
-		if (withdrawal.restoredAt !== undefined) {
-			events.push({
-				key: `${withdrawal.id}-restored`,
-				at: withdrawal.restoredAt,
-				title: "Restored",
-				by: withdrawal.restoredBy ?? ERASED_ACCOUNT,
-				detail: hasText(withdrawal.restorationReason)
-					? `Reason: “${withdrawal.restorationReason}”`
-					: undefined,
-			});
-		}
-	}
-	if (feedback.dispute !== undefined) {
-		events.push({
-			key: "disputed",
-			at: feedback.dispute.disputedAt,
-			title: "Disputed by the developer",
-			detail: (
-				<blockquote className="mt-1 border-l-2 pl-3 break-words whitespace-pre-wrap text-foreground">
-					{feedback.dispute.explanation}
-				</blockquote>
-			),
-		});
+	const failed = feedback.copies.some((copy) => copy.state === "FAILED");
+	events.push(...feedback.sends.flatMap((send) => sendEvent(send, failed) ?? []));
+	const response = responseEvent(feedback);
+	if (response !== undefined) {
+		events.push(response);
 	}
 	return events;
 }
 
-/**
- * What one delivery carried, how often it was tried, when it is tried next, why it was held back and
- * the last error, and the link to what it posted where no comment of the feedback links there
- * already. A reason the "Withheld" event already gives is not given again.
- */
-function DispatchDetail({
-	dispatch,
-	linked,
-	withheldFor,
-}: {
-	dispatch: ReviewFeedbackDispatch;
-	linked: boolean;
-	withheldFor: ReviewFeedbackDispatch["suppressionReason"];
-}) {
-	return (
-		<>
-			<span className="block">{dispatchCarried(dispatch)}</span>
-			{dispatch.nextAttemptAt !== undefined && (
-				<span className="block">
-					Next attempt <ReviewDayTime at={dispatch.nextAttemptAt} className="tabular-nums" />
-				</span>
-			)}
-			{dispatch.suppressionReason !== undefined && dispatch.suppressionReason !== withheldFor && (
-				<span className="block">{WITHHOLDING_REASON_DEFS[dispatch.suppressionReason]}</span>
-			)}
-			{hasText(dispatch.lastError) && (
-				<div className="mt-1">
-					Last error:
-					<pre className="mt-1 max-h-48 overflow-auto rounded-md bg-muted/50 p-2 text-xs break-words whitespace-pre-wrap">
-						{dispatch.lastError}
-					</pre>
-				</div>
-			)}
-			{!linked && hasText(dispatch.deliveredExternalUrl) && (
-				<InlineLink href={dispatch.deliveredExternalUrl} external>
-					Open what was posted
-				</InlineLink>
-			)}
-		</>
-	);
+function decisionEvent(decision: FeedbackDecision): SheetEvent {
+	const { reasonCode, note } = decision;
+	return {
+		key: decision.id,
+		at: decision.decidedAt,
+		title: FEEDBACK_DECISION_DEFS[decision.action].label,
+		by: decision.actor === null ? ERASED_ACCOUNT : accountName(decision.actor),
+		detail:
+			reasonCode !== null || hasText(note) ? (
+				<>
+					{reasonCode !== null && (
+						<span className="block">Reason: {feedbackDecisionReasonLabel(reasonCode)}</span>
+					)}
+					{hasText(note) && <span className="block whitespace-pre-wrap">Note: “{note}”</span>}
+				</>
+			) : undefined,
+	};
 }
 
-/**
- * What a sent delivery adds to the "Delivered" event: the attempts it took when one was not enough,
- * and the link to what it posted where no comment links there already.
- */
-function SentDispatchDetail({
-	dispatch,
-	linked,
-}: {
-	dispatch: ReviewFeedbackDispatch;
-	linked: boolean;
-}) {
-	const retried = dispatch.attemptCount > 1;
-	const link = !linked && hasText(dispatch.deliveredExternalUrl);
-	if (!retried && !link) {
-		return null;
+function copyEvent(
+	copy: FeedbackCopy,
+	feedbackStopReason: FeedbackRecord["stopReason"],
+): SheetEvent | undefined {
+	const kind = FEEDBACK_COPY_KIND_DEFS[copy.kind].label;
+	const anchor = copyAnchor(copy);
+	const where = anchor !== undefined && <code className="break-all">{anchor}</code>;
+	switch (copy.state) {
+		case "PLANNED": {
+			return undefined;
+		}
+		case "POSTED":
+		case "RETRACTED": {
+			return {
+				key: copy.id,
+				at: copy.postedAt ?? undefined,
+				title: `${kind} posted`,
+				detail: (
+					<span className="flex flex-wrap items-center gap-x-2">
+						{where}
+						{hasText(copy.externalUrl) && (
+							<InlineLink href={copy.externalUrl} external>
+								Open the comment
+							</InlineLink>
+						)}
+					</span>
+				),
+			};
+		}
+		case "WRITE_STARTED":
+		case "FAILED": {
+			const def = FEEDBACK_COPY_STATE_DEFS[copy.state];
+			return {
+				key: copy.id,
+				at: copy.writeStartedAt ?? undefined,
+				title: `${kind} ${def.label.toLowerCase()}`,
+				detail: (
+					<>
+						{where}
+						<span className="block">{def.description}</span>
+						{hasText(copy.lastError) && <LastError error={copy.lastError} />}
+					</>
+				),
+			};
+		}
+		case "WITHHELD": {
+			const reason = copy.stopReason;
+			return {
+				key: copy.id,
+				at: undefined,
+				title: `${kind} withheld`,
+				detail: (
+					<>
+						{where}
+						{reason !== null && reason !== feedbackStopReason && (
+							<span className="block">{WITHHOLDING_REASON_DEFS[reason]}</span>
+						)}
+					</>
+				),
+			};
+		}
 	}
-	return (
-		<span className="mt-0.5 flex flex-wrap items-center gap-x-2">
-			{retried && <span>{dispatchCarried(dispatch)}</span>}
-			{link && (
-				<InlineLink href={dispatch.deliveredExternalUrl} external>
-					Open what was posted
-				</InlineLink>
-			)}
-		</span>
-	);
 }
 
-/** "The review’s comments · 5 attempts". */
-function dispatchCarried(dispatch: ReviewFeedbackDispatch): string {
-	const attempts = dispatch.attemptCount === 1 ? "1 attempt" : `${dispatch.attemptCount} attempts`;
-	return `${FEEDBACK_DISPATCH_DESTINATION_LABELS[dispatch.destination]} · ${attempts}`;
+function sendEvent(send: FeedbackSend, copiesFailed: boolean): SheetEvent | undefined {
+	const done = send.state === "DONE";
+	let title: string;
+	if (!done) {
+		title = FEEDBACK_SEND_STATE_DEFS[send.state].label;
+	} else if (send.action === "RETRACT") {
+		title = FEEDBACK_COPY_STATE_DEFS.RETRACTED.label;
+	} else if (copiesFailed) {
+		title = "Stopped trying";
+	} else {
+		return undefined;
+	}
+	return {
+		key: `send-${send.action}`,
+		at: send.updatedAt,
+		title,
+		detail: (
+			<>
+				<span className="block">
+					{FEEDBACK_SEND_ACTION_LABELS[send.action]} · {attemptsLabel(send.attemptCount)}
+				</span>
+				{send.state === "UNCERTAIN" && (
+					<span className="block">{FEEDBACK_SEND_STATE_DEFS.UNCERTAIN.description}</span>
+				)}
+				{!done && (
+					<span className="block">
+						Next attempt <ReviewDayTime at={send.nextAttemptAt} className="tabular-nums" />
+					</span>
+				)}
+				{hasText(send.lastError) && <LastError error={send.lastError} />}
+			</>
+		),
+	};
 }
+
+function attemptsLabel(count: number): string {
+	if (count === 0) {
+		return "not tried yet";
+	}
+	return count === 1 ? "1 attempt" : `${count} attempts`;
+}
+
+function responseEvent(feedback: FeedbackRecord): SheetEvent | undefined {
+	const { response } = feedback;
+	const answer = developerAnswer(response);
+	if (answer === undefined || response === null) {
+		return undefined;
+	}
+	const { resolution, usefulness, comment } = response;
+	const facts = [
+		resolution !== null && resolution !== "DISAGREE"
+			? FEEDBACK_RESOLUTION_DEFS[resolution].label
+			: undefined,
+		usefulness === null ? undefined : FEEDBACK_USEFULNESS_DEFS[usefulness].label,
+	].filter(hasText);
+	return {
+		key: "response",
+		at: response.createdAt ?? undefined,
+		title: DEVELOPER_ANSWER_DEFS[answer].label,
+		by: developerLabel(feedback.developer),
+		detail: (
+			<>
+				{facts.length > 0 && <span className="block">{facts.join(" · ")}</span>}
+				{hasText(comment) && (
+					<blockquote className="mt-1 border-l-2 pl-3 break-words whitespace-pre-wrap text-foreground">
+						{comment}
+					</blockquote>
+				)}
+			</>
+		),
+	};
+}
+
+const WITHDRAWN_NOW: Record<FeedbackDestination, string> = {
+	ON_WORK:
+		"It is withdrawn. Copies it posted on the work are retracted there, and their receipts stay in this history. The results behind it are unchanged.",
+	PRACTICE_PAGE:
+		"It is off the developer’s practice pages and out of the feedback given to later reviews and Heph. The results behind it are unchanged.",
+	CONVERSATION:
+		"It is withdrawn, so Heph does not raise it in a conversation. The results behind it are unchanged.",
+};
 
 /** What the current state means, in one sentence, in place of an alert. */
 function feedbackNow(feedback: FeedbackRecord): ReactNode {
-	if (activeWithdrawal(feedback) !== undefined) {
-		return "It is off the developer’s practice pages and out of the feedback given to later reviews and Heph. The observations behind it are unchanged.";
+	if (feedback.withdrawn) {
+		return WITHDRAWN_NOW[feedback.destination];
 	}
-	if (feedback.dispute !== undefined) {
-		return "While the dispute stands, a later review of the same work does not raise the same point again.";
+	if (feedback.disagreedAt !== null) {
+		return "While the developer’s disagreement stands, a later review of the same work does not raise the same point again.";
 	}
-	if (feedback.deliveryState === "AWAITING_APPROVAL") {
-		return "It waits for an admin to approve or reject it.";
+	switch (feedback.state) {
+		case "AWAITING_APPROVAL": {
+			return "It waits for a workspace admin to approve or reject it.";
+		}
+		case "READY": {
+			return readyLine(feedback);
+		}
+		case "UNCONFIRMED": {
+			return "A conversation linked it, but its appearance was not recorded, so it does not count as delivered.";
+		}
+		case "DELIVERED":
+		case "WITHHELD":
+		case "REJECTED":
+		case "REPLACED":
+		case "FAILED": {
+			return undefined;
+		}
 	}
-	if (isDeliveryInProgress(feedback)) {
-		return deliveryInProgressLine(feedback);
-	}
-	return undefined;
 }
 
-/**
- * What "still on its way" means on this channel. Only a comment on the work is retried; a practice
- * pages card is delivered when the developer opens it, and a conversation piece when Heph raises it.
- */
-function deliveryInProgressLine(feedback: FeedbackRecord): string {
-	switch (feedback.channel) {
-		case "IN_APP": {
+function readyLine(feedback: FeedbackRecord): string {
+	switch (feedback.destination) {
+		case "PRACTICE_PAGE": {
 			return "It is ready on the developer’s practice pages. It counts as delivered when they open it.";
 		}
-		case "IN_CHAT": {
+		case "CONVERSATION": {
 			return "It is ready for the developer’s next conversation with Heph, which is what delivers it.";
 		}
-		case "IN_CONTEXT": {
-			return "Delivery is still in progress. This updates as the remaining comments are tried again.";
+		case "ON_WORK": {
+			return feedback.sends.some((send) => send.state === "UNCERTAIN")
+				? "A write was not confirmed. The provider is checked before anything is posted again."
+				: "Delivery is still in progress. This updates as the copies not yet posted are tried again.";
 		}
 	}
 }
@@ -583,17 +623,17 @@ function deliveryInProgressLine(feedback: FeedbackRecord): string {
 function feedbackTechnical(feedback: FeedbackRecord): TechnicalFact[] {
 	const facts: TechnicalFact[] = [
 		{ label: "Feedback ID", value: <code>{feedback.id}</code>, copy: feedback.id },
-		{ label: "Review ID", value: <code>{feedback.agentJobId}</code>, copy: feedback.agentJobId },
-		{ label: "Delivery state", value: <code>{feedback.deliveryState}</code> },
+		{ label: "Review ID", value: <code>{feedback.reviewId}</code>, copy: feedback.reviewId },
+		{ label: "Delivery state", value: <code>{feedback.state}</code> },
 	];
-	if (feedback.suppressionReason !== undefined) {
-		facts.push({ label: "Withheld reason", value: <code>{feedback.suppressionReason}</code> });
+	if (feedback.stopReason !== null) {
+		facts.push({ label: "Stop reason", value: <code>{feedback.stopReason}</code> });
 	}
-	if (hasText(feedback.threadKey)) {
+	if (hasText(feedback.contentDigest)) {
 		facts.push({
-			label: "Thread key",
-			value: <code>{feedback.threadKey}</code>,
-			copy: feedback.threadKey,
+			label: "Content digest",
+			value: <code>{feedback.contentDigest}</code>,
+			copy: feedback.contentDigest,
 		});
 	}
 	if (hasText(feedback.replacesId)) {
@@ -603,79 +643,70 @@ function feedbackTechnical(feedback: FeedbackRecord): TechnicalFact[] {
 			copy: feedback.replacesId,
 		});
 	}
-	for (const placement of feedback.placements) {
-		const ref = placement.postedCommentRef ?? placement.chatMessageId;
+	for (const [index, entry] of [...feedback.basis]
+		.sort((a, b) => a.ordinal - b.ordinal)
+		.entries()) {
+		const number = feedback.basis.length === 1 ? "" : ` ${String(index + 1)}`;
+		facts.push({
+			label: `Basis result${number}`,
+			value: <code>{entry.resultId}</code>,
+			copy: entry.resultId,
+		});
+		if (entry.problemId !== null) {
+			facts.push({
+				label: `Basis problem${number}`,
+				value: <code>{entry.problemId}</code>,
+				copy: entry.problemId,
+			});
+		}
+	}
+	const copies = inOrder(feedback.copies);
+	for (const copy of copies) {
+		const ref = copy.externalRef ?? copy.chatMessageId;
 		if (hasText(ref)) {
-			facts.push({
-				label: `${PLACEMENT_DEFS[placement.placementType].label} reference`,
-				value: <code>{ref}</code>,
-				copy: ref,
-			});
+			const sameKind = copies.filter((other) => other.kind === copy.kind);
+			const kind = FEEDBACK_COPY_KIND_DEFS[copy.kind].label;
+			const label = sameKind.length === 1 ? kind : `${kind} ${sameKind.indexOf(copy) + 1}`;
+			facts.push({ label: `${label} reference`, value: <code>{ref}</code>, copy: ref });
 		}
-	}
-	for (const [index, dispatch] of feedback.dispatches.entries()) {
-		const label = feedback.dispatches.length === 1 ? "Delivery" : `Delivery ${index + 1}`;
-		facts.push({ label: `${label} ID`, value: <code>{dispatch.id}</code>, copy: dispatch.id });
-		if (hasText(dispatch.deliveredExternalRef)) {
-			facts.push({
-				label: `${label} reference`,
-				value: <code>{dispatch.deliveredExternalRef}</code>,
-				copy: dispatch.deliveredExternalRef,
-			});
-		}
-	}
-	if (feedback.approval?.actorAccountId !== undefined) {
-		facts.push({ label: "Decided by account", value: String(feedback.approval.actorAccountId) });
 	}
 	return facts;
 }
 
-/**
- * Only a practice-page card that is waiting to be read or already shown can be taken back; a
- * withdrawn one can always be restored.
- */
-function canWithdraw(feedback: FeedbackRecord) {
+function canChangeWithdrawal(feedback: FeedbackRecord): boolean {
 	return (
-		feedback.channel === "IN_APP" &&
-		(activeWithdrawal(feedback) !== undefined ||
-			feedback.deliveryState === "PREPARED" ||
-			feedback.deliveryState === "DELIVERED")
+		feedback.withdrawn ||
+		feedback.state === "READY" ||
+		feedback.state === "DELIVERED" ||
+		feedback.state === "UNCONFIRMED"
 	);
 }
 
-function WithdrawalPopover({
-	withdrawn,
-	disabled,
-	onSubmit,
-}: {
-	withdrawn: boolean;
-	disabled: boolean;
-	onSubmit: (reason: string) => Promise<unknown>;
-}) {
-	return (
-		<CorrectionReasonPopover
-			copy={
-				withdrawn
-					? {
-							trigger: "Restore feedback",
-							title: "Restore this feedback",
-							description:
-								"It returns to the developer’s practice pages if its observations can still be shown there. Nothing is sent again.",
-							placeholder: "Why the feedback was right after all…",
-						}
-					: {
-							trigger: "Withdraw feedback",
-							title: "Withdraw this feedback",
-							description:
-								"It comes off the developer’s practice pages and out of the feedback given to later reviews and Heph. The observations behind it are unchanged. A developer who already saw it sees that it was withdrawn, not your reason.",
-							placeholder: "What the feedback got wrong…",
-						}
-			}
-			icon={withdrawn ? Undo2Icon : EyeOffIcon}
-			destructive={!withdrawn}
-			name="feedback-withdrawal-reason"
-			disabled={disabled}
-			onSubmit={onSubmit}
-		/>
-	);
+const WITHDRAW_DESCRIPTIONS: Record<FeedbackDestination, string> = {
+	ON_WORK:
+		"Copies already posted on the work are retracted there, and nothing more is posted. Their receipts stay on this sheet, and the results behind it are unchanged.",
+	PRACTICE_PAGE:
+		"It comes off the developer’s practice pages and out of the feedback given to later reviews and Heph. The results behind it are unchanged. A developer who already saw it sees that it was withdrawn, not your reason.",
+	CONVERSATION:
+		"Heph does not raise it in a conversation, and it leaves the feedback given to later reviews. The results behind it are unchanged.",
+};
+
+function withdrawalCopy(feedback: FeedbackRecord): CorrectionReasonCopy {
+	if (feedback.withdrawn) {
+		return {
+			trigger: "Restore feedback",
+			title: "Restore this feedback",
+			description:
+				feedback.destination === "PRACTICE_PAGE"
+					? "It returns to the developer’s practice pages if its results can still be shown there. Nothing is sent again."
+					: "The withdrawal ends. It is sent again only after every check passes.",
+			placeholder: "Why the feedback was right after all…",
+		};
+	}
+	return {
+		trigger: "Withdraw feedback",
+		title: "Withdraw this feedback",
+		description: WITHDRAW_DESCRIPTIONS[feedback.destination],
+		placeholder: "What the feedback got wrong…",
+	};
 }

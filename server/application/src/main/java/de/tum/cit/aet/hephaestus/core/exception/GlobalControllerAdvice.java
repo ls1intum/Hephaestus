@@ -10,20 +10,26 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.core.PropertyReferenceException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
-import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 /**
  * Global exception handler providing RFC 7807 ProblemDetail responses for all controllers.
@@ -33,11 +39,9 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
  */
 @RestControllerAdvice
 @Order(Ordered.LOWEST_PRECEDENCE)
-public class GlobalControllerAdvice {
+public class GlobalControllerAdvice extends ResponseEntityExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalControllerAdvice.class);
-
-    // STANDARD EXCEPTIONS
 
     @ExceptionHandler(EntityNotFoundException.class)
     ProblemDetail handleNotFound(EntityNotFoundException exception) {
@@ -45,12 +49,6 @@ public class GlobalControllerAdvice {
                 "Handled entity not found exception: message={}, lookup={}",
                 messageOf(exception),
                 exception.getLookup());
-        return problem(HttpStatus.NOT_FOUND, "Resource not found", messageOf(exception));
-    }
-
-    @ExceptionHandler(NoResourceFoundException.class)
-    ProblemDetail handleNoResourceFound(NoResourceFoundException exception) {
-        log.debug("Handled no resource found exception: message={}", messageOf(exception));
         return problem(HttpStatus.NOT_FOUND, "Resource not found", messageOf(exception));
     }
 
@@ -70,6 +68,11 @@ public class GlobalControllerAdvice {
     ProblemDetail handleBadRequest(IllegalArgumentException exception) {
         log.debug("Handled bad request exception: message={}", messageOf(exception));
         return problem(HttpStatus.BAD_REQUEST, "Invalid request", messageOf(exception));
+    }
+
+    @ExceptionHandler(PropertyReferenceException.class)
+    ProblemDetail handleInvalidSort(PropertyReferenceException exception) {
+        return problem(HttpStatus.BAD_REQUEST, "Invalid request", "The requested sort field is not available.");
     }
 
     @ExceptionHandler(IllegalStateException.class)
@@ -109,10 +112,9 @@ public class GlobalControllerAdvice {
                 HttpStatus.CONFLICT, "Conflict", "This request conflicts with the current data. Reload and try again.");
     }
 
-    // VALIDATION EXCEPTIONS
-
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    ProblemDetail handleMethodArgumentNotValid(MethodArgumentNotValidException exception) {
+    @Override
+    protected @Nullable ResponseEntity<Object> handleMethodArgumentNotValid(
+            MethodArgumentNotValidException exception, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
         Map<String, List<String>> errors = exception.getBindingResult().getFieldErrors().stream()
                 .collect(Collectors.groupingBy(
                         FieldError::getField, Collectors.mapping(FieldError::getDefaultMessage, Collectors.toList())));
@@ -121,7 +123,7 @@ public class GlobalControllerAdvice {
                 HttpStatus.BAD_REQUEST, "Some fields need changes. Check your entries and try again.");
         problem.setTitle("Validation failed");
         problem.setProperty("errors", errors);
-        return problem;
+        return handleExceptionInternal(exception, problem, headers, status, request);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -137,8 +139,6 @@ public class GlobalControllerAdvice {
         problem.setProperty("errors", errors);
         return problem;
     }
-
-    // EXTERNAL SERVICE EXCEPTIONS
 
     @ExceptionHandler(WebClientRequestException.class)
     ProblemDetail handleWebClientRequestException(WebClientRequestException exception) {
@@ -159,8 +159,6 @@ public class GlobalControllerAdvice {
                 "We could not reach a service that Hephaestus depends on. Try again in a moment.");
     }
 
-    // FALLBACK HANDLER
-
     @ExceptionHandler(TenancyViolationException.class)
     ProblemDetail handleTenancyViolation(TenancyViolationException ex) {
         // Server bug — log full SQL context server-side, sanitize client-facing message.
@@ -173,7 +171,6 @@ public class GlobalControllerAdvice {
 
     @ExceptionHandler(Exception.class)
     ProblemDetail handleGeneric(Exception exception) {
-        // Log the full exception for debugging, but don't expose details to client
         log.error(
                 "Caught unhandled exception: exceptionType={}",
                 exception.getClass().getSimpleName(),
@@ -183,8 +180,6 @@ public class GlobalControllerAdvice {
                 "Internal server error",
                 "We could not finish that. Try again. If it keeps failing, contact your instance operator.");
     }
-
-    // HELPER METHODS
 
     private static String messageOf(Exception exception) {
         return exception.getMessage() != null

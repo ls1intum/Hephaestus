@@ -6,6 +6,8 @@ import static org.assertj.core.api.SoftAssertions.assertSoftly;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
@@ -15,10 +17,14 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderTyp
 import de.tum.cit.aet.hephaestus.integration.core.graphql.FragmentMergingDocumentSource;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemSourceAccess;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
@@ -39,7 +45,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectA
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabRepositoryMonitors;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabRouteAdmission;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabWorkspaceInitializationService;
-import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
+import de.tum.cit.aet.hephaestus.integration.scm.workspace.ScmWorkspaceContentEraser;
+import de.tum.cit.aet.hephaestus.integration.scm.workspace.WorkspaceRepositoryMonitorService;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.adapter.WorkspaceSyncTargetProvider;
 import io.nats.client.Message;
@@ -73,7 +80,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -99,7 +105,10 @@ class RepositoryProviderScopeIntegrationTest extends AbstractWorkspaceIntegratio
     private WorkspaceSyncTargetProvider syncTargets;
 
     @Autowired
-    private WebTestClient web;
+    private ItemIndexService itemWriter;
+
+    @Autowired
+    private ScmItemSourceAccess sourceAccess;
 
     @Autowired
     private IssueRepository issues;
@@ -863,7 +872,7 @@ class RepositoryProviderScopeIntegrationTest extends AbstractWorkspaceIntegratio
 
     @Test
     @WithMentorUser
-    void shouldAcceptTheRegisteredDefaultSourceWhileItsConnectionIsPaused() {
+    void shouldRetainMonitoredWorkAndRefuseDeliveryWhilePausedThenRestoreAccessOnResume() {
         Workspace workspace = workspace("default-source", persistUser("mentor"));
         Repository mine = repository(ensureGitHubProvider(), NATIVE_ID, NAME);
         IdentityProvider enterprise = gitProviderRepository.saveAndFlush(
@@ -887,7 +896,7 @@ class RepositoryProviderScopeIntegrationTest extends AbstractWorkspaceIntegratio
         Issue work = issue(mine);
         assertWorkFacts(workspace, work);
 
-        connectionService.transition(
+        Connection suspended = connectionService.transition(
                 active,
                 new ConnectionService.TransitionRequest(
                         IntegrationState.SUSPENDED,
@@ -899,6 +908,16 @@ class RepositoryProviderScopeIntegrationTest extends AbstractWorkspaceIntegratio
         assertThat(repositories.findAllByWorkspaceMonitors(workspace.getId()))
                 .extracting(Repository::getId)
                 .containsExactly(mine.getId());
+        assertNoWorkFacts(workspace, work);
+        connectionService.transition(
+                suspended,
+                new ConnectionService.TransitionRequest(
+                        IntegrationState.ACTIVE,
+                        "TEST_RESUMED",
+                        "SYSTEM",
+                        "provider-scope-test",
+                        UUID.randomUUID().toString(),
+                        "Source resumed"));
         assertWorkFacts(workspace, work);
     }
 
@@ -1152,30 +1171,20 @@ class RepositoryProviderScopeIntegrationTest extends AbstractWorkspaceIntegratio
     }
 
     private void assertWorkFacts(Workspace workspace, Issue issue) {
-        web.get()
-                .uri(
-                        "/workspaces/{slug}/practices/reviews/work/scm.issue/{id}",
-                        workspace.getWorkspaceSlug(),
-                        issue.getId())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.artifactId")
-                .isEqualTo(issue.getId());
+        assertThat(sourceAccess.permits(item(workspace, issue), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+                .isTrue();
     }
 
     private void assertNoWorkFacts(Workspace workspace, Issue issue) {
-        web.get()
-                .uri(
-                        "/workspaces/{slug}/practices/reviews/work/scm.issue/{id}",
-                        workspace.getWorkspaceSlug(),
-                        issue.getId())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isNoContent()
-                .expectBody(Void.class);
+        assertThat(sourceAccess.permits(item(workspace, issue), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+                .isFalse();
+    }
+
+    private ItemRef item(Workspace workspace, Issue issue) {
+        var sourceRepository = Objects.requireNonNull(issue.getRepository());
+        var repository = itemWriter.upsert(new ItemRegistration(
+                workspace.getId(), new ItemKind("scm.repository"), sourceRepository.getId(), null, null));
+        return itemWriter.upsert(new ItemRegistration(
+                workspace.getId(), new ItemKind("scm.issue"), issue.getId(), repository.itemId(), null));
     }
 }

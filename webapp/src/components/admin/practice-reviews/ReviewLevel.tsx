@@ -1,49 +1,47 @@
-import { CopyIcon } from "lucide-react";
-import { type ReactNode, useId } from "react";
-
+import { Link } from "@tanstack/react-router";
 import { cn } from "cn";
+import { Fragment, type ReactNode } from "react";
 
 import type {
-	AgentJob,
-	AgentJobUsage,
-	AgentJobUsageAttempt,
-	DeliveryPolicyTrace as DeliveryCheck,
-	ReviewRunSummary,
+	FeedbackCheck,
+	ReviewDetail,
+	ReviewJob,
+	ReviewPractice,
+	ReviewResultCounts,
+	ReviewUsage,
+	ReviewUsageAttempt,
 } from "@/api/types.gen";
-import { formatTokens, JOB_TYPE_LABELS } from "@/components/admin/usage/usage-utils";
+import { formatTokens } from "@/components/admin/usage/usage-utils";
+import { accountName } from "@/components/admin/users/account-labels";
+import { InlineLink } from "@/components/common/InlineLink";
 import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
-import { useNow } from "@/components/common/use-now";
+import { type StatusDef, statusToneClass } from "@/components/common/status-def";
+import { StatusBadge } from "@/components/common/StatusBadge";
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
-import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { Section } from "@/components/layout/Section";
-import { DeliveryPolicyTrace } from "@/components/practice-trace/DeliveryPolicyTrace";
+import { FeedbackChecks } from "@/components/practice-trace/FeedbackChecks";
+import { PracticeScriptTraceLine } from "@/components/practice-trace/PracticeScriptTraceLine";
+import { FOUND_BY_DESCRIPTIONS, FOUND_BY_LABELS } from "@/components/practice-trace/trace-format";
+import { OUTCOME_DEFS, type Outcome } from "@/components/practice-vocabulary/outcome-defs";
+import { REVIEW_ORIGIN_DEFS } from "@/components/practice-vocabulary/review-origin-defs";
 import {
-	DISCOVERED_VIA_DESCRIPTIONS,
-	DISCOVERED_VIA_LABELS,
-} from "@/components/practice-trace/trace-format";
-import { OBSERVATION_ORIGIN_DEFS } from "@/components/practice-vocabulary/observation-origin-defs";
-import { REVIEW_CANCELLATION_DEFS } from "@/components/practice-vocabulary/review-cancellation-defs";
-import {
-	RESULT_PROCESSING_DEFS,
-	reviewStatusDef,
+	isActiveReview,
+	reviewReasonSentence,
+	REVIEW_JOB_PROCESSING_DEFS,
+	REVIEW_JOB_STATUS_DEFS,
+	REVIEW_PRACTICE_STATUS_DEFS,
+	REVIEW_STATUS_DEFS,
+	REVIEW_STOP_REASON_SENTENCES,
 } from "@/components/practice-vocabulary/review-status-defs";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { DrawerBody, DrawerFooter } from "@/components/ui/drawer";
-import { reviewedWorkName } from "@/lib/artifact-kinds";
-import { copyToClipboard } from "@/lib/clipboard";
-import { asDate, durationText } from "@/lib/dates";
+import { durationText } from "@/lib/dates";
+import { itemKindNoun, itemName } from "@/lib/item-kinds";
 import { formatCostUsd } from "@/lib/money";
 import { hasText } from "@/lib/text";
 
-import {
-	holdReasonCopy,
-	isCancellable,
-	isResultProcessingRetryable,
-	jobPhases,
-	jobWait,
-} from "./job-utils";
+import { jobPhases } from "./job-utils";
 import { LevelBodySkeleton } from "./LevelBodySkeleton";
 import {
 	type SheetEvent,
@@ -54,39 +52,25 @@ import {
 	type TechnicalFact,
 } from "./RecordSheet";
 import { RequestReviewAction } from "./RequestReviewAction";
-import { revisionLabel, subjectLabel } from "./review-format";
-import { reviewLevel } from "./review-levels";
-import {
-	endedEarly,
-	type PracticeGroupLook,
-	ReviewPractices,
-	type RunTraceState,
-	startingMoment,
-} from "./review-run-sections";
-import { ReviewArtifactLink } from "./ReviewArtifact";
+import { feedbackSlots, type ReviewListTarget } from "./review-outcomes";
+import { ReviewActions } from "./ReviewActions";
 import { ReviewStatusMark } from "./ReviewBadges";
 import { ReviewDayTime } from "./ReviewDayTime";
 import { ReviewFact, ReviewFactGrid } from "./ReviewFactGrid";
+import { ReviewItemLink } from "./ReviewItem";
 import { ReviewLevelHeader } from "./ReviewLevelHeader";
-import { ReviewRunActions } from "./ReviewRunActions";
+import { ReviewListLink } from "./ReviewListLink";
+import { ReviewPracticeScriptTable } from "./ReviewPracticeScriptTable";
 
 export interface ReviewLevelProps {
+	workspaceSlug: string;
 	nested?: boolean;
 	path: LevelPath;
-	job: PanelState<{ job: AgentJob }>;
-	/** The review's row on the Reviews list, for its counts, its developers and its place on the work. */
-	summary: ReviewRunSummary | undefined;
-	trace: RunTraceState;
-	/** The workspace's groups, for the colour each practice's group is named in. */
-	groups?: readonly PracticeGroupLook[] | undefined;
-	/** The delivery checks the review ran for itself rather than for one piece of feedback. */
-	deliveryChecks?: PanelState<{ checks: DeliveryCheck[] }>;
-	/** What the review spent on the model, attempt by attempt. */
-	usage?: PanelState<{ usage: AgentJobUsage }>;
+	review: PanelState<{ review: ReviewDetail }>;
+	eventLabel: (name: string) => string;
+	feedbackChecks?: PanelState<{ checks: FeedbackCheck[] }>;
 	onCancel: () => void;
 	cancelPending: boolean;
-	onRetryResultProcessing: () => void;
-	retryResultProcessingPending: boolean;
 	/** Asks for a new review of the same work; omitted where the work cannot be reviewed on demand. */
 	onRequestReview?: () => void;
 	requestingReview?: boolean;
@@ -96,72 +80,70 @@ export interface ReviewLevelProps {
 	requestRefusal?: ReactNode;
 }
 
-const REVIEW_OUTCOME_LABELS: Record<AgentJob["reviewOutcome"], string> = {
-	REVIEWED: "Reviewed",
-	INSUFFICIENT_EVIDENCE: "Nothing assessed: the evidence it needed was missing or unreadable",
-	COALESCED: "Coalesced: an earlier review had answered every practice on the same code",
-	SUPERSEDED: "Replaced: a newer review of the same work carries its practices",
-};
-
-/** What the history says of where the review stands now, where that is not plain from its events. */
-function reviewNow(job: AgentJob, partial: boolean): string | undefined {
-	if (job.reviewOutcome === "SUPERSEDED") {
-		return "A newer review of the same work replaced it while it waited. That review carries its practices and may still be waiting or running.";
-	}
-	return partial
-		? "It ended early, so its observations and feedback may be only part of what it would have found."
-		: undefined;
+function kindLabel(review: ReviewDetail): string {
+	return review.kind === "SCAN"
+		? "Scan"
+		: `Review of the ${itemKindNoun(review.item.kind, 1, review.item.provider)}`;
 }
 
+export const RUNTIME_EXPIRED = "Execution details are no longer available.";
+
 /** "9 min" between two times, or undefined while either is missing. */
-function between(from: Date | undefined, to: Date | undefined): string | undefined {
-	return from === undefined || to === undefined
+function between(from: Date | null | undefined, to: Date | null | undefined): string | undefined {
+	return from === null || from === undefined || to === null || to === undefined
 		? undefined
 		: durationText((to.getTime() - from.getTime()) / 1000);
 }
 
-/**
- * One review's sheet, and only the review, in the order every sheet has: the header's status line
- * (status, how it ended when not plainly, how long it ran, when it finished), what it is, its
- * history from the ask to the first posted comment, every practice with its state and the review's
- * own delivery checks, and the technical facts. Its actions are the footer.
- *
- * It lists no other record and links to none: its observations, its feedback, when its feedback was
- * first read and the other moments on the work are its trace or the work's sheet. The work links
- * out to its provider.
- */
+function firstStart(review: ReviewDetail): Date | undefined {
+	let earliest: Date | undefined;
+	for (const { startedAt } of [...(review.runtime?.jobs ?? []), ...review.stageTiming]) {
+		if (startedAt !== null && (earliest === undefined || startedAt < earliest)) {
+			earliest = startedAt;
+		}
+	}
+	return earliest;
+}
+
+function reviewNow(review: ReviewDetail): string | undefined {
+	if (review.status === "PARTIAL") {
+		return review.kind === "SCAN"
+			? "It ended early, so its results cover only the work it reached."
+			: "It ended early, so its results and feedback cover only the work it reached.";
+	}
+	if (review.status === "FAILED" || review.status === "CANCELLED") {
+		return "Results it recorded before it stopped still stand.";
+	}
+	return undefined;
+}
+
 export function ReviewLevel({
+	workspaceSlug,
 	nested,
 	path,
-	job: state,
-	summary,
-	trace,
-	groups,
-	deliveryChecks,
-	usage,
+	review: state,
+	eventLabel,
+	feedbackChecks,
 	onCancel,
 	cancelPending,
-	onRetryResultProcessing,
-	retryResultProcessingPending,
 	onRequestReview,
 	requestingReview = false,
 	requestBlocked,
 	requestRefusal,
 }: ReviewLevelProps) {
-	const now = useNow();
-	const job = state.status === "ready" ? state.job : undefined;
+	const review = state.status === "ready" ? state.review : undefined;
 	const header = (
 		<ReviewLevelHeader
 			nested={nested}
 			path={path}
 			kind="review"
 			loading={state.status === "loading"}
-			chips={job && <ReviewStatus job={job} />}
-			title={job?.target.title}
-			description={job && <ReviewArtifactLink reviewedWork={job.target.reviewedWork} />}
+			chips={review && <ReviewStatusLine review={review} />}
+			title={review && (review.item.title ?? itemName(review.item))}
+			description={review && <ReviewItemLink item={review.item} />}
 		/>
 	);
-	if (job === undefined) {
+	if (review === undefined) {
 		return (
 			<>
 				{header}
@@ -179,85 +161,56 @@ export function ReviewLevel({
 			</>
 		);
 	}
-	const cancellable = isCancellable(job.status);
-	const retryable = isResultProcessingRetryable(job);
-	const wait = jobWait(job, now);
-	const hold = wait?.kind === "hold" ? holdReasonCopy(wait.reason) : undefined;
-	const partial =
-		endedEarly(job) &&
-		summary !== undefined &&
-		Object.values(summary.observations).some((count) => count > 0);
+	const cancellable = isActiveReview(review.status);
+	const scripted = review.practices.filter((practice) => practice.script !== null);
 	return (
 		<>
 			{header}
 			<DrawerBody className="flex flex-col gap-8 pt-2">
 				{requestRefusal}
-				{/* The one alert: a hold is happening now, and it says what ends it. */}
-				{hold && (
-					<Alert variant="warning">
-						<AlertTitle>{hold.label}</AlertTitle>
-						<AlertDescription>{hold.detail}</AlertDescription>
-					</Alert>
-				)}
 				<SheetSection part="what">
-					<ReviewWhat job={job} summary={summary} trace={trace} />
+					<ReviewWhat workspaceSlug={workspaceSlug} review={review} eventLabel={eventLabel} />
 				</SheetSection>
 				<SheetSection part="state">
-					<SheetHistory events={reviewHistory(job)} now={reviewNow(job, partial)} />
-					<ReviewPhases job={job} />
-					{job.reviewOutcome === "SUPERSEDED" &&
-						hasText(job.coveringJobId) && (
-							// The one link a sheet makes to another record, by decision: a replaced review has no
-							// practices of its own, so the review that carries them is the only next step, and
-							// its ID alone under Technical left the reader to find it by hand.
-							<DetailStackLink
-								entry={reviewLevel(job.coveringJobId)}
-								single
-								className={cn(buttonVariants({ variant: "link", size: "inline" }), "mt-2 text-sm")}
-							>
-								Open the newer review
-							</DetailStackLink>
-						)}
+					<ReviewHistory review={review} />
 				</SheetSection>
 				<SheetSection part="details" title="Every practice">
-					<ReviewPractices job={job} trace={trace} summary={summary} groups={groups} />
+					<ReviewPracticeList workspaceSlug={workspaceSlug} review={review} />
 				</SheetSection>
-				{deliveryChecks !== undefined && <ReviewDeliveryChecks state={deliveryChecks} />}
-				<SheetTechnical facts={technicalFacts(job, usage)}>
-					{usage?.status === "error" && (
-						<QueryErrorAlert
-							error={usage.error}
-							title="We could not load what the review cost"
-							onRetry={usage.onRetry}
-						/>
-					)}
-					{usage?.status === "ready" && usage.usage.attempts.length > 1 && (
-						<UsageAttempts attempts={usage.usage.attempts} />
-					)}
-					{!cancellable && <ModelActivity diagnostics={job.reviewDiagnostics} />}
-					<GeneratedPaths job={job} />
+				{feedbackChecks !== undefined && <ReviewFeedbackChecks state={feedbackChecks} />}
+				{scripted.length > 0 && (
+					<SheetSection
+						part="details"
+						title="Practice scripts"
+						description="How each practice script ran in this review."
+					>
+						<ReviewPracticeScriptTable workspaceSlug={workspaceSlug} practices={scripted} />
+						<p className="text-xs text-muted-foreground">
+							Spend is on{" "}
+							<InlineLink
+								render={<Link to="/w/$workspaceSlug/admin/usage" params={{ workspaceSlug }} />}
+							>
+								AI usage
+							</InlineLink>
+							.
+						</p>
+					</SheetSection>
+				)}
+				<SheetTechnical facts={technicalFacts(review)}>
+					{review.usage.attempts.length > 1 && <UsageAttempts attempts={review.usage.attempts} />}
+					<ReviewJobs jobs={review.runtime?.jobs} />
+					<GeneratedPaths review={review} />
 				</SheetTechnical>
 			</DrawerBody>
-			{(cancellable || retryable || onRequestReview !== undefined) && (
+			{(cancellable || onRequestReview !== undefined) && (
 				<DrawerFooter>
-					{(cancellable || retryable) && (
-						<ReviewRunActions
-							job={job}
-							isCancelling={cancelPending}
-							isRetrying={retryResultProcessingPending}
-							onCancel={onCancel}
-							onRetry={onRetryResultProcessing}
-						/>
-					)}
+					{cancellable && <ReviewActions isCancelling={cancelPending} onCancel={onCancel} />}
 					{/* While this review still runs, another would only be coalesced into it. */}
 					{!cancellable && onRequestReview !== undefined && (
 						<RequestReviewAction
 							label="Request another review"
 							request={{
-								work:
-									job.target.reviewedWork === undefined
-										? "this work"
-										: reviewedWorkName(job.target.reviewedWork),
+								work: itemName(review.item),
 								onRequest: onRequestReview,
 								requesting: requestingReview,
 								blocked: requestBlocked,
@@ -270,268 +223,424 @@ export function ReviewLevel({
 	);
 }
 
-/**
- * The status line: its status; how it ended, where that is not plain (nothing assessed, coalesced,
- * the result processing not done); how long it ran; and the time that matters for where it is.
- */
-function ReviewStatus({ job }: { job: AgentJob }) {
-	let flag: ReactNode;
-	if (job.deliveryStatus !== undefined && job.deliveryStatus !== "DELIVERED") {
-		flag = <ReviewStatusMark def={RESULT_PROCESSING_DEFS[job.deliveryStatus]} />;
-	} else if (job.status === "COMPLETED" && job.reviewOutcome === "INSUFFICIENT_EVIDENCE") {
-		flag = "Nothing assessed";
-	} else if (job.status === "COMPLETED" && job.reviewOutcome === "COALESCED") {
-		flag = "Coalesced";
+function ReviewStatusLine({ review }: { review: ReviewDetail }) {
+	const started = firstStart(review);
+	let at: { label: string; date: Date } = { label: "asked for", date: review.createdAt };
+	if (review.completedAt !== null) {
+		at = { label: "finished", date: review.completedAt };
+	} else if (started !== undefined) {
+		at = { label: "started", date: started };
 	}
-	let at: { label: string; date: Date } = { label: "asked for", date: job.createdAt };
-	if (job.completedAt !== undefined) {
-		at = { label: "finished", date: job.completedAt };
-	} else if (job.startedAt !== undefined) {
-		at = { label: "started", date: job.startedAt };
-	}
-	const ran = between(job.startedAt, job.completedAt);
+	const ran = between(started, review.completedAt);
 	return (
 		<SheetStatusLine
-			status={<ReviewStatusMark def={reviewStatusDef(job)} />}
-			flag={flag}
+			status={<ReviewStatusMark def={REVIEW_STATUS_DEFS[review.status]} />}
 			figure={ran === undefined ? undefined : `ran ${ran}`}
 			at={at}
 		/>
 	);
 }
 
-function ReviewWhat({
-	job,
-	summary,
-	trace,
+const RESULT_OUTCOMES = [
+	["MET", "met"],
+	["NOT_MET", "notMet"],
+	["DOES_NOT_APPLY", "doesNotApply"],
+	["COULD_NOT_DETERMINE", "couldNotDetermine"],
+] as const satisfies readonly (readonly [Outcome, keyof ReviewResultCounts])[];
+
+/**
+ * One count, marked with its registry's icon, that opens a list at exactly the rows it counts. The
+ * icon only repeats the word beside it.
+ */
+function CountLink({
+	workspaceSlug,
+	def,
+	text,
+	name,
+	destination,
 }: {
-	job: AgentJob;
-	summary: ReviewRunSummary | undefined;
-	trace: RunTraceState;
+	workspaceSlug: string;
+	def: StatusDef;
+	text: string;
+	/** Set where the same count can stand on several rows; it starts with `text`. */
+	name: string | undefined;
+	destination: ReviewListTarget;
 }) {
-	const moment = startingMoment(trace, job.id);
-	let startedBy: ReactNode = (
-		<span className="text-muted-foreground">
-			{trace.status === "loading" ? "Loading…" : "No moment on the work is recorded"}
+	const Icon = def.icon;
+	return (
+		<span className="inline-flex items-center gap-1 whitespace-nowrap">
+			<Icon aria-hidden className={cn("size-3.5 shrink-0", statusToneClass(def.badgeVariant))} />
+			<InlineLink
+				tone="count"
+				aria-label={name}
+				render={<ReviewListLink workspaceSlug={workspaceSlug} destination={destination} />}
+			>
+				{text}
+			</InlineLink>
 		</span>
 	);
-	if (moment !== undefined) {
-		startedBy = (
-			<span className="space-y-0.5">
-				<span className="block">{moment.displayName}</span>
-				<span className="block text-muted-foreground">
-					<ReviewDayTime at={moment.occurredAt} /> ·{" "}
-					<span title={DISCOVERED_VIA_DESCRIPTIONS[moment.discoveredVia]}>
-						{DISCOVERED_VIA_LABELS[moment.discoveredVia]}
-					</span>
-				</span>
-			</span>
-		);
+}
+
+/**
+ * Results by outcome, each opening the Results tab at exactly those results: the review's, or one
+ * of its practices'. The words name only the outcome, since the fact or the row already says whose
+ * results they are. Problems sit under Not met results and are not counted here: the link opens
+ * them without a figure the sheet does not hold.
+ */
+function ResultCountLinks({
+	workspaceSlug,
+	counts,
+	scope,
+	practiceName,
+	empty,
+}: {
+	workspaceSlug: string;
+	counts: ReviewResultCounts;
+	scope: { reviewId: string; practiceSlug?: string[] };
+	/** The practice the counts are of, which tells each link from the same count on another row. */
+	practiceName?: string;
+	/** What the counts read as when there are none. */
+	empty: string;
+}) {
+	const counted = RESULT_OUTCOMES.filter(([, key]) => counts[key] > 0);
+	if (counted.length === 0) {
+		return empty;
+	}
+	const named = (text: string) =>
+		practiceName === undefined ? undefined : `${text}, ${practiceName}`;
+	return (
+		<span>
+			{counted.map(([outcome, key], index) => {
+				const text = `${String(counts[key])} ${OUTCOME_DEFS[outcome].label.toLowerCase()}`;
+				return (
+					<Fragment key={outcome}>
+						{index > 0 && ", "}
+						<CountLink
+							workspaceSlug={workspaceSlug}
+							def={OUTCOME_DEFS[outcome]}
+							text={text}
+							name={named(text)}
+							destination={{ list: "results", search: { ...scope, outcome: [outcome] } }}
+						/>
+					</Fragment>
+				);
+			})}
+			{counts.notMet > 0 && (
+				<>
+					{" · "}
+					<InlineLink
+						aria-label={named("View problems")}
+						render={
+							<ReviewListLink
+								workspaceSlug={workspaceSlug}
+								destination={{ list: "problems", search: scope }}
+							/>
+						}
+					>
+						View problems
+					</InlineLink>
+				</>
+			)}
+		</span>
+	);
+}
+
+/** The review's feedback by delivery family, each opening the Feedback tab at exactly those. */
+function FeedbackCountLinks({
+	workspaceSlug,
+	review,
+}: {
+	workspaceSlug: string;
+	review: ReviewDetail;
+}) {
+	// An empty scope still names each family's states; the review narrows them to its own feedback.
+	const counted = feedbackSlots(review.feedback, {}).filter((slot) => slot.count > 0);
+	if (counted.length === 0) {
+		return "None";
 	}
 	return (
+		<span>
+			{counted.map((slot, index) => (
+				<Fragment key={slot.key}>
+					{index > 0 && ", "}
+					{slot.target?.list === "feedback" && (
+						<CountLink
+							workspaceSlug={workspaceSlug}
+							def={slot.def}
+							text={`${String(slot.count)} ${slot.label}`}
+							name={undefined}
+							destination={{
+								list: "feedback",
+								search: { ...slot.target.search, reviewId: review.id },
+							}}
+						/>
+					)}
+				</Fragment>
+			))}
+		</span>
+	);
+}
+
+function ReviewWhat({
+	workspaceSlug,
+	review,
+	eventLabel,
+}: {
+	workspaceSlug: string;
+	review: ReviewDetail;
+	eventLabel: (name: string) => string;
+}) {
+	const origin = REVIEW_ORIGIN_DEFS[review.origin];
+	const event = review.startedBy;
+	return (
 		<ReviewFactGrid>
-			<ReviewFact label="Reviewed as">{JOB_TYPE_LABELS[job.jobType]}</ReviewFact>
-			<ReviewFact label="Started by">{startedBy}</ReviewFact>
-			{summary?.origin !== undefined && (
-				<ReviewFact label="Origin">
-					<span title={OBSERVATION_ORIGIN_DEFS[summary.origin].description}>
-						{OBSERVATION_ORIGIN_DEFS[summary.origin].label}
+			<ReviewFact label="Kind">{kindLabel(review)}</ReviewFact>
+			<ReviewFact label="Started by">
+				<span className="space-y-0.5">
+					<span className="block" title={origin.description}>
+						{origin.label}
+						{review.requestedBy !== null && ` by ${accountName(review.requestedBy)}`}
 					</span>
+					{event !== null && (
+						<span className="block text-muted-foreground">
+							{eventLabel(event.name)} · <ReviewDayTime at={event.occurredAt} /> ·{" "}
+							<span title={FOUND_BY_DESCRIPTIONS[event.foundBy]}>
+								{FOUND_BY_LABELS[event.foundBy]}
+							</span>
+						</span>
+					)}
+				</span>
+			</ReviewFact>
+			<ReviewFact label="Results">
+				<ResultCountLinks
+					workspaceSlug={workspaceSlug}
+					counts={review.results}
+					scope={{ reviewId: review.id }}
+					empty="None"
+				/>
+			</ReviewFact>
+			{review.kind !== "SCAN" && (
+				<ReviewFact label="Feedback">
+					<FeedbackCountLinks workspaceSlug={workspaceSlug} review={review} />
 				</ReviewFact>
 			)}
-			{moment !== undefined && hasText(moment.revision) && (
-				<ReviewFact label="Reviewed revision">
-					<code className="break-all">{revisionLabel(moment.revision)}</code>
+			{hasText(review.itemVersion) && (
+				<ReviewFact label="Reviewed version">
+					<code className="break-all">{review.itemVersion}</code>
 				</ReviewFact>
 			)}
-			{summary !== undefined && summary.developers.length > 0 && (
-				<ReviewFact label={summary.developers.length === 1 ? "Developer" : "Developers"}>
-					{summary.developers.map((developer) => subjectLabel(developer)).join(", ")}
+			{review.kind === "SCAN" && (
+				<ReviewFact label="Report">
+					<Link
+						to="/w/$workspaceSlug/admin/practices/scans/$scanId"
+						params={{ workspaceSlug, scanId: review.id }}
+						className={buttonVariants({ variant: "link", size: "inline" })}
+					>
+						Open the scan report
+					</Link>
 				</ReviewFact>
-			)}
-			{summary?.positionOnWork !== undefined && (
-				<ReviewFact label="On this work">Review {summary.positionOnWork}</ReviewFact>
-			)}
-			{job.status === "COMPLETED" && (
-				<ReviewFact label="Outcome">{REVIEW_OUTCOME_LABELS[job.reviewOutcome]}</ReviewFact>
 			)}
 		</ReviewFactGrid>
 	);
 }
 
-/**
- * The current attempt's wall-clock phases between the boundaries the job records: not model,
- * provider or tool timing. A phase still running is in progress, one that has not begun is not
- * started, and one whose boundary is missing is not recorded, never a zero.
- */
-function ReviewPhases({ job }: { job: AgentJob }) {
-	const phases = jobPhases(job);
-	return (
-		<div className="mt-4">
-			<ReviewFactGrid>
-				<ReviewFact label={phases.retried ? "Request to this attempt" : "Wait to start"}>
-					{phases.wait}
-					{phases.retried && (
-						<span className="text-muted-foreground">
-							{" "}
-							(includes earlier attempts and retry waits)
-						</span>
-					)}
-				</ReviewFact>
-				<ReviewFact label="Preparation">{phases.preparation}</ReviewFact>
-				<ReviewFact label="Execution">{phases.execution}</ReviewFact>
-			</ReviewFactGrid>
-		</div>
-	);
+function ReviewHistory({ review }: { review: ReviewDetail }) {
+	return <SheetHistory events={reviewHistory(review)} now={reviewNow(review)} />;
 }
 
-/**
- * From the ask to the first posted comment, each step once with its time and how long the step
- * before it took. The merge is the work's; only how it fell against this review is said here.
- */
-export function reviewHistory(job: AgentJob): SheetEvent[] {
-	const events: SheetEvent[] = [{ key: "asked", at: job.createdAt, title: "Asked for" }];
-	if (hasText(job.holdReason) && job.availableAt.getTime() > job.createdAt.getTime()) {
-		events.push({
-			key: "held",
-			at: job.availableAt,
-			title: "Held until",
-			detail: holdReasonCopy(job.holdReason).label,
-		});
-	}
-	const queued = between(job.createdAt, job.startedAt);
-	if (job.startedAt !== undefined) {
+export function reviewHistory(review: ReviewDetail): SheetEvent[] {
+	const events: SheetEvent[] = [
+		{
+			key: "asked",
+			at: review.createdAt,
+			title: "Asked for",
+			by: review.requestedBy === null ? undefined : accountName(review.requestedBy),
+		},
+	];
+	const started = firstStart(review);
+	const queued = between(review.createdAt, started);
+	if (started !== undefined) {
 		events.push({
 			key: "started",
-			at: job.startedAt,
+			at: started,
 			title: "Started",
 			detail: queued === undefined ? undefined : `after ${queued} in the queue`,
 		});
 	}
-	const preparing = between(job.startedAt, job.executionStartedAt);
-	if (job.executionStartedAt !== undefined) {
-		events.push({
-			key: "model",
-			at: job.executionStartedAt,
-			title: "With the model",
-			detail: preparing === undefined ? undefined : `after ${preparing} preparing`,
-		});
+	for (const job of review.runtime?.jobs ?? []) {
+		if (job.attempt > 1) {
+			events.push({
+				key: `retry-${job.id}`,
+				at: job.availableAt,
+				title: "Retry due",
+				detail: `Attempt ${job.attempt} waits until then after an earlier attempt stopped.`,
+			});
+		}
 	}
-	const publicReviewAcceptedAt = asDate(job.publicReviewAcceptedAt);
-	if (publicReviewAcceptedAt !== undefined) {
-		events.push({
-			key: "public-accepted",
-			at: publicReviewAcceptedAt,
-			title: "Review on the work accepted",
-			detail:
-				"The public decision is recorded. Each piece of feedback records its own delivery state.",
-		});
-	}
-	if (job.completedAt !== undefined) {
-		const withModel = between(job.executionStartedAt, job.completedAt);
-		const cancellation =
-			job.status === "CANCELLED" && job.cancellationReason !== undefined
-				? REVIEW_CANCELLATION_DEFS[job.cancellationReason]
-				: undefined;
+	if (review.completedAt !== null) {
+		const ran = between(started, review.completedAt);
 		events.push({
 			key: "ended",
-			at: job.completedAt,
-			title: reviewStatusDef(job).label,
+			at: review.completedAt,
+			title: REVIEW_STATUS_DEFS[review.status].label,
 			detail: (
 				<>
-					{withModel !== undefined && (
-						<span className="block">after {withModel} with the model</span>
-					)}
-					{cancellation !== undefined && (
-						<span className="block">
-							Reason: {cancellation.label}. {cancellation.description}
-						</span>
-					)}
-					{hasText(job.errorMessage) && (
-						<pre className="mt-1 max-h-48 overflow-auto rounded-md bg-muted/50 p-2 text-xs break-words whitespace-pre-wrap">
-							{job.errorMessage}
-						</pre>
+					{ran !== undefined && <span className="block">after {ran} running</span>}
+					{review.stopReason !== null && (
+						<span className="block">{REVIEW_STOP_REASON_SENTENCES[review.stopReason]}</span>
 					)}
 				</>
 			),
 		});
 	}
-	const posted = between(job.completedAt, job.firstFeedbackPostedAt);
-	if (job.firstFeedbackPostedAt !== undefined) {
-		let detail: string | undefined;
-		if (job.completedAt !== undefined && job.firstFeedbackPostedAt < job.completedAt) {
-			detail = "while the review was still running";
-		} else if (posted !== undefined) {
-			detail = `${posted} after it finished`;
-		}
-		events.push({
-			key: "posted",
-			at: job.firstFeedbackPostedAt,
-			title: "First comment posted",
-			detail,
-		});
-	}
-	const merged = job.workMergedAt;
-	const mergedBefore = between(merged, job.completedAt);
-	if (
-		merged !== undefined &&
-		job.completedAt !== undefined &&
-		mergedBefore !== undefined &&
-		merged < job.completedAt
-	) {
-		events.push({
-			key: "merge",
-			at: undefined,
-			title: "The work was merged before this review finished",
-			detail: `${mergedBefore} before its end. The merge itself is on the work.`,
-		});
-	}
 	return events;
 }
 
-/** "$0.04", or why there is no total: no usage recorded, or an attempt has no confirmed cost. */
-function costText(usage: PanelState<{ usage: AgentJobUsage }> | undefined): string {
-	if (usage === undefined || usage.status === "error") {
-		return "—";
+function itemCountsLine(practice: ReviewPractice): string {
+	const { reviewed, reused, withheld, notReviewed, listed } = practice.itemCounts;
+	const counts: { count: number; label: string }[] = [
+		{ count: reviewed - reused, label: "reviewed" },
+		{ count: reused, label: "reused" },
+		{ count: withheld, label: "withheld" },
+		{ count: notReviewed, label: "not reviewed" },
+		{ count: listed, label: "listed" },
+	];
+	return counts
+		.filter(({ count }) => count > 0)
+		.map(({ count, label }) => `${count} ${label}`)
+		.join(", ");
+}
+
+/** Why a practice that has not finished stands where it does; a finished one lists its results. */
+function practiceReason(practice: ReviewPractice): string | undefined {
+	if (hasText(practice.reason)) {
+		return reviewReasonSentence(practice.reason) ?? practice.reason;
 	}
-	if (usage.status === "loading") {
-		return "Loading…";
+	// Once its script has a run, the trace line under it says how that run went.
+	return practice.script === null
+		? REVIEW_PRACTICE_STATUS_DEFS[practice.status].description
+		: undefined;
+}
+
+function ReviewPracticeList({
+	workspaceSlug,
+	review,
+}: {
+	workspaceSlug: string;
+	review: ReviewDetail;
+}) {
+	if (review.practices.length === 0) {
+		return (
+			<p className="text-sm text-muted-foreground">
+				{isActiveReview(review.status)
+					? "Practices appear here as the review reaches them."
+					: "This review reached no practice, so there is nothing to list here."}
+			</p>
+		);
 	}
-	const { attempts, totalCostUsd, unpricedAttempts } = usage.usage;
+	// The same Done on every row says nothing; the results line already shows each one finished.
+	const showStatus = review.practices.some((practice) => practice.status !== "DONE");
+	return (
+		<ul aria-label="Every practice in this review" className="divide-y rounded-xl border">
+			{review.practices.map((practice) => {
+				const hasResults = RESULT_OUTCOMES.some(([, key]) => practice.results[key] > 0);
+				const reason = practiceReason(practice);
+				return (
+					<li
+						key={practice.practiceSlug}
+						data-practice-status={practice.status}
+						className="@container px-3 py-2.5 text-sm"
+					>
+						<div
+							className={cn(
+								"grid min-w-0 items-start gap-x-4 gap-y-1.5",
+								showStatus
+									? "@lg:grid-cols-[9rem_minmax(0,1fr)_minmax(0,1fr)]"
+									: "@lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]",
+							)}
+						>
+							{showStatus && (
+								<span>
+									<StatusBadge def={REVIEW_PRACTICE_STATUS_DEFS[practice.status]} />
+								</span>
+							)}
+							<span className="font-medium break-words">{practice.practiceName}</span>
+							<span className="flex min-w-0 flex-col gap-1 text-pretty text-muted-foreground">
+								{practice.status !== "DONE" && hasResults && <span>Results recorded so far</span>}
+								{(practice.status === "DONE" || hasResults) && (
+									<span>
+										<ResultCountLinks
+											workspaceSlug={workspaceSlug}
+											counts={practice.results}
+											scope={{ reviewId: review.id, practiceSlug: [practice.practiceSlug] }}
+											practiceName={practice.practiceName}
+											empty="No results"
+										/>
+									</span>
+								)}
+								{practice.status !== "DONE" &&
+									(!hasResults || hasText(practice.reason)) &&
+									reason !== undefined && <span>{reason}</span>}
+								{review.kind === "SCAN" && itemCountsLine(practice) !== "" && (
+									<span className="text-xs">Files: {itemCountsLine(practice)}</span>
+								)}
+								{practice.script !== null && (
+									<span className="text-xs">
+										<PracticeScriptTraceLine
+											workspaceSlug={workspaceSlug}
+											practiceSlug={practice.practiceSlug}
+											practiceName={practice.practiceName}
+											reviewId={review.id}
+											run={practice.script}
+											details={false}
+										/>
+									</span>
+								)}
+							</span>
+						</div>
+					</li>
+				);
+			})}
+		</ul>
+	);
+}
+
+function costText(usage: ReviewUsage): string {
+	const { attempts, costUsd, priced } = usage;
 	if (attempts.length === 0) {
 		return "No usage recorded";
 	}
-	if (totalCostUsd !== undefined) {
-		return attempts.length > 1
-			? `${formatCostUsd(totalCostUsd)} over ${attempts.length} attempts`
-			: formatCostUsd(totalCostUsd);
+	if (priced && costUsd !== null) {
+		const cost = formatCostUsd(Number(costUsd));
+		return attempts.length > 1 ? `${cost} over ${attempts.length} attempts` : cost;
 	}
-	return unpricedAttempts === 1
-		? "Not known: 1 attempt has no confirmed cost"
-		: `Not known: ${unpricedAttempts} attempts have no confirmed cost`;
+	const unpriced = attempts.filter((attempt) => attempt.pricingState === "UNPRICED").length;
+	return unpriced === 1
+		? "Not known: 1 attempt has no price"
+		: `Not known: ${unpriced} attempts have no price`;
 }
 
-/** One attempt's recorded cost, or that the cost remains unavailable. */
-function attemptCostText(attempt: AgentJobUsageAttempt): string {
-	if (attempt.costUsd === undefined) {
-		return "no confirmed cost";
+function attemptCostText(attempt: ReviewUsageAttempt): string {
+	if (attempt.pricingState === "NO_CHARGE") {
+		return "no charge";
 	}
-	return attempt.pricingState === "NO_CHARGE" ? "no charge" : formatCostUsd(attempt.costUsd);
+	return attempt.costUsd === null ? "no price known" : formatCostUsd(Number(attempt.costUsd));
 }
 
-/** Each attempt that reached the model, where a retry made more than one. */
-function UsageAttempts({ attempts }: { attempts: AgentJobUsageAttempt[] }) {
+function UsageAttempts({ attempts }: { attempts: ReviewUsageAttempt[] }) {
 	return (
 		<Section level={4} size="sm" title="Attempts" className="space-y-2">
 			<ol className="space-y-1 text-sm">
 				{attempts.map((attempt) => (
-					<li key={attempt.attempt} className="flex flex-wrap gap-x-2 tabular-nums">
-						<span className="font-medium">Attempt {attempt.attempt + 1}</span>
+					<li
+						key={`${attempt.jobId}-${attempt.attempt}`}
+						className="flex flex-wrap gap-x-2 tabular-nums"
+					>
+						<span className="font-medium">Attempt {attempt.attempt}</span>
 						<span>{attemptCostText(attempt)}</span>
 						<span className="text-muted-foreground">
 							{formatTokens(attempt.inputTokens)} read · {formatTokens(attempt.outputTokens)}{" "}
-							written · {formatTokens(attempt.totalCalls)} calls
-							{hasText(attempt.model) && ` · ${attempt.model}`}
+							written · {formatTokens(attempt.calls)} calls
 						</span>
 					</li>
 				))}
@@ -540,255 +649,159 @@ function UsageAttempts({ attempts }: { attempts: AgentJobUsageAttempt[] }) {
 	);
 }
 
-type ReviewDiagnostics = NonNullable<AgentJob["reviewDiagnostics"]>;
-type PhaseDiagnostics = ReviewDiagnostics["phases"][number];
-type ModelFailure = NonNullable<PhaseDiagnostics["finalModelFailure"]>;
-
-const MODEL_PHASE_LABELS: Record<PhaseDiagnostics["phase"], string> = {
-	PRACTICE: "Practice checks",
-	PUBLIC_REVIEW: "Review on the work",
-	PRIVATE_FEEDBACK: "Private feedback",
-	UNKNOWN: "Not assigned to a phase",
-};
-
-const MODEL_FAILURE_LABELS: Record<ModelFailure["kind"], string> = {
-	HTTP_ERROR: "HTTP error",
-	CONNECTION_TIMEOUT: "Connection timed out",
-	CONNECTION_ERROR: "Connection failed",
-	STREAM_INCOMPLETE: "Response ended early",
-	FINISH_REASON_ERROR: "Model stopped with an error",
-	STREAM_ERROR_EVENT: "Error in the response stream",
-	RESPONSE_FAILED: "Response failed",
-	RESPONSE_STATUS_ERROR: "Response reported an error",
-	TOOL_CALL_INCOMPLETE: "Tool call left incomplete",
-	ABORTED: "Aborted",
-	UNKNOWN: "Unknown failure",
-};
-
-const MODEL_FAILURE_STEP_LABELS: Record<NonNullable<ModelFailure["phase"]>, string> = {
-	REQUEST: "while sending the request",
-	RESPONSE_BODY: "while reading the response",
-};
-
-const NOT_RECORDED = "Not recorded";
-
-function msText(ms: number): string {
-	return ms > 0 && ms < 1000 ? "under 1 s" : durationText(ms / 1000);
-}
-
-function callCount(count: number): string {
-	return count === 1 ? "1 call" : `${count} calls`;
-}
-
-/** The summed model spans, with how many calls they cover: a span is only kept for a timed call. */
-function modelTimeText({ assistantCalls, modelCallTiming: timing }: PhaseDiagnostics): string {
-	if (timing == null || timing.elapsedMs == null) {
-		return NOT_RECORDED;
-	}
-	const coverage =
-		assistantCalls == null
-			? `${callCount(timing.timedCalls)} timed`
-			: `${timing.timedCalls} of ${callCount(assistantCalls)} timed`;
-	const longest = timing.maxElapsedMs == null ? "" : `, longest ${msText(timing.maxElapsedMs)}`;
-	return `${msText(timing.elapsedMs)} over ${coverage}${longest}`;
-}
-
-/** Each kind of failed call and how many; an empty list is none recorded, an absent one unknown. */
-function failedCallsText({ modelFailures }: PhaseDiagnostics): string {
-	if (modelFailures == null) {
-		return NOT_RECORDED;
-	}
-	if (modelFailures.length === 0) {
-		return "None recorded";
-	}
-	return modelFailures
-		.map(({ kind, count }) => `${MODEL_FAILURE_LABELS[kind]}: ${count ?? "number not recorded"}`)
-		.join(" · ");
-}
-
-function lastCallFailureText(failure: ModelFailure): string {
-	const parts = [
-		failure.status == null
-			? MODEL_FAILURE_LABELS[failure.kind]
-			: `${MODEL_FAILURE_LABELS[failure.kind]} ${failure.status}`,
-	];
-	if (failure.phase != null) {
-		parts.push(MODEL_FAILURE_STEP_LABELS[failure.phase]);
-	}
-	if (failure.retryEndedUnsuccessfully === true) {
-		parts.push("after retries ended unsuccessfully");
-	}
-	return `Failed: ${parts.join(", ")}`;
-}
-
-function PhaseActivity({ phase }: { phase: PhaseDiagnostics }) {
-	const labelId = useId();
-	const timing = phase.modelCallTiming;
-	const turns = phase.recordedTurns === 1 ? "1 turn" : `${phase.recordedTurns} turns`;
+function ReviewJobs({ jobs }: { jobs: ReviewJob[] | undefined }) {
 	return (
-		<div role="group" aria-labelledby={labelId} className="space-y-2">
-			<p id={labelId} className="font-medium">
-				{MODEL_PHASE_LABELS[phase.phase]}
-			</p>
-			<ReviewFactGrid>
-				<ReviewFact label="Closed turns">
-					{turns}, {phase.elapsedMs == null ? "time not recorded" : msText(phase.elapsedMs)}
-				</ReviewFact>
-				<ReviewFact label="Calls recorded">{phase.assistantCalls ?? NOT_RECORDED}</ReviewFact>
-				<ReviewFact label="Model time">{modelTimeText(phase)}</ReviewFact>
-				{timing?.responseMs != null && (
-					<ReviewFact label="Request to SDK response">
-						{msText(timing.responseMs)} over {callCount(timing.respondedCalls)}
-					</ReviewFact>
-				)}
-				<ReviewFact label="Failed calls">{failedCallsText(phase)}</ReviewFact>
-				{phase.finalModelFailure != null && (
-					<ReviewFact label="Latest turn’s last call">
-						{lastCallFailureText(phase.finalModelFailure)}
-					</ReviewFact>
-				)}
-			</ReviewFactGrid>
-		</div>
+		<Section level={4} size="sm" title="Execution" className="space-y-2">
+			{jobs === undefined || jobs.length === 0 ? (
+				<p className="text-sm text-muted-foreground">{RUNTIME_EXPIRED}</p>
+			) : (
+				<ol aria-label="Execution" className="space-y-3 text-sm">
+					{jobs.map((job, index) => (
+						<ReviewJobEntry
+							key={job.id}
+							job={job}
+							position={jobs.length > 1 ? `${index + 1} of ${jobs.length} · ` : ""}
+						/>
+					))}
+				</ol>
+			)}
+		</Section>
 	);
 }
 
-function ModelActivity({ diagnostics }: { diagnostics: ReviewDiagnostics | undefined }) {
-	const phases = diagnostics?.phases.filter((phase) => phase.recordedTurns > 0);
-	let body: ReactNode;
-	if (phases == null) {
-		body = <p className="text-muted-foreground">Not available.</p>;
-	} else if (phases.length === 0) {
-		body = <p className="text-muted-foreground">No closed turns were kept.</p>;
-	} else {
-		body = phases.map((phase) => <PhaseActivity key={phase.phase} phase={phase} />);
+function ReviewJobEntry({ job, position }: { job: ReviewJob; position: string }) {
+	const phases = jobPhases(job);
+	return (
+		<li className="min-w-0 space-y-1">
+			<p className="flex flex-wrap items-center gap-2">
+				<span className="font-medium">
+					{position}Attempt {job.attempt}
+				</span>
+				<StatusBadge def={REVIEW_JOB_STATUS_DEFS[job.status]} />
+				<StatusBadge def={REVIEW_JOB_PROCESSING_DEFS[job.processingStatus]} />
+			</p>
+			<p className="text-muted-foreground tabular-nums">
+				{phases.retried ? "Request to this attempt" : "Wait to start"}: {phases.wait} · Running:{" "}
+				{phases.execution}
+				{job.exitCode !== null && ` · Exit code ${job.exitCode}`}
+			</p>
+			<p className="text-muted-foreground">
+				Trace ID <code className="text-xs break-all">{job.traceId}</code>
+			</p>
+			{hasText(job.errorMessage) && (
+				<pre className="max-h-48 overflow-auto rounded-md bg-muted/50 p-2 text-xs break-words whitespace-pre-wrap">
+					{job.errorMessage}
+				</pre>
+			)}
+		</li>
+	);
+}
+
+function technicalFacts(review: ReviewDetail): TechnicalFact[] {
+	const { usage } = review;
+	const usagePending = isActiveReview(review.status) && usage.attempts.length === 0;
+	let reasoning = 0;
+	let cacheRead = 0;
+	let cacheWrite = 0;
+	for (const attempt of usage.attempts) {
+		reasoning += attempt.reasoningTokens;
+		cacheRead += attempt.cacheReadTokens;
+		cacheWrite += attempt.cacheWriteTokens;
+	}
+	const writtenTokens =
+		reasoning > 0
+			? `${formatTokens(usage.outputTokens)} (${formatTokens(reasoning)} of it reasoning)`
+			: formatTokens(usage.outputTokens);
+	const facts: TechnicalFact[] = [
+		{ label: "Review ID", value: <code>{review.id}</code>, copy: review.id },
+		{ label: "Cost", value: usagePending ? "Not recorded yet" : costText(usage) },
+		{ label: "Model", value: hasText(review.model) ? review.model : "—" },
+		// The review's own calls: a practice script's decision, embedding and reranking calls are on
+		// the Practice scripts section above.
+		{
+			label: "Review model calls",
+			value: usagePending ? "Not recorded yet" : formatTokens(usage.calls),
+		},
+		{
+			label: "Tokens read",
+			value: usagePending ? "Not recorded yet" : formatTokens(usage.inputTokens),
+		},
+		{
+			label: "Tokens written",
+			value: usagePending ? "Not recorded yet" : writtenTokens,
+		},
+		{
+			label: "Cache tokens",
+			value: usagePending
+				? "Not recorded yet"
+				: `${formatTokens(cacheRead)} read · ${formatTokens(cacheWrite)} written`,
+		},
+	];
+	if (review.batchId !== null) {
+		facts.push({ label: "Batch ID", value: <code>{review.batchId}</code>, copy: review.batchId });
+	}
+	return facts;
+}
+
+function GeneratedPaths({ review }: { review: ReviewDetail }) {
+	const { generatedPaths } = review;
+	if (generatedPaths === null) {
+		return null;
 	}
 	return (
 		<Section
 			level={4}
 			size="sm"
-			title="Model activity"
-			description="From the closed turns kept in the review’s output, not a live or complete record of every call. A turn’s time includes tools and local work. Model spans are not a partition of execution. Failed calls may have recovered later."
-			className="space-y-4 text-sm"
+			title="Generated paths"
+			description="Kept as generated output, not judged as hand-written work."
+			className="space-y-2 text-sm"
 		>
-			{body}
+			{generatedPaths.withheld ? (
+				<p className="text-muted-foreground">
+					{hasText(generatedPaths.reason)
+						? generatedPaths.reason
+						: "Generated paths were not checked for this review."}
+				</p>
+			) : (
+				<>
+					<p className="break-all">
+						Patterns:{" "}
+						{generatedPaths.patterns.length > 0
+							? generatedPaths.patterns.join(", ")
+							: "None configured"}
+					</p>
+					{generatedPaths.excludedPaths.length > 0 ? (
+						<ul className="list-inside list-disc">
+							{generatedPaths.excludedPaths.map((excluded) => (
+								<li key={excluded}>
+									<code className="break-all">{excluded}</code>
+								</li>
+							))}
+						</ul>
+					) : (
+						<p className="text-muted-foreground">No changed paths matched.</p>
+					)}
+				</>
+			)}
 		</Section>
 	);
 }
 
-function technicalFacts(
-	job: AgentJob,
-	usage: PanelState<{ usage: AgentJobUsage }> | undefined,
-): TechnicalFact[] {
-	const model = [job.model, job.llmModel, job.llmModelVersion].filter((part) => hasText(part));
-	const facts: TechnicalFact[] = [
-		{ label: "Review ID", value: <code>{job.id}</code>, copy: job.id },
-		{ label: "Cost", value: costText(usage) },
-		{ label: "Model", value: model.length > 0 ? model.join(" · ") : "—" },
-		{ label: "Model calls", value: formatTokens(job.llmTotalCalls) },
-		{ label: "Tokens read", value: formatTokens(job.llmTotalInputTokens) },
-		{
-			label: "Tokens written",
-			value:
-				job.llmTotalReasoningTokens != null && job.llmTotalReasoningTokens > 0
-					? `${formatTokens(job.llmTotalOutputTokens)} (${formatTokens(job.llmTotalReasoningTokens)} of it reasoning)`
-					: formatTokens(job.llmTotalOutputTokens),
-		},
-		{
-			label: "Cache tokens",
-			value: `${formatTokens(job.llmCacheReadTokens)} read · ${formatTokens(job.llmCacheWriteTokens)} written`,
-		},
-		{ label: "Retries", value: String(job.retryCount) },
-		{ label: "Exit code", value: job.exitCode === undefined ? "—" : String(job.exitCode) },
-	];
-	if (hasText(job.traceId)) {
-		facts.push({ label: "Trace ID", value: <code>{job.traceId}</code>, copy: job.traceId });
-	}
-	if (job.reviewOutcome === "SUPERSEDED" && hasText(job.coveringJobId)) {
-		facts.push({
-			label: "Newer review ID",
-			value: <code>{job.coveringJobId}</code>,
-			copy: job.coveringJobId,
-		});
-	}
-	if (hasText(job.deliveryCommentId)) {
-		facts.push({
-			label: "Summary comment",
-			value: <code>{job.deliveryCommentId}</code>,
-			copy: job.deliveryCommentId,
-		});
-	}
-	return facts;
-}
-
-/** The paths the review kept as generated output, and the copy of its configuration. */
-function GeneratedPaths({ job }: { job: AgentJob }) {
-	let paths: ReactNode = null;
-	if (job.generatedPaths) {
-		paths = (
-			<Section
-				level={4}
-				size="sm"
-				title="Generated paths"
-				description="Kept as generated output, not judged as hand-written work."
-				className="space-y-2"
-			>
-				<p className="break-all">
-					Patterns:{" "}
-					{job.generatedPaths.patterns.length > 0
-						? job.generatedPaths.patterns.join(", ")
-						: "None configured"}
-				</p>
-				{job.generatedPaths.paths.length > 0 ? (
-					<ul className="list-inside list-disc">
-						{job.generatedPaths.paths.map((path) => (
-							<li key={path}>
-								<code className="break-all">{path}</code>
-							</li>
-						))}
-					</ul>
-				) : (
-					<p className="text-muted-foreground">No changed paths matched.</p>
-				)}
-			</Section>
-		);
-	} else if (job.jobType === "PULL_REQUEST_REVIEW") {
-		paths = (
-			<p className="text-muted-foreground">Generated paths were not recorded for this review.</p>
-		);
-	}
-	return (
-		<div className="space-y-3 text-sm">
-			{paths}
-			<Button
-				variant="outline"
-				size="sm"
-				onClick={() =>
-					copyToClipboard(JSON.stringify(job.configSnapshot, null, 2), "Configuration copied")
-				}
-			>
-				<CopyIcon aria-hidden />
-				Copy configuration
-			</Button>
-		</div>
-	);
-}
-
-/** The checks the review ran for itself; a piece of feedback shows its own on its sheet. */
-function ReviewDeliveryChecks({ state }: { state: PanelState<{ checks: DeliveryCheck[] }> }) {
+function ReviewFeedbackChecks({ state }: { state: PanelState<{ checks: FeedbackCheck[] }> }) {
 	if (state.status === "ready" && state.checks.length === 0) {
 		return null;
 	}
 	return (
-		<Section level={3} title="Delivery checks of the review" className="min-w-0">
+		<Section level={3} title="Feedback checks of the review" className="min-w-0">
 			{state.status === "loading" && <LevelBodySkeleton />}
 			{state.status === "error" && (
 				<QueryErrorAlert
 					error={state.error}
-					title="We could not load the delivery checks"
+					title="We could not load the feedback checks"
 					onRetry={state.onRetry}
 				/>
 			)}
-			{state.status === "ready" && <DeliveryPolicyTrace evaluations={state.checks} />}
+			{state.status === "ready" && <FeedbackChecks checks={state.checks} />}
 		</Section>
 	);
 }

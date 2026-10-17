@@ -1,12 +1,21 @@
-import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn } from "storybook/test";
+import type { Meta, StoryContext, StoryObj } from "@storybook/react";
+import { expect, fn, within } from "storybook/test";
 
 import { PageLayout } from "@/components/layout/PageLayout";
 import { withStandardPage } from "@/stories/decorators";
 import { STORY_NOW } from "@/stories/story-clock";
+import { precedes } from "@/test/dom";
 
-import { dayOfMonth, eurRate, STORY_MONTH, usageReport, withOwnProvider } from "./fixtures";
-import { addMonths } from "./usage-utils";
+import {
+	dayOfMonth,
+	eurRate,
+	STORY_MONTH,
+	usageReport,
+	withMonthTotals,
+	withOwnProvider,
+	withPracticeScriptUsage,
+} from "./fixtures";
+import { addMonths, formatMonthLabel } from "./usage-utils";
 import { WorkspaceUsageReport } from "./WorkspaceUsageReport";
 
 const FX_DISCLOSURE = /reference rate published on/u;
@@ -42,20 +51,76 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+async function tileOf(
+	canvas: StoryContext["canvas"],
+	purse: "Shared models" | "Own provider",
+): Promise<HTMLElement> {
+	const spend = await canvas.findByRole("region", { name: /^Spend /u });
+	const title = within(spend).getByText(purse);
+	const tile = title.closest("[data-slot='card']");
+	if (!(tile instanceof HTMLElement)) {
+		throw new Error(`No tile is titled ${purse}.`);
+	}
+	return tile;
+}
+
 export const BothCapsHealthy: Story = {
 	play: async ({ canvas }) => {
+		await canvas.findByRole("region", { name: "Spend this month" });
 		await expect(canvas.queryByRole("status")).toBeNull();
 		await expect(canvas.queryByText(FX_DISCLOSURE)).toBeNull();
 		await expect(canvas.queryAllByLabelText(ESTIMATE_LABEL)).toHaveLength(0);
-		canvas.getByRole("button", { name: "Change cap" });
+		const spend = within(canvas.getByRole("region", { name: "Spend this month" }));
+		spend.getByRole("button", { name: "Change provider cap" });
+
+		const shared = within(await tileOf(canvas, "Shared models"));
+		await expect(shared.getByText("$13.48")).toBeVisible();
+		await expect(shared.getByText("of $25")).toBeVisible();
+		await expect(shared.getByText("Set by an instance admin")).toBeVisible();
+		await expect(shared.getByText("54% used")).toBeVisible();
+		const own = within(await tileOf(canvas, "Own provider"));
+		await expect(own.getByText("of $10")).toBeVisible();
+		await expect(own.getByText("Billed to you by your provider")).toBeVisible();
+		await expect(canvas.queryByText(/^Near the /u)).toBeNull();
+		const sharedTile = await tileOf(canvas, "Shared models");
+		const ownTile = await tileOf(canvas, "Own provider");
+		await expect(sharedTile.getBoundingClientRect().height).toBe(
+			ownTile.getBoundingClientRect().height,
+		);
+	},
+};
+
+const PRACTICE_SCRIPT_CARD = "Models for practice scripts, by practice";
+
+export const PracticeScriptModelsByPractice: Story = {
+	args: { report: withPracticeScriptUsage(capped) },
+	play: async ({ canvas }) => {
+		const title = await canvas.findByRole("heading", { name: PRACTICE_SCRIPT_CARD });
+		const runTypes = canvas.getByRole("heading", { name: "By run type" });
+		await expect(precedes(runTypes, title)).toBe(true);
+		const link = canvas.getByRole("link", { name: "Comments explain why" });
+		await expect(link.getAttribute("href")).toMatch(/^\/w\/acme\/admin\/practices\?/u);
+		canvas.getByText(
+			"Decision, embedding and reranking calls from finished reviews, to date. Chat calls from scripts are in each review’s cost. A review that ran several scripts counts once in the total.",
+		);
+	},
+};
+
+export const NoPracticeScriptCalls: Story = {
+	play: async ({ canvas }) => {
+		await expect(await canvas.findByText("By run type")).toBeVisible();
+		await expect(canvas.queryByText(PRACTICE_SCRIPT_CARD)).toBeNull();
 	},
 };
 
 export const NoProviderConnected: Story = {
 	args: { report: baseReport },
 	play: async ({ canvas }) => {
-		canvas.getByText("No provider cap set · nothing has run on a provider of your own");
-		canvas.getByRole("button", { name: "Set cap" });
+		const own = within(await tileOf(canvas, "Own provider"));
+		own.getByText(/^Work on a provider you connect in/u);
+		await expect(canvas.queryByRole("button", { name: /cap/u })).toBeNull();
+		const runTypes = within(canvas.getByRole("table", { name: "AI spend by run type" }));
+		await expect(runTypes.queryByRole("columnheader", { name: "Own provider" })).toBeNull();
 	},
 };
 
@@ -64,8 +129,23 @@ export const ProviderUncapped: Story = {
 		report: { ...capped, ownProviderMonthlyBudgetUsd: undefined },
 	},
 	play: async ({ canvas }) => {
-		canvas.getByText("No provider cap set · billed to you by your provider");
+		const own = within(await tileOf(canvas, "Own provider"));
+		own.getByText("No cap set");
+		own.getByText("Billed to you by your provider");
 		await expect(canvas.queryByRole("progressbar", { name: "Your provider cap used" })).toBeNull();
+		canvas.getByRole("button", { name: "Set provider cap" });
+	},
+};
+
+export const ConnectedBeforeFirstSpend: Story = {
+	args: { report: { ...baseReport, ownProviderInUse: true } },
+	play: async ({ canvas }) => {
+		const own = within(await tileOf(canvas, "Own provider"));
+		await expect(own.getByText("$0.00")).toBeVisible();
+		own.getByText("No cap set");
+		await expect(canvas.getByRole("button", { name: "Set provider cap" })).toBeVisible();
+		const runTypes = within(canvas.getByRole("table", { name: "AI spend by run type" }));
+		await expect(runTypes.getByRole("columnheader", { name: "Own provider" })).toBeVisible();
 	},
 };
 
@@ -74,7 +154,9 @@ export const NoSharedBudget: Story = {
 		report: { ...capped, instanceMonthlyBudgetUsd: undefined },
 	},
 	play: async ({ canvas }) => {
-		canvas.getByText("No shared-model budget set by an instance admin");
+		const shared = within(await tileOf(canvas, "Shared models"));
+		shared.getByText("No budget set");
+		await expect(shared.queryByText("Set by an instance admin")).toBeNull();
 		await expect(
 			canvas.queryByRole("progressbar", { name: "Shared-model budget used" }),
 		).toBeNull();
@@ -83,10 +165,17 @@ export const NoSharedBudget: Story = {
 
 export const ApproachingBothCaps: Story = {
 	args: {
-		report: { ...capped, instanceTotalCostUsd: 22, ownProviderTotalCostUsd: 8.4 },
+		report: withMonthTotals(capped, { instanceTotalCostUsd: 22, ownProviderTotalCostUsd: 8.4 }),
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getAllByRole("status")).toHaveLength(2);
+		await expect(await canvas.findAllByRole("status")).toHaveLength(2);
+		await expect(
+			within(await tileOf(canvas, "Shared models")).getByText("Near the budget"),
+		).toBeVisible();
+		await expect(
+			within(await tileOf(canvas, "Own provider")).getByText("Near the cap"),
+		).toBeVisible();
+		await expect(within(await tileOf(canvas, "Own provider")).getByText("84% used")).toBeVisible();
 	},
 };
 
@@ -94,7 +183,7 @@ export const ApproachingBothCaps: Story = {
 export const ApproachingWithoutProjection: Story = {
 	args: {
 		now: dayOfMonth(STORY_MONTH, 2),
-		report: { ...capped, ownProviderTotalCostUsd: 8.4 },
+		report: withMonthTotals(capped, { ownProviderTotalCostUsd: 8.4 }),
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("status").textContent).not.toMatch(/At this pace/u);
@@ -104,24 +193,25 @@ export const ApproachingWithoutProjection: Story = {
 export const ProviderCapUnenforceable: Story = {
 	args: {
 		report: {
-			...capped,
+			...withMonthTotals(capped, { unpricedEventCount: 7 }),
 			ownProviderBudgetVerdict: "UNVERIFIABLE",
 			ownProviderPaused: true,
-			unpricedEventCount: 7,
 		},
 	},
 	play: async ({ canvas }) => {
 		canvas.getByText("Your provider cap cannot be enforced");
+		const own = within(await tileOf(canvas, "Own provider"));
+		own.getByText("Paused");
+		own.getByText("Unavailable cost");
 	},
 };
 
 export const SharedBudgetUnverifiable: Story = {
 	args: {
 		report: {
-			...capped,
+			...withMonthTotals(capped, { unpricedEventCount: 7 }),
 			instanceBudgetVerdict: "UNVERIFIABLE",
 			instancePaused: true,
-			unpricedEventCount: 7,
 		},
 	},
 	play: async ({ canvas }) => {
@@ -132,7 +222,7 @@ export const SharedBudgetUnverifiable: Story = {
 export const BothCapsUnverifiable: Story = {
 	args: {
 		report: {
-			...capped,
+			...withMonthTotals(capped, { unpricedEventCount: 7 }),
 			instanceBudgetVerdict: "UNVERIFIABLE",
 			instancePaused: true,
 			ownProviderBudgetVerdict: "UNVERIFIABLE",
@@ -143,7 +233,7 @@ export const BothCapsUnverifiable: Story = {
 	play: async ({ canvas }) => {
 		canvas.getByText("Your provider cap cannot be enforced");
 		canvas.getByText("Shared-model spend cannot be verified");
-		canvas.getByText("7 usage records are not counted in these totals");
+		canvas.getByText("7 runs have unavailable cost");
 		const banners = canvas.getAllByRole("alert");
 		await expect(banners).toHaveLength(2);
 		for (const banner of banners) {
@@ -156,9 +246,7 @@ export const BothCapsUnverifiable: Story = {
 export const BothPaused: Story = {
 	args: {
 		report: {
-			...capped,
-			instanceTotalCostUsd: 25.0142,
-			ownProviderTotalCostUsd: 10.12,
+			...withMonthTotals(capped, { instanceTotalCostUsd: 25.0142, ownProviderTotalCostUsd: 10.12 }),
 			instanceBudgetVerdict: "EXHAUSTED",
 			instancePaused: true,
 			ownProviderBudgetVerdict: "EXHAUSTED",
@@ -169,6 +257,8 @@ export const BothPaused: Story = {
 		const own = await canvas.findByText("Your provider cap is reached");
 		const shared = canvas.getByText("Shared-model budget reached");
 		await expect(own.getBoundingClientRect().top).toBeLessThan(shared.getBoundingClientRect().top);
+		await expect(within(await tileOf(canvas, "Shared models")).getByText("Paused")).toBeVisible();
+		await expect(within(await tileOf(canvas, "Own provider")).getByText("Paused")).toBeVisible();
 	},
 };
 
@@ -176,33 +266,54 @@ export const BothPaused: Story = {
 export const ZeroProviderCap: Story = {
 	args: {
 		report: {
-			...capped,
+			...withMonthTotals(capped, { ownProviderTotalCostUsd: 0 }),
 			ownProviderMonthlyBudgetUsd: 0,
-			ownProviderTotalCostUsd: 0,
 			ownProviderBudgetVerdict: "EXHAUSTED",
 			ownProviderPaused: true,
 		},
 	},
 	play: async ({ canvas }) => {
-		canvas.getByText("100% used · Paused");
+		const own = within(await tileOf(canvas, "Own provider"));
+		own.getByText("100% used");
+		own.getByText("Paused");
 	},
 };
 
-export const UsageRecordsWithUnavailableCost: Story = {
+export const ZeroProviderCapNotInUse: Story = {
 	args: {
-		report: { ...capped, unpricedEventCount: 42 },
+		report: {
+			...baseReport,
+			ownProviderMonthlyBudgetUsd: 0,
+			ownProviderBudgetVerdict: "EXHAUSTED",
+			ownProviderPaused: true,
+		},
 	},
 	play: async ({ canvas }) => {
-		canvas.getByText("42 usage records are not counted in these totals");
+		const own = within(await tileOf(canvas, "Own provider"));
+		own.getByText(/^Work on a provider you connect in/u);
+		await expect(canvas.queryByText("Your provider cap is reached")).toBeNull();
+		await expect(canvas.queryByText("Paused")).toBeNull();
+		await expect(canvas.queryByText(/^Near the /u)).toBeNull();
+		await expect(canvas.queryByRole("alert")).toBeNull();
+		await expect(canvas.queryByRole("status")).toBeNull();
 	},
 };
 
-export const SingleUsageRecordWithUnavailableCost: Story = {
+export const RunsWithUnavailableCost: Story = {
 	args: {
-		report: { ...capped, unpricedEventCount: 1 },
+		report: withMonthTotals(capped, { unpricedEventCount: 42 }),
 	},
 	play: async ({ canvas }) => {
-		canvas.getByText("1 usage record is not counted in these totals");
+		canvas.getByText("42 runs have unavailable cost");
+	},
+};
+
+export const SingleRunWithUnavailableCost: Story = {
+	args: {
+		report: withMonthTotals(capped, { unpricedEventCount: 1 }),
+	},
+	play: async ({ canvas }) => {
+		canvas.getByText("1 run has unavailable cost");
 	},
 };
 
@@ -250,12 +361,15 @@ export const PastMonth: Story = {
 		month: LAST_MONTH,
 		isCurrentMonth: false,
 		report: {
-			...withOwnProvider(usageReport(LAST_MONTH)),
-			instanceTotalCostUsd: 25.0142,
+			...withMonthTotals(withOwnProvider(usageReport(LAST_MONTH)), {
+				instanceTotalCostUsd: 25.0142,
+			}),
 			instanceBudgetVerdict: "EXHAUSTED",
 		},
 	},
 	play: async ({ canvas }) => {
+		await canvas.findByRole("region", { name: `Spend in ${formatMonthLabel(LAST_MONTH)}` });
+		await expect(canvas.queryByText("Paused")).toBeNull();
 		await expect(canvas.queryByRole("button", { name: /^(?:Change|Set) cap$/u })).toBeNull();
 		await expect(canvas.queryByRole("alert")).toBeNull();
 		canvas.getByText(
@@ -286,5 +400,31 @@ export const Empty: Story = {
 	play: async ({ canvas }) => {
 		canvas.getByText(/^No AI usage in /u);
 		canvas.getByRole("link", { name: "Open AI models" });
+	},
+};
+
+export const Dark: Story = {
+	args: {
+		report: {
+			...withMonthTotals(withPracticeScriptUsage(capped), {
+				instanceTotalCostUsd: 25.0142,
+				unpricedEventCount: 7,
+			}),
+			instanceBudgetVerdict: "EXHAUSTED",
+			instancePaused: true,
+			ownProviderBudgetVerdict: "UNVERIFIABLE",
+			ownProviderPaused: true,
+		},
+	},
+	globals: { theme: "dark" },
+	play: async ({ canvas }) => {
+		await expect(await canvas.findByRole("heading", { name: PRACTICE_SCRIPT_CARD })).toBeVisible();
+		await expect(
+			canvas.getByRole("progressbar", { name: "Shared-model budget used" }),
+		).toBeVisible();
+		await expect(within(await tileOf(canvas, "Shared models")).getByText("Paused")).toBeVisible();
+		const own = within(await tileOf(canvas, "Own provider"));
+		await expect(own.getByText("Paused")).toBeVisible();
+		await expect(own.getByText("Unavailable cost")).toBeVisible();
 	},
 };

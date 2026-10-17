@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
 
-import { ARTIFACT_KIND } from "@/lib/artifact-kinds";
+import { conversation, document, pullRequest } from "@/stories/practice-profile-story-mock-data";
 import { expectNoPageOverflow, expectTargetSize } from "@/stories/reflow";
 import { inStoryYear } from "@/stories/story-clock";
 
@@ -12,15 +12,11 @@ const meta = {
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
 	args: {
-		latestRun: {
-			reviewId: "run-2026-09-09",
+		latestReview: {
+			reviewId: "5d1e2a3b-0000-4000-8000-000000000909",
 			at: inStoryYear("09-09T14:10"),
-			reviewedWork: {
-				id: "C01/p1",
-				label: "#releases",
-				url: "https://example.slack.com/archives/C01/p1",
-				kind: ARTIFACT_KIND.conversationThread,
-			},
+			item: conversation("#releases"),
+			status: "COMPLETE",
 		},
 		counts: { STRENGTH: 7, MIXED: 3, DEVELOPING: 2, NO_OPPORTUNITY: 1, NOT_OBSERVED: 3 },
 		practiceCount: 16,
@@ -46,7 +42,7 @@ export const Default: Story = {
 			"3Mixed",
 			"7Going well",
 			"1Nothing to report",
-			"3Not observed",
+			"3Not reviewed",
 		]);
 
 		// The chip is one control, and the level it opens is an address.
@@ -74,21 +70,16 @@ export const SomeStandingsAbsent: Story = {
 	},
 };
 
-/**
- * Nothing reviewed yet: every practice stands at "Not observed", so the ring is one grey arc and
- * the legend one line, and the card still names its destination. With no review there is nothing
- * to open, so the chip is a plain badge rather than a door onto an empty list.
- */
-export const NothingObservedYet: Story = {
+export const NothingReviewedYet: Story = {
 	args: {
-		latestRun: undefined,
+		latestReview: undefined,
 		counts: { STRENGTH: 0, MIXED: 0, DEVELOPING: 0, NO_OPPORTUNITY: 0, NOT_OBSERVED: 16 },
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("No review yet")).toBeVisible();
 		await expect(canvas.queryByRole("link", { name: /review/iu })).toBeNull();
 		await expect(canvas.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
-			"16Not observed",
+			"16Not reviewed",
 		]);
 		await expect(canvas.getByRole("link", { name: "See all practice groups" })).toBeVisible();
 	},
@@ -104,15 +95,11 @@ export const LongWorkLabel: Story = {
 		chromatic: { viewports: [320] },
 	},
 	args: {
-		latestRun: {
-			reviewId: "run-2026-09-09",
+		latestReview: {
+			reviewId: "5d1e2a3b-0000-4000-8000-000000000909",
 			at: inStoryYear("09-09T14:10"),
-			reviewedWork: {
-				id: "queue-retry-policy",
-				label: "Queue retry policy for the notification pipeline",
-				url: "https://outline.example.com/doc/queue-retry-policy",
-				kind: ARTIFACT_KIND.document,
-			},
+			item: document(1, "Queue retry policy for the notification pipeline"),
+			status: "COMPLETE",
 		},
 	},
 	play: async ({ canvas }) => {
@@ -123,13 +110,13 @@ export const LongWorkLabel: Story = {
 };
 
 /** A review is being run now, and the chip says so in words. */
-export const ReviewRunning: Story = {
+export const ReviewInProgress: Story = {
 	args: {
-		latestRun: {
-			reviewId: "run-2026-09-27",
+		latestReview: {
+			reviewId: "5d1e2a3b-0000-4000-8000-000000000927",
 			at: inStoryYear("09-27T09:20"),
-			reviewedWork: { id: "905", label: "#905", kind: ARTIFACT_KIND.pullRequest },
-			status: "IN_PROGRESS",
+			item: pullRequest(905),
+			status: "RUNNING",
 		},
 	},
 	play: async ({ canvas }) => {
@@ -141,10 +128,10 @@ export const ReviewRunning: Story = {
 /** A review that stopped before it finished says so about the work, not about the machinery. */
 export const LatestReviewFailed: Story = {
 	args: {
-		latestRun: {
-			reviewId: "run-2026-09-25",
+		latestReview: {
+			reviewId: "5d1e2a3b-0000-4000-8000-000000000925",
 			at: inStoryYear("09-25T11:13"),
-			reviewedWork: { id: "890", label: "#890", kind: ARTIFACT_KIND.pullRequest },
+			item: pullRequest(890),
 			status: "FAILED",
 		},
 	},
@@ -157,7 +144,7 @@ export const LatestReviewFailed: Story = {
 /** A workspace with no practices: the chip says no review has run, and the card has nothing to count. */
 export const Empty: Story = {
 	args: {
-		latestRun: undefined,
+		latestReview: undefined,
 		counts: { STRENGTH: 0, MIXED: 0, DEVELOPING: 0, NO_OPPORTUNITY: 0, NOT_OBSERVED: 0 },
 		practiceCount: 0,
 		groupCount: 0,

@@ -51,7 +51,7 @@ try {
 	await rm(output, { recursive: true, force: true });
 }
 process.stdout.write(
-	"Code editor runtime: CSP, workers, typing, read-only, draft-preserving retry and model ownership passed.\n",
+	"Code editor runtime: CSP, workers, syntax-only markers, typing, read-only, draft-preserving retry and model ownership passed.\n",
 );
 
 async function checkEditor(browser: Browser, url: string, fault: boolean) {
@@ -94,7 +94,7 @@ async function checkEditor(browser: Browser, url: string, fault: boolean) {
 			await expect(page.getByLabel("Other model")).toHaveText("present");
 			await page.getByRole("button", { name: "Retry", exact: true }).click();
 		}
-		const editor = page.getByRole("textbox", { name: "Static analysis script", exact: true });
+		const editor = page.getByRole("textbox", { name: "Practice script", exact: true });
 		await expect(editor).toBeVisible();
 		await expect(page.getByRole("textbox", { name: "Name", exact: true })).toHaveValue(
 			"Keep this edited name",
@@ -119,6 +119,15 @@ async function checkEditor(browser: Browser, url: string, fault: boolean) {
 		await editor.press("ControlOrMeta+A");
 		await editor.pressSequentially("export const restored = true;");
 		await expect(page.getByLabel("Script draft")).toHaveText("export const restored = true;");
+		// Imports are not loaded beside the script, so a syntax error is marked and an unresolved import is not.
+		const markers = async () => {
+			await page.getByRole("button", { name: "Count markers" }).click();
+			return page.getByLabel("Editor markers").textContent();
+		};
+		await page.getByRole("button", { name: "Use a syntax error" }).click();
+		await expect.poll(markers).not.toMatch(/^0?$/u);
+		await page.getByRole("button", { name: "Use an unresolved import" }).click();
+		await expect.poll(markers).toBe("0");
 		await page.getByRole("button", { name: "Count models" }).click();
 		await expect(page.getByLabel("Model count")).toHaveText(fault ? "2" : "1");
 		await page.getByRole("button", { name: "Hide editor" }).click();

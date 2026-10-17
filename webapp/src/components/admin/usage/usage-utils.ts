@@ -1,4 +1,5 @@
-import type { LlmUsageByJobType } from "@/api/types.gen";
+import type { LlmUsageByJobType, WorkspaceLlmUsageReport } from "@/api/types.gen";
+import { PURSES, type Purse } from "@/components/practice-vocabulary/purse-defs";
 import { asDate, type DateLike } from "@/lib/dates";
 
 export type LlmJobType = LlmUsageByJobType["jobType"];
@@ -10,6 +11,86 @@ export const JOB_TYPE_LABELS: Record<LlmJobType, string> = {
 	DOCUMENT_REVIEW: "Document review",
 	MENTOR_TURN: "Heph turn",
 };
+
+export interface PurseSpend {
+	instanceTotalCostUsd: number;
+	ownProviderTotalCostUsd: number;
+}
+
+export function spendOf(row: PurseSpend, purse: Purse): number {
+	return purse === "SHARED" ? row.instanceTotalCostUsd : row.ownProviderTotalCostUsd;
+}
+
+export type PurseCaps = Pick<
+	WorkspaceLlmUsageReport,
+	| "instanceTotalCostUsd"
+	| "instanceMonthlyBudgetUsd"
+	| "instancePaused"
+	| "instanceBudgetVerdict"
+	| "ownProviderTotalCostUsd"
+	| "ownProviderMonthlyBudgetUsd"
+	| "ownProviderPaused"
+	| "ownProviderBudgetVerdict"
+	| "ownProviderInUse"
+>;
+
+export interface PurseCap {
+	spendUsd: number;
+	capUsd: number | undefined;
+	paused: boolean;
+	verdict: WorkspaceLlmUsageReport["instanceBudgetVerdict"];
+}
+
+// A cap cannot block a provider that is not in use.
+export function purseCap(usage: PurseCaps, purse: Purse): PurseCap {
+	if (purse === "SHARED") {
+		return {
+			spendUsd: usage.instanceTotalCostUsd,
+			capUsd: usage.instanceMonthlyBudgetUsd,
+			paused: usage.instancePaused,
+			verdict: usage.instanceBudgetVerdict,
+		};
+	}
+	if (!usage.ownProviderInUse) {
+		return {
+			spendUsd: usage.ownProviderTotalCostUsd,
+			capUsd: undefined,
+			paused: false,
+			verdict: "WITHIN",
+		};
+	}
+	return {
+		spendUsd: usage.ownProviderTotalCostUsd,
+		capUsd: usage.ownProviderMonthlyBudgetUsd,
+		paused: usage.ownProviderPaused,
+		verdict: usage.ownProviderBudgetVerdict,
+	};
+}
+
+const SHARED_ONLY: readonly Purse[] = ["SHARED"];
+
+/** Provider use is server-owned; neither spend nor a cap can establish it. */
+export function pursesOf(
+	usage: Pick<WorkspaceLlmUsageReport, "ownProviderInUse">,
+): readonly Purse[] {
+	return usage.ownProviderInUse ? PURSES : SHARED_ONLY;
+}
+
+/** Unknown cost and absent runs cannot establish an average; a measured zero can. */
+export function averageSpend(
+	totalUsd: number,
+	count: number,
+	unpricedCount: number,
+): number | null {
+	if (count === 0 || (totalUsd === 0 && unpricedCount > 0)) {
+		return null;
+	}
+	return totalUsd / count;
+}
+
+export function practiceScriptByPracticeDescription(isCurrentMonth: boolean): string {
+	return `Decision, embedding and reranking calls from finished reviews${isCurrentMonth ? ", to date" : ""}. Chat calls from scripts are in each review’s cost. A review that ran several scripts counts once in the total.`;
+}
 
 /** Current calendar month in UTC as ISO `yyyy-MM`. */
 export function currentMonthUtc(): string {
@@ -141,3 +222,16 @@ export function formatTokens(value: number | undefined): string {
 	}
 	return value.toLocaleString();
 }
+
+export const FIRST_COLUMN =
+	"sticky left-0 z-1 bg-card after:absolute after:inset-y-0 after:right-0 after:w-px after:bg-border";
+
+// Sticky total labels need an opaque background; translucent footer paint would let scrolled cells show through.
+export const TOTAL_CELL = "bg-muted";
+
+export const UNPRICED_RUNS = {
+	label: "Unavailable cost",
+	className: "min-w-24 whitespace-normal text-balance",
+};
+
+export const WIDE_ONLY = "hidden lg:table-cell";

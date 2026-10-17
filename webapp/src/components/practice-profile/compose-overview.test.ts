@@ -1,20 +1,25 @@
 import { describe, expect, it } from "vitest";
 
-import type { ProfileChange, ReviewedWorkRef } from "@/api/types.gen";
+import type { ItemRef, ProfileChange } from "@/api/types.gen";
 import type { FeedbackTextSegment } from "@/components/practice-vocabulary/feedback-text";
-import { ARTIFACT_KIND } from "@/lib/artifact-kinds";
+import { ITEM_KIND } from "@/lib/item-kinds";
 
 import { composeGroupOverview, composeOverview, EMPTY_OVERVIEW } from "./compose-overview";
 
 const AT = new Date("2026-09-09T14:10:00Z");
 
 /** A GitLab merge request, so its noun is the provider's. */
-const pullRequest = (n: number): ReviewedWorkRef => ({
+const pullRequest = (n: number): ItemRef => ({
 	id: String(n),
-	kind: ARTIFACT_KIND.pullRequest,
+	kind: ITEM_KIND.pullRequest,
+	parentId: null,
 	provider: "GITLAB",
 	label: `!${n}`,
+	title: null,
 	url: `https://gitlab.example/mr/${n}`,
+	container: null,
+	path: null,
+	removedAt: null,
 });
 /** The sentence as a reader reads it, pills, groups and links and all. */
 function readSegment(segment: FeedbackTextSegment): string {
@@ -42,10 +47,14 @@ const change = (
 	practiceName: name,
 	groupSlug: "review-ready-work",
 	groupName: "Packaging work for review",
+	direction: null,
+	from: null,
+	to: null,
+	resolvedBy: null,
 	// A feedback change on the wire always names the piece it is about, and a fall back says what
 	// the clean run it emptied was.
-	...(type.startsWith("FEEDBACK_") ? { feedbackId: `${slug}-feedback` } : {}),
-	...(type === "FEEDBACK_RESET" ? { cleanNeeded: 3 } : {}),
+	feedbackId: type.startsWith("FEEDBACK_") ? `${slug}-feedback` : null,
+	cleanNeeded: type === "FEEDBACK_RESET" ? 3 : null,
 	evidence: [pullRequest(421), pullRequest(425)],
 	...extra,
 });
@@ -54,14 +63,19 @@ type Overview = Parameters<typeof composeOverview>[0];
 
 const overview = (partial: Partial<Overview>): Overview => ({
 	...EMPTY_OVERVIEW,
-	latestRun: { reviewId: "job-1", at: AT, reviewedWork: pullRequest(425) },
+	latestReview: {
+		reviewId: "5d1e2a3b-0000-4000-8000-000000000001",
+		at: AT,
+		item: pullRequest(425),
+		status: "COMPLETE",
+	},
 	...partial,
 });
 
 describe("composeOverview", () => {
-	it("has no latest run and no group sentences before the first run", () => {
+	it("has no latest review and no group sentences before the first review", () => {
 		const composed = composeOverview(EMPTY_OVERVIEW);
-		expect(composed.latestRun).toBeUndefined();
+		expect(composed.latestReview).toBeUndefined();
 		expect(composed.groupSentences).toStrictEqual({});
 	});
 
@@ -78,7 +92,7 @@ describe("composeOverview", () => {
 				],
 			}),
 		);
-		expect(composed.latestRun?.reviewId).toBe("job-1");
+		expect(composed.latestReview?.reviewId).toBe("5d1e2a3b-0000-4000-8000-000000000001");
 		expect(composed.groupSentences.communication?.map(plain)).toStrictEqual([
 			"Scope moved to Going well.",
 		]);
@@ -121,7 +135,7 @@ describe("dedupe", () => {
 	const sentencesOf = (changes: ProfileChange[]) =>
 		composeGroupOverview(overview({ changes }), "review-ready-work").practiceSentences;
 
-	it("says no sentence for new feedback: the card says it, so a move up in the same run shows", () => {
+	it("says no sentence for new feedback: the card says it, so a move up in the same review shows", () => {
 		const sentences = sentencesOf([
 			change("STANDING_MOVED", "scope", "Scope", { from: "MIXED", to: "STRENGTH" }),
 			change("FEEDBACK_NEW", "scope", "Scope"),
@@ -211,7 +225,7 @@ describe("group sentences", () => {
 			groupSlug: "g",
 			groupName: "G",
 			changes: [1, 2, 3, 4].map((n) =>
-				change("FIRST_OBSERVED", `p-${n}`, `P ${n}`, { evidence: [] }),
+				change("FIRST_RECORDED", `p-${n}`, `P ${n}`, { evidence: [] }),
 			),
 		});
 		expect(sentences).toStrictEqual(["P 1, P 2, P 3 and P 4 were seen for the first time."]);
@@ -238,9 +252,9 @@ describe("group sentences", () => {
 			groupSlug: "g",
 			groupName: "G",
 			changes: [
-				change("FIRST_OBSERVED", "a", "A", { evidence: [] }),
+				change("FIRST_RECORDED", "a", "A", { evidence: [] }),
 				change("GROUP_MOVED", "", "", { from: "MIXED", to: "STRENGTH", evidence: [] }),
-				change("FIRST_OBSERVED", "b", "B", { evidence: [] }),
+				change("FIRST_RECORDED", "b", "B", { evidence: [] }),
 			],
 		});
 		// The group moved up, so its bullet comes with the moves up, before the first sightings.
@@ -300,7 +314,7 @@ describe("composeGroupOverview", () => {
 						evidence: [pullRequest(423)],
 					}),
 					// Another group's change stays out of this group's level.
-					change("FIRST_OBSERVED", "other", "Other", { groupSlug: "other", groupName: "Other" }),
+					change("FIRST_RECORDED", "other", "Other", { groupSlug: "other", groupName: "Other" }),
 				],
 			}),
 			"review-ready-work",
@@ -326,7 +340,7 @@ describe("practice sentences", () => {
 			groupSlug: "g",
 			groupName: "G",
 			changes: [
-				change("FIRST_OBSERVED", "first", "First", { to: "STRENGTH", evidence: [pullRequest(1)] }),
+				change("FIRST_RECORDED", "first", "First", { to: "STRENGTH", evidence: [pullRequest(1)] }),
 				change("TREND_TURNED", "trend", "Trend", { to: "DECLINING", evidence: [] }),
 			],
 		});
@@ -340,7 +354,7 @@ describe("practice sentences", () => {
 		const sentences = practiceSentences({
 			groupSlug: "g",
 			groupName: "G",
-			changes: [change("FIRST_OBSERVED", "first", "First", { evidence: [] })],
+			changes: [change("FIRST_RECORDED", "first", "First", { evidence: [] })],
 		});
 		expect(plainBullets(sentences.first)).toBe("Seen for the first time.");
 	});

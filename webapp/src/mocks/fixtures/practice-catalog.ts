@@ -1,12 +1,6 @@
-import type { CuratedPracticeDefinition } from "@/api/types.gen";
+import type { PracticeDefinition } from "@/api/types.gen";
 
 import bundledCatalog from "@bundled-practices";
-
-import {
-	mockAuthorDeclaredEvidenceValidation,
-	mockDocumentReviewFields,
-	mockDocumentWorkType,
-} from "./practice";
 
 const group = bundledCatalog.groups.find(
 	(candidate) => candidate.slug === "decisions-and-documentation",
@@ -17,19 +11,31 @@ const practice = group?.practices.find(
 if (group === undefined || practice === undefined) {
 	throw new Error("Bundled document preview practice is missing");
 }
+const { definition } = practice;
 
+// Validate imported catalog JSON before it reaches typed prop fixtures.
 export const realPracticeDefinition = {
-	name: practice.name,
-	artifactKind: mockDocumentWorkType.artifactKind,
-	...mockDocumentReviewFields,
-	criteria: `${bundledCatalog.criteriaPreambles["docs.document"]}\n\n---\n\n${practice.criteria}`,
-	deliveryBehavior: { summaryOnly: false },
-	automatedReviewPolicy: mockDocumentWorkType.recommendedPolicy,
-	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
-	whyItMatters: practice.whyItMatters,
-	whatGoodLooksLike: practice.whatGoodLooksLike,
-	groupSlug: group.slug,
-} satisfies CuratedPracticeDefinition;
+	name: definition.name,
+	reviewOn: { events: definition.reviewOn.events, state: {} },
+	appliesWhen: null,
+	about: "AUTHOR",
+	reads: {
+		contract: definition.reads.contract,
+		sources: [{ source: "docs.document.core", need: "COMPLETE" }],
+	},
+	reviewedBy: { by: "HEPHAESTUS", humanReason: null, limits: [] },
+	criteria: `${bundledCatalog.criteriaPreambles["docs.document"]}\n\n---\n\n${definition.criteria}`,
+	script: null,
+	scan: null,
+	lineNotes: definition.lineNotes,
+	guidance: {
+		whyItMatters: definition.guidance.whyItMatters,
+		whatGoodLooksLike: definition.guidance.whatGoodLooksLike,
+		goingWell: definition.guidance.goingWell,
+		visual: null,
+		guide: null,
+	},
+} satisfies PracticeDefinition;
 
-export const realGroupName = group.name;
-export const realGroupSlug = group.slug;
+export const realPracticeSlug = practice.slug;
+export const realPracticeKind = practice.kind;

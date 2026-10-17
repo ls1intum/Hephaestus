@@ -7,9 +7,12 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import tools.jackson.databind.JsonNode;
@@ -25,7 +28,11 @@ import tools.jackson.databind.JsonNode;
         indexes = {
             @Index(name = "idx_person_evidence_copy_store", columnList = "store_id,state"),
             @Index(name = "idx_person_evidence_copy_job", columnList = "job_id")
-        })
+        },
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uk_person_evidence_copy_workspace",
+                        columnNames = {"id", "workspace_id"}))
 @Getter
 @Setter
 public class PersonEvidenceCopy {
@@ -37,6 +44,10 @@ public class PersonEvidenceCopy {
 
     @Column(name = "job_id", nullable = false)
     private UUID jobId;
+
+    @ColumnDefault("now()")
+    @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
+    private Instant createdAt;
 
     @Column(name = "store_id", nullable = false)
     private UUID storeId;

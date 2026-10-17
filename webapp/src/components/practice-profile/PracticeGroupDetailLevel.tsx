@@ -1,7 +1,7 @@
 import { ClipboardCheckIcon } from "lucide-react";
 import { Fragment, type ReactNode, useState } from "react";
 
-import type { PracticeGroup, PracticeGroupStanding, PracticeStanding } from "@/api/types.gen";
+import type { GroupRef, PracticeGroupStanding, PracticeStanding } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
 import { LevelHeader } from "@/components/layout/detail-drawer/LevelHeader";
@@ -43,7 +43,7 @@ export interface PracticeGroupDetailLevelProps {
 	nested?: boolean;
 	/** Where the level sits, from the drawer. */
 	path: LevelPath;
-	group?: PracticeGroup;
+	group?: GroupRef;
 	standing?: PracticeGroupStanding;
 	/** The group's practices, as the standings carry them; left out while they load. */
 	practices?: PracticeStanding[];
@@ -63,10 +63,12 @@ export interface PracticeGroupDetailLevelProps {
 	patterns?: Record<string, PracticePattern | undefined>;
 }
 
+// A group can hold practices that only people review, which never reach this table, so the words
+// claim no reviewed practice rather than no practice at all.
 const NO_PRACTICES_YET = {
 	icon: <ClipboardCheckIcon />,
-	title: "No practices yet",
-	description: "Practices appear here once a workspace admin adds them to this group.",
+	title: "No reviewed practices yet",
+	description: "Practices in this group appear here once reviews of your work check them.",
 };
 
 const NO_PATTERNS: Record<string, PracticePattern | undefined> = {};
@@ -100,11 +102,6 @@ const loadingRow = (
 
 const NO_SENTENCES: NonNullable<PracticeGroupDetailLevelProps["practiceSentences"]> = {};
 
-/**
- * One practice group as the profile's first detail level, in one column: the catalog's words on
- * the group, then the practices it reviews. Where the reader stands in it is the header's. What the
- * reviews found stays one level deeper, on the practice.
- */
 export function PracticeGroupDetailLevel({
 	nested,
 	path,
@@ -125,12 +122,12 @@ export function PracticeGroupDetailLevel({
 	const counts = countPracticeStandings(practices ?? []);
 	// The table's sort is this level's alone: it is not a place a reader returns to by URL.
 	const [sort, setSort] = useState(DEFAULT_PRACTICE_GROUP_SORT);
-	// Practices that never applied, and the ones no review has observed yet, leave the table for one
+	// Practices that never applied, and the ones no review has reviewed yet, leave the table for one
 	// folded line each under it.
-	const { shown: applied, neverApplied, notObserved } = splitFoldedPractices(practices ?? []);
+	const { shown: applied, neverApplied, notReviewed } = splitFoldedPractices(practices ?? []);
 	// Every practice of the group sits in a fold: the group has practices, so "No practices yet"
 	// would be wrong. The folds stand open instead and their own sentences say why.
-	const onlyFolded = applied.length === 0 && neverApplied.length + notObserved.length > 0;
+	const onlyFolded = applied.length === 0 && neverApplied.length + notReviewed.length > 0;
 	const byStanding = (rows: readonly PracticeStanding[]) =>
 		sortByStanding(
 			rows,
@@ -159,8 +156,8 @@ export function PracticeGroupDetailLevel({
 				) : (
 					<StandingCell
 						standing={practice.standing}
-						direction={practice.direction}
-						support={practice.trendSupport}
+						direction={practice.direction ?? undefined}
+						support={practice.trendSupport ?? undefined}
 						scope="practice"
 					/>
 				)}
@@ -215,7 +212,7 @@ export function PracticeGroupDetailLevel({
 				isLoading ? undefined : (
 					<>
 						{fold(neverApplied, "never-applied", columns)}
-						{fold(notObserved, "not-observed", columns)}
+						{fold(notReviewed, "not-reviewed", columns)}
 					</>
 				)
 			}
@@ -240,22 +237,17 @@ export function PracticeGroupDetailLevel({
 			/>
 		);
 	} else if (group && practiceCount === 0) {
-		// The page lists no such group; a link to one lands here rather than on an empty table.
+		// The page folds such a group; its row or a link to it lands here rather than on an empty table.
 		body = <GroupWithoutPractices />;
 	} else if (group) {
 		body = (
-			<>
-				{hasText(group.description) && (
-					<p className="max-w-2xl text-base text-pretty">{group.description}</p>
-				)}
-				<Section
-					size="lg"
-					title="Practices in this group"
-					description="Each practice with its standing and trend. Open one for the work behind it."
-				>
-					{practicesTable}
-				</Section>
-			</>
+			<Section
+				size="lg"
+				title="Practices in this group"
+				description="Each practice with its standing and trend. Open one for the work behind it."
+			>
+				{practicesTable}
+			</Section>
 		);
 	} else {
 		body = <NoSuchGroup />;
@@ -273,8 +265,8 @@ export function PracticeGroupDetailLevel({
 						size="lg"
 						slug={group?.slug}
 						name={group?.name}
-						icon={group?.icon}
-						color={group?.color}
+						icon={group?.icon ?? undefined}
+						color={group?.color ?? undefined}
 					/>
 				}
 				chips={
@@ -287,11 +279,11 @@ export function PracticeGroupDetailLevel({
 							<StandingBadge
 								standing={standing?.standing ?? "NOT_OBSERVED"}
 								scope="group"
-								support={standing?.trendSupport}
+								support={standing?.trendSupport ?? undefined}
 							/>
 							<TrendNote
-								direction={standing?.direction}
-								support={standing?.trendSupport}
+								direction={standing?.direction ?? undefined}
+								support={standing?.trendSupport ?? undefined}
 								scope="group"
 							/>
 						</>
@@ -312,6 +304,11 @@ export function PracticeGroupDetailLevel({
 				{/* The line under the header, with the room on each side that the blocks below keep
 				    between them. */}
 				<Separator />
+				{hasText(standing?.groupDescription) && (
+					<p className="max-w-prose text-sm break-words text-muted-foreground">
+						{standing.groupDescription}
+					</p>
+				)}
 				{body}
 			</DrawerBody>
 		</>

@@ -6,8 +6,11 @@ import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCatalog;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataContributor;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataSelection;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataStores;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentityResolver;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopyCleanupCustody;
+import de.tum.cit.aet.hephaestus.practices.review.report.ScanReportService;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -20,219 +23,236 @@ import tools.jackson.databind.ObjectMapper;
 @ConditionalOnServerRole
 @RequiredArgsConstructor
 @PersonDataStores({
-    "delivery_policy_evaluation",
-    "feedback_dispatch",
-    "reaction",
-    "feedback_placement",
-    "feedback_observation",
-    "feedback_approval",
-    "feedback_withdrawal",
-    "observation_invalidation",
+    "feedback_send",
+    "feedback_response",
+    "feedback_copy",
+    "feedback_basis",
+    "feedback_decision",
     "feedback",
-    "observation",
-    "feedback_approval_actor",
-    "feedback_withdrawal_actor",
-    "feedback_restoration_actor",
-    "observation_invalidation_actor",
-    "observation_restoration_actor"
+    "result_mark",
+    "review_item",
+    "problem",
+    "result",
+    "result_mark_created_actor",
+    "result_mark_removed_actor",
+    "feedback_decision_actor",
+    "review",
+    "review_batch",
+    "review_schedule"
 })
 public class PracticesPersonDataCatalog implements PersonDataCatalog, PersonConversationCopySource {
-    // Observations and feedback belong to the developer they are about. Rows about another developer
-    // stay even when they derive from shared work; the agent and evidence catalogs erase hidden copies.
-    private static final String OBSERVATION_IDS = "SELECT id FROM observation WHERE about_user_id = ANY(:users)";
+    // Migrated review IDs preserve producer job IDs after runtime retention removes the job pointer.
+    private static final String RESULT_IDS =
+            "SELECT id FROM result WHERE developer_id=:account OR (evidence_version=0 AND review_id=ANY(:derivedJobs))"
+                    + " OR id IN(SELECT result_id FROM review_item WHERE"
+                    + " result_id IS NOT NULL AND (job_id=ANY(:derivedJobs) OR EXISTS(SELECT 1 FROM"
+                    + " jsonb_array_elements_text(COALESCE(detail->'custody'->'sourceJobIds','[]'::jsonb)) source(value)"
+                    + " WHERE source.value::uuid=ANY(:derivedJobs))))";
     private static final String FEEDBACK_IDS =
-            "SELECT id FROM feedback WHERE about_user_id = ANY(:users) OR recipient_user_id = ANY(:users)"
-                    + " OR id IN (SELECT feedback_id FROM feedback_observation WHERE observation_id IN ("
-                    + OBSERVATION_IDS + "))";
-    private static final String JOB_IDS =
-            """
-            SELECT j.id FROM agent_job j
-            WHERE j.metadata->>'author_id' IN (SELECT unnest(CAST(:users AS bigint[]))::text)
-            OR j.metadata->>'actor_user_id' IN (SELECT unnest(CAST(:users AS bigint[]))::text)
-            OR j.metadata->>'about_user_id' IN (SELECT unnest(CAST(:users AS bigint[]))::text)
-            """ + " OR j.id IN (SELECT agent_job_id FROM observation WHERE id IN (" + OBSERVATION_IDS
-                    + ")) OR j.id IN (SELECT agent_job_id FROM feedback WHERE id IN (" + FEEDBACK_IDS + "))";
-
+            "SELECT id FROM feedback WHERE developer_id=:account OR id IN(SELECT feedback_id FROM feedback_basis WHERE"
+                    + " result_id IN(" + RESULT_IDS + "))";
     private final NamedParameterJdbcTemplate jdbc;
     private final ObjectMapper mapper;
+    private final FeedbackCopyCleanupCustody custody;
+    private final PersonIdentityResolver identities;
+    private final ScanReportService reports;
 
     @Override
     public List<ConversationCopy> conversationCopies(PersonScope person) {
-        var placement = contributors().stream()
-                .filter(store -> store.store().equals("feedback_placement"))
+        var selected = contributors().stream()
+                .filter(s -> s.store().equals("feedback_copy"))
                 .findFirst()
-                .orElseThrow();
-        var selected = placement.select(person);
+                .orElseThrow()
+                .select(person);
         if (selected.rows().isEmpty()) return List.of();
         return jdbc.query(
                 """
-                SELECT DISTINCT f.workspace_id, p.chat_message_id
-                FROM feedback_placement p JOIN feedback f ON f.id=p.feedback_id
-                WHERE p.chat_message_id IS NOT NULL AND EXISTS (
-                    SELECT 1 FROM jsonb_populate_recordset(NULL::feedback_placement,CAST(:keys AS jsonb)) selected
-                    WHERE selected.id=p.id)
-                ORDER BY f.workspace_id,p.chat_message_id
+                SELECT DISTINCT c.workspace_id,c.chat_message_id FROM feedback_copy c
+                WHERE c.chat_message_id IS NOT NULL AND EXISTS(SELECT 1 FROM jsonb_populate_recordset(NULL::feedback_copy,CAST(:keys AS jsonb)) s WHERE s.id=c.id AND s.workspace_id=c.workspace_id)
+                ORDER BY c.workspace_id,c.chat_message_id
                 """,
                 Map.of(
                         "keys",
                         mapper.writeValueAsString(selected.rows().stream()
                                 .map(PersonDataSelection.RowKey::columns)
                                 .toList())),
-                (rs, row) -> new ConversationCopy(rs.getLong(1), UUID.fromString(rs.getString(2))));
+                (rs, n) -> new ConversationCopy(rs.getLong(1), rs.getObject(2, UUID.class)));
     }
 
     @Override
     public List<PersonDataContributor> contributors() {
-        return List.of(
-                new JdbcPersonDataStore(
-                        jdbc,
-                        mapper,
-                        "delivery_policy_evaluation",
-                        "delivery_policy_evaluation",
-                        "t.feedback_id IN (" + FEEDBACK_IDS + ")" + " OR t.agent_job_id IN (" + JOB_IDS + ")",
-                        "id,workspace_id,agent_job_id,feedback_id,admitted_revision,evaluated_revision,resolver_version,surface,stage,allowed,decisive_reason,checks,facts,evaluated_at",
-                        "id",
-                        "",
-                        -230),
-                new ExternalFeedbackPersonDataStore(
-                        jdbc,
-                        mapper,
-                        "feedback_dispatch",
-                        "feedback_dispatch",
-                        "t.feedback_id IN (" + FEEDBACK_IDS + ")" + " OR t.agent_job_id IN (" + JOB_IDS + ")",
-                        "id,destination_key,workspace_id,agent_job_id,feedback_id,destination,state,body,practice_slugs,package_content,delivered_placements,write_started,delivered_external_ref,delivered_external_url,lease_owner,lease_expires_at,next_attempt_at,attempt_count,suppression_reason,last_error,projected_at,projection_owner,projection_expires_at,created_at,updated_at,write_started_at,inline_write_started",
-                        "id",
-                        "",
-                        -220),
-                new JdbcPersonDataStore(
-                        jdbc,
-                        mapper,
-                        "reaction",
-                        "reaction",
-                        "t.feedback_id IN (" + FEEDBACK_IDS + ")",
-                        "id,reactor_user_id,action,explanation,created_at,feedback_id,recurrence_key,usefulness",
-                        "id",
-                        "",
-                        -210),
-                new ExternalFeedbackPersonDataStore(
-                        jdbc,
-                        mapper,
-                        "feedback_placement",
-                        "feedback_placement",
-                        "t.feedback_id IN (" + FEEDBACK_IDS + ")",
-                        "id,feedback_id,placement_type,anchor_kind,anchor_path,anchor_start_line,anchor_end_line,anchor_side,posted_comment_ref,posted_comment_url,created_at,chat_message_id",
-                        "id",
-                        "",
-                        -200),
-                new JdbcPersonDataStore(
-                        jdbc,
-                        mapper,
-                        "feedback_observation",
-                        "feedback_observation",
-                        "t.feedback_id IN (" + FEEDBACK_IDS + ")",
-                        "feedback_id,observation_id,role,ordinal",
-                        "feedback_id,observation_id",
-                        "",
-                        -190),
-                new JdbcPersonDataStore(
-                        jdbc,
-                        mapper,
-                        "feedback_approval",
-                        "feedback_approval",
-                        "t.feedback_id IN (" + FEEDBACK_IDS + ")",
-                        "id,feedback_id,workspace_id,actor_account_id,decision,rejection_reason,rejection_note,content_digest,decided_at",
-                        "id",
-                        "",
-                        -180),
-                new JdbcPersonDataStore(
-                        jdbc,
-                        mapper,
-                        "feedback_withdrawal",
-                        "feedback_withdrawal",
-                        "t.feedback_id IN (" + FEEDBACK_IDS + ")",
-                        "id,feedback_id,reason,restoration_reason,restored_at,restored_by_account_id,withdrawn_at,withdrawn_by_account_id,workspace_id",
-                        "id",
-                        "",
-                        -180),
-                new JdbcPersonDataStore(
-                        jdbc,
-                        mapper,
-                        "observation_invalidation",
-                        "observation_invalidation",
-                        "t.observation_id IN (" + OBSERVATION_IDS + ")",
-                        "id,invalidated_at,invalidated_by_account_id,observation_id,provider_copy,provider_copy_retry_at,reason,restoration_reason,restored_at,restored_by_account_id,workspace_id",
-                        "id",
-                        "",
-                        -180),
-                new JdbcPersonDataStore(
-                        jdbc,
-                        mapper,
-                        "feedback",
-                        "feedback",
-                        "t.id IN (" + FEEDBACK_IDS + ")",
-                        "id,agent_job_id,workspace_id,artifact_kind,artifact_id,recipient_user_id,about_user_id,channel,position,delivery_state,suppression_reason,body,source,replaces_id,thread_key,created_at,delivered_at,proposed_placements,reviewed_revision,proposed_practice_slugs",
-                        "id",
-                        "",
-                        -160),
-                new JdbcPersonDataStore(
-                        jdbc,
-                        mapper,
-                        "observation",
-                        "observation",
-                        "t.id IN (" + OBSERVATION_IDS + ")",
-                        "id,occurrence_key,agent_job_id,practice_id,artifact_kind,artifact_id,about_user_id,summary,outcome,severity,evidence,evidence_rationale,observed_at,recurrence_key,practice_revision_id,origin,workspace_id,superseded_at",
-                        "id",
-                        "",
-                        -150),
-                new JdbcPersonDataStore(
-                        jdbc,
-                        mapper,
-                        "feedback_approval_actor",
-                        "feedback_approval",
-                        "t.actor_account_id = :account",
-                        "id,feedback_id,workspace_id,actor_account_id,decision,rejection_reason,rejection_note,decided_at",
-                        "id",
-                        "actor_account_id=NULL,rejection_note=NULL",
-                        -185),
-                new JdbcPersonDataStore(
-                        jdbc,
-                        mapper,
-                        "feedback_withdrawal_actor",
-                        "feedback_withdrawal",
-                        "t.withdrawn_by_account_id = :account",
-                        "id,feedback_id,workspace_id,withdrawn_by_account_id,withdrawn_at,reason",
-                        "id",
-                        "withdrawn_by_account_id=NULL,reason='Erased administrator text'",
-                        -185),
-                new JdbcPersonDataStore(
-                        jdbc,
-                        mapper,
-                        "feedback_restoration_actor",
-                        "feedback_withdrawal",
-                        "t.restored_by_account_id = :account",
-                        "id,feedback_id,workspace_id,restored_by_account_id,restored_at,restoration_reason",
-                        "id",
-                        "restored_by_account_id=NULL,restoration_reason=NULL",
-                        -185),
-                new JdbcPersonDataStore(
-                        jdbc,
-                        mapper,
-                        "observation_invalidation_actor",
-                        "observation_invalidation",
-                        "t.invalidated_by_account_id = :account",
-                        "id,observation_id,workspace_id,invalidated_by_account_id,invalidated_at,reason",
-                        "id",
-                        "invalidated_by_account_id=NULL,reason='Erased administrator text'",
-                        -185),
-                new JdbcPersonDataStore(
-                        jdbc,
-                        mapper,
-                        "observation_restoration_actor",
-                        "observation_invalidation",
-                        "t.restored_by_account_id = :account",
-                        "id,observation_id,workspace_id,restored_by_account_id,restored_at,restoration_reason",
-                        "id",
-                        "restored_by_account_id=NULL,restoration_reason=NULL",
-                        -185));
+        return List.<PersonDataContributor>of(
+                        new JdbcPersonDataStore(
+                                jdbc,
+                                mapper,
+                                "review",
+                                "review",
+                                "t.requested_by_id=:account",
+                                "id,workspace_id,kind,origin,requested_by_id,created_at,ordered_at,completed_at",
+                                "id,workspace_id",
+                                "requested_by_id=NULL",
+                                -180),
+                        new JdbcPersonDataStore(
+                                jdbc,
+                                mapper,
+                                "review_batch",
+                                "review_batch",
+                                "t.requested_by_account_id=:account OR t.confirmed_by_account_id=:account",
+                                "id,workspace_id,kind,origin,status,requested_by_account_id,confirmed_by_account_id,created_at,started_at,finished_at",
+                                "id,workspace_id",
+                                "version=version+1,requested_by_account_id=CASE WHEN requested_by_account_id=:account"
+                                        + " THEN NULL ELSE requested_by_account_id END,confirmed_by_account_id=CASE WHEN"
+                                        + " confirmed_by_account_id=:account THEN NULL ELSE confirmed_by_account_id END",
+                                -180),
+                        new JdbcPersonDataStore(
+                                jdbc,
+                                mapper,
+                                "review_schedule",
+                                "review_schedule",
+                                "t.created_by_account_id=:account",
+                                "id,workspace_id,kind,cadence,enabled,created_by_account_id,created_at,last_run_at,next_run_at",
+                                "id,workspace_id",
+                                "created_by_account_id=NULL",
+                                -180),
+                        new JdbcPersonDataStore(
+                                jdbc,
+                                mapper,
+                                "feedback_send",
+                                "feedback_send",
+                                "t.feedback_id IN(" + FEEDBACK_IDS + ")",
+                                "feedback_id,workspace_id,action,state,lease_owner,lease_expires_at,next_attempt_at,attempts,last_error,created_at,updated_at",
+                                "feedback_id,workspace_id",
+                                "",
+                                -230),
+                        new JdbcPersonDataStore(
+                                jdbc,
+                                mapper,
+                                "feedback_response",
+                                "feedback_response",
+                                "t.feedback_id IN(" + FEEDBACK_IDS + ")",
+                                "id,workspace_id,feedback_id,resolution,usefulness,comment,created_at",
+                                "id,workspace_id",
+                                "",
+                                -220),
+                        new ExternalFeedbackPersonDataStore(
+                                custody,
+                                jdbc,
+                                mapper,
+                                "feedback_copy",
+                                "feedback_copy",
+                                "t.feedback_id IN(" + FEEDBACK_IDS + ")",
+                                "id,workspace_id,feedback_id,kind,position,body,path,start_line,end_line,side,stop_reason,last_error,state,write_started_at,write_key,write_marker,external_ref,external_url,chat_message_id,created_at,posted_at",
+                                "id,workspace_id",
+                                "",
+                                -210),
+                        new JdbcPersonDataStore(
+                                jdbc,
+                                mapper,
+                                "feedback_basis",
+                                "feedback_basis",
+                                "t.feedback_id IN(" + FEEDBACK_IDS + ")",
+                                "id,workspace_id,feedback_id,developer_id,result_id,problem_id,ordinal",
+                                "id,workspace_id",
+                                "",
+                                -200),
+                        new JdbcPersonDataStore(
+                                jdbc,
+                                mapper,
+                                "feedback_decision",
+                                "feedback_decision",
+                                "t.feedback_id IN(" + FEEDBACK_IDS + ")",
+                                "id,workspace_id,feedback_id,action,actor_account_id,reason,note,content_digest,decided_at",
+                                "id,workspace_id",
+                                "",
+                                -190),
+                        new JdbcPersonDataStore(
+                                jdbc,
+                                mapper,
+                                "feedback",
+                                "feedback",
+                                "t.id IN(" + FEEDBACK_IDS + ")",
+                                "id,workspace_id,review_id,item_id,developer_id,destination,state,stop_reason,body,replaces_id,created_at,delivered_at,checks",
+                                "id,workspace_id",
+                                "",
+                                -180),
+                        new ScanReportReferencePersonDataStore(
+                                reports,
+                                jdbc,
+                                mapper,
+                                "review_item",
+                                "review_item",
+                                "t.result_id IN(" + RESULT_IDS
+                                        + ") OR t.job_id=ANY(:derivedJobs) OR EXISTS(SELECT 1 FROM"
+                                        + " jsonb_array_elements_text(COALESCE(t.detail->'custody'->'sourceJobIds','[]'::jsonb))"
+                                        + " source(value) WHERE source.value::uuid=ANY(:derivedJobs))",
+                                "workspace_id,review_id,practice_id,item_id,item_version,state,result_id,job_id,attempted_at,reason,detail",
+                                "workspace_id,review_id,practice_id,item_id",
+                                "",
+                                -175),
+                        new JdbcPersonDataStore(
+                                jdbc,
+                                mapper,
+                                "result_mark",
+                                "result_mark",
+                                "t.result_id IN(" + RESULT_IDS + ")",
+                                "id,workspace_id,result_id,kind,reason,created_by_id,created_at,removed_by_id,removed_at,removal_reason",
+                                "id,workspace_id",
+                                "",
+                                -170),
+                        new JdbcPersonDataStore(
+                                jdbc,
+                                mapper,
+                                "problem",
+                                "problem",
+                                "t.result_id IN(" + RESULT_IDS + ")",
+                                "id,workspace_id,result_id,position,key,severity,summary,explanation,citations,basis,next_step",
+                                "id,workspace_id",
+                                "",
+                                -160),
+                        new JdbcPersonDataStore(
+                                jdbc,
+                                mapper,
+                                "result",
+                                "result",
+                                "t.id IN(" + RESULT_IDS + ")",
+                                "id,workspace_id,review_id,practice_id,practice_version_id,item_id,item_version,developer_id,outcome,summary,explanation,severity,evidence,example,coverage,evidence_version,recorded_at,ended_at,end_reason",
+                                "id,workspace_id",
+                                "",
+                                -150),
+                        new JdbcPersonDataStore(
+                                jdbc,
+                                mapper,
+                                "result_mark_created_actor",
+                                "result_mark",
+                                "t.created_by_id=:account",
+                                "id,workspace_id,result_id,created_by_id,created_at,reason",
+                                "id,workspace_id",
+                                "created_by_id=NULL,reason='Erased administrator text'",
+                                -180),
+                        new JdbcPersonDataStore(
+                                jdbc,
+                                mapper,
+                                "result_mark_removed_actor",
+                                "result_mark",
+                                "t.removed_by_id=:account",
+                                "id,workspace_id,result_id,removed_by_id,removed_at,removal_reason",
+                                "id,workspace_id",
+                                "removed_by_id=NULL,removal_reason=NULL",
+                                -180),
+                        new JdbcPersonDataStore(
+                                jdbc,
+                                mapper,
+                                "feedback_decision_actor",
+                                "feedback_decision",
+                                "t.actor_account_id=:account",
+                                "id,workspace_id,feedback_id,action,actor_account_id,reason,note,content_digest,decided_at",
+                                "id,workspace_id",
+                                "actor_account_id=NULL,note=NULL,reason=CASE WHEN action='APPROVE' THEN NULL ELSE"
+                                        + " 'Erased administrator text' END",
+                                -180))
+                .stream()
+                .map(store ->
+                        (PersonDataContributor) new CapturedPersonDataContributor(store, identities, jdbc, mapper))
+                .toList();
     }
 }

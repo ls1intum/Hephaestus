@@ -27,13 +27,6 @@ export interface ReviewFilterBarProps extends ScopeFiltersProps {
 	noun: readonly [string, string];
 }
 
-/**
- * The filters of the Reviews, Observations and Feedback tabs, in two places. The shared scope
- * (developer, group, practice, date) and "Clear scope" go above the tabs (`ReviewScopeFilters`),
- * because they apply to every tab. Below the tabs are all of the tab's own facets in one row that
- * wraps, then "Reset" for those facets alone, and the count on the right. The pills of the tab's
- * own facets are below that row on a phone.
- */
 export function ReviewFilterBar({
 	onClearScope,
 	facets,

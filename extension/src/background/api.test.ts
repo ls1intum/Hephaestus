@@ -3,6 +3,14 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type {
+	DeliveredWorkFeedback,
+	ItemRef,
+	OwnItemTrace,
+	PageResponseDtoProfileReview,
+	ReviewRef,
+	ReviewRequestOutcome,
+} from "~/api/types.gen";
 import { AuthenticatedApi, publicApi } from "~/background/api";
 import {
 	type Credentials,
@@ -66,15 +74,71 @@ function json(body: unknown, status = 200): Response {
 	return Response.json(body, { status });
 }
 
-function ownReviewResponse(
-	run: { reviewId: string; reviewedWork: { kind: string; id: string } },
-	trace: unknown,
-	status = 200,
-) {
+const REVIEW = "0b7c1a52-0d3e-4c55-8a0b-1d2e3f4a5b6c";
+const LATER_REVIEW = "7d5e0c3a-1b2c-4d3e-8f40-000000000002";
+
+function itemRef(id: string): ItemRef {
+	return {
+		id,
+		kind: "scm.pull_request",
+		parentId: null,
+		provider: "GITHUB",
+		label: `#${id}`,
+		title: "Add login",
+		url: `https://github.com/octo/app/pull/${id}`,
+		container: "octo/app",
+		path: null,
+		removedAt: null,
+	};
+}
+
+function reviewRef(id: string, item: ItemRef): ReviewRef {
+	return {
+		id,
+		kind: "ITEM",
+		item,
+		itemVersion: "abc",
+		origin: "EVENT",
+		status: "COMPLETE",
+		createdAt: "2026-09-26T11:00:00Z",
+		completedAt: "2026-09-26T11:05:00Z",
+	};
+}
+
+function ownTrace(review: ReviewRef, item = review.item): OwnItemTrace {
+	return { item, review, events: [], results: [] };
+}
+
+function ownReviews(...reviews: ReviewRef[]): PageResponseDtoProfileReview {
+	const content = reviews.map((review) => ({ review, results: [], feedback: [] }));
+	const sort = { empty: false, sorted: true, unsorted: false };
+	return {
+		content,
+		totalElements: content.length,
+		totalPages: content.length === 0 ? 0 : 1,
+		number: 0,
+		size: 10,
+		numberOfElements: content.length,
+		first: true,
+		last: true,
+		empty: content.length === 0,
+		sort,
+		pageable: { offset: 0, pageNumber: 0, pageSize: 10, paged: true, unpaged: false, sort },
+	};
+}
+
+function ownReviewResponse(latest: () => ReviewRef, trace: unknown, status = 200) {
 	return async (request: Request) =>
-		new URL(request.url).pathname.endsWith("/review-runs")
-			? json({ content: [run] })
+		new URL(request.url).pathname.endsWith("/reviews")
+			? json(ownReviews(latest()))
 			: json(trace, status);
+}
+
+function latestOwnReview(latest: () => ReviewRef) {
+	return async (request: Request) =>
+		new URL(request.url).pathname.endsWith("/reviews")
+			? json(ownReviews(latest()))
+			: json(ownTrace(latest()));
 }
 
 function recordFetch(respond: (request: Request) => Promise<Response>) {
@@ -220,151 +284,126 @@ describe("the report's calls", () => {
 		return { built, requests };
 	}
 
-	it("asks for the reader's own observations on one exact piece of work", async () => {
+	it("asks for the reader's own results on one exact item, most actionable first", async () => {
 		const { built, requests } = await api(async () => json({ content: [], totalElements: 0 }));
-		await built.ownObservations("team", "scm.pull_request", 16, 25);
+		await built.ownResults("team", "16", 25);
 		const url = new URL(required(requests[0], "the request").url);
-		expect(url.pathname).toBe("/api/workspaces/team/practices/observations");
+		expect(url.pathname).toBe("/api/workspaces/team/practices/results");
 		expect(Object.fromEntries(url.searchParams)).toStrictEqual({
-			artifactKind: "scm.pull_request",
-			artifactId: "16",
+			itemId: "16",
 			displayableOnly: "true",
-			sort: "SEVERITY",
+			sort: "ACTIONABILITY",
 			size: "25",
 		});
 	});
 
-	it("names the newest own review for this work instead of requesting an aggregate trace", async () => {
-		const reviewId = "0b7c1a52-0d3e-4c55-8a0b-1d2e3f4a5b6c";
-		const answer = {
-			artifactKind: "scm.pull_request",
-			artifactId: 16,
-			reviewedWork: { kind: "scm.pull_request", id: "16", label: "#1" },
-			signals: [],
-			practices: [],
-		};
-		const { built, requests } = await api(
-			ownReviewResponse({ reviewId, reviewedWork: answer.reviewedWork }, answer),
-		);
-		await expect(built.trace("team", "scm.pull_request", 16)).resolves.toStrictEqual(answer);
+	it("names the newest own review of the item instead of requesting an aggregate trace", async () => {
+		const answer = ownTrace(reviewRef(REVIEW, itemRef("16")));
+		const { built, requests } = await api(ownReviewResponse(() => answer.review, answer));
+		await expect(built.trace("team", "16")).resolves.toStrictEqual(answer);
 		const urls = requests.map((request) => new URL(request.url));
 		expect(urls.map((url) => url.pathname)).toStrictEqual([
-			"/api/workspaces/team/practices/reviewed-work/scm.pull_request/16/review-runs",
-			"/api/workspaces/team/practices/trace/scm.pull_request/16/own",
+			"/api/workspaces/team/practices/items/16/reviews",
+			"/api/workspaces/team/practices/items/16/own-trace",
 		]);
 		expect(Object.fromEntries(required(urls[0], "own review request").searchParams)).toStrictEqual({
 			size: "1",
 		});
 		expect(Object.fromEntries(required(urls[1], "named trace request").searchParams)).toStrictEqual(
-			{ reviewId },
+			{ reviewId: REVIEW },
 		);
 	});
 
 	it("does not request an aggregate trace when the reader has no own review", async () => {
-		const { built, requests } = await api(async () => json({ content: [] }));
-		await expect(built.trace("team", "scm.issue", 16)).resolves.toBeNull();
+		const { built, requests } = await api(async () => json(ownReviews()));
+		await expect(built.trace("team", "16")).resolves.toBeNull();
 		expect(requests).toHaveLength(1);
 	});
 
-	it("keeps a missing named trace unavailable and a refused own-run read an error", async () => {
+	it("keeps a missing named trace unavailable and a refused own-review read an error", async () => {
 		const missing = await api(
-			ownReviewResponse(
-				{
-					reviewId: "0b7c1a52-0d3e-4c55-8a0b-1d2e3f4a5b6c",
-					reviewedWork: { kind: "scm.issue", id: "16" },
-				},
-				{ title: "Not found" },
-				404,
-			),
+			ownReviewResponse(() => reviewRef(REVIEW, itemRef("16")), { title: "Not found" }, 404),
 		);
-		await expect(missing.built.trace("team", "scm.issue", 16)).resolves.toBeNull();
+		await expect(missing.built.trace("team", "16")).resolves.toBeNull();
 		const refused = await api(async () => json({ title: "Forbidden" }, 403));
-		await expect(refused.built.trace("team", "scm.issue", 16)).rejects.toMatchObject({
-			code: "server",
-		});
+		await expect(refused.built.trace("team", "16")).rejects.toMatchObject({ code: "server" });
 		expect(refused.requests).toHaveLength(1);
 	});
 
-	it("refuses an own run returned for different work before asking for its trace", async () => {
+	it("refuses an own review returned for another item before asking for its trace", async () => {
 		const { built, requests } = await api(async () =>
-			json({
-				content: [
-					{
-						reviewId: "7d5e0c3a-1b2c-4d3e-8f40-000000000002",
-						reviewedWork: { kind: "scm.issue", id: "99" },
-					},
-				],
-			}),
+			json(ownReviews(reviewRef(LATER_REVIEW, itemRef("99")))),
 		);
-		await expect(built.trace("team", "scm.issue", 16)).rejects.toMatchObject({ code: "server" });
+		await expect(built.trace("team", "16")).rejects.toMatchObject({ code: "server" });
 		expect(requests).toHaveLength(1);
 	});
 
-	it("discovers a newly recorded own run on the next read", async () => {
-		const run = {
-			reviewId: "0b7c1a52-0d3e-4c55-8a0b-1d2e3f4a5b6c",
-			reviewedWork: { kind: "scm.issue", id: "16", label: "#1" },
-		};
-		const { built, requests } = await api(
-			ownReviewResponse(run, {
-				artifactKind: "scm.issue",
-				artifactId: 16,
-				reviewedWork: run.reviewedWork,
-				signals: [],
-				practices: [],
-			}),
-		);
-		await built.trace("team", "scm.issue", 16);
-		run.reviewId = "7d5e0c3a-1b2c-4d3e-8f40-000000000002";
-		await built.trace("team", "scm.issue", 16);
+	it.each([
+		["about another item", ownTrace(reviewRef(REVIEW, itemRef("16")), itemRef("99"))],
+		["of another review", ownTrace(reviewRef(LATER_REVIEW, itemRef("16")))],
+	])("refuses a trace %s than the one named", async (_name, trace) => {
+		const { built } = await api(ownReviewResponse(() => reviewRef(REVIEW, itemRef("16")), trace));
+		await expect(built.trace("team", "16")).rejects.toMatchObject({ code: "server" });
+	});
+
+	it("discovers a newly recorded own review on the next read", async () => {
+		let latest = reviewRef(REVIEW, itemRef("16"));
+		const { built, requests } = await api(latestOwnReview(() => latest));
+		await built.trace("team", "16");
+		latest = reviewRef(LATER_REVIEW, itemRef("16"));
+		await built.trace("team", "16");
 		expect(
 			requests
-				.filter((request) => new URL(request.url).pathname.includes("/trace/"))
+				.filter((request) => new URL(request.url).pathname.endsWith("/own-trace"))
 				.map((request) => new URL(request.url).searchParams.get("reviewId")),
-		).toStrictEqual([
-			"0b7c1a52-0d3e-4c55-8a0b-1d2e3f4a5b6c",
-			"7d5e0c3a-1b2c-4d3e-8f40-000000000002",
-		]);
+		).toStrictEqual([REVIEW, LATER_REVIEW]);
 	});
 
 	it("posts one review request, and returns a refusal as the server's answer", async () => {
-		const { built, requests } = await api(async () =>
-			json({ status: "REFUSED", reason: "COOLDOWN_ACTIVE", reasonDescription: "Too soon." }),
-		);
-		await expect(built.requestReview("team", "scm.pull_request", 16)).resolves.toMatchObject({
+		const refusal: ReviewRequestOutcome = {
 			status: "REFUSED",
-			reasonDescription: "Too soon.",
-		});
+			reviewId: null,
+			reason: "COOLDOWN_ACTIVE",
+		};
+		const { built, requests } = await api(async () => json(refusal));
+		await expect(built.requestReview("team", "16")).resolves.toStrictEqual(refusal);
 		expect(requests).toHaveLength(1);
-		expect(requests[0]?.method).toBe("POST");
-		await expect(requests[0]?.json()).resolves.toStrictEqual({
-			artifactKind: "scm.pull_request",
-			artifactId: 16,
-		});
+		const [request] = requests;
+		expect(request?.method).toBe("POST");
+		expect(new URL(required(request, "the request").url).pathname).toBe(
+			"/api/workspaces/team/practices/review-requests",
+		);
+		await expect(request?.json()).resolves.toStrictEqual({ itemId: "16" });
 	});
 
 	it("says a forbidden request as such, not as a server failure", async () => {
-		const forbidden = await api(async () => json({ title: "Forbidden" }, 403));
-		await expect(forbidden.built.requestReview("team", "scm.issue", 1)).rejects.toMatchObject({
-			code: "forbidden",
-		});
+		for (const status of [403, 404]) {
+			const forbidden = await api(async () => json({ title: "Forbidden" }, status));
+			await expect(forbidden.built.requestReview("team", "1")).rejects.toMatchObject({
+				code: "forbidden",
+			});
+		}
 	});
 
 	it("asks for the reader's own comments on the work by its address, with the session's bearer", async () => {
-		const answer = {
-			work: { id: "16", kind: "scm.pull_request", label: "#16" },
-			hasMore: false,
+		const answer: DeliveredWorkFeedback = {
+			item: itemRef("16"),
 			feedback: [
 				{
 					id: "5c1f7a90-1b2c-4d3e-8f90-a1b2c3d4e5f6",
 					deliveredAt: "2026-09-26T11:00:00Z",
 					practices: [{ slug: "clear-work", name: "Clear work" }],
-					placements: [
+					copies: [
 						{
 							id: "6d2a8b01-2c3d-4e5f-9a01-b2c3d4e5f607",
-							type: "SUMMARY",
-							commentRef: "IC_kwDOA",
-							permalink: "https://github.com/octo/app/pull/16#issuecomment-1",
+							kind: "SUMMARY",
+							externalRef: "IC_kwDOA",
+							externalUrl: "https://github.com/octo/app/pull/16#issuecomment-1",
+							path: null,
+							startLine: null,
+							endLine: null,
+							side: null,
+							postedAt: "2026-09-26T11:00:00Z",
 						},
 					],
 				},
@@ -399,7 +438,7 @@ describe("the report's calls", () => {
 
 	it("never reads the in-app feedback endpoint, which records delivery", async () => {
 		const { built, requests } = await api(async () => json({ content: [], totalElements: 0 }));
-		await built.ownObservations("team", "scm.pull_request", 16, 25);
+		await built.ownResults("team", "16", 25);
 		await built.workFeedback("team", "https://github.com/octo/app/pull/16").catch(() => undefined);
 		expect(requests.some((request) => request.url.includes("/feedback/in-app"))).toBe(false);
 	});

@@ -41,9 +41,19 @@ public record WorkspaceLlmUsageReportDTO(
 
         @NonNull
         @Schema(
-                description = "Ledger usage records this month (either purse) with unavailable cost because rates "
-                        + "are missing or measurements are unverified. They are excluded from "
-                        + "both totals above, so a non-zero value means the real spend may be higher than shown.")
+                description = "Whether this month has an own-provider purse to show. True when the month has at least "
+                        + "one own-provider call, priced or not, so a month of confirmed $0.00 calls counts. For the "
+                        + "current month, also true when the workspace has an enabled own-provider model on an "
+                        + "enabled connection, so its admins can set a provider cap before the first call. The "
+                        + "spend and cap fields cannot answer this.")
+        Boolean ownProviderInUse,
+
+        @NonNull
+        @Schema(
+                description = "Runs this month (job attempts and mentor turns, either purse) with at least one "
+                        + "ledger row whose cost is unavailable because a rate is missing or the measurement is unverified, each counted once. A practice script row counts "
+                        + "toward the run of its review. Those rows are excluded from both totals above, so a "
+                        + "non-zero value means the real spend may be higher than shown.")
         Long unpricedEventCount,
 
         @NonNull
@@ -58,9 +68,9 @@ public record WorkspaceLlmUsageReportDTO(
 
         @NonNull
         @Schema(
-                description = "Whether work on SHARED models is currently paused for this workspace. Authoritative — "
-                        + "it mirrors the live gate rather than being derivable from the verdict alone. Always false for a "
-                        + "past month, which cannot pause anything.")
+                description = "Whether work on SHARED models is currently paused for this workspace. Authoritative —"
+                        + " it mirrors the live gate rather than being derivable from the verdict alone. Always false for"
+                        + " a past month, which cannot pause anything.")
         Boolean instancePaused,
 
         @NonNull @Schema(description = "Whether work on this workspace's OWN provider is currently paused.")
@@ -68,6 +78,16 @@ public record WorkspaceLlmUsageReportDTO(
 
         @NonNull List<LlmUsageByJobTypeDTO> byJobType,
         @NonNull List<LlmUsageByDayDTO> byDay,
+
+        @NonNull
+        @Schema(
+                description = "The decision, embedding and reranking calls of practice scripts, one entry per "
+                        + "practice, most spend first. Their spend is already part of byJobType. Chat calls of "
+                        + "practice scripts are in each review's own cost and not here.")
+        List<LlmUsageByPracticeDTO> byPractice,
+
+        @NonNull @Schema(description = "The byPractice entries in total, read from the ledger.")
+        LlmUsagePracticeScriptTotalDTO practiceScriptTotal,
 
         @Nullable
         @Schema(

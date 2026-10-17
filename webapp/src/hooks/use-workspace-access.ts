@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
+import { accountName, workspaceIdentity } from "@/components/admin/users/account-labels";
 import { hasMinimumWorkspaceRole } from "@/lib/workspace-roles";
 import { useAuth } from "@/runtime/auth/AuthContext";
 import { workspaceMembershipQueryOptions } from "@/runtime/auth/guard";
@@ -21,7 +22,9 @@ export function useWorkspaceAccess() {
 		enabled: Boolean(chromeWorkspaceSlug) && isAuthenticated && !authLoading,
 	});
 
-	const role = membershipQuery.data?.role;
+	const membership = membershipQuery.data;
+	const role = membership?.role;
+	const provider = chromeWorkspace?.providerType;
 
 	return {
 		chromeWorkspaceSlug,
@@ -29,14 +32,12 @@ export function useWorkspaceAccess() {
 		workspaces,
 		role,
 		isAdmin: !userView && hasMinimumWorkspaceRole(role, "ADMIN"),
-		// The account's own login here, which the server chooses per workspace; the sign-in `username`
-		// names whichever linked identity signed in, so it answers only where no membership can.
-		// Undefined while the membership loads, so no page asks for another identity's data first.
+		// Sign-in usernames can name another linked identity; workspace activity needs this provider's login.
 		selfLogin:
 			chromeWorkspaceSlug === undefined || membershipQuery.isError
 				? username
-				: membershipQuery.data?.userLogin,
-		userName: membershipQuery.data?.userName,
+				: membership && (workspaceIdentity(membership.account, provider)?.login ?? undefined),
+		userName: membership && accountName(membership.account, provider),
 		isLoading: workspacesLoading || membershipQuery.isLoading,
 		error: membershipQuery.error,
 	};

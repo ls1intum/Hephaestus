@@ -12,7 +12,6 @@ import de.tum.cit.aet.hephaestus.core.time.TimeRange;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -25,6 +24,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.GitHubIssueDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment.dto.GitHubIssueCommentEventDTO.GitHubCommentDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
@@ -148,7 +148,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         testWorkspace.setDisplayName("Test Workspace");
         testWorkspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         testWorkspace.setPublicActivityEnabled(true);
-        testWorkspace.setOrganization(org);
+        testWorkspace.setOrganizationId(org.getId());
         testWorkspace.setAccountLogin(TEST_ORG_LOGIN);
         testWorkspace.setAccountType(AccountType.ORG);
         testWorkspace = workspaceRepository.save(testWorkspace);
@@ -245,10 +245,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
                 Objects.requireNonNull(reloaded(comment).getIssue()).getId());
     }
 
-    /**
-     * GitHub numbers issues and pull requests in one space per repository: a stored pull request is the parent
-     * of a comment on its number, even beside an issue row with that number and a different native id.
-     */
+    // GitHub shares issue and pull-request numbers; the stored pull request determines a comment's canonical parent.
     @Nested
     class CanonicalPullRequestParent {
 
@@ -276,7 +273,8 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
 
         @Test
         void shouldMoveStoredCommentsOnceAndLeaveEveryOtherParent() {
-            // A retired issue row keeps its tombstone; only its comments move. Retired before any comment is
+            // A retired issue row keeps its tombstone; only its comments move. Retired before any
+            // comment is
             // stored, so saving the detached row cannot orphan one.
             testIssue.setDeletedAt(Instant.parse("2025-02-01T00:00:00Z"));
             testIssue = issueRepository.save(testIssue);
@@ -333,17 +331,17 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             IssueComment comment = storedComment(testIssue, 1);
             PullRequest pr = storedPullRequest(testRepository, 42, TEST_ISSUE_ID + 1);
             long actorId = Objects.requireNonNull(jdbc.queryForObject(
-                    "INSERT INTO \"user\"(native_id,provider_id,login,type) VALUES (?,?,?,'USER') RETURNING id",
+                    "INSERT INTO \"user\"(native_id,provider_id,login,type) VALUES" + " (?,?,?,'USER') RETURNING id",
                     Long.class,
                     77,
                     githubProvider.getId(),
                     "commenter"));
             UUID eventId = UUID.randomUUID();
             jdbc.update("""
-                    INSERT INTO activity_event(id,workspace_id,event_key,event_type,occurred_at,actor_id,
-                        repository_id,target_type,target_id,ingested_at)
-                    VALUES (?,?,'stored-comment','COMMENT_CREATED','2025-01-01 10:00:00Z',?,?,'issue_comment',?,now())
-                    """, eventId, testWorkspace.getId(), actorId, testRepository.getId(), comment.getId());
+                INSERT INTO activity_event(id,workspace_id,event_key,event_type,occurred_at,actor_id,
+                    repository_id,target_type,target_id,ingested_at)
+                VALUES (?,?,'stored-comment','COMMENT_CREATED','2025-01-01 10:00:00Z',?,?,'issue_comment',?,now())
+                """, eventId, testWorkspace.getId(), actorId, testRepository.getId(), comment.getId());
             var before = jdbc.queryForMap("SELECT * FROM activity_event WHERE id=?", eventId);
             var scope =
                     new ActivityScope(testWorkspace.getId(), Set.of(actorId), Set.of(), Set.of(testRepository.getId()));
@@ -640,7 +638,8 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         @Test
         void shouldUseExistingParentWhenItAlreadyExists() {
             GitHubCommentDTO commentDto = createCommentDTO(TEST_COMMENT_ID, "Comment on existing issue");
-            // Use testIssue's number (42) so that findByRepositoryIdAndNumber finds the existing issue
+            // Use testIssue's number (42) so that findByRepositoryIdAndNumber finds the existing
+            // issue
             GitHubIssueDTO issueDto = createIssueDTOForExistingIssue(testIssue.getNativeId(), testIssue.getNumber());
             ProcessingContext context = createContext();
 

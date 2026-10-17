@@ -12,11 +12,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmAuthMode;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageSourceType;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.tracing.Tracer;
 import io.micrometer.tracing.otel.bridge.OtelCurrentTraceContext;
@@ -34,13 +37,16 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import mockwebserver3.MockResponse;
 import mockwebserver3.MockWebServer;
 import mockwebserver3.RecordedRequest;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -50,6 +56,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -84,23 +92,26 @@ class LlmProxyServiceTest extends BaseUnitTest {
     @Mock
     private MentorTurnUsageAccumulator mentorTurnUsageAccumulator;
 
+    @Mock
+    private ProxyRoutingService routingService;
+
     private LlmProxyService controller;
+    private SimpleMeterRegistry meterRegistry;
 
     @BeforeEach
     void setUp() {
         lenient().when(requestPolicy.allows(any())).thenReturn(true);
+        meterRegistry = new SimpleMeterRegistry();
         controller = new LlmProxyService(
                 Tracer.NOOP,
                 WebClient.create(),
                 resolver,
                 OBJECT_MAPPER,
                 new ProxyAccounting(
-                        budgetGate,
-                        usageAccumulator,
-                        mentorTurnUsageAccumulator,
-                        new SimpleMeterRegistry(),
-                        OBJECT_MAPPER),
-                requestPolicy);
+                        budgetGate, usageAccumulator, mentorTurnUsageAccumulator, meterRegistry, OBJECT_MAPPER),
+                requestPolicy,
+                mock(ScanCallGuard.class),
+                routingService);
     }
 
     @Test
@@ -113,8 +124,7 @@ class LlmProxyServiceTest extends BaseUnitTest {
                 new MockHttpServletResponse(),
                 new HttpHeaders(),
                 jsonBody());
-        assertThat(result).isNotNull();
-        assertThat(result.getStatusCode().value()).isEqualTo(403);
+        assertThat(Objects.requireNonNull(result).getStatusCode().value()).isEqualTo(403);
         verifyNoInteractions(resolver, budgetGate);
     }
 
@@ -143,6 +153,8 @@ class LlmProxyServiceTest extends BaseUnitTest {
             assertThat(String.valueOf(result.getBody()))
                     .contains("Shared-model budget reached")
                     .contains("raises the budget");
+            assertThat(blocked("openai-completions", "instance")).isEqualTo(1);
+            assertThat(blocked("openai-completions", "byo")).isZero();
         }
 
         @Test
@@ -162,6 +174,8 @@ class LlmProxyServiceTest extends BaseUnitTest {
             assertThat(String.valueOf(result.getBody()))
                     .contains("Own-provider budget reached")
                     .contains("raises the cap");
+            assertThat(blocked("openai-completions", "byo")).isEqualTo(1);
+            assertThat(blocked("openai-completions", "instance")).isZero();
         }
 
         /** 502, not 429: the credential resolves to nothing, so anything but 429 proves the call got through. */
@@ -202,7 +216,7 @@ class LlmProxyServiceTest extends BaseUnitTest {
                     jsonBody());
 
             assertThat(result).isNotNull();
-            assertThat(result.getStatusCode().value()).isEqualTo(403);
+            assertThat(Objects.requireNonNull(result).getStatusCode().value()).isEqualTo(403);
             verifyNoInteractions(resolver);
             verifyNoInteractions(mentorTurnUsageAccumulator);
             verifyNoInteractions(usageAccumulator);
@@ -279,6 +293,18 @@ class LlmProxyServiceTest extends BaseUnitTest {
         void shouldRejectProtocolPathMismatchBeforeCredentialResolution() {
             authenticate(routing("openai-responses"));
             var request = request("POST", "/internal/llm/chat/completions");
+
+            var result = controller.proxy(request, new MockHttpServletResponse(), new HttpHeaders(), jsonBody());
+
+            assertThat(result).isNotNull();
+            assertThat(result.getStatusCode().value()).isEqualTo(404);
+            verifyNoInteractions(resolver);
+        }
+
+        @Test
+        void shouldRejectANonChatProtocolOnTheReviewPathsWhenTheRoutingNamesOne() {
+            authenticate(routing("openai-embeddings"));
+            var request = request("POST", "/internal/llm/embeddings");
 
             var result = controller.proxy(request, new MockHttpServletResponse(), new HttpHeaders(), jsonBody());
 
@@ -413,6 +439,224 @@ class LlmProxyServiceTest extends BaseUnitTest {
         }
     }
 
+    @Nested
+    class PracticeScriptRoutes {
+
+        @ParameterizedTest
+        @NullSource
+        @ValueSource(strings = {"", "Comment-Quality", "../comment-quality", "-comment-quality"})
+        void shouldRefuseAndCountACallWhenItNamesNoValidPractice(@Nullable String practice) {
+            authenticate(practiceScriptRouting(ModelKind.EMBEDDING, "openai-embeddings"));
+            HttpHeaders headers = new HttpHeaders();
+            if (practice != null) {
+                headers.set(JobTokenAuthenticationFilter.PRACTICE_SCRIPT_PRACTICE_HEADER, practice);
+            }
+
+            var result = controller.proxyPracticeScript(
+                    request("POST", "/internal/llm/practice-script/embedding/embeddings"),
+                    new MockHttpServletResponse(),
+                    headers,
+                    jsonBody());
+
+            assertThat(result).isNotNull();
+            assertThat(result.getStatusCode().value()).isEqualTo(400);
+            assertThat(meterRegistry
+                            .counter("llm.proxy.practice_script.unattributed")
+                            .count())
+                    .isEqualTo(1.0);
+            verifyNoInteractions(resolver, usageAccumulator);
+        }
+
+        @Test
+        void shouldRefuseACallWhenItsPracticeIsLongerThanASlug() {
+            authenticate(practiceScriptRouting(ModelKind.EMBEDDING, "openai-embeddings"));
+
+            var result = controller.proxyPracticeScript(
+                    request("POST", "/internal/llm/practice-script/embedding/embeddings"),
+                    new MockHttpServletResponse(),
+                    practiceHeaders("a".repeat(65)),
+                    jsonBody());
+
+            assertThat(result).isNotNull();
+            assertThat(result.getStatusCode().value()).isEqualTo(400);
+        }
+
+        @Test
+        void shouldRefuseAnOpWhenItIsNotThePathOfTheSlotsProtocol() {
+            authenticate(practiceScriptRouting(ModelKind.DECISION, "openai-decisions"));
+
+            var result = controller.proxyPracticeScript(
+                    request("POST", "/internal/llm/practice-script/decision/chat/completions"),
+                    new MockHttpServletResponse(),
+                    practiceHeaders(),
+                    jsonBody());
+
+            assertThat(result).isNotNull();
+            assertThat(result.getStatusCode().value()).isEqualTo(400);
+            verifyNoInteractions(resolver);
+        }
+
+        @Test
+        void shouldAcceptChatCompletionsOnTheDecisionSlotWhenItsModelIsAChatCompletionsModel() {
+            var routing = practiceScriptRouting(ModelKind.DECISION, "openai-completions");
+            authenticate(routing);
+            stubCredential(routing, credential("openai-completions", LlmAuthMode.BEARER));
+            doThrow(new IllegalArgumentException("blocked"))
+                    .when(requestPolicy)
+                    .validateTarget("https://api.example.com/v1");
+
+            var result = controller.proxyPracticeScript(
+                    request("POST", "/internal/llm/practice-script/decision/chat/completions"),
+                    new MockHttpServletResponse(),
+                    practiceHeaders(),
+                    jsonBody());
+
+            assertThat(result).isNotNull();
+            assertThat(result.getStatusCode().value()).isEqualTo(502);
+        }
+
+        @Test
+        void shouldRefuseASlotWhenItsFrozenProtocolServesAnotherKind() {
+            authenticate(practiceScriptRouting(ModelKind.EMBEDDING, "openai-decisions"));
+
+            var result = controller.proxyPracticeScript(
+                    request("POST", "/internal/llm/practice-script/embedding/decisions"),
+                    new MockHttpServletResponse(),
+                    practiceHeaders(),
+                    jsonBody());
+
+            assertThat(result).isNotNull();
+            assertThat(result.getStatusCode().value()).isEqualTo(404);
+            verifyNoInteractions(resolver);
+        }
+
+        @Test
+        void shouldRefuseAStreamWhenAPracticeScriptCallAsksForOne() {
+            authenticate(practiceScriptRouting(ModelKind.CHAT, "openai-completions"));
+
+            var result = controller.proxyPracticeScript(
+                    request("POST", "/internal/llm/practice-script/chat/chat/completions"),
+                    new MockHttpServletResponse(),
+                    practiceHeaders(),
+                    "{\"stream\":true,\"messages\":[]}".getBytes(StandardCharsets.UTF_8));
+
+            assertThat(result).isNotNull();
+            assertThat(result.getStatusCode().value()).isEqualTo(400);
+            verifyNoInteractions(resolver);
+        }
+
+        @Test
+        void shouldRefuseAPracticeScriptRoutingWhenItReachesAReviewPath() {
+            authenticate(practiceScriptRouting(ModelKind.CHAT, "openai-completions"));
+
+            var result = controller.proxy(
+                    request("POST", "/internal/llm/chat/completions"),
+                    new MockHttpServletResponse(),
+                    practiceHeaders(),
+                    jsonBody());
+
+            assertThat(result).isNotNull();
+            assertThat(result.getStatusCode().value()).isEqualTo(404);
+            verifyNoInteractions(resolver);
+        }
+
+        @Test
+        void shouldRefuseAReviewRoutingWhenItReachesAPracticeScriptPath() {
+            authenticate(routing("openai-completions"));
+
+            var result = controller.proxyPracticeScript(
+                    request("POST", "/internal/llm/practice-script/chat/chat/completions"),
+                    new MockHttpServletResponse(),
+                    practiceHeaders(),
+                    jsonBody());
+
+            assertThat(result).isNotNull();
+            assertThat(result.getStatusCode().value()).isEqualTo(404);
+            verifyNoInteractions(resolver);
+        }
+
+        @Test
+        void shouldRefuseWithPaymentRequiredWhenTheDirectModelCapIsSpent() {
+            var routing = practiceScriptRouting(ModelKind.EMBEDDING, "openai-embeddings");
+            authenticate(routing);
+            when(budgetGate.isDirectModelCapReached(Objects.requireNonNull(routing.attempt())))
+                    .thenReturn(true);
+
+            var result = controller.proxyPracticeScript(
+                    request("POST", "/internal/llm/practice-script/embedding/embeddings"),
+                    new MockHttpServletResponse(),
+                    practiceHeaders(),
+                    jsonBody());
+
+            assertThat(result).isNotNull();
+            assertThat(result.getStatusCode().value()).isEqualTo(402);
+            assertThat(String.valueOf(result.getBody())).isEqualTo("Practice script budget spent");
+            verifyNoInteractions(resolver);
+            assertThat(blocked("openai-embeddings", "practice_script_attempt")).isEqualTo(1);
+            assertThat(blocked("openai-embeddings", "instance")).isZero();
+        }
+
+        @Test
+        void shouldRefuseWithPaymentRequiredWhenTheMonthlyBudgetStopsAPracticeScriptCall() {
+            var routing = practiceScriptRouting(ModelKind.CHAT, "openai-completions");
+            authenticate(routing);
+            when(budgetGate.isBlocked(routing)).thenReturn(true);
+
+            var result = controller.proxyPracticeScript(
+                    request("POST", "/internal/llm/practice-script/chat/chat/completions"),
+                    new MockHttpServletResponse(),
+                    practiceHeaders(),
+                    jsonBody());
+
+            assertThat(result).isNotNull();
+            assertThat(result.getStatusCode().value()).isEqualTo(402);
+            assertThat(String.valueOf(result.getBody())).contains("Shared-model budget reached");
+            verifyNoInteractions(resolver);
+            // An admin fixes a monthly budget and an operator the attempt's cap, so an alert must tell them apart.
+            assertThat(blocked("openai-completions", "instance")).isEqualTo(1);
+            assertThat(blocked("openai-completions", "practice_script_attempt")).isZero();
+        }
+
+        @ParameterizedTest
+        @CsvSource({
+            "DECISION,openai-decisions,/internal/llm/practice-script/decision/decisions,questions,64",
+            "EMBEDDING,openai-embeddings,/internal/llm/practice-script/embedding/embeddings,input,64",
+            "RERANKING,cohere-rerank,/internal/llm/practice-script/reranking/rerank,documents,256"
+        })
+        void shouldRefuseACallBeforeTheUpstreamWhenItHoldsMoreEntriesThanItsBound(
+                ModelKind slot, String protocol, String path, String field, int max) {
+            authenticate(practiceScriptRouting(slot, protocol));
+
+            var atBound = controller.proxyPracticeScript(
+                    request("POST", path), new MockHttpServletResponse(), practiceHeaders(), entries(field, max));
+            var aboveBound = controller.proxyPracticeScript(
+                    request("POST", path), new MockHttpServletResponse(), practiceHeaders(), entries(field, max + 1));
+
+            assertThat(atBound).isNotNull();
+            assertThat(atBound.getStatusCode().value()).isEqualTo(502);
+            assertThat(aboveBound).isNotNull();
+            assertThat(aboveBound.getStatusCode().value()).isEqualTo(413);
+            assertThat(String.valueOf(aboveBound.getBody()))
+                    .isEqualTo("'" + field + "' must hold at most " + max + " entries");
+        }
+
+        private static HttpHeaders practiceHeaders() {
+            return practiceHeaders("comment-quality");
+        }
+
+        private static HttpHeaders practiceHeaders(String practice) {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set(JobTokenAuthenticationFilter.PRACTICE_SCRIPT_PRACTICE_HEADER, practice);
+            return headers;
+        }
+
+        private static byte[] entries(String field, int count) {
+            var body = OBJECT_MAPPER.createObjectNode();
+            body.set(field, OBJECT_MAPPER.valueToTree(Collections.nCopies(count, "entry")));
+            return OBJECT_MAPPER.writeValueAsBytes(body);
+        }
+    }
+
     @ParameterizedTest
     @CsvSource({
         "COMPLETED, 200, OK",
@@ -453,7 +697,9 @@ class LlmProxyServiceTest extends BaseUnitTest {
                             mentorTurnUsageAccumulator,
                             new SimpleMeterRegistry(),
                             OBJECT_MAPPER),
-                    requestPolicy);
+                    requestPolicy,
+                    mock(ScanCallGuard.class),
+                    routingService);
             var routing = routing("openai-completions");
             authenticate(routing);
             when(resolver.resolveProxyCredential(any()))
@@ -500,6 +746,78 @@ class LlmProxyServiceTest extends BaseUnitTest {
         }
     }
 
+    @ParameterizedTest
+    @CsvSource(
+            delimiter = '|',
+            value = {
+                "DECISION|openai-decisions|decision/decisions|"
+                        + "{\"answers\":[],\"usage\":{\"input_tokens\":40,\"output_tokens\":3}}|40|3|",
+                "CHAT|openai-completions|chat/chat/completions|{\"usage\":{\"prompt_tokens\":100,"
+                        + "\"completion_tokens\":5,\"prompt_tokens_details\":{\"cached_tokens\":60}}}|100|5|",
+                "RERANKING|cohere-rerank|reranking/rerank|"
+                        + "{\"results\":[],\"meta\":{\"billed_units\":{\"search_units\":3}}}|||3"
+            })
+    void shouldTagTheUsageOnTheSpanWhenAPracticeScriptCallIsNotStreamed(
+            ModelKind slot,
+            String protocol,
+            String op,
+            String reply,
+            @Nullable Long inputTokens,
+            @Nullable Long outputTokens,
+            @Nullable Long searchUnits) {
+        var exporter = mock(SpanExporter.class);
+        when(exporter.export(any())).thenReturn(CompletableResultCode.ofSuccess());
+        when(exporter.shutdown()).thenReturn(CompletableResultCode.ofSuccess());
+        try (var provider = SdkTracerProvider.builder()
+                .setSampler(Sampler.alwaysOn())
+                .addSpanProcessor(SimpleSpanProcessor.create(exporter))
+                .build()) {
+            var upstreamResponse = ClientResponse.create(HttpStatusCode.valueOf(200))
+                    .header(HttpHeaders.CONTENT_TYPE, "application/json")
+                    .body(reply)
+                    .build();
+            var service = new LlmProxyService(
+                    new OtelTracer(provider.get("test"), new OtelCurrentTraceContext(), event -> {}),
+                    WebClient.builder()
+                            .exchangeFunction(request -> Mono.just(upstreamResponse))
+                            .build(),
+                    resolver,
+                    OBJECT_MAPPER,
+                    new ProxyAccounting(
+                            budgetGate,
+                            usageAccumulator,
+                            mentorTurnUsageAccumulator,
+                            new SimpleMeterRegistry(),
+                            OBJECT_MAPPER),
+                    requestPolicy,
+                    mock(ScanCallGuard.class),
+                    routingService);
+            authenticate(practiceScriptRouting(slot, protocol));
+            when(resolver.resolveProxyCredential(any())).thenReturn(credential(protocol, LlmAuthMode.BEARER));
+            HttpHeaders headers = new HttpHeaders();
+            headers.set(JobTokenAuthenticationFilter.PRACTICE_SCRIPT_PRACTICE_HEADER, "comment-quality");
+
+            var result = service.proxyPracticeScript(
+                    request("POST", "/internal/llm/practice-script/" + op),
+                    new MockHttpServletResponse(),
+                    headers,
+                    "{}".getBytes(StandardCharsets.UTF_8));
+
+            assertThat(result).isNotNull();
+            assertThat(result.getStatusCode().value()).isEqualTo(200);
+            verify(exporter).export(argThat(spans -> {
+                var attributes = spans.iterator().next().getAttributes();
+                assertThat(attributes.get(AttributeKey.longKey("gen_ai.usage.input_tokens")))
+                        .isEqualTo(inputTokens);
+                assertThat(attributes.get(AttributeKey.longKey("gen_ai.usage.output_tokens")))
+                        .isEqualTo(outputTokens);
+                assertThat(attributes.get(AttributeKey.longKey("hephaestus.usage.search_units")))
+                        .isEqualTo(searchUnits);
+                return true;
+            }));
+        }
+    }
+
     /**
      * These tests drive an actual HTTP stream because the failure they guard against is invisible to any
      * mock: a controller that returns the instant it sees an SSE body serves a perfect response and
@@ -528,7 +846,9 @@ class LlmProxyServiceTest extends BaseUnitTest {
                             mentorTurnUsageAccumulator,
                             streamingMeterRegistry,
                             OBJECT_MAPPER),
-                    requestPolicy);
+                    requestPolicy,
+                    mock(ScanCallGuard.class),
+                    routingService);
         }
 
         @AfterEach
@@ -541,11 +861,13 @@ class LlmProxyServiceTest extends BaseUnitTest {
                     "job:stream",
                     "openai-completions",
                     upstream.url("/v1").toString(),
-                    FundingSource.INSTANCE,
+                    UsageFundingSource.INSTANCE,
                     7L,
                     8L,
                     9L,
-                    ATTEMPT);
+                    ATTEMPT,
+                    null,
+                    null);
         }
 
         private MockHttpServletResponse proxyStream(String... sseFrames) {
@@ -620,7 +942,7 @@ class LlmProxyServiceTest extends BaseUnitTest {
             proxyStream("{\"usage\":{\"prompt_tokens\":1,\"prompt_tokens_details\":{\"cached_tokens\":2}}}");
 
             assertThat(streamingMeterRegistry
-                            .counter("llm.proxy.usage.unparseable", "sourceType", "AGENT_JOB")
+                            .counter("llm.proxy.usage.unparseable", "sourceType", UsageSourceType.REVIEW_JOB.name())
                             .count())
                     .isEqualTo(1.0);
             assertThat(missingUsage())
@@ -631,7 +953,7 @@ class LlmProxyServiceTest extends BaseUnitTest {
 
         private double missingUsage() {
             return streamingMeterRegistry
-                    .counter("llm.proxy.usage.missing", "sourceType", "AGENT_JOB")
+                    .counter("llm.proxy.usage.missing", "sourceType", UsageSourceType.REVIEW_JOB.name())
                     .count();
         }
 
@@ -706,11 +1028,13 @@ class LlmProxyServiceTest extends BaseUnitTest {
                     "job:stream",
                     "openai-responses",
                     upstream.url("/v1").toString(),
-                    FundingSource.INSTANCE,
+                    UsageFundingSource.INSTANCE,
                     7L,
                     8L,
                     9L,
-                    ATTEMPT);
+                    ATTEMPT,
+                    null,
+                    null);
             authenticate(routing);
             stubCredential(
                     routing,
@@ -785,9 +1109,9 @@ class LlmProxyServiceTest extends BaseUnitTest {
 
     @Test
     void shouldBuildCanonicalProtocolUrls() {
-        assertThat(LlmProxyService.buildUpstreamUri("https://api.example.com/v1/", "openai-completions"))
+        assertThat(LlmProxyService.buildUpstreamUri("https://api.example.com/v1/", LlmApiProtocol.OPENAI_COMPLETIONS))
                 .isEqualTo(URI.create("https://api.example.com/v1/chat/completions"));
-        assertThat(LlmProxyService.buildUpstreamUri("https://api.example.com/v1", "openai-responses"))
+        assertThat(LlmProxyService.buildUpstreamUri("https://api.example.com/v1", LlmApiProtocol.OPENAI_RESPONSES))
                 .isEqualTo(URI.create("https://api.example.com/v1/responses"));
     }
 
@@ -810,8 +1134,14 @@ class LlmProxyServiceTest extends BaseUnitTest {
         return headers;
     }
 
+    private double blocked(String apiProtocol, String cap) {
+        return meterRegistry
+                .counter("llm.proxy.budget.blocked", "apiProtocol", apiProtocol, "cap", cap)
+                .count();
+    }
+
     private static final ProxyRouting.BilledAttempt ATTEMPT = new ProxyRouting.BilledAttempt(
-            LlmUsageSourceType.AGENT_JOB,
+            UsageSourceType.REVIEW_JOB,
             UUID.fromString("00000000-0000-0000-0000-0000000000aa"),
             0,
             BigDecimal.ZERO,
@@ -819,7 +1149,30 @@ class LlmProxyServiceTest extends BaseUnitTest {
 
     private static ProxyRouting routing(String protocol) {
         return new ProxyRouting(
-                "job:test", protocol, "https://frozen.example.com/v1", FundingSource.INSTANCE, 7L, 8L, 9L, ATTEMPT);
+                "job:test",
+                protocol,
+                "https://frozen.example.com/v1",
+                UsageFundingSource.INSTANCE,
+                7L,
+                8L,
+                9L,
+                ATTEMPT,
+                null,
+                null);
+    }
+
+    private static ProxyRouting practiceScriptRouting(ModelKind slot, String protocol) {
+        return new ProxyRouting(
+                "job:test:practice-script",
+                protocol,
+                "https://frozen.example.com/v1",
+                UsageFundingSource.INSTANCE,
+                7L,
+                8L,
+                9L,
+                ATTEMPT,
+                slot,
+                DataHandlingTier.CLOUD);
     }
 
     private static ProxyRouting workspaceFundedRouting() {
@@ -827,11 +1180,13 @@ class LlmProxyServiceTest extends BaseUnitTest {
                 "job:test",
                 "openai-completions",
                 "https://frozen.example.com/v1",
-                FundingSource.WORKSPACE,
+                UsageFundingSource.WORKSPACE,
                 7L,
                 8L,
                 9L,
-                ATTEMPT);
+                ATTEMPT,
+                null,
+                null);
     }
 
     private static ProxyRouting unboundMentorSessionRouting() {
@@ -839,10 +1194,12 @@ class LlmProxyServiceTest extends BaseUnitTest {
                 "mentor-session",
                 "openai-completions",
                 "https://frozen.example.com/v1",
-                FundingSource.INSTANCE,
+                UsageFundingSource.INSTANCE,
                 7L,
                 8L,
                 9L,
+                null,
+                null,
                 null);
     }
 
@@ -852,7 +1209,10 @@ class LlmProxyServiceTest extends BaseUnitTest {
     }
 
     private void authenticate(ProxyRouting routing) {
-        SecurityContextHolder.getContext().setAuthentication(new JobTokenAuthentication(routing));
+        var identity = new ProxyIdentity(
+                null, null, new MentorProxyCredentialRegistry.AuthenticatedSession(UUID.randomUUID(), "test-hash"));
+        lenient().when(routingService.resolve(eq(identity), any())).thenReturn(routing);
+        SecurityContextHolder.getContext().setAuthentication(new JobTokenAuthentication(identity, Set.of()));
     }
 
     private void stubCredential(ProxyRouting routing, LlmModelResolver.ProxyCredential credential) {

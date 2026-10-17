@@ -10,31 +10,31 @@ import { USER_VIEW_STORAGE_KEY } from "@/runtime/user-view/session";
 import { useReviewTabCounts } from "./use-review-tab-counts";
 
 const MINUTE = 60_000;
-const initial = { runs: 10, observations: 20, feedback: 30 };
+const initial = { reviews: 10, results: 20, problems: 25, feedback: 30 };
+
+const paged = (total: number) => ({ content: [], totalElements: total });
 
 function countReads(status = 200) {
 	let totals = initial;
 	const reads: URL[] = [];
 	const endpoints = [
-		["runs", ""],
-		["observations", "/observations"],
-		["feedback", "/feedback"],
+		["reviews", "", paged],
+		["results", "/results", paged],
+		["problems", "/problems", paged],
+		["feedback", "/feedback", paged],
 	] as const;
 	server.use(
-		...endpoints.map(([kind, suffix]) =>
+		...endpoints.map(([kind, suffix, body]) =>
 			http.get(`*/workspaces/:workspaceSlug/practices/reviews${suffix}`, ({ request }) => {
 				reads.push(new URL(request.url));
-				return HttpResponse.json(
-					{ content: [], page: { size: 1, number: 0, totalElements: totals[kind], totalPages: 1 } },
-					{ status },
-				);
+				return HttpResponse.json(body(totals[kind]), { status });
 			}),
 		),
 	);
 	return {
 		reads,
 		change: () => {
-			totals = { runs: 11, observations: 22, feedback: 33 };
+			totals = { reviews: 11, results: 22, problems: 27, feedback: 33 };
 		},
 	};
 }
@@ -42,7 +42,7 @@ function countReads(status = 200) {
 function mountCounts() {
 	const client = new QueryClient({ defaultOptions: { queries: { refetchOnWindowFocus: false } } });
 	const hook = renderHook(
-		() => useReviewTabCounts("demo", { subjectUserId: 7, practiceSlug: ["testing"] }),
+		() => useReviewTabCounts("demo", { developerId: "7", practiceSlug: ["testing"] }),
 		{
 			wrapper: ({ children }: { children: ReactNode }) => (
 				<QueryClientProvider client={client}>{children}</QueryClientProvider>
@@ -74,24 +74,22 @@ describe("practice review tab totals", () => {
 				await vi.advanceTimersByTimeAsync(MINUTE);
 			});
 			await waitFor(() =>
-				expect(result.current).toStrictEqual({ runs: 11, observations: 22, feedback: 33 }),
+				expect(result.current).toStrictEqual({
+					reviews: 11,
+					results: 22,
+					problems: 27,
+					feedback: 33,
+				}),
 			);
-			expect(wire.reads).toHaveLength(6);
+			expect(wire.reads).toHaveLength(8);
 			for (const url of wire.reads) {
 				expect(url.pathname).toContain("/workspaces/demo/practices/reviews");
 				expect(url.searchParams.get("size")).toBe("1");
 				expect(url.searchParams.get("practiceSlug")).toBe("testing");
 			}
-			expect(
-				wire.reads
-					.filter((url) => url.pathname.endsWith("/feedback"))
-					.map((url) => url.searchParams.get("recipientUserId")),
-			).toStrictEqual(["7", "7"]);
-			expect(
-				wire.reads
-					.filter((url) => !url.pathname.endsWith("/feedback"))
-					.map((url) => url.searchParams.get("subjectUserId")),
-			).toStrictEqual(["7", "7", "7", "7"]);
+			expect(wire.reads.map((url) => url.searchParams.get("developerId"))).toStrictEqual(
+				Array.from({ length: 8 }, () => "7"),
+			);
 		} finally {
 			cleanup();
 			client.clear();
@@ -108,7 +106,7 @@ describe("practice review tab totals", () => {
 			await act(async () => {
 				await vi.advanceTimersByTimeAsync(MINUTE);
 			});
-			expect(wire.reads).toHaveLength(3);
+			expect(wire.reads).toHaveLength(4);
 			expect(result.current).toStrictEqual(initial);
 			focusManager.setFocused(true);
 			await act(async () => {
@@ -123,7 +121,15 @@ describe("practice review tab totals", () => {
 
 	it.each([
 		{ status: 200, expected: initial },
-		{ status: 500, expected: { runs: undefined, observations: undefined, feedback: undefined } },
+		{
+			status: 500,
+			expected: {
+				reviews: undefined,
+				results: undefined,
+				problems: undefined,
+				feedback: undefined,
+			},
+		},
 	])(
 		"does not repeat audited user-view reads after a $status response",
 		async ({ status, expected }) => {
@@ -133,23 +139,23 @@ describe("practice review tab totals", () => {
 					operatorAccountId: 1,
 					workspaceSlug: "demo",
 					workspaceName: "Demo",
-					userId: 7,
-					login: "developer",
+					accountId: "7",
+					providerLogin: "developer",
 					name: "Developer",
-					hasAccount: true,
+					unclaimed: false,
 					reason: "Inspect own synthetic fixture",
 				}),
 			);
 			const wire = countReads(status);
 			const { result, client } = mountCounts();
 			try {
-				await waitFor(() => expect(wire.reads).toHaveLength(3));
+				await waitFor(() => expect(wire.reads).toHaveLength(4));
 				await waitFor(() => expect(client.isFetching()).toBe(0));
 				expect(result.current).toStrictEqual(expected);
 				await act(async () => {
 					await vi.advanceTimersByTimeAsync(MINUTE * 2);
 				});
-				expect(wire.reads).toHaveLength(3);
+				expect(wire.reads).toHaveLength(4);
 			} finally {
 				cleanup();
 				client.clear();

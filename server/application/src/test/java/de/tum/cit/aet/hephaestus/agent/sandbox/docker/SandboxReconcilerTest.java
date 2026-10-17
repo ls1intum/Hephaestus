@@ -10,9 +10,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
@@ -35,7 +35,7 @@ import org.mockito.Mock;
 class SandboxReconcilerTest extends BaseUnitTest {
 
     @Mock
-    private AgentJobRepository jobRepository;
+    private ReviewJobRepository jobRepository;
 
     @Mock
     private SandboxContainerManager containerManager;
@@ -78,7 +78,7 @@ class SandboxReconcilerTest extends BaseUnitTest {
         UUID active = UUID.randomUUID();
         UUID orphan = UUID.randomUUID();
         UUID starting = UUID.randomUUID();
-        var job = new AgentJob();
+        var job = new ReviewJob();
         job.setId(active);
         when(jobRepository.findByStatusIn(any())).thenReturn(List.of(job));
         when(containerManager.listManagedContainers()).thenReturn(List.of());
@@ -152,9 +152,9 @@ class SandboxReconcilerTest extends BaseUnitTest {
         @Test
         void missingLocalContainerNeverChangesRunningJobState() {
             UUID jobId = UUID.randomUUID();
-            AgentJob runningJob = new AgentJob();
+            ReviewJob runningJob = new ReviewJob();
             runningJob.setId(jobId);
-            runningJob.setStatus(AgentJobStatus.RUNNING);
+            runningJob.setStatus(ReviewJobStatus.RUNNING);
 
             when(containerManager.listManagedContainers()).thenReturn(List.of());
             when(jobRepository.findByStatusIn(any())).thenReturn(List.of(runningJob));
@@ -162,9 +162,9 @@ class SandboxReconcilerTest extends BaseUnitTest {
 
             reconciler.onStartup();
 
-            assertThat(runningJob.getStatus()).isEqualTo(AgentJobStatus.RUNNING);
+            assertThat(runningJob.getStatus()).isEqualTo(ReviewJobStatus.RUNNING);
             verify(jobRepository, never()).save(any());
-            verify(jobRepository, never()).findByStatus(AgentJobStatus.RUNNING);
+            verify(jobRepository, never()).findByStatus(ReviewJobStatus.RUNNING);
         }
 
         @Test
@@ -186,9 +186,9 @@ class SandboxReconcilerTest extends BaseUnitTest {
         @Test
         void shouldNotMarkActiveContainerJobs() {
             UUID jobId = UUID.randomUUID();
-            AgentJob activeJob = new AgentJob();
+            ReviewJob activeJob = new ReviewJob();
             activeJob.setId(jobId);
-            activeJob.setStatus(AgentJobStatus.RUNNING);
+            activeJob.setStatus(ReviewJobStatus.RUNNING);
             // containerId NOT set — label-based matching should still find the container
 
             when(containerManager.listManagedContainers())
@@ -242,9 +242,9 @@ class SandboxReconcilerTest extends BaseUnitTest {
             UUID activeJobId = UUID.randomUUID();
             String containerId = "active-container";
 
-            AgentJob activeJob = new AgentJob();
+            ReviewJob activeJob = new ReviewJob();
             activeJob.setId(activeJobId);
-            activeJob.setStatus(AgentJobStatus.RUNNING);
+            activeJob.setStatus(ReviewJobStatus.RUNNING);
 
             when(jobRepository.findByStatusIn(any())).thenReturn(List.of(activeJob));
 

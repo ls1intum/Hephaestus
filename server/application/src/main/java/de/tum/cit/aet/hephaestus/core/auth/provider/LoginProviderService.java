@@ -29,42 +29,26 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Owns the instance-scoped {@link LoginProvider} table: seeds the env-configured defaults on first
- * boot, is the single read path for building login {@code ClientRegistration}s, and backs
- * the instance-admin CRUD.
- *
- * <p>Seeding is idempotent and promote-once: a provider is created from {@code hephaestus.auth.login-
- * providers.*} only when it does not already exist, so env becomes the <em>seed</em>, never the live
- * source — an admin can edit or disable a seeded provider afterwards and the env value won't clobber it
- * on the next boot. Each entry is keyed by a stable, operator-chosen {@code registrationId} (e.g.
- * {@code github}, {@code gitlab}, {@code gitlab-lrz}) so {@code IdentityLink}s and the admin allowlist
- * keep resolving across reboots; multiple providers per instance seed in one boot (one per
- * {@code (type, baseUrl)} SCM instance).
- *
- * <p>Every mutation evicts the {@link LoginProviderClientRegistrationRepository} cache so an admin's
- * edit/enable/disable takes effect immediately rather than after the 60s TTL.
- *
- * <p>The three admin mutations write to the instance-scoped {@code auth_event} trail; env seeding does
- * not, having no authenticated principal behind it.
- */
+// Environment configuration seeds missing providers only; it must not overwrite later administrator changes.
 @ConditionalOnServerRole
 @Service
 @WorkspaceAgnostic("Login providers are instance-global, not workspace-scoped")
 public class LoginProviderService {
 
     static final String GITHUB_SCOPES = "read:user user:email";
-    // GitLab is plain OAuth2, NOT OIDC — scope must NOT contain "openid" (see sanitizeScopesOrThrow).
+    // GitLab is plain OAuth2, NOT OIDC — scope must NOT contain "openid" (see
+    // sanitizeScopesOrThrow).
     // "read_user" alone returns id + username + email from /api/v4/user. See ADR 0017.
     static final String GITLAB_SCOPES = "read_user";
     // "Sign in with Slack" is OIDC: the id_token carries the sub + verified team_id claim, and
     // "openid" is REQUIRED (it makes Spring take the OIDC path).
     static final String SLACK_SCOPES = "openid profile email";
-    // Outline is plain OAuth2, NOT OIDC — scope must NOT contain "openid" (see sanitizeScopesOrThrow).
-    // "read" is Outline's read-everything scope, sufficient for the POST /api/auth.info identity probe.
+    // Outline is plain OAuth2, NOT OIDC — scope must NOT contain "openid" (see
+    // sanitizeScopesOrThrow).
+    // "read" is Outline's read-everything scope, sufficient for the POST /api/auth.info identity
+    // probe.
     static final String OUTLINE_SCOPES = "read";
     private static final String GITHUB_COM = "https://github.com";
-    // The single Slack instance. Canonical origin the seeded identity_provider + SlackMentorIdentityResolver key on.
     private static final String SLACK_COM = "https://slack.com";
 
     private static final Logger log = LoggerFactory.getLogger(LoginProviderService.class);
@@ -106,9 +90,9 @@ public class LoginProviderService {
     }
 
     /**
-     * The enabled provider behind a registration id, or empty when unknown/disabled — the login-begin
-     * lookup ({@code AuthBeginController}): an unknown or disabled provider must not start an OAuth
-     * flow, and the row's type drives the link-only gate.
+     * The enabled provider behind a registration id, or empty when unknown/disabled — the
+     * login-begin lookup ({@code AuthBeginController}): an unknown or disabled provider must not
+     * start an OAuth flow, and the row's type drives the link-only gate.
      */
     @Transactional(readOnly = true)
     public Optional<LoginProvider> findEnabled(String registrationId) {
@@ -138,7 +122,8 @@ public class LoginProviderService {
         if (!registrationId.matches("^[a-z][a-z0-9-]{1,62}$")) {
             throw new ResponseStatusException(
                     HttpStatus.UNPROCESSABLE_CONTENT,
-                    "Enter a registration ID of 2 to 63 characters. Start with a lowercase letter, then use only lowercase letters, digits, or hyphens.");
+                    "Enter a registration ID of 2 to 63 characters. Start with a lowercase letter,"
+                            + " then use only lowercase letters, digits, or hyphens.");
         }
         if (repository.existsByRegistrationId(registrationId)) {
             throw new ResponseStatusException(
@@ -161,7 +146,9 @@ public class LoginProviderService {
         return saved;
     }
 
-    /** Apply a partial update (only non-null fields). registrationId + type are immutable identity. */
+    /**
+     * Apply a partial update (only non-null fields). registrationId + type are immutable identity.
+     */
     @Transactional
     public LoginProvider update(String registrationId, Patch patch) {
         LoginProvider provider = loadRequired(registrationId);
@@ -202,7 +189,9 @@ public class LoginProviderService {
         return saved;
     }
 
-    /** Delete a login provider. Refuses to remove the last enabled one (would lock everyone out). */
+    /**
+     * Delete a login provider. Refuses to remove the last enabled one (would lock everyone out).
+     */
     @Transactional
     public void delete(String registrationId) {
         LoginProvider provider = loadRequired(registrationId);
@@ -215,10 +204,7 @@ public class LoginProviderService {
         log.info("auth.login-provider: admin deleted '{}'", registrationId);
     }
 
-    /**
-     * Record an admin login-provider mutation on the {@code auth_event} trail. {@code changed} carries
-     * the field names a PATCH touched — never their values, so no secret can reach the trail.
-     */
+    // Audit changed field names only; provider values can contain credentials.
     private void audit(AuthEvent.EventType type, LoginProvider provider, @Nullable List<String> changed) {
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("registrationId", provider.getRegistrationId());
@@ -234,19 +220,12 @@ public class LoginProviderService {
                 .record();
     }
 
-    /**
-     * A seed slot is <em>silence</em> (both credential halves blank — "this deployment has no wiki") or a
-     * <em>promise</em> (credentials present). A promise that cannot be kept — a half-filled credential, an
-     * unusable base URL — is an operator mistake, reported at ERROR with the exact knob to fix.
-     *
-     * <p>Deliberately non-fatal: this listener runs on {@link ApplicationReadyEvent}, and an exception here
-     * aborts startup. One misconfigured optional integration must not take the whole app down — so we shout,
-     * we don't die.
-     */
+    // Invalid optional providers must not abort startup; ApplicationReadyEvent listener errors propagate.
     @EventListener(ApplicationReadyEvent.class)
     @Transactional
     public void seedFromEnvOnStartup() {
-        // Sorted by registration id for deterministic seeding when two entries collide on (type, baseUrl).
+        // Sorted by registration id for deterministic seeding when two entries collide on (type,
+        // baseUrl).
         Set<String> seededInstances = new HashSet<>();
         new TreeMap<>(authProperties.loginProviders()).forEach((registrationId, seed) -> {
             if (seed == null) {
@@ -254,23 +233,28 @@ public class LoginProviderService {
             }
             String id = registrationId == null ? "" : registrationId.trim();
             if (seed.partiallyConfigured()) {
-                // Half a credential: seeding it would offer an ENABLED provider whose every OAuth exchange
-                // 401s at the IdP with an opaque error. Skip it — and say exactly which env var is missing.
+                // Half a credential: seeding it would offer an ENABLED provider
+                // whose every OAuth exchange
+                // 401s at the IdP with an opaque error. Skip it — and say exactly
+                // which env var is missing.
                 log.error(
-                        "auth.login-provider: NOT seeding '{}' — it is half-configured: {} is blank. "
-                                + "Set {}, or clear the other half to disable this provider entirely.",
+                        "auth.login-provider: NOT seeding '{}' — it is"
+                                + " half-configured: {} is blank. Set {}, or clear the"
+                                + " other half to disable this provider entirely.",
                         id,
                         seed.missingCredentialField(),
                         envKnobFor(id, seed.missingCredentialField()));
                 return;
             }
             if (!seed.configured()) {
-                return; // blank credentials → provider omitted (credential-less pods still boot)
+                return;
             }
             if (!id.matches("^[a-z][a-z0-9-]{1,62}$")) {
                 log.error(
-                        "auth.login-provider: NOT seeding '{}' — invalid registration id. It must be 2-63 chars: "
-                                + "a lowercase letter followed by lowercase letters, digits, or hyphens (e.g. 'gitlab-lrz').",
+                        "auth.login-provider: NOT seeding '{}' — invalid"
+                                + " registration id. It must be 2-63 chars: a lowercase"
+                                + " letter followed by lowercase letters, digits, or"
+                                + " hyphens (e.g. 'gitlab-lrz').",
                         registrationId);
                 return;
             }
@@ -281,23 +265,27 @@ public class LoginProviderService {
             try {
                 baseUrl = resolveBaseUrl(seed.type(), seed.baseUrl());
             } catch (ResponseStatusException e) {
-                // The common self-hosted-Outline / self-hosted-GitLab trip-wire: credentials set, base URL
-                // blank, http://, or a private/internal address (rejected by the SSRF guard).
+                // The common self-hosted-Outline / self-hosted-GitLab trip-wire:
+                // credentials set, base URL
+                // blank, http://, or a private/internal address (rejected by the
+                // SSRF guard).
                 log.error(
-                        "auth.login-provider: NOT seeding '{}' ({}) — its base URL is unusable: {}. "
-                                + "Set {} to the instance's public HTTPS origin (e.g. https://wiki.example.com).",
+                        "auth.login-provider: NOT seeding '{}' ({}) — its base URL"
+                                + " is unusable: {}. Set {} to the instance's public"
+                                + " HTTPS origin (e.g. https://wiki.example.com).",
                         id,
                         seed.type(),
                         e.getReason(),
                         envKnobFor(id, "base-url"));
                 return;
             }
-            // One login app per SCM instance (uq on type+base_url): skip a duplicate so a misconfiguration
+            // One login app per SCM instance (uq on type+base_url): skip a
+            // duplicate so a misconfiguration
             // can't crash startup on a constraint violation.
             if (!seededInstances.add(seed.type() + "|" + baseUrl)
                     || repository.existsByTypeAndBaseUrl(seed.type(), baseUrl)) {
                 log.warn(
-                        "auth.login-provider: skipping seed '{}' — a {} provider for {} already exists",
+                        "auth.login-provider: skipping seed '{}' — a {} provider" + " for {} already exists",
                         id,
                         seed.type(),
                         baseUrl);
@@ -317,13 +305,7 @@ public class LoginProviderService {
         });
     }
 
-    /**
-     * The env var that feeds a shipped seed slot's field, so a misconfiguration diagnostic names the knob the
-     * operator actually sets ({@code OUTLINE_OAUTH_CLIENT_SECRET}), not an abstract property path. Slots the
-     * operator declared themselves (e.g. {@code gitlab-lrz}) have no fixed env var — fall back to the canonical
-     * property path, which is always correct. Keep in sync with {@code application.yml}'s
-     * {@code hephaestus.auth.login-providers} block.
-     */
+    // Keep shipped environment names aligned with application.yml for operator diagnostics.
     private static final Map<String, String> SHIPPED_SLOT_ENV_PREFIX = Map.of(
             "github", "GITHUB_OAUTH", "gitlab", "GITLAB_OAUTH", "slack", "SLACK_OAUTH", "outline", "OUTLINE_OAUTH");
 
@@ -358,25 +340,24 @@ public class LoginProviderService {
 
     private LoginProvider persist(LoginProvider provider) {
         // Flush here rather than at commit: an update mutates a managed entity, so a UNIQUE(type,
-        // base_url) violation would otherwise surface after the caller has already recorded a SUCCESS.
-        // That row is written in its own REQUIRES_NEW transaction, so it outlives the rollback and the
+        // base_url) violation would otherwise surface after the caller has already recorded a
+        // SUCCESS.
+        // That row is written in its own REQUIRES_NEW transaction, so it outlives the rollback and
+        // the
         // trail keeps a change that never happened.
         LoginProvider saved = repository.saveAndFlush(provider);
         registrationCache.evict(saved.getRegistrationId());
         return saved;
     }
 
-    /**
-     * GitHub login is github.com only (GHE login is out of scope; the registration builder hardcodes
-     * github.com endpoints). For GitLab and Outline (self-hosted instances), validate the supplied
-     * base URL (HTTPS + SSRF guard).
-     */
+    // GitHub login endpoints are fixed to github.com; self-hosted GitLab and Outline origins require SSRF validation.
     private String resolveBaseUrl(LoginProvider.ProviderType type, @Nullable String baseUrl) {
         if (type == LoginProvider.ProviderType.GITHUB) {
             return GITHUB_COM;
         }
         if (type == LoginProvider.ProviderType.SLACK) {
-            // Slack login is slack.com only (the registration builder hardcodes the slack.com OIDC endpoints).
+            // Slack login is slack.com only (the registration builder hardcodes the slack.com OIDC
+            // endpoints).
             return SLACK_COM;
         }
         String value = baseUrl == null ? "" : baseUrl.trim();
@@ -389,7 +370,8 @@ public class LoginProviderService {
         if (type == LoginProvider.ProviderType.OUTLINE && !outlineOriginPolicy.allows(value)) {
             throw new ResponseStatusException(
                     HttpStatus.UNPROCESSABLE_CONTENT,
-                    "This Outline address is not approved on this instance. Ask your instance operator to approve it.");
+                    "This Outline address is not approved on this instance. Ask your instance"
+                            + " operator to approve it.");
         }
         return value;
     }
@@ -411,13 +393,7 @@ public class LoginProviderService {
         };
     }
 
-    /**
-     * GitLab and Outline use the plain OAuth2 flow (userInfo = /api/v4/user resp. /api/auth.info); an
-     * {@code openid} scope flips Spring to the OIDC path and 500s the callback (no jwkSetUri is
-     * configured — Outline is not an OIDC provider at all). Reject it with an actionable 422 so an
-     * admin editing the provider can't silently brick sign-in. See GITLAB_SCOPES / OUTLINE_SCOPES +
-     * ADR 0017.
-     */
+    // openid selects Spring's OIDC path; GitLab and Outline registrations require plain OAuth2.
     private static String sanitizeScopesOrThrow(LoginProvider.ProviderType type, String scopes) {
         String trimmed = scopes.trim();
         if (type == LoginProvider.ProviderType.GITLAB || type == LoginProvider.ProviderType.OUTLINE) {
@@ -426,7 +402,9 @@ public class LoginProviderService {
                 if (scope.equalsIgnoreCase("openid")) {
                     throw new ResponseStatusException(
                             HttpStatus.UNPROCESSABLE_CONTENT,
-                            type + " login uses the plain OAuth2 flow. The scope must not contain “openid”. Use "
+                            type
+                                    + " login uses the plain OAuth2 flow. The scope must not"
+                                    + " contain “openid”. Use "
                                     + replacement
                                     + " instead.");
                 }
@@ -435,14 +413,7 @@ public class LoginProviderService {
         return trimmed;
     }
 
-    /**
-     * The lockout guard, counting only providers that can actually sign someone in. A link-only provider
-     * ({@link LoginProvider.ProviderType#isLinkOnly()} — Slack, Outline) is BY CONSTRUCTION never a sign-in
-     * method: it is filtered off the login picker and rejected at flow begin. Counting it here would (a)
-     * refuse to remove the sole Outline provider on an instance that has one, and (b) worse, let an admin
-     * delete the last REAL sign-in provider as long as a link-only one remained — the guard would see a
-     * non-empty "enabled" list and wave it through. Both fall out once the count is sign-in-capable only.
-     */
+    // Link-only providers cannot prevent lockout; count only providers that can start a sign-in.
     private void requireNotLastEnabled(String registrationId, String verb) {
         List<LoginProvider> enabled = repository.findByEnabledTrueOrderByDisplayNameAsc().stream()
                 .filter(p -> p.getType() != null && !p.getType().isLinkOnly())

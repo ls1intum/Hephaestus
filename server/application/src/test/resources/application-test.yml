@@ -26,15 +26,10 @@ spring:
             mode: always
             schema-locations: classpath:db/auth-event-sequence.sql,classpath:db/rate-limit-buckets.sql
 
-    # JPA configuration for tests
-    # Use 'create' instead of 'create-drop': the Testcontainer is ephemeral so
-    # DROP TABLE on shutdown is unnecessary.  With ~6 cached Spring contexts each
-    # trying to DROP against the same container during JVM shutdown, the cumulative
-    # connection-timeout delays can hold the test JVM open after execution has finished.
+    # Liquibase owns the same native constraints and functions in tests and production.
     jpa:
-        defer-datasource-initialization: true
         hibernate:
-            ddl-auto: create
+            ddl-auto: validate
         show-sql: false
 
     # Test-specific configurations for faster shutdown
@@ -44,16 +39,15 @@ spring:
                 await-termination: true
                 await-termination-period: 5s
 
-    # Disable liquibase for tests (use JPA auto DDL instead)
     liquibase:
-        enabled: false
+        enabled: true
+        contexts: dev
 
-    # Liquibase is off, so the registry creates its own event_publication table (CREATE IF NOT EXISTS).
     modulith:
         events:
             jdbc:
                 schema-initialization:
-                    enabled: true
+                    enabled: false
 
     # Security configuration for tests (minimal config)
     security:
@@ -105,12 +99,21 @@ hephaestus:
     integration:
         oauth-state:
             secret: test-oauth-state-hmac-secret-not-real
+        slack:
+            enabled: true
+            signing-secret: test-slack-signing-secret-not-real
         # Suite-wide so GitLab @ConditionalOnProperty beans load in the base context — the GitLab
         # tests no longer need a per-class @TestPropertySource (which forked a context each).
         gitlab:
             enabled: true
             default-server-url: https://gitlab.lrz.de
     webhook:
+        # Test brokers share the runner's disk with application and image builds.
+        stream:
+            max-bytes: 128MB
+            max-bytes-by-stream:
+                github: 128MB
+            storage-budget: 512MB
         # A GitLab signing token's whsec_ form, so signed GitLab webhooks verify end to end.
         secret: whsec_dGVzdC1naXRsYWItc2lnbmluZy1rZXktbm90LXJlYWw=
         external-url: http://localhost:8080

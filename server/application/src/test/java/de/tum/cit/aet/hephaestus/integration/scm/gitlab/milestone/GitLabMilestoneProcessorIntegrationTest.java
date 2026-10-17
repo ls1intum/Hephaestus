@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.MilestoneRepository;
@@ -15,6 +14,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organizatio
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.milestone.dto.GitLabMilestoneDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
@@ -30,19 +30,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-/**
- * Integration tests for GitLabMilestoneProcessor.
- * <p>
- * Tests the processor independently from the webhook handler to verify:
- * <ul>
- *   <li>Milestone upsert logic (create vs update)</li>
- *   <li>State mapping: GitLab {@code "active"} &rarr; OPEN, {@code "closed"} &rarr; CLOSED</li>
- *   <li>Domain event publishing (MilestoneCreated, MilestoneUpdated, MilestoneDeleted)</li>
- *   <li>Due date parsing (date-only string &rarr; Instant at midnight UTC)</li>
- *   <li>Group milestone deterministic nativeId</li>
- *   <li>htmlUrl construction (GraphQL webPath vs webhook projectWebUrl)</li>
- * </ul>
- */
 @DisplayName("GitLab Milestone Processor")
 class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
 
@@ -458,7 +445,8 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(first.getNumber()).isEqualTo(8);
             assertNotNull(second);
             assertThat(second.getNumber()).isEqualTo(8);
-            // … but different deterministic negative nativeIds so (provider_id, native_id) stays unique.
+            // … but different deterministic negative nativeIds so (provider_id, native_id) stays
+            // unique.
             assertThat(first.getNativeId()).isNegative();
             assertThat(second.getNativeId()).isNegative();
             assertThat(first.getNativeId()).isNotEqualTo(second.getNativeId());
@@ -492,7 +480,8 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
                             .atStartOfDay(ZoneOffset.UTC)
                             .toInstant());
             assertThat(result.getState()).isEqualTo(Milestone.State.CLOSED);
-            // closed_at is approximated from updatedAt on first transition to CLOSED — must not be null.
+            // closed_at is approximated from updatedAt on first transition to CLOSED — must not be
+            // null.
             assertThat(result.getClosedAt()).isNotNull();
         }
 
@@ -593,7 +582,7 @@ class GitLabMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         testWorkspace.setDisplayName("HephaestusTest GitLab");
         testWorkspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         testWorkspace.setPublicActivityEnabled(true);
-        testWorkspace.setOrganization(org);
+        testWorkspace.setOrganizationId(org.getId());
         testWorkspace.setAccountLogin(FIXTURE_ORG_LOGIN);
         testWorkspace.setAccountType(AccountType.ORG);
         testWorkspace = workspaceRepository.save(testWorkspace);

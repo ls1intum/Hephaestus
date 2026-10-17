@@ -13,8 +13,8 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { ARTIFACT_KIND, artifactKindNoun } from "@/lib/artifact-kinds";
 import { formatCalendarDate } from "@/lib/dates";
+import { ITEM_KIND, itemKindNoun } from "@/lib/item-kinds";
 import type { ProviderType } from "@/lib/provider/provider-terms";
 import { capitalise } from "@/lib/text";
 import {
@@ -52,7 +52,7 @@ export function PublicPersonSummary({
 	stale: boolean;
 	span: { from: Date; to: Date };
 }) {
-	const pullRequests = artifactKindNoun(ARTIFACT_KIND.pullRequest, 2, providerType);
+	const pullRequests = itemKindNoun(ITEM_KIND.pullRequest, 2, providerType);
 	const { counts } = row;
 	const spanLabel = publicActivitySpanLabel(span.from, span.to);
 	const others: Total[] = [

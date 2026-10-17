@@ -1,177 +1,93 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.evidence.SourceCatalog;
+import de.tum.cit.aet.hephaestus.evidence.SourceContract;
+import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
-import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathArtifactSourceCatalogRegistry;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
-import de.tum.cit.aet.hephaestus.practices.dto.PracticeDefinitionOptionsDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.PracticeEvidenceSourceOptionDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.PracticeReviewStateDimensionDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.PracticeReviewStateValueDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.PracticeWorkTypeDefinitionOptionsDTO;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
+import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventCoverage;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventDefinition;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventName;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewCapabilities;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.PullRequestItemDescriptor;
+import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Clock;
-import org.junit.jupiter.api.Tag;
+import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
-@Tag("unit")
-class PracticeDefinitionOptionsServiceTest {
+class PracticeDefinitionOptionsServiceTest extends BaseUnitTest {
+    @Test
+    void shouldUseTheRegisteredProviderAndConnectedCoverageForEventOptions() {
+        var items = mock(PracticeItemOptions.class);
+        var sources = mock(ClasspathSourceCatalogRegistry.class);
+        var catalog = mock(SourceCatalog.class);
+        var coverage = mock(ItemEventCoverage.class);
+        var descriptor = mock(ItemDescriptor.class);
+        var event = mock(ItemEventDefinition.class);
+        var name = new ItemEventName("scm.pull_request.opened");
+        when(items.all()).thenReturn(List.of(descriptor));
+        when(sources.current()).thenReturn(catalog);
+        when(catalog.version()).thenReturn(new SourceContractVersion("2.0.0"));
+        when(catalog.sources()).thenReturn(List.of());
+        when(descriptor.kind()).thenReturn(new ItemKind("scm.pull_request"));
+        when(descriptor.displayName()).thenReturn("Pull request");
+        when(descriptor.roles()).thenReturn(Set.of(AboutRole.AUTHOR));
+        when(descriptor.events()).thenReturn(List.of(event));
+        when(descriptor.reviewCapabilities())
+                .thenReturn(new ReviewCapabilities(List.of(), List.of(), Set.of(), Set.of(), Set.of()));
+        when(event.name()).thenReturn(name);
+        when(event.displayName()).thenReturn("Opened");
+        when(event.bindableForAuthoring()).thenReturn(true);
+        when(coverage.connectedCoverage(10L)).thenReturn(Set.of(name));
+        when(coverage.raisedBy(name)).thenReturn(Set.of(IntegrationKind.GITHUB));
+        var result = new PracticeDefinitionOptionsService(items, sources, coverage).options(10L);
+        assertThat(result.itemTypes())
+                .singleElement()
+                .satisfies(type -> assertThat(type.events()).singleElement().satisfies(option -> {
+                    assertThat(option.connected()).isTrue();
+                    assertThat(option.raisedBy()).containsExactly(IntegrationKind.GITHUB);
+                }));
+    }
 
     @Test
-    void exposesTheCurrentBaselineAndOnlyProfileCompatibleSources() {
-        var catalogs =
-                new ClasspathArtifactSourceCatalogRegistry(JsonMapper.builder().build(), Clock.systemUTC());
-        var service = new PracticeDefinitionOptionsService(
-                catalogs,
-                new PracticeEvidenceDefaults(catalogs, PracticeSignalOptionsFixture.catalog()),
-                PracticeSignalOptionsFixture.real());
-
-        PracticeDefinitionOptionsDTO result = service.options();
-
-        // Ordered by kind rather than by whichever descriptor bean happened to register first: bean
-        // order is not stable across builds, and an authoring picker that reshuffles between deploys is
-        // worse than one that is merely alphabetical.
-        assertThat(result.workTypes())
-                .extracting(PracticeWorkTypeDefinitionOptionsDTO::artifactKind)
-                .containsExactly(
-                        ArtifactKinds.CONVERSATION_THREAD,
-                        ArtifactKind.of("docs.document"),
-                        ArtifactKinds.ISSUE,
-                        ArtifactKinds.PULL_REQUEST);
-        PracticeWorkTypeDefinitionOptionsDTO pullRequests = workType(result, ArtifactKinds.PULL_REQUEST);
-        assertThat(pullRequests.signals())
-                .filteredOn(option -> option.recommended())
-                .extracting(option -> option.signal().value())
-                .containsExactly("scm.pull_request.opened", "scm.pull_request.ready", "scm.pull_request.synchronized");
-        assertThat(pullRequests.signals())
-                .filteredOn(option -> option.signal().equals(ScmSignals.PULL_REQUEST_CLOSED))
-                .singleElement()
-                .satisfies(option -> {
-                    // The label is the domain's own, shown under a "Run mentoring when" legend that already
-                    // names the work type — so it says what happened, not what it happened to.
-                    assertThat(option.displayName()).isEqualTo("Closed without merging");
-                    assertThat(option.recommended()).isFalse();
-                });
-        assertThat(pullRequests.reviewWhenDimensions())
-                .extracting(PracticeReviewStateDimensionDTO::key)
-                .containsExactly("draftStatus", "state");
-        assertThat(pullRequests.reviewWhenDimensions().getFirst()).satisfies(dimension -> {
-            assertThat(dimension.recommendedValues()).containsExactly("NOT_DRAFT");
-            assertThat(dimension.values())
-                    .extracting(PracticeReviewStateValueDTO::value)
-                    .containsExactly("DRAFT", "NOT_DRAFT");
+    void shouldKeepScanOnlySourcesOutOfTheParentItemReadOptions() {
+        var registry = new ClasspathSourceCatalogRegistry(JsonMapper.builder().build(), Clock.systemUTC());
+        var tree = registry.requireSource(new SourceKind("scm.repository.tree"));
+        var fileOnly = new SourceContract(
+                new SourceKind("custom.file.content"),
+                tree.displayName(),
+                tree.description(),
+                tree.selectionScope(),
+                Set.of("scm.file"),
+                tree.defaultRequirement(),
+                tree.authority(),
+                tree.identityPolicy(),
+                tree.completenessPolicy(),
+                tree.requiredQuality(),
+                tree.privacyClass(),
+                tree.supportedAbsenceStates(),
+                tree.retentionPolicy(),
+                tree.erasurePolicy(),
+                tree.useDecisionIds(),
+                tree.citation());
+        var sources = mock(ClasspathSourceCatalogRegistry.class);
+        when(sources.current()).thenReturn(new SourceCatalog(registry.current().version(), List.of(fileOnly)));
+        var items = mock(PracticeItemOptions.class);
+        when(items.all()).thenReturn(List.of(new PullRequestItemDescriptor()));
+        var result = new PracticeDefinitionOptionsService(items, sources, mock(ItemEventCoverage.class)).options(null);
+        assertThat(result.itemTypes()).singleElement().satisfies(type -> {
+            assertThat(type.scanItemKinds()).contains("scm.file");
+            assertThat(type.readSources()).isEmpty();
         });
-        assertThat(pullRequests.subjectRoles())
-                .containsExactly(ActorRole.AUTHOR, ActorRole.ASSIGNEE, ActorRole.REVIEWER, ActorRole.MERGER);
-        assertThat(workType(result, ArtifactKinds.ISSUE).subjectRoles())
-                .containsExactly(ActorRole.AUTHOR, ActorRole.ASSIGNEE);
-        assertThat(workType(result, ArtifactKinds.CONVERSATION_THREAD).subjectRoles())
-                .containsExactly(ActorRole.AUTHOR);
-        assertThat(pullRequests.supportedAutomatedReviewModes())
-                .containsExactly(PracticeAutomatedReviewMode.LANGUAGE_MODEL);
-        assertThat(pullRequests.recommendedEvidenceRequirements())
-                .extracting(need -> need.sourceKind().value())
-                .containsExactly("scm.pull-request.core", "scm.pull-request.diff", "scm.pull-request.comments");
-        assertThat(pullRequests.allowedSources())
-                .extracting(PracticeEvidenceSourceOptionDTO::sourceKind)
-                .contains("scm.pull-request.core", "scm.repository.tree")
-                .doesNotContain("scm.issue.core", "slack.conversation.thread");
-        assertThat(pullRequests.allowedSources())
-                .filteredOn(option -> option.sourceKind().equals("scm.pull-request.core"))
-                .singleElement()
-                .satisfies(option -> assertThat(option.displayName()).isEqualTo("Pull request details"));
-    }
-
-    /**
-     * The occasion list is the list of things an author may pick. A review somebody asks for by hand is
-     * carried beside it instead, so no reader has to re-derive the exception from a signal's spelling.
-     */
-    @Test
-    void offersOnlyChoosableOccasionsAndNamesTheHandRequestSeparately() {
-        var catalogs =
-                new ClasspathArtifactSourceCatalogRegistry(JsonMapper.builder().build(), Clock.systemUTC());
-        var service = new PracticeDefinitionOptionsService(
-                catalogs,
-                new PracticeEvidenceDefaults(catalogs, PracticeSignalOptionsFixture.catalog()),
-                PracticeSignalOptionsFixture.real());
-
-        PracticeDefinitionOptionsDTO result = service.options();
-
-        assertThat(workType(result, ArtifactKinds.PULL_REQUEST)).satisfies(pullRequests -> {
-            assertThat(pullRequests.signals())
-                    .extracting(option -> option.signal().value())
-                    .doesNotContain("scm.pull_request.manual_review");
-            assertThat(pullRequests.manualReviewSignal()).isNotNull().satisfies(manual -> {
-                assertThat(manual.signal()).isEqualTo(ScmSignals.PULL_REQUEST_MANUAL_REVIEW);
-                assertThat(manual.displayName()).isNotBlank();
-            });
-        });
-        // Absent rather than invented: nothing lets a person ask for a review of a conversation thread.
-        assertThat(workType(result, ArtifactKinds.CONVERSATION_THREAD).manualReviewSignal())
-                .isNull();
-    }
-
-    /**
-     * The evidence facts below belong to one contract version, and a practice records the version it was
-     * written against — without this a reader cannot tell "these options describe this practice" from
-     * "these options describe a newer contract".
-     */
-    @Test
-    void saysWhichSourceContractTheOptionsDescribe() {
-        var catalogs =
-                new ClasspathArtifactSourceCatalogRegistry(JsonMapper.builder().build(), Clock.systemUTC());
-        var service = new PracticeDefinitionOptionsService(
-                catalogs,
-                new PracticeEvidenceDefaults(catalogs, PracticeSignalOptionsFixture.catalog()),
-                PracticeSignalOptionsFixture.real());
-
-        assertThat(service.options().sourceContractVersion())
-                .isEqualTo(catalogs.current().version());
-    }
-
-    @Test
-    void saysWhichSourcesCanCarryAClaimAboutWhatIsAbsent() {
-        var catalogs =
-                new ClasspathArtifactSourceCatalogRegistry(JsonMapper.builder().build(), Clock.systemUTC());
-        var service = new PracticeDefinitionOptionsService(
-                catalogs,
-                new PracticeEvidenceDefaults(catalogs, PracticeSignalOptionsFixture.catalog()),
-                PracticeSignalOptionsFixture.real());
-
-        PracticeDefinitionOptionsDTO result = service.options();
-
-        PracticeWorkTypeDefinitionOptionsDTO pullRequests = workType(result, ArtifactKinds.PULL_REQUEST);
-        // The two sit at the same required-capture floor, so the flag is the only thing that separates
-        // them — an author offered EXHAUSTIVE over linked work items would be sending a request
-        // PracticeDefinitionValidator refuses.
-        assertThat(pullRequests.allowedSources())
-                .filteredOn(option -> option.sourceKind().equals("scm.pull-request.comments"))
-                .singleElement()
-                .satisfies(option -> {
-                    assertThat(option.supportsExhaustiveEvidence()).isTrue();
-                    // The bound the claim is made against travels with the flag. Offering EXHAUSTIVE without
-                    // saying where the capture stops asks an author to promise something they cannot check.
-                    assertThat(option.selectionScope())
-                            .isEqualTo(catalogs.requireSource(
-                                            catalogs.current().version(), new SourceKind("scm.pull-request.comments"))
-                                    .selectionScope());
-                });
-        assertThat(pullRequests.allowedSources())
-                .filteredOn(option -> option.sourceKind().equals("scm.linked-work-items"))
-                .singleElement()
-                .satisfies(option ->
-                        assertThat(option.supportsExhaustiveEvidence()).isFalse());
-    }
-
-    private static PracticeWorkTypeDefinitionOptionsDTO workType(
-            PracticeDefinitionOptionsDTO options, ArtifactKind kind) {
-        return options.workTypes().stream()
-                .filter(candidate -> candidate.artifactKind().equals(kind))
-                .findFirst()
-                .orElseThrow();
     }
 }

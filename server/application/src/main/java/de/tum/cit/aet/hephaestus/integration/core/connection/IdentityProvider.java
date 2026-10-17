@@ -20,14 +20,14 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Represents an identity provider instance (e.g., github.com, gitlab.lrz.de, slack.com).
- * <p>
- * Each unique combination of provider type and server URL is a distinct provider.
- * This supports multiple instances of the same provider type (e.g., GitLab SaaS
- * and self-hosted GitLab Enterprise) as well as non-SCM identity providers (Slack).
- * <p>
- * All git service entities reference an {@link IdentityProvider} via foreign key, scoping
- * native IDs to prevent cross-provider collisions; {@code identity_link} rows key their
- * federated-login subject by the same provider row.
+ *
+ * <p>Each unique combination of provider type and server URL is a distinct provider. This supports
+ * multiple instances of the same provider type (e.g., GitLab SaaS and self-hosted GitLab
+ * Enterprise) as well as non-SCM identity providers (Slack).
+ *
+ * <p>All git service entities reference an {@link IdentityProvider} via foreign key, scoping native
+ * IDs to prevent cross-provider collisions; {@code identity} rows key their federated-login subject
+ * by the same provider row.
  */
 @Entity
 @Table(

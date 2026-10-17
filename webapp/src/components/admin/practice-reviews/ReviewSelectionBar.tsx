@@ -25,9 +25,9 @@ export interface ReviewSelectionBarProps {
 const TRACE_BUTTON = buttonVariants({ variant: "outline", size: "sm", className: "h-8" });
 
 const UNNAMED: Record<ReviewSelectionKind, string> = {
-	work: "a piece of work",
+	item: "a piece of work",
 	review: "a review",
-	observation: "an observation",
+	result: "a result",
 	feedback: "a piece of feedback",
 	practice: "a practice",
 };

@@ -2,12 +2,13 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.workspace;
 
 import static de.tum.cit.aet.hephaestus.core.TransactionCallbacks.afterCommit;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener;
 import de.tum.cit.aet.hephaestus.integration.scm.github.lifecycle.GitHubLifecycleListener;
+import de.tum.cit.aet.hephaestus.integration.scm.workspace.WorkspaceRepositoryMonitorService;
 import de.tum.cit.aet.hephaestus.workspace.RepositorySelection;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepositoryMonitorService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceScopeFilter;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
@@ -18,6 +19,7 @@ import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Component;
 
 @Component
+@ConditionalOnServerRole
 public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubWorkspaceProvisioningAdapter.class);
@@ -74,8 +76,10 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
             return;
         }
 
-        // GitHub includes the initial repository list on "created" events with "selected" repository
-        // selection; materialise Repository entities and monitors for each from that webhook metadata.
+        // GitHub includes the initial repository list on "created" events with "selected"
+        // repository
+        // selection; materialise Repository entities and monitors for each from that webhook
+        // metadata.
         if (installation.repositories() != null && !installation.repositories().isEmpty()) {
             List<RepositorySnapshot> allowedRepos = installation.repositories().stream()
                     .filter(r -> workspaceScopeFilter.isRepositoryAllowed(r.nameWithOwner()))
@@ -110,10 +114,13 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
         }
 
         // Delegates to the full purge chain rather than a narrower stop-NATS/remove-monitors pair:
-        // purgeWorkspace first stops the NATS consumer, then ScmWorkspacePurgeAdapter (order -200) drops
-        // the monitors through an orphan-guarded cascade — unlike removeAllRepositoriesFromMonitor, it
+        // purgeWorkspace first stops the NATS consumer, then ScmWorkspacePurgeAdapter (order -200)
+        // drops
+        // the monitors through an orphan-guarded cascade — unlike removeAllRepositoriesFromMonitor,
+        // it
         // will not delete a repository another workspace still monitors. The chain also tears down
-        // Slack/Outline content, org-tier teams and organization memberships, derived practice/activity
+        // Slack/Outline content, org-tier teams and organization memberships, derived
+        // practice/activity
         // rows, and the Connection's stored credentials.
         githubLifecycleListener.purgeWorkspaceForInstallation(installationId);
 

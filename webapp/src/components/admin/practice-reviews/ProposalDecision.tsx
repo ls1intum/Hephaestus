@@ -7,11 +7,15 @@ import {
 } from "lucide-react";
 import { useId, useState } from "react";
 
-import type { GetPracticeReviewFeedbackResponse } from "@/api/types.gen";
+import type { ReviewFeedbackDetail } from "@/api/types.gen";
 import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { Section } from "@/components/layout/Section";
-import { OPERATOR_WITHHELD_TEXT } from "@/components/practice-vocabulary/delivery-place-defs";
-import { deliveredPlacementType } from "@/components/practice-vocabulary/placement-defs";
+import { copyKindsPhrase } from "@/components/practice-vocabulary/feedback-copy-defs";
+import {
+	FEEDBACK_DECISION_REASONS,
+	type FeedbackDecisionReason,
+} from "@/components/practice-vocabulary/feedback-decision-defs";
+import { ADMIN_WITHHELD_TEXT } from "@/components/practice-vocabulary/feedback-destination-defs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
@@ -28,40 +32,28 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 
 import { FeedbackBody } from "./FeedbackBody";
-import {
-	PROPOSAL_REJECTION_REASONS,
-	type ProposalRejectionReason,
-} from "./proposal-rejection-vocabulary";
 import { feedbackLevel } from "./review-levels";
 import { ReviewPackage } from "./ReviewPackage";
 
 /** Exactly what approval sends, expanded, because approving it unread is the failure to design out. */
-export function ProposalPackage({ feedback }: { feedback: GetPracticeReviewFeedbackResponse }) {
-	// A private place's text is never shown here, nor counted: the place's own words stand in.
-	if (OPERATOR_WITHHELD_TEXT[feedback.channel] !== undefined) {
+export function ProposalPackage({ feedback }: { feedback: ReviewFeedbackDetail }) {
+	// A private destination's text is never shown here, nor counted: the destination's own words
+	// stand in.
+	if (ADMIN_WITHHELD_TEXT[feedback.destination] !== undefined) {
 		return (
 			<Section level={3} title="What will be sent">
-				<FeedbackBody feedback={{ ...feedback, body: undefined }} />
+				<FeedbackBody feedback={{ ...feedback, body: null }} />
 			</Section>
 		);
 	}
-	const { proposedPlacements } = feedback;
-	const summary = proposedPlacements.find((placement) => placement.type === "SUMMARY");
-	const inline = proposedPlacements.filter((placement) => placement.type === "INLINE");
-	const linked =
-		deliveredPlacementType("INLINE", feedback.reviewedWork?.provider) === "LOCATION_COMMENT";
-	const [one, many] = linked
-		? ["comment linking to lines", "comments linking to lines"]
-		: ["line comment", "line comments"];
+	const phrase = copyKindsPhrase(feedback.copies);
 	return (
 		<Section
 			level={3}
 			title="What will be sent"
-			description={`${summary ? "1 summary" : "No summary"} and ${inline.length} ${
-				inline.length === 1 ? one : many
-			}`}
+			description={phrase === "" ? undefined : phrase.charAt(0).toUpperCase() + phrase.slice(1)}
 		>
-			{proposedPlacements.length === 0 ? (
+			{feedback.copies.length === 0 ? (
 				<Alert variant="destructive">
 					<CircleAlertIcon aria-hidden />
 					<AlertDescription>
@@ -91,7 +83,7 @@ export interface ProposalDecisionProps {
 	canApprove: boolean;
 	isDeciding: boolean;
 	onApprove: () => void;
-	onReject: (reason: ProposalRejectionReason, note?: string) => void;
+	onReject: (reason: FeedbackDecisionReason, note?: string) => void;
 	/**
 	 * Where this proposal sits in the approval queue; absent when it is not in the part of the queue
 	 * that was read. In a queue, a decision moves on to another proposal still waiting, or closes the
@@ -175,7 +167,7 @@ function RejectFeedbackPopover({
 	onReject: ProposalDecisionProps["onReject"];
 }) {
 	const [open, setOpen] = useState(false);
-	const [reason, setReason] = useState<ProposalRejectionReason | "">("");
+	const [reason, setReason] = useState<FeedbackDecisionReason | "">("");
 	const [note, setNote] = useState("");
 	const rejectionId = useId();
 	const noteId = useId();
@@ -202,7 +194,7 @@ function RejectFeedbackPopover({
 					aria-label="Rejection reason"
 					className="gap-1"
 				>
-					{PROPOSAL_REJECTION_REASONS.map((option) => (
+					{FEEDBACK_DECISION_REASONS.map((option) => (
 						<label
 							key={option.value}
 							htmlFor={`${rejectionId}-${option.value}`}

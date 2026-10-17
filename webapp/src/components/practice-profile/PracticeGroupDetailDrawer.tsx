@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import type { PracticeGroup, PracticeGroupStanding } from "@/api/types.gen";
+import type { GroupRef, PracticeGroupStanding } from "@/api/types.gen";
 import { type LoadState, loadProps } from "@/components/common/panel-state";
 import type { DetailStackEntry } from "@/components/layout/detail-drawer/detail-stack";
 import { DetailDrawerStack } from "@/components/layout/detail-drawer/DetailDrawerStack";
@@ -56,12 +56,12 @@ export interface PracticeGroupDetailDrawerProps {
 	/** Pushes the practice level over the group. */
 	onOpenPractice: (practiceSlug: string) => void;
 	/** The groups the levels list and name, and the developer's standing in each. */
-	groups: PracticeGroup[];
+	groups: GroupRef[];
 	/**
 	 * The groups with no practice in them. Not in the table: they sit in the fold of groups not
-	 * observed yet. A link to one opens its level, which says the group has no practices.
+	 * reviewed yet. A link to one opens its level, which says the group has no practices.
 	 */
-	emptyGroups?: PracticeGroup[];
+	emptyGroups?: GroupRef[];
 	groupStandings: Record<string, PracticeGroupStanding | undefined>;
 	/**
 	 * The page's load state: a level shows nothing without the page's standings, so it waits and
@@ -84,9 +84,9 @@ export interface PracticeGroupDetailDrawerProps {
 	/** How many rows the practice level's feed draws while its first page loads. */
 	skeletonRows: number;
 	/** The two review levels; the drawer adds where each sits and which review is open. */
-	reviewRuns: {
+	reviews: {
 		list: Omit<ProfileReviewsLevelProps, "nested" | "path" | "openReviewId">;
-		open: Omit<ProfileReviewLevelProps, "nested" | "path" | "positionOnWork" | "groups">;
+		open: Omit<ProfileReviewLevelProps, "nested" | "path" | "positionOnWork" | "responses">;
 	};
 	/**
 	 * Writes the selection in place — the tab is a view of the level, not a place — so Escape and
@@ -100,7 +100,7 @@ export interface PracticeGroupDetailDrawerProps {
 /** The page under the stack, as the first crumb of every level's path. */
 const PAGE_LABEL = "Practice profile";
 
-const NO_GROUPS: PracticeGroup[] = [];
+const NO_GROUPS: GroupRef[] = [];
 
 /**
  * The detail drawer over the practice profile, addressed by the route's `detail` stack: the
@@ -121,7 +121,7 @@ export function PracticeGroupDetailDrawer({
 	ratingProps,
 	practiceTab,
 	skeletonRows,
-	reviewRuns,
+	reviews,
 	onSelectionChange,
 	levelFooter,
 }: PracticeGroupDetailDrawerProps) {
@@ -165,7 +165,7 @@ export function PracticeGroupDetailDrawer({
 	};
 	const pathAt = levelPathAt(detailStack, { pageLabel: PAGE_LABEL, labelOf, onClose });
 	const openReviewId = openLevelId(detailStack, "review");
-	const { list, open } = reviewRuns;
+	const { list, open } = reviews;
 
 	return (
 		<DetailDrawerStack stack={detailStack} onClose={onClose} footer={levelFooter}>
@@ -207,6 +207,7 @@ export function PracticeGroupDetailDrawer({
 								nested={level.nested}
 								path={pathAt(level.depth)}
 								practice={detail.practice}
+								described={detail.described}
 								guidance={detail.guidance}
 								feed={detail.feed}
 								feedbackCards={feedbackCards}
@@ -217,10 +218,7 @@ export function PracticeGroupDetailDrawer({
 								onOpenGroup={openGroup && (() => onClose(groupIndex + 1))}
 								tab={practiceTab}
 								onTabChange={(tab) => onSelectionChange({ practiceTab: tab })}
-								observations={{
-									onRespond: detail.respond,
-									pendingResponses: detail.pendingResponses,
-								}}
+								responses={detail.responses}
 								neverApplied={detail.practice !== undefined && isNeverApplied(detail.practice)}
 								{...load}
 							/>
@@ -245,7 +243,7 @@ export function PracticeGroupDetailDrawer({
 								positionOnWork={
 									openReviewId === undefined ? undefined : list.positions?.get(openReviewId)
 								}
-								groups={groups}
+								responses={detail.responses}
 							/>
 						);
 					}

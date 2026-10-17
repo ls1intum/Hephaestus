@@ -52,14 +52,13 @@ public class SlackParticipantConsent {
     @ColumnDefault("false")
     private boolean ingestionOptedOut;
 
-    /** Historical value retained for schema compatibility; current research consent lives in the native-account ledger. */
-    @Column(name = "research_opted_out", nullable = false)
+    @Column(name = "research_opted_out", nullable = false, insertable = false, updatable = false)
     @ColumnDefault("false")
     private boolean researchOptedOut;
 
-    /** Where the decision originated (e.g. {@code SLACK_APP_HOME}); nullable for historical/backfilled rows. */
-    @Column(name = "source", length = 32)
-    private @Nullable String source;
+    @Nullable
+    @Column(name = "source", length = 32, insertable = false, updatable = false)
+    private String source;
 
     /**
      * When the current decision was made. Every write goes through the repository's native {@code ON CONFLICT}

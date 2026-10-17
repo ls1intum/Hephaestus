@@ -8,7 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobExecutor;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobExecutor;
 import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerCapacityState;
 import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerControlClient;
 import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerDrainCoordinator;
@@ -52,7 +52,7 @@ class SandboxGatewayDrainIntegrationTest {
     @Timeout(90)
     void shouldKeepGatewayConnectorServingWhileDrainAwaitsInFlightReviewWhenContextCloses() throws Exception {
         WorkerProperties properties = WorkerPropertiesFixtures.withDrain(DRAIN);
-        AgentJobExecutor executor = mock(AgentJobExecutor.class);
+        ReviewJobExecutor executor = mock(ReviewJobExecutor.class);
         CountDownLatch draining = new CountDownLatch(1);
         CountDownLatch reviewFinished = new CountDownLatch(1);
         when(executor.awaitInFlight(any(Duration.class))).thenAnswer(invocation -> {

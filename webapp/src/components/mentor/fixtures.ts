@@ -23,18 +23,26 @@ export const REPLY_WITH_FEEDBACK: ChatMessage = {
 	parts: [
 		{ type: "text", text: "I looked at your latest pull request, **Cache the practice catalog**." },
 		{
-			type: "data-observation",
+			type: "data-result",
 			id: "link-1",
 			data: {
-				observationId: "3f0c2b4e-8a1d-4c6e-9b7f-2d5e8a1c4b6f",
+				resultId: "3f0c2b4e-8a1d-4c6e-9b7f-2d5e8a1c4b6f",
 				text: "Your description names **the decision**, a five-minute cache, but not why it beat invalidating on write.",
 			},
 		},
-		// Stored before links carried their feedback, so it shows nothing.
 		{
-			type: "data-observation",
+			type: "data-problem",
 			id: "link-2",
-			data: { observationId: "c9bf9e57-1685-4c89-bafb-ff5af830be8a" },
+			data: {
+				resultId: "3f0c2b4e-8a1d-4c6e-9b7f-2d5e8a1c4b6f",
+				problemId: "8d3e6f1a-2b4c-4d5e-9f6a-7b8c9d0e1f2a",
+				text: "The commit `Fix stuff` does not say what it changes.",
+			},
+		},
+		{
+			type: "data-result",
+			id: "link-3",
+			data: { resultId: "c9bf9e57-1685-4c89-bafb-ff5af830be8a", text: "" },
 		},
 		{ type: "text", text: "What made you pick the time-based cache?" },
 	],

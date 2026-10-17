@@ -12,14 +12,14 @@ vi.mock(import("@/environment"), async (importOriginal) => {
 describe("user view request context", () => {
 	afterEach(clearUserView);
 
-	it("keeps the selected user and reason on normal app reads", () => {
+	it("keeps the selected account and reason on normal app reads", () => {
 		storeUserView({ reason: "Check practice page" });
 		const request = applyUserViewHeaders(
 			new Request("https://example.test/api/workspaces/engineering/practices"),
 		);
 
 		expect(request.headers.get("X-User-View-Workspace")).toBe("engineering");
-		expect(request.headers.get("X-User-View-User")).toBe("11");
+		expect(request.headers.get("X-User-View-Account")).toBe("11");
 		expect(request.headers.get("X-User-View-Reason")).toBe("Check%20practice%20page");
 	});
 
@@ -29,7 +29,7 @@ describe("user view request context", () => {
 			storeUserView();
 			const request = applyUserViewHeaders(new Request(`https://example.test${path}`));
 
-			expect(request.headers.has("X-User-View-User")).toBe(false);
+			expect(request.headers.has("X-User-View-Account")).toBe(false);
 		},
 	);
 
@@ -40,7 +40,7 @@ describe("user view request context", () => {
 		storeUserView();
 		const request = applyUserViewHeaders(new Request(`https://example.test${path}`));
 
-		expect(request.headers.get("X-User-View-User")).toBe("11");
+		expect(request.headers.get("X-User-View-Account")).toBe("11");
 	});
 
 	it.each(["abc", "123", "a".repeat(51)])("accepts the workspace slug %s", (workspaceSlug) => {
@@ -56,8 +56,8 @@ describe("user view request context", () => {
 		},
 	);
 
-	it("ignores invalid stored identities", () => {
-		storeUserView({ userId: -1 });
+	it.each(["-1", "0", "alex", "11abc"])("ignores the stored account id %s", (accountId) => {
+		storeUserView({ accountId });
 
 		expect(getUserViewSession()).toBeUndefined();
 	});

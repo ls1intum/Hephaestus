@@ -1,10 +1,9 @@
 import Foundation
 
 final class LoginService {
-    private let apiKey = "sk-live-AKIAIOSFODNN7EXAMPLE-prod-2026"
-    private let dbPassword = "admin123!"
+    private let password = "admin123!"
 
-    func authenticate(user: String) -> Bool {
-        return user == "root"
+    func authenticate(user: String, password: String) -> Bool {
+        return user == "root" && password == self.password
     }
 }

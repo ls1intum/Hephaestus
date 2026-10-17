@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCatalog;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataContributor;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataSelection;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataStores;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +18,7 @@ import tools.jackson.databind.ObjectMapper;
 @RequiredArgsConstructor
 @PersonDataStores({
     "account_feature",
-    "identity_link",
+    "identity",
     "issued_jwt",
     "client_session",
     "client_sign_in_handoff",
@@ -32,8 +33,7 @@ import tools.jackson.databind.ObjectMapper;
     "person_data_request",
     "person_data_request_administration",
     "person_data_store_administration",
-    "person_suppression",
-    "public_activity_objection"
+    "identity_restriction"
 })
 public class CorePrivacyPersonDataCatalog implements PersonDataCatalog {
     private final NamedParameterJdbcTemplate jdbc;
@@ -56,10 +56,10 @@ public class CorePrivacyPersonDataCatalog implements PersonDataCatalog {
                 new JdbcPersonDataStore(
                         jdbc,
                         mapper,
-                        "identity_link",
-                        "identity_link",
+                        "identity",
+                        "identity",
                         "t.account_id = :account",
-                        "id,account_id,provider_id,subject,team_id,external_actor_id,username_at_signup,email_at_signup,display_name,avatar_url,profile_url,linked_at,linked_via,last_login_at,disabled_at",
+                        "id,account_id,provider_id,provider_user_key,team_key,linked_at,linked_via,last_login_at,disabled_at",
                         "id",
                         "",
                         900),
@@ -118,10 +118,17 @@ public class CorePrivacyPersonDataCatalog implements PersonDataCatalog {
                         mapper,
                         "auth_event",
                         "auth_event",
-                        "t.account_id = :account OR t.acting_account_id = :account OR t.viewed_user_id = ANY(:users)",
+                        "t.account_id = :account OR t.acting_account_id = :account OR"
+                                + " t.viewed_account_id=:account OR t.viewed_actor_id = ANY(:users)",
                         "id,occurred_at,event_type,result,failure_reason,provider_id,workspace_id,ip_inet,user_agent",
                         "id,occurred_at",
-                        "ip_inet=NULL,user_agent=NULL,details=NULL",
+                        "ip_inet=NULL,user_agent=NULL,details=NULL,account_id=CASE WHEN"
+                                + " account_id=:account THEN NULL ELSE account_id"
+                                + " END,acting_account_id=CASE WHEN acting_account_id=:account THEN"
+                                + " NULL ELSE acting_account_id END,viewed_actor_id=CASE WHEN"
+                                + " viewed_account_id=:account OR viewed_actor_id=ANY(:users) THEN NULL"
+                                + " ELSE viewed_actor_id END,viewed_account_id=CASE WHEN"
+                                + " viewed_account_id=:account THEN NULL ELSE viewed_account_id END",
                         850),
                 new JdbcPersonDataStore(
                         jdbc,
@@ -148,7 +155,9 @@ public class CorePrivacyPersonDataCatalog implements PersonDataCatalog {
                         mapper,
                         "config_audit_event_membership_subject",
                         "config_audit_event",
-                        "t.entity_type IN ('WORKSPACE_ROLE','ACTIVITY_AUTOMATION') AND t.entity_id IN (SELECT id::text FROM \"user\" WHERE id = ANY(:users))",
+                        "(t.entity_type='WORKSPACE_ROLE' AND t.entity_id=CAST(:account AS text)) OR"
+                                + " (t.entity_type='ACTIVITY_AUTOMATION' AND t.entity_id IN (SELECT"
+                                + " u::text FROM unnest(:users) u))",
                         "id,occurred_at,workspace_id,entity_type,entity_id,action,changed_keys,old_value,new_value",
                         "id",
                         "entity_id='ERASED'",
@@ -168,7 +177,9 @@ public class CorePrivacyPersonDataCatalog implements PersonDataCatalog {
                         mapper,
                         "event_publication",
                         "event_publication",
-                        "(t.serialized_event::jsonb)->>'accountId' = CAST(:account AS text) OR (t.serialized_event::jsonb)->>'recipientAccountId' = CAST(:account AS text)",
+                        "(t.serialized_event::jsonb)->>'accountId' = CAST(:account AS text) OR"
+                                + " (t.serialized_event::jsonb)->>'recipientAccountId' = CAST(:account"
+                                + " AS text)",
                         "id,event_type,publication_date,completion_date,status",
                         "id",
                         "",
@@ -178,10 +189,17 @@ public class CorePrivacyPersonDataCatalog implements PersonDataCatalog {
                         mapper,
                         "person_data_request",
                         "person_data_request",
-                        "t.scope_json IS NOT NULL AND ((t.scope_json::jsonb)->>'accountId'=CAST(:account AS text) OR EXISTS(SELECT 1 FROM jsonb_array_elements((t.scope_json::jsonb)->'identities') stored JOIN jsonb_array_elements(CAST(:identities AS jsonb)) chosen ON stored=chosen))",
+                        "t.scope_json IS NOT NULL AND"
+                                + " ((t.scope_json::jsonb)->>'accountId'=CAST(:account AS text) OR"
+                                + " EXISTS(SELECT 1 FROM"
+                                + " jsonb_array_elements((t.scope_json::jsonb)->'identities') stored"
+                                + " JOIN jsonb_array_elements(CAST(:identities AS jsonb)) chosen ON"
+                                + " stored=chosen))",
                         "id,state,created_at,expires_at,completed_at,counts_json,completed_json,failure_code",
                         "id",
-                        "scope_json=CASE WHEN state IN ('ERASING','FAILED') THEN scope_json END,selections_json=CASE WHEN state IN ('ERASING','FAILED') THEN selections_json END",
+                        "scope_json=CASE WHEN state IN ('ERASING','FAILED') THEN scope_json"
+                                + " END,selections_json=CASE WHEN state IN ('ERASING','FAILED') THEN"
+                                + " selections_json END",
                         1100),
                 new JdbcPersonDataStore(
                         jdbc,
@@ -196,30 +214,18 @@ public class CorePrivacyPersonDataCatalog implements PersonDataCatalog {
                 new JdbcPersonDataStore(
                         jdbc,
                         mapper,
-                        "public_activity_objection",
-                        "public_activity_objection",
-                        "EXISTS(SELECT 1 FROM jsonb_to_recordset(CAST(:identities AS jsonb)) i(\"providerId\" bigint,subject text) WHERE i.\"providerId\"=t.provider_id AND i.subject=t.subject)",
-                        "id,provider_id,subject",
+                        "identity_restriction",
+                        "identity_restriction",
+                        "EXISTS(SELECT 1 FROM jsonb_to_recordset(CAST(:identities AS jsonb))"
+                                + " i(\"providerId\" bigint,subject text,\"teamId\" text) WHERE"
+                                + " i.\"providerId\"=t.provider_id AND i.subject=t.provider_user_key"
+                                + " AND COALESCE(i.\"teamId\",'')=t.team_key)",
+                        "id,provider_id,provider_user_key,team_key,kind",
                         "id",
                         "",
                         0) {
                     @Override
-                    public long erase(PersonDataSelection selection) {
-                        return 0;
-                    }
-                },
-                new JdbcPersonDataStore(
-                        jdbc,
-                        mapper,
-                        "person_suppression",
-                        "person_suppression",
-                        "EXISTS(SELECT 1 FROM jsonb_to_recordset(CAST(:identities AS jsonb)) i(\"providerId\" bigint,subject text,\"teamId\" text) WHERE i.\"providerId\"=t.provider_id AND i.subject=t.subject AND COALESCE(i.\"teamId\",'')=t.team_key)",
-                        "id,provider_id,subject,team_key",
-                        "id",
-                        "",
-                        0) {
-                    @Override
-                    public long erase(PersonDataSelection selection) {
+                    public long erase(PersonDataSelection selection, PersonScope frozenScope) {
                         return 0;
                     }
                 });

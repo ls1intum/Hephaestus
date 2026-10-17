@@ -1,12 +1,18 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ObserverStub } from "@/test/observers";
 import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter } from "@/test/router-harness";
 
 import { OVERVIEW, serveAttention } from "./-overview-attention-server";
 
 vi.setConfig({ testTimeout: 30_000 });
+
+// jsdom needs an IntersectionObserver stub for paged lists.
+beforeEach(() => {
+	vi.stubGlobal("IntersectionObserver", ObserverStub);
+});
 
 /**
  * The overview's figures are real links: a click puts the filter into the list's URL, so the
@@ -26,29 +32,12 @@ describe("the overview's figures open the lists filtered to them", () => {
 		await waitFor(() =>
 			expect(router.state.location.pathname).toBe("/w/acme/admin/practices/reviews/feedback"),
 		);
-		expect(router.state.location.search).toMatchObject({
-			deliveryState: ["DELIVERED", "PARTIALLY_DELIVERED"],
-		});
+		expect(router.state.location.search).toMatchObject({ state: "DELIVERED" });
 		expect(router.state.location.search).toHaveProperty("from");
 
 		router.history.back();
 		await waitFor(() => expect(router.state.location.pathname).toBe(OVERVIEW));
 		await screen.findByRole("list", { name: "Feedback by delivery" }, ROUTE_RENDER_WAIT);
-	});
-
-	it("opens the Reviews table filtered to exactly the waiting reviews from Waiting", async () => {
-		serveAttention();
-		const { router } = renderRouteAtWithRouter(`${OVERVIEW}?range=30d`);
-
-		await userEvent.click(
-			await screen.findByRole("link", { name: "14 reviews waiting" }, ROUTE_RENDER_WAIT),
-		);
-		await waitFor(() =>
-			expect(router.state.location.pathname).toBe("/w/acme/admin/practices/reviews/runs"),
-		);
-		// The queue is now, so no days narrow it; Waiting leaves out the reviews on hold.
-		expect(router.state.location.search).toMatchObject({ status: "WAITING" });
-		expect(router.state.location.search).not.toHaveProperty("from");
 	});
 
 	it("opens the Reviews table filtered to what the queue counts from See all", async () => {
@@ -59,13 +48,9 @@ describe("the overview's figures open the lists filtered to them", () => {
 			await screen.findByRole("link", { name: "See all 14" }, ROUTE_RENDER_WAIT),
 		);
 		await waitFor(() =>
-			expect(router.state.location.pathname).toBe("/w/acme/admin/practices/reviews/runs"),
+			expect(router.state.location.pathname).toBe("/w/acme/admin/practices/reviews"),
 		);
-		// Not QUEUED: a queued review backing off before a retry is not waiting, and the total leaves
-		// it out.
-		expect(router.state.location.search).toMatchObject({
-			status: ["RUNNING", "WAITING", "ON_HOLD"],
-		});
+		expect(router.state.location.search).toMatchObject({ status: ["RUNNING", "QUEUED"] });
 	});
 
 	it("opens an address from before that asked for 12 months as all time", async () => {
@@ -88,9 +73,7 @@ describe("the overview's figures open the lists filtered to them", () => {
 		await waitFor(() =>
 			expect(router.state.location.pathname).toBe("/w/acme/admin/practices/reviews/feedback"),
 		);
-		expect(router.state.location.search).toMatchObject({
-			deliveryState: ["DELIVERED", "PARTIALLY_DELIVERED"],
-		});
+		expect(router.state.location.search).toMatchObject({ state: "DELIVERED" });
 		expect(router.state.location.search).not.toHaveProperty("from");
 		expect(router.state.location.search).not.toHaveProperty("to");
 	});
@@ -111,7 +94,7 @@ describe("the overview's range across the tabs", () => {
 		const tabs = screen.getByRole("navigation", { name: "Practice review sections" });
 		await userEvent.click(within(tabs).getByRole("link", { name: /^Reviews/u }));
 		await waitFor(() =>
-			expect(router.state.location.pathname).toBe("/w/acme/admin/practices/reviews/runs"),
+			expect(router.state.location.pathname).toBe("/w/acme/admin/practices/reviews"),
 		);
 		expect(router.state.location.search).not.toHaveProperty("range");
 
@@ -133,9 +116,9 @@ describe("the overview's range across the tabs", () => {
 				),
 			ROUTE_RENDER_WAIT,
 		);
-		router.history.push("/w/acme/admin/practices/reviews/runs");
+		router.history.push("/w/acme/admin/practices/reviews");
 		await waitFor(() =>
-			expect(router.state.location.pathname).toBe("/w/acme/admin/practices/reviews/runs"),
+			expect(router.state.location.pathname).toBe("/w/acme/admin/practices/reviews"),
 		);
 		router.history.push(OVERVIEW);
 		await waitFor(

@@ -6,7 +6,7 @@ const cellLefts = (row: Element) =>
 
 /**
  * Every row of a Practice profile fold starts its cells where `firstRow` of the table above starts
- * them, within 1 px: the fold is part of that table, not a table of its own beside it. Stacked on a
+ * them, within 1 px: the fold belongs to that table, not a table of its own beside it. Stacked on a
  * phone, a row is a card rather than a line of columns, so there it lines up by its edges.
  */
 export async function expectFoldOnTableColumns(firstRow: Element | null, fold: HTMLElement) {

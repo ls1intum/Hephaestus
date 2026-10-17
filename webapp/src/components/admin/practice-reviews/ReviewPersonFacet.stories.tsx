@@ -11,10 +11,10 @@ function peopleFrom(
 	rest: Partial<ReviewPeople> = {},
 ): ReviewPeople {
 	return {
-		options: members.map((member) => ({
-			userId: member.userId,
-			label: member.userName ?? `#${member.userId}`,
-			secondary: member.userLogin,
+		options: members.map(({ account }) => ({
+			accountId: account.id,
+			label: account.displayName ?? `#${account.id}`,
+			secondary: account.identities[0]?.login ?? undefined,
 		})),
 		capped: members.length >= MEMBER_PAGE_SIZE,
 		isLoading: false,
@@ -44,14 +44,14 @@ const meta = {
 	// Controlled: `selected` comes back through the same prop the choice is reported on, so a frozen
 	// value would leave the list looking dead after a click.
 	render: (args) => (
-		<Stateful<number | undefined> initial={args.selected}>
+		<Stateful<string | undefined> initial={args.selected}>
 			{(selected, setSelected) => (
 				<ReviewPersonFacet
 					{...args}
 					selected={selected}
-					onChange={(userId) => {
-						setSelected(userId);
-						args.onChange(userId);
+					onChange={(accountId) => {
+						setSelected(accountId);
+						args.onChange(accountId);
 					}}
 				/>
 			)}
@@ -67,18 +67,13 @@ export const Default: Story = {
 		await userEvent.click(canvas.getByRole("combobox", { name: "Developer" }));
 		const listbox = await screen.findByRole("listbox", { name: "Developer options" });
 		await userEvent.click(await within(listbox).findByRole("option", { name: /Grace Hopper/u }));
-		await expect(args.onChange).toHaveBeenCalledWith(9);
+		await expect(args.onChange).toHaveBeenCalledWith("9");
 		await canvas.findByRole("combobox", { name: "Developer: Grace Hopper" });
 	},
 };
 
-/** "Recipient" on Delivery, "Developer" on Observations — the two are not always the same person. */
-export const NamedForItsList: Story = {
-	args: { title: "Recipient" },
-};
-
 export const ClearTheSelection: Story = {
-	args: { selected: 9 },
+	args: { selected: "9" },
 	play: async ({ args, canvas, userEvent }) => {
 		await canvas.findByRole("combobox", { name: "Developer: Grace Hopper" });
 		await userEvent.click(canvas.getByRole("combobox", { name: "Developer: Grace Hopper" }));
@@ -93,7 +88,7 @@ export const ClearTheSelection: Story = {
  * that name must be *theirs*: read off the first row it is right only while the filter is on.
  */
 export const SomebodyNoLongerInTheWorkspace: Story = {
-	args: { selected: 404, fallbackName: "Barbara Liskov" },
+	args: { selected: "404", fallbackName: "Barbara Liskov" },
 	play: async ({ canvas }) => {
 		await canvas.findByRole("combobox", { name: "Developer: Barbara Liskov" });
 	},
@@ -101,7 +96,7 @@ export const SomebodyNoLongerInTheWorkspace: Story = {
 
 /** Without even a name to fall back on, the id is shown rather than an empty badge. */
 export const SomebodyWithNoNameAtAll: Story = {
-	args: { selected: 404 },
+	args: { selected: "404" },
 	play: async ({ canvas }) => {
 		await canvas.findByRole("combobox", { name: "Developer: #404" });
 	},

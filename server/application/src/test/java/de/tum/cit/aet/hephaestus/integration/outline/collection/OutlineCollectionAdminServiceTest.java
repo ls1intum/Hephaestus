@@ -83,9 +83,11 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
         lenient()
                 .when(connectionService.findActiveBearerToken(WS, IntegrationKind.OUTLINE))
                 .thenReturn(Optional.of(new BearerToken(TOKEN, null)));
-        lenient()
-                .when(collectionRepository.save(any(OutlineCollection.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(collectionRepository.save(any(OutlineCollection.class))).thenAnswer(invocation -> {
+            OutlineCollection saved = invocation.getArgument(0);
+            if (saved.getId() == null) saved.setId(41L);
+            return saved;
+        });
         return new OutlineCollectionAdminService(
                 connectionService,
                 collectionRepository,
@@ -98,6 +100,7 @@ class OutlineCollectionAdminServiceTest extends BaseUnitTest {
 
     private OutlineCollection registeredRow(MirrorState state, SyncStatus syncStatus) {
         OutlineCollection row = new OutlineCollection();
+        row.setId(41L);
         row.setWorkspaceId(WS);
         row.setConnectionId(CONNECTION_ID);
         row.setCollectionId(COLLECTION_ID);

@@ -944,8 +944,7 @@ public class GitLabWorkspaceInitializationService {
         }
 
         log.info(
-                "GitLab repo sync complete: workspaceId={}, repos={}, labels={}, milestones={}, issues={}, mrs={}, "
-                        + "collaborators={}, commits={}, cooldownSkipped={}",
+                "GitLab repo sync complete: workspaceId={}, repos={}, labels={}, milestones={}, issues={}, mrs={}, collaborators={}, commits={}, cooldownSkipped={}",
                 workspace.getId(),
                 repos.size(),
                 totalLabels,

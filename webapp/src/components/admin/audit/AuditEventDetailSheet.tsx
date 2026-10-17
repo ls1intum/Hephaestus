@@ -90,8 +90,8 @@ export function AuditEventDetailSheet({
 							</DetailRow>
 						)}
 						<DetailRow label="Acting account">{actor ?? "—"}</DetailRow>
-						{event.viewedUserId != null && (
-							<DetailRow label="Viewed user">#{event.viewedUserId}</DetailRow>
+						{event.viewedAccountId != null && (
+							<DetailRow label="Viewed account">#{event.viewedAccountId}</DetailRow>
 						)}
 						<DetailRow label="Workspace">
 							{event.workspaceId == null ? "—" : workspaceLabel(event.workspaceId, workspaceName)}

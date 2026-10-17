@@ -1,11 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 
 import {
-	listGroupsOptions,
-	listPracticeGroupStandingsOptions,
-	listPracticeStandingsOptions,
+	getOwnGroupStandingsOptions,
+	getOwnPracticeStandingsOptions,
+	listReviewedPracticesOptions,
 } from "@/api/@tanstack/react-query.gen";
-import type { PracticeGroup, PracticeGroupStanding, PracticeStanding } from "@/api/types.gen";
+import type {
+	GroupRef,
+	PracticeGroupStanding,
+	PracticeStanding,
+	ReviewedPractice,
+} from "@/api/types.gen";
 import {
 	combinePanelStates,
 	type LoadState,
@@ -15,16 +20,12 @@ import { hasText } from "@/lib/text";
 
 export interface PracticeStandings {
 	/** The groups the practice profile shows, in catalog order: those with a practice in them. */
-	groups: PracticeGroup[];
-	/**
-	 * The groups with no practice to show: none added, or all switched off. The table lists none of
-	 * them; the all-groups table folds them with the groups not observed yet, and a link to one opens
-	 * a level that says so.
-	 */
-	emptyGroups: PracticeGroup[];
+	groups: GroupRef[];
+	emptyGroups: GroupRef[];
 	/** The developer's standing in each group, keyed by group slug. */
 	groupStandings: Record<string, PracticeGroupStanding>;
 	practiceStandings: PracticeStanding[];
+	reviewedPractices: ReviewedPractice[];
 	practicesByGroup: Record<string, PracticeStanding[] | undefined>;
 	/** The three queries as one: the page shows them together, so they load and fail as one. */
 	state: LoadState;
@@ -44,17 +45,31 @@ function groupPracticeStandings(
 }
 
 /**
+ * The groups the group standings name, in their order. The server sends one standing for every
+ * group shown to developers, in catalog order, and none for a hidden group, so this is the whole
+ * set of groups the profile can show, empty ones included.
+ */
+export function groupsOfStandings(standings: PracticeGroupStanding[]): GroupRef[] {
+	return standings.map((standing) => ({
+		slug: standing.groupSlug,
+		name: standing.groupName,
+		icon: standing.groupIcon,
+		color: standing.groupColor,
+	}));
+}
+
+/**
  * Splits the groups into the ones the profile shows and the ones it leaves out, keeping the
  * catalog's order in both. A group is shown when the standings carry a practice in it: the standings
  * carry every practice review is admitted for and none that is switched off, so a group whose
  * practices are all switched off is as empty as one with no practices at all.
  */
 export function partitionGroupsByPractices(
-	groups: PracticeGroup[],
+	groups: GroupRef[],
 	practicesByGroup: Record<string, PracticeStanding[] | undefined>,
-): { shown: PracticeGroup[]; empty: PracticeGroup[] } {
-	const shown: PracticeGroup[] = [];
-	const empty: PracticeGroup[] = [];
+): { shown: GroupRef[]; empty: GroupRef[] } {
+	const shown: GroupRef[] = [];
+	const empty: GroupRef[] = [];
 	for (const group of groups) {
 		((practicesByGroup[group.slug]?.length ?? 0) > 0 ? shown : empty).push(group);
 	}
@@ -66,29 +81,28 @@ export function partitionGroupsByPractices(
  * standing on every practice — as the practice profile and the drawer over it read them.
  */
 export function usePracticeStandings(workspaceSlug: string): PracticeStandings {
-	const groupsQuery = useQuery(
-		listGroupsOptions({
-			path: { workspaceSlug },
-			query: { visibleInPracticeDashboardsOnly: true },
-		}),
-	);
-	const groupStandingsQuery = useQuery(
-		listPracticeGroupStandingsOptions({ path: { workspaceSlug } }),
-	);
-	const standingsQuery = useQuery(listPracticeStandingsOptions({ path: { workspaceSlug } }));
+	const reviewedQuery = useQuery(listReviewedPracticesOptions({ path: { workspaceSlug } }));
+	const groupStandingsQuery = useQuery(getOwnGroupStandingsOptions({ path: { workspaceSlug } }));
+	const standingsQuery = useQuery(getOwnPracticeStandingsOptions({ path: { workspaceSlug } }));
 	const practiceStandings = standingsQuery.data ?? [];
 	const practicesByGroup = groupPracticeStandings(practiceStandings);
-	const { shown, empty } = partitionGroupsByPractices(groupsQuery.data ?? [], practicesByGroup);
+	const reviewedPractices = reviewedQuery.data ?? [];
+	const groupStandings = groupStandingsQuery.data ?? [];
+	const { shown, empty } = partitionGroupsByPractices(
+		groupsOfStandings(groupStandings),
+		practicesByGroup,
+	);
 	return {
 		groups: shown,
 		emptyGroups: empty,
 		groupStandings: Object.fromEntries(
-			(groupStandingsQuery.data ?? []).map((standing) => [standing.groupSlug, standing]),
+			groupStandings.map((standing) => [standing.groupSlug, standing]),
 		),
 		practiceStandings,
+		reviewedPractices,
 		practicesByGroup,
 		state: combinePanelStates(
-			[groupsQuery, groupStandingsQuery, standingsQuery].map((query) => queryLoadState(query)),
+			[reviewedQuery, groupStandingsQuery, standingsQuery].map((query) => queryLoadState(query)),
 		),
 	};
 }

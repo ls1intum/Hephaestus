@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.practice;
 
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.NetworkPolicy;
+import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
 import java.util.List;
 import java.util.Map;
@@ -10,7 +11,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * Sandbox configuration produced by {@link PracticePiAdapter#buildSandboxSpec}.
  * The executor combines it with job-level concerns into a {@link
- * de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxSpec}. {@code inputFiles} paths are
+ * SandboxSpec}. {@code inputFiles} paths are
  * workspace-relative.
  */
 public record PracticeSandboxSpec(

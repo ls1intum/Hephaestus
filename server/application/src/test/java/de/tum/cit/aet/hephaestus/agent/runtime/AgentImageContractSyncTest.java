@@ -52,9 +52,9 @@ class AgentImageContractSyncTest extends BaseUnitTest {
                 .isEqualTo(SandboxLayout.NODE_MAJOR);
 
         assertThat(majorOf(body, PI_VERSION_ARG, "PI_VERSION"))
-                .as(
-                        "docker/agents/pi/Dockerfile moved to a new Pi SDK major: decide whether the runners still "
-                                + "import against it, then bump SandboxLayout.PI_SDK_MAJOR and RUNTIME_CONTRACT_VERSION together")
+                .as("docker/agents/pi/Dockerfile moved to a new Pi SDK major: decide whether the runners still"
+                        + " import against it, then bump SandboxLayout.PI_SDK_MAJOR and RUNTIME_CONTRACT_VERSION"
+                        + " together")
                 .isEqualTo(SandboxLayout.PI_SDK_MAJOR);
     }
 

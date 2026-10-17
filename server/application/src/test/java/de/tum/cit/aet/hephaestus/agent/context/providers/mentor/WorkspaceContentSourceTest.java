@@ -5,10 +5,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery;
+import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
+import de.tum.cit.aet.hephaestus.integration.core.spi.MentorWorkQuery;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -29,13 +28,16 @@ import tools.jackson.databind.ObjectMapper;
 class WorkspaceContentSourceTest extends BaseUnitTest {
 
     @Mock
-    UserRepository userRepository;
+    AccountSummaryQuery accounts;
 
     @Mock
     WorkspaceRepository workspaceRepository;
 
     @Mock
-    MentorContextQueryRepository queryRepository;
+    MentorWorkQuery queryRepository;
+
+    @Mock
+    MentorConversationQueryRepository conversations;
 
     @Spy
     ObjectMapper objectMapper = new ObjectMapper();
@@ -45,26 +47,25 @@ class WorkspaceContentSourceTest extends BaseUnitTest {
 
     @Test
     void writesWorkspaceJson() throws Exception {
-        User user = new User();
-        user.setLogin("octo");
-        user.setName("Octo");
-        when(userRepository.findById(eq(2L))).thenReturn(Optional.of(user));
+        when(accounts.findAllByIds(List.of(2L)))
+                .thenReturn(Map.of(2L, new AccountSummaryQuery.AccountSummary(2, "Octo", null)));
 
         Workspace ws = new Workspace();
         ws.setWorkspaceSlug("acme");
         ws.setDisplayName("Acme");
         when(workspaceRepository.findById(eq(1L))).thenReturn(Optional.of(ws));
 
-        when(queryRepository.findRecentChatThreads(eq(1L), eq(2L), any())).thenReturn(List.of());
+        when(conversations.findRecentChatThreads(eq(1L), eq(2L), any())).thenReturn(List.of());
         when(queryRepository.findAssignedOpenIssues(eq(1L), eq(2L))).thenReturn(List.of());
         when(queryRepository.findPendingReviewRequestPrs(eq(1L), eq(2L))).thenReturn(List.of());
 
         Map<String, byte[]> files = new HashMap<>();
-        provider.contribute(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID()), files);
+        provider.contribute(new MentorContextRequest(1L, 2L, UUID.randomUUID(), null), files);
 
         byte[] bytes = files.get("inputs/context/workspace.json");
         assertThat(bytes).isNotNull();
         JsonNode root = objectMapper.readTree(bytes);
+        assertThat(root.at("/user/name").asString()).isEqualTo("Octo");
         assertThat(root.get("workspace").get("slug").asString()).isEqualTo("acme");
         assertThat(root.get("workspace").get("displayName").asString()).isEqualTo("Acme");
         assertThat(root.get("recentSessions").isArray()).isTrue();
@@ -75,17 +76,16 @@ class WorkspaceContentSourceTest extends BaseUnitTest {
 
     @Test
     void staleReviewRequests() {
-        PullRequest pr = new PullRequest();
-        // 5 days in the past — beyond the 3-day urgency threshold.
-        pr.setCreatedAt(Instant.now().minus(Duration.ofDays(5)));
+        var pr = new MentorWorkQuery.RequestedReview(
+                1, 1, null, null, null, Instant.now().minus(Duration.ofDays(5)));
         List<String> suggestions = WorkspaceContentSource.computeFocusSuggestions(List.of(), List.of(pr));
         assertThat(suggestions).anyMatch(s -> s.contains("review request"));
     }
 
     @Test
     void freshReviewRequests() {
-        PullRequest pr = new PullRequest();
-        pr.setCreatedAt(Instant.now().minus(Duration.ofHours(2)));
+        var pr = new MentorWorkQuery.RequestedReview(
+                1, 1, null, null, null, Instant.now().minus(Duration.ofHours(2)));
         List<String> suggestions = WorkspaceContentSource.computeFocusSuggestions(List.of(), List.of(pr));
         assertThat(suggestions).noneMatch(s -> s.contains("review request"));
     }

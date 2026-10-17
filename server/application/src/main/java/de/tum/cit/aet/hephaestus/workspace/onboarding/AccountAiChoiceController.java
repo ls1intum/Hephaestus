@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.workspace.onboarding;
 
+import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
 import de.tum.cit.aet.hephaestus.core.auth.web.CurrentAccount;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
-import de.tum.cit.aet.hephaestus.workspace.spi.MemberAiChoice;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -27,7 +27,7 @@ public class AccountAiChoiceController {
     private final WorkspaceOnboardingService service;
 
     public record AccountAiChoiceRequestDTO(
-            @NonNull @NotNull MemberAiChoice choice) {}
+            @NonNull @NotNull AiChoice choice) {}
 
     @GetMapping
     @Operation(summary = "Get your AI choice", operationId = "getAccountAiChoice")

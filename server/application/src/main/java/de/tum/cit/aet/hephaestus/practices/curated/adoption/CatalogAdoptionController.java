@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.practices.curated.adoption;
 
 import de.tum.cit.aet.hephaestus.core.AuditLedger;
 import de.tum.cit.aet.hephaestus.core.Audited;
+import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
+import de.tum.cit.aet.hephaestus.core.exception.PreconditionRequiredException;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.practices.CatalogOriginPresenter;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
@@ -82,7 +84,7 @@ public class CatalogAdoptionController {
         CatalogAdoptionPlan plan = service.preview(context, slug);
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore().cachePrivate())
-                .eTag(CatalogAdoptionService.formatted(plan.etag()))
+                .eTag(EntityTagPrecondition.format(plan.etag()))
                 .body(plan.preview());
     }
 
@@ -93,7 +95,7 @@ public class CatalogAdoptionController {
         CatalogGroupAdoptionPlan plan = service.previewGroup(context, slug);
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore().cachePrivate())
-                .eTag(CatalogAdoptionService.formatted(plan.etag()))
+                .eTag(EntityTagPrecondition.format(plan.etag()))
                 .body(plan.preview());
     }
 
@@ -134,7 +136,7 @@ public class CatalogAdoptionController {
             @PathVariable String slug,
             @RequestHeader(value = HttpHeaders.IF_MATCH, required = false) @Nullable String ifMatch) {
         if (ifMatch == null || ifMatch.isBlank()) {
-            throw new CatalogAdoptionPreconditionRequiredException();
+            throw new PreconditionRequiredException();
         }
         Practice adopted = service.adopt(context, slug, ifMatch);
         URI location = ServletUriComponentsBuilder.fromCurrentContextPath()
@@ -154,7 +156,7 @@ public class CatalogAdoptionController {
             @PathVariable String slug,
             @RequestHeader(value = HttpHeaders.IF_MATCH, required = false) @Nullable String ifMatch) {
         if (ifMatch == null || ifMatch.isBlank()) {
-            throw new CatalogAdoptionPreconditionRequiredException();
+            throw new PreconditionRequiredException();
         }
         CatalogAdoptionService.CatalogGroupAdoptionResult result = service.adoptGroup(context, slug, ifMatch);
         CatalogGroupAdoptionResultDTO response = new CatalogGroupAdoptionResultDTO(

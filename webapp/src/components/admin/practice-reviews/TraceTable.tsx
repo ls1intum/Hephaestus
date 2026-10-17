@@ -2,8 +2,7 @@ import type { ReactNode } from "react";
 
 import { cn } from "cn";
 
-/** The two kinds of table a stage of the trace holds: the review's observations, its feedback. */
-export type TraceTableKind = "observations" | "feedback";
+export type TraceTableKind = "results" | "feedback";
 
 /**
  * The columns of each table, with and without its time column. Written out in full, so the
@@ -11,7 +10,7 @@ export type TraceTableKind = "observations" | "feedback";
  * but a stack: its number on the left, its main cell on the first line, the rest wrapping under it.
  */
 const COLUMNS: Record<TraceTableKind, { times: string; plain: string }> = {
-	observations: {
+	results: {
 		times: "@lg:grid-cols-[1.375rem_minmax(0,1fr)_6.5rem_6.5rem_4.5rem_8.5rem]",
 		plain: "@lg:grid-cols-[1.375rem_minmax(0,1fr)_6.5rem_6.5rem_4.5rem]",
 	},
@@ -22,8 +21,8 @@ const COLUMNS: Record<TraceTableKind, { times: string; plain: string }> = {
 };
 
 const HEADERS: Record<TraceTableKind, readonly string[]> = {
-	observations: ["#", "Practice", "Outcome", "Severity", "Feedback", "Time"],
-	feedback: ["#", "Channel", "State", "From", "Time"],
+	results: ["#", "Practice", "Outcome", "Severity", "Feedback", "Time"],
+	feedback: ["#", "Destination", "State", "From", "Time"],
 };
 
 /** The grid of one row, and of the header above the rows, so the columns line up. */

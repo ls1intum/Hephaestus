@@ -18,11 +18,11 @@ import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountFeatureRepository;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountAiChoiceExport;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountMembershipQuery;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountMembershipQuery.MembershipView;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountWorkspaceMembershipQuery;
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountWorkspaceMembershipQuery.WorkspaceMembershipView;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
 import de.tum.cit.aet.hephaestus.core.auth.spi.NotificationPreferencesExportQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.ResearchParticipationQuery;
@@ -32,6 +32,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -56,7 +57,7 @@ class AccountExportServiceTest extends BaseUnitTest {
         AccountService accountService = mock(AccountService.class);
         AccountFeatureRepository featureRepo = mock(AccountFeatureRepository.class);
         AuthEventRepository authEventRepo = mock(AuthEventRepository.class);
-        AccountWorkspaceMembershipQuery membershipQuery = mock(AccountWorkspaceMembershipQuery.class);
+        AccountMembershipQuery membershipQuery = mock(AccountMembershipQuery.class);
         AccountPreferencesQuery preferencesQuery = mock(AccountPreferencesQuery.class);
         GitProviderRegistry gitProviderRegistry = mock(GitProviderRegistry.class);
         ResearchParticipationQuery research = mock(ResearchParticipationQuery.class);
@@ -69,20 +70,21 @@ class AccountExportServiceTest extends BaseUnitTest {
         account.setStatus(Account.Status.ACTIVE);
         account.setCreatedAt(clock.instant());
 
-        IdentityLink link = new IdentityLink();
+        Identity link = new Identity();
         link.setProviderId(55L);
         when(gitProviderRegistry.providerTypeName(55L)).thenReturn("GITLAB");
-        link.setSubject("123");
-        link.setUsernameAtSignup("ada");
-        link.setEmailAtSignup("ada@signup.example.com");
-        link.setDisplayName("Ada");
+        link.setProviderUserKey("123");
+        var identityKey = new GitProviderRegistry.IdentityKey(55L, "123", "");
+        when(gitProviderRegistry.profiles(List.of(identityKey)))
+                .thenReturn(Map.of(
+                        identityKey, new GitProviderRegistry.IdentityProfile("ada", "Ada on GitLab", null, null)));
 
         when(accountService.requireById(ACCOUNT_ID)).thenReturn(account);
         when(accountService.activeIdentities(ACCOUNT_ID)).thenReturn(List.of(link));
         when(featureRepo.findFlagsByAccountId(ACCOUNT_ID)).thenReturn(List.of("notification_access"));
         when(authEventRepo.findByAccountSince(eq(ACCOUNT_ID), any())).thenReturn(List.of());
         when(membershipQuery.membershipsForAccount(ACCOUNT_ID))
-                .thenReturn(List.of(new WorkspaceMembershipView(7L, "tum-ase", "TUM ASE", "MEMBER", 314L)));
+                .thenReturn(List.of(new MembershipView(7L, "tum-ase", "TUM ASE", AccountMembershipQuery.Role.MEMBER)));
         when(preferencesQuery.preferencesForAccount(ACCOUNT_ID))
                 .thenReturn(Optional.of(new AccountPreferencesQuery.PreferencesView(!participating, false)));
 
@@ -100,12 +102,12 @@ class AccountExportServiceTest extends BaseUnitTest {
 
         ExportBundle bundle = assembler.assemble(ACCOUNT_ID);
 
-        assertThat(bundle.schemaVersion()).isEqualTo(ExportBundle.SCHEMA_VERSION);
-        assertThat(bundle.account().id()).isEqualTo(ACCOUNT_ID);
+        assertThat(bundle.schemaVersion()).isEqualTo("2.0");
+        assertThat(bundle.account().id()).isEqualTo(ACCOUNT_ID.toString());
         assertThat(bundle.account().primaryEmail()).isEqualTo("ada@example.com");
         assertThat(bundle.identities()).singleElement().satisfies(i -> {
             assertThat(i.provider()).isEqualTo("GITLAB");
-            assertThat(i.usernameAtSignup()).isEqualTo("ada");
+            assertThat(i.login()).isEqualTo("ada");
         });
         assertThat(bundle.workspaceMemberships()).singleElement().satisfies(m -> {
             assertThat(m.slug()).isEqualTo("tum-ase");
@@ -216,7 +218,8 @@ class AccountExportServiceTest extends BaseUnitTest {
             return e;
         });
 
-        // No active transaction in a unit test → TransactionCallbacks.afterCommit runs the handoff inline.
+        // No active transaction in a unit test → TransactionCallbacks.afterCommit runs the handoff
+        // inline.
         AccountExportService service = new AccountExportService(repo, worker, logger, clock);
 
         AccountExport created = service.requestExport(ACCOUNT_ID);

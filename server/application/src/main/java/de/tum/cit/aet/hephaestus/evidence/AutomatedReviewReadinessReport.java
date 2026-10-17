@@ -3,22 +3,25 @@ package de.tum.cit.aet.hephaestus.evidence;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 public record AutomatedReviewReadinessReport(
         SourceContractVersion contractVersion,
         String catalogDigest,
-        String artifactKind,
+        String itemKind,
         Instant manifestCapturedAt,
         Instant decidedAt,
-        List<AutomatedReviewReadinessDecision> decisions) {
+        List<AutomatedReviewReadinessDecision> decisions,
+        Map<String, AppliesWhenCheck> applicability) {
     public AutomatedReviewReadinessReport {
+        applicability = Map.copyOf(applicability);
         Objects.requireNonNull(contractVersion, "contractVersion");
         Objects.requireNonNull(catalogDigest, "catalogDigest");
         if (!catalogDigest.matches("[0-9a-f]{64}")) {
             throw new IllegalArgumentException("Invalid catalog digest: " + catalogDigest);
         }
-        Objects.requireNonNull(artifactKind, "artifactKind");
+        Objects.requireNonNull(itemKind, "itemKind");
         Objects.requireNonNull(manifestCapturedAt, "manifestCapturedAt");
         Objects.requireNonNull(decidedAt, "decidedAt");
         decisions = List.copyOf(Objects.requireNonNull(decisions, "decisions"));
@@ -35,5 +38,11 @@ public record AutomatedReviewReadinessReport(
         if (decisions.stream().anyMatch(decision -> !decision.decidedAt().equals(decidedAt))) {
             throw new IllegalArgumentException("Every readiness decision must use the report decision time");
         }
+    }
+
+    /** A practice runs when its evidence is ready and its conditions are not proven absent. */
+    public boolean runs(AutomatedReviewReadinessDecision decision) {
+        var check = applicability.get(decision.practiceSlug());
+        return decision.ready() && (check == null || !check.absent());
     }
 }

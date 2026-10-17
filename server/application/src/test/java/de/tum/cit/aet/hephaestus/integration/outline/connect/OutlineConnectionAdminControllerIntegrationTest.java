@@ -20,8 +20,8 @@ import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.Membership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -107,7 +107,7 @@ class OutlineConnectionAdminControllerIntegrationTest extends AbstractWorkspaceI
     @DisplayName("a workspace MEMBER cannot reach the token endpoint → 403")
     void nonAdmin_forbidden() {
         User mentor = persistUser("mentor");
-        ensureWorkspaceMembership(workspace, mentor, WorkspaceRole.MEMBER);
+        ensureMembership(workspace, mentor, WorkspaceRole.MEMBER);
 
         tokenRequest().expectStatus().isForbidden().expectBody(Void.class);
     }

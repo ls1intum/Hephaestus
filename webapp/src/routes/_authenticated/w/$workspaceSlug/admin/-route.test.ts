@@ -7,7 +7,7 @@ import { isRecord } from "@/lib/is-record";
 import { ROUTER_SEARCH } from "@/lib/router-search";
 import { hasText } from "@/lib/text";
 import type { WorkspaceRole } from "@/lib/workspace-roles";
-import { workspaceListItem } from "@/mocks/fixtures/workspaces";
+import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
 import { routeTree } from "@/routeTree.gen";
 
@@ -43,7 +43,7 @@ function mockMembership(role: WorkspaceRole | null) {
 	server.use(
 		http.get("*/workspaces/:workspaceSlug/members/me", () => {
 			if (role) {
-				return HttpResponse.json({ role, userId: 1, userLogin: "ada", userName: "Ada" });
+				return HttpResponse.json(ownMembership(role));
 			}
 			// The server answers a non-member with 400, not 403.
 			return HttpResponse.json({ status: 400, title: "Bad Request" }, { status: 400 });

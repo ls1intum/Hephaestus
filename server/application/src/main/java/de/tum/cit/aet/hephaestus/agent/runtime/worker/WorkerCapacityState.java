@@ -3,11 +3,6 @@ package de.tum.cit.aet.hephaestus.agent.runtime.worker;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CapacityReport;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * Per-worker in-flight counts for review jobs and mentor sessions. Read by the capacity
- * reporter, drain coordinator, and {@code AgentJobExecutor}; resolved maxes come from
- * {@link WorkerProperties}.
- */
 public final class WorkerCapacityState {
 
     private final AtomicInteger inFlightReview = new AtomicInteger();
@@ -60,11 +55,7 @@ public final class WorkerCapacityState {
         return mentorMax;
     }
 
-    /**
-     * Idempotent: returns when the counter is already at 0 instead of throwing, because release
-     * paths fire from defensive code (e.g. {@code AgentJobExecutor.releaseCapacity}) that can't
-     * tolerate an exception, and the early-shutdown / double-release window is real but harmless.
-     */
+    // Capacity release is idempotent and must not throw during shutdown.
     private static void decrementIfPositive(AtomicInteger counter) {
         while (true) {
             int current = counter.get();

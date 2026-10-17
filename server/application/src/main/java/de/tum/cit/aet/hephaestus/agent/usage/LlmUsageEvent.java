@@ -1,15 +1,12 @@
 package de.tum.cit.aet.hephaestus.agent.usage;
 
-import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.math.BigDecimal;
@@ -25,12 +22,13 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One row per LLM-consuming unit of work — the append-only spend ledger the rollup and the monthly
- * budget cap are computed from. Never update a row.
+ * Records the LLM usage of review jobs and mentor turns for spending totals and budget caps.
+ * Source identity and usage stay frozen; an operator can price an unpriced row.
  *
- * <p>{@code sourceId} is a soft reference (no FK) to the originating {@code agent_job.id} or
- * {@code chat_message.id}: accounting must survive source-row deletion. Source kind, id, and attempt
- * form the idempotency key, so retries are billed once each without collapsing distinct provider calls.
+ * <p>{@code sourceId} is a soft reference (no FK) to the originating {@code review_job.id} or
+ * {@code chat_message.id}: accounting must survive source-row deletion. Source kind, id, and
+ * attempt form the idempotency key, so retries are billed once each without collapsing distinct
+ * provider calls.
  */
 @Entity
 @Table(
@@ -41,10 +39,14 @@ import org.jspecify.annotations.Nullable;
             // leading column is absent from that predicate.
             @Index(name = "idx_llm_usage_occurred_at", columnList = "occurred_at")
         },
-        uniqueConstraints =
-                @UniqueConstraint(
-                        name = "ux_llm_usage_event_source_attempt",
-                        columnNames = {"source_type", "source_id", "source_attempt"}))
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "ux_llm_usage_event_source_attempt",
+                    columnNames = {"source_type", "source_id", "source_attempt"}),
+            @UniqueConstraint(
+                    name = "uk_llm_usage_event_workspace",
+                    columnNames = {"id", "workspace_id"})
+        })
 @Getter
 @Setter
 @NoArgsConstructor
@@ -57,16 +59,12 @@ public class LlmUsageEvent {
     @Column(nullable = false, updatable = false)
     private UUID id;
 
-    @NonNull
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "workspace_id", nullable = false)
-    @ToString.Exclude
-    private Workspace workspace;
+    @Column(name = "workspace_id", nullable = false)
+    private long workspaceId;
 
     @NonNull
-    @Enumerated(EnumType.STRING)
     @Column(name = "job_type", nullable = false, length = 40)
-    private LlmUsageJobType jobType;
+    private String jobType;
 
     @NonNull
     @Column(name = "source_id", nullable = false, updatable = false)
@@ -74,12 +72,16 @@ public class LlmUsageEvent {
 
     @NonNull
     @Enumerated(EnumType.STRING)
-    @Column(name = "source_type", nullable = false, length = 20, updatable = false)
-    private LlmUsageSourceType sourceType;
+    @Column(name = "source_type", nullable = false, length = 32, updatable = false)
+    private UsageSourceType sourceType;
 
     @ColumnDefault("0")
     @Column(name = "source_attempt", nullable = false, updatable = false)
     private int sourceAttempt;
+
+    @Nullable
+    @Column(name = "review_id", updatable = false)
+    private UUID reviewId;
 
     @Nullable
     @Column(name = "model", length = 128)
@@ -105,15 +107,11 @@ public class LlmUsageEvent {
     @Column(name = "total_calls", nullable = false)
     private int totalCalls = 1;
 
-    /**
-     * USD cost of this unit of work. Null when its measurement or price cannot be verified — the sums exclude such a
-     * row rather than counting it as $0. Clamped into range by {@link LlmPriceSnapshot#calculateCost}.
-     */
+    // Unknown prices remain null and are excluded from sums; they are not zero-cost usage.
     @Nullable
     @Column(name = "cost_usd", precision = 18, scale = 6)
     private BigDecimal costUsd;
 
-    /** When the work finished — the rollup and month-window time axis. */
     @NonNull
     @Column(name = "occurred_at", nullable = false)
     private Instant occurredAt;
@@ -122,7 +120,7 @@ public class LlmUsageEvent {
     @ColumnDefault("'UNPRICED'")
     @Enumerated(EnumType.STRING)
     @Column(name = "pricing_state", nullable = false, length = 16)
-    private PricingState pricingState = PricingState.UNPRICED;
+    private UsagePricingState pricingState = UsagePricingState.UNPRICED;
 
     @ColumnDefault("0")
     @Column(name = "reasoning_tokens", nullable = false)
@@ -132,22 +130,17 @@ public class LlmUsageEvent {
     @ColumnDefault("'INSTANCE'")
     @Enumerated(EnumType.STRING)
     @Column(name = "funding_source", nullable = false, length = 16)
-    private FundingSource fundingSource = FundingSource.INSTANCE;
+    private UsageFundingSource fundingSource = UsageFundingSource.INSTANCE;
 
-    /** Provenance: the {@code llm_model_price} row applied to this event. Soft ref (no FK). */
     @Nullable
     @Column(name = "applied_price_id")
     private Long appliedPriceId;
 
-    /** Provenance: the {@code workspace_llm_model} row applied to this event. Soft ref (no FK). */
     @Nullable
     @Column(name = "applied_workspace_model_id")
     private Long appliedWorkspaceModelId;
 
-    /**
-     * The rates actually applied, frozen. The two provenance ids above are live refs — repricing or
-     * deleting the row they point at must not change what a historical event was charged.
-     */
+    // Freeze applied rates so edits or deletion of price records cannot change historical charges.
     @Nullable
     @Column(name = "applied_per_1m_input_usd", precision = 18, scale = 8)
     private BigDecimal appliedPer1mInputUsd;
@@ -164,15 +157,20 @@ public class LlmUsageEvent {
     @Column(name = "applied_per_1m_cache_write_usd", precision = 18, scale = 8)
     private BigDecimal appliedPer1mCacheWriteUsd;
 
-    /**
-     * Which of the two independent spend records these token counts came from — see
-     * {@link UsageProvenance}. Nullable only because rows written before this column existed have no
-     * honest answer; every row this application writes carries one.
-     */
+    // Null provenance records no source-selection decision; it must not imply verified measurement.
     @Nullable
     @Enumerated(EnumType.STRING)
     @Column(name = "usage_provenance", length = 16)
     private UsageProvenance usageProvenance;
+
+    // Rerank search units remain unpriced without a rate, unless the model declares no metered cost.
+    @ColumnDefault("0")
+    @Column(name = "search_units", nullable = false)
+    private long searchUnits;
+
+    @ColumnDefault("0")
+    @Column(name = "unreported_calls", nullable = false, updatable = false)
+    private int unreportedCalls;
 
     @NonNull
     @ColumnDefault("'UNKNOWN'")

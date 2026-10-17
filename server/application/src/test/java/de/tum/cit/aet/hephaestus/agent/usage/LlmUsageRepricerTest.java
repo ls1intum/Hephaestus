@@ -16,7 +16,7 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.PricingMode;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRepricer.Outcome;
+import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.math.BigDecimal;
 import java.util.List;
@@ -65,7 +65,7 @@ class LlmUsageRepricerTest extends BaseUnitTest {
 
     private static UnpricedLedgerRow row(
             @Nullable String model,
-            FundingSource funding,
+            UsageFundingSource funding,
             @Nullable Long appliedPriceId,
             @Nullable Long appliedWorkspaceModelId) {
         return new UnpricedLedgerRow(
@@ -74,6 +74,7 @@ class LlmUsageRepricerTest extends BaseUnitTest {
                 model,
                 funding,
                 1_000_000L,
+                0L,
                 0L,
                 0L,
                 0L,
@@ -107,21 +108,69 @@ class LlmUsageRepricerTest extends BaseUnitTest {
         when(priceRepository.findById(11L)).thenReturn(Optional.of(price(PricingMode.PRICED, new BigDecimal("3.00"))));
         repriceSucceeds();
 
-        Outcome outcome = repricer.reprice(row("gpt-5", FundingSource.INSTANCE, 11L, null));
+        LlmUsageRepricer.ResultOutcome outcome = repricer.reprice(row("gpt-5", UsageFundingSource.INSTANCE, 11L, null));
 
-        assertThat(outcome).isEqualTo(Outcome.REPRICED);
+        assertThat(outcome).isEqualTo(LlmUsageRepricer.ResultOutcome.REPRICED);
         ArgumentCaptor<BigDecimal> cost = ArgumentCaptor.forClass(BigDecimal.class);
         ArgumentCaptor<LlmPriceSnapshot> price = ArgumentCaptor.forClass(LlmPriceSnapshot.class);
         verify(usageRepository).applyResolvedPrice(eq(EVENT_ID), cost.capture(), price.capture());
         // One million input tokens at $3.00 per million.
         assertThat(cost.getValue()).isEqualByComparingTo("3.00");
-        assertThat(price.getValue().pricingState()).isEqualTo(PricingState.PRICED);
+        assertThat(price.getValue().pricingState()).isEqualTo(UsagePricingState.PRICED);
         // The row is priced by the catalogue entry it names, and the rate written back is that entry's.
         assertThat(price.getValue().appliedPriceId()).isEqualTo(11L);
         assertThat(price.getValue().per1mInputUsd()).isEqualByComparingTo("3.00");
     }
 
-    // A verified measurement without a price reference can still name its model unambiguously.
+    // A Cohere reranking row billed search units and no tokens. A price per token cannot charge them, so
+    // pricing its zero tokens would confirm $0 for a call that the provider charged.
+    @Test
+    @DisplayName("a row with only search units stays unpriced, because it holds no token to price")
+    void aRowWithOnlySearchUnitsStaysUnpriced() {
+        LlmUsageRepricer.ResultOutcome outcome = repricer.reprice(new UnpricedLedgerRow(
+                EVENT_ID,
+                WORKSPACE_ID,
+                "rerank-v3.5",
+                UsageFundingSource.INSTANCE,
+                0L,
+                0L,
+                0L,
+                0L,
+                3L,
+                11L,
+                null,
+                MeasurementVerification.VERIFIED));
+
+        assertThat(outcome).isEqualTo(LlmUsageRepricer.ResultOutcome.NO_TOKEN_EVIDENCE);
+        verify(usageRepository, never()).applyResolvedPrice(any(), any(), any());
+    }
+
+    // Tokens and search units on one row: the tokens have a rate, the search units do not.
+    @Test
+    @DisplayName("a row with tokens and search units stays unpriced, because no price has a rate for search units")
+    void aRowWithTokensAndSearchUnitsStaysUnpriceable() {
+        when(priceRepository.findById(11L)).thenReturn(Optional.of(price(PricingMode.PRICED, new BigDecimal("3.00"))));
+
+        LlmUsageRepricer.ResultOutcome outcome = repricer.reprice(new UnpricedLedgerRow(
+                EVENT_ID,
+                WORKSPACE_ID,
+                "rerank-v3.5",
+                UsageFundingSource.INSTANCE,
+                120L,
+                0L,
+                0L,
+                0L,
+                3L,
+                11L,
+                null,
+                MeasurementVerification.VERIFIED));
+
+        assertThat(outcome).isEqualTo(LlmUsageRepricer.ResultOutcome.STILL_UNPRICEABLE);
+        verify(usageRepository, never()).applyResolvedPrice(any(), any(), any());
+    }
+
+    // Every row the ledger backfill created — the ones that actually held a live cap shut — carries no
+    // provenance at all, because historical spend predates it. The model name is the only handle.
     @Test
     @DisplayName("a row with no provenance is priced through its model name")
     void repricesThroughTheModelName() {
@@ -132,8 +181,8 @@ class LlmUsageRepricerTest extends BaseUnitTest {
                 .thenReturn(Optional.of(price(PricingMode.PRICED, new BigDecimal("2.00"))));
         repriceSucceeds();
 
-        assertThat(repricer.reprice(row("gpt-5", FundingSource.INSTANCE, null, null)))
-                .isEqualTo(Outcome.REPRICED);
+        assertThat(repricer.reprice(row("gpt-5", UsageFundingSource.INSTANCE, null, null)))
+                .isEqualTo(LlmUsageRepricer.ResultOutcome.REPRICED);
     }
 
     // Two connections may serve the same upstream id at different prices. Picking one would put a number
@@ -143,18 +192,19 @@ class LlmUsageRepricerTest extends BaseUnitTest {
     void refusesToGuessBetweenTwoModelsOfTheSameName() {
         when(modelRepository.findByUpstreamModelId("gpt-5")).thenReturn(List.of(new LlmModel(), new LlmModel()));
 
-        Outcome outcome = repricer.reprice(row("gpt-5", FundingSource.INSTANCE, null, null));
+        LlmUsageRepricer.ResultOutcome outcome =
+                repricer.reprice(row("gpt-5", UsageFundingSource.INSTANCE, null, null));
 
-        assertThat(outcome).isEqualTo(Outcome.UNIDENTIFIABLE);
+        assertThat(outcome).isEqualTo(LlmUsageRepricer.ResultOutcome.UNIDENTIFIABLE);
         verify(usageRepository, never()).applyResolvedPrice(any(), any(), any());
     }
 
     @Test
     @DisplayName("a row naming no model at all is reported as unidentifiable, not as free")
     void aRowWithNoModelIsUnidentifiable() {
-        Outcome outcome = repricer.reprice(row(null, FundingSource.INSTANCE, null, null));
+        LlmUsageRepricer.ResultOutcome outcome = repricer.reprice(row(null, UsageFundingSource.INSTANCE, null, null));
 
-        assertThat(outcome).isEqualTo(Outcome.UNIDENTIFIABLE);
+        assertThat(outcome).isEqualTo(LlmUsageRepricer.ResultOutcome.UNIDENTIFIABLE);
         verifyNoInteractions(usageRepository);
     }
 
@@ -163,9 +213,9 @@ class LlmUsageRepricerTest extends BaseUnitTest {
     void stillUnpricedCatalogueEntryChangesNothing() {
         when(priceRepository.findById(11L)).thenReturn(Optional.of(price(PricingMode.UNPRICED, null)));
 
-        Outcome outcome = repricer.reprice(row("gpt-5", FundingSource.INSTANCE, 11L, null));
+        LlmUsageRepricer.ResultOutcome outcome = repricer.reprice(row("gpt-5", UsageFundingSource.INSTANCE, 11L, null));
 
-        assertThat(outcome).isEqualTo(Outcome.STILL_UNPRICEABLE);
+        assertThat(outcome).isEqualTo(LlmUsageRepricer.ResultOutcome.STILL_UNPRICEABLE);
         verify(usageRepository, never()).applyResolvedPrice(any(), any(), any());
     }
 
@@ -176,8 +226,8 @@ class LlmUsageRepricerTest extends BaseUnitTest {
     void aPartialPriceIsNotApplied() {
         when(priceRepository.findById(11L)).thenReturn(Optional.of(price(PricingMode.PRICED, null)));
 
-        assertThat(repricer.reprice(row("gpt-5", FundingSource.INSTANCE, 11L, null)))
-                .isEqualTo(Outcome.STILL_UNPRICEABLE);
+        assertThat(repricer.reprice(row("gpt-5", UsageFundingSource.INSTANCE, 11L, null)))
+                .isEqualTo(LlmUsageRepricer.ResultOutcome.STILL_UNPRICEABLE);
     }
 
     @Test
@@ -186,10 +236,10 @@ class LlmUsageRepricerTest extends BaseUnitTest {
         when(priceRepository.findById(11L)).thenReturn(Optional.of(price(PricingMode.NO_CHARGE, null)));
         repriceSucceeds();
 
-        Outcome outcome = repricer.reprice(row("gpt-5", FundingSource.INSTANCE, 11L, null));
+        LlmUsageRepricer.ResultOutcome outcome = repricer.reprice(row("gpt-5", UsageFundingSource.INSTANCE, 11L, null));
 
-        assertThat(outcome).isEqualTo(Outcome.REPRICED);
-        assertThat(appliedPrice().pricingState()).isEqualTo(PricingState.NO_CHARGE);
+        assertThat(outcome).isEqualTo(LlmUsageRepricer.ResultOutcome.REPRICED);
+        assertThat(appliedPrice().pricingState()).isEqualTo(UsagePricingState.NO_CHARGE);
     }
 
     @Test
@@ -199,7 +249,8 @@ class LlmUsageRepricerTest extends BaseUnitTest {
                 EVENT_ID,
                 WORKSPACE_ID,
                 "gpt-5",
-                FundingSource.INSTANCE,
+                UsageFundingSource.INSTANCE,
+                0L,
                 0L,
                 0L,
                 0L,
@@ -208,7 +259,7 @@ class LlmUsageRepricerTest extends BaseUnitTest {
                 null,
                 MeasurementVerification.VERIFIED);
 
-        assertThat(repricer.reprice(unmeasured)).isEqualTo(Outcome.NO_TOKEN_EVIDENCE);
+        assertThat(repricer.reprice(unmeasured)).isEqualTo(LlmUsageRepricer.ResultOutcome.NO_TOKEN_EVIDENCE);
         verifyNoInteractions(usageRepository, priceRepository, modelRepository, workspaceModelRepository);
     }
 
@@ -221,8 +272,9 @@ class LlmUsageRepricerTest extends BaseUnitTest {
                 EVENT_ID,
                 WORKSPACE_ID,
                 "gpt-5",
-                FundingSource.INSTANCE,
+                UsageFundingSource.INSTANCE,
                 1_000_000L,
+                0L,
                 0L,
                 0L,
                 0L,
@@ -230,7 +282,7 @@ class LlmUsageRepricerTest extends BaseUnitTest {
                 null,
                 verification);
 
-        assertThat(repricer.reprice(row)).isEqualTo(Outcome.UNVERIFIED_MEASUREMENT);
+        assertThat(repricer.reprice(row)).isEqualTo(LlmUsageRepricer.ResultOutcome.UNVERIFIED_MEASUREMENT);
         verifyNoInteractions(usageRepository, priceRepository, modelRepository, workspaceModelRepository);
     }
 
@@ -242,8 +294,8 @@ class LlmUsageRepricerTest extends BaseUnitTest {
         when(priceRepository.findById(11L)).thenReturn(Optional.of(price(PricingMode.PRICED, new BigDecimal("3.00"))));
         when(usageRepository.applyResolvedPrice(any(), any(), any())).thenReturn(0);
 
-        assertThat(repricer.reprice(row("gpt-5", FundingSource.INSTANCE, 11L, null)))
-                .isEqualTo(Outcome.STILL_UNPRICEABLE);
+        assertThat(repricer.reprice(row("gpt-5", UsageFundingSource.INSTANCE, 11L, null)))
+                .isEqualTo(LlmUsageRepricer.ResultOutcome.STILL_UNPRICEABLE);
     }
 
     @Test
@@ -256,9 +308,10 @@ class LlmUsageRepricerTest extends BaseUnitTest {
         when(workspaceModelRepository.findByIdAndWorkspaceId(21L, WORKSPACE_ID)).thenReturn(Optional.of(model));
         repriceSucceeds();
 
-        Outcome outcome = repricer.reprice(row("own-model", FundingSource.WORKSPACE, null, 21L));
+        LlmUsageRepricer.ResultOutcome outcome =
+                repricer.reprice(row("own-model", UsageFundingSource.WORKSPACE, null, 21L));
 
-        assertThat(outcome).isEqualTo(Outcome.REPRICED);
+        assertThat(outcome).isEqualTo(LlmUsageRepricer.ResultOutcome.REPRICED);
         verify(modelRepository, never()).findByUpstreamModelId(any());
         verify(priceRepository, never()).findByModelIdAndEffectiveToIsNull(anyLong());
     }

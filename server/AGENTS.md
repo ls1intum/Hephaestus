@@ -60,6 +60,11 @@ authorization logic.
 never log a token) · `@Transactional` on a controller (service layer only) · expose an entity from a
 controller.
 
+## Practice model boundaries
+
+A practice Problem is distinct from HTTP ProblemDetail.
+[ADR 0056 § Decision](../docs/decisions/0056-one-practice-model-for-items-and-scans.md#decision) owns the module boundaries, person model and erasure order.
+
 ## Null-safety
 
 NullAway checks all handwritten production and test code in JSpecify mode. Generated sources are

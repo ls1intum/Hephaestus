@@ -1,0 +1,250 @@
+{
+	"schemaVersion": 2,
+	"results": [
+		{
+			"practiceSlug": "handles-errors-instead-of-swallowing-them",
+			"candidate": {
+				"outcome": "NOT_MET",
+				"summary": "Two added catch blocks drop export failures",
+				"explanation": "The pull request adds a retry around the invoice export. Two of its new catch blocks end the failure path without logging, rethrowing or recording the failed export, so an operator cannot tell a dropped invoice from a sent one. A third catch in the same change keeps the invoice id and rethrows, which is the shape the criteria ask for.",
+				"citations": [],
+				"problems": [
+					{
+						"severity": "MAJOR",
+						"summary": "Timeout during export is caught and ignored",
+						"explanation": "The added catch block discards the TimeoutException. The export then returns normally, so the caller records the invoice as sent although the gateway never received it.",
+						"citations": [
+							{
+								"sourceKind": "scm.pull-request.diff",
+								"sourcePath": "context/change.json",
+								"path": "src/main/java/com/acme/billing/export/InvoiceExporter.java",
+								"side": "NEW",
+								"startLine": 88,
+								"endLine": 88,
+								"quote": "        } catch (TimeoutException ignored) {}"
+							}
+						],
+						"basis": {
+							"type": "introduced",
+							"head": 0,
+							"explanation": "This pull request adds the catch block on the new side of the change."
+						},
+						"nextStep": "Log the timeout with the invoice id and rethrow it, or record the invoice as a failed export so that the retry policy sees it."
+					},
+					{
+						"severity": "MINOR",
+						"summary": "Retry failure is logged only at debug level",
+						"explanation": "The retry policy logs the final failure at debug level and then returns false. Production runs at info level, so the failure leaves no trace.",
+						"citations": [
+							{
+								"sourceKind": "scm.pull-request.diff",
+								"sourcePath": "context/change.json",
+								"path": "src/main/java/com/acme/billing/export/ExportRetryPolicy.java",
+								"side": "NEW",
+								"startLine": 41,
+								"endLine": 41,
+								"quote": "            log.debug(\"retry failed\", e);"
+							}
+						],
+						"basis": {
+							"type": "introduced",
+							"head": 0,
+							"explanation": "This pull request adds the debug-level log call on the new side of the change."
+						},
+						"nextStep": "Log the final retry failure at warn level with the invoice id."
+					}
+				],
+				"example": {
+					"citation": {
+						"sourceKind": "scm.pull-request.diff",
+						"sourcePath": "context/change.json",
+						"path": "src/main/java/com/acme/billing/export/ExportRetryPolicy.java",
+						"side": "NEW",
+						"startLine": 52,
+						"endLine": 52,
+						"quote": "            throw new ExportFailedException(invoice.id(), e);"
+					},
+					"note": "This catch keeps the invoice id and rethrows the cause. The two catches above can follow the same shape."
+				},
+				"evidence": {
+					"search": {
+						"consulted": [
+							"scm.pull-request.diff",
+							"scm.repository.tree"
+						],
+						"lookedFor": "catch blocks and error callbacks that this pull request adds or changes and that drop the error",
+						"boundary": "every hunk of the three changed files; unchanged code only where a changed line calls it"
+					},
+					"openQuestions": [
+						{
+							"openQuestion": "Is an empty result here the documented contract for a missing invoice, or does it hide a failed lookup?",
+							"wouldSettleIt": "The contract of InvoiceRepository.findForExport, or a caller that treats an empty result as an error.",
+							"citation": {
+								"sourceKind": "scm.pull-request.diff",
+								"sourcePath": "context/change.json",
+								"path": "src/main/java/com/acme/billing/export/InvoiceExporter.java",
+								"side": "NEW",
+								"startLine": 57,
+								"endLine": 57,
+								"quote": "            return Optional.empty();"
+							}
+						}
+					]
+				},
+				"coverage": {
+					"source": "host",
+					"reads": 9,
+					"truncatedReads": 1,
+					"failedReads": 0,
+					"complete": false,
+					"omitted": [
+						{
+							"what": "lines of the export client beyond the read limit",
+							"count": 1,
+							"reason": "truncated",
+							"items": [
+								"src/main/java/com/acme/billing/export/client/ExportClient.java"
+							]
+						}
+					],
+					"receipts": []
+				}
+			}
+		},
+		{
+			"practiceSlug": "leaves-the-code-clean-with-intent-revealing-comments",
+			"candidate": {
+				"outcome": "MET",
+				"summary": "Added comments explain why, not what",
+				"explanation": "The pull request adds two comments. Each states a constraint that the code cannot express: the gateway's batch limit and its behaviour after an idle period. No added comment restates the code, and no commented-out code is added.",
+				"citations": [
+					{
+						"sourceKind": "scm.pull-request.diff",
+						"sourcePath": "context/change.json",
+						"path": "src/main/java/com/acme/billing/export/InvoiceExporter.java",
+						"side": "NEW",
+						"startLine": 72,
+						"endLine": 72,
+						"quote": "        // The gateway rejects batches over 500 invoices; split before sending."
+					}
+				],
+				"example": {
+					"citation": {
+						"sourceKind": "scm.pull-request.diff",
+						"sourcePath": "context/change.json",
+						"path": "src/main/java/com/acme/billing/export/ExportRetryPolicy.java",
+						"side": "NEW",
+						"startLine": 18,
+						"endLine": 18,
+						"quote": "    // One retry only: the export gateway drops the first call after an idle period."
+					},
+					"note": "This comment states why the retry exists, which the code alone cannot say."
+				},
+				"evidence": {
+					"search": {
+						"consulted": [
+							"scm.pull-request.diff"
+						],
+						"lookedFor": "added comments that restate the code, mislead, or comment out code",
+						"boundary": "every added line of the three changed files"
+					}
+				},
+				"coverage": {
+					"source": "host",
+					"reads": 6,
+					"truncatedReads": 0,
+					"failedReads": 0,
+					"complete": true,
+					"receipts": []
+				}
+			}
+		},
+		{
+			"practiceSlug": "makes-ui-accessible-by-default",
+			"candidate": {
+				"outcome": "DOES_NOT_APPLY",
+				"summary": "The change adds or changes no user interface",
+				"explanation": "The pull request changes three Java files of the export service and its test. None of them is a view, template, stylesheet or UI component.",
+				"citations": [
+					{
+						"sourceKind": "scm.pull-request.core",
+						"sourcePath": "context/metadata.json",
+						"path": "context/metadata.json",
+						"startLine": 27,
+						"endLine": 27,
+						"quote": "  \"changed_files\": 3,"
+					}
+				],
+				"evidence": {
+					"inapplicability": {
+						"consulted": [
+							"scm.pull-request.core",
+							"scm.pull-request.diff"
+						],
+						"ruledOutBy": "All three changed files are Java sources under src/main/java and src/test/java of the export service; the change adds or changes no view, template, stylesheet or component file.",
+						"prerequisite": "user interface views and components that the change adds or changes"
+					}
+				},
+				"coverage": {
+					"source": "claimed",
+					"selected": 3,
+					"checked": 3,
+					"total": 3,
+					"complete": true
+				}
+			}
+		},
+		{
+			"practiceSlug": "validates-and-escapes-untrusted-input",
+			"candidate": {
+				"outcome": "COULD_NOT_DETERMINE",
+				"summary": "Origin of the customer reference header is unclear",
+				"explanation": "The exporter now reads the customer reference from a request header and puts it into the export file name. Whether this needs validation depends on who can set the header. The captured repository does not contain the gateway configuration that answers this.",
+				"citations": [
+					{
+						"sourceKind": "scm.pull-request.diff",
+						"sourcePath": "context/change.json",
+						"path": "src/main/java/com/acme/billing/export/InvoiceExporter.java",
+						"side": "NEW",
+						"startLine": 64,
+						"endLine": 64,
+						"quote": "        String customerRef = request.getHeader(\"X-Customer-Ref\");"
+					}
+				],
+				"evidence": {
+					"search": {
+						"consulted": [
+							"scm.pull-request.diff",
+							"scm.repository.tree"
+						],
+						"lookedFor": "validation or escaping of X-Customer-Ref before it reaches the file name",
+						"boundary": "the changed files and every repository file that names X-Customer-Ref"
+					},
+					"openQuestions": [
+						{
+							"openQuestion": "Is X-Customer-Ref set only by the internal gateway, or can a client send it?",
+							"wouldSettleIt": "The gateway configuration that strips or sets X-Customer-Ref on inbound requests.",
+							"citation": {
+								"sourceKind": "scm.pull-request.diff",
+								"sourcePath": "context/change.json",
+								"path": "src/main/java/com/acme/billing/export/InvoiceExporter.java",
+								"side": "NEW",
+								"startLine": 64,
+								"endLine": 64,
+								"quote": "        String customerRef = request.getHeader(\"X-Customer-Ref\");"
+							}
+						}
+					]
+				},
+				"coverage": {
+					"source": "host",
+					"reads": 4,
+					"truncatedReads": 0,
+					"failedReads": 0,
+					"complete": true,
+					"receipts": []
+				}
+			}
+		}
+	]
+}

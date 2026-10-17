@@ -142,3 +142,9 @@ complexity to shave the poll-interval latency off job start; or a tenant's wait 
 workspace becomes a real complaint, at which point per-workspace fairness lanes (round-robin or
 weighted-share dequeue) are the answer — deliberately deferred to the replay/backfill epic (#1354),
 which needs them anyway.
+
+## Update — 2026-10-14 (#2656): the job table and classes are renamed
+
+`agent_job` is `review_job`. `AgentJobExecutor`, `AgentJobService`, `AgentJobZombieSweeper` and
+`AgentJobRetentionService` are `ReviewJobExecutor`, `ReviewJobService`, `ReviewJobZombieSweeper` and
+`ReviewJobRetentionService`.

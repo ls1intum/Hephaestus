@@ -10,13 +10,12 @@ import {
 import { type RailStage, TRACE_STAGE_LABELS } from "./lineage-story";
 import type { TraceBottleneck } from "./trace-bottleneck";
 
-/** The headers of the rail: the four stages, and the observations as a part of the review of their own. */
-export type StageKey = RailStage["stage"] | "observations";
+export type StageKey = RailStage["stage"] | "results";
 
 /** Each header's name, icon and what the stage holds, for the rail and the legend. */
 export const STAGE_HEADERS: Record<StageKey, { label: string; icon: LucideIcon; holds: string }> = {
-	trigger: {
-		label: TRACE_STAGE_LABELS.trigger,
+	start: {
+		label: TRACE_STAGE_LABELS.start,
 		icon: ZapIcon,
 		holds: "the work and what started the review",
 	},
@@ -25,8 +24,8 @@ export const STAGE_HEADERS: Record<StageKey, { label: string; icon: LucideIcon; 
 		icon: BotIcon,
 		holds: "how it ran, with queue and run times",
 	},
-	observations: {
-		label: "Observations",
+	results: {
+		label: "Results",
 		icon: ListChecksIcon,
 		holds: "what the review observed",
 	},
@@ -43,9 +42,9 @@ export const STAGE_HEADERS: Record<StageKey, { label: string; icon: LucideIcon; 
 };
 
 export const STAGE_ORDER: readonly StageKey[] = [
-	"trigger",
+	"start",
 	"review",
-	"observations",
+	"results",
 	"feedback",
 	"effect",
 ];

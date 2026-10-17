@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.integration.slack.channel;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackChannelConsentEvent;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackChannelConsentEventRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel;
@@ -29,30 +29,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Write-side authority for the per-channel Slack consent lifecycle (read side: {@code SlackChannelConsentGate}).
- * Owns the guarded state machine, posts the in-channel consent announcement on activation, stamps
- * {@code consent_announced_at} (the forward-only ingestion boundary), erases the channel's raw + derived data on
- * revocation, and writes an immutable audit row for every transition.
- *
- * <pre>
- *   PENDING ──activate──▶ ACTIVE ⇄ PAUSED
- *      │                    │        │
- *      └────────── any → REVOKED (stop + ERASE; register again → PENDING) ──────────┘
- * </pre>
- * <ul>
- *   <li>{@code PENDING → ACTIVE}: post the announcement ({@link SlackConsentBlocks}) and stamp
- *       {@code consent_announced_at = now()} — {@code SlackIngestService} only stores messages whose {@code ts} is
- *       strictly after this stamp.</li>
- *   <li>{@code ACTIVE ⇄ PAUSED}: stop / resume ingestion, keeping stored data. Resuming an already-announced
- *       channel does NOT re-announce or re-stamp.</li>
- *   <li>{@code * → REVOKED}: stops ingestion and erases raw messages, thread aggregates, and derived
- *       {@code chat.conversation_thread} observations/feedback ({@link SlackIngestService#eraseChannel}). A later
- *       registration starts a fresh {@code PENDING} setup with a new announcement boundary.</li>
- * </ul>
- * A same-state PATCH is an idempotent no-op (no side effect, no audit row). Every other edge not drawn above is a
- * violation → {@link SlackChannelConsentViolationException} (409).
+ * Only messages after the consent announcement may be ingested. Resume preserves that boundary.
+ * Revocation erases raw and derived content; registration starts a new consent setup.
  */
 @Service
+@ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 public class SlackChannelConsentService {
 
@@ -64,7 +45,6 @@ public class SlackChannelConsentService {
     private final SlackIngestService ingestService;
     private final SlackMessageService slackMessageService;
     private final ConnectionService connectionService;
-    private final UserRepository userRepository;
     private final TransactionTemplate transactionTemplate;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -82,7 +62,6 @@ public class SlackChannelConsentService {
             SlackIngestService ingestService,
             SlackMessageService slackMessageService,
             ConnectionService connectionService,
-            UserRepository userRepository,
             TransactionTemplate transactionTemplate,
             ApplicationEventPublisher eventPublisher) {
         this.monitoredChannelRepository = monitoredChannelRepository;
@@ -91,7 +70,6 @@ public class SlackChannelConsentService {
         this.ingestService = ingestService;
         this.slackMessageService = slackMessageService;
         this.connectionService = connectionService;
-        this.userRepository = userRepository;
         this.transactionTemplate = transactionTemplate;
         this.eventPublisher = eventPublisher;
     }
@@ -308,9 +286,9 @@ public class SlackChannelConsentService {
 
     private void recordAudit(
             long workspaceId, String slackChannelId, ConsentState from, ConsentState to, @Nullable String reason) {
-        Long actorUserId = userRepository.getCurrentUser().map(User::getId).orElse(null);
+        Long actorAccountId = SecurityUtils.getCurrentAccountId().orElse(null);
         consentEventRepository.save(
-                new SlackChannelConsentEvent(workspaceId, slackChannelId, from, to, actorUserId, reason));
+                new SlackChannelConsentEvent(workspaceId, slackChannelId, from, to, actorAccountId, reason));
     }
 
     /** Transition guard. The same-state case ({@code from == target}) is already handled as an idempotent no-op by callers. */

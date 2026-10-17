@@ -40,8 +40,8 @@ not open that as work.
 You can never assert that spy, and the Actions panel stays empty.
 The file still looks well instrumented. To find it: for each `fn()` in `meta.args`, grep the file for a
 JSX attribute of the same name that is **not** `{...args}`.
-`webapp/src/components/admin/practice-editor/OccasionLifecycle.stories.tsx` shows the shape that stays
-instrumented: it spreads `{...args}` and patches only the props it holds state for.
+`webapp/src/components/admin/practice-editor/PracticeGuideEditor.stories.tsx` shows the shape that stays
+instrumented: it spreads `{...args}`, calls the spy, and patches only the props it holds state for.
 
 ## `argTypes` where a prop is explorable, and nowhere else
 

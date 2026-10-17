@@ -1,5 +1,4 @@
 import { cn } from "cn";
-import { ShieldAlertIcon } from "lucide-react";
 
 import {
 	DIFF_SIDE_LABELS,
@@ -23,19 +22,16 @@ interface EvidenceFileBlockProps {
 	location: EvidenceLocation;
 }
 
-/**
- * One quoted citation behind an observation. A `code` locator captions the path and lines; an
- * `object` one points into the runner's own context, which the reader cannot open, so it captions
- * the source's name and no numbers.
- */
+// Non-code locators point into serialized runner input, not coordinates in the source app.
 export function EvidenceFileBlock({ location }: EvidenceFileBlockProps) {
 	const source = evidenceSourceDef(location.sourceKind);
-	const locatedByLine = source.locator === "code";
-	const { directory, fileName } = splitPath(location.path);
+	const locatedByLine = source.locator === "code" && hasText(location.path);
+	const { directory, fileName } = splitPath(location.path ?? "");
+	const lineRange = evidenceLineRangeLabel(location);
 	const { change } = location;
 	const { side } = location;
 	const lines = location.snippet?.split("\n") ?? [];
-	const firstLineNumber = location.startLine;
+	const firstLineNumber = location.startLine ?? 1;
 	const hasSnippet = change !== undefined || lines.length > 0;
 	const SourceIcon = source.icon;
 	/**
@@ -46,7 +42,7 @@ export function EvidenceFileBlock({ location }: EvidenceFileBlockProps) {
 		if (quotedSide) {
 			return index === 0 ? DIFF_SIDE_LABELS[quotedSide] : "";
 		}
-		return locatedByLine ? firstLineNumber + index : undefined;
+		return locatedByLine && location.startLine !== undefined ? firstLineNumber + index : undefined;
 	};
 
 	return (
@@ -69,23 +65,15 @@ export function EvidenceFileBlock({ location }: EvidenceFileBlockProps) {
 				) : (
 					<span className="min-w-0 flex-1 truncate text-xs font-medium">{source.label}</span>
 				)}
-				{locatedByLine && change === undefined && (
-					<span className="shrink-0 font-mono text-xs text-muted-foreground">
-						{evidenceLineRangeLabel(location)}
-					</span>
+				{locatedByLine && change === undefined && lineRange !== undefined && (
+					<span className="shrink-0 font-mono text-xs text-muted-foreground">{lineRange}</span>
 				)}
-				{hasText(location.revision) && (
+				{hasText(location.commit) && (
 					<p className="min-w-0 basis-full text-xs break-all text-muted-foreground">
-						Commit <code>{location.revision}</code>
+						Commit <code>{location.commit}</code>
 					</p>
 				)}
 			</figcaption>
-			{location.redacted && (
-				<p className="flex items-start gap-2 border-t p-3 text-sm text-muted-foreground">
-					<ShieldAlertIcon className="mt-0.5 size-4 shrink-0" aria-hidden />
-					{redactionSentence(locatedByLine)}
-				</p>
-			)}
 			{hasSnippet && (
 				<pre
 					// oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Keyboard users must be able to scroll this region.
@@ -118,17 +106,6 @@ export function EvidenceFileBlock({ location }: EvidenceFileBlockProps) {
 			)}
 		</figure>
 	);
-}
-
-/**
- * What a withheld quote may say about where it sits. A code citation names a path and a line in the
- * caption above, so the sentence can point at them; an object citation shows the source's name and
- * no numbers at all, so promising a path and a line there would point at nothing on screen.
- */
-function redactionSentence(locatedByLine: boolean): string {
-	return locatedByLine
-		? "Not quoted. The passage was withheld, so only its location was kept."
-		: "Not quoted. The passage was withheld.";
 }
 
 /** One line of a quote: what the gutter says about it, then the line itself. */

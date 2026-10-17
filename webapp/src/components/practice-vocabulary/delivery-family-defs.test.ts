@@ -8,12 +8,12 @@ import {
 import { statusValues } from "@/components/common/status-def";
 
 import { DELIVERY_FAMILY_DEFS, DELIVERY_FAMILY_STATES } from "./delivery-family-defs";
-import { DELIVERY_STATE_DEFS, type DeliveryState } from "./delivery-outcome-defs";
+import { DELIVERY_STATE_DEFS, type DeliveryState } from "./delivery-state-defs";
 
 /** The delivery states a count's link filters the Feedback list to. */
 function linkedStates(target: ReviewListTarget | undefined): readonly DeliveryState[] {
 	assert(target?.list === "feedback", "A family's count opens the Feedback list");
-	return target.search.deliveryState ?? [];
+	return target.search.state ?? [];
 }
 
 describe("delivery families", () => {
@@ -34,9 +34,9 @@ describe("delivery families", () => {
 			statusValues(DELIVERY_FAMILY_DEFS).map((family) => DELIVERY_FAMILY_DEFS[family].label),
 		).toStrictEqual([
 			"Awaiting approval",
-			"Prepared",
+			"Ready",
 			"Delivered",
-			"Unconfirmed",
+			"Delivery unconfirmed",
 			"Withheld",
 			"Failed to deliver",
 		]);
@@ -49,33 +49,29 @@ describe("delivery families", () => {
 	it("counts every state once, and opens each family on exactly the states it counted", () => {
 		const weight = {
 			AWAITING_APPROVAL: 1,
-			PREPARED: 2,
+			READY: 2,
 			DELIVERED: 4,
-			PARTIALLY_DELIVERED: 8,
-			UNCONFIRMED: 16,
-			SUPPRESSED: 32,
-			DISCARDED: 64,
-			SUPERSEDED: 128,
-			FAILED: 256,
-			PARTIALLY_FAILED: 512,
+			UNCONFIRMED: 8,
+			WITHHELD: 16,
+			REJECTED: 32,
+			REPLACED: 64,
+			FAILED: 128,
 		} satisfies Record<DeliveryState, number>;
 		const slots = feedbackSlots(
 			{
 				awaitingApproval: weight.AWAITING_APPROVAL,
-				prepared: weight.PREPARED,
+				ready: weight.READY,
 				delivered: weight.DELIVERED,
-				partiallyDelivered: weight.PARTIALLY_DELIVERED,
 				unconfirmed: weight.UNCONFIRMED,
-				suppressed: weight.SUPPRESSED,
-				discarded: weight.DISCARDED,
-				superseded: weight.SUPERSEDED,
+				withheld: weight.WITHHELD,
+				rejected: weight.REJECTED,
+				replaced: weight.REPLACED,
 				failed: weight.FAILED,
-				partiallyFailed: weight.PARTIALLY_FAILED,
 			},
 			{ from: "2026-09-01", to: "2026-09-30" },
 		);
 
-		expect(slotsTotal(slots)).toBe(1023);
+		expect(slotsTotal(slots)).toBe(255);
 		expect(slots.map(({ key, count }) => [key, count])).toStrictEqual(
 			slots.map(({ key, target }) => [
 				key,

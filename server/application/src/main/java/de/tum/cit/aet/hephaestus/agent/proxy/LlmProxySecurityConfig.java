@@ -1,12 +1,15 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
+import static org.springframework.security.oauth2.core.authorization.OAuth2AuthorizationManagers.hasScope;
+
 import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewayProperties;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxOutputArchive;
 import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerProperties;
 import de.tum.cit.aet.hephaestus.core.auth.ratelimit.AuthRateLimitProperties;
 import de.tum.cit.aet.hephaestus.core.auth.ratelimit.BucketResolver;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWorkerRole;
+import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtVerifier;
 import de.tum.cit.aet.hephaestus.core.web.PayloadSizeFilter;
 import jakarta.servlet.http.HttpServletRequest;
@@ -17,9 +20,12 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authorization.AuthorizationDecision;
+import org.springframework.security.authorization.AuthorizationManagers;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.AndRequestMatcher;
@@ -27,24 +33,8 @@ import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * The sandbox gateway's three chains. The first two are ordered ahead of every application chain
- * because they claim a request by the connector it arrived on rather than by its path; the third
- * matches by path and only has to precede the chains that would otherwise serve
- * {@code /internal/llm/**}:
- *
- * <ol>
- *   <li>the sandbox capabilities on the gateway connector, authenticated by a proxy-scoped bearer
- *       credential and rate-limited per authenticated principal;
- *   <li>everything else on the gateway connector, denied and answered {@code 404} so the connector
- *       admits to no route a sandbox is not meant to call;
- *   <li>the capability paths on every other connector, denied the same way, so they exist only where
- *       sandboxes reach them.
- * </ol>
- *
- * <p>Gated on the worker/sandbox capability rather than the practice-job feature flag, because
- * disabling practice reviews must not break mentor turns.
- */
+// Match the gateway connector before application chains; capability paths must exist only on that connector.
+// Gate on sandbox support so disabling practice reviews cannot disable mentor turns.
 @Configuration
 @ConditionalOnWorkerRole
 class LlmProxySecurityConfig {
@@ -54,7 +44,7 @@ class LlmProxySecurityConfig {
     SecurityFilterChain llmProxyFilterChain(
             HttpSecurity http,
             SandboxGatewayProperties gatewayProperties,
-            AgentJobRepository agentJobRepository,
+            ReviewJobRepository agentJobRepository,
             WorkerJwtVerifier jwtVerifier,
             MentorProxyCredentialRegistry mentorRegistry,
             BucketResolver bucketResolver,
@@ -63,12 +53,14 @@ class LlmProxySecurityConfig {
             WorkerProperties workerProperties)
             throws Exception {
         var paths = PathPatternRequestMatcher.withDefaults();
+        RequestMatcher practiceScriptCalls = paths.matcher(HttpMethod.POST, "/internal/llm/practice-script/{slot}/**");
         RequestMatcher modelCalls = new OrRequestMatcher(
                 paths.matcher(HttpMethod.POST, "/internal/llm/chat/completions"),
                 paths.matcher(HttpMethod.POST, "/internal/llm/responses"),
-                paths.matcher(HttpMethod.POST, "/internal/llm/admit-observations"),
+                practiceScriptCalls,
+                paths.matcher(HttpMethod.POST, "/internal/llm/admit-results"),
                 paths.matcher(HttpMethod.POST, "/internal/llm/public-feedback-history"),
-                paths.matcher(HttpMethod.POST, "/internal/llm/complete-public-review"));
+                paths.matcher(HttpMethod.POST, "/internal/llm/prepare-feedback"));
         RequestMatcher runtimeReads = new OrRequestMatcher(
                 paths.matcher(HttpMethod.GET, "/internal/llm/runtime/{id}"),
                 paths.matcher(HttpMethod.GET, "/internal/llm/runtime/{id}/workspace"),
@@ -82,14 +74,17 @@ class LlmProxySecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(errors -> errors.authenticationEntryPoint(
                         (request, response, exception) -> response.setStatus(HttpStatus.NOT_FOUND.value())))
-                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                .authorizeHttpRequests(auth -> auth.requestMatchers(practiceScriptCalls)
+                        .access(AuthorizationManagers.allOf(
+                                hasScope(WorkerJwtIssuer.LLM_PROXY_SCOPE),
+                                (authentication, context) -> new AuthorizationDecision(
+                                        authentication.get().getPrincipal() instanceof ProxyIdentity identity
+                                                && identity.job() != null)))
+                        .anyRequest()
+                        .access(hasScope(WorkerJwtIssuer.LLM_PROXY_SCOPE)))
                 .addFilterBefore(
                         new JobTokenAuthenticationFilter(
-                                agentJobRepository,
-                                jwtVerifier,
-                                mentorRegistry,
-                                objectMapper,
-                                workerProperties.resolvedWorkerId()),
+                                agentJobRepository, jwtVerifier, mentorRegistry, workerProperties.resolvedWorkerId()),
                         UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(
                         bounded(gatewayProperties.maxRequestBytes(), modelCalls), JobTokenAuthenticationFilter.class)
@@ -98,7 +93,7 @@ class LlmProxySecurityConfig {
                         JobTokenAuthenticationFilter.class)
                 .addFilterAfter(
                         new SandboxGatewayRateLimitFilter(limit, bucketResolver, objectMapper, accounting),
-                        JobTokenAuthenticationFilter.class);
+                        AuthorizationFilter.class);
 
         return http.build();
     }

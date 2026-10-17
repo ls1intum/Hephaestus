@@ -1,8 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreviewcomment;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -15,6 +12,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest.dto.GitHubPullRequestDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreviewcomment.dto.GitHubPullRequestReviewCommentEventDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor;
@@ -200,10 +200,6 @@ public class GitHubPullRequestReviewCommentProcessor {
                 .map(comment -> {
                     comment.setBody(dto.body());
                     comment.setUpdatedAt(dto.updatedAt());
-                    // Rows stored before the side was kept get it on their next edit or sync.
-                    if (dto.side() != null && comment.getSide() == null) {
-                        comment.setSide(mapSide(dto.side()));
-                    }
                     PullRequestReviewComment saved = commentRepository.save(comment);
                     eventPublisher.publishEvent(new ScmDomainEvent.ReviewCommentEdited(
                             ScmEventPayload.ReviewCommentData.from(saved),
@@ -225,8 +221,10 @@ public class GitHubPullRequestReviewCommentProcessor {
                 .findByNativeIdAndProviderId(commentId, Objects.requireNonNull(context.providerId()))
                 .ifPresent(comment -> {
                     // CRITICAL: For bidirectional @OneToMany with orphanRemoval=true,
-                    // we MUST remove the comment from the thread's collection BEFORE deleting.
-                    // Otherwise, the thread's in-memory collection still references the deleted
+                    // we MUST remove the comment from the thread's collection BEFORE
+                    // deleting.
+                    // Otherwise, the thread's in-memory collection still references the
+                    // deleted
                     // entity, causing TransientObjectException on flush.
                     PullRequestReviewThread thread = comment.getThread();
                     if (thread != null) {
@@ -293,7 +291,7 @@ public class GitHubPullRequestReviewCommentProcessor {
         // Outdated flag (whether the comment's code context has changed)
         comment.setOutdated(dto.outdated());
 
-        // Which side of the diff the comment sits on: the webhook's own `side`, the sync's thread side.
+        // The webhook supplies the diff side; sync uses the containing thread's side.
         if (dto.side() != null) {
             comment.setSide(mapSide(dto.side()));
         }
@@ -545,8 +543,7 @@ public class GitHubPullRequestReviewCommentProcessor {
 
         PullRequest saved = prRepository.save(pr);
         log.info(
-                "Created stub PullRequest from review comment webhook (will be hydrated by PR webhook or sync): "
-                        + "prId={}, prNumber={}, repoName={}",
+                "Created stub PullRequest from review comment webhook (will be hydrated by PR webhook or sync): prId={}, prNumber={}, repoName={}",
                 saved.getId(),
                 saved.getNumber(),
                 repository.getNameWithOwner());
@@ -570,8 +567,8 @@ public class GitHubPullRequestReviewCommentProcessor {
      */
     private Issue.State convertState(String state) {
         if (state == null) {
-            log.warn("PR state is null when creating stub from review comment webhook, defaulting to OPEN. "
-                    + "This may indicate missing data in webhook payload.");
+            log.warn(
+                    "PR state is null when creating stub from review comment webhook, defaulting to OPEN. This may indicate missing data in webhook payload.");
             return Issue.State.OPEN;
         }
         return switch (state.toUpperCase(Locale.ROOT)) {

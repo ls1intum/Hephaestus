@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.AgentJobType;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
@@ -15,30 +15,33 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.PricingMode;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
+import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
-import de.tum.cit.aet.hephaestus.agent.handler.AdmittedObservationFixtures;
-import de.tum.cit.aet.hephaestus.agent.handler.ObservationAdmissionService;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.agent.handler.AdmittedResultFixtures;
+import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
-import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonCopyIdentity;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Result;
+import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
@@ -47,12 +50,13 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.tracing.Tracer;
-import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -72,11 +76,10 @@ import tools.jackson.databind.ObjectMapper;
 /** Verifies orphan recovery, retry fencing, and claim eligibility against PostgreSQL. */
 @DisplayName("Orphan recovery over PostgreSQL Integration")
 class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
-
-    private AgentJobZombieSweeper sweeper;
-
     @Autowired
-    private AgentJobLifecycleService lifecycleService;
+    private PracticeVersionService runtimePracticeVersions;
+
+    private ReviewJobZombieSweeper sweeper;
 
     @Autowired
     private LlmUsageRecorder usageRecorder;
@@ -85,7 +88,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     private MeterRegistry meterRegistry;
 
     @Autowired
-    private AgentJobRepository jobRepository;
+    private ReviewJobRepository jobRepository;
 
     @Autowired
     private WorkerRegistryRepository workerRegistryRepository;
@@ -115,10 +118,10 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     private PracticeRepository practiceRepository;
 
     @Autowired
-    private PracticeRevisionRepository practiceRevisionRepository;
+    private PracticeVersionRepository practiceVersionRepository;
 
     @Autowired
-    private ObservationRepository observationRepository;
+    private ResultRepository practiceResultRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -132,6 +135,9 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private ReviewCompositionContinuation continuation;
 
+    @Autowired
+    private ReviewCompositionBasisRepository compositionBasisRepository;
+
     private Workspace workspace;
     private LlmModel instanceModel;
     private Practice practice;
@@ -142,17 +148,16 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         databaseTestUtils.cleanDatabase();
         AgentProperties properties = mock(AgentProperties.class);
         when(properties.maxRetries()).thenReturn(5);
-        sweeper = new AgentJobZombieSweeper(
+        sweeper = new ReviewJobZombieSweeper(
                 jobRepository,
                 workerRegistryRepository,
-                properties,
                 objectMapper,
                 transactionTemplate,
-                lifecycleService,
                 usageRecorder,
                 meterRegistry,
-                new AgentJobTelemetry(meterRegistry, Tracer.NOOP));
-        sweeper.setCompositionContinuation(continuation);
+                new ReviewJobTelemetry(meterRegistry, Tracer.NOOP),
+                new ReviewJobRecovery(
+                        jobRepository, properties, objectMapper, usageRecorder, Optional.of(continuation)));
         workspace = workspaceRepository.save(TestEntities.activeWorkspace("orphan-recovery-ws"));
 
         LlmConnection connection = connectionRepository.save(LlmCatalogTestFixtures.connection("orphan-recovery"));
@@ -173,18 +178,16 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         binding.setInstanceModel(instanceModel);
         agentBindingRepository.save(binding);
 
-        practice = new Practice();
-        PracticeTestEvidence.configure(practice, ArtifactKinds.PULL_REQUEST);
-        practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
-        practice.setWorkspace(workspace);
-        practice.setSlug("orphan-recovery-practice");
-        practice.setName("Orphan recovery practice");
-        practice.setCriteria("The first definition");
-        practice.setAutonomy(PracticeAutonomy.AUTOMATIC);
-        PracticeTestEvidence.configure(practice, ScmSignals.PULL_REQUEST_OPENED);
-        practice = practiceRepository.saveAndFlush(practice);
-        practice.setCurrentRevision(practiceRevisionRepository.save(new PracticeRevision(practice, 1)));
-        practice = practiceRepository.saveAndFlush(practice);
+        practice = runtimePracticeVersions.create(new PracticeVersionService.NewPractice(
+                workspace,
+                "orphan-recovery-practice",
+                new ItemKind("scm.pull_request"),
+                DefinitionTestFixtures.definition(
+                        new ItemKind("scm.pull_request"), "Orphan recovery practice", "The first definition", null),
+                null,
+                0,
+                null));
+        practice.setFeedbackMode(FeedbackMode.AUTOMATIC);
         IdentityProvider provider = identityProviderRepository
                 .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
                 .orElseGet(() -> identityProviderRepository.save(
@@ -193,48 +196,21 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("a dead worker's RUNNING job is requeued (retry_count++) and becomes claimable again")
+    @DisplayName("a dead worker's RUNNING job is requeued (attempt++) and becomes claimable again")
     void orphanRecoveryRequeuesAndBecomesClaimable() {
         UUID jobId = runningJobOwnedBy("dead-replica", Instant.now().minus(Duration.ofMinutes(5)), 0);
         registerStaleWorker("dead-replica");
 
         sweeper.recoverOrphanedJobs();
 
-        AgentJob requeued = jobRepository.findById(jobId).orElseThrow();
-        assertThat(requeued.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
+        ReviewJob requeued = jobRepository.findById(jobId).orElseThrow();
+        assertThat(requeued.getStatus()).isEqualTo(ReviewJobStatus.QUEUED);
         assertThat(requeued.getWorkerId()).isNull();
-        assertThat(requeued.getRetryCount()).isEqualTo(1);
+        assertThat(requeued.getAttempt()).isEqualTo(1);
 
         fastForwardAvailableAt(jobId);
 
         assertThat(eligibleForClaim(jobId)).isTrue();
-    }
-
-    @Test
-    @DisplayName("orphan requeue rotates the job token — the old token no longer authenticates, the new one does")
-    void orphanRequeueRotatesTheJobToken() {
-        UUID jobId = runningJobOwnedBy("dead-replica", Instant.now().minus(Duration.ofMinutes(5)), 0);
-        registerStaleWorker("dead-replica");
-        AgentJob before = jobRepository.findById(jobId).orElseThrow();
-        String oldTokenHash = before.getJobTokenHash();
-
-        sweeper.recoverOrphanedJobs();
-
-        AgentJob requeued = jobRepository.findById(jobId).orElseThrow();
-        String newTokenHash = requeued.getJobTokenHash();
-        assertThat(newTokenHash).isNotEqualTo(oldTokenHash);
-
-        // The old token is dead: this mirrors JobTokenAuthenticationFilter#resolveJobRouting's lookup
-        // (hash + status=RUNNING) — the requeue moved status to QUEUED too, so BOTH conditions now fail
-        // for the old token even before considering the hash change.
-        assertThat(jobRepository.findByJobTokenHashAndStatus(oldTokenHash, AgentJobStatus.RUNNING))
-                .isEmpty();
-
-        fastForwardAvailableAt(jobId);
-
-        assertThat(eligibleForClaim(jobId)).isTrue();
-        assertThat(jobRepository.findByJobTokenHashAndStatus(oldTokenHash, AgentJobStatus.RUNNING))
-                .isEmpty();
     }
 
     @Test
@@ -245,15 +221,15 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
 
         sweeper.recoverOrphanedJobs();
 
-        AgentJob requeued = jobRepository.findById(jobId).orElseThrow();
-        assertThat(requeued.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
+        ReviewJob requeued = jobRepository.findById(jobId).orElseThrow();
+        assertThat(requeued.getStatus()).isEqualTo(ReviewJobStatus.QUEUED);
         assertThat(requeued.getAvailableAt())
                 .as("the backoff-computed available_at is still in the future")
                 .isAfter(Instant.now());
 
         assertThat(eligibleForClaim(jobId)).isFalse();
-        AgentJob stillQueued = jobRepository.findById(jobId).orElseThrow();
-        assertThat(stillQueued.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
+        ReviewJob stillQueued = jobRepository.findById(jobId).orElseThrow();
+        assertThat(stillQueued.getStatus()).isEqualTo(ReviewJobStatus.QUEUED);
     }
 
     @Test
@@ -265,8 +241,8 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         sweeper.recoverOrphanedJobs();
 
         // The requeue's backoff puts available_at far enough out that this is not a race with the clock.
-        AgentJob requeued = jobRepository.findById(jobId).orElseThrow();
-        assertThat(requeued.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
+        ReviewJob requeued = jobRepository.findById(jobId).orElseThrow();
+        assertThat(requeued.getStatus()).isEqualTo(ReviewJobStatus.QUEUED);
         assertThat(requeued.getAvailableAt()).isAfter(Instant.now());
 
         assertThat(jobRepository.findQueuedIdsOldestFirst(10))
@@ -282,8 +258,8 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
 
         sweeper.recoverOrphanedJobs();
 
-        AgentJob failed = jobRepository.findById(jobId).orElseThrow();
-        assertThat(failed.getStatus()).isEqualTo(AgentJobStatus.FAILED);
+        ReviewJob failed = jobRepository.findById(jobId).orElseThrow();
+        assertThat(failed.getStatus()).isEqualTo(ReviewJobStatus.FAILED);
         assertThat(failed.getErrorMessage()).contains("retry limit is reached");
         assertThat(jobRepository.findQueuedIdsOldestFirst(10)).doesNotContain(jobId);
     }
@@ -296,22 +272,16 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
 
         // @Modifying queries need an active transaction (the sweeper normally provides one via
         // TransactionTemplate); wrap here too.
-        String candidateNewToken = AgentJob.generateJobToken();
-        int updated = transactionTemplate.execute(s -> jobRepository.requeueOrphan(
-                jobId,
-                "dead-replica",
-                5,
-                Instant.now(),
-                candidateNewToken,
-                AgentJob.computeTokenHash(candidateNewToken)));
+        int updated =
+                transactionTemplate.execute(s -> jobRepository.requeueOrphan(jobId, "dead-replica", 5, Instant.now()));
 
         assertThat(updated)
                 .as("the CAS must not match — the row's worker_id does not match the stale caller's")
                 .isZero();
-        AgentJob untouched = jobRepository.findById(jobId).orElseThrow();
-        assertThat(untouched.getStatus()).isEqualTo(AgentJobStatus.RUNNING);
+        ReviewJob untouched = jobRepository.findById(jobId).orElseThrow();
+        assertThat(untouched.getStatus()).isEqualTo(ReviewJobStatus.RUNNING);
         assertThat(untouched.getWorkerId()).isEqualTo("live-sibling");
-        assertThat(untouched.getRetryCount()).isZero();
+        assertThat(untouched.getAttempt()).isZero();
     }
 
     @Test
@@ -319,51 +289,51 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     void requeueOrphanRefusesPastTheRetryCapEvenUnchecked() {
         UUID jobId = runningJobOwnedBy("dead-replica-3", Instant.now(), 5);
 
-        String candidateNewToken = AgentJob.generateJobToken();
-        int updated = transactionTemplate.execute(s -> jobRepository.requeueOrphan(
-                jobId,
-                "dead-replica-3",
-                5,
-                Instant.now(),
-                candidateNewToken,
-                AgentJob.computeTokenHash(candidateNewToken)));
+        int updated = transactionTemplate.execute(
+                s -> jobRepository.requeueOrphan(jobId, "dead-replica-3", 5, Instant.now()));
 
         assertThat(updated).isZero();
-        AgentJob unchanged = jobRepository.findById(jobId).orElseThrow();
-        assertThat(unchanged.getStatus()).isEqualTo(AgentJobStatus.RUNNING);
-        assertThat(unchanged.getRetryCount()).isEqualTo(5);
+        ReviewJob unchanged = jobRepository.findById(jobId).orElseThrow();
+        assertThat(unchanged.getStatus()).isEqualTo(ReviewJobStatus.RUNNING);
+        assertThat(unchanged.getAttempt()).isEqualTo(5);
     }
 
     @Test
-    @DisplayName("an orphan whose observations were admitted fails with them kept, after its practice changed")
-    void shouldFailWithTheAdmittedObservationsKeptWhenTheOwningWorkerIsLostAfterAdmission() {
+    @DisplayName("an orphan whose results were admitted fails with them kept, after its practice changed")
+    void shouldFailWithTheAdmittedResultsKeptWhenTheOwningWorkerIsLostAfterAdmission() {
         UUID jobId = runningJobOwnedBy("dead-replica-6", Instant.now().minus(Duration.ofMinutes(5)), 0);
-        Observation observed = admitWithObservation(jobId);
+        Result observed = admitWithResult(jobId);
         changePracticeDefinition();
         registerStaleWorker("dead-replica-6");
-        AgentJob before = jobRepository.findById(jobId).orElseThrow();
+        ReviewJob before = jobRepository.findById(jobId).orElseThrow();
 
         sweeper.recoverOrphanedJobs();
 
-        AgentJob failed = jobRepository.findById(jobId).orElseThrow();
-        assertThat(failed.getStatus()).isEqualTo(AgentJobStatus.FAILED);
-        assertThat(failed.getErrorMessage()).isEqualTo(ObservationAdmissionService.INTERRUPTED_AFTER_ADMISSION);
-        assertThat(failed.getRetryCount()).isZero();
-        assertThat(failed.getJobTokenHash()).isEqualTo(before.getJobTokenHash());
-        assertThat(failed.getMetadata()).isEqualTo(before.getMetadata());
-        assertThat(failed.getEvidenceSnapshot()).isEqualTo(before.getEvidenceSnapshot());
-        Observation kept = observationRepository.findById(observed.getId()).orElseThrow();
-        assertThat(kept.getAgentJobId()).isEqualTo(jobId);
-        PracticeRevision originalRevision = requireNonNull(observed.getPracticeRevision());
-        Long originalRevisionId = requireNonNull(originalRevision.getId());
-        assertThat(requireNonNull(kept.getPracticeRevision()).getId()).isEqualTo(originalRevisionId);
-        assertThat(practiceRevisionRepository
-                        .findById(originalRevisionId)
+        ReviewJob failed = jobRepository.findById(jobId).orElseThrow();
+        assertThat(failed.getStatus()).isEqualTo(ReviewJobStatus.FAILED);
+        assertThat(failed.getErrorMessage()).isEqualTo(ResultAdmissionService.INTERRUPTED_AFTER_ADMISSION);
+        assertThat(failed.getAttempt()).isZero();
+        assertThat(failed.getInput()).isEqualTo(before.getInput());
+        assertThat(failed.getCapture()).isEqualTo(before.getCapture());
+        Result kept = practiceResultRepository.findById(observed.getId()).orElseThrow();
+        assertThat(kept.getReviewId()).isEqualTo(before.getReviewId());
+        Long originalVersionId = requireNonNull(observed.getPracticeVersionId());
+        assertThat(kept.getPracticeVersionId()).isEqualTo(originalVersionId);
+        assertThat(practiceVersionRepository
+                        .findById(originalVersionId)
                         .orElseThrow()
-                        .getCriteria())
+                        .getDefinition()
+                        .path("criteria")
+                        .asString())
                 .isEqualTo("The first definition");
-        assertThat(practiceRepository.findById(practice.getId()).orElseThrow().getCriteria())
-                .isEqualTo("The changed definition");
+        var currentCriteria = transactionTemplate.execute(status -> practiceRepository
+                .findById(practice.getId())
+                .orElseThrow()
+                .getCurrentVersion()
+                .getDefinition()
+                .path("criteria")
+                .asString());
+        assertThat(currentCriteria).isEqualTo("The second definition");
         assertThat(kept.getEvidence()).isEqualTo(observed.getEvidence());
         assertThat(jobRepository.findQueuedIdsOldestFirst(10)).doesNotContain(jobId);
     }
@@ -372,12 +342,11 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     @DisplayName("requeueOrphan refuses an admitted attempt in SQL, and only its owner's attempt can end it")
     void shouldRefuseToRequeueAnAdmittedAttemptWhenAnyCallerTries() {
         UUID admitted = runningJobOwnedBy("owner", Instant.now(), 0);
-        admitWithObservation(admitted);
+        admitWithResult(admitted);
         UUID unadmitted = runningJobOwnedBy("owner", Instant.now(), 0);
 
-        String token = AgentJob.generateJobToken();
-        int requeued = transactionTemplate.execute(s -> jobRepository.requeueOrphan(
-                admitted, "owner", 5, Instant.now(), token, AgentJob.computeTokenHash(token)));
+        int requeued =
+                transactionTemplate.execute(s -> jobRepository.requeueOrphan(admitted, "owner", 5, Instant.now()));
         int byStranger = transactionTemplate.execute(
                 s -> jobRepository.failAdmittedOwnedBy(admitted, "stranger", 0, Instant.now(), "lost"));
         int byLaterAttempt = transactionTemplate.execute(
@@ -389,10 +358,10 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         assertThat(byStranger).isZero();
         assertThat(byLaterAttempt).isZero();
         assertThat(notAdmitted).isZero();
-        AgentJob untouched = jobRepository.findById(admitted).orElseThrow();
-        assertThat(untouched.getStatus()).isEqualTo(AgentJobStatus.RUNNING);
-        assertThat(untouched.getRetryCount()).isZero();
-        assertThat(jobRepository.findById(unadmitted).orElseThrow().getStatus()).isEqualTo(AgentJobStatus.RUNNING);
+        ReviewJob untouched = jobRepository.findById(admitted).orElseThrow();
+        assertThat(untouched.getStatus()).isEqualTo(ReviewJobStatus.RUNNING);
+        assertThat(untouched.getAttempt()).isZero();
+        assertThat(jobRepository.findById(unadmitted).orElseThrow().getStatus()).isEqualTo(ReviewJobStatus.RUNNING);
     }
 
     @Test
@@ -400,40 +369,37 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
             "a lost admitted review whose original inputs are vouched for continues as one writer of its admission")
     void shouldContinueALostAdmittedReviewUnderItsOriginalAdmissionAsANewAttempt() {
         UUID jobId = runningJobOwnedBy("dead-replica-9", Instant.now().minus(Duration.ofMinutes(5)), 0);
-        Observation observed = admitWithObservation(jobId);
+        Result observed = admitWithResult(jobId);
         keepOriginalInputs(jobId, 0, "READY", "COMPLETE", Instant.now().plus(Duration.ofHours(1)));
         spentBeforeItWasLost(jobId, 3);
         registerStaleWorker("dead-replica-9");
-        AgentJob before = jobRepository.findById(jobId).orElseThrow();
+        ReviewJob before = jobRepository.findById(jobId).orElseThrow();
 
         sweeper.recoverOrphanedJobs();
 
-        AgentJob continuing = jobRepository.findById(jobId).orElseThrow();
-        assertThat(continuing.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
-        assertThat(continuing.getRetryCount()).isEqualTo(1);
-        assertThat(continuing.getJobTokenHash()).isNotEqualTo(before.getJobTokenHash());
+        ReviewJob continuing = jobRepository.findById(jobId).orElseThrow();
+        assertThat(continuing.getStatus()).isEqualTo(ReviewJobStatus.QUEUED);
+        assertThat(continuing.getAttempt()).isEqualTo(1);
         // The admission and the evidence it was verified against are the original attempt's, untouched.
-        assertThat(continuing.getMetadata()).isEqualTo(before.getMetadata());
-        assertThat(continuing.getEvidenceSnapshot()).isEqualTo(before.getEvidenceSnapshot());
-        assertThat(ObservationAdmissionService.isContinuation(continuing)).isTrue();
-        assertThat(ObservationAdmissionService.citationAttempt(continuing)).isZero();
-        assertThat(observationRepository.findById(observed.getId())).isPresent();
+        assertThat(continuing.getInput()).isEqualTo(before.getInput());
+        assertThat(continuing.getCapture()).isEqualTo(before.getCapture());
+        assertThat(ResultAdmissionService.isContinuation(continuing)).isTrue();
+        assertThat(ResultAdmissionService.citationAttempt(continuing)).isZero();
+        assertThat(practiceResultRepository.findById(observed.getId())).isPresent();
         // The lost attempt is settled as itself; the new attempt starts from nothing.
-        assertThat(continuing.getLlmTotalCalls()).isZero();
+        assertThat(continuing.getLlmCalls()).isZero();
         assertThat(jdbc.queryForList(
                         "SELECT total_calls FROM llm_usage_event WHERE source_id::text = ? AND source_attempt = 0",
                         Integer.class,
                         jobId.toString()))
                 .containsExactly(3);
         // The lost worker's own attempt is gone: its requeue or its failure matches nothing now.
-        String token = AgentJob.generateJobToken();
         Integer staleRequeue = transactionTemplate.execute(s -> {
             continuation.holdRecoveryCustody();
             return continuation.requeue(
                     continuing,
                     "dead-replica-9",
-                    new AgentJobRepository.CompositionRequeue(
-                            0, 5, Instant.now(), Instant.now(), token, AgentJob.computeTokenHash(token)));
+                    new ReviewJobRepository.CompositionRequeue(0, 5, Instant.now(), Instant.now()));
         });
         assertThat(staleRequeue).isZero();
         Integer staleFailure = transactionTemplate.execute(
@@ -449,20 +415,21 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
                 "erased receipt",
                 "receipt not indexing its copies",
                 "expired inputs",
-                "legacy admission",
+                "inputs from another admission",
                 "suppressed person"
             })
     @DisplayName("a lost admitted review whose original inputs cannot be vouched for fails as before")
     void shouldFailTheLostAdmittedReviewWhenItsOriginalInputsCannotBeContinued(String why) {
         UUID jobId = runningJobOwnedBy("dead-replica-10", Instant.now().minus(Duration.ofMinutes(5)), 0);
-        admitWithObservation(jobId);
+        admitWithResult(jobId);
         Instant fresh = Instant.now().plus(Duration.ofHours(1));
         switch (why) {
             case "erased receipt" -> keepOriginalInputs(jobId, 0, "ERASE_REQUESTED", "COMPLETE", fresh);
             case "suppressed person" -> {
                 keepOriginalInputs(jobId, 0, "READY", "COMPLETE", fresh);
                 jdbc.update(
-                        "INSERT INTO person_suppression(id,provider_id,subject,team_key) VALUES (?,?,?,'')",
+                        "INSERT INTO identity_restriction(id,provider_id,provider_user_key,team_key,kind) VALUES"
+                                + " (?,?,?,'','ERASED')",
                         UUID.randomUUID(),
                         requireNonNull(developer.getProvider()).getId(),
                         "100");
@@ -470,26 +437,24 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
             case "receipt not indexing its copies" -> keepOriginalInputs(jobId, 0, "READY", "UNKNOWN", fresh);
             case "expired inputs" ->
                 keepOriginalInputs(jobId, 0, "READY", "COMPLETE", Instant.now().minusSeconds(1));
-            default -> {
+            case "inputs from another admission" -> {
                 keepOriginalInputs(jobId, 0, "READY", "COMPLETE", fresh);
-                // Admitted before the admitting attempt was recorded: nothing says whose citations these were.
                 jdbc.update(
-                        "UPDATE agent_job SET metadata = metadata - CAST(? AS text) WHERE id = ?",
-                        ObservationAdmissionService.ATTEMPT_METADATA_KEY,
+                        "UPDATE review_composition_basis SET admission_digest = ? WHERE job_id = ?",
+                        "another-admission-digest",
                         jobId);
             }
+            default -> throw new IllegalArgumentException("Unknown recovery case: " + why);
         }
         spentBeforeItWasLost(jobId, 2);
         registerStaleWorker("dead-replica-10");
-        AgentJob before = jobRepository.findById(jobId).orElseThrow();
 
         sweeper.recoverOrphanedJobs();
 
-        AgentJob failed = jobRepository.findById(jobId).orElseThrow();
-        assertThat(failed.getStatus()).isEqualTo(AgentJobStatus.FAILED);
-        assertThat(failed.getErrorMessage()).isEqualTo(ObservationAdmissionService.INTERRUPTED_AFTER_ADMISSION);
-        assertThat(failed.getRetryCount()).isZero();
-        assertThat(failed.getJobTokenHash()).isEqualTo(before.getJobTokenHash());
+        ReviewJob failed = jobRepository.findById(jobId).orElseThrow();
+        assertThat(failed.getStatus()).isEqualTo(ReviewJobStatus.FAILED);
+        assertThat(failed.getErrorMessage()).isEqualTo(ResultAdmissionService.INTERRUPTED_AFTER_ADMISSION);
+        assertThat(failed.getAttempt()).isZero();
         assertThat(jdbc.queryForList(
                         "SELECT total_calls FROM llm_usage_event WHERE source_id::text = ? AND source_attempt = 0",
                         Integer.class,
@@ -504,22 +469,20 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         UUID jobId = runningJobOwnedBy("dead-replica-7", Instant.now().minus(Duration.ofMinutes(5)), 0);
         registerStaleWorker("dead-replica-7");
 
-        whileRecoveryWaits(
-                jobId,
-                committed,
-                job -> job.setMetadata(objectMapper
-                        .createObjectNode()
-                        .put(ObservationAdmissionService.DIGEST_METADATA_KEY, "admitted-digest")));
+        whileRecoveryWaits(jobId, committed, job -> {
+            job.setAdmissionDigest("admitted-digest");
+            job.setAdmissionAttempt(job.getAttempt());
+        });
 
-        AgentJob after = jobRepository.findById(jobId).orElseThrow();
+        ReviewJob after = jobRepository.findById(jobId).orElseThrow();
         if (committed) {
-            assertThat(after.getStatus()).isEqualTo(AgentJobStatus.FAILED);
-            assertThat(after.getRetryCount()).isZero();
-            assertThat(ObservationAdmissionService.isAdmitted(after)).isTrue();
+            assertThat(after.getStatus()).isEqualTo(ReviewJobStatus.FAILED);
+            assertThat(after.getAttempt()).isZero();
+            assertThat(ResultAdmissionService.isAdmitted(after)).isTrue();
         } else {
-            assertThat(after.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
-            assertThat(after.getRetryCount()).isEqualTo(1);
-            assertThat(ObservationAdmissionService.isAdmitted(after)).isFalse();
+            assertThat(after.getStatus()).isEqualTo(ReviewJobStatus.QUEUED);
+            assertThat(after.getAttempt()).isEqualTo(1);
+            assertThat(ResultAdmissionService.isAdmitted(after)).isFalse();
         }
     }
 
@@ -531,29 +494,28 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
 
         whileRecoveryWaits(jobId, true, job -> {
             job.setWorkerId("live-sibling");
-            job.setRetryCount(6);
+            job.setAttempt(6);
         });
 
-        AgentJob after = jobRepository.findById(jobId).orElseThrow();
-        assertThat(after.getStatus()).isEqualTo(AgentJobStatus.RUNNING);
+        ReviewJob after = jobRepository.findById(jobId).orElseThrow();
+        assertThat(after.getStatus()).isEqualTo(ReviewJobStatus.RUNNING);
         assertThat(after.getWorkerId()).isEqualTo("live-sibling");
-        assertThat(after.getRetryCount()).isEqualTo(6);
+        assertThat(after.getAttempt()).isEqualTo(6);
         assertThat(after.getErrorMessage()).isNull();
     }
 
-    /**
+    /*
      * Holds the job's row lock as the admission does, changes it, and lets the sweep run against it: the
      * sweep blocks on the lock, then decides on what this transaction committed or rolled back.
      */
-    private void whileRecoveryWaits(UUID jobId, boolean commit, Consumer<AgentJob> change) throws Exception {
+    private void whileRecoveryWaits(UUID jobId, boolean commit, Consumer<ReviewJob> change) throws Exception {
         var locked = new CountDownLatch(1);
         var pool = Executors.newFixedThreadPool(2);
         try {
             var holder = pool.submit(() -> transactionTemplate.executeWithoutResult(tx -> {
-                AgentJob job =
-                        jobRepository.findByIdWithWorkspaceForUpdate(jobId).orElseThrow();
+                ReviewJob job = jobRepository.lockById(jobId).orElseThrow();
                 change.accept(job);
-                jobRepository.saveAndFlush(job);
+                jobRepository.saveAndFlush(RuntimeJobTestData.persistParent(jdbc, job));
                 locked.countDown();
                 awaitBlockedTransaction();
                 if (!commit) tx.setRollbackOnly();
@@ -576,57 +538,54 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         Awaitility.await().pollInSameThread().atMost(30, TimeUnit.SECONDS).until(() -> {
             jdbc.execute("SELECT pg_stat_clear_snapshot()");
             return Boolean.TRUE.equals(jdbc.queryForObject(
-                    "SELECT EXISTS (SELECT FROM pg_stat_activity WHERE CAST(? AS integer) = ANY(pg_blocking_pids(pid)))",
+                    "SELECT EXISTS (SELECT FROM pg_stat_activity WHERE CAST(? AS integer) ="
+                            + " ANY(pg_blocking_pids(pid)))",
                     Boolean.class,
                     holderPid));
         });
     }
 
-    /**
-     * An admission as it is persisted: an observation of a practice revision, citing this job's capture,
-     * and the digest on the job's metadata.
-     */
-    private Observation admitWithObservation(UUID jobId) {
-        UUID id = UUID.randomUUID();
-        observationRepository.insertIfAbsent(
-                id,
-                "occurrence-" + id,
-                jobId,
-                workspace.getId(),
-                practice.getId(),
-                practice.getCurrentRevision().getId(),
-                "scm.pull_request",
-                42L,
-                developer.getId(),
-                "Observation title",
-                "NOT_MET",
-                "MAJOR",
-                AdmittedObservationFixtures.evidence(
-                                jobId, "scm.pull-request.core", "context/metadata.json", "metadata.json", "example")
-                        .toString(),
-                null,
-                null,
-                Instant.now(),
-                "LIVE");
-        transactionTemplate.executeWithoutResult(status -> {
-            AgentJob job = jobRepository.findById(jobId).orElseThrow();
-            job.setMetadata(objectMapper
+    private Result admitWithResult(UUID jobId) {
+        return Objects.requireNonNull(transactionTemplate.execute(status -> {
+            ReviewJob job = jobRepository.findById(jobId).orElseThrow();
+            UUID id = UUID.randomUUID();
+            var row = Result.builder()
+                    .id(id)
+                    .workspaceId(job.getWorkspaceId())
+                    .reviewId(job.getReviewId())
+                    .practiceId(practice.getId())
+                    .practiceVersionId(practice.getCurrentVersion().getId())
+                    .itemId(job.getInput().itemId())
+                    .itemVersion("fixture:one")
+                    .developerId(null)
+                    .outcome(ResultOutcome.MET)
+                    .summary("Stored result")
+                    .explanation("The recorded quote supports it.")
+                    .evidence(AdmittedResultFixtures.evidence("scm.pull-request.core"))
+                    .coverage(objectMapper.readTree(
+                            "{\"source\":\"claimed\",\"complete\":true,\"selected\":1,\"checked\":1,\"total\":1}"))
+                    .recordedAt(Instant.now())
+                    .build();
+            practiceResultRepository.saveAndFlush(row);
+            jdbc.update(
+                    "UPDATE review_item SET state='JUDGED',result_id=?,job_id=? WHERE workspace_id=? AND review_id=?"
+                            + " AND practice_id=? AND item_id=?",
+                    row.getId(),
+                    job.getId(),
+                    job.getWorkspaceId(),
+                    job.getReviewId(),
+                    practice.getId(),
+                    job.getInput().itemId());
+            job.setAdmissionDigest("admitted-digest");
+            job.setAdmissionAttempt(job.getAttempt());
+            job.setCapture(objectMapper
                     .createObjectNode()
-                    .put("pull_request_id", 42)
-                    .put(ObservationAdmissionService.DIGEST_METADATA_KEY, "admitted-digest")
-                    .put(ObservationAdmissionService.ATTEMPT_METADATA_KEY, job.getRetryCount()));
-            job.setEvidenceSnapshot(objectMapper
-                    .createObjectNode()
-                    .set("manifest", objectMapper.createObjectNode().put("contractVersion", "1.2.0")));
+                    .set("manifest", objectMapper.createObjectNode().put("contractVersion", "2.0.0")));
             jobRepository.saveAndFlush(job);
-        });
-        return observationRepository.findById(id).orElseThrow();
+            return row;
+        }));
     }
 
-    /**
-     * What an admission keeps for a later writer, as persisted: the inputs under its digest and attempt, and the
-     * capture receipt that vouches for whose rows they copied.
-     */
     private void keepOriginalInputs(
             UUID jobId, int attempt, String receiptState, String dependencies, Instant expiresAt) {
         UUID copyId = UUID.randomUUID();
@@ -647,65 +606,88 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
                                 objectMapper.valueToTree(
                                         List.of(new PersonCopyIdentity("GITHUB", "https://github.com", "100", null))))
                         .toString());
-        jdbc.update(
-                "INSERT INTO review_composition_basis(job_id,workspace_id,admission_attempt,admission_digest,"
-                        + "basis_version,basis_digest,copy_id,byte_size,created_at,expires_at,payload) "
-                        + "VALUES (?,?,?,?,?,?,?,?,?,?,CAST(? AS jsonb))",
-                jobId,
-                workspace.getId(),
-                attempt,
-                "admitted-digest",
-                ReviewCompositionBasis.VERSION,
-                ReviewCompositionBasis.digest(Map.of()),
-                copyId,
-                12,
-                Timestamp.from(expiresAt.minus(Duration.ofHours(2))),
-                Timestamp.from(expiresAt),
-                "{\"files\":{}}");
+        var basis = new ReviewCompositionBasis();
+        basis.setJobId(jobId);
+        basis.setWorkspaceId(workspace.getId());
+        basis.setAdmissionAttempt(attempt);
+        basis.setAdmissionDigest("admitted-digest");
+        basis.setBasisVersion(ReviewCompositionBasis.VERSION);
+        basis.setBasisDigest(ReviewCompositionBasis.digest(Map.of()));
+        basis.setCopyId(copyId);
+        basis.setExpiresAt(expiresAt);
+        basis.setPayload(objectMapper.createObjectNode().set("files", objectMapper.createObjectNode()));
+        transactionTemplate.executeWithoutResult(status -> compositionBasisRepository.save(basis));
     }
 
-    /** The attempt ran and the proxy counted its calls before its worker was lost. */
     private void spentBeforeItWasLost(UUID jobId, int calls) {
-        jdbc.update(
-                "UPDATE agent_job SET execution_started_at = now(), llm_total_calls = ? WHERE id = ?", calls, jobId);
+        jdbc.update("UPDATE review_job SET execution_started_at = now(), llm_calls = ? WHERE id = ?", calls, jobId);
     }
 
-    /** The practice's definition moves on after the admission, as a later edit would. */
     private void changePracticeDefinition() {
-        practice.setCriteria("The changed definition");
-        practice.setCurrentRevision(practiceRevisionRepository.save(new PracticeRevision(practice, 2)));
-        practice = practiceRepository.saveAndFlush(practice);
+        var kind = practice.getKind();
+        runtimePracticeVersions.append(
+                practice,
+                DefinitionTestFixtures.definition(kind, "Updated standard", "The second definition", null),
+                null);
     }
 
-    private UUID runningJobOwnedBy(String workerId, Instant startedAt, int retryCount) {
-        AgentJob job = new AgentJob();
-        job.setWorkspace(workspace);
-        job.setPurpose(AgentPurpose.PRACTICE_REVIEW);
-        job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-        job.setStatus(AgentJobStatus.RUNNING);
+    private UUID runningJobOwnedBy(String workerId, Instant startedAt, int attempt) {
+        ReviewJob job = new ReviewJob();
+        RuntimeJobTestData.initialize(job, workspace.getId());
+
+        job.setStatus(ReviewJobStatus.RUNNING);
         job.setConfigSnapshot(new ConfigSnapshot(
                         ConfigSnapshot.SCHEMA_VERSION,
-                        "openai-completions",
-                        "https://api.openai.com/v1",
-                        "test-model",
+                        new FrozenModel(
+                                LlmApiProtocol.OPENAI_COMPLETIONS,
+                                "https://api.openai.com/v1",
+                                "test-model",
+                                UsageFundingSource.INSTANCE,
+                                instanceModel.getConnection().getId(),
+                                instanceModel.getId(),
+                                workspace.getId(),
+                                null,
+                                null,
+                                null),
                         null,
                         null,
-                        null,
-                        null,
-                        FundingSource.INSTANCE,
-                        instanceModel.getConnection().getId(),
-                        instanceModel.getId(),
-                        workspace.getId(),
                         600,
                         false,
-                        null,
                         null)
                 .withPriceSnapshot(new LlmPriceSnapshot(
-                        FundingSource.INSTANCE, PricingState.NO_CHARGE, null, null, null, null, null, null))
+                        UsageFundingSource.INSTANCE, UsagePricingState.NO_CHARGE, null, null, null, null, null, null))
                 .toJson(objectMapper));
         job.setWorkerId(workerId);
         job.setStartedAt(startedAt);
-        job.setRetryCount(retryCount);
+        job.setAttempt(attempt);
+        long itemId = requireNonNull(jdbc.queryForObject(
+                "INSERT INTO item(workspace_id,kind,source_id,created_at) VALUES (?,?,?,now()) RETURNING id",
+                Long.class,
+                workspace.getId(),
+                practice.getKind().value(),
+                (job.getReviewId().getLeastSignificantBits() & Long.MAX_VALUE) | 1));
+        jdbc.update(
+                "INSERT INTO review(id,workspace_id,item_id,kind,item_version,origin,ordered_at) VALUES"
+                        + " (?,?,?,'ITEM','fixture:one','REQUEST',now())",
+                job.getReviewId(),
+                workspace.getId(),
+                itemId);
+        jdbc.update(
+                "INSERT INTO review_practice(review_id,workspace_id,practice_id,practice_version_id,status) VALUES"
+                        + " (?,?,?,?,'READY')",
+                job.getReviewId(),
+                workspace.getId(),
+                practice.getId(),
+                practice.getCurrentVersion().getId());
+        jdbc.update(
+                "INSERT INTO review_item(review_id,workspace_id,practice_id,item_id,item_version) VALUES"
+                        + " (?,?,?,?,'fixture:one')",
+                job.getReviewId(),
+                workspace.getId(),
+                practice.getId(),
+                itemId);
+        job.setInput(new ReviewJobInput(
+                itemId, List.of(new ReviewAssignmentId(job.getReviewId(), practice.getId(), itemId))));
         return jobRepository.saveAndFlush(job).getId();
     }
 
@@ -731,9 +713,9 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
 
     private void fastForwardAvailableAt(UUID jobId) {
         transactionTemplate.executeWithoutResult(status -> {
-            AgentJob job = jobRepository.findById(jobId).orElseThrow();
+            ReviewJob job = jobRepository.findById(jobId).orElseThrow();
             job.setAvailableAt(Instant.now().minus(Duration.ofSeconds(1)));
-            jobRepository.saveAndFlush(job);
+            jobRepository.saveAndFlush(RuntimeJobTestData.persistParent(jdbc, job));
         });
     }
 }

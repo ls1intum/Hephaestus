@@ -98,7 +98,6 @@ class GitLabPushMessageHandlerIntegrationTest extends BaseIntegrationTest {
         workspace.setWorkspaceSlug("push-fixture");
         workspace.setDisplayName("Push fixture");
         workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
-        workspace.setOrganization(organization);
         workspace.setAccountLogin("hephaestustest");
         workspace.setAccountType(AccountType.ORG);
         workspace = workspaces.saveAndFlush(workspace);

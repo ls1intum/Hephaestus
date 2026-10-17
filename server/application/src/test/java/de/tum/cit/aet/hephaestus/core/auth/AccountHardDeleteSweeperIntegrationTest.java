@@ -7,13 +7,18 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountFeature;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountFeatureRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.auth.export.AccountExport;
 import de.tum.cit.aet.hephaestus.core.auth.export.AccountExportRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwt;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -25,24 +30,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/**
- * Regression coverage for the GDPR Art. 17 hard-delete sweeper ({@link AccountHardDeleteSweeper}).
- *
- * <p>The sweeper is the enforcement half of {@code AccountService.softDelete}: an account sits in
- * {@link Account.Status#DELETING} during the recovery window and, once {@code deleted_at} is older
- * than {@code hephaestus.auth.delete-cooldown}, its personal/auth child rows are purged and the row
- * is flipped to the terminal {@link Account.Status#DELETED} with PII cleared. This test pins that
- * contract against <b>observable database state</b> so a regression in the selection query, the
- * child-row deletes, the PII clearing, or the status flip fails the build.
- *
- * <h2>Time control</h2>
- * The production {@code clock} bean ({@code Clock.systemUTC()}) is used as-is; we never override
- * it. Instead each fixture sets {@code deleted_at} relative to the very clock the sweeper reads
- * (autowired below), and fixtures use the bound cooldown value.
- */
+// Set deletion times relative to the production clock and bound cooldown; overriding the clock would change selection.
 class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
 
-    /** Tombstone left on display_name (see {@code AccountHardDeleteSweeper.TOMBSTONE_DISPLAY_NAME}). */
     private static final String TOMBSTONE_DISPLAY_NAME = "deleted-account";
 
     @Autowired
@@ -55,7 +45,7 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
     private AccountFeatureRepository accountFeatureRepository;
 
     @Autowired
-    private IdentityLinkRepository identityLinkRepository;
+    private IdentityRepository identityRepository;
 
     @Autowired
     private IssuedJwtRepository issuedJwtRepository;
@@ -65,6 +55,12 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private IdentityProviderRepository providers;
+
+    @Autowired
+    private UserRepository users;
 
     /** The same clock the sweeper reads — fixtures are positioned relative to it. */
     @Autowired
@@ -78,11 +74,8 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
         databaseTestUtils.cleanDatabase();
     }
 
-    // ── Case 1: account past the cooldown is fully purged ────────────────────────────────────
-
     @Test
     void sweepNow_pastCooldown_purgesChildrenClearsPiiAndFlipsToDeleted() {
-        // Arrange: an account soft-deleted well before the cutoff, with one row in every child table.
         Account account = newAccount("Ada Lovelace", "ada@example.com");
         Long id = persistedId(account.getId());
         seedChildRows(id);
@@ -112,12 +105,10 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
                 .isNull();
 
         assertThat(childRowCounts(id))
-                .as(
-                        "all personal/auth child rows are gone (account_feature, identity_link, issued_jwt, account_export)")
+                .as("all personal/auth child rows are gone (account_feature, identity,"
+                        + " issued_jwt, account_export)")
                 .containsExactly(0, 0, 0, 0);
     }
-
-    // ── Case 2: account still inside the cooldown is left untouched ───────────────────────────
 
     @Test
     void sweepNow_withinCooldown_leavesAccountAndChildrenIntact() {
@@ -145,8 +136,6 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
                 .containsExactly(1, 1, 1, 1);
     }
 
-    // ── Case 3: terminal DELETED is never re-selected; the sweep is idempotent ────────────────
-
     @Test
     void sweepNow_alreadyDeleted_isNeverReselected_andSweepIsIdempotent() {
         Account account = newAccount("Alan Turing", "alan@example.com");
@@ -171,8 +160,6 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
         assertThat(childRowCounts(id)).containsExactly(0, 0, 0, 0);
     }
 
-    // ── Case 4: the cutoff is computed from delete-cooldown ───────────────────────────────────
-
     @Test
     void sweepNow_cutoffIsDrivenByDeleteCooldown_boundaryAccountsSplit() {
         // One account is just past the configured cooldown and one is just inside it.
@@ -196,8 +183,6 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
                 .isEqualTo(Account.Status.DELETING);
     }
 
-    // ── Case 5: GDPR erasure anonymizes the subject's retained audit rows ─────────────────────
-
     @Test
     void sweepNow_anonymizesSubjectAndImpersonatorAuditRows() {
         Account account = newAccount("Erased User", "erased@example.com");
@@ -206,17 +191,20 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
         // (acting_account_id) of an event about a different account → both must be redacted.
         seedAuthEvent(9001L, erasedId, null, "LOGIN", "203.0.113.7", "UA-A", "{\"x\":1}");
         seedAuthEvent(
-                9002L, 88_888L, erasedId, "IMPERSONATION_BEGIN", "198.51.100.9", "UA-B", "{\"reason\":\"abuse\"}");
+                9002L,
+                persistedId(newAccount("Operator", "operator@example.com").getId()),
+                erasedId,
+                "IMPERSONATION_BEGIN",
+                "198.51.100.9",
+                "UA-B",
+                "{\"reason\":\"abuse\"}");
         markDeleting(
                 erasedId, clock.instant().minus(authProperties.deleteCooldown()).minus(Duration.ofHours(1)));
 
         sweeper.sweepNow();
 
-        var rows = jdbcTemplate.queryForList(
-                "SELECT event_type, result, ip_inet, user_agent, details FROM auth_event "
-                        + "WHERE account_id = ? OR acting_account_id = ? ORDER BY id",
-                erasedId,
-                erasedId);
+        var rows = jdbcTemplate.queryForList("SELECT event_type, result, ip_inet, user_agent, details FROM auth_event "
+                + "WHERE id IN (9001,9002) ORDER BY id");
         assertThat(rows).hasSize(2);
         assertThat(rows).allSatisfy(r -> {
             assertThat(r.get("ip_inet")).as("IP redacted").isNull();
@@ -231,14 +219,17 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
     void shouldRedactAViewOfTheErasedUserWhenTheViewPredatesTheirSignIn() {
         Long erasedId = persistedId(
                 newAccount("Viewed user", "viewed-erased@example.com").getId());
-        seedUserView(9012L, 77_777L, "{\"reason\":\"Before sign-in\"}");
-        seedUserView(9011L, 66_666L, "{\"reason\":\"Another user\"}");
-        IdentityLink linkedLater = new IdentityLink();
+        var provider = provider();
+        var viewed = users.saveAndFlush(TestUserFactory.createUser(77_777L, "viewed-erased", provider));
+        var retained = users.saveAndFlush(TestUserFactory.createUser(66_666L, "viewed-retained", provider));
+        long operator = persistedId(newAccount("Viewer", "viewer@example.com").getId());
+        seedUserView(9012L, operator, persistedId(viewed.getId()), "{\"reason\":\"Before sign-in\"}");
+        seedUserView(9011L, operator, persistedId(retained.getId()), "{\"reason\":\"Another user\"}");
+        Identity linkedLater = new Identity();
         linkedLater.setAccount(accountRepository.findById(erasedId).orElseThrow());
-        linkedLater.setProviderId(1L);
-        linkedLater.setSubject("77777");
-        linkedLater.setExternalActorId(77_777L);
-        identityLinkRepository.save(linkedLater);
+        linkedLater.setProviderId(persistedId(provider.getId()));
+        linkedLater.setProviderUserKey("77777");
+        identityRepository.save(linkedLater);
         markDeleting(
                 erasedId, clock.instant().minus(authProperties.deleteCooldown()).minus(Duration.ofHours(1)));
 
@@ -249,8 +240,6 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
         assertThat(jdbcTemplate.queryForObject("SELECT details::text FROM auth_event WHERE id = 9011", String.class))
                 .contains("Another user");
     }
-
-    // ── Case 6: product submissions the account owns are erased with it ───────────────────────
 
     @Test
     void shouldEraseProductSubmissionsWhenAccountIsPurged() {
@@ -281,19 +270,18 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
                         erasedResponse,
                         erasedDecline,
                         retainedResponse))
-                .as("both a response and a decline are erased; another account's response is untouched")
+                .as("both a response and a decline are erased; another account's response is" + " untouched")
                 .containsExactly(retainedResponse);
         assertThat(accountRepository.findById(erasedId).orElseThrow().getStatus())
                 .isEqualTo(Account.Status.DELETED);
     }
 
-    // ── Fixtures ──────────────────────────────────────────────────────────────────────────────
-
     private UUID seedProductFeedback(Long accountId) {
         UUID id = UUID.randomUUID();
         jdbcTemplate.update(
-                "INSERT INTO product_feedback (id, account_id, kind, message, app_version, created_at, submission_minute) "
-                        + "VALUES (?, ?, 'FEEDBACK', 'Personal submission', 'test', now(), now())",
+                "INSERT INTO product_feedback (id, account_id, kind, message, app_version,"
+                        + " created_at, submission_minute) VALUES (?, ?, 'FEEDBACK', 'Personal"
+                        + " submission', 'test', now(), now())",
                 id,
                 accountId);
         return id;
@@ -303,12 +291,14 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
         UUID id = UUID.randomUUID();
         UUID surveyId = UUID.randomUUID();
         jdbcTemplate.update(
-                "INSERT INTO product_survey (id, title, description, questions_json, starts_at, active, created_at) "
-                        + "VALUES (?, 'Survey', 'Description', CAST('[]' AS jsonb), now(), true, now())",
+                "INSERT INTO product_survey (id, title, description, questions_json, starts_at,"
+                        + " active, created_at) VALUES (?, 'Survey', 'Description', CAST('[]' AS"
+                        + " jsonb), now(), true, now())",
                 surveyId);
         jdbcTemplate.update(
-                "INSERT INTO product_survey_participation (id, survey_id, account_id, status, answers_json, invited_at, decided_at) "
-                        + "VALUES (?, ?, ?, ?, CAST(? AS jsonb), now(), now())",
+                "INSERT INTO product_survey_participation (id, survey_id, account_id, status,"
+                        + " answers_json, invited_at, decided_at) VALUES (?, ?, ?, ?, CAST(? AS jsonb),"
+                        + " now(), now())",
                 id,
                 surveyId,
                 accountId,
@@ -317,12 +307,14 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
         return id;
     }
 
-    private void seedUserView(long id, long viewedUserId, String details) {
+    private void seedUserView(long id, long actingAccountId, long viewedActorId, String details) {
         jdbcTemplate.update(
-                "INSERT INTO auth_event (id, occurred_at, acting_account_id, viewed_user_id, event_type, result, details) "
-                        + "VALUES (?, now(), 88888, ?, 'USER_VIEW', 'SUCCESS', CAST(? AS jsonb))",
+                "INSERT INTO auth_event (id, occurred_at, acting_account_id, viewed_actor_id,"
+                        + " event_type, result, details) VALUES (?, now(), ?, ?, 'USER_VIEW',"
+                        + " 'SUCCESS', CAST(? AS jsonb))",
                 id,
-                viewedUserId,
+                actingAccountId,
+                viewedActorId,
                 details);
     }
 
@@ -335,9 +327,9 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
             String userAgent,
             String details) {
         jdbcTemplate.update(
-                "INSERT INTO auth_event "
-                        + "(id, occurred_at, account_id, acting_account_id, event_type, result, ip_inet, user_agent, details) "
-                        + "VALUES (?, now(), ?, ?, ?, 'SUCCESS', CAST(? AS inet), ?, CAST(? AS jsonb))",
+                "INSERT INTO auth_event (id, occurred_at, account_id, acting_account_id,"
+                        + " event_type, result, ip_inet, user_agent, details) VALUES (?, now(), ?, ?,"
+                        + " ?, 'SUCCESS', CAST(? AS inet), ?, CAST(? AS jsonb))",
                 id,
                 accountId,
                 actingAccountId,
@@ -345,6 +337,13 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
                 ip,
                 userAgent,
                 details);
+    }
+
+    private IdentityProvider provider() {
+        return providers
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> providers.saveAndFlush(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
     }
 
     /** Persists a real ACTIVE account via the production repository. */
@@ -360,12 +359,11 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
     private void seedChildRows(Long accountId) {
         accountFeatureRepository.save(new AccountFeature(accountId, "notification_access"));
 
-        IdentityLink link = new IdentityLink();
+        Identity link = new Identity();
         link.setAccount(accountRepository.findById(accountId).orElseThrow());
-        link.setProviderId(1L); // scalar FK column (no JPA association → no ddl-auto FK constraint)
-        link.setSubject("subject-" + accountId);
-        link.setUsernameAtSignup("user" + accountId);
-        identityLinkRepository.save(link);
+        link.setProviderId(persistedId(provider().getId()));
+        link.setProviderUserKey(Long.toString(100_000L + accountId));
+        identityRepository.save(link);
 
         IssuedJwt jwt =
                 new IssuedJwt(UUID.randomUUID(), accountId, clock.instant().plus(Duration.ofHours(1)));
@@ -386,15 +384,11 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
         accountRepository.save(account);
     }
 
-    /**
-     * Observable child-row counts in fixed order: account_feature, identity_link, issued_jwt,
-     * account_export. Read straight from the database (not the persistence context) so the
-     * sweeper's JDBC deletes are reflected.
-     */
+    // Read JDBC deletion results from the database rather than the persistence context.
     private List<Integer> childRowCounts(Long accountId) {
         return List.of(
                 count("account_feature", accountId),
-                count("identity_link", accountId),
+                count("identity", accountId),
                 count("issued_jwt", accountId),
                 count("account_export", accountId));
     }

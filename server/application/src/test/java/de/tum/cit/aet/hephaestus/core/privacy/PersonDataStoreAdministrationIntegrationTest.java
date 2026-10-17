@@ -33,13 +33,14 @@ class PersonDataStoreAdministrationIntegrationTest extends BaseIntegrationTest {
                 "second", new PersonDataStoreReceipt(7, time, 84L))));
         requests.saveAndFlush(request);
         var contributor = new PersonDataStoreAdministrationContributor(jdbc, mapper);
-        var selected = contributor.select(new PersonScope(42L, List.of(), List.of()));
+        var selectedScope = new PersonScope(42L, List.of(), List.of());
+        var selected = contributor.select(selectedScope);
         assertThat(selected.rows()).hasSize(1);
-        var exported = contributor.export(selected);
+        var exported = contributor.export(selected, selectedScope);
         assertThat(exported).hasSize(1);
         assertThat(exported.getFirst().path("receipt").path("count").asLong()).isEqualTo(12);
-        assertThat(contributor.erase(selected)).isEqualTo(1);
-        assertThat(contributor.erase(selected)).isZero();
+        assertThat(contributor.erase(selected, selectedScope)).isEqualTo(1);
+        assertThat(contributor.erase(selected, selectedScope)).isZero();
         var receipts = PersonDataStoreReceipt.read(
                 mapper, requests.findById(request.getId()).orElseThrow().getCompletedJson());
         assertThat(receipts.get("first")).isEqualTo(new PersonDataStoreReceipt(12, time, null));

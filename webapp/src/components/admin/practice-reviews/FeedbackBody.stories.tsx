@@ -11,7 +11,7 @@ const meta = {
 	parameters: { layout: "padded", chromatic: { viewports: [320, 768] } },
 	tags: ["autodocs"],
 	args: {
-		feedback: { body, channel: "IN_CONTEXT", deliveryState: "DELIVERED" },
+		feedback: { body, destination: "ON_WORK", textHidden: false },
 	},
 } satisfies Meta<typeof FeedbackBody>;
 
@@ -23,7 +23,7 @@ type Story = StoryObj<typeof meta>;
  * this card sits on says so once already. The header row is then the view switch alone, sitting on
  * the same left edge as the note below it.
  */
-export const Delivered: Story = {
+export const OnTheWork: Story = {
 	play: async ({ canvas }) => {
 		canvas.getByRole("heading", { level: 4, name: "What worked" });
 		await expect(canvas.queryByText("Delivered")).not.toBeInTheDocument();
@@ -70,61 +70,37 @@ export const SwitchToSource: Story = {
 	},
 };
 
-export const Withheld: Story = {
-	args: {
-		feedback: {
-			body,
-			channel: "IN_CONTEXT",
-			deliveryState: "SUPPRESSED",
-			suppressionReason: "ARTIFACT_MERGED",
-		},
-	},
-	// The sheet's status line says it was withheld; the card shows only the text that was composed.
+// Source denial withholds private prose even when the caller supplies it.
+export const ForConversation: Story = {
+	args: { feedback: { body, destination: "CONVERSATION", textHidden: true } },
 	play: async ({ canvas }) => {
-		canvas.getByRole("heading", { level: 4, name: "What worked" });
-		await expect(canvas.queryByText("Withheld")).not.toBeInTheDocument();
-	},
-};
-
-export const FailedToDeliver: Story = {
-	args: { feedback: { body, channel: "IN_CONTEXT", deliveryState: "FAILED" } },
-};
-
-/**
- * A piece prepared for a conversation: the sheet's status line names where it waits. The lane's notes
- * are private: absent text is explained as withheld, never as missing, and a body a caller passes
- * anyway is not shown.
- */
-export const PreparedForConversation: Story = {
-	args: { feedback: { body, channel: "IN_CHAT", deliveryState: "PREPARED" } },
-	play: async ({ canvas }) => {
-		canvas.getByText(/withheld from operators/u);
+		canvas.getByText(/withheld from admins/u);
 		await expect(canvas.queryByText("What worked")).toBeNull();
-		await expect(canvas.queryByText(/No feedback text was composed/u)).toBeNull();
+		await expect(canvas.queryByText(/No feedback text is recorded/u)).toBeNull();
 	},
 };
 
-export const ReplacedByNewer: Story = {
-	args: { feedback: { body, channel: "IN_CONTEXT", deliveryState: "SUPERSEDED" } },
+export const ForPracticePage: Story = {
+	args: { feedback: { body, destination: "PRACTICE_PAGE", textHidden: true } },
+	play: async ({ canvas }) => {
+		canvas.getByText(/written for the developer’s own practice pages/u);
+		await expect(canvas.queryByText("What worked")).toBeNull();
+	},
 };
 
-export const NoComposedText: Story = {
+export const NoRecordedText: Story = {
 	args: {
-		feedback: {
-			channel: "IN_CONTEXT",
-			deliveryState: "SUPPRESSED",
-			suppressionReason: "REACTED_DISPUTED",
-		},
+		feedback: { body: null, destination: "ON_WORK", textHidden: false },
 	},
 	play: async ({ canvas }) => {
-		canvas.getByText("No feedback text was composed for this record.");
+		canvas.getByText("No feedback text is recorded here.");
 	},
 };
 
 const UUID = "0b7d3c2e-8f14-4a6b-9c5d-2e1f0a3b4c5d";
 const marker = `<!-- hephaestus:practice-review:${UUID} -->`;
 const disclosure =
-	"<sub>Practice review &middot; Model. This feedback is AI-generated and can be inaccurate. Answer or dispute it in [Hephaestus](https://example.com/respond).</sub>";
+	"<sub>Practice review &middot; Model. This feedback is AI-generated and can be inaccurate. Answer or disagree in [Hephaestus](https://example.com/respond).</sub>";
 const settings = "<sub>[Why you see this and how to stop it](https://example.com/settings)</sub>";
 const postedBody = [
 	marker,
@@ -140,7 +116,7 @@ const postedBody = [
  * exactly and a code block quoting either keeps it.
  */
 export const AsPostedOnTheWork: Story = {
-	args: { feedback: { body: postedBody, channel: "IN_CONTEXT", deliveryState: "DELIVERED" } },
+	args: { feedback: { body: postedBody, destination: "ON_WORK", textHidden: false } },
 	play: async ({ canvas, userEvent }) => {
 		const rendered = canvas.getByRole("tabpanel", { name: "Rendered" });
 		await expect(within(rendered).getByRole("link", { name: "Hephaestus" })).toHaveAttribute(
@@ -172,9 +148,8 @@ export const UntrustedMarkdown: Story = {
 				"<img src=x onerror=alert(1)>",
 				"[safe link](https://example.com/docs)",
 			].join("\n\n"),
-			channel: "IN_CONTEXT",
-			deliveryState: "SUPPRESSED",
-			suppressionReason: "VOLUME_CAPPED",
+			destination: "ON_WORK",
+			textHidden: false,
 		},
 	},
 	play: async ({ canvas, canvasElement }) => {
@@ -185,5 +160,16 @@ export const UntrustedMarkdown: Story = {
 			"href",
 			"https://example.com/docs",
 		);
+	},
+};
+
+export const HiddenSource: Story = {
+	args: { feedback: { body, destination: "ON_WORK", textHidden: true } },
+	play: async ({ canvas }) => {
+		canvas.getByText(
+			"Feedback text is hidden because access to its sources could not be verified.",
+		);
+		await expect(canvas.queryByText("What worked")).toBeNull();
+		await expect(canvas.queryByText(/No feedback text is recorded/u)).toBeNull();
 	},
 };

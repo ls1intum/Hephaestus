@@ -50,30 +50,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Synchronizes GitLab subgroups as teams via GraphQL API.
- * <p>
- * Intentionally NOT @Transactional at the orchestrator level — each phase
- * manages its own transactional boundaries via TransactionTemplate to avoid
- * holding a DB connection during network calls and throttle delays.
- * <p>
- * Uses TransactionTemplate instead of @Transactional because Spring's
- * proxy-based AOP doesn't intercept internal method calls within the same class.
- * <p>
- * Phases:
- * <ol>
- *   <li>A — Fetch the root group and its descendant groups and create Team entities</li>
- *   <li>B — Resolve parent references (two-pass)</li>
- *   <li>C — Set each team's members, in one transaction per team, from both of its sources: the subgroup's
- *       members and invited groups' members ({@link GitLabGroupMemberResponse#TEAM_RELATIONS}) and the WRITE/TRIAGE collaborators of
- *       projects directly in it on the same instance, such as students. A team whose listing is incomplete keeps
- *       its members.</li>
- *   <li>D — Sync team-repo permissions (repos whose org = subgroup fullPath)</li>
- *   <li>E — Cleanup stale teams (only if the whole graph was listed)</li>
- *   <li>G — Fire {@link TeamMembershipListener} with whether every team's members are current, so consumers
- *       (e.g. workspace) can reconcile against the team graph once it is, and only add members before that.
- *       Covers the gap where subgroup-only users (tutor maintainers) never appear in
- *       organization_membership and would otherwise miss workspace_membership.</li>
- * </ol>
+ * Network calls must hold no database connection; use explicit transactions because Spring ignores self-invocation.
+ * Incomplete listings retain memberships; {@link TeamMembershipListener} must know whether reconciliation is complete.
  */
 @Service
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
@@ -187,8 +165,9 @@ public class GitLabTeamSyncService {
                 parentNativeIdByChildNativeId,
                 teamFullPathsByNativeId,
                 syncedNativeIds);
-        // Only a whole graph proves a team or a parent link is gone: an unreadable root or a partial
-        // descendant listing must not delete teams, clear parents, or reconcile memberships.
+        // Only a whole graph proves a team or a parent link is gone: an unreadable root or a
+        // partial descendant listing must not delete teams, clear parents, or reconcile
+        // memberships.
         boolean graphComplete = rootTeam != null && descendantsComplete;
 
         int totalSynced = syncedTeamsByNativeId.size();
@@ -253,9 +232,10 @@ public class GitLabTeamSyncService {
             removeDeletedTeams(groupFullPath, syncedNativeIds, providerId);
         }
 
-        // Phase G: Tell downstream consumers (e.g. workspace memberships) about the team graph. Only fired when the
-        // whole graph was listed, and it says whether every team's members are current: a team whose listing was
-        // incomplete kept old rows, which justify keeping someone but not removing anyone else.
+        // Phase G: Tell downstream consumers (e.g. workspace memberships) about the team graph.
+        // Only fired when the whole graph was listed, and it says whether every team's members are
+        // current: a team whose listing was incomplete kept old rows, which justify keeping someone
+        // but not removing anyone else.
         boolean complete = graphComplete && membersComplete;
         if (graphComplete && teamMembershipListener != null) {
             try {
@@ -407,7 +387,8 @@ public class GitLabTeamSyncService {
             }
             graphQlClientProvider.recordSuccess();
 
-            // A subgroup whose parent field errored would read as a top-level group and lose its parent link.
+            // A subgroup whose parent field errored would read as a top-level group and lose its
+            // parent link.
             if (!Objects.requireNonNull(response).getErrors().isEmpty()) {
                 log.warn("Stopped descendant group sync: reason=fieldErrors, groupPath={}", groupFullPath);
                 return false;
@@ -421,8 +402,8 @@ public class GitLabTeamSyncService {
             List<GitLabDescendantGroupResponse> groups =
                     response.field("group.descendantGroups.nodes").toEntityList(GitLabDescendantGroupResponse.class);
             for (GitLabDescendantGroupResponse group : groups) {
-                // A listed subgroup this sync cannot read, or whose parent it cannot identify, is still on
-                // GitLab: dropping it would read as a deleted team or a top-level one.
+                // A listed subgroup this sync cannot read, or whose parent it cannot identify, is
+                // still on GitLab: dropping it would read as a deleted team or a top-level one.
                 Long parentNativeId = parentNativeId(group);
                 Team team = parentNativeId == null ? null : teamProcessor.process(group, groupFullPath, provider);
                 if (team == null) {
@@ -534,8 +515,7 @@ public class GitLabTeamSyncService {
         List<GitLabGroupMemberResponse> allMembers = new ArrayList<>();
         boolean memberSyncComplete = fetchAllGroupMembers(client, scopeId, groupFullPath, allMembers);
 
-        // Phase C.2: Read the whole listing before writing anything. A failed page, or an entry without a readable
-        // user or access level, leaves every stored membership and role of this team as it was.
+        // An incomplete listing cannot change stored memberships or roles.
         if (!memberSyncComplete) {
             log.warn("Skipped team membership changes: reason=incompleteListing, groupPath={}", groupFullPath);
             return new MemberSync(0, false);
@@ -555,8 +535,8 @@ public class GitLabTeamSyncService {
             }
         }
 
-        // Phase C.3: Apply the membership diff in a short transaction, only while this scope still owns the group
-        // on the instance it was read from.
+        // Phase C.3: Apply the membership diff in a short transaction, only while this scope still
+        // owns the group on the instance it was read from.
         MemberSync result = transactionTemplate.execute(status -> {
             if (workspaceLinkService
                     .groupWriteProvider(scopeId, rootGroupFullPath)
@@ -592,10 +572,11 @@ public class GitLabTeamSyncService {
                 syncedMemberIds.add(user.getId());
                 applyMembership(team, user, Objects.requireNonNull(listed.role()), existingMemberships);
             }
-            // A project collaborator the subgroup does not list directly, such as a student, is a member too. Read in
-            // this transaction, so a failed read changes nothing rather than dropping them as stale. Collaborator rows
-            // change only from the owning scope's complete project listing, so a failed collaborator sync leaves its
-            // last complete answer in place rather than an empty one.
+            // A project collaborator the subgroup does not list directly, such as a student, is a
+            // member too. Read in this transaction, so a failed read changes nothing rather than
+            // dropping them as stale. Collaborator rows change only from the owning scope's
+            // complete project listing, so a failed collaborator sync leaves its last complete
+            // answer in place rather than an empty one.
             for (RepositoryCollaborator collaborator : collaboratorRepository.findByOrgLoginAndPermissions(
                     groupFullPath, providerId, TEAM_COLLABORATOR_PERMISSIONS)) {
                 if (syncedMemberIds.add(collaborator.getUser().getId())) {
@@ -656,8 +637,8 @@ public class GitLabTeamSyncService {
                 return false;
             }
             graphQlClientProvider.recordSuccess();
-            // A page with field errors, such as a member whose access level is missing, does not say who holds
-            // which role; none of it is applied.
+            // A page with field errors, such as a member whose access level is missing, does not
+            // say who holds which role; none of it is applied.
             if (!Objects.requireNonNull(response).getErrors().isEmpty()) {
                 log.warn("Stopped team member sync: reason=fieldErrors, groupPath={}", groupFullPath);
                 return false;
@@ -856,6 +837,7 @@ public class GitLabTeamSyncService {
             Thread.currentThread().interrupt();
         }
     }
+
     /**
      * The group GitLab reports under {@code groupNativeId} to the workspace's own credential, whatever path it has now;
      * empty when GitLab reports none. Only reads; a response GitLab could not give throws, so a caller can retry.
@@ -929,7 +911,7 @@ public class GitLabTeamSyncService {
         var request = graphQlClientProvider.forScope(scopeId).documentName(document);
         variables.forEach(request::variable);
         ClientGraphQlResponse response = request.execute().block(gitLabProperties.graphqlTimeout());
-        // A partial answer is no answer: an errored field would otherwise read as an absent group or member.
+        // An errored field cannot prove a group or member absent.
         if (responseHandler.handle(response, context, log).action()
                         != GitLabGraphQlResponseHandler.HandleResult.Action.CONTINUE
                 || !Objects.requireNonNull(response).getErrors().isEmpty()) {

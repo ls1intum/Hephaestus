@@ -7,17 +7,23 @@ import { StatefulPatch } from "@/stories/stateful";
 
 import { clearedFeedbackFacets, FeedbackFilters } from "./FeedbackFilters";
 import { practiceGroups, workspaceMembers, workspacePractices } from "./fixtures";
-import { practiceFacetOptions } from "./ObservationFilters";
+import { practiceFacetOptions } from "./ResultFilters";
 import { clearedScope } from "./review-scope";
 import type { FeedbackSearch } from "./review-search";
 import type { ReviewPeople } from "./ReviewPersonFacet";
 import { STORY_GROUPS } from "./story-scope-sources";
 
+const UNFILTERED = {
+	state: undefined,
+	destination: undefined,
+	withheldFamily: undefined,
+} satisfies FeedbackSearch;
+
 const PEOPLE: ReviewPeople = {
-	options: workspaceMembers.map((member) => ({
-		userId: member.userId,
-		label: member.userName ?? `#${member.userId}`,
-		secondary: member.userLogin,
+	options: workspaceMembers.map(({ account }) => ({
+		accountId: account.id,
+		label: account.displayName ?? `#${account.id}`,
+		secondary: account.identities[0]?.login ?? undefined,
 	})),
 	capped: false,
 	isLoading: false,
@@ -40,7 +46,7 @@ const meta = {
 	decorators: [withStandardPage],
 	tags: ["autodocs"],
 	args: {
-		search: { deliveryState: undefined, withheldFamily: undefined, location: undefined },
+		search: UNFILTERED,
 		onPatch: fn(),
 		onReset: fn(),
 		onClearScope: fn(),
@@ -89,7 +95,7 @@ export const Unfiltered: Story = {
 /** Reset appears as soon as anything is set, and the count changes its wording with it. */
 export const FilteredCountReadsDifferently: Story = {
 	args: {
-		search: { deliveryState: ["DELIVERED"], withheldFamily: undefined, location: undefined },
+		search: { ...UNFILTERED, state: ["DELIVERED"] },
 		total: 3,
 	},
 	play: async ({ canvas }) => {
@@ -101,7 +107,7 @@ export const FilteredCountReadsDifferently: Story = {
 /** One row of feedback is still a sentence that agrees with itself. */
 export const ExactlyOneMatch: Story = {
 	args: {
-		search: { deliveryState: ["DELIVERED"], withheldFamily: undefined, location: undefined },
+		search: { ...UNFILTERED, state: ["DELIVERED"] },
 		total: 1,
 	},
 	play: async ({ canvas }) => {
@@ -109,12 +115,12 @@ export const ExactlyOneMatch: Story = {
 	},
 };
 
-export const ReportsAChosenOutcome: Story = {
+export const ReportsAChosenDelivery: Story = {
 	play: async ({ args, canvas, userEvent }) => {
-		await userEvent.click(canvas.getByRole("combobox", { name: "Outcome" }));
-		const listbox = await screen.findByRole("listbox", { name: "Outcome options" });
-		await userEvent.click(await within(listbox).findByRole("option", { name: /Delivered/u }));
-		await expect(args.onPatch).toHaveBeenCalledWith({ deliveryState: ["DELIVERED"] });
+		await userEvent.click(canvas.getByRole("combobox", { name: "Delivery" }));
+		const listbox = await screen.findByRole("listbox", { name: "Delivery options" });
+		await userEvent.click(await within(listbox).findByRole("option", { name: /^Delivered/u }));
+		await expect(args.onPatch).toHaveBeenCalledWith({ state: ["DELIVERED"] });
 	},
 };
 
@@ -124,13 +130,8 @@ export const ReportsAChosenOutcome: Story = {
  */
 export const FilteredToSomebodyOffThePage: Story = {
 	args: {
-		search: {
-			deliveryState: undefined,
-			withheldFamily: undefined,
-			location: undefined,
-			recipientUserId: 404,
-		},
-		recipientName: "Barbara Liskov",
+		search: { ...UNFILTERED, developerId: "404" },
+		developerName: "Barbara Liskov",
 		total: 2,
 	},
 	play: async ({ canvas }) => {
@@ -141,23 +142,15 @@ export const FilteredToSomebodyOffThePage: Story = {
 /** Below `sm` the facet chips collapse to a count, so the applied values need their own pill row. */
 export const Mobile: Story = {
 	args: {
-		search: {
-			deliveryState: ["DELIVERED", "SUPPRESSED"],
-			withheldFamily: undefined,
-			location: undefined,
-		},
+		search: { ...UNFILTERED, state: ["DELIVERED", "WITHHELD"] },
 		total: 7,
 	},
 	parameters: { chromatic: { viewports: [320] }, viewport: { defaultViewport: "reflow" } },
 	play: async ({ canvas }) => {
-		await canvas.findByTitle("Outcome: Delivered");
+		await canvas.findByTitle("Delivery: Delivered");
 	},
 };
 
-/**
- * A piece of feedback belongs to every practice one of its observations was about, so filtering by a
- * practice finds the feedback a practice's count on the overview was counting.
- */
 export const ReportsAChosenPractice: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("combobox", { name: "Practice" }));
@@ -172,12 +165,7 @@ export const ReportsAChosenPractice: Story = {
 /** Arriving from a practice's count, the practice reads as a pill at every width and clears there. */
 export const APracticeOnAPhone: Story = {
 	args: {
-		search: {
-			deliveryState: undefined,
-			withheldFamily: undefined,
-			location: undefined,
-			practiceSlug: ["thin-controllers"],
-		},
+		search: { ...UNFILTERED, practiceSlug: ["thin-controllers"] },
 		total: 3,
 	},
 	parameters: { chromatic: { viewports: [320] }, viewport: { defaultViewport: "reflow" } },
@@ -198,18 +186,24 @@ export const WhileThePracticesLoad: Story = {
 	},
 };
 
-/**
- * Sorting does not narrow anything, which is why Reset leaves it alone — as on the observations
- * list. It sits in the row with the facets. Picking the default again clears it from the search
- * rather than writing the server's own default into the URL.
- */
+export const ThePracticesCouldNotBeLoaded: Story = {
+	args: { practices: { options: [], isLoading: false, isError: true } },
+	play: async ({ canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("combobox", { name: "Practice" }));
+		await screen.findByText("We could not load practices");
+	},
+};
+
+export const NothingMatches: Story = {
+	args: { search: { ...UNFILTERED, state: ["FAILED"] }, total: 0 },
+	play: async ({ canvas }) => {
+		canvas.getByText("0 pieces of feedback match your filters.");
+	},
+};
+
 export const SortIsNotAFilter: Story = {
 	args: {
-		search: {
-			deliveryState: ["AWAITING_APPROVAL"],
-			withheldFamily: undefined,
-			location: undefined,
-		},
+		search: { ...UNFILTERED, state: ["AWAITING_APPROVAL"] },
 		total: 3,
 	},
 	play: async ({ args, canvas, userEvent }) => {
@@ -231,10 +225,6 @@ export const SortIsNotAFilter: Story = {
 	},
 };
 
-/**
- * A group is part of the shared scope: it finds the feedback written from observations of any
- * practice in it, and it narrows the practices on offer.
- */
 export const ReportsAChosenGroup: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		const group = STORY_GROUPS.options[0];
@@ -247,11 +237,10 @@ export const ReportsAChosenGroup: Story = {
 	},
 };
 
-/** Every facet sits in one row: Outcome, Channel, Why withheld and the sort, with no toggle. */
 export const EveryFacetInOneRow: Story = {
 	play: async ({ args, canvas, userEvent }) => {
-		canvas.getByRole("combobox", { name: "Outcome" });
-		canvas.getByRole("combobox", { name: "Channel" });
+		canvas.getByRole("combobox", { name: "Delivery" });
+		canvas.getByRole("combobox", { name: "Destination" });
 		canvas.getByRole("combobox", { name: /Sort/u });
 		await expect(canvas.queryByRole("button", { name: /More filters/u })).toBeNull();
 		await userEvent.click(canvas.getByRole("combobox", { name: "Why withheld" }));

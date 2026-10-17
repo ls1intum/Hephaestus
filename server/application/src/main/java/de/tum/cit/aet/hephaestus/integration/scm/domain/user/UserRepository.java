@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.user;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.security.CurrentScmIdentityHolder;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
@@ -13,6 +14,29 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
+    interface IdentityProfileView {
+        long getProviderId();
+
+        long getNativeId();
+
+        String getLogin();
+
+        @Nullable
+        String getDisplayName();
+
+        String getAvatarUrl();
+
+        String getProfileUrl();
+    }
+
+    @Query("""
+        SELECT u.provider.id AS providerId, u.nativeId AS nativeId, u.login AS login,
+               u.name AS displayName, u.avatarUrl AS avatarUrl, u.htmlUrl AS profileUrl
+        FROM User u WHERE u.provider.id IN :providerIds AND u.nativeId IN :nativeIds
+        """)
+    List<IdentityProfileView> findIdentityProfiles(
+            @Param("providerIds") Collection<Long> providerIds, @Param("nativeIds") Collection<Long> nativeIds);
+
     @Query("""
             SELECT u
             FROM User u

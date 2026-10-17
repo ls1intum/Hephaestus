@@ -86,10 +86,7 @@ export const ProfileGroupLevel: Story = {
 export const WorkspaceGroupLevelWithMarkedPractice: Story = {
 	args: {
 		...FOCUS_FOOTER_COPY.workspaceGroup,
-		accessibleLabel: focusSwitchName(
-			FOCUS_FOOTER_COPY.workspaceGroup.label,
-			PACKAGING_GROUP.groupName,
-		),
+		accessibleLabel: focusSwitchName(FOCUS_FOOTER_COPY.workspaceGroup.label, PACKAGING_GROUP.name),
 	},
 	render: (args) => (
 		<DetailDrawerStack
@@ -112,11 +109,11 @@ export const WorkspaceGroupLevelWithMarkedPractice: Story = {
 		const level = within(await settledDrawerPanel());
 		await expectSettledVisible(
 			level.getByRole("button", {
-				name: `See your own standing: ${PACKAGING_GROUP.groupName}`,
+				name: `See your own standing: ${PACKAGING_GROUP.name}`,
 			}),
 		);
 		// One way to the profile's group: the footer's, not also a link above the table.
-		const toGroup = `Open in your Practice profile ${PACKAGING_GROUP.groupName}`;
+		const toGroup = `Open in your Practice profile ${PACKAGING_GROUP.name}`;
 		await expect([
 			...level.queryAllByRole("link", { name: toGroup }),
 			...level.queryAllByRole("button", { name: toGroup }),

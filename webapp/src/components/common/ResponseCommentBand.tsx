@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { hasText } from "@/lib/text";
 
-/** `FeedbackResponseRequestDTO.comment` caps the comment; a dispute has to carry one. */
+/** `FeedbackResponseRequestDTO.comment` caps the comment; a disagreement has to carry one. */
 const FEEDBACK_COMMENT_MAX_LENGTH = 2000;
 
 export interface ResponseCommentBandProps {
@@ -29,12 +29,6 @@ export interface ResponseCommentBandProps {
 	className?: string;
 }
 
-/**
- * The band a response opens under a card's footer or an observation's response buttons, on the
- * action band's ground: a label, one line for Heph, and Skip or Send. The caller mounts it only
- * while the response is being given and keys it on the choice, so a draft never survives into
- * another choice's band.
- */
 export function ResponseCommentBand({
 	name,
 	label,

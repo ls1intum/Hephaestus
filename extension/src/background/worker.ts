@@ -14,7 +14,7 @@ import {
 import { AuthenticatedApi, publicApi } from "~/background/api";
 import {
 	type ContextEnvironment,
-	observationPage,
+	resultPage,
 	resolveContext,
 	workFeedback,
 	WorkspaceDirectory,
@@ -459,8 +459,8 @@ const handlers: { [K in keyof RpcResponses]: Handler<K> } = {
 		);
 	},
 
-	async "list-observations"(request, tabId) {
-		return observationPage(await environment(), requireTab(tabId), request.workspaceSlug);
+	async "list-results"(request, tabId) {
+		return resultPage(await environment(), requireTab(tabId), request.workspaceSlug);
 	},
 
 	async "get-report-view"(_request, tabId) {
@@ -538,10 +538,7 @@ async function dispatch<K extends keyof RpcResponses>(
 	return handler(request, tabId);
 }
 
-/**
- * The only door into the worker. Shape first, then who is asking, then the command — and the reply
- * carries the generation it was computed under.
- */
+// Validate the message and sender before dispatch; replies retain the session generation.
 export async function handleMessage(
 	message: unknown,
 	sender: SenderFacts,

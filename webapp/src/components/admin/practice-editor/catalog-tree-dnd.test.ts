@@ -5,15 +5,15 @@ import { getCatalogDropTarget } from "./catalog-tree-dnd";
 interface Entry {
 	slug: string;
 	name: string;
-	groupSlug?: string;
-	displayOrder: number;
+	groupSlug: string | null;
+	position: number;
 }
 
-const entry = (slug: string, groupSlug: string | undefined, displayOrder: number): Entry => ({
+const entry = (slug: string, groupSlug: string | null, position: number): Entry => ({
 	slug,
 	name: slug,
 	groupSlug,
-	displayOrder,
+	position,
 });
 
 describe("catalog tree drop target", () => {
@@ -45,7 +45,7 @@ describe("catalog tree drop target", () => {
 		});
 	});
 
-	it("orders a displayOrder tie by name", () => {
+	it("orders a position tie by name", () => {
 		const tied = [entry("beta", "delivery", 0), entry("alpha", "delivery", 0)];
 
 		expect(getCatalogDropTarget(tied, "source", "delivery", "beta")).toStrictEqual({

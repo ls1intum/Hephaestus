@@ -11,7 +11,7 @@ import org.springframework.context.annotation.Import;
 
 /**
  * Wires the NATS-backed webhook publisher. Gated by {@code hephaestus.runtime.webhook.enabled} (default on)
- * AND requires the {@link Connection} bean from {@code config.NatsConfig} — the publisher
+ * AND requires the {@link Connection} bean from {@code integration.core.consumer.NatsConfig} — the publisher
  * reuses that connection rather than opening a second one. See ADR 0008.
  *
  * <p>HTTP ingress guards live in {@link WebhookHttpConfiguration} so payload-size protection does

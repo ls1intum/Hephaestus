@@ -39,12 +39,14 @@ class NoMockingOwnedEntitiesTest {
             "Repository",
             "Workspace",
             "PullRequest",
-            "AgentJob",
+            "ReviewJob",
+            "Practice",
+            "PracticeVersion",
             "Commit",
             "Organization",
             "IdentityProvider",
             "User",
-            "IdentityLink");
+            "Identity");
 
     /** {@code mock(Entity.class)} or {@code Mockito.mock(Entity.class)}, with optional settings arg. */
     private static final Pattern MOCK_CALL =

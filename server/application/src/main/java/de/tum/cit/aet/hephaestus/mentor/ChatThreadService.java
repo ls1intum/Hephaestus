@@ -1,11 +1,10 @@
 package de.tum.cit.aet.hephaestus.mentor;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.core.security.CurrentScmIdentityHolder;
+import de.tum.cit.aet.hephaestus.core.security.UserViewContextHolder;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +30,7 @@ public class ChatThreadService {
     @Transactional(readOnly = true)
     public List<ChatThreadSummaryDTO> listSummariesForCurrentUser(Long workspaceId) {
         return chatThreadRepository
-                .findSummariesByWorkspaceAndUserIdIn(workspaceId, requireAccountActorIds(), Pageable.unpaged())
+                .findSummariesByWorkspaceAndAccountId(workspaceId, requireAccountId(workspaceId), Pageable.unpaged())
                 .getContent();
     }
 
@@ -47,17 +46,19 @@ public class ChatThreadService {
 
     private ChatThread requireOwnedThread(Long workspaceId, UUID threadId) {
         return chatThreadRepository
-                .findByIdAndWorkspaceIdAndUserIdIn(threadId, workspaceId, requireAccountActorIds())
+                .findByIdAndWorkspaceIdAndAccountId(threadId, workspaceId, requireAccountId(workspaceId))
                 .orElseThrow(() -> new EntityNotFoundException("ChatThread", threadId.toString()));
     }
 
     /** A thread belongs to the account whichever of its actors in the workspace started it. */
-    private static Set<Long> requireAccountActorIds() {
-        Set<Long> actorIds = CurrentScmIdentityHolder.getAccountActorIds();
-        if (actorIds.isEmpty()) {
-            throw new EntityNotFoundException("User", "current authenticated user");
+    private static long requireAccountId(long workspaceId) {
+        var view = UserViewContextHolder.get();
+        if (view != null) {
+            if (view.workspaceId() != workspaceId)
+                throw new EntityNotFoundException("Workspace", String.valueOf(workspaceId));
+            return view.accountId();
         }
-        return actorIds;
+        return MentorTurnAccount.requireId();
     }
 
     /** Delete a thread (cascades to messages, votes). Owner-scoped via {@link #getOwnedThread}. */

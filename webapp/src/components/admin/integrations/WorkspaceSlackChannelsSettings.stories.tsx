@@ -39,17 +39,18 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const pending: SlackMonitoredChannel = {
-	id: 1,
+	id: "1",
 	slackChannelId: "C01PENDING01",
 	slackTeamId: "T0000000000",
 	channelName: "team-intro",
 	consentState: "PENDING",
 	optedOutMemberCount: 0,
+	consentAnnouncedAt: null,
 	createdAt: daysBefore(3),
 };
 
 const active: SlackMonitoredChannel = {
-	id: 2,
+	id: "2",
 	slackChannelId: "C02ACTIVE002",
 	slackTeamId: "T0000000000",
 	channelName: "team-standup",
@@ -60,7 +61,7 @@ const active: SlackMonitoredChannel = {
 };
 
 const paused: SlackMonitoredChannel = {
-	id: 3,
+	id: "3",
 	slackChannelId: "C03PAUSED003",
 	slackTeamId: "T0000000000",
 	channelName: "team-random",
@@ -71,7 +72,7 @@ const paused: SlackMonitoredChannel = {
 };
 
 const revoked: SlackMonitoredChannel = {
-	id: 4,
+	id: "4",
 	slackChannelId: "C04REVOKED04",
 	slackTeamId: "T0000000000",
 	channelName: "team-legacy",
@@ -124,7 +125,6 @@ export const WithOptOuts: Story = {
 			return row;
 		};
 		within(rowFor("team-standup")).getByText("2");
-		// 0 is rendered as a trust signal rather than blanked out.
 		within(rowFor("team-intro")).getByText("0");
 	},
 };
@@ -134,9 +134,10 @@ export const NoChannelName: Story = {
 	args: {
 		channels: [
 			{
-				id: 9,
+				id: "9",
 				slackChannelId: "C09NONAMED09",
 				slackTeamId: "T0000000000",
+				channelName: null,
 				consentState: "ACTIVE",
 				optedOutMemberCount: 0,
 				consentAnnouncedAt: daysBefore(1),

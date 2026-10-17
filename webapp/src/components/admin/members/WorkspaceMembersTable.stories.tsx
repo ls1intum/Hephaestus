@@ -1,136 +1,30 @@
-import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, screen, userEvent, within } from "storybook/test";
+import type { Meta, StoryContext, StoryObj } from "@storybook/react";
+import { expect, fn, within } from "storybook/test";
 
-import type { TeamInfo } from "@/api/types.gen";
 import { expectNoPageOverflow } from "@/stories/reflow";
 
-import type { ExtendedUserTeams } from "./user-teams";
+import {
+	memberAccount,
+	membership,
+	mockMemberships,
+	mockTeams,
+	multiProviderMember,
+	unclaimedMember,
+} from "./fixtures";
+import { workspaceMemberRows } from "./workspace-members";
 import { WorkspaceMembersTable } from "./WorkspaceMembersTable";
 
-const frontendTeam: TeamInfo = {
-	id: 1,
-	name: "Frontend Team",
-	hidden: false,
-	membershipCount: 0,
-	repoPermissionCount: 0,
-	slug: "team-1",
-	repositories: [],
-	labels: [],
-	members: [],
-};
+const members = workspaceMemberRows(mockMemberships);
 
-const backendTeam: TeamInfo = {
-	id: 2,
-	name: "Backend Team",
-	hidden: false,
-	membershipCount: 0,
-	repoPermissionCount: 0,
-	slug: "team-2",
-	repositories: [],
-	labels: [],
-	members: [],
-};
+type Scope = StoryContext["canvas"];
 
-const devopsTeam: TeamInfo = {
-	id: 3,
-	name: "DevOps Team",
-	hidden: false,
-	membershipCount: 0,
-	repoPermissionCount: 0,
-	slug: "team-3",
-	repositories: [],
-	labels: [],
-	members: [],
-};
-
-const qaTeam: TeamInfo = {
-	id: 4,
-	name: "QA Team",
-	hidden: false,
-	membershipCount: 0,
-	repoPermissionCount: 0,
-	slug: "team-4",
-	repositories: [],
-	labels: [],
-	members: [],
-};
-
-const mockTeams: TeamInfo[] = [frontendTeam, backendTeam, devopsTeam, qaTeam];
-
-const aliceOnTwoTeams: ExtendedUserTeams = {
-	id: 1,
-	login: "alice",
-	name: "Alice Johnson",
-	hidden: false,
-	url: "https://github.com/alice",
-	teams: [frontendTeam, devopsTeam],
-	user: {
-		id: "user-1",
-		name: "Alice Johnson",
-		login: "alice",
-		email: "alice@example.com",
-	},
-};
-
-const mockUsers: ExtendedUserTeams[] = [
-	aliceOnTwoTeams,
-	{
-		id: 2,
-		login: "bob",
-		name: "Bob Smith",
-		hidden: false,
-		url: "https://github.com/bob",
-		teams: [backendTeam],
-		user: {
-			id: "user-2",
-			name: "Bob Smith",
-			login: "bob",
-			email: "bob@example.com",
-		},
-	},
-	{
-		id: 3,
-		login: "charlie",
-		name: "Charlie Brown",
-		hidden: false,
-		url: "https://github.com/charlie",
-		teams: [frontendTeam, backendTeam, qaTeam],
-		user: {
-			id: "user-3",
-			name: "Charlie Brown",
-			login: "charlie",
-			email: "charlie@example.com",
-		},
-	},
-	{
-		id: 4,
-		login: "diana",
-		name: "Diana Prince",
-		hidden: false,
-		url: "https://github.com/diana",
-		teams: [],
-		user: {
-			id: "user-4",
-			name: "Diana Prince",
-			login: "diana",
-			email: "diana@example.com",
-		},
-	},
-	{
-		id: 5,
-		login: "ethan",
-		name: "Ethan Hunt",
-		hidden: false,
-		url: "https://github.com/ethan",
-		teams: [devopsTeam, qaTeam],
-		user: {
-			id: "user-5",
-			name: "Ethan Hunt",
-			login: "ethan",
-			email: "ethan@example.com",
-		},
-	},
-];
+function rowOf(canvas: Scope, name: string): HTMLElement {
+	const row = canvas.getByText(name, { selector: "div" }).closest("tr");
+	if (row === null) {
+		throw new Error(`No row for ${name}`);
+	}
+	return row;
+}
 
 const meta = {
 	component: WorkspaceMembersTable,
@@ -139,8 +33,11 @@ const meta = {
 	},
 	tags: ["autodocs"],
 	args: {
-		users: mockUsers,
+		members,
+		rowCount: members.length,
 		teams: mockTeams,
+		onToggleHidden: fn(),
+		onRoleChange: fn(),
 		view: { q: "", team: "all", sort: "name", desc: false, page: 0, size: 10 },
 		onViewChange: fn(),
 	},
@@ -150,7 +47,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-	play: async ({ args, canvas }) => {
+	play: async ({ canvas }) => {
 		// The sort lives in the URL, so a column is always sorted — and which one has to be legible
 		// to a screen reader, not only to whoever can see the arrow.
 		await expect(canvas.getByRole("columnheader", { name: "Name" })).toHaveAttribute(
@@ -161,137 +58,125 @@ export const Default: Story = {
 			"aria-sort",
 			"none",
 		);
-
-		await userEvent.click(canvas.getByRole("button", { name: "Username" }));
-		await expect(args.onViewChange).toHaveBeenCalledWith({
-			sort: "username",
-			desc: false,
-			page: 0,
-		});
 	},
 };
 
-/** 200% zoom on a laptop: the toolbar's search, filter and columns do not fit one row, so they wrap. */
+export const MultiProviderAccount: Story = {
+	args: { members: workspaceMemberRows([multiProviderMember]), rowCount: 1 },
+	play: async ({ canvas }) => {
+		const row = within(rowOf(canvas, "Alice Johnson"));
+		await expect(row.getByText("alice")).toBeVisible();
+		await expect(row.getByText("ajohnson")).toBeVisible();
+		await expect(row.getByText("(GitLab)")).toBeVisible();
+		await expect(canvas.getByText("Showing 1 of 1 member")).toBeVisible();
+	},
+};
+
+export const UnclaimedAccount: Story = {
+	args: { members: workspaceMemberRows([unclaimedMember]), rowCount: 1 },
+	play: async ({ canvas }) => {
+		const row = within(rowOf(canvas, "Bob Smith"));
+		await expect(row.getByText("Unclaimed")).toBeVisible();
+		await expect(row.queryByText("Active")).not.toBeInTheDocument();
+	},
+};
+
+export const MemberWhoLeft: Story = {
+	args: {
+		rowCount: 1,
+		members: workspaceMemberRows([
+			membership(
+				memberAccount("21", {
+					displayName: "Erin Former",
+					identities: [{ provider: "GITHUB", login: "erin", displayName: null, avatarUrl: null }],
+				}),
+				{ leftAt: new Date("2026-06-30T12:00:00Z") },
+			),
+		]),
+	},
+	play: async ({ canvas }) => {
+		await expect(within(rowOf(canvas, "Erin Former")).getByText(/^Left /u)).toBeVisible();
+	},
+};
+
+export const RoleChangePending: Story = {
+	args: { pendingRoleAccountId: unclaimedMember.account.id },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("combobox", { name: "Role of Bob Smith" })).toBeDisabled();
+		await expect(canvas.getByRole("combobox", { name: "Role of Alice Johnson" })).toBeEnabled();
+	},
+};
+
+export const FilteredByTeam: Story = {
+	args: {
+		members: workspaceMemberRows([multiProviderMember]),
+		rowCount: 1,
+		view: { q: "", team: "3", sort: "name", desc: false, page: 0, size: 10 },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Alice Johnson")).toBeVisible();
+		await expect(canvas.queryByText("Charlie Brown")).not.toBeInTheDocument();
+	},
+};
+
 export const AtTwoHundredPercentZoom: Story = {
 	parameters: { viewport: { defaultViewport: "zoom200" } },
 	play: expectNoPageOverflow,
 };
 
-/**
- * The busy table under its real header: every placeholder row has one cell per header, so the
- * columns that arrive line up with the ones already drawn. No empty state and no "0 of 0" count.
- */
-async function expectLoadingRows(table: HTMLElement, rows: number) {
-	await expect(table).toHaveAttribute("aria-busy", "true");
-	const headers = within(table).getAllByRole("columnheader");
-	const [, ...bodyRows] = within(table).getAllByRole("row");
-	await expect(bodyRows).toHaveLength(rows);
-	for (const row of bodyRows) {
-		await expect(within(row).getAllByRole("cell")).toHaveLength(headers.length);
-	}
-	return headers;
-}
-
 export const Loading: Story = {
 	args: {
 		isLoading: true,
-		users: [],
-	},
-	play: async ({ args, canvas }) => {
-		const table = canvas.getByRole("table", { name: "Workspace members" });
-		await expect(await expectLoadingRows(table, args.view.size)).toHaveLength(2);
-		within(table).getByRole("columnheader", { name: "Username" });
-		await expect(canvas.queryByText("No members found")).not.toBeInTheDocument();
-		await expect(canvas.queryByText(/^Showing /u)).not.toBeInTheDocument();
-
-		// A column the reader hides leaves the placeholders as well as the header.
-		await userEvent.click(canvas.getByRole("button", { name: "Columns" }));
-		await userEvent.click(await screen.findByRole("menuitemcheckbox", { name: "username" }));
-		await userEvent.keyboard("{Escape}");
-		await expect(await expectLoadingRows(table, args.view.size)).toHaveLength(1);
-		await expect(
-			within(table).queryByRole("columnheader", { name: "Username" }),
-		).not.toBeInTheDocument();
+		members: [],
+		rowCount: 0,
 	},
 };
 
-/** With the visibility control, the placeholders keep its column too. */
-export const LoadingWithVisibilityControl: Story = {
+export const Empty: Story = {
 	args: {
-		isLoading: true,
-		users: [],
-		onToggleHidden: fn(),
-	},
-	play: async ({ args, canvas }) => {
-		const table = canvas.getByRole("table", { name: "Workspace members" });
-		await expect(await expectLoadingRows(table, args.view.size)).toHaveLength(3);
-		within(table).getByRole("columnheader", { name: "Visible" });
-	},
-};
-
-export const EmptyState: Story = {
-	args: {
-		users: [],
+		members: [],
+		rowCount: 0,
 		isLoading: false,
 	},
-};
-
-export const SingleUser: Story = {
-	args: {
-		users: [aliceOnTwoTeams],
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("This workspace has no members yet.")).toBeVisible();
 	},
 };
 
-export const UsersWithoutTeams: Story = {
+export const EmptyPage: Story = {
 	args: {
-		users: [
-			{
-				id: 6,
-				login: "john",
-				name: "John Doe",
-				hidden: false,
-				url: "https://github.com/john",
-				teams: [],
-				user: {
-					id: "user-6",
-					login: "john",
-					name: "John Doe",
-					email: "john@example.com",
-				},
-			},
-			{
-				id: 7,
-				login: "jane",
-				name: "Jane Smith",
-				hidden: false,
-				url: "https://github.com/jane",
-				teams: [],
-				user: {
-					id: "user-7",
-					login: "jane",
-					name: "Jane Smith",
-					email: "jane@example.com",
-				},
-			},
-		],
+		members: [],
+		rowCount: 2,
+		view: { q: "", team: "all", sort: "name", desc: false, page: 9, size: 10 },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("No members on this page")).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Go to first page" })).toBeVisible();
 	},
 };
 
-export const ManyUsers: Story = {
+export const ReadOnly: Story = {
+	args: { onRoleChange: undefined, onToggleHidden: undefined },
+	play: async ({ canvas }) => {
+		await expect(canvas.queryByRole("combobox", { name: /^Role of/u })).not.toBeInTheDocument();
+		await expect(canvas.getByText("Owner")).toBeVisible();
+	},
+};
+
+export const ManyMembers: Story = {
 	args: {
-		users: Array.from({ length: 50 }, (_, i) => ({
-			id: i + 10,
-			login: `user${i + 1}`,
-			name: `User ${i + 1}`,
-			hidden: false,
-			url: `https://github.com/user${i + 1}`,
-			teams: mockTeams.filter((_team, teamIndex) => (i + teamIndex) % 3 === 0),
-			user: {
-				id: `user-${i + 10}`,
-				name: `User ${i + 1}`,
-				login: `user${i + 1}`,
-				email: `user${i + 1}@example.com`,
-			},
-		})),
+		rowCount: 50,
+		members: workspaceMemberRows(
+			Array.from({ length: 10 }, (_, i) =>
+				membership(
+					memberAccount(String(i + 100), {
+						displayName: `User ${String(i + 1).padStart(2, "0")}`,
+						identities: [
+							{ provider: "GITHUB", login: `user${i + 1}`, displayName: null, avatarUrl: null },
+						],
+					}),
+				),
+			),
+		),
 	},
 };

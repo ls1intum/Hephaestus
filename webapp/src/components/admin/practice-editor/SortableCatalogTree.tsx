@@ -35,7 +35,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Item, ItemActions, ItemGroup } from "@/components/ui/item";
-import { byDisplayOrder } from "@/hooks/practice-catalog-cache";
+import { byPosition } from "@/hooks/practice-catalog-cache";
 import { hasText } from "@/lib/text";
 
 import { type CatalogDropTarget, getCatalogDropTarget } from "./catalog-tree-dnd";
@@ -43,14 +43,14 @@ import { type CatalogDropTarget, getCatalogDropTarget } from "./catalog-tree-dnd
 export const UNASSIGNED_CATALOG_BUCKET = "__unassigned__";
 
 export interface SortableCatalogGroup {
-	displayOrder: number;
+	position: number;
 	name: string;
 	slug: string;
 }
 
 export interface SortableCatalogEntry {
-	groupSlug?: string;
-	displayOrder: number;
+	groupSlug: string | null;
+	position: number;
 	moveSourceGroupSlug?: string;
 	name: string;
 	slug: string;
@@ -165,7 +165,7 @@ export function SortableCatalogTree<
 	const [dropTarget, setDropTarget] = useState<ActiveEntryDrop | null>(null);
 	const [collapsedGroups, setCollapsedGroups] = useState<readonly string[]>([]);
 	const focusAfterMove = useRef<string | null>(null);
-	const sortedGroups = [...groups].sort(byDisplayOrder);
+	const sortedGroups = [...groups].sort(byPosition);
 	const visibleEntries = visibleEntrySlugs
 		? entries.filter((entry) => visibleEntrySlugs.has(entry.slug))
 		: [...entries];
@@ -296,7 +296,7 @@ export function SortableCatalogTree<
 		const currentGroupSlug = activeData.groupSlug;
 		const currentPosition = entries
 			.filter((entry) => (entry.groupSlug ?? null) === currentGroupSlug)
-			.sort(byDisplayOrder)
+			.sort(byPosition)
 			.findIndex((entry) => entry.slug === activeData.entrySlug);
 		if (currentGroupSlug !== target.groupSlug || currentPosition !== target.position) {
 			onPlaceEntry(activeData.entrySlug, target.groupSlug, target.position);
@@ -395,7 +395,7 @@ export function SortableCatalogTree<
 		const bucketKey = currentGroupSlug ?? UNASSIGNED_CATALOG_BUCKET;
 		const ordered = entries
 			.filter((candidate) => (candidate.groupSlug ?? null) === currentGroupSlug)
-			.sort(byDisplayOrder);
+			.sort(byPosition);
 		const index = ordered.findIndex((candidate) => candidate.slug === entry.slug);
 		const movesDisabled = disabledEntrySlugs.has(entry.slug) || !showEntryReorderHandles;
 		const reorderDisabled = movesDisabled || blockedEntryOrderBuckets.has(bucketKey);
@@ -451,7 +451,7 @@ export function SortableCatalogTree<
 				announcements,
 				screenReaderInstructions: {
 					draggable:
-						"Press space to pick up an item. Use the arrow keys to move it, then press space to drop or escape to cancel. You can also use the item’s actions menu to move it without dragging.",
+						"Press space to pick up a row. Use the arrow keys to move it, then press space to drop or escape to cancel. You can also use the row’s actions menu to move it without dragging.",
 				},
 			}}
 			onDragStart={handleDragStart}
@@ -487,7 +487,7 @@ export function SortableCatalogTree<
 						<SortableGroupSection
 							key={group.slug}
 							group={group}
-							entries={(byGroup.get(group.slug) ?? []).sort(byDisplayOrder)}
+							entries={(byGroup.get(group.slug) ?? []).sort(byPosition)}
 							total={totalByGroup.get(group.slug) ?? 0}
 							collapseDisabled={forceOpenGroupSlugs?.has(group.slug) ?? false}
 							reorderDisabled={groupReorderDisabled || disabledGroupSlugs.has(group.slug)}
@@ -529,7 +529,7 @@ export function SortableCatalogTree<
 						<EntryBucket
 							groupSlug={null}
 							groupName={unassignedLabel}
-							entries={(byGroup.get(UNASSIGNED_CATALOG_BUCKET) ?? []).sort(byDisplayOrder)}
+							entries={(byGroup.get(UNASSIGNED_CATALOG_BUCKET) ?? []).sort(byPosition)}
 							reorderDisabled={blockedEntryOrderBuckets.has(UNASSIGNED_CATALOG_BUCKET)}
 							blockedMoveDestinationSlugs={blockedMoveDestinationSlugs}
 							disabledEntrySlugs={disabledEntrySlugs}

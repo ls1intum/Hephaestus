@@ -3,7 +3,7 @@ import { ArrowRightIcon, CheckIcon, ClockIcon, PackageIcon } from "lucide-react"
 import { type ComponentType, type ReactNode, useId } from "react";
 
 import { cn } from "cn";
-import type { InAppEvidence, ReviewedWorkRef } from "@/api/types.gen";
+import type { ItemRef } from "@/api/types.gen";
 import { FOCUS_RING } from "@/components/common/focus";
 import { InlineLink } from "@/components/common/InlineLink";
 import { ResponseButton, toneOf } from "@/components/common/ResponseButton";
@@ -19,6 +19,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { formatDay, formatDayTime } from "@/lib/dates";
 import { hasText } from "@/lib/text";
 
+import { UNVERIFIED_HISTORY_NOTE } from "./claim-currentness";
 import { FEEDBACK_RESOLUTION_DEFS, type FeedbackResolution } from "./feedback-resolution-defs";
 import { FEEDBACK_STATE_DEFS, type FeedbackState, isOpenFeedback } from "./feedback-state-defs";
 import { count, type FeedbackTextSegment, linkWork } from "./feedback-text";
@@ -26,31 +27,32 @@ import { FEEDBACK_USEFULNESS_DEFS, type FeedbackUsefulness } from "./feedback-us
 import { FeedbackText } from "./FeedbackText";
 import { FeedbackWorkTimeline } from "./FeedbackWorkTimeline";
 import { GroupName } from "./GroupName";
+import type { Outcome } from "./outcome-defs";
 import { cleanLabel, timelinePieces } from "./practice-feedback-timeline";
 import { PracticePill } from "./PracticePill";
 
-/** The band under a card's footer: the rating's comment, or the sentence a dispute carries. */
-export type FeedbackBand = "comment" | "dispute";
+export type FeedbackBand = "comment" | "disagreement";
 
 /** The control whose write is in flight, so "Saving…" lands on it and nowhere else. */
 export type ResponseControl = "rating" | "answer" | "send" | "disagree";
 
 /**
  * An answer that resolves the feedback, the card's own way to close it beside the work coming back
- * clean. A dispute leaves the feedback open, so it has its own Disagree button.
+ * clean. A disagreement leaves the feedback open, so it has its own Disagree button.
  */
-export type ResolvingAnswer = Exclude<FeedbackResolution, "DISPUTED">;
+export type ResolvingAnswer = Exclude<FeedbackResolution, "DISAGREE">;
 
 /**
  * One piece of reviewed work on the card's timeline — the evidence behind the feedback — with
- * what the review saw on it.
+ * what the review saw on it where the record says so. Practice-page evidence carries no outcome,
+ * and the timeline invents none for it.
  */
 export interface ReviewedWorkOutcome {
 	/** The work by number — "!425" — linked to its page when the provider has one. */
-	ref: ReviewedWorkRef;
+	ref: ItemRef;
 	/** When the work was reviewed; the timeline orders by it and shows it as the short day, "28 Aug". */
 	date: Date;
-	outcome: InAppEvidence["outcome"];
+	outcome?: Outcome;
 }
 
 /**
@@ -58,7 +60,7 @@ export interface ReviewedWorkOutcome {
  * no outcome of its own: being here is what the timeline marks it with.
  */
 export interface CleanWork {
-	ref: ReviewedWorkRef;
+	ref: ItemRef;
 	/** When the piece was reviewed; the timeline orders and dates it by this. */
 	date: Date;
 }
@@ -81,6 +83,7 @@ export interface PracticeFeedbackCardGroup {
  */
 export interface PracticeFeedbackCardEntry {
 	feedbackId: string;
+	unverifiedHistory?: boolean;
 	practiceSlug: string;
 	practiceName: string;
 	/**
@@ -125,12 +128,12 @@ export interface FeedbackRatingProps {
 	usefulness?: FeedbackUsefulness;
 	/**
 	 * The reader's answer, the one standing or the one being written. Addressed and Not applicable
-	 * press their button; a dispute presses neither, and either press replaces it.
+	 * press their button; a disagreement presses neither, and either press replaces it.
 	 */
 	resolution?: FeedbackResolution;
 	/**
 	 * The band open under the footer, at most one: a rating press opens `comment`, a press on
-	 * Disagree opens `dispute`, and Send and Skip close either.
+	 * Disagree opens `disagreement`, and Send and Skip close either.
 	 */
 	openBand?: FeedbackBand;
 	/** A response is being written, so every response control waits. */
@@ -147,11 +150,10 @@ export interface FeedbackRatingProps {
 	 */
 	onRate?: (usefulness: FeedbackUsefulness) => void;
 	onSendComment?: (comment: string) => void;
-	/** Skip in either band: the comment's or the dispute's. */
 	onSkipComment?: () => void;
-	/** Without it the card has no Disagree button. The caller decides what a press on a standing dispute does. */
+	/** Without it the card has no Disagree button. The caller decides what a press on a standing disagreement does. */
 	onDisagree?: () => void;
-	onSendDispute?: (comment: string) => void;
+	onSendDisagreement?: (comment: string) => void;
 	/**
 	 * A press on Addressed or Not applicable, the chosen one included: the caller decides that a
 	 * second press takes the answer back. Without it the card has none of these buttons, and neither
@@ -192,7 +194,7 @@ const ANSWER_WORDS: Record<ResolvingAnswer, { label: string; effect: string }> =
 	},
 };
 
-const DisagreeIcon = FEEDBACK_RESOLUTION_DEFS.DISPUTED.icon;
+const DisagreeIcon = FEEDBACK_RESOLUTION_DEFS.DISAGREE.icon;
 
 const DISAGREE = {
 	label: "Disagree",
@@ -244,6 +246,12 @@ const ZONE_HEADING = "text-sm font-semibold text-foreground";
 
 const workKey = (ref: { kind: string; id: string | number }) => `${ref.kind} ${ref.id}`;
 
+function UnverifiedHistoryNotice({ unverified }: { unverified?: boolean }) {
+	return unverified === true ? (
+		<p className="text-xs text-muted-foreground">{UNVERIFIED_HISTORY_NOTE}</p>
+	) : null;
+}
+
 /**
  * One piece of practice feedback in zones a reader takes in at a glance. The top says what it is
  * about, its explanation under "Why this was raised"; the tinted band under it, what to do next;
@@ -254,6 +262,7 @@ const workKey = (ref: { kind: string; id: string | number }) => `${ref.kind} ${r
  * the earlier card dense and its parts hard to tell apart; these zones answer that. A withdrawn card
  * keeps the head and the footer only, with the notice in between.
  */
+
 export function PracticeFeedbackCard({
 	card: {
 		practiceSlug,
@@ -269,6 +278,7 @@ export function PracticeFeedbackCard({
 		state,
 		timestamp,
 		preparedAt,
+		unverifiedHistory,
 	},
 	usefulness,
 	resolution,
@@ -279,7 +289,7 @@ export function PracticeFeedbackCard({
 	onSendComment,
 	onSkipComment,
 	onDisagree,
-	onSendDispute,
+	onSendDisagreement,
 	onResolve,
 	onLearnMore,
 	onOpenPractice,
@@ -377,6 +387,7 @@ export function PracticeFeedbackCard({
 				<h3 id={headingId} className="max-w-3xl text-lg leading-snug font-semibold">
 					{headline}
 				</h3>
+				<UnverifiedHistoryNotice unverified={unverifiedHistory} />
 				{/*
 				 * The whole explanation under a heading that names it: it is short, and a clamp only hid the
 				 * reason behind a click.
@@ -553,8 +564,8 @@ export function PracticeFeedbackCard({
 							<Reaction
 								label={saving === "disagree" ? "Saving…" : DISAGREE.label}
 								description={DISAGREE.description}
-								tone={toneOf(FEEDBACK_RESOLUTION_DEFS.DISPUTED.badgeVariant)}
-								pressed={resolution === "DISPUTED"}
+								tone={toneOf(FEEDBACK_RESOLUTION_DEFS.DISAGREE.badgeVariant)}
+								pressed={resolution === "DISAGREE"}
 								disabled={isPending}
 								onClick={onDisagree}
 							>
@@ -567,17 +578,17 @@ export function PracticeFeedbackCard({
 
 			{/* The bands take their own presses, above the card's link. */}
 			<div className="relative z-10 flex flex-col">
-				{openBand === "dispute" && (
+				{openBand === "disagreement" && (
 					<ResponseCommentBand
-						key="dispute"
+						key="disagreement"
 						name="Why you disagree"
 						label="What is wrong in this feedback?"
 						placeholder="One or two sentences on what is wrong"
 						required
-						audience="Workspace admins read your sentence, not the card, and can correct its observations or withdraw it. The card stays open until then."
+						audience="Workspace admins read your sentence, not the card, and can correct its results or withdraw it. The card stays open until then."
 						isPending={isPending}
 						sending={saving === "send"}
-						onSend={onSendDispute}
+						onSend={onSendDisagreement}
 						onSkip={onSkipComment}
 					/>
 				)}

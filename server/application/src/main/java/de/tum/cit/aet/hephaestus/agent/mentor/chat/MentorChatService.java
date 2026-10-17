@@ -3,14 +3,10 @@ package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.MemberAiRoutingAdapter;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
-import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MentorContextKeys;
-import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MergeReadinessContentSource;
-import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.ObservationHistoryContentSource;
+import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.ResultHistoryContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.ReviewAttemptsContentSource;
-import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationalDeliveryReconciler;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorAgentRequest;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorLlmConfig;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorPiAdapter;
@@ -30,27 +26,33 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.MentorBusyException;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetBlockReason;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetExhaustedException;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUnpricedUsageBlockedException;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery.AccountSummary;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonProcessingSuppression;
-import de.tum.cit.aet.hephaestus.core.security.CurrentScmIdentityHolder;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
+import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
-import de.tum.cit.aet.hephaestus.workspace.spi.MemberAiChoice;
+import de.tum.cit.aet.hephaestus.mentor.MentorTurnAccount;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryQuery;
 import de.tum.cit.aet.hephaestus.workspace.spi.MemberAiPreferences;
 import io.micrometer.core.instrument.Timer;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -82,14 +84,15 @@ import tools.jackson.databind.node.JsonNodeFactory;
  * submitted to the virtual-thread executor; all blocking work happens off the request thread.
  */
 @Service
+@ConditionalOnCaptureRole
 @RequiredArgsConstructor
-public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
+public class MentorChatService implements MentorTurnRunner {
 
     private static final Logger log = LoggerFactory.getLogger(MentorChatService.class);
     private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
     private static final String REPLY_NOT_SAVED = "Heph could not save the reply. Try again.";
 
-    private final UserRepository userRepository;
+    private final AccountSummaryQuery accounts;
     private final ChatThreadRepository chatThreadRepository;
     private final WorkspaceContextBuilder workspaceContextBuilder;
     private final MentorPiAdapter mentorPiAdapter;
@@ -108,13 +111,12 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
     private final MemberAiRoutingAdapter memberAiRouting;
     private final PersonProcessingSuppression personSuppression;
     private final MemberAiPreferences memberAiPreferences;
-    private final MergeReadinessContentSource mergeReadiness;
-    private final ObservationHistoryContentSource observationHistory;
+    private final ResultHistoryContentSource practiceResultHistory;
     private final ReviewAttemptsContentSource reviewAttempts;
-    private final ConversationalDeliveryReconciler conversationalDeliveryReconciler;
+    private final ResultHistoryQuery resultsHistory;
+    private final ConversationFeedbackReceipts feedbackReceipts;
 
     /** The holder lets a disconnect abort a runner attached after lifecycle callbacks were registered. */
-    @Override
     public void start(MentorTurnRequest request, SseEmitter emitter) {
         MentorSseChannel channel = new MentorSseChannel(
                 request.workspaceId(), request.threadId(), emitter, objectMapper, runnerTimeoutScheduler.scheduler());
@@ -127,24 +129,19 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
         metrics.recordStarted();
         long acceptedAt = System.nanoTime();
         ExecutorService executor = turnExecutor.executor();
-        Long actorId = CurrentScmIdentityHolder.getUserId().orElse(null);
-        String actorLogin = CurrentScmIdentityHolder.getLogin().orElse(null);
-        Set<Long> accountActorIds = CurrentScmIdentityHolder.getAccountActorIds();
+        long accountId = MentorTurnAccount.requireId();
         try {
             executor.execute(() -> {
-                // Spring propagates authentication, not our workspace-specific SCM identity.
-                if (actorId != null && actorLogin != null) {
-                    CurrentScmIdentityHolder.set(actorId, actorLogin, accountActorIds);
-                }
+                MentorTurnAccount.set(accountId);
                 try {
                     dispatchTurn(request, channel, clientHolder, acceptedAt);
                 } finally {
-                    CurrentScmIdentityHolder.clear();
+                    MentorTurnAccount.clear();
                 }
             });
         } catch (RejectedExecutionException rejected) {
             log.warn("Mentor turn rejected by executor (probably shutting down): {}", rejected.getMessage());
-            metrics.recordCompleted(MentorChatMetrics.Outcome.REJECTED);
+            metrics.recordCompleted(MentorChatMetrics.ResultOutcome.REJECTED);
             channel.completeWithError("Heph is not available because the server is stopping. Try again in a moment.");
         }
     }
@@ -162,23 +159,23 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
     /** Non-HTTP turns pin their verified actor on the worker thread because no request identity is available. */
     @Override
     public void run(MentorTurnRequest request, MentorChannel channel, long developerId) {
-        User developer = userRepository
-                .findById(developerId)
-                .orElseThrow(() -> new EntityNotFoundException("User", String.valueOf(developerId)));
+        if (!accounts.findAllByIds(List.of(developerId)).containsKey(developerId)) {
+            throw new EntityNotFoundException("Account", String.valueOf(developerId));
+        }
         metrics.recordStarted();
         long acceptedAt = System.nanoTime();
         try {
             turnExecutor.executor().execute(() -> {
-                CurrentScmIdentityHolder.set(developerId, developer.getLogin(), Set.of(developerId));
+                MentorTurnAccount.set(developerId);
                 try {
                     dispatchTurn(request, channel, new AtomicReference<>(), acceptedAt);
                 } finally {
-                    CurrentScmIdentityHolder.clear();
+                    MentorTurnAccount.clear();
                 }
             });
         } catch (RejectedExecutionException rejected) {
             log.warn("Slack mentor turn rejected by executor: {}", rejected.getMessage());
-            metrics.recordCompleted(MentorChatMetrics.Outcome.REJECTED);
+            metrics.recordCompleted(MentorChatMetrics.ResultOutcome.REJECTED);
             channel.completeWithError("Heph is not available because the server is stopping. Try again in a moment.");
         }
     }
@@ -195,13 +192,13 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
             Optional<Boolean> acquired = turnLock.withLockOr409(key, () -> {
                 Timer.Sample sample = metrics.startTimer();
                 try {
-                    MentorChatMetrics.Outcome outcome = runTurn(request, channel, clientHolder, acceptedAt);
+                    MentorChatMetrics.ResultOutcome outcome = runTurn(request, channel, clientHolder, acceptedAt);
                     metrics.recordCompleted(outcome);
                     return Boolean.TRUE;
                 } catch (TurnAlreadyInFlightException dup) {
                     // WARN (not INFO): DB index trip means the JVM lock missed — pageable signal.
                     log.warn("Mentor turn rejected (DB in-flight index): {}", dup.getMessage());
-                    metrics.recordCompleted(MentorChatMetrics.Outcome.IN_FLIGHT_CONFLICT_DB);
+                    metrics.recordCompleted(MentorChatMetrics.ResultOutcome.IN_FLIGHT_CONFLICT_DB);
                     channel.completeWithConflict();
                     return Boolean.FALSE;
                 } catch (RuntimeException e) {
@@ -211,7 +208,7 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
                             key.threadId(),
                             e.getMessage(),
                             e);
-                    metrics.recordCompleted(MentorChatMetrics.Outcome.ERROR);
+                    metrics.recordCompleted(MentorChatMetrics.ResultOutcome.ERROR);
                     completeWithError(channel, e, userFacingError(e));
                     return Boolean.FALSE;
                 } finally {
@@ -223,7 +220,7 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
                         "Mentor turn rejected (in flight): workspaceId={}, threadId={}",
                         key.workspaceId(),
                         key.threadId());
-                metrics.recordCompleted(MentorChatMetrics.Outcome.IN_FLIGHT_CONFLICT_LOCAL);
+                metrics.recordCompleted(MentorChatMetrics.ResultOutcome.IN_FLIGHT_CONFLICT_LOCAL);
                 channel.completeWithConflict();
             }
         } catch (Throwable t) {
@@ -233,7 +230,7 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
                     key.threadId(),
                     t.getMessage(),
                     t);
-            metrics.recordCompleted(MentorChatMetrics.Outcome.ERROR);
+            metrics.recordCompleted(MentorChatMetrics.ResultOutcome.ERROR);
             try {
                 channel.completeWithError("Heph could not finish this reply. Try again.");
             } catch (RuntimeException ignored) {
@@ -246,7 +243,7 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
     }
 
     @SuppressWarnings("try") // Each MDC entry is removed when its binding closes.
-    private MentorChatMetrics.Outcome runTurn(
+    private MentorChatMetrics.ResultOutcome runTurn(
             MentorTurnRequest request,
             MentorChannel channel,
             AtomicReference<@Nullable MentorRunnerClient> clientHolder,
@@ -260,7 +257,7 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
 
     // Closing the scope is the operation; its binding is intentionally unread.
     @SuppressWarnings("try")
-    private MentorChatMetrics.Outcome runTurnInternal(
+    private MentorChatMetrics.ResultOutcome runTurnInternal(
             MentorTurnRequest submitted,
             MentorChannel channel,
             AtomicReference<@Nullable MentorRunnerClient> clientHolder,
@@ -268,7 +265,7 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
         // Admission and budget checks precede persistence; the admitted model determines whose budget applies.
         MentorLlmConfig llmConfig = resolveWorkspaceLlmConfig(submitted.workspaceId());
 
-        FundingSource mentorFunding =
+        UsageFundingSource mentorFunding =
                 Objects.requireNonNull(llmConfig.connectionScope(), "Mentor model must have a funding source");
         LlmBudgetBlockReason blockReason =
                 llmBudgetService.decide(submitted.workspaceId()).forFunding(mentorFunding);
@@ -280,8 +277,10 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
             metrics.recordBudgetBlocked();
             throw new LlmUnpricedUsageBlockedException(mentorFunding);
         }
-        User user = userRepository.getCurrentUserElseThrow();
-        if (personSuppression.isUserSuppressed(user.getId())) {
+        AccountSummary user =
+                accounts.findAllByIds(List.of(MentorTurnAccount.requireId())).get(MentorTurnAccount.requireId());
+        if (user == null) throw new EntityNotFoundException("Account", String.valueOf(MentorTurnAccount.requireId()));
+        if (personSuppression.isAccountSuppressed(user.id())) {
             throw new MentorRefusedException(MentorRefusal.PERSON_ERASED);
         }
         UUID retryOf = submitted.retryOfAssistantMessageId();
@@ -293,11 +292,7 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
             throw new MentorRetryRejectedException(MentorRetryRejectedException.NOT_RETRYABLE);
         }
         ChatThread thread = persistence.ensureThread(
-                submitted.workspaceId(),
-                submitted.threadId(),
-                user,
-                CurrentScmIdentityHolder.getAccountActorIds(),
-                submitted.userMessage());
+                submitted.workspaceId(), submitted.threadId(), user.id(), submitted.userMessage());
         UUID assistantMessageId = UUID.randomUUID();
         // Read model only: it makes this turn's completed calls visible to the budget gate while the
         // turn is still running. Billing comes from the turn's row, which the proxy writes per call.
@@ -329,7 +324,7 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
         Turn turn = new Turn(acceptedAt);
         channel.startKeepAlive();
         boolean poisoned = false;
-        MentorChatMetrics.Outcome outcome = MentorChatMetrics.Outcome.ERROR;
+        MentorChatMetrics.ResultOutcome outcome = MentorChatMetrics.ResultOutcome.ERROR;
         try {
             // Start goes out BEFORE sandbox.attach so the client renders a placeholder during the
             // multi-second cold start; markStarted then suppresses the translator's duplicate Start.
@@ -338,16 +333,45 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
 
             Map<String, byte[]> contextInputs = buildMentorContext(request, user, cookie.userMessageId());
             Function<MentorRunnerClient.FetchContextRequest, JsonNode> fetchContext =
-                    callback -> handleFetchContext(callback, contextInputs, request.workspaceId(), user.getId());
-            Predicate<MentorRunnerClient.LinkObservationRequest> linkObservation = link -> {
-                boolean admitted = conversationalDeliveryReconciler.admits(
-                        request.workspaceId(), user.getId(), link.observationId());
+                    callback -> handleFetchContext(callback, contextInputs, request.workspaceId(), user.id());
+            Predicate<MentorRunnerClient.LinkRequest> linkProblem = link -> {
+                if (link.kind() == MentorRunnerClient.LinkKind.FEEDBACK) {
+                    return state.claimFeedback(
+                            link.linkedId(),
+                            () -> feedbackReceipts.claim(request.workspaceId(), link.linkedId(), assistantMessageId));
+                }
+                // A problem is shown under its result: the result decides whether either may be shown.
+                UUID resultId = link.kind() == MentorRunnerClient.LinkKind.RESULT
+                        ? link.linkedId()
+                        : resultsHistory
+                                .forDeveloper(
+                                        request.workspaceId(),
+                                        user.id(),
+                                        Instant.now().minus(90, ChronoUnit.DAYS),
+                                        90)
+                                .stream()
+                                .filter(entry -> entry.problems().stream()
+                                        .anyMatch(problem -> problem.problemId().equals(link.linkedId())))
+                                .map(entry -> entry.resultId())
+                                .findFirst()
+                                .orElse(null);
+                if (resultId == null) {
+                    return false;
+                }
+                boolean admitted = resultsHistory
+                        .find(request.workspaceId(), resultId, user.id(), SourceUsePurpose.CONVERSATIONAL_MENTORING)
+                        .filter(entry -> Long.valueOf(user.id()).equals(entry.developerAccountId()))
+                        .isPresent();
                 if (admitted) {
-                    state.admitLink(link.observationId());
+                    if (link.kind() == MentorRunnerClient.LinkKind.RESULT) {
+                        state.admitLink(resultId);
+                    } else {
+                        state.admitProblemLink(link.linkedId(), resultId);
+                    }
                 }
                 return admitted;
             };
-            MentorAgentRequest agentRequest = new MentorAgentRequest(request.workspaceId(), user.getId());
+            MentorAgentRequest agentRequest = new MentorAgentRequest(request.workspaceId(), user.id());
             InteractiveSandboxService sandboxService = interactiveSandboxServiceProvider.getObject();
             InteractiveSandboxSpec spec = mentorPiAdapter.buildSandboxSpec(agentRequest, llmConfig);
             try {
@@ -365,7 +389,7 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
             }
             // Pi is single-session: hold the lock from attach through the terminal chunk, so a second turn can
             // neither orphan this one nor pick up a runner this turn is about to discard.
-            MentorTurnLock.SandboxKey sandboxKey = new MentorTurnLock.SandboxKey(request.workspaceId(), user.getId());
+            MentorTurnLock.SandboxKey sandboxKey = new MentorTurnLock.SandboxKey(request.workspaceId(), user.id());
             try (var ignored = turnLock.acquireSandboxLock(sandboxKey)) {
                 boolean poisoning = false;
                 try {
@@ -378,15 +402,7 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
                         sandbox = attachSandbox(sandboxService, freshSpec.get(), freshSpec);
                     }
                     client = startRunner(
-                            sandbox,
-                            request,
-                            channel,
-                            clientHolder,
-                            state,
-                            cookie,
-                            turn,
-                            fetchContext,
-                            linkObservation);
+                            sandbox, request, channel, clientHolder, state, cookie, turn, fetchContext, linkProblem);
                     try {
                         client.openThread(request.threadId(), priorSession).get(10, TimeUnit.SECONDS);
                     } catch (Exception openFailure) {
@@ -412,7 +428,7 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
                                 cookie,
                                 turn,
                                 fetchContext,
-                                linkObservation);
+                                linkProblem);
                         client.openThread(request.threadId(), null).get(10, TimeUnit.SECONDS);
                     }
                     metrics.recordRuntimeReady(Duration.ofNanos(System.nanoTime() - turn.acceptedAt));
@@ -447,8 +463,8 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
                 }
             }
             outcome = turn.terminal.get() == Terminal.FAILED_IN_STREAM
-                    ? MentorChatMetrics.Outcome.ERROR
-                    : MentorChatMetrics.Outcome.SUCCESS;
+                    ? MentorChatMetrics.ResultOutcome.ERROR
+                    : MentorChatMetrics.ResultOutcome.SUCCESS;
         } catch (TimeoutException timeout) {
             // A missing terminal event leaves the runtime's state unknown; it was discarded under the sandbox lock.
             log.warn(
@@ -456,7 +472,7 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
                     request.threadId(),
                     timeout.toString());
             failTurn(turn, state, channel, cookie, timeout, "Heph took too long to reply and stopped. Try again.");
-            outcome = MentorChatMetrics.Outcome.TIMEOUT;
+            outcome = MentorChatMetrics.ResultOutcome.TIMEOUT;
         } catch (ClientDisconnectedException disconnect) {
             if (clientHolder.get() == null) {
                 // No runner subscription exists to complete the persisted turn.
@@ -470,17 +486,24 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
                     failTurn(turn, state, channel, cookie, disconnect, null);
                 }
             }
-            outcome = MentorChatMetrics.Outcome.CLIENT_DISCONNECT;
+            outcome = MentorChatMetrics.ResultOutcome.CLIENT_DISCONNECT;
         } catch (Exception e) {
             poisoned = isPoisoning(e);
             log.warn("Mentor turn errored (poisoned={}): {}", poisoned, e.getMessage(), e);
             failTurn(turn, state, channel, cookie, e, userFacingError(e));
-            outcome = poisoned ? MentorChatMetrics.Outcome.POISONED : MentorChatMetrics.Outcome.ERROR;
+            outcome = poisoned ? MentorChatMetrics.ResultOutcome.POISONED : MentorChatMetrics.ResultOutcome.ERROR;
         } finally {
+            state.sealFeedbackClaims();
             channel.close();
+            settleFeedback(
+                    request.workspaceId(),
+                    assistantMessageId,
+                    state,
+                    channel,
+                    turn.terminal.get() == Terminal.COMPLETED);
             // Skip closeThread on client-disconnect: the runner was already aborted via the channel,
             // and this round-trip would chain onto the drain timeout, holding the per-thread lock.
-            boolean skipCloseThread = outcome == MentorChatMetrics.Outcome.CLIENT_DISCONNECT;
+            boolean skipCloseThread = outcome == MentorChatMetrics.ResultOutcome.CLIENT_DISCONNECT;
             if (client != null) {
                 if (!skipCloseThread) {
                     try {
@@ -498,6 +521,29 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
             }
         }
         return outcome;
+    }
+
+    private void settleFeedback(
+            long workspaceId, UUID messageId, TranslatorState state, MentorChannel channel, boolean completed) {
+        var actual = channel.receipt().filter(receipt -> messageId.equals(receipt.chatMessageId()));
+        var now = Instant.now();
+        for (var entry : state.sealFeedbackClaims().entrySet()) {
+            boolean shown = state.hasShownFeedback(entry.getKey());
+            MentorTurnReceipt receipt = !shown
+                    ? new MentorTurnReceipt(messageId, null, null, null, null, false)
+                    : !completed
+                            ? new MentorTurnReceipt(messageId, null, null, null, null, true)
+                            : actual.orElseGet(() -> new MentorTurnReceipt(messageId, null, null, null, null, true));
+            try {
+                feedbackReceipts.record(workspaceId, entry.getValue(), receipt, now);
+            } catch (RuntimeException failure) {
+                log.warn(
+                        "Conversation copy receipt could not be stored: workspaceId={}, messageId={}, failure={}",
+                        workspaceId,
+                        messageId,
+                        failure.getClass().getSimpleName());
+            }
+        }
     }
 
     /**
@@ -566,7 +612,7 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
             MentorTurnPersistence.TurnPersistenceCookie cookie,
             Turn turn,
             Function<MentorRunnerClient.FetchContextRequest, JsonNode> fetchContext,
-            Predicate<MentorRunnerClient.LinkObservationRequest> linkObservation)
+            Predicate<MentorRunnerClient.LinkRequest> linkProblem)
             throws InterruptedException, ExecutionException, TimeoutException {
         if (channel.isClientGone()) {
             throw new ClientDisconnectedException("Client disconnected during sandbox attach");
@@ -588,7 +634,7 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
                     }
                 },
                 fetchContext,
-                linkObservation,
+                linkProblem,
                 runnerTimeoutScheduler.scheduler(),
                 // Per-thread event filter: the sandbox is shared by (userId, workspaceId), so
                 // a second tab in the same workspace would otherwise see this tab's events.
@@ -778,6 +824,7 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
         if (!turn.terminal.compareAndSet(null, Terminal.COMPLETING)) {
             return;
         }
+        state.sealFeedbackClaims();
         Optional<UIMessageChunk.Finish> recorded;
         try {
             recorded = persistence.complete(cookie, state, finish);
@@ -802,13 +849,7 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
         turn.terminal.set(Terminal.COMPLETED);
         sendTerminal(channel, toSend);
         // Slack learns whether its buffered reply was suppressed only as it closes, so delivery is settled after.
-        MentorChannel.DeliveryOutcome deliveryOutcome = channel.completeWithDone();
-        try {
-            persistence.recordDelivery(cookie, deliveryOutcome);
-        } catch (RuntimeException e) {
-            // The linked feedback stays prepared, which the TTL sweep settles; it is never marked delivered unseen.
-            log.warn("Could not settle the feedback mentor reply {} linked", cookie.assistantMessageId(), e);
-        }
+        channel.completeWithDone();
         Double costUsd =
                 toSend.messageMetadata() != null ? toSend.messageMetadata().costUsd() : null;
         if (costUsd != null) metrics.recordCostUsd(costUsd);
@@ -912,20 +953,20 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
         return "Heph could not finish this reply. Try again.";
     }
 
-    private Map<String, byte[]> buildMentorContext(MentorTurnRequest request, User user, UUID currentUserMessageId) {
-        return workspaceContextBuilder.build(new ContextRequest.MentorChatRequest(
-                request.workspaceId(), user.getId(), request.threadId(), currentUserMessageId));
+    private Map<String, byte[]> buildMentorContext(
+            MentorTurnRequest request, AccountSummary user, UUID currentUserMessageId) {
+        return workspaceContextBuilder.build(
+                new MentorContextRequest(request.workspaceId(), user.id(), request.threadId(), currentUserMessageId));
     }
 
     private MentorLlmConfig resolveWorkspaceLlmConfig(long workspaceId) {
-        WorkspaceAgentBinding binding = admittedBinding(
-                workspaceId, CurrentScmIdentityHolder.getUserId().orElse(null));
+        WorkspaceAgentBinding binding = admittedBinding(workspaceId, MentorTurnAccount.requireId());
         return MentorLlmConfig.fromAdmission(binding, llmAdmissionService.admit(binding));
     }
 
     /** Mentor admission for web and Slack alike: the member's AI choice, then a model within it. */
     private WorkspaceAgentBinding admittedBinding(long workspaceId, @Nullable Long developerId) {
-        if (developerId != null && personSuppression.isUserSuppressed(developerId)) {
+        if (developerId != null && personSuppression.isAccountSuppressed(developerId)) {
             throw new MentorRefusedException(MentorRefusal.PERSON_ERASED);
         }
         return memberAiRouting
@@ -935,7 +976,7 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
 
     private MentorRefusal refusalWithoutModel(long workspaceId, @Nullable Long developerId) {
         MemberAiPreferences.Decision decision = memberAiPreferences.forDeveloper(workspaceId, developerId);
-        if (decision.choice() == MemberAiChoice.NO_AI) return MentorRefusal.NO_AI;
+        if (decision.choice() == AiChoice.NO_AI) return MentorRefusal.NO_AI;
         return decision.permitsAi() ? MentorRefusal.UNAVAILABLE : MentorRefusal.CHOICE_REQUIRED;
     }
 
@@ -945,15 +986,13 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
             long workspaceId,
             long developerId) {
         String path = req.path();
-        Optional<Long> mergeRequest = MergeReadinessContentSource.artifactIdOf(path);
-        if (mergeRequest.isPresent()) {
-            return mergeReadiness.inspect(workspaceId, developerId, mergeRequest.get());
+        var supplied = workspaceContextBuilder.read(workspaceId, developerId, path);
+        if (supplied.isPresent()) return supplied.get();
+        Optional<UUID> practiceResult = ResultHistoryContentSource.resultIdOf(path);
+        if (practiceResult.isPresent()) {
+            return practiceResultHistory.inspect(workspaceId, developerId, practiceResult.get());
         }
-        Optional<UUID> observation = ObservationHistoryContentSource.observationIdOf(path);
-        if (observation.isPresent()) {
-            return observationHistory.inspect(workspaceId, developerId, observation.get());
-        }
-        Optional<AgentJobRepository.ScmWork> reviewedWork = ReviewAttemptsContentSource.workOf(path);
+        var reviewedWork = ReviewAttemptsContentSource.selectionOf(path);
         if (reviewedWork.isPresent()) {
             return reviewAttempts.inspect(workspaceId, developerId, reviewedWork.get());
         }

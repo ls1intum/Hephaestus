@@ -5,10 +5,10 @@ export const storedUserView: UserViewSession = {
 	operatorAccountId: 42,
 	workspaceSlug: "engineering",
 	workspaceName: "Engineering",
-	userId: 11,
-	login: "alex",
+	accountId: "11",
+	providerLogin: "alex",
 	name: "Alex",
-	hasAccount: false,
+	unclaimed: true,
 	reason: "Check practice feedback",
 };
 

@@ -131,7 +131,7 @@ The following constraints do not appear in diagnostics.
   A `ReactNode` slot typed `ReactElement | undefined` needs none of these checks.
 - **The one exception `jsx-a11y/no-autofocus` earns** is the first field of an overlay the user just
   opened. Suppress that case inline with the reason. Everything else is the bug the rule describes.
-- **Before you trust or change an off rule's reason, re-derive its findings.**
+- **Before you trust or change an off rule's reason, re-derive its reports.**
   From the repository root, run `vp -C webapp lint -A all -D <rule> --report-unused-disable-directives-severity=off .`.
   `-A all` excludes the rest of the rule set from the result.
   The severity flag excludes suppressions that those excluded rules left unused.
@@ -284,8 +284,12 @@ Thus, the two rules intentionally differ for a handler: `new Date()` is permitte
 
 A component, its file, its props type, and its story title all name the same concept.
 Use the name in `docs/contributor/practice-feedback-language.md`.
-It is the product's word, not the server's or the screen's previous word. The unit a review detects is an **observation**. The unit delivered
-to a developer is **feedback**. Neither is a "finding" or a "message".
+It is the product's word, not the server's or the screen's previous word.
+
+The outcome of one practice for one item is a **result**.
+One located problem under a Not met result is a **problem** in code and on screen.
+What a developer receives is **feedback**.
+Use only these three words for them.
 
 Changing only the copy is not sufficient.
 The next component inherits a name that stays in the import list.
@@ -324,7 +328,7 @@ the first workspace.
 Client-side gating is a UX affordance only — the server enforces authorization on every endpoint.
 Never re-invent `role === "ADMIN"`. Use the shared pieces:
 
-- **Whole admin surfaces — gate by placement, not by a check.** Put workspace-admin pages under
+- **Whole admin surfaces — gate by route, not by a check.** Put workspace-admin pages under
   `src/routes/_authenticated/w/$workspaceSlug/admin/`. Its `route.tsx` layout carries the `beforeLoad`
   role guard, so every route in the directory inherits it.
   A file that maps to an `/admin` URL outside that layout silently skips the gate.
@@ -358,16 +362,11 @@ Never re-invent `role === "ADMIN"`. Use the shared pieces:
   `useAuth().isAppAdmin` is instance-wide (ADR 0017). A workspace-role gate on a surface with no active
   workspace is always false.
 - There is **no `<RequireRole>` wrapper component**.
-  Route placement covers whole surfaces.
-  For the rest, the route reads a boolean once and passes it down.
-  From the practice profile route, `canAdminister` reaches `RefusalFixLink` through three components:
-  - `PracticeGroupDetailDrawer`.
-  - `ProfileReviewLevel`.
-  - `TraceSignalTimeline`.
-
-  These are three hops for one leaf.
-  Copy the shape of the refusal beside it instead.
-  The route renders `TraceRefusalAlert` and passes it down as a node.
+  The route tree gates whole surfaces.
+  For the rest, the route reads a boolean once.
+  Do not pass that flag through several components to reach one leaf.
+  Copy the shape of the practice profile route instead.
+  It renders `TraceRefusalAlert` with its `RefusalFixLink` and passes the alert down as a node.
   Before you pass a flag further down, render the gated leaf in the route.
   Pass it down as `children`.
   When a role-assignment UI arrives, its mutation must invalidate the membership query key.
@@ -395,7 +394,7 @@ Each holds one or more of these:
 - `@keyframes`.
 - A generated `::before`.
 - A `clip-path`.
-- A grid whose placement descendants override at a breakpoint.
+- A grid whose descendants override their `grid-row` or `grid-column` at a breakpoint.
 - `HephIcon`'s size, which a container's `[&_svg]:size-4` would outrank as a utility.
 
 Anything that a utility can express stays a utility.

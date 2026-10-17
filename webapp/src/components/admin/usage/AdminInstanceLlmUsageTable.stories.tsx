@@ -3,8 +3,10 @@ import { expect, fn, within } from "storybook/test";
 
 import type { AdminWorkspaceLlmUsage, WorkspaceLlmUsageReport } from "@/api/types.gen";
 import { expectTargetSize, horizontalScrollParentOf } from "@/stories/reflow";
+import { StatefulPatch } from "@/stories/stateful";
 
 import { AdminInstanceLlmUsageTable } from "./AdminInstanceLlmUsageTable";
+import { commentQualityUsage, NO_PRACTICE_SCRIPT_USAGE, notAttributedUsage } from "./fixtures";
 
 const FX_DISCLOSURE = /reference rate published on/u;
 
@@ -35,6 +37,7 @@ const pausedOnSharedBudget: AdminWorkspaceLlmUsage = {
 	ownProviderTotalCostUsd: 6.5,
 	ownProviderBudgetVerdict: "WITHIN",
 	ownProviderPaused: false,
+	ownProviderInUse: true,
 	events: 118,
 };
 
@@ -49,6 +52,7 @@ const nearingItsOwnProviderCap: AdminWorkspaceLlmUsage = {
 	ownProviderTotalCostUsd: 21.4,
 	ownProviderBudgetVerdict: "WITHIN",
 	ownProviderPaused: false,
+	ownProviderInUse: true,
 	events: 74,
 };
 
@@ -58,8 +62,9 @@ const sharedBudgetOnlyUnverifiable: AdminWorkspaceLlmUsage = {
 	instanceMonthlyBudgetUsd: 50,
 	instanceTotalCostUsd: 38.2,
 	instanceBudgetVerdict: "UNVERIFIABLE",
-	instancePaused: false,
+	instancePaused: true,
 	ownProviderTotalCostUsd: 0,
+	ownProviderInUse: false,
 	events: 22,
 	ownProviderBudgetVerdict: "WITHIN",
 	ownProviderPaused: false,
@@ -71,10 +76,20 @@ const uncapped: AdminWorkspaceLlmUsage = {
 	instanceTotalCostUsd: 0.42,
 	instanceBudgetVerdict: "WITHIN",
 	ownProviderTotalCostUsd: 0,
+	ownProviderInUse: false,
 	events: 3,
 	ownProviderBudgetVerdict: "WITHIN",
 	ownProviderPaused: false,
 	instancePaused: false,
+};
+
+const uncappedUnpriced: AdminWorkspaceLlmUsage = {
+	...uncapped,
+	workspaceSlug: "workbench",
+	displayName: "Workbench",
+	instanceTotalCostUsd: 0,
+	instanceBudgetVerdict: "UNVERIFIABLE",
+	events: 6,
 };
 
 const pausedOnItsOwnProviderCap: AdminWorkspaceLlmUsage = {
@@ -86,6 +101,7 @@ const pausedOnItsOwnProviderCap: AdminWorkspaceLlmUsage = {
 	ownProviderTotalCostUsd: 12.4,
 	ownProviderBudgetVerdict: "EXHAUSTED",
 	ownProviderPaused: true,
+	ownProviderInUse: true,
 	events: 40,
 	instancePaused: false,
 };
@@ -95,54 +111,80 @@ const rows: AdminWorkspaceLlmUsage[] = [
 	nearingItsOwnProviderCap,
 	sharedBudgetOnlyUnverifiable,
 	uncapped,
+	uncappedUnpriced,
 	pausedOnItsOwnProviderCap,
 ];
 
-const detailReport: WorkspaceLlmUsageReport = {
-	month: "2026-07",
-	instanceMonthlyBudgetUsd: 25,
-	instanceTotalCostUsd: 25.0142,
-	instanceBudgetVerdict: "EXHAUSTED",
-	instancePaused: true,
-	ownProviderMonthlyBudgetUsd: 40,
-	ownProviderTotalCostUsd: 1.5,
-	ownProviderBudgetVerdict: "WITHIN",
-	ownProviderPaused: false,
-	unpricedEventCount: 0,
-	byJobType: [
-		{
-			jobType: "PULL_REQUEST_REVIEW",
-			instanceTotalCostUsd: 25.0142,
-			ownProviderTotalCostUsd: 1.5,
-			unpricedEventCount: 0,
-			inputTokens: 80_000,
-			outputTokens: 12_000,
-			cacheReadTokens: 10_000,
-			cacheWriteTokens: 2000,
-			totalCalls: 42,
-			events: 18,
-		},
-	],
-	byDay: [
-		{
-			day: new Date("2026-07-05T00:00:00.000Z"),
-			instanceTotalCostUsd: 25.0142,
-			ownProviderTotalCostUsd: 1.5,
-			unpricedEventCount: 0,
-			events: 18,
-		},
-	],
-};
+function detailReportFor(row: AdminWorkspaceLlmUsage): WorkspaceLlmUsageReport {
+	const { workspaceSlug: _workspaceSlug, displayName: _displayName, events, ...limits } = row;
+	const figures = {
+		instanceTotalCostUsd: row.instanceTotalCostUsd,
+		ownProviderTotalCostUsd: row.ownProviderTotalCostUsd,
+		unpricedEventCount: 0,
+		events,
+	};
+	return {
+		...limits,
+		month: "2026-07",
+		unpricedEventCount: 0,
+		...NO_PRACTICE_SCRIPT_USAGE,
+		byJobType: [
+			{
+				jobType: "PULL_REQUEST_REVIEW",
+				...figures,
+				inputTokens: events * 4000,
+				outputTokens: events * 600,
+				cacheReadTokens: events * 500,
+				cacheWriteTokens: events * 100,
+				totalCalls: events * 3,
+			},
+		],
+		byDay: [{ day: new Date("2026-07-05T00:00:00.000Z"), ...figures }],
+	};
+}
 
-/**
- * Every workspace's AI spend for one month, against both caps: the shared-model budget the host
- * grants — editable here — and the workspace's own provider cap, read-only because it is their money.
- */
+const detailReport = detailReportFor(pausedOnSharedBudget);
+
+const thirtyWorkspaces: AdminWorkspaceLlmUsage[] = Array.from({ length: 30 }, (_, index) => {
+	const number = String(index + 1).padStart(2, "0");
+	return {
+		...uncapped,
+		workspaceSlug: `team-${number}`,
+		displayName: `Team ${number}`,
+		instanceTotalCostUsd: index + 1,
+		events: (index + 1) * 3,
+	};
+});
+
+async function workspaceNames(canvas: StoryContext["canvas"]): Promise<string[]> {
+	const table = await canvas.findByRole("table", { name: /^Per-workspace AI spend/u });
+	return within(table)
+		.getAllByRole("row")
+		.slice(2)
+		.map((row) => within(row).getAllByRole("cell")[0]?.querySelector("div")?.textContent ?? "");
+}
+
 const meta = {
 	component: AdminInstanceLlmUsageTable,
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
+	render: (args) => (
+		<StatefulPatch initial={args.view}>
+			{(view, patch) => (
+				<AdminInstanceLlmUsageTable
+					{...args}
+					view={view}
+					onViewChange={(next) => {
+						args.onViewChange(next);
+						patch(next);
+					}}
+				/>
+			)}
+		</StatefulPatch>
+	),
 	args: {
+		view: { q: "", sort: "sharedSpend", desc: true, page: 0 },
+		onViewChange: fn(),
 		rows,
 		month: "2026-07",
 		now: new Date("2026-07-10T12:00:00.000Z"),
@@ -163,9 +205,127 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+function sharedBudgetCellOf(canvas: StoryContext["canvas"], displayName: string): HTMLElement {
+	const row = canvas.getByRole("row", { name: new RegExp(`^${displayName}`, "u") });
+	const cell = within(row).getAllByRole("cell")[2];
+	if (cell == null) {
+		throw new Error(`The row of ${displayName} has no shared-model budget cell.`);
+	}
+	return cell;
+}
+
 export const AllCapCombinationsInUsd: Story = {
 	play: async ({ canvas }) => {
+		await expect(await workspaceNames(canvas)).toStrictEqual([
+			"Launchpad",
+			"Example Workspace",
+			"Hephaestus Dev",
+			"Sandbox",
+			"Atelier",
+			"Workbench",
+		]);
 		await expect(canvas.queryByText(FX_DISCLOSURE)).toBeNull();
+		const launchpad = within(sharedBudgetCellOf(canvas, "Launchpad"));
+		await expect(launchpad.getByText("Paused")).toBeVisible();
+		await expect(launchpad.getByText("Unavailable cost")).toBeVisible();
+		const workbench = sharedBudgetCellOf(canvas, "Workbench");
+		await expect(workbench.textContent).toBe("—Unavailable cost");
+		await expect(within(workbench).getByText("Unavailable cost")).toBeVisible();
+		await expect(canvas.queryByRole("columnheader", { name: "Status" })).toBeNull();
+	},
+};
+
+export const SharedModelBudgetActions: Story = {
+	play: async ({ canvas }) => {
+		await canvas.findByRole("table", { name: /^Per-workspace AI spend/u });
+		for (const [workspace, action] of [
+			["Launchpad", "Change budget"],
+			["Sandbox", "Set budget"],
+		] as const) {
+			const button = canvas.getByRole("button", {
+				name: `${action} for ${workspace} (shared models)`,
+			});
+			await expect(button).toHaveTextContent(new RegExp(`^${action}$`, "u"));
+		}
+	},
+};
+
+export const FirstPage: Story = {
+	args: { rows: thirtyWorkspaces },
+	play: async ({ canvas, userEvent }) => {
+		await expect(await workspaceNames(canvas)).toHaveLength(25);
+		await userEvent.click(canvas.getByRole("button", { name: "Go to page 2" }));
+		await expect(await workspaceNames(canvas)).toStrictEqual([
+			"Team 05",
+			"Team 04",
+			"Team 03",
+			"Team 02",
+			"Team 01",
+		]);
+	},
+};
+
+export const PageTwo: Story = {
+	args: { rows: thirtyWorkspaces, view: { q: "", sort: "sharedSpend", desc: true, page: 1 } },
+	play: async ({ canvas }) => {
+		await expect(await canvas.findByRole("button", { name: "Go to page 2" })).toHaveAttribute(
+			"aria-current",
+			"page",
+		);
+		await expect(await workspaceNames(canvas)).toHaveLength(5);
+	},
+};
+
+export const FilteredByName: Story = {
+	args: { rows: thirtyWorkspaces },
+	play: async ({ canvas, userEvent }) => {
+		await userEvent.type(await canvas.findByLabelText("Search workspaces"), "Team 2");
+		await expect(await workspaceNames(canvas)).toHaveLength(10);
+		await expect(canvas.queryByRole("navigation", { name: /pagination/iu })).toBeNull();
+
+		await userEvent.click(canvas.getByRole("button", { name: "Reset" }));
+		await expect(await workspaceNames(canvas)).toHaveLength(25);
+	},
+};
+
+export const LongSearch: Story = {
+	args: { rows: thirtyWorkspaces },
+	play: async ({ canvas, userEvent }) => {
+		const search = await canvas.findByLabelText("Search workspaces");
+		await userEvent.click(search);
+		await userEvent.paste("x".repeat(250));
+		await expect(search).toHaveValue("x".repeat(200));
+		await expect(await canvas.findByText("No workspaces match your search")).toBeVisible();
+	},
+};
+
+export const NoNameMatches: Story = {
+	args: { rows: thirtyWorkspaces, view: { q: "Atlas", sort: "sharedSpend", desc: true, page: 0 } },
+	play: async ({ canvas }) => {
+		await expect(await canvas.findByText("No workspaces match your search")).toBeVisible();
+	},
+};
+
+export const SortByName: Story = {
+	play: async ({ canvas, userEvent }) => {
+		const headers = await canvas.findAllByRole("columnheader");
+		const groups = headers.filter((header) => header.getAttribute("colspan") === "2");
+		await expect(groups.map((group) => group.getAttribute("scope"))).toStrictEqual(["col", "col"]);
+		await expect(groups.some((group) => group.hasAttribute("aria-sort"))).toBe(false);
+
+		const name = canvas.getByRole("columnheader", { name: "Workspace" });
+		await userEvent.click(within(name).getByRole("button", { name: "Workspace" }));
+		await expect(name).toHaveAttribute("aria-sort", "ascending");
+		const [first] = await workspaceNames(canvas);
+		await expect(first).toBe("Atelier");
+	},
+};
+
+export const SharedModelsOnly: Story = {
+	args: { rows: [uncapped, sharedBudgetOnlyUnverifiable] },
+	play: async ({ canvas }) => {
+		await canvas.findByRole("table", { name: /^Per-workspace AI spend/u });
+		await expect(canvas.queryByRole("columnheader", { name: "Own provider" })).toBeNull();
 	},
 };
 
@@ -174,18 +334,74 @@ export const Expanded: Story = {
 		expandedWorkspaceSlug: pausedOnSharedBudget.workspaceSlug,
 		detailReport,
 	},
+	play: async ({ canvas }) => {
+		const element = await expandedPanelFor(canvas, pausedOnSharedBudget.displayName);
+		const panel = within(element);
+		await expect(getComputedStyle(element).backgroundColor).toBe("rgba(0, 0, 0, 0)");
+		await expect(
+			panel.getByRole("heading", { level: 2, name: pausedOnSharedBudget.displayName }),
+		).toBeVisible();
+		await expect(panel.getByText("Usage details")).toBeVisible();
+		await expect(
+			panel.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent),
+		).toStrictEqual(["By run type", "By day"]);
+		await expect(
+			panel.queryByRole("heading", { name: "Models for practice scripts, by practice" }),
+		).toBeNull();
+	},
+};
+
+export const ExpandedWithPracticeScriptModels: Story = {
+	args: {
+		expandedWorkspaceSlug: pausedOnSharedBudget.workspaceSlug,
+		detailReport: {
+			...detailReport,
+			byPractice: [commentQualityUsage, notAttributedUsage],
+			practiceScriptTotal: {
+				reviews: 19,
+				calls: 426,
+				inputTokens: 99_500,
+				outputTokens: 1280,
+				instanceTotalCostUsd: 0.37,
+				ownProviderTotalCostUsd: 0,
+				unpricedEventCount: 0,
+			},
+		},
+	},
+	parameters: { viewport: { defaultViewport: "desktop" } },
+	play: async ({ canvas }) => {
+		const panel = within(await expandedPanelFor(canvas, pausedOnSharedBudget.displayName));
+		const table = panel.getByRole("table", {
+			name: "Spend on models for practice scripts, by practice",
+		});
+		await expect(within(table).getByText("Comments explain why")).toBeVisible();
+		await expect(within(table).queryByRole("link")).toBeNull();
+		await expect(within(table).getByRole("row", { name: /^Total/u }).textContent).toContain(
+			"$0.37",
+		);
+		for (const name of [
+			"AI spend by run type",
+			"AI spend by day",
+			"Spend on models for practice scripts, by practice",
+		]) {
+			const scroller = horizontalScrollParentOf(panel.getByRole("table", { name }));
+			await expect(scroller.scrollWidth, name).toBeLessThanOrEqual(scroller.clientWidth + 1);
+		}
+	},
 };
 
 export const ExpandedNearCap: Story = {
 	args: {
 		expandedWorkspaceSlug: nearingItsOwnProviderCap.workspaceSlug,
-		detailReport: {
-			...detailReport,
-			instanceMonthlyBudgetUsd: 50,
-			instanceTotalCostUsd: 42,
-			instanceBudgetVerdict: "WITHIN",
-			instancePaused: false,
-		},
+		detailReport: detailReportFor(nearingItsOwnProviderCap),
+	},
+	play: async ({ canvas }) => {
+		const panel = within(await expandedPanelFor(canvas, nearingItsOwnProviderCap.displayName));
+		const runTypes = within(panel.getByRole("table", { name: "AI spend by run type" }));
+		const row = runTypes.getByRole("row", { name: /^Pull request review/u });
+		await expect(within(row).getByText("$13.48")).toBeVisible();
+		await expect(within(row).getByText("$21.40")).toBeVisible();
+		await expect(within(row).getByText("74")).toBeVisible();
 	},
 };
 
@@ -247,7 +463,7 @@ export const ExpandedMobileReflow: Story = {
  */
 export const HelpHeaderTargetSize: Story = {
 	play: async ({ canvas }) => {
-		for (const name of ["Shared-model budget", "Provider cap"]) {
+		for (const name of ["Budget (Shared models)", "Cap (Own provider)"]) {
 			const header = canvas.getByRole("columnheader", { name });
 			await expectTargetSize(within(header).getByRole("button"));
 		}
@@ -269,9 +485,23 @@ export const NearCap: Story = {
 				ownProviderTotalCostUsd: 27.6,
 				ownProviderBudgetVerdict: "WITHIN",
 				ownProviderPaused: false,
+				ownProviderInUse: true,
 				events: 210,
 			},
 		],
+	},
+	play: async ({ canvas }) => {
+		await canvas.findByRole("table", { name: /^Per-workspace AI spend/u });
+		for (const [meter, badge] of [
+			["Shared-model budget used by Close Call", "Near the budget"],
+			["Provider cap used by Close Call", "Near the cap"],
+		] as const) {
+			const cell = canvas.getByRole("progressbar", { name: meter }).closest("td");
+			await expect(cell).not.toBeNull();
+			const label = within(cell ?? document.body).getByText(badge);
+			await expect(label).toBeVisible();
+			await expect(label.scrollWidth).toBeLessThanOrEqual(label.clientWidth);
+		}
 	},
 };
 
@@ -297,9 +527,13 @@ export const PausedByBothCaps: Story = {
 				ownProviderTotalCostUsd: 15,
 				ownProviderBudgetVerdict: "EXHAUSTED",
 				ownProviderPaused: true,
+				ownProviderInUse: true,
 				events: 96,
 			},
 		],
+	},
+	play: async ({ canvas }) => {
+		await expect(await canvas.findAllByText("Paused")).toHaveLength(2);
 	},
 };
 
@@ -317,6 +551,7 @@ export const ZeroInstanceCap: Story = {
 				ownProviderTotalCostUsd: 0,
 				ownProviderBudgetVerdict: "WITHIN",
 				ownProviderPaused: false,
+				ownProviderInUse: false,
 				events: 0,
 			},
 		],
@@ -342,10 +577,33 @@ export const NoProviderCapsSet: Story = {
 export const PastMonth: Story = {
 	args: { isCurrentMonth: false },
 	play: async ({ canvas }) => {
-		await expect(canvas.queryByRole("button", { name: /^Set budget for/u })).toBeNull();
+		await expect(canvas.queryByRole("button", { name: /budget for/u })).toBeNull();
 		await expect(canvas.getAllByRole("button", { name: /^Details for/u })).toHaveLength(
 			rows.length,
 		);
+	},
+};
+
+export const Dark: Story = {
+	globals: { theme: "dark" },
+	play: async ({ canvas }) => {
+		await canvas.findByRole("table", { name: /^Per-workspace AI spend/u });
+		await expect(
+			within(sharedBudgetCellOf(canvas, "Example Workspace")).getByText("Paused"),
+		).toBeVisible();
+		await expect(
+			within(sharedBudgetCellOf(canvas, "Launchpad")).getByText("Unavailable cost"),
+		).toBeVisible();
+		await expect(
+			within(
+				canvas
+					.getByRole("progressbar", { name: "Provider cap used by Hephaestus Dev" })
+					.closest("td") ?? document.body,
+			).getByText("Near the cap"),
+		).toBeVisible();
+		await expect(
+			within(sharedBudgetCellOf(canvas, "Workbench")).getByText("Unavailable cost"),
+		).toBeVisible();
 	},
 };
 

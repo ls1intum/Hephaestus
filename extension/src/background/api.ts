@@ -1,27 +1,27 @@
 import { type Client, createClient, createConfig } from "~/api/client";
 import {
-	getOwnArtifactTrace,
 	getClientSignInConfiguration,
 	getConsentStatus,
 	getCurrentUser,
 	getOwnDeliveredWorkFeedback,
+	getOwnItemTrace,
 	getWorkspace,
 	listIdentityProviders,
-	listObservations,
-	listReviewedWorkReviewRuns,
+	listOwnItemReviews,
+	listOwnResults,
 	listWorkspaces,
 	logoutClientSession,
 	refreshClientSession,
-	requestPracticeReview,
+	requestReview,
 	resolveReviewContext,
 } from "~/api/sdk.gen";
 import type {
-	ArtifactTrace,
 	ConsentStatus,
 	CurrentUserView,
 	DeliveredWorkFeedback,
 	IdentityProviderView,
-	PageResponseDtoObservationList,
+	OwnItemTrace,
+	PageResponseDtoResultList,
 	ReviewRequestOutcome,
 	ReviewContext as ReviewContextDTO,
 	Workspace,
@@ -238,64 +238,50 @@ export class AuthenticatedApi {
 		return body(result);
 	}
 
-	/** A trace of the reader's latest visible review; missing access says nothing about other reviews. */
-	async trace(workspaceSlug: string, artifactKind: string, artifactId: number) {
-		const runs = body(
+	/** The trace of the reader's latest own review of the item; missing access says nothing about other reviews. */
+	async trace(workspaceSlug: string, itemId: string): Promise<OwnItemTrace | null> {
+		const reviews = body(
 			await this.#call(async (client) =>
-				listReviewedWorkReviewRuns({
-					client,
-					path: { workspaceSlug, artifactKind, artifactId },
-					query: { size: 1 },
-				}),
+				listOwnItemReviews({ client, path: { workspaceSlug, itemId }, query: { size: 1 } }),
 			),
 		);
-		const run = runs.content[0];
-		if (run === undefined) {
+		const latest = reviews.content[0];
+		if (latest === undefined) {
 			return null;
 		}
-		if (run.reviewedWork.kind !== artifactKind || run.reviewedWork.id !== String(artifactId)) {
-			throw new WorkerError(
-				"server",
-				"Hephaestus returned records about different work. Open the work in Hephaestus instead.",
-			);
+		if (latest.review.item.id !== itemId) {
+			throw differentItem();
 		}
-		const trace: ArtifactTrace | undefined = bodyOrMissing(
+		const trace = bodyOrMissing(
 			await this.#call(async (client) =>
-				getOwnArtifactTrace({
+				getOwnItemTrace({
 					client,
-					path: { workspaceSlug, artifactKind, artifactId },
-					query: { reviewId: run.reviewId },
+					path: { workspaceSlug, itemId },
+					query: { reviewId: latest.review.id },
 				}),
 			),
 		);
-		if (
-			trace !== undefined &&
-			(trace.artifactKind !== artifactKind || trace.artifactId !== artifactId)
-		) {
-			throw new WorkerError(
-				"server",
-				"Hephaestus returned records about different work. Open the work in Hephaestus instead.",
-			);
+		if (trace !== undefined && (trace.item.id !== itemId || trace.review.id !== latest.review.id)) {
+			throw differentItem();
 		}
 		return trace ?? null;
 	}
 
 	/**
-	 * The reader's own observations on one piece of work, most severe first. Not-applicable rows are
-	 * left out: they say the practice had nothing to judge here, which the web app's trace explains.
+	 * The reader's own results on one item, most severe first. Does-not-apply results are left out:
+	 * they say the practice had nothing to judge here, which the web app's trace explains.
 	 */
-	async ownObservations(
+	async ownResults(
 		workspaceSlug: string,
-		artifactKind: string,
-		artifactId: number,
+		itemId: string,
 		size: number,
-	): Promise<PageResponseDtoObservationList> {
+	): Promise<PageResponseDtoResultList> {
 		return body(
 			await this.#call(async (client) =>
-				listObservations({
+				listOwnResults({
 					client,
 					path: { workspaceSlug },
-					query: { artifactKind, artifactId, displayableOnly: true, sort: "SEVERITY", size },
+					query: { itemId, displayableOnly: true, sort: "ACTIONABILITY", size },
 				}),
 			),
 		);
@@ -317,17 +303,9 @@ export class AuthenticatedApi {
 	 * Asks for a review. A 200 is an answer either way: `SUBMITTED` started one, `REFUSED` names why
 	 * not. A refused ask is not an error, and nothing here asks twice.
 	 */
-	async requestReview(
-		workspaceSlug: string,
-		artifactKind: string,
-		artifactId: number,
-	): Promise<ReviewRequestOutcome> {
+	async requestReview(workspaceSlug: string, itemId: string): Promise<ReviewRequestOutcome> {
 		const result = await this.#call(async (client) =>
-			requestPracticeReview({
-				client,
-				path: { workspaceSlug },
-				body: { artifactKind, artifactId },
-			}),
+			requestReview({ client, path: { workspaceSlug }, body: { itemId } }),
 		);
 		const status = result.response?.status;
 		if (status === 403 || status === 404) {
@@ -335,4 +313,11 @@ export class AuthenticatedApi {
 		}
 		return body(result);
 	}
+}
+
+function differentItem(): WorkerError {
+	return new WorkerError(
+		"server",
+		"Hephaestus returned records about different work. Open the work in Hephaestus instead.",
+	);
 }

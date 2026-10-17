@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { once } from "node:events";
-import { readFile, mkdtemp, rm, writeFile, mkdir, readdir, stat } from "node:fs/promises";
+import { readFile, mkdtemp, rm, writeFile, mkdir, readdir, rename, stat } from "node:fs/promises";
 import { createServer, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -54,6 +54,7 @@ await test("STE paths are explicit, unique, and grow only", () => {
 		'[".github/workflows/check.yml"]',
 		'[".github/ISSUE_TEMPLATE/nested/form.yml"]',
 		'["webapp/src/components/Test.tsx"]',
+		'[{"path":"new.md","renamedFrom":"old.md"}]',
 	]) {
 		assert.throws(() => parsePaths(source));
 	}
@@ -272,6 +273,71 @@ await test("the path ratchet compares the actual base and rejects shrinkage, mis
 		await rm(directory, { recursive: true, force: true });
 	}
 });
+
+for (const scenario of [
+	{
+		name: "retains enforcement across a committed rename",
+		rename: true,
+		enforced: ["new.md"],
+		retained: true,
+	},
+	{
+		name: "rejects deletion of an enforced page",
+		rename: false,
+		enforced: ["other.md"],
+		retained: false,
+	},
+	{
+		name: "rejects a rename to an unenforced page",
+		rename: true,
+		enforced: ["other.md"],
+		retained: false,
+	},
+]) {
+	await test(`the path ratchet ${scenario.name}`, async () => {
+		const directory = await mkdtemp(path.join(tmpdir(), "ste-rename-"));
+		try {
+			const env = environmentForGitFixture();
+			const git = (...args: string[]) =>
+				execFileSync("git", args, { cwd: directory, env, encoding: "utf8", stdio: "pipe" });
+			const commit = (message: string) => {
+				git("add", ".");
+				git(
+					"-c",
+					"user.name=Fixture",
+					"-c",
+					"user.email=fixture@example.invalid",
+					"commit",
+					"--quiet",
+					"-m",
+					message,
+				);
+			};
+			git("init", "--quiet");
+			await mkdir(path.join(directory, ".vale"));
+			await writeFile(path.join(directory, "old.md"), "Keep this page enforced after a rename.\n");
+			await writeFile(path.join(directory, "other.md"), "Another page.\n");
+			const manifest = path.join(directory, ".vale", "enforced-paths.json");
+			await writeFile(manifest, '["old.md"]');
+			commit("Initial enforced page");
+			const base = git("rev-parse", "HEAD").trim();
+			if (scenario.rename) {
+				await rename(path.join(directory, "old.md"), path.join(directory, "new.md"));
+			} else {
+				await rm(path.join(directory, "old.md"));
+			}
+			await writeFile(manifest, JSON.stringify(scenario.enforced));
+			commit("Move or delete the enforced page");
+			if (scenario.retained) {
+				assert.deepEqual(checkRatchet(base, directory), scenario.enforced);
+			} else {
+				assert.throws(() => checkRatchet(base, directory), /lost paths.*old\.md/u);
+			}
+		} finally {
+			await rm(directory, { recursive: true, force: true });
+		}
+	});
+}
 
 await test("each Vale rule has a passing sample, a failing sample, and a repair message", async () => {
 	const vale = await prepareVale();

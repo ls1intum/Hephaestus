@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.discussion.Discussion;
@@ -18,6 +17,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organizatio
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.github.discussioncomment.dto.GitHubDiscussionCommentDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
@@ -122,7 +122,7 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
         testWorkspace.setDisplayName("Test Workspace");
         testWorkspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         testWorkspace.setPublicActivityEnabled(true);
-        testWorkspace.setOrganization(org);
+        testWorkspace.setOrganizationId(org.getId());
         testWorkspace.setAccountLogin(TEST_ORG_LOGIN);
         testWorkspace.setAccountType(AccountType.ORG);
         testWorkspace = workspaceRepository.save(testWorkspace);
@@ -226,7 +226,9 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
                     TEST_COMMENT_ID,
                     "node_id_" + TEST_COMMENT_ID,
                     "Comment without author",
-                    "https://github.com/" + TEST_REPO_FULL_NAME + "/discussions/27#discussioncomment-"
+                    "https://github.com/"
+                            + TEST_REPO_FULL_NAME
+                            + "/discussions/27#discussioncomment-"
                             + TEST_COMMENT_ID,
                     false,
                     false,
@@ -282,7 +284,9 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             existing.setNativeId(TEST_COMMENT_ID);
             existing.setProvider(githubProvider);
             existing.setBody("Original body");
-            existing.setHtmlUrl("https://github.com/" + TEST_REPO_FULL_NAME + "/discussions/27#discussioncomment-"
+            existing.setHtmlUrl("https://github.com/"
+                    + TEST_REPO_FULL_NAME
+                    + "/discussions/27#discussioncomment-"
                     + TEST_COMMENT_ID);
             existing.setCreatedAt(Instant.now());
             existing.setDiscussion(testDiscussion);
@@ -315,7 +319,9 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             existing.setNativeId(TEST_COMMENT_ID);
             existing.setProvider(githubProvider);
             existing.setBody("Answer body");
-            existing.setHtmlUrl("https://github.com/" + TEST_REPO_FULL_NAME + "/discussions/27#discussioncomment-"
+            existing.setHtmlUrl("https://github.com/"
+                    + TEST_REPO_FULL_NAME
+                    + "/discussions/27#discussioncomment-"
                     + TEST_COMMENT_ID);
             existing.setAnswer(false);
             existing.setCreatedAt(Instant.now());
@@ -328,7 +334,9 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
                     TEST_COMMENT_ID,
                     "node_id_" + TEST_COMMENT_ID,
                     "Answer body",
-                    "https://github.com/" + TEST_REPO_FULL_NAME + "/discussions/27#discussioncomment-"
+                    "https://github.com/"
+                            + TEST_REPO_FULL_NAME
+                            + "/discussions/27#discussioncomment-"
                             + TEST_COMMENT_ID,
                     true,
                     false,
@@ -443,7 +451,9 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             existing.setNativeId(TEST_COMMENT_ID);
             existing.setProvider(githubProvider);
             existing.setBody("Comment to test bidirectional sync");
-            existing.setHtmlUrl("https://github.com/" + TEST_REPO_FULL_NAME + "/discussions/27#discussioncomment-"
+            existing.setHtmlUrl("https://github.com/"
+                    + TEST_REPO_FULL_NAME
+                    + "/discussions/27#discussioncomment-"
                     + TEST_COMMENT_ID);
             existing.setCreatedAt(Instant.now());
             existing.setDiscussion(testDiscussion);

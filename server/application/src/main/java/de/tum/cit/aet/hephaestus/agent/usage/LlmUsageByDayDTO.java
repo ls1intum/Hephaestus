@@ -18,8 +18,12 @@ public record LlmUsageByDayDTO(
 
         @NonNull
         @Schema(
-                description = "Ledger usage records this day with unavailable cost because rates are missing "
-                        + "or measurements are unverified. Excluded from both totals above.")
+                description =
+                        "Runs this day with at least one ledger row whose cost is unavailable because a rate is missing or the measurement is unverified. A "
+                                + "practice script row counts toward the run of its review. Those rows are excluded from both "
+                                + "totals above.")
         Long unpricedEventCount,
 
-        @NonNull Long events) {}
+        @NonNull
+        @Schema(description = "Runs: job attempts and mentor turns. Rows of models for practice scripts are not runs.")
+        Long events) {}

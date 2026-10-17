@@ -9,12 +9,11 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountWorkspaceMembershipQuery;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountMembershipQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Optional;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -36,7 +35,7 @@ class OutlineIdentityResolverTest extends BaseUnitTest {
     private AccountIdentityQuery accountIdentityQuery;
 
     @Mock
-    private AccountWorkspaceMembershipQuery workspaceMembershipQuery;
+    private AccountMembershipQuery workspaceMembershipQuery;
 
     private OutlineIdentityResolver resolver;
 
@@ -44,27 +43,25 @@ class OutlineIdentityResolverTest extends BaseUnitTest {
     void setUp() {
         resolver = new OutlineIdentityResolver(gitProviderRegistry, accountIdentityQuery, workspaceMembershipQuery);
         lenient()
-                .when(gitProviderRegistry.resolveProviderId("OUTLINE", SERVER_URL))
-                .thenReturn(PROVIDER_ID);
+                .when(gitProviderRegistry.findProviderId("OUTLINE", SERVER_URL))
+                .thenReturn(Optional.of(PROVIDER_ID));
     }
 
-    private static AccountWorkspaceMembershipQuery.WorkspaceMembershipView membership(
-            long workspaceId, @Nullable Long memberId) {
-        return new AccountWorkspaceMembershipQuery.WorkspaceMembershipView(
-                workspaceId, "ws", "Workspace", "MEMBER", memberId);
+    private static AccountMembershipQuery.MembershipView membership(long workspaceId) {
+        return new AccountMembershipQuery.MembershipView(
+                workspaceId, "ws", "Workspace", AccountMembershipQuery.Role.MEMBER);
     }
 
     @Test
-    @DisplayName("a linked author with membership in the workspace resolves to the view's member id")
+    @DisplayName("an exact linked account resolves only with membership in the workspace")
     void happyPath_resolvesMemberId() {
         when(accountIdentityQuery.resolveAccountId(PROVIDER_ID, SUBJECT, TEAM_ID))
                 .thenReturn(Optional.of(ACCOUNT_ID));
-        when(workspaceMembershipQuery.membershipsForAccount(ACCOUNT_ID))
-                .thenReturn(List.of(membership(WORKSPACE_ID, 555L)));
+        when(workspaceMembershipQuery.membershipsForAccount(ACCOUNT_ID)).thenReturn(List.of(membership(WORKSPACE_ID)));
 
-        Optional<Long> memberId = resolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, SUBJECT);
+        Optional<Long> memberId = resolver.resolveAccountId(WORKSPACE_ID, SERVER_URL, TEAM_ID, SUBJECT);
 
-        assertThat(memberId).contains(555L);
+        assertThat(memberId).contains(ACCOUNT_ID);
 
         verify(accountIdentityQuery).resolveAccountId(PROVIDER_ID, SUBJECT, TEAM_ID);
     }
@@ -75,7 +72,7 @@ class OutlineIdentityResolverTest extends BaseUnitTest {
         when(accountIdentityQuery.resolveAccountId(PROVIDER_ID, SUBJECT, TEAM_ID))
                 .thenReturn(Optional.empty());
 
-        assertThat(resolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, SUBJECT))
+        assertThat(resolver.resolveAccountId(WORKSPACE_ID, SERVER_URL, TEAM_ID, SUBJECT))
                 .isEmpty();
         verifyNoInteractions(workspaceMembershipQuery);
     }
@@ -86,40 +83,38 @@ class OutlineIdentityResolverTest extends BaseUnitTest {
         when(accountIdentityQuery.resolveAccountId(PROVIDER_ID, SUBJECT, TEAM_ID))
                 .thenReturn(Optional.of(ACCOUNT_ID));
         when(workspaceMembershipQuery.membershipsForAccount(ACCOUNT_ID))
-                .thenReturn(List.of(membership(WORKSPACE_ID + 1, 555L)));
+                .thenReturn(List.of(membership(WORKSPACE_ID + 1)));
 
-        assertThat(resolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, SUBJECT))
-                .isEmpty();
-    }
-
-    @Test
-    @DisplayName("a membership view without a member id resolves to empty rather than a bogus attribution")
-    void membershipWithoutMemberId_resolvesEmpty() {
-        when(accountIdentityQuery.resolveAccountId(PROVIDER_ID, SUBJECT, TEAM_ID))
-                .thenReturn(Optional.of(ACCOUNT_ID));
-        when(workspaceMembershipQuery.membershipsForAccount(ACCOUNT_ID))
-                .thenReturn(List.of(membership(WORKSPACE_ID, null)));
-
-        assertThat(resolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, SUBJECT))
+        assertThat(resolver.resolveAccountId(WORKSPACE_ID, SERVER_URL, TEAM_ID, SUBJECT))
                 .isEmpty();
     }
 
     @Test
     @DisplayName("blank subject or server URL short-circuits to empty without touching the registry")
     void blankInputs_shortCircuit() {
-        assertThat(resolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, " "))
+        assertThat(resolver.resolveAccountId(WORKSPACE_ID, SERVER_URL, TEAM_ID, " "))
                 .isEmpty();
-        assertThat(resolver.resolveMemberId(WORKSPACE_ID, "", TEAM_ID, SUBJECT)).isEmpty();
+        assertThat(resolver.resolveAccountId(WORKSPACE_ID, "", TEAM_ID, SUBJECT))
+                .isEmpty();
         verifyNoInteractions(gitProviderRegistry);
         verify(accountIdentityQuery, never()).resolveAccountId(any(), any(), any());
     }
 
     @Test
-    void shouldRejectMissingTeamBeforeResolvingIdentity() {
-        assertThat(resolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, null, SUBJECT))
+    void shouldResolveAnExactDefaultTeamIdentityWhenTheProviderHasNoTeamKey() {
+        when(accountIdentityQuery.resolveAccountId(PROVIDER_ID, SUBJECT, null)).thenReturn(Optional.of(ACCOUNT_ID));
+        when(workspaceMembershipQuery.membershipsForAccount(ACCOUNT_ID)).thenReturn(List.of(membership(WORKSPACE_ID)));
+        assertThat(resolver.resolveAccountId(WORKSPACE_ID, SERVER_URL, null, SUBJECT))
+                .contains(ACCOUNT_ID);
+        verify(accountIdentityQuery).resolveAccountId(PROVIDER_ID, SUBJECT, null);
+    }
+
+    @Test
+    void missingProviderDoesNotCreateAuthorityOrResolveAnAccount() {
+        when(gitProviderRegistry.findProviderId("OUTLINE", SERVER_URL)).thenReturn(Optional.empty());
+        assertThat(resolver.resolveAccountId(WORKSPACE_ID, SERVER_URL, TEAM_ID, SUBJECT))
                 .isEmpty();
-        assertThat(resolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, " ", SUBJECT))
-                .isEmpty();
-        verifyNoInteractions(gitProviderRegistry, accountIdentityQuery, workspaceMembershipQuery);
+        verify(gitProviderRegistry, never()).resolveProviderId("OUTLINE", SERVER_URL);
+        verifyNoInteractions(accountIdentityQuery, workspaceMembershipQuery);
     }
 }

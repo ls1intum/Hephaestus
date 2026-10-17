@@ -3,15 +3,15 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.commit;
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitContributorRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.RepositoryRef;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlResponseHandler;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncExcepti
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabRouteAdmission;
+import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -77,6 +78,8 @@ public class GitLabCommitMergeRequestLinker {
     private final GitLabRouteAdmission routeAdmission;
     private final TransactionTemplate transactions;
 
+    private final Clock clock;
+
     public GitLabCommitMergeRequestLinker(
             CommitRepository commitRepository,
             CommitContributorRepository commitContributorRepository,
@@ -87,7 +90,9 @@ public class GitLabCommitMergeRequestLinker {
             ApplicationEventPublisher eventPublisher,
             GitLabRouteAdmission routeAdmission,
             TransactionTemplate transactions,
+            Clock clock,
             GitLabProjectAdmission admission) {
+        this.clock = clock;
         this.admission = admission;
         this.commitRepository = commitRepository;
         this.commitContributorRepository = commitContributorRepository;
@@ -228,7 +233,7 @@ public class GitLabCommitMergeRequestLinker {
                                     extractNestedEndCursor(mrNode),
                                     safeProjectPath + "!" + iid);
                             if (tail == null) {
-                                // Incomplete follow-up pagination: skip the MR to avoid partial links.
+                                // Incomplete pagination cannot establish all commit links.
                                 continue;
                             }
                             commitNodes.addAll(tail);
@@ -266,8 +271,7 @@ public class GitLabCommitMergeRequestLinker {
                                 totalLinks += fallbackInserted;
                                 if (fallbackInserted == 0) {
                                     log.debug(
-                                            "Fallback produced no link rows; referenced SHAs not yet in git_commit: "
-                                                    + "projectPath={}, iid={}, shaCount={}",
+                                            "Fallback produced no link rows; referenced SHAs not yet in git_commit: projectPath={}, iid={}, shaCount={}",
                                             safeProjectPath,
                                             iid,
                                             fallbackShas.size());
@@ -691,7 +695,8 @@ public class GitLabCommitMergeRequestLinker {
             }
         }
 
-        // Signal downstream consumers (the activity ledger) that commit author identities
+        // ItemEventDefinition downstream consumers (the activity ledger) that commit author
+        // identities
         // for this repository have been reconciled. The activity module listens for this
         // event and backfills COMMIT_CREATED rows whose actor_id was NULL at ingest time.
         if (commitAuthorRowsUpdated > 0) {
@@ -700,7 +705,8 @@ public class GitLabCommitMergeRequestLinker {
                     EventContext.forSync(
                             scopeId,
                             Objects.requireNonNull(RepositoryRef.from(repository)),
-                            IdentityProviderType.GITLAB)));
+                            IdentityProviderType.GITLAB,
+                            clock.instant())));
         }
 
         if (contributorRowsUpdated > 0

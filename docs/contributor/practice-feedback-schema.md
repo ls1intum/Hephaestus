@@ -1,172 +1,128 @@
 ---
 title: Practice feedback schema
-description: The persisted shape of an observation and the feedback composed from it.
+description: The persisted shape of a practice result, its problems, and the feedback composed from them.
 ---
 
 # Practice review data model
 
-This page records the durable relationships and invariants behind practice reviews.
-It deliberately does not maintain exhaustive implementation inventories.
+The [product vocabulary](./practice-feedback-language.md) owns result and feedback meanings.
+The [review glossary](./practice-review-glossary.mdx) owns review and runtime terms.
+[ADR 0056](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0056-one-practice-model-for-items-and-scans.md) records the model decision.
+The [generated schema](./database-schema.mdx) owns table and key inventories.
 
-Use the executable sources for exact details:
+## Definitions and identity
 
-- [generated database schema](./database-schema.mdx) for tables, columns, keys, and relationships.
-- [the `practices` module](https://github.com/hephaestus-build/Hephaestus/tree/main/server/application/src/main/java/de/tum/cit/aet/hephaestus/practices)
-  for the domain model.
-- [Liquibase changelogs](https://github.com/hephaestus-build/Hephaestus/tree/main/server/application/src/main/resources/db/changelog)
-  for persisted constraints and indexes.
-- [`openapi.yaml`](https://github.com/hephaestus-build/Hephaestus/blob/main/server/openapi.yaml) for HTTP projections.
-- [ADR 0021](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0021-observations-feedback-synthesis-seam.md)
-  and
-  [ADR 0050](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0050-one-practice-standard-one-outcome.md)
-  for design history.
-- [practice feedback language](./practice-feedback-language.md) for user-facing terms.
+A practice belongs to one workspace and points to its current practice version.
+Each version owns one immutable definition.
+Name and review digest are database-generated projections of that definition.
+Organization and feedback mode remain operational settings on the practice.
 
-## Model at a glance
+Accounts identify people. Provider identities link accounts to provider logins.
+Membership joins an account to a workspace and retains its role and scope selection.
+A member who leaves has `left_at`. Leaving does not erase historical work.
 
-| Concept               | Role                                                                       | Relationships                                                                   |
-| --------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `PracticeGroup`        | Workspace-defined grouping for practices                                   | Has many practices. A practice may be unassigned                                |
-| `Practice`            | Configurable criterion a review checks                                     | Belongs to a workspace and may belong to a group                                |
-| `PracticeRevision`    | Criteria snapshot used to interpret a past result                          | Belongs to one practice. An observation may pin one revision                    |
-| `Observation`         | Evidence produced by one review job                                        | Belongs to one practice and one job. May support many pieces of feedback        |
-| `Feedback`            | One recipient-specific piece of feedback and its delivery outcome          | Belongs to one job. May draw on many observations and have many placements      |
-| `FeedbackApproval`    | Immutable decision to approve or reject one exact feedback proposal        | Stores the feedback ID, workspace, actor, decision context, content digest, and time |
-| `FeedbackDispatch`    | Crash-safe provider delivery of one exact review package                   | Owns one job or approved feedback proposal. Records provider placements before ledger projection |
-| `FeedbackObservation` | Ordered evidence binding between one piece of feedback and one observation | Joins feedback to observations with a primary or supporting role                |
-| `FeedbackPlacement`   | Where a piece of feedback was placed                                       | Belongs to one `Feedback`. Records a summary, inline, or conversation placement |
-| `Reaction`            | Immutable feedback-response snapshot                                       | Belongs to one `Feedback`. Stores usefulness, resolution, or both               |
+An item has a domain kind, a workspace and an adapter-owned identity.
+A file item has a repository parent and a path.
+A provider pull request review has the pull request item as its parent.
+The domain owns the item's version and role semantics.
 
-## Invariants
+## Reviews and execution
 
-### Evidence and feedback are separate
+An item event records a change to an item.
+A review pins the item version and practice versions.
+It records an origin independently of its ITEM or SCAN kind.
+New requests need no synthetic event.
+Historical origin links can be absent after migration or actor erasure.
 
-An observation records what a review observed.
-Feedback records the guidance prepared from one or more observations and what happened to it.
-A placement records where that feedback appeared.
-This separation preserves observations even when no feedback is composed or delivery is withheld.
+A review can own many execution jobs.
+A scan executes bounded file jobs serially.
+Database indexes permit one active job per review and one active scan per workspace.
+Job cleanup does not remove the product review or its results.
 
-Observation rows are immutable.
-Practice criteria are mutable, so each observation can reference the criteria revision that applied to its review.
-Feedback content, provenance, and replacement link are immutable.
-A re-review creates a new provider comment and a new feedback unit linked to the last delivered unit.
+`review_practice` freezes the definition and complete method used for each practice.
+`review_item` owns the selected practice/item pairs and their proof references.
+Its stored states are LISTED, JUDGED, REUSED and WITHHELD.
+After closure, a remaining LISTED pair is Not reviewed.
+An outcome and a membership state are different facts.
 
-It never rewrites the earlier review.
-Guarded lifecycle updates may change delivery state, delivery timestamp, or suppression reason.
+Reused results keep their original producer review.
+Report queries therefore join through membership rather than only through `result.review_id`.
+The aggregate report contains no second copy of quotes or detailed proof.
 
-### Occurrence and recurrence have different identities
+## Results and problems
 
-`occurrenceKey` prevents duplicate persistence of the same result within a job retry. `recurrenceKey` groups the same evidence location across review jobs, including observations about different behaviors.
-A new review creates a new observation.
-Location grouping proves neither recurrence nor resolution. Responses and exact-observation delivery decisions use the observations bound to the feedback.
+The [outcome contract](./practice-feedback-language.md#result-outcomes) owns the four outcomes and their evidence requirements.
+Admission persists the result and its problems atomically.
+A refused child or citation withholds the entire candidate.
+The server never deletes a problem to turn a candidate into Met.
 
-### Historical measurement is not current conformance
+The admission key is review, practice, item and developer.
+The current claim key is practice, item and developer, with null developers treated as equal.
+The newest ordered claim occupies that key until replacement, work change or removal ends it.
+Ordering uses review order time, result record time and review UUID text.
+An older incoming claim enters history as OUTRANKED.
 
-A result from the earlier behavior-level scheme does not establish conformance under the current whole-standard contract.
-Historical revision fingerprints are preserved.
-A missing or incompatible fingerprint makes a claim `UNVERIFIABLE`.
-It cannot support current standings or new delivery.
+A current marked result still occupies the key.
+Readers exclude marked proof when appropriate. They do not resurrect an older claim.
+Neither INCORRECT nor ACCEPTED changes `ended_at`.
+Each mark requires a reason and has a remove-mark reverse action.
 
-New reviews append a current-scheme snapshot without rewriting the revision of a past observation.
+Historical evidence uses `evidence_version=0` and retains unknown fields.
+New admission requires version 1.
+It never constructs strict current proof from missing historical coverage, roles or quotations.
+Archived proof cannot support scan reuse.
 
-### One contract across boundaries
+## Feedback and delivery
 
-An observation carries one required `outcome`: `MET`, `NOT_MET`, `NOT_APPLICABLE`, or `UNDETERMINED`.
-The [product vocabulary](./practice-feedback-language.md#observation-outcomes) owns their meaning.
-The runtime, persistence, and HTTP projections use the same values.
-Severity is required exactly for `NOT_MET`.
+Feedback names one developer and one destination.
+Several distinct pieces can share a review, developer and destination.
+Each retains its own words, responses and UUID.
 
-It is absent otherwise.
-Admission rejects contradictory submissions rather than deleting fields or manufacturing a judgment.
-Delivery policy remains independent of the observation outcome.
+The basis joins feedback to results and optional problems.
+Composite foreign keys enforce the same workspace and developer on both parents.
+A problem reference must belong to the named result.
+A developerless result cannot support feedback.
 
-### Evidence warrants
+`review.checks.feedbackComposition` retains each feedback proposal's exact support per copy and its quiet decisions with prior-advice witness IDs.
+The same record retains the primary result and any explicit conversation replacement target.
+Preparation rejects a replay that changes this record.
+These records share the review's existing JSON limit and require no additional table.
 
-Every observation cites exact staged text.
-Additional warrants express the basis for the claim:
+The runtime passes practice-page title, body and next step through the practices SPI.
+Feedback preparation renders these fields inside the practices module.
 
-| Claim | Evidence branch | Meaning |
-| --- | --- | --- |
-| An absence-based decided claim | `evidence.search` | Sources searched, target, and bounded scope |
-| `NOT_APPLICABLE` | `evidence.inapplicability` | Sources read, prerequisite, and fact excluding it |
-| `UNDETERMINED` | `evidence.undecidability` | Open question and evidence that would settle it |
-| Directly evidenced conformance or shortfall | Citations | The actual work supporting the claim |
+Feedback preparation persists the basis and physical copies before provider access.
+An on-work send owns lease and reconciliation state.
+Copy text, anchors and write identity become immutable after a write begins.
+Historical provider write keys and markers remain exact.
+New copies use their UUID as their write key.
 
-A missing, errored, redacted, or inadequate required source is a readiness failure, not an outcome.
-Every source declared exhaustive must appear in `search.consulted`.
-A `MET` claim based on absence requires at least one exhaustive source.
-This proves conformance only within the recorded boundary.
+A confirmed copy records its provider reference and appearance time.
+An unresolved sibling keeps the parent Unconfirmed without erasing the confirmed time.
+Readback can establish FOUND, ABSENT or UNKNOWN.
+Only an explicit admin retry after proved absence can reopen a write.
+Unknown visibility never authorizes another POST.
 
-Admission validates submitted search coverage.
-Neither structural validation nor a schema proves the truth or completeness of a model's claim.
-Empirical evaluation must test those properties separately.
+Practice-page delivery uses the feedback record's first authenticated developer read time.
+A view-as admin read does not create that receipt.
+Conversation delivery requires actual shown words in a completed turn.
+A result link alone is not delivery.
 
-### Ordering uses observable properties
+Approval binds the exact proposal before any copy write begins.
+Withdrawal changes private card visibility without changing delivery history or result outcomes.
+A response keeps resolution and usefulness as independent dimensions.
+Its history is append-only, including a clear marker when the developer removes the response.
 
-Observations have no model-reported confidence score. `ObservationOrder` sorts by severity where it applies, then by the number of distinct cited loci, then by stable identity.
-This makes ordering deterministic and derives every input from admitted evidence instead of model self-assessment.
+## Source access and erasure
 
-### Recipient and subject remain distinct
+A persisted row does not grant source access.
+Read projections apply tenancy, owner, consent and source permissions.
+Unavailable text does not mean the result has no problems.
+Safe counts and outcome facts can remain visible while words and evidence are absent.
 
-An observation's `aboutUserId` identifies the developer the evidence concerns.
-Feedback separately stores the subject and the recipient.
-They may be equal, but they are not the same concept and must not be inferred from each other.
+Erasure removes dependent feedback and proof before membership.
+It also removes source-person proof in reviews about another developer or about no developer.
+Physical removal receipts survive parent deletion until their mounted-store acknowledgement arrives.
+Audit actors can become null without changing their recorded action.
 
-### Delivery state is an audit fact
-
-Each feedback row retains its delivery outcome.
-See [Evaluation Provenance Contract](./evaluation-provenance.md) for state interpretation, evaluation joins, and limitations.
-
-`AWAITING_APPROVAL` is actionable feedback, not suppression.
-Its ordered package contains the exact summary and inline comments.
-A guarded decision moves it once to `PREPARED` or terminal `DISCARDED` and writes one `FeedbackApproval`.
-One approval covers the complete package.
-
-The digest binds the content, recipient, channel, and artifact target, and release refuses a stale or mismatched decision.
-Approval records retain identifier snapshots rather than JPA relationships so account erasure does not rewrite the audit.
-
-Provider creates use one durable dispatch for the complete review package.
-The dispatch stores the exact content before egress and records each provider placement as it converges.
-A terminal package is projected into feedback and placement rows under a separate lease.
-A crash between provider acknowledgement and ledger recording resumes projection without posting the package again.
-
-### One feedback response has two independent dimensions
-
-The recipient responds to the delivered `Feedback` unit, not to a private observation.
-One response may record perceived usefulness (`HELPFUL` or `UNHELPFUL`), a resolution (`ADDRESSED`, `DISPUTED`, or `NOT_APPLICABLE`), or both. `DISPUTED` requires a comment because it rejects the feedback's judgment. Usefulness alone does not change standing, trend, or re-nag suppression.
-
-PUT replaces the complete response.
-Omitted dimensions are cleared.
-DELETE removes the response.
-Both operations are idempotent at the API boundary.
-
-Response history is append-only in persistence.
-Read projections expose only the current response, so a change of mind never counts as several currently resolved pieces of feedback.
-
-## Read projections and access
-
-The persistence model is not an authorization boundary.
-Controllers define who may see each projection:
-
-- developer observation list, detail, and summary endpoints, and practice standings are scoped to the authenticated
-  developer.
-- the pull-request observation projection shows workspace members every relevant observation for that pull
-  request.
-- the workspace-admin practice-review endpoints expose observations and feedback across that workspace.
-- developer-facing practice projections omit practice criteria by construction.
-
-Workspace-admin response projections use the recipient's latest response snapshot.
-Only a snapshot with an explicit answer exposes occurrence and time metadata.
-A rating alone and an empty retraction expose neither.
-Only a current dispute exposes its explanation.
-Ratings and other notes remain private.
-
-Workspace-admin job reads expose typed execution, readiness, outcome, and usage facts, not the retained runtime result.
-The job `output` property remains nullable in the API contract.
-Administrative detail and list reads no longer return its retained value.
-Derive permitted facts from the internal result before projecting the response.
-The stored result remains available to its delivery and retention owners.
-Removing it from a response must not erase or rewrite it.
-
-Keep these rules enforceable in controller authorization, repository predicates, DTO shape, and tests.
-Do not add a field matrix here: the [OpenAPI specification](https://github.com/hephaestus-build/Hephaestus/blob/main/server/openapi.yaml) is the authoritative contract for fields exposed by each endpoint.
+The [data map](/admin/dsms/personal-data-map) owns retention, export and erasure procedures.

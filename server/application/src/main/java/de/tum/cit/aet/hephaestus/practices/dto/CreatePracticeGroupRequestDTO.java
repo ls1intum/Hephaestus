@@ -1,48 +1,48 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.annotation.Nulls;
+import de.tum.cit.aet.hephaestus.practices.ClosedPracticeInput;
+import de.tum.cit.aet.hephaestus.practices.GroupDefinition;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import org.jspecify.annotations.Nullable;
 
-@Schema(description = "Request to create a new practice group")
+@JsonInclude(JsonInclude.Include.ALWAYS)
 public record CreatePracticeGroupRequestDTO(
-        @NotBlank(message = "Slug is required")
-        @Size(min = 3, max = 64, message = "Slug must be between 3 and 64 characters")
-        @Pattern(
-                regexp = "^[a-z0-9]+(?:-[a-z0-9]+)*$",
-                message = "Slug must contain only lowercase alphanumeric characters and hyphens,"
-                        + " must not start or end with a hyphen, and must not contain consecutive hyphens")
-        @Schema(description = "URL-safe identifier unique within the workspace", example = "review-ready-work")
-        String slug,
+        @JsonProperty(required = true) @ValidPracticeSlug String slug,
 
-        @NotBlank(message = "Name is required")
-        @Size(min = 3, max = 128, message = "Name must be between 3 and 128 characters")
-        @Schema(description = "Human-readable name", example = "Submitting review-ready work")
+        @JsonProperty(required = true) @NotBlank @Size(max = GroupDefinition.NAME_MAX_LENGTH)
         String name,
 
-        @Size(max = 5000, message = "Description must be at most 5000 characters")
-        @Schema(description = "What this group develops")
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
+        @JsonProperty(required = true)
         @Nullable
+        @Size(max = GroupDefinition.DESCRIPTION_MAX_LENGTH)
         String description,
 
-        @PositiveOrZero(message = "Display order must be zero or positive")
-        @Schema(description = "Sort order within the workspace. Appended when omitted.", example = "1")
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
+        @JsonProperty(required = true)
         @Nullable
-        Integer displayOrder,
-
-        @Size(max = 64, message = "Icon must be at most 64 characters")
-        @Pattern(regexp = "^[A-Za-z0-9]+$", message = "Icon must be a lucide icon name (letters and digits only)")
-        @Schema(
-                description = "Optional lucide icon name giving the group a glanceable identity",
-                example = "ShieldAlert")
-        @Nullable
+        @Size(max = GroupDefinition.ICON_MAX_LENGTH)
         String icon,
 
-        @Size(max = 32, message = "Color must be at most 32 characters")
-        @Pattern(regexp = "^[a-z]+$", message = "Color must be a lowercase palette key")
-        @Schema(description = "Optional palette colour key for the group's chip", example = "rose")
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
+        @JsonProperty(required = true)
         @Nullable
-        String color) {}
+        @Size(max = GroupDefinition.COLOR_MAX_LENGTH)
+        String color,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
+        @JsonProperty(required = true)
+        @Nullable
+        @PositiveOrZero
+        Integer position,
+
+        @JsonProperty(required = true) @JsonSetter(nulls = Nulls.FAIL)
+        boolean shownToDevelopers)
+        implements ClosedPracticeInput {}

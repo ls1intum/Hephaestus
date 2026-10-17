@@ -1,7 +1,7 @@
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
-import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
+import { assert, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
 	getActivityFacetsQueryKey,
@@ -14,18 +14,16 @@ import type {
 	ActivityWork,
 	ActivityWorkPage,
 	OpenWork,
-	WorkItem,
+	WorkspaceMembership,
 } from "@/api/types.gen";
 import type { Wire } from "@/lib/dates";
 import { currentUser } from "@/mocks/fixtures/auth";
-import { workspaceListItem } from "@/mocks/fixtures/workspaces";
+import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
 import { QUERY_STALE_TIME_MS } from "@/runtime/tanstack-query/query-defaults";
-import { clearUserView } from "@/runtime/user-view/session";
 import { deferred } from "@/test/async";
 import { ObserverStub } from "@/test/observers";
 import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter, testQueryClient } from "@/test/router-harness";
-import { storeUserView } from "@/test/user-view";
 
 // A case mounts the whole app chrome, whose route modules are imported lazily.
 vi.setConfig({ testTimeout: 40_000 });
@@ -156,47 +154,32 @@ function pagedWork(record: (request: Request) => void) {
 		"page-2": { content: [workItem(2), workItem(3)], nextCursor: "page-3" },
 		"page-3": { content: [workItem(4)] },
 	};
-	return http.get(/\/workspaces\/[^/]+\/activity\/(?:people\/\d+\/)?work/u, ({ request }) => {
-		record(request);
-		const cursor = new URL(request.url).searchParams.get("cursor") ?? "first";
-		return HttpResponse.json(pages[cursor]);
-	});
+	return http.get(
+		/\/workspaces\/[^/]+\/activity\/(?:(?:people\/\d+|me)\/)?work/u,
+		({ request }) => {
+			record(request);
+			const cursor = new URL(request.url).searchParams.get("cursor") ?? "first";
+			return HttpResponse.json(pages[cursor]);
+		},
+	);
 }
 
-const ownPullRequest = {
-	id: 3101,
-	type: "PULL_REQUEST",
-	number: 42,
-	title: "Retry webhook delivery",
-	state: "OPEN",
-	isDraft: false,
-	// Approved, so it needs Ada and is not folded away with what waits on others.
-	reviewDecision: "APPROVED",
-	author: { id: 7, login: "ada-lrz", name: "Ada", avatarUrl: "", htmlUrl: "" },
-} satisfies WorkItem;
-const ownIssue = {
-	id: 3102,
-	type: "ISSUE",
-	number: 43,
-	title: "Document the restore drill",
-	state: "OPEN",
-	isDraft: false,
-} satisfies WorkItem;
-const reviewRequested = {
-	...ownPullRequest,
-	reviewDecision: undefined,
-	id: 3103,
-	number: 44,
-	title: "Bob's pull request",
-	author: { id: 8, login: "bob", name: "Bob", avatarUrl: "", htmlUrl: "" },
-} satisfies WorkItem;
-/** Ada's own pull request and assigned issue, and one of Bob's she was asked to review. */
-const ownWork = {
-	reviewRequests: { content: [reviewRequested], hasMore: false },
-	teamReviewRequests: nothing,
-	pullRequests: { content: [ownPullRequest], hasMore: false },
-	issues: { content: [ownIssue], hasMore: false },
-} satisfies OpenWork;
+function adaMembership(
+	role: WorkspaceMembership["role"],
+	identities: WorkspaceMembership["account"]["identities"] = [
+		{ provider: "GITHUB", login: "ada-lrz", displayName: "Ada", avatarUrl: null },
+	],
+): Wire<WorkspaceMembership> {
+	return {
+		account: { id: "70", status: "ACTIVE", displayName: "Ada", avatarUrl: null, identities },
+		role,
+		joinedAt: "2026-01-01T00:00:00Z",
+		leftAt: null,
+		hidden: false,
+		reviewSelected: true,
+		eligibleForPracticeReview: true,
+	};
+}
 
 /** Signed in as `ada`, while the workspace's connected instance knows the same account as `ada-lrz`. */
 describe("Activity", () => {
@@ -214,13 +197,13 @@ describe("Activity", () => {
 			),
 			http.get("*/workspaces/:workspaceSlug", () => HttpResponse.json(workspaceListItem("acme"))),
 			http.get("*/workspaces/:workspaceSlug/members/me", () =>
-				HttpResponse.json({ role: "MEMBER", userId: 7, userLogin: "ada-lrz", userName: "Ada" }),
+				HttpResponse.json(adaMembership("MEMBER")),
 			),
 			http.get("*/workspaces/:workspaceSlug/activity/people", ({ request }) => {
 				record(request);
 				return HttpResponse.json(people);
 			}),
-			http.get("*/workspaces/:workspaceSlug/activity/people/:userId", ({ request }) => {
+			http.get("*/workspaces/:workspaceSlug/activity/me", ({ request }) => {
 				record(request);
 				return HttpResponse.json(personDetail);
 			}),
@@ -228,7 +211,7 @@ describe("Activity", () => {
 				record(request);
 				return HttpResponse.json(workPage);
 			}),
-			http.get("*/workspaces/:workspaceSlug/activity/people/:userId/work", ({ request }) => {
+			http.get("*/workspaces/:workspaceSlug/activity/me/work", ({ request }) => {
 				record(request);
 				return HttpResponse.json(workPage);
 			}),
@@ -245,132 +228,15 @@ describe("Activity", () => {
 		renderRouteAtWithRouter("/w/acme/activity");
 
 		await screen.findByRole("heading", { name: "Needs you" }, ROUTE_RENDER_WAIT);
-		await waitFor(() => expect(readsOf("/activity/people/7").length).toBeGreaterThan(0));
-		expect(readsOf("/activity/people/7").every((url) => !url.searchParams.has("login"))).toBe(true);
+		await waitFor(() => expect(readsOf("/activity/me").length).toBeGreaterThan(0));
+		expect(readsOf("/activity/me").every((url) => !url.searchParams.has("login"))).toBe(true);
 		expect(readsOf("/activity/people")).toStrictEqual([]);
-		expect(readsOf("/activity/people/7").every((url) => !url.searchParams.has("membersOnly"))).toBe(
-			true,
-		);
+		expect(reads.filter((url) => url.pathname.includes("/activity/people/"))).toStrictEqual([]);
+		expect(readsOf("/activity/me").every((url) => !url.searchParams.has("membersOnly"))).toBe(true);
 		expect(readsOf("/open-work").map((url) => url.pathname)).toContain(
 			"/workspaces/acme/activity/members/ada-lrz/open-work",
 		);
 		expect(reads.some((url) => url.searchParams.get("login") === "ada")).toBe(false);
-	});
-
-	describe("Request review", () => {
-		let asked: unknown[] = [];
-		beforeEach(() => {
-			asked = [];
-			server.use(
-				http.get("*/workspaces/:workspaceSlug/activity/members/:login/open-work", () =>
-					HttpResponse.json(ownWork),
-				),
-				http.post("*/workspaces/:workspaceSlug/practices/review-requests", async ({ request }) => {
-					asked.push(await request.json());
-					return HttpResponse.json({ status: "SUBMITTED", jobId: "job-1" });
-				}),
-			);
-		});
-		afterEach(clearUserView);
-
-		it("asks for a review of your own work by its kind and id, and of nobody else's", async () => {
-			const user = userEvent.setup();
-			renderRouteAtWithRouter("/w/acme/activity");
-
-			await user.click(
-				await screen.findByRole("button", { name: "Request review: #42" }, ROUTE_RENDER_WAIT),
-			);
-			await user.click(screen.getByRole("button", { name: "Request review: #43" }));
-
-			await waitFor(() =>
-				expect(asked).toStrictEqual([
-					{ artifactKind: "scm.pull_request", artifactId: 3101 },
-					{ artifactKind: "scm.issue", artifactId: 3102 },
-				]),
-			);
-			expect(screen.queryByRole("button", { name: "Request review: #44" })).toBeNull();
-		});
-
-		it("says why a review asked for from open work was refused", async () => {
-			server.use(
-				http.post("*/workspaces/:workspaceSlug/practices/review-requests", () =>
-					HttpResponse.json({
-						status: "REFUSED",
-						reason: "REQUEST_COOLDOWN_ACTIVE",
-						reasonDescription: "A review of this was already asked for a moment ago.",
-					}),
-				),
-			);
-			const user = userEvent.setup();
-			renderRouteAtWithRouter("/w/acme/activity");
-
-			await user.click(
-				await screen.findByRole("button", { name: "Request review: #42" }, ROUTE_RENDER_WAIT),
-			);
-
-			await screen.findByText("No review was started", undefined, ROUTE_RENDER_WAIT);
-			await screen.findByText("A review of this was already asked for a moment ago.");
-		});
-
-		/** A refusal answered after a second ask was sent is still said: every answer is its own. */
-		it("says why an earlier ask was refused after a later one was sent", async () => {
-			// The first ask is answered only once the test says so; the second at once.
-			const firstAnswer = deferred();
-			const answers = [
-				async () => {
-					await firstAnswer.promise;
-					return {
-						status: "REFUSED",
-						reason: "REQUEST_COOLDOWN_ACTIVE",
-						reasonDescription: "A review of this was already asked for a moment ago.",
-					};
-				},
-				async () => ({ status: "SUBMITTED", jobId: "job-2" }),
-			];
-			server.use(
-				http.post("*/workspaces/:workspaceSlug/practices/review-requests", async ({ request }) => {
-					asked.push(await request.json());
-					const answer = answers.shift();
-					assert(answer, "Only two reviews are asked for");
-					return HttpResponse.json(await answer());
-				}),
-			);
-			const user = userEvent.setup();
-			renderRouteAtWithRouter("/w/acme/activity");
-
-			await user.click(
-				await screen.findByRole("button", { name: "Request review: #42" }, ROUTE_RENDER_WAIT),
-			);
-			await user.click(screen.getByRole("button", { name: "Request review: #43" }));
-			await waitFor(() => expect(asked).toHaveLength(2));
-			await screen.findByText("Review started");
-			firstAnswer.resolve();
-
-			await screen.findByText("No review was started", undefined, ROUTE_RENDER_WAIT);
-			await screen.findByText("A review of this was already asked for a moment ago.");
-		});
-
-		it("offers no review where the workspace reviews no practices", async () => {
-			server.use(
-				http.get("*/workspaces", () =>
-					HttpResponse.json([workspaceListItem("acme", { practicesEnabled: false })]),
-				),
-			);
-			renderRouteAtWithRouter("/w/acme/activity");
-
-			await screen.findByText("Retry webhook delivery", undefined, ROUTE_RENDER_WAIT);
-			expect(screen.queryByRole("button", { name: /^Request review/u })).toBeNull();
-		});
-
-		it("offers no review in a user view, which never spends the member's budget", async () => {
-			storeUserView({ workspaceSlug: "acme" });
-			renderRouteAtWithRouter("/w/acme/activity");
-
-			await screen.findByText("Retry webhook delivery", undefined, ROUTE_RENDER_WAIT);
-			// The view is on, so the absence below is the view's doing.
-			screen.getByText(/read-only/u);
-			expect(screen.queryByRole("button", { name: /^Request review/u })).toBeNull();
-		});
 	});
 
 	it("pages your timeline by the server's cursor and asks the server for the period", async () => {
@@ -383,17 +249,17 @@ describe("Activity", () => {
 		);
 
 		await waitFor(() =>
-			expect(
-				readsOf("/activity/people/7/work").map((url) => url.searchParams.get("cursor")),
-			).toContain("page-2"),
+			expect(readsOf("/activity/me/work").map((url) => url.searchParams.get("cursor"))).toContain(
+				"page-2",
+			),
 		);
 		// A preset is the server's to resolve, so no read names a start or an end of its own.
-		for (const url of readsOf("/activity/people/7/work")) {
+		for (const url of readsOf("/activity/me/work")) {
 			expect(url.searchParams.get("range")).toBe("90d");
 			expect(url.searchParams.has("from")).toBe(false);
 		}
 		// The one read with days of its own is the period before, which ends where this one begins.
-		const earlier = readsOf("/activity/people/7").filter((url) => url.searchParams.has("to"));
+		const earlier = readsOf("/activity/me").filter((url) => url.searchParams.has("to"));
 		expect(earlier.map((url) => url.searchParams.get("to"))).toStrictEqual([
 			"2026-09-01T00:00:00.000Z",
 		]);
@@ -403,10 +269,10 @@ describe("Activity", () => {
 		renderRouteAtWithRouter("/w/acme/activity?from=2026-03-01&to=2026-03-31");
 
 		await waitFor(
-			() => expect(readsOf("/activity/people/7").length).toBeGreaterThan(0),
+			() => expect(readsOf("/activity/me").length).toBeGreaterThan(0),
 			ROUTE_RENDER_WAIT,
 		);
-		const [first] = readsOf("/activity/people/7");
+		const [first] = readsOf("/activity/me");
 		assert(first);
 		expect(first.searchParams.get("range")).toBe("custom");
 		expect(new Date(String(first.searchParams.get("from")))).toStrictEqual(new Date(2026, 2, 1));
@@ -419,13 +285,11 @@ describe("Activity", () => {
 		await waitFor(
 			() =>
 				expect(
-					readsOf("/activity/people/7/work").some(
-						(url) => url.searchParams.getAll("kinds").length > 0,
-					),
+					readsOf("/activity/me/work").some((url) => url.searchParams.getAll("kinds").length > 0),
 				).toBe(true),
 			ROUTE_RENDER_WAIT,
 		);
-		const filtered = readsOf("/activity/people/7/work").find(
+		const filtered = readsOf("/activity/me/work").find(
 			(url) => url.searchParams.getAll("kinds").length > 0,
 		);
 		expect(filtered?.searchParams.getAll("kinds")).toStrictEqual([
@@ -446,7 +310,7 @@ describe("Activity", () => {
 
 		await screen.findByText("Copied 4 items as Markdown", undefined, ROUTE_RENDER_WAIT);
 		expect(
-			readsOf("/activity/people/7/work")
+			readsOf("/activity/me/work")
 				.filter((url) => url.searchParams.get("size") === "100")
 				.map((url) => url.searchParams.get("cursor")),
 		).toStrictEqual(["page-2", "page-3"]);
@@ -461,7 +325,11 @@ describe("Activity", () => {
 	it("tells a member with no connected account in the workspace how to connect one", async () => {
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/members/me", () =>
-				HttpResponse.json({ role: "MEMBER", userId: 7, userName: "Ada" }),
+				HttpResponse.json(
+					adaMembership("MEMBER", [
+						{ provider: "SLACK", login: null, displayName: "Ada", avatarUrl: null },
+					]),
+				),
 			),
 		);
 		renderRouteAtWithRouter("/w/acme/activity");
@@ -470,7 +338,7 @@ describe("Activity", () => {
 		expect(screen.getByRole("link", { name: "Connect an account" }).getAttribute("href")).toBe(
 			"/settings#linked-accounts-heading",
 		);
-		expect(readsOf("/activity/people/7")).toStrictEqual([]);
+		expect(readsOf("/activity/me")).toStrictEqual([]);
 	});
 
 	it("reads nobody's activity when the membership cannot be read, and says so", async () => {
@@ -495,15 +363,13 @@ describe("Activity", () => {
 		await waitFor(
 			() =>
 				expect(
-					readsOf("/activity/people/7/work").some(
-						(url) => url.searchParams.getAll("kinds").length > 0,
-					),
+					readsOf("/activity/me/work").some((url) => url.searchParams.getAll("kinds").length > 0),
 				).toBe(true),
 			ROUTE_RENDER_WAIT,
 		);
 		await expect(screen.findAllByRole("dialog")).resolves.toHaveLength(1);
 		expect(
-			readsOf("/activity/people/7/work").flatMap((url) => url.searchParams.getAll("kinds")),
+			readsOf("/activity/me/work").flatMap((url) => url.searchParams.getAll("kinds")),
 		).not.toContain("ISSUE_OPENED");
 	});
 
@@ -634,7 +500,7 @@ describe("Workspace activity", () => {
 	let reads: URL[] = [];
 	let automation: URL[] = [];
 	let visibility: URL[] = [];
-	let role = "MEMBER";
+	let role: WorkspaceMembership["role"] = "MEMBER";
 	const record = (request: Request) => {
 		reads.push(new URL(request.url));
 	};
@@ -649,7 +515,7 @@ describe("Workspace activity", () => {
 			http.get("*/workspaces", () => HttpResponse.json([workspaceListItem("acme")])),
 			http.get("*/workspaces/:workspaceSlug", () => HttpResponse.json(workspaceListItem("acme"))),
 			http.get("*/workspaces/:workspaceSlug/members/me", () =>
-				HttpResponse.json({ role, userId: 7, userLogin: "ada-lrz", userName: "Ada" }),
+				HttpResponse.json(adaMembership(role)),
 			),
 			// Ada is the only member; Bob contributes without a membership.
 			http.get("*/workspaces/:workspaceSlug/users", () =>
@@ -667,7 +533,7 @@ describe("Workspace activity", () => {
 				record(request);
 				return HttpResponse.json(personDetail);
 			}),
-			http.get(/\/workspaces\/[^/]+\/activity\/(?:people\/\d+\/)?work/u, ({ request }) => {
+			http.get(/\/workspaces\/[^/]+\/activity\/(?:(?:people\/\d+|me)\/)?work/u, ({ request }) => {
 				record(request);
 				return HttpResponse.json(workPage);
 			}),
@@ -1270,7 +1136,7 @@ describe("Workspace activity", () => {
 				await held.promise;
 				return HttpResponse.json(people);
 			}),
-			http.get(/\/workspaces\/[^/]+\/activity\/(?:people\/\d+\/)?work/u, () =>
+			http.get(/\/workspaces\/[^/]+\/activity\/(?:(?:people\/\d+|me)\/)?work/u, () =>
 				HttpResponse.json({ content: [workItem(1)] }),
 			),
 		);
@@ -1918,7 +1784,19 @@ describe("Workspace activity", () => {
 			expect(router.state.location.search.detail).toBe("person:bob");
 			await act(async () => {
 				membership.resolve(
-					HttpResponse.json({ role: "ADMIN", userId: 7, userLogin: "ada-lrz", userName: "Ada" }),
+					HttpResponse.json(
+						ownMembership("ADMIN", {
+							account: {
+								id: "7",
+								status: "ACTIVE",
+								displayName: "Ada",
+								avatarUrl: null,
+								identities: [
+									{ provider: "GITLAB", login: "ada-lrz", displayName: "Ada", avatarUrl: null },
+								],
+							},
+						}),
+					),
 				);
 				await navigation;
 			});
@@ -1928,7 +1806,19 @@ describe("Workspace activity", () => {
 			await act(async () => {
 				response.resolve(new HttpResponse(null, { status: 204 }));
 				membership.resolve(
-					HttpResponse.json({ role: "ADMIN", userId: 7, userLogin: "ada-lrz", userName: "Ada" }),
+					HttpResponse.json(
+						ownMembership("ADMIN", {
+							account: {
+								id: "7",
+								status: "ACTIVE",
+								displayName: "Ada",
+								avatarUrl: null,
+								identities: [
+									{ provider: "GITLAB", login: "ada-lrz", displayName: "Ada", avatarUrl: null },
+								],
+							},
+						}),
+					),
 				);
 				await navigation;
 			});

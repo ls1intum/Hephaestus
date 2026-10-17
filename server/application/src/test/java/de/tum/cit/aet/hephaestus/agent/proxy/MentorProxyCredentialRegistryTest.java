@@ -4,10 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.github.benmanes.caffeine.cache.Ticker;
 import de.tum.cit.aet.hephaestus.agent.proxy.MentorProxyCredentialRegistry.Route;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
-import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageSourceType;
+import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -22,6 +22,18 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
     private final MentorProxyCredentialRegistry registry = new MentorProxyCredentialRegistry();
 
     @Test
+    void authenticatedHandleStopsRoutingWhenItsCredentialIsReplaced() {
+        var session = UUID.randomUUID();
+        var route = new Route("openai-responses", "https://models.example/v1", null, null, null, null);
+        var original = registry.mint(session, route);
+        var handle = registry.authenticate(original).orElseThrow();
+        var replacement = registry.mint(session, route);
+        assertThat(registry.resolve(handle)).isEmpty();
+        assertThat(registry.authenticate(replacement).flatMap(registry::resolve))
+                .isPresent();
+    }
+
+    @Test
     void revokeIsIdempotent() {
         UUID sessionId = UUID.randomUUID();
         String token = registry.mint(
@@ -30,7 +42,7 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
         registry.revoke(sessionId);
         registry.revoke(sessionId);
 
-        assertThat(registry.validate(token)).isEmpty();
+        assertThat(registry.authenticate(token).flatMap(registry::resolve)).isEmpty();
     }
 
     @Test
@@ -41,7 +53,7 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
 
         registry.revoke(UUID.randomUUID());
 
-        assertThat(registry.validate(liveToken)).isPresent();
+        assertThat(registry.authenticate(liveToken).flatMap(registry::resolve)).isPresent();
         assertThat(registry.trackedSessions()).isEqualTo(1);
     }
 
@@ -56,8 +68,8 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
 
         registry.revoke(sessionA);
 
-        assertThat(registry.validate(tokenA)).isEmpty();
-        assertThat(registry.validate(tokenB)).isPresent();
+        assertThat(registry.authenticate(tokenA).flatMap(registry::resolve)).isEmpty();
+        assertThat(registry.authenticate(tokenB).flatMap(registry::resolve)).isPresent();
     }
 
     @Test
@@ -65,13 +77,19 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
         UUID sessionId = UUID.randomUUID();
         String token = registry.mint(
                 sessionId,
-                new Route("anthropic-messages", "https://api.anthropic.com", FundingSource.INSTANCE, 42L, null, null));
+                new Route(
+                        "anthropic-messages",
+                        "https://api.anthropic.com",
+                        UsageFundingSource.INSTANCE,
+                        42L,
+                        null,
+                        null));
 
-        var routing = registry.validate(token).orElseThrow();
+        var routing = registry.authenticate(token).flatMap(registry::resolve).orElseThrow();
 
         assertThat(routing.apiProtocol()).isEqualTo("anthropic-messages");
         assertThat(routing.baseUrl()).isEqualTo("https://api.anthropic.com");
-        assertThat(routing.connectionScope()).isEqualTo(FundingSource.INSTANCE);
+        assertThat(routing.connectionScope()).isEqualTo(UsageFundingSource.INSTANCE);
         assertThat(routing.connectionId()).isEqualTo(42L);
     }
 
@@ -89,9 +107,15 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
         String secondToken = registry.mint(
                 second, new Route("anthropic-messages", "https://api.anthropic.com", null, null, null, null));
 
-        assertThat(registry.validate(firstToken).orElseThrow().principalDescription())
+        assertThat(registry.authenticate(firstToken)
+                        .flatMap(registry::resolve)
+                        .orElseThrow()
+                        .principalDescription())
                 .isEqualTo("mentor-session:" + first)
-                .isNotEqualTo(registry.validate(secondToken).orElseThrow().principalDescription());
+                .isNotEqualTo(registry.authenticate(secondToken)
+                        .flatMap(registry::resolve)
+                        .orElseThrow()
+                        .principalDescription());
     }
 
     /**
@@ -105,8 +129,8 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
         private final MentorProxyCredentialRegistry registry = new MentorProxyCredentialRegistry();
 
         private static final LlmPriceSnapshot TEN_DOLLARS_PER_MILLION = new LlmPriceSnapshot(
-                FundingSource.INSTANCE,
-                PricingState.PRICED,
+                UsageFundingSource.INSTANCE,
+                UsagePricingState.PRICED,
                 1L,
                 null,
                 new BigDecimal("10"),
@@ -117,14 +141,18 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
         private String mint(UUID sessionId) {
             return registry.mint(
                     sessionId,
-                    new Route("openai-completions", "https://api.openai.com", FundingSource.INSTANCE, 1L, 2L, 3L));
+                    new Route("openai-completions", "https://api.openai.com", UsageFundingSource.INSTANCE, 1L, 2L, 3L));
         }
 
         @Test
         void aSessionWithNoTurnRunningCarriesNoBillingTarget() {
             String token = mint(UUID.randomUUID());
 
-            assertThat(registry.validate(token).orElseThrow().attempt()).isNull();
+            assertThat(registry.authenticate(token)
+                            .flatMap(registry::resolve)
+                            .orElseThrow()
+                            .attempt())
+                    .isNull();
         }
 
         @Test
@@ -140,13 +168,19 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
             registry.accumulate(turnId, new ProxyTokenUsage(100_000, 0, 0, 0, 0));
             registry.accumulate(turnId, new ProxyTokenUsage(100_000, 0, 0, 0, 0));
 
-            var attempt = registry.validate(token).orElseThrow().attempt();
+            var attempt = registry.authenticate(token)
+                    .flatMap(registry::resolve)
+                    .orElseThrow()
+                    .attempt();
             assertThat(attempt).isNotNull();
-            assertThat(attempt.sourceType()).isEqualTo(LlmUsageSourceType.MENTOR_TURN);
+            assertThat(attempt.sourceType()).isEqualTo(UsageSourceType.MENTOR_TURN);
             assertThat(attempt.sourceId()).isEqualTo(turnId);
             assertThat(attempt.number()).isZero();
             assertThat(attempt.spentUsd()).isEqualByComparingTo("2.00");
-            assertThat(registry.validate(token).orElseThrow().inFlightSpendUsd())
+            assertThat(registry.authenticate(token)
+                            .flatMap(registry::resolve)
+                            .orElseThrow()
+                            .inFlightSpendUsd())
                     .isEqualByComparingTo("2.00");
         }
 
@@ -178,7 +212,10 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
 
             registry.unbindTurn(sessionId, meter);
 
-            assertThat(registry.validate(token).orElseThrow().attempt())
+            assertThat(registry.authenticate(token)
+                            .flatMap(registry::resolve)
+                            .orElseThrow()
+                            .attempt())
                     .as("no longer billable")
                     .isNull();
             assertThat(meter.observed().inputTokens())
@@ -198,7 +235,10 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
 
             registry.unbindTurn(sessionId, turnA);
 
-            var attempt = registry.validate(token).orElseThrow().attempt();
+            var attempt = registry.authenticate(token)
+                    .flatMap(registry::resolve)
+                    .orElseThrow()
+                    .attempt();
             assertThat(attempt).isNotNull();
             assertThat(attempt.sourceId()).isEqualTo(turnB.turnId());
         }
@@ -252,7 +292,10 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
             registry.bindTurn(sessionId, meter);
             registry.accumulate(meter.turnId(), new ProxyTokenUsage(1_000_000, 0, 0, 0, 0));
 
-            var attempt = registry.validate(token).orElseThrow().attempt();
+            var attempt = registry.authenticate(token)
+                    .flatMap(registry::resolve)
+                    .orElseThrow()
+                    .attempt();
             assertThat(attempt).isNotNull();
             assertThat(attempt.spentUsd()).isEqualByComparingTo("0");
             assertThat(meter.observed().inputTokens()).isEqualTo(1_000_000);
@@ -281,7 +324,7 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
             ticker.advance(Duration.ofHours(13));
             registry.runPendingEviction();
 
-            assertThat(registry.validate(token)).isEmpty();
+            assertThat(registry.authenticate(token).flatMap(registry::resolve)).isEmpty();
             assertThat(registry.trackedSessions()).isZero();
         }
 
@@ -294,7 +337,7 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
             ticker.advance(Duration.ofHours(11));
             registry.runPendingEviction();
 
-            assertThat(registry.validate(token)).isPresent();
+            assertThat(registry.authenticate(token).flatMap(registry::resolve)).isPresent();
             assertThat(registry.trackedSessions()).isEqualTo(1);
         }
 
@@ -306,12 +349,12 @@ class MentorProxyCredentialRegistryTest extends BaseUnitTest {
             String second = registry.mint(
                     sessionId, new Route("openai-completions", "https://api.openai.com", null, null, null, null));
 
-            assertThat(registry.validate(first)).isEmpty();
-            assertThat(registry.validate(second)).isPresent();
+            assertThat(registry.authenticate(first).flatMap(registry::resolve)).isEmpty();
+            assertThat(registry.authenticate(second).flatMap(registry::resolve)).isPresent();
             assertThat(registry.trackedSessions()).isEqualTo(1);
 
             registry.revoke(sessionId);
-            assertThat(registry.validate(second)).isEmpty();
+            assertThat(registry.authenticate(second).flatMap(registry::resolve)).isEmpty();
             assertThat(registry.trackedSessions()).isZero();
         }
     }

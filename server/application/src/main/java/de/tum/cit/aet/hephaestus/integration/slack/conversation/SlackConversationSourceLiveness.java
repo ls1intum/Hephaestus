@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.slack.conversation;
 
-import de.tum.cit.aet.hephaestus.agent.conversation.ConversationSourceLiveness;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConversationSourceLiveness;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import java.util.Collection;
 import java.util.HashSet;

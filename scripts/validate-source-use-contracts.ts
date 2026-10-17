@@ -5,6 +5,7 @@ import path from "node:path";
 import addFormats from "ajv-formats";
 import Ajv2020 from "ajv/dist/2020.js";
 import { asArray, asRecord, asString, at, isRecord, parseJson, readJsonFile } from "./lib/json.ts";
+import { migrationOwnedPracticeScripts } from "./lib/migration-practice-scripts.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
 const contractsRoot = path.join(root, "server/application/src/main/resources/contracts/source-use");
@@ -16,9 +17,15 @@ const contractVersions = contractEntries
 if (contractVersions.length === 0) {
 	throw new Error("No source-use contract versions found");
 }
-// Published schema identifiers are immutable even when their classpath directory changes.
-const schemaId = (version: string, file: string): string =>
-	`https://hephaestus.aet.cit.tum.de/contracts/artifact-source/${version}/${file}`;
+const schemaIds = new Map<string, string>();
+const catalogSchemaIds = new Map<string, string>();
+const schemaId = (version: string, file: string): string => {
+	const id = schemaIds.get(`${version}/${file}`);
+	if (id === undefined) {
+		throw new Error(`Missing source-use schema ${version}/${file}`);
+	}
+	return id;
+};
 
 const requireDescription = (value: unknown, label: string): void => {
 	const description = isRecord(value) ? value.description : undefined;
@@ -67,12 +74,20 @@ const readSchema = async (file: string, label: string): Promise<Record<string, u
 for (const version of contractVersions) {
 	const versionDir = path.join(contractsRoot, version);
 	for (const file of await readdir(versionDir)) {
-		if (file.endsWith(".schema.json")) {
-			const label = `${version}/${file}`;
-			const schema = await readSchema(path.join(versionDir, file), label);
-			validateSchemaDocumentation(schema, label);
-			ajv.addSchema(schema);
+		if (!file.endsWith(".schema.json")) {
+			continue;
 		}
+		const label = `${version}/${file}`;
+		const schema = await readSchema(path.join(versionDir, file), label);
+		validateSchemaDocumentation(schema, label);
+		schemaIds.set(label, asString(schema.$id, `${label} $id`));
+		if (file.endsWith("-source-catalog.schema.json")) {
+			if (catalogSchemaIds.has(version)) {
+				throw new Error(`${version} declares multiple source catalog schemas`);
+			}
+			catalogSchemaIds.set(version, asString(schema.$id, `${label} $id`));
+		}
+		ajv.addSchema(schema);
 	}
 }
 
@@ -99,7 +114,7 @@ const expectRejection = (id: string, value: unknown, label: string): void => {
 	}
 };
 
-const validatePolicySchema = (version: string): void => {
+const validatePublishedPolicySchema = (version: string): void => {
 	const id = schemaId(version, "practice-automated-review-policy.schema.json");
 	const reviewed = {
 		sourceContractVersion: version,
@@ -191,14 +206,56 @@ const validatePolicySchema = (version: string): void => {
 	}
 };
 
+const validateReviewedBySchema = (version: string): void => {
+	const id = schemaId(version, "practice-automated-review-policy.schema.json");
+	const reason = {
+		code: "NEEDS_A_PERSON",
+		description: "This practice needs context no source carries.",
+	};
+	const limit = {
+		code: "RUNTIME_NOT_OBSERVED",
+		description: "Captured evidence does not establish runtime behavior.",
+	};
+	const reviewed = { by: "HEPHAESTUS", humanReason: null, limits: [limit] };
+	validate(id, reviewed, `${version} Hephaestus-reviewed practice`);
+	validate(
+		id,
+		{ by: "PEOPLE", humanReason: reason, limits: [] },
+		`${version} people-reviewed practice`,
+	);
+	validate(id, { by: "NOBODY", humanReason: null, limits: [] }, `${version} unreviewed practice`);
+	const invalid: readonly (readonly [string, unknown])[] = [
+		["an unknown reviewer", { ...reviewed, by: "LANGUAGE_MODEL" }],
+		["a missing reviewer", { humanReason: null, limits: [] }],
+		["a person review without a reason", { ...reviewed, by: "PEOPLE" }],
+		["a human reason on an automated review", { ...reviewed, humanReason: reason }],
+		[
+			"a human reason on an unreviewed practice",
+			{ ...reviewed, by: "NOBODY", humanReason: reason },
+		],
+		["a limit without a code", { ...reviewed, limits: [{ description: "Missing code" }] }],
+		[
+			"a retired automatedReview field",
+			{ ...reviewed, automatedReview: { mode: "LANGUAGE_MODEL" } },
+		],
+	];
+	for (const [label, value] of invalid) {
+		expectRejection(
+			id,
+			value,
+			`${version}/practice-automated-review-policy.schema.json accepted ${label}`,
+		);
+	}
+};
+
 for (const version of contractVersions) {
 	const directory = path.join(contractsRoot, version);
 	const bytes = await readFile(path.join(directory, "catalog.json"));
-	validate(
-		schemaId(version, "artifact-source-catalog.schema.json"),
-		parseJson(bytes.toString("utf8")),
-		`${version}/catalog.json`,
-	);
+	const catalogSchemaId = catalogSchemaIds.get(version);
+	if (catalogSchemaId === undefined) {
+		throw new Error(`${version} has no source catalog schema`);
+	}
+	validate(catalogSchemaId, parseJson(bytes.toString("utf8")), `${version}/catalog.json`);
 	validate(
 		schemaId(version, "source-use-decisions.schema.json"),
 		await readJsonFile(path.join(directory, "source-use-decisions.json")),
@@ -215,7 +272,11 @@ for (const version of contractVersions) {
 	if (digest !== createHash("sha256").update(bytes).digest("hex")) {
 		throw new Error(`${version} readiness schema has a stale catalog digest`);
 	}
-	validatePolicySchema(version);
+	if (version === "2.0.0") {
+		validateReviewedBySchema(version);
+	} else {
+		validatePublishedPolicySchema(version);
+	}
 }
 
 const PRACTICE_CATALOG = "practices/default-catalog.json";
@@ -234,7 +295,7 @@ validate(
 /** A bundled practice, as far as the script/practice pairing below is concerned. */
 interface BundledPractice {
 	readonly slug: string;
-	readonly precomputeScript: string | undefined;
+	readonly scriptResource: string | undefined;
 }
 
 const bundledPractices = (value: unknown, label: string): BundledPractice[] =>
@@ -244,13 +305,13 @@ const bundledPractices = (value: unknown, label: string): BundledPractice[] =>
 			(practice, index) => {
 				const entry = `${groupLabel} practices[${index}]`;
 				const record = asRecord(practice, entry);
-				const script = record.precomputeScript;
+				const script = record.scriptResource;
 				return {
 					slug: asString(record.slug, `${entry}.slug`),
-					precomputeScript:
+					scriptResource:
 						script === undefined || script === null
 							? undefined
-							: asString(script, `${entry}.precomputeScript`),
+							: asString(script, `${entry}.scriptResource`),
 				};
 			},
 		);
@@ -258,38 +319,50 @@ const bundledPractices = (value: unknown, label: string): BundledPractice[] =>
 
 const practices = bundledPractices(parsedPracticeCatalog, PRACTICE_CATALOG);
 
-const precomputeResourcePrefix = "practices/precompute/";
-const precomputeFiles = await readdir(
-	path.join(root, "server/application/src/main/resources/practices/precompute"),
+const practiceScriptResourcePrefix = "practices/scripts/";
+const practiceScriptFiles = await readdir(
+	path.join(root, "server/application/src/main/resources/practices/scripts"),
 );
-const precomputeScripts = new Set(
-	precomputeFiles
+const practiceScripts = new Set(
+	practiceScriptFiles
 		.filter((file) => file.endsWith(".ts"))
-		.map((file) => precomputeResourcePrefix + file),
+		.map((file) => practiceScriptResourcePrefix + file),
 );
-const referencedPrecomputeScripts = new Set<string>();
+const referencedPracticeScripts = new Set<string>();
 for (const practice of practices) {
-	if (practice.precomputeScript === undefined) {
+	if (practice.scriptResource === undefined) {
 		continue;
 	}
 	// The loader checks the script exists. Nothing checks it belongs to the practice that names it,
 	// and a script named after a slug is the only thing that keeps the pair findable from either side.
-	const expected = `${precomputeResourcePrefix}${practice.slug}.ts`;
-	if (practice.precomputeScript !== expected) {
+	const expected = `${practiceScriptResourcePrefix}${practice.slug}.ts`;
+	if (practice.scriptResource !== expected) {
 		throw new Error(
-			`default-catalog.json practice '${practice.slug}' must name its precompute script '${expected}'`,
+			`default-catalog.json practice '${practice.slug}' must name its practice script '${expected}'`,
 		);
 	}
-	if (!precomputeScripts.has(expected)) {
+	if (!practiceScripts.has(expected)) {
 		throw new Error(
-			`default-catalog.json practice '${practice.slug}' names a missing precompute script`,
+			`default-catalog.json practice '${practice.slug}' names a missing practice script`,
 		);
 	}
-	referencedPrecomputeScripts.add(expected);
+	referencedPracticeScripts.add(expected);
 }
-for (const script of precomputeScripts) {
-	if (!referencedPrecomputeScripts.has(script)) {
-		throw new Error(`precompute script '${script}' is not named by any bundled practice`);
+const unreferencedScripts = new Set(
+	[...practiceScripts].filter((script) => !referencedPracticeScripts.has(script)),
+);
+const migrationScripts =
+	unreferencedScripts.size === 0
+		? new Set<string>()
+		: await migrationOwnedPracticeScripts(
+				path.join(root, "server/application/src/main/resources"),
+				unreferencedScripts,
+			);
+for (const script of unreferencedScripts) {
+	if (!migrationScripts.has(script)) {
+		throw new Error(
+			`practice script '${script}' has no bundled practice or verified migration owner`,
+		);
 	}
 }
 

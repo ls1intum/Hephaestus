@@ -21,12 +21,13 @@ function renderWithClient(node: ReactNode) {
 
 const base = {
 	slackTeamId: "T0000000000",
+	consentAnnouncedAt: null,
 	createdAt: new Date("2026-01-01T00:00:00Z"),
-} satisfies Pick<SlackMonitoredChannel, "slackTeamId" | "createdAt">;
+} satisfies Pick<SlackMonitoredChannel, "slackTeamId" | "consentAnnouncedAt" | "createdAt">;
 
 const pending: SlackMonitoredChannel = {
 	...base,
-	id: 1,
+	id: "1",
 	slackChannelId: "C01PENDING01",
 	channelName: "team-intro",
 	consentState: "PENDING",
@@ -35,7 +36,7 @@ const pending: SlackMonitoredChannel = {
 
 const active: SlackMonitoredChannel = {
 	...base,
-	id: 2,
+	id: "2",
 	slackChannelId: "C02ACTIVE002",
 	channelName: "team-standup",
 	consentState: "ACTIVE",
@@ -45,7 +46,7 @@ const active: SlackMonitoredChannel = {
 
 const revoked: SlackMonitoredChannel = {
 	...base,
-	id: 3,
+	id: "3",
 	slackChannelId: "C03REVOKED03",
 	channelName: "team-legacy",
 	consentState: "REVOKED",

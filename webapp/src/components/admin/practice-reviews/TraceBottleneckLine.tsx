@@ -2,7 +2,6 @@ import {
 	BotIcon,
 	ClipboardListIcon,
 	ClockIcon,
-	EyeIcon,
 	type LucideIcon,
 	SendIcon,
 	ZapIcon,
@@ -25,7 +24,6 @@ export const SPAN_ICONS: Record<TraceSpanKind, LucideIcon> = {
 	execution: BotIcon,
 	run: BotIcon,
 	delivery: SendIcon,
-	read: EyeIcon,
 };
 
 /**

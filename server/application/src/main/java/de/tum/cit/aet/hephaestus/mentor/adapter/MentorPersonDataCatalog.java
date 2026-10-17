@@ -39,7 +39,8 @@ public class MentorPersonDataCatalog implements PersonDataCatalog {
                         mapper,
                         "chat_message_vote",
                         "chat_message_vote",
-                        "t.message_id IN (SELECT id FROM chat_message WHERE thread_id IN (SELECT id FROM chat_thread WHERE user_id = ANY(:users)))",
+                        "t.message_id IN (SELECT id FROM chat_message WHERE thread_id IN (SELECT id FROM chat_thread"
+                                + " WHERE account_id = :account))",
                         "message_id,created_at,is_upvoted,updated_at",
                         "message_id",
                         "",
@@ -50,8 +51,8 @@ public class MentorPersonDataCatalog implements PersonDataCatalog {
                         mapper,
                         "chat_thread",
                         "chat_thread",
-                        "t.user_id = ANY(:users)",
-                        "id,created_at,title,user_id,workspace_id,surface",
+                        "t.account_id = :account",
+                        "id,created_at,title,account_id,workspace_id,surface",
                         "id",
                         "",
                         -90));

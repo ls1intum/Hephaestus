@@ -51,10 +51,10 @@ class WorkspaceOnboardingLinks {
                     && !team.isBlank()
                     && origin(server) != null
                     && links.stream()
-                            .anyMatch(link -> type.equals(registry.providerTypeName(link.gitProviderId()))
+                            .anyMatch(link -> type.equals(registry.providerTypeName(link.providerId()))
                                     && Objects.equals(
-                                            origin(registry.providerServerUrl(link.gitProviderId())), origin(server))
-                                    && team.equals(link.teamId()));
+                                            origin(registry.providerServerUrl(link.providerId())), origin(server))
+                                    && team.equals(link.teamKey()));
             long id = Objects.requireNonNull(connection.getId());
             String name = connection.getDisplayName();
             result.add(new WorkspaceOnboardingDTO.WorkspaceOnboardingLinkDTO(
@@ -67,7 +67,8 @@ class WorkspaceOnboardingLinks {
                     available,
                     linked));
         }
-        // A removed required integration stays visible as a configuration problem, never a silent waiver.
+        // A removed required integration stays visible as a configuration problem, never a silent
+        // waiver.
         for (long id : required)
             if (result.stream().noneMatch(link -> link.connectionId() == id)) {
                 result.add(new WorkspaceOnboardingDTO.WorkspaceOnboardingLinkDTO(

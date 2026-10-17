@@ -4,8 +4,6 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.EventTypeKey;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.PayloadParsingException;
 import io.nats.client.Message;
 import java.io.IOException;
 import java.time.Instant;
@@ -33,6 +31,7 @@ public abstract class AbstractIntegrationMessageHandler<T> implements Integratio
 
     private final EventTypeKey key;
     private final String eventType;
+
     /**
      * The raw last-segment of the subject this handler accepts (e.g. {@code "issues"}
      * for GitHub's {@code repository.issues} key, {@code "merge_request"} for GitLab).

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.outline.sync;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.outline.OutlineProperties;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnapshot;
@@ -44,6 +45,7 @@ import org.springframework.stereotype.Service;
  * is the audit trail and erases with the workspace/connection, not with a document.
  */
 @Service
+@ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
 public class OutlineMirrorRetentionService {
 

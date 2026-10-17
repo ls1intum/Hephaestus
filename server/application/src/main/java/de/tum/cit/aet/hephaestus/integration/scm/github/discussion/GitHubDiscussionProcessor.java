@@ -1,8 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.discussion;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.discussion.Discussion;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.discussion.DiscussionCategory;
@@ -13,6 +10,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.MilestoneRepos
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.BaseGitHubProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.github.discussion.dto.GitHubDiscussionCategoryDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.discussion.dto.GitHubDiscussionDTO;
@@ -150,7 +150,9 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
         Discussion discussion = discussionRepository
                 .findByRepositoryIdAndNumber(repository.getId(), dto.number())
                 .orElseThrow(() -> new IllegalStateException("Discussion not found after upsert: repositoryId="
-                        + repository.getId() + ", number=" + dto.number()));
+                        + repository.getId()
+                        + ", number="
+                        + dto.number()));
 
         // Handle ManyToMany relationships (labels) - these can't be done in the upsert
         boolean labelsChanged =

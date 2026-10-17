@@ -64,27 +64,8 @@ function DiagnosticItem({
 	);
 }
 
-/**
- * The rate-limit diagnostic, rendered from one observed snapshot in strict priority order. Every branch
- * shows only measured fields — a value an admin reads here was reported by the vendor, never seeded or
- * derived by optimistic bookkeeping. When nothing measured is renderable the reading is `null` and the
- * caller drops the row entirely; the absence of the row *is* the "not reported by this instance" state.
- *
- * The order is deliberate:
- *  1. A live back-off (`throttledUntil` in the future) is the state an admin most needs to see — it is
- *     Slack's and any 429'd vendor's only real signal — so it wins over a stale gauge. No bar: there is
- *     no budget to show at that instant.
- *  2. A full `remaining / limit` gauge, but only when both were measured and are still current. It is
- *     rendered as a bare number rather than a bar: a "full = healthy" budget bar beside the job bar's
- *     "full = done" would put two bars on one card filling for opposite reasons. Only a budget about to
- *     run out earns colour, and the reset window lives one hover away.
- *  3. Ceiling only: the window budget is a real observation but the live remaining is not (reported once
- *     and since rolled over, or a vendor that never sends it). Show the ceiling — never a fabricated
- *     remaining, and never `— / N` which reads as a gauge.
- *  4. Nothing renderable → `null`.
- *
- * `now` decides whether branch 1 is still live and anchors the relative phrases.
- */
+// Show only vendor measurements, with live backoff taking priority.
+// Use numbers for rate limits: a filled budget bar would conflict with the job progress bar.
 function rateLimitReading(rateLimit: RateLimitSnapshot, now: number): ReactNode {
 	const throttledUntil = asDate(rateLimit.throttledUntil);
 	if (throttledUntil && throttledUntil.getTime() > now) {
@@ -184,7 +165,7 @@ function ConnectionDiagnostics({ status }: { status: ConnectionSyncStatus }) {
 		);
 	}
 
-	// Every row is gated on a real observation, so a connection that reports none (a fresh Slack
+	// Every row is gated on a real reading, so a connection that reports none (a fresh Slack
 	// workspace before its first event) has nothing to qualify — render no empty row rather than an
 	// invisible flex box the surrounding `space-y-4` would still pad around.
 	if (diagnostics.length === 0) {

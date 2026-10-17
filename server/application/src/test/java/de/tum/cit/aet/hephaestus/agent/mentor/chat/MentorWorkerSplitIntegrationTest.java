@@ -7,7 +7,6 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -21,27 +20,26 @@ import de.tum.cit.aet.hephaestus.agent.config.MemberAiRoutingAdapter;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.usage.AdmittedLlmModel;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerSessionRegistry;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CapacityReport;
+import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackStreamingMentorChannel;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessage;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
-import de.tum.cit.aet.hephaestus.testconfig.StubMentorChatStarter;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.TestMentorWorker;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.Membership;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -103,9 +101,6 @@ class MentorWorkerSplitIntegrationTest extends AbstractWorkspaceIntegrationTest 
     SlackMessageService slack;
 
     @MockitoBean
-    StubMentorChatStarter starter;
-
-    @MockitoBean
     MemberAiRoutingAdapter routing;
 
     @MockitoBean
@@ -121,7 +116,7 @@ class MentorWorkerSplitIntegrationTest extends AbstractWorkspaceIntegrationTest 
     void configureTurn() {
         developer = persistUser("mentor");
         workspace = createWorkspace("worker-mentor", "Worker Mentor", "worker-mentor", AccountType.ORG, developer);
-        ensureWorkspaceMembership(workspace, developer, WorkspaceMembership.WorkspaceRole.MEMBER);
+        ensureMembership(workspace, developer, Membership.WorkspaceRole.MEMBER);
         var binding = new WorkspaceAgentBinding();
         binding.setPurpose(AgentPurpose.MENTOR);
         binding.setEnabled(true);
@@ -132,17 +127,18 @@ class MentorWorkerSplitIntegrationTest extends AbstractWorkspaceIntegrationTest 
                 .thenReturn(new AdmittedLlmModel(
                         new ResolvedLlmModel(
                                 "https://upstream.example/v1", "openai-completions", "test-model", null, null, null),
-                        new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 1L, 2L, workspace.getId()),
+                        new LlmModelResolver.ConnectionRef(UsageFundingSource.INSTANCE, 1L, 2L, workspace.getId()),
                         new LlmPriceSnapshot(
-                                FundingSource.INSTANCE, PricingState.NO_CHARGE, null, null, null, null, null, null)));
+                                UsageFundingSource.INSTANCE,
+                                UsagePricingState.NO_CHARGE,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null)));
         when(contextBuilder.build(any()))
-                .thenReturn(Map.of("inputs/context/observations_history.json", "[]".getBytes(StandardCharsets.UTF_8)));
-        doAnswer(invocation -> {
-                    service.start(invocation.getArgument(0), invocation.getArgument(1));
-                    return null;
-                })
-                .when(starter)
-                .start(any(), any());
+                .thenReturn(Map.of("inputs/context/results_history.json", "[]".getBytes(StandardCharsets.UTF_8)));
         when(slack.startStream(anyLong(), anyString(), anyString(), anyString()))
                 .thenReturn("stream-ts");
         doNothing().when(slack).stopStream(anyLong(), anyString(), anyString(), any());
@@ -177,7 +173,7 @@ class MentorWorkerSplitIntegrationTest extends AbstractWorkspaceIntegrationTest 
             service.run(
                     MentorTurnRequest.slackDm(workspace.getId(), slackThread, "Hi Heph", UUID.randomUUID()),
                     channel,
-                    developer.getId());
+                    accountId(developer));
             await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> assertCompleted(slackThread));
             verify(slack, timeout(5000))
                     .startStream(
@@ -291,7 +287,7 @@ class MentorWorkerSplitIntegrationTest extends AbstractWorkspaceIntegrationTest 
     }
 
     private void assertCompleted(UUID thread) {
-        var created = messages.findContextMessages(workspace.getId(), developer.getId(), thread, null);
+        var created = messages.findContextMessages(workspace.getId(), accountId(developer), thread, null);
         assertThat(created).anySatisfy(message -> {
             assertThat(message.getRole()).isEqualTo(ChatMessage.Role.ASSISTANT);
             assertThat(message.getStatus()).isEqualTo(ChatMessage.Status.completed);

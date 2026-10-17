@@ -60,5 +60,9 @@ export function toRpcError(error: unknown): RpcError {
 	if (error instanceof WorkerError) {
 		return { code: error.code, message: error.message };
 	}
-	return { code: "server", message: "The extension hit an unexpected problem. Try again." };
+	return {
+		code: "server",
+		message:
+			"We could not finish that. Try again. If it keeps failing, contact your instance operator.",
+	};
 }

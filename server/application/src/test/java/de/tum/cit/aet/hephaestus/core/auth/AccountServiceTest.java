@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -16,9 +17,10 @@ import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventWriter;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwt;
+import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
 import de.tum.cit.aet.hephaestus.core.event.AccountDeletionScheduledEvent;
 import de.tum.cit.aet.hephaestus.core.event.AccountSecurityChangedEvent;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -35,54 +37,50 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
-/**
- * Unit coverage of {@link AccountService} guard logic ({@code unlinkIdentity} last-identity/ownership
- * rules and {@code adminSetRole} last-admin/self-demotion rules) with all repository/audit
- * collaborators mocked — including the post-lock race branch ({@code deleteByIdAndAccountId == 0}),
- * which the integration test cannot reach. Uses a real {@link AuthEventLogger} over a mock
- * {@link AuthEventWriter} so "did we audit?" is a single {@code write(...)} verification.
- */
 class AccountServiceTest extends BaseUnitTest {
 
     private final AccountRepository accountRepository = mock(AccountRepository.class);
-    private final IdentityLinkRepository identityLinkRepository = mock(IdentityLinkRepository.class);
+    private final IdentityRepository identityRepository = mock(IdentityRepository.class);
     private final SessionRevocation sessionRevocation = mock(SessionRevocation.class);
     private final AuthEventWriter auditWriter = mock(AuthEventWriter.class);
     private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
     private final Clock clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC);
 
+    private final GitProviderRegistry providers = mock(GitProviderRegistry.class);
     private AccountService service;
 
     @BeforeEach
     void setUp() {
+        lenient().when(providers.providerTypeName(anyLong())).thenReturn("GITHUB");
         service = new AccountService(
                 accountRepository,
-                identityLinkRepository,
+                identityRepository,
                 sessionRevocation,
                 new AuthEventLogger(auditWriter),
                 AuthPropertiesFixture.defaults(),
                 eventPublisher,
-                clock);
+                clock,
+                providers);
     }
 
-    private static IdentityLink link(long id, long gitProviderId) {
+    private static Identity link(long id, long gitProviderId) {
         // Real owned entity, not a mock: stubbing getId()/getProviderId() would test the stub, not
-        // the service, and couple to getter names. IdentityLink is @NoArgsConstructor + @Setter.
-        IdentityLink il = new IdentityLink();
+        // the service, and couple to getter names. Identity is @NoArgsConstructor + @Setter.
+        Identity il = new Identity();
         il.setId(id);
         il.setProviderId(gitProviderId);
         return il;
     }
 
     @Test
-    void unlinkSecondaryIdentityDeletesItAndAudits() {
-        List<IdentityLink> active = List.of(link(10L, 100L), link(11L, 101L));
-        when(identityLinkRepository.findActiveByAccountIdForUpdate(1L)).thenReturn(active);
-        when(identityLinkRepository.deleteByIdAndAccountId(10L, 1L)).thenReturn(1);
+    void shouldDisableSecondaryIdentityAndRetainItsKeyWhenItIsDisconnected() {
+        List<Identity> active = List.of(link(10L, 100L), link(11L, 101L));
+        when(identityRepository.findActiveByAccountIdForUpdate(1L)).thenReturn(active);
 
         service.unlinkIdentity(1L, 10L);
 
-        verify(identityLinkRepository).deleteByIdAndAccountId(10L, 1L);
+        assertThat(active.getFirst().getDisabledAt()).isEqualTo(clock.instant());
+        verify(identityRepository).save(active.getFirst());
         verify(eventPublisher)
                 .publishEvent(new AccountSecurityChangedEvent(
                         1L, AccountSecurityChangedEvent.Kind.IDENTITY_UNLINKED, clock.instant()));
@@ -94,44 +92,40 @@ class AccountServiceTest extends BaseUnitTest {
 
     @Test
     void cannotUnlinkTheOnlyRemainingIdentity() {
-        List<IdentityLink> active = List.of(link(10L, 100L));
-        when(identityLinkRepository.findActiveByAccountIdForUpdate(1L)).thenReturn(active);
+        List<Identity> active = List.of(link(10L, 100L));
+        when(identityRepository.findActiveByAccountIdForUpdate(1L)).thenReturn(active);
 
         assertThatThrownBy(() -> service.unlinkIdentity(1L, 10L))
                 .isInstanceOfSatisfying(
                         ResponseStatusException.class,
                         e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
 
-        verify(identityLinkRepository, never()).deleteByIdAndAccountId(anyLong(), anyLong());
+        verify(identityRepository, never()).save(any());
         verifyNoInteractions(auditWriter);
     }
 
     @Test
     void unlinkingAnIdentityTheAccountDoesNotOwnIs404() {
-        List<IdentityLink> active = List.of(link(10L, 100L), link(11L, 101L));
-        when(identityLinkRepository.findActiveByAccountIdForUpdate(1L)).thenReturn(active);
+        List<Identity> active = List.of(link(10L, 100L), link(11L, 101L));
+        when(identityRepository.findActiveByAccountIdForUpdate(1L)).thenReturn(active);
 
         assertThatThrownBy(() -> service.unlinkIdentity(1L, 999L))
                 .isInstanceOfSatisfying(
                         ResponseStatusException.class,
                         e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
 
-        verify(identityLinkRepository, never()).deleteByIdAndAccountId(anyLong(), anyLong());
+        verify(identityRepository, never()).save(any());
         verifyNoInteractions(auditWriter);
     }
 
     @Test
-    void lostRaceAfterTheGuardSurfacesAs404() {
-        List<IdentityLink> active = List.of(link(10L, 100L), link(11L, 101L));
-        when(identityLinkRepository.findActiveByAccountIdForUpdate(1L)).thenReturn(active);
-        when(identityLinkRepository.deleteByIdAndAccountId(10L, 1L)).thenReturn(0);
-
-        assertThatThrownBy(() -> service.unlinkIdentity(1L, 10L))
-                .isInstanceOfSatisfying(
-                        ResponseStatusException.class,
-                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
-
-        verifyNoInteractions(auditWriter);
+    void shouldRefuseToDisconnectTheOnlySignInIdentityWhenSlackRemainsConnected() {
+        var github = link(10L, 100L);
+        var slack = link(11L, 101L);
+        when(providers.providerTypeName(101L)).thenReturn("SLACK");
+        when(identityRepository.findActiveByAccountIdForUpdate(1L)).thenReturn(List.of(github, slack));
+        assertThatThrownBy(() -> service.unlinkIdentity(1L, 10L)).isInstanceOf(ResponseStatusException.class);
+        assertThat(github.getDisabledAt()).isNull();
     }
 
     private Account accountWithRole(long id, Account.AppRole role) {
@@ -153,14 +147,16 @@ class AccountServiceTest extends BaseUnitTest {
                 .publishEvent(new AccountSecurityChangedEvent(
                         2L, AccountSecurityChangedEvent.Kind.APP_ROLE_CHANGED, clock.instant()));
         verify(accountRepository).save(account);
-        // Dedicated APP_ROLE_CHANGED type so the most security-sensitive mutation stays queryable on
+        // Dedicated APP_ROLE_CHANGED type so the most security-sensitive mutation stays queryable
+        // on
         // the indexed event_type column.
         ArgumentCaptor<AuthEventData> event = ArgumentCaptor.forClass(AuthEventData.class);
         verify(auditWriter).write(event.capture());
         assertThat(event.getValue().type()).isEqualTo(AuthEvent.EventType.APP_ROLE_CHANGED);
         assertThat(event.getValue().details()).contains("\"from\":\"USER\"", "\"to\":\"APP_ADMIN\"");
         verify(accountRepository, never()).findByAppRoleAndStatusForUpdate(any(), any());
-        // Promotion does NOT revoke sessions — the new role is picked up on the next silent refresh,
+        // Promotion does NOT revoke sessions — the new role is picked up on the next silent
+        // refresh,
         // so the user is not forced to re-login.
         verify(sessionRevocation, never()).revokeAccount(anyLong(), any(), any(), any());
     }
@@ -176,7 +172,8 @@ class AccountServiceTest extends BaseUnitTest {
         assertThat(account.getAppRole()).isEqualTo(Account.AppRole.USER);
         verify(accountRepository).save(account);
         verify(auditWriter).write(any());
-        // Demotion revokes the stripped admin's live sessions so app_admin authority can't outlive the
+        // Demotion revokes the stripped admin's live sessions so app_admin authority can't outlive
+        // the
         // role change for the token's TTL.
         verify(sessionRevocation).revokeAccount(2L, IssuedJwt.RevokedReason.ADMIN_REVOKE, null, null);
     }

@@ -5,7 +5,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
-import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryWriter;
+import de.tum.cit.aet.hephaestus.integration.scm.feedback.ScmFeedbackFixtures;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.testconfig.ScriptedCommentThreads;
 import de.tum.cit.aet.hephaestus.testconfig.ScriptedGraphQlClient;
@@ -14,19 +15,19 @@ import java.util.Map;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import reactor.core.publisher.Mono;
 
-/** The real {@link GitHubSummaryChannel} over a GitHub whose issue and pull request comments the test controls. */
 public final class ScriptedGitHubComments {
 
     private final ScriptedCommentThreads threads = new ScriptedCommentThreads("IC_");
-    private final SummaryChannel channel;
+    private final SummaryWriter channel;
 
     public ScriptedGitHubComments(OutboundEgressGuard egressGuard) {
         GitHubGraphQlClientProvider provider = mock(GitHubGraphQlClientProvider.class);
         when(provider.forScope(anyLong())).thenReturn(ScriptedGraphQlClient.of(this::answer));
-        channel = new GitHubSummaryChannel(provider, new GitHubPrNodeIdResolver(provider), egressGuard);
+        channel = new GitHubSummaryWriter(
+                provider, new GitHubPrNodeIdResolver(provider), egressGuard, ScmFeedbackFixtures.resolver());
     }
 
-    public SummaryChannel channel() {
+    public SummaryWriter channel() {
         return channel;
     }
 

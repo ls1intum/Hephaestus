@@ -1,14 +1,20 @@
 import { describe, expect, it } from "vitest";
 
-import type { ReviewedWorkRef } from "@/api/types.gen";
+import type { ItemRef } from "@/api/types.gen";
 
-import { count, countedWork, linkWork, list, text } from "./feedback-text";
+import { count, linkWork, list, text } from "./feedback-text";
 
-const pullRequest = (n: number): ReviewedWorkRef => ({
+const pullRequest = (n: number): ItemRef => ({
 	id: String(n),
 	kind: "scm.pull_request",
 	label: `#${n}`,
 	url: `https://github.example/pr/${n}`,
+	container: "ls1intum/Hephaestus",
+	parentId: null,
+	path: null,
+	provider: "GITHUB",
+	removedAt: null,
+	title: null,
 });
 
 describe("linkWork", () => {
@@ -81,15 +87,5 @@ describe("count", () => {
 		[3, true, "3 practices"],
 	])("writes %i as the prose does", (n: number, digits: boolean | undefined, expected: string) => {
 		expect(count(n, "practice", "practices", digits)).toBe(expected);
-	});
-});
-
-describe("countedWork", () => {
-	it.each([
-		["GITHUB", 4, "four pull requests"],
-		["GITLAB", 4, "four merge requests"],
-		["GITLAB", 1, "one merge request"],
-	] as const)("names a pull request at %s by that provider's noun", (provider, n, expected) => {
-		expect(countedWork("scm.pull_request", n, provider)).toBe(expected);
 	});
 });

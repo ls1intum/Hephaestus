@@ -2,7 +2,7 @@ import { type LucideIcon, MessageSquareTextIcon, ScanSearchIcon, WorkflowIcon } 
 import type { ReactNode } from "react";
 
 import { cn } from "cn";
-import type { PracticeReviewBucket, PracticeReviewOverview } from "@/api/types.gen";
+import type { ReviewBucket, ReviewOverview } from "@/api/types.gen";
 import { deltaPhrase } from "@/components/activity/activity-buckets";
 import { STALE } from "@/components/activity/activity-tones";
 import { BucketBars } from "@/components/activity/BucketBars";
@@ -19,7 +19,7 @@ import {
 	finishedCount,
 	markedIncorrectSlot,
 	OUTCOME_LEGEND_LABELS,
-	observationSlots,
+	resultSlots,
 	type OutcomeScope,
 	scopeSearch,
 	overviewFeedbackSlots,
@@ -48,7 +48,7 @@ export interface ReviewPipelineProps {
 	workspaceSlug?: string;
 }
 
-export type StageKey = "reviews" | "observations" | "feedback";
+export type StageKey = "reviews" | "results" | "feedback";
 
 /**
  * Volume is information, not a state, and a practice surface has no tone for that: its accent is
@@ -63,10 +63,10 @@ interface StageDef {
 	title: string;
 	icon: LucideIcon;
 	noun: (count: number) => string;
-	perBucket: (bucket: PracticeReviewBucket) => number;
-	total: (overview: PracticeReviewOverview) => number;
-	slots: (overview: PracticeReviewOverview, scope?: OutcomeScope) => OutcomeSlot[];
-	flags?: (overview: PracticeReviewOverview, scope: OutcomeScope) => OutcomeMixProps["flags"];
+	perBucket: (bucket: ReviewBucket) => number;
+	total: (overview: ReviewOverview) => number;
+	slots: (overview: ReviewOverview, scope?: OutcomeScope) => OutcomeSlot[];
+	flags?: (overview: ReviewOverview, scope: OutcomeScope) => OutcomeMixProps["flags"];
 }
 
 const isFinished = (slot: OutcomeSlot) =>
@@ -90,21 +90,20 @@ const STAGES: readonly StageDef[] = [
 		}),
 	},
 	{
-		key: "observations",
-		title: "Observations",
+		key: "results",
+		title: "Results",
 		icon: ScanSearchIcon,
-		noun: (count) => (count === 1 ? "observation" : "observations"),
-		perBucket: (bucket) => bucket.observations,
-		total: (overview) => slotsTotal(observationSlots(overview.observations)),
-		// The outcome's own word, one form for all four: "35 met", "27 not met", "10 not applicable".
+		noun: (count) => (count === 1 ? "result" : "results"),
+		perBucket: (bucket) => bucket.results,
+		total: (overview) => slotsTotal(resultSlots(overview.results)),
 		slots: (overview, scope) =>
-			observationSlots(overview.observations, scope).map((slot) => ({
+			resultSlots(overview.results, scope).map((slot) => ({
 				...slot,
 				label: slot.def.label.toLowerCase(),
 			})),
 		flags: (overview, scope) => ({
-			label: OUTCOME_LEGEND_LABELS.checkedObservations,
-			slots: [markedIncorrectSlot(overview.observationsInvalidated, scope)],
+			label: OUTCOME_LEGEND_LABELS.checkedResults,
+			slots: [markedIncorrectSlot(overview.resultsMarkedIncorrect, scope)],
 		}),
 	},
 	{
@@ -125,14 +124,6 @@ const GRID_COLUMNS: Partial<Record<number, string>> = {
 	3: "@3xl:grid-cols-3",
 };
 
-/**
- * The stages work flows through — reviews ran, recorded observations, composed feedback — a tile
- * each, in the recipe of Activity's tiles: the total, how it compares with the period before, its
- * volume over the range, then what it split into. Each stage is counted by its own date, so the
- * tiles stand side by side rather than claiming one caused the next. The tile's title has no link,
- * since the tab above opens the same list; given a workspace, each count opens the list filtered to
- * exactly the rows it counts, over the range.
- */
 export function ReviewPipeline({
 	state,
 	previous,
@@ -191,7 +182,7 @@ function StageTile({
 	workspaceSlug,
 }: {
 	stage: StageDef;
-	overview: PracticeReviewOverview;
+	overview: ReviewOverview;
 	previous: PreviousReviewPeriodState;
 	previousName: string;
 	/** The overview is the previous range's, which nothing may be set against. */
@@ -229,7 +220,7 @@ function StageTile({
 					workspaceSlug={workspaceSlug}
 					trailing={
 						stage.key === "reviews" ? (
-							<FailedOrTimedOut overview={overview} scope={scope} workspaceSlug={workspaceSlug} />
+							<FailedShare overview={overview} scope={scope} workspaceSlug={workspaceSlug} />
 						) : undefined
 					}
 				>
@@ -251,36 +242,29 @@ function StageTile({
 }
 
 /** Reviews of the range not finished yet, queued or running, opening the Reviews table at them. */
-function openReviewsSlot(overview: PracticeReviewOverview, scope: OutcomeScope): OutcomeSlot {
+function openReviewsSlot(overview: ReviewOverview, scope: OutcomeScope): OutcomeSlot {
 	return {
 		key: "open",
 		def: REVIEW_STATUS_DEFS.RUNNING,
 		label: "not finished yet",
 		count: overview.reviews.queued + overview.reviews.running,
 		target: {
-			list: "runs",
-			search: { ...scopeSearch(scope, "runs"), status: ["QUEUED", "RUNNING"] },
+			list: "reviews",
+			search: { ...scopeSearch(scope, "reviews"), status: ["QUEUED", "RUNNING"] },
 		},
 	};
 }
 
-/**
- * The share of the range's finished reviews that failed or timed out, as the last item of the
- * Reviews tile's row: "8 % failed or timed out". The counts are in the row already; the share is
- * what the row adds. Plain at any share, by the overview's colour rule
- * (`review-attention-thresholds.ts`); none when nothing failed. Given a workspace, it opens the
- * Reviews table filtered to them over the range.
- */
-function FailedOrTimedOut({
+function FailedShare({
 	overview: { reviews },
 	scope,
 	workspaceSlug,
 }: {
-	overview: PracticeReviewOverview;
+	overview: ReviewOverview;
 	scope: OutcomeScope;
 	workspaceSlug?: string;
 }) {
-	const failed = reviews.failed + reviews.timedOut;
+	const { failed } = reviews;
 	const finished = finishedCount(reviews);
 	if (failed === 0) {
 		return null;
@@ -288,7 +272,7 @@ function FailedOrTimedOut({
 	const share = shareOf(failed, finished);
 	const text = (
 		<>
-			<span className={OVERVIEW_TYPE.value}>{percentText(share)}</span> failed or timed out
+			<span className={OVERVIEW_TYPE.value}>{percentText(share)}</span> failed
 		</>
 	);
 	return (
@@ -303,13 +287,13 @@ function FailedOrTimedOut({
 			) : (
 				<InlineLink
 					tone="count"
-					aria-label={`${percentText(share)} failed or timed out, ${failed} of ${finished} finished reviews`}
+					aria-label={`${percentText(share)} failed, ${failed} of ${finished} finished reviews`}
 					render={
 						<ReviewListLink
 							workspaceSlug={workspaceSlug}
 							destination={{
-								list: "runs",
-								search: { ...scopeSearch(scope, "runs"), status: ["FAILED", "TIMED_OUT"] },
+								list: "reviews",
+								search: { ...scopeSearch(scope, "reviews"), status: ["FAILED"] },
 							}}
 						/>
 					}

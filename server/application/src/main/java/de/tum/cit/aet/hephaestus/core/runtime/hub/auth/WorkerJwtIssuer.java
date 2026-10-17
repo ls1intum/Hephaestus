@@ -13,6 +13,12 @@ public class WorkerJwtIssuer {
     static final String WORKER_TOKEN_TYPE = "worker-session+jwt";
     static final String JOB_TOKEN_TYPE = "job+jwt";
 
+    /**
+     * Lets a sandbox call the review model, the direct models of its practice programs and the other gateway
+     * capabilities of its job. A job holds one such credential.
+     */
+    public static final String LLM_PROXY_SCOPE = "llm_proxy";
+
     private final WorkerKeyRing keyRing;
     private final WorkerTokenProperties properties;
 
@@ -59,7 +65,7 @@ public class WorkerJwtIssuer {
                 .withClaim("job_id", jobId.toString())
                 .withClaim("workspace_id", workspaceId)
                 .withClaim("attempt", attempt)
-                .withClaim("scope", List.of("llm_proxy"))
+                .withClaim("scope", List.of(LLM_PROXY_SCOPE))
                 .withJWTId(UUID.randomUUID().toString())
                 .withIssuedAt(now)
                 .withNotBefore(now)

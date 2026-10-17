@@ -1,6 +1,6 @@
 import { ChevronRight, CircleAlert } from "lucide-react";
 
-import type { CatalogGroupAdoptionPreview } from "@/api/types.gen";
+import type { GroupAdoptionPreview } from "@/components/admin/practices/catalog-adoption";
 import { PRACTICE_SETUP_LEVEL_LABELS } from "@/components/admin/practices/practice-search";
 import { PracticeListSkeleton } from "@/components/admin/practices/PracticeSkeletons";
 import type { PanelState } from "@/components/common/panel-state";
@@ -28,7 +28,7 @@ import {
 import { hasText } from "@/lib/text";
 
 export type GroupAdoptionState = PanelState<{
-	preview: CatalogGroupAdoptionPreview;
+	preview: GroupAdoptionPreview;
 	action: "idle" | "adding" | "stale";
 }>;
 

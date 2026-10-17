@@ -24,7 +24,7 @@ import type {
 	Workspace,
 } from "@/api/types.gen";
 import type { Wire } from "@/lib/dates";
-import { workspaceListItem } from "@/mocks/fixtures/workspaces";
+import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
 import { type Deferred, deferred } from "@/test/async";
 import { ROUTE_RENDER_WAIT, renderRouteAt, renderRouteAtWithRouter } from "@/test/router-harness";
@@ -69,7 +69,7 @@ function mockConnection(kind: "GITHUB" | "GITLAB", installationId?: number) {
 		http.get("*/workspaces", () => HttpResponse.json([listed])),
 		http.get("*/workspaces/:workspaceSlug", () => HttpResponse.json(workspace)),
 		http.get("*/workspaces/:workspaceSlug/members/me", () =>
-			HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
+			HttpResponse.json(ownMembership("ADMIN")),
 		),
 		http.get("*/workspaces/:workspaceSlug/connections/catalog", () => HttpResponse.json([entry])),
 		http.get("*/workspaces/:workspaceSlug/connections/7", () => HttpResponse.json(detail)),
@@ -1421,7 +1421,7 @@ async function openSlackRemove(user: ReturnType<typeof userEvent.setup>, channel
 }
 
 const standupChannel: Wire<SlackMonitoredChannel> = {
-	id: 2,
+	id: "00000000-0000-4000-8000-000000000002",
 	slackChannelId: "C02ACTIVE002",
 	slackTeamId: "T0000000000",
 	channelName: "team-standup",
@@ -1434,17 +1434,17 @@ const standupChannel: Wire<SlackMonitoredChannel> = {
 describe("Slack channel management reads", () => {
 	const designChannel: Wire<SlackMonitoredChannel> = {
 		...standupChannel,
-		id: 3,
+		id: "00000000-0000-4000-8000-000000000003",
 		slackChannelId: "C03DESIGN03",
 		channelName: "team-design",
 	};
 	const introChannel: Wire<SlackMonitoredChannel> = {
 		...standupChannel,
-		id: 1,
+		id: "00000000-0000-4000-8000-000000000001",
 		slackChannelId: "C01PENDING01",
 		channelName: "team-intro",
 		consentState: "PENDING",
-		consentAnnouncedAt: undefined,
+		consentAnnouncedAt: null,
 	};
 	const general: SlackChannelCandidate = {
 		slackChannelId: "C05GENERAL5",

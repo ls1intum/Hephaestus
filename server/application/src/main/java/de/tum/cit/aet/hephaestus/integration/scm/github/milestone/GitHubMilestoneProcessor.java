@@ -1,14 +1,14 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.milestone;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.MilestoneRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.github.milestone.dto.GitHubMilestoneDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
@@ -193,11 +193,7 @@ public class GitHubMilestoneProcessor {
      * @return a deterministic negative Long ID
      */
     private Long generateDeterministicId(Long repositoryId, int milestoneNumber) {
-        // Use bit shifting to combine repo ID and milestone number without collision.
-        // The formula repositoryId * 31 + milestoneNumber can produce collisions
-        // (e.g., repo=2,milestone=31 and repo=3,milestone=0 both = 62).
-        // Bit shifting separates components: repo ID in upper 32 bits, milestone number in lower 32 bits.
-        // Negative IDs won't collide with GitHub's positive databaseIds.
+        // Multiplication by 31 can give different repository/milestone pairs the same fallback ID.
         long combined = (repositoryId << 32) | (milestoneNumber & 0xFFFFFFFFL);
         return -combined;
     }
@@ -223,9 +219,7 @@ public class GitHubMilestoneProcessor {
                 .findByNativeIdAndProviderId(nativeId, Objects.requireNonNull(context.providerId()))
                 .ifPresent(milestone -> {
                     Long milestoneId = milestone.getId();
-                    // Clean up issue references via direct database UPDATE before deletion.
-                    // Using issueRepository.clearMilestoneReferences() instead of milestone.removeAllIssues()
-                    // because the in-memory collection may be stale or not fully loaded.
+                    // The in-memory collection can omit issue references that the database still holds.
                     int clearedCount = issueRepository.clearMilestoneReferences(milestoneId);
                     if (clearedCount > 0) {
                         log.debug("Cleared milestone references from {} issues before deletion", clearedCount);

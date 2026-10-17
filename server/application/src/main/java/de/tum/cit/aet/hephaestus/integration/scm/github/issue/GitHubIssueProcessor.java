@@ -1,9 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.issue;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
@@ -17,6 +14,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestR
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.BaseGitHubProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.GitHubIssueDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.GitHubIssueTypeDTO;
@@ -193,7 +193,9 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         Issue issue = issueRepository
                 .findByRepositoryIdAndNumber(repository.getId(), dto.number())
                 .orElseThrow(() -> new IllegalStateException("Issue not found after upsert: repositoryId="
-                        + repository.getId() + ", number=" + dto.number()));
+                        + repository.getId()
+                        + ", number="
+                        + dto.number()));
 
         // ManyToMany relationships (labels, assignees) can't be handled by the native upsert.
         boolean relationshipsChanged = updateRelationships(dto, issue, repository, providerId);
@@ -385,20 +387,8 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         return issue;
     }
 
-    /**
-     * Process a {@code transferred} event: the issue has moved to another repository and no longer
-     * exists in this one.
-     *
-     * <p>GitHub delivers {@code transferred} to the SOURCE repository, and the payload's issue is the
-     * source-side issue. Routing it to {@link #process} would re-upsert the issue into the repository
-     * it had just left, creating a permanent phantom instead of removing one. A transfer is not a
-     * delete event, but from this repository's perspective the outcome is identical: the issue is gone.
-     *
-     * <p>Tombstoned rather than deleted, matching the {@code RECONCILIATION} sweep: the issue's
-     * feedback/observation rows reference it by bare id with no FK, so removing the row would orphan
-     * them. The sweep would eventually catch this anyway (a transferred issue vanishes from the
-     * source repository's upstream listing); handling the event makes it immediate.
-     */
+    // GitHub sends transfers to the source repository; upserting that payload would recreate an issue that left.
+    // Tombstones retain source ids referenced by items, feedback, and activity.
     @Transactional
     public void processTransferred(GitHubIssueDTO issueDto, ProcessingContext context) {
         if (namesPullRequest(issueDto, context)) return;
@@ -434,9 +424,9 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
                         issueDto.number())
                 .ifPresent(issue -> {
                     Long syntheticId = issue.getId();
-                    issueRepository.delete(issue);
                     eventPublisher.publishEvent(
                             new ScmDomainEvent.IssueDeleted(syntheticId, EventContext.from(context)));
+                    issueRepository.delete(issue);
                     log.info("Deleted issue: issueId={}, number={}", syntheticId, issueDto.number());
                 });
     }

@@ -21,12 +21,9 @@ erDiagram
         TIMESTAMPTZ deleted_at
         BIGINT version "NOT NULL"
         BOOLEAN public_activity_visible "NOT NULL"
-    }
-
-    AccountAiChoice {
-        BIGINT account_id PK,FK
-        VARCHAR(24) ai_choice "NOT NULL"
-        TIMESTAMPTZ updated_at "NOT NULL"
+        VARCHAR(24) ai_choice
+        TIMESTAMPTZ ai_choice_at
+        BOOLEAN feedback_delivery_enabled "NOT NULL"
     }
 
     AccountExport {
@@ -64,72 +61,6 @@ erDiagram
         TIMESTAMPTZ ingested_at "NOT NULL"
     }
 
-    AgentJob {
-        UUID id PK,UK
-        BIGINT workspace_id FK,UK "NOT NULL"
-        VARCHAR(50) job_type "NOT NULL"
-        VARCHAR(20) status "NOT NULL"
-        JSONB metadata
-        JSONB output
-        JSONB config_snapshot "NOT NULL"
-        TEXT job_token UK "NOT NULL"
-        VARCHAR(255) idempotency_key
-        INTEGER exit_code
-        TEXT error_message
-        INTEGER retry_count "NOT NULL"
-        TIMESTAMPTZ created_at "NOT NULL"
-        TIMESTAMPTZ started_at
-        TIMESTAMPTZ completed_at
-        VARCHAR(64) job_token_hash
-        VARCHAR(20) delivery_status
-        VARCHAR(255) delivery_comment_id
-        TEXT container_logs
-        VARCHAR(100) llm_model
-        INTEGER llm_total_calls
-        INTEGER llm_total_input_tokens
-        INTEGER llm_total_output_tokens
-        INTEGER llm_total_reasoning_tokens
-        INTEGER llm_cache_read_tokens
-        INTEGER llm_cache_write_tokens
-        VARCHAR(50) llm_model_version
-        VARCHAR(32) cancellation_reason
-        VARCHAR(255) worker_id
-        VARCHAR(48) integration_kind
-        VARCHAR(64) artifact_kind
-        VARCHAR(64) prompt_digest
-        VARCHAR(64) inputs_digest
-        TIMESTAMPTZ available_at "NOT NULL"
-        SMALLINT delivery_attempts "NOT NULL"
-        TIMESTAMPTZ execution_started_at
-        VARCHAR(32) purpose
-        VARCHAR(32) hold_reason
-        JSONB evidence_snapshot
-        JSONB review_readiness
-        TIMESTAMPTZ in_chat_prepared_at
-        TIMESTAMPTZ in_app_prepared_at
-        BIGINT practice_rollout_revision "NOT NULL"
-        VARCHAR(24) practice_trigger_mode "NOT NULL"
-        VARCHAR(32) trace_id "NOT NULL"
-    }
-
-    ArtifactSignal {
-        UUID id PK
-        BIGINT workspace_id FK,UK "NOT NULL"
-        VARCHAR(64) artifact_kind UK "NOT NULL"
-        BIGINT artifact_id UK "NOT NULL"
-        VARCHAR(128) signal_name UK "NOT NULL"
-        VARCHAR(128) revision UK "NOT NULL"
-        TIMESTAMPTZ occurred_at "NOT NULL"
-        VARCHAR(16) discovered_via "NOT NULL"
-        VARCHAR(16) state "NOT NULL"
-        VARCHAR(48) state_reason
-        UUID job_id
-        TIMESTAMPTZ state_changed_at "NOT NULL"
-        TIMESTAMPTZ last_attempted_at
-        BIGINT requested_by_user_id FK
-        BIGINT actor_user_id FK
-    }
-
     AuthEvent {
         BIGINT id PK
         TIMESTAMPTZ occurred_at PK
@@ -140,12 +71,13 @@ erDiagram
         VARCHAR(64) failure_reason
         BIGINT provider_id FK
         BIGINT workspace_id FK
-        BIGINT identity_link_id FK
+        BIGINT identity_id FK
         INET ip_inet
         VARCHAR(512) user_agent
         TEXT details
         BOOLEAN elevated_via_instance_admin "NOT NULL"
-        BIGINT viewed_user_id FK
+        BIGINT viewed_actor_id FK
+        BIGINT viewed_account_id FK
     }
 
     AuthRateLimitBucket {
@@ -154,8 +86,20 @@ erDiagram
         BIGINT expires_at
     }
 
+    CatalogEntry {
+        VARCHAR(16) entry_type PK
+        VARCHAR(64) slug PK
+        VARCHAR(64) kind
+        JSONB definition
+        JSONB base
+        INTEGER position
+        TIMESTAMPTZ excluded_at
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ updated_at "NOT NULL"
+    }
+
     ChatMessage {
-        UUID id PK
+        UUID id PK,UK
         TIMESTAMPTZ created_at "NOT NULL"
         JSONB metadata
         VARCHAR(16) role "NOT NULL"
@@ -170,6 +114,7 @@ erDiagram
         BIGINT llm_total_reasoning_tokens "NOT NULL"
         BIGINT llm_cache_read_tokens "NOT NULL"
         BIGINT llm_cache_write_tokens "NOT NULL"
+        BIGINT workspace_id FK,UK "NOT NULL"
     }
 
     ChatMessageVote {
@@ -180,11 +125,11 @@ erDiagram
     }
 
     ChatThread {
-        UUID id PK
+        UUID id PK,UK
         TIMESTAMPTZ created_at "NOT NULL"
         TEXT title
-        BIGINT user_id FK
-        BIGINT workspace_id FK "NOT NULL"
+        BIGINT account_id FK
+        BIGINT workspace_id FK,UK "NOT NULL"
         BYTEA session_jsonl
         VARCHAR(16) surface "NOT NULL"
     }
@@ -304,8 +249,7 @@ erDiagram
         VARCHAR(40) purpose "NOT NULL"
         BOOLEAN granted "NOT NULL"
         VARCHAR(32) mechanism "NOT NULL"
-        VARCHAR(32) notice_version FK "NOT NULL"
-        VARCHAR(64) notice_sha256 FK
+        VARCHAR(32) notice_version "NOT NULL"
         TIMESTAMPTZ occurred_at "NOT NULL"
         VARCHAR(255) research_organization
     }
@@ -315,65 +259,6 @@ erDiagram
         TEXT notice_text "NOT NULL"
         VARCHAR(64) sha256 UK "NOT NULL"
         TIMESTAMPTZ published_at "NOT NULL"
-    }
-
-    CuratedGroupOverride {
-        VARCHAR(64) slug PK
-        VARCHAR(128) name
-        TEXT description
-        INTEGER position
-        VARCHAR(64) icon
-        VARCHAR(32) color
-        VARCHAR(128) based_on_digest
-        TIMESTAMPTZ retired_at
-        TIMESTAMPTZ created_at "NOT NULL"
-        TIMESTAMPTZ updated_at "NOT NULL"
-        BIGINT version "NOT NULL"
-    }
-
-    CuratedPracticeOverride {
-        VARCHAR(64) slug PK
-        VARCHAR(128) name
-        VARCHAR(64) applies_to
-        TEXT criteria
-        TEXT precompute_script
-        TEXT why_it_matters
-        TEXT what_good_looks_like
-        VARCHAR(64) group_slug
-        INTEGER position
-        VARCHAR(128) based_on_digest
-        TIMESTAMPTZ retired_at
-        TIMESTAMPTZ created_at "NOT NULL"
-        TIMESTAMPTZ updated_at "NOT NULL"
-        BIGINT version "NOT NULL"
-        JSONB automated_review_policy
-        JSONB adopted_base
-        VARCHAR(32) adopted_base_source
-        JSONB delivery_behavior
-        JSONB signals
-        JSONB evidence_requirements
-        JSONB review_when
-        VARCHAR(16) subject
-        JSONB precondition
-        JSONB guide
-        JSONB visual
-    }
-
-    DeliveryPolicyEvaluation {
-        UUID id PK
-        BIGINT workspace_id FK "NOT NULL"
-        UUID agent_job_id FK "NOT NULL"
-        UUID feedback_id FK
-        BIGINT admitted_revision "NOT NULL"
-        BIGINT evaluated_revision
-        VARCHAR(16) resolver_version "NOT NULL"
-        VARCHAR(24) surface "NOT NULL"
-        VARCHAR(24) stage "NOT NULL"
-        BOOLEAN allowed "NOT NULL"
-        VARCHAR(48) decisive_reason
-        JSONB checks "NOT NULL"
-        JSONB facts "NOT NULL"
-        TIMESTAMPTZ evaluated_at "NOT NULL"
     }
 
     Discussion {
@@ -451,101 +336,89 @@ erDiagram
 
     Feedback {
         UUID id PK,UK
-        UUID agent_job_id FK,UK "NOT NULL"
         BIGINT workspace_id FK,UK "NOT NULL"
-        VARCHAR(64) artifact_kind
-        BIGINT artifact_id
-        BIGINT recipient_user_id FK "NOT NULL"
-        BIGINT about_user_id FK "NOT NULL"
-        VARCHAR(32) channel "NOT NULL"
-        INTEGER position UK "NOT NULL"
-        VARCHAR(32) delivery_state "NOT NULL"
-        VARCHAR(32) suppression_reason
+        UUID review_id FK "NOT NULL"
+        BIGINT item_id FK
+        BIGINT developer_id FK,UK "NOT NULL"
+        VARCHAR(24) destination "NOT NULL"
+        VARCHAR(24) state "NOT NULL"
+        VARCHAR(48) stop_reason
         TEXT body
-        VARCHAR(16) source "NOT NULL"
+        JSONB checks "NOT NULL"
         UUID replaces_id FK
-        VARCHAR(64) thread_key
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ delivered_at
-        JSONB proposed_placements "NOT NULL"
-        VARCHAR(64) reviewed_revision
-        JSONB proposed_practice_slugs "NOT NULL"
     }
 
-    FeedbackApproval {
-        UUID id PK
-        UUID feedback_id UK "NOT NULL"
-        BIGINT workspace_id "NOT NULL"
-        BIGINT actor_account_id
-        VARCHAR(16) decision "NOT NULL"
-        VARCHAR(32) rejection_reason
-        VARCHAR(500) rejection_note
-        VARCHAR(64) content_digest "NOT NULL"
-        TIMESTAMPTZ decided_at "NOT NULL"
-    }
-
-    FeedbackDispatch {
-        UUID id PK
-        VARCHAR(96) destination_key UK "NOT NULL"
-        BIGINT workspace_id FK "NOT NULL"
-        UUID agent_job_id FK "NOT NULL"
-        UUID feedback_id FK
-        VARCHAR(40) destination "NOT NULL"
-        VARCHAR(16) state "NOT NULL"
-        TEXT body "NOT NULL"
-        JSONB practice_slugs "NOT NULL"
-        JSONB package_content "NOT NULL"
-        JSONB delivered_placements "NOT NULL"
-        BOOLEAN write_started "NOT NULL"
-        VARCHAR(255) delivered_external_ref
-        VARCHAR(64) lease_owner
-        TIMESTAMPTZ lease_expires_at
-        TIMESTAMPTZ next_attempt_at "NOT NULL"
-        INTEGER attempt_count "NOT NULL"
-        VARCHAR(48) suppression_reason
-        VARCHAR(512) last_error
-        TIMESTAMPTZ projected_at
-        VARCHAR(64) projection_owner
-        TIMESTAMPTZ projection_expires_at
-        TIMESTAMPTZ created_at "NOT NULL"
-        TIMESTAMPTZ updated_at "NOT NULL"
-        TIMESTAMPTZ write_started_at
-        BOOLEAN inline_write_started
-        TEXT delivered_external_url
-    }
-
-    FeedbackObservation {
-        UUID feedback_id PK,FK
-        UUID observation_id PK,FK
-        VARCHAR(16) role "NOT NULL"
+    FeedbackBasi {
+        UUID id PK,UK
+        BIGINT workspace_id FK,UK "NOT NULL"
+        UUID feedback_id FK,UK "NOT NULL"
+        UUID result_id FK,UK "NOT NULL"
+        UUID problem_id FK,UK
+        BIGINT developer_id FK "NOT NULL"
         INTEGER ordinal "NOT NULL"
     }
 
-    FeedbackPlacement {
-        UUID id PK
+    FeedbackCopy {
+        UUID id PK,UK
+        BIGINT workspace_id FK,UK "NOT NULL"
         UUID feedback_id FK,UK "NOT NULL"
-        VARCHAR(32) placement_type "NOT NULL"
-        VARCHAR(16) anchor_kind
-        TEXT anchor_path
-        INTEGER anchor_start_line
-        INTEGER anchor_end_line
-        VARCHAR(8) anchor_side
-        TEXT posted_comment_ref UK
-        TIMESTAMPTZ created_at "NOT NULL"
+        VARCHAR(16) kind "NOT NULL"
+        INTEGER position UK "NOT NULL"
+        TEXT body
+        TEXT path
+        INTEGER start_line
+        INTEGER end_line
+        VARCHAR(3) side
+        VARCHAR(48) stop_reason
+        VARCHAR(16) readback
+        VARCHAR(512) last_error
+        VARCHAR(16) state "NOT NULL"
+        TIMESTAMPTZ write_started_at
+        TEXT write_key
+        TEXT write_marker
+        TEXT external_ref UK
+        TEXT external_url
         UUID chat_message_id FK
-        TEXT posted_comment_url
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ posted_at
     }
 
-    FeedbackWithdrawal {
-        UUID id PK
+    FeedbackDecision {
+        UUID id PK,UK
+        BIGINT workspace_id FK,UK "NOT NULL"
         UUID feedback_id FK "NOT NULL"
-        VARCHAR(500) reason "NOT NULL"
-        VARCHAR(500) restoration_reason
-        TIMESTAMPTZ restored_at
-        BIGINT restored_by_account_id FK
-        TIMESTAMPTZ withdrawn_at "NOT NULL"
-        BIGINT withdrawn_by_account_id FK
-        BIGINT workspace_id FK "NOT NULL"
+        VARCHAR(8) action "NOT NULL"
+        BIGINT actor_account_id FK
+        VARCHAR(500) reason
+        TEXT note
+        VARCHAR(64) content_digest
+        TIMESTAMPTZ decided_at "NOT NULL"
+    }
+
+    FeedbackResponse {
+        UUID id PK,UK
+        BIGINT workspace_id FK,UK "NOT NULL"
+        UUID feedback_id FK "NOT NULL"
+        VARCHAR(16) resolution
+        VARCHAR(16) usefulness
+        TEXT comment
+        TIMESTAMPTZ created_at "NOT NULL"
+    }
+
+    FeedbackSend {
+        UUID feedback_id PK,FK,UK
+        BIGINT workspace_id FK,UK "NOT NULL"
+        VARCHAR(8) action "NOT NULL"
+        VARCHAR(16) state "NOT NULL"
+        VARCHAR(64) lease_owner
+        TIMESTAMPTZ lease_expires_at
+        INTEGER attempts "NOT NULL"
+        TIMESTAMPTZ next_attempt_at "NOT NULL"
+        VARCHAR(512) last_error
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ updated_at "NOT NULL"
     }
 
     FxRate {
@@ -587,20 +460,14 @@ erDiagram
         TIMESTAMPTZ git_details_captured_at
     }
 
-    IdentityLink {
+    Identity {
         BIGINT id PK
         BIGINT account_id FK "NOT NULL"
         BIGINT provider_id FK "NOT NULL"
-        VARCHAR(255) subject "NOT NULL"
-        VARCHAR(255) team_id
-        BIGINT external_actor_id
-        VARCHAR(255) username_at_signup
-        VARCHAR(320) email_at_signup
-        VARCHAR(255) display_name
-        TEXT avatar_url
-        TEXT profile_url
-        TIMESTAMPTZ linked_at "NOT NULL"
+        VARCHAR(255) provider_user_key "NOT NULL"
+        VARCHAR(255) team_key "NOT NULL"
         VARCHAR(16) linked_via "NOT NULL"
+        TIMESTAMPTZ linked_at "NOT NULL"
         TIMESTAMPTZ last_login_at
         TIMESTAMPTZ disabled_at
     }
@@ -610,6 +477,15 @@ erDiagram
         VARCHAR(10) type UK "NOT NULL"
         VARCHAR(512) server_url UK "NOT NULL"
         TIMESTAMPTZ created_at "NOT NULL"
+    }
+
+    IdentityRestriction {
+        UUID id PK
+        BIGINT provider_id FK,UK "NOT NULL"
+        VARCHAR(255) provider_user_key UK "NOT NULL"
+        VARCHAR(255) team_key UK "NOT NULL"
+        VARCHAR(16) kind UK "NOT NULL"
+        UUID active_request_id FK
     }
 
     InstanceLlmSetting {
@@ -732,6 +608,34 @@ erDiagram
         UUID session_id FK
     }
 
+    Item {
+        BIGINT id PK,UK
+        BIGINT workspace_id FK,UK "NOT NULL"
+        VARCHAR(64) kind "NOT NULL"
+        BIGINT parent_id FK
+        BIGINT source_id
+        TEXT path
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ removed_at
+    }
+
+    ItemEvent {
+        UUID id PK,UK
+        BIGINT workspace_id FK,UK "NOT NULL"
+        BIGINT item_id FK,UK "NOT NULL"
+        VARCHAR(128) name UK "NOT NULL"
+        TEXT item_version UK "NOT NULL"
+        TIMESTAMPTZ occurred_at "NOT NULL"
+        VARCHAR(16) found_by "NOT NULL"
+        BIGINT actor_user_id FK
+        BIGINT requested_by_id FK
+        VARCHAR(16) state "NOT NULL"
+        VARCHAR(48) reason
+        TIMESTAMPTZ decided_at "NOT NULL"
+        TIMESTAMPTZ last_attempted_at
+        TIMESTAMPTZ retry_at
+    }
+
     JwtSigningKey {
         VARCHAR(64) kid PK
         VARCHAR(16) algorithm "NOT NULL"
@@ -812,10 +716,10 @@ erDiagram
     }
 
     LlmUsageEvent {
-        UUID id PK
-        BIGINT workspace_id FK "NOT NULL"
+        UUID id PK,UK
+        BIGINT workspace_id FK,UK "NOT NULL"
         VARCHAR(40) job_type "NOT NULL"
-        VARCHAR(20) source_type UK "NOT NULL"
+        VARCHAR(32) source_type UK "NOT NULL"
         UUID source_id UK "NOT NULL"
         INTEGER source_attempt UK "NOT NULL"
         VARCHAR(128) model
@@ -837,6 +741,9 @@ erDiagram
         TIMESTAMPTZ occurred_at "NOT NULL"
         VARCHAR(16) usage_provenance
         VARCHAR(16) measurement_verification "NOT NULL"
+        UUID review_id FK
+        BIGINT search_units "NOT NULL"
+        INTEGER unreported_calls "NOT NULL"
     }
 
     LoginProvider {
@@ -852,6 +759,18 @@ erDiagram
         BOOLEAN seeded_from_env "NOT NULL"
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at "NOT NULL"
+    }
+
+    Membership {
+        BIGINT workspace_id PK,FK
+        BIGINT account_id PK,FK
+        VARCHAR(16) role "NOT NULL"
+        BOOLEAN hidden "NOT NULL"
+        BOOLEAN review_selected "NOT NULL"
+        BIGINT onboarding_seen_revision
+        BOOLEAN public_activity_seen "NOT NULL"
+        TIMESTAMPTZ joined_at "NOT NULL"
+        TIMESTAMPTZ left_at
     }
 
     MentorSlackThread {
@@ -902,41 +821,6 @@ erDiagram
         TIMESTAMPTZ issued_at "NOT NULL"
         TIMESTAMPTZ consumed_at
         BIGINT actor_account_id FK
-    }
-
-    Observation {
-        UUID id PK,UK
-        VARCHAR(255) occurrence_key UK "NOT NULL"
-        UUID agent_job_id FK "NOT NULL"
-        BIGINT practice_id FK "NOT NULL"
-        VARCHAR(64) artifact_kind "NOT NULL"
-        BIGINT artifact_id "NOT NULL"
-        BIGINT about_user_id FK "NOT NULL"
-        VARCHAR(255) summary "NOT NULL"
-        VARCHAR(16) severity
-        JSONB evidence
-        TEXT evidence_rationale
-        TIMESTAMPTZ observed_at "NOT NULL"
-        VARCHAR(64) recurrence_key
-        BIGINT practice_revision_id FK
-        VARCHAR(16) origin "NOT NULL"
-        BIGINT workspace_id FK,UK "NOT NULL"
-        TIMESTAMPTZ superseded_at
-        VARCHAR(16) outcome "NOT NULL"
-    }
-
-    ObservationInvalidation {
-        UUID id PK
-        TIMESTAMPTZ invalidated_at "NOT NULL"
-        BIGINT invalidated_by_account_id FK
-        UUID observation_id FK "NOT NULL"
-        VARCHAR(16) provider_copy "NOT NULL"
-        TIMESTAMPTZ provider_copy_retry_at "NOT NULL"
-        VARCHAR(500) reason "NOT NULL"
-        VARCHAR(500) restoration_reason
-        TIMESTAMPTZ restored_at
-        BIGINT restored_by_account_id FK
-        BIGINT workspace_id FK "NOT NULL"
     }
 
     Organization {
@@ -1034,115 +918,71 @@ erDiagram
     }
 
     PersonEvidenceCopy {
-        UUID id PK
+        UUID id PK,UK
         UUID job_id "NOT NULL"
         VARCHAR(24) state "NOT NULL"
         JSONB payload "NOT NULL"
         UUID store_id "NOT NULL"
-        BIGINT workspace_id "NOT NULL"
-    }
-
-    PersonSuppression {
-        UUID id PK
-        UUID active_request_id FK
-        BIGINT provider_id FK,UK "NOT NULL"
-        VARCHAR(255) subject UK "NOT NULL"
-        VARCHAR(255) team_key UK "NOT NULL"
+        BIGINT workspace_id UK "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
     }
 
     Practice {
+        BIGINT id PK,FK,UK
+        BIGINT workspace_id FK,UK "NOT NULL"
+        VARCHAR(64) slug UK "NOT NULL"
+        VARCHAR(64) kind "NOT NULL"
+        BIGINT group_id FK
+        INTEGER position "NOT NULL"
+        BIGINT current_version_id FK "NOT NULL"
+        VARCHAR(16) feedback_mode
+        VARCHAR(64) catalog_slug
+        JSONB catalog_base
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ updated_at
+    }
+
+    PracticeGroup {
         BIGINT id PK,UK
         BIGINT workspace_id FK,UK "NOT NULL"
         VARCHAR(64) slug UK "NOT NULL"
         VARCHAR(128) name "NOT NULL"
-        TEXT criteria "NOT NULL"
-        TIMESTAMPTZ created_at "NOT NULL"
-        TIMESTAMPTZ updated_at
-        TEXT precompute_script
-        BIGINT practice_group_id FK
-        VARCHAR(64) applies_to "NOT NULL"
-        TEXT why_it_matters
-        TEXT what_good_looks_like
-        INTEGER display_order "NOT NULL"
-        BIGINT current_revision_id FK,UK
-        VARCHAR(64) source_curated_slug
-        VARCHAR(96) source_curated_fingerprint
-        JSONB automated_review_policy "NOT NULL"
-        VARCHAR(16) autonomy
-        JSONB adopted_base
-        VARCHAR(32) adopted_base_source
-        VARCHAR(96) declined_offered_digest
-        JSONB delivery_behavior "NOT NULL"
-        JSONB signals "NOT NULL"
-        JSONB evidence_requirements "NOT NULL"
-        JSONB review_when "NOT NULL"
-        VARCHAR(16) subject "NOT NULL"
-        JSONB precondition
-        JSONB guide
-        JSONB visual
-    }
-
-    PracticeCatalogInstallation {
-        BIGINT workspace_id PK,FK
-        TIMESTAMPTZ installed_at "NOT NULL"
-        TIMESTAMPTZ provenance_linked_at
-    }
-
-    PracticeGroup {
-        BIGINT id PK
-        BIGINT workspace_id FK,UK "NOT NULL"
-        VARCHAR(64) slug UK "NOT NULL"
-        VARCHAR(128) name "NOT NULL"
         TEXT description
-        BOOLEAN visible_in_practice_dashboards "NOT NULL"
-        INTEGER display_order "NOT NULL"
-        TIMESTAMPTZ created_at "NOT NULL"
-        TIMESTAMPTZ updated_at
         VARCHAR(64) icon
         VARCHAR(32) color
-        VARCHAR(64) source_curated_slug
-        VARCHAR(64) source_curated_fingerprint
-        VARCHAR(16) autonomy
-    }
-
-    PracticeReviewPersonTarget {
-        BIGINT workspace_id PK,FK
-        BIGINT user_id PK,FK
-    }
-
-    PracticeReviewRepositoryTarget {
-        BIGINT workspace_id PK,FK
-        BIGINT repository_monitor_id PK,FK
-        JSONB base_branches "NOT NULL"
-    }
-
-    PracticeRevision {
-        BIGINT id PK
-        BIGINT practice_id FK,UK "NOT NULL"
-        INTEGER revision_number UK "NOT NULL"
-        TEXT criteria "NOT NULL"
+        INTEGER position "NOT NULL"
+        BOOLEAN shown_to_developers "NOT NULL"
+        VARCHAR(16) feedback_mode
+        VARCHAR(64) catalog_slug
+        JSONB catalog_base
         TIMESTAMPTZ created_at "NOT NULL"
-        VARCHAR(64) slug
+        TIMESTAMPTZ updated_at
+    }
+
+    PracticeVersion {
+        BIGINT id PK,UK
+        BIGINT workspace_id FK,UK "NOT NULL"
+        BIGINT practice_id FK,UK "NOT NULL"
+        INTEGER number UK "NOT NULL"
+        JSONB definition "NOT NULL"
         VARCHAR(128) name
-        VARCHAR(64) applies_to
-        TEXT precompute_script
-        TEXT why_it_matters
-        TEXT what_good_looks_like
-        VARCHAR(64) group_slug
-        VARCHAR(128) group_name
-        TEXT group_description
-        VARCHAR(64) group_icon
-        VARCHAR(32) group_color
-        VARCHAR(96) review_rule_fingerprint
-        JSONB automated_review_policy
-        JSONB delivery_behavior "NOT NULL"
-        JSONB signals
-        JSONB evidence_requirements
-        JSONB review_when
-        VARCHAR(16) subject
-        JSONB precondition
-        JSONB guide
-        JSONB visual
+        VARCHAR(96) review_digest "NOT NULL"
+        BIGINT created_by_account_id FK
+        TIMESTAMPTZ created_at "NOT NULL"
+    }
+
+    Problem {
+        UUID id PK,UK
+        BIGINT workspace_id FK,UK "NOT NULL"
+        UUID result_id FK,UK "NOT NULL"
+        INTEGER position UK "NOT NULL"
+        VARCHAR(64) key UK
+        VARCHAR(16) severity "NOT NULL"
+        VARCHAR(255) summary "NOT NULL"
+        TEXT explanation "NOT NULL"
+        JSONB citations "NOT NULL"
+        JSONB basis
+        TEXT next_step
     }
 
     ProductFeedback {
@@ -1295,25 +1135,6 @@ erDiagram
         BIGINT provider_id FK,UK "NOT NULL"
     }
 
-    PublicActivityObjection {
-        UUID id PK
-        BIGINT provider_id UK "NOT NULL"
-        VARCHAR(255) subject UK "NOT NULL"
-    }
-
-    PublicReviewCompletion {
-        UUID job_id PK,FK
-        TIMESTAMPTZ accepted_at "NOT NULL"
-        INTEGER accepted_attempt "NOT NULL"
-        VARCHAR(255) accepted_worker_id "NOT NULL"
-        INTEGER admission_attempt "NOT NULL"
-        VARCHAR(64) admission_digest "NOT NULL"
-        INTEGER contract_version "NOT NULL"
-        JSONB review
-        VARCHAR(64) review_digest "NOT NULL"
-        BIGINT workspace_id FK "NOT NULL"
-    }
-
     PullRequestClosingIssue {
         BIGINT pull_request_id PK,FK
         BIGINT issue_id PK,FK
@@ -1397,17 +1218,6 @@ erDiagram
         TIMESTAMPTZ resolved_at
     }
 
-    Reaction {
-        UUID id PK
-        BIGINT reactor_user_id FK "NOT NULL"
-        VARCHAR(16) action
-        TEXT explanation
-        TIMESTAMPTZ created_at "NOT NULL"
-        UUID feedback_id FK "NOT NULL"
-        VARCHAR(64) recurrence_key
-        VARCHAR(16) usefulness
-    }
-
     ReleaseStart {
         BIGINT id PK
         VARCHAR(16) channel "NOT NULL"
@@ -1474,58 +1284,227 @@ erDiagram
         TIMESTAMPTZ repository_visibility_confirmed_at
     }
 
-    ReviewBackfillRun {
-        UUID id PK
-        BIGINT workspace_id FK "NOT NULL"
-        VARCHAR(64) artifact_kind "NOT NULL"
-        TIMESTAMPTZ from_at "NOT NULL"
-        TIMESTAMPTZ to_at "NOT NULL"
+    Result {
+        UUID id PK,UK
+        BIGINT workspace_id FK,UK "NOT NULL"
+        UUID review_id FK "NOT NULL"
+        BIGINT practice_id FK,UK "NOT NULL"
+        BIGINT practice_version_id FK
+        BIGINT item_id FK,UK "NOT NULL"
+        TEXT item_version
+        BIGINT developer_id FK,UK
+        VARCHAR(24) outcome "NOT NULL"
+        VARCHAR(16) severity
+        VARCHAR(255) summary
+        TEXT explanation
+        JSONB evidence
+        JSONB example
+        JSONB coverage
+        SMALLINT evidence_version "NOT NULL"
+        TIMESTAMPTZ recorded_at "NOT NULL"
+        TIMESTAMPTZ ended_at
+        VARCHAR(24) end_reason
+    }
+
+    ResultMark {
+        UUID id PK,UK
+        BIGINT workspace_id FK,UK "NOT NULL"
+        UUID result_id FK "NOT NULL"
+        VARCHAR(16) kind "NOT NULL"
+        VARCHAR(500) reason "NOT NULL"
+        BIGINT created_by_id FK
+        TIMESTAMPTZ created_at "NOT NULL"
+        BIGINT removed_by_id FK
+        TIMESTAMPTZ removed_at
+        VARCHAR(500) removal_reason
+    }
+
+    Review {
+        UUID id PK,UK
+        BIGINT workspace_id FK,UK "NOT NULL"
+        BIGINT item_id FK "NOT NULL"
+        VARCHAR(8) kind "NOT NULL"
+        TEXT item_version
+        TEXT base_version
+        VARCHAR(16) origin "NOT NULL"
+        UUID event_id FK
+        UUID batch_id FK
+        BIGINT requested_by_id FK
+        VARCHAR(16) status "NOT NULL"
+        VARCHAR(48) stop_reason
+        NUMERIC(18,6) budget_usd
+        BIGINT rollout_revision "NOT NULL"
+        TIMESTAMPTZ ordered_at "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ admitted_at
+        TIMESTAMPTZ completed_at
+        TIMESTAMPTZ public_review_at
+        JSONB report
+        JSONB inventory_receipt
+        UUID request_key UK
+        VARCHAR(64) request_digest
+        JSONB checks "NOT NULL"
+    }
+
+    ReviewBatch {
+        UUID id PK,UK
+        BIGINT version "NOT NULL"
+        BIGINT workspace_id FK,UK "NOT NULL"
+        VARCHAR(64) kind "NOT NULL"
+        VARCHAR(16) origin "NOT NULL"
+        UUID schedule_id FK
+        TIMESTAMPTZ from_at
+        TIMESTAMPTZ to_at
         VARCHAR(24) status "NOT NULL"
         VARCHAR(32) pause_reason
-        INTEGER estimated_artifacts "NOT NULL"
+        NUMERIC(18,6) budget_usd
+        INTEGER estimated_items "NOT NULL"
         NUMERIC(12,4) estimated_cost_usd
-        BIGINT cursor_artifact_id
+        BIGINT cursor_item_id FK
         INTEGER submitted_count "NOT NULL"
-        INTEGER passed_count "NOT NULL"
-        BIGINT requested_by_account_id "NOT NULL"
-        BIGINT confirmed_by_account_id
+        INTEGER skipped_count "NOT NULL"
+        INTEGER failed_count "NOT NULL"
+        BIGINT requested_by_account_id FK
+        BIGINT confirmed_by_account_id FK
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ started_at
         TIMESTAMPTZ finished_at
         TIMESTAMPTZ updated_at "NOT NULL"
-        BIGINT version "NOT NULL"
-        INTEGER failed_count "NOT NULL"
-        VARCHAR(16) discovered_via "NOT NULL"
-        UUID sweep_schedule_id
+    }
+
+    ReviewBatchTarget {
+        UUID batch_id PK,FK,UK
+        BIGINT item_id PK,FK,UK
+        BIGINT workspace_id FK,UK "NOT NULL"
     }
 
     ReviewCompositionBasi {
-        UUID job_id PK,FK
+        UUID job_id PK,FK,UK
+        BIGINT workspace_id FK,UK "NOT NULL"
         INTEGER admission_attempt "NOT NULL"
         VARCHAR(64) admission_digest "NOT NULL"
         VARCHAR(64) basis_digest "NOT NULL"
         INTEGER basis_version "NOT NULL"
-        BIGINT byte_size "NOT NULL"
         UUID copy_id "NOT NULL"
-        TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ expires_at "NOT NULL"
         JSONB payload "NOT NULL"
-        BIGINT workspace_id FK "NOT NULL"
     }
 
-    ReviewSweepSchedule {
-        UUID id PK
+    ReviewItem {
+        BIGINT workspace_id FK,UK "NOT NULL"
+        UUID review_id PK,FK,UK
+        BIGINT practice_id PK,FK,UK
+        BIGINT item_id PK,FK,UK
+        TEXT item_version
+        VARCHAR(16) state "NOT NULL"
+        UUID result_id FK
+        UUID job_id FK
+        TIMESTAMPTZ attempted_at
+        VARCHAR(128) reason
+        JSONB detail
+    }
+
+    ReviewJob {
+        UUID id PK,UK
+        UUID review_id FK "NOT NULL"
+        BIGINT workspace_id FK,UK "NOT NULL"
+        TIMESTAMPTZ submitted_at "NOT NULL"
+        VARCHAR(20) status "NOT NULL"
+        INTEGER attempt "NOT NULL"
+        VARCHAR(16) processing_status "NOT NULL"
+        TIMESTAMPTZ available_at "NOT NULL"
+        VARCHAR(32) hold_reason
+        VARCHAR(255) worker_id
+        VARCHAR(255) idempotency_key
+        VARCHAR(32) trace_id "NOT NULL"
+        JSONB input "NOT NULL"
+        JSONB config_snapshot "NOT NULL"
+        JSONB capture
+        JSONB output
+        INTEGER exit_code
+        TEXT error_message
+        VARCHAR(32) cancellation_reason
+        TIMESTAMPTZ conversation_prepared_at
+        TIMESTAMPTZ practice_page_prepared_at
+        VARCHAR(64) public_review_digest
+        INTEGER admission_attempt
+        VARCHAR(64) admission_digest
+        INTEGER llm_calls "NOT NULL"
+        BIGINT llm_input_tokens "NOT NULL"
+        BIGINT llm_output_tokens "NOT NULL"
+        BIGINT llm_reasoning_tokens "NOT NULL"
+        BIGINT llm_cache_read_tokens "NOT NULL"
+        BIGINT llm_cache_write_tokens "NOT NULL"
+        TIMESTAMPTZ started_at
+        TIMESTAMPTZ execution_started_at
+        TIMESTAMPTZ completed_at
+    }
+
+    ReviewJobScriptRun {
+        UUID job_id PK,FK
+        INTEGER attempt PK
+        BIGINT practice_id PK,FK
+        BIGINT workspace_id FK "NOT NULL"
+        BIGINT practice_version_id FK "NOT NULL"
+        VARCHAR(16) status "NOT NULL"
+        VARCHAR(16) script_kind "NOT NULL"
+        VARCHAR(32) stop_reason
+        JSONB calls
+        JSONB models
+        TIMESTAMPTZ finished_at "NOT NULL"
+        VARCHAR(500) error
+        INTEGER duration_ms
+    }
+
+    ReviewJobScriptUsage {
+        UUID job_id PK,FK
+        INTEGER attempt PK
+        VARCHAR(16) model_kind PK
+        BIGINT practice_id PK,FK
+        BIGINT workspace_id FK "NOT NULL"
+        VARCHAR(24) data_handling_tier
+        INTEGER calls "NOT NULL"
+        INTEGER reported_calls "NOT NULL"
+        BIGINT input_tokens "NOT NULL"
+        BIGINT output_tokens "NOT NULL"
+        BIGINT cache_read_tokens "NOT NULL"
+        BIGINT cache_write_tokens "NOT NULL"
+        BIGINT search_units "NOT NULL"
+    }
+
+    ReviewPractice {
+        UUID review_id PK,FK,UK
+        BIGINT practice_id PK,FK,UK
+        BIGINT workspace_id FK,UK "NOT NULL"
+        BIGINT practice_version_id FK
+        VARCHAR(16) status "NOT NULL"
+        VARCHAR(48) reason
+        INTEGER items_listed
+        BOOLEAN listing_complete
+        JSONB capture_decision
+        JSONB method
+    }
+
+    ReviewSchedule {
+        UUID id PK,UK
         BIGINT version "NOT NULL"
         BIGINT workspace_id FK,UK "NOT NULL"
-        VARCHAR(64) artifact_kind UK "NOT NULL"
+        VARCHAR(64) kind UK "NOT NULL"
         VARCHAR(16) cadence "NOT NULL"
-        INTEGER lookback_days "NOT NULL"
+        INTEGER lookback_days
+        NUMERIC(18,6) budget_usd
         BOOLEAN enabled "NOT NULL"
         TIMESTAMPTZ next_run_at "NOT NULL"
         TIMESTAMPTZ last_run_at
-        BIGINT created_by_account_id "NOT NULL"
+        BIGINT created_by_account_id FK
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at "NOT NULL"
+    }
+
+    ReviewScopeRepository {
+        BIGINT workspace_id PK,FK
+        BIGINT repository_monitor_id PK,FK
+        JSONB base_branches "NOT NULL"
     }
 
     Shedlock {
@@ -1536,18 +1515,18 @@ erDiagram
     }
 
     SlackChannelConsentEvent {
-        BIGINT id PK
-        BIGINT workspace_id FK "NOT NULL"
+        BIGINT id PK,UK
+        BIGINT workspace_id FK,UK "NOT NULL"
         VARCHAR(32) slack_channel_id "NOT NULL"
         VARCHAR(16) from_state
         VARCHAR(16) to_state "NOT NULL"
-        BIGINT actor_user_id FK
+        BIGINT actor_account_id FK
         TEXT reason
         TIMESTAMPTZ created_at "NOT NULL"
     }
 
     SlackMessage {
-        BIGINT id PK
+        BIGINT id PK,UK
         BIGINT workspace_id FK,UK "NOT NULL"
         VARCHAR(32) slack_team_id "NOT NULL"
         VARCHAR(32) slack_channel_id UK "NOT NULL"
@@ -1558,7 +1537,7 @@ erDiagram
         TIMESTAMPTZ edited_at
         TIMESTAMPTZ deleted_at
         TIMESTAMPTZ ingested_at "NOT NULL"
-        BIGINT author_member_id FK
+        BIGINT author_account_id FK
     }
 
     SlackMonitoredChannel {
@@ -1585,7 +1564,7 @@ erDiagram
     }
 
     SlackThread {
-        BIGINT id PK
+        BIGINT id PK,UK
         BIGINT workspace_id FK,UK "NOT NULL"
         VARCHAR(32) slack_channel_id UK "NOT NULL"
         VARCHAR(32) slack_thread_ts UK "NOT NULL"
@@ -1593,7 +1572,7 @@ erDiagram
         VARCHAR(32) last_ts
         INTEGER message_count "NOT NULL"
         TIMESTAMPTZ created_at "NOT NULL"
-        ARRAY participant_member_ids "NOT NULL"
+        ARRAY participant_account_ids "NOT NULL"
         VARCHAR(32) last_reviewed_ts
     }
 
@@ -1614,7 +1593,7 @@ erDiagram
         INTEGER items_total
         JSONB progress
         TEXT error_summary
-        BIGINT triggered_by_user_id
+        BIGINT triggered_by_account_id
     }
 
     Team {
@@ -1659,13 +1638,6 @@ erDiagram
         BIGINT provider_id FK,UK "NOT NULL"
     }
 
-    UserPreference {
-        BIGINT id PK
-        BIGINT user_id FK,UK "NOT NULL"
-        BOOLEAN participate_in_research "NOT NULL"
-        BOOLEAN ai_review_enabled "NOT NULL"
-    }
-
     WorkerRegistry {
         VARCHAR(255) worker_id PK
         TIMESTAMPTZ last_heartbeat "NOT NULL"
@@ -1698,19 +1670,19 @@ erDiagram
         BOOLEAN practices_enabled "NOT NULL"
         BOOLEAN practice_review_auto_trigger_enabled "NOT NULL"
         BOOLEAN practice_review_manual_trigger_enabled "NOT NULL"
-        BOOLEAN practice_skip_drafts
         BOOLEAN practice_deliver_to_merged
         INTEGER practice_cooldown_minutes
         NUMERIC(10,2) monthly_llm_budget_usd
         NUMERIC(10,2) monthly_byo_llm_budget_usd
-        VARCHAR(16) practice_default_autonomy
-        VARCHAR(24) practice_repository_coverage_mode "NOT NULL"
-        VARCHAR(24) practice_person_coverage_mode "NOT NULL"
+        VARCHAR(16) practice_default_feedback_mode
+        VARCHAR(24) review_scope_repositories "NOT NULL"
+        VARCHAR(24) review_scope_people "NOT NULL"
         VARCHAR(16) practice_delivery_status "NOT NULL"
         BIGINT practice_rollout_revision "NOT NULL"
         BIGINT practice_config_version "NOT NULL"
         BOOLEAN public_activity_enabled "NOT NULL"
         BOOLEAN public_activity_search_engines "NOT NULL"
+        TIMESTAMPTZ practice_catalog_installed_at
     }
 
     WorkspaceAgentBinding {
@@ -1726,11 +1698,6 @@ erDiagram
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at
         VARCHAR(24) data_handling_tier UK "NOT NULL"
-    }
-
-    WorkspaceHiddenFormerMember {
-        BIGINT user_id PK,FK
-        BIGINT workspace_id PK,FK
     }
 
     WorkspaceLlmConnection {
@@ -1772,23 +1739,6 @@ erDiagram
         VARCHAR(200) data_handling_note
         VARCHAR(24) operated_by
         VARCHAR(16) brand
-    }
-
-    WorkspaceMemberOnboarding {
-        BIGINT id PK
-        BIGINT account_id FK,UK "NOT NULL"
-        BIGINT seen_revision
-        TIMESTAMPTZ updated_at "NOT NULL"
-        BIGINT workspace_id FK,UK "NOT NULL"
-        BOOLEAN public_activity_seen "NOT NULL"
-    }
-
-    WorkspaceMembership {
-        TIMESTAMPTZ created_at "NOT NULL"
-        VARCHAR(16) role "NOT NULL"
-        BIGINT user_id PK,FK
-        BIGINT workspace_id PK,FK
-        BOOLEAN hidden "NOT NULL"
     }
 
     WorkspaceOnboardingSetting {
@@ -1833,16 +1783,12 @@ erDiagram
 
     %% Relationships
     %% One-to-One relationships
-    Account ||--|| AccountAiChoice : has
     ChatMessage ||--|| ChatMessageVote : has
     DiscussionComment ||--|| Discussion : references
-    PracticeRevision ||--|| Practice : references
-    Workspace ||--|| PracticeCatalogInstallation : has
-    WorkspaceMembership ||--|| PracticeReviewPersonTarget : reviewed
-    AgentJob ||--|| PublicReviewCompletion : reviewed
+    Feedback ||--|| FeedbackSend : has
+    PracticeVersion ||--|| Practice : references
     PullRequestReviewComment ||--|| PullRequestReviewThread : reviewed
-    AgentJob ||--|| ReviewCompositionBasi : reviewed
-    User ||--|| UserPreference : has
+    ReviewJob ||--|| ReviewCompositionBasi : reviewed
     Organization ||--|| Workspace : has
     Workspace ||--|| WorkspaceOnboardingSetting : has
 
@@ -1852,20 +1798,18 @@ erDiagram
     User ||--o{ ActivityEvent : references
     Repository ||--o{ ActivityEvent : has
     Workspace ||--o{ ActivityEvent : has
-    Workspace ||--o{ AgentJob : has
-    Workspace ||--o{ ArtifactSignal : has
-    User ||--o{ ArtifactSignal : actor_user_id
-    User ||--o{ ArtifactSignal : requested_by_user_id
     Account ||--o{ AuthEvent : account_id
     Account ||--o{ AuthEvent : acting_account_id
     IdentityProvider ||--o{ AuthEvent : references
-    IdentityLink ||--o{ AuthEvent : has
-    User ||--o{ AuthEvent : has
+    Identity ||--o{ AuthEvent : has
+    Account ||--o{ AuthEvent : viewed_account_id
+    User ||--o{ AuthEvent : references
     Workspace ||--o{ AuthEvent : has
-    ChatThread ||--o{ ChatMessage : has
     ChatMessage ||--o{ ChatMessage : references
-    User ||--o{ ChatThread : has
+    ChatThread ||--o{ ChatMessage : has
+    Workspace ||--o{ ChatMessage : has
     Workspace ||--o{ ChatThread : has
+    Account ||--o{ ChatThread : has
     Account ||--o{ ClientSession : has
     Account ||--o{ ClientSignInHandoff : has
     GitCommit ||--o{ CommitContributor : has
@@ -1878,10 +1822,6 @@ erDiagram
     Connection ||--o{ ConnectionAudit : has
     Account ||--o{ ConnectionAudit : has
     Account ||--o{ ConsentDecision : has
-    ConsentNotice ||--o{ ConsentDecision : references
-    Feedback ||--o{ DeliveryPolicyEvaluation : references
-    AgentJob ||--o{ DeliveryPolicyEvaluation : references
-    Workspace ||--o{ DeliveryPolicyEvaluation : has
     User ||--o{ Discussion : references
     User ||--o{ Discussion : authored_by
     DiscussionCategory ||--o{ Discussion : has
@@ -1892,24 +1832,27 @@ erDiagram
     Discussion ||--o{ DiscussionComment : commented_on
     DiscussionComment ||--o{ DiscussionComment : commented_on
     IdentityProvider ||--o{ DiscussionComment : commented_on
-    AgentJob ||--o{ Feedback : has
-    User ||--o{ Feedback : recipient_user_id
+    Membership ||--o{ Feedback : references
+    Item ||--o{ Feedback : has
     Feedback ||--o{ Feedback : references
-    User ||--o{ Feedback : about_user_id
+    Review ||--o{ Feedback : has
     Workspace ||--o{ Feedback : has
-    Feedback ||--o{ FeedbackDispatch : references
-    AgentJob ||--o{ FeedbackDispatch : references
-    Workspace ||--o{ FeedbackDispatch : has
-    Feedback ||--o{ FeedbackPlacement : has
-    ChatMessage ||--o{ FeedbackPlacement : has
-    Feedback ||--o{ FeedbackWithdrawal : references
-    Account ||--o{ FeedbackWithdrawal : restored_by_account_id
-    Account ||--o{ FeedbackWithdrawal : withdrawn_by_account_id
+    ChatMessage ||--o{ FeedbackCopy : has
+    Feedback ||--o{ FeedbackCopy : has
+    Workspace ||--o{ FeedbackCopy : has
+    Account ||--o{ FeedbackDecision : has
+    Feedback ||--o{ FeedbackDecision : has
+    Workspace ||--o{ FeedbackDecision : has
+    Feedback ||--o{ FeedbackResponse : has
+    Workspace ||--o{ FeedbackResponse : has
+    Workspace ||--o{ FeedbackSend : has
     User ||--o{ GitCommit : authored_by
     User ||--o{ GitCommit : references
     Repository ||--o{ GitCommit : has
-    Account ||--o{ IdentityLink : has
-    IdentityProvider ||--o{ IdentityLink : references
+    Account ||--o{ Identity : has
+    IdentityProvider ||--o{ Identity : references
+    IdentityProvider ||--o{ IdentityRestriction : references
+    PersonDataRequest ||--o{ IdentityRestriction : references
     Account ||--o{ InstanceLlmSetting : has
     Account ||--o{ InstanceSetting : has
     Repository ||--o{ Issue : has
@@ -1925,11 +1868,20 @@ erDiagram
     Organization ||--o{ IssueType : has
     Account ||--o{ IssuedJwt : has
     ClientSession ||--o{ IssuedJwt : has
+    Item ||--o{ Item : references
+    Workspace ||--o{ Item : has
+    User ||--o{ ItemEvent : has
+    Item ||--o{ ItemEvent : has
+    Account ||--o{ ItemEvent : references
+    Workspace ||--o{ ItemEvent : has
     Repository ||--o{ Label : labeled
     IdentityProvider ||--o{ Label : labeled
     LlmConnection ||--o{ LlmModel : has
     LlmModel ||--o{ LlmModelPrice : has
+    Review ||--o{ LlmUsageEvent : has
     Workspace ||--o{ LlmUsageEvent : has
+    Account ||--o{ Membership : belongs_to
+    Workspace ||--o{ Membership : belongs_to
     ChatThread ||--o{ MentorSlackThread : has
     Workspace ||--o{ MentorSlackThread : has
     IdentityProvider ||--o{ Milestone : references
@@ -1937,15 +1889,6 @@ erDiagram
     User ||--o{ Milestone : created_by
     Account ||--o{ NotificationSubscription : has
     Account ||--o{ OauthStateNonce : has
-    Practice ||--o{ Observation : practice_id
-    Practice ||--o{ Observation : practice_id
-    PracticeRevision ||--o{ Observation : has
-    AgentJob ||--o{ Observation : has
-    User ||--o{ Observation : has
-    Workspace ||--o{ Observation : has
-    Observation ||--o{ ObservationInvalidation : has
-    Account ||--o{ ObservationInvalidation : invalidated_by_account_id
-    Account ||--o{ ObservationInvalidation : restored_by_account_id
     IdentityProvider ||--o{ Organization : references
     Connection ||--o{ OutlineCollection : has
     Workspace ||--o{ OutlineCollection : has
@@ -1954,12 +1897,14 @@ erDiagram
     Connection ||--o{ OutlineDocumentEvent : has
     Workspace ||--o{ OutlineDocumentEvent : has
     Account ||--o{ PersonDataRequest : has
-    PersonDataRequest ||--o{ PersonSuppression : references
-    IdentityProvider ||--o{ PersonSuppression : references
-    PracticeGroup ||--o{ Practice : has
     Workspace ||--o{ Practice : has
+    PracticeGroup ||--o{ Practice : has
     Workspace ||--o{ PracticeGroup : has
-    Practice ||--o{ PracticeRevision : has
+    Account ||--o{ PracticeVersion : has
+    Practice ||--o{ PracticeVersion : has
+    Workspace ||--o{ PracticeVersion : has
+    Result ||--o{ Problem : has
+    Workspace ||--o{ Problem : has
     Account ||--o{ ProductFeedback : account_id
     Account ||--o{ ProductFeedback : resolved_by_account_id
     Workspace ||--o{ ProductFeedback : has
@@ -1999,16 +1944,52 @@ erDiagram
     IdentityProvider ||--o{ PullRequestReviewThread : reviewed
     Issue ||--o{ PullRequestReviewThread : reviewed
     User ||--o{ PullRequestReviewThread : reviewed
-    Feedback ||--o{ Reaction : has
-    User ||--o{ Reaction : has
     Organization ||--o{ Repository : has
     IdentityProvider ||--o{ Repository : references
     Workspace ||--o{ RepositoryToMonitor : monitors
-    Workspace ||--o{ ReviewBackfillRun : reviewed
-    Workspace ||--o{ ReviewSweepSchedule : reviewed
-    User ||--o{ SlackChannelConsentEvent : has
+    Membership ||--o{ Result : references
+    Item ||--o{ Result : has
+    Practice ||--o{ Result : has
+    Review ||--o{ Result : has
+    PracticeVersion ||--o{ Result : has
+    Workspace ||--o{ Result : has
+    Account ||--o{ ResultMark : created_by_id
+    Account ||--o{ ResultMark : removed_by_id
+    Result ||--o{ ResultMark : has
+    Workspace ||--o{ ResultMark : has
+    ReviewBatch ||--o{ Review : reviewed
+    ItemEvent ||--o{ Review : reviewed
+    Item ||--o{ Review : reviewed
+    Account ||--o{ Review : reviewed
+    Workspace ||--o{ Review : reviewed
+    Account ||--o{ ReviewBatch : confirmed_by_account_id
+    Item ||--o{ ReviewBatch : reviewed
+    Account ||--o{ ReviewBatch : requested_by_account_id
+    ReviewSchedule ||--o{ ReviewBatch : reviewed
+    Workspace ||--o{ ReviewBatch : reviewed
+    Workspace ||--o{ ReviewCompositionBasi : reviewed
+    Item ||--o{ ReviewItem : reviewed
+    ReviewJob ||--o{ ReviewItem : reviewed
+    ReviewPractice ||--o{ ReviewItem : reviewed
+    Result ||--o{ ReviewItem : reviewed
+    Workspace ||--o{ ReviewItem : reviewed
+    Review ||--o{ ReviewJob : reviewed
+    Workspace ||--o{ ReviewJob : reviewed
+    ReviewJob ||--o{ ReviewJobScriptRun : reviewed
+    PracticeVersion ||--o{ ReviewJobScriptRun : reviewed
+    Workspace ||--o{ ReviewJobScriptRun : reviewed
+    ReviewJob ||--o{ ReviewJobScriptUsage : reviewed
+    Practice ||--o{ ReviewJobScriptUsage : reviewed
+    Workspace ||--o{ ReviewJobScriptUsage : reviewed
+    Practice ||--o{ ReviewPractice : reviewed
+    Review ||--o{ ReviewPractice : reviewed
+    PracticeVersion ||--o{ ReviewPractice : reviewed
+    Workspace ||--o{ ReviewPractice : reviewed
+    Account ||--o{ ReviewSchedule : reviewed
+    Workspace ||--o{ ReviewSchedule : reviewed
+    Account ||--o{ SlackChannelConsentEvent : has
     Workspace ||--o{ SlackChannelConsentEvent : has
-    User ||--o{ SlackMessage : authored_by
+    Membership ||--o{ SlackMessage : references
     Workspace ||--o{ SlackMessage : has
     Workspace ||--o{ SlackMonitoredChannel : has
     Workspace ||--o{ SlackParticipantConsent : has
@@ -2026,10 +2007,6 @@ erDiagram
     WorkspaceLlmConnection ||--o{ WorkspaceLlmModel : connection_id
     Workspace ||--o{ WorkspaceLlmModel : has
     WorkspaceLlmConnection ||--o{ WorkspaceLlmModel : connection_id
-    Workspace ||--o{ WorkspaceMemberOnboarding : belongs_to
-    Account ||--o{ WorkspaceMemberOnboarding : belongs_to
-    User ||--o{ WorkspaceMembership : belongs_to
-    Workspace ||--o{ WorkspaceMembership : belongs_to
     Workspace ||--o{ WorkspaceSlugHistory : has
 
     %% Many-to-Many relationships
@@ -2041,8 +2018,12 @@ erDiagram
     Workspace }o--o{ ConnectionActivity : has
     Discussion }o--o{ DiscussionLabel : labeled
     Label }o--o{ DiscussionLabel : labeled
-    Feedback }o--o{ FeedbackObservation : has
-    Observation }o--o{ FeedbackObservation : has
+    Feedback }o--o{ FeedbackBasi : feedback_id
+    Feedback }o--o{ FeedbackBasi : feedback_id
+    Problem }o--o{ FeedbackBasi : has
+    Result }o--o{ FeedbackBasi : result_id
+    Result }o--o{ FeedbackBasi : result_id
+    Workspace }o--o{ FeedbackBasi : has
     User }o--o{ IssueAssignee : assigned_to
     Issue }o--o{ IssueAssignee : assigned_to
     Issue }o--o{ IssueBlocking : blocked_issue_id
@@ -2051,8 +2032,6 @@ erDiagram
     Label }o--o{ IssueLabel : labeled
     LlmModel }o--o{ LlmModelWorkspaceGrant : has
     Workspace }o--o{ LlmModelWorkspaceGrant : has
-    RepositoryToMonitor }o--o{ PracticeReviewRepositoryTarget : reviewed
-    Workspace }o--o{ PracticeReviewRepositoryTarget : reviewed
     Issue }o--o{ PullRequestClosingIssue : has
     Issue }o--o{ PullRequestClosingIssue : references
     Issue }o--o{ PullRequestRequestedReviewer : reviewed
@@ -2061,12 +2040,15 @@ erDiagram
     Team }o--o{ PullRequestRequestedTeam : has
     Repository }o--o{ RepositoryCollaborator : has
     User }o--o{ RepositoryCollaborator : has
+    ReviewBatch }o--o{ ReviewBatchTarget : reviewed
+    Item }o--o{ ReviewBatchTarget : reviewed
+    Workspace }o--o{ ReviewBatchTarget : reviewed
+    RepositoryToMonitor }o--o{ ReviewScopeRepository : reviewed
+    Workspace }o--o{ ReviewScopeRepository : reviewed
     User }o--o{ TeamMembership : belongs_to
     Team }o--o{ TeamMembership : belongs_to
     Team }o--o{ TeamRepositoryPermission : has
     Repository }o--o{ TeamRepositoryPermission : has
-    User }o--o{ WorkspaceHiddenFormerMember : belongs_to
-    Workspace }o--o{ WorkspaceHiddenFormerMember : belongs_to
     Label }o--o{ WorkspaceTeamLabelFilter : labeled
     Team }o--o{ WorkspaceTeamLabelFilter : labeled
     Workspace }o--o{ WorkspaceTeamLabelFilter : labeled

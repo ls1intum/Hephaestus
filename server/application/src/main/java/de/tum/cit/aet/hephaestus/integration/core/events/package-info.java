@@ -1,9 +1,3 @@
-/**
- * In-process {@link de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent} family +
- * payload records published via Spring's {@code ApplicationEventPublisher}.
- * JVM-local pub/sub only — nothing here crosses a NATS subject. Wire-level
- * messages are raw bytes plus headers; see {@code integration/webhook/PublishRequest}.
- */
 @org.springframework.modulith.NamedInterface("events")
 @org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.integration.core.events;

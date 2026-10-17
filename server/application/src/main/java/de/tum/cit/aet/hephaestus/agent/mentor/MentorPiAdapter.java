@@ -71,8 +71,7 @@ public class MentorPiAdapter {
                 llmConfig.allowInternet(),
                 llmConfig.timeoutSeconds(),
                 PROFILE,
-                extraInputs,
-                "");
+                extraInputs);
 
         PiPlan plan = runtimeFactory.build(planSpec);
 

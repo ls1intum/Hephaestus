@@ -4,8 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
@@ -27,7 +27,7 @@ public final class TestUserFactory {
     }
 
     /** Creates an active identity during setup; disabled links are not reactivated. */
-    public static void ensureAccountForUser(AccountRepository accounts, IdentityLinkRepository identities, User actor) {
+    public static void ensureAccountForUser(AccountRepository accounts, IdentityRepository identities, User actor) {
         Long providerId = actor.getProvider().getId();
         assertNotNull(providerId);
         String subject = actor.getNativeId().toString();
@@ -39,12 +39,10 @@ public final class TestUserFactory {
             account.setAppRole(Account.AppRole.APP_ADMIN);
         }
         account = accounts.saveAndFlush(account);
-        var link = new IdentityLink();
+        var link = new Identity();
         link.setAccount(account);
         link.setProviderId(providerId);
-        link.setSubject(subject);
-        link.setUsernameAtSignup(actor.getLogin());
-        link.setExternalActorId(actor.getId());
+        link.setProviderUserKey(subject);
         identities.saveAndFlush(link);
     }
 

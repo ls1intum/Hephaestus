@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 
-import type { PracticeGroup } from "@/api/types.gen";
+import type { GroupRef } from "@/api/types.gen";
 import { InlineLink } from "@/components/common/InlineLink";
 
 import type { FeedbackTextSegment } from "./feedback-text";
@@ -15,14 +15,14 @@ export interface FeedbackTextProps {
 	 * The workspace's groups: where a group segment reads its icon and its colour. A group the
 	 * list does not carry falls back to the catalog's default folder and grey.
 	 */
-	groups?: PracticeGroup[];
+	groups?: GroupRef[];
 	onOpenGroup?: (groupSlug: string) => void;
 	/** A paragraph when the text stands on its own, a span when it sits inside other text. */
 	as?: "p" | "span";
 	className?: string;
 }
 
-const NO_GROUPS: PracticeGroup[] = [];
+const NO_GROUPS: GroupRef[] = [];
 
 /** Punctuation that must stay on the line of the work link before it. */
 const LEADING_PUNCTUATION = /^[.,;:!?)]+/u;
@@ -95,7 +95,7 @@ function Segment({
 	}
 	if (segment.type === "work") {
 		return (
-			<InlineLink href={segment.ref.url} external>
+			<InlineLink href={segment.ref.url ?? undefined} external>
 				{segment.ref.label}
 			</InlineLink>
 		);

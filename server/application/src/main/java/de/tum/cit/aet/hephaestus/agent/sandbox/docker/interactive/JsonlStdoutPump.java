@@ -16,11 +16,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Reads JSONL frames from a runner's stdout. Frames are delimited by ASCII {@code \n} ONLY;
- * {@code \r} and U+2028/U+2029 are legal inside JSON string values and must survive framing —
- * {@link java.io.BufferedReader#readLine} would mis-split. Lines longer than {@code maxLineChars}
- * are dropped and terminate the pump. Every line that does not reach the sink as a frame is reported
- * through {@code onFrameLost}: the stream around it is no longer complete.
+ * Frames end only at ASCII LF; {@link BufferedReader#readLine} also splits CR.
+ * A dropped frame must report loss so the sink cannot claim a complete stream.
  */
 final class JsonlStdoutPump {
 

@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices;
 import de.tum.cit.aet.hephaestus.core.AuditLedger;
 import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.practices.dto.AcceptPracticeReleaseRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeReleaseProposalDTO;
@@ -30,8 +31,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 
 @WorkspaceScopedController
 @RequestMapping("/practices/releases")
-@Tag(name = "Practice Catalog", description = "Review catalogue changes before they affect a workspace")
+@Tag(name = "Practice Catalog", description = "Review catalog changes before they affect a workspace")
 @RequiredArgsConstructor
+@ConditionalOnServerRole
 public class PracticeReleaseController {
 
     private final PracticeReleaseService releases;

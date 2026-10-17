@@ -4,12 +4,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
+import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataWriteFence;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.SchemaRowSeeder;
@@ -20,7 +23,6 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -37,7 +39,7 @@ class NativePersonDataWriteFenceIntegrationTest extends BaseIntegrationTest {
     private PersonDataWriteFence fence;
 
     @Autowired
-    private PersonSuppressionService suppression;
+    private IdentityRestrictionService suppression;
 
     @Autowired
     private PersonDataRequestRepository requests;
@@ -47,6 +49,12 @@ class NativePersonDataWriteFenceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private UserRepository users;
+
+    @Autowired
+    private AccountRepository accounts;
+
+    @Autowired
+    private IdentityRepository identityRows;
 
     @Autowired
     private WorkspaceRepository workspaces;
@@ -78,16 +86,13 @@ class NativePersonDataWriteFenceIntegrationTest extends BaseIntegrationTest {
                 new IdentityProvider(IdentityProviderType.GITLAB, "https://batch-fence.example.test"));
         var target = users.saveAndFlush(TestUserFactory.createUser(42L, "target", provider));
         var other = users.saveAndFlush(TestUserFactory.createUser(84L, "other", provider));
-        jdbc.update(
-                "INSERT INTO person_suppression(id,provider_id,subject,team_key) VALUES (?,?,?,?)",
-                UUID.randomUUID(),
-                provider.getId(),
-                "42",
-                "");
+        long targetAccountId = accountId(target);
+        long otherAccountId = accountId(other);
+        databaseTestUtils.erase(Objects.requireNonNull(provider.getId()), "42", "");
         new TransactionTemplate(transactions).executeWithoutResult(status -> {
-            assertThat(fence.holdForUserWrites(List.of(other.getId(), target.getId(), other.getId(), -1L)))
-                    .containsExactly(other.getId());
-            assertThat(fence.holdForUserWrites(List.of())).isEmpty();
+            assertThat(fence.holdForAccountWrites(List.of(otherAccountId, targetAccountId, otherAccountId, -1L)))
+                    .containsExactly(otherAccountId);
+            assertThat(fence.holdForAccountWrites(List.of())).isEmpty();
         });
     }
 
@@ -96,26 +101,25 @@ class NativePersonDataWriteFenceIntegrationTest extends BaseIntegrationTest {
         databaseTestUtils.cleanDatabase();
         var original = providers.saveAndFlush(
                 new IdentityProvider(IdentityProviderType.GITLAB, "https://late-alias.example.test"));
-        jdbc.update(
-                "INSERT INTO person_suppression(id,provider_id,subject,team_key) VALUES (?,?,?,?)",
-                UUID.randomUUID(),
-                original.getId(),
-                "42",
-                "");
+        databaseTestUtils.erase(Objects.requireNonNull(original.getId()), "42", "");
         var alias = providers.saveAndFlush(
                 new IdentityProvider(IdentityProviderType.GITLAB, "HTTPS://LATE-ALIAS.EXAMPLE.TEST:443/"));
         var otherInstance = providers.saveAndFlush(
                 new IdentityProvider(IdentityProviderType.GITLAB, "https://late-alias.example.test:8443"));
         var otherType = providers.saveAndFlush(
                 new IdentityProvider(IdentityProviderType.GITHUB, "https://late-alias.example.test"));
-        var target = users.saveAndFlush(TestUserFactory.createUser(42L, "same-display", alias));
-        var other = users.saveAndFlush(TestUserFactory.createUser(84L, "same-display", alias));
+        var targetActor = TestUserFactory.createUser(42L, "target-login", alias);
+        targetActor.setName("Same display");
+        var target = users.saveAndFlush(targetActor);
+        var otherActor = TestUserFactory.createUser(84L, "other-login", alias);
+        otherActor.setName("Same display");
+        var other = users.saveAndFlush(otherActor);
+        long targetAccountId = accountId(target);
+        long otherAccountId = accountId(other);
         assertThat(suppression.isSuppressed(Objects.requireNonNull(alias.getId()), "42", null))
                 .isTrue();
-        assertThat(suppression.isUserSuppressed(Objects.requireNonNull(target.getId())))
-                .isTrue();
-        assertThat(suppression.isUserSuppressed(Objects.requireNonNull(other.getId())))
-                .isFalse();
+        assertThat(suppression.isAccountSuppressed(targetAccountId)).isTrue();
+        assertThat(suppression.isAccountSuppressed(otherAccountId)).isFalse();
         assertThat(suppression.isSuppressed(Objects.requireNonNull(otherInstance.getId()), "42", null))
                 .isFalse();
         assertThat(suppression.isSuppressed(Objects.requireNonNull(otherType.getId()), "42", null))
@@ -170,13 +174,13 @@ class NativePersonDataWriteFenceIntegrationTest extends BaseIntegrationTest {
                         12L,
                         "state",
                         "OPEN"));
-        assertThat(suppression.isArtifactSuppressed(workspaceId, "scm.issue", 812205L))
+        assertThat(suppression.isSourceSuppressed(workspaceId, "scm.issue", 812205L))
                 .isTrue();
-        assertThat(suppression.isArtifactSuppressed(-1L, "scm.issue", 812205L)).isFalse();
+        assertThat(suppression.isSourceSuppressed(-1L, "scm.issue", 812205L)).isFalse();
         new TransactionTemplate(transactions).executeWithoutResult(status -> {
-            assertThat(fence.holdForUserWrites(List.of(target.getId(), other.getId())))
-                    .containsExactly(other.getId());
-            assertThat(fence.holdForUserWrite(target.getId())).isFalse();
+            assertThat(fence.holdForAccountWrites(List.of(targetAccountId, otherAccountId)))
+                    .containsExactly(otherAccountId);
+            assertThat(fence.holdForAccountWrite(targetAccountId)).isFalse();
         });
     }
 
@@ -195,16 +199,17 @@ class NativePersonDataWriteFenceIntegrationTest extends BaseIntegrationTest {
                 assertThat(fence.holdForWrite(identities)).isTrue();
                 admitted.countDown();
                 waitFor(release);
-                jdbc.update(
-                        "INSERT INTO user_preferences(user_id,participate_in_research,ai_review_enabled) VALUES (?,false,false)",
-                        user.getId());
+                jdbc.update("UPDATE \"user\" SET name='Admitted" + " profile' WHERE id=?", user.getId());
             }));
             assertThat(admitted.await(10, TimeUnit.SECONDS)).isTrue();
             var eraser = executor.submit(() -> new TransactionTemplate(transactions).execute(status -> {
-                eraserPid.set(Objects.requireNonNull(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class)));
+                eraserPid.set(
+                        Objects.requireNonNull(jdbc.queryForObject("SELECT" + " pg_backend_pid()", Integer.class)));
                 fence.holdForErasure(identities);
                 return jdbc.queryForObject(
-                        "SELECT count(*) FROM user_preferences WHERE user_id=?", Long.class, user.getId());
+                        "SELECT count(*) FROM \"user\"" + " WHERE id=? AND" + " name='Admitted profile'",
+                        Long.class,
+                        user.getId());
             }));
             try {
                 await().atMost(Duration.ofSeconds(10)).until(() -> waitingForLock(eraserPid.get()));
@@ -240,7 +245,8 @@ class NativePersonDataWriteFenceIntegrationTest extends BaseIntegrationTest {
             }));
             assertThat(locked.await(10, TimeUnit.SECONDS)).isTrue();
             var writer = executor.submit(() -> new TransactionTemplate(transactions).execute(status -> {
-                writerPid.set(Objects.requireNonNull(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class)));
+                writerPid.set(
+                        Objects.requireNonNull(jdbc.queryForObject("SELECT" + " pg_backend_pid()", Integer.class)));
                 return fence.holdForWrite(List.of(aliasIdentity));
             }));
             try {
@@ -264,7 +270,7 @@ class NativePersonDataWriteFenceIntegrationTest extends BaseIntegrationTest {
     private boolean waitingForLock(int pid) {
         return pid != 0
                 && Boolean.TRUE.equals(jdbc.queryForObject(
-                        "SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE pid=? AND wait_event='advisory')",
+                        "SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE pid=? AND" + " wait_event='advisory')",
                         Boolean.class,
                         pid));
     }
@@ -276,5 +282,17 @@ class NativePersonDataWriteFenceIntegrationTest extends BaseIntegrationTest {
             Thread.currentThread().interrupt();
             throw new IllegalStateException(exception);
         }
+    }
+
+    private long accountId(User user) {
+        TestUserFactory.ensureAccountForUser(accounts, identityRows, user);
+        return Objects.requireNonNull(identityRows
+                .findActiveByProviderSubject(
+                        Objects.requireNonNull(user.getProvider().getId()),
+                        user.getNativeId().toString(),
+                        null)
+                .orElseThrow()
+                .getAccount()
+                .getId());
     }
 }

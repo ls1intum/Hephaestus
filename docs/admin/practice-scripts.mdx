@@ -1,0 +1,136 @@
+---
+id: practice-scripts
+title: Write a practice script
+description: Write and test a practice script that returns one candidate for admission.
+---
+
+# Write a practice script
+
+A practice script returns one evidence-bounded candidate for one assigned item.
+It can decide from captured records or ask the review model to decide.
+Every candidate passes the same server admission.
+
+## Start with the built-in behavior
+
+1. Open the practice editor.
+2. Open Script.
+3. Enter a default export with meta and run(ctx).
+4. Return the candidate from ctx.review().
+5. Save the practice.
+
+```ts
+import { definePracticeScript } from "../lib/core/practice-script.ts";
+
+export default definePracticeScript({
+  meta: {},
+  async run(ctx) {
+    return ctx.review();
+  },
+});
+```
+
+The installed toolkit resolves the core import.
+For provider evidence, use its validated SCM, chat or docs kit.
+A null Script runs the built-in script. An invalid custom script stops without fallback.
+
+## The context
+
+The host supplies the practice version, criteria, assigned scope, origin and About.
+The core item record is unknown until a domain kit validates it.
+Bigint IDs are decimal strings, not JavaScript numbers.
+A script cannot choose another workspace, developer or recipient.
+
+The callable ctx.review also carries the frozen review's metadata.
+Pass leads, facts, directions, prepared context or limitations to its call.
+Only the final return from run reaches admission.
+A review call by itself creates no persisted result.
+
+For an ITEM review, scope names that item and version.
+For a SCAN, scope names one file at the frozen default-branch commit.
+The product scan concerns its repository. About is null.
+The previous result is metadata for the same assigned claim, not authority to repeat old proof.
+
+## Use a domain kit
+
+A domain kit validates the item record before it exposes source-specific helpers.
+This SCM example preserves the normal review and adds a typed fact:
+
+```ts
+import { definePracticeScript } from "../lib/core/practice-script.ts";
+import { scm } from "../kits/scm/index.ts";
+
+export default definePracticeScript({
+  meta: {},
+  async run(ctx) {
+    const target = scm(ctx);
+    return ctx.review({ facts: { itemKind: target.kind } });
+  },
+});
+```
+
+The kit supplies evidence tools under the host's permission boundary.
+It does not change the selected workspace, item or developer.
+Do not cast the unknown core item into a provider payload.
+
+## Return a result
+
+Use Met, Not met, Does not apply or Could not determine.
+The [outcome contract](/contributor/practice-feedback-language#result-outcomes) owns their meanings and requirements.
+Each problem has its own severity, citations and claim basis.
+Do not return result-level severity.
+Not met can retain open questions beside established problems.
+Operational read or model failure does not become an open question.
+
+A scan Met needs a trusted complete read of the assigned file.
+A listing, search match or claimed count alone does not prove that read.
+Citations must quote authorized captured text.
+The host verifies location, version and domain basis before the result can support feedback.
+
+## Ask assigned models
+
+Declare required or optional chat, decision, embedding and reranking models under meta.models.
+If a required model is unavailable, the practice stops. The runtime records its reason.
+Handle an absent optional model explicitly.
+The host brokers model calls through typed IPC without giving the script credentials.
+
+Calls follow the developer's account-wide AI choice and the review's stricter model tier.
+The complete frozen method records all model slots, including absent bindings.
+The [model guide](./ai-providers.mdx#models-for-practice-scripts) owns assignment and cost controls.
+
+## Test a script locally
+
+Use a checkout with the repository's pinned Node and Vite+ versions.
+Keep the tutorial file in an ignored scratch directory.
+Use the toolkit's fixture style to supply strict version 3 inputs.
+Mock models and captured evidence rather than reaching live providers.
+
+```bash
+vp run test:agents
+```
+
+Run the focused toolkit test file while you develop the script.
+Then run the agent suite before deploying it.
+Include both ITEM and SCAN cases when the practice supports scans.
+Test a refused read and an unavailable required model as operational failures.
+Never assert that a missing required source produces Could not determine.
+
+## Read execution
+
+Practice scripts in a review shows status, model calls, coverage and the first safe error line.
+Withheld means the script or candidate was refused with a recorded reason.
+Not reached means execution did not reach that practice before the review stopped.
+Result admission and feedback delivery remain separate facts.
+Execution details can expire while durable review history remains available.
+
+## Upgrade a script from an earlier release
+
+If the default export has the wrong shape, execution stops with “The script's default export is not a practice script. Write it with definePracticeScript.”
+Use the [operator migration entry](https://github.com/hephaestus-build/Hephaestus/blob/main/MIGRATION.md) and the [runner contract](/contributor/practice-script-runner) to upgrade custom scripts.
+
+## Limits
+
+Each script uses the attempt's deadline. No separate time is reserved before review.
+Direct model calls share token and search-unit limits for that attempt.
+Failed or unreported calls retain their reservation.
+The [cost guide](./ai-providers.mdx#cost-and-limits) owns the configured values and HTTP 402 behavior.
+The [runner contract](/contributor/practice-script-runner) owns proof size and citation limits.

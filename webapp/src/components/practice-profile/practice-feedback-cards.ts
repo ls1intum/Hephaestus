@@ -1,4 +1,4 @@
-import type { InAppFeedback, PracticeGroup } from "@/api/types.gen";
+import type { GroupRef, PracticePageFeedback } from "@/api/types.gen";
 import {
 	count,
 	type FeedbackTextSegment,
@@ -29,7 +29,7 @@ const cleanCondition = (needed: number): FeedbackTextSegment[] => [
  * How a piece of feedback closed, if it did. When and by what is the server's to say, in
  * `closedAt` and `closedBy`; the card only words it.
  */
-function closureOf(feedback: InAppFeedback):
+function closureOf(feedback: PracticePageFeedback):
 	| {
 			at: Date;
 			state: "resolved" | "marked" | "closed";
@@ -37,7 +37,7 @@ function closureOf(feedback: InAppFeedback):
 	  }
 	| undefined {
 	const { closedAt: at, closedBy } = feedback;
-	if (at === undefined || closedBy === undefined) {
+	if (at === null || closedBy === null) {
 		return undefined;
 	}
 	const day = formatDay(at);
@@ -50,7 +50,7 @@ function closureOf(feedback: InAppFeedback):
 					feedback.cleanWork.length > 0
 						? [
 								text(`Resolved by the work on ${day} · `),
-								...refs(feedback.cleanWork.map((clean) => clean.reviewedWork)),
+								...refs(feedback.cleanWork.map((clean) => clean.item)),
 								text(" came back clean"),
 							]
 						: [text(`Resolved by the work on ${day}`)],
@@ -77,25 +77,20 @@ function closureOf(feedback: InAppFeedback):
 	}
 }
 
-/**
- * One piece of feedback from the wire as a card. Each piece of evidence arrives named, linked
- * and with its outcome, so the strip shows exactly what the wire says about it, and the
- * developer's current response rides on the card, so resolving it needs no second query.
- */
 export function toFeedbackCard(
-	feedback: InAppFeedback,
-	groups: PracticeGroup[],
+	feedback: PracticePageFeedback,
+	groups: GroupRef[],
 ): PracticeFeedbackCardEntry {
 	const group = groups.find((candidate) => candidate.slug === feedback.groupSlug);
-	const { withdrawnAt } = feedback;
-	const closure = withdrawnAt === undefined ? closureOf(feedback) : undefined;
+	const { withdrawn } = feedback;
+	const closure = withdrawn ? undefined : closureOf(feedback);
 	const reviewedWork: ReviewedWorkOutcome[] = feedback.evidence.map((evidence) => ({
-		ref: evidence.reviewedWork,
-		date: evidence.observedAt,
-		outcome: evidence.outcome,
+		ref: evidence.item,
+		date: evidence.recordedAt,
 	}));
 	return {
 		feedbackId: feedback.id,
+		unverifiedHistory: feedback.unverifiedHistory,
 		practiceSlug: feedback.practiceSlug,
 		practiceName: feedback.practiceName,
 		// A practice in no group leaves the card's group out; the card names it itself.
@@ -116,15 +111,13 @@ export function toFeedbackCard(
 		nextStep: capitalise(feedback.nextStep ?? ""),
 		condition: closure?.condition ?? cleanCondition(feedback.cleanNeeded),
 		cleanWork: feedback.cleanWork.map((clean) => ({
-			ref: clean.reviewedWork,
-			date: clean.reviewedAt,
+			ref: clean.item,
+			date: clean.recordedAt,
 		})),
 		cleanNeeded: feedback.cleanNeeded,
-		state:
-			withdrawnAt === undefined
-				? (closure?.state ?? (feedback.readAt ? "open" : "new"))
-				: "withdrawn",
-		timestamp: withdrawnAt ?? closure?.at ?? feedback.preparedAt,
+		state: withdrawn ? "withdrawn" : (closure?.state ?? (feedback.readAt ? "open" : "new")),
+		// The wire does not say when feedback was withdrawn, so a withdrawn card keeps its own day.
+		timestamp: closure?.at ?? feedback.preparedAt,
 		preparedAt: feedback.preparedAt,
 	};
 }

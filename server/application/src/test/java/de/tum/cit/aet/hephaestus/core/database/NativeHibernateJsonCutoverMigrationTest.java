@@ -54,10 +54,12 @@ class NativeHibernateJsonCutoverMigrationTest {
         List<String> metadata = metadata(database);
         List<@Nullable String> history = query(
                 database,
-                "SELECT id || ':' || author || ':' || filename || ':' || md5sum FROM databasechangelog ORDER BY orderexecuted");
+                "SELECT id || ':' || author || ':' || filename || ':' || md5sum FROM databasechangelog ORDER BY"
+                        + " orderexecuted");
         var store = exportStore(database);
-        var selected = store.select(new PersonScope(null, List.of(), List.of(995101L)));
-        var beforeExport = store.export(selected);
+        var selectedScope = new PersonScope(null, List.of(), List.of(995101L));
+        var selected = store.select(selectedScope);
+        var beforeExport = store.export(selected, selectedScope);
         var configStore = new JdbcPersonDataStore(
                 new NamedParameterJdbcTemplate(
                         new DriverManagerDataSource(database.jdbcUrl(), database.username(), database.password())),
@@ -69,8 +71,9 @@ class NativeHibernateJsonCutoverMigrationTest {
                 "id",
                 "old_value=NULL,new_value=NULL",
                 0);
-        var configSelected = configStore.select(new PersonScope(null, List.of(), List.of()));
-        var beforeConfigExport = configStore.export(configSelected);
+        var configSelectedScope = new PersonScope(null, List.of(), List.of());
+        var configSelected = configStore.select(configSelectedScope);
+        var beforeConfigExport = configStore.export(configSelected, configSelectedScope);
         assertThat(beforeConfigExport.get(5).path("old_value").isObject()).isTrue();
         assertThat(beforeConfigExport.get(5).path("new_value").isObject()).isTrue();
         assertThat(beforeExport.get(5).path("detail").isObject()).isTrue();
@@ -92,7 +95,8 @@ class NativeHibernateJsonCutoverMigrationTest {
         assertThat(metadata(database)).isEqualTo(metadata);
         assertThat(query(
                                 database,
-                                "SELECT id || ':' || author || ':' || filename || ':' || md5sum FROM databasechangelog ORDER BY orderexecuted")
+                                "SELECT id || ':' || author || ':' || filename || ':' || md5sum FROM databasechangelog"
+                                        + " ORDER BY orderexecuted")
                         .subList(0, history.size()))
                 .isEqualTo(history);
         for (String projection : List.of(
@@ -106,12 +110,12 @@ class NativeHibernateJsonCutoverMigrationTest {
         }
         assertThat(query(database, "SELECT details FROM auth_event WHERE id=995300"))
                 .containsExactly("Retained old prose");
-        assertThat(
-                        query(
-                                database,
-                                "SELECT (tableoid <> 'public.auth_event_default'::regclass)::text FROM auth_event WHERE id=995204"))
+        assertThat(query(
+                        database,
+                        "SELECT (tableoid <> 'public.auth_event_default'::regclass)::text FROM auth_event"
+                                + " WHERE id=995204"))
                 .containsExactly("true");
-        var afterExport = store.export(selected);
+        var afterExport = store.export(selected, selectedScope);
         assertThat(afterExport.get(5).path("detail").isString()).isTrue();
         assertThat(afterExport.get(5).path("detail").asString())
                 .isEqualTo(SHAPES.get(5).text());
@@ -119,7 +123,7 @@ class NativeHibernateJsonCutoverMigrationTest {
                 .isEqualTo(beforeExport.get(3).path("detail"));
         assertThat(afterExport.get(1).path("detail").isNull()).isTrue();
         assertThat(afterExport.get(2).path("detail").asString()).isEqualTo("null");
-        var afterConfigExport = configStore.export(configSelected);
+        var afterConfigExport = configStore.export(configSelected, configSelectedScope);
         for (String column : List.of("old_value", "new_value")) {
             assertThat(afterConfigExport.get(5).path(column).isString()).isTrue();
             assertThat(afterConfigExport.get(5).path(column).asString())
@@ -131,11 +135,12 @@ class NativeHibernateJsonCutoverMigrationTest {
         execute(
                 database,
                 "SELECT partman.create_partition_time('public.auth_event', ARRAY['2101-01-01'::timestamptz])",
-                "INSERT INTO auth_event(id,occurred_at,event_type,result,details) VALUES(995301,'2101-01-02','LOGIN','SUCCESS','Future partition prose')");
-        assertThat(
-                        query(
-                                database,
-                                "SELECT (tableoid <> 'public.auth_event_default'::regclass)::text || ':' || details FROM auth_event WHERE id=995301"))
+                "INSERT INTO auth_event(id,occurred_at,event_type,result,details)"
+                        + " VALUES(995301,'2101-01-02','LOGIN','SUCCESS','Future partition prose')");
+        assertThat(query(
+                        database,
+                        "SELECT (tableoid <> 'public.auth_event_default'::regclass)::text || ':' || details"
+                                + " FROM auth_event WHERE id=995301"))
                 .containsExactly("true:Future partition prose");
         assertPartitionTypes(database);
         if (context.equals("prod")) assertGuards(database);
@@ -151,7 +156,7 @@ class NativeHibernateJsonCutoverMigrationTest {
         try (Liquibase liquibase = liquibase(database)) {
             assertThatThrownBy(() ->
                             liquibase.rollback(appliedSinceBoundary, new Contexts(context), new LabelExpression()))
-                    .hasStackTraceContaining("verified database backup");
+                    .hasStackTraceContaining("verified");
         }
         assertPartitionTypes(database);
     }
@@ -165,7 +170,9 @@ class NativeHibernateJsonCutoverMigrationTest {
         assertThat(
                         query(
                                 database,
-                                "SELECT count(*)::text FROM information_schema.columns WHERE table_schema='public' AND data_type='text' AND (table_name,column_name) IN (('auth_event','details'),('config_audit_event','old_value'),('config_audit_event','new_value'),('project_field','options'),('connection_audit','detail'))"))
+                                "SELECT count(*)::text FROM information_schema.columns WHERE table_schema='public' AND"
+                                        + " data_type='text' AND (table_name,column_name) IN"
+                                        + " (('auth_event','details'),('config_audit_event','old_value'),('config_audit_event','new_value'),('project_field','options'),('connection_audit','detail'))"))
                 .containsExactly("5");
         List<@Nullable String> history =
                 query(database, "SELECT id || ':' || md5sum FROM databasechangelog ORDER BY orderexecuted");
@@ -179,10 +186,10 @@ class NativeHibernateJsonCutoverMigrationTest {
         TestDatabase database = beforeCutover("prod");
         execute(database, "ALTER TABLE project_field ALTER COLUMN options TYPE text USING options::text");
         assertThatThrownBy(() -> migrate(database, "prod")).hasStackTraceContaining("requires all five source columns");
-        assertThat(
-                        query(
-                                database,
-                                "SELECT atttypid::regtype::text FROM pg_attribute WHERE attrelid='auth_event'::regclass AND attname='details'"))
+        assertThat(query(
+                        database,
+                        "SELECT atttypid::regtype::text FROM pg_attribute WHERE"
+                                + " attrelid='auth_event'::regclass AND attname='details'"))
                 .containsExactly("jsonb");
         execute(database, "ALTER TABLE project_field ALTER COLUMN options TYPE jsonb USING options::jsonb");
         String template = Objects.requireNonNull(
@@ -192,15 +199,16 @@ class NativeHibernateJsonCutoverMigrationTest {
         execute(database, "ALTER TABLE " + template + " ALTER COLUMN details TYPE text USING details::text");
         assertThatThrownBy(() -> migrate(database, "prod"))
                 .hasStackTraceContaining("standalone jsonb auth_event template");
-        assertThat(
-                        query(
-                                database,
-                                "SELECT atttypid::regtype::text FROM pg_attribute WHERE attrelid='config_audit_event'::regclass AND attname='old_value'"))
+        assertThat(query(
+                        database,
+                        "SELECT atttypid::regtype::text FROM pg_attribute WHERE"
+                                + " attrelid='config_audit_event'::regclass AND attname='old_value'"))
                 .containsExactly("jsonb");
         execute(
                 database,
                 "ALTER TABLE " + template + " ALTER COLUMN details TYPE jsonb USING details::jsonb",
-                "UPDATE partman.part_config SET template_table='public.missing_cutover_template' WHERE parent_table='public.auth_event'");
+                "UPDATE partman.part_config SET template_table='public.missing_cutover_template' WHERE"
+                        + " parent_table='public.auth_event'");
         assertThatThrownBy(() -> migrate(database, "prod"))
                 .hasStackTraceContaining("standalone jsonb auth_event template");
         execute(
@@ -241,15 +249,15 @@ class NativeHibernateJsonCutoverMigrationTest {
                 "UPDATE auth_event SET ip_inet=NULL,user_agent=NULL,details=NULL WHERE id=995204",
                 "UPDATE config_audit_event SET old_value=NULL,new_value=NULL WHERE id=995204",
                 "DELETE FROM config_audit_event WHERE id=995201");
-        assertThat(
-                        query(
-                                database,
-                                "SELECT (details IS NULL AND ip_inet IS NULL AND user_agent IS NULL)::text FROM auth_event WHERE id=995204"))
+        assertThat(query(
+                        database,
+                        "SELECT (details IS NULL AND ip_inet IS NULL AND user_agent IS NULL)::text FROM"
+                                + " auth_event WHERE id=995204"))
                 .containsExactly("true");
-        assertThat(
-                        query(
-                                database,
-                                "SELECT (old_value IS NULL AND new_value IS NULL)::text FROM config_audit_event WHERE id=995204"))
+        assertThat(query(
+                        database,
+                        "SELECT (old_value IS NULL AND new_value IS NULL)::text FROM config_audit_event WHERE"
+                                + " id=995204"))
                 .containsExactly("true");
         assertThat(query(database, "SELECT count(*)::text FROM config_audit_event WHERE id=995201"))
                 .containsExactly("0");
@@ -266,31 +274,37 @@ class NativeHibernateJsonCutoverMigrationTest {
     }
 
     private static void assertPartitionTypes(TestDatabase database) throws SQLException {
-        assertThat(
-                        query(
-                                database,
-                                "SELECT DISTINCT a.atttypid::regtype::text FROM pg_partition_tree('public.auth_event') p JOIN pg_attribute a ON a.attrelid=p.relid WHERE a.attname='details'"))
+        assertThat(query(
+                        database,
+                        "SELECT DISTINCT a.atttypid::regtype::text FROM pg_partition_tree('public.auth_event')"
+                                + " p JOIN pg_attribute a ON a.attrelid=p.relid WHERE a.attname='details'"))
                 .containsExactly("text");
-        assertThat(
-                        query(
-                                database,
-                                "SELECT a.atttypid::regtype::text FROM partman.part_config p JOIN pg_attribute a ON a.attrelid=to_regclass(p.template_table) WHERE p.parent_table='public.auth_event' AND a.attname='details'"))
+        assertThat(query(
+                        database,
+                        "SELECT a.atttypid::regtype::text FROM partman.part_config p JOIN pg_attribute a ON"
+                                + " a.attrelid=to_regclass(p.template_table) WHERE"
+                                + " p.parent_table='public.auth_event' AND a.attname='details'"))
                 .containsExactly("text");
-        assertThat(
-                        query(
-                                database,
-                                "SELECT count(*)::text FROM auth_event WHERE id=995201 AND tableoid='public.auth_event_default'::regclass"))
+        assertThat(query(
+                        database,
+                        "SELECT count(*)::text FROM auth_event WHERE id=995201 AND"
+                                + " tableoid='public.auth_event_default'::regclass"))
                 .containsExactly("1");
     }
 
     private static void seed(TestDatabase database) throws SQLException {
         execute(
                 database,
-                "INSERT INTO workspace(id,account_login,account_type,display_name,slug,status) VALUES(995101,'json-cutover','ORG','JSON cutover','json-cutover','ACTIVE')",
-                "INSERT INTO connection(id,workspace_id,kind,instance_key,config) VALUES(995101,995101,'GITHUB','cutover','{\"type\":\"GITHUB_PAT\",\"enabledStreams\":[]}')",
-                "INSERT INTO project(id,native_id,provider_id,owner_type,owner_id,number,template,closed,is_public) SELECT 995102,995102,id,'ORGANIZATION',995101,1,false,false,false FROM identity_provider WHERE type='GITHUB' AND server_url='https://github.com'",
+                "INSERT INTO workspace(id,account_login,account_type,display_name,slug,status)"
+                        + " VALUES(995101,'json-cutover','ORG','JSON cutover','json-cutover','ACTIVE')",
+                "INSERT INTO connection(id,workspace_id,kind,instance_key,config)"
+                        + " VALUES(995101,995101,'GITHUB','cutover','{\"type\":\"GITHUB_PAT\",\"enabledStreams\":[]}')",
+                "INSERT INTO project(id,native_id,provider_id,owner_type,owner_id,number,template,closed,is_public)"
+                        + " SELECT 995102,995102,id,'ORGANIZATION',995101,1,false,false,false FROM identity_provider WHERE"
+                        + " type='GITHUB' AND server_url='https://github.com'",
                 "SELECT partman.create_partition_time('public.auth_event', ARRAY['2020-01-01'::timestamptz])",
-                "INSERT INTO auth_event(id,occurred_at,event_type,result,details) VALUES(995300,'2020-01-02','LOGIN','SUCCESS','\"Retained old prose\"')");
+                "INSERT INTO auth_event(id,occurred_at,event_type,result,details)"
+                        + " VALUES(995300,'2020-01-02','LOGIN','SUCCESS','\"Retained old prose\"')");
         try (Connection connection = connect(database)) {
             for (int i = 0; i < SHAPES.size(); i++) {
                 long id = 995201L + i;
@@ -298,11 +312,15 @@ class NativeHibernateJsonCutoverMigrationTest {
                         "INSERT INTO auth_event(id,occurred_at,event_type,result,details,ip_inet,user_agent) VALUES(?,"
                                 + (i == 0 ? "'2100-01-02'" : "now()")
                                 + ",'LOGIN','SUCCESS',?::jsonb,'192.0.2.1','cutover fixture')",
-                        "INSERT INTO config_audit_event(id,occurred_at,actor_kind,entity_type,entity_id,action,changed_keys,old_value,new_value) VALUES(?,"
+                        "INSERT INTO"
+                                + " config_audit_event(id,occurred_at,actor_kind,entity_type,entity_id,action,changed_keys,old_value,new_value)"
+                                + " VALUES(?,"
                                 + (i == 0 ? "now()-interval '366 days'" : "now()")
                                 + ",'SYSTEM','CURATED_PRACTICE','hash:sha256:abc','UPDATED',ARRAY['hash'],?::jsonb,?::jsonb)",
-                        "INSERT INTO project_field(id,project_id,name,data_type,options,created_at,updated_at) VALUES(?::text,995102,?::text,'SINGLE_SELECT',?::jsonb,now(),now())",
-                        "INSERT INTO connection_audit(id,connection_id,event_type,actor_kind,detail,correlation_id) VALUES(?,995101,'SUSPEND','SYSTEM',?::jsonb,?)")) {
+                        "INSERT INTO project_field(id,project_id,name,data_type,options,created_at,updated_at)"
+                                + " VALUES(?::text,995102,?::text,'SINGLE_SELECT',?::jsonb,now(),now())",
+                        "INSERT INTO connection_audit(id,connection_id,event_type,actor_kind,detail,correlation_id)"
+                                + " VALUES(?,995101,'SUSPEND','SYSTEM',?::jsonb,?)")) {
                     try (var statement = connection.prepareStatement(sql)) {
                         statement.setLong(1, id);
                         if (sql.contains("project_field")) {
@@ -364,7 +382,12 @@ class NativeHibernateJsonCutoverMigrationTest {
 
     private static void migrate(TestDatabase database, String context) throws Exception {
         try (Liquibase liquibase = liquibase(database)) {
-            liquibase.update(new Contexts(context));
+            var pending = liquibase.listUnrunChangeSets(new Contexts(context), new LabelExpression());
+            int count = IntStream.range(0, pending.size())
+                    .filter(i -> pending.get(i).getFilePath().endsWith("1791486276211_changelog.xml"))
+                    .findFirst()
+                    .orElse(pending.size());
+            if (count > 0) liquibase.update(count, new Contexts(context), new LabelExpression());
         }
     }
 

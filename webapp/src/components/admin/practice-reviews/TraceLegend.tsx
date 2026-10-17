@@ -3,9 +3,9 @@ import { type ReactNode, useId, useRef } from "react";
 
 import { cn } from "cn";
 import { type BadgeVariant, type StatusDef, statusValues } from "@/components/common/status-def";
-import { DELIVERY_STATE_DEFS } from "@/components/practice-vocabulary/delivery-outcome-defs";
-import { DELIVERY_PLACE_DEFS } from "@/components/practice-vocabulary/delivery-place-defs";
+import { DELIVERY_STATE_DEFS } from "@/components/practice-vocabulary/delivery-state-defs";
 import { DEVELOPER_ANSWER_DEFS } from "@/components/practice-vocabulary/developer-answer-defs";
+import { FEEDBACK_DESTINATION_DEFS } from "@/components/practice-vocabulary/feedback-destination-defs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { GlossaryTerm } from "./GlossaryTerm";
 import { SLOW_GAP_SECONDS } from "./lineage-chain";
 import { ConnectorSample, connectorTone } from "./LineageConnectors";
-import { observationChipClass } from "./LineageObservationChip";
+import { resultChipClass } from "./LineageResultChip";
 import {
 	type Dot,
 	FeedbackLetter,
@@ -45,20 +45,19 @@ const DOTS: readonly { dot: Dot; label: string; text: string }[] = [
 		text: "a practice not met, a delivery failed",
 	},
 	{ dot: { tone: "warning" }, label: "Lost or late", text: "withheld, not arrived, a long wait" },
-	{ dot: { tone: "default" }, label: "Answered or disputed", text: "the answer stays private" },
+	{ dot: { tone: "default" }, label: "Answered or disagreed", text: "the answer stays private" },
 	{ dot: { tone: "secondary" }, label: "Open", text: "no outcome yet" },
 	{
 		dot: { tone: "outline", hollow: true },
 		label: "Hollow",
-		text: "nothing to judge, as a moment",
+		text: "nothing to judge, as an event",
 	},
 ];
 
 const ENDS: readonly { kind: TraceEndKind; text: string }[] = [
-	{ kind: "worked", text: "resolved by the work" },
+	{ kind: "delivered", text: "delivered to the developer" },
 	{ kind: "lost", text: "withheld, rejected, replaced or failed" },
 	{ kind: "open", text: "on its way, or no answer yet" },
-	{ kind: "answered", text: "answered privately, or disputed" },
 	{ kind: "none", text: "nothing had to be sent" },
 ];
 
@@ -70,24 +69,20 @@ const MARKS: readonly { kind: keyof typeof STAGE_MARKS; tone: BadgeVariant }[] =
 	{ kind: "waiting", tone: "outline" },
 ];
 
-const PLACES: readonly StatusDef[] = [
-	DELIVERY_PLACE_DEFS.IN_CONTEXT,
-	DELIVERY_PLACE_DEFS.IN_APP,
-	DELIVERY_PLACE_DEFS.IN_CHAT,
-];
+const DESTINATIONS: readonly StatusDef[] = statusValues(FEEDBACK_DESTINATION_DEFS).map(
+	(destination) => FEEDBACK_DESTINATION_DEFS[destination],
+);
 
 // Every state the rail can draw, from the registry it draws them with.
 const DELIVERY: readonly StatusDef[] = statusValues(DELIVERY_STATE_DEFS).map(
 	(state) => DELIVERY_STATE_DEFS[state],
 );
 
-const ANSWERS: readonly StatusDef[] = [
-	DEVELOPER_ANSWER_DEFS.ANSWERED,
-	DEVELOPER_ANSWER_DEFS.DISPUTED,
-	DEVELOPER_ANSWER_DEFS.RESOLVED_BY_WORK,
-];
+const ANSWERS: readonly StatusDef[] = statusValues(DEVELOPER_ANSWER_DEFS).map(
+	(answer) => DEVELOPER_ANSWER_DEFS[answer],
+);
 
-const TERMS: readonly TraceTerm[] = ["moment", "observation", "withheld", "coalesced"];
+const TERMS: readonly TraceTerm[] = ["event", "result", "withheld", "coalesced"];
 
 const SLOW_MINUTES = Math.round(SLOW_GAP_SECONDS / 60);
 
@@ -169,46 +164,31 @@ export function TraceLegend({ open, onOpenChange }: TraceLegendProps) {
 							</LegendGroup>
 						</div>
 						<div className="space-y-4">
-							<LegendGroup title="Observations and feedback">
+							<LegendGroup title="Results and feedback">
+								<Entry mark={<Chip className={resultChipClass({ outcome: "NOT_MET" })}>3</Chip>}>
+									<Name>Result</Name> by number, in its outcome’s colour
+								</Entry>
 								<Entry
-									mark={<Chip className={observationChipClass({ outcome: "NOT_MET" })}>3</Chip>}
+									mark={<Chip className={resultChipClass({ outcome: "DOES_NOT_APPLY" })}>4</Chip>}
 								>
-									<Name>Observation</Name> by number, in its outcome’s colour
+									<Name>Does not apply</Name> hollow, unlike could not determine
 								</Entry>
 								<Entry
 									mark={
-										<Chip className={observationChipClass({ outcome: "NOT_APPLICABLE" })}>4</Chip>
+										<Chip className={resultChipClass({ outcome: "MET", ringed: true })}>1</Chip>
 									}
 								>
-									<Name>Not applicable</Name> hollow, unlike undetermined
-								</Entry>
-								<Entry
-									mark={
-										<Chip className={observationChipClass({ outcome: "MET", invalidated: true })}>
-											5
-										</Chip>
-									}
-								>
-									<Name>Marked incorrect</Name> dashed edge, number struck
-								</Entry>
-								<Entry
-									mark={
-										<Chip className={observationChipClass({ outcome: "MET", ringed: true })}>
-											1
-										</Chip>
-									}
-								>
-									<Name>Ringed</Name> the observation you started from
+									<Name>Ringed</Name> the result you started from
 								</Entry>
 								<Entry mark={<FeedbackLetter letter="A" />}>
-									<Name>Feedback</Name> by letter, with its observations under From
+									<Name>Feedback</Name> by letter, with its results under From
 								</Entry>
 							</LegendGroup>
 							<LegendGroup title="Connections">
 								<Entry
 									mark={<ConnectorSample className={connectorTone("destructive", "strong")} />}
 								>
-									<Name>Line</Name> from an observation to each piece written from it
+									<Name>Line</Name> from a result to each piece written from it
 								</Entry>
 								<Entry mark={<ConnectorSample className={connectorTone("destructive", "faint")} />}>
 									<Name>Grey line</Name> off the path of your record
@@ -231,7 +211,7 @@ export function TraceLegend({ open, onOpenChange }: TraceLegendProps) {
 							</LegendGroup>
 							<LegendGroup title="Icons">
 								<IconRow label="Where it went">
-									{PLACES.map((def) => (
+									{DESTINATIONS.map((def) => (
 										<StepTag key={def.label} def={def} />
 									))}
 								</IconRow>
@@ -263,7 +243,7 @@ export function TraceLegend({ open, onOpenChange }: TraceLegendProps) {
 								What the trace cannot show
 							</h4>
 							<ul className="list-disc space-y-0.5 pl-4">
-								<li>Whether an observation is right: only an admin’s “Marked incorrect”.</li>
+								<li>Whether a result is right: only an admin’s “Marked incorrect”.</li>
 								<li>Why the model judged so: only its rationale is stored.</li>
 								<li>Whether the developer read a comment on the work, or learned from it.</li>
 							</ul>

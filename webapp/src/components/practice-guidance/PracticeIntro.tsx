@@ -1,6 +1,6 @@
 import { useSpinDelay } from "spin-delay";
 
-import type { PracticeGuidance, PracticeStanding } from "@/api/types.gen";
+import type { PracticeGuidanceDto, PracticeStanding } from "@/api/types.gen";
 import type { PanelState } from "@/components/common/panel-state";
 import { LabelledBlock } from "@/components/practice-profile/practice-profile-blocks";
 import { Button } from "@/components/ui/button";
@@ -9,8 +9,7 @@ import { hasText } from "@/lib/text";
 
 import { PracticeFigure } from "./PracticeFigure";
 
-/** The practice's picture and guide as they load; either may be absent once in. */
-export type PracticeGuidanceState = PanelState<Pick<PracticeGuidance, "visual" | "guide">>;
+export type PracticeGuidanceState = PanelState<PracticeGuidanceDto>;
 
 export interface PracticeIntroProps {
 	/**
@@ -36,7 +35,7 @@ export function PracticeIntro({ practice, guidance }: PracticeIntroProps) {
 	});
 	// Undefined until the answer is in and the skeleton has had its minimum time.
 	const settled = guidance.status === "loading" || showSkeleton ? undefined : guidance;
-	const visual = settled?.status === "ready" ? settled.visual : undefined;
+	const visual = settled?.status === "ready" ? (settled.visual ?? undefined) : undefined;
 	const { whyItMatters: lead, whatGoodLooksLike: caption } = practice;
 
 	if (

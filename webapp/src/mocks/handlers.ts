@@ -48,7 +48,9 @@ export const handlers = [
 		HttpResponse.json(workspaceOnboarding()),
 	),
 	// The account's AI choice: unanswered by default, so no story or test inherits an answer.
-	http.get("*/user/ai-choice", () => HttpResponse.json({})),
+	http.get("*/user/ai-choice", () =>
+		HttpResponse.json({ choice: null, updatedAt: null } satisfies Wire<AccountAiChoice>),
+	),
 	http.get("*/user/settings", () => HttpResponse.json({ practiceFeedbackDeliveryEnabled: true })),
 	http.put<PathParams, AccountAiChoiceRequest>("*/user/ai-choice", async ({ request }) => {
 		const body = await request.json();

@@ -393,8 +393,14 @@ class DockerInteractiveSandboxLiveTest {
                     "second turn"));
 
             assertThat(reused).isSameAs(first);
-            assertThat(proxyCredentialRegistry.validate(captured(firstToken))).isPresent();
-            assertThat(proxyCredentialRegistry.validate(captured(unusedToken))).isEmpty();
+            assertThat(proxyCredentialRegistry
+                            .authenticate(captured(firstToken))
+                            .flatMap(proxyCredentialRegistry::resolve))
+                    .isPresent();
+            assertThat(proxyCredentialRegistry
+                            .authenticate(captured(unusedToken))
+                            .flatMap(proxyCredentialRegistry::resolve))
+                    .isEmpty();
             first.close(Duration.ofSeconds(2));
         }
 
@@ -410,8 +416,13 @@ class DockerInteractiveSandboxLiveTest {
 
             assertThat(replacement).isNotSameAs(oldSandbox);
             assertThat(((DockerAttachedSandboxAdapter) oldSandbox).state()).isEqualTo(AttachedSandboxState.CLOSED);
-            assertThat(proxyCredentialRegistry.validate(captured(oldToken))).isEmpty();
-            assertThat(proxyCredentialRegistry.validate(captured(newToken)))
+            assertThat(proxyCredentialRegistry
+                            .authenticate(captured(oldToken))
+                            .flatMap(proxyCredentialRegistry::resolve))
+                    .isEmpty();
+            assertThat(proxyCredentialRegistry
+                            .authenticate(captured(newToken))
+                            .flatMap(proxyCredentialRegistry::resolve))
                     .get()
                     .extracting(route -> route.baseUrl())
                     .isEqualTo("https://new.example/v1");
@@ -499,10 +510,11 @@ class DockerInteractiveSandboxLiveTest {
                     containerId,
                     "sh",
                     "-c",
-                    "set -e; " + "touch /workspace/scratch/probe && rm /workspace/scratch/probe && echo scratch:rw; "
-                            + "touch /workspace/context/user/probe && rm /workspace/context/user/probe && echo user:rw; "
-                            + "if touch /workspace/context/target/probe 2>/dev/null; then echo target:RW_UNEXPECTED; else echo target:ro; fi; "
-                            + "if touch /workspace/context/probe 2>/dev/null; then echo context:RW_UNEXPECTED; else echo context:ro; fi");
+                    "set -e; touch /workspace/scratch/probe && rm /workspace/scratch/probe && echo scratch:rw; touch"
+                            + " /workspace/context/user/probe && rm /workspace/context/user/probe && echo user:rw; if"
+                            + " touch /workspace/context/target/probe 2>/dev/null; then echo target:RW_UNEXPECTED; else"
+                            + " echo target:ro; fi; if touch /workspace/context/probe 2>/dev/null; then echo"
+                            + " context:RW_UNEXPECTED; else echo context:ro; fi");
             pb.redirectErrorStream(true);
             try {
                 Process p = pb.start();
@@ -592,8 +604,7 @@ class DockerInteractiveSandboxLiveTest {
                 true,
                 120,
                 new MentorRunnerProfile(),
-                Map.of(),
-                "");
+                Map.of());
         PiRuntimeFactory.PiPlan plan = factory.build(planSpec);
 
         Map<String, String> env = new HashMap<>(plan.environment());

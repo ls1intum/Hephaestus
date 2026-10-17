@@ -1,11 +1,13 @@
 import type {
-	ArtifactTrace,
-	DeliveryPolicyTrace,
-	PracticeSignal,
+	FeedbackCheck,
+	ItemEvent,
+	ItemRef,
+	ItemTrace,
+	OwnItemTrace,
+	PracticeScriptRun,
 	PracticeTraceEntry,
-	ReviewedWorkRef,
-	TracedArtifact,
-	TracedSignal,
+	ResultList,
+	ReviewRef,
 } from "@/api/types.gen";
 
 /**
@@ -15,29 +17,32 @@ import type {
  * transformer revives on the way in.
  */
 
-const READY = {
-	signal: "scm.pull_request.ready",
-	displayName: "Marked ready for review",
-} satisfies PracticeSignal;
-const PUSHED = {
-	signal: "scm.pull_request.synchronized",
-	displayName: "New commits pushed",
-} satisfies PracticeSignal;
-const ASKED_BY_HAND = {
-	signal: "scm.pull_request.manual_review",
-	displayName: "Review requested by hand",
-} satisfies PracticeSignal;
-const REVIEW_SUBMITTED = {
-	signal: "scm.pull_request.review_submitted",
-	displayName: "Review submitted",
-} satisfies PracticeSignal;
-const REPLIED = {
-	signal: "chat.conversation_thread.replied",
-	displayName: "Replied",
-} satisfies PracticeSignal;
-const ISSUE_OPENED = { signal: "scm.issue.opened", displayName: "Opened" } satisfies PracticeSignal;
+const EVENT_LABELS: Record<string, string> = {
+	"scm.pull_request.opened": "Opened",
+	"scm.pull_request.ready": "Marked ready for review",
+	"scm.pull_request.synchronized": "New commits pushed",
+	"scm.pull_request.edited": "Edited",
+	"scm.issue.opened": "Opened",
+};
 
-const PULL_REQUEST_1423 = {
+export function eventLabel(name: string): string {
+	return EVENT_LABELS[name] ?? name;
+}
+
+const NO_RESULTS = { met: 0, notMet: 0, doesNotApply: 0, couldNotDetermine: 0 };
+
+const item = (fields: Pick<ItemRef, "id" | "kind" | "label"> & Partial<ItemRef>): ItemRef => ({
+	parentId: null,
+	provider: null,
+	title: null,
+	url: null,
+	container: null,
+	path: null,
+	removedAt: null,
+	...fields,
+});
+
+const PULL_REQUEST_1423 = item({
 	id: "1423",
 	kind: "scm.pull_request",
 	provider: "GITHUB",
@@ -45,9 +50,9 @@ const PULL_REQUEST_1423 = {
 	title: "Member-facing review activity: say why a practice stayed quiet",
 	url: "https://github.com/ls1intum/Hephaestus/pull/1423",
 	container: "ls1intum/Hephaestus",
-} satisfies ReviewedWorkRef;
+});
 
-const ISSUE_1430 = {
+const ISSUE_1430 = item({
 	id: "1430",
 	kind: "scm.issue",
 	provider: "GITHUB",
@@ -55,467 +60,369 @@ const ISSUE_1430 = {
 	title: "Define the practice-binding contract",
 	url: "https://github.com/ls1intum/Hephaestus/issues/1430",
 	container: "ls1intum/Hephaestus",
-} satisfies ReviewedWorkRef;
+});
 
-export const tracedArtifacts = [
-	{
-		artifactKind: "scm.pull_request",
-		artifactId: 1423,
-		reviewedWork: PULL_REQUEST_1423,
-		lastSignalAt: new Date("2026-08-07T09:12:00Z"),
-		signalCount: 6,
-		reviewedSignalCount: 2,
-		lastSignal: {
-			id: "sig-1423-push",
-			signal: "scm.pull_request.synchronized",
-			displayName: "New commits pushed",
-			revision: "9c1e2f0a",
-			occurredAt: new Date("2026-08-07T09:12:00Z"),
-			discoveredVia: "EVENT",
-			state: "TRIGGERED",
-			reviewId: "9d1c6a52-7c1e-4b0a-9d1e-2f3a4b5c6d7e",
-		},
-	},
-	{
-		artifactKind: "scm.pull_request",
-		artifactId: 1418,
-		reviewedWork: {
-			id: "1418",
-			kind: "scm.pull_request",
-			provider: "GITHUB",
-			label: "#1418",
-			title: "Scope review to the branches and repositories a workspace picks",
-			url: "https://github.com/ls1intum/Hephaestus/pull/1418",
-			container: "ls1intum/Hephaestus",
-		} satisfies ReviewedWorkRef,
-		lastSignalAt: new Date("2026-08-06T16:40:00Z"),
-		signalCount: 3,
-		reviewedSignalCount: 1,
-		lastSignal: {
-			id: "sig-1418-ready",
-			signal: "scm.pull_request.ready_for_review",
-			displayName: "Marked ready for review",
-			revision: "41ab9e7c",
-			occurredAt: new Date("2026-08-06T16:40:00Z"),
-			discoveredVia: "EVENT",
-			state: "TRIGGERED",
-			reviewId: "2b7e4c1d-5a6f-4e3b-8c9d-0a1b2c3d4e5f",
-		},
-	},
-	{
-		artifactKind: "scm.issue",
-		artifactId: 1430,
-		reviewedWork: ISSUE_1430,
-		lastSignalAt: new Date("2026-08-05T11:02:00Z"),
-		signalCount: 2,
-		reviewedSignalCount: 0,
-		lastSignal: {
-			id: "sig-1430-opened",
-			signal: "scm.issue.opened",
-			displayName: "Opened",
-			revision: "1",
-			occurredAt: new Date("2026-08-05T11:02:00Z"),
-			discoveredVia: "EVENT",
-			state: "SUPPRESSED",
-			stateReason: "GATE_SKIPPED",
-			stateReasonDescription:
-				"This workspace’s review settings did not allow a review of this work.",
-		},
-	},
-	{
-		// No number, no container, no upstream link: a deleted or unlinkable artifact still lists.
-		artifactKind: "chat.conversation_thread",
-		artifactId: 88,
-		reviewedWork: {
-			id: "88",
-			kind: "chat.conversation_thread",
-			label: "Conversation",
-		} satisfies ReviewedWorkRef,
-		lastSignalAt: new Date("2026-08-04T08:30:00Z"),
-		signalCount: 1,
-		reviewedSignalCount: 0,
-		lastSignal: {
-			id: "sig-88-message",
-			signal: "chat.conversation_thread.message_posted",
-			displayName: "Message posted",
-			revision: "1",
-			occurredAt: new Date("2026-08-04T08:30:00Z"),
-			discoveredVia: "SYNC",
-			state: "LAPSED",
-			stateReason: "PENDING_DEADLINE_EXCEEDED",
-			stateReasonDescription: "It waited too long for a free review slot and was dropped.",
-		},
-	},
-	{
-		artifactKind: "docs.document",
-		artifactId: 512,
-		reviewedWork: {
-			id: "512",
-			kind: "docs.document",
-			provider: "OUTLINE",
-			label: "Onboarding: your first week",
-			container: "Engineering handbook",
-			url: "https://outline.example.com/doc/onboarding-your-first-week",
-		} satisfies ReviewedWorkRef,
-		lastSignalAt: new Date("2026-08-03T14:15:00Z"),
-		signalCount: 2,
-		reviewedSignalCount: 1,
-		lastSignal: {
-			id: "sig-512-edited",
-			signal: "docs.document.updated",
-			displayName: "Edited",
-			revision: "7",
-			occurredAt: new Date("2026-08-03T14:15:00Z"),
-			discoveredVia: "SWEEP",
-			state: "TRIGGERED",
-			reviewId: "6f5e4d3c-2b1a-4098-8f7e-6d5c4b3a2918",
-		},
-	},
-] satisfies TracedArtifact[];
+export const tracedItems: ItemRef[] = [
+	PULL_REQUEST_1423,
+	item({
+		id: "1418",
+		kind: "scm.pull_request",
+		provider: "GITHUB",
+		label: "#1418",
+		title: "Scope review to the branches and repositories a workspace picks",
+		url: "https://github.com/ls1intum/Hephaestus/pull/1418",
+		container: "ls1intum/Hephaestus",
+	}),
+	ISSUE_1430,
+	item({
+		id: "88",
+		kind: "chat.thread",
+		label: "Conversation",
+		removedAt: new Date("2026-08-05T08:30:00Z"),
+	}),
+	item({
+		id: "512",
+		kind: "docs.document",
+		provider: "OUTLINE",
+		label: "Onboarding: your first week",
+		container: "Engineering handbook",
+		url: "https://outline.example.com/doc/onboarding-your-first-week",
+	}),
+];
 
-/**
- * `scm.pull_request.synchronized` appears twice at different revisions. That collision is the
- * point: the name cannot say which push an answer rests on, so practice rows link through the ids.
- */
-export const tracedSignals = [
+const READY_REVIEW = "11111111-1111-1111-1111-111111111111";
+const PUSH_REVIEW = "22222222-2222-2222-2222-222222222222";
+
+const readyReview: ReviewRef = {
+	id: READY_REVIEW,
+	kind: "ITEM",
+	item: PULL_REQUEST_1423,
+	itemVersion: "27f4e88c",
+	origin: "EVENT",
+	status: "COMPLETE",
+	createdAt: new Date("2026-08-06T10:15:00Z"),
+	completedAt: new Date("2026-08-06T10:21:00Z"),
+};
+
+const pushReview: ReviewRef = {
+	id: PUSH_REVIEW,
+	kind: "ITEM",
+	item: PULL_REQUEST_1423,
+	itemVersion: "b71d0a52",
+	origin: "EVENT",
+	status: "RUNNING",
+	createdAt: new Date("2026-08-07T08:30:00Z"),
+	completedAt: null,
+};
+
+export const traceReviews: ReviewRef[] = [readyReview, pushReview];
+
+export const itemEvents: ItemEvent[] = [
 	{
-		id: "sig-opened",
-		signal: "scm.pull_request.opened",
-		displayName: "Opened as a draft",
-		revision: "27f4e88c",
+		id: "event-opened",
+		itemId: "1423",
+		name: "scm.pull_request.opened",
+		itemVersion: "27f4e88c",
 		occurredAt: new Date("2026-08-05T08:02:00Z"),
-		discoveredVia: "EVENT",
-		state: "SUPPRESSED",
-		stateReason: "GATE_SKIPPED",
-		stateReasonDescription: "This workspace’s review settings did not allow a review of this work.",
+		foundBy: "WEBHOOK",
+		state: "WITHHELD",
+		reason: "GATE_WITHHELD",
+		decidedAt: new Date("2026-08-05T08:02:00Z"),
+		reviewId: null,
 	},
 	{
-		id: "sig-ready",
-		signal: "scm.pull_request.ready",
-		displayName: "Marked ready for review",
-		revision: "27f4e88c",
+		id: "event-ready",
+		itemId: "1423",
+		name: "scm.pull_request.ready",
+		itemVersion: "27f4e88c",
 		occurredAt: new Date("2026-08-06T10:15:00Z"),
-		discoveredVia: "EVENT",
-		state: "TRIGGERED",
-		reviewId: "11111111-1111-1111-1111-111111111111",
+		foundBy: "WEBHOOK",
+		state: "STARTED",
+		reason: null,
+		decidedAt: new Date("2026-08-06T10:15:00Z"),
+		reviewId: READY_REVIEW,
 	},
 	{
-		id: "sig-sync-9ab3c410",
-		signal: "scm.pull_request.synchronized",
-		displayName: "New commits pushed",
-		revision: "9ab3c410",
+		id: "event-sync-9ab3c410",
+		itemId: "1423",
+		name: "scm.pull_request.synchronized",
+		itemVersion: "9ab3c410",
 		occurredAt: new Date("2026-08-06T14:48:00Z"),
-		discoveredVia: "SYNC",
-		state: "SUPPRESSED",
-		stateReason: "COOLDOWN_ACTIVE",
-		stateReasonDescription:
-			"This work already had a review within this workspace’s cooldown period.",
+		foundBy: "SYNC",
+		state: "WITHHELD",
+		reason: "COOLDOWN_ACTIVE",
+		decidedAt: new Date("2026-08-06T14:48:00Z"),
+		reviewId: null,
 	},
 	{
-		id: "sig-review-requested",
-		signal: "scm.pull_request.manual_review",
-		displayName: "Review requested",
-		revision: "9ab3c410",
+		id: "event-sync-b71d0a52",
+		itemId: "1423",
+		name: "scm.pull_request.synchronized",
+		itemVersion: "b71d0a52",
 		occurredAt: new Date("2026-08-07T08:30:00Z"),
-		discoveredVia: "MANUAL",
-		state: "PENDING",
+		foundBy: "WEBHOOK",
+		state: "STARTED",
+		reason: null,
+		decidedAt: new Date("2026-08-07T08:30:00Z"),
+		reviewId: PUSH_REVIEW,
 	},
 	{
-		id: "sig-sync-b71d0a52",
-		signal: "scm.pull_request.synchronized",
-		displayName: "New commits pushed",
-		revision: "b71d0a52",
+		id: "event-edited",
+		itemId: "1423",
+		name: "scm.pull_request.edited",
+		itemVersion: "b71d0a52",
 		occurredAt: new Date("2026-08-07T09:12:00Z"),
-		discoveredVia: "BACKFILL",
-		state: "LAPSED",
-		stateReason: "PENDING_DEADLINE_EXCEEDED",
-		stateReasonDescription: "This work waited too long for a review to start.",
+		foundBy: "BACKFILL",
+		state: "EXPIRED",
+		reason: "PENDING_DEADLINE_EXCEEDED",
+		decidedAt: new Date("2026-08-07T10:12:00Z"),
+		reviewId: null,
 	},
-] satisfies TracedSignal[];
+];
 
-const practiceTraceEntries = [
+const practiceTraceEntries: PracticeTraceEntry[] = [
 	{
 		practiceSlug: "thin-controllers",
-		practiceName: "Thin controllers",
-		groupSlug: "review-ready-work",
-		groupName: "Packaging work for review",
-		autonomy: "AUTOMATIC",
-		outcome: "REVIEWED",
-		explanation:
-			"Reviewed on the commits pushed at 14:48. Three observations were recorded and one was raised with you; the rest repeated a point already made on this pull request.",
-		watches: [READY, PUSHED],
-		occasionedBy: READY,
-		occasionedById: "sig-ready",
-		decidedAt: new Date("2026-08-06T10:19:00Z"),
-		reviewId: "11111111-1111-1111-1111-111111111111",
-		observationCount: 3,
-		deliveredCount: 1,
-		withheldReasons: ["COMPOSER_DEDUPED"],
+		feedbackMode: "AUTOMATIC",
+		reviewOn: {
+			events: ["scm.pull_request.ready", "scm.pull_request.synchronized"],
+			state: {},
+		},
+		about: "AUTHOR",
+		review: readyReview,
+		results: { ...NO_RESULTS, notMet: 1, met: 2 },
+		withheldReasons: [
+			{
+				reason: "REPEATS_DELIVERED_NOTE",
+				description: "It repeated a point already made on this work.",
+				count: 2,
+			},
+		],
 	},
 	{
 		practiceSlug: "product-language",
-		practiceName: "Product language",
-		groupSlug: "communication",
-		groupName: "Communicating in the open",
-		autonomy: "HUMAN_APPROVAL",
-		outcome: "REVIEWED",
-		explanation:
-			"Reviewed, and two observations were recorded. This practice is set to Review before sending, so nothing was said to you; raise its autonomy to Send automatically to hear about results like these.",
-		watches: [READY],
-		occasionedBy: READY,
-		occasionedById: "sig-ready",
-		decidedAt: new Date("2026-08-06T10:19:00Z"),
-		reviewId: "11111111-1111-1111-1111-111111111111",
-		observationCount: 2,
-		deliveredCount: 0,
-		withheldReasons: ["PRACTICE_REQUIRES_APPROVAL"],
+		feedbackMode: "APPROVE_FIRST",
+		reviewOn: { events: ["scm.pull_request.ready"], state: {} },
+		about: "AUTHOR",
+		review: readyReview,
+		results: { ...NO_RESULTS, notMet: 2 },
+		withheldReasons: [
+			{
+				reason: "PRACTICE_REQUIRES_APPROVAL",
+				description: "This practice waits for an admin to approve its feedback.",
+				count: 2,
+			},
+		],
 	},
 	{
 		practiceSlug: "meaningful-commits",
-		practiceName: "Meaningful commit history",
-		groupSlug: "review-ready-work",
-		groupName: "Packaging work for review",
-		autonomy: "AUTOMATIC",
-		outcome: "RUNNING",
-		explanation:
-			"A review started when the last commits landed and has not finished yet. Check back in a few minutes.",
-		watches: [PUSHED],
-		occasionedBy: PUSHED,
-		occasionedById: "sig-sync-b71d0a52",
-		reviewId: "22222222-2222-2222-2222-222222222222",
-		observationCount: 0,
-		deliveredCount: 0,
-		withheldReasons: [],
-	},
-	{
-		practiceSlug: "tests-accompany-behaviour",
-		practiceName: "Tests accompany behaviour changes",
-		groupSlug: "testing-discipline",
-		groupName: "Testing your changes",
-		autonomy: "AUTOMATIC",
-		outcome: "PENDING",
-		explanation:
-			"Queued behind the reviews already running for this workspace. It will start on its own; nothing is needed from you.",
-		// Only lifecycle moments are watched: asking by hand is not one of them, and it still ran this
-		// review, because such a request reviews every practice on the work type.
-		watches: [READY],
-		occasionedBy: ASKED_BY_HAND,
-		occasionedById: "sig-review-requested",
-		observationCount: 0,
-		deliveredCount: 0,
-		withheldReasons: [],
-	},
-	{
-		practiceSlug: "small-changes",
-		practiceName: "Small, reviewable changes",
-		groupSlug: "review-ready-work",
-		groupName: "Packaging work for review",
-		autonomy: "AUTOMATIC",
-		outcome: "SKIPPED",
-		explanation:
-			"Skipped because this pull request was reviewed 40 minutes ago and the workspace's cooldown is one hour. The next push after that window will be reviewed.",
-		watches: [PUSHED],
-		occasionedBy: PUSHED,
-		occasionedById: "sig-sync-9ab3c410",
-		decidedAt: new Date("2026-08-06T14:48:00Z"),
-		observationCount: 0,
-		deliveredCount: 0,
-		withheldReasons: [],
-	},
-	{
-		practiceSlug: "clear-ownership",
-		practiceName: "Clear ownership",
-		groupSlug: "acting-on-review-feedback",
-		groupName: "Acting on review feedback",
-		autonomy: "AUTOMATIC",
-		outcome: "NOT_REACHED",
-		explanation: "The review ended before it reached this practice.",
-		watches: [READY],
-		occasionedBy: READY,
-		occasionedById: "sig-ready",
-		decidedAt: new Date("2026-08-06T10:19:00Z"),
-		reviewId: "11111111-1111-1111-1111-111111111111",
-		observationCount: 0,
-		deliveredCount: 0,
-		withheldReasons: [],
-	},
-	{
-		practiceSlug: "migration-safety",
-		practiceName: "Migration safety",
-		groupSlug: "testing-discipline",
-		groupName: "Testing your changes",
-		autonomy: "AUTOMATIC",
-		outcome: "NOT_ASSESSABLE",
-		explanation:
-			"The diff for these commits could not be read, so this practice could not be judged either way. Re-run once the provider serves the diff again.",
-		watches: [READY],
-		occasionedBy: READY,
-		occasionedById: "sig-ready",
-		decidedAt: new Date("2026-08-06T10:19:00Z"),
-		reviewId: "11111111-1111-1111-1111-111111111111",
-		observationCount: 0,
-		deliveredCount: 0,
+		feedbackMode: "AUTOMATIC",
+		reviewOn: { events: ["scm.pull_request.synchronized"], state: {} },
+		about: "AUTHOR",
+		review: pushReview,
+		results: NO_RESULTS,
 		withheldReasons: [],
 	},
 	{
 		practiceSlug: "descriptive-pull-requests",
-		practiceName: "Descriptive pull requests",
-		groupSlug: "review-ready-work",
-		groupName: "Packaging work for review",
-		autonomy: "OFF",
-		outcome: "TURNED_OFF",
-		explanation:
-			"This workspace has turned this practice off, so it was not run. A workspace admin can turn it back on in the practice settings.",
-		watches: [READY],
-		observationCount: 0,
-		deliveredCount: 0,
+		feedbackMode: "OFF",
+		reviewOn: { events: ["scm.pull_request.ready"], state: {} },
+		about: null,
+		review: readyReview,
+		results: { ...NO_RESULTS, met: 1 },
 		withheldReasons: [],
 	},
 	{
 		practiceSlug: "timely-review-response",
-		practiceName: "Timely review response",
-		groupSlug: "acting-on-review-feedback",
-		groupName: "Acting on review feedback",
-		autonomy: "AUTOMATIC",
-		outcome: "NOT_OCCASIONED",
-		explanation:
-			"Nothing this practice watches for has happened on this pull request yet. It reacts when a review is submitted.",
-		watches: [REVIEW_SUBMITTED],
-		observationCount: 0,
-		deliveredCount: 0,
+		feedbackMode: "AUTOMATIC",
+		reviewOn: { events: ["scm.pull_request_review.submitted"], state: {} },
+		about: "REVIEWER",
+		review: null,
+		results: NO_RESULTS,
 		withheldReasons: [],
 	},
 	{
 		practiceSlug: "discussion-hygiene",
-		practiceName: "Discussion hygiene",
-		groupSlug: "communication",
-		groupName: "Communicating in the open",
-		autonomy: "AUTOMATIC",
-		outcome: "DORMANT",
-		explanation:
-			"This practice needs a chat integration, and this workspace has none connected. It will start answering once one is.",
-		watches: [REPLIED],
-		observationCount: 0,
-		deliveredCount: 0,
+		feedbackMode: "AUTOMATIC",
+		reviewOn: { events: ["chat.thread.settled"], state: {} },
+		about: "AUTHOR",
+		review: null,
+		results: NO_RESULTS,
 		withheldReasons: [],
 	},
-	{
-		practiceSlug: "draft-not-left-open",
-		practiceName: "Drafts are not left open",
-		groupSlug: "acting-on-review-feedback",
-		groupName: "Acting on review feedback",
-		autonomy: "AUTOMATIC",
-		outcome: "LAPSED",
-		explanation:
-			"This one waited longer than the workspace allows before a reviewer was free, so the question expired unanswered. A new push will ask it again.",
-		watches: [PUSHED],
-		occasionedBy: PUSHED,
-		occasionedById: "sig-sync-b71d0a52",
-		decidedAt: new Date("2026-08-07T09:42:00Z"),
-		observationCount: 0,
-		deliveredCount: 0,
-		withheldReasons: [],
-	},
-	{
-		practiceSlug: "dependency-risk",
-		practiceName: "Dependency risk",
-		autonomy: "AUTOMATIC",
-		outcome: "FAILED",
-		explanation:
-			"The review of this practice failed with an error and produced nothing. It will be retried on the next push; tell a workspace admin if it keeps failing.",
-		watches: [READY],
-		occasionedBy: READY,
-		occasionedById: "sig-ready",
-		decidedAt: new Date("2026-08-06T10:21:00Z"),
-		reviewId: "33333333-3333-3333-3333-333333333333",
-		observationCount: 0,
-		deliveredCount: 0,
-		withheldReasons: [],
-	},
-] satisfies PracticeTraceEntry[];
+];
 
-export const deniedDeliveryPolicyEvaluation: DeliveryPolicyTrace = {
-	reviewId: "22222222-2222-2222-2222-222222222222",
-	admittedRevision: 4,
-	evaluatedRevision: 5,
-	facts: {
-		artifactKind: "scm.pull_request",
-		repository: "ls1intum/Hephaestus",
-		baseBranch: "develop",
-		subject: "RESOLVED_LINKED_HUMAN",
-		repositoryMode: "SELECTED",
-		personMode: "SELECTED",
-		repositoryMatched: true,
-		branchMatched: true,
-		personMatched: true,
-		recipientConsent: false,
-		deliveryStatus: "ACTIVE",
-		triggerMode: "AUTO",
-		contributingPractices: [{ slug: "review-feedback", autonomy: "AUTOMATIC" }],
-	},
-	resolverVersion: "1",
-	surface: "ARTIFACT",
+const script = (
+	fields: Pick<PracticeScriptRun, "scriptKind" | "status"> & Partial<PracticeScriptRun>,
+): PracticeScriptRun => ({
+	jobId: "a1b2c3d4-0000-4000-8000-000000000001",
+	attempt: 1,
+	practiceId: "41",
+	practiceVersionId: "112",
+	stopReason: null,
+	finishedAt: new Date("2026-08-06T10:20:00Z"),
+	durationMs: 4200,
+	error: null,
+	models: [],
+	...fields,
+});
+
+export const practiceScriptRuns = {
+	returned: script({ scriptKind: "CUSTOM", status: "OK" }),
+	builtin: script({ scriptKind: "BUILTIN", status: "OK" }),
+	withModels: script({
+		scriptKind: "CUSTOM",
+		status: "OK",
+		models: [
+			{
+				kind: "DECISION",
+				modelId: "gpt-5-mini",
+				dataHandlingTier: "CLOUD",
+				calls: 6,
+				inputTokens: 18_400,
+				outputTokens: 920,
+				cacheReadTokens: 0,
+				cacheWriteTokens: 0,
+			},
+		],
+	}),
+	withheld: script({ scriptKind: "CUSTOM", status: "WITHHELD", stopReason: "UNAVAILABLE" }),
+	outOfTime: script({ scriptKind: "CUSTOM", status: "FAILED", stopReason: "DEADLINE" }),
+	notReached: script({ scriptKind: "CUSTOM", status: "NOT_REACHED", durationMs: null }),
+	notFinished: script({ scriptKind: "CUSTOM", status: "NOT_FINISHED", durationMs: null }),
+	failed: script({
+		scriptKind: "CUSTOM",
+		status: "FAILED",
+		stopReason: "ERROR",
+		error: "TypeError: cannot read properties of undefined",
+	}),
+} satisfies Record<string, PracticeScriptRun>;
+
+export const deniedFeedbackCheck: FeedbackCheck = {
 	stage: "EGRESS",
 	allowed: false,
-	decisiveReason: "RECIPIENT_OPTED_OUT",
-	evaluatedAt: new Date("2026-08-06T10:20:30Z"),
-	checks: [
-		{ check: "INSTANCE_SILENT_MODE", status: "PASSED" },
-		{ check: "WORKSPACE_ENABLED", status: "PASSED" },
-		{ check: "ROLLOUT_REVISION", status: "PASSED" },
-		{ check: "WORKSPACE_DELIVERY", status: "PASSED" },
-		{ check: "CURRENT_COVERAGE", status: "PASSED" },
-		{ check: "PRACTICE_AUTHORITY", status: "PASSED" },
-		{ check: "RECIPIENT_CONSENT", status: "DENIED" },
-		{ check: "ARTIFACT_ELIGIBILITY", status: "NOT_REACHED" },
-	],
+	reason: "REVIEWED_VERSION_CHANGED",
+	checkedAt: new Date("2026-08-06T10:20:30Z"),
+	facts: {
+		admittedRolloutRevision: "4",
+		evaluatedRolloutRevision: "5",
+		inScope: true,
+		evidenceAllowed: true,
+		modelAllowed: true,
+		deliveryEnabled: true,
+		incorrectBasis: false,
+		currentVersion: false,
+		approvalCurrent: true,
+		writeStarted: false,
+	},
 };
 
-export const artifactTrace = {
-	artifactKind: "scm.pull_request",
-	artifactId: 1423,
-	reviewedWork: PULL_REQUEST_1423,
-	signals: tracedSignals,
+export const itemTrace: ItemTrace = {
+	item: PULL_REQUEST_1423,
+	events: itemEvents,
+	reviews: traceReviews,
 	practices: practiceTraceEntries,
-} satisfies ArtifactTrace;
+};
 
-export const untouchedArtifactTrace = {
-	artifactKind: "scm.issue",
-	artifactId: 1430,
-	reviewedWork: ISSUE_1430,
-	signals: [
+export const untouchedItemTrace: ItemTrace = {
+	item: ISSUE_1430,
+	events: [
 		{
-			id: "sig-issue-opened",
-			signal: "scm.issue.opened",
-			displayName: "Opened",
-			revision: "1",
+			id: "event-issue-opened",
+			itemId: "1430",
+			name: "scm.issue.opened",
+			itemVersion: "1",
 			occurredAt: new Date("2026-08-05T11:02:00Z"),
-			discoveredVia: "SYNC",
-			state: "SUPPRESSED",
-			stateReason: "NO_ACTIVE_PRACTICE",
-			stateReasonDescription: "No practice was watching for this when it happened.",
+			foundBy: "SYNC",
+			state: "WITHHELD",
+			reason: "NO_ACTIVE_PRACTICE",
+			decidedAt: new Date("2026-08-05T11:02:00Z"),
+			reviewId: null,
 		},
 	],
+	reviews: [],
 	practices: [
 		{
 			practiceSlug: "issue-hygiene",
-			practiceName: "Issue hygiene",
-			autonomy: "OFF",
-			outcome: "TURNED_OFF",
-			explanation:
-				"This workspace has turned this practice off, so it was not run. A workspace admin can turn it back on in the practice settings.",
-			watches: [ISSUE_OPENED],
-			observationCount: 0,
-			deliveredCount: 0,
+			feedbackMode: "OFF",
+			reviewOn: { events: ["scm.issue.opened"], state: {} },
+			about: "AUTHOR",
+			review: null,
+			results: NO_RESULTS,
 			withheldReasons: [],
 		},
 	],
-} satisfies ArtifactTrace;
+};
 
-export function tracedArtifact(artifactId: number) {
-	const match = tracedArtifacts.find((candidate) => candidate.artifactId === artifactId);
+const ownResult = (
+	fields: Pick<ResultList, "id" | "practiceSlug" | "practiceName" | "outcome"> &
+		Partial<ResultList>,
+): ResultList => ({
+	reviewId: READY_REVIEW,
+	item: PULL_REQUEST_1423,
+	severity: null,
+	summary: null,
+	origin: "EVENT",
+	recordedAt: new Date("2026-08-06T10:19:00Z"),
+	currentness: "CURRENT",
+	markedIncorrectAt: null,
+	acceptedAt: null,
+	problems: [],
+	...fields,
+});
+
+export const notMetOwnResult = ownResult({
+	id: "00000000-0000-0000-0000-0000000001a1",
+	practiceSlug: "thin-controllers",
+	practiceName: "Thin controllers",
+	outcome: "NOT_MET",
+	severity: "MAJOR",
+	summary: "Two controllers query the database directly",
+	problems: [
+		{
+			id: "00000000-0000-0000-0000-0000000002a1",
+			severity: "MAJOR",
+			summary: "OrderController builds its own SQL",
+		},
+		{
+			id: "00000000-0000-0000-0000-0000000002a2",
+			severity: "MINOR",
+			summary: "InvoiceController reads the repository inline",
+		},
+	],
+});
+
+export const metOwnResult = ownResult({
+	id: "00000000-0000-0000-0000-0000000001a2",
+	practiceSlug: "descriptive-pull-requests",
+	practiceName: "Descriptive pull requests",
+	outcome: "MET",
+});
+
+export const reusedOwnResult = ownResult({
+	id: "00000000-0000-0000-0000-0000000001a3",
+	practiceSlug: "product-language",
+	practiceName: "Product language",
+	outcome: "DOES_NOT_APPLY",
+	summary: "The change touches no copy",
+	reviewId: "00000000-0000-4000-8000-0000000000e1",
+});
+
+export const ownResults: ResultList[] = [notMetOwnResult, metOwnResult, reusedOwnResult];
+
+export const ownItemTrace: OwnItemTrace = {
+	item: PULL_REQUEST_1423,
+	review: readyReview,
+	events: itemEvents
+		.filter((event) => event.occurredAt <= readyReview.createdAt)
+		.map(({ name, occurredAt }) => ({ name, occurredAt })),
+	results: ownResults,
+};
+
+export function tracedItem(itemId: string) {
+	const match = tracedItems.find((candidate) => candidate.id === itemId);
 	if (!match) {
-		throw new Error(`No traced-artifact fixture with id ${artifactId}`);
+		throw new Error(`No traced-item fixture with id ${itemId}`);
 	}
 	return match;
 }

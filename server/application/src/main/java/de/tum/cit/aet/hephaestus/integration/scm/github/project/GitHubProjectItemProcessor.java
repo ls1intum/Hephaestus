@@ -1,11 +1,11 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.project;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.MilestoneRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.BaseGitHubProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEventPayload;
@@ -144,7 +144,9 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
         ProjectItem item = projectItemRepository
                 .findByProjectIdAndNodeId(project.getId(), dto.nodeId())
                 .orElseThrow(() -> new IllegalStateException("ProjectItem not found after upsert: projectId="
-                        + project.getId() + ", nodeId=" + dto.nodeId()));
+                        + project.getId()
+                        + ", nodeId="
+                        + dto.nodeId()));
 
         // Publish domain events with actor information
         GitHubProjectEventPayload.ProjectItemData itemData =

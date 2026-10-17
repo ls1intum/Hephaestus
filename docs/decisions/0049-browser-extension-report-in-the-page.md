@@ -1,6 +1,6 @@
 # ADR 0049: The browser extension shows its report in the page and confirms changes in its own window
 
-**Status:** Accepted
+**Status:** Accepted (amended 2026-10-12 — a not met result names its problems)
 **Date:** 2026-09-27
 **Authors:** Felix T.J. Dietrich
 
@@ -107,3 +107,11 @@ Within the chosen section, and on lists:
 
 A provider offers a supported extension surface for contextual content, or users need line-level
 evidence that navigation from the report cannot give.
+
+## Update — 2026-10-12 (#2656): a not met result names its problems
+
+The report lists the reader's own **results**.
+Under a `NOT_MET` result, it shows the one-line summary of each problem, in the review's order.
+The list endpoint carries these summaries only where the result detail would show its evidence.
+The report still shows no feedback text, no explanation, and no place in the work.
+Nothing inside opens further.

@@ -12,31 +12,23 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountFeature;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountFeatureRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.database.AuthEventPartitionMaintenance;
-import de.tum.cit.aet.hephaestus.core.privacy.ExactPersonDataCopyRecorder;
 import de.tum.cit.aet.hephaestus.core.runtime.ShedLockConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.slack.SlackConversationTestSupport;
-import de.tum.cit.aet.hephaestus.integration.slack.conversation.SlackConversationProjector;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.testconfig.PostgreSQLTestContainer;
 import de.tum.cit.aet.hephaestus.testconfig.PostgreSQLTestContainer.TestDatabase;
 import de.tum.cit.aet.hephaestus.testconfig.TestCacheConfiguration;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
-import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Stream;
@@ -48,7 +40,6 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -57,7 +48,6 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -65,8 +55,6 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.node.ArrayNode;
-import tools.jackson.databind.node.ObjectNode;
 
 /** Validates the production schema, its JPA mappings, and database-enforced contracts. */
 @DataJpaTest(
@@ -82,8 +70,6 @@ import tools.jackson.databind.node.ObjectNode;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({
     TestCacheConfiguration.class,
-    SlackConversationProjector.class,
-    ExactPersonDataCopyRecorder.class,
     ConfigAuditRetentionJob.class,
     ShedLockConfig.class,
     AuthEventPartitionMaintenance.class,
@@ -97,8 +83,13 @@ class ProductionSchemaContractIntegrationTest {
     private static final String ACCOUNT_FEATURE = "run_practice_review";
     private static final String IDENTITY_SUBJECT = "583231";
 
-    private static final TestDatabase DATABASE =
-            PostgreSQLTestContainer.createDatabase("hephaestus_liquibase_validation");
+    private static final TestDatabase DATABASE = createSchemaDatabase();
+
+    private static TestDatabase createSchemaDatabase() {
+        var database = PostgreSQLTestContainer.createDatabase("hephaestus_liquibase_validation");
+        PostgreSQLTestContainer.migrateDatabase(database, "dev,prod");
+        return database;
+    }
 
     @DynamicPropertySource
     static void configureDatabase(DynamicPropertyRegistry registry) {
@@ -117,9 +108,6 @@ class ProductionSchemaContractIntegrationTest {
     private AuthEventPartitionMaintenance partitionMaintenance;
 
     @Autowired
-    private SlackConversationProjector slackConversationProjector;
-
-    @Autowired
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
@@ -129,7 +117,7 @@ class ProductionSchemaContractIntegrationTest {
     private AccountRepository accountRepository;
 
     @Autowired
-    private IdentityLinkRepository identityLinkRepository;
+    private IdentityRepository identities;
 
     @Autowired
     private AccountFeatureRepository accountFeatureRepository;
@@ -138,79 +126,18 @@ class ProductionSchemaContractIntegrationTest {
     private IdentityProviderRepository identityProviderRepository;
 
     @Test
-    void shouldScopeAndCascadeOriginalCompositionInputsToTheirJob() {
-        DispatchOwner owner = insertDispatchOwner("basis-a-" + UUID.randomUUID());
-        DispatchOwner other = insertDispatchOwner("basis-b-" + UUID.randomUUID());
-        assertThatThrownBy(() -> insertCompositionBasis(new DispatchOwner(other.workspaceId(), owner.jobId())))
-                .isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining("sfk_review_composition_basis_job");
-
-        insertCompositionBasis(owner);
-        insertCompositionBasis(other);
-        assertThat(jdbcTemplate.queryForObject(
-                        "SELECT workspace_id FROM review_composition_basis WHERE job_id = ?",
-                        Long.class,
-                        owner.jobId()))
-                .isEqualTo(owner.workspaceId());
-
-        jdbcTemplate.update(
-                "DELETE FROM agent_job WHERE id = ? AND workspace_id = ?", owner.jobId(), owner.workspaceId());
-        assertThat(jdbcTemplate.queryForObject(
-                        "SELECT count(*) FROM review_composition_basis WHERE job_id = ?", Integer.class, owner.jobId()))
-                .isZero();
-        assertThat(jdbcTemplate.queryForObject(
-                        "SELECT count(*) FROM review_composition_basis WHERE job_id = ?", Integer.class, other.jobId()))
-                .isEqualTo(1);
-    }
-
-    @Test
-    void shouldScopeAndCascadeAcceptedPublicReviewsToTheirJob() {
-        DispatchOwner owner = insertDispatchOwner("completion-a-" + UUID.randomUUID());
-        DispatchOwner other = insertDispatchOwner("completion-b-" + UUID.randomUUID());
-        assertThatThrownBy(() -> insertPublicCompletion(new DispatchOwner(other.workspaceId(), owner.jobId())))
-                .isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining("sfk_public_review_completion_job");
-        insertPublicCompletion(owner);
-        insertPublicCompletion(other);
-        jdbcTemplate.update("DELETE FROM agent_job WHERE id=? AND workspace_id=?", owner.jobId(), owner.workspaceId());
-        assertThat(jdbcTemplate.queryForObject(
-                        "SELECT count(*) FROM public_review_completion WHERE job_id=?", Integer.class, owner.jobId()))
-                .isZero();
-        assertThat(jdbcTemplate.queryForObject(
-                        "SELECT workspace_id FROM public_review_completion WHERE job_id=?", Long.class, other.jobId()))
-                .isEqualTo(other.workspaceId());
-    }
-
-    private void insertPublicCompletion(DispatchOwner owner) {
-        jdbcTemplate.update("""
-                INSERT INTO public_review_completion(job_id,workspace_id,contract_version,admission_attempt,
-                    admission_digest,accepted_attempt,accepted_worker_id,review_digest,review,accepted_at)
-                VALUES (?,?,1,0,?,0,'schema-fixture',?,'{}'::jsonb,now())
-                """, owner.jobId(), owner.workspaceId(), "a".repeat(64), "b".repeat(64));
-    }
-
-    private void insertCompositionBasis(DispatchOwner owner) {
-        jdbcTemplate.update("""
-                INSERT INTO review_composition_basis
-                  (job_id,workspace_id,admission_attempt,admission_digest,basis_version,basis_digest,
-                   copy_id,byte_size,created_at,expires_at,payload)
-                VALUES (?,?,0,?,1,?,?,2,now(),now()+interval '1 day','{}'::jsonb)
-                """, owner.jobId(), owner.workspaceId(), "a".repeat(64), "b".repeat(64), UUID.randomUUID());
-    }
-
-    @Test
     void shouldKeepTheActivityCoveringIndexAndRemoveItsRedundantBaseline() {
         assertThat(jdbcTemplate.queryForObject("""
-                SELECT indnkeyatts FROM pg_index
-                WHERE indexrelid = 'public.idx_activity_event_workspace_covering'::regclass
-                """, Integer.class)).isEqualTo(2);
+            SELECT indnkeyatts FROM pg_index
+            WHERE indexrelid = 'public.idx_activity_event_workspace_covering'::regclass
+            """, Integer.class)).isEqualTo(2);
         assertThat(jdbcTemplate.queryForList("""
-                SELECT a.attname FROM pg_index i
-                CROSS JOIN LATERAL unnest(i.indkey) WITH ORDINALITY AS columns(number, position)
-                JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = columns.number
-                WHERE i.indexrelid = 'public.idx_activity_event_workspace_covering'::regclass
-                ORDER BY columns.position
-                """, String.class))
+            SELECT a.attname FROM pg_index i
+            CROSS JOIN LATERAL unnest(i.indkey) WITH ORDINALITY AS columns(number, position)
+            JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = columns.number
+            WHERE i.indexrelid = 'public.idx_activity_event_workspace_covering'::regclass
+            ORDER BY columns.position
+            """, String.class))
                 .containsExactly(
                         "workspace_id",
                         "occurred_at",
@@ -256,7 +183,7 @@ class ProductionSchemaContractIntegrationTest {
     }
 
     @Test
-    void observationForeignKeysPreserveTenantAndProvenance() {
+    void shouldPreserveResultTenantAndProvenanceForeignKeys() {
         List<@Nullable String> foreignKeys = jdbcTemplate.queryForList("""
             SELECT DISTINCT rc.constraint_name || ':' || parent.table_name || ':' || rc.delete_rule
             FROM information_schema.referential_constraints rc
@@ -266,17 +193,17 @@ class ProductionSchemaContractIntegrationTest {
               ON parent.constraint_schema = rc.unique_constraint_schema
              AND parent.constraint_name = rc.unique_constraint_name
             WHERE rc.constraint_schema = current_schema()
-              AND child.table_name = 'observation'
+              AND child.table_name = 'result'
             """, String.class);
         assertThat(foreignKeys)
-                .noneMatch(foreignKey -> foreignKey.endsWith(":CASCADE"))
+                .noneMatch(foreignKey -> Objects.requireNonNull(foreignKey).endsWith(":CASCADE"))
                 .contains(
-                        "sfk_observation_workspace:workspace:NO ACTION",
-                        "fk_observation_practice:practice:NO ACTION",
-                        "fk_observation_practice_workspace:practice:NO ACTION",
-                        "fk_observation_revision:practice_revision:SET NULL");
+                        "sfk_result_workspace:workspace:RESTRICT",
+                        "sfk_result_practice:practice:RESTRICT",
+                        "sfk_result_version:practice_version:RESTRICT",
+                        "sfk_result_review:review:RESTRICT");
 
-        assertColumnRequired("observation", "workspace_id");
+        assertColumnRequired("result", "workspace_id");
     }
 
     @Test
@@ -308,27 +235,26 @@ class ProductionSchemaContractIntegrationTest {
         long provider = provider("https://disabled-provider.example");
         Account account = accountRepository.save(new Account("Disabled identity account"));
         accountFeatureRepository.save(new AccountFeature(Objects.requireNonNull(account.getId()), ACCOUNT_FEATURE));
-        IdentityLink identity = link(account, provider);
+        Identity identity = link(account, provider);
 
         assertThat(accountFeatureRepository.existsActiveFeatureForProviderSubject(
                         provider, IDENTITY_SUBJECT, ACCOUNT_FEATURE))
                 .isTrue();
 
         identity.setDisabledAt(Instant.now());
-        identityLinkRepository.save(identity);
+        identities.save(identity);
 
         assertThat(accountFeatureRepository.existsActiveFeatureForProviderSubject(
                         provider, IDENTITY_SUBJECT, ACCOUNT_FEATURE))
                 .isFalse();
     }
 
-    private IdentityLink link(Account account, long providerId) {
-        IdentityLink identity = new IdentityLink();
+    private Identity link(Account account, long providerId) {
+        Identity identity = new Identity();
         identity.setAccount(account);
         identity.setProviderId(providerId);
-        identity.setSubject(IDENTITY_SUBJECT);
-        identity.setUsernameAtSignup("octocat");
-        return identityLinkRepository.save(identity);
+        identity.setProviderUserKey(IDENTITY_SUBJECT);
+        return identities.save(identity);
     }
 
     private long provider(String serverUrl) {
@@ -343,41 +269,38 @@ class ProductionSchemaContractIntegrationTest {
         assertColumnExists("workspace", "account_login");
         assertColumnExists("repository_to_monitor", "generated_paths");
         assertColumnExists("connection", "credentials_encrypted");
-        assertColumnExists("slack_message", "author_member_id");
-        assertColumnExists("slack_thread", "participant_member_ids");
-        assertColumnExists("slack_thread", "last_reviewed_ts");
+        assertColumnExists("slack_message", "author_account_id");
+        assertColumnExists("slack_thread", "participant_account_ids");
         assertColumnExists("identity_provider", "type");
         assertIndexExists("idx_slack_thread_participants");
         assertIndexExists("idx_slack_message_ingest");
-        assertConstraintExists("chk_feedback_dispatch_lease");
-        assertConstraintExists("chk_feedback_dispatch_delivery");
-        assertConstraintExists("chk_feedback_dispatch_suppression");
+        assertConstraintExists("ck_feedback_send_lease");
+        assertConstraintExists("ck_feedback_copy_fence");
+        assertConstraintExists("ck_feedback_withheld");
     }
 
     @Test
-    void shouldRejectUnknownCoverageModes() {
+    void shouldRejectUnknownScopeModes() {
         long workspaceId = insertWorkspace("coverage-mode-check");
 
-        assertThatCode(() -> setCoverageMode(workspaceId, "practice_repository_coverage_mode", "SELECTED"))
+        assertThatCode(() -> setScopeMode(workspaceId, "review_scope_repositories", "SELECTED"))
                 .as("a declared mode is what the entity writes")
                 .doesNotThrowAnyException();
 
-        assertThatThrownBy(() -> setCoverageMode(workspaceId, "practice_repository_coverage_mode", "ALL"))
+        assertThatThrownBy(() -> setScopeMode(workspaceId, "review_scope_repositories", "EVERYONE"))
                 .isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining("chk_workspace_practice_repository_coverage");
+                .hasMessageContaining("ck_workspace_scope_repositories");
 
-        assertThatThrownBy(() -> setCoverageMode(workspaceId, "practice_person_coverage_mode", "EVERYONE"))
+        assertThatThrownBy(() -> setScopeMode(workspaceId, "review_scope_people", "EVERYONE"))
                 .isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining("chk_workspace_practice_person_coverage");
+                .hasMessageContaining("ck_workspace_scope_people");
 
-        assertThatThrownBy(() -> setCoverageMode(workspaceId, "practice_delivery_status", "STOPPED"))
+        assertThatThrownBy(() -> setScopeMode(workspaceId, "practice_default_feedback_mode", "INVALID"))
                 .isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining("chk_workspace_practice_delivery_status");
+                .hasMessageContaining("ck_workspace_feedback_mode");
 
         assertThat(jdbcTemplate.queryForObject(
-                        "SELECT practice_repository_coverage_mode FROM workspace WHERE id = ?",
-                        String.class,
-                        workspaceId))
+                        "SELECT review_scope_repositories FROM workspace WHERE id = ?", String.class, workspaceId))
                 .as("a refused write leaves the last accepted mode in force")
                 .isEqualTo("SELECTED");
     }
@@ -387,25 +310,26 @@ class ProductionSchemaContractIntegrationTest {
     void shouldRejectMalformedBaseBranches(String branches) {
         long workspaceId = insertWorkspace("base-branches-" + UUID.randomUUID());
         Long monitorId = jdbcTemplate.queryForObject(
-                "INSERT INTO repository_to_monitor (workspace_id, name_with_owner, generated_paths) VALUES (?, ?, '[]'::jsonb) RETURNING id",
+                "INSERT INTO repository_to_monitor (workspace_id, name_with_owner, generated_paths) VALUES (?, ?,"
+                        + " '[]'::jsonb) RETURNING id",
                 Long.class,
                 workspaceId,
                 "acme/repository");
         assertThatCode(() -> jdbcTemplate.update(
-                        "INSERT INTO practice_review_repository_target "
+                        "INSERT INTO review_scope_repository "
                                 + "(workspace_id, repository_monitor_id, base_branches) VALUES (?, ?, '[]'::jsonb)",
                         workspaceId,
                         monitorId))
                 .doesNotThrowAnyException();
 
         assertThatThrownBy(() -> jdbcTemplate.update(
-                        "UPDATE practice_review_repository_target SET base_branches = CAST(? AS jsonb) "
+                        "UPDATE review_scope_repository SET base_branches = CAST(? AS jsonb) "
                                 + "WHERE workspace_id = ? AND repository_monitor_id = ?",
                         branches,
                         workspaceId,
                         monitorId))
                 .isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining("chk_practice_review_repository_target_branches");
+                .hasMessageContaining("ck_review_scope_repository_branches");
     }
 
     @Test
@@ -413,370 +337,20 @@ class ProductionSchemaContractIntegrationTest {
         long ownerWorkspace = insertWorkspace("monitor-owner-" + UUID.randomUUID());
         long targetWorkspace = insertWorkspace("monitor-target-" + UUID.randomUUID());
         Long monitorId = jdbcTemplate.queryForObject(
-                "INSERT INTO repository_to_monitor (workspace_id, name_with_owner, generated_paths) VALUES (?, ?, '[]'::jsonb) RETURNING id",
+                "INSERT INTO repository_to_monitor (workspace_id, name_with_owner, generated_paths) VALUES (?, ?,"
+                        + " '[]'::jsonb) RETURNING id",
                 Long.class,
                 ownerWorkspace,
                 "acme/repository");
 
         assertThatThrownBy(() -> jdbcTemplate.update(
-                        "INSERT INTO practice_review_repository_target "
+                        "INSERT INTO review_scope_repository "
                                 + "(workspace_id, repository_monitor_id, base_branches) VALUES (?, ?, '[]'::jsonb)",
                         targetWorkspace,
                         monitorId))
                 .isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining("sfk_practice_review_repository_target_monitor");
+                .hasMessageContaining("sfk_review_scope_repository_monitor");
     }
-
-    @Test
-    void peopleCoverageCannotReferenceAnotherWorkspacesMember() {
-        long ownerWorkspace = insertWorkspace("member-owner-" + UUID.randomUUID());
-        long targetWorkspace = insertWorkspace("member-target-" + UUID.randomUUID());
-        Long providerId = jdbcTemplate.queryForObject(
-                "INSERT INTO identity_provider (type, server_url) VALUES ('GITHUB', ?) RETURNING id",
-                Long.class,
-                "https://provider.example/" + UUID.randomUUID());
-        Long userId = jdbcTemplate.queryForObject(
-                "INSERT INTO \"user\" (native_id, provider_id, login, type) VALUES (1, ?, ?, 'USER') RETURNING id",
-                Long.class,
-                providerId,
-                "member-" + UUID.randomUUID());
-        jdbcTemplate.update(
-                "INSERT INTO workspace_membership (workspace_id, user_id, role, hidden, created_at) "
-                        + "VALUES (?, ?, 'MEMBER', false, now())",
-                ownerWorkspace,
-                userId);
-
-        assertThatThrownBy(() -> jdbcTemplate.update(
-                        "INSERT INTO practice_review_person_target (workspace_id, user_id) VALUES (?, ?)",
-                        targetWorkspace,
-                        userId))
-                .isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining("sfk_practice_review_person_target_membership");
-    }
-
-    @ParameterizedTest
-    @MethodSource("invalidDispatchStates")
-    void shouldRejectContradictoryDispatchState(String assignment, String constraint) {
-        UUID dispatchId = insertDispatch("dispatch-" + UUID.randomUUID());
-
-        assertThatThrownBy(() ->
-                        jdbcTemplate.update("UPDATE feedback_dispatch SET " + assignment + " WHERE id = ?", dispatchId))
-                .isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining(constraint);
-    }
-
-    static Stream<Arguments> invalidDispatchStates() {
-        return Stream.of(
-                Arguments.of("state = 'CLAIMED'", "chk_feedback_dispatch_lease"),
-                Arguments.of("lease_owner = 'worker', lease_expires_at = now()", "chk_feedback_dispatch_lease"),
-                Arguments.of("state = 'SENT'", "chk_feedback_dispatch_delivery"),
-                Arguments.of("state = 'SUPPRESSED'", "chk_feedback_dispatch_suppression"),
-                Arguments.of("suppression_reason = 'WORKSPACE_DELIVERY_PAUSED'", "chk_feedback_dispatch_suppression"));
-    }
-
-    /**
-     * Foreign-key triggers are off for this one rolled-back insert, so only the row's own checks decide it: a
-     * restoration keeps its time even when person erasure clears its actor or free-text reason.
-     */
-    @ParameterizedTest(name = "{argumentSetName}")
-    @MethodSource("restorationStates")
-    void observationCorrectionRecordsARestorationWhole(
-            @Nullable Instant restoredAt,
-            @Nullable Long restoredBy,
-            @Nullable String restorationReason,
-            boolean accepted) {
-        Boolean inserted = jdbcTemplate.execute((ConnectionCallback<Boolean>) connection -> {
-            boolean autoCommit = connection.getAutoCommit();
-            connection.setAutoCommit(false);
-            try (var statement = connection.createStatement();
-                    var insert = connection.prepareStatement("""
-                            INSERT INTO observation_invalidation (id, workspace_id, observation_id, reason,
-                                invalidated_by_account_id, invalidated_at, restoration_reason, restored_by_account_id,
-                                restored_at, provider_copy, provider_copy_retry_at)
-                            VALUES (?, 1, ?, 'Wrong when made', 1, now(), ?, ?, ?, 'PENDING', now())
-                            """)) {
-                statement.execute("SET LOCAL session_replication_role = replica");
-                insert.setObject(1, UUID.randomUUID());
-                insert.setObject(2, UUID.randomUUID());
-                insert.setObject(3, restorationReason);
-                insert.setObject(4, restoredBy);
-                insert.setObject(5, restoredAt == null ? null : Timestamp.from(restoredAt));
-                insert.executeUpdate();
-                return true;
-            } catch (SQLException rejected) {
-                assertThat(rejected.getMessage()).contains("ck_observation_invalidation_restoration");
-                return false;
-            } finally {
-                connection.rollback();
-                connection.setAutoCommit(autoCommit);
-            }
-        });
-
-        assertThat(inserted).isEqualTo(accepted);
-    }
-
-    static Stream<Arguments> restorationStates() {
-        Instant now = Instant.now();
-        return Stream.of(
-                Arguments.argumentSet("active", null, null, null, true),
-                Arguments.argumentSet("restored", now, 1L, "Right after all", true),
-                Arguments.argumentSet("missing time", null, 1L, "Right after all", false),
-                Arguments.argumentSet("erased actor", now, null, "Right after all", true),
-                Arguments.argumentSet("erased reason", now, 1L, null, true),
-                Arguments.argumentSet("erased attribution", now, null, null, true),
-                Arguments.argumentSet("blank reason", now, 1L, "   ", false));
-    }
-
-    @Test
-    void feedbackDispatchAcceptsCompleteTerminalStates() {
-        UUID sent = insertDispatch("valid-sent");
-        UUID suppressed = insertDispatch("valid-suppressed");
-
-        assertThat(jdbcTemplate.update(
-                        "UPDATE feedback_dispatch SET state = 'SENT', delivered_external_ref = 'provider-1' WHERE id = ?",
-                        sent))
-                .isEqualTo(1);
-        assertThat(jdbcTemplate.update(
-                        "UPDATE feedback_dispatch SET state = 'SUPPRESSED', suppression_reason = "
-                                + "'WORKSPACE_DELIVERY_PAUSED' WHERE id = ?",
-                        suppressed))
-                .isEqualTo(1);
-    }
-
-    /** The migrated constraint and the enum the server records must admit the same reasons. */
-    @ParameterizedTest
-    @EnumSource(FeedbackSuppressionReason.class)
-    void feedbackAcceptsEverySuppressionReasonTheServerRecords(FeedbackSuppressionReason reason) {
-        String key = "reason-" + reason.name().toLowerCase(Locale.ROOT).replace('_', '-') + "-"
-                + UUID.randomUUID().toString().substring(0, 8);
-        UUID feedbackId = insertFeedback(insertDispatchOwner(key), key);
-
-        assertThat(jdbcTemplate.update(
-                        "UPDATE feedback SET delivery_state = 'SUPPRESSED', suppression_reason = ? WHERE id = ?",
-                        reason.name(),
-                        feedbackId))
-                .isEqualTo(1);
-    }
-
-    @ParameterizedTest
-    @MethodSource("invalidPracticeSlugs")
-    void feedbackDispatchRequiresAStringArrayOfPracticeSlugs(String practiceSlugs) {
-        UUID dispatchId = insertDispatch("practice-slugs-" + UUID.randomUUID());
-
-        assertThatThrownBy(() -> jdbcTemplate.update(
-                        "UPDATE feedback_dispatch SET practice_slugs = CAST(? AS jsonb) WHERE id = ?",
-                        practiceSlugs,
-                        dispatchId))
-                .isInstanceOf(DataIntegrityViolationException.class);
-    }
-
-    @Test
-    void approvedDispatchRequiresFeedbackAndSummaryDispatchForbidsIt() {
-        DispatchOwner owner = insertDispatchOwner("dispatch-destination");
-        UUID feedbackId = insertFeedback(owner, "destination");
-        UUID summary = insertDispatch(owner, "summary-destination", "AUTOMATIC_REVIEW_PACKAGE", null);
-
-        assertThatThrownBy(() -> jdbcTemplate.update(
-                        "UPDATE feedback_dispatch SET destination = 'APPROVED_REVIEW_PACKAGE' WHERE id = ?", summary))
-                .isInstanceOf(DataIntegrityViolationException.class);
-        assertThatThrownBy(() -> jdbcTemplate.update(
-                        "UPDATE feedback_dispatch SET feedback_id = ? WHERE id = ?", feedbackId, summary))
-                .isInstanceOf(DataIntegrityViolationException.class);
-
-        UUID approved = insertDispatch(owner, "valid-approved", "APPROVED_REVIEW_PACKAGE", feedbackId);
-        assertThat(jdbcTemplate.queryForObject(
-                        "SELECT destination FROM feedback_dispatch WHERE id = ?", String.class, approved))
-                .isEqualTo("APPROVED_REVIEW_PACKAGE");
-    }
-
-    @Test
-    void deletingAJobErasesItsPolicyEvaluationsAndDispatches() {
-        DispatchOwner owner = insertDispatchOwner("job-erasure");
-        UUID dispatchId = insertDispatch(owner, "job-erasure-dispatch", "AUTOMATIC_REVIEW_PACKAGE", null);
-        UUID evaluationId = insertPolicyEvaluation(owner, null);
-
-        jdbcTemplate.update("DELETE FROM agent_job WHERE id = ?", owner.jobId());
-
-        assertThat(rowExists("feedback_dispatch", dispatchId)).isFalse();
-        assertThat(rowExists("delivery_policy_evaluation", evaluationId)).isFalse();
-    }
-
-    @Test
-    void deletingFeedbackErasesApprovedDispatchAndAnonymizesItsEvaluation() {
-        DispatchOwner owner = insertDispatchOwner("feedback-erasure");
-        UUID feedbackId = insertFeedback(owner, "erasure");
-        UUID dispatchId = insertDispatch(owner, "feedback-erasure-dispatch", "APPROVED_REVIEW_PACKAGE", feedbackId);
-        UUID evaluationId = insertPolicyEvaluation(owner, feedbackId);
-
-        jdbcTemplate.update("DELETE FROM feedback WHERE id = ?", feedbackId);
-
-        assertThat(rowExists("feedback_dispatch", dispatchId)).isFalse();
-        assertThat(jdbcTemplate.queryForObject(
-                        "SELECT feedback_id IS NULL FROM delivery_policy_evaluation WHERE id = ?",
-                        Boolean.class,
-                        evaluationId))
-                .isTrue();
-    }
-
-    static Stream<Arguments> withdrawalRestorationStates() {
-        return Stream.of(
-                Arguments.of("restored_at = now(), restored_by_account_id = %d", true),
-                Arguments.of("restored_at = now(), restored_by_account_id = %d, restoration_reason = '  '", false),
-                Arguments.of("restored_at = now(), restoration_reason = 'Right after all'", true),
-                Arguments.of("restored_at = now()", true),
-                Arguments.of("restored_by_account_id = %d, restoration_reason = 'Right after all'", false));
-    }
-
-    @ParameterizedTest
-    @MethodSource("withdrawalRestorationStates")
-    void feedbackWithdrawalKeepsRestorationFactsAfterAttributionErasure(String assignment, boolean accepted) {
-        long account = Objects.requireNonNull(
-                accountRepository.save(new Account("Withdrawal actor")).getId());
-        DispatchOwner owner = insertDispatchOwner("restore-" + UUID.randomUUID());
-        UUID withdrawal = insertWithdrawal(owner, insertFeedback(owner, "restore-" + UUID.randomUUID()), account);
-
-        String update = "UPDATE feedback_withdrawal SET " + assignment.formatted(account) + " WHERE id = ?";
-        if (accepted) {
-            assertThat(jdbcTemplate.update(update, withdrawal)).isOne();
-            assertThat(jdbcTemplate.queryForObject(
-                            "SELECT restored_at IS NOT NULL FROM feedback_withdrawal WHERE id = ?",
-                            Boolean.class,
-                            withdrawal))
-                    .isTrue();
-            return;
-        }
-        assertThatThrownBy(() -> jdbcTemplate.update(update, withdrawal))
-                .isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining("ck_feedback_withdrawal_restoration");
-    }
-
-    @Test
-    void feedbackWithdrawalKeepsOneOpenRowPerFeedbackWithinItsWorkspace() {
-        long account = Objects.requireNonNull(
-                accountRepository.save(new Account("Withdrawal actor")).getId());
-        DispatchOwner owner = insertDispatchOwner("withdrawal-" + UUID.randomUUID());
-        DispatchOwner other = insertDispatchOwner("other-" + UUID.randomUUID());
-        UUID feedbackId = insertFeedback(owner, "withdrawal-" + UUID.randomUUID());
-
-        assertThatThrownBy(() -> insertWithdrawal(other, feedbackId, account))
-                .isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining("sfk_feedback_withdrawal_feedback");
-        UUID first = insertWithdrawal(owner, feedbackId, account);
-        assertThatThrownBy(() -> insertWithdrawal(owner, feedbackId, account))
-                .isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining("uk_feedback_withdrawal_active");
-        assertThatThrownBy(
-                        () -> jdbcTemplate.update("UPDATE feedback_withdrawal SET reason = '   ' WHERE id = ?", first))
-                .isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining("ck_feedback_withdrawal_reason");
-
-        jdbcTemplate.update(
-                "UPDATE feedback_withdrawal SET restored_at = now(), restored_by_account_id = ?, "
-                        + "restoration_reason = 'Right after all' WHERE id = ?",
-                account,
-                first);
-        UUID second = insertWithdrawal(owner, feedbackId, account);
-
-        jdbcTemplate.update("DELETE FROM feedback WHERE id = ?", feedbackId);
-        assertThat(rowExists("feedback_withdrawal", first)).isFalse();
-        assertThat(rowExists("feedback_withdrawal", second)).isFalse();
-    }
-
-    private UUID insertWithdrawal(DispatchOwner owner, UUID feedbackId, long accountId) {
-        UUID id = UUID.randomUUID();
-        jdbcTemplate.update(
-                "INSERT INTO feedback_withdrawal (id, workspace_id, feedback_id, reason, withdrawn_by_account_id, "
-                        + "withdrawn_at) VALUES (?, ?, ?, 'Wrong words', ?, now())",
-                id,
-                owner.workspaceId(),
-                feedbackId,
-                accountId);
-        return id;
-    }
-
-    private UUID insertDispatch(String key) {
-        DispatchOwner owner = insertDispatchOwner(key);
-        return insertDispatch(owner, key, "AUTOMATIC_REVIEW_PACKAGE", null);
-    }
-
-    private DispatchOwner insertDispatchOwner(String key) {
-        long workspaceId = insertWorkspace(key);
-        UUID jobId = UUID.randomUUID();
-        jdbcTemplate.update(
-                "INSERT INTO agent_job (id, workspace_id, job_type, status, config_snapshot, job_token, trace_id, retry_count, "
-                        + "created_at, available_at, delivery_attempts, practice_rollout_revision, practice_trigger_mode) "
-                        + "VALUES (?, ?, 'PULL_REQUEST_REVIEW', 'COMPLETED', '{}'::jsonb, ?, ?, 0, now(), now(), 0, 0, 'AUTO')",
-                jobId,
-                workspaceId,
-                "token-" + jobId,
-                UUID.randomUUID().toString().replace("-", ""));
-        return new DispatchOwner(workspaceId, jobId);
-    }
-
-    private UUID insertDispatch(DispatchOwner owner, String key, String destination, @Nullable UUID feedbackId) {
-        UUID dispatchId = UUID.randomUUID();
-        jdbcTemplate.update(
-                "INSERT INTO feedback_dispatch (id, destination_key, workspace_id, agent_job_id, feedback_id, "
-                        + "destination, state, body, practice_slugs, package_content, delivered_placements, write_started, "
-                        + "next_attempt_at, attempt_count, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'PENDING', "
-                        + "'body', '[]'::jsonb, '{\"mrNote\":\"body\",\"diffNotes\":[],\"withheld\":[]}'::jsonb, "
-                        + "'[]'::jsonb, false, now(), 0, now(), now())",
-                dispatchId,
-                key,
-                owner.workspaceId(),
-                owner.jobId(),
-                feedbackId,
-                destination);
-        return dispatchId;
-    }
-
-    private UUID insertFeedback(DispatchOwner owner, String key) {
-        Long providerId = jdbcTemplate.queryForObject(
-                "INSERT INTO identity_provider (type, server_url) VALUES ('GITHUB', ?) RETURNING id",
-                Long.class,
-                "https://provider.example/" + key);
-        Long userId = jdbcTemplate.queryForObject(
-                "INSERT INTO \"user\" (native_id, provider_id, login, type) VALUES (1, ?, ?, 'USER') RETURNING id",
-                Long.class,
-                providerId,
-                "user-" + key);
-        UUID feedbackId = UUID.randomUUID();
-        jdbcTemplate.update(
-                "INSERT INTO feedback (id, agent_job_id, workspace_id, recipient_user_id, about_user_id, channel, "
-                        + "position, delivery_state, source, created_at) VALUES (?, ?, ?, ?, ?, 'IN_CONTEXT', 0, "
-                        + "'AWAITING_APPROVAL', 'AGENT', now())",
-                feedbackId,
-                owner.jobId(),
-                owner.workspaceId(),
-                userId,
-                userId);
-        return feedbackId;
-    }
-
-    private UUID insertPolicyEvaluation(DispatchOwner owner, @Nullable UUID feedbackId) {
-        UUID id = UUID.randomUUID();
-        jdbcTemplate.update(
-                "INSERT INTO delivery_policy_evaluation (id, workspace_id, agent_job_id, feedback_id, "
-                        + "admitted_revision, evaluated_revision, resolver_version, surface, stage, allowed, checks, facts, "
-                        + "evaluated_at) VALUES (?, ?, ?, ?, 0, 0, '1', 'ARTIFACT', 'EGRESS', true, '[]'::jsonb, "
-                        + "'{}'::jsonb, now())",
-                id,
-                owner.workspaceId(),
-                owner.jobId(),
-                feedbackId);
-        return id;
-    }
-
-    private boolean rowExists(String table, UUID id) {
-        return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
-                "SELECT EXISTS (SELECT 1 FROM " + table + " WHERE id = ?)", Boolean.class, id));
-    }
-
-    static Stream<String> invalidPracticeSlugs() {
-        return Stream.of("{}", "[1]", "[\"practice\", 2]");
-    }
-
-    private record DispatchOwner(long workspaceId, UUID jobId) {}
 
     static Stream<String> invalidBaseBranches() {
         return Stream.of("\"main\"", "[1]", "[\"\"]", "[\"   \"]", "[\"" + "x".repeat(256) + "\"]");
@@ -785,8 +359,8 @@ class ProductionSchemaContractIntegrationTest {
     /** A workspace row with only the columns the schema demands; every setting below is left at its default. */
     private long insertWorkspace(String slug) {
         Long id = jdbcTemplate.queryForObject(
-                "INSERT INTO workspace (slug, display_name, status, account_type, account_login, public_activity_enabled) "
-                        + "VALUES (?, ?, 'ACTIVE', 'ORG', ?, false) RETURNING id",
+                "INSERT INTO workspace (slug, display_name, status, account_type, account_login,"
+                        + " public_activity_enabled) VALUES (?, ?, 'ACTIVE', 'ORG', ?, false) RETURNING id",
                 Long.class,
                 slug,
                 "Review scope constraint fixture",
@@ -794,7 +368,7 @@ class ProductionSchemaContractIntegrationTest {
         return Objects.requireNonNull(id, "workspace insert returned no id");
     }
 
-    private void setCoverageMode(long workspaceId, String column, String mode) {
+    private void setScopeMode(long workspaceId, String column, String mode) {
         jdbcTemplate.update("UPDATE workspace SET " + column + " = ? WHERE id = ?", mode, workspaceId);
     }
 
@@ -839,39 +413,6 @@ class ProductionSchemaContractIntegrationTest {
     }
 
     @Test
-    void participantFirewallUsesTheMigratedArrayColumn() {
-        long workspaceId = 900_101L;
-        String channel = "C1";
-        SlackConversationTestSupport support = new SlackConversationTestSupport(jdbcTemplate);
-        jdbcTemplate.execute("SET session_replication_role = 'replica'");
-        try {
-            support.seedChannel(workspaceId, channel, "ACTIVE");
-            support.seedThread(workspaceId, channel, "100.000000", "100.500000", 4, "{100,101}");
-            support.seedMessage(workspaceId, channel, "100.000000", null, "root");
-            support.seedMessage(workspaceId, channel, "100.500000", "100.000000", "reply");
-            jdbcTemplate.update(
-                    "UPDATE slack_message SET author_member_id = 100 WHERE workspace_id = ? AND slack_channel_id = ?",
-                    workspaceId,
-                    channel);
-        } finally {
-            jdbcTemplate.execute("SET session_replication_role = 'origin'");
-        }
-
-        ObjectNode participant = slackConversationProjector.buildPayload(workspaceId, 100L);
-        ArrayNode conversations = (ArrayNode) participant.get("conversations");
-        assertThat(conversations).hasSize(1);
-        assertThat(conversations.get(0).get("channelName").asString()).isEqualTo("engineering");
-        ArrayNode messages = (ArrayNode) conversations.get(0).get("messages");
-        assertThat(messages).hasSize(2).allSatisfy(message -> {
-            assertThat(message.get("text").asString()).isIn("root", "reply");
-            assertThat(message.has("authorMemberId")).isFalse();
-        });
-        ArrayNode outsiderConversations = (ArrayNode)
-                slackConversationProjector.buildPayload(workspaceId, 999L).get("conversations");
-        assertThat(outsiderConversations).isEmpty();
-    }
-
-    @Test
     void configAuditRowsAreAppendOnlyWithTheRetentionException() {
         long workspaceId = auditWorkspaceId();
         long current = insertAuditRow(workspaceId, 0);
@@ -890,7 +431,8 @@ class ProductionSchemaContractIntegrationTest {
                         "SELECT new_value::text FROM config_audit_event WHERE id = ?", String.class, current))
                 .contains("cooldownMinutes");
         assertThatThrownBy(() -> jdbcTemplate.update(
-                        "UPDATE config_audit_event SET actor_account_id = NULL, entity_type = 'AGENT_CONFIG' WHERE id = ?",
+                        "UPDATE config_audit_event SET actor_account_id = NULL, entity_type = 'AGENT_CONFIG' WHERE id"
+                                + " = ?",
                         current))
                 .hasMessageContaining("append-only");
 
@@ -921,12 +463,9 @@ class ProductionSchemaContractIntegrationTest {
                 .filter(part -> part.matches("[A-Z_]{2,}"))
                 .distinct()
                 .toList();
-        List<String> expected =
-                new ArrayList<>(Arrays.stream(values).map(Enum::name).toList());
-        if (constraintName.equals("ck_config_audit_event_entity_type")) {
-            expected.addAll(List.of("PRACTICE_AREA", "CURATED_PRACTICE_AREA"));
-        }
-        assertThat(accepted).containsExactlyInAnyOrderElementsOf(expected);
+        assertThat(accepted)
+                .containsExactlyInAnyOrderElementsOf(
+                        Arrays.stream(values).map(Enum::name).toList());
     }
 
     private long auditWorkspaceId() {
@@ -945,14 +484,14 @@ class ProductionSchemaContractIntegrationTest {
 
     private long insertAuditRow(long workspaceId, int ageInDays) {
         return Objects.requireNonNull(jdbcTemplate.queryForObject("""
-                INSERT INTO config_audit_event
-                    (workspace_id, entity_type, entity_id, action, actor_kind, actor_account_id,
-                     old_value, new_value, changed_keys, occurred_at)
-                VALUES (?, 'PRACTICE_REVIEW_SETTINGS', '1', 'UPDATED', 'USER', NULL,
-                        '{"cooldownMinutes":30}'::jsonb, '{"cooldownMinutes":10}'::jsonb,
-                        ARRAY['cooldownMinutes'], now() - make_interval(days => ?))
-                RETURNING id
-                """, Long.class, workspaceId, ageInDays));
+            INSERT INTO config_audit_event
+                (workspace_id, entity_type, entity_id, action, actor_kind, actor_account_id,
+                 old_value, new_value, changed_keys, occurred_at)
+            VALUES (?, 'PRACTICE_REVIEW_SETTINGS', '1', 'UPDATED', 'USER', NULL,
+                    '{"cooldownMinutes":30}'::jsonb, '{"cooldownMinutes":10}'::jsonb,
+                    ARRAY['cooldownMinutes'], now() - make_interval(days => ?))
+            RETURNING id
+            """, Long.class, workspaceId, ageInDays));
     }
 
     private boolean auditRowExists(long id) {

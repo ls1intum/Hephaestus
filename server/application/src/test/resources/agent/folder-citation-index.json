@@ -1,0 +1,85 @@
+{
+	"sources": [
+		{
+			"kind": "scm.pull-request.core",
+			"state": {
+				"availability": "AVAILABLE",
+				"content": "EMPTY",
+				"completeness": "UNKNOWN",
+				"facts": {
+					"capturedAt": "2026-10-14T00:00:00Z",
+					"sourceEffectiveAt": null,
+					"observedAt": null,
+					"immutableIdentity": null
+				},
+				"limitations": []
+			},
+			"citation": {
+				"side": "FORBIDDEN",
+				"commit": "FORBIDDEN"
+			},
+			"files": []
+		},
+		{
+			"kind": "scm.pull-request.diff",
+			"state": {
+				"availability": "AVAILABLE",
+				"content": "EMPTY",
+				"completeness": "UNKNOWN",
+				"facts": {
+					"capturedAt": "2026-10-14T00:00:00Z",
+					"sourceEffectiveAt": null,
+					"observedAt": null,
+					"immutableIdentity": null
+				},
+				"limitations": []
+			},
+			"citation": {
+				"side": "REQUIRED",
+				"commit": "OPTIONAL"
+			},
+			"files": []
+		},
+		{
+			"kind": "scm.repository.tree",
+			"state": {
+				"availability": "AVAILABLE",
+				"content": "EMPTY",
+				"completeness": "UNKNOWN",
+				"facts": {
+					"capturedAt": "2026-10-14T00:00:00Z",
+					"sourceEffectiveAt": null,
+					"observedAt": null,
+					"immutableIdentity": null
+				},
+				"limitations": []
+			},
+			"citation": {
+				"side": "FORBIDDEN",
+				"commit": "OPTIONAL"
+			},
+			"files": []
+		},
+		{
+			"kind": "docs.document.core",
+			"state": {
+				"availability": "AVAILABLE",
+				"content": "EMPTY",
+				"completeness": "UNKNOWN",
+				"facts": {
+					"capturedAt": "2026-10-14T00:00:00Z",
+					"sourceEffectiveAt": null,
+					"observedAt": null,
+					"immutableIdentity": null
+				},
+				"limitations": []
+			},
+			"citation": {
+				"side": "FORBIDDEN",
+				"commit": "FORBIDDEN"
+			},
+			"files": []
+		}
+	],
+	"files": []
+}

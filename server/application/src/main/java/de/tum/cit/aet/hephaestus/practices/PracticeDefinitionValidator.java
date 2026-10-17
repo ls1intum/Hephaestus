@@ -1,201 +1,126 @@
 package de.tum.cit.aet.hephaestus.practices;
 
-import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
-import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceContract;
-import de.tum.cit.aet.hephaestus.evidence.SourceKind;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
-import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
-import java.util.Optional;
-import java.util.Set;
-import java.util.regex.Matcher;
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewedByKind;
 import java.util.regex.Pattern;
+import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
-public final class PracticeDefinitionValidator {
+@RequiredArgsConstructor
+public class PracticeDefinitionValidator {
+    private static final Pattern RESULT_WORD =
+            Pattern.compile("\\b(?:MET|NOT_MET|DOES_NOT_APPLY|COULD_NOT_DETERMINE)\\b");
+    private final ClasspathSourceCatalogRegistry sources;
+    private final PracticeItemOptions items;
 
-    private static final Pattern REVIEW_RESULT_LABEL = Pattern.compile(
-            "\\b(?:PRESENT|ABSENT|GOOD|BAD|POSITIVE|NEGATIVE|ASSESSED|MET|NOT_MET|NOT_APPLICABLE|UNDETERMINED)\\b");
-
-    private final ArtifactSourceCatalogRegistry sourceCatalogs;
-    private final PracticeSignalOptions signalOptions;
-
-    public PracticeDefinitionValidator(
-            ArtifactSourceCatalogRegistry sourceCatalogs, PracticeSignalOptions signalOptions) {
-        this.sourceCatalogs = sourceCatalogs;
-        this.signalOptions = signalOptions;
-    }
-
-    public void validate(PracticeDefinition definition) {
-        boolean canRunAutomatedReview =
-                definition.automatedReviewPolicy().automatedReview().canAttemptAutomatedReview();
-        validateSignals(definition);
-        validateReviewWhenAndPrecondition(definition);
-        if (!canRunAutomatedReview && definition.precomputeScript() != null) {
-            throw new IllegalArgumentException("A precompute script needs a practice that Hephaestus can review.");
+    public void validate(ItemKind kind, PracticeDefinition definition) {
+        var descriptor = items.require(kind);
+        var capabilities = descriptor.reviewCapabilities();
+        text(definition.name(), 3, 128, "practice name");
+        text(definition.criteria(), 1, 50_000, "criteria");
+        if (definition.script() != null)
+            text(definition.script(), 1, PracticeDefinition.MAX_PRACTICE_SCRIPT_LENGTH, "practice script");
+        if (definition.reviewOn().events().size() > 100) {
+            throw new IllegalArgumentException("Choose at most 100 review events.");
         }
-        rejectReviewResultLabels("Why it matters", definition.whyItMatters());
-        rejectReviewResultLabels("What good looks like", definition.whatGoodLooksLike());
-        PracticeVisual visual = definition.visual();
-        if (visual != null) {
-            PracticeGuidanceRules.validate(visual);
-            rejectReviewResultLabels("The visual's description", visual.alt());
-        }
-        PracticeGuide guide = definition.guide();
-        if (guide != null) {
-            PracticeGuidanceRules.validate(guide);
-            rejectReviewResultLabels("The guide", guide.markdown());
-        }
-        validateEvidence(definition.artifactKind(), definition);
-    }
-
-    private void validateReviewWhenAndPrecondition(PracticeDefinition definition) {
-        ReviewWhen.normalize(definition.reviewWhen(), signalOptions.reviewWhenDimensionsFor(definition.artifactKind()));
-        if (definition.precondition() == null) {
-            return;
-        }
-        var aspects = signalOptions.preconditionSupportedAspectsFor(definition.artifactKind());
-        var collections = signalOptions.preconditionEvidenceCollectionsFor(definition.artifactKind());
-        for (var clause : definition.precondition().anyOf()) {
-            if (!aspects.contains(clause.aspect().name())) {
-                throw new IllegalArgumentException("Unsupported precondition for this work type: " + clause.aspect());
-            }
-            var collection = clause.evidenceHasItems();
-            if (collection != null && !collections.contains(collection.id())) {
-                throw new IllegalArgumentException(
-                        "Unsupported evidence collection for this work type: " + collection.id());
+        for (var event : definition.reviewOn().events()) {
+            if (descriptor.events().stream()
+                    .noneMatch(option -> option.name().equals(event) && option.bindableForAuthoring())) {
+                throw new IllegalArgumentException("Choose review events offered for this item kind.");
             }
         }
-    }
-
-    private void validateSignals(PracticeDefinition definition) {
-        ArtifactKind artifactKind = definition.artifactKind();
-        Set<SignalName> declared = signalOptions.eligibleFor(artifactKind);
-        if (declared.isEmpty()) {
-            throw new IllegalArgumentException("The chosen moments do not belong to a kind of work Hephaestus reviews. "
-                    + "Choose a kind of work, then the moments it offers.");
+        if (definition.about() != null && !descriptor.roles().contains(definition.about())) {
+            throw new IllegalArgumentException("Choose an About role offered for this item kind.");
         }
-        Set<ActorRole> roles = signalOptions.rolesFor(artifactKind);
-        // An occasion may only be about a relation this kind of work can actually identify a person
-        // in. Attributing a result to a role the artifact cannot resolve leaves an observation about
-        // nobody — or, worse, one filed against whichever person the kind happens to name.
-        if (!roles.contains(definition.subject())) {
-            throw new IllegalArgumentException("This kind of work does not record “" + roleLabel(definition.subject())
-                    + "”, so a review of it cannot be about them. Choose from the people listed under “Person "
-                    + "this practice judges”.");
-        }
-        for (SignalName signal : definition.signals()) {
-            if (signalOptions.isManualRequest(signal)) {
-                throw new IllegalArgumentException("Remove “" + signalOptions.displayNameOf(signal)
-                        + "”. A review someone asks for by hand already covers every practice on this work type, "
-                        + "whatever state the work is in. It is not a moment to choose.");
+        definition.reviewOn().state().forEach((dimension, values) -> {
+            var declared = capabilities.reviewOnStateDimensions().stream()
+                    .filter(option -> option.key().equals(dimension))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Choose a known review state" + " dimension."));
+            if (values.isEmpty()
+                    || values.size() > 100
+                    || values.stream()
+                            .anyMatch(value -> value.isBlank()
+                                    || value.length() > 200
+                                    || declared.values().stream()
+                                            .noneMatch(option -> option.value().equals(value)))) {
+                throw new IllegalArgumentException("Choose values offered for this review state dimension.");
             }
-            if (!declared.contains(signal)) {
-                // Every declared signal but the hand-asked one is bindable, so this one is undeclared and
-                // has no words to name it by.
-                throw new IllegalArgumentException("This kind of work does not offer one of the chosen moments. "
-                        + "Choose from the moments it offers.");
+        });
+        if (definition.reviewedBy().by() != ReviewedByKind.HEPHAESTUS && definition.script() != null) {
+            throw new IllegalArgumentException("A practice script needs Hephaestus as the reviewer.");
+        }
+        boolean automated = definition.reviewedBy().by() == ReviewedByKind.HEPHAESTUS;
+        validateReads(kind, definition.reads(), automated);
+        var scan = definition.scan();
+        if (scan != null) {
+            if (!capabilities.scanItemKinds().contains(scan.itemKind())) {
+                throw new IllegalArgumentException("This item kind does not support the selected scan item kind.");
             }
+            validateReads(scan.itemKind(), scan.reads(), automated);
         }
-    }
-
-    /**
-     * A source's display name, or empty for one the catalogue does not declare: that is the author's input,
-     * not a stale row, so it is answered in the message rather than logged.
-     */
-    private Optional<String> named(SourceKind source) {
-        return sourceCatalogs.current().source(source).map(ArtifactSourceContract::displayName);
-    }
-
-    /**
-     * A source the catalogue does not declare has no label, so the id the author gave stands alone, and the
-     * message says where the sources this kind of work has are listed.
-     */
-    private static String unknownSource(SourceKind source) {
-        return source.value()
-                + " is not an evidence source Hephaestus knows. Choose from the sources listed under “Reads” "
-                + "in “When this practice is reviewed”.";
-    }
-
-    /** The editor's label for each relation, as its “Person this practice judges” list shows it. */
-    private static String roleLabel(ActorRole role) {
-        return switch (role) {
-            case AUTHOR -> "Author";
-            case ASSIGNEE -> "Assignee";
-            case REVIEWER -> "Reviewer";
-            case MERGER -> "Whoever merged it";
-        };
-    }
-
-    private static void rejectReviewResultLabels(String field, @Nullable String value) {
-        if (value == null) {
-            return;
-        }
-        Matcher label = REVIEW_RESULT_LABEL.matcher(value);
-        if (label.find()) {
-            throw new IllegalArgumentException(field + " is guidance for people. Remove the review result label “"
-                    + label.group() + "”. Use plain words instead.");
-        }
-    }
-
-    /** Applicability predicates must use evidence capable of settling the predicate. */
-    private void validatePrecondition(PracticeDefinition definition, Set<SourceKind> applicable) {
-        var version = definition.automatedReviewPolicy().sourceContractVersion();
-        PracticePrecondition subject = definition.precondition();
-        if (subject == null) {
-            return;
-        }
-        if (!definition.automatedReviewPolicy().automatedReview().canAttemptAutomatedReview()) {
-            throw new IllegalArgumentException(
-                    "A practice that Hephaestus does not review cannot declare what it applies to. Nothing would read it.");
-        }
-        for (PracticePreconditionClause clause : subject.anyOf()) {
-            SourceKind readFrom = clause.readsFrom();
-            if (!applicable.contains(readFrom)) {
-                // The gate is typed as JSON, so the source is named by its label and its id together.
-                throw new IllegalArgumentException(named(readFrom)
-                        .map(source -> "This kind of work has no “" + source + "” (" + readFrom.value()
-                                + "). A condition that reads it can never be decided. Choose a "
-                                + "condition that this kind of work can answer, or remove the condition.")
-                        .orElseGet(() -> unknownSource(readFrom)));
-            }
-            ArtifactSourceContract source = sourceCatalogs.requireSource(version, readFrom);
-            if (!source.completenessPolicy().supportsComplete()) {
-                throw new IllegalArgumentException("A capture of “" + source.displayName() + "” (" + readFrom.value()
-                        + ") is never complete, so an empty result cannot show that this "
-                        + "practice does not apply. Choose a condition that reads other evidence.");
+        if (definition.appliesWhen() != null) {
+            for (var clause : definition.appliesWhen().anyOf()) {
+                String aspect = clause.changedPath() != null
+                        ? "CHANGED_PATH"
+                        : clause.diffContains() != null ? "DIFF_CONTAINS" : "HAS_ITEMS";
+                if (!capabilities.appliesWhenSupportedAspects().contains(aspect)) {
+                    throw new IllegalArgumentException("This item kind cannot check the selected condition.");
+                }
+                if (clause.hasItems() != null
+                        && !capabilities.appliesWhenEvidenceCollections().contains(clause.hasItems())) {
+                    throw new IllegalArgumentException("Choose an evidence collection offered for this item kind.");
+                }
             }
         }
+        var guidance = definition.guidance();
+        guidance(guidance.whyItMatters());
+        guidance(guidance.whatGoodLooksLike());
+        guidance(guidance.goingWell());
+        if (guidance.visual() != null) {
+            PracticeGuidanceRules.validate(guidance.visual());
+            guidance(guidance.visual().alt());
+        }
+        if (guidance.guide() != null) {
+            PracticeGuidanceRules.validate(guidance.guide());
+            guidance(guidance.guide().markdown());
+        }
     }
 
-    /**
-     * A practice may only read evidence that could exist for the kind of thing it reviews. What each
-     * source demands of its capture is the source contract's business, not checked here.
-     */
-    private void validateEvidence(ArtifactKind artifactKind, PracticeDefinition definition) {
-        var version = definition.automatedReviewPolicy().sourceContractVersion();
-        Set<SourceKind> applicable = sourceCatalogs.requireSourcesFor(version, artifactKind.value());
-        validatePrecondition(definition, applicable);
-        for (PracticeEvidenceRequirement need : definition.evidenceRequirements()) {
-            if (!applicable.contains(need.sourceKind())) {
-                throw new IllegalArgumentException(named(need.sourceKind())
-                        .map(source -> "“" + source
-                                + "” is not available for this kind of work. Turn it off, or choose "
-                                + "evidence that this kind of work has.")
-                        .orElseGet(() -> unknownSource(need.sourceKind())));
+    private void validateReads(ItemKind kind, PracticeReads reads, boolean automated) {
+        if (!reads.contract().equals(sources.current().version().value())) {
+            throw new IllegalArgumentException("Choose the current source contract for a new definition.");
+        }
+        var applicable = sources.current().sourcesFor(kind.value());
+        for (var source : reads.sources()) {
+            if (!applicable.contains(source.source())) {
+                throw new IllegalArgumentException("Choose read sources offered for this item kind.");
             }
-            var contract = sourceCatalogs.requireSource(version, need.sourceKind());
-            // An exhaustive claim over a source that can never report a complete capture refuses
-            // every review it triggers. Caught at authoring time, because at review time
-            // "permanently refusing" and "nobody has done this yet" produce the same report.
-            if (need.stance().demandsCompleteCapture()
-                    && !contract.completenessPolicy().supportsComplete()) {
-                throw new IllegalArgumentException("A capture of “" + contract.displayName()
-                        + "” is never complete, so a review cannot claim that something is absent "
-                        + "from it. Clear the checkbox “May claim something is absent” for this source.");
+            if (source.need() == ReadNeed.COMPLETE
+                    && !sources.requireSource(source.source())
+                            .completenessPolicy()
+                            .supportsComplete()) {
+                throw new IllegalArgumentException("This source cannot provide a complete capture.");
             }
+        }
+        if (automated && reads.sources().stream().noneMatch(source -> source.need() != ReadNeed.OPTIONAL)) {
+            throw new IllegalArgumentException("Hephaestus needs at least one required read source.");
+        }
+    }
+
+    private static void text(String value, int min, int max, String field) {
+        if (value.isBlank() || value.length() < min || value.length() > max) {
+            throw new IllegalArgumentException("Use " + min + " to " + max + " characters for the " + field + ".");
+        }
+    }
+
+    private static void guidance(@Nullable String value) {
+        if (value != null && RESULT_WORD.matcher(value).find()) {
+            throw new IllegalArgumentException("Use plain guidance without review outcome labels.");
         }
     }
 }

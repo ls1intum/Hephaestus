@@ -7,16 +7,16 @@ import {
 	OutlineIcon,
 	SlackIcon,
 } from "@/components/icons/brand";
-import type { WorkProvider } from "@/lib/artifact-kinds";
+import type { ItemProvider } from "@/lib/item-kinds";
 
 export const PROVIDER_ICONS = {
 	GITHUB: GitHubIcon,
 	GITLAB: GitLabIcon,
 	SLACK: SlackIcon,
 	OUTLINE: OutlineIcon,
-} satisfies Record<WorkProvider, BrandIcon>;
+} satisfies Record<ItemProvider, BrandIcon>;
 
-function hasProviderIcon(providerType: string): providerType is WorkProvider {
+function hasProviderIcon(providerType: string): providerType is ItemProvider {
 	return Object.hasOwn(PROVIDER_ICONS, providerType);
 }
 

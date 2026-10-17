@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.slack.webhook;
 
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackChannelJoinNoticeHandler;
 import java.time.Clock;
 import java.time.Duration;
@@ -10,6 +11,7 @@ import tools.jackson.databind.JsonNode;
 
 /** Posts just-in-time consent notices for new channel members. */
 @Component
+@ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 public class SlackMemberJoinedChannelMessageHandler extends AbstractSlackEnvelopeHandler {
 

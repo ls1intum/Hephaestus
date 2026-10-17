@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import com.github.dockerjava.core.DefaultDockerClientConfig;
 import com.github.dockerjava.core.DockerClientImpl;
 import com.github.dockerjava.httpclient5.ApacheDockerHttpClient;
-import de.tum.cit.aet.hephaestus.agent.context.EvidenceDirectory;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.NetworkPolicy;
@@ -15,6 +14,7 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
+import de.tum.cit.aet.hephaestus.evidence.capture.EvidenceDirectory;
 import de.tum.cit.aet.hephaestus.testconfig.LiveDockerTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.OutputStream;
@@ -60,6 +60,7 @@ class RepositoryTreeStagingLiveTest {
     /** A tree large enough that any per-file ceiling would have to reject it. */
     private static final int TREE_FILE_COUNT = 25_000;
 
+    private final String owner = "live-" + UUID.randomUUID();
     private LiveSandboxGateway gateway;
     private DockerSandboxAdapter sandboxAdapter;
     private SandboxContainerManager containerManager;
@@ -80,7 +81,7 @@ class RepositoryTreeStagingLiveTest {
     void setUp() throws Exception {
         gateway = new LiveSandboxGateway();
         SandboxProperties properties = new SandboxProperties(5, 10, 300, null);
-        var dockerProperties = new DockerSandboxProperties("unix:///var/run/docker.sock", false, null, null, "default");
+        var dockerProperties = new DockerSandboxProperties("unix:///var/run/docker.sock", false, null, null, owner);
         var dockerClient = DockerClientImpl.getInstance(
                 DefaultDockerClientConfig.createDefaultConfigBuilder().build(),
                 new ApacheDockerHttpClient.Builder()
@@ -88,8 +89,7 @@ class RepositoryTreeStagingLiveTest {
                         .build());
         DockerClientOperations dockerOps = new DockerClientOperations(dockerClient, dockerClient);
         dockerWaitExecutor = Executors.newCachedThreadPool();
-        containerManager =
-                new SandboxContainerManager(dockerOps, image -> {}, properties, "default", dockerWaitExecutor);
+        containerManager = new SandboxContainerManager(dockerOps, image -> {}, properties, owner, dockerWaitExecutor);
         networkManager = new SandboxNetworkManager(dockerOps, dockerProperties, new SandboxCreator(dockerOps));
         sandboxAdapter = new DockerSandboxAdapter(
                 networkManager,

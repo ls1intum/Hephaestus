@@ -16,7 +16,7 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceNamespace;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
@@ -26,11 +26,11 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitDetailsPers
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitDetailsPersister.Outcome;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.RepositoryKey;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryRefDTO;
@@ -185,7 +185,8 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 0,
                 0,
                 List.of(),
-                List.of());
+                List.of(),
+                "msg");
     }
 
     private Repository createMockRepository(Long id, String nameWithOwner, String defaultBranch) {
@@ -195,10 +196,6 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
         return repo;
     }
 
-    /**
-     * Sets up scope resolution mocks so that the handler considers the scope active.
-     * Required for tests that exercise the local git processing path.
-     */
     private void mockActiveScopeForRepo(String nameWithOwner) {
         when(scopeIdResolver.findScopeIdByRepositoryName(nameWithOwner)).thenReturn(Optional.of(1L));
         when(syncTargetProvider.isScopeActiveForSync(1L)).thenReturn(true);

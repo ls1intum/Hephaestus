@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.workurl;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workurl.ReviewedWorkUrls.Page;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workurl.ReviewedWorkUrls.WorkAddress;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -15,10 +15,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/**
- * The address grammar is the first fence between a browser tab and a workspace's mirrored work: anything
- * it lets through ambiguously could name another project's work, so every rejection here is deliberate.
- */
 class ReviewedWorkUrlsTest extends BaseUnitTest {
 
     @Test
@@ -148,7 +144,6 @@ class ReviewedWorkUrlsTest extends BaseUnitTest {
             assertThat(ReviewedWorkUrls.configuredOrigin(serverUrl)).isEmpty();
         }
 
-        /** A host is compared whole: a lookalike that merely ends in the configured host is another server. */
         @Test
         void shouldNotMatchAHostThatOnlySharesASuffixWhenComparingOrigins() {
             String page = ReviewedWorkUrls.page("https://evil-github.com/octo/repo/pull/5")
@@ -177,19 +172,19 @@ class ReviewedWorkUrlsTest extends BaseUnitTest {
                     "https://github.com/octo/repo/pull/5#issuecomment-1",
                 })
         void shouldReadAPullRequestWhenThePageIsOneOfItsTabs(String url) {
-            assertThat(gitHub(url)).contains(new WorkAddress("octo/repo", ScmSignals.PULL_REQUEST, 5));
+            assertThat(gitHub(url)).contains(new WorkAddress("octo/repo", ScmItemEvents.PULL_REQUEST, 5));
         }
 
         @Test
         void shouldReadAnIssueWhenThePageIsTheIssue() {
             assertThat(gitHub("https://github.com/octo/repo/issues/12/"))
-                    .contains(new WorkAddress("octo/repo", ScmSignals.ISSUE, 12));
+                    .contains(new WorkAddress("octo/repo", ScmItemEvents.ISSUE, 12));
         }
 
         @Test
         void shouldKeepDotsAndHyphensInsideNamesWhenReadingAGitHubPage() {
             assertThat(gitHub("https://ghe.example.test/my-org/repo.name.js/pull/3"))
-                    .contains(new WorkAddress("my-org/repo.name.js", ScmSignals.PULL_REQUEST, 3));
+                    .contains(new WorkAddress("my-org/repo.name.js", ScmItemEvents.PULL_REQUEST, 3));
         }
 
         @ParameterizedTest
@@ -224,7 +219,7 @@ class ReviewedWorkUrlsTest extends BaseUnitTest {
         @Test
         void shouldReadTheLargestIntNumberWhenItFits() {
             assertThat(gitHub("https://github.com/octo/repo/issues/2147483647"))
-                    .contains(new WorkAddress("octo/repo", ScmSignals.ISSUE, Integer.MAX_VALUE));
+                    .contains(new WorkAddress("octo/repo", ScmItemEvents.ISSUE, Integer.MAX_VALUE));
         }
 
         private Optional<WorkAddress> gitHub(String url) {
@@ -249,10 +244,9 @@ class ReviewedWorkUrlsTest extends BaseUnitTest {
                     "https://gitlab.example.test/group/project/-/merge_requests/5?tab=diffs#note_9",
                 })
         void shouldReadAMergeRequestWhenThePageIsOneOfItsTabs(String url) {
-            assertThat(gitLab(url)).contains(new WorkAddress("group/project", ScmSignals.PULL_REQUEST, 5));
+            assertThat(gitLab(url)).contains(new WorkAddress("group/project", ScmItemEvents.PULL_REQUEST, 5));
         }
 
-        /** Issues and work items share one project IID namespace; the same number is the same issue. */
         @ParameterizedTest
         @ValueSource(
                 strings = {
@@ -261,13 +255,13 @@ class ReviewedWorkUrlsTest extends BaseUnitTest {
                     "https://gitlab.example.test/group/project/-/work_items/5/",
                 })
         void shouldReadAnIssueWhenThePageIsAnIssueOrAProjectWorkItem(String url) {
-            assertThat(gitLab(url)).contains(new WorkAddress("group/project", ScmSignals.ISSUE, 5));
+            assertThat(gitLab(url)).contains(new WorkAddress("group/project", ScmItemEvents.ISSUE, 5));
         }
 
         @Test
         void shouldKeepEveryNestedSubgroupWhenReadingAGitLabPage() {
             assertThat(gitLab("https://gitlab.example.test/top/sub/deeper/my.project-x/-/merge_requests/7"))
-                    .contains(new WorkAddress("top/sub/deeper/my.project-x", ScmSignals.PULL_REQUEST, 7));
+                    .contains(new WorkAddress("top/sub/deeper/my.project-x", ScmItemEvents.PULL_REQUEST, 7));
         }
 
         @ParameterizedTest

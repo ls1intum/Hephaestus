@@ -59,10 +59,9 @@ discriminated union over the states a section can be in rather than parallel fla
   Thus, a part needing its own controls deliberately stayed a prop.
 
 Detection: `grep -rn "createContext" webapp/src/components` — for each, name the common ancestor. If one
-exists and renders both consumers, it is D. The live example of the opposite failure is the practice
-profile route's `canAdminister`, drilled through
-`webapp/src/components/practice-profile/PracticeGroupDetailDrawer.tsx` → `ProfileReviewLevel.tsx` →
-`webapp/src/components/practice-trace/TraceSignalTimeline.tsx` → `RefusalFixLink.tsx` for one leaf.
+exists and renders both consumers, it is D. The opposite failure is a role flag drilled through
+several components to reach one leaf. The practice profile route shows the fix: it renders
+`TraceRefusalAlert` with its `RefusalFixLink` and passes the alert down as a node.
 
 ## Dimension 3 — Slot obligations, when `render=` is used
 
@@ -107,8 +106,8 @@ is not a gap** — a component whose prop is one domain object has nothing explo
 **Anti-criterion — the swallowed spy.** A stateful wrapper that *overrides* a callback from `args` makes
 the `fn()` in `meta.args` unreachable: never assertable, Actions panel permanently empty, file looks well
 instrumented. Detection: for each `fn()` in `meta.args`, grep for a JSX attribute of the same name that
-is **not** `{...args}`. `webapp/src/components/admin/practice-editor/OccasionLifecycle.stories.tsx`
-is the shape that survives: spread `{...args}`, patch only the props the wrapper holds state for.
+is **not** `{...args}`. `webapp/src/components/admin/practice-editor/PracticeGuideEditor.stories.tsx`
+is the shape that survives: spread `{...args}`, call the spy, patch only the props the wrapper holds state for.
 
 ## Dimension 5 — Which states does the file actually show?
 

@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.core.oauth;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountWorkspaceMembershipQuery;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountMembershipQuery;
 import de.tum.cit.aet.hephaestus.core.exception.DataIntegrityViolationConstraints;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
@@ -74,7 +74,7 @@ public class OAuthCallbackService {
     private final ConnectionService connectionService;
     private final WorkspaceRepository workspaceRepository;
     private final CredentialBundleConverter credentialBundleConverter;
-    private final AccountWorkspaceMembershipQuery membershipQuery;
+    private final AccountMembershipQuery membershipQuery;
     private final TransactionTemplate transactionTemplate;
 
     public String workspaceSlug(long workspaceId) {
@@ -89,7 +89,7 @@ public class OAuthCallbackService {
             ConnectionService connectionService,
             WorkspaceRepository workspaceRepository,
             CredentialBundleConverter credentialBundleConverter,
-            AccountWorkspaceMembershipQuery membershipQuery,
+            AccountMembershipQuery membershipQuery,
             PlatformTransactionManager transactionManager) {
         this.connectionRepository = connectionRepository;
         this.connectionService = connectionService;
@@ -146,7 +146,7 @@ public class OAuthCallbackService {
             if (exclusive == null || !DataIntegrityViolationConstraints.hasName(e, exclusive.index())) {
                 throw e;
             }
-            // A concurrent connect of the same instance committed after this one's ownership check passed.
+            // A concurrent connect can commit after the ownership check.
             String conflict = connectedElsewhere(
                             pending.getKind(), pending.getWorkspace().getId(), completed.instanceKey(), actorAccountId)
                     .orElseThrow(() -> e);
@@ -230,11 +230,19 @@ public class OAuthCallbackService {
                             owner.getId(),
                             workspaceId);
                     return administers(owner.getId(), actorAccountId)
-                            ? "This " + exclusive.noun() + " is already connected to the Hephaestus workspace \""
-                                    + owner.getDisplayName() + "\" (" + owner.getWorkspaceSlug()
-                                    + "). Disconnect " + exclusive.provider() + " there before you connect it here."
-                            : "This " + exclusive.noun() + " is already connected to another Hephaestus workspace."
-                                    + " A workspace admin there must disconnect " + exclusive.provider()
+                            ? "This "
+                                    + exclusive.noun()
+                                    + " is already connected to the Hephaestus workspace \""
+                                    + owner.getDisplayName()
+                                    + "\" ("
+                                    + owner.getWorkspaceSlug()
+                                    + "). Disconnect "
+                                    + exclusive.provider()
+                                    + " there before you connect it here."
+                            : "This "
+                                    + exclusive.noun()
+                                    + " is already connected to another Hephaestus workspace. A workspace admin there must disconnect "
+                                    + exclusive.provider()
                                     + " first.";
                 });
     }
@@ -285,9 +293,8 @@ public class OAuthCallbackService {
         if (completed.displayName() != null) {
             connection.setDisplayName(completed.displayName());
         }
-        // Strategies that resolve vendor metadata during finalize (Slack team id/name)
-        // hand back a config blob; null leaves the placeholder seeded by
-        // findOrCreatePendingConnection in place.
+        // Slack finalization can return resolved team metadata.
+        // A null config retains the pending connection metadata.
         if (completed.config() != null) {
             connection.setConfig(refreshedConfig(connection, completed.config()));
         }

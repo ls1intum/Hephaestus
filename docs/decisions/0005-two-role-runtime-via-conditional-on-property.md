@@ -189,3 +189,7 @@ needs. The shipped Compose stacks now set it there: `application-worker` is the 
 the worker role and the only one given the Docker socket, and the `gate:env` check fails a container
 that mounts the socket without that role. That is the server-only deployment the 2026-07-22 update
 called unbuilt; it needed no new role.
+
+## Update — 2026-10-14 (#2656): the job table is renamed
+
+`agent_job` is renamed; see [ADR 0025](0025-agent-job-queue-on-postgresql.md#update--2026-10-14-2656-the-job-table-and-classes-are-renamed).

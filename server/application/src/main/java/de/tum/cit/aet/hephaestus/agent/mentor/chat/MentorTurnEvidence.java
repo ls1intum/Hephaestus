@@ -1,9 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
-import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MergeReadinessContentSource;
-import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.ObservationHistoryContentSource;
-import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.RecentAuthoredWorkContentSource;
+import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.ResultHistoryContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.providers.mentor.ReviewAttemptsContentSource;
+import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextPaths;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -25,11 +24,11 @@ final class MentorTurnEvidence {
 
     private static final int MAX_SOURCE_CHARS = 12_000;
     private static final List<String> WORK_FIELDS =
-            List.of("artifactId", "resource", "reviewsResource", "number", "url", "state", "isDraft");
+            List.of("pullRequestId", "resource", "reviewsResource", "number", "url", "state", "isDraft");
     private static final List<String> ATTEMPT_FIELDS = List.of(
             "reviewId",
-            "artifactKind",
-            "artifactId",
+            "itemKind",
+            "pullRequestId",
             "number",
             "url",
             "state",
@@ -39,7 +38,7 @@ final class MentorTurnEvidence {
             "createdAt",
             "completedAt");
     private static final List<String> READINESS_FIELDS = List.of(
-            "artifactId",
+            "pullRequestId",
             "resource",
             "number",
             "url",
@@ -60,8 +59,8 @@ final class MentorTurnEvidence {
             "checksObserved",
             "checksObservedAt",
             "latestReviewsStatus");
-    private static final List<String> OBSERVATION_FIELDS = List.of(
-            "id",
+    private static final List<String> RESULT_FIELDS = List.of(
+            "resultId",
             "resource",
             "reviewId",
             "origin",
@@ -69,8 +68,8 @@ final class MentorTurnEvidence {
             "outcome",
             "severity",
             "observedAt",
-            "artifactKind",
-            "artifactId",
+            "itemKind",
+            "pullRequestId",
             "reviewedWork");
 
     private MentorTurnEvidence() {}
@@ -80,17 +79,16 @@ final class MentorTurnEvidence {
         receipt.put("providerFreshness", "UNKNOWN");
         List<String> readinessLists = List.of("pullRequests", "notLoaded");
         ObjectNode readiness =
-                source(mapper, inputs, MergeReadinessContentSource.OUTPUT_KEY, readinessLists, READINESS_FIELDS);
+                source(mapper, inputs, MentorContextPaths.MERGE_READINESS, readinessLists, READINESS_FIELDS);
         receipt.set("mergeReadiness", readiness);
 
-        List<String> observationLists = List.of("recentObservations", "abstentions", "earlierObservations");
-        ObjectNode observations = source(
-                mapper, inputs, ObservationHistoryContentSource.OUTPUT_KEY, observationLists, OBSERVATION_FIELDS);
-        receipt.set("observations", observations);
+        List<String> practiceResultLists = List.of("recentResults", "abstentions", "earlierResults");
+        ObjectNode practiceResults =
+                source(mapper, inputs, ResultHistoryContentSource.OUTPUT_KEY, practiceResultLists, RESULT_FIELDS);
+        receipt.set("results", practiceResults);
 
         List<String> workLists = List.of("pullRequests", "issues");
-        ObjectNode authored =
-                source(mapper, inputs, RecentAuthoredWorkContentSource.OUTPUT_KEY, workLists, WORK_FIELDS);
+        ObjectNode authored = source(mapper, inputs, MentorContextPaths.RECENT_AUTHORED_WORK, workLists, WORK_FIELDS);
         authored.put("use", "ARTIFACT_INDEX_NOT_CURRENT_READINESS");
         receipt.set("authoredWorkIndex", authored);
 
@@ -104,7 +102,7 @@ final class MentorTurnEvidence {
                 receipt,
                 List.of(
                         new Section(readiness, readinessLists),
-                        new Section(observations, observationLists),
+                        new Section(practiceResults, practiceResultLists),
                         new Section(authored, workLists),
                         new Section(attempts, attemptLists)));
     }

@@ -1,23 +1,12 @@
-import type {
-	PracticeReviewCounts,
-	PracticeReviewOverview,
-	ReviewFeedbackCounts,
-} from "@/api/types.gen";
+import type { ReviewFeedbackCounts, ReviewOverview, ReviewPracticeCounts } from "@/api/types.gen";
 
-import { familyCount, observationSlots, slotsTotal } from "./review-outcomes";
+import { familyCount, resultSlots, slotsTotal } from "./review-outcomes";
 
-/**
- * The Practices table's totals row: the overview's own figures, the ones the Reviews, Observations
- * and Feedback tiles above show, so the table and the tiles cannot disagree. The observation columns
- * add up across the practices by construction, since every observation is of one practice. Feedback
- * delivered does not: a piece of feedback about two practices counts in the row of each, and a piece
- * bound to no observation counts in none, so the rows can add up to more or less than the pieces.
- */
 export interface PracticeTotals {
-	observations: number;
+	results: number;
 	notMet: number;
-	notApplicable: number;
-	undetermined: number;
+	doesNotApply: number;
+	couldNotDetermine: number;
 	markedIncorrect: number;
 	/** Pieces of feedback delivered, each once, as the Feedback tile counts them. */
 	feedbackDelivered: number;
@@ -25,8 +14,7 @@ export interface PracticeTotals {
 	feedbackComposed: number;
 	/** What the Feedback delivered column adds up to over every practice, hidden or shown. */
 	feedbackDeliveredInRows: number;
-	/** The practices of the range the table's filters hide, and their observations. */
-	hidden: { practices: number; observations: number };
+	hidden: { practices: number; results: number };
 }
 
 /**
@@ -38,33 +26,30 @@ export interface PracticeTotals {
 export function feedbackComposed(counts: ReviewFeedbackCounts): number {
 	return (
 		counts.awaitingApproval +
-		counts.prepared +
+		counts.ready +
 		counts.delivered +
-		counts.partiallyDelivered +
 		counts.unconfirmed +
-		counts.suppressed +
-		counts.discarded +
-		counts.failed +
-		counts.partiallyFailed
+		counts.withheld +
+		counts.rejected +
+		counts.failed
 	);
 }
 
-const observationsOf = (counts: PracticeReviewCounts) =>
-	slotsTotal(observationSlots(counts.observations));
+const resultsOf = (counts: ReviewPracticeCounts) => slotsTotal(resultSlots(counts.results));
 
 /** The totals of the range, with the rows on screen to tell how much the filters hide. */
 export function practiceTotals(
-	overview: PracticeReviewOverview,
-	shown: readonly PracticeReviewCounts[],
+	overview: ReviewOverview,
+	shown: readonly ReviewPracticeCounts[],
 ): PracticeTotals {
 	const shownSlugs = new Set(shown.map((counts) => counts.practiceSlug));
 	const hiddenRows = overview.practices.filter((counts) => !shownSlugs.has(counts.practiceSlug));
 	return {
-		observations: slotsTotal(observationSlots(overview.observations)),
-		notMet: overview.observations.notMet,
-		notApplicable: overview.observations.notApplicable,
-		undetermined: overview.observations.undetermined,
-		markedIncorrect: overview.observationsInvalidated,
+		results: slotsTotal(resultSlots(overview.results)),
+		notMet: overview.results.notMet,
+		doesNotApply: overview.results.doesNotApply,
+		couldNotDetermine: overview.results.couldNotDetermine,
+		markedIncorrect: overview.resultsMarkedIncorrect,
 		feedbackDelivered: familyCount(overview.feedback, "DELIVERED"),
 		feedbackComposed: feedbackComposed(overview.feedback),
 		feedbackDeliveredInRows: overview.practices.reduce(
@@ -73,7 +58,7 @@ export function practiceTotals(
 		),
 		hidden: {
 			practices: hiddenRows.length,
-			observations: hiddenRows.reduce((sum, counts) => sum + observationsOf(counts), 0),
+			results: hiddenRows.reduce((sum, counts) => sum + resultsOf(counts), 0),
 		},
 	};
 }
@@ -88,7 +73,7 @@ export function practiceTotalsNotes(totals: PracticeTotals): string[] {
 	const notes: string[] = [];
 	if (totals.hidden.practices > 0) {
 		notes.push(
-			`The totals include ${plural(totals.hidden.practices, "practice", "practices")} that the filters hide, with ${plural(totals.hidden.observations, "observation", "observations")}.`,
+			`The totals include ${plural(totals.hidden.practices, "practice", "practices")} that the filters hide, with ${plural(totals.hidden.results, "result", "results")}.`,
 		);
 	}
 	if (totals.feedbackDeliveredInRows !== totals.feedbackDelivered) {

@@ -2,10 +2,14 @@ package de.tum.cit.aet.hephaestus.integration.outline.lifecycle;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocument;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineTestFixtures;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
-import java.util.concurrent.atomic.AtomicLong;
+import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -17,7 +21,11 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 class OutlineWorkspacePurgeAdapterIntegrationTest extends BaseIntegrationTest {
 
-    private static final AtomicLong WS_SEQ = new AtomicLong(9_200_000L);
+    @Autowired
+    private WorkspaceRepository workspaces;
+
+    @Autowired
+    private ConnectionRepository connections;
 
     @Autowired
     private OutlineWorkspacePurgeAdapter adapter;
@@ -42,24 +50,22 @@ class OutlineWorkspacePurgeAdapterIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void purge_erasesTheWorkspacesDocumentsAndSparesAnother() {
-        long wsA = WS_SEQ.incrementAndGet();
-        long wsB = WS_SEQ.incrementAndGet();
-        repository.save(document(wsA, 1L, "doc-a1"));
-        repository.save(document(wsA, 1L, "doc-a2"));
-        repository.save(document(wsB, 2L, "doc-b1"));
+        var first = workspaces.saveAndFlush(WorkspaceTestFixtures.activeWorkspace("purge-a-" + UUID.randomUUID()));
+        var second = workspaces.saveAndFlush(WorkspaceTestFixtures.activeWorkspace("purge-b-" + UUID.randomUUID()));
+        long wsA = first.getId();
+        long wsB = second.getId();
+        var sourceA = OutlineTestFixtures.connection(connections, first);
+        var sourceB = OutlineTestFixtures.connection(connections, second);
+        var a1 = repository.saveAndFlush(document(wsA, sourceA.getId(), "doc-a1"));
+        var a2 = repository.saveAndFlush(document(wsA, sourceA.getId(), "doc-a2"));
+        var b1 = repository.saveAndFlush(document(wsB, sourceB.getId(), "doc-b1"));
 
         // The production purge runs the contributor chain inside one transaction (WorkspacePurgeIntegrationTest →
         // workspaceLifecycleService.purgeWorkspace); mirror that boundary so the bulk delete has an active tx.
         transactionTemplate.executeWithoutResult(status -> adapter.deleteWorkspaceData(wsA));
 
-        assertThat(rowsFor(wsA)).isZero();
-        assertThat(rowsFor(wsB)).isEqualTo(1L);
-    }
-
-    /** Total mirrored rows (tombstoned or not) for a workspace — the erase target the purge must zero out. */
-    private long rowsFor(long workspaceId) {
-        return repository.findAll().stream()
-                .filter(d -> d.getWorkspaceId() == workspaceId)
-                .count();
+        assertThat(repository.findById(a1.getId())).isEmpty();
+        assertThat(repository.findById(a2.getId())).isEmpty();
+        assertThat(repository.findById(b1.getId())).isPresent();
     }
 }

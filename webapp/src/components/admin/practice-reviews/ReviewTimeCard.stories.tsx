@@ -5,12 +5,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { withStandardPage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/stories/reflow";
 
-import { practiceReviewTiming, reviewOverviewScope } from "./fixtures";
+import { practiceReviewTiming } from "./fixtures";
 import { ReviewTimeCard } from "./ReviewTimeCard";
 
 type Canvas = StoryContext["canvas"];
 
-const EMPTY_STAGE = { count: 0 };
+const EMPTY_STAGE = { count: 0, medianSeconds: null, p90Seconds: null };
 
 /** A figure's number, by its key: "finished", "lost", "late". */
 function figureOf(canvas: Canvas, key: string) {
@@ -67,17 +67,16 @@ const meta = {
 	args: {
 		workspaceSlug: "demo",
 		state: { status: "ready", timing: practiceReviewTiming, stale: false },
-		scope: reviewOverviewScope,
 		label: "Last 30 days",
 		during: "in the last 30 days",
 		finished: {
 			state: { status: "ready", total: 34, stale: false },
 			list: {
-				list: "runs",
+				list: "reviews",
 				search: {
 					from: "2026-09-10",
 					to: "2026-10-09",
-					status: ["COMPLETED", "FAILED", "TIMED_OUT"],
+					status: ["COMPLETE", "PARTIAL", "FAILED"],
 				},
 			},
 		},
@@ -147,9 +146,8 @@ export const Default: Story = {
 		await expect(widths[3]).toBeGreaterThan((widths[1] ?? 0) * 10);
 		// Every review recorded its execution start, so no unsplit run is drawn or explained.
 		await expect(canvas.queryByText(/not split/u)).toBeNull();
-		const late = canvas.getByRole("link", { name: "9 reviews finished after the merge" });
-		await expect(late).toHaveAttribute("href", expect.stringContaining("finishedAfterMerge=true"));
-		await expect(canvas.getAllByRole("link")).toHaveLength(2);
+		await expect(figureOf(canvas, "late")).toHaveTextContent("9");
+		await expect(canvas.getAllByRole("link")).toHaveLength(1);
 	},
 };
 
@@ -170,11 +168,11 @@ export const FinishedInTheRange: Story = {
 		const link = new URL(
 			canvas.getByRole<HTMLAnchorElement>("link", { name: "34 reviews finished" }).href,
 		);
-		await expect(link.pathname).toBe("/w/demo/admin/practices/reviews/runs");
+		await expect(link.pathname).toBe("/w/demo/admin/practices/reviews");
 		await expect(link.searchParams.getAll("status")).toStrictEqual([
-			"COMPLETED",
+			"COMPLETE",
+			"PARTIAL",
 			"FAILED",
-			"TIMED_OUT",
 		]);
 		await expect(link.searchParams.get("from")).toBe("2026-09-10");
 		await expect(await infoOf(canvas)).toContain(
@@ -218,10 +216,6 @@ export const SlowQueue: Story = {
 	},
 };
 
-/**
- * Two of the five the merge itself started, so they could only finish after it. The figure counts
- * all five, the rows its link opens, and the (i) says how many of them the merge started.
- */
 export const FinishedAfterMerge: Story = {
 	args: {
 		state: {
@@ -235,9 +229,7 @@ export const FinishedAfterMerge: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		await expect(
-			canvas.getByRole("link", { name: "5 reviews finished after the merge" }),
-		).toHaveAttribute("href", expect.stringContaining("finishedAfterMerge=true"));
+		await expect(canvas.queryByRole("link", { name: /finished after the merge/u })).toBeNull();
 		await expect(figureOf(canvas, "late")).toHaveTextContent("5");
 		// Said in the (i), for every reader rather than a screen reader alone.
 		await expect(await infoOf(canvas)).toContain("2 of them were started by the merge.");
@@ -261,7 +253,7 @@ export const CommentsLostToMerge: Story = {
 		await expect(lost).toHaveTextContent("21");
 		await expect(lost).not.toHaveClass("text-warning");
 		await expect(lost).not.toHaveClass("text-destructive");
-		canvas.getByRole("link", { name: "9 reviews finished after the merge" });
+		await expect(figureOf(canvas, "late")).toHaveTextContent("9");
 	},
 };
 
@@ -279,16 +271,16 @@ export const NoData: Story = {
 				model: EMPTY_STAGE,
 				posted: EMPTY_STAGE,
 				total: EMPTY_STAGE,
-				totalShares: undefined,
+				totalShares: null,
 				finished: EMPTY_STAGE,
-				finishedShares: undefined,
+				finishedShares: null,
 				read: EMPTY_STAGE,
 				finishedAfterMerge: 0,
 			},
 		},
 		finished: {
 			state: { status: "ready", total: 0, stale: false },
-			list: { list: "runs", search: { status: ["COMPLETED", "FAILED", "TIMED_OUT"] } },
+			list: { list: "reviews", search: { status: ["COMPLETE", "PARTIAL", "FAILED"] } },
 		},
 	},
 	play: async ({ canvas }) => {
@@ -312,7 +304,7 @@ export const NoComment: Story = {
 				...practiceReviewTiming,
 				posted: EMPTY_STAGE,
 				total: EMPTY_STAGE,
-				totalShares: undefined,
+				totalShares: null,
 				finished: { count: 40, medianSeconds: 600, p90Seconds: 1200 },
 				finishedShares: {
 					asked: 0.1,
@@ -320,6 +312,7 @@ export const NoComment: Story = {
 					preparation: 0.01,
 					model: 0.88,
 					runUnsplit: 0,
+					posted: null,
 				},
 				finishedAfterMerge: 0,
 			},
@@ -380,7 +373,7 @@ export const OlderReviewsNotSplit: Story = {
 export const Loading: Story = {
 	args: { state: { status: "loading" } },
 	play: async ({ canvas }) => {
-		canvas.getByText("Loading the review time");
+		canvas.getByText("Loading the review time…");
 	},
 };
 
@@ -414,8 +407,6 @@ export const Narrow: Story = {
 export const Dark: Story = {
 	globals: { theme: "dark" },
 	play: async ({ canvas }) => {
-		await expect(
-			canvas.getByRole("link", { name: "9 reviews finished after the merge" }),
-		).toBeVisible();
+		await expect(figureOf(canvas, "late")).toHaveTextContent("9");
 	},
 };

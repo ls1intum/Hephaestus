@@ -20,9 +20,10 @@ class PrivacyAccountErasureAdapter implements AccountErasureContributor {
     public void eraseAccount(long id) {
         var steps = new PersonDataStoreAdministrationContributor(namedJdbc, mapper);
         var actor = new PersonScope(id, List.of(), List.of());
-        steps.erase(steps.select(actor));
+        steps.erase(steps.select(actor), actor);
         jdbc.update(
-                "UPDATE person_data_request SET administrator_account_id=NULL,version=version+1 WHERE administrator_account_id=?",
+                "UPDATE person_data_request SET administrator_account_id=NULL,version=version+1 WHERE"
+                        + " administrator_account_id=?",
                 id);
     }
 }

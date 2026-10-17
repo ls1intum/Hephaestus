@@ -2,8 +2,14 @@ package de.tum.cit.aet.hephaestus.agent.usage;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmConnection;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmConnectionRepository;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModel;
+import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRate;
 import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRateRepository;
+import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -41,21 +47,28 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
     @Autowired
     private FxRateRepository fxRateRepository;
 
+    @Autowired
+    private WorkspaceLlmConnectionRepository workspaceLlmConnectionRepository;
+
+    @Autowired
+    private WorkspaceLlmModelRepository workspaceLlmModelRepository;
+
     private Workspace setupWorkspace(String slug) {
         User owner = persistUser(slug + "-owner");
         return createWorkspace(slug, "Admin usage " + slug, slug + "-org", AccountType.ORG, owner);
     }
 
     private void seedEvent(Workspace workspace, String cost) {
-        seedEvent(workspace, cost, FundingSource.INSTANCE, PricingState.PRICED);
+        seedEvent(workspace, cost, UsageFundingSource.INSTANCE, UsagePricingState.PRICED);
     }
 
-    private void seedEvent(Workspace workspace, @Nullable String cost, FundingSource funding, PricingState pricing) {
+    private void seedEvent(
+            Workspace workspace, @Nullable String cost, UsageFundingSource funding, UsagePricingState pricing) {
         LlmUsageEvent event = new LlmUsageEvent();
         event.setId(UUID.randomUUID());
-        event.setWorkspace(workspace);
-        event.setJobType(LlmUsageJobType.PULL_REQUEST_REVIEW);
-        event.setSourceType(LlmUsageSourceType.AGENT_JOB);
+        event.setWorkspaceId(workspace.getId());
+        event.setJobType("PRACTICE_REVIEW");
+        event.setSourceType(UsageSourceType.REVIEW_JOB);
         event.setSourceId(UUID.randomUUID());
         event.setCostUsd(cost == null ? null : new BigDecimal(cost));
         // Budgeted spend only counts PRICED + INSTANCE-funded rows — both are the
@@ -113,7 +126,7 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
         workspace.setMonthlyByoLlmBudgetUsd(new BigDecimal("5.00")); // workspace's own cap: reached
         workspaceRepository.save(workspace);
         seedEvent(workspace, "1.00");
-        seedEvent(workspace, "5.00", FundingSource.WORKSPACE, PricingState.PRICED);
+        seedEvent(workspace, "5.00", UsageFundingSource.WORKSPACE, UsagePricingState.PRICED);
 
         var row = rollupFor(workspace);
 
@@ -135,7 +148,7 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
         workspace.setMonthlyByoLlmBudgetUsd(new BigDecimal("100.00"));
         workspaceRepository.save(workspace);
         seedEvent(workspace, "1.00");
-        seedEvent(workspace, null, FundingSource.WORKSPACE, PricingState.UNPRICED);
+        seedEvent(workspace, null, UsageFundingSource.WORKSPACE, UsagePricingState.UNPRICED);
 
         var row = rollupFor(workspace);
 
@@ -143,6 +156,35 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
         assertThat(row.ownProviderBudgetVerdict()).isEqualTo(LlmBudgetVerdict.UNVERIFIABLE);
         assertThat(row.instancePaused()).isFalse();
         assertThat(row.ownProviderPaused()).isTrue();
+    }
+
+    @Test
+    void theRollupMarksAWorkspaceOwnProviderInUseFromAConnectedModelOrAnOwnProviderCall() {
+        Workspace connected = setupWorkspace("adm-own-connected");
+        WorkspaceLlmConnection connection = new WorkspaceLlmConnection();
+        connection.setWorkspace(connected);
+        connection.setSlug("own-connection");
+        connection.setDisplayName("Own connection");
+        connection.setBaseUrl("https://api.openai.com");
+        connection.setApiProtocol(LlmApiProtocol.OPENAI_COMPLETIONS);
+        connection.setEnabled(true);
+        connection = workspaceLlmConnectionRepository.save(connection);
+        WorkspaceLlmModel model = new WorkspaceLlmModel();
+        model.setWorkspace(connected);
+        model.setConnection(connection);
+        model.setSlug("own-model");
+        model.setDisplayName("Own model");
+        model.setUpstreamModelId("gpt-5");
+        model.setEnabled(true);
+        workspaceLlmModelRepository.save(model);
+        Workspace zeroCalls = setupWorkspace("adm-own-zero-calls");
+        seedEvent(zeroCalls, "0.00", UsageFundingSource.WORKSPACE, UsagePricingState.NO_CHARGE);
+        Workspace sharedOnly = setupWorkspace("adm-own-shared-only");
+        seedEvent(sharedOnly, "1.00");
+
+        assertThat(rollupFor(connected).ownProviderInUse()).isTrue();
+        assertThat(rollupFor(zeroCalls).ownProviderInUse()).isTrue();
+        assertThat(rollupFor(sharedOnly).ownProviderInUse()).isFalse();
     }
 
     @Test

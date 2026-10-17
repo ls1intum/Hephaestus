@@ -55,7 +55,11 @@ public class GitLabWorkspaceLinkService {
         return workspaceRepository
                 .findById(scopeId)
                 .map(workspace -> {
-                    Organization linked = workspace.getOrganization();
+                    Organization linked = workspace.getOrganizationId() == null
+                            ? null
+                            : organizationRepository
+                                    .findById(workspace.getOrganizationId())
+                                    .orElse(null);
                     return linked != null ? linked.getLogin() : workspace.getAccountLogin();
                 })
                 .filter(groupPath -> path.length() > groupPath.length()
@@ -100,7 +104,7 @@ public class GitLabWorkspaceLinkService {
                         .map(organization -> ownsGroup(scopeId, organization))
                         .orElseGet(() -> workspaceRepository
                                 .findById(scopeId)
-                                .filter(workspace -> workspace.getOrganization() == null)
+                                .filter(workspace -> workspace.getOrganizationId() == null)
                                 .map(workspace -> groupPath.equalsIgnoreCase(workspace.getAccountLogin()))
                                 .orElse(false)))
                 .flatMap(identityProviderRepository::findById);
@@ -124,7 +128,11 @@ public class GitLabWorkspaceLinkService {
         return workspaceRepository
                 .findById(scopeId)
                 .map(workspace -> {
-                    Organization linked = workspace.getOrganization();
+                    Organization linked = workspace.getOrganizationId() == null
+                            ? null
+                            : organizationRepository
+                                    .findById(workspace.getOrganizationId())
+                                    .orElse(null);
                     if (linked != null) {
                         return Objects.equals(linked.getId(), organization.getId());
                     }
@@ -136,12 +144,13 @@ public class GitLabWorkspaceLinkService {
 
     @Transactional
     public void link(Workspace workspace) {
-        if (workspace.getOrganization() != null
+        if (workspace.getOrganizationId() != null
                 || workspace.getAccountLogin() == null
                 || workspace.getAccountLogin().isBlank()) {
             return;
         }
-        // Another GitLab instance can host the same group path, so only the connected instance's row is linked.
+        // Another GitLab instance can host the same group path, so only the connected instance's
+        // row is linked.
         actorSelector
                 .connectedProviderId(workspace.getId())
                 .flatMap(providerId -> organizationRepository.findByLoginIgnoreCaseAndProviderId(
@@ -157,11 +166,11 @@ public class GitLabWorkspaceLinkService {
                     }
                     workspaceRepository
                             .findById(workspace.getId())
-                            .filter(current -> current.getOrganization() == null)
+                            .filter(current -> current.getOrganizationId() == null)
                             .ifPresent(current -> {
-                                current.setOrganization(org);
+                                current.setOrganizationId(org.getId());
                                 workspaceRepository.save(current);
-                                workspace.setOrganization(org);
+                                workspace.setOrganizationId(org.getId());
                                 log.info(
                                         "Linked organization to workspace: orgId={}, workspaceId={}",
                                         org.getId(),

@@ -8,6 +8,7 @@ import static com.tngtech.archunit.library.GeneralCodingRules.THROW_GENERIC_EXCE
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 import static de.tum.cit.aet.hephaestus.architecture.ArchitectureTestConstants.BASE_PACKAGE;
 
+import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.library.dependencies.SliceAssignment;
@@ -339,10 +340,23 @@ class ArchitectureTest extends HephaestusArchitectureTest {
             ArchRule rule = classes()
                     .that()
                     .areAnnotatedWith(Repository.class)
+                    .and(DescribedPredicate.not(DescribedPredicate.describe(
+                            "Spring Data repository fragment implementations", this::isRepositoryFragment)))
                     .should()
                     .haveSimpleNameEndingWith("Repository")
                     .because("Consistent naming improves code discoverability");
             rule.check(classes);
+        }
+
+        private boolean isRepositoryFragment(JavaClass implementation) {
+            return implementation.getRawInterfaces().stream()
+                    .anyMatch(fragment -> implementation.getSimpleName().equals(fragment.getSimpleName() + "Impl")
+                            && implementation.getPackageName().equals(fragment.getPackageName())
+                            && classes.stream()
+                                    .anyMatch(repository -> repository.isInterface()
+                                            && repository.isAssignableTo(
+                                                    org.springframework.data.repository.Repository.class)
+                                            && repository.isAssignableTo(fragment.getName())));
         }
 
         /**

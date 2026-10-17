@@ -1,130 +1,45 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, waitFor, within } from "storybook/test";
 
-import type { ReviewFeedbackDetail } from "@/api/types.gen";
+import type { FeedbackBasis, ReviewFeedbackDetail } from "@/api/types.gen";
+import { FEEDBACK_LOCATION_DEFS } from "@/components/practice-vocabulary/feedback-location-defs";
 import { withPageBehind } from "@/stories/decorators";
 import { InLevelStack } from "@/stories/level-stack";
 import { expectSettledVisible, settledDrawerPanel } from "@/stories/overlay";
 import { expectNoPanelOverflow } from "@/stories/reflow";
-import { daysBefore, hoursBefore, minutesAfter } from "@/stories/story-clock";
 import { expectGenuinelyDisabled } from "@/test/controls";
 import { levelsOpenedBy } from "@/test/detail-stack";
 import { precedes } from "@/test/dom";
 
 import { FeedbackLevel } from "./FeedbackLevel";
 import {
+	approvedFeedbackDetail,
+	awaitingApprovalFeedbackDetail,
+	failedFeedbackDetail,
 	feedbackDetail,
 	longFeedbackDetail,
+	markedIncorrectFeedbackDetail,
+	partialPackageFeedbackDetail,
 	POSTED_SUMMARY_COMMENT,
-	reviewArtifact,
+	PRIVATE_FEEDBACK_TEXT,
+	rejectedFeedbackDetail,
+	replacedFeedbackDetail,
+	restoredFeedbackDetail,
 	reviewFeedbackDetail,
+	unconfirmedFeedbackDetail,
+	uncertainWriteFeedbackDetail,
+	withdrawnFeedbackDetail,
 } from "./fixtures";
 import { SHEET_SECTIONS } from "./RecordSheet";
+import { resultSummary } from "./result-words";
+import { developerLabel } from "./review-format";
 import { feedbackLevel } from "./review-levels";
 
 const ready = (feedback: ReviewFeedbackDetail) => ({ status: "ready" as const, feedback });
 
-const delivered = feedbackDetail("99999999-6666-6666-6666-666666666666");
-
 /** A card shown on the developer's practice pages; its text is theirs alone. */
-const practicePageCard: ReviewFeedbackDetail = {
-	...delivered,
-	channel: "IN_APP",
-	location: "PRACTICE_PAGES",
-	deliveryState: "DELIVERED",
-	body: undefined,
-	placements: [],
-	dispatches: [],
-};
+const practicePageCard = feedbackDetail("44444444-5555-5555-5555-555555555555");
 
-const partiallyDelivered: ReviewFeedbackDetail = {
-	...delivered,
-	deliveryState: "PARTIALLY_DELIVERED",
-	deliveredAt: undefined,
-	placements: [{ id: "summary-placement", placementType: "SUMMARY", postedCommentRef: "2481933" }],
-	// The line comment did not go through yet: the approved package is tried again.
-	dispatches: [
-		{
-			id: "d15c0000-0000-4000-8000-000000000001",
-			destination: "APPROVED_REVIEW_PACKAGE",
-			state: "PENDING",
-			attemptCount: 2,
-			nextAttemptAt: minutesAfter(10),
-			lastError: "GitHub answered 502 Bad Gateway while the line comment was posted.",
-			createdAt: hoursBefore(5),
-			updatedAt: hoursBefore(4),
-		},
-	],
-	proposedPlacements: [
-		{ type: "SUMMARY", body: "Review summary" },
-		{
-			type: "INLINE",
-			body: "Use the established retry boundary here.",
-			path: "server/src/main/java/example/LongProviderBoundaryName.java",
-			startLine: 118,
-		},
-	],
-	approval: {
-		decision: "APPROVED",
-		actorAccountId: 7,
-		decidedBy: "Ada Admin",
-		decidedAt: hoursBefore(5),
-	},
-};
-
-const rejected: ReviewFeedbackDetail = {
-	...partiallyDelivered,
-	deliveryState: "DISCARDED",
-	placements: [],
-	dispatches: [],
-	approval: {
-		decision: "REJECTED",
-		actorAccountId: 8,
-		decidedBy: "Grace Admin",
-		decidedAt: hoursBefore(4),
-		rejectionReason: "MISSING_CONTEXT",
-		rejectionNote: "The review did not account for the provider's retry contract.",
-	},
-};
-
-/** A proposal: the exact summary and line comments approval would send, written against a revision. */
-const awaitingApproval: ReviewFeedbackDetail = {
-	...reviewFeedbackDetail,
-	reviewedWork: reviewArtifact.reviewedWork,
-	deliveryState: "AWAITING_APPROVAL",
-	deliveredAt: undefined,
-	suppressionReason: undefined,
-	placements: [],
-	proposedPlacements: [
-		{ type: "SUMMARY", body: reviewFeedbackDetail.body ?? "Review summary" },
-		{
-			type: "INLINE",
-			body: "Catch the expected transport error and let programming errors surface.",
-			path: "src/main/java/example/RetryService.java",
-			startLine: 48,
-		},
-		{
-			type: "INLINE",
-			body: "Explain why this branch changes behavior.",
-			path: "src/main/java/example/ReviewHandler.java",
-			startLine: 91,
-			endLine: 94,
-		},
-	],
-	reviewedRevision: "27f4e88c9f5a",
-};
-
-/**
- * One piece of feedback's sheet, over the list it was opened from or over a trace, in the order
- * every record sheet has: a status line, What it is, State and history (composed, decided,
- * withheld with its precise reason, delivered with each comment's permalink, withdrawn, disputed),
- * what it says and its own delivery checks, Technical (closed) and the actions. It is titled by its
- * first line, as its row is. It links to no other record: the observations it was written from
- * are its trace.
- *
- * Feedback awaiting approval is the same level: the package is expanded, because approving it
- * unread is the failure to design out, and the decision is the footer like every sheet's actions.
- */
 const meta = {
 	component: FeedbackLevel,
 	parameters: { layout: "fullscreen" },
@@ -159,80 +74,78 @@ async function expectHeaderChip(panel: HTMLElement, label: string) {
 	await expect(precedes(within(panel).getByRole("heading", { level: 2 }), chip)).toBe(true);
 }
 
-export const NotDelivered: Story = {
+/** The sheet's title: the developer and where the feedback goes, never its text. */
+function titleOf(feedback: ReviewFeedbackDetail): string {
+	const where = FEEDBACK_LOCATION_DEFS[feedback.location].label;
+	return `For ${developerLabel(feedback.developer)} · ${where}`;
+}
+
+function history(panel: HTMLElement) {
+	return within(within(panel).getByRole("list", { name: "History" }));
+}
+
+export const Withheld: Story = {
 	play: async () => {
 		const panelElement = await settledDrawerPanel();
 		const panel = within(panelElement);
-		// Titled by its first line, as its row on the Feedback list is.
-		await expect(panel.getByRole("heading", { level: 2 })).not.toHaveTextContent(/^Feedback for /u);
+		// Titled by who it is for and where it goes, as its row is named; its text is said once, below.
+		const heading = panel.getByRole("heading", { level: 2 });
+		await expect(heading).toHaveTextContent(titleOf(reviewFeedbackDetail));
+		await expect(heading).not.toHaveTextContent(/public response/u);
 		await expectHeaderChip(panelElement, "Withheld");
-		await expect(
-			panel.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent),
-		).toStrictEqual([
+		const sections = [
 			SHEET_SECTIONS.what,
 			SHEET_SECTIONS.state,
 			"What it says",
+			"Checks",
 			SHEET_SECTIONS.technical,
-		]);
-		// The sheet is the feedback alone: no story, and no link to another record or list.
+		];
 		await expect(
-			panel.queryByRole("group", { name: "How this came about" }),
-		).not.toBeInTheDocument();
+			panel
+				.getAllByRole("heading", { level: 3 })
+				.map((sectionHeading) => sectionHeading.textContent)
+				.filter((text) => sections.includes(text)),
+		).toStrictEqual(sections);
+		// A sheet links its own relatives only: the results and problems the feedback rests on. A
+		// reference with nowhere to go has no address.
 		for (const link of panel.queryAllByRole("link")) {
-			await expect(String(link.getAttribute("href"))).not.toMatch(/detail=|\/reviews\//u);
+			await expect(String(link.getAttribute("href"))).toMatch(
+				/^(?:https:\/\/|null$)|\?detail=(?:result|problem):[^&]+$/u,
+			);
 		}
-		panel.getByText("Found while reviewing past work, which is measured but never sent.");
-		// A record, not a proposal: nothing is left to decide.
+		history(panelElement).getByText(
+			"Found while reviewing past work, which is measured but never sent.",
+		);
 		await expect(
 			panel.queryByRole("button", { name: "Approve for delivery" }),
 		).not.toBeInTheDocument();
-	},
-};
-
-/** A comment's permalink is the sheet's one link out besides the work. */
-export const DeliveredWithPermalink: Story = {
-	args: {
-		feedback: ready({
-			...delivered,
-			placements: delivered.placements.map((placement) => ({
-				...placement,
-				postedCommentUrl: `https://github.com/ls1intum/Hephaestus/pull/1431#discussion_r${placement.postedCommentRef ?? "1"}`,
-			})),
-		}),
-	},
-	play: async () => {
-		const panel = within(await settledDrawerPanel());
-		const [link] = panel.getAllByRole("link", { name: /Open the comment/u });
-		await expect(link).toHaveAttribute("href", expect.stringContaining("#discussion_r"));
-		// The comment links there, so its delivery does not link there a second time.
-		await expect(panel.queryByRole("link", { name: "Open what was posted" })).toBeNull();
+		await expect(
+			panel.queryByRole("button", { name: "Withdraw feedback" }),
+		).not.toBeInTheDocument();
 	},
 };
 
 export const Delivered: Story = {
-	args: { feedback: ready(delivered) },
+	args: { feedback: ready(approvedFeedbackDetail) },
 	play: async () => {
 		const panelElement = await settledDrawerPanel();
 		const panel = within(panelElement);
 		await expectHeaderChip(panelElement, "Delivered");
-		// Each comment where it was posted, once, in the history.
-		panel.getByText("As an inline note");
-		panel.getByText("server/application/src/main/resources/application.yml:118–120");
-		// Its sent delivery is that "Delivered" event, not a second event saying it was sent; the
-		// link to what it posted joins the event.
-		const history = within(panel.getByRole("list", { name: "History" }));
-		await expect(history.queryByText("Sent")).toBeNull();
-		// Composed and Delivered, each one event; the comments it lists are not events.
-		await expect(panelElement.querySelectorAll("[data-sheet-event]")).toHaveLength(2);
-		history.getByRole("link", { name: /Open what was posted/u });
+		const events = history(panelElement);
+		events.getByText("Approved");
+		events.getByText("by Grace Hopper");
+		events.getByText("Summary posted");
+		await expect(events.getByRole("link", { name: /Open the comment/u })).toHaveAttribute(
+			"href",
+			expect.stringContaining("#issuecomment-"),
+		);
+		await expect(events.queryByText("Done")).toBeNull();
+		events.getByText("Answered");
+		events.getByText("Helpful");
 		// Where it went, by provider: once, among What it is.
-		panel.getByText(/^Comment on Git(?:Hub|Lab) (?:pull|merge) request/u);
-		await expect(panel.queryByText(/^On Git(?:Hub|Lab)$/u)).toBeNull();
+		panel.getByText(/^Comment on GitHub pull request/u);
 		await expect(panel.queryByRole("button", { name: "Reject feedback" })).not.toBeInTheDocument();
-		// Only a practice-page card can be withdrawn; a note on the work offers no such action.
-		await expect(
-			panel.queryByRole("button", { name: "Withdraw feedback" }),
-		).not.toBeInTheDocument();
+		await expect(panel.getByRole("button", { name: "Withdraw feedback" })).toBeEnabled();
 	},
 };
 
@@ -242,7 +155,15 @@ export const Delivered: Story = {
  */
 export const DeliveredSummaryComment: Story = {
 	args: {
-		feedback: ready({ ...delivered, body: POSTED_SUMMARY_COMMENT, proposedPlacements: [] }),
+		feedback: ready({
+			...approvedFeedbackDetail,
+			destination: "ON_WORK",
+			body: POSTED_SUMMARY_COMMENT,
+			copies: approvedFeedbackDetail.copies.map((copy) => ({
+				...copy,
+				body: POSTED_SUMMARY_COMMENT,
+			})),
+		}),
 	},
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
@@ -255,46 +176,189 @@ export const DeliveredSummaryComment: Story = {
 	},
 };
 
-/**
- * On GitLab a note proposed for some lines is posted as a comment on the merge request that links to
- * them, and the sheet says so rather than calling it an inline note.
- */
-export const DeliveredAsCommentsLinkingToLines: Story = {
+export const PartialPackage: Story = {
+	args: { feedback: ready(partialPackageFeedbackDetail) },
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		await expect(panelElement.querySelector("[data-sheet-status]")).toHaveTextContent(
+			/1 posted · 2 failed/u,
+		);
+		const events = history(panelElement);
+		events.getByText("Summary posted");
+		await expect(events.getAllByText("Line note failed")).toHaveLength(2);
+		events.getByText("ReviewQueryService.java:116–119");
+		await expect(events.getAllByText(/the line is no longer part of the diff/u)).toHaveLength(2);
+		events.getByText("Waiting to be sent");
+		events.getByText("Post the copies · 2 attempts");
+		events.getByText(/Next attempt/u);
+		events.getByText(/422 for both line notes/u);
+	},
+};
+
+export const Disagreed: Story = {
+	args: { feedback: ready({ ...longFeedbackDetail, destination: "ON_WORK" }) },
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		await expectHeaderChip(panelElement, "Disagreed");
+		const events = history(panelElement);
+		events.getByText("Disagreed");
+		events.getByText("The two cases share a cause, so one status is right here.");
+		await expect(events.queryByText(/Marked incorrect/u)).toBeNull();
+		within(panelElement).getByText(/While the developer’s disagreement stands/u);
+	},
+};
+
+export const ClearedResponse: Story = {
 	args: {
 		feedback: ready({
-			...delivered,
-			placements: [
-				{ id: "p1", placementType: "SUMMARY", postedCommentRef: "2481933" },
-				{ id: "p2", placementType: "LOCATION_COMMENT", postedCommentRef: "2481934" },
-			],
+			...longFeedbackDetail,
+			disagreedAt: null,
+			response: { resolution: null, usefulness: null, comment: null, createdAt: null },
 		}),
 	},
 	play: async () => {
 		const panelElement = await settledDrawerPanel();
+		const events = history(panelElement);
+		await expect(events.queryByText("Disagreed")).toBeNull();
+		await expect(events.queryByText("Answered")).toBeNull();
 		await expect(
-			within(panelElement).getAllByText(/As a comment linking to the lines/u).length,
-		).toBeGreaterThan(0);
-		await expect(panelElement.textContent).not.toContain("As an inline note");
+			within(panelElement).queryByText(/While the developer’s disagreement stands/u),
+		).toBeNull();
 	},
 };
 
-/** The change got a new push after its review, so what was not yet posted stayed back. */
-export const WithheldAfterTheChangeWasUpdated: Story = {
+// An uncertain provider write must be checked before another send.
+export const UncertainWrite: Story = {
+	args: { feedback: ready(uncertainWriteFeedbackDetail) },
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		await expectHeaderChip(panelElement, "Ready to send");
+		const events = history(panelElement);
+		events.getByText("Not confirmed");
+		events.getByText("Summary writing");
+		events.getByText(/The connection closed before GitHub answered/u);
+		within(panelElement).getByText(
+			"A write was not confirmed. The provider is checked before anything is posted again.",
+		);
+	},
+};
+
+export const DeliveryFailed: Story = {
+	args: { feedback: ready(failedFeedbackDetail) },
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		await expectHeaderChip(panelElement, "Failed to deliver");
+		const events = history(panelElement);
+		events.getByText("Stopped trying");
+		events.getByText("Summary failed");
+		events.getByText("Post the copies · 5 attempts");
+		await expect(events.getAllByText(/Resource not accessible by integration/u).length).toBe(2);
+		await expect(events.queryByText(/Next attempt/u)).toBeNull();
+	},
+};
+
+export const WithheldResultMarkedIncorrect: Story = {
+	args: { feedback: ready(markedIncorrectFeedbackDetail) },
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		await expectHeaderChip(panelElement, "Withheld");
+		history(panelElement).getByText(
+			"A workspace admin marked a result behind it as incorrect, so nothing more of it was sent.",
+		);
+	},
+};
+
+export const WithheldAfterTheWorkChanged: Story = {
 	args: {
 		feedback: ready({
-			...delivered,
-			deliveryState: "SUPPRESSED",
-			suppressionReason: "REVIEWED_REVISION_CHANGED",
-			deliveredAt: undefined,
-			placements: [],
-			dispatches: [],
+			...approvedFeedbackDetail,
+			state: "WITHHELD",
+			stopReason: "REVIEWED_VERSION_CHANGED",
+			deliveredAt: null,
+			copies: approvedFeedbackDetail.copies.map((copy) => ({
+				...copy,
+				state: "WITHHELD" as const,
+				stopReason: "REVIEWED_VERSION_CHANGED" as const,
+				postedAt: null,
+				externalRef: null,
+				externalUrl: null,
+			})),
+			sends: [],
+			response: null,
 		}),
 	},
 	play: async () => {
-		const panel = within(await settledDrawerPanel());
+		const events = history(await settledDrawerPanel());
 		await expect(
-			panel.getAllByText("The change was updated before this feedback could be posted.").length,
-		).toBeGreaterThan(0);
+			events.getAllByText("The work changed before this feedback could be posted."),
+		).toHaveLength(1);
+		events.getByText("Summary withheld");
+	},
+};
+
+export const Replaced: Story = {
+	args: { feedback: ready(replacedFeedbackDetail) },
+	play: async () => {
+		await expectHeaderChip(await settledDrawerPanel(), "Replaced by newer");
+	},
+};
+
+export const Rejected: Story = {
+	args: { feedback: ready(rejectedFeedbackDetail) },
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		await expectHeaderChip(panelElement, "Rejected");
+		const events = history(panelElement);
+		events.getByText("Rejected");
+		events.getByText("by Grace Hopper");
+		await expect(events.getByText(/Not useful to the developer/u)).toBeVisible();
+		events.getByText(/The long comment already covers the test names/u);
+	},
+};
+
+export const DecidedByAnErasedAccount: Story = {
+	args: {
+		feedback: ready({
+			...rejectedFeedbackDetail,
+			decisions: rejectedFeedbackDetail.decisions.map((decision) => ({
+				...decision,
+				actor: null,
+			})),
+		}),
+	},
+	play: async () => {
+		await expect(
+			history(await settledDrawerPanel()).getByText(/an account that no longer exists/u),
+		).toBeVisible();
+	},
+};
+
+export const Withdrawn: Story = {
+	args: { feedback: ready(withdrawnFeedbackDetail) },
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		const panel = within(panelElement);
+		await expectHeaderChip(panelElement, "Withdrawn");
+		panel.getByText(/It is off the developer’s practice pages/u);
+		await expect(panel.queryByRole("alert")).toBeNull();
+		await expect(panel.getByRole("button", { name: "Restore feedback" })).toBeEnabled();
+		const events = history(panelElement);
+		events.getByText("Withdrawn");
+		events.getByText(/Already covered elsewhere/u);
+	},
+};
+
+export const Restored: Story = {
+	args: { feedback: ready(restoredFeedbackDetail) },
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		const events = history(panelElement);
+		events.getByText("Withdrawn");
+		events.getByText("Restored");
+		events.getByText(/The result stands after all/u);
+		await expect(
+			within(panelElement).getByRole("button", { name: "Withdraw feedback" }),
+		).toBeEnabled();
 	},
 };
 
@@ -303,11 +367,11 @@ export const WithdrawFeedback: Story = {
 	args: { feedback: ready(practicePageCard) },
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ args, userEvent }) => {
-		const panel = within(await settledDrawerPanel());
+		const panelElement = await settledDrawerPanel();
+		const panel = within(panelElement);
 		// The text is private to the developer, and is not reported as never composed.
-		panel.getByText(
-			/written for the developer’s own practice pages and is withheld from operators/u,
-		);
+		panel.getByText(/written for the developer’s own practice pages and is withheld from admins/u);
+		await expect(panelElement.textContent).not.toContain(PRIVATE_FEEDBACK_TEXT);
 		panel.getByText("Card on their practice pages");
 		await userEvent.click(panel.getByRole("button", { name: "Withdraw feedback" }));
 		const reason = await screen.findByRole("textbox", { name: "Reason" });
@@ -352,152 +416,43 @@ export const WithdrawFeedbackFails: Story = {
 	},
 };
 
-/** A disputed card shows the developer's explanation above what became of it, never the card's text. */
-export const Disputed: Story = {
+// Without an appearance receipt, a conversation link cannot establish delivery.
+export const DeliveryUnconfirmed: Story = {
+	args: { feedback: ready(unconfirmedFeedbackDetail) },
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		await expectHeaderChip(panelElement, "Delivery unconfirmed");
+		within(panelElement).getByText(/so it does not count as delivered/u);
+		await expect(history(panelElement).queryByText("Delivered")).toBeNull();
+	},
+};
+
+export const ReadyForConversation: Story = {
+	args: { feedback: ready(feedbackDetail("11111111-4444-4444-4444-444444444444")) },
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		await expectHeaderChip(panelElement, "Ready for conversation");
+		within(panelElement).getByText("For a conversation with Heph");
+		within(panelElement).getByText(/which is what delivers it/u);
+	},
+};
+
+export const ReadyForPracticePages: Story = {
 	args: {
-		feedback: ready({
-			...practicePageCard,
-			dispute: {
-				feedbackId: practicePageCard.id,
-				channel: "IN_APP",
-				explanation: "This was about a branch I did not write.",
-				disputedAt: hoursBefore(1),
-			},
-		}),
-	},
-	play: async () => {
-		const panel = within(await settledDrawerPanel());
-		panel.getByText("Disputed by the developer");
-		panel.getByText("This was about a branch I did not write.");
-		await expect(panel.queryByRole("alert")).toBeNull();
-		panel.getByText(
-			/written for the developer’s own practice pages and is withheld from operators/u,
-		);
-		panel.getByRole("button", { name: "Withdraw feedback" });
-	},
-};
-
-/** Withdrawn again after a restore: the level offers the restore, and the earlier round stays listed. */
-export const Withdrawn: Story = {
-	args: {
-		feedback: ready({
-			...practicePageCard,
-			withdrawals: [
-				{
-					id: "wd-2",
-					reason: "It describes issues from before this pull request.",
-					withdrawnAt: hoursBefore(2),
-					withdrawnBy: "Ada Admin",
-				},
-				{
-					id: "wd-1",
-					reason: "Looked wrong at first.",
-					withdrawnAt: daysBefore(3),
-					withdrawnBy: "Ada Admin",
-					restorationReason: "It was about this pull request after all.",
-					restoredAt: daysBefore(2),
-				},
-			],
-		}),
+		feedback: ready({ ...practicePageCard, state: "READY", deliveredAt: null }),
 	},
 	play: async () => {
 		const panelElement = await settledDrawerPanel();
-		const panel = within(panelElement);
-		await expectHeaderChip(panelElement, "Withdrawn");
-		panel.getByText(/It is off the developer’s practice pages/u);
-		await expect(panel.queryByRole("alert")).toBeNull();
-		await expect(panel.getByRole("button", { name: "Restore feedback" })).toBeEnabled();
-		const history = within(panel.getByRole("list", { name: "History" }));
-		await expect(history.getAllByText("Withdrawn")).toHaveLength(2);
-		await expect(history.getAllByText("Restored")).toHaveLength(1);
-		// The erased restorer is named as such, not left blank.
-		await expect(history.getByText(/an account that no longer exists/u)).toBeVisible();
+		await expectHeaderChip(panelElement, "Ready for their practice pages");
+		await expect(
+			within(panelElement).getByText(/counts as delivered when they open it/u),
+		).toBeVisible();
+		await expect(within(panelElement).queryByText(/tried again/u)).toBeNull();
 	},
 };
 
-export const PartiallyDelivered: Story = {
-	args: { feedback: ready(partiallyDelivered) },
-	play: async () => {
-		const panelElement = await settledDrawerPanel();
-		const panel = within(panelElement);
-		await expect(panelElement.querySelector("[data-sheet-status]")).toHaveTextContent(
-			/1 of 2 delivered/u,
-		);
-		panel.getByText("Approved");
-		// Named, not "Account 7".
-		panel.getByText("by Ada Admin");
-		await expect(panel.queryByText(/Account 7/u)).toBeNull();
-		// Its delivery: how often it was tried, when next, and the provider's last answer.
-		const history = within(panel.getByRole("list", { name: "History" }));
-		history.getByText("Waiting to be sent");
-		history.getByText(/The approved comments · 2 attempts/u);
-		history.getByText(/Next attempt/u);
-		history.getByText(/502 Bad Gateway/u);
-	},
-};
-
-/**
- * A delivery that gave up says how often it was tried and what the provider last answered, under
- * the outcome rather than as a second outcome.
- */
-export const DeliveryFailed: Story = {
-	args: {
-		feedback: ready({
-			...delivered,
-			deliveryState: "FAILED",
-			deliveredAt: undefined,
-			placements: [],
-			dispatches: [
-				{
-					id: "d15c0000-0000-4000-8000-000000000002",
-					destination: "AUTOMATIC_REVIEW_PACKAGE",
-					state: "FAILED",
-					attemptCount: 5,
-					lastError: "GitHub answered 403: Resource not accessible by integration.",
-					createdAt: hoursBefore(6),
-					updatedAt: hoursBefore(5),
-				},
-			],
-		}),
-	},
-	play: async () => {
-		const panelElement = await settledDrawerPanel();
-		const panel = within(panelElement);
-		// The outcome once, on the status line; the history says what became of the delivery and why,
-		// not "Failed" a second time.
-		await expectHeaderChip(panelElement, "Failed to deliver");
-		const history = within(panel.getByRole("list", { name: "History" }));
-		history.getByText("Stopped trying");
-		await expect(history.queryByText(/Failed/u)).toBeNull();
-		history.getByText("The review’s comments · 5 attempts");
-		history.getByText(/Resource not accessible by integration/u);
-		// Nothing is tried again, so no next attempt.
-		await expect(history.queryByText(/Next attempt/u)).toBeNull();
-		panel.getByText("d15c0000-0000-4000-8000-000000000002");
-	},
-};
-
-export const Rejected: Story = {
-	args: { feedback: ready(rejected) },
-	play: async () => {
-		const panelElement = await settledDrawerPanel();
-		const panel = within(panelElement);
-		await expectHeaderChip(panelElement, "Rejected");
-		// Said once, in the status line; the history names who decided and why.
-		await expect(panel.getAllByText("Rejected")).toHaveLength(2);
-		panel.getByText("by Grace Admin");
-		// The category is the registry's words, not the stored value.
-		await expect(panel.getByText(/Missing important context/u)).toBeVisible();
-		panel.getByText(/The review did not account for the provider's retry contract/u);
-	},
-};
-
-/**
- * The longest realistic record, at the narrowest width: a rendered body with code, and every
- * observation it was based on.
- */
 export const Reflow: Story = {
-	args: { feedback: ready(longFeedbackDetail) },
+	args: { feedback: ready({ ...longFeedbackDetail, destination: "ON_WORK" }) },
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
 	play: async () => {
 		await expectNoPanelOverflow(await settledDrawerPanel());
@@ -506,7 +461,7 @@ export const Reflow: Story = {
 
 /** Long feedback reads whole, Rendered or as its Source. */
 export const LongFeedback: Story = {
-	args: { feedback: ready(longFeedbackDetail) },
+	args: { feedback: ready({ ...longFeedbackDetail, destination: "ON_WORK" }) },
 	play: async ({ userEvent }) => {
 		const panel = within(await settledDrawerPanel());
 		const rendered = panel.getByRole("tabpanel", { name: "Rendered" });
@@ -516,53 +471,16 @@ export const LongFeedback: Story = {
 	},
 };
 
-export const PreparedForConversation: Story = {
-	args: { feedback: ready(feedbackDetail("11111111-4444-4444-4444-444444444444")) },
-	play: async () => {
-		const panelElement = await settledDrawerPanel();
-		await expectHeaderChip(panelElement, "Prepared for conversation");
-		within(panelElement).getByText("For a conversation with Heph");
-		// The conversation names it in the facts.
-		within(panelElement).getAllByText("#engineering");
-	},
-};
-
-/**
- * A practice pages card not opened yet. Nothing is retried on this channel, so the sheet says the
- * developer opening it is the delivery, never that comments are tried again.
- */
-export const PreparedForPracticePages: Story = {
-	args: {
-		feedback: ready({ ...practicePageCard, deliveryState: "PREPARED", deliveredAt: undefined }),
-	},
-	play: async () => {
-		const panelElement = await settledDrawerPanel();
-		await expectHeaderChip(panelElement, "Prepared for their practice pages");
-		await expect(
-			within(panelElement).getByText(/counts as delivered when they open it/u),
-		).toBeVisible();
-		await expect(within(panelElement).queryByText(/tried again/u)).toBeNull();
-	},
-};
-
-/**
- * Awaiting approval, the level leads with what approval authorizes and ends in the decision. What
- * will be sent is expanded — one summary and every line comment — rather than behind a disclosure.
- */
 export const AwaitingApproval: Story = {
-	args: { feedback: ready(awaitingApproval) },
+	args: { feedback: ready(awaitingApprovalFeedbackDetail) },
 	play: async ({ args, userEvent }) => {
 		const panel = within(await settledDrawerPanel());
+		await expect(panel.getByText(/Approval authorizes every copy above/u)).toBeVisible();
+		await expect(panel.getByText(/^A summary, a line note,? and a file note$/u)).toBeVisible();
 		await expect(
-			panel.getByText(/Approval authorizes the summary and every line comment above/u),
+			panel.getByText(/This name says the delay doubles, which is the rule a reader needs/u),
 		).toBeVisible();
-		await expect(panel.getByText("1 summary and 2 line comments")).toBeVisible();
-		await expect(panel.getByText("src/main/java/example/RetryService.java")).toBeVisible();
-		await expect(panel.getByText("27f4e88c9f5a")).toBeVisible();
-		// The record's own sections wait until there is a record: nothing has become of it yet.
-		await expect(
-			panel.queryByRole("heading", { name: "What became of it" }),
-		).not.toBeInTheDocument();
+		panel.getByText("It waits for a workspace admin to approve or reject it.");
 
 		// The decision is the footer, like every sheet's actions, so it stays in reach under the package.
 		const approve = panel.getByRole("button", { name: "Approve for delivery" });
@@ -574,34 +492,8 @@ export const AwaitingApproval: Story = {
 	},
 };
 
-/**
- * On GitLab the line notes go up as comments on the merge request that link to their lines, so the
- * preview says that, while the package below still shows each note at the lines it was written for.
- */
-export const AwaitingApprovalOnGitLab: Story = {
-	args: {
-		feedback: ready({
-			...awaitingApproval,
-			reviewedWork: {
-				id: "425",
-				kind: "scm.pull_request",
-				label: "!425",
-				provider: "GITLAB",
-				container: "acme/api",
-			},
-		}),
-	},
-	play: async () => {
-		const panel = within(await settledDrawerPanel());
-		await expect(panel.getByText("1 summary and 2 comments linking to lines")).toBeVisible();
-		panel.getByText("As a comment linking to the lines on the work");
-		await expect(panel.queryByText("As an inline note on the work")).not.toBeInTheDocument();
-		await expect(panel.getByText("src/main/java/example/RetryService.java")).toBeVisible();
-	},
-};
-
 export const AwaitingApprovalReflow: Story = {
-	args: { feedback: ready(awaitingApproval) },
+	args: { feedback: ready(awaitingApprovalFeedbackDetail) },
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
 	play: async () => {
 		const panel = await settledDrawerPanel();
@@ -619,7 +511,7 @@ const NEXT_ID = "aaaaaaaa-0000-4000-8000-000000000003";
  */
 export const InApprovalQueue: Story = {
 	args: {
-		feedback: ready(awaitingApproval),
+		feedback: ready(awaitingApprovalFeedbackDetail),
 		queue: { position: 2, total: 7, previous: PREVIOUS_ID, next: NEXT_ID },
 	},
 	play: async ({ args, userEvent }) => {
@@ -644,7 +536,7 @@ export const InApprovalQueue: Story = {
  */
 export const LastInApprovalQueue: Story = {
 	args: {
-		feedback: ready(awaitingApproval),
+		feedback: ready(awaitingApprovalFeedbackDetail),
 		queue: { position: 7, total: 7, previous: PREVIOUS_ID },
 	},
 	play: async () => {
@@ -658,7 +550,7 @@ export const LastInApprovalQueue: Story = {
 /** The only one awaiting approval: no steps to take, and approving it closes the level. */
 export const OnlyInApprovalQueue: Story = {
 	args: {
-		feedback: ready(awaitingApproval),
+		feedback: ready(awaitingApprovalFeedbackDetail),
 		queue: { position: 1, total: 1 },
 	},
 	play: async () => {
@@ -707,9 +599,8 @@ export const InApprovalQueueReflow: Story = {
 	},
 };
 
-/** A proposal with no package has nothing to authorize, so only rejection is offered. */
 export const PackageUnavailable: Story = {
-	args: { feedback: ready({ ...awaitingApproval, proposedPlacements: [] }) },
+	args: { feedback: ready({ ...awaitingApprovalFeedbackDetail, copies: [] }) },
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
 		await expect(panel.getByRole("alert")).toHaveTextContent("This review package is unavailable");
@@ -718,17 +609,8 @@ export const PackageUnavailable: Story = {
 	},
 };
 
-/** Nothing to check it against is worth saying, and is not a reason to withhold the decision. */
-export const AwaitingApprovalWithoutObservations: Story = {
-	args: { feedback: ready({ ...awaitingApproval, observations: [] }) },
-	play: async () => {
-		const panel = within(await settledDrawerPanel());
-		await expect(panel.getByRole("button", { name: "Approve for delivery" })).toBeEnabled();
-	},
-};
-
 export const RejectingWithContext: Story = {
-	args: { feedback: ready(awaitingApproval) },
+	args: { feedback: ready(awaitingApprovalFeedbackDetail) },
 	play: async ({ args, userEvent }) => {
 		const panel = within(await settledDrawerPanel());
 		await userEvent.click(panel.getByRole("button", { name: "Reject feedback" }));
@@ -749,7 +631,7 @@ export const RejectingWithContext: Story = {
 };
 
 export const Deciding: Story = {
-	args: { feedback: ready(awaitingApproval), isDeciding: true },
+	args: { feedback: ready(awaitingApprovalFeedbackDetail), isDeciding: true },
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
 		await expectGenuinelyDisabled(panel.getByRole("button", { name: "Approve for delivery" }));
@@ -788,5 +670,156 @@ export const LoadFailed: Story = {
 		// With no record to name it, the level is named for what it is.
 		await expect(screen.getByRole("dialog")).toHaveAccessibleName("Feedback");
 		await expect(panel.getByRole("button", { name: "Retry" })).toBeEnabled();
+	},
+};
+
+export const HiddenSource: Story = {
+	args: {
+		feedback: ready({
+			...partialPackageFeedbackDetail,
+			textHidden: true,
+			body: null,
+			bodyPreview: null,
+		}),
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		panel.getByRole("heading", { level: 2, name: titleOf(partialPackageFeedbackDetail) });
+		panel.getByText("Feedback text is hidden because access to its sources could not be verified.");
+		await expect(panel.queryByText(/No feedback text is recorded/u)).toBeNull();
+	},
+};
+
+const [basisSource] = reviewFeedbackDetail.basis;
+if (basisSource === undefined) {
+	throw new Error("The feedback fixtures must rest on a result");
+}
+const RESULT_ID = basisSource.resultId;
+const SUMMARY = resultSummary(basisSource.result);
+const PRACTICE = basisSource.result.practiceName;
+const OTHER_RESULT_ID = "cccccccc-0000-4000-8000-000000000001";
+const UNAVAILABLE_RESULT_ID = "cccccccc-0000-4000-8000-000000000002";
+const PROBLEM_ID = "dddddddd-0000-4000-8000-000000000001";
+const SECOND_PROBLEM_ID = "dddddddd-0000-4000-8000-000000000002";
+const OTHER_PROBLEM_ID = "dddddddd-0000-4000-8000-000000000003";
+
+/** The feedback, resting on each basis in the order given. */
+function restingOn(basis: Omit<FeedbackBasis, "ordinal">[]): ReviewFeedbackDetail {
+	return { ...reviewFeedbackDetail, basis: basis.map((entry, ordinal) => ({ ...entry, ordinal })) };
+}
+
+function basisEntries(panel: HTMLElement): HTMLElement[] {
+	return within(within(panel).getByRole("list", { name: "Based on" })).getAllByRole("listitem");
+}
+
+/**
+ * Feedback that rests on a whole result and on one problem of the same result names that result
+ * once, with both bases under it. The technical facts still list each basis.
+ */
+export const BasedOnAResultAndOneOfItsProblems: Story = {
+	args: {
+		feedback: ready(
+			restingOn([
+				{ resultId: RESULT_ID, problemId: null, result: basisSource.result },
+				{ resultId: RESULT_ID, problemId: PROBLEM_ID, result: basisSource.result },
+			]),
+		),
+	},
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		const [entry, ...others] = basisEntries(panelElement);
+		if (entry === undefined) {
+			throw new Error("The feedback names no result it rests on");
+		}
+		await expect(others).toHaveLength(0);
+		const result = within(entry);
+		await expect(result.getAllByRole("link", { name: SUMMARY })).toHaveLength(1);
+		await expect(entry).toHaveTextContent(
+			`${PRACTICE} · The whole result · One problem of this result`,
+		);
+		await expect(levelsOpenedBy(result.getByRole("link", { name: SUMMARY }))).toEqual([
+			`result:${RESULT_ID}`,
+		]);
+		await expect(
+			levelsOpenedBy(result.getByRole("link", { name: `One problem of this result: ${SUMMARY}` })),
+		).toEqual([`problem:${PROBLEM_ID}`]);
+		const panel = within(panelElement);
+		await expect(panel.getByRole("button", { name: "Copy basis result 1" })).toBeVisible();
+		await expect(panel.getByRole("button", { name: "Copy basis result 2" })).toBeVisible();
+		await expect(panel.getByRole("button", { name: "Copy basis problem 2" })).toBeVisible();
+		await expect(panel.getByText(PROBLEM_ID)).toBeVisible();
+	},
+};
+
+/**
+ * Each result once, in the order the feedback first names it: several problems of one result each
+ * open their own, another result with the same summary keeps its own entry, and a result whose text
+ * is unavailable still opens.
+ */
+export const BasedOnSeveralResults: Story = {
+	args: {
+		feedback: ready(
+			restingOn([
+				{ resultId: RESULT_ID, problemId: PROBLEM_ID, result: basisSource.result },
+				{
+					resultId: OTHER_RESULT_ID,
+					problemId: OTHER_PROBLEM_ID,
+					result: { ...basisSource.result, id: OTHER_RESULT_ID },
+				},
+				{ resultId: RESULT_ID, problemId: null, result: basisSource.result },
+				{ resultId: RESULT_ID, problemId: SECOND_PROBLEM_ID, result: basisSource.result },
+				{
+					resultId: UNAVAILABLE_RESULT_ID,
+					problemId: null,
+					result: { ...basisSource.result, id: UNAVAILABLE_RESULT_ID, summary: null },
+				},
+			]),
+		),
+	},
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		const [first, second, third, ...others] = basisEntries(panelElement);
+		if (first === undefined || second === undefined || third === undefined) {
+			throw new Error("The feedback names fewer than three results");
+		}
+		await expect(others).toHaveLength(0);
+
+		// Two results with the same summary are still two entries, each opening its own result.
+		await expect(
+			within(panelElement)
+				.getAllByRole("link", { name: SUMMARY })
+				.map((link) => levelsOpenedBy(link)),
+		).toEqual([[`result:${RESULT_ID}`], [`result:${OTHER_RESULT_ID}`]]);
+
+		const result = within(first);
+		await expect(result.getAllByRole("link", { name: SUMMARY })).toHaveLength(1);
+		await expect(first).toHaveTextContent(
+			`${PRACTICE} · The whole result · One problem of this result · Another problem of this result`,
+		);
+		for (const [name, problemId] of [
+			[`One problem of this result: ${SUMMARY} (reference 1 of 2)`, PROBLEM_ID],
+			[`Another problem of this result: ${SUMMARY} (reference 2 of 2)`, SECOND_PROBLEM_ID],
+		] as const) {
+			await expect(levelsOpenedBy(result.getByRole("link", { name }))).toEqual([
+				`problem:${problemId}`,
+			]);
+		}
+
+		const other = within(second);
+		await expect(other.getAllByRole("link", { name: SUMMARY })).toHaveLength(1);
+		await expect(second).toHaveTextContent(`${PRACTICE} · One problem of this result`);
+		await expect(second).not.toHaveTextContent("The whole result");
+		await expect(second).not.toHaveTextContent("Another problem of this result");
+		await expect(
+			levelsOpenedBy(other.getByRole("link", { name: `One problem of this result: ${SUMMARY}` })),
+		).toEqual([`problem:${OTHER_PROBLEM_ID}`]);
+
+		const unavailable = within(third);
+		await expect(third).toHaveTextContent(`${PRACTICE} · The whole result`);
+		await expect(unavailable.getAllByRole("link")).toHaveLength(1);
+		await expect(
+			levelsOpenedBy(unavailable.getByRole("link", { name: "Result text unavailable" })),
+		).toEqual([`result:${UNAVAILABLE_RESULT_ID}`]);
+		await expectNoPanelOverflow(panelElement);
 	},
 };

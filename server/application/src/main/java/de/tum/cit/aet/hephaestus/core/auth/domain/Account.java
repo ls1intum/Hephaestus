@@ -17,21 +17,11 @@ import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.jspecify.annotations.Nullable;
+import org.springframework.modulith.NamedInterface;
 
 /**
- * The Hephaestus-native principal. One row per human (and, post-MVP, per service principal)
- * that has authenticated through any {@link IdentityLink}.
- *
- * <p>This is the entity that {@code AccountFeature.account_id},
- * preferences, sessions, exports, and audit rows reference. The git-provider mirror
- * ({@code User} in {@code integration.scm.domain.user}) is a separate, read-only entity
- * that records activity authorship — bots and organizations live there, not here.
- *
- * <h2>Email — contact only, never auth</h2>
- * {@code primary_email} is for outbound contact (account-delete confirmation when we add
- * email, security alerts, GDPR notifications). It is <em>never</em> used to look up an
- * account during login. Authentication lookup is always {@code (provider, subject)} via
- * {@link IdentityLink} — defense against the nOAuth (Descope 2023) class of attacks.
+ * One human principal across workspaces. Roster identities can own an unclaimed account. A verified
+ * sign-in claims its exact provider key. Email is contact data, never ownership proof.
  */
 @Entity
 @Table(name = "account")
@@ -47,10 +37,7 @@ public class Account {
     @Column(name = "display_name", nullable = false, length = 255)
     private String displayName;
 
-    /**
-     * Contact email (CITEXT). NEVER used for authentication lookup — see class doc.
-     * Unique among non-deleted active accounts.
-     */
+    // Contact email is never an authentication lookup key.
     @Column(name = "primary_email", columnDefinition = "citext")
     @Nullable
     private String primaryEmail;
@@ -91,10 +78,21 @@ public class Account {
     @ColumnDefault("true")
     private boolean publicActivityVisible = true;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ai_choice", length = 24)
+    private @Nullable AiChoice aiChoice;
+
+    @Column(name = "ai_choice_at")
+    private @Nullable Instant aiChoiceAt;
+
+    @Column(name = "feedback_delivery_enabled", nullable = false)
+    @ColumnDefault("true")
+    private boolean feedbackDeliveryEnabled = true;
+
     @Version
     @Column(nullable = false)
     @ColumnDefault("0")
-    private Long version = 0L;
+    private @Nullable Long version;
 
     public Account(String displayName) {
         this.displayName = displayName;
@@ -105,13 +103,12 @@ public class Account {
         APP_ADMIN,
     }
 
+    @NamedInterface("auth-types")
     public enum Status {
+        UNCLAIMED,
         ACTIVE,
         SUSPENDED,
-        /**
-         * Soft-deleted: sessions revoked and login blocked immediately; the row is purged after the
-         * 48h cooldown ({@code AccountHardDeleteSweeper}). There is no self-service recovery path today.
-         */
+        /** Sessions are revoked and login blocked immediately; erasure follows the configured cooldown. */
         DELETING,
         DELETED,
     }

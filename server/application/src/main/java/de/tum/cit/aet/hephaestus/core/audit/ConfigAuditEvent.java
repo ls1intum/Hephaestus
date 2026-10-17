@@ -4,7 +4,6 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditAction;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditActorKind;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -75,7 +74,7 @@ public class ConfigAuditEvent {
     @Column(name = "elevated_via_instance_admin", nullable = false)
     private boolean elevatedViaInstanceAdmin;
 
-    @Convert(converter = ConfigAuditEntityTypeConverter.class)
+    @Enumerated(EnumType.STRING)
     @Column(name = "entity_type", nullable = false, length = 48)
     private ConfigAuditEntityType entityType;
 
@@ -86,13 +85,7 @@ public class ConfigAuditEvent {
     @Column(name = "action", nullable = false, length = 16)
     private ConfigAuditAction action;
 
-    /**
-     * Dot-paths whose value differs between the snapshots (see {@code ConfigAuditDiff}). Persisted
-     * rather than derived because Postgres has no built-in jsonb diff, and because per-control history
-     * must filter server-side: several controls live in one entity, so a whole page may contain zero
-     * rows matching the requested control, and a client filtering after paging cannot know whether to
-     * fetch more.
-     */
+    // Store changed keys for server-side history filters; client filtering after pagination can miss matching rows.
     @JdbcTypeCode(SqlTypes.ARRAY)
     @Column(name = "changed_keys", nullable = false, columnDefinition = "text[]")
     private String[] changedKeys;

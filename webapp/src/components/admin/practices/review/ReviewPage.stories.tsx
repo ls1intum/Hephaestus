@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, waitFor, within } from "storybook/test";
+
+import type { AgentBinding } from "@/api/types.gen";
 import { expectNoPageOverflow } from "@/stories/reflow";
 import { StatefulPatch } from "@/stories/stateful";
 import type { ReviewSectionId } from "./review-sections";
@@ -12,8 +14,8 @@ const sectionBody = (id: ReviewSectionId) => (
 );
 
 const sections = {
-	"how-much": sectionBody("how-much"),
-	"when-and-where": sectionBody("when-and-where"),
+	"feedback-mode": sectionBody("feedback-mode"),
+	"automated-review": sectionBody("automated-review"),
 	"past-work": sectionBody("past-work"),
 };
 
@@ -22,7 +24,8 @@ const readyBinding = {
 	purpose: "PRACTICE_REVIEW",
 	enabled: true,
 	ready: true,
-} as const;
+	servedTiers: ["IN_HOUSE", "CLOUD"],
+} satisfies AgentBinding;
 
 const meta = {
 	component: ReviewPage,
@@ -33,9 +36,9 @@ const meta = {
 	},
 	tags: ["autodocs"],
 	args: {
-		section: "how-much",
+		section: "feedback-mode",
 		onSectionChange: fn(),
-		running: {
+		readiness: {
 			enabled: true,
 			model: { status: "ready", binding: readyBinding },
 		},
@@ -60,21 +63,21 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const HowMuch: Story = {
+export const FeedbackMode: Story = {
 	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("tab", { name: "How much" })).toHaveAttribute(
+		await expect(canvas.getByRole("tab", { name: "Feedback mode" })).toHaveAttribute(
 			"aria-selected",
 			"true",
 		);
-		await expect(canvas.getByText("Section body: how-much")).toBeVisible();
+		await expect(canvas.getByText("Section body: feedback-mode")).toBeVisible();
 		await expectNoPageOverflow();
 	},
 };
 
-export const WhenAndWhere: Story = {
-	args: { section: "when-and-where" },
+export const AutomatedReview: Story = {
+	args: { section: "automated-review" },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("Section body: when-and-where")).toBeVisible();
+		await expect(canvas.getByText("Section body: automated-review")).toBeVisible();
 		await expectNoPageOverflow();
 	},
 };
@@ -88,14 +91,16 @@ export const PastWork: Story = {
 };
 
 export const NoModelIsReady: Story = {
-	args: { running: { enabled: true, model: { status: "ready" } } },
+	args: { readiness: { enabled: true, model: { status: "ready" } } },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("status")).toHaveTextContent("Reviews cannot start");
+		await expect(canvas.getByRole("note", { name: "Practice review readiness" })).toHaveTextContent(
+			"Reviews cannot start",
+		);
 	},
 };
 
 export const StateNotKnownYet: Story = {
-	args: { running: undefined },
+	args: { readiness: undefined },
 	play: async ({ canvas }) => {
 		await expect(canvas.queryByRole("status")).not.toBeInTheDocument();
 		await expect(canvas.getByRole("tablist")).toBeVisible();
@@ -110,16 +115,16 @@ export const SectionsAreRealTabs: Story = {
 			within(list)
 				.getAllByRole("tab")
 				.map((tab) => tab.textContent),
-		).toEqual(["How much", "When and where", "Past work"]);
+		).toEqual(["Feedback mode", "Automated review", "Past work"]);
 		await expect(canvas.getAllByRole("tabpanel")).toHaveLength(1);
-		await expect(canvas.queryByText("Section body: when-and-where")).not.toBeInTheDocument();
+		await expect(canvas.queryByText("Section body: automated-review")).not.toBeInTheDocument();
 		await expect(canvas.queryByText("Section body: past-work")).not.toBeInTheDocument();
 
-		await userEvent.click(canvas.getByRole("tab", { name: "When and where" }));
-		await expect(args.onSectionChange).toHaveBeenCalledWith("when-and-where");
-		await expect(await canvas.findByText("Section body: when-and-where")).toBeVisible();
+		await userEvent.click(canvas.getByRole("tab", { name: "Automated review" }));
+		await expect(args.onSectionChange).toHaveBeenCalledWith("automated-review");
+		await expect(await canvas.findByText("Section body: automated-review")).toBeVisible();
 		await waitFor(async () =>
-			expect(canvas.queryByText("Section body: how-much")).not.toBeInTheDocument(),
+			expect(canvas.queryByText("Section body: feedback-mode")).not.toBeInTheDocument(),
 		);
 	},
 };

@@ -7,7 +7,7 @@ import org.jspecify.annotations.NonNull;
 /** One job type's slice of a month, inside {@link WorkspaceLlmUsageReportDTO}. */
 @Schema(description = "Month spend aggregated by job type")
 public record LlmUsageByJobTypeDTO(
-        @NonNull LlmUsageJobType jobType,
+        @NonNull String jobType,
 
         @NonNull @Schema(description = "Confirmed spend on shared (instance) models for this job type, in USD.")
         BigDecimal instanceTotalCostUsd,
@@ -17,8 +17,10 @@ public record LlmUsageByJobTypeDTO(
 
         @NonNull
         @Schema(
-                description = "Ledger usage records for this job type with unavailable cost because rates are missing "
-                        + "or measurements are unverified. Excluded from both totals above.")
+                description =
+                        "Runs of this job type with at least one ledger row whose cost is unavailable because a rate is missing or the measurement is unverified. A "
+                                + "practice script row counts toward the run of its review. Those rows are excluded from both "
+                                + "totals above.")
         Long unpricedEventCount,
 
         @NonNull Long inputTokens,
@@ -32,5 +34,6 @@ public record LlmUsageByJobTypeDTO(
                         + "include every assistant call in an internal tool loop.")
         Long totalCalls,
 
-        @NonNull @Schema(description = "Ledger events (jobs / mentor turns)")
+        @NonNull
+        @Schema(description = "Runs: job attempts and mentor turns. Rows of models for practice scripts are not runs.")
         Long events) {}

@@ -1,15 +1,17 @@
 import type { UIMessage } from "ai";
 import type { z } from "zod";
 
-import type { mentorStatusDataSchema, observationDataSchema } from "@/lib/chat-validation";
+import type {
+	mentorStatusDataSchema,
+	problemLinkDataSchema,
+	resultLinkDataSchema,
+} from "@/lib/chat-validation";
 
-/**
- * Mirrors `UIMessageChunk.DataObservation` and `UIMessageChunk.DataMentorStatus`; read them through
- * `shownFeedbackText` and `mentorStatus`, which check the payload.
- */
+// UI chunk payloads cross a trust boundary; read them through the shared validators.
 export interface CustomUIDataTypes {
 	[name: string]: unknown;
-	observation: z.infer<typeof observationDataSchema>;
+	result: z.infer<typeof resultLinkDataSchema>;
+	problem: z.infer<typeof problemLinkDataSchema>;
 	"mentor-status": z.infer<typeof mentorStatusDataSchema>;
 }
 

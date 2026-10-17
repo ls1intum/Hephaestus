@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.agent.catalog.CreateWorkspaceLlmConnectionRequestDTO;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmAuthMode;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditAction;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditActorKind;
@@ -11,21 +12,21 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
 import de.tum.cit.aet.hephaestus.core.tenancy.TenancyViolationException;
-import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
+import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
+import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
+import de.tum.cit.aet.hephaestus.practices.ReviewOn;
+import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
+import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.Membership;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import jakarta.persistence.EntityManager;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -61,9 +62,6 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     private ConfigAuditEventRepository configAuditEventRepository;
 
     @Autowired
-    private IdentityLinkRepository identityLinkRepository;
-
-    @Autowired
     private AuthEventRepository authEventRepository;
 
     @Autowired
@@ -88,9 +86,11 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(row.getNewValue()).contains("45");
         // Untouched fields must survive into the snapshot, or the "from what to what" is a lie.
         // Present AND null, not absent: null is "inherit the fleet default", so a serializer that
-        // dropped null keys would make clearing an override indistinguishable from never setting one.
+        // dropped null keys would make clearing an override indistinguishable from never setting
+        // one.
         assertThat(row.getNewValue()).contains("\"cooldownMinutes\":45");
-        // Through the real filter chain (JWT -> CurrentAccount -> actor): USER, not SYSTEM, because a
+        // Through the real filter chain (JWT -> CurrentAccount -> actor): USER, not SYSTEM, because
+        // a
         // signed-in admin did this. The id stays null because the test harness mints a non-numeric
         // subject; production subjects are always the account id.
         assertThat(row.getActorKind()).isEqualTo(ConfigAuditActorKind.USER);
@@ -108,7 +108,8 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         ConfigAuditEvent row = reviewSettingsRowFor(workspace);
         assertThat(row.getActorAccountId()).isEqualTo(adminId);
         assertThat(row.isElevatedViaInstanceAdmin()).isTrue();
-        // One marker for the access window, not one per request, although the patch is two requests.
+        // One marker for the access window, not one per request, although the patch is two
+        // requests.
         assertThat(elevationEventsFor(adminId)).singleElement().satisfies(event -> {
             assertThat(event.getWorkspaceId()).isEqualTo(workspace.getId());
             assertThat(event.isElevatedViaInstanceAdmin()).isTrue();
@@ -119,17 +120,17 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     void shouldTagNeitherLedgerWhenTheSameChangeIsMadeByAWorkspaceMember() {
         Workspace workspace = setupWorkspace("audit-member");
         User member = persistUser("audit-member-admin");
-        ensureWorkspaceMembership(workspace, member, WorkspaceMembership.WorkspaceRole.ADMIN);
-        Account account = persistInstanceAdmin("Workspace member");
-        linkIdentity(account, member);
+        ensureMembership(workspace, member, Membership.WorkspaceRole.ADMIN);
+        Account account = accountRepository.findById(accountId(member)).orElseThrow();
+        account.setStatus(Account.Status.ACTIVE);
+        account.setAppRole(Account.AppRole.APP_ADMIN);
+        accountRepository.saveAndFlush(account);
         long accountId = persistedId(account);
 
         patchPracticeReviewAs(workspace, token(accountId), Map.of("cooldownMinutes", 48));
 
         ConfigAuditEvent row = reviewSettingsRowFor(workspace);
         assertThat(row.getActorAccountId()).isEqualTo(accountId);
-        // The token carries app_admin exactly as the elevated case does; only the membership differs,
-        // so this proves the filter's own branch condition and not merely a token's authorities.
         assertThat(row.isElevatedViaInstanceAdmin()).isFalse();
         assertThat(elevationEventsFor(accountId))
                 .as("no elevation marker for the account this test signed in as")
@@ -171,19 +172,13 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .uri("/workspaces/{slug}/practices", workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(Map.of(
-                        "slug",
+                .bodyValue(new CreatePracticeRequestDTO(
                         "focused-reviews",
-                        "name",
-                        "Focused reviews",
-                        "signals",
-                        PracticeTestEvidence.signals(ArtifactKinds.PULL_REQUEST),
-                        "evidenceRequirements",
-                        PracticeTestEvidence.needsFor(ArtifactKinds.PULL_REQUEST),
-                        "criteria",
-                        "Initial private criteria",
-                        "precomputeScript",
-                        "return { hints: [] };"))
+                        "scm.pull_request",
+                        DefinitionTestFixtures.authoring(definition(
+                                "Focused reviews", "Initial private criteria describe retained review expectations.")),
+                        null,
+                        null))
                 .exchange()
                 .expectStatus()
                 .isCreated()
@@ -197,13 +192,11 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .uri("/workspaces/{slug}/practices/{practiceSlug}", workspace.getWorkspaceSlug(), practice.slug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(Map.of(
-                        "name",
-                        "Focused code reviews",
-                        "criteria",
-                        "Updated private criteria",
-                        "precomputeScript",
-                        "return { hints: ['updated'] };"))
+                .bodyValue(new UpdatePracticeRequestDTO(
+                        DefinitionTestFixtures.authoring(definition(
+                                "Focused code reviews",
+                                "Updated private criteria describe retained review expectations.")),
+                        practice.currentVersion().id()))
                 .exchange()
                 .expectStatus()
                 .isOk()
@@ -229,15 +222,14 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .extracting(ConfigAuditEvent::getAction)
                 .containsExactly(ConfigAuditAction.CREATED, ConfigAuditAction.UPDATED, ConfigAuditAction.DELETED);
         assertThat(rows.get(0).getNewValue())
-                .contains("\"criteriaRevision\":1", "\"criteriaSha256\"", "\"precomputeScriptSha256\"")
-                .doesNotContain("Initial private criteria", "return { hints");
-        assertThat(rows.get(1).changedKeyList())
-                .containsExactlyInAnyOrder("name", "criteriaRevision", "criteriaSha256", "precomputeScriptSha256");
+                .contains("\"versionId\":", "\"reviewDigest\":")
+                .doesNotContain("Initial private criteria");
+        assertThat(rows.get(1).changedKeyList()).containsExactlyInAnyOrder("versionId", "reviewDigest");
         assertThat(rows.get(1).getNewValue())
-                .contains("\"criteriaRevision\":2", "\"name\":\"Focused code reviews\"")
-                .doesNotContain("Updated private criteria", "return { hints");
+                .doesNotContain("Updated private criteria")
+                .isNotEqualTo(rows.get(0).getNewValue());
         assertThat(rows.get(2).getNewValue()).isNull();
-        assertThat(rows.get(2).getOldValue()).contains("\"criteriaRevision\":2");
+        assertThat(rows.get(2).getOldValue()).isEqualTo(rows.get(1).getNewValue());
     }
 
     @Test
@@ -317,7 +309,8 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Test
     @WithAdminUser
     void instanceAdminSeesEveryWorkspaceAndCanNarrowToOne() {
-        // First and only execution of findForAdmin: its SpEL binds and the CAST(:workspaceId AS bigint)
+        // First and only execution of findForAdmin: its SpEL binds and the CAST(:workspaceId AS
+        // bigint)
         // null-branch are compile-clean but runtime-fragile, so nothing else proves they work.
         Workspace a = setupWorkspace("audit-inst-a");
         Workspace b = setupWorkspace("audit-inst-b");
@@ -354,7 +347,8 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Test
     @WithMentorUser
     void aWorkspaceAdminIsRefusedAnotherWorkspacesTrail() {
-        // Deliberately not @WithAdminUser: app_admin carries cross-workspace elevation, so that user
+        // Deliberately not @WithAdminUser: app_admin carries cross-workspace elevation, so that
+        // user
         // reads any workspace by design. The sibling test also administers both workspaces, so it
         // survives removing the gate. Only a caller who administers neither proves the gate binds.
         Workspace theirs = createWorkspace(
@@ -364,7 +358,8 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 AccountType.ORG,
                 persistUser("audit-gate-theirs-owner"));
 
-        // 401, not 403: a non-member resolves no workspace context at all, so the request is refused
+        // 401, not 403: a non-member resolves no workspace context at all, so the request is
+        // refused
         // before the admin gate is consulted. Either way the trail is not served.
         webTestClient
                 .get()
@@ -389,11 +384,6 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .expectBody(Void.class);
     }
 
-    /**
-     * One case per filter dimension this matrix covers. Each carries both directions, because a
-     * predicate transposed to match NOTHING passes every zero case on its own — and a failure has to
-     * name which predicate broke, which one fat test cannot.
-     */
     static Stream<Arguments> filterCases() {
         String future = Instant.now().plusSeconds(60).toString();
         String past = Instant.now().minusSeconds(60).toString();
@@ -423,8 +413,6 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Test
     @WithAdminUser
     void narrowingToOneResourceIsWhatMakesAPerResourceHistoryPossible() {
-        // The entity_id predicate is otherwise unexercised: transposed to `<>` the suite stays green,
-        // while the per-resource history the column exists to serve returns everything but the resource.
         Workspace workspace = setupWorkspace("audit-entity");
         patchPracticeReview(workspace, Map.of("cooldownMinutes", 45));
 
@@ -442,9 +430,6 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Test
     @WithAdminUser
     void repeatingAFilterParameterWidensItRatherThanReplacingIt() {
-        // The question a change trail is opened for is usually disjunctive ("did anyone touch either of
-        // these?"), so repeated values must union. The values bind as a text[] matched with = ANY(...), which a
-        // single-value test cannot distinguish from plain equality.
         Workspace workspace = setupWorkspace("audit-multi");
         patchPracticeReview(workspace, Map.of("cooldownMinutes", 45));
         createConnection(workspace, "primary");
@@ -460,9 +445,7 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Test
     @WithAdminUser
     void newestRowsComeFirstEvenWhenTwoShareAnInstant() {
-        // The rows are forced onto one instant: the recorder's clock has microsecond precision, so two
-        // ordinary writes never tie and the id tie-break in ORDER BY occurred_at DESC, id DESC — the
-        // thing that makes paging deterministic — would go unexercised.
+        // Equal timestamps exercise the id tie-break; normal writes rarely share a microsecond.
         Workspace workspace = setupWorkspace("audit-order");
         patchPracticeReview(workspace, Map.of("cooldownMinutes", 45));
         patchPracticeReview(workspace, Map.of("cooldownMinutes", 46));
@@ -507,7 +490,8 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @WithAdminUser
     @Transactional
     void anUnscopedReadOfTheAuditTableIsCaughtByTenancyEnforcement() {
-        // Pins that the table is registered workspace-scoped; isolation itself is carried by the gate
+        // Pins that the table is registered workspace-scoped; isolation itself is carried by the
+        // gate
         // and by findForWorkspace.
         assertThatThrownBy(() -> entityManager
                         .createNativeQuery("SELECT * FROM config_audit_event", ConfigAuditEvent.class)
@@ -575,18 +559,6 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         return "mock-jwt-sub-" + accountId;
     }
 
-    /** Wires an account to an SCM actor, which is what turns a workspace membership into roles. */
-    private void linkIdentity(Account account, User actor) {
-        IdentityProvider provider = ensureGitHubProvider();
-        IdentityLink link = new IdentityLink();
-        link.setAccount(account);
-        link.setProviderId(Objects.requireNonNull(provider.getId()));
-        link.setSubject(String.valueOf(actor.getNativeId()));
-        link.setUsernameAtSignup(actor.getLogin());
-        link.setExternalActorId(actor.getId());
-        identityLinkRepository.save(link);
-    }
-
     private ConfigAuditEvent reviewSettingsRowFor(Workspace workspace) {
         return configAuditEventRepository.findAll().stream()
                 .filter(e -> workspace.getId().equals(e.getWorkspaceId())
@@ -607,7 +579,6 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         return Objects.requireNonNull(account.getId(), "the account must be persisted");
     }
 
-    /** A second producer, of a different entity type and action, so the filter matrix proves each predicate narrows. */
     private void createConnection(Workspace workspace, String slug) {
         webTestClient
                 .post()
@@ -618,7 +589,7 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
                         slug,
                         "My Provider",
                         "https://api.openai.com",
-                        "openai-completions",
+                        LlmApiProtocol.OPENAI_COMPLETIONS,
                         LlmAuthMode.BEARER,
                         "sk-workspace-secret-9999",
                         true,
@@ -627,5 +598,12 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .expectStatus()
                 .isCreated()
                 .expectBody(Void.class);
+    }
+
+    private static PracticeDefinition definition(String name, String criteria) {
+        return DefinitionTestFixtures.withLineNotes(
+                DefinitionTestFixtures.withReviewOn(
+                        DefinitionTestFixtures.definition(name, criteria), new ReviewOn(List.of(), Map.of())),
+                false);
     }
 }

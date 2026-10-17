@@ -44,7 +44,8 @@ class IntegrationFrameworkBootstrapTest extends BaseUnitTest {
     void declaredCapabilityWithoutItsBeanFailsLoud() {
         IntegrationManifestRegistry registry = new IntegrationManifestRegistry(
                 List.of(manifest(IntegrationKind.GITHUB, Set.of(Capability.WEBHOOK_INGEST))));
-        // Universal beans present, but no WebhookSignatureVerifier backing the WEBHOOK_INGEST claim.
+        // Universal beans present, but no WebhookSignatureVerifier backing the WEBHOOK_INGEST
+        // claim.
         IntegrationFrameworkBootstrap bootstrap = bootstrap(
                 registry,
                 List.of(credentialProvider(IntegrationKind.GITHUB)),
@@ -147,13 +148,12 @@ class IntegrationFrameworkBootstrapTest extends BaseUnitTest {
                 List.of(), // inlineFeedbackChannels
                 List.of(), // approvalChannels
                 lifecycleListeners,
-                // A validator over an empty world: these tests are about capability wiring, and every manifest
-                // below contributes nothing to review, so the review contract has nothing to say about them.
+                // A validator over an empty world: these tests are about capability wiring, and
+                // every manifest
+                // below contributes nothing to review, so the review contract has nothing to say
+                // about them.
                 new ReviewContractValidator(
-                        new ArtifactDescriptorRegistry(List.of()),
-                        new IntegrationMessageHandlerRegistry(List.of()),
-                        List.of(),
-                        Set::of),
+                        new ItemDescriptorRegistry(List.of()), new IntegrationMessageHandlerRegistry(List.of())),
                 webhookRoleEnabled);
     }
 

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelPrice;
 import de.tum.cit.aet.hephaestus.agent.catalog.UpdateLlmModelPriceRequestDTO;
+import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
@@ -108,8 +109,8 @@ class MoneyWirePrecisionTest extends BaseUnitTest {
 
     private static BigDecimal clampedCost(BigDecimal per1mInputUsd, long inputTokens) {
         LlmPriceSnapshot price = new LlmPriceSnapshot(
-                FundingSource.INSTANCE,
-                PricingState.PRICED,
+                UsageFundingSource.INSTANCE,
+                UsagePricingState.PRICED,
                 1L,
                 null,
                 per1mInputUsd,

@@ -466,7 +466,7 @@ function RouteComponent() {
 				},
 			}}
 			aiChoiceProps={{
-				choice: aiChoiceQuery.data?.choice,
+				choice: aiChoiceQuery.data?.choice ?? undefined,
 				onSave: (choice) => aiChoiceMutation.mutate({ body: { choice } }),
 				isSaving: aiChoiceMutation.isPending,
 				isLoading: aiChoiceQuery.isLoading,

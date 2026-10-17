@@ -19,7 +19,8 @@ public record CommitDetails(
         int deletions,
         int changedFiles,
         List<FileChange> fileChanges,
-        List<String> parentShas) {
+        List<String> parentShas,
+        String rawMessage) {
 
     public record FileChange(
             String filename,

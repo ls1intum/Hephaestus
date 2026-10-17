@@ -6,7 +6,11 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { resolveTaskPaths, taskPaths } from "../../../main/resources/agent/pi-task-paths.ts";
+import {
+	resolveTaskPaths,
+	SUPPORTED_SCHEMA_VERSION,
+	taskPaths,
+} from "../../../main/resources/agent/pi-task-paths.ts";
 
 const paths = {
 	contextRoot: "areas/scm",
@@ -15,7 +19,7 @@ const paths = {
 	practiceIndex: "practices/index.json",
 	compositionRequest: "composition/request.json",
 	preparedFeedback: "history/prepared.json",
-	precomputeScripts: "scripts/practices",
+	practiceScripts: "scripts/practices",
 };
 
 void test("resolves a completely relocated layout without any captured-input prefix", () => {
@@ -63,24 +67,37 @@ void test("ignores additive metadata without relaxing required path validation",
 	assert.throws(() => taskPaths({ ...paths, manifest: 42 }), /manifest/u);
 });
 
-void test("accepts the envelope produced by the Java task writer", () => {
+void test("accepts the envelope produced by the Java task writer, at the version the runner supports", () => {
+	assert.equal(SUPPORTED_SCHEMA_VERSION, 6);
 	const envelope: unknown = JSON.parse(
-		readFileSync(new URL("../task-fixtures/v3/practice-review.json", import.meta.url), "utf8"),
+		readFileSync(new URL("../task-fixtures/practice-review.json", import.meta.url), "utf8"),
 	);
 	assert.ok(typeof envelope === "object" && envelope !== null);
 	assert.equal(taskPaths(envelope).contextRoot, Reflect.get(envelope, "contextRoot"));
-	assert.equal(Reflect.get(envelope, "schemaVersion"), 3);
+	assert.equal(taskPaths(envelope).practiceScripts, "work/practice-scripts/practices");
+	assert.equal(Reflect.get(envelope, "schemaVersion"), SUPPORTED_SCHEMA_VERSION);
 	assert.equal(Reflect.has(envelope, "kind"), false);
 	assert.equal(Reflect.has(envelope, "task"), false);
 	assert.equal(Reflect.has(envelope, "paths"), false);
 });
 
 for (const [name, envelope] of Object.entries({
-	"old schema": { schemaVersion: 2, ...paths, prompt: "Review" },
-
-	"missing paths": { schemaVersion: 3, prompt: "Review" },
+	"the previous schema": { schemaVersion: 4, ...paths, prompt: "Review" },
+	"an older schema": { schemaVersion: 3, ...paths, prompt: "Review" },
+	"missing paths": {
+		schemaVersion: 6,
+		reviewId: "11111111-1111-4111-8111-111111111111",
+		jobId: "22222222-2222-4222-8222-222222222222",
+		attempt: 1,
+		workspaceId: "1",
+		prompt: "Review",
+	},
 	traversal: {
-		schemaVersion: 3,
+		schemaVersion: 6,
+		reviewId: "11111111-1111-4111-8111-111111111111",
+		jobId: "22222222-2222-4222-8222-222222222222",
+		attempt: 1,
+		workspaceId: "1",
 		...paths,
 		manifest: "../secret",
 		prompt: "Review",

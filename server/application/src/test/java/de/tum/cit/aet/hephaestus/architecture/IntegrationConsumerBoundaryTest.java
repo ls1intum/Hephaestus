@@ -63,10 +63,6 @@ class IntegrationConsumerBoundaryTest extends HephaestusArchitectureTest {
                 .check(classes);
     }
 
-    /**
-     * Not even its own connection: a jnats import anywhere under {@code agent/} would mean a NATS-based
-     * feature crept back in without going through the {@code agent_job} queue.
-     */
     @Test
     void agentDoesNotLinkAgainstJnatsAtAll() {
         noClasses()
@@ -75,8 +71,8 @@ class IntegrationConsumerBoundaryTest extends HephaestusArchitectureTest {
                 .should()
                 .dependOnClassesThat()
                 .resideInAPackage("io.nats..")
-                .because("the agent job queue is Postgres-backed (agent_job table, polled by "
-                        + "AgentJobExecutor) — the agent package must have zero io.nats dependency")
+                .because("the agent job queue is Postgres-backed (review_job table, polled by "
+                        + "ReviewJobExecutor) — the agent package must have zero io.nats dependency")
                 .check(classes);
     }
 }

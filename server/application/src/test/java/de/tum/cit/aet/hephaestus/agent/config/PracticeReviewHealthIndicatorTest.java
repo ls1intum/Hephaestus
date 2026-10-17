@@ -5,9 +5,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.job.AgentProperties;
-import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Clock;
 import java.time.Duration;
@@ -55,13 +54,13 @@ class PracticeReviewHealthIndicatorTest extends BaseUnitTest {
 
     private static PracticeReviewHealthIndicator indicator(
             boolean agentEnabled, boolean gitEnabled, Optional<Instant> expiry, boolean workerRole) {
-        ArtifactSourceCatalogRegistry sourceCatalog = mock(ArtifactSourceCatalogRegistry.class);
+        ClasspathSourceCatalogRegistry sourceCatalog = mock(ClasspathSourceCatalogRegistry.class);
         expiry.ifPresent(
                 value -> when(sourceCatalog.earliestUseDecisionExpiry(SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))
                         .thenReturn(Optional.of(value)));
         return new PracticeReviewHealthIndicator(
                 agent(agentEnabled),
-                git(gitEnabled),
+                gitEnabled,
                 sourceCatalog,
                 Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC),
                 workerRole);
@@ -70,9 +69,5 @@ class PracticeReviewHealthIndicatorTest extends BaseUnitTest {
     private static AgentProperties agent(boolean enabled) {
         return new AgentProperties(
                 enabled, Duration.ofSeconds(1), 5, 5, Duration.ofSeconds(25), Duration.ofDays(14), Duration.ofDays(90));
-    }
-
-    private static GitRepositoryProperties git(boolean enabled) {
-        return new GitRepositoryProperties(enabled, 2, 1L << 33);
     }
 }

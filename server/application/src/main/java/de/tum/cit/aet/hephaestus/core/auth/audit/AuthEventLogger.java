@@ -29,12 +29,13 @@ public class AuthEventLogger {
         private final AuthEvent.EventType type;
         private final AuthEvent.Result result;
         private @Nullable Long accountId;
-        private @Nullable Long viewedUserId;
+        private @Nullable Long viewedActorId;
+        private @Nullable Long viewedAccountId;
         private @Nullable Long actingAccountId;
         private @Nullable String failureReason;
         private @Nullable Long gitProviderId;
         private @Nullable Long workspaceId;
-        private @Nullable Long identityLinkId;
+        private @Nullable Long identityId;
         private @Nullable String details;
 
         private Draft(AuthEvent.EventType type, AuthEvent.Result result) {
@@ -42,8 +43,13 @@ public class AuthEventLogger {
             this.result = result;
         }
 
-        public Draft viewedUser(@Nullable Long id) {
-            this.viewedUserId = id;
+        public Draft viewedAccount(@Nullable Long id) {
+            this.viewedAccountId = id;
+            return this;
+        }
+
+        public Draft viewedActor(@Nullable Long id) {
+            this.viewedActorId = id;
             return this;
         }
 
@@ -72,8 +78,8 @@ public class AuthEventLogger {
             return this;
         }
 
-        public Draft identityLink(@Nullable Long id) {
-            this.identityLinkId = id;
+        public Draft identity(@Nullable Long id) {
+            this.identityId = id;
             return this;
         }
 
@@ -83,7 +89,8 @@ public class AuthEventLogger {
         }
 
         /**
-         * @return whether the event committed; callers decide whether a failed audit must block their operation
+         * @return whether the event committed; callers decide whether a failed audit must block
+         *     their operation
          */
         public boolean record() {
             try {
@@ -91,14 +98,16 @@ public class AuthEventLogger {
                         type,
                         result,
                         accountId,
-                        viewedUserId,
+                        viewedActorId,
+                        viewedAccountId,
                         actingAccountId,
                         failureReason,
                         gitProviderId,
                         workspaceId,
-                        identityLinkId,
+                        identityId,
                         details,
-                        // Read here, from the request's security context, so no producer can forget the
+                        // Read here, from the request's security context, so no producer
+                        // can forget the
                         // flag or assert one it did not earn.
                         WorkspaceElevationContext.isElevated(workspaceId)));
             } catch (RuntimeException e) {

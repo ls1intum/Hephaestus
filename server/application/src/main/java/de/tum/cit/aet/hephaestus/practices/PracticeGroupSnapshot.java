@@ -1,31 +1,40 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditSnapshot;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
 import org.jspecify.annotations.Nullable;
 
-/**
- * @param autonomy null means the group holds no autonomy and follows the workspace default — a real state, so it is
- *     serialized
- */
 record PracticeGroupSnapshot(
         String slug,
         String name,
         @Nullable String description,
-        boolean visibleInPracticeDashboards,
+        boolean shownToDevelopers,
         @Nullable String icon,
         @Nullable String color,
-        @Nullable PracticeAutonomy autonomy)
+        int position,
+        @Nullable FeedbackMode feedbackMode,
+        @Nullable String catalogSlug,
+        @Nullable String catalogBaseDigest)
         implements ConfigAuditSnapshot {
     static PracticeGroupSnapshot of(PracticeGroup group) {
         return new PracticeGroupSnapshot(
                 group.getSlug(),
                 group.getName(),
                 group.getDescription(),
-                group.isVisibleInPracticeDashboards(),
+                group.isShownToDevelopers(),
                 group.getIcon(),
                 group.getColor(),
-                group.getAutonomy());
+                group.getPosition(),
+                group.getFeedbackMode(),
+                group.getCatalogSlug(),
+                group.getCatalogBase() == null
+                        ? null
+                        : new CanonicalDigest()
+                                .add(group.getCatalogBase().name())
+                                .addNullable(group.getCatalogBase().description())
+                                .addNullable(group.getCatalogBase().icon())
+                                .addNullable(group.getCatalogBase().color())
+                                .hex());
     }
 }

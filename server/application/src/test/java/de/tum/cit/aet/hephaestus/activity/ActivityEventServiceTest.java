@@ -12,7 +12,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataWriteFence;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -37,33 +36,31 @@ class ActivityEventServiceTest extends BaseUnitTest {
     private MeterRegistry meterRegistry;
     private ActivityEventService service;
 
-    private final PersonDataWriteFence writeFence = Mockito.mock(PersonDataWriteFence.class);
+    private final ActivityPersonWriteAdmission admission = Mockito.mock(ActivityPersonWriteAdmission.class);
 
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
-        Mockito.lenient()
-                .when(writeFence.holdForUserWrite(ArgumentMatchers.anyLong()))
-                .thenReturn(true);
-        service = new ActivityEventService(eventRepository, workspaceRepository, meterRegistry, writeFence);
+        Mockito.lenient().when(admission.holdActor(ArgumentMatchers.anyLong())).thenReturn(true);
+        service = new ActivityEventService(eventRepository, workspaceRepository, meterRegistry, admission);
     }
 
     @Test
     void backfillAdmitsTheWholeBatchBeforeUpdatingOnlyPermittedAuthors() {
         when(eventRepository.unresolvedCommitAuthors(200L)).thenReturn(List.of(42L, 84L));
-        when(writeFence.holdForUserWrites(List.of(42L, 84L))).thenReturn(List.of(84L));
+        when(admission.holdActors(List.of(42L, 84L))).thenReturn(List.of(84L));
         when(eventRepository.backfillCommitActors(200L, List.of(84L))).thenReturn(3);
         assertThat(service.backfillCommitActors(200L)).isEqualTo(3);
-        var order = inOrder(writeFence, eventRepository);
+        var order = inOrder(admission, eventRepository);
         order.verify(eventRepository).unresolvedCommitAuthors(200L);
-        order.verify(writeFence).holdForUserWrites(List.of(42L, 84L));
+        order.verify(admission).holdActors(List.of(42L, 84L));
         order.verify(eventRepository).backfillCommitActors(200L, List.of(84L));
     }
 
     @Test
     void backfillDoesNotUpdateAnEntirelySuppressedBatch() {
         when(eventRepository.unresolvedCommitAuthors(200L)).thenReturn(List.of(42L));
-        when(writeFence.holdForUserWrites(List.of(42L))).thenReturn(List.of());
+        when(admission.holdActors(List.of(42L))).thenReturn(List.of());
         assertThat(service.backfillCommitActors(200L)).isZero();
         verify(eventRepository, never()).backfillCommitActors(anyLong(), anyList());
     }

@@ -47,51 +47,29 @@ class PersonSourceProviderBackfillIntegrationTest extends BaseIntegrationTest {
     private OutlineDocumentRepository documents;
 
     @Test
-    void shouldRegisterLegacySourcesAndInheritExactNativeControlsIdempotently() throws Exception {
-        databaseTestUtils.cleanDatabase();
+    void shouldInheritBothFinalNativeControlsIdempotentlyWhenEquivalentProviderIsRegistered() {
         String host = UUID.randomUUID() + ".example.test";
         var original = providers.saveAndFlush(new IdentityProvider(IdentityProviderType.OUTLINE, "https://" + host));
         UUID controlId = UUID.randomUUID();
-        jdbc.update(
-                "INSERT INTO person_suppression(id,provider_id,subject,team_key) VALUES (?,?,?,?)",
-                controlId,
-                original.getId(),
-                "native-42",
-                "");
-        String legacyUrl = "HTTPS://" + host.toUpperCase(Locale.ROOT) + ":443/";
-        var workspace = workspaces.saveAndFlush(WorkspaceTestFixtures.activeWorkspace("source-backfill"));
-        connections.saveAndFlush(new Connection(
-                workspace,
-                IntegrationKind.OUTLINE,
-                "outline",
-                new ConnectionConfig.OutlineConfig(legacyUrl, null, null, Set.of())));
-        connections.saveAndFlush(new Connection(
-                workspace,
-                IntegrationKind.SLACK,
-                "T1",
-                new ConnectionConfig.SlackConfig("T1", "not-a-key", null, Set.of())));
-        try (var connection = dataSource.getConnection()) {
-            connection.setAutoCommit(false);
-            var database = new PostgresDatabase();
-            database.setConnection(new JdbcConnection(connection));
-            var change = new PersonSourceProviderBackfillChange();
-            change.execute(database);
-            change.execute(database);
-            connection.commit();
-        }
-        long aliasId = Objects.requireNonNull(providers
-                .findByTypeAndServerUrl(IdentityProviderType.OUTLINE, legacyUrl)
-                .orElseThrow()
-                .getId());
-        assertThat(providers.findByTypeAndServerUrl(IdentityProviderType.SLACK, "https://slack.com"))
-                .isPresent();
+        jdbc.update("""
+            INSERT INTO identity_restriction(id,provider_id,provider_user_key,team_key,kind)
+            VALUES (?,?,?,'','ERASED'),(?,?,?,'','HIDE_PUBLIC')
+            """, controlId, original.getId(), "native-42", UUID.randomUUID(), original.getId(), "native-42");
+        String equivalentUrl = "HTTPS://" + host.toUpperCase(Locale.ROOT) + ":443/";
+        var equivalent = providers.saveAndFlush(new IdentityProvider(IdentityProviderType.OUTLINE, equivalentUrl));
+        long providerId = Objects.requireNonNull(equivalent.getId());
+
+        IdentityRestrictionService.inheritProviderControls(jdbc, providerId);
+        IdentityRestrictionService.inheritProviderControls(jdbc, providerId);
+
+        assertThat(jdbc.queryForList("""
+            SELECT kind FROM identity_restriction
+            WHERE provider_id=? AND provider_user_key='native-42' AND team_key='' ORDER BY kind
+            """, String.class, providerId)).containsExactly("ERASED", "HIDE_PUBLIC");
         assertThat(jdbc.queryForObject(
-                        "SELECT count(*) FROM person_suppression WHERE provider_id=? AND subject='native-42' AND team_key=''",
-                        Long.class,
-                        aliasId))
-                .isEqualTo(1L);
-        assertThat(jdbc.queryForObject(
-                        "SELECT id FROM person_suppression WHERE provider_id=?", UUID.class, original.getId()))
+                        "SELECT id FROM identity_restriction WHERE provider_id=? AND kind='ERASED'",
+                        UUID.class,
+                        original.getId()))
                 .isEqualTo(controlId);
     }
 
@@ -118,7 +96,8 @@ class PersonSourceProviderBackfillIntegrationTest extends BaseIntegrationTest {
             database.setConnection(new JdbcConnection(connection));
             assertThatThrownBy(() -> new PersonSourceProviderBackfillChange().execute(database))
                     .isInstanceOf(CustomChangeException.class)
-                    .hasRootCauseMessage("Outline connection " + source.getId()
+                    .hasRootCauseMessage("Outline connection "
+                            + source.getId()
                             + " mirrors documents but has no exact provider instance");
             connection.rollback();
         }

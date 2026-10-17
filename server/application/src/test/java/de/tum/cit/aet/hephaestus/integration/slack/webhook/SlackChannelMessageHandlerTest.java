@@ -11,7 +11,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
@@ -19,7 +19,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.events.SlackChannelConsentGat
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackIngestService;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackParticipantConsentGate;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackWorkspaceResolver;
-import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
+import de.tum.cit.aet.hephaestus.integration.slack.identity.SlackRosterIdentityResolver;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.nats.client.Message;
@@ -65,7 +65,7 @@ class SlackChannelMessageHandlerTest extends BaseUnitTest {
     private SlackThreadRepository threadRepository;
 
     @Mock
-    private SlackMentorIdentityResolver identityResolver;
+    private SlackRosterIdentityResolver identityResolver;
 
     @Mock
     private ConversationFeedbackErasure conversationFeedbackErasure;
@@ -146,7 +146,7 @@ class SlackChannelMessageHandlerTest extends BaseUnitTest {
         when(monitoredChannelRepository.findConsentAnnouncedAt(WORKSPACE, "C1"))
                 .thenReturn(Optional.of(ANNOUNCED_BEFORE));
         when(participantConsentGate.ingestionAllowed(WORKSPACE, "U1")).thenReturn(true);
-        when(identityResolver.resolveMemberId(WORKSPACE, "T1", "U1")).thenReturn(Optional.of(7L));
+        when(identityResolver.humanAccountId(WORKSPACE, "T1", "U1")).thenReturn(Optional.of(7L));
     }
 
     @Test
@@ -213,9 +213,9 @@ class SlackChannelMessageHandlerTest extends BaseUnitTest {
     @Test
     void botMessage_isIgnored() {
         handler.onMessage(natsMessage("""
-                {"type":"event_callback","team_id":"T1","event":{
-                  "type":"message","channel_type":"channel","channel":"C1","bot_id":"B1","ts":"100.1","text":"beep"}}
-                """));
+            {"type":"event_callback","team_id":"T1","event":{
+              "type":"message","channel_type":"channel","channel":"C1","bot_id":"B1","ts":"100.1","text":"beep"}}
+            """));
 
         verify(messageRepository, never()).insertIfAbsent(anyLong(), any(), any(), any(), any(), any(), any(), any());
     }
@@ -229,10 +229,10 @@ class SlackChannelMessageHandlerTest extends BaseUnitTest {
         // A thread reply also broadcast to the channel arrives with subtype "thread_broadcast" but carries a real
         // author + ts + text, so it must ingest — not be dropped by the non-content subtype no-op.
         handler.onMessage(natsMessage("""
-                {"type":"event_callback","team_id":"T1","event":{
-                  "type":"message","subtype":"thread_broadcast","channel_type":"channel","channel":"C1",
-                  "user":"U1","ts":"100.1","thread_ts":"100.0","text":"broadcast reply"}}
-                """));
+            {"type":"event_callback","team_id":"T1","event":{
+              "type":"message","subtype":"thread_broadcast","channel_type":"channel","channel":"C1",
+              "user":"U1","ts":"100.1","thread_ts":"100.0","text":"broadcast reply"}}
+            """));
 
         verify(messageRepository).insertIfAbsent(WORKSPACE, "T1", "C1", "100.1", "100.0", "U1", 7L, "broadcast reply");
         verify(threadRepository).upsertOnMessage(WORKSPACE, "C1", "100.0", "100.1", 7L);
@@ -246,10 +246,10 @@ class SlackChannelMessageHandlerTest extends BaseUnitTest {
                 .thenReturn(1);
 
         handler.onMessage(natsMessage("""
-                {"type":"event_callback","team_id":"T1","event":{
-                  "type":"message","subtype":"message_changed","channel":"C1","ts":"200.9",
-                  "message":{"ts":"100.1","user":"U1","text":"edited body"}}}
-                """));
+            {"type":"event_callback","team_id":"T1","event":{
+              "type":"message","subtype":"message_changed","channel":"C1","ts":"200.9",
+              "message":{"ts":"100.1","user":"U1","text":"edited body"}}}
+            """));
 
         verify(messageRepository)
                 .applyEdit(eq(WORKSPACE), eq("C1"), eq("100.1"), eq("edited body"), any(Instant.class));
@@ -270,10 +270,10 @@ class SlackChannelMessageHandlerTest extends BaseUnitTest {
                 .thenReturn(1);
 
         handler.onMessage(natsMessage("""
-                {"type":"event_callback","team_id":"T1","event":{
-                  "type":"message","subtype":"message_changed","channel":"C1","ts":"200.9",
-                  "message":{"ts":"100.1","user":"U1","thread_ts":"100.0","text":"edited body"}}}
-                """));
+            {"type":"event_callback","team_id":"T1","event":{
+              "type":"message","subtype":"message_changed","channel":"C1","ts":"200.9",
+              "message":{"ts":"100.1","user":"U1","thread_ts":"100.0","text":"edited body"}}}
+            """));
 
         // Re-ingest ran through the gated path and persisted the EDITED text under the resolved workspace + member id.
         verify(messageRepository).insertIfAbsent(WORKSPACE, "T1", "C1", "100.1", "100.0", "U1", 7L, "edited body");
@@ -290,10 +290,10 @@ class SlackChannelMessageHandlerTest extends BaseUnitTest {
                 .thenReturn(true);
 
         handler.onMessage(natsMessage("""
-                {"type":"event_callback","team_id":"T1","event":{
-                  "type":"message","subtype":"message_changed","channel":"C1","ts":"200.9",
-                  "message":{"ts":"100.1","user":"U1","text":"edited body"}}}
-                """));
+            {"type":"event_callback","team_id":"T1","event":{
+              "type":"message","subtype":"message_changed","channel":"C1","ts":"200.9",
+              "message":{"ts":"100.1","user":"U1","text":"edited body"}}}
+            """));
 
         verify(messageRepository, never()).insertIfAbsent(anyLong(), any(), any(), any(), any(), any(), any(), any());
     }
@@ -303,10 +303,10 @@ class SlackChannelMessageHandlerTest extends BaseUnitTest {
         handler = handlerWithIngestDisabled();
 
         handler.onMessage(natsMessage("""
-                {"type":"event_callback","team_id":"T1","event":{
-                  "type":"message","subtype":"message_changed","channel":"C1","ts":"200.9",
-                  "message":{"ts":"100.1","user":"U1","text":"edited body"}}}
-                """));
+            {"type":"event_callback","team_id":"T1","event":{
+              "type":"message","subtype":"message_changed","channel":"C1","ts":"200.9",
+              "message":{"ts":"100.1","user":"U1","text":"edited body"}}}
+            """));
 
         // Kill switch off: the edit path short-circuits before resolving the tenant or touching persistence.
         verify(workspaceResolver, never()).resolveWorkspaceId(any());
@@ -319,9 +319,9 @@ class SlackChannelMessageHandlerTest extends BaseUnitTest {
         handler = handlerWithIngestDisabled();
 
         handler.onMessage(natsMessage("""
-                {"type":"event_callback","team_id":"T1","event":{
-                  "type":"message","subtype":"message_deleted","channel":"C1","ts":"200.9","deleted_ts":"100.1"}}
-                """));
+            {"type":"event_callback","team_id":"T1","event":{
+              "type":"message","subtype":"message_deleted","channel":"C1","ts":"200.9","deleted_ts":"100.1"}}
+            """));
 
         verify(workspaceResolver, never()).resolveWorkspaceId(any());
         verify(messageRepository, never()).tombstone(anyLong(), any(), any(), any(), any(Instant.class));
@@ -342,9 +342,9 @@ class SlackChannelMessageHandlerTest extends BaseUnitTest {
         stubAnnouncedChannelForTombstone();
 
         handler.onMessage(natsMessage("""
-                {"type":"event_callback","team_id":"T1","event":{
-                  "type":"message","subtype":"message_deleted","channel":"C1","ts":"200.9","deleted_ts":"100.1"}}
-                """));
+            {"type":"event_callback","team_id":"T1","event":{
+              "type":"message","subtype":"message_deleted","channel":"C1","ts":"200.9","deleted_ts":"100.1"}}
+            """));
 
         // Keyed on the deleted message's ts (100.1), carrying the team id for the durable upsert.
         verify(messageRepository).tombstone(eq(WORKSPACE), eq("T1"), eq("C1"), eq("100.1"), any(Instant.class));
@@ -355,9 +355,9 @@ class SlackChannelMessageHandlerTest extends BaseUnitTest {
         stubAnnouncedChannelForTombstone();
 
         handler.onMessage(natsMessage("""
-                {"type":"event_callback","team_id":"T1","event":{
-                  "type":"message","subtype":"message_deleted","channel":"C1","ts":"200.9","previous_message":{"ts":"150.2"}}}
-                """));
+            {"type":"event_callback","team_id":"T1","event":{
+              "type":"message","subtype":"message_deleted","channel":"C1","ts":"200.9","previous_message":{"ts":"150.2"}}}
+            """));
 
         verify(messageRepository).tombstone(eq(WORKSPACE), eq("T1"), eq("C1"), eq("150.2"), any(Instant.class));
     }
@@ -369,9 +369,9 @@ class SlackChannelMessageHandlerTest extends BaseUnitTest {
         stubAnnouncedChannelForTombstone();
 
         handler.onMessage(natsMessage("""
-                {"type":"event_callback","team_id":"T1","event":{
-                  "type":"message","subtype":"message_deleted","channel":"C1","ts":"200.9","deleted_ts":"100.1"}}
-                """));
+            {"type":"event_callback","team_id":"T1","event":{
+              "type":"message","subtype":"message_deleted","channel":"C1","ts":"200.9","deleted_ts":"100.1"}}
+            """));
 
         verify(messageRepository).tombstone(eq(WORKSPACE), eq("T1"), eq("C1"), eq("100.1"), any(Instant.class));
     }
@@ -382,9 +382,9 @@ class SlackChannelMessageHandlerTest extends BaseUnitTest {
         when(monitoredChannelRepository.findConsentAnnouncedAt(WORKSPACE, "C1")).thenReturn(Optional.empty());
 
         handler.onMessage(natsMessage("""
-                {"type":"event_callback","team_id":"T1","event":{
-                  "type":"message","subtype":"message_deleted","channel":"C1","ts":"200.9","deleted_ts":"100.1"}}
-                """));
+            {"type":"event_callback","team_id":"T1","event":{
+              "type":"message","subtype":"message_deleted","channel":"C1","ts":"200.9","deleted_ts":"100.1"}}
+            """));
 
         // Nothing was ever stored on a never-announced channel; no contentless tombstone row is created.
         verify(messageRepository, never()).tombstone(anyLong(), any(), any(), any(), any(Instant.class));
@@ -397,10 +397,10 @@ class SlackChannelMessageHandlerTest extends BaseUnitTest {
         stubActiveConsentedChannel();
 
         handler.onMessage(natsMessage("""
-                {"type":"event_callback","team_id":"T1","event":{
-                  "type":"message","subtype":"file_share","channel_type":"channel","channel":"C1","user":"U1","ts":"100.1",
-                  "text":"here is the failing trace - race?","files":[{"id":"F1"}]}}
-                """));
+            {"type":"event_callback","team_id":"T1","event":{
+              "type":"message","subtype":"file_share","channel_type":"channel","channel":"C1","user":"U1","ts":"100.1",
+              "text":"here is the failing trace - race?","files":[{"id":"F1"}]}}
+            """));
 
         verify(messageRepository)
                 .insertIfAbsent(
@@ -417,10 +417,10 @@ class SlackChannelMessageHandlerTest extends BaseUnitTest {
     @Test
     void fileShareWithoutComment_storesNothing() {
         handler.onMessage(natsMessage("""
-                {"type":"event_callback","team_id":"T1","event":{
-                  "type":"message","subtype":"file_share","channel_type":"channel","channel":"C1","user":"U1","ts":"100.1",
-                  "text":"","files":[{"id":"F1"}]}}
-                """));
+            {"type":"event_callback","team_id":"T1","event":{
+              "type":"message","subtype":"file_share","channel_type":"channel","channel":"C1","user":"U1","ts":"100.1",
+              "text":"","files":[{"id":"F1"}]}}
+            """));
 
         verify(messageRepository, never()).insertIfAbsent(anyLong(), any(), any(), any(), any(), any(), any(), any());
     }

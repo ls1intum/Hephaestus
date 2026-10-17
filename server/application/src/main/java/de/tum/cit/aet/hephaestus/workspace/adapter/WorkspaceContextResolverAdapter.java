@@ -6,20 +6,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
 
-/**
- * Adapter that bridges the integration.scm module's ScopeIdResolver SPI to the workspace domain.
- * <p>
- * This adapter resolves scope IDs (workspace IDs) using multiple strategies:
- * <ol>
- *   <li>By organization login - for organization-owned repositories</li>
- *   <li>By repository nameWithOwner - for personal repositories and fallback</li>
- * </ol>
- *
- * <h2>Personal Repository Support</h2>
- * Personal repositories (owned by GitHub users, not organizations) have no organization entity.
- * The {@link #findScopeIdByRepositoryName(String)} method enables activity tracking for these
- * repositories by looking up the workspace that monitors them.
- */
+// Personal repositories have no organization row; resolve their workspace through repository monitors.
 @Component
 public class WorkspaceContextResolverAdapter implements ScopeIdResolver {
 
@@ -33,7 +20,7 @@ public class WorkspaceContextResolverAdapter implements ScopeIdResolver {
     public Optional<Long> findScopeIdByOrgLogin(String organizationLogin) {
         // First try to find by linked organization login
         return workspaceRepository
-                .findByOrganization_Login(organizationLogin)
+                .findByAccountLoginIgnoreCase(organizationLogin)
                 .or(() -> workspaceRepository.findByAccountLoginIgnoreCase(organizationLogin))
                 .map(Workspace::getId);
     }

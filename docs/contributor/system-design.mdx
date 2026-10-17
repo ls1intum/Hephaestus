@@ -40,14 +40,16 @@ GitLab, Slack, and Outline each have their own adapter. A deployment syncs one c
 instance.
 Additional login providers do not create additional GitLab sync instances.
 
-`agent` owns review execution and orchestration. `practices` owns practice revisions, observations,
-feedback, approval, and the review gate. Admission uses `integration.scm.ReviewTargetQuery` for SCM
-identity rather than SCM entities or repositories. Identity lookup does not authorize workspace
-access or feedback delivery.
+`agent` owns execution jobs and sandbox orchestration.
+`practices` owns definitions, durable reviews, assignments, results, problems and feedback.
+Core uses neutral item, capture and citation-verifier ports.
+Domain modules own kind, version, role and evidence meaning.
+Provider adapters own APIs, roster sync, capture and external writes.
+Core imports neither provider persistence nor an SCM diff shape.
 
 Integration modules are [open](https://docs.spring.io/spring-modulith/reference/fundamentals.html#modules.open).
 Modulith verification therefore does not enforce their persistence encapsulation.
-`PracticeReviewModuleBoundaryTest` guards the SCM admission boundary.
+The architecture tests enforce the core, domain and provider boundary.
 [Workspace context](./workspace-context) owns tenant enforcement.
 
 ## Sign-in
@@ -79,17 +81,17 @@ records native auth. [Instance administration](./instance-admin) owns recent-sig
 ## Practice reviews
 
 The webhook role verifies and durably buffers provider events. Server consumers sync the work and
-record occurrences. Eligible occasions become PostgreSQL-backed jobs.
-Workers claim these jobs and execute them in isolated sandboxes. The worker admits observations through the shared Java admission service
+record item events. Eligible reviews create PostgreSQL-backed execution jobs.
+Workers claim these jobs and execute them in isolated sandboxes. The worker admits the results of a review through the shared Java admission service
 before composition and feedback delivery.
 
 Feedback on the work awaits workspace-admin approval by default. Delivery rechecks policy and
 silent mode independently from measurement.
 
-The [review pipeline](./practice-review-pipeline) owns occasion, capture, observation, composition,
+The [review pipeline](./practice-review-pipeline) owns selection, capture, result admission, composition,
 and delivery. [Review runtime](./practice-review-runtime) owns execution and retry boundaries.
 [Workspace ABI](./agent/workspace-abi.mdx) owns the job folder, capture manifest, and output contract.
-Missing required capture produces no observation.
+Missing required capture produces no result.
 
 ## Heph
 
@@ -97,7 +99,7 @@ The server owns HTTP/SSE, Slack delivery, admission, budget checks, thread persi
 `fetch_context`. A connected worker owns the live session, its sandbox, attachment, and eviction.
 [Unified Pi runtime](./unified-pi-runtime) owns placement and conversation checkpoints.
 The UI uses shadcn components over Base UI.
-It renders streamed text, tool activity, and observation feedback without a separate assistant-ui runtime.
+It renders streamed text, tool activity, and result links without a separate assistant-ui runtime.
 
 Heph is available to workspace members only, within their account-wide AI choice. It uses permitted
 recent work, review requests, assigned issues, earlier conversations, practices, and connected
@@ -110,3 +112,10 @@ A workspace that reviews practices opens on the member's private Practice profil
 open on Activity. Activity and Workspace activity count and list work without ranking developers.
 Members read reviews of their own work from the Practice profile. Workspace admins inspect the wider
 history under Practice reviews. Workspace review history does not grant access to a member's private Practice profile or Heph feedback.
+
+## Repository scans
+
+Scans pin a monitored default branch and keep durable practice/file membership.
+Serial execution jobs can expire while report membership and product history remain.
+Reports have separate recorded totals and current open-problem counts.
+The [scan guide](/admin/practice-scans) owns procedures and export availability.

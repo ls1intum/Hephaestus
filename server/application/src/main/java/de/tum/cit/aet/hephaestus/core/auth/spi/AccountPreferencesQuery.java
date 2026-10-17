@@ -3,13 +3,11 @@ package de.tum.cit.aet.hephaestus.core.auth.spi;
 import java.util.Optional;
 
 public interface AccountPreferencesQuery {
-    /** Preferences for the first-linked SCM actor; the account-level projection contains one preference set. */
+    /** One account's choices apply to every linked identity and workspace. */
     Optional<PreferencesView> preferencesForAccount(Long accountId);
 
-    Optional<PreferencesView> preferencesForUserId(long userId);
-
-    default boolean practiceFeedbackDeliveryEnabled(long userId) {
-        return preferencesForUserId(userId)
+    default boolean practiceFeedbackDeliveryEnabled(long accountId) {
+        return preferencesForAccount(accountId)
                 .map(PreferencesView::practiceFeedbackDeliveryEnabled)
                 .orElse(PreferencesView.PRACTICE_FEEDBACK_DELIVERY_ENABLED_BY_DEFAULT);
     }

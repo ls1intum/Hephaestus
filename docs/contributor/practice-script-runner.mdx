@@ -1,0 +1,152 @@
+---
+id: practice-script-runner
+title: Practice script runner
+description: How the review runner hosts the program of each practice, what a program can reach, how the attempt budgets and reports it, how the server learns its needs, and how to test it.
+---
+
+# Practice script runner
+
+A practice script returns one candidate for one assigned practice and item.
+The strict contract is version 3. The runtime image contract is version 7.
+The host and server validate the same result shape.
+
+## Define a script
+
+Import the author entry point from `lib/core/practice-script.ts`.
+Domain helpers belong to `kits/scm/index.ts`, `kits/chat/index.ts` or `kits/docs/index.ts`.
+The runtime resolves these imports inside its installed toolkit.
+
+```ts
+import { definePracticeScript } from "./lib/core/practice-script.ts";
+
+export default definePracticeScript({
+  meta: {},
+  async run(ctx) {
+    return ctx.review();
+  },
+});
+```
+
+This is the built-in behavior expressed as a custom script.
+A null definition script invokes the built-in script without a custom process.
+An invalid custom script never falls back to it.
+
+## Context and trust
+
+The core context has practice identity, scope, origin, About and previous result metadata.
+It treats the domain item record as unknown until a domain kit validates it.
+SCM helpers do not belong in the core context.
+Script bigint identifiers are positive decimal strings, not JavaScript numbers.
+UUIDs remain UUID strings.
+
+`ctx.review` is callable and also carries the frozen review metadata.
+It can use prepared leads, facts, directions, context and limitations.
+Only the final candidate returned by `run` reaches admission.
+The host attaches item, practice, review, job and attempt identity.
+Custom code cannot choose a different developer or workspace.
+
+A domain kit validates its own record before it supplies domain tools.
+SCM supports changes and repository files. Chat and docs support their own ITEM records.
+A scan's script scope is one file at the pinned repository version.
+Its product review concerns the repository. About is null.
+
+## Candidate proof
+
+The [product vocabulary](./practice-feedback-language.md#result-outcomes) owns outcome requirements.
+A candidate has outcome, summary, explanation, coverage, citations and evidence.
+Only Not met carries nonempty problems.
+It can also carry nonempty open questions.
+Could not determine requires open questions without problems.
+
+Severity belongs to problems, never to the candidate.
+The server derives the result's worst severity.
+Every new problem has verified citations and a permitted claim basis.
+An example can appear only on Met or Not met and cannot overlap a problem.
+
+Coverage distinguishes host read receipts from a script's claimed counts.
+Claimed completeness is not a trusted complete file read.
+
+Host coverage checks the practice's required sources and the sources that its result cites.
+A source supplied in full by the opening brief needs no duplicate read.
+Other required or cited sources need continuous reads from line 1 through EOF.
+A partial window remains incomplete until further reads cover the whole source.
+Its omissions name only unresolved gaps in these sources.
+
+Exploration does not expand the required sources.
+Listings, metadata, history queries and failed reads of optional paths do not prevent complete coverage.
+Session diagnostics retain all observed reads.
+Candidate failure counts describe only unresolved gaps in required or cited sources.
+A scan Met needs a COMPLETE receipt for its assigned file at the pinned commit.
+An unavailable required read withholds the result instead of producing an outcome.
+
+## Citation verification
+
+Core verifies the quote against captured text and fills coordinates.
+An ambiguous quote is refused.
+A duty basis must quote the practice criteria and cite the captured event.
+Domain citation verifiers own change-side, version and basis checks.
+
+In `submit_result`, cite the source you read with `path`, `startLine`, optional `endLine`, and a required exact `quote`.
+The runner accepts one `args`, `arguments`, or `input` wrapper before it validates the call.
+For outcomes other than `NOT_MET`, omitted, null, or empty `problems` means no problems.
+`evidence` is an object: `search` for a search warrant, `inapplicability` for `DOES_NOT_APPLY`, and `openQuestions` for `COULD_NOT_DETERMINE`.
+`NOT_MET` can also carry `search` and `openQuestions`.
+
+The tool description gives an example for each outcome.
+An invalid field gets a correction example.
+An example never supplies evidence or changes the stored result.
+
+The runner resolves source kind, manifest identity, and the captured repository revision.
+Repository-relative paths and absolute sandbox paths are accepted.
+For a diff, you can set `sourcePath` to `work/change/diff.patch` and `path` to the changed file.
+The runner resolves the diff side from the quote when you omit `side`.
+Historical repository quotes still need a full commit SHA.
+
+Git history output is not repository file content.
+Cite the captured commit record for commit facts.
+A citation refusal includes a corrected example from captured text or an exact read call when text is unavailable.
+An example proves citation syntax only. The evidence must still support the claim.
+
+A missing verifier cannot authorize version-dependent proof.
+
+Non-code source records cannot borrow diff-side semantics.
+A scan state problem must cite its own file or an authorized inventory witness.
+Context from another file cannot replace that witness.
+The [source contract](./item-source-contract.mdx) owns source citation capabilities.
+
+## Revise problems in a model session
+
+`submit_result` accepts a complete result in one call.
+For a result with several problems, the model can instead use `upsert_problem` to save each complete problem under a stable local key.
+Replacing a key validates the new body before changing the draft.
+`remove_problem` discards a draft, and `read_problem` retrieves its complete body after context compaction.
+
+The final `submit_result` selects ordered `problemKeys` or supplies inline `problems`, never both.
+Both paths use the same candidate and evidence checks.
+Drafts belong to one practice session and create no product records.
+Only the complete candidate returned by the script reaches admission.
+Removing a draft does not repair or remove a recorded Problem.
+
+## Models and limits
+
+`meta.models` declares required or optional chat, decision, embedding and reranking slots.
+The `agent()` helper chooses forced tool calls only for models that support them.
+Opus 5.5 and Sonnet 5.5 use automatic tool choice, including through an OpenAI-compatible gateway.
+After a text-only turn, the helper gives at most two submission reminders within its original step budget.
+
+A required missing model stops the script.
+An optional model remains absent and the script must handle that state.
+The frozen method records every slot, including absent bindings, without executing code to discover dependencies.
+
+The child process calls models through the host.
+It has no job token or provider secret.
+The host checks the account ceiling, declared needs, request fields and budget.
+A failed or unreported call retains its reservation rather than claiming free work.
+
+Summary length is at most 160 UTF-16 code units. Candidate output is at most 131,072 UTF-8 bytes.
+A result has at most 50 problems. A problem has at most 20 citations.
+Open questions have a limit of 20.
+The runtime withholds excessive proof rather than truncating a claim.
+
+The [operator script guide](/admin/practice-scripts) owns author procedures and local test commands.
+The [cost guide](/admin/ai-providers#cost-and-limits) owns model usage limits and prices.

@@ -1,14 +1,12 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
-import static de.tum.cit.aet.hephaestus.practices.model.Outcome.NOT_MET;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountWorkspaceMembershipQuery;
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountWorkspaceMembershipQuery.WorkspaceMembershipView;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountMembershipQuery;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountMembershipQuery.MembershipView;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
@@ -19,14 +17,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
-import de.tum.cit.aet.hephaestus.practices.AbstractPracticeReviewIntegrationTest;
-import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.InAppFeedbackBody;
-import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
-import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -35,21 +27,21 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-/**
- * An account whose first-linked actor owns a workspace connected to another provider or another instance of
- * the same provider, where its later-linked actor is the one reviewed. The account reads the workspace as its
- * actor on the connected instance, and keeps what it started through either actor.
- */
-class WorkspaceActorSelectionIntegrationTest extends AbstractPracticeReviewIntegrationTest {
+class WorkspaceActorSelectionIntegrationTest extends AbstractWorkspaceIntegrationTest {
+    @Autowired
+    private WorkspaceActorSelector actors;
 
     @Autowired
-    private IdentityLinkRepository identities;
+    private IdentityRepository identities;
+
+    @Autowired
+    private WebTestClient webTestClient;
 
     @Autowired
     private ConnectionRepository connections;
 
     @Autowired
-    private AccountWorkspaceMembershipQuery memberships;
+    private AccountMembershipQuery memberships;
 
     @Autowired
     private ChatThreadRepository threadRepository;
@@ -64,32 +56,25 @@ class WorkspaceActorSelectionIntegrationTest extends AbstractPracticeReviewInteg
         link(account, githubActor);
 
         Workspace workspace = createWorkspace("actor-github", "GitHub", "acme", AccountType.ORG, gitlabActor);
-        ensureWorkspaceMembership(workspace, githubActor, WorkspaceMembership.WorkspaceRole.MEMBER);
+        ensureMembership(workspace, githubActor, Membership.WorkspaceRole.MEMBER);
         connect(workspace, IntegrationKind.GITHUB, new ConnectionConfig.GitHubPatConfig("acme", null, Set.of()));
-        Practice practice = persistPractice(workspace, null, "github-practice", "GitHub practice", null);
-        AgentJob run = persistPullRequestReview(workspace, 1, NOW.minus(Duration.ofDays(1)));
-        observe(practice, run, 1L, githubActor, NOT_MET, Severity.MAJOR, NOW.minus(Duration.ofDays(1)));
+        assertThat(actors.select(
+                        workspace.getId(),
+                        List.of(
+                                Objects.requireNonNull(gitlabActor.getId()),
+                                Objects.requireNonNull(githubActor.getId()))))
+                .contains(githubActor.getId());
 
         String token = "mock-jwt-user-sub-" + account.getId();
         read(token, "/workspaces/actor-github/members/me")
-                .jsonPath("$.userId")
-                .isEqualTo(githubActor.getId())
+                .jsonPath("$.account.id")
+                .isEqualTo(Objects.requireNonNull(account.getId()).toString())
                 .jsonPath("$.role")
                 .isEqualTo("OWNER");
-        read(token, "/workspaces/actor-github/practices/standings")
-                .jsonPath("$[0].slug")
-                .isEqualTo("github-practice")
-                // One problem on one piece of work: a verdict read for this actor, one setback.
-                .jsonPath("$[0].standing")
-                .isEqualTo("MIXED");
-        read(token, "/workspaces/actor-github/practice-profile/overview")
-                .jsonPath("$.latestRun.reviewId")
-                .isEqualTo(run.getId().toString());
-
         // Slack and Outline attribute through the same account view.
         assertThat(memberships.membershipsForAccount(Objects.requireNonNull(account.getId())))
-                .extracting(WorkspaceMembershipView::memberId)
-                .containsExactly(githubActor.getId());
+                .extracting(MembershipView::workspaceId)
+                .containsExactly(workspace.getId());
     }
 
     @Test
@@ -103,8 +88,8 @@ class WorkspaceActorSelectionIntegrationTest extends AbstractPracticeReviewInteg
         link(account, githubActor);
 
         Workspace workspace = createWorkspace("actor-threads", "Threads", "acme", AccountType.ORG, gitlabActor);
-        ensureWorkspaceMembership(workspace, githubActor, WorkspaceMembership.WorkspaceRole.MEMBER);
-        ensureWorkspaceMembership(workspace, colleague, WorkspaceMembership.WorkspaceRole.MEMBER);
+        ensureMembership(workspace, githubActor, Membership.WorkspaceRole.MEMBER);
+        ensureMembership(workspace, colleague, Membership.WorkspaceRole.MEMBER);
         connect(workspace, IntegrationKind.GITHUB, new ConnectionConfig.GitHubPatConfig("acme", null, Set.of()));
         UUID earlier = persistThread(workspace, gitlabActor, "Started as the GitLab actor");
         UUID current = persistThread(workspace, githubActor, "Started as the GitHub actor");
@@ -153,7 +138,7 @@ class WorkspaceActorSelectionIntegrationTest extends AbstractPracticeReviewInteg
         link(account, selfHostedActor);
 
         Workspace workspace = createWorkspace("actor-lrz", "LRZ", "group", AccountType.ORG, saasActor);
-        ensureWorkspaceMembership(workspace, selfHostedActor, WorkspaceMembership.WorkspaceRole.MEMBER);
+        ensureMembership(workspace, selfHostedActor, Membership.WorkspaceRole.MEMBER);
         connect(
                 workspace,
                 IntegrationKind.GITLAB,
@@ -164,37 +149,22 @@ class WorkspaceActorSelectionIntegrationTest extends AbstractPracticeReviewInteg
                         ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
                         Set.of(),
                         null));
-        Practice practice = persistPractice(workspace, null, "lrz-practice", "LRZ practice", null);
-        AgentJob run = persistPullRequestReview(workspace, 3, NOW.minus(Duration.ofDays(1)));
-        UUID observation =
-                observe(practice, run, 3L, selfHostedActor, NOT_MET, Severity.MAJOR, NOW.minus(Duration.ofDays(1)));
-        Feedback feedback = persistInAppFeedback(
-                run,
-                selfHostedActor,
-                1,
-                FeedbackDeliveryState.DELIVERED,
-                InAppFeedbackBody.render("A way of working", "What recurs.", "One thing to try."),
-                NOW.minus(Duration.ofDays(1)));
-        bind(feedback, observation);
+        assertThat(actors.select(
+                        workspace.getId(),
+                        List.of(
+                                Objects.requireNonNull(saasActor.getId()),
+                                Objects.requireNonNull(selfHostedActor.getId()))))
+                .contains(selfHostedActor.getId());
 
         String token = "mock-jwt-user-sub-" + account.getId();
         read(token, "/workspaces/actor-lrz/members/me")
-                .jsonPath("$.userId")
-                .isEqualTo(selfHostedActor.getId())
+                .jsonPath("$.account.id")
+                .isEqualTo(Objects.requireNonNull(account.getId()).toString())
                 .jsonPath("$.role")
                 .isEqualTo("OWNER");
-        read(token, "/workspaces/actor-lrz/practices/standings")
-                .jsonPath("$[0].slug")
-                .isEqualTo("lrz-practice")
-                // One problem on one piece of work: a verdict read for this actor, one setback.
-                .jsonPath("$[0].standing")
-                .isEqualTo("MIXED");
-        read(token, "/workspaces/actor-lrz/practices/feedback/in-app")
-                .jsonPath("$[0].id")
-                .isEqualTo(feedback.getId().toString());
         assertThat(memberships.membershipsForAccount(Objects.requireNonNull(account.getId())))
-                .extracting(WorkspaceMembershipView::memberId)
-                .containsExactly(selfHostedActor.getId());
+                .extracting(MembershipView::workspaceId)
+                .containsExactly(workspace.getId());
     }
 
     private WebTestClient.BodyContentSpec read(String token, String uri) {
@@ -209,10 +179,10 @@ class WorkspaceActorSelectionIntegrationTest extends AbstractPracticeReviewInteg
     }
 
     private void link(Account account, User actor) {
-        IdentityLink link = new IdentityLink();
+        Identity link = new Identity();
         link.setAccount(account);
         link.setProviderId(Objects.requireNonNull(actor.getProvider().getId()));
-        link.setSubject(actor.getNativeId().toString());
+        link.setProviderUserKey(actor.getNativeId().toString());
         identities.saveAndFlush(link);
     }
 
@@ -220,7 +190,7 @@ class WorkspaceActorSelectionIntegrationTest extends AbstractPracticeReviewInteg
         ChatThread thread = new ChatThread();
         thread.setId(UUID.randomUUID());
         thread.setWorkspace(workspace);
-        thread.setUser(owner);
+        thread.setAccountId(accountId(owner));
         thread.setTitle(title);
         return threadRepository.saveAndFlush(thread).getId();
     }

@@ -2,12 +2,16 @@ package de.tum.cit.aet.hephaestus.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.core.converter.AnnotatedType;
 import io.swagger.v3.core.converter.ModelConverters;
+import io.swagger.v3.core.util.Json31;
 import io.swagger.v3.oas.annotations.media.Schema.RequiredMode;
 import io.swagger.v3.oas.models.media.Schema;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Tag;
@@ -35,8 +39,7 @@ class JSpecifyRequiredModelConverterTest {
 
     @Test
     void marksExplicitlyNonNullMembersRequiredAndKeepsSchemaRequiredPrimitives() {
-        Schema<?> schema = resolve(Sample.class).get("Sample");
-        assertThat(schema).isNotNull();
+        Schema<?> schema = Objects.requireNonNull(resolve(Sample.class).get("Sample"));
 
         // Required iff the member is explicitly @NonNull, or declares @Schema(requiredMode = REQUIRED)
         // as a primitive does (mirrors the real GitLabPreflightResponseDTO#valid). @Nullable,
@@ -47,19 +50,51 @@ class JSpecifyRequiredModelConverterTest {
     @Test
     void resolvesRequiredForNestedRecordReachedAsAJavaType() {
         // Nested types arrive at the converter as a Jackson JavaType, not a Class; this locks that path.
-        Schema<?> nested = resolve(Sample.class).get("Nested");
-        assertThat(nested).isNotNull();
+        Schema<?> nested = Objects.requireNonNull(resolve(Sample.class).get("Nested"));
 
         assertThat(nested.getRequired()).containsExactly("x");
     }
 
     @Test
     void walksSuperclassFieldsForPlainClasses() {
-        Schema<?> schema = resolve(Child.class).get("Child");
-        assertThat(schema).isNotNull();
+        Schema<?> schema = Objects.requireNonNull(resolve(Child.class).get("Child"));
 
         assertThat(schema.getRequired()).containsExactlyInAnyOrder("parentNonNull", "childNonNull");
     }
+
+    @Test
+    void shouldPublishEveryAlwaysPresentResponseKeyAndItsNullableType() {
+        Schema<?> schema =
+                Objects.requireNonNull(resolve(CompleteResponse.class).get("CompleteResponse"));
+        assertThat(schema.getRequired()).containsExactlyInAnyOrder("reason", "count", "detail");
+        Schema<?> reason = Objects.requireNonNull(schema.getProperties().get("reason"));
+        Schema<?> detail = Objects.requireNonNull(schema.getProperties().get("detail"));
+        assertThat(reason.getTypes()).containsExactlyInAnyOrder("string", "null");
+        assertThat(reason.getEnum()).isEqualTo(Arrays.asList("REPAIRED", null));
+        assertThat(detail.getAnyOf()).anySatisfy(member -> {
+            Schema<?> branch = member;
+            assertThat(branch.getTypes()).containsExactly("null");
+        });
+    }
+
+    @Test
+    void shouldSerializeNullableReferenceAsNullUnionInOpenApi31() {
+        Schema<?> schema =
+                Objects.requireNonNull(resolve(CompleteResponse.class).get("CompleteResponse"));
+        var serialized = Json31.mapper().valueToTree(schema);
+        assertThat(serialized.path("properties").path("detail").path("anyOf"))
+                .anySatisfy(branch -> assertThat(branch.path("type").asText()).isEqualTo("null"));
+        assertThat(serialized.path("required"))
+                .anySatisfy(key -> assertThat(key.asText()).isEqualTo("detail"));
+    }
+
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    record CompleteResponse(
+            @io.swagger.v3.oas.annotations.media.Schema(allowableValues = "REPAIRED") @Nullable
+            String reason,
+
+            int count,
+            @Nullable Nested detail) {}
 
     record Sample(
             @NonNull String nonNull,

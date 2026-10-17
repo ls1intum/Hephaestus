@@ -2,13 +2,16 @@ import { ArrowRightIcon, ChevronRightIcon, HistoryIcon } from "lucide-react";
 
 import { cn } from "cn";
 
-import type { ReviewRunRef } from "@/api/types.gen";
+import type { ProfileReviewRef } from "@/api/types.gen";
 import { InlineLink } from "@/components/common/InlineLink";
 import { statusToneClass } from "@/components/common/status-def";
 import { useNow } from "@/components/common/use-now";
 import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { countsTogether } from "@/components/practice-vocabulary/feedback-text";
-import { REVIEW_RUN_STATE_DEFS } from "@/components/practice-vocabulary/review-run-state-defs";
+import {
+	isActiveReview,
+	OWN_REVIEW_STATUS_DEFS,
+} from "@/components/practice-vocabulary/review-status-defs";
 import type { StandingCounts } from "@/components/practice-vocabulary/standing-counts";
 import { StandingSummaryBox } from "@/components/practice-vocabulary/StandingSummaryBox";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +26,7 @@ export interface PracticeProfilePageHeaderProps {
 	 * The newest review of the reader's work, which the chip beside the title describes and which
 	 * opens the reviews of their work; absent while none has run, when the chip says so instead.
 	 */
-	latestRun?: ReviewRunRef;
+	latestReview?: ProfileReviewRef;
 	/** How many practices sit at each standing; the ring and the legend are drawn from these. */
 	counts: StandingCounts;
 	/**
@@ -40,10 +43,10 @@ export interface PracticeProfilePageHeaderProps {
  * feedback ends. Everything below the fold is the record this sentence introduces.
  */
 const INTRO =
-	"Hephaestus reviews your work against the practices your workspace cares about. What it observes appears here. A piece of feedback resolves once your work comes back clean.";
+	"Hephaestus reviews your work against the practices your workspace cares about. What it records appears here. A piece of feedback resolves once your work comes back clean.";
 
 export function PracticeProfilePageHeader({
-	latestRun,
+	latestReview,
 	counts,
 	practiceCount,
 	groupCount,
@@ -57,7 +60,7 @@ export function PracticeProfilePageHeader({
 					{isLoading ? (
 						<Skeleton className="h-5 w-64 rounded-full" />
 					) : (
-						<LatestReviewChip run={latestRun} />
+						<LatestReviewChip review={latestReview} />
 					)}
 				</div>
 				<p className="max-w-2xl text-sm text-muted-foreground">{INTRO}</p>
@@ -90,11 +93,11 @@ export function PracticeProfilePageHeader({
 	);
 }
 
-const RUNNING = REVIEW_RUN_STATE_DEFS.IN_PROGRESS;
+const { RUNNING } = OWN_REVIEW_STATUS_DEFS;
 
 interface LatestReviewChipProps {
 	/** The newest review of the reader's work; absent until one has run. */
-	run?: ReviewRunRef;
+	review?: ProfileReviewRef;
 }
 
 /**
@@ -102,9 +105,9 @@ interface LatestReviewChipProps {
  * linked here: a link inside the chip would be a control inside a control. A review still going
  * says so in words; its icon stands still, as every status icon does.
  */
-function LatestReviewChip({ run }: LatestReviewChipProps) {
+function LatestReviewChip({ review }: LatestReviewChipProps) {
 	const today = new Date(useNow());
-	if (run === undefined) {
+	if (review === undefined) {
 		return (
 			<Badge variant="muted">
 				<HistoryIcon aria-hidden />
@@ -112,9 +115,10 @@ function LatestReviewChip({ run }: LatestReviewChipProps) {
 			</Badge>
 		);
 	}
-	const at = asDate(run.at);
-	const { label } = run.reviewedWork;
-	const running = run.status === "IN_PROGRESS";
+	const at = asDate(review.at);
+	const { label } = review.item;
+	const running = review.status !== null && isActiveReview(review.status);
+	const stopped = review.status === "FAILED" || review.status === "CANCELLED";
 	const Icon = running ? RUNNING.icon : HistoryIcon;
 	const iconTone = running ? statusToneClass(RUNNING.badgeVariant) : "text-muted-foreground";
 
@@ -134,7 +138,7 @@ function LatestReviewChip({ run }: LatestReviewChipProps) {
 			)}
 			<ClauseDot />
 			<span className="min-w-0 truncate font-normal text-muted-foreground">
-				{run.status === "FAILED" ? "stopped before it finished" : `after ${label}`}
+				{stopped ? "stopped before it finished" : `after ${label}`}
 			</span>
 		</>
 	);

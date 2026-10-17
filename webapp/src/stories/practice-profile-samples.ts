@@ -2,7 +2,7 @@
 // them from these. Nothing here comes from a workspace; every name, number and piece of work is made up, so a
 // story can never show a real developer's feedback.
 
-import type { ReviewedWorkRef } from "@/api/types.gen";
+import type { ItemRef } from "@/api/types.gen";
 import type { PracticeFeedbackCardEntry } from "@/components/practice-vocabulary/PracticeFeedbackCard";
 
 import {
@@ -12,12 +12,17 @@ import {
 
 const HOUR = 3_600_000;
 
-const pullRequest = (number: number, title: string): ReviewedWorkRef => ({
+const pullRequest = (number: number, title: string): ItemRef => ({
 	kind: "scm.pull_request",
 	id: String(9000 + number),
+	parentId: null,
 	label: `#${number}`,
 	title,
 	provider: "GITHUB",
+	url: null,
+	container: null,
+	path: null,
+	removedAt: null,
 });
 
 const DESCRIBE = { slug: "describe-what-and-why", name: "Describe what changed and why" };
@@ -33,8 +38,8 @@ function card(
 	practice: { slug: string; name: string },
 	hoursAgo: number,
 	headline: string,
-	work: ReviewedWorkRef[],
-	clean: ReviewedWorkRef[] = [],
+	work: ItemRef[],
+	clean: ItemRef[] = [],
 ): PracticeFeedbackCardEntry {
 	return {
 		feedbackId,
@@ -46,7 +51,6 @@ function card(
 		reviewedWork: work.map((ref, index) => ({
 			ref,
 			date: new Date(now - (hoursAgo + 24 * (work.length - index)) * HOUR),
-			outcome: "NOT_MET",
 		})),
 		cleanWork: clean.map((ref, index) => ({
 			ref,
@@ -111,7 +115,6 @@ export const SAMPLE_NEVER_APPLIED = [
 	{ slug: "platform-logger", name: "Log through the platform logger" },
 ];
 
-/** Practices no review has observed in the reader's work yet; made up, like every sample here. */
 export const SAMPLE_NOT_OBSERVED = [
 	{ slug: "names-the-risk", name: "Name the risk a change carries" },
 	{ slug: "rollback-plan", name: "Say how to roll the change back" },

@@ -5,7 +5,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 import static de.tum.cit.aet.hephaestus.architecture.ArchitectureTestConstants.BASE_PACKAGE;
-import static de.tum.cit.aet.hephaestus.architecture.conditions.HephaestusConditions.haveSecurityAnnotationIfEndpoint;
+import static de.tum.cit.aet.hephaestus.architecture.conditions.HephaestusConditions.haveExplicitSecurityIfEndpoint;
 
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaMethod;
@@ -138,14 +138,14 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
     class SecurityTests {
 
         @Test
-        void controllerMethodsHaveSecurityAnnotations() {
+        void controllerMethodsHaveExplicitSecurity() {
             ArchRule rule = methods()
                     .that()
                     .areDeclaredInClassesThat()
                     .areAnnotatedWith(RestController.class)
                     .and()
                     .arePublic()
-                    .should(haveSecurityAnnotationIfEndpoint())
+                    .should(haveExplicitSecurityIfEndpoint())
                     .because("All endpoints must have explicit security");
 
             rule.check(classes);
@@ -210,7 +210,7 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                         return;
                     }
 
-                    // Sub-SPI interfaces (e.g. family-typed extensions like ScmFeedbackChannel,
+                    // Sub-SPI interfaces (e.g. family-typed domain contracts,
                     // sealed permits like FeedbackAnchor.DocumentAnchor) are contracts, not adapters.
                     if (javaClass.isInterface()) {
                         return;
@@ -248,8 +248,8 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                             || // IntegrationManifest impls + bootstrap utilities
                             javaClass.getPackageName().contains(".registry")
                             || // ConnectionPurgeContributor lives with the entity
-                            // A domain descriptor belongs beside the artifact it describes, not in a vendor package.
-                            javaClass.getSimpleName().endsWith("ArtifactDescriptor")
+                            // A domain descriptor belongs beside the item it describes, not in a vendor package.
+                            javaClass.getSimpleName().endsWith("ItemDescriptor")
                             || javaClass.getSimpleName().endsWith("Adapter")
                             || javaClass.getSimpleName().endsWith("Provider")
                             || javaClass.getSimpleName().endsWith("Tracker")
@@ -432,7 +432,8 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                                 events.add(SimpleConditionEvent.violated(
                                         javaClass,
                                         String.format(
-                                                "%s is an integration test but does not declare a Spring slice, integration tag, or full-context base",
+                                                "%s is an integration test but does not declare a Spring slice,"
+                                                        + " integration tag, or full-context base",
                                                 javaClass.getSimpleName())));
                             }
                         }

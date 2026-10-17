@@ -173,8 +173,8 @@ public interface ActivityLedgerRepository extends Repository<ActivityEvent, UUID
                    :repositoryId, target_type, target_id, CURRENT_TIMESTAMP
             FROM candidate c
             WHERE occurred_at IS NOT NULL AND actor_id IN (:actors)
-              AND NOT EXISTS (SELECT 1 FROM person_suppression s JOIN "user" u
-                  ON u.provider_id=s.provider_id AND u.native_id::text=s.subject
+              AND NOT EXISTS (SELECT 1 FROM identity_restriction s JOIN "user" u
+                  ON u.provider_id=s.provider_id AND s.kind='ERASED' AND u.native_id::text=s.provider_user_key
                   WHERE u.id=c.actor_id AND s.team_key='')
               AND NOT EXISTS (SELECT 1 FROM activity_event e
                   WHERE e.workspace_id=:workspaceId AND e.target_type=c.target_type

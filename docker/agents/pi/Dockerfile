@@ -9,8 +9,8 @@ COPY pi/package.json pi/pnpm-lock.yaml pi/pnpm-workspace.yaml ./
 COPY pi/patches/ ./patches/
 RUN pnpm install --prod --frozen-lockfile --ignore-scripts
 
-WORKDIR /opt/precompute
-COPY precompute/package.json precompute/pnpm-lock.yaml precompute/pnpm-workspace.yaml ./
+WORKDIR /opt/practice-scripts
+COPY practice-scripts/package.json practice-scripts/pnpm-lock.yaml practice-scripts/pnpm-workspace.yaml ./
 RUN pnpm install --prod --frozen-lockfile --ignore-scripts
 
 # Debian 13: its fd (>= 8.7) takes the `--no-require-git` Pi's find tool passes outside a repository.
@@ -87,9 +87,28 @@ RUN mkdir -p /tmp/abi-check && ln -sf /opt/pi-sdk/node_modules /tmp/abi-check/no
       -e 'require("node:child_process").spawnSync("true")' 2>/dev/null && \
     rm -rf /tmp/abi-check
 
-COPY --from=dependencies /opt/precompute/node_modules /opt/precompute/node_modules
-COPY precompute/package.json precompute/runner.ts /opt/precompute/
-COPY precompute/lib/ /opt/precompute/lib/
+COPY --from=dependencies /opt/practice-scripts/node_modules /opt/practice-scripts/node_modules
+COPY practice-scripts/package.json practice-scripts/child.ts /opt/practice-scripts/
+COPY practice-scripts/lib/ /opt/practice-scripts/lib/
+COPY practice-scripts/kits/ /opt/practice-scripts/kits/
+
+# The runner imports the practice program host through a link the runtime creates before Node starts
+# (`PracticeRunnerProfile.setupCommands`): `/workspace/work/practice-scripts/lib` → `/opt/practice-scripts/lib`.
+# Resolving it here, as /workspace/.run-pi.ts does, proves the toolkit and its own dependencies load beside the
+# Pi SDK, and that a program's process starts under the permissions the host gives it.
+RUN mkdir -p /tmp/host-check/work/practice-scripts/practices && \
+    ln -s /opt/pi-sdk/node_modules /tmp/host-check/node_modules && \
+    ln -sfn /opt/practice-scripts/lib /tmp/host-check/work/practice-scripts/lib && \
+    ln -sfn /opt/practice-scripts/kits /tmp/host-check/work/practice-scripts/kits && \
+    printf '%s\n' \
+      'import { createAgentSession } from "@earendil-works/pi-coding-agent";' \
+      'import { BUILTIN_SCRIPT, runPracticeProgram } from "./work/practice-scripts/lib/core/program-host.ts";' \
+      'import { parseCandidate } from "./work/practice-scripts/lib/core/contract.ts";' \
+      'if (typeof createAgentSession !== "function" || typeof runPracticeProgram !== "function") { throw new Error("the host cannot load the Pi SDK and the toolkit together"); }' \
+      'if (typeof BUILTIN_SCRIPT.run !== "function" || parseCandidate({}).ok) { throw new Error("the toolkit contract does not load"); }' \
+      > /tmp/host-check/.run-pi.ts && \
+    node /tmp/host-check/.run-pi.ts && \
+    rm -rf /tmp/host-check
 
 RUN git config --system core.hooksPath /nonexistent && \
     git config --system core.fsmonitor false && \
@@ -141,7 +160,7 @@ RUN mkdir -p /workspace/work /workspace/out /workspace/.pi /workspace/.sessions 
     chown -R 1000:1000 /workspace/work /workspace/out /workspace/.pi /workspace/.sessions && \
     ln -s /opt/pi-sdk/node_modules /workspace/node_modules
 
-LABEL hephaestus.agent.runtime-contract=4
+LABEL hephaestus.agent.runtime-contract=7
 LABEL hephaestus.agent.node-version=${NODE_VERSION}
 LABEL hephaestus.agent.pi-version=${PI_VERSION}
 

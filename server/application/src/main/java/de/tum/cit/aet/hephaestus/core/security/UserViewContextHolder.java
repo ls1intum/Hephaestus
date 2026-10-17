@@ -11,14 +11,14 @@ import org.springframework.security.web.util.matcher.RequestMatchers;
 public final class UserViewContextHolder {
 
     public static final String WORKSPACE_HEADER = "X-User-View-Workspace";
-    public static final String USER_HEADER = "X-User-View-User";
+    public static final String ACCOUNT_HEADER = "X-User-View-Account";
     public static final String REASON_HEADER = "X-User-View-Reason";
     public static final RequestMatcher USER_VIEW_REQUEST = RequestMatchers.anyOf(
-            new RequestHeaderRequestMatcher(WORKSPACE_HEADER), new RequestHeaderRequestMatcher(USER_HEADER));
+            new RequestHeaderRequestMatcher(WORKSPACE_HEADER), new RequestHeaderRequestMatcher(ACCOUNT_HEADER));
     public static final RequestMatcher USER_VIEW_READ = RequestMatchers.allOf(
             USER_VIEW_REQUEST, PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.GET, "/**"));
 
-    public record View(long workspaceId, long userId) {}
+    public record View(long workspaceId, long accountId) {}
 
     private static final ThreadLocal<View> VIEW = new ThreadLocal<>();
 

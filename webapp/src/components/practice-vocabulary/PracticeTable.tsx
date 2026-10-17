@@ -8,7 +8,7 @@ import {
 } from "react";
 
 import { cn } from "cn";
-import type { PracticeStanding, PracticeTrend, TrendSupport } from "@/api/types.gen";
+import type { PracticeStanding, TrendSupport } from "@/api/types.gen";
 import { ROW_CONTROL_FOCUS } from "@/components/common/focus";
 import { InlineLink } from "@/components/common/InlineLink";
 import { SortButton } from "@/components/common/SortButton";
@@ -32,6 +32,7 @@ import type { FeedbackTextSegment } from "./feedback-text";
 import { FeedbackText } from "./FeedbackText";
 import type { SortDirection } from "./practice-group-list-order";
 import type { StandingScope } from "./practice-group-standing-defs";
+import type { TrendDirection } from "./practice-trend-defs";
 import { StandingBadge, TrendNote } from "./StandingBadge";
 
 /** Skeleton rows while the first load is in flight, about a small workspace's worth. */
@@ -385,7 +386,7 @@ export function PracticeTableRow({
 
 export interface StandingCellProps {
 	standing: PracticeStanding["standing"];
-	direction?: PracticeTrend["direction"];
+	direction?: TrendDirection;
 	support?: TrendSupport;
 	scope: StandingScope;
 }

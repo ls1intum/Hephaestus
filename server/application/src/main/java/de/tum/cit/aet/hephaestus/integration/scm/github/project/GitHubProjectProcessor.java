@@ -1,11 +1,11 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.project;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.MilestoneRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.BaseGitHubProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEventPayload;
@@ -171,7 +171,8 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
         // Fetch the entity to return a managed instance
         Project project = projectRepository
                 .findByOwnerTypeAndOwnerIdAndNumber(ownerType, ownerId, dto.number())
-                .orElseThrow(() -> new IllegalStateException("Project not found after upsert: ownerType=" + ownerType
+                .orElseThrow(() -> new IllegalStateException("Project not found after upsert: ownerType="
+                        + ownerType
                         + ", ownerId="
                         + ownerId
                         + ", number="

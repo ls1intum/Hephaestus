@@ -18,7 +18,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -55,7 +57,8 @@ class GitLabPullRequestReviewThreadProcessorTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        processor = new GitLabPullRequestReviewThreadProcessor(threadRepository, pullRequestRepository, eventPublisher);
+        processor = new GitLabPullRequestReviewThreadProcessor(
+                threadRepository, pullRequestRepository, eventPublisher, Clock.fixed(Instant.EPOCH, ZoneOffset.UTC));
 
         provider = new IdentityProvider();
         provider.setId(PROVIDER_ID);

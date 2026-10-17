@@ -6,7 +6,7 @@ import type { SlackMonitoredChannel } from "@/api/types.gen";
 import { RemoveChannelAlertDialog } from "./RemoveChannelAlertDialog";
 
 const active: SlackMonitoredChannel = {
-	id: 1,
+	id: "1",
 	slackTeamId: "T0000000000",
 	slackChannelId: "C02ACTIVE002",
 	channelName: "team-standup",
@@ -82,7 +82,7 @@ export const ConfirmMismatch: Story = {
 
 /** PENDING — nothing was ever collected, so the copy says so and there is no gate. */
 export const NothingCollected: Story = {
-	args: { channel: { ...active, consentState: "PENDING", consentAnnouncedAt: undefined } },
+	args: { channel: { ...active, consentState: "PENDING", consentAnnouncedAt: null } },
 	play: async ({ args }) => {
 		const dialog = within(await screen.findByRole("alertdialog"));
 		dialog.getByText(/nothing has been collected/iu);

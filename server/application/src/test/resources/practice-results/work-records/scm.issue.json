@@ -1,0 +1,44 @@
+{
+	"cause": {
+		"kind": "scm.issue",
+		"subject": {
+			"role": "AUTHOR"
+		},
+		"practice": {
+			"versionId": 1
+		},
+		"scope": {
+			"key": "scm.issue:1:AUTHOR",
+			"mode": "change",
+			"description": "What its author contributed to the reviewed work"
+		},
+		"cause": {
+			"type": "requested",
+			"origin": "MANUAL",
+			"admittedAt": "2026-10-01T09:00:00Z",
+			"state": {
+				"state": "OPEN"
+			}
+		}
+	},
+	"work": {
+		"issue_number": 1,
+		"title": "Add the change shown in the captured files",
+		"body": "",
+		"state": "OPEN",
+		"state_reason": null,
+		"html_url": "https://github.com/test/fixture/issues/1",
+		"repository_full_name": "test/fixture",
+		"repository_id": 1,
+		"author": "fixture-author",
+		"author_id": 11,
+		"issue_type": null,
+		"is_locked": false,
+		"sub_issues_total": null,
+		"sub_issues_completed": null,
+		"milestone": null,
+		"closed_at": null,
+		"labels": [],
+		"assignees": []
+	}
+}

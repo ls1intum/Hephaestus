@@ -14,3 +14,9 @@ The command rewrites `docs/contributor/erd/schema.mmd`.
 This page renders that file directly.
 
 <Mermaid value={databaseSchema} />
+
+## Practice model relationships
+
+The diagram below comes from the migrated schema.
+The [practice data model](./practice-feedback-schema.md) explains its invariants without repeating the column inventory.
+Product reviews and scan membership remain durable when execution jobs expire.

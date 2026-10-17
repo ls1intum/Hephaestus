@@ -7,10 +7,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
-/**
- * The statements an account purge erases the account's auth-owned rows with. {@link AccountPurger} owns their
- * order; each statement here is one step of it.
- */
 @WorkspaceAgnostic("Account erasure is account-scoped; the rows it removes span every workspace")
 interface AccountErasureRepository extends Repository<Account, Long> {
 
@@ -19,8 +15,8 @@ interface AccountErasureRepository extends Repository<Account, Long> {
     void deleteFeatures(@Param("accountId") Long accountId);
 
     @Modifying
-    @Query(value = "DELETE FROM identity_link WHERE account_id = :accountId", nativeQuery = true)
-    void deleteIdentityLinks(@Param("accountId") Long accountId);
+    @Query(value = "DELETE FROM identity WHERE account_id = :accountId", nativeQuery = true)
+    void deleteIdentities(@Param("accountId") Long accountId);
 
     @Modifying
     @Query(value = "DELETE FROM client_sign_in_handoff WHERE account_id = :accountId", nativeQuery = true)
@@ -44,19 +40,23 @@ interface AccountErasureRepository extends Repository<Account, Long> {
 
     @Modifying
     @Query(value = """
-            UPDATE auth_event SET ip_inet = NULL, user_agent = NULL, details = NULL
+            UPDATE auth_event SET ip_inet = NULL, user_agent = NULL, details = NULL,
+                account_id = CASE WHEN account_id = :accountId THEN NULL ELSE account_id END,
+                acting_account_id = CASE WHEN acting_account_id = :accountId THEN NULL ELSE acting_account_id END,
+                viewed_actor_id = CASE WHEN viewed_account_id = :accountId THEN NULL ELSE viewed_actor_id END,
+        viewed_account_id = CASE WHEN viewed_account_id = :accountId THEN NULL ELSE viewed_account_id END
              WHERE account_id = :accountId OR acting_account_id = :accountId
-                OR viewed_user_id IN (SELECT external_actor_id FROM identity_link WHERE account_id = :accountId)
-            """, nativeQuery = true)
+                OR viewed_account_id = :accountId
+        """, nativeQuery = true)
     int redactAuthEvents(@Param("accountId") Long accountId);
 
     /** The append-only audit trigger permits nulling account references for erasure. */
     @Modifying
     @Query(value = """
-            UPDATE config_audit_event
-               SET actor_account_id = CASE WHEN actor_account_id = :accountId THEN NULL ELSE actor_account_id END,
-                   acting_account_id = CASE WHEN acting_account_id = :accountId THEN NULL ELSE acting_account_id END
-             WHERE actor_account_id = :accountId OR acting_account_id = :accountId
-            """, nativeQuery = true)
+        UPDATE config_audit_event
+           SET actor_account_id = CASE WHEN actor_account_id = :accountId THEN NULL ELSE actor_account_id END,
+               acting_account_id = CASE WHEN acting_account_id = :accountId THEN NULL ELSE acting_account_id END
+         WHERE actor_account_id = :accountId OR acting_account_id = :accountId
+        """, nativeQuery = true)
     int unlinkConfigAuditEvents(@Param("accountId") Long accountId);
 }

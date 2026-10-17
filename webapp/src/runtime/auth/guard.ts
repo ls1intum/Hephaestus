@@ -2,7 +2,7 @@ import { type QueryClient, queryOptions } from "@tanstack/react-query";
 
 import {
 	getConsentStatusOptions,
-	getCurrentUserMembershipOptions,
+	getOwnMembershipOptions,
 	getCurrentUserOptions,
 } from "@/api/@tanstack/react-query.gen";
 import { getCurrentUser } from "@/api/sdk.gen";
@@ -70,7 +70,7 @@ function isServerRefusal(error: unknown): boolean {
 
 export function workspaceMembershipQueryOptions(workspaceSlug: string) {
 	return {
-		...getCurrentUserMembershipOptions({ path: { workspaceSlug } }),
+		...getOwnMembershipOptions({ path: { workspaceSlug } }),
 		staleTime: QUERY_STALE_TIME_MS,
 		// Retrying a refusal would stall the redirect of everyone who is legitimately not a member.
 		retry: (failureCount: number, error: unknown) => !isServerRefusal(error) && failureCount < 2,

@@ -9,7 +9,6 @@ import {
 	busyReviewQueue,
 	idleReviewQueue,
 	practiceReviewTiming,
-	reviewOverviewScope,
 	reviewQueueHead,
 } from "./fixtures";
 import type { ReviewListTarget } from "./review-outcomes";
@@ -33,8 +32,8 @@ function partsOf(canvas: Canvas) {
 }
 
 const FINISHED_LIST: ReviewListTarget = {
-	list: "runs",
-	search: { from: "2026-09-10", to: "2026-10-09", status: ["COMPLETED", "FAILED", "TIMED_OUT"] },
+	list: "reviews",
+	search: { from: "2026-09-10", to: "2026-10-09", status: ["COMPLETE", "PARTIAL", "FAILED"] },
 };
 
 /**
@@ -50,7 +49,6 @@ const meta = {
 		queue: { status: "ready", queue: busyReviewQueue },
 		timing: { status: "ready", timing: practiceReviewTiming, stale: false },
 		finished: { state: { status: "ready", total: 34, stale: false }, list: FINISHED_LIST },
-		scope: reviewOverviewScope,
 		label: "Last 30 days",
 		during: "in the last 30 days",
 	},
@@ -133,13 +131,8 @@ export const TestWorkspace: Story = {
 			"3 lost to merge",
 			"12 finished after merge",
 		]);
-		// Every count still opens what it counts.
-		for (const name of [
-			"2 reviews running",
-			"1 review on hold",
-			"272 reviews finished",
-			"12 reviews finished after the merge",
-		]) {
+		// Running and finished counts open their reviews.
+		for (const name of ["2 reviews running", "272 reviews finished"]) {
 			canvas.getByRole("link", { name });
 		}
 	},
