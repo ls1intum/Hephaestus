@@ -1,5 +1,4 @@
 import type {
-	GoingWellPractice,
 	GroupRef,
 	ItemRef,
 	PracticeGroupStanding,
@@ -114,19 +113,25 @@ const groupStanding = (
 	slug: string,
 	standing: PracticeGroupStanding["standing"],
 	direction: PracticeGroupStanding["direction"] = null,
-): PracticeGroupStanding => ({
-	groupSlug: slug,
-	groupName: groups.find((candidate) => candidate.slug === slug)?.name ?? slug,
-	standing,
-	direction,
-	trendSupport: direction ? wellSupported : null,
-	results: [],
-	sources: standing === "NOT_OBSERVED" ? [] : [{ itemKind: ITEM_KIND.pullRequest, count: 6 }],
-	feedbackSince: standing === "NOT_OBSERVED" ? null : inStoryYear("07-30T09:00"),
-	feedbackSpanDays: standing === "NOT_OBSERVED" ? null : 42,
-	guidance: null,
-	guidanceSource: null,
-});
+): PracticeGroupStanding => {
+	const ref = groups.find((candidate) => candidate.slug === slug);
+	return {
+		groupSlug: slug,
+		groupName: ref?.name ?? slug,
+		groupDescription: null,
+		groupIcon: ref?.icon ?? null,
+		groupColor: ref?.color ?? null,
+		standing,
+		direction,
+		trendSupport: direction ? wellSupported : null,
+		results: [],
+		sources: standing === "NOT_OBSERVED" ? [] : [{ itemKind: ITEM_KIND.pullRequest, count: 6 }],
+		feedbackSince: standing === "NOT_OBSERVED" ? null : inStoryYear("07-30T09:00"),
+		feedbackSpanDays: standing === "NOT_OBSERVED" ? null : 42,
+		guidance: null,
+		guidanceSource: null,
+	};
+};
 
 /** Where the developer stands in the group the detail levels open. */
 export const packagingStanding = groupStanding(packagingGroup.slug, "DEVELOPING", "DECLINING");
@@ -440,7 +445,6 @@ const REVIEWING_CHANGES: ProfileChange[] = [
 
 export const SHARED_TRANSITION_OVERVIEW: PracticeProfileOverview = {
 	latestReview: LATEST_REVIEW,
-	goingWell: [],
 	reviewedItems: [pullRequest(22)],
 	window: { since: inStoryYear("09-02T09:00"), until: LATEST_REVIEW_AT },
 	changes: [
@@ -503,45 +507,8 @@ export const SHARED_TRANSITION_OVERVIEW: PracticeProfileOverview = {
 	],
 };
 
-/**
- * Practices going well, with the results that show them: one with its workspace's sentence and one
- * without, so neither the page nor a story writes praise of its own.
- */
-export const GOING_WELL: GoingWellPractice[] = [
-	{
-		practiceSlug: "ready-and-traceable-handoff",
-		practiceName: "Mark the change ready and link its issue",
-		groupSlug: "review-ready-work",
-		goingWell: "Your pull requests say when they are ready and name the issue they close.",
-		since: inStoryYear("08-12T09:00"),
-		workCount: 6,
-		evidence: [22, 21].map((number) => goingWellEvidence(pullRequest(number))),
-		hasMore: false,
-	},
-	{
-		practiceSlug: "gives-actionable-answers",
-		practiceName: "Give answers people can act on",
-		groupSlug: "communication",
-		goingWell: null,
-		since: inStoryYear("08-20T09:00"),
-		workCount: 3,
-		evidence: [goingWellEvidence(conversation("#releases"))],
-		hasMore: false,
-	},
-];
-
-function goingWellEvidence(on: ItemRef): GoingWellPractice["evidence"][number] {
-	return {
-		resultId: `0b9c6f0e-0000-4000-8000-00000000${on.id.padStart(4, "0")}`,
-		reviewId: `5d1e2a3b-0000-4000-8000-00000000${on.id.padStart(4, "0")}`,
-		item: on,
-		recordedAt: LATEST_REVIEW_AT,
-	};
-}
-
 export const OVERVIEW_FIXTURE: PracticeProfileOverview = {
 	latestReview: LATEST_REVIEW,
-	goingWell: GOING_WELL,
 	reviewedItems: [pullRequest(22)],
 	window: { since: inStoryYear("09-02T09:00"), until: LATEST_REVIEW_AT },
 	changes: [...PACKAGING_CHANGES, ...COMMUNICATION_CHANGES, ...REVIEWING_CHANGES],

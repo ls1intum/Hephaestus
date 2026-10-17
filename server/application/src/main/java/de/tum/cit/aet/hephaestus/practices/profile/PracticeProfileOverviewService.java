@@ -12,7 +12,6 @@ import de.tum.cit.aet.hephaestus.practices.profile.dto.OverviewWindowDTO;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.PracticeProfileOverviewDTO;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.ProfileChangeDTO;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.ProfileReviewRefDTO;
-import de.tum.cit.aet.hephaestus.practices.result.GoingWellQueryService;
 import de.tum.cit.aet.hephaestus.practices.result.PracticeGroupStandingService;
 import de.tum.cit.aet.hephaestus.practices.result.PracticeStandingService;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
@@ -58,7 +57,6 @@ public class PracticeProfileOverviewService {
     private final ResultViewQuery views;
     private final ResultVisibilityPolicy visibility;
     private final ProductReferenceQuery references;
-    private final GoingWellQueryService goingWell;
     private final Clock clock;
     private final ProfileFeedbackQuery feedbackFacts;
     private final ProfileOverviewRepository ledger;
@@ -69,7 +67,7 @@ public class PracticeProfileOverviewService {
         if (account.isEmpty()) {
             var empty = OverviewWindow.sincePreviousRun(null, now);
             return new PracticeProfileOverviewDTO(
-                    new OverviewWindowDTO(empty.since(), empty.until()), null, List.of(), List.of(), List.of());
+                    new OverviewWindowDTO(empty.since(), empty.until()), null, List.of(), List.of());
         }
         var rows = read.forDevelopersSince(ws.id(), List.of(account.get()), now.minus(OverviewWindow.LOOKBACK), false);
         var permitted = visibility.permitsHistory(ws.id(), rows, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
@@ -143,7 +141,6 @@ public class PracticeProfileOverviewService {
                                 latest.result().getRecordedAt(),
                                 latest.item(),
                                 latest.review().getStatus()),
-                goingWell.own(ws.id()),
                 unique,
                 reviewed);
     }

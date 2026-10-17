@@ -1,16 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import type { GroupRef, ReviewedPractice } from "@/api/types.gen";
-import { practiceStandings } from "@/stories/practice-profile-story-mock-data";
+import type { GroupRef, PracticeGroupStanding } from "@/api/types.gen";
+import { packagingStanding, practiceStandings } from "@/stories/practice-profile-story-mock-data";
 
-import { groupsOfReviewedPractices, partitionGroupsByPractices } from "./use-practice-standings";
+import { groupsOfStandings, partitionGroupsByPractices } from "./use-practice-standings";
 
 function group(slug: string): GroupRef {
 	return { slug, name: slug, icon: null, color: null };
-}
-
-function reviewed(slug: string, inGroup: GroupRef | null): ReviewedPractice {
-	return { slug, name: slug, group: inGroup, whyItMatters: null, whatGoodLooksLike: null };
 }
 
 const [practice] = practiceStandings;
@@ -18,19 +14,44 @@ if (!practice) {
 	throw new Error("The fixtures carry at least one practice with a standing");
 }
 
-describe("groupsOfReviewedPractices", () => {
-	it("lists each group of a reviewed practice once, in the catalog's order", () => {
-		const packaging = group("packaging");
-		const testing = group("testing");
+describe("groupsOfStandings", () => {
+	it("names every group the standings carry, in their order, with its icon and colour", () => {
+		const empty = {
+			groupSlug: "testing-discipline",
+			groupName: "Testing your changes",
+			groupDescription: null,
+			groupIcon: "TestTube",
+			groupColor: "amber",
+			standing: "NOT_OBSERVED",
+			direction: null,
+			trendSupport: null,
+			results: [],
+			sources: [],
+			feedbackSince: null,
+			feedbackSpanDays: null,
+			guidance: null,
+			guidanceSource: null,
+		} satisfies PracticeGroupStanding;
+		const standings = [
+			{ ...packagingStanding, groupDescription: "Work a reviewer can start on." },
+			// A shown group with nothing reviewed yet is still a group the profile can show.
+			empty,
+		];
 
-		const groups = groupsOfReviewedPractices([
-			reviewed("scope", packaging),
-			reviewed("tests", testing),
-			reviewed("describe", packaging),
-			reviewed("loose", null),
+		expect(groupsOfStandings(standings)).toStrictEqual([
+			{
+				slug: packagingStanding.groupSlug,
+				name: packagingStanding.groupName,
+				icon: packagingStanding.groupIcon,
+				color: packagingStanding.groupColor,
+			},
+			{
+				slug: empty.groupSlug,
+				name: empty.groupName,
+				icon: empty.groupIcon,
+				color: empty.groupColor,
+			},
 		]);
-
-		expect(groups.map((entry) => entry.slug)).toStrictEqual(["packaging", "testing"]);
 	});
 });
 

@@ -12,6 +12,9 @@ function standing(slug: string, value: PracticeGroupStanding["standing"]): Pract
 	return {
 		groupSlug: slug,
 		groupName: slug,
+		groupDescription: null,
+		groupIcon: null,
+		groupColor: null,
 		standing: value,
 		results: [],
 		sources: [],

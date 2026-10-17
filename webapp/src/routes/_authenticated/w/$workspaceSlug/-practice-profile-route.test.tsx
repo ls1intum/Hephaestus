@@ -4,8 +4,8 @@ import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
-	GoingWellPractice,
 	PracticeGuidanceDto,
+	PracticeGroupStanding,
 	PracticePageFeedback,
 	ProfileReview,
 	ProfileReviewDetail,
@@ -22,12 +22,13 @@ import { clearUserView } from "@/runtime/user-view/session";
 import { detailResult, detailReview } from "@/stories/practice-detail-story-mock-data";
 import { bundledGuidance } from "@/stories/practice-guidance-story-mock-data";
 import {
-	GOING_WELL,
 	groups,
 	groupStandings,
 	OVERVIEW_FIXTURE,
 	packagingGroup,
+	packagingStanding,
 	practiceStandings,
+	pullRequest,
 } from "@/stories/practice-profile-story-mock-data";
 import {
 	openProfileReview,
@@ -35,7 +36,6 @@ import {
 	profileReviews,
 } from "@/stories/profile-reviews-story-mock-data";
 import { STORY_NOW } from "@/stories/story-clock";
-import { deferred } from "@/test/async";
 import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter } from "@/test/router-harness";
 import { storeUserView } from "@/test/user-view";
 
@@ -218,22 +218,30 @@ const practiceEntry = `practice:${practice.slug}`;
 
 const emptyGroup = { ...packagingGroup, slug: "empty-group", name: "Nothing in here" };
 
+/** A shown group with nothing reviewed in it: the standings name every shown group. */
 function useEmptyGroup() {
 	server.use(
-		http.get("*/workspaces/:workspaceSlug/practices/reviewed", () =>
+		http.get("*/workspaces/:workspaceSlug/practice-groups/standings", () =>
 			HttpResponse.json([
-				...reviewedPractices,
+				...Object.values(groupStandings),
 				{
-					slug: "release-notes",
-					name: "Write release notes",
-					group: emptyGroup,
-					whyItMatters: null,
-					whatGoodLooksLike: null,
-				} satisfies ReviewedPractice,
+					...packagingStanding,
+					groupSlug: emptyGroup.slug,
+					groupName: emptyGroup.name,
+					standing: "NOT_OBSERVED",
+					direction: null,
+					trendSupport: null,
+					results: [],
+					sources: [],
+					feedbackSince: null,
+					feedbackSpanDays: null,
+				} satisfies PracticeGroupStanding,
 			]),
 		),
 	);
 }
+
+const hiddenGroup = { ...packagingGroup, slug: "hidden-group", name: "Hidden from developers" };
 
 /** Through the page to the first practice's level, one level per history entry. */
 async function openPractice(router: Awaited<ReturnType<typeof renderProfile>>) {
@@ -360,9 +368,56 @@ describe("practice profile route", () => {
 			`${PAGE}?detail=${encodeURIComponent(JSON.stringify([`practice-group:${emptyGroup.slug}`]))}`,
 		);
 
-		await screen.findByText("This group has no practices", undefined, ROUTE_RENDER_WAIT);
+		await screen.findByText("No reviewed practices", undefined, ROUTE_RENDER_WAIT);
 		screen.getByRole("heading", { name: emptyGroup.name });
 		expect(screen.queryByText("We could not find this practice group")).toBeNull();
+	});
+
+	it("leaves out a hidden group even when a reviewed practice names it", async () => {
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/practices/reviewed", () =>
+				HttpResponse.json([
+					...reviewedPractices,
+					{
+						slug: "secret-practice",
+						name: "A practice in a hidden group",
+						group: hiddenGroup,
+						whyItMatters: null,
+						whatGoodLooksLike: null,
+					} satisfies ReviewedPractice,
+				]),
+			),
+		);
+		renderRouteAtWithRouter(
+			`${PAGE}?detail=${encodeURIComponent(JSON.stringify(["practice-groups:all"]))}`,
+		);
+
+		const table = await screen.findByRole(
+			"table",
+			{ name: "All practice groups" },
+			ROUTE_RENDER_WAIT,
+		);
+		await within(table).findByRole(
+			"button",
+			{ name: `Open group ${packagingGroup.name}` },
+			ROUTE_RENDER_WAIT,
+		);
+		expect(screen.queryByText(hiddenGroup.name)).toBeNull();
+	});
+
+	it("shows a group's own description on its level", async () => {
+		const description = "Work a reviewer can start on without asking first.";
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/practice-groups/standings", () =>
+				HttpResponse.json([{ ...packagingStanding, groupDescription: description }]),
+			),
+		);
+		renderRouteAtWithRouter(
+			`${PAGE}?detail=${encodeURIComponent(JSON.stringify([`practice-group:${packagingGroup.slug}`]))}`,
+		);
+
+		await screen.findByText(description, undefined, ROUTE_RENDER_WAIT);
+		screen.getByRole("heading", { name: packagingGroup.name });
 	});
 
 	it("never asks the admin-only list of practice groups", async () => {
@@ -645,194 +700,87 @@ describe("practice profile route", () => {
 	});
 });
 
-const [linked, unworded] = GOING_WELL;
-if (!linked || !unworded) {
-	throw new Error("The fixtures carry two practices going well");
-}
-const [proof] = linked.evidence;
-if (!proof) {
-	throw new Error("The first practice going well carries a result that shows it");
-}
-const linkedSentence = linked.goingWell;
-if (linkedSentence === null) {
-	throw new Error("The first practice going well carries its workspace's sentence");
-}
+/** A Met result of the developer's own, on a pull request the overview lists. */
+const MET = {
+	resultId: "0b9c6f0e-0000-4000-8000-000000000022",
+	reviewId: "5d1e2a3b-0000-4000-8000-000000000022",
+	item: pullRequest(22),
+	practiceSlug: "ready-and-traceable-handoff",
+	practiceName: "Mark the change ready and link its issue",
+	summary: "The pull request is marked ready and closes its issue",
+};
 
-describe("going well", () => {
-	const provingReview: ProfileReviewDetail = {
+describe("a met result", () => {
+	const metReview: ProfileReviewDetail = {
 		...openProfileReviewDetail,
-		review: { ...openProfileReviewDetail.review, id: proof.reviewId, item: proof.item },
+		review: { ...openProfileReviewDetail.review, id: MET.reviewId, item: MET.item },
 		results: [
 			...openProfileReviewDetail.results,
 			{
 				...ownResult,
-				id: proof.resultId,
-				reviewId: proof.reviewId,
-				item: proof.item,
-				practiceSlug: linked.practiceSlug,
-				practiceName: linked.practiceName,
+				id: MET.resultId,
+				reviewId: MET.reviewId,
+				item: MET.item,
+				practiceSlug: MET.practiceSlug,
+				practiceName: MET.practiceName,
 				outcome: "MET",
 				severity: null,
-				summary: "The pull request is marked ready and closes its issue",
+				summary: MET.summary,
 				problems: [],
 			},
 		],
 	};
 
-	it("names each practice under a heading that links to its level", async () => {
-		const router = await renderProfile();
-		const section = await screen.findByRole("region", { name: "Going well" }, ROUTE_RENDER_WAIT);
-		const name = within(section).getByRole("link", { name: linked.practiceName });
-		expect(name.closest("h3")).not.toBeNull();
-		within(section).getByText(linkedSentence);
-		within(section).getByRole("link", { name: unworded.practiceName });
-
-		fireEvent.click(name);
-		await waitFor(() =>
-			expect(stackInSearch(router.state.location.search.detail)).toStrictEqual([
-				`practice:${linked.practiceSlug}`,
-			]),
-		);
-		await screen.findByRole("heading", { name: linked.practiceName }, ROUTE_RENDER_WAIT);
+	it("gets no section of its own: the feedback follows the header", async () => {
+		await renderProfile();
+		await screen.findByRole("heading", { level: 2, name: "Your feedback" }, ROUTE_RENDER_WAIT);
+		// The header still counts the practices going well; only the section is gone.
+		expect(practiceStandings.some((entry) => entry.standing === "STRENGTH")).toBe(true);
+		expect(screen.queryByRole("region", { name: "Going well" })).toBeNull();
 	});
 
-	it("opens a supporting result in its own review, at that result", async () => {
+	it("opens in its own review, at that result, from a link to it", async () => {
 		const reviewsRead: string[] = [];
 		const resultsRead: string[] = [];
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/practice-profile/reviews/:reviewId", ({ params }) => {
 				reviewsRead.push(String(params.reviewId));
-				return HttpResponse.json(provingReview);
+				return HttpResponse.json(metReview);
 			}),
 			http.get("*/workspaces/:workspaceSlug/practices/results/:resultId", ({ params }) => {
 				resultsRead.push(String(params.resultId));
 				return HttpResponse.json({
 					...detailResult,
-					id: proof.resultId,
-					reviewId: proof.reviewId,
-					item: proof.item,
-					practiceSlug: linked.practiceSlug,
-					practiceName: linked.practiceName,
+					id: MET.resultId,
+					reviewId: MET.reviewId,
+					item: MET.item,
+					practiceSlug: MET.practiceSlug,
+					practiceName: MET.practiceName,
 					outcome: "MET",
 					severity: null,
-					summary: "The pull request is marked ready and closes its issue",
+					summary: MET.summary,
 					problems: [],
 					explanation:
 						"The description opens with Closes #41 and the pull request left draft first.",
 				} satisfies ResultDetail);
 			}),
 		);
-		const router = await renderProfile();
-		const section = await screen.findByRole("region", { name: "Going well" }, ROUTE_RENDER_WAIT);
-
-		fireEvent.click(within(section).getByRole("link", { name: "Pull request #22" }));
-
-		await waitFor(() =>
-			expect(stackInSearch(router.state.location.search.detail)).toStrictEqual([
-				`review:${proof.reviewId}`,
-			]),
+		const detail = encodeURIComponent(JSON.stringify([`review:${MET.reviewId}`]));
+		const { router } = renderRouteAtWithRouter(
+			`${PAGE}?detail=${detail}&reviewResult=${MET.resultId}`,
 		);
-		expect(router.state.location.search.reviewResult).toBe(proof.resultId);
+
 		await screen.findByText(
 			"The description opens with Closes #41 and the pull request left draft first.",
 			undefined,
 			ROUTE_RENDER_WAIT,
 		);
-		expect(reviewsRead).toContain(proof.reviewId);
-		expect(resultsRead).toStrictEqual([proof.resultId]);
-	});
-
-	it("opens a practice's results list from More", async () => {
-		server.use(
-			http.get("*/workspaces/:workspaceSlug/practice-profile/overview", () =>
-				HttpResponse.json({
-					...OVERVIEW_FIXTURE,
-					goingWell: [{ ...linked, hasMore: true }] satisfies GoingWellPractice[],
-				}),
-			),
-		);
-		const router = await renderProfile();
-		const section = await screen.findByRole("region", { name: "Going well" }, ROUTE_RENDER_WAIT);
-
-		fireEvent.click(
-			within(section).getByRole("link", { name: `More results for ${linked.practiceName}` }),
-		);
-
-		await waitFor(() =>
-			expect(stackInSearch(router.state.location.search.detail)).toStrictEqual([
-				`practice:${linked.practiceSlug}`,
-			]),
-		);
-		await screen.findByRole("tab", { name: /^Results/u, selected: true }, ROUTE_RENDER_WAIT);
-	});
-
-	it("shows a custom practice's own sentence as the workspace wrote it", async () => {
-		const sentence = "Every migration ships with its rollback, written down before it runs.";
-		server.use(
-			http.get("*/workspaces/:workspaceSlug/practice-profile/overview", () =>
-				HttpResponse.json({
-					...OVERVIEW_FIXTURE,
-					goingWell: [
-						{
-							...linked,
-							practiceSlug: "migrations-roll-back",
-							practiceName: "Migrations roll back",
-							goingWell: sentence,
-						},
-					] satisfies GoingWellPractice[],
-				}),
-			),
-		);
-		await renderProfile();
-		const section = await screen.findByRole("region", { name: "Going well" }, ROUTE_RENDER_WAIT);
-
-		within(section).getByText(sentence);
-		within(section).getByRole("link", { name: "Migrations roll back" });
-	});
-
-	it("says what will appear when nothing goes well yet, and praises nothing", async () => {
-		server.use(
-			http.get("*/workspaces/:workspaceSlug/practice-profile/overview", () =>
-				HttpResponse.json({ ...OVERVIEW_FIXTURE, goingWell: [] }),
-			),
-		);
-		await renderProfile();
-		const section = await screen.findByRole("region", { name: "Going well" }, ROUTE_RENDER_WAIT);
-
-		within(section).getByText(
-			"Practices that your work keeps meeting appear here, with the work that shows it.",
-		);
-		expect(within(section).queryAllByRole("link")).toHaveLength(0);
-	});
-
-	it("draws skeletons while the overview loads, and claims nothing", async () => {
-		const overview = deferred();
-		server.use(
-			http.get("*/workspaces/:workspaceSlug/practice-profile/overview", async () => {
-				await overview.promise;
-				return HttpResponse.json(OVERVIEW_FIXTURE);
-			}),
-		);
-		await renderProfile();
-		const section = await screen.findByRole("region", { name: "Going well" }, ROUTE_RENDER_WAIT);
-
-		within(section).getByText("Loading what is going well…");
-		expect(within(section).queryAllByRole("link")).toHaveLength(0);
-		expect(within(section).queryByText(/appear here/u)).toBeNull();
-		overview.resolve();
-		await within(section).findByRole("link", { name: linked.practiceName }, SETTLE_WAIT);
-	});
-
-	it("claims nothing when the overview fails to load", async () => {
-		server.use(
-			http.get("*/workspaces/:workspaceSlug/practice-profile/overview", () =>
-				HttpResponse.json({ status: 500, title: "Internal Server Error" }, { status: 500 }),
-			),
-		);
-		renderRouteAtWithRouter(PAGE);
-
-		await screen.findByText("We could not load your practices", undefined, ROUTE_RENDER_WAIT);
-		expect(screen.queryByRole("region", { name: "Going well" })).toBeNull();
+		expect(stackInSearch(router.state.location.search.detail)).toStrictEqual([
+			`review:${MET.reviewId}`,
+		]);
+		expect(router.state.location.search.reviewResult).toBe(MET.resultId);
+		expect(reviewsRead).toContain(MET.reviewId);
+		expect(resultsRead).toStrictEqual([MET.resultId]);
 	});
 });
 

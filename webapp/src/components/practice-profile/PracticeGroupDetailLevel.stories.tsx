@@ -196,12 +196,28 @@ export const NoPractices: Story = {
 		...groupOverview(otherGroup.slug),
 	},
 	play: async () => {
-		await expectSettledVisible(await screen.findByText("This group has no practices"));
+		await expectSettledVisible(await screen.findByText("No reviewed practices"));
 		await expect(screen.getByRole("heading", { name: otherGroup.name })).toBeVisible();
 		await expect(screen.queryByRole("tab")).toBeNull();
 		await expect(screen.queryByRole("table")).toBeNull();
 		await expect(screen.queryByText(/^Not reviewed/u)).toBeNull();
 		await expect(screen.queryByText("We could not find this practice group")).toBeNull();
+	},
+};
+
+/** The group's own description, as the workspace wrote it, under the header. */
+export const WithItsDescription: Story = {
+	args: {
+		standing: {
+			...packagingStanding,
+			groupDescription: "Work a reviewer can start on without asking first.",
+		},
+	},
+	play: async () => {
+		await expectSettledVisible(
+			await screen.findByText("Work a reviewer can start on without asking first."),
+		);
+		await expect(screen.getByText("Practices in this group")).toBeVisible();
 	},
 };
 

@@ -1,10 +1,5 @@
 // The palette this page and its levels share is `webapp/AGENTS.md` § Practice surfaces palette.
-import type {
-	GoingWellPractice,
-	GroupRef,
-	PracticeStanding,
-	ProfileReviewRef,
-} from "@/api/types.gen";
+import type { GroupRef, PracticeStanding, ProfileReviewRef } from "@/api/types.gen";
 import type { LoadState } from "@/components/common/panel-state";
 import {
 	PracticeTabsList,
@@ -23,7 +18,6 @@ import {
 import { countPracticeStandings } from "@/components/practice-vocabulary/standing-counts";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 
-import { GoingWellPractices } from "./GoingWellPractices";
 import { newestFirst } from "./practice-feedback-cards";
 import { FeedbackEmpty, type FeedbackEmptyProps } from "./practice-profile-blocks";
 import { FEEDBACK_TABS, type FeedbackTab } from "./practice-profile-search";
@@ -32,7 +26,6 @@ import { PracticeProfilePageHeader } from "./PracticeProfilePageHeader";
 export interface PracticeProfilePageProps {
 	/** The review the header's latest-review chip names; absent before the first review. */
 	latestReview?: ProfileReviewRef;
-	goingWell: GoingWellPractice[];
 	/** Every practice with a standing, for the header's overview ring. */
 	practices: PracticeStanding[];
 	/** The groups a card's group name can open; the header counts them. */
@@ -95,7 +88,6 @@ function feedbackCardsByTab(
 
 export function PracticeProfilePage({
 	latestReview,
-	goingWell,
 	practices,
 	groups,
 	feedbackCards,
@@ -138,7 +130,6 @@ export function PracticeProfilePage({
 				groupCount={groups.length}
 				isLoading={isLoading}
 			/>
-			<GoingWellPractices practices={goingWell} state={state} />
 			<Section
 				size="lg"
 				title="Your feedback"

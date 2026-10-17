@@ -1,5 +1,4 @@
 import type {
-	GoingWellPractice,
 	ItemRef,
 	PracticeProfileOverview,
 	ProfileChange,
@@ -17,14 +16,12 @@ import { PRACTICE_TREND_DEFS } from "@/components/practice-vocabulary/practice-t
 import { asDate, formatDay } from "@/lib/dates";
 import { capitalise, hasText } from "@/lib/text";
 
-type OverviewInput = Pick<PracticeProfileOverview, "latestReview" | "changes" | "goingWell">;
+type OverviewInput = Pick<PracticeProfileOverview, "latestReview" | "changes">;
 
-export const EMPTY_OVERVIEW: OverviewInput = { changes: [], goingWell: [], latestReview: null };
+export const EMPTY_OVERVIEW: OverviewInput = { changes: [], latestReview: null };
 
 export interface ComposedOverview {
 	latestReview?: ProfileReviewRef;
-	/** The practices going well, as the server picked and worded them; the page adds no praise. */
-	goingWell: GoingWellPractice[];
 	/**
 	 * What moved in each group, for the "All practice groups" table: one sentence per bullet, keyed
 	 * by group slug. Practices that made the same move share a bullet.
@@ -409,7 +406,6 @@ function composePracticeSentences(
 export function composeOverview(overview: OverviewInput): ComposedOverview {
 	return {
 		latestReview: overview.latestReview ?? undefined,
-		goingWell: overview.goingWell,
 		groupSentences: Object.fromEntries(
 			groupSlugsOf(overview).map((slug) => [
 				slug,

@@ -6,7 +6,6 @@ import { ALL_FEEDBACK_CARDS } from "@/stories/practice-feedback-cards-story-mock
 import {
 	groups,
 	LATEST_REVIEW,
-	OVERVIEW_FIXTURE,
 	practiceStandings,
 } from "@/stories/practice-profile-story-mock-data";
 import { expectNoPageOverflow } from "@/stories/reflow";
@@ -24,7 +23,6 @@ const meta = {
 	tags: ["autodocs"],
 	args: {
 		latestReview: LATEST_REVIEW,
-		goingWell: OVERVIEW_FIXTURE.goingWell,
 		practices: practiceStandings,
 		groups,
 		feedbackCards: ALL_FEEDBACK_CARDS,
@@ -36,7 +34,6 @@ const meta = {
 	},
 	argTypes: {
 		latestReview: { control: false },
-		goingWell: { control: false },
 	},
 } satisfies Meta<typeof PracticeProfilePage>;
 
@@ -67,12 +64,15 @@ export const Default: Story = {
 			"href",
 			expect.stringContaining("practice-groups:all"),
 		);
-		const goingWell = canvas.getByRole("heading", { level: 2, name: "Going well" });
-		const feedback = canvas.getByRole("heading", { level: 2, name: "Your feedback" });
-		await expect(precedes(goingWell, feedback)).toBe(true);
+		// Practices going well are counted in the header's standings, with no section of their own:
+		// the feedback is the first section under the header.
+		await expect(practiceStandings.some((practice) => practice.standing === "STRENGTH")).toBe(true);
+		await expect(canvas.queryByRole("heading", { name: "Going well" })).toBeNull();
+		const firstSection = canvas.getByRole("heading", { level: 2, name: "Your feedback" });
+		await expect(canvas.getAllByRole("heading", { level: 2 })[0]).toBe(firstSection);
 		await expect(
-			canvas.getByRole("link", { name: "Mark the change ready and link its issue" }),
-		).toHaveAttribute("href", expect.stringContaining("practice:ready-and-traceable-handoff"));
+			precedes(canvas.getByRole("heading", { level: 1, name: "Practice profile" }), firstSection),
+		).toBe(true);
 		await expect(canvas.queryByRole("img", { name: HEPH_LABEL })).toBeNull();
 		await expect(canvas.queryByText("What changed")).toBeNull();
 		// A card's practice pill and its "Learn more" both open the practice's level, where its
@@ -141,7 +141,6 @@ export const FeedbackTabs: Story = {
 export const ColdStart: Story = {
 	args: {
 		latestReview: undefined,
-		goingWell: [],
 		practices: [],
 		feedbackCards: [],
 	},
@@ -162,7 +161,6 @@ export const ColdStart: Story = {
 export const NothingResolvedYet: Story = {
 	args: {
 		latestReview: undefined,
-		goingWell: [],
 		practices: [],
 		feedbackCards: [],
 		feedbackTab: "resolved",
@@ -181,7 +179,6 @@ export const NothingResolvedYet: Story = {
 export const Loading: Story = {
 	args: {
 		latestReview: undefined,
-		goingWell: [],
 		practices: [],
 		groups: [],
 		feedbackCards: [],
@@ -196,7 +193,6 @@ export const Loading: Story = {
 export const LoadFailed: Story = {
 	args: {
 		latestReview: undefined,
-		goingWell: [],
 		practices: [],
 		groups: [],
 		feedbackCards: [],

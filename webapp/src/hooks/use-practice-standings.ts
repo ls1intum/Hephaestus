@@ -44,14 +44,18 @@ function groupPracticeStandings(
 	return byGroup;
 }
 
-export function groupsOfReviewedPractices(practices: ReviewedPractice[]): GroupRef[] {
-	const groups = new Map<string, GroupRef>();
-	for (const { group } of practices) {
-		if (group !== null && !groups.has(group.slug)) {
-			groups.set(group.slug, group);
-		}
-	}
-	return [...groups.values()];
+/**
+ * The groups the group standings name, in their order. The server sends one standing for every
+ * group shown to developers, in catalog order, and none for a hidden group, so this is the whole
+ * set of groups the profile can show, empty ones included.
+ */
+export function groupsOfStandings(standings: PracticeGroupStanding[]): GroupRef[] {
+	return standings.map((standing) => ({
+		slug: standing.groupSlug,
+		name: standing.groupName,
+		icon: standing.groupIcon,
+		color: standing.groupColor,
+	}));
 }
 
 /**
@@ -83,15 +87,16 @@ export function usePracticeStandings(workspaceSlug: string): PracticeStandings {
 	const practiceStandings = standingsQuery.data ?? [];
 	const practicesByGroup = groupPracticeStandings(practiceStandings);
 	const reviewedPractices = reviewedQuery.data ?? [];
+	const groupStandings = groupStandingsQuery.data ?? [];
 	const { shown, empty } = partitionGroupsByPractices(
-		groupsOfReviewedPractices(reviewedPractices),
+		groupsOfStandings(groupStandings),
 		practicesByGroup,
 	);
 	return {
 		groups: shown,
 		emptyGroups: empty,
 		groupStandings: Object.fromEntries(
-			(groupStandingsQuery.data ?? []).map((standing) => [standing.groupSlug, standing]),
+			groupStandings.map((standing) => [standing.groupSlug, standing]),
 		),
 		practiceStandings,
 		reviewedPractices,

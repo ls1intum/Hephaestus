@@ -46,21 +46,21 @@ class PracticeProfileOverviewIntegrationTest extends BaseIntegrationTest {
                 .expectBody()
                 .jsonPath("$.latestReview")
                 .isEmpty()
-                .jsonPath("$.goingWell.length()")
-                .isEqualTo(0)
+                .jsonPath("$.goingWell")
+                .doesNotExist()
                 .jsonPath("$.reviewedItems.length()")
                 .isEqualTo(0);
     }
 
     @Test
-    void oneMetResultDoesNotMakeARecurringStrengthClaim() {
-        data.result(scenario, ResultOutcome.MET, Instant.now());
+    void oneMetResultIsTheLatestReview() {
+        var result = data.result(scenario, ResultOutcome.MET, Instant.now());
         get("/practice-profile/overview")
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.goingWell.length()")
-                .isEqualTo(0);
+                .jsonPath("$.latestReview.reviewId")
+                .isEqualTo(result.getReviewId().toString());
     }
 
     @Test
@@ -82,8 +82,6 @@ class PracticeProfileOverviewIntegrationTest extends BaseIntegrationTest {
                 .isOk()
                 .expectBody()
                 .jsonPath("$.latestReview.reviewId")
-                .isEqualTo(result.getReviewId().toString())
-                .jsonPath("$.goingWell.length()")
-                .isEqualTo(0);
+                .isEqualTo(result.getReviewId().toString());
     }
 }

@@ -1863,24 +1863,6 @@ export type GitLabProvider = {
     defaultServerUrl?: string;
 };
 
-export type GoingWellEvidence = {
-    item: ItemRef;
-    recordedAt: string;
-    resultId: string;
-    reviewId: string;
-};
-
-export type GoingWellPractice = {
-    evidence: Array<GoingWellEvidence>;
-    goingWell: string | null;
-    groupSlug: string | null;
-    hasMore: boolean;
-    practiceName: string;
-    practiceSlug: string;
-    since: string;
-    workCount: number;
-};
-
 export type GroupDefinition = {
     color: string | null;
     description: string | null;
@@ -3197,6 +3179,9 @@ export type PracticeGroupStanding = {
     direction: 'IMPROVING' | 'DECLINING' | 'UNCERTAIN' | 'INSUFFICIENT_EVIDENCE' | null;
     feedbackSince: string | null;
     feedbackSpanDays: null | number;
+    groupColor: string | null;
+    groupDescription: string | null;
+    groupIcon: string | null;
     groupName: string;
     groupSlug: string;
     guidance: string | null;
@@ -3296,7 +3281,6 @@ export type PracticePageSupport = ({
 
 export type PracticeProfileOverview = {
     changes: Array<ProfileChange>;
-    goingWell: Array<GoingWellPractice>;
     latestReview: ProfileReviewRef | null;
     reviewedItems: Array<ItemRef>;
     window: OverviewWindow;

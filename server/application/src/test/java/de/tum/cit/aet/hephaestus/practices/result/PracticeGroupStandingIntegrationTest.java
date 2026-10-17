@@ -73,4 +73,57 @@ class PracticeGroupStandingIntegrationTest extends BaseIntegrationTest {
                 .jsonPath("$.length()")
                 .isEqualTo(0);
     }
+
+    @Test
+    void shownGroupCarriesItsAuthoredDescriptionIconAndColorBesideAHiddenOne() {
+        var shown = new PracticeGroup();
+        shown.setWorkspace(scenario.workspace());
+        shown.setSlug("testing");
+        shown.setName("Testing");
+        shown.setDescription("How we test what we ship.");
+        shown.setIcon("flask-conical");
+        shown.setColor("teal");
+        groups.saveAndFlush(shown);
+        var hidden = new PracticeGroup();
+        hidden.setWorkspace(scenario.workspace());
+        hidden.setSlug("hidden");
+        hidden.setName("Hidden");
+        hidden.setShownToDevelopers(false);
+        groups.saveAndFlush(hidden);
+        get("/practice-groups/standings")
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.length()")
+                .isEqualTo(1)
+                .jsonPath("$[0].groupSlug")
+                .isEqualTo("testing")
+                .jsonPath("$[0].groupDescription")
+                .isEqualTo("How we test what we ship.")
+                .jsonPath("$[0].groupIcon")
+                .isEqualTo("flask-conical")
+                .jsonPath("$[0].groupColor")
+                .isEqualTo("teal")
+                .jsonPath("$[0].standing")
+                .isEqualTo("NOT_OBSERVED");
+    }
+
+    @Test
+    void groupWithoutAuthoredMetadataSendsNulls() {
+        var group = new PracticeGroup();
+        group.setWorkspace(scenario.workspace());
+        group.setSlug("testing");
+        group.setName("Testing");
+        groups.saveAndFlush(group);
+        get("/practice-groups/standings")
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$[0].groupDescription")
+                .isEmpty()
+                .jsonPath("$[0].groupIcon")
+                .isEmpty()
+                .jsonPath("$[0].groupColor")
+                .isEmpty();
+    }
 }

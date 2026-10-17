@@ -97,6 +97,9 @@ public class PracticeGroupStandingService {
         return new PracticeGroupStandingDTO(
                 group.getSlug(),
                 group.getName(),
+                group.getDescription(),
+                group.getIcon(),
+                group.getColor(),
                 standing,
                 guidance,
                 guidanceSource,

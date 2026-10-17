@@ -1219,18 +1219,6 @@ const profileChangeSchemaResponseTransformer = (data: any) => {
     return data;
 };
 
-const goingWellEvidenceSchemaResponseTransformer = (data: any) => {
-    data.item = itemRefSchemaResponseTransformer(data.item);
-    data.recordedAt = new Date(data.recordedAt);
-    return data;
-};
-
-const goingWellPracticeSchemaResponseTransformer = (data: any) => {
-    data.evidence = data.evidence.map((item: any) => goingWellEvidenceSchemaResponseTransformer(item));
-    data.since = new Date(data.since);
-    return data;
-};
-
 const profileReviewRefSchemaResponseTransformer = (data: any) => {
     data.at = new Date(data.at);
     data.item = itemRefSchemaResponseTransformer(data.item);
@@ -1245,7 +1233,6 @@ const overviewWindowSchemaResponseTransformer = (data: any) => {
 
 const practiceProfileOverviewSchemaResponseTransformer = (data: any) => {
     data.changes = data.changes.map((item: any) => profileChangeSchemaResponseTransformer(item));
-    data.goingWell = data.goingWell.map((item: any) => goingWellPracticeSchemaResponseTransformer(item));
     if (data.latestReview) {
         data.latestReview = profileReviewRefSchemaResponseTransformer(data.latestReview);
     }

@@ -157,7 +157,6 @@ function PracticeProfile() {
 		<>
 			<PracticeProfilePage
 				latestReview={composed.latestReview}
-				goingWell={composed.goingWell}
 				practices={practiceStandings}
 				groups={groups}
 				feedbackCards={feedback.cards}

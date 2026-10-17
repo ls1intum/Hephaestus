@@ -14,6 +14,16 @@ import org.jspecify.annotations.Nullable;
 public record PracticeGroupStandingDTO(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String groupSlug,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String groupName,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        String groupDescription,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        String groupIcon,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        String groupColor,
+
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) PracticeStanding standing,
 
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable

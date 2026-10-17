@@ -269,6 +269,9 @@ class ProfileChangeDetectorTest {
         return new PracticeGroupStandingDTO(
                 "review-ready-work",
                 "Packaging work for review",
+                null,
+                null,
+                null,
                 standing,
                 null,
                 null,

@@ -25,7 +25,7 @@ export interface ReviewStepState {
 
 const ASSESSED_NOTHING: Record<ReviewStatus, string> = {
 	QUEUED: "The review has not started, so it has recorded nothing yet.",
-	RUNNING: "Results appear as the review reaches each practice.",
+	RUNNING: "The review finishes its practice checks before recording results here.",
 	COMPLETE: "The review ran to the end and recorded no result.",
 	PARTIAL: "The review closed before it recorded a result.",
 	FAILED: "The review stopped before it recorded a result.",

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { GoingWellPractice, ItemRef, ProfileChange } from "@/api/types.gen";
+import type { ItemRef, ProfileChange } from "@/api/types.gen";
 import type { FeedbackTextSegment } from "@/components/practice-vocabulary/feedback-text";
 import { ITEM_KIND } from "@/lib/item-kinds";
 
@@ -73,34 +73,10 @@ const overview = (partial: Partial<Overview>): Overview => ({
 });
 
 describe("composeOverview", () => {
-	it("has no latest review, nothing going well and no group sentences before the first review", () => {
+	it("has no latest review and no group sentences before the first review", () => {
 		const composed = composeOverview(EMPTY_OVERVIEW);
 		expect(composed.latestReview).toBeUndefined();
-		expect(composed.goingWell).toStrictEqual([]);
 		expect(composed.groupSentences).toStrictEqual({});
-	});
-
-	it("passes the practices going well through as the server worded them", () => {
-		const goingWell: GoingWellPractice[] = [
-			{
-				practiceSlug: "scope",
-				practiceName: "Scope",
-				groupSlug: "review-ready-work",
-				goingWell: null,
-				since: AT,
-				workCount: 4,
-				evidence: [
-					{
-						resultId: "0b9c6f0e-0000-4000-8000-000000000001",
-						reviewId: "5d1e2a3b-0000-4000-8000-000000000001",
-						item: pullRequest(425),
-						recordedAt: AT,
-					},
-				],
-				hasMore: false,
-			},
-		];
-		expect(composeOverview(overview({ goingWell })).goingWell).toStrictEqual(goingWell);
 	});
 
 	it("keys the table's sentences by every group the overview mentions", () => {

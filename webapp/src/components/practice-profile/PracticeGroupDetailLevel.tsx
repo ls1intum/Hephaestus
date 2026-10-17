@@ -26,7 +26,7 @@ import { DrawerBody } from "@/components/ui/drawer";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableCell } from "@/components/ui/table";
-import { capitalise } from "@/lib/text";
+import { capitalise, hasText } from "@/lib/text";
 
 import {
 	type FoldReason,
@@ -63,10 +63,12 @@ export interface PracticeGroupDetailLevelProps {
 	patterns?: Record<string, PracticePattern | undefined>;
 }
 
+// A group can hold practices that only people review, which never reach this table, so the words
+// claim no reviewed practice rather than no practice at all.
 const NO_PRACTICES_YET = {
 	icon: <ClipboardCheckIcon />,
-	title: "No practices yet",
-	description: "Practices appear here once a workspace admin adds them to this group.",
+	title: "No reviewed practices yet",
+	description: "Practices in this group appear here once reviews of your work check them.",
 };
 
 const NO_PATTERNS: Record<string, PracticePattern | undefined> = {};
@@ -235,7 +237,7 @@ export function PracticeGroupDetailLevel({
 			/>
 		);
 	} else if (group && practiceCount === 0) {
-		// The page lists no such group; a link to one lands here rather than on an empty table.
+		// The page folds such a group; its row or a link to it lands here rather than on an empty table.
 		body = <GroupWithoutPractices />;
 	} else if (group) {
 		body = (
@@ -302,6 +304,11 @@ export function PracticeGroupDetailLevel({
 				{/* The line under the header, with the room on each side that the blocks below keep
 				    between them. */}
 				<Separator />
+				{hasText(standing?.groupDescription) && (
+					<p className="max-w-prose text-sm break-words text-muted-foreground">
+						{standing.groupDescription}
+					</p>
+				)}
 				{body}
 			</DrawerBody>
 		</>

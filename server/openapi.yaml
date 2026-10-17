@@ -15607,61 +15607,6 @@ components:
           type: string
           description: Origin of the one GitLab instance workspaces are created on
           example: https://gitlab.lrz.de
-    GoingWellEvidence:
-      type: object
-      properties:
-        item:
-          $ref: "#/components/schemas/ItemRef"
-        recordedAt:
-          type: string
-          format: date-time
-        resultId:
-          type: string
-          format: uuid
-        reviewId:
-          type: string
-          format: uuid
-      required:
-      - item
-      - recordedAt
-      - resultId
-      - reviewId
-    GoingWellPractice:
-      type: object
-      properties:
-        evidence:
-          type: array
-          items:
-            $ref: "#/components/schemas/GoingWellEvidence"
-        goingWell:
-          type:
-          - string
-          - "null"
-        groupSlug:
-          type:
-          - string
-          - "null"
-        hasMore:
-          type: boolean
-        practiceName:
-          type: string
-        practiceSlug:
-          type: string
-        since:
-          type: string
-          format: date-time
-        workCount:
-          type: integer
-          format: int32
-      required:
-      - evidence
-      - goingWell
-      - groupSlug
-      - hasMore
-      - practiceName
-      - practiceSlug
-      - since
-      - workCount
     GroupDefinition:
       type: object
       properties:
@@ -18449,6 +18394,18 @@ components:
           - "null"
           - integer
           format: int32
+        groupColor:
+          type:
+          - string
+          - "null"
+        groupDescription:
+          type:
+          - string
+          - "null"
+        groupIcon:
+          type:
+          - string
+          - "null"
         groupName:
           type: string
         groupSlug:
@@ -18488,6 +18445,9 @@ components:
       - direction
       - feedbackSince
       - feedbackSpanDays
+      - groupColor
+      - groupDescription
+      - groupIcon
       - groupName
       - groupSlug
       - guidance
@@ -18775,10 +18735,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ProfileChange"
-        goingWell:
-          type: array
-          items:
-            $ref: "#/components/schemas/GoingWellPractice"
         latestReview:
           anyOf:
           - $ref: "#/components/schemas/ProfileReviewRef"
@@ -18791,7 +18747,6 @@ components:
           $ref: "#/components/schemas/OverviewWindow"
       required:
       - changes
-      - goingWell
       - latestReview
       - reviewedItems
       - window
