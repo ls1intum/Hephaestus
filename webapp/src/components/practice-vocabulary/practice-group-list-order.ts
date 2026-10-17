@@ -1,4 +1,4 @@
-import type { PracticeGroup, PracticeGroupStanding, PracticeStanding } from "@/api/types.gen";
+import type { GroupRef, PracticeGroupStanding, PracticeStanding } from "@/api/types.gen";
 
 import { statusValues } from "@/components/common/status-def";
 import { PRACTICE_GROUP_STANDING_DEFS } from "./practice-group-standing-defs";
@@ -32,19 +32,16 @@ export function sortByStanding<T>(
 	);
 }
 
-/**
- * The groups by standing; a group the standings did not report reads as not observed, and ties keep
- * the catalog's display order, then the name.
- */
-export function sortPracticeGroups(
-	groups: PracticeGroup[],
+export function sortPracticeGroups<TGroup extends Pick<GroupRef, "slug">>(
+	groups: readonly TGroup[],
 	standings: Record<string, PracticeGroupStanding | undefined>,
 	sort: SortDirection,
-): PracticeGroup[] {
+): TGroup[] {
+	const arrival = new Map(groups.map((group, index) => [group.slug, index]));
 	return sortByStanding(
 		groups,
 		sort,
 		(group) => standings[group.slug]?.standing ?? "NOT_OBSERVED",
-		(left, right) => left.displayOrder - right.displayOrder || left.name.localeCompare(right.name),
+		(left, right) => (arrival.get(left.slug) ?? 0) - (arrival.get(right.slug) ?? 0),
 	);
 }

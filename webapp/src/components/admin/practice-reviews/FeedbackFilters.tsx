@@ -1,23 +1,23 @@
 import type { FacetSource } from "@/components/common/FacetMultiSelect";
+import { ReferenceFilterPill } from "@/components/common/ReferenceFilterPill";
 import { statusFacetOptions } from "@/components/common/status-def";
-import { DELIVERY_STATE_DEFS } from "@/components/practice-vocabulary/delivery-outcome-defs";
+import { DELIVERY_STATE_DEFS } from "@/components/practice-vocabulary/delivery-state-defs";
+import { FEEDBACK_DESTINATION_DEFS } from "@/components/practice-vocabulary/feedback-destination-defs";
 import { FEEDBACK_LOCATION_DEFS } from "@/components/practice-vocabulary/feedback-location-defs";
 import { WITHHOLDING_FAMILY_DEFS } from "@/components/practice-vocabulary/withholding-defs";
 import { nonEmpty } from "@/lib/search-params";
 
 import { listFacet } from "./AppliedFacetPills";
-import type { PracticeFacetOption } from "./ObservationFilters";
-import { clearedScope, hasAppliedScope, readScope, scopeSearch } from "./review-scope";
+import type { PracticeFacetOption } from "./ResultFilters";
+import { clearedScope, hasAppliedScope, readScope } from "./review-scope";
 import type { FeedbackSearch, FeedbackSort } from "./review-search";
 import { ReviewFilterBar } from "./ReviewFilterBar";
 import type { ReviewPeople } from "./ReviewPersonFacet";
 import type { ScopeRecordFilter } from "./ReviewScopeFilters";
 import { type ReviewSortItem, ReviewSortSelect } from "./ReviewSortSelect";
 
-const OUTCOME_OPTIONS = statusFacetOptions(DELIVERY_STATE_DEFS);
-// The channel facet offers locations: each channel split by the provider that shows it, so an admin
-// can ask for GitHub or Slack alone. The channel-wide entries cover feedback whose provider is unknown.
-const LOCATION_OPTIONS = statusFacetOptions(FEEDBACK_LOCATION_DEFS);
+const STATE_OPTIONS = statusFacetOptions(DELIVERY_STATE_DEFS);
+const DESTINATION_OPTIONS = statusFacetOptions(FEEDBACK_DESTINATION_DEFS);
 const WITHHELD_FAMILY_OPTIONS = statusFacetOptions(WITHHOLDING_FAMILY_DEFS);
 
 const SORT_ITEMS: [ReviewSortItem<FeedbackSort>, ...ReviewSortItem<FeedbackSort>[]] = [
@@ -27,13 +27,16 @@ const SORT_ITEMS: [ReviewSortItem<FeedbackSort>, ...ReviewSortItem<FeedbackSort>
 
 /**
  * The facets this list owns, cleared: what the toolbar's Reset clears. `order` is excluded, as on the
- * observations list, and so is the shared scope, which "Clear scope" owns.
+ * results list, and so is the shared scope, which "Clear scope" owns.
  */
 export function clearedFeedbackFacets(): Partial<FeedbackSearch> {
 	return {
-		deliveryState: undefined,
+		state: undefined,
+		destination: undefined,
 		withheldFamily: undefined,
 		location: undefined,
+		withdrawn: undefined,
+		disagreed: undefined,
 	};
 }
 
@@ -44,9 +47,12 @@ export function clearedFeedbackFilters(): Partial<FeedbackSearch> {
 
 function hasFeedbackFacet(search: FeedbackSearch): boolean {
 	return (
-		(search.deliveryState?.length ?? 0) > 0 ||
+		(search.state?.length ?? 0) > 0 ||
+		(search.destination?.length ?? 0) > 0 ||
 		(search.withheldFamily?.length ?? 0) > 0 ||
-		(search.location?.length ?? 0) > 0
+		search.location !== undefined ||
+		search.withdrawn !== undefined ||
+		search.disagreed !== undefined
 	);
 }
 
@@ -62,9 +68,7 @@ export interface FeedbackFiltersProps {
 	onReset: () => void;
 	/** Clears the shared scope, on this tab and every tab after it. */
 	onClearScope: () => void;
-	/** The groups whose practices' observations the feedback was written from. */
 	groups: FacetSource;
-	/** The practices whose observations the feedback was written from. */
 	practices: FacetSource<PracticeFacetOption>;
 	people: ReviewPeople;
 	/** How many rows the filters currently select, or `undefined` while that is unknown. */
@@ -72,10 +76,10 @@ export interface FeedbackFiltersProps {
 	/** The one record the scope is filtered to, by name; absent for none, or for a selection. */
 	record?: ScopeRecordFilter;
 	/**
-	 * The name of the person `recipientUserId` identifies. It must name *that* person: reading it off
-	 * the first row is right only while the filter is on.
+	 * The name of the developer `developerId` identifies. It must name *that* developer: reading it
+	 * off the first row is right only while the filter is on.
 	 */
-	recipientName?: string;
+	developerName?: string;
 }
 
 export function FeedbackFilters({
@@ -88,14 +92,13 @@ export function FeedbackFilters({
 	people,
 	total,
 	record,
-	recipientName,
+	developerName,
 }: FeedbackFiltersProps) {
-	const scope = readScope(search);
-	const outcome = listFacet("Outcome", OUTCOME_OPTIONS, search.deliveryState, (values) =>
-		onPatch({ deliveryState: nonEmpty(values) }),
+	const state = listFacet("Delivery", STATE_OPTIONS, search.state, (values) =>
+		onPatch({ state: nonEmpty(values) }),
 	);
-	const channel = listFacet("Channel", LOCATION_OPTIONS, search.location, (values) =>
-		onPatch({ location: nonEmpty(values) }),
+	const destination = listFacet("Destination", DESTINATION_OPTIONS, search.destination, (values) =>
+		onPatch({ destination: nonEmpty(values) }),
 	);
 	const withheld = listFacet(
 		"Why withheld",
@@ -107,21 +110,19 @@ export function FeedbackFilters({
 	return (
 		<ReviewFilterBar
 			tab="feedback"
-			scope={scope}
-			onChange={(patch) => onPatch(scopeSearch("feedback", patch))}
+			scope={readScope(search)}
+			onChange={onPatch}
 			onClearScope={onClearScope}
-			// "Composed" rather than "Date": this range filters when the feedback was written, which is
-			// not when it was delivered and not when the observation behind it was made.
 			dateTitle="Composed"
 			groups={groups}
 			practices={practices}
 			people={people}
-			personName={recipientName}
+			personName={developerName}
 			record={record}
 			facets={
 				<>
-					{outcome.control}
-					{channel.control}
+					{state.control}
+					{destination.control}
 					{withheld.control}
 					<ReviewSortSelect
 						items={SORT_ITEMS}
@@ -130,7 +131,32 @@ export function FeedbackFilters({
 					/>
 				</>
 			}
-			pills={[...outcome.pills, ...channel.pills, ...withheld.pills]}
+			pills={[...state.pills, ...destination.pills, ...withheld.pills]}
+			referencePills={
+				<>
+					{search.location !== undefined && (
+						<ReferenceFilterPill
+							label="Where"
+							value={FEEDBACK_LOCATION_DEFS[search.location].label}
+							onClear={() => onPatch({ location: undefined })}
+						/>
+					)}
+					{search.withdrawn !== undefined && (
+						<ReferenceFilterPill
+							label="Withdrawn"
+							value={search.withdrawn ? "Only" : "Excluded"}
+							onClear={() => onPatch({ withdrawn: undefined })}
+						/>
+					)}
+					{search.disagreed !== undefined && (
+						<ReferenceFilterPill
+							label="Developer disagreed"
+							value={search.disagreed ? "Only" : "Excluded"}
+							onClear={() => onPatch({ disagreed: undefined })}
+						/>
+					)}
+				</>
+			}
 			hasFacet={hasFeedbackFacet(search)}
 			onReset={onReset}
 			total={total}

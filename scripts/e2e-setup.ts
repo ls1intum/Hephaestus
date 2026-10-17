@@ -42,10 +42,12 @@ function textField(value: JsonObject, field: string, context: string): string {
 }
 
 function idField(value: JsonObject, context: string): number {
-	if (typeof value.id !== "number" || !Number.isSafeInteger(value.id)) {
+	const id =
+		typeof value.id === "string" && /^[1-9][0-9]*$/u.test(value.id) ? Number(value.id) : value.id;
+	if (typeof id !== "number" || !Number.isSafeInteger(id) || id <= 0) {
 		throw new TypeError(`${context} response has no valid id`);
 	}
-	return value.id;
+	return id;
 }
 
 function parseArgs(args: string[]): Map<string, string> {
@@ -297,42 +299,69 @@ async function resolveScmIdentity(config: Config): Promise<ScmIdentity> {
 	return { scmOrigin, scmId, scmLogin };
 }
 
-async function seedIdentity(
-	database: Client,
-	config: Config,
+interface IdentitySeedDatabase {
+	query: (statement: string, values?: unknown[]) => Promise<{ rows: JsonObject[] }>;
+}
+
+export async function seedIdentity(
+	database: IdentitySeedDatabase,
+	config: Pick<Config, "provider">,
 	accountId: number,
 	{ scmOrigin, scmId, scmLogin }: ScmIdentity,
 ): Promise<number> {
-	const account = await database.query<{ exists: boolean }>(
-		"SELECT EXISTS (SELECT 1 FROM account WHERE id = $1) AS exists",
+	const account = await database.query(
+		"SELECT EXISTS (SELECT 1 FROM account WHERE id = $1 AND status='ACTIVE') AS exists",
 		[accountId],
 	);
 	if (account.rows[0]?.exists !== true) {
 		throw new Error("E2E_APP_URL and E2E_DB_URL point to different databases");
 	}
 	await database.query("BEGIN");
-	const provider = await database.query<{ id: number }>(
-		"INSERT INTO identity_provider (type, server_url, created_at) VALUES ($1,$2,now()) ON CONFLICT (type, server_url) DO UPDATE SET server_url=EXCLUDED.server_url RETURNING id",
-		[config.provider.toUpperCase(), scmOrigin],
-	);
-	const providerId = provider.rows[0]?.id;
-	if (providerId === undefined) {
-		throw new Error("identity provider seeding failed");
+	try {
+		const provider = await database.query(
+			"INSERT INTO identity_provider (type, server_url, created_at) VALUES ($1,$2,now()) ON CONFLICT (type, server_url) DO UPDATE SET server_url=EXCLUDED.server_url RETURNING id",
+			[config.provider.toUpperCase(), scmOrigin],
+		);
+		const providerId = idField(object(provider.rows[0], "Identity provider"), "Identity provider");
+		const user = await database.query(
+			"INSERT INTO \"user\" (native_id, provider_id, login, type, avatar_url, html_url, created_at, updated_at) VALUES ($1,$2,$3,'USER','',$4,now(),now()) ON CONFLICT (provider_id, native_id) DO UPDATE SET login=EXCLUDED.login RETURNING id",
+			[scmId, providerId, scmLogin, `${scmOrigin}/${scmLogin}`],
+		);
+		const userId = idField(object(user.rows[0], "SCM user"), "SCM user");
+		const restrictions = await database.query(
+			"SELECT EXISTS(SELECT 1 FROM identity_restriction WHERE provider_id=$1 AND provider_user_key=$2 AND team_key='' AND kind='ERASED') AS erased",
+			[providerId, String(scmId)],
+		);
+		if (restrictions.rows[0]?.erased !== false) {
+			throw new Error("SCM identity processing is suppressed");
+		}
+		const existing = await database.query(
+			"SELECT account_id::text,disabled_at FROM identity WHERE provider_id=$1 AND provider_user_key=$2 AND team_key='' FOR UPDATE",
+			[providerId, String(scmId)],
+		);
+		const active = existing.rows.find((row) => row.disabled_at === null);
+		if (active?.account_id !== String(accountId) && existing.rows.length > 0) {
+			throw new Error("SCM identity is disabled or belongs to a different account");
+		}
+		if (existing.rows.length === 0) {
+			await database.query(
+				"INSERT INTO identity (account_id, provider_id, provider_user_key, team_key, linked_at, linked_via) VALUES ($1,$2,$3,'',now(),'SIGN_IN') ON CONFLICT (provider_id, provider_user_key, team_key) WHERE disabled_at IS NULL DO NOTHING",
+				[accountId, providerId, String(scmId)],
+			);
+		}
+		const linked = await database.query(
+			"SELECT account_id::text FROM identity WHERE provider_id=$1 AND provider_user_key=$2 AND team_key='' AND disabled_at IS NULL",
+			[providerId, String(scmId)],
+		);
+		if (linked.rows[0]?.account_id !== String(accountId)) {
+			throw new Error("SCM identity is disabled or belongs to a different account");
+		}
+		await database.query("COMMIT");
+		return userId;
+	} catch (error) {
+		await database.query("ROLLBACK");
+		throw error;
 	}
-	const user = await database.query<{ id: number }>(
-		"INSERT INTO \"user\" (native_id, provider_id, login, type, avatar_url, html_url, created_at, updated_at) VALUES ($1,$2,$3,'USER','',$4,now(),now()) ON CONFLICT (provider_id, native_id) DO UPDATE SET login=EXCLUDED.login RETURNING id",
-		[scmId, providerId, scmLogin, `${scmOrigin}/${scmLogin}`],
-	);
-	const userId = user.rows[0]?.id;
-	if (userId === undefined) {
-		throw new Error("SCM user seeding failed");
-	}
-	await database.query(
-		"INSERT INTO identity_link (account_id, provider_id, subject, linked_at, linked_via, external_actor_id, username_at_signup) VALUES ($1,$2,$3,now(),'OAUTH_LOGIN',$4,$5) ON CONFLICT (account_id, provider_id, COALESCE(team_id, '')) WHERE disabled_at IS NULL DO NOTHING",
-		[accountId, providerId, String(scmId), userId, scmLogin],
-	);
-	await database.query("COMMIT");
-	return userId;
 }
 
 async function ensureWorkspace(
@@ -475,66 +504,20 @@ async function bindAgents(api: Api, config: Config, modelId: number): Promise<vo
 	}
 }
 
-async function adoptAvailablePractice(api: Api, config: Config, jwt: string): Promise<void> {
-	const adoption = array(
-		await api("GET", `/workspaces/${config.workspaceSlug}/practice-catalog/adoption`),
-		"practice-catalog adoption",
-	);
-	const available = adoption.find((entry) => entry.availability === "AVAILABLE");
-	if (!available) {
-		if (!adoption.some((entry) => entry.availability === "ADOPTED")) {
-			throw new Error("practice catalog has neither an available nor an adopted practice");
-		}
-		return;
-	}
-	const slug = textField(available, "slug", "practice-catalog adoption");
-	const preview = await fetch(
-		`${config.appUrl}/workspaces/${config.workspaceSlug}/practice-catalog/adoption/${slug}`,
-		{ headers: { authorization: `Bearer ${jwt}` }, signal: AbortSignal.timeout(30_000) },
-	);
-	if (!preview.ok) {
-		throw new Error(`practice adoption preview failed with HTTP ${preview.status}`);
-	}
-	const etag = preview.headers.get("etag");
-	const previewBody = object(parseJson(await preview.text()), "practice adoption preview");
-	const definition = object(previewBody.definition, "practice adoption preview.definition");
-	if (
-		previewBody.slug !== slug ||
-		previewBody.availability !== "AVAILABLE" ||
-		previewBody.initialAutonomy !== "HUMAN_APPROVAL" ||
-		textField(definition, "criteria", "practice adoption preview.definition").trim().length === 0 ||
-		typeof previewBody.sourceReviewRuleFingerprint !== "string" ||
-		previewBody.sourceReviewRuleFingerprint.length === 0 ||
-		etag === null ||
-		etag === ""
-	) {
-		throw new Error("practice adoption preview is incomplete or inconsistent");
-	}
-	const adopted = object(
-		await jsonRequest(
-			`${config.appUrl}/workspaces/${config.workspaceSlug}/practice-catalog/adoption/${slug}`,
-			{ method: "POST", headers: { authorization: `Bearer ${jwt}`, "if-match": etag } },
-			"practice adoption",
-		),
-		"practice adoption",
-	);
-	const autonomy = object(adopted.autonomy, "adopted practice autonomy");
-	if (autonomy.effective !== "HUMAN_APPROVAL" || autonomy.override !== "HUMAN_APPROVAL") {
-		throw new Error("adopted practice did not start in human-approval mode");
-	}
-}
-
-async function definePractices(api: Api, config: Config): Promise<void> {
+export async function definePractices(
+	api: Api,
+	config: Pick<Config, "workspaceSlug">,
+): Promise<void> {
 	const needs = [
-		{ sourceKind: "scm.pull-request.core", stance: "REQUIRED" },
-		{ sourceKind: "scm.pull-request.diff", stance: "REQUIRED" },
-		{ sourceKind: "scm.pull-request.comments", stance: "REQUIRED" },
+		{ source: "scm.pull-request.core", need: "REQUIRED" },
+		{ source: "scm.pull-request.diff", need: "REQUIRED" },
+		{ source: "scm.pull-request.comments", need: "REQUIRED" },
 	];
 	const definitions = [
 		{
 			slug: "submit-reviewable-work",
 			name: "Submit reviewable work",
-			signals: [
+			events: [
 				"scm.pull_request.opened",
 				"scm.pull_request.ready",
 				"scm.pull_request.synchronized",
@@ -545,14 +528,14 @@ async function definePractices(api: Api, config: Config): Promise<void> {
 		{
 			slug: "act-on-feedback",
 			name: "Act on feedback",
-			signals: ["scm.pull_request.reviewed", "scm.pull_request.synchronized"],
+			events: ["scm.pull_request.synchronized"],
 			criteria:
 				"After reviewers leave comments, the author addresses them with follow-up commits or replies rather than ignoring or force-resolving them.",
 		},
 		{
 			slug: "plan-and-scope-issues",
 			name: "Plan & scope issues",
-			signals: ["scm.pull_request.opened"],
+			events: ["scm.pull_request.opened"],
 			criteria:
 				"The MR references a well-defined, properly scoped issue and stays within that scope. Flag MRs with no linked issue or scope creep.",
 		},
@@ -562,33 +545,53 @@ async function definePractices(api: Api, config: Config): Promise<void> {
 		"practices",
 	);
 	for (const practice of existingPractices) {
-		if (
-			practice.autonomy != null &&
-			object(practice.autonomy, "practice autonomy").effective !== "OFF"
-		) {
-			await api(
-				"PATCH",
-				`/workspaces/${config.workspaceSlug}/practices/${textField(practice, "slug", "practice")}/autonomy`,
-				{ autonomy: "OFF" },
-			);
-		}
+		await api(
+			"PATCH",
+			`/workspaces/${config.workspaceSlug}/practices/${textField(practice, "slug", "practice")}/feedback-mode`,
+			{ feedbackMode: "OFF" },
+		);
 	}
-	for (const definition of definitions) {
-		const body = {
-			name: definition.name,
-			bindings: [{ signals: definition.signals, needs }],
-			criteria: definition.criteria,
+	for (const entry of definitions) {
+		const definition = {
+			name: entry.name,
+			reviewOn: { events: entry.events, state: {} },
+			appliesWhen: null,
+			about: "AUTHOR",
+			reads: { contract: "2.0.0", sources: needs },
+			reviewedBy: { by: "HEPHAESTUS", humanReason: null, limits: [] },
+			criteria: entry.criteria,
+			script: null,
+			scan: null,
+			lineNotes: false,
+			guidance: {
+				whyItMatters: null,
+				whatGoodLooksLike: null,
+				goingWell: null,
+				visual: null,
+				guide: null,
+			},
 		};
-		await (existingPractices.some((practice) => practice.slug === definition.slug)
-			? api("PATCH", `/workspaces/${config.workspaceSlug}/practices/${definition.slug}`, body)
-			: api("POST", `/workspaces/${config.workspaceSlug}/practices`, {
-					slug: definition.slug,
-					...body,
+		const existing = existingPractices.find((practice) => practice.slug === entry.slug);
+		await (existing === undefined
+			? api("POST", `/workspaces/${config.workspaceSlug}/practices`, {
+					slug: entry.slug,
+					kind: "scm.pull_request",
+					definition,
+					groupSlug: null,
+					position: null,
+				})
+			: api("PATCH", `/workspaces/${config.workspaceSlug}/practices/${entry.slug}`, {
+					definition,
+					expectedVersionId: textField(
+						object(existing.currentVersion, "practice.currentVersion"),
+						"id",
+						"practice.currentVersion",
+					),
 				}));
 		await api(
 			"PATCH",
-			`/workspaces/${config.workspaceSlug}/practices/${definition.slug}/autonomy`,
-			{ autonomy: "AUTOMATIC" },
+			`/workspaces/${config.workspaceSlug}/practices/${entry.slug}/feedback-mode`,
+			{ feedbackMode: "AUTOMATIC" },
 		);
 	}
 }
@@ -650,7 +653,7 @@ async function main(): Promise<void> {
 	});
 	await database.connect();
 	try {
-		const userId = await seedIdentity(database, config, accountId, scm);
+		await seedIdentity(database, config, accountId, scm);
 		jwt = await login(config);
 		const workspace = await ensureWorkspace(
 			api,
@@ -663,8 +666,8 @@ async function main(): Promise<void> {
 			personalAccessToken: config.pat,
 		});
 		await database.query(
-			"INSERT INTO workspace_membership (workspace_id, user_id, role, hidden, created_at) VALUES ($1,$2,'ADMIN',false,now()) ON CONFLICT DO NOTHING",
-			[workspaceId, userId],
+			"INSERT INTO membership (workspace_id, account_id, role, hidden, joined_at) VALUES ($1,$2,'ADMIN',false,now()) ON CONFLICT (workspace_id,account_id) DO UPDATE SET left_at=NULL,role=CASE WHEN membership.role='OWNER' THEN 'OWNER' ELSE 'ADMIN' END",
+			[workspaceId, accountId],
 		);
 		await api("PATCH", `/workspaces/${config.workspaceSlug}/features`, {
 			practicesEnabled: true,
@@ -683,7 +686,6 @@ async function main(): Promise<void> {
 		);
 		const modelId = await configureLlm(api, config);
 		await bindAgents(api, config, modelId);
-		await adoptAvailablePractice(api, config, jwt);
 		await definePractices(api, config);
 		if (config.repository !== undefined) {
 			const monitored = await api("GET", `/workspaces/${config.workspaceSlug}/repositories`);

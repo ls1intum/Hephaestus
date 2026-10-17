@@ -1,6 +1,6 @@
 import { ChevronRight, Library } from "lucide-react";
 
-import type { CatalogPracticeSummary } from "@/api/types.gen";
+import type { AdoptablePractice } from "@/components/admin/practices/catalog-adoption";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { Section } from "@/components/layout/Section";
@@ -27,7 +27,7 @@ import {
 import { hasText } from "@/lib/text";
 
 export interface AvailablePracticeListProps {
-	practices: CatalogPracticeSummary[];
+	practices: AdoptablePractice[];
 	existingGroupSlugs: ReadonlySet<string>;
 }
 
@@ -38,7 +38,7 @@ export function AvailablePracticeList({
 	const offered = practices.filter(
 		(practice) =>
 			practice.availability !== "ADOPTED" ||
-			(practice.groupSlug !== undefined && !existingGroupSlugs.has(practice.groupSlug)),
+			(hasText(practice.groupSlug) && !existingGroupSlugs.has(practice.groupSlug)),
 	);
 
 	if (offered.length === 0) {
@@ -60,7 +60,7 @@ export function AvailablePracticeList({
 		);
 	}
 
-	const groups = new Map<string, CatalogPracticeSummary[]>();
+	const groups = new Map<string, AdoptablePractice[]>();
 	for (const practice of offered) {
 		const key = practice.groupSlug ?? "__unassigned__";
 		groups.set(key, [...(groups.get(key) ?? []), practice]);
@@ -76,7 +76,7 @@ export function AvailablePracticeList({
 				const { groupSlug } = first;
 				const available = entries.filter(({ availability }) => availability === "AVAILABLE").length;
 				const restorable = entries.filter(({ availability }) => availability === "ADOPTED").length;
-				const groupMissing = groupSlug !== undefined && !existingGroupSlugs.has(groupSlug);
+				const groupMissing = hasText(groupSlug) && !existingGroupSlugs.has(groupSlug);
 
 				return (
 					<Section
@@ -131,7 +131,7 @@ function reviewLabel(groupMissing: boolean, available: number, restorable: numbe
 	return `Add group · ${countLabel(available)}`;
 }
 
-function PracticeRow({ practice }: { practice: CatalogPracticeSummary }) {
+function PracticeRow({ practice }: { practice: AdoptablePractice }) {
 	const def = CATALOG_AVAILABILITY_DEFS[practice.availability];
 	// Both open as a drawer level, so the catalog never has to be left to look at something in it.
 	const link =
@@ -154,7 +154,7 @@ function PracticeRow({ practice }: { practice: CatalogPracticeSummary }) {
 					<span className="sr-only">, {def.action}</span>
 				</ItemTitle>
 				<ItemDescription className="line-clamp-none">
-					<WorkTypeLabel artifactKind={practice.artifactKind} />
+					<WorkTypeLabel itemKind={practice.kind} />
 				</ItemDescription>
 				{/* Without this the rows differ only by name: the large majority of the bundled catalogue
 				    reviews a pull request, so the work type above separates almost none of them. */}

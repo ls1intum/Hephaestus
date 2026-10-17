@@ -376,8 +376,8 @@ The HTTP graceful shutdown starts only after the drain.
 
 Unadmitted reviews return to the queue within `AGENT_MAX_RETRIES`, for another worker to claim.
 An exhausted retry budget or a concurrent cancellation leaves the job terminal instead.
-Admitted observations are never measured again.
-An interrupted review without saved completed feedback fails with an explicit reason and retains its observations.
+Admitted results are never measured again.
+An interrupted review without saved completed feedback fails with an explicit reason and retains its results.
 Completed reviews continue through normal delivery and delivery recovery.
 `timeout=0` skips step 2 and immediately applies the same recovery decisions.
 

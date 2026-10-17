@@ -39,7 +39,20 @@ class PracticeCriteriaCaseStagingIntegrationTest {
         for (String sidecar : List.of("pi-change.ts", "pi-task-paths.ts")) {
             Files.copy(Path.of("src/main/resources/agent", sidecar), workspace.resolve(sidecar));
         }
-        PracticeCriteriaCaseFixtures.stage(workspace, scenario);
+        var definitions = PracticeCriteriaCaseFixtures.stage(workspace, scenario);
+        LiveRunnerWorkspace.stageFixtureInputs(
+                workspace,
+                scenario.path("workType").asString().equals("issue") ? "scm.issue" : "scm.pull_request",
+                definitions);
+        for (var entry : definitions.entrySet()) {
+            Path script = workspace.resolve(SandboxLayout.PRACTICE_SCRIPT_PRACTICES_PREFIX + entry.getKey() + ".ts");
+            var program = entry.getValue().path("script");
+            if (program.isNull()) {
+                assertThat(script).doesNotExist();
+            } else {
+                assertThat(script).as("bundled program for %s", entry.getKey()).hasContent(program.asString());
+            }
+        }
         var practiceIndex = mapper.readTree(
                 workspace.resolve(SandboxLayout.PRACTICES_PREFIX + "index.json").toFile());
         assertThat(practiceIndex)
@@ -61,8 +74,8 @@ class PracticeCriteriaCaseStagingIntegrationTest {
         var index =
                 mapper.readTree(workspace.resolve(SandboxLayout.MANIFEST_PATH).toFile());
         var paths = new HashSet<String>();
-        for (var artifact : index.path("artifacts")) {
-            String path = artifact.path("artifact").path("path").asString();
+        for (var artifact : index.path("files")) {
+            String path = artifact.path("file").path("path").asString();
             assertThat(paths.add(path))
                     .as("unique artifact in %s", scenario.path("id"))
                     .isTrue();
@@ -73,8 +86,8 @@ class PracticeCriteriaCaseStagingIntegrationTest {
         String commentsKind = scenario.path("workType").asString().equals("issue")
                 ? "scm.issue.comments"
                 : "scm.pull-request.comments";
-        for (var artifact : index.path("artifacts")) {
-            String path = artifact.path("artifact").path("path").asString();
+        for (var artifact : index.path("files")) {
+            String path = artifact.path("file").path("path").asString();
             if (path.equals(PracticeCriteriaCaseFixtures.COMMITS)) {
                 assertThat(artifact.path("kind").asString()).isEqualTo("scm.pull-request.core");
             }
@@ -106,9 +119,7 @@ class PracticeCriteriaCaseStagingIntegrationTest {
                                         : "scm.issue.comments"));
         var task = mapper.readTree(
                 workspace.resolve(SandboxLayout.TASK_ENVELOPE_FILENAME).toFile());
-        assertThat(task.path("repositoryRoot").asString())
-                .isEqualTo(SandboxLayout.REPO_MOUNT_RELATIVE.replaceFirst("/$", ""));
-        assertThat(task.path("prompt").asString())
+        assertThat(task.path("task").path("prompt").asString())
                 .doesNotContain(scenario.path("reason").asString());
         var files = mapper.readTree(workspace.resolve("work/change/files.json").toFile())
                 .path("files");
@@ -172,9 +183,10 @@ class PracticeCriteriaCaseStagingIntegrationTest {
         }
         var metadata =
                 mapper.readTree(workspace.resolve("context/metadata.json").toFile());
-        var defaults = mapper.readTree(PracticeCriteriaCaseFixtures.FIXTURE_DIR
-                .resolve("metadata.json")
-                .toFile());
+        // Every field the content source writes is staged, whatever the case states.
+        var defaults = scenario.path("workType").asString().equals("issue")
+                ? LiveWorkRecords.issue(PracticeCriteriaCaseFixtures.DEFAULT_TITLE, "")
+                : LiveWorkRecords.pullRequest("0".repeat(40), PracticeCriteriaCaseFixtures.DEFAULT_TITLE, "", 1);
         for (var field : defaults.properties()) {
             assertThat(metadata.has(field.getKey()))
                     .as("default %s", field.getKey())
@@ -226,7 +238,8 @@ class PracticeCriteriaCaseStagingIntegrationTest {
                 Map.of("scope-one-reviewable-change", "UNDETERMINED"),
                 "files",
                 Map.of("repo/Example.java", "final class Example {}\n")));
-        PracticeCriteriaCaseFixtures.stage(workspace, scenario);
+        var definitions = PracticeCriteriaCaseFixtures.stage(workspace, scenario);
+        LiveRunnerWorkspace.stageFixtureInputs(workspace, "scm.pull_request", definitions);
         var index = mapper.readTree(
                 workspace.resolve(SandboxLayout.PRACTICES_PREFIX + "index.json").toFile());
         assertThat(index).hasSize(1);
@@ -271,12 +284,12 @@ class PracticeCriteriaCaseStagingIntegrationTest {
     void shouldStopFixtureProcessWhenInterrupted() throws Exception {
         Path pidFile = root.resolve("fixture.pid");
         try (var executor = Executors.newSingleThreadExecutor()) {
-            var command = executor.submit(
-                    () -> PracticeCriteriaCaseFixtures.fixtureCommand(
-                            root,
-                            "node",
-                            "-e",
-                            "require('node:fs').writeFileSync('fixture.pid', String(process.pid)); setInterval(() => {}, 1000);"));
+            var command = executor.submit(() -> PracticeCriteriaCaseFixtures.fixtureCommand(
+                    root,
+                    "node",
+                    "-e",
+                    "require('node:fs').writeFileSync('fixture.pid', String(process.pid)); setInterval(() =>"
+                            + " {}, 1000);"));
             try {
                 await().atMost(5, TimeUnit.SECONDS).until(() -> Files.exists(pidFile) && Files.size(pidFile) > 0);
                 var child = ProcessHandle.of(Long.parseLong(Files.readString(pidFile)))

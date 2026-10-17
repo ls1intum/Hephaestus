@@ -2,13 +2,13 @@ package de.tum.cit.aet.hephaestus.activity.overview;
 
 import de.tum.cit.aet.hephaestus.activity.ActivityAutomation;
 import de.tum.cit.aet.hephaestus.activity.ActivityAutomationRepository;
+import de.tum.cit.aet.hephaestus.activity.ActivityPersonWriteAdmission;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditSnapshot;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCopyFence;
-import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataWriteFence;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import lombok.RequiredArgsConstructor;
@@ -24,12 +24,12 @@ class ActivityAutomationService {
     private final ActivityPeopleQueryRepository people;
     private final ConfigAuditPort audit;
     private final PersonDataCopyFence fence;
-    private final PersonDataWriteFence writeFence;
+    private final ActivityPersonWriteAdmission admission;
 
     @Transactional
     public void classify(long workspaceId, long userId, boolean treatAsAutomation) {
         fence.holdForCapture();
-        if (!writeFence.holdForUserWrite(userId)) {
+        if (!admission.holdActor(userId)) {
             throw new EntityNotFoundException("Contributor", userId);
         }
         var workspace = workspaces

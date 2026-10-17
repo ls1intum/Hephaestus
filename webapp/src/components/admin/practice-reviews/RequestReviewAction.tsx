@@ -125,9 +125,9 @@ export function RequestReviewAction({ request, label }: RequestReviewActionProps
 				<AlertDialogHeader>
 					<AlertDialogTitle>Request a review of {work}?</AlertDialogTitle>
 					<AlertDialogDescription>
-						Heph reviews {work} now against the practices that apply to it, as a requested review.
-						It runs as an agent job and counts toward this workspace&rsquo;s AI usage. If the
-						workspace settings stop it, you see why.
+						Hephaestus reviews {work} now against the practices that apply to it, as a requested
+						review. It runs as an agent job and counts toward this workspace&rsquo;s AI usage. If
+						the workspace settings stop it, you see why.
 					</AlertDialogDescription>
 				</AlertDialogHeader>
 				<AlertDialogFooter>

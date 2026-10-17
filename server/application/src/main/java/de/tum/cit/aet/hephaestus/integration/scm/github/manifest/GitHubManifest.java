@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.manifest;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.Capability;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackLane;
+import de.tum.cit.aet.hephaestus.integration.core.spi.CopyCapability;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import java.util.Map;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
@@ -55,32 +55,35 @@ public class GitHubManifest implements IntegrationManifest {
                 Capability.APPROVAL_WORKFLOW);
     }
 
-    /**
-     * GitHub carries the shared SCM domain in full: every signal a descriptor declares as
-     * webhook-produced has a GitHub event behind it. The manual review-request signals are absent
-     * because no ingested event raises them — somebody asks for those by hand.
-     */
     @Override
     public ReviewContribution reviewContribution() {
         return new ReviewContribution(
-                Set.of(ScmSignals.PULL_REQUEST, ScmSignals.ISSUE),
+                Set.of(
+                        ScmItemEvents.PULL_REQUEST,
+                        ScmItemEvents.PULL_REQUEST_REVIEW,
+                        ScmItemEvents.ISSUE,
+                        ScmItemEvents.REPOSITORY,
+                        ScmItemEvents.FILE),
                 Map.of(
-                        ScmSignals.PULL_REQUEST,
+                        ScmItemEvents.PULL_REQUEST,
                         Set.of(
-                                ScmSignals.PULL_REQUEST_OPENED,
-                                ScmSignals.PULL_REQUEST_READY,
-                                ScmSignals.PULL_REQUEST_SYNCHRONIZED,
-                                ScmSignals.PULL_REQUEST_EDITED,
-                                ScmSignals.PULL_REQUEST_LINKED_ISSUE_UPDATED,
-                                ScmSignals.PULL_REQUEST_REVIEWED,
-                                ScmSignals.PULL_REQUEST_MERGED,
-                                ScmSignals.PULL_REQUEST_CLOSED),
-                        ScmSignals.ISSUE,
-                        Set.of(ScmSignals.ISSUE_OPENED, ScmSignals.ISSUE_UPDATED, ScmSignals.ISSUE_CLOSED)),
+                                ScmItemEvents.PULL_REQUEST_OPENED,
+                                ScmItemEvents.PULL_REQUEST_READY,
+                                ScmItemEvents.PULL_REQUEST_SYNCHRONIZED,
+                                ScmItemEvents.PULL_REQUEST_EDITED,
+                                ScmItemEvents.PULL_REQUEST_LINKED_ISSUE_UPDATED,
+                                ScmItemEvents.PULL_REQUEST_MERGED,
+                                ScmItemEvents.PULL_REQUEST_CLOSED),
+                        ScmItemEvents.ISSUE,
+                        Set.of(ScmItemEvents.ISSUE_OPENED, ScmItemEvents.ISSUE_UPDATED, ScmItemEvents.ISSUE_CLOSED),
+                        ScmItemEvents.PULL_REQUEST_REVIEW,
+                        Set.of(ScmItemEvents.PULL_REQUEST_REVIEW_SUBMITTED)),
                 Map.of(
-                        ScmSignals.PULL_REQUEST,
-                        Set.of(FeedbackLane.IN_CONTEXT_SUMMARY, FeedbackLane.IN_CONTEXT_INLINE),
-                        ScmSignals.ISSUE,
-                        Set.of(FeedbackLane.IN_CONTEXT_SUMMARY)));
+                        ScmItemEvents.PULL_REQUEST,
+                        Set.of(CopyCapability.SUMMARY, CopyCapability.LINE_NOTE),
+                        ScmItemEvents.ISSUE,
+                        Set.of(CopyCapability.SUMMARY),
+                        ScmItemEvents.PULL_REQUEST_REVIEW,
+                        Set.of(CopyCapability.SUMMARY, CopyCapability.LINE_NOTE)));
     }
 }

@@ -7,6 +7,8 @@ import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityWorkPageDTO;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.OpenWorkDTO;
 import de.tum.cit.aet.hephaestus.core.AuditLedger;
 import de.tum.cit.aet.hephaestus.core.Audited;
+import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.core.security.CurrentScmIdentityHolder;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserInfoDTO;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -192,6 +194,36 @@ public class ActivityController {
             @Valid @ParameterObject ActivityWorkFilterParams work) {
         return ResponseEntity.ok(
                 activityService.work(workspaceContext.id(), login, team, repo == null ? Set.of() : repo, range, work));
+    }
+
+    @GetMapping("/me")
+    @Operation(operationId = "getOwnActivity", summary = "Read your activity in this workspace")
+    @ApiResponse(responseCode = "200", description = "Your activity returned")
+    public ResponseEntity<ActivityPersonDetailDTO> getOwnActivity(
+            WorkspaceContext workspaceContext,
+            @ParameterObject ActivityPeopleRangeParams range,
+            @RequestParam(required = false) @Nullable String team,
+            @RequestParam(required = false) @Nullable Set<String> repo) {
+        return ResponseEntity.ok(peopleService.person(
+                workspaceContext.id(), currentActor(), range, team, repo == null ? Set.of() : repo));
+    }
+
+    @GetMapping("/me/work")
+    @Operation(operationId = "getOwnActivityWork", summary = "List the work on which your activity happened")
+    @ApiResponse(responseCode = "200", description = "Your work listed")
+    public ResponseEntity<ActivityWorkPageDTO> getOwnActivityWork(
+            WorkspaceContext workspaceContext,
+            @ParameterObject ActivityPeopleRangeParams range,
+            @RequestParam(required = false) @Nullable String team,
+            @RequestParam(required = false) @Nullable Set<String> repo,
+            @Valid @ParameterObject ActivityWorkFilterParams work) {
+        return ResponseEntity.ok(activityService.personWork(
+                workspaceContext.id(), currentActor(), range, team, repo == null ? Set.of() : repo, work));
+    }
+
+    private static long currentActor() {
+        return CurrentScmIdentityHolder.getUserId()
+                .orElseThrow(() -> new EntityNotFoundException("SCM identity", "current account"));
     }
 
     @GetMapping("/members/{login}/open-work")

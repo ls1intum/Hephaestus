@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
-import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewSettings;
 import de.tum.cit.aet.hephaestus.workspace.validation.WorkspaceSlug;
 import jakarta.persistence.CascadeType;
@@ -10,13 +9,10 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.ForeignKey;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -35,53 +31,7 @@ import org.hibernate.annotations.ColumnDefault;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Root tenant entity in Hephaestus's multi-tenant architecture.
- *
- * <p>A Workspace represents an isolated tenant boundary, scoping all domain data
- * (repositories, users, issues, PRs, teams) to a single git provider organization or user account.
- * All workspace-scoped queries are filtered by {@code workspace_id} to enforce tenant isolation.
- *
- * <h2>Multi-Tenancy Model</h2>
- * <ul>
- *   <li><b>Isolation:</b> Each workspace operates independently with its own data, settings, and members</li>
- *   <li><b>Identity:</b> Uniquely identified by {@link #workspaceSlug} (URL-safe) and internal {@link #id}</li>
- *   <li><b>Ownership:</b> Linked to a git provider account via {@link #accountLogin}</li>
- * </ul>
- *
- * <h2>Authentication &amp; Provider Identity</h2>
- * Authentication credentials, provider classification, and integration-specific
- * configuration (GitHub App installation id, GitLab group id / webhook id, Slack
- * channel + token, …) are <em>not</em> stored on this entity. They live on per-kind
- * {@link de.tum.cit.aet.hephaestus.integration.core.connection.Connection Connection} rows
- * owned by the {@link de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService
- * ConnectionService}. Use {@code ConnectionService.findActiveProviderKind(workspaceId)}
- * to classify a workspace at runtime and the typed accessors
- * ({@code findActiveGitHubAppConfig}, {@code findActiveGitLabConfig},
- * {@code findSlackConfig}, {@code findActiveBearerToken}) to read
- * per-Connection state.
- *
- * <h2>Lifecycle States</h2>
- * Workspaces follow a defined lifecycle managed by {@link WorkspaceLifecycleService}:
- * <pre>
- *   ACTIVE ──suspend──► SUSPENDED ──resume──► ACTIVE
- *      │                    │
- *      └──────purge────────►│
- *                           └──────purge─────► PURGED (terminal)
- * </pre>
- *
- * <h2>Key Relationships</h2>
- * <ul>
- *   <li>{@link #repositoriesToMonitor} – Repositories tracked for webhook events</li>
- *   <li>{@link #organization} – Optional link to synced GitHub Organization entity</li>
- *   <li>{@link WorkspaceMembership} – User memberships with roles (OWNER/ADMIN/MEMBER)</li>
- * </ul>
- *
- * @see WorkspaceContext
- * @see WorkspaceMembership
- * @see WorkspaceLifecycleService
- * @see de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService
- */
+// Integration credentials and provider configuration belong to connection rows, outside the tenant entity.
 @Entity
 @Table(name = "workspace")
 @Getter
@@ -89,6 +39,9 @@ import org.jspecify.annotations.Nullable;
 @NoArgsConstructor
 @ToString
 public class Workspace {
+
+    @Column(name = "practice_catalog_installed_at")
+    private @Nullable Instant practiceCatalogInstalledAt;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -117,13 +70,6 @@ public class Workspace {
 
     // Identity & Display
 
-    /**
-     * URL-safe unique identifier for the workspace.
-     * Used in URLs: {@code /api/workspaces/{slug}/...}
-     * <p>
-     * Format: a non-reserved lowercase DNS label. See WorkspaceSlugValidator.
-     * Renames create permanent redirect entries in {@link WorkspaceSlugHistory}.
-     */
     @Column(name = "slug", unique = true, nullable = false, length = 64)
     @NotBlank(message = "Workspace slug is required")
     @WorkspaceSlug
@@ -161,12 +107,7 @@ public class Workspace {
 
     // Repository Monitoring
 
-    /**
-     * Repositories this workspace monitors for webhook events.
-     * <p>
-     * Note: EAGER fetch is intentional - workspace queries typically need repository list,
-     * and the set is bounded (typically &lt;100 repos per workspace).
-     */
+    // Workspace reads need the monitor list; eager loading avoids per-monitor queries for this bounded set.
     @OneToMany(
             mappedBy = "workspace",
             fetch = FetchType.EAGER,
@@ -177,7 +118,6 @@ public class Workspace {
 
     // Git Provider Account
 
-    /** Git provider account login (GitHub org login or GitLab group path, e.g., "ls1intum" or "org/team") */
     @Column(name = "account_login", nullable = false, length = 120)
     @NotBlank(message = "Account login is required")
     private String accountLogin;
@@ -193,15 +133,8 @@ public class Workspace {
     @Column(name = "repository_selection")
     private RepositorySelection repositorySelection;
 
-    /**
-     * Synced organization entity — GitHub organization or GitLab group
-     * (populated after initial organization sync).
-     * Null for user-type workspaces or before first sync completes.
-     */
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "organization_id", unique = true, foreignKey = @ForeignKey(name = "fk_workspace_organization"))
-    @ToString.Exclude
-    private @Nullable Organization organization;
+    @Column(name = "organization_id", unique = true)
+    private @Nullable Long organizationId;
 
     // Audit Timestamps
 
@@ -219,34 +152,21 @@ public class Workspace {
 
     // AI configuration
 
-    /**
-     * Monthly cap in USD on this workspace's INSTANCE-funded spend — the shared models the host pays
-     * for. {@code null} = uncapped; reaching it pauses work on shared models until the calendar month
-     * (UTC) rolls over. Set exclusively by instance admins, since it is the host's cost backstop.
-     */
+    // Only instance admins set the cap on instance-funded spend; null is uncapped.
     @Column(name = "monthly_llm_budget_usd", precision = 10, scale = 2)
     private @Nullable BigDecimal monthlyLlmBudgetUsd;
 
-    /**
-     * Monthly cap in USD on this workspace's OWN-provider (BYO) spend, set by the workspace's own
-     * admins. {@code null} = uncapped. The two caps are different people's money and are
-     * <b>never summed</b> — see {@code docs/contributor/llm-cost-vocabulary.md}, rule 2.
-     *
-     * <p>The API and the UI say "ownProvider"; the field keeps the released column's "byo" spelling.
-     */
+    // Workspace admins control own-provider spend; its cap is separate from the instance-funded cap.
     @Column(name = "monthly_byo_llm_budget_usd", precision = 10, scale = 2)
     private @Nullable BigDecimal monthlyByoLlmBudgetUsd;
 
-    /**
-     * Per-workspace practice-review trigger/delivery overrides; read via {@link #getReviewSettings()}.
-     *
-     * @see PracticeReviewSettings
-     */
     @Embedded
     @Valid
     private PracticeReviewSettings reviewSettings = new PracticeReviewSettings();
 
-    /** Null-safe accessor: Hibernate sets the embeddable to {@code null} when every column is null. */
+    /**
+     * Null-safe accessor: Hibernate sets the embeddable to {@code null} when every column is null.
+     */
     public PracticeReviewSettings getReviewSettings() {
         if (reviewSettings == null) {
             reviewSettings = new PracticeReviewSettings();
@@ -271,6 +191,7 @@ public class Workspace {
      * Workspace lifecycle states with defined transition rules.
      *
      * <h2>State Machine</h2>
+     *
      * <pre>
      *   ACTIVE ──suspend──► SUSPENDED ──resume──► ACTIVE
      *      │                    │
@@ -279,10 +200,11 @@ public class Workspace {
      * </pre>
      *
      * <h2>Behavior by State</h2>
+     *
      * <ul>
-     *   <li><b>ACTIVE:</b> Normal operation - syncs run, webhooks processed, full access</li>
-     *   <li><b>SUSPENDED:</b> Read-only mode - no syncs, webhooks queued, limited access</li>
-     *   <li><b>PURGED:</b> Soft-deleted - excluded from queries, pending hard delete</li>
+     *   <li><b>ACTIVE:</b> Normal operation - syncs run, webhooks processed, full access
+     *   <li><b>SUSPENDED:</b> Read-only mode - no syncs, webhooks queued, limited access
+     *   <li><b>PURGED:</b> Soft-deleted - excluded from queries, pending hard delete
      * </ul>
      *
      * @see WorkspaceLifecycleService for state transition operations

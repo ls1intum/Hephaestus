@@ -18,6 +18,8 @@ const PATHS = [
 	"w/$workspaceSlug/admin/practices",
 	"w/$workspaceSlug/admin/practices/review",
 	"w/$workspaceSlug/admin/practices/reviews",
+	"w/$workspaceSlug/admin/practices/scans",
+	"w/$workspaceSlug/admin/practices/scans/$scanId",
 	"w/$workspaceSlug/admin/integrations",
 	"w/$workspaceSlug/admin/integrations/scm",
 ] as const;
@@ -60,6 +62,8 @@ describe("NavAdmin", () => {
 		// Both directions, because the two paths differ by one trailing character and a matcher that
 		// compared strings rather than whole segments would light both entries up on either.
 		["/w/acme/admin/practices/reviews", "Practice reviews"],
+		["/w/acme/admin/practices/scans", "Scans"],
+		["/w/acme/admin/practices/scans/6f1c2a7e-0d4b-4a8e-9b51-1a2b3c4d5e6f", "Scans"],
 		["/w/acme/admin/integrations/scm", "GitHub"],
 	])("marks only the destination for %s as current", async (path, currentLabel) => {
 		renderNavigation(path);
@@ -80,7 +84,7 @@ describe("NavAdmin", () => {
 		expect(Object.hasOwn(practices.dataset, "active")).toBe(true);
 	});
 
-	it("offers three destinations under Practices, not five", async () => {
+	it("offers four destinations under Practices", async () => {
 		renderNavigation("/w/acme/admin/practices");
 		await screen.findByRole("link", { name: "Practice setup" });
 		const submenu = within(screen.getByRole("list", { name: "Practices" }));
@@ -88,6 +92,7 @@ describe("NavAdmin", () => {
 		// Operations first: what the reviews need from an admin is the visit that recurs.
 		expect(submenu.getAllByRole("link").map((link) => link.textContent)).toStrictEqual([
 			"Practice reviews",
+			"Scans",
 			"Practice setup",
 			"Review settings",
 		]);

@@ -82,7 +82,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
 	const hasRole = (role: string) => !viewed && (user?.roles ?? []).includes(role);
 
-	const username = viewed?.login ?? user?.username ?? undefined;
+	// A viewed account without a workspace login must not inherit the operator's login.
+	const username = viewed ? (viewed.providerLogin ?? undefined) : (user?.username ?? undefined);
 
 	const getUserId = () => (viewed !== undefined || user?.id == null ? undefined : String(user.id));
 

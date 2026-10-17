@@ -1,9 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.reviewoutput;
 
-import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.MonitoredRepositoryScope;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -14,70 +11,59 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
-/**
- * The reads a lineage makes: observations, feedback and the bindings between them, each scoped to one workspace and
- * each capped by its caller. Read-only, so it extends the bare {@link Repository} and exposes no write.
- */
 interface ReviewLineageRepository extends Repository<Feedback, UUID> {
 
-    /** The columns an observation row carries; requires the alias {@code o}. */
-    String OBSERVATION_COLUMNS = """
-        SELECT o.id AS "id", o.agent_job_id AS "agentJobId", o.summary AS "summary",
-               p.slug AS "practiceSlug", p.name AS "practiceName", o.outcome AS "outcome", o.severity AS "severity",
-               o.observed_at AS "observedAt", o.artifact_kind AS "artifactKind", o.artifact_id AS "artifactId",
-               (SELECT oi.invalidated_at FROM observation_invalidation oi WHERE
-        """ + ObservationRepository.OPEN_INVALIDATION + """
-               ) AS "markedIncorrectAt",
-               linked.feedback_count AS "feedbackCount", linked.own_feedback_count AS "ownFeedbackCount"
-        FROM observation o
-        JOIN practice p ON p.id = o.practice_id
-        CROSS JOIN LATERAL (SELECT COUNT(*) AS feedback_count,
-                                   COUNT(*) FILTER (WHERE fb.agent_job_id = o.agent_job_id) AS own_feedback_count
-                            FROM feedback_observation fo
-                            JOIN feedback fb ON fb.id = fo.feedback_id AND fb.workspace_id = o.workspace_id
-                            WHERE fo.observation_id = o.id) linked
+    String RESULT_COLUMNS = """
+        SELECT r.id, r.review_id AS "reviewId", r.item_id AS "itemId", r.practice_id AS "practiceId",
+               r.summary, p.slug AS "practiceSlug", v.name AS "practiceName", r.outcome, r.severity,
+               (SELECT count(*) FROM problem child WHERE child.result_id = r.id
+                  AND child.workspace_id = r.workspace_id) AS "problemCount",
+               r.recorded_at AS "recordedAt", r.ended_at AS "endedAt",
+               (SELECT m.created_at FROM result_mark m WHERE m.result_id = r.id
+                 AND m.workspace_id = r.workspace_id AND m.kind = 'INCORRECT'
+                 AND m.removed_at IS NULL) AS "markedIncorrectAt",
+               (SELECT m.created_at FROM result_mark m WHERE m.result_id = r.id
+                 AND m.workspace_id = r.workspace_id AND m.kind = 'ACCEPTED'
+                 AND m.removed_at IS NULL) AS "acceptedAt"
+        FROM result r JOIN practice p ON p.id = r.practice_id AND p.workspace_id = r.workspace_id
+        LEFT JOIN practice_version v ON v.id = r.practice_version_id AND v.workspace_id = r.workspace_id
         """;
 
-    @Query(value = OBSERVATION_COLUMNS + """
-        WHERE o.workspace_id = :workspaceId AND o.id IN (:ids)
-        """, nativeQuery = true)
-    List<ObservationRow> findObservations(@Param("workspaceId") Long workspaceId, @Param("ids") Collection<UUID> ids);
+    @Query(value = RESULT_COLUMNS + " WHERE r.workspace_id = :workspaceId AND r.id IN (:ids)", nativeQuery = true)
+    List<ResultRow> findResults(@Param("workspaceId") long workspaceId, @Param("ids") Collection<UUID> ids);
 
-    /**
-     * A review's observations, most worth reading first: the ones feedback came from, then problems by severity, then
-     * the rest; newest first within each.
-     */
-    @Query(value = OBSERVATION_COLUMNS + """
-        WHERE o.workspace_id = :workspaceId AND o.agent_job_id = :agentJobId
-        ORDER BY EXISTS (SELECT 1 FROM feedback_observation bound WHERE bound.observation_id = o.id) DESC,
-                 CASE o.outcome WHEN 'NOT_MET' THEN 0 WHEN 'MET' THEN 1 ELSE 2 END,
-                 CASE o.severity WHEN 'CRITICAL' THEN 0 WHEN 'MAJOR' THEN 1 WHEN 'MINOR' THEN 2 WHEN 'INFO' THEN 3
-                     ELSE 4 END,
-                 o.observed_at DESC, o.id DESC
-        LIMIT :limit
+    @Query(value = RESULT_COLUMNS + """
+        WHERE r.workspace_id = :workspaceId AND r.review_id = :reviewId
+        ORDER BY r.recorded_at DESC, r.id DESC LIMIT :limit
         """, nativeQuery = true)
-    List<ObservationRow> findObservationsOfReview(
-            @Param("workspaceId") Long workspaceId, @Param("agentJobId") UUID agentJobId, @Param("limit") int limit);
+    List<ResultRow> findResultsOfReview(
+            @Param("workspaceId") long workspaceId, @Param("reviewId") UUID reviewId, @Param("limit") int limit);
 
-    @Query(value = """
-        SELECT o.id FROM observation o WHERE o.workspace_id = :workspaceId AND o.agent_job_id = :agentJobId
-        """, nativeQuery = true)
-    List<UUID> findObservationIdsOfReview(@Param("workspaceId") Long workspaceId, @Param("agentJobId") UUID agentJobId);
+    @Query(
+            value = "SELECT id FROM result WHERE workspace_id = :workspaceId AND review_id = :reviewId",
+            nativeQuery = true)
+    List<UUID> findResultIdsOfReview(@Param("workspaceId") long workspaceId, @Param("reviewId") UUID reviewId);
 
-    @Query(value = """
-        SELECT COUNT(*) FROM observation o WHERE o.workspace_id = :workspaceId AND o.agent_job_id = :agentJobId
-        """, nativeQuery = true)
-    int countObservationsOfReview(@Param("workspaceId") Long workspaceId, @Param("agentJobId") UUID agentJobId);
+    @Query(
+            value = "SELECT count(*) FROM result WHERE workspace_id = :workspaceId AND review_id = :reviewId",
+            nativeQuery = true)
+    int countResultsOfReview(@Param("workspaceId") long workspaceId, @Param("reviewId") UUID reviewId);
 
-    interface ObservationRow {
+    interface ResultRow {
         UUID getId();
 
-        UUID getAgentJobId();
+        UUID getReviewId();
 
+        long getItemId();
+
+        long getPracticeId();
+
+        @Nullable
         String getSummary();
 
         String getPracticeSlug();
 
+        @Nullable
         String getPracticeName();
 
         String getOutcome();
@@ -85,93 +71,46 @@ interface ReviewLineageRepository extends Repository<Feedback, UUID> {
         @Nullable
         String getSeverity();
 
-        Instant getObservedAt();
+        long getProblemCount();
 
-        String getArtifactKind();
+        Instant getRecordedAt();
 
-        Long getArtifactId();
+        @Nullable
+        Instant getEndedAt();
 
-        /** Set while an admin has the observation marked incorrect; at most one invalidation is open. */
         @Nullable
         Instant getMarkedIncorrectAt();
 
-        long getFeedbackCount();
-
-        long getOwnFeedbackCount();
+        @Nullable
+        Instant getAcceptedAt();
     }
 
-    /**
-     * The columns a feedback row carries; requires the alias {@code f}. The location is the operator list's own
-     * expression, so the chain and the list never name a different place for the same piece.
-     */
     String FEEDBACK_COLUMNS = """
-        SELECT f.id AS "id", f.agent_job_id AS "agentJobId", f.channel AS "channel",
-        """ + FeedbackRepository.LOCATION + """
-                AS "location",
-               a.decision AS "decision", a.decided_at AS "decidedAt",
-               (SELECT w.withdrawn_at FROM feedback_withdrawal w
-                WHERE w.feedback_id = f.id AND w.workspace_id = f.workspace_id AND w.restored_at IS NULL
-                ORDER BY w.withdrawn_at DESC LIMIT 1) AS "withdrawnAt",
-               f.delivery_state AS "deliveryState", f.suppression_reason AS "suppressionReason",
-               f.created_at AS "createdAt", f.delivered_at AS "deliveredAt", f.replaces_id AS "replacesId",
-               f.artifact_kind AS "artifactKind", f.artifact_id AS "artifactId",
-               newer.id AS "replacedById", newer.created_at AS "replacedAt",
-               (SELECT COUNT(*) FROM feedback_placement fp WHERE fp.feedback_id = f.id) AS "placementCount"
+        SELECT f.id, f.review_id AS "reviewId", f.item_id AS "itemId", f.destination, f.state,
+               f.delivered_at AS "deliveredAt", f.replaces_id AS "replacesId", f.created_at AS "createdAt",
+               COALESCE((SELECT d.action = 'WITHDRAW' FROM feedback_decision d
+                  WHERE d.feedback_id = f.id AND d.workspace_id = f.workspace_id
+                    AND d.action IN ('WITHDRAW', 'RESTORE')
+                  ORDER BY d.decided_at DESC, d.id DESC LIMIT 1), false) AS withdrawn
         FROM feedback f
-        LEFT JOIN feedback_approval a ON a.feedback_id = f.id AND a.workspace_id = f.workspace_id
-        LEFT JOIN LATERAL (SELECT n.id, n.created_at FROM feedback n
-                           WHERE n.workspace_id = f.workspace_id AND n.replaces_id = f.id
-                           ORDER BY n.created_at DESC, n.id DESC LIMIT 1) newer ON TRUE
         """;
 
     @Query(value = FEEDBACK_COLUMNS + """
-        WHERE f.workspace_id = :workspaceId AND f.id IN (:ids)
-        ORDER BY f.created_at DESC, f.id DESC
+        WHERE f.workspace_id = :workspaceId AND f.id IN (:ids) ORDER BY f.created_at DESC, f.id DESC
         """, nativeQuery = true)
-    List<FeedbackRow> findFeedback(@Param("workspaceId") Long workspaceId, @Param("ids") Collection<UUID> ids);
-
-    /** The feedback written from one observation, newest first. */
-    @Query(value = """
-        SELECT f.id FROM feedback_observation fo
-        JOIN feedback f ON f.id = fo.feedback_id AND f.workspace_id = :workspaceId
-        WHERE fo.observation_id = :observationId
-        ORDER BY f.created_at DESC, f.id DESC
-        """, nativeQuery = true)
-    List<UUID> findFeedbackIdsOfObservation(
-            @Param("workspaceId") Long workspaceId, @Param("observationId") UUID observationId);
-
-    /** The feedback one review composed, newest first. */
-    @Query(value = """
-        SELECT f.id FROM feedback f
-        WHERE f.workspace_id = :workspaceId AND f.agent_job_id = :agentJobId
-        ORDER BY f.created_at DESC, f.id DESC
-        """, nativeQuery = true)
-    List<UUID> findFeedbackIdsOfReview(@Param("workspaceId") Long workspaceId, @Param("agentJobId") UUID agentJobId);
+    List<FeedbackRow> findFeedback(@Param("workspaceId") long workspaceId, @Param("ids") Collection<UUID> ids);
 
     interface FeedbackRow {
         UUID getId();
 
-        UUID getAgentJobId();
-
-        String getChannel();
-
-        String getLocation();
+        UUID getReviewId();
 
         @Nullable
-        String getDecision();
+        Long getItemId();
 
-        @Nullable
-        Instant getDecidedAt();
+        String getDestination();
 
-        @Nullable
-        Instant getWithdrawnAt();
-
-        String getDeliveryState();
-
-        @Nullable
-        String getSuppressionReason();
-
-        Instant getCreatedAt();
+        String getState();
 
         @Nullable
         Instant getDeliveredAt();
@@ -179,125 +118,51 @@ interface ReviewLineageRepository extends Repository<Feedback, UUID> {
         @Nullable
         UUID getReplacesId();
 
-        @Nullable
-        UUID getReplacedById();
+        Instant getCreatedAt();
 
-        @Nullable
-        Instant getReplacedAt();
-
-        @Nullable
-        String getArtifactKind();
-
-        @Nullable
-        Long getArtifactId();
-
-        long getPlacementCount();
+        boolean getWithdrawn();
     }
 
-    /** Which observations each piece of feedback was written from, in render order. */
     @Query(value = """
-        SELECT fo.feedback_id AS "feedbackId", fo.observation_id AS "observationId"
-        FROM feedback_observation fo
-        JOIN feedback f ON f.id = fo.feedback_id AND f.workspace_id = :workspaceId
-        WHERE fo.feedback_id IN (:feedbackIds)
-        ORDER BY fo.ordinal, fo.observation_id
+        SELECT f.id FROM feedback f WHERE f.workspace_id = :workspaceId
+          AND EXISTS (SELECT 1 FROM feedback_basis b WHERE b.feedback_id = f.id
+            AND b.workspace_id = f.workspace_id AND b.result_id = :resultId)
+        ORDER BY f.created_at DESC, f.id DESC
+        """, nativeQuery = true)
+    List<UUID> findFeedbackIdsOfResult(@Param("workspaceId") long workspaceId, @Param("resultId") UUID resultId);
+
+    @Query(value = """
+        SELECT id FROM feedback WHERE workspace_id = :workspaceId AND review_id = :reviewId
+        ORDER BY created_at DESC, id DESC
+        """, nativeQuery = true)
+    List<UUID> findFeedbackIdsOfReview(@Param("workspaceId") long workspaceId, @Param("reviewId") UUID reviewId);
+
+    @Query(value = """
+        SELECT b.feedback_id AS "feedbackId", b.result_id AS "resultId", b.problem_id AS "problemId"
+        FROM feedback_basis b JOIN feedback f ON f.id = b.feedback_id AND f.workspace_id = b.workspace_id
+        WHERE b.workspace_id = :workspaceId AND b.feedback_id IN (:feedbackIds)
+        GROUP BY b.feedback_id, b.result_id, b.problem_id
+        ORDER BY b.feedback_id, min(b.ordinal), b.result_id, b.problem_id
         """, nativeQuery = true)
     List<BindingRow> findBindings(
-            @Param("workspaceId") Long workspaceId, @Param("feedbackIds") Collection<UUID> feedbackIds);
+            @Param("workspaceId") long workspaceId, @Param("feedbackIds") Collection<UUID> feedbackIds);
 
     interface BindingRow {
         UUID getFeedbackId();
 
-        UUID getObservationId();
-    }
+        UUID getResultId();
 
-    /** The newest review that recorded an observation or composed feedback about one piece of work. */
-    @Query(value = """
-        SELECT recorded.agent_job_id FROM (
-            SELECT o.agent_job_id, o.observed_at AS at FROM observation o
-            WHERE o.workspace_id = :workspaceId AND o.artifact_kind = :artifactKind AND o.artifact_id = :artifactId
-            UNION ALL
-            SELECT f.agent_job_id, f.created_at AS at FROM feedback f
-            WHERE f.workspace_id = :workspaceId AND f.artifact_kind = :artifactKind AND f.artifact_id = :artifactId
-        ) recorded
-        ORDER BY recorded.at DESC, recorded.agent_job_id DESC
-        LIMIT 1
-        """, nativeQuery = true)
-    Optional<UUID> findNewestReviewOfWork(
-            @Param("workspaceId") Long workspaceId,
-            @Param("artifactKind") String artifactKind,
-            @Param("artifactId") Long artifactId);
-
-    /**
-     * When a pull request or merge request was merged, for one in a repository this workspace monitors. Empty while
-     * it is not merged.
-     */
-    @Query(value = """
-        SELECT pr.merged_at FROM issue pr
-        WHERE pr.id = :pullRequestId AND pr.issue_type = 'PULL_REQUEST' AND pr.merged_at IS NOT NULL
-          AND EXISTS (
-              SELECT 1 FROM repository r
-              JOIN repository_to_monitor rtm ON rtm.name_with_owner = r.name_with_owner
-                AND\s""" + MonitoredRepositoryScope.NATIVE_RTM_R + """
-
-              WHERE r.id = pr.repository_id AND rtm.workspace_id = :workspaceId)
-        """, nativeQuery = true)
-    Optional<Instant> findMergedAt(@Param("workspaceId") Long workspaceId, @Param("pullRequestId") Long pullRequestId);
-
-    /**
-     * The first moment on the work that names the review: the one that started it. A later moment that names it was
-     * folded into the same review.
-     */
-    @Query(value = """
-        SELECT s.id AS "id", s.signal_name AS "signalName", s.discovered_via AS "discoveredVia",
-               s.occurred_at AS "occurredAt"
-        FROM artifact_signal s
-        WHERE s.workspace_id = :workspaceId AND s.artifact_kind = :artifactKind AND s.artifact_id = :artifactId
-          AND s.job_id = :agentJobId
-        ORDER BY s.occurred_at, s.id
-        LIMIT 1
-        """, nativeQuery = true)
-    Optional<StartRow> findStart(
-            @Param("workspaceId") Long workspaceId,
-            @Param("artifactKind") String artifactKind,
-            @Param("artifactId") Long artifactId,
-            @Param("agentJobId") UUID agentJobId);
-
-    interface StartRow {
-        UUID getId();
-
-        String getSignalName();
-
-        String getDiscoveredVia();
-
-        Instant getOccurredAt();
-    }
-
-    /**
-     * The newest moments on one piece of work, newest first, and the review each started or was folded into, if any.
-     * Several moments can name one review: the first started it, the rest joined it.
-     */
-    @Query(value = """
-        SELECT s.id AS "id", s.signal_name AS "signalName", s.discovered_via AS "discoveredVia",
-               s.occurred_at AS "occurredAt", s.job_id AS "jobId"
-        FROM artifact_signal s
-        WHERE s.workspace_id = :workspaceId AND s.artifact_kind = :artifactKind AND s.artifact_id = :artifactId
-        ORDER BY s.occurred_at DESC, s.id DESC
-        LIMIT :limit
-        """, nativeQuery = true)
-    List<MomentRow> findMoments(
-            @Param("workspaceId") Long workspaceId,
-            @Param("artifactKind") String artifactKind,
-            @Param("artifactId") Long artifactId,
-            @Param("limit") int limit);
-
-    interface MomentRow extends StartRow {
         @Nullable
-        UUID getJobId();
+        UUID getProblemId();
     }
 
-    /** The feedback rows themselves, for the reads that judge whether later work resolved them. */
+    @Query(value = """
+        SELECT id FROM review WHERE workspace_id = :workspaceId AND item_id = :itemId
+        ORDER BY ordered_at DESC, admitted_at DESC NULLS LAST, id::text DESC LIMIT 1
+        """, nativeQuery = true)
+    Optional<UUID> findNewestReviewOfItem(@Param("workspaceId") long workspaceId, @Param("itemId") long itemId);
+
     @Query("SELECT f FROM Feedback f WHERE f.workspaceId = :workspaceId AND f.id IN :ids")
     List<Feedback> findAllByWorkspaceIdAndIdIn(
-            @Param("workspaceId") Long workspaceId, @Param("ids") Collection<UUID> ids);
+            @Param("workspaceId") long workspaceId, @Param("ids") Collection<UUID> ids);
 }

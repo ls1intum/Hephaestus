@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
@@ -50,7 +50,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
     private WorkspaceLifecycleService workspaceLifecycleService;
 
     @Autowired
-    private IdentityLinkRepository identityLinkRepository;
+    private IdentityRepository identityRepository;
 
     @Autowired
     private LoginProviderRepository loginProviderRepository;
@@ -61,10 +61,6 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
     /** {@code hephaestus.integration.gitlab.default-server-url} in the test profile. */
     private static final String DEFAULT_INSTANCE = "https://gitlab.lrz.de";
 
-    /**
-     * A caller whose {@link Account} has an active GitLab {@link IdentityLink} on the default instance,
-     * authenticated through the {@code mock-jwt-sub-} test token (sub = the account id).
-     */
     private Consumer<HttpHeaders> gitLabCaller(String login) {
         return gitLabCaller(login, gitLabInstance(DEFAULT_INSTANCE));
     }
@@ -73,12 +69,13 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
     private Consumer<HttpHeaders> gitLabCaller(String login, IdentityProvider... instances) {
         Account account = accountRepository.save(new Account(login));
         for (IdentityProvider gitlab : instances) {
-            IdentityLink link = new IdentityLink();
+            Identity link = new Identity();
             link.setAccount(account);
             link.setProviderId(persistedId(gitlab.getId()));
-            link.setSubject(String.valueOf(subject(account, gitlab)));
-            link.setUsernameAtSignup(login);
-            identityLinkRepository.save(link);
+            long nativeId = subject(account, gitlab);
+            TestUserFactory.ensureUser(userRepository, login, nativeId, gitlab);
+            link.setProviderUserKey(String.valueOf(nativeId));
+            identityRepository.save(link);
         }
         String token = "mock-jwt-sub-" + persistedId(account.getId());
         return headers -> headers.setBearerAuth(token);
@@ -88,7 +85,6 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         return 70_000 + persistedId(account.getId()) * 100 + persistedId(gitlab.getId());
     }
 
-    /** A seeded GitLab caller plus its resolved SCM {@link User} mirror (for owner/membership setup). */
     private record GitLabCaller(Consumer<HttpHeaders> headers, User scmUser) {}
 
     /** Adds the SCM mirror belonging to the caller's verified provider subject. */
@@ -97,13 +93,11 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         IdentityProvider gitlab = gitLabInstance(DEFAULT_INSTANCE);
         long nativeId = 70_000 + persistedId(account.getId());
         User scmUser = TestUserFactory.ensureUser(userRepository, login, nativeId, gitlab);
-        IdentityLink link = new IdentityLink();
+        Identity link = new Identity();
         link.setAccount(account);
         link.setProviderId(persistedId(gitlab.getId()));
-        link.setSubject(String.valueOf(nativeId));
-        link.setUsernameAtSignup(login);
-        link.setExternalActorId(persistedId(scmUser.getId()));
-        identityLinkRepository.save(link);
+        link.setProviderUserKey(String.valueOf(nativeId));
+        identityRepository.save(link);
         return new GitLabCaller(
                 headers -> headers.setBearerAuth("mock-jwt-sub-" + persistedId(account.getId())), scmUser);
     }
@@ -115,7 +109,6 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
                         () -> gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITLAB, serverUrl)));
     }
 
-    /** An enabled GitLab login provider: what makes a self-hosted instance eligible for workspaces. */
     private void configureGitLabLogin(String registrationId, String baseUrl) {
         LoginProvider provider = new LoginProvider();
         provider.setRegistrationId(registrationId);
@@ -286,9 +279,10 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         User instanceActor = userRepository
                 .findByLoginAndProviderId("mentor", persistedId(instance.getId()))
                 .orElseThrow();
-        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(workspace.id(), instanceActor.getId()))
-                .hasValueSatisfying(membership ->
-                        assertThat(membership.getRole()).isEqualTo(WorkspaceMembership.WorkspaceRole.OWNER));
+        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndId_AccountId(
+                        workspace.id(), accountId(instanceActor)))
+                .hasValueSatisfying(
+                        membership -> assertThat(membership.getRole()).isEqualTo(Membership.WorkspaceRole.OWNER));
     }
 
     @Test
@@ -432,11 +426,10 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         WorkspaceDTO workspace = Objects.requireNonNull(created);
 
         var membership = workspaceMembershipRepository
-                .findByWorkspace_IdAndUser_Id(
-                        workspace.id(), persistedId(caller.scmUser().getId()))
+                .findByWorkspace_IdAndId_AccountId(workspace.id(), accountId(caller.scmUser()))
                 .orElseThrow(() -> new AssertionError("Owner membership not created"));
-        assertThat(membership.getRole()).isEqualTo(WorkspaceMembership.WorkspaceRole.OWNER);
-        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(workspace.id(), namesake.getId()))
+        assertThat(membership.getRole()).isEqualTo(Membership.WorkspaceRole.OWNER);
+        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndId_AccountId(workspace.id(), accountId(namesake)))
                 .isEmpty();
     }
 
@@ -512,7 +505,8 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
                 .getResponseBody();
 
         assertThat(workspaces).isNotNull();
-        // providerType is derived from the active Connection: the GitLab workspace created via the REST
+        // providerType is derived from the active Connection: the GitLab workspace created via the
+        // REST
         // API path provisions a GitLab Connection inline and surfaces as GITLAB.
         assertThat(workspaces).extracting(WorkspaceListItemDTO::providerType).contains(IdentityProviderType.GITLAB);
     }

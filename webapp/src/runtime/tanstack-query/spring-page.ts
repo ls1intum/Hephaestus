@@ -1,16 +1,21 @@
 import type { InfiniteData } from "@tanstack/react-query";
 
+/**
+ * A flat Spring page (`PageResponseDto*`): one page of rows, with its place and the total at the root.
+ * Every field is required, so a response of another shape fails the type check instead of reading as
+ * a single page with no total.
+ */
 export interface SpringPage<T> {
-	content?: T[];
-	number?: number;
-	last?: boolean;
-	totalElements?: number;
+	content: T[];
+	number: number;
+	last: boolean;
+	totalElements: number;
 }
 
 export const springPageParams = {
 	initialPageParam: 0,
 	getNextPageParam: <T>(lastPage: SpringPage<T>) =>
-		lastPage.last === true ? undefined : (lastPage.number ?? 0) + 1,
+		lastPage.last ? undefined : lastPage.number + 1,
 };
 
 /** A server slice: one page and whether another follows, with no total to count. */
@@ -23,20 +28,6 @@ export const slicePageParams = {
 	initialPageParam: 0,
 	getNextPageParam: (lastPage: SlicePage) =>
 		lastPage.hasNext === true ? (lastPage.page ?? 0) + 1 : undefined,
-};
-
-/** Spring's `PagedModel`: one page of rows, with its place among the pages nested under `page`. */
-export interface PagedModel<T> {
-	content?: T[];
-	page?: { number?: number; totalPages?: number; totalElements?: number };
-}
-
-export const pagedModelParams = {
-	initialPageParam: 0,
-	getNextPageParam: <T>(lastPage: PagedModel<T>) => {
-		const next = (lastPage.page?.number ?? 0) + 1;
-		return next < (lastPage.page?.totalPages ?? 0) ? next : undefined;
-	},
 };
 
 /**

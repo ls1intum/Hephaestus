@@ -1,9 +1,11 @@
 import { existsSync, readFileSync } from "node:fs";
 
-import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
+import type { ExtensionFactory, ModelRuntime } from "@earendil-works/pi-coding-agent";
 
 import { errorText } from "./pi-error-text.ts";
 import { hasText } from "./pi-text.ts";
+import { isJsonObject as isRecord } from "./work/practice-scripts/lib/core/json.ts";
+import { supportsForcedToolChoice } from "./work/practice-scripts/lib/core/model-capabilities.ts";
 
 /** One chat model as {@link ModelRuntime.registerProvider} takes it; the extension-facing type omits sampling. */
 export type RegisteredModel = Extract<
@@ -35,6 +37,74 @@ export interface ProviderConfig {
 	reasoningEffort?: ReasoningEffort;
 	contextWindow?: number;
 	maxOutputTokens?: number;
+}
+
+/** Require the recording tool only after exploration has ended or a submission needs correction. */
+export function submissionExtension(
+	config: ProviderConfig,
+	required: () => boolean,
+): ExtensionFactory {
+	return (pi) => {
+		pi.on("before_provider_request", ({ payload }) => {
+			if (!required() || !isRecord(payload) || !supportsForcedToolChoice(config.modelId)) {
+				return;
+			}
+			const tools: unknown[] = Array.isArray(payload.tools) ? payload.tools : [];
+			if (
+				config.apiProtocol === "openai-completions" &&
+				tools.some(
+					(tool) =>
+						isRecord(tool) && isRecord(tool.function) && tool.function.name === "submit_result",
+				)
+			) {
+				return {
+					...payload,
+					tool_choice: { type: "function", function: { name: "submit_result" } },
+				};
+			}
+			if (
+				config.apiProtocol === "openai-responses" &&
+				tools.some(
+					(tool) => isRecord(tool) && tool.type === "function" && tool.name === "submit_result",
+				)
+			) {
+				return { ...payload, tool_choice: { type: "function", name: "submit_result" } };
+			}
+			if (
+				config.apiProtocol === "anthropic-messages" &&
+				// Manual extended thinking permits only auto/none tool choice.
+				!(isRecord(payload.thinking) && payload.thinking.type === "enabled") &&
+				tools.some((tool) => isRecord(tool) && tool.name === "submit_result")
+			) {
+				return { ...payload, tool_choice: { type: "tool", name: "submit_result" } };
+			}
+			if (
+				(config.apiProtocol === "google-generative-ai" || config.apiProtocol === "google-vertex") &&
+				isRecord(payload.config) &&
+				Array.isArray(payload.config.tools) &&
+				payload.config.tools.some(
+					(tool: unknown) =>
+						isRecord(tool) &&
+						Array.isArray(tool.functionDeclarations) &&
+						tool.functionDeclarations.some(
+							(declaration: unknown) =>
+								isRecord(declaration) && declaration.name === "submit_result",
+						),
+				)
+			) {
+				return {
+					...payload,
+					config: {
+						...payload.config,
+						toolConfig: {
+							functionCallingConfig: { mode: "ANY", allowedFunctionNames: ["submit_result"] },
+						},
+					},
+				};
+			}
+			return payload;
+		});
+	};
 }
 
 /**
@@ -75,10 +145,6 @@ export const PROVIDER_CONFIG_FILENAME = "pi-provider.json";
 export const DEFAULT_WORKSPACE_ROOT = "/workspace";
 const DEFAULT_CONTEXT_WINDOW = 128_000;
 const DEFAULT_MAX_TOKENS = 16_384;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null;
-}
 
 function positiveInteger(value: unknown): boolean {
 	return typeof value === "number" && Number.isInteger(value) && value > 0;

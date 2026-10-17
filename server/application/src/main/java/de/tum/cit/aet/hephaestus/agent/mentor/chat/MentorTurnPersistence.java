@@ -1,21 +1,18 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
-import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationalDeliveryReconciler;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorLlmConfig;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.exception.MentorRetryRejectedException;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.exception.TurnAlreadyInFlightException;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.TranslatorState;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageJobType;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder.LlmUsageSample;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
 import de.tum.cit.aet.hephaestus.agent.usage.MeasurementVerification;
 import de.tum.cit.aet.hephaestus.agent.usage.UsageProvenance;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.core.exception.DataIntegrityViolationConstraints;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessage;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
@@ -25,9 +22,8 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -57,7 +53,6 @@ public class MentorTurnPersistence {
     private final ChatThreadRepository chatThreadRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final WorkspaceRepository workspaceRepository;
-    private final ConversationalDeliveryReconciler conversationalDeliveryReconciler;
     private final LlmUsageRecorder usageRecorder;
 
     private final TransactionTemplate requiresNewTx;
@@ -66,13 +61,11 @@ public class MentorTurnPersistence {
             ChatThreadRepository chatThreadRepository,
             ChatMessageRepository chatMessageRepository,
             WorkspaceRepository workspaceRepository,
-            ConversationalDeliveryReconciler conversationalDeliveryReconciler,
             LlmUsageRecorder usageRecorder,
             PlatformTransactionManager transactionManager) {
         this.chatThreadRepository = chatThreadRepository;
         this.chatMessageRepository = chatMessageRepository;
         this.workspaceRepository = workspaceRepository;
-        this.conversationalDeliveryReconciler = conversationalDeliveryReconciler;
         this.usageRecorder = usageRecorder;
         this.requiresNewTx = new TransactionTemplate(transactionManager);
         this.requiresNewTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -84,28 +77,25 @@ public class MentorTurnPersistence {
      * reads, so the feedback the turn delivers is recorded for the developer it was about.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public ChatThread ensureThread(
-            long workspaceId, UUID threadId, User user, Set<Long> accountActorIds, String firstPrompt) {
+    public ChatThread ensureThread(long workspaceId, UUID threadId, long accountId, String firstPrompt) {
         return chatThreadRepository
                 .findByIdAndWorkspaceId(threadId, workspaceId)
                 .map(existing -> {
-                    if (existing.getUser() == null
-                            || !accountActorIds.contains(existing.getUser().getId())) {
+                    if (existing.getAccountId() == null || !Objects.equals(existing.getAccountId(), accountId)) {
                         throw new EntityNotFoundException("ChatThread", threadId.toString());
                     }
-                    existing.setUser(user);
                     return existing;
                 })
-                .orElseGet(() -> createThread(workspaceId, threadId, user, firstPrompt));
+                .orElseGet(() -> createThread(workspaceId, threadId, accountId, firstPrompt));
     }
 
-    private ChatThread createThread(long workspaceId, UUID threadId, User user, String firstPrompt) {
+    private ChatThread createThread(long workspaceId, UUID threadId, long accountId, String firstPrompt) {
         Workspace workspace = workspaceRepository
                 .findById(workspaceId)
                 .orElseThrow(() -> new EntityNotFoundException("Workspace", String.valueOf(workspaceId)));
         ChatThread thread = new ChatThread();
         thread.setId(threadId);
-        thread.setUser(user);
+        thread.setAccountId(accountId);
         thread.setWorkspace(workspace);
         thread.setTitle(truncateTitle(firstPrompt));
         return chatThreadRepository.save(thread);
@@ -401,17 +391,6 @@ public class MentorTurnPersistence {
     }
 
     /**
-     * Settles the feedback a completed reply showed, by what its channel reports reached the developer. Runs after
-     * the channel closes, because only then is that known, and reads the stored reply, so what settles is what was
-     * sent.
-     */
-    public void recordDelivery(TurnPersistenceCookie cookie, MentorChannel.DeliveryOutcome deliveryOutcome) {
-        requiresNewTx.executeWithoutResult(tx -> chatMessageRepository
-                .findById(cookie.assistantMessageId())
-                .ifPresent(assistant -> reconcileConversationalDelivery(assistant, deliveryOutcome)));
-    }
-
-    /**
      * Append this turn's spend to the {@code llm_usage_event} ledger, in the same transaction as the
      * assistant message. Runs for complete AND interrupt: an interrupted turn still burned tokens.
      */
@@ -420,8 +399,9 @@ public class MentorTurnPersistence {
         if (thread == null || thread.getWorkspace() == null || !state.hasLlmCallStarted()) return;
         UsageBreakdown usage = turn.usage();
         LlmUsageSample sample = new LlmUsageSample(
-                LlmUsageJobType.MENTOR_TURN,
-                LlmUsageSourceType.MENTOR_TURN,
+                null,
+                "MENTOR_TURN",
+                UsageSourceType.MENTOR_TURN,
                 assistant.getId(),
                 0,
                 cookie.upstreamModelId(),
@@ -430,6 +410,7 @@ public class MentorTurnPersistence {
                 usage.cacheReadTokens(),
                 usage.cacheWriteTokens(),
                 turn.reasoningTokens(),
+                0L,
                 Math.max(1, turn.calls()),
                 cookie.priceSnapshot(),
                 // Neither record had tokens, so the row names no source rather than crediting one that saw nothing.
@@ -511,29 +492,6 @@ public class MentorTurnPersistence {
                 && usage.cacheWriteTokens() <= 0);
     }
 
-    private void reconcileConversationalDelivery(ChatMessage assistant, MentorChannel.DeliveryOutcome deliveryOutcome) {
-        List<UUID> shownObservationIds = UIMessageChunk.DataObservation.shownObservationIds(assistant.getParts());
-        if (shownObservationIds.isEmpty()) {
-            return;
-        }
-        ChatThread thread = assistant.getThread();
-        if (thread == null || thread.getWorkspace() == null || thread.getUser() == null) {
-            return;
-        }
-        switch (deliveryOutcome) {
-            case INSTANCE_SILENCED ->
-                conversationalDeliveryReconciler.suppressForSilentMode(
-                        thread.getWorkspace().getId(), thread.getUser().getId(), shownObservationIds);
-            case DELIVERED ->
-                conversationalDeliveryReconciler.reconcile(
-                        thread.getWorkspace().getId(),
-                        thread.getUser().getId(),
-                        assistant.getId(),
-                        shownObservationIds);
-            case NOT_DELIVERED -> {}
-        }
-    }
-
     /** Records the turn as interrupted unless its row already holds an outcome. */
     public void interrupt(TurnPersistenceCookie cookie, TranslatorState state, Throwable cause) {
         try {
@@ -541,7 +499,7 @@ public class MentorTurnPersistence {
         } catch (OptimisticLockingFailureException stale) {
             // Theirs wins: never downgrade a row another writer already completed.
             log.info(
-                    "interrupt lost optimistic-lock race for assistantMessageId={} — leaving prior observation in place",
+                    "interrupt lost optimistic-lock race for assistantMessageId={} — leaving prior result in place",
                     cookie.assistantMessageId());
         }
     }

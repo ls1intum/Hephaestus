@@ -4,7 +4,7 @@ import type { CatalogPracticeSummary } from "@/api/types.gen";
 
 import type { StatusDef, StatusDefs } from "@/components/common/status-def";
 
-export type CatalogAvailability = CatalogPracticeSummary["availability"];
+export type CatalogAvailability = NonNullable<CatalogPracticeSummary["availability"]>;
 
 export interface CatalogAvailabilityDef extends StatusDef {
 	/**

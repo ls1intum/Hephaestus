@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelWorkspaceGrantRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmConnectionRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeContributor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class AgentWorkspacePurgeAdapter implements WorkspacePurgeContributor {
 
-    private final AgentJobRepository jobRepository;
+    private final ReviewJobRepository jobRepository;
     private final WorkspaceAgentBindingRepository bindingRepository;
     private final WorkspaceLlmModelRepository modelRepository;
     private final WorkspaceLlmConnectionRepository connectionRepository;

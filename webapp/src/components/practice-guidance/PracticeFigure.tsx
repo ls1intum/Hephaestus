@@ -8,7 +8,7 @@ import { PracticeVisual } from "./PracticeVisual";
 export interface PracticeFigureProps {
 	visual: PracticeVisualValue;
 	/** What good looks like, set directly under the picture. */
-	caption?: string;
+	caption?: string | null;
 }
 
 /**

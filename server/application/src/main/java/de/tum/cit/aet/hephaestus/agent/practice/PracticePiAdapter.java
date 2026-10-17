@@ -1,5 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.practice;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import de.tum.cit.aet.hephaestus.agent.catalog.ReasoningEffort;
+import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentImageProperties;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentResult;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiPlanSpec;
@@ -8,10 +11,15 @@ import de.tum.cit.aet.hephaestus.agent.runtime.PiRuntimeFactory;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +31,7 @@ public class PracticePiAdapter {
     private final PiResultParser resultParser;
     private final AgentImageProperties imageProperties;
     private final PracticeReviewProperties reviewProperties;
+    private final ObjectMapper objectMapper;
 
     /** The runner reads it and registers it as the model's sampling temperature. */
     static final String SAMPLING_TEMPERATURE_ENV = "LLM_SAMPLING_TEMPERATURE";
@@ -30,9 +39,27 @@ public class PracticePiAdapter {
     /** The runner bounds each turn by these, per practice it carries: pi-runner.ts PER_PRACTICE_WORK. */
     static final String PRACTICE_MODEL_CALLS_ENV = "PI_PRACTICE_MODEL_CALLS";
 
+    static final String PRACTICE_CONCURRENCY_ENV = "PI_PRACTICE_CONCURRENCY";
+
     static final String PRACTICE_OUTPUT_TOKENS_ENV = "PI_PRACTICE_OUTPUT_TOKENS";
 
+    /**
+     * The tokens the direct model calls of the attempt's practice programs may spend together: the runner holds its
+     * programs to it, and the proxy refuses further direct calls past {@code direct-model-tokens-per-attempt}.
+     */
+    static final String DIRECT_MODEL_TOKENS_ENV = "PI_DIRECT_MODEL_TOKENS";
+
+    /**
+     * The shortest job timeout: more than the runner's shutdown buffer, so the runner has work time at all. No
+     * program stage is reserved; the programs run inside the runner's own budget.
+     */
+    public static final int MIN_TIMEOUT_SECONDS = PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS + 1;
+
     public PracticeSandboxSpec buildSandboxSpec(PracticeAgentRequest request) {
+        Map<String, BoundModel> practiceScriptModels = boundModels(request.practiceScriptModels());
+        Map<String, byte[]> extraInputs = practiceScriptModels.isEmpty()
+                ? Map.of()
+                : Map.of(SandboxLayout.PRACTICE_SCRIPT_MODELS_FILE, toJson(practiceScriptModels));
         PiRuntimeFactory.PiPlan plan = runtimeFactory.build(new PiPlanSpec(
                 request.apiProtocol(),
                 request.upstreamModelId(),
@@ -44,11 +71,12 @@ public class PracticePiAdapter {
                 false,
                 request.timeoutSeconds(),
                 PROFILE,
-                Map.of(),
-                buildPrecomputeStep(request.timeoutSeconds())));
+                extraInputs));
         Map<String, String> environment = new LinkedHashMap<>(plan.environment());
         environment.put(PRACTICE_MODEL_CALLS_ENV, Integer.toString(reviewProperties.practiceModelCalls()));
         environment.put(PRACTICE_OUTPUT_TOKENS_ENV, Integer.toString(reviewProperties.practiceOutputTokens()));
+        environment.put(PRACTICE_CONCURRENCY_ENV, Integer.toString(reviewProperties.practiceConcurrency()));
+        environment.put(DIRECT_MODEL_TOKENS_ENV, Long.toString(reviewProperties.directModelTokensPerAttempt()));
         Double temperature = reviewProperties.samplingTemperature();
         if (temperature != null) {
             environment.put(SAMPLING_TEMPERATURE_ENV, temperature.toString());
@@ -68,13 +96,24 @@ public class PracticePiAdapter {
         return resultParser.parse(sandboxResult);
     }
 
-    /**
-     * What runs before the model: the change view is derived from the checkout (a failure there is the
-     * review's failure, since nothing could be reviewed), then the practices' precompute scripts, which
-     * only add hints and may fail quietly.
-     */
-    static String buildPrecomputeStep(int timeoutSeconds) {
-        int budgetSeconds = Math.min(30, Math.max(1, timeoutSeconds / 10));
-        return "node /workspace/pi-change.ts && sh /workspace/pi-precompute.sh " + budgetSeconds + " && ";
+    /** One entry of {@link SandboxLayout#PRACTICE_SCRIPT_MODELS_FILE}: the toolkit's {@code boundModelSchema}. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    record BoundModel(
+            String protocol, String modelId, @Nullable ReasoningEffort reasoningEffort) {}
+
+    private static Map<String, BoundModel> boundModels(Map<ModelKind, FrozenModel> models) {
+        Map<String, BoundModel> bound = new LinkedHashMap<>();
+        models.forEach((kind, model) -> bound.put(
+                kind.name().toLowerCase(Locale.ROOT),
+                new BoundModel(model.apiProtocol().wire(), model.upstreamModelId(), model.reasoningEffort())));
+        return Map.copyOf(bound);
+    }
+
+    private byte[] toJson(Map<String, BoundModel> models) {
+        try {
+            return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(models);
+        } catch (JacksonException e) {
+            throw new IllegalStateException("Failed to serialize " + SandboxLayout.PRACTICE_SCRIPT_MODELS_FILE, e);
+        }
     }
 }

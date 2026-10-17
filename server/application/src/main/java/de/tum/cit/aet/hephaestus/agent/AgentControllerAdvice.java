@@ -1,14 +1,12 @@
 package de.tum.cit.aet.hephaestus.agent;
 
-import de.tum.cit.aet.hephaestus.agent.backfill.ReviewBackfillConflictException;
-import de.tum.cit.aet.hephaestus.agent.backfill.ReviewSweepScheduleConflictException;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionInUseException;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionSlugConflictException;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelInUseException;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelSlugConflictException;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelUpstreamIdConflictException;
 import de.tum.cit.aet.hephaestus.agent.config.AgentBindingSlotMismatchException;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobStateConflictException;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobStateConflictException;
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
 import java.net.URI;
@@ -21,28 +19,10 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-/**
- * Error mapper for agent-module exceptions, per {@code docs/contributor/api-error-handling.md}.
- *
- * <p>An agent exception without an explicit handler below returns 500 regardless of any
- * {@code @ResponseStatus} on it: {@code GlobalControllerAdvice}'s
- * {@code @ExceptionHandler(Exception.class)} catches it before
- * {@link org.springframework.web.servlet.mvc.support.ResponseStatusExceptionResolver} can run.
- */
+// Explicit handlers run before GlobalControllerAdvice, which precedes ResponseStatusExceptionResolver.
 @RestControllerAdvice(basePackageClasses = AgentControllerAdvice.class)
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class AgentControllerAdvice {
-
-    @ExceptionHandler(ReviewBackfillConflictException.class)
-    ProblemDetail handleReviewBackfillConflict(ReviewBackfillConflictException exception) {
-        return problem(HttpStatus.CONFLICT, "review-backfill-conflict", "Review backfill conflict", exception);
-    }
-
-    @ExceptionHandler(ReviewSweepScheduleConflictException.class)
-    ProblemDetail handleReviewSweepScheduleConflict(ReviewSweepScheduleConflictException exception) {
-        return problem(
-                HttpStatus.CONFLICT, "review-sweep-schedule-conflict", "Review sweep schedule conflict", exception);
-    }
 
     /**
      * An optimistic-lock failure that outlived its retries is a conflict, not a server fault.
@@ -62,8 +42,8 @@ public class AgentControllerAdvice {
                 new IllegalStateException("The record changed while the server processed this request. Try again."));
     }
 
-    @ExceptionHandler(AgentJobStateConflictException.class)
-    ProblemDetail handleAgentJobStateConflict(AgentJobStateConflictException exception) {
+    @ExceptionHandler(ReviewJobStateConflictException.class)
+    ProblemDetail handleAgentJobStateConflict(ReviewJobStateConflictException exception) {
         return problem(HttpStatus.CONFLICT, "agent-job-state-conflict", "Agent job state conflict", exception);
     }
 

@@ -8,13 +8,16 @@ import {
 } from "@tanstack/react-table";
 import { ChevronDown, EyeIcon, EyeOffIcon, Filter, Search, Users } from "lucide-react";
 // oxlint-disable-next-line no-restricted-imports -- TanStack Table keys its caches on identity, which the compiler memoises as an optimisation rather than promises; each `useMemo` below says what breaks without it.
-import { type ComponentProps, type ReactElement, useEffect, useMemo, useState } from "react";
+import { type ComponentProps, type ReactElement, useMemo, useState } from "react";
+import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
+import { Spinner } from "@/components/ui/spinner";
 
 import type { TeamInfo } from "@/api/types.gen";
+import { ACCOUNT_STATUS_LABELS } from "@/components/admin/users/account-labels";
 import { type DataTableFeatures, dataTableFeatures } from "@/components/common/data-table";
 import { DataTableHeader } from "@/components/common/DataTableHeader";
 import { TablePagination } from "@/components/common/TablePagination";
-import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -33,24 +36,41 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+import { formatDate } from "@/lib/dates";
+import { getProviderLabel } from "@/lib/provider/provider-labels";
 import { hasText } from "@/lib/text";
+import type { WorkspaceRole } from "@/lib/workspace-roles";
 
-import type { ExtendedUserTeams } from "./user-teams";
+import { WORKSPACE_ROLE_LABELS, type WorkspaceMemberRow } from "./workspace-members";
 
-const columnHelper = createColumnHelper<DataTableFeatures, ExtendedUserTeams>();
+const columnHelper = createColumnHelper<DataTableFeatures, WorkspaceMemberRow>();
+
+const ROLE_ITEMS = (["OWNER", "ADMIN", "MEMBER"] satisfies WorkspaceRole[]).map((role) => ({
+	value: role,
+	label: WORKSPACE_ROLE_LABELS[role],
+}));
 
 /** The width each column's placeholder promises, by column id; a column the reader hid has none. */
 const SKELETON_WIDTHS: Record<string, string> = {
 	name: "w-32",
 	username: "w-24",
+	account: "w-16",
+	role: "w-20",
+	joined: "w-20",
+	"review scope": "w-16",
 	visibility: "w-6",
 };
 
 interface WorkspaceMembersTableProps {
-	users: ExtendedUserTeams[];
+	members: WorkspaceMemberRow[];
+	rowCount: number;
 	teams: TeamInfo[];
 	isLoading?: boolean;
-	onToggleHidden?: (userId: number, hidden: boolean) => void;
+	onToggleHidden?: (accountId: string, hidden: boolean) => void;
+	/** Present for an admin, who can give a member another workspace role. */
+	onRoleChange?: (accountId: string, role: WorkspaceRole) => void;
+	/** The member whose role change is in flight; only that member's role control waits. */
+	pendingRoleAccountId?: string;
 	view: WorkspaceMembersTableView;
 	onViewChange: (patch: Partial<WorkspaceMembersTableView>) => void;
 	renderPageLink?: (page: number, props: ComponentProps<"a">) => ReactElement;
@@ -65,11 +85,30 @@ export interface WorkspaceMembersTableView {
 	size: number;
 }
 
+// An unclaimed account has not signed in; it does not indicate a fault.
+function AccountStatus({ row }: { row: WorkspaceMemberRow }) {
+	const { account, leftAt } = row.membership;
+	if (leftAt !== null) {
+		return <span className="text-muted-foreground">Left {formatDate(leftAt)}</span>;
+	}
+	if (account.status === "ACTIVE") {
+		return <span className="text-muted-foreground">{ACCOUNT_STATUS_LABELS.ACTIVE}</span>;
+	}
+	return (
+		<Badge variant={account.status === "UNCLAIMED" ? "outline" : "destructive"}>
+			{ACCOUNT_STATUS_LABELS[account.status]}
+		</Badge>
+	);
+}
+
 export function WorkspaceMembersTable({
-	users,
+	members,
+	rowCount,
 	teams,
 	isLoading = false,
 	onToggleHidden,
+	onRoleChange,
+	pendingRoleAccountId,
 	view,
 	onViewChange,
 	renderPageLink,
@@ -87,15 +126,86 @@ export function WorkspaceMembersTable({
 	const columns = useMemo(
 		() =>
 			columnHelper.columns([
-				columnHelper.accessor((row) => row.user.name, {
+				columnHelper.accessor((row) => row.name, {
 					id: "name",
 					header: "Name",
-					cell: ({ row }) => <div className="font-medium">{row.original.user.name}</div>,
+					cell: ({ row }) => <div className="font-medium">{row.original.name}</div>,
 				}),
-				columnHelper.accessor((row) => row.user.login, {
+				columnHelper.accessor((row) => row.logins.join(" "), {
 					id: "username",
 					header: "Username",
-					cell: ({ row }) => <div className="text-muted-foreground">{row.original.user.login}</div>,
+					cell: ({ row }) => (
+						<ul className="space-y-0.5">
+							{row.original.membership.account.identities
+								.filter((identity) => hasText(identity.login))
+								.map((identity) => (
+									<li key={`${identity.provider}:${identity.login ?? ""}`}>
+										{identity.login}{" "}
+										<span className="text-muted-foreground">
+											({getProviderLabel(identity.provider)})
+										</span>
+									</li>
+								))}
+						</ul>
+					),
+				}),
+				columnHelper.display({
+					id: "account",
+					header: () => "Account",
+					cell: ({ row }) => <AccountStatus row={row.original} />,
+				}),
+				columnHelper.display({
+					id: "role",
+					header: () => "Role",
+					cell: ({ row }) => {
+						const { account, role } = row.original.membership;
+						const accountId = account.id;
+						if (!onRoleChange) {
+							return WORKSPACE_ROLE_LABELS[role];
+						}
+						return (
+							<Select
+								value={role}
+								items={ROLE_ITEMS}
+								disabled={pendingRoleAccountId === accountId}
+								onValueChange={(next) => {
+									if (next !== null && next !== role) {
+										onRoleChange(accountId, next);
+									}
+								}}
+							>
+								<SelectTrigger size="sm" aria-label={`Role of ${row.original.name}`}>
+									{pendingRoleAccountId === accountId && <Spinner />}
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent aria-label={`Role of ${row.original.name}`}>
+									{ROLE_ITEMS.map((item) => (
+										<SelectItem key={item.value} value={item.value}>
+											{item.label}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						);
+					},
+				}),
+				columnHelper.display({
+					id: "joined",
+					header: () => "Joined",
+					cell: ({ row }) => (
+						<span className="text-muted-foreground">
+							{formatDate(row.original.membership.joinedAt)}
+						</span>
+					),
+				}),
+				columnHelper.display({
+					id: "review scope",
+					header: () => "Review scope",
+					cell: ({ row }) => (
+						<span className="text-muted-foreground">
+							{row.original.membership.reviewSelected ? "Included" : "Excluded"}
+						</span>
+					),
 				}),
 				...(onToggleHidden
 					? [
@@ -109,15 +219,18 @@ export function WorkspaceMembersTable({
 										variant="ghost"
 										size="icon-xs"
 										onClick={() =>
-											onToggleHidden(Number(row.original.user.id), !row.original.hidden)
+											onToggleHidden(
+												row.original.membership.account.id,
+												!row.original.membership.hidden,
+											)
 										}
 										aria-label={
-											row.original.hidden
-												? `Show ${row.original.user.name} in workspace activity`
-												: `Hide ${row.original.user.name} from workspace activity`
+											row.original.membership.hidden
+												? `Show ${row.original.name} in workspace activity`
+												: `Hide ${row.original.name} from workspace activity`
 										}
 									>
-										{row.original.hidden ? (
+										{row.original.membership.hidden ? (
 											<EyeOffIcon className="size-4 text-muted-foreground" />
 										) : (
 											<EyeIcon className="size-4" />
@@ -128,20 +241,7 @@ export function WorkspaceMembersTable({
 						]
 					: []),
 			]),
-		[onToggleHidden],
-	);
-
-	// The table's `data`, keyed the same way `columns` is: the core row model is cached against this
-	// array's identity.
-	const filteredData = useMemo(
-		() =>
-			users.filter((user) => {
-				if (view.team === "all") {
-					return true;
-				}
-				return user.teams.some((team) => team.id.toString() === view.team);
-			}),
-		[users, view.team],
+		[onToggleHidden, onRoleChange, pendingRoleAccountId],
 	);
 
 	const sortedTeams = [...teams].sort((a, b) => a.name.localeCompare(b.name));
@@ -161,7 +261,11 @@ export function WorkspaceMembersTable({
 	// render overwrites it.
 	const table = useTable({
 		features: dataTableFeatures,
-		data: filteredData,
+		data: members,
+		rowCount,
+		manualFiltering: true,
+		manualSorting: true,
+		manualPagination: true,
 		columns,
 		autoResetPageIndex: false,
 		onSortingChange: (updater) => {
@@ -173,12 +277,6 @@ export function WorkspaceMembersTable({
 			});
 		},
 		onColumnVisibilityChange: setColumnVisibility,
-		onGlobalFilterChange: (updater) => {
-			// The library types `globalFilter` as `any`, so the value is narrowed on the way back out
-			// rather than trusted into a typed search param.
-			const next: unknown = functionalUpdate(updater, view.q.trim());
-			onViewChange({ q: typeof next === "string" ? next : "", page: 0 });
-		},
 		onPaginationChange: (updater) => {
 			const next = functionalUpdate(updater, { pageIndex: view.page, pageSize: view.size });
 			if (next.pageIndex !== view.page || next.pageSize !== view.size) {
@@ -188,17 +286,15 @@ export function WorkspaceMembersTable({
 		state: {
 			sorting,
 			columnVisibility,
-			globalFilter: view.q.trim(),
 			pagination: { pageIndex: view.page, pageSize: view.size },
 		},
 	});
-	const lastPage = Math.max(0, table.getPageCount() - 1);
 
-	useEffect(() => {
-		if (!isLoading && view.page > lastPage) {
-			onViewChange({ page: lastPage });
-		}
-	}, [isLoading, lastPage, onViewChange, view.page]);
+	const noMatchesMessage =
+		hasText(view.q) || view.team !== "all"
+			? "Try a different search or team."
+			: "This workspace has no members yet.";
+	const emptyMessage = rowCount > 0 ? "Choose another page." : noMatchesMessage;
 
 	let body: ReactElement | ReactElement[];
 	if (table.getRowModel().rows.length > 0) {
@@ -217,12 +313,15 @@ export function WorkspaceMembersTable({
 				<TableCell colSpan={table.getVisibleLeafColumns().length} className="h-32 text-center">
 					<div className="flex flex-col items-center justify-center space-y-2">
 						<Users className="h-8 w-8 text-muted-foreground" />
-						<p className="text-sm font-medium">No members found</p>
-						<p className="text-xs text-muted-foreground">
-							{view.q || view.team !== "all"
-								? "Try a different search or team."
-								: "This workspace has no members yet."}
+						<p className="text-sm font-medium">
+							{rowCount > 0 ? "No members on this page" : "No members found"}
 						</p>
+						<p className="text-xs text-muted-foreground">{emptyMessage}</p>
+						{rowCount > 0 && view.page > 0 && (
+							<Button variant="outline" size="sm" onClick={() => onViewChange({ page: 0 })}>
+								Go to first page
+							</Button>
+						)}
 					</div>
 				</TableCell>
 			</TableRow>

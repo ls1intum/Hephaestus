@@ -137,7 +137,7 @@ const INTENTIONALLY_MISSING_PATHS = [
 	{
 		document: "docs/contributor/agent/workspace-abi.mdx",
 		value: "description.md",
-		reason: "a captured artifact written into the agent workspace",
+		reason: "a captured item written into the agent workspace",
 	},
 	{
 		document: "docs/contributor/practice-review-runtime.mdx",
@@ -146,8 +146,8 @@ const INTENTIONALLY_MISSING_PATHS = [
 	},
 	{
 		document: "docs/contributor/practice-review-runtime.mdx",
-		value: "work/composition/observations.json",
-		reason: "the admitted observations, written inside the agent workspace for the composer",
+		value: "work/composition/results.json",
+		reason: "the admitted results, written inside the agent workspace for the composer",
 	},
 	{
 		document: "docs/contributor/agent/workspace-abi.mdx",
@@ -156,13 +156,19 @@ const INTENTIONALLY_MISSING_PATHS = [
 	},
 	{
 		document: "docs/contributor/agent/workspace-abi.mdx",
-		value: "inputs/history/observations.json",
+		value: "context/item.json",
+		reason: "the pinned scan item record, written into the agent workspace",
+	},
+	{
+		document: "docs/contributor/agent/workspace-abi.mdx",
+		value: "inputs/history/results.json",
 		reason: "the staged history record, written into the agent workspace",
 	},
 	{
 		document: "docs/contributor/practice-catalogue.md",
-		value: "work/precompute-out/<slug>.md",
-		reason: "a practice's precompute section, written inside the agent workspace for its turn",
+		value: "work/practice-scripts-out/<slug>.md",
+		reason:
+			"the practice script section of a practice, written inside the agent workspace for its turn",
 	},
 	{
 		document: "AGENTS.md",
@@ -171,6 +177,11 @@ const INTENTIONALLY_MISSING_PATHS = [
 	},
 	{
 		document: "docs/contributor/local-development.mdx",
+		value: "server/.env",
+		reason: "a developer-local secrets file that must stay untracked",
+	},
+	{
+		document: "docs/contributor/database-migration.mdx",
 		value: "server/.env",
 		reason: "a developer-local secrets file that must stay untracked",
 	},
@@ -217,16 +228,6 @@ const INTENTIONALLY_MISSING_PATHS = [
 	{
 		document: "docs/contributor/agent/workspace-abi.mdx",
 		value: "out/watchdog-killed.json",
-		reason: "a path inside the staged agent workspace, not the repository checkout",
-	},
-	{
-		document: "docs/contributor/artifact-source-contract.mdx",
-		value: "INDEX.md",
-		reason: "a path inside the staged agent workspace, not the repository checkout",
-	},
-	{
-		document: "docs/contributor/artifact-source-contract.mdx",
-		value: "context/change.json",
 		reason: "a path inside the staged agent workspace, not the repository checkout",
 	},
 	{

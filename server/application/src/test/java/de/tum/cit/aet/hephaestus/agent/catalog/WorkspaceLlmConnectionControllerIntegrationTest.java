@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.catalog;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
@@ -9,9 +10,10 @@ import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.Membership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.spi.LlmConnectionPlatform;
+import java.util.Map;
 import java.util.Objects;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,7 +40,7 @@ class WorkspaceLlmConnectionControllerIntegrationTest extends AbstractWorkspaceI
                 slug,
                 "My Provider",
                 LlmCatalogTestFixtures.PUBLIC_BASE_URL,
-                "openai-completions",
+                LlmApiProtocol.OPENAI_COMPLETIONS,
                 LlmAuthMode.BEARER,
                 "sk-workspace-secret-9999",
                 true,
@@ -67,6 +69,9 @@ class WorkspaceLlmConnectionControllerIntegrationTest extends AbstractWorkspaceI
         assertThat(created.hasApiKey()).isTrue();
         assertThat(created.apiKeyLast4()).isEqualTo("9999");
         assertThat(created.connectionPlatform()).isEqualTo(LlmConnectionPlatform.AZURE);
+        // A chat completions model also answers the decisions of practice scripts.
+        assertThat(created.purposes())
+                .containsExactly(AgentPurpose.PRACTICE_REVIEW, AgentPurpose.MENTOR, AgentPurpose.PRACTICE_DECISION);
 
         webTestClient
                 .get()
@@ -77,7 +82,9 @@ class WorkspaceLlmConnectionControllerIntegrationTest extends AbstractWorkspaceI
                 .isOk()
                 .expectBody()
                 .jsonPath("$.slug")
-                .isEqualTo("my-openai");
+                .isEqualTo("my-openai")
+                .jsonPath("$.apiProtocol")
+                .isEqualTo("openai-completions");
 
         webTestClient
                 .get()
@@ -139,7 +146,7 @@ class WorkspaceLlmConnectionControllerIntegrationTest extends AbstractWorkspaceI
                         "redact-me",
                         "Redact Me",
                         LlmCatalogTestFixtures.PUBLIC_BASE_URL,
-                        "openai-completions",
+                        LlmApiProtocol.OPENAI_COMPLETIONS,
                         LlmAuthMode.BEARER,
                         "sk-super-secret-workspace-value",
                         true,
@@ -164,7 +171,7 @@ class WorkspaceLlmConnectionControllerIntegrationTest extends AbstractWorkspaceI
         // Login must match @WithMentorUser's default "mentor" principal so the workspace membership
         // resolver finds this exact row.
         User mentor = persistUser("mentor");
-        ensureWorkspaceMembership(workspace, mentor, WorkspaceRole.MEMBER);
+        ensureMembership(workspace, mentor, WorkspaceRole.MEMBER);
 
         webTestClient
                 .get()
@@ -206,7 +213,7 @@ class WorkspaceLlmConnectionControllerIntegrationTest extends AbstractWorkspaceI
         User admin = persistUser("mentor");
         Workspace workspace =
                 createWorkspace("byo-realadmin-ws", "Real Admin", "byo-realadmin-org", AccountType.ORG, admin);
-        ensureWorkspaceMembership(workspace, admin, WorkspaceRole.ADMIN);
+        ensureMembership(workspace, admin, WorkspaceRole.ADMIN);
 
         Workspace otherWorkspace = createWorkspace(
                 "byo-nonmember-ws-2",
@@ -247,7 +254,7 @@ class WorkspaceLlmConnectionControllerIntegrationTest extends AbstractWorkspaceI
                 "gated-out",
                 "Gated Out",
                 LlmCatalogTestFixtures.PUBLIC_BASE_URL,
-                "openai-completions",
+                LlmApiProtocol.OPENAI_COMPLETIONS,
                 LlmAuthMode.BEARER,
                 null,
                 true,
@@ -262,6 +269,26 @@ class WorkspaceLlmConnectionControllerIntegrationTest extends AbstractWorkspaceI
                 .exchange()
                 .expectStatus()
                 .isForbidden()
+                .expectBody(Void.class);
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldRejectTheConnectionWhenItsProtocolIsNotOneHephaestusSpeaks() {
+        Workspace workspace = setupWorkspace("byo-protocol-ws");
+
+        webTestClient
+                .post()
+                .uri("/workspaces/{slug}/llm/connections", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of(
+                        "displayName", "Messages",
+                        "baseUrl", LlmCatalogTestFixtures.PUBLIC_BASE_URL,
+                        "apiProtocol", "anthropic-messages"))
+                .exchange()
+                .expectStatus()
+                .isBadRequest()
                 .expectBody(Void.class);
     }
 }

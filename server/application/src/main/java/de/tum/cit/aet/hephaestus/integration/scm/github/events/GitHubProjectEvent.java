@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.events;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 

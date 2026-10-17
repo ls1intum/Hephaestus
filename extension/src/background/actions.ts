@@ -1,11 +1,12 @@
 import { z } from "zod";
 
+import { ITEM_EVENT_REASON_SENTENCES } from "@/components/practice-vocabulary/item-event-defs";
 import type { ReviewRequestOutcome } from "~/api/types.gen";
 import {
 	type ContextApi,
 	type ContextEnvironment,
 	requireReady,
-	sameWork,
+	sameItem,
 } from "~/background/context";
 import { forbidden, WorkerError } from "~/background/errors";
 import {
@@ -27,7 +28,7 @@ import type { ReadyContext } from "~/shared/review-context";
  * local step that consumes it before the one request is sent.
  */
 export interface ActionApi extends ContextApi {
-	requestReview: (slug: string, kind: string, id: number) => Promise<ReviewRequestOutcome>;
+	requestReview: (slug: string, itemId: string) => Promise<ReviewRequestOutcome>;
 }
 
 /** Long enough to read the window, short enough that a forgotten one does not linger. */
@@ -40,7 +41,7 @@ const intentSchema = z.object({
 	tabId: z.number().int(),
 	pageUrl: z.string(),
 	workspaceSlug: z.string(),
-	work: z.object({ kind: z.string(), id: z.string() }),
+	itemId: z.string(),
 	action: reviewActionSchema,
 	expiresAt: z.number(),
 	/**
@@ -125,7 +126,7 @@ function expired(): WorkerError {
 
 /** Whether the reader may ask for a review of this work now, by the server's current answer. */
 function allowed(context: ReadyContext): void {
-	if (!context.canRequestReview) {
+	if (!context.requestAllowed) {
 		throw forbidden("Your account cannot request a review of this work.");
 	}
 }
@@ -150,7 +151,7 @@ export async function openAction(
 		tabId,
 		pageUrl: context.pageUrl,
 		workspaceSlug,
-		work: { kind: context.work.kind, id: context.work.id },
+		itemId: context.item.id,
 		action,
 		expiresAt: deps.now() + INTENT_LIFETIME_MS,
 	};
@@ -216,7 +217,7 @@ async function revalidate(
 			throw expired();
 		}
 		const { context, stillShowing } = await requireReady(env, intent.tabId, intent.workspaceSlug);
-		if (context.pageUrl !== intent.pageUrl || !sameWork(intent.work, context)) {
+		if (context.pageUrl !== intent.pageUrl || !sameItem(intent.itemId, context)) {
 			throw expired();
 		}
 		allowed(context);
@@ -244,7 +245,7 @@ export async function previewAction(
 		action: intent.action,
 		instanceHost: context.instanceHost,
 		workspace: context.workspace,
-		work: context.work,
+		item: context.item,
 	};
 }
 
@@ -302,16 +303,15 @@ async function send(
 	env: ContextEnvironment<ActionApi>,
 	context: ReadyContext,
 ): Promise<ActionOutcome> {
-	const outcome = await env.api.requestReview(
-		context.workspace.slug,
-		context.work.kind,
-		Number(context.work.id),
-	);
-	return {
-		kind: "request-review",
-		status: outcome.status,
-		reasonDescription: outcome.status === "REFUSED" ? outcome.reasonDescription : undefined,
-	};
+	const outcome = await env.api.requestReview(context.workspace.slug, context.item.id);
+	return outcome.status === "SUBMITTED"
+		? { kind: "request-review", status: "SUBMITTED" }
+		: {
+				kind: "request-review",
+				status: "REFUSED",
+				reasonDescription:
+					outcome.reason === null ? undefined : ITEM_EVENT_REASON_SENTENCES[outcome.reason],
+			};
 }
 
 /** The window's own "Cancel": removes its intent, and only while it is still this window's. */

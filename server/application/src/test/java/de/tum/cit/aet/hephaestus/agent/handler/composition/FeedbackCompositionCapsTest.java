@@ -1,43 +1,51 @@
 package de.tum.cit.aet.hephaestus.agent.handler.composition;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
-import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import java.nio.charset.StandardCharsets;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import org.junit.jupiter.api.BeforeEach;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCompositionTrace;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-class FeedbackCompositionCapsTest extends BaseUnitTest {
+@Tag("unit")
+class FeedbackCompositionCapsTest {
 
-    private final JsonMapper objectMapper = JsonMapper.builder().build();
-    private JsonNode request;
-
-    @BeforeEach
-    void stageAnEventReview() {
-        Map<String, byte[]> files = new LinkedHashMap<>();
-        FeedbackCompositionInputs.stage(files, ObservationOrigin.LIVE);
-        request = objectMapper.readTree(
-                new String(files.get(SandboxLayout.FEEDBACK_COMPOSITION_PATH), StandardCharsets.UTF_8));
+    @Test
+    void shouldRejectDuplicateResultIdsAndPrivateAnchoredNotes() {
+        UUID id = UUID.randomUUID();
+        assertThatThrownBy(() -> new ComposedFeedback(
+                        FeedbackDestination.ON_WORK,
+                        List.of(id, id),
+                        "body",
+                        List.of(),
+                        null,
+                        new FeedbackCompositionTrace(List.of(), List.of(), null, null),
+                        null))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ComposedFeedback(
+                        FeedbackDestination.CONVERSATION,
+                        List.of(id),
+                        "body",
+                        List.of(new ComposedFeedback.Note(UUID.randomUUID(), 0, "note")),
+                        null,
+                        new FeedbackCompositionTrace(List.of(), List.of(), null, null),
+                        null))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
-    void stagesTwoInAppUnitsPerRun() {
-        assertThat(request.get("channels")
-                        .get(FeedbackChannel.IN_APP.name())
-                        .get("maxUnits")
-                        .asInt())
-                .isEqualTo(2);
+    void shouldBoundTheTextBeforeAnyPersistence() {
+        assertThatThrownBy(() -> new ComposedFeedback.Note(UUID.randomUUID(), 0, "x".repeat(8001)))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
-    void requiresTwoDistinctArtifactsForPatternClaims() {
-        assertThat(request.get("minDistinctArtifacts").asInt()).isEqualTo(2);
+    void shouldRejectAnInlineNoteWithoutAnExplicitCitationSelection() {
+        var json = "{\"problemId\":\"" + UUID.randomUUID() + "\",\"body\":\"Check the token.\"}";
+        assertThatThrownBy(() -> new JsonMapper().readValue(json, ComposedFeedback.Note.class))
+                .isInstanceOf(RuntimeException.class);
     }
 }

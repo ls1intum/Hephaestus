@@ -11,10 +11,10 @@ export interface ReviewResultsSkeletonProps {
 	rows: number;
 }
 
-/** The shape of {@link ReviewRow} in {@link ReviewRowList}, before the rows exist. */
+/** The shape of a list of review rows, before the rows exist. */
 export function ReviewResultsSkeleton({ label, rows }: ReviewResultsSkeletonProps) {
 	return (
-		<div className="overflow-hidden rounded-xl border bg-card" role="status">
+		<div className="overflow-hidden rounded-xl border bg-card" aria-busy="true">
 			<span className="sr-only">{label}</span>
 			<SkeletonRows rows={rows} />
 		</div>

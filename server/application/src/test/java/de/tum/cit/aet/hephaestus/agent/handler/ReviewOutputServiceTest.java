@@ -1,1957 +1,355 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.context.CitedSourceAccess;
-import de.tum.cit.aet.hephaestus.agent.context.HistoricalGitEvidence;
 import de.tum.cit.aet.hephaestus.agent.context.JobEvidenceFiles;
-import de.tum.cit.aet.hephaestus.agent.context.providers.PullRequestContentSource;
-import de.tum.cit.aet.hephaestus.agent.conversation.ConversationSourceLiveness;
-import de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection;
-import de.tum.cit.aet.hephaestus.agent.handler.ReviewResultParser.ValidatedObservation;
-import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
-import de.tum.cit.aet.hephaestus.agent.handler.spi.ObservationsRefusedException;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
-import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.agent.context.JobFolderIndex;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.ResultsRefusedException;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobAssignments;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmissionRequestDTO;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.RuntimeNonResultDTO;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.SubmittedResultDTO;
+import de.tum.cit.aet.hephaestus.evidence.AppliesWhenCheck;
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
+import de.tum.cit.aet.hephaestus.evidence.SourceCapture;
+import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
+import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
-import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
-import de.tum.cit.aet.hephaestus.integration.scm.ReviewTargetQuery;
-import de.tum.cit.aet.hephaestus.practices.EvidenceStance;
-import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
-import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceLimitation;
-import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceRequirement;
-import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptions;
-import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Outcome;
-import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.review.AutomatedReviewFence;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewedWorkChanges;
+import de.tum.cit.aet.hephaestus.integration.core.spi.CandidateRefusal;
+import de.tum.cit.aet.hephaestus.practices.spi.AdmissionReceipt;
+import de.tum.cit.aet.hephaestus.practices.spi.PinnedPractice;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultCandidate;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultStore;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentStore;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewStopReason;
+import de.tum.cit.aet.hephaestus.practices.spi.WithheldItem;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import java.io.StringReader;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
+import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-import java.util.function.Supplier;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
-import org.springframework.test.util.ReflectionTestUtils;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 class ReviewOutputServiceTest extends BaseUnitTest {
-    /** The pinned change: {@code BASE..HEAD}, in a checkout whose HEAD tree is {@code TREE}. */
-    private static final String BASE = "a".repeat(40);
-
-    private static final String HEAD = "b".repeat(40);
-    private static final String TREE = "c".repeat(40);
-    private static final String HEAD_DIGEST = "d".repeat(64);
-    private static final String REFS_DIGEST = "f".repeat(64);
-    private static final String BLOB_DIGEST = "e".repeat(64);
-    private static final String HEAD_PATH = SandboxLayout.REPO_MOUNT_RELATIVE + ".git/HEAD";
-    private static final String REFS_PATH = SandboxLayout.REPO_MOUNT_RELATIVE + ".git/hephaestus-captured-refs";
-
-    private final ObjectMapper objectMapper = new ObjectMapper();
-
-    @Mock
-    private PracticeRevisionRepository practiceRevisionRepository;
-
-    @Mock
-    private ObservationRepository observationRepository;
-
-    @Mock
-    private ReviewTargetQuery reviewTargets;
-
-    @Mock
-    private ConversationSourceLiveness conversationSourceLiveness;
-
-    @Mock
-    private DocumentProjection documentProjection;
-
-    @Mock
-    private JobEvidenceFiles cas;
-
-    @Mock
-    private ArtifactSourceCatalogRegistry sourceCatalogs;
-
-    @Mock
-    private HistoricalGitEvidence historicalGit;
-
-    @Mock
-    private CitedSourceAccess citedSourceAccess;
-
-    private ReviewOutputService service;
-
-    /** A regular file the attempt's checkout holds at one revision. */
-    private record Blob(String revision, String path) {}
-
-    /** What the checkout can be quoted from: the numbered lines of each blob, as the verifier reads them. */
-    private final Map<Blob, Map<Integer, String>> checkout = new HashMap<>();
-
-    /** The paths the pinned change touches, as the checkout's own history reports them. */
-    private Set<String> changedPaths = Set.of("src/Auth.java");
-
-    private Practice testPractice;
-    private PracticeRevision testRevision;
-    private AgentJob testJob;
+    private final JsonMapper mapper = new JsonMapper();
+    private final ReviewJobAssignments assignments = mock(ReviewJobAssignments.class);
+    private final CandidateEvidenceVerifier verifier = mock(CandidateEvidenceVerifier.class);
+    private final ResultStore results = mock(ResultStore.class);
+    private final ReviewAssignmentStore membership = mock(ReviewAssignmentStore.class);
+    private final JobEvidenceFiles files = mock(JobEvidenceFiles.class);
+    private final ClasspathSourceCatalogRegistry catalogs = mock(ClasspathSourceCatalogRegistry.class);
+    private final ReviewJob job = RuntimeReviewTestData.job();
+    private final ReviewOutputService service =
+            new ReviewOutputService(assignments, verifier, results, mapper, files, catalogs, membership);
 
     @BeforeEach
-    void setUp() {
-        // The developer's AI choice permits the result unless a scenario withdraws it.
-        lenient().when(citedSourceAccess.permitsReviewResult(any())).thenReturn(true);
-        lenient()
-                .when(citedSourceAccess.asOneRead(anyLong(), eq(SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW), any()))
-                .thenAnswer(invocation -> invocation
-                        .<Supplier<ReviewOutputService.PreparedObservations>>getArgument(2)
-                        .get());
-        service = new ReviewOutputService(
-                practiceRevisionRepository,
-                observationRepository,
-                new ReviewResultTargetResolver(reviewTargets, conversationSourceLiveness, documentProjection),
-                objectMapper,
-                cas,
-                sourceCatalogs,
-                historicalGit,
-                new AutomatedReviewFence(Map.of()),
-                new LinkedIssueRepairAdmissionService(
-                        mock(ReviewedWorkChanges.class),
-                        observationRepository,
-                        mock(FeedbackObservationRepository.class),
-                        mock(FeedbackRepository.class)),
-                mock(PracticeSignalOptions.class),
-                citedSourceAccess);
-
-        lenient().when(sourceCatalogs.isSourceUsePermitted(any(), any(), any())).thenReturn(true);
-
-        Workspace workspace = new Workspace();
-        ReflectionTestUtils.setField(workspace, "id", 1L);
-
-        testPractice = new Practice();
-        ReflectionTestUtils.setField(testPractice, "id", 10L);
-        testPractice.setSlug("pr-description-quality");
-        PracticeTestEvidence.configure(testPractice, ArtifactKinds.PULL_REQUEST);
-        testPractice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
-        testPractice.setWorkspace(workspace);
-
-        testJob = new AgentJob();
-        ReflectionTestUtils.setField(testJob, "id", UUID.randomUUID());
-        testJob.setWorkspace(workspace);
-        ObjectNode metadata = objectMapper.createObjectNode();
-        metadata.put("pull_request_id", 456L);
-        metadata.put("repository_id", 123L);
-        metadata.put("repository_full_name", "owner/repo");
-        metadata.put("pr_number", 42);
-        testJob.setMetadata(metadata);
-        ObjectNode snapshot = EvidenceSnapshotFixtures.snapshot(objectMapper);
-        EvidenceSnapshotFixtures.artifact(
-                snapshot,
-                EvidenceSnapshotFixtures.availableSource(snapshot, "scm.pull-request.diff", BASE + ":" + HEAD),
-                PullRequestContentSource.CHANGE_FILE,
-                "a".repeat(64));
-        ObjectNode tree = EvidenceSnapshotFixtures.availableSource(snapshot, "scm.repository.tree", HEAD + ":" + TREE);
-        EvidenceSnapshotFixtures.artifact(snapshot, tree, HEAD_PATH, HEAD_DIGEST);
-        EvidenceSnapshotFixtures.artifact(snapshot, tree, REFS_PATH, REFS_DIGEST);
-        EvidenceSnapshotFixtures.artifact(
-                snapshot,
-                EvidenceSnapshotFixtures.availableSource(snapshot, "scm.pull-request.core", null),
-                "context/pull_request.json",
-                "b".repeat(64));
-        EvidenceSnapshotFixtures.admittedPractice(snapshot, "pr-description-quality", 11L);
-        testJob.setEvidenceSnapshot(snapshot);
-
-        testRevision = mock(PracticeRevision.class);
-        lenient().when(testRevision.getId()).thenReturn(11L);
-        lenient().when(testRevision.getReviewRuleFingerprint()).thenReturn("v5:" + "a".repeat(64));
-        lenient().when(testRevision.getSlug()).thenReturn("pr-description-quality");
-        lenient().when(testRevision.getPractice()).thenReturn(testPractice);
-        lenient().when(testRevision.getAutomatedReviewPolicy()).thenReturn(testPractice.getAutomatedReviewPolicy());
-        // Evidence requirements bound absence claims; every source that applies to the
-        // artifact is staged for citation regardless.
-        lenient().when(testRevision.getSignals()).thenReturn(testPractice.getSignals());
-        lenient().when(testRevision.getEvidenceRequirements()).thenReturn(testPractice.getEvidenceRequirements());
-        lenient().when(testRevision.getReviewWhen()).thenReturn(testPractice.getReviewWhen());
-        lenient().when(testRevision.getSubject()).thenReturn(testPractice.getSubject());
-        lenient().when(testRevision.getPrecondition()).thenReturn(testPractice.getPrecondition());
-        lenient()
-                .when(practiceRevisionRepository.findByIdAndWorkspaceId(11L, 1L))
-                .thenReturn(Optional.of(testRevision));
-
-        captured(HEAD, "src/Auth.java", 10, "insecure();", "allowAll();");
-        lenient()
-                .when(historicalGit.changedPaths(testJob, HEAD_DIGEST, REFS_DIGEST, BASE, HEAD))
-                .thenAnswer(invocation -> changedPaths);
-        lenient()
-                .when(historicalGit.verifyAll(eq(testJob), eq(HEAD_DIGEST), eq(REFS_DIGEST), eq(HEAD), any()))
-                .thenAnswer(invocation -> {
-                    List<HistoricalGitEvidence.Citation> submitted = invocation.getArgument(4);
-                    Map<HistoricalGitEvidence.Citation, JobEvidenceFiles.QuoteMatch> verified = new LinkedHashMap<>();
-                    for (HistoricalGitEvidence.Citation citation : submitted) {
-                        verified.put(citation, quoteMatch(citation));
-                    }
-                    return verified;
-                });
-
-        lenient()
-                .when(reviewTargets.findPullRequest(456L))
-                .thenReturn(Optional.of(new ReviewTargetQuery.Target(123L, "owner/repo", 42, 789L, false)));
-        lenient()
-                .when(observationRepository.insertIfAbsent(
-                        any(),
-                        anyString(),
-                        any(),
-                        anyLong(),
-                        anyLong(),
-                        any(), // practiceRevisionId
-                        anyString(),
-                        anyLong(),
-                        anyLong(),
-                        any(),
-                        anyString(),
-                        any(),
-                        any(),
-                        any(),
-                        anyString(),
-                        any(),
-                        anyString()))
-                .thenReturn(1);
+    void setup() {
+        var assigned = RuntimeReviewTestData.assignment(5L, null);
+        when(assignments.admissible(job)).thenReturn(List.of(assigned));
+        when(assignments.review(job)).thenReturn(RuntimeReviewTestData.review(ReviewKind.ITEM, assigned));
+        var manifest = new JobFolderIndex(
+                new SourceContractVersion("2.0.0"),
+                "a".repeat(64),
+                "docs.document",
+                Instant.EPOCH,
+                List.of(new SourceCapture(
+                        new SourceKind("docs.document.core"),
+                        new SourceCaptureState.NotCollected(SourceAbsenceReason.GOVERNANCE_NOT_EFFECTIVE),
+                        EvidenceSnapshotFixtures.citation(new SourceKind("docs.document.core")),
+                        List.of())),
+                List.of(),
+                List.of(),
+                List.of());
+        var capture = mapper.createObjectNode();
+        capture.set("manifest", mapper.valueToTree(manifest));
+        job.setCapture(capture);
+        job.setWorkerId("worker");
     }
 
-    /** Puts {@code lines} into the checkout at {@code path} in {@code revision}, the first at {@code firstLine}. */
-    private void captured(String revision, String path, int firstLine, String... lines) {
-        Map<Integer, String> numbered = checkout.computeIfAbsent(new Blob(revision, path), blob -> new HashMap<>());
-        for (int i = 0; i < lines.length; i++) {
-            numbered.put(firstLine + i, lines[i]);
-        }
+    private void acceptReadReceipts() {
+        when(files.registerReadReceipts(eq(job), any(), eq(List.of()), eq(catalogs)))
+                .thenAnswer(invocation -> invocation.getArgument(1));
     }
 
-    /** What the verifier answers for one citation: the blob is absent, or its lines do or do not read as quoted. */
-    private JobEvidenceFiles.QuoteMatch quoteMatch(HistoricalGitEvidence.Citation citation) {
-        Map<Integer, String> lines = checkout.get(new Blob(citation.revision(), citation.path()));
-        if (lines == null) return JobEvidenceFiles.QuoteMatch.absent();
-        StringBuilder text = new StringBuilder();
-        for (int line = citation.startLine(); line <= citation.endLine(); line++) {
-            String content = lines.get(line);
-            if (content == null) return new JobEvidenceFiles.QuoteMatch(false, BLOB_DIGEST);
-            if (line > citation.startLine()) text.append('\n');
-            text.append(content);
-        }
-        return new JobEvidenceFiles.QuoteMatch(text.toString().equals(citation.quote()), BLOB_DIGEST);
-    }
-
-    private ValidatedObservation validObservation(String slug, @Nullable Outcome outcome) {
-        ObjectNode evidence = objectMapper.createObjectNode();
-        evidence.putArray("citations")
-                .addObject()
-                .put("sourceKind", "scm.pull-request.diff")
-                .put("artifactPath", PullRequestContentSource.CHANGE_FILE)
-                .put("path", "src/Auth.java")
-                .put("side", "NEW")
-                .put("startLine", 10)
-                .put("endLine", 10)
-                .put("quote", "insecure();");
-        // This observation claims absence and records the scope of its search.
-        if (outcome == Outcome.NOT_MET) {
-            ObjectNode search = evidence.putObject("search");
-            search.putArray("consulted").add("scm.pull-request.diff");
-            search.put("lookedFor", "a described rationale for the change");
-            search.put("boundary", "the diff of this pull request only");
-        }
-        // A NOT_APPLICABLE observation asserts something about the work too — that this practice has no
-        // subject in it — so delivery requires it to name what the practice looks for and what rules it out.
-        if (outcome == null) {
-            ObjectNode inapplicability = evidence.putObject("inapplicability");
-            inapplicability.putArray("consulted").add("scm.pull-request.diff");
-            inapplicability.put("subject", "a described rationale for the change");
-            inapplicability.put("ruledOutBy", "the change is a generated lockfile update with no prose to judge");
-        }
-        return new ValidatedObservation(
-                slug,
-                "Test observation",
-                outcome == null ? Outcome.NOT_APPLICABLE : outcome,
-                outcome == Outcome.NOT_MET ? Severity.MINOR : null,
-                evidence,
-                null);
+    private AdmissionRequestDTO submission(String slug, String version) {
+        var candidate = mapper.readTree("""
+            {"outcome":"MET","summary":"Clear names","explanation":"The names explain the document.",
+             "citations":[{"sourceKind":"docs.document.core","sourcePath":"context/body.txt","path":"document/body","startLine":1,"endLine":1,"quote":"Clear names"}],
+             "evidence":{},"coverage":{"source":"claimed","selected":1,"checked":1,"total":1,"complete":true}}
+            """);
+        return new AdmissionRequestDTO(
+                3,
+                job.getReviewId(),
+                job.getId(),
+                0,
+                List.of(new SubmittedResultDTO(slug, "2", version, candidate, List.of())),
+                List.of());
     }
 
     @Test
-    void shouldRefuseAPendingReviewPinnedToAnEarlierObservationStandard() {
-        when(testRevision.getReviewRuleFingerprint()).thenReturn("v4:" + "a".repeat(64));
-
-        assertThatThrownBy(() ->
-                        service.prepare(testJob, List.of(validObservation("pr-description-quality", Outcome.MET))))
-                .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("incompatible observation standard");
-        verifyNoInteractions(observationRepository);
-    }
-
-    @ParameterizedTest
-    @CsvSource({
-        "MET,inapplicability", "MET,undecidability",
-        "NOT_MET,inapplicability", "NOT_MET,undecidability",
-        "NOT_APPLICABLE,search", "NOT_APPLICABLE,undecidability",
-        "UNDETERMINED,search", "UNDETERMINED,inapplicability"
-    })
-    void shouldRefuseAnEvidenceWarrantThatContradictsTheOutcome(Outcome outcome, String warrant) {
-        ValidatedObservation observation = validObservation("pr-description-quality", outcome);
-        ((ObjectNode) evidenceOf(observation)).putObject(warrant);
-
-        assertThatThrownBy(() -> service.prepare(testJob, List.of(observation)))
-                .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("warrant does not match outcome");
-        verifyNoInteractions(observationRepository);
-    }
-
-    private static ObjectNode firstCitation(ValidatedObservation observation) {
-        return (ObjectNode) evidenceOf(observation).withArray("citations").get(0);
-    }
-
-    /** The persisted first citation of the one observation {@code result} recorded. */
-    private static JsonNode storedCitation(ReviewOutputService.RecordedObservations result) {
-        return Objects.requireNonNull(result.recorded().getFirst().evidence())
-                .path("citations")
-                .get(0);
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {"", " \t\n"})
-    void shouldRejectABlankQuote(String quote) {
-        var observation = validObservation("pr-description-quality", Outcome.MET);
-        firstCitation(observation).put("quote", quote);
-        assertThatThrownBy(() -> publishVerified(testJob, List.of(observation)))
-                .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("code citation");
-        verifyNoInteractions(observationRepository);
-    }
-
-    @ParameterizedTest
-    @ValueSource(longs = {2147483648L, 4294967306L, Long.MAX_VALUE})
-    void shouldRejectCoordinatesThatWouldOverflowAnInteger(long line) {
-        var observation = validObservation("pr-description-quality", Outcome.MET);
-        var citation = firstCitation(observation);
-        citation.put("startLine", line).put("endLine", line);
-        assertThatThrownBy(() -> publishVerified(testJob, List.of(observation)))
-                .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("code citation");
-        citation.put("startLine", 10);
-        assertThatThrownBy(() -> publishVerified(testJob, List.of(observation)))
-                .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("invalid evidence citation");
-        verifyNoInteractions(observationRepository);
+    void shouldWithholdAnUnverifiedPracticeThroughTheOneMembershipPort() {
+        acceptReadReceipts();
+        doThrow(new CandidateEvidenceVerifier.Unverified(
+                        CandidateRefusal.QUOTE_UNVERIFIED, "The text was unavailable", null))
+                .when(verifier)
+                .verifyCandidate(eq(job), any(), eq(ReviewKind.ITEM), any(), any());
+        when(results.admit(1, job.getReviewId(), job.getId(), 0, List.of()))
+                .thenReturn(new AdmissionReceipt(List.of(), List.of()));
+        var prepared = service.prepare(job, submission("clear-names", "docs:one"));
+        verifyNoInteractions(membership, results);
+        prepared.record(job);
+        verify(membership)
+                .withhold(
+                        1,
+                        RuntimeReviewTestData.assignment(5L, null).id(),
+                        CandidateRefusal.QUOTE_UNVERIFIED,
+                        "The text was unavailable");
+        assertThat(Objects.requireNonNull(job.getCapture())
+                        .path("withheld")
+                        .get(0)
+                        .path("reason")
+                        .asString())
+                .isEqualTo("quote_unverified");
     }
 
     @Test
-    void shouldAdmitContextualAssessmentWithoutParsingPolarityFromCriteria() {
-        var observation = validObservation("pr-description-quality", Outcome.MET);
-        publishVerified(testJob, List.of(observation));
-        verify(testRevision, never()).getCriteria();
-        verify(observationRepository)
-                .insertIfAbsent(
-                        any(),
-                        anyString(),
-                        any(),
-                        anyLong(),
-                        anyLong(),
-                        any(),
-                        anyString(),
-                        anyLong(),
-                        anyLong(),
-                        any(),
-                        anyString(),
-                        any(),
-                        any(),
-                        any(),
-                        anyString(),
-                        any(),
-                        anyString());
+    void shouldWithholdHostCoverageWhenItsReceiptsDifferFromTheSubmission() {
+        var submitted = submission("clear-names", "docs:one");
+        var entry = submitted.results().getFirst();
+        var candidate = (ObjectNode) entry.candidate();
+        candidate.set("coverage", mapper.readTree("""
+            {"source":"host","complete":true,"reads":1,"truncatedReads":0,"failedReads":0,
+             "receipts":[{"sourceKind":"docs.document.core","sourcePath":"context/body.txt",
+             "path":"document/body","version":"docs:one","status":"COMPLETE"}]}
+            """));
+        when(results.admit(1, job.getReviewId(), job.getId(), 0, List.of()))
+                .thenReturn(new AdmissionReceipt(List.of(), List.of()));
+        service.prepare(job, submitted).record(job);
+        verifyNoInteractions(verifier);
+        verify(membership)
+                .withhold(
+                        1,
+                        RuntimeReviewTestData.assignment(5L, null).id(),
+                        CandidateRefusal.COVERAGE_INCONSISTENT,
+                        "Host coverage differs from the submitted read receipts");
     }
 
     @Test
-    void shouldRequireAnUnresolvedQuestionForUndeterminedObservations() {
-        var base = validObservation("pr-description-quality", null);
-        ObjectNode evidence = (ObjectNode) evidenceOf(base);
-        evidence.remove("inapplicability");
-        var observation = new ValidatedObservation(
-                base.practiceSlug(),
-                base.summary(),
-                Outcome.UNDETERMINED,
-                null,
-                evidence,
-                "The captured evidence does not settle the criterion.");
-        assertThatThrownBy(() -> publishVerified(testJob, List.of(observation)))
-                .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("open question");
-        evidence.putObject("undecidability")
-                .put("openQuestion", "Does the criterion include this compatibility-only change?")
-                .put("wouldSettleIt", "Clarification of the practice's scope.");
-        assertThat(publishVerified(testJob, List.of(observation)).inserted()).isEqualTo(1);
-    }
-
-    private static JsonNode evidenceOf(ValidatedObservation observation) {
-        JsonNode evidence = observation.evidence();
-        assertThat(evidence).isNotNull();
-        return evidence;
-    }
-
-    private void admit(Practice practice, long revisionId) {
-        practice.setWorkspace(testPractice.getWorkspace());
-        ((ObjectNode) testJob.getEvidenceSnapshot())
-                .withArray("practices")
-                .addObject()
-                .put("slug", practice.getSlug())
-                .put("revisionId", revisionId);
-        PracticeRevision revision = mock(PracticeRevision.class);
-        lenient().when(revision.getId()).thenReturn(revisionId);
-        lenient().when(revision.getReviewRuleFingerprint()).thenReturn("v5:" + "a".repeat(64));
-        lenient().when(revision.getSlug()).thenReturn(practice.getSlug());
-        lenient().when(revision.getPractice()).thenReturn(practice);
-        lenient().when(revision.getAutomatedReviewPolicy()).thenReturn(practice.getAutomatedReviewPolicy());
-        lenient().when(revision.getSignals()).thenReturn(practice.getSignals());
-        lenient().when(revision.getEvidenceRequirements()).thenReturn(practice.getEvidenceRequirements());
-        lenient().when(revision.getReviewWhen()).thenReturn(practice.getReviewWhen());
-        lenient().when(revision.getSubject()).thenReturn(practice.getSubject());
-        lenient().when(revision.getPrecondition()).thenReturn(practice.getPrecondition());
-        lenient()
-                .when(practiceRevisionRepository.findByIdAndWorkspaceId(revisionId, 1L))
-                .thenReturn(Optional.of(revision));
-    }
-
-    /** A second admitted practice, so one observation can be withheld while another is delivered. */
-    private Practice admitSecondPractice() {
-        Practice second = new Practice();
-        ReflectionTestUtils.setField(second, "id", 20L);
-        second.setSlug("pr-scope");
-        PracticeTestEvidence.configure(second, ArtifactKinds.PULL_REQUEST);
-        second.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
-        admit(second, 21L);
-        return second;
-    }
-
-    private ReviewOutputService.RecordedObservations publishVerified(
-            AgentJob job, List<ReviewResultParser.ValidatedObservation> submitted) {
-        return service.publish(job, service.prepare(job, submitted));
+    void shouldRejectAChangedItemVersionBeforeItCanProduceProof() {
+        assertThatThrownBy(() -> service.prepare(job, submission("clear-names", "docs:other")))
+                .isInstanceOf(ResultsRefusedException.class);
+        verifyNoInteractions(results, membership, verifier);
     }
 
     @Test
-    void shouldRejectPreparedObservationsWhenSourceAuthorizationChangesBeforePublication() {
-        var prepared = service.prepare(testJob, List.of(validObservation("pr-description-quality", Outcome.MET)));
-        when(sourceCatalogs.isSourceUsePermitted(any(), any(), any())).thenReturn(false);
-        assertThatThrownBy(() -> service.publish(testJob, prepared)).isInstanceOf(JobDeliveryException.class);
-        verifyNoInteractions(observationRepository);
+    void shouldRejectAnUnassignedPractice() {
+        assertThatThrownBy(() -> service.prepare(job, submission("other-practice", "docs:one")))
+                .isInstanceOf(ResultsRefusedException.class);
+        verifyNoInteractions(results, membership, verifier);
     }
 
     @Test
-    void shouldRefusePublicationWhenTheJobChangedSincePreparation() {
-        var prepared = service.prepare(testJob, List.of(validObservation("pr-description-quality", Outcome.MET)));
-        testJob.setRetryCount(1);
-        assertThatThrownBy(() -> service.publish(testJob, prepared))
-                .isInstanceOf(ObservationAdmissionService.StaleAttemptException.class);
-        verifyNoInteractions(observationRepository);
-    }
-
-    @ParameterizedTest
-    @ValueSource(booleans = {true, false})
-    void shouldAdmitRepositoryTextAgainstTheCapturedRepositoryIdentity(boolean historical) {
-        String revision = historical ? BASE : HEAD;
-        captured(revision, "deleted.java", 3, "old source");
-        var observation = validObservation("pr-description-quality", Outcome.MET);
-        ObjectNode citation = firstCitation(observation);
-        citation.put("sourceKind", "scm.repository.tree")
-                .put("artifactPath", HEAD_PATH)
-                .put("path", "deleted.java")
-                .put("revision", revision)
-                .put("quote", "old source")
-                .put("startLine", 3)
-                .put("endLine", 3);
-        citation.remove("side");
-        if (!historical) citation.remove("revision");
-        var requested = new HistoricalGitEvidence.Citation(revision, "deleted.java", "old source", 3, 3);
-
-        var result = publishVerified(testJob, List.of(observation));
-
-        JsonNode stored = storedCitation(result);
-        assertThat(stored.path("verification").path("artifactSha256").asString())
-                .isEqualTo(BLOB_DIGEST);
-        assertThat(stored.path("revision").asString()).isEqualTo(revision);
-        verify(historicalGit).verifyAll(testJob, HEAD_DIGEST, REFS_DIGEST, HEAD, List.of(requested));
-        verify(historicalGit, never()).changedPaths(any(), any(), any(), any(), any());
+    void shouldKeepTheWorkerAttemptFenceAroundTheProductWrite() {
+        acceptReadReceipts();
+        when(verifier.verifyCandidate(eq(job), any(), eq(ReviewKind.ITEM), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(3));
+        var prepared = service.prepare(job, submission("clear-names", "docs:one"));
+        job.setAttempt(1);
+        assertThatThrownBy(() -> prepared.record(job)).isInstanceOf(ResultAdmissionService.StaleAttemptException.class);
+        verifyNoInteractions(results, membership);
     }
 
     @Test
-    void shouldWithholdOnlyTheCitationWhosePathIsAbsentAtItsRevision() {
-        captured(HEAD, "kept.java", 3, "old source");
-        admitSecondPractice();
-        var present = validObservation("pr-description-quality", Outcome.MET);
-        var missing = validObservation("pr-scope", Outcome.MET);
-        for (var pair : List.of(Map.entry(present, "kept.java"), Map.entry(missing, "gone.java"))) {
-            ObjectNode citation = firstCitation(pair.getKey());
-            citation.put("sourceKind", "scm.repository.tree")
-                    .put("artifactPath", HEAD_PATH)
-                    .put("path", pair.getValue())
-                    .put("quote", "old source")
-                    .put("startLine", 3)
-                    .put("endLine", 3);
-            citation.remove("side");
-        }
-
-        var result = publishVerified(testJob, List.of(present, missing));
-
-        assertThat(result.recorded())
-                .extracting(ValidatedObservation::practiceSlug)
-                .containsExactly("pr-description-quality");
-    }
-
-    /**
-     * A quote from the change is a quote from one of its two revisions at a path the change touches:
-     * the side names the revision, the checkout's own history names the paths, and the verifier reads
-     * the blob the same way it reads any other repository citation.
-     */
-    @Nested
-    class ChangeCitations {
-
-        @Test
-        @DisplayName("the NEW side is verified at the head of the pinned range, which the citation then records")
-        void verifiesTheNewSideAtTheHead() {
-            var observation = validObservation("pr-description-quality", Outcome.MET);
-
-            var result = publishVerified(testJob, List.of(observation));
-
-            JsonNode stored = storedCitation(result);
-            assertThat(stored.path("revision").asString()).isEqualTo(HEAD);
-            assertThat(stored.path("side").asString()).isEqualTo("NEW");
-            assertThat(stored.path("verification").path("artifactSha256").asString())
-                    .isEqualTo(BLOB_DIGEST);
-            assertThat(stored.path("verification").path("quoteSha256").asString())
-                    .isEqualTo(CitationVerification.quoteDigest("insecure();"));
-            verify(historicalGit).changedPaths(testJob, HEAD_DIGEST, REFS_DIGEST, BASE, HEAD);
-            verify(historicalGit)
-                    .verifyAll(
-                            testJob,
-                            HEAD_DIGEST,
-                            REFS_DIGEST,
-                            HEAD,
-                            List.of(new HistoricalGitEvidence.Citation(HEAD, "src/Auth.java", "insecure();", 10, 10)));
-        }
-
-        @Test
-        @DisplayName("the OLD side is verified at the base of the pinned range")
-        void verifiesTheOldSideAtTheBase() {
-            captured(BASE, "src/Auth.java", 8, "requireAdmin();");
-            var observation = validObservation("pr-description-quality", Outcome.MET);
-            firstCitation(observation)
-                    .put("side", "OLD")
-                    .put("startLine", 8)
-                    .put("endLine", 8)
-                    .put("quote", "requireAdmin();");
-
-            var result = publishVerified(testJob, List.of(observation));
-
-            assertThat(storedCitation(result).path("revision").asString()).isEqualTo(BASE);
-            verify(historicalGit)
-                    .verifyAll(
-                            testJob,
-                            HEAD_DIGEST,
-                            REFS_DIGEST,
-                            HEAD,
-                            List.of(new HistoricalGitEvidence.Citation(
-                                    BASE, "src/Auth.java", "requireAdmin();", 8, 8)));
-        }
-
-        @Test
-        @DisplayName("a quote spanning two lines of the change verifies as one")
-        void verifiesAQuoteSpanningTwoLines() {
-            var observation = validObservation("pr-description-quality", Outcome.MET);
-            firstCitation(observation).put("endLine", 11).put("quote", "insecure();\nallowAll();");
-
-            assertThat(publishVerified(testJob, List.of(observation)).inserted())
-                    .isEqualTo(1);
-        }
-
-        @Test
-        @DisplayName("a path the change does not touch is withheld as unverified, not fatal")
-        void withholdsAPathTheChangeDoesNotTouch() {
-            captured(HEAD, "src/Other.java", 10, "insecure();");
-            admitSecondPractice();
-            var inChange = validObservation("pr-description-quality", Outcome.MET);
-            var outsideChange = validObservation("pr-scope", Outcome.MET);
-            firstCitation(outsideChange).put("path", "src/Other.java");
-
-            var result = publishVerified(testJob, List.of(inChange, outsideChange));
-
-            assertThat(result.recorded())
-                    .extracting(ValidatedObservation::practiceSlug)
-                    .containsExactly("pr-description-quality");
-            JsonNode failures = Objects.requireNonNull(testJob.getMetadata()).path("citation_verification_failures");
-            assertThat(failures).hasSize(1);
-            assertThat(failures.get(0).path("observationIndex").asInt()).isEqualTo(1);
-            assertThat(failures.get(0).path("reasonCode").asString()).isEqualTo("QUOTE_LOCATION_MISMATCH");
-        }
-
-        @Test
-        @DisplayName("a quote that is not at the cited lines of the cited revision is withheld")
-        void withholdsAQuoteThatDoesNotMatchTheRevision() {
-            var wrongLine = validObservation("pr-description-quality", Outcome.MET);
-            firstCitation(wrongLine).put("startLine", 11).put("endLine", 11);
-
-            assertThatThrownBy(() -> publishVerified(testJob, List.of(wrongLine)))
-                    .isInstanceOf(ObservationsRefusedException.class)
-                    .hasMessageContaining("Quote does not match the cited revision and lines");
-
-            var wrongText = validObservation("pr-description-quality", Outcome.MET);
-            firstCitation(wrongText).put("quote", "fabricated quote");
-
-            assertThatThrownBy(() -> publishVerified(testJob, List.of(wrongText)))
-                    .isInstanceOf(ObservationsRefusedException.class)
-                    .hasMessageContaining("Quote does not match the cited revision and lines");
-
-            var beyondTheFile = validObservation("pr-description-quality", Outcome.MET);
-            firstCitation(beyondTheFile).put("endLine", 12).put("quote", "insecure();\nallowAll();\n");
-
-            assertThatThrownBy(() -> publishVerified(testJob, List.of(beyondTheFile)))
-                    .isInstanceOf(ObservationsRefusedException.class)
-                    .hasMessageContaining("Quote does not match the cited revision and lines");
-            verifyNoInteractions(observationRepository);
-        }
-
-        @Test
-        @DisplayName("a two-line quote whose second line is altered is withheld")
-        void withholdsATwoLineQuoteWhoseSecondLineIsAltered() {
-            var observation = validObservation("pr-description-quality", Outcome.MET);
-            firstCitation(observation).put("endLine", 11).put("quote", "insecure();\nallowSome();");
-
-            assertThatThrownBy(() -> publishVerified(testJob, List.of(observation)))
-                    .isInstanceOf(ObservationsRefusedException.class)
-                    .hasMessageContaining("Quote does not match the cited revision and lines");
-            verifyNoInteractions(observationRepository);
-        }
-
-        @Test
-        @DisplayName("a renamed file is quoted under its new name at the head")
-        void verifiesTheNewPathOfARenamedFile() {
-            changedPaths = Set.of("src/Old.java", "src/New.java");
-            captured(HEAD, "src/New.java", 10, "insecure();");
-            var observation = validObservation("pr-description-quality", Outcome.MET);
-            firstCitation(observation).put("path", "src/New.java");
-
-            assertThat(publishVerified(testJob, List.of(observation)).inserted())
-                    .isEqualTo(1);
-        }
-
-        @Test
-        @DisplayName(
-                "the old name of a renamed file no longer exists at the head, so a NEW-side quote of it is withheld")
-        void withholdsTheOldPathOfARenamedFileOnTheNewSide() {
-            changedPaths = Set.of("src/Old.java", "src/New.java");
-            captured(HEAD, "src/New.java", 10, "insecure();");
-            var observation = validObservation("pr-description-quality", Outcome.MET);
-            firstCitation(observation).put("path", "src/Old.java");
-
-            assertThatThrownBy(() -> publishVerified(testJob, List.of(observation)))
-                    .isInstanceOf(ObservationsRefusedException.class)
-                    .hasMessageContaining("Cited path does not exist at the cited revision");
-            verifyNoInteractions(observationRepository);
-        }
-
-        @Test
-        @DisplayName("a change citation names a side, never a revision")
-        void rejectsARevisionOnAChangeCitation() {
-            var observation = validObservation("pr-description-quality", Outcome.MET);
-            firstCitation(observation).put("revision", HEAD);
-
-            assertThatThrownBy(() -> publishVerified(testJob, List.of(observation)))
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("Invalid change citation");
-            verifyNoInteractions(observationRepository, historicalGit);
-        }
-
-        @Test
-        void rejectsAChangeCitationWithoutASide() {
-            var observation = validObservation("pr-description-quality", Outcome.MET);
-            firstCitation(observation).remove("side");
-
-            assertThatThrownBy(() -> publishVerified(testJob, List.of(observation)))
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("Invalid change citation");
-            verifyNoInteractions(observationRepository, historicalGit);
-        }
-
-        @Test
-        @DisplayName("a change citation names the pinned change, not some other artifact")
-        void rejectsAChangeCitationOfAnotherArtifact() {
-            var observation = validObservation("pr-description-quality", Outcome.MET);
-            firstCitation(observation).put("artifactPath", "context/pull_request.json");
-
-            assertThatThrownBy(() -> publishVerified(testJob, List.of(observation)))
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("code citation");
-            verifyNoInteractions(observationRepository, historicalGit);
-        }
-
-        @Test
-        @DisplayName("a change can only be quoted from a checkout the run captured")
-        void rejectsAChangeCitationWithoutACapturedCheckout() {
-            ObjectNode snapshot = (ObjectNode) Objects.requireNonNull(testJob.getEvidenceSnapshot());
-            EvidenceSnapshotFixtures.unavailable(snapshot, (ObjectNode)
-                    snapshot.withObject("manifest").withArray("sources").get(1));
-
-            assertThatThrownBy(() ->
-                            publishVerified(testJob, List.of(validObservation("pr-description-quality", Outcome.MET))))
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("scm.repository.tree");
-            verifyNoInteractions(observationRepository, historicalGit);
-        }
+    void shouldKeepAnAdmissiblePracticeWhenAnotherCandidateBreaksItsContract() {
+        acceptReadReceipts();
+        when(verifier.verifyCandidate(eq(job), any(), eq(ReviewKind.ITEM), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(3));
+        var first = RuntimeReviewTestData.assignment(5L, null);
+        var second = new ReviewAssignmentSnapshot(
+                new ReviewAssignmentId(job.getReviewId(), 41, 2),
+                first.item(),
+                first.version(),
+                first.developerId(),
+                "other-practice",
+                new PinnedPractice(
+                        41,
+                        42,
+                        first.practice().definition(),
+                        first.practice().reviewDigest(),
+                        first.practice().method()));
+        when(assignments.admissible(job)).thenReturn(List.of(first, second));
+        when(results.admit(eq(1L), eq(job.getReviewId()), eq(job.getId()), eq(0), any()))
+                .thenReturn(new AdmissionReceipt(List.of(), List.of()));
+        var valid = submission("clear-names", "docs:one").results().getFirst();
+        var malformed = new SubmittedResultDTO("other-practice", "2", "docs:one", mapper.createObjectNode(), List.of());
+        var prepared = service.prepare(
+                job,
+                new AdmissionRequestDTO(3, job.getReviewId(), job.getId(), 0, List.of(valid, malformed), List.of()));
+        prepared.record(job);
+        ArgumentCaptor<List<ResultCandidate>> admitted = ArgumentCaptor.captor();
+        verify(results).admit(eq(1L), eq(job.getReviewId()), eq(job.getId()), eq(0), admitted.capture());
+        assertThat(admitted.getValue())
+                .singleElement()
+                .satisfies(result -> assertThat(result.practiceId()).isEqualTo(31));
+        assertThat(Objects.requireNonNull(job.getCapture())
+                        .path("withheld")
+                        .get(0)
+                        .path("practiceSlug")
+                        .asString())
+                .isEqualTo("other-practice");
+        assertThat(Objects.requireNonNull(job.getCapture())
+                        .path("withheld")
+                        .get(0)
+                        .path("reason")
+                        .asString())
+                .isEqualTo("malformed_candidate");
     }
 
     @Test
-    void shouldNotAdmitObservationsAfterDeveloperChoosesNoAi() {
-        when(citedSourceAccess.permitsReviewResult(testJob)).thenReturn(false);
-        assertThatThrownBy(() ->
-                        service.prepare(testJob, List.of(validObservation("pr-description-quality", Outcome.MET))))
-                .isInstanceOfSatisfying(
-                        ObservationsRefusedException.class,
-                        refused -> assertThat(refused.reasonCode()).isEqualTo("member_ai_declined"))
-                .hasMessageContaining("AI choice");
-        verifyNoInteractions(observationRepository);
+    void shouldAdmitACompletedPracticeWhenAnotherExhaustsItsRuntimeBudget() {
+        acceptReadReceipts();
+        when(verifier.verifyCandidate(eq(job), any(), eq(ReviewKind.ITEM), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(3));
+        var first = RuntimeReviewTestData.assignment(5L, null);
+        var second = new ReviewAssignmentSnapshot(
+                new ReviewAssignmentId(job.getReviewId(), 41, 2),
+                first.item(),
+                first.version(),
+                first.developerId(),
+                "other-practice",
+                new PinnedPractice(
+                        41,
+                        42,
+                        first.practice().definition(),
+                        first.practice().reviewDigest(),
+                        first.practice().method()));
+        when(assignments.admissible(job)).thenReturn(List.of(first, second));
+        when(results.admit(eq(1L), eq(job.getReviewId()), eq(job.getId()), eq(0), any()))
+                .thenReturn(new AdmissionReceipt(List.of(), List.of()));
+        var request = new AdmissionRequestDTO(
+                3,
+                job.getReviewId(),
+                job.getId(),
+                0,
+                submission("clear-names", "docs:one").results(),
+                List.of(new RuntimeNonResultDTO("other-practice", ReviewStopReason.BUDGET)));
+        var prepared = service.prepare(job, request);
+        verifyNoInteractions(results, membership);
+        prepared.record(job);
+        ArgumentCaptor<List<ResultCandidate>> admitted = ArgumentCaptor.captor();
+        verify(results).admit(eq(1L), eq(job.getReviewId()), eq(job.getId()), eq(0), admitted.capture());
+        assertThat(admitted.getValue())
+                .singleElement()
+                .satisfies(result -> assertThat(result.practiceId()).isEqualTo(31));
+        assertThat(Objects.requireNonNull(job.getCapture()).path("nonResults"))
+                .isEqualTo(mapper.valueToTree(request.nonResults()));
+        verifyNoInteractions(membership);
     }
 
-    @Nested
-    class EvidenceBoundary {
-
-        @Test
-        void rejectsMissingSourceAttribution() {
-            ValidatedObservation observation = validObservation("pr-description-quality", Outcome.MET);
-            ((ObjectNode) evidenceOf(observation)).remove("citations");
-
-            assertThatThrownBy(() -> publishVerified(testJob, List.of(observation)))
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("no source-bound evidence citation");
-            verifyNoInteractions(observationRepository);
-        }
-
-        @Test
-        @DisplayName("a side selects a revision of the change; no other source has one")
-        void rejectsNonCodeCitationWithSide() {
-            ValidatedObservation observation = validObservation("pr-description-quality", Outcome.MET);
-            ObjectNode citation = firstCitation(observation);
-            citation.put("sourceKind", "scm.pull-request.core");
-            citation.put("artifactPath", "context/pull_request.json");
-            citation.put("path", "pull_request.json");
-
-            assertThatThrownBy(() -> publishVerified(testJob, List.of(observation)))
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("Only repository citations may select a revision or a side");
-            verifyNoInteractions(observationRepository, historicalGit);
-        }
-
-        @Test
-        @DisplayName("a revision selects a commit of the checkout; no other source has one")
-        void rejectsNonCodeCitationWithRevision() {
-            ValidatedObservation observation = validObservation("pr-description-quality", Outcome.MET);
-            ObjectNode citation = firstCitation(observation);
-            citation.put("sourceKind", "scm.pull-request.core");
-            citation.put("artifactPath", "context/pull_request.json");
-            citation.put("path", "pull_request.json");
-            citation.put("revision", HEAD);
-            citation.remove("side");
-
-            assertThatThrownBy(() -> publishVerified(testJob, List.of(observation)))
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("Only repository citations may select a revision or a side");
-            verifyNoInteractions(observationRepository, historicalGit);
-        }
-
-        @Test
-        @DisplayName("a quote is always required; there is no digest-only citation")
-        void rejectsACitationWithoutAQuote() {
-            ValidatedObservation observation = validObservation("pr-description-quality", Outcome.MET);
-            ObjectNode citation = firstCitation(observation);
-            citation.remove("quote");
-            citation.put("quoteSha256", "cc8c484344d4e1f933f0020a76f6dc3f6fa1462dfc7c1ac7b42cae840404141f");
-
-            assertThatThrownBy(() -> publishVerified(testJob, List.of(observation)))
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("code citation");
-            verifyNoInteractions(observationRepository, historicalGit);
-
-            ObjectNode nonCode = firstCitation(observation);
-            nonCode.put("sourceKind", "scm.pull-request.core");
-            nonCode.put("artifactPath", "context/pull_request.json");
-            nonCode.put("path", "pull_request.json");
-            nonCode.remove("side");
-
-            assertThatThrownBy(() -> publishVerified(testJob, List.of(observation)))
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("invalid evidence citation");
-            verifyNoInteractions(observationRepository);
-        }
-
-        @Test
-        @DisplayName("a citation to a source this run did not stage is refused")
-        void rejectsSourcesTheRunNeverStaged() {
-            ValidatedObservation observation = validObservation("pr-description-quality", Outcome.MET);
-            ObjectNode citation = firstCitation(observation);
-            citation.put("sourceKind", "scm.pull-request.comments");
-            citation.put("artifactPath", "context/comments.json");
-            citation.put("path", "comments.json");
-            citation.remove("side");
-
-            assertThatThrownBy(() -> publishVerified(testJob, List.of(observation)))
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("misattributed evidence source");
-            verifyNoInteractions(observationRepository);
-        }
-
-        /**
-         * Every source that applies to the artifact is staged for every review, so a quote from one this
-         * practice's signals never named is still a quote from bytes that were really there — refusing it
-         * would throw away an observation for being observant.
-         */
-        @Test
-        @DisplayName("a citation to a staged source the practice's signals did not name is accepted")
-        void acceptsAStagedSourceOutsideThePracticeDeclaration() {
-            var inventory = EvidenceSnapshotFixtures.availableSource(
-                    (ObjectNode) Objects.requireNonNull(testJob.getEvidenceSnapshot()),
-                    "workspace.project-inventory",
-                    null);
-            EvidenceSnapshotFixtures.artifact(
-                    (ObjectNode) Objects.requireNonNull(testJob.getEvidenceSnapshot()),
-                    inventory,
-                    "context/project_inventory.json",
-                    "c".repeat(64));
-            when(cas.containsUtf8AtLines(
-                            testJob,
-                            "context/project_inventory.json",
-                            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-                            "\"title\":\"Same migration\"",
-                            1,
-                            1))
-                    .thenReturn(Optional.of(true));
-            ValidatedObservation observation = validObservation("pr-description-quality", Outcome.MET);
-            ObjectNode citation = firstCitation(observation);
-            citation.put("sourceKind", "workspace.project-inventory");
-            citation.put("artifactPath", "context/project_inventory.json");
-            citation.put("path", "project_inventory.json");
-            citation.put("startLine", 1);
-            citation.put("endLine", 1);
-            citation.put("quote", "\"title\":\"Same migration\"");
-            citation.remove("side");
-
-            assertThat(publishVerified(testJob, List.of(observation)).inserted())
-                    .isEqualTo(1);
-        }
-
-        @Test
-        void rejectsASourceWithdrawnAfterCapture() {
-            when(sourceCatalogs.isSourceUsePermitted(any(), any(), eq(SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)))
-                    .thenReturn(false);
-
-            assertThatThrownBy(() ->
-                            publishVerified(testJob, List.of(validObservation("pr-description-quality", Outcome.MET))))
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("authorization was withdrawn");
-            verifyNoInteractions(observationRepository);
-            verify(sourceCatalogs).isSourceUsePermitted(any(), any(), eq(SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY));
-        }
-
-        @Test
-        void rejectsAnUncitedSourceWithdrawnAfterCapture() {
-            when(sourceCatalogs.isSourceUsePermitted(any(), eq(new SourceKind("scm.pull-request.core")), any()))
-                    .thenReturn(false);
-
-            assertThatThrownBy(() ->
-                            publishVerified(testJob, List.of(validObservation("pr-description-quality", Outcome.MET))))
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("scm.pull-request.core");
-            verifyNoInteractions(observationRepository);
-        }
-
-        @Test
-        @DisplayName("only the claim whose quote does not verify is withheld; the other is delivered")
-        void withholdsOnlyTheObservationWhoseQuoteDoesNotVerify() {
-            admitSecondPractice();
-
-            ValidatedObservation sound = validObservation("pr-description-quality", Outcome.MET);
-            ValidatedObservation misquoted = validObservation("pr-scope", Outcome.MET);
-            firstCitation(misquoted).put("quote", "insecure();,");
-
-            var result = publishVerified(testJob, List.of(sound, misquoted));
-
-            assertThat(result.recorded())
-                    .as("the claim that verified is the one persisted, and it is the only one")
-                    .extracting(ValidatedObservation::practiceSlug)
-                    .containsExactly("pr-description-quality");
-            assertThat(result.inserted()).isEqualTo(1);
-            JsonNode failures = Objects.requireNonNull(testJob.getMetadata()).path("citation_verification_failures");
-            assertThat(failures).hasSize(1);
-            assertThat(failures.get(0).path("observationIndex").asInt()).isEqualTo(1);
-            assertThat(failures.get(0).path("citationIndex").asInt()).isEqualTo(0);
-            assertThat(failures.get(0).path("reasonCode").asString()).isEqualTo("QUOTE_LOCATION_MISMATCH");
-        }
-
-        @Test
-        @DisplayName("a citation to an unstaged source still fails the whole delivery, even beside a sound claim")
-        void anEvidenceFailureThatIsNotAQuoteMismatchStillFailsEverything() {
-            admitSecondPractice();
-
-            ValidatedObservation sound = validObservation("pr-description-quality", Outcome.MET);
-            ValidatedObservation unstaged = validObservation("pr-scope", Outcome.MET);
-            ObjectNode citation = firstCitation(unstaged);
-            citation.put("sourceKind", "scm.pull-request.comments");
-            citation.put("artifactPath", "context/comments.json");
-            citation.put("path", "comments.json");
-            citation.remove("side");
-
-            assertThatThrownBy(() -> publishVerified(testJob, List.of(sound, unstaged)))
-                    .as("an unstaged source impugns the run, not just the claim that cited it")
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("misattributed evidence source");
-            verifyNoInteractions(observationRepository);
-        }
-
-        @Test
-        @DisplayName("a batch in which no quote verifies is refused rather than retried as an unavailable server")
-        void shouldRefuseObservationsWhenNoQuotedEvidenceVerifies() {
-            ValidatedObservation misquoted = validObservation("pr-description-quality", Outcome.MET);
-            firstCitation(misquoted).put("quote", "fabricated quote");
-
-            assertThatThrownBy(() -> publishVerified(testJob, List.of(misquoted)))
-                    .isInstanceOfSatisfying(ObservationsRefusedException.class, refusal -> {
-                        assertThat(refusal.reasonCode()).isEqualTo("no_valid_observations");
-                        JsonNode failures = refusal.verificationFailures();
-                        assertThat(failures).hasSize(1);
-                        assertThat(failures.get(0).path("observationIndex").asInt())
-                                .isZero();
-                        assertThat(failures.get(0).path("citationIndex").asInt())
-                                .isZero();
-                        assertThat(failures.get(0).path("reasonCode").asString())
-                                .isEqualTo("QUOTE_LOCATION_MISMATCH");
-                    })
-                    .hasMessageContaining("No observation survived the evidence check");
-            verifyNoInteractions(observationRepository);
-        }
-
-        @Test
-        @DisplayName("a change whose capture failed cannot be quoted, however the checkout looks")
-        void rejectsACitationToAnUnavailableSource() {
-            EvidenceSnapshotFixtures.unavailable(
-                    (ObjectNode) Objects.requireNonNull(testJob.getEvidenceSnapshot()),
-                    (ObjectNode) testJob.getEvidenceSnapshot()
-                            .path("manifest")
-                            .path("sources")
-                            .get(0));
-
-            assertThatThrownBy(() ->
-                            publishVerified(testJob, List.of(validObservation("pr-description-quality", Outcome.MET))))
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("no pinned base and head");
-            verifyNoInteractions(observationRepository, historicalGit);
-        }
+    @Test
+    void shouldRefuseARunThatHasOnlyRuntimeNonResults() {
+        var request = new AdmissionRequestDTO(
+                3,
+                job.getReviewId(),
+                job.getId(),
+                0,
+                List.of(),
+                List.of(new RuntimeNonResultDTO("clear-names", ReviewStopReason.BUDGET)));
+        assertThatThrownBy(() -> service.prepare(job, request))
+                .isInstanceOf(ResultsRefusedException.class)
+                .hasMessage("The submission contains no practice results");
+        verifyNoInteractions(results, membership, verifier);
     }
 
-    /**
-     * A submitted search warrant must be verified at the delivery boundary — not just
-     * the in-sandbox normalizer, which a crashed runner or a rescued text payload can bypass.
-     */
-    @Nested
-    class RecordedSearch {
-
-        @Test
-        @DisplayName("a NOT_MET observation need not make an absence claim")
-        void acceptsNotMetWithoutASearch() {
-            ValidatedObservation observation = validObservation("pr-description-quality", Outcome.NOT_MET);
-            ((ObjectNode) evidenceOf(observation)).remove("search");
-
-            assertThat(publishVerified(testJob, List.of(observation)).inserted())
-                    .isEqualTo(1);
+    @Test
+    void shouldRejectADuplicateRuntimeNonResultOrAnUnassignedPractice() {
+        for (var slug : List.of("clear-names", "unknown")) {
+            var request = new AdmissionRequestDTO(
+                    3,
+                    job.getReviewId(),
+                    job.getId(),
+                    0,
+                    submission("clear-names", "docs:one").results(),
+                    List.of(new RuntimeNonResultDTO(slug, ReviewStopReason.BUDGET)));
+            assertThatThrownBy(() -> service.prepare(job, request)).isInstanceOf(ResultsRefusedException.class);
         }
-
-        @Test
-        @DisplayName("a recorded search missing any of its three parts is refused")
-        void rejectsAnIncompleteSearch() {
-            for (String field : new String[] {"consulted", "lookedFor", "boundary"}) {
-                ValidatedObservation observation = validObservation("pr-description-quality", Outcome.NOT_MET);
-                ((ObjectNode) evidenceOf(observation).get("search")).remove(field);
-
-                assertThatThrownBy(() -> publishVerified(testJob, List.of(observation)))
-                        .as("a search warrant missing search.%s", field)
-                        .isInstanceOf(JobDeliveryException.class)
-                        .hasMessageContaining("must record where it searched");
-            }
-            verifyNoInteractions(observationRepository);
-        }
-
-        @Test
-        @DisplayName("a search claiming a source this run never staged is refused")
-        void rejectsASearchOutsideTheBoundary() {
-            // The absence-shaped twin of citing evidence we never had: the source was not staged, so it
-            // cannot have been searched, and the claim of having searched it is unfalsifiable otherwise.
-            ValidatedObservation observation = validObservation("pr-description-quality", Outcome.NOT_MET);
-            ObjectNode search = (ObjectNode) evidenceOf(observation).get("search");
-            search.putArray("consulted").add("scm.pull-request.comments");
-
-            assertThatThrownBy(() -> publishVerified(testJob, List.of(observation)))
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("claims a source this run did not stage");
-            verifyNoInteractions(observationRepository);
-        }
-
-        @Test
-        @DisplayName("a complete search warrant is delivered")
-        void acceptsAnAbsentWithARecordedSearch() {
-            ValidatedObservation observation = validObservation("pr-description-quality", Outcome.NOT_MET);
-
-            var result = publishVerified(testJob, List.of(observation));
-
-            assertThat(result.inserted()).isEqualTo(1);
-        }
-
-        @Test
-        @DisplayName("a MET absence claim requires an exhaustive evidence source")
-        void rejectsACleanStrengthFromAnUnboundedPractice() {
-            ValidatedObservation observation = cleanStrength("pr-description-quality");
-
-            assertThatThrownBy(() -> publishVerified(testJob, List.of(observation)))
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("declares no EXHAUSTIVE evidence source");
-            verifyNoInteractions(observationRepository);
-        }
-
-        @Test
-        @DisplayName("a MET absence claim is accepted over an exhaustive corpus")
-        void acceptsACleanStrengthOverABoundedCorpus() {
-            exhaustiveOverTheDiff(testPractice);
-            ValidatedObservation observation = cleanStrength("pr-description-quality");
-
-            var result = publishVerified(testJob, List.of(observation));
-
-            assertThat(result.inserted()).isEqualTo(1);
-        }
-
-        @Test
-        @DisplayName("a bounded corpus still has to have been searched whole")
-        void stillRejectsAPartialSearchBehindACleanStrength() {
-            // Declaring the stance is what makes the claim admissible, not what makes it true: the search must
-            // still cover every source held exhaustive, or the strength is a universal over unread bytes.
-            exhaustiveOverTheDiff(testPractice);
-            ValidatedObservation observation = cleanStrength("pr-description-quality");
-            ((ObjectNode) evidenceOf(observation).get("search"))
-                    .putArray("consulted")
-                    .add("scm.pull-request.core");
-
-            assertThatThrownBy(() -> publishVerified(testJob, List.of(observation)))
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("did not search the sources its practice asserts absence over");
-            verifyNoInteractions(observationRepository);
-        }
-
-        /** A MET result supported by a bounded search for a defect. */
-        private ValidatedObservation cleanStrength(String slug) {
-            ValidatedObservation gap = validObservation(slug, Outcome.NOT_MET);
-            return new ValidatedObservation(
-                    gap.practiceSlug(), gap.summary(), Outcome.MET, null, gap.evidence(), gap.evidenceRationale());
-        }
-
-        private void exhaustiveOverTheDiff(Practice practice) {
-            var requirements = practice.getEvidenceRequirements().stream()
-                    .map(requirement -> requirement.sourceKind().value().equals("scm.pull-request.diff")
-                            ? new PracticeEvidenceRequirement(requirement.sourceKind(), EvidenceStance.EXHAUSTIVE)
-                            : requirement)
-                    .toList();
-            practice.setEvidenceRequirements(requirements);
-            lenient().when(testRevision.getEvidenceRequirements()).thenReturn(requirements);
-        }
-
-        @Test
-        @DisplayName("a NOT_APPLICABLE observation with no stated ground is refused")
-        void rejectsAnUnjustifiedNotApplicable() {
-            // Sandbox output is untrusted even when its normalizer enforces the same rule.
-            ValidatedObservation observation = validObservation("pr-description-quality", null);
-            ((ObjectNode) evidenceOf(observation)).remove("inapplicability");
-
-            assertThatThrownBy(() -> publishVerified(testJob, List.of(observation)))
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("must name what the practice looks for")
-                    // Direct the model to uncertainty rather than an invented justification.
-                    .hasMessageContaining("UNDETERMINED");
-            verifyNoInteractions(observationRepository);
-        }
-
-        @Test
-        @DisplayName("a stated inapplicability missing any of its three parts is refused")
-        void rejectsAnIncompleteInapplicability() {
-            for (String field : new String[] {"consulted", "subject", "ruledOutBy"}) {
-                ValidatedObservation observation = validObservation("pr-description-quality", null);
-                ((ObjectNode) evidenceOf(observation).get("inapplicability")).remove(field);
-
-                assertThatThrownBy(() -> publishVerified(testJob, List.of(observation)))
-                        .as("a NOT_APPLICABLE observation missing inapplicability.%s", field)
-                        .isInstanceOf(JobDeliveryException.class)
-                        .hasMessageContaining("must name what the practice looks for");
-            }
-            verifyNoInteractions(observationRepository);
-        }
-
-        @Test
-        @DisplayName("a stated inapplicability claiming a source this run never staged is refused")
-        void rejectsAnInapplicabilityOutsideTheBoundary() {
-            ValidatedObservation observation = validObservation("pr-description-quality", null);
-            ObjectNode inapplicability = (ObjectNode) evidenceOf(observation).get("inapplicability");
-            inapplicability.putArray("consulted").add("scm.pull-request.comments");
-
-            assertThatThrownBy(() -> publishVerified(testJob, List.of(observation)))
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("claims a source this run did not stage");
-            verifyNoInteractions(observationRepository);
-        }
-
-        @Test
-        @DisplayName("decided outcomes require no inapplicability warrant")
-        void doesNotAskForAGroundOnDecidedOutcomes() {
-            for (Outcome outcome : new Outcome[] {Outcome.MET, Outcome.NOT_MET}) {
-                ValidatedObservation observation = validObservation("pr-description-quality", outcome);
-                assertThat(evidenceOf(observation).get("inapplicability"))
-                        .as("%s carries no stated inapplicability", outcome)
-                        .isNull();
-
-                assertThatCode(() -> publishVerified(testJob, List.of(observation)))
-                        .as("%s is delivered without a stated inapplicability", outcome)
-                        .doesNotThrowAnyException();
-            }
-        }
-
-        @Test
-        @DisplayName("MET can be supported by direct evidence without a search")
-        void acceptsMetWithoutASearch() {
-            for (Outcome outcome : new Outcome[] {Outcome.MET, Outcome.NOT_MET}) {
-                if (outcome == Outcome.NOT_MET) {
-                    continue;
-                }
-                ValidatedObservation observation = validObservation("pr-description-quality", outcome);
-                assertThat(evidenceOf(observation).get("search"))
-                        .as("%s carries no search", outcome)
-                        .isNull();
-
-                assertThatCode(() -> publishVerified(testJob, List.of(observation)))
-                        .as("%s is delivered without a recorded search", outcome)
-                        .doesNotThrowAnyException();
-            }
-        }
-
-        @Test
-        @DisplayName("a citation to the review history is in bounds although no binding declared it")
-        void acceptsACitationToTheStagedHistory() {
-            stageHistory("we raised this in the last review");
-            ValidatedObservation observation = historyCiting("we raised this in the last review");
-
-            var result = publishVerified(testJob, List.of(observation));
-
-            assertThat(result.inserted()).isEqualTo(1);
-        }
-
-        @Test
-        @DisplayName("a fabricated quote from the review history is refused like any other")
-        void rejectsAnInventedPastObservation() {
-            stageHistory("we raised this in the last review");
-            ValidatedObservation observation = historyCiting("we raised this three times before");
-
-            assertThatThrownBy(() -> publishVerified(testJob, List.of(observation)))
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("quote");
-            verifyNoInteractions(observationRepository);
-        }
-
-        private static final String HISTORY_SHA = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
-
-        private void stageHistory(String body) {
-            EvidenceSnapshotFixtures.artifact(
-                    (ObjectNode) Objects.requireNonNull(testJob.getEvidenceSnapshot()),
-                    EvidenceSnapshotFixtures.availableSource(
-                            (ObjectNode) Objects.requireNonNull(testJob.getEvidenceSnapshot()),
-                            "hephaestus.observation-history",
-                            null),
-                    "inputs/history/observations.json",
-                    HISTORY_SHA);
-            when(cas.containsUtf8AtLines(
-                            eq(testJob),
-                            eq("inputs/history/observations.json"),
-                            eq(HISTORY_SHA),
-                            anyString(),
-                            anyInt(),
-                            anyInt()))
-                    .thenAnswer(invocation -> Optional.of(body.contains(invocation.getArgument(3, String.class))));
-        }
-
-        private ValidatedObservation historyCiting(String quote) {
-            ValidatedObservation observation = validObservation("pr-description-quality", Outcome.MET);
-            ObjectNode citation = firstCitation(observation);
-            citation.put("sourceKind", "hephaestus.observation-history");
-            citation.put("artifactPath", "inputs/history/observations.json");
-            citation.put("path", "inputs/history/observations.json");
-            citation.put("startLine", 1);
-            citation.put("endLine", 1);
-            citation.remove("side");
-            citation.put("quote", quote);
-            return observation;
-        }
+        verifyNoInteractions(results, membership);
     }
 
-    @Nested
-    class HappyPath {
-
-        @Test
-        void persistsValidObservation() {
-            var observations = List.of(validObservation("pr-description-quality", Outcome.MET));
-
-            var result = publishVerified(testJob, observations);
-
-            assertThat(result.inserted()).isEqualTo(1);
-            assertThat(result.discardedDuplicate()).isZero();
-
-            ArgumentCaptor<String> fingerprintCaptor = ArgumentCaptor.forClass(String.class);
-            verify(observationRepository)
-                    .insertIfAbsent(
-                            any(UUID.class),
-                            eq("pr-description-quality:scm.pull_request:456:" + testJob.getId()),
-                            eq(testJob.getId()),
-                            anyLong(),
-                            eq(10L),
-                            eq(11L),
-                            eq("scm.pull_request"),
-                            eq(456L),
-                            eq(789L), // aboutUserId
-                            eq("Test observation"),
-                            eq("MET"), // outcome
-                            isNull(), // severity
-                            anyString(),
-                            isNull(),
-                            fingerprintCaptor.capture(), // recurrence key
-                            any(),
-                            eq("LIVE") // an event-triggered review is the unbiased population
-                            );
-
-            // The recurrence_key written to the row MUST equal the fingerprint the result map returns —
-            // they are the single supersession identity, so any drift between them silently breaks re-review.
-            var keys = result.recorded().get(0).keys();
-            assertThat(keys).isNotNull();
-            assertThat(fingerprintCaptor.getValue())
-                    .as("persisted recurrence_key matches the returned recurrence key")
-                    .matches("[0-9a-f]{64}")
-                    .isEqualTo(keys.recurrenceKey());
-        }
+    @Test
+    void shouldAdmitAHostInapplicabilityResultWithoutAModelSubmission() {
+        var assigned = RuntimeReviewTestData.assignment(5L, null);
+        when(assignments.load(job)).thenReturn(List.of(assigned));
+        when(assignments.admissible(job)).thenReturn(List.of());
+        var check = new AppliesWhenCheck(
+                true,
+                "The change touches no Swift file.",
+                List.of(new AppliesWhenCheck.Clause(
+                        "CHANGED_PATH", new SourceKind("scm.pull-request.diff"), AppliesWhenCheck.Result.NOT_FOUND)));
+        var capture = (ObjectNode) Objects.requireNonNull(job.getCapture());
+        capture.putObject("readiness")
+                .putObject("applicability")
+                .set(assigned.practiceSlug(), mapper.valueToTree(check));
+        when(results.admit(eq(1L), eq(job.getReviewId()), eq(job.getId()), eq(0), any()))
+                .thenReturn(new AdmissionReceipt(List.of(), List.of()));
+        service.prepare(job, new AdmissionRequestDTO(3, job.getReviewId(), job.getId(), 0, List.of(), List.of()))
+                .record(job);
+        ArgumentCaptor<List<ResultCandidate>> candidates = ArgumentCaptor.captor();
+        verify(results).admit(eq(1L), eq(job.getReviewId()), eq(job.getId()), eq(0), candidates.capture());
+        assertThat(candidates.getValue()).singleElement().satisfies(candidate -> {
+            assertThat(candidate.outcome()).isEqualTo(ResultOutcome.DOES_NOT_APPLY);
+            assertThat(candidate.explanation()).isEqualTo(check.otherwise());
+            assertThat(candidate.problems()).isEmpty();
+            assertThat(candidate.evidence().inapplicability()).isNotNull();
+        });
+        verifyNoInteractions(verifier);
     }
 
-    @Nested
-    class PracticeResolution {
-
-        @Test
-        void unknownSlug() {
-            var observations = List.of(validObservation("unknown-practice", Outcome.MET));
-
-            assertThatThrownBy(() -> publishVerified(testJob, observations))
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("not admitted");
-            verifyNoInteractions(observationRepository);
-        }
-    }
-
-    @Nested
-    class TargetResolution {
-
-        @Test
-        void shouldResolveReviewerWhenSubmittedReviewMatchesArtifactAndSubject() {
-            when(reviewTargets.reviewMatchesTarget(77L, 456L, 999L)).thenReturn(true);
-            ObjectNode metadata = assertInstanceOf(ObjectNode.class, testJob.getMetadata());
-            metadata.put("review_id", 77L);
-            metadata.put("about_user_id", 999L);
-            metadata.put("subject_role", "REVIEWER");
-            Practice reviewing = new Practice();
-            ReflectionTestUtils.setField(reviewing, "id", 30L);
-            reviewing.setSlug("reviews-with-care");
-            reviewing.setSignals(List.of(PracticeTestEvidence.defaultSignal(ArtifactKinds.PULL_REQUEST)));
-            reviewing.setEvidenceRequirements(PracticeTestEvidence.needsFor(ArtifactKinds.PULL_REQUEST));
-            reviewing.setReviewWhen(Map.of());
-            reviewing.setSubject(ActorRole.REVIEWER);
-            reviewing.setPrecondition(null);
-            reviewing.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
-            admit(reviewing, 31L);
-
-            publishVerified(testJob, List.of(validObservation("reviews-with-care", Outcome.MET)));
-
-            verify(observationRepository)
-                    .insertIfAbsent(
-                            any(),
-                            anyString(),
-                            eq(testJob.getId()),
-                            eq(1L),
-                            eq(30L),
-                            eq(31L),
-                            eq("scm.pull_request"),
-                            eq(456L),
-                            eq(999L),
-                            anyString(),
-                            eq("MET"),
-                            isNull(),
-                            anyString(),
-                            isNull(),
-                            anyString(),
-                            any(),
-                            eq("LIVE"));
-        }
-
-        @Test
-        void shouldRejectReviewerWhenSubmittedReviewDoesNotMatchSubject() {
-            ObjectNode metadata = assertInstanceOf(ObjectNode.class, testJob.getMetadata());
-            metadata.put("review_id", 77L);
-            metadata.put("about_user_id", 999L);
-            metadata.put("subject_role", "REVIEWER");
-
-            assertThatThrownBy(() -> publishVerified(testJob, List.of()))
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("no longer matches");
-            verifyNoInteractions(observationRepository);
-        }
-
-        @Test
-        @DisplayName("throws when pull request not found")
-        void prNotFound() {
-            when(reviewTargets.findPullRequest(456L)).thenReturn(Optional.empty());
-            var observations = List.of(validObservation("pr-description-quality", Outcome.MET));
-
-            assertThatThrownBy(() -> publishVerified(testJob, observations))
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("Pull request not found");
-        }
-
-        @Test
-        @DisplayName("throws when pull request has no author")
-        void prNoAuthor() {
-            when(reviewTargets.findPullRequest(456L))
-                    .thenReturn(Optional.of(new ReviewTargetQuery.Target(123L, "owner/repo", 42, null, false)));
-            var observations = List.of(validObservation("pr-description-quality", Outcome.MET));
-
-            assertThatThrownBy(() -> publishVerified(testJob, observations))
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("no author");
-        }
-
-        @Test
-        void mismatchedArtifactMetadataIsRejectedBeforePersistence() {
-            ObjectNode metadata = assertInstanceOf(ObjectNode.class, testJob.getMetadata());
-            metadata.put("repository_id", 999L);
-            var observations = List.of(validObservation("pr-description-quality", Outcome.MET));
-
-            assertThatThrownBy(() -> publishVerified(testJob, observations))
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("does not match the live target");
-            verifyNoInteractions(observationRepository);
-        }
-
-        @Test
-        void conversationTargetMustMatchTheLiveWorkspaceThreadAndParticipant() {
-            ObjectNode metadata = objectMapper.createObjectNode();
-            metadata.put("artifact_kind", ArtifactKinds.CONVERSATION_THREAD.value());
-            metadata.put("slack_thread_id", 77L);
-            metadata.put("slack_channel_id", "C123");
-            metadata.put("slack_thread_ts", "1700000000.100000");
-            metadata.put("about_user_id", 789L);
-            testJob.setMetadata(metadata);
-
-            assertThatThrownBy(() -> publishVerified(testJob, List.of()))
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("no longer authorized");
-            verify(conversationSourceLiveness).isDeliverableThread(1L, 77L, "C123", "1700000000.100000", 789L);
-        }
-    }
-
-    @Nested
-    class ConversationCitations {
-
-        private static final String THREAD = "context/conversation_thread.json";
-        private static final String THREAD_DIGEST = "9".repeat(64);
-
-        /** Written as the content source writes it, with the default pretty printer. */
-        private static final String THREAD_JSON = """
-                {
-                  "channel" : "C123",
-                  "messages" : [ {
-                    "ts" : "1700000000.100000",
-                    "text" : "Can someone look at the failing build?",
-                    "underReview" : false
-                  }, {
-                    "ts" : "1700000000.200000",
-                    "text" : "It is broken. Fix it.",
-                    "underReview" : true
-                  } ]
-                }
-                """;
-
-        @BeforeEach
-        void conversationReview() {
-            testJob.setJobType(AgentJobType.CONVERSATION_REVIEW);
-            ObjectNode metadata = objectMapper.createObjectNode();
-            metadata.put("artifact_kind", ArtifactKinds.CONVERSATION_THREAD.value());
-            metadata.put("slack_thread_id", 77L);
-            metadata.put("slack_channel_id", "C123");
-            metadata.put("slack_thread_ts", "1700000000.100000");
-            metadata.put("about_user_id", 789L);
-            testJob.setMetadata(metadata);
-            when(conversationSourceLiveness.isDeliverableThread(1L, 77L, "C123", "1700000000.100000", 789L))
-                    .thenReturn(true);
-            ObjectNode snapshot = (ObjectNode) Objects.requireNonNull(testJob.getEvidenceSnapshot());
-            EvidenceSnapshotFixtures.artifact(
-                    snapshot,
-                    EvidenceSnapshotFixtures.availableSource(snapshot, "slack.conversation.thread", null),
-                    THREAD,
-                    THREAD_DIGEST);
-            when(cas.containsUtf8AtLines(eq(testJob), eq(THREAD), eq(THREAD_DIGEST), anyString(), anyInt(), anyInt()))
-                    .thenReturn(Optional.of(true));
-            lenient()
-                    .when(cas.inspect(eq(testJob), eq(THREAD), eq(THREAD_DIGEST), any()))
-                    .thenAnswer(invocation -> Optional.of(invocation
-                            .<JobEvidenceFiles.TextInspection<?>>getArgument(3)
-                            .inspect(new StringReader(THREAD_JSON))));
-        }
-
-        private ValidatedObservation citingLine(Outcome outcome, int line, String quote) {
-            ValidatedObservation observation = validObservation("pr-description-quality", outcome);
-            ObjectNode citation = firstCitation(observation);
-            citation.put("sourceKind", "slack.conversation.thread");
-            citation.put("artifactPath", THREAD);
-            citation.put("path", "conversation_thread.json");
-            citation.put("startLine", line);
-            citation.put("endLine", line);
-            citation.put("quote", quote);
-            citation.remove("side");
-            return observation;
-        }
-
-        @Test
-        @DisplayName("a NOT_MET that cites only another participant's turn is withheld with its reason")
-        void shouldWithholdANotMetWhenItCitesOnlyAnotherParticipant() {
-            var observations = List.of(citingLine(Outcome.NOT_MET, 5, "Can someone look at the failing build?"));
-
-            assertThatThrownBy(() -> service.prepare(testJob, observations))
-                    .isInstanceOfSatisfying(ObservationsRefusedException.class, refused -> {
-                        JsonNode failure = refused.verificationFailures().get(0);
-                        assertThat(failure.path("reasonCode").asString()).isEqualTo("NOT_THE_REVIEWED_PARTICIPANT");
-                        assertThat(failure.path("observationIndex").asInt()).isZero();
-                    });
-        }
-
-        @Test
-        @DisplayName("a NOT_MET that cites a turn of the participant under review is admitted")
-        void shouldAdmitANotMetWhenItCitesTheParticipantUnderReview() {
-            var observations = List.of(citingLine(Outcome.NOT_MET, 9, "It is broken. Fix it."));
-
-            assertThatCode(() -> service.prepare(testJob, observations)).doesNotThrowAnyException();
-        }
-
-        @Test
-        @DisplayName("a MET may rest on another participant's turn, which is context")
-        void shouldAdmitAMetThatCitesAnotherParticipant() {
-            var observations = List.of(citingLine(Outcome.MET, 5, "Can someone look at the failing build?"));
-
-            assertThatCode(() -> service.prepare(testJob, observations)).doesNotThrowAnyException();
-        }
-    }
-
-    @Nested
-    class MetadataValidation {
-
-        @Test
-        void nullMetadata() {
-            testJob.setMetadata(null);
-            var observations = List.of(validObservation("pr-description-quality", Outcome.MET));
-
-            assertThatThrownBy(() -> publishVerified(testJob, observations))
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("Missing job metadata");
-        }
-
-        @Test
-        void missingPullRequestId() {
-            testJob.setMetadata(objectMapper.createObjectNode());
-            var observations = List.of(validObservation("pr-description-quality", Outcome.MET));
-
-            assertThatThrownBy(() -> publishVerified(testJob, observations))
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("Missing pull_request_id");
-        }
-    }
-
-    @Nested
-    class OneResultPerPractice {
-
-        @Test
-        void rejectsMultipleResultsForOnePracticeBeforePersistence() {
-            for (Outcome first : Outcome.values()) {
-                for (Outcome second : Outcome.values()) {
-                    ValidatedObservation left = validObservation("pr-description-quality", first);
-                    ValidatedObservation right = validObservation("PR_DESCRIPTION_QUALITY", second);
-                    assertThatThrownBy(() -> service.prepare(testJob, List.of(left, right)))
-                            .isInstanceOf(ObservationsRefusedException.class)
-                            .hasMessageContaining("one final observation for each practice");
-                }
-            }
-            verifyNoInteractions(observationRepository);
-        }
-
-        @Test
-        void shouldPersistResultsForDifferentPractices() {
-            Practice otherPractice = new Practice();
-            ReflectionTestUtils.setField(otherPractice, "id", 20L);
-            otherPractice.setSlug("error-handling");
-            PracticeTestEvidence.configure(otherPractice, ArtifactKinds.PULL_REQUEST);
-            otherPractice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
-            admit(otherPractice, 22L);
-
-            var observations = List.of(
-                    validObservation("pr-description-quality", Outcome.NOT_MET),
-                    validObservation("error-handling", Outcome.NOT_MET));
-
-            var result = publishVerified(testJob, observations);
-
-            assertThat(result.inserted()).isEqualTo(2);
-        }
-    }
-
-    @Nested
-    class NotApplicableObservation {
-
-        @Test
-        @DisplayName("persists NOT_APPLICABLE observation without counting as negative")
-        void notApplicablePersisted() {
-            var observations = List.of(validObservation("pr-description-quality", null));
-
-            var result = publishVerified(testJob, observations);
-
-            assertThat(result.inserted()).isEqualTo(1);
-        }
-    }
-
-    @Nested
-    class SeverityCoherence {
-
-        private String capturedSeverityFor(ValidatedObservation observation) {
-            publishVerified(testJob, List.of(observation));
-            ArgumentCaptor<String> severityCaptor = ArgumentCaptor.forClass(String.class);
-            verify(observationRepository)
-                    .insertIfAbsent(
-                            any(),
-                            anyString(),
-                            any(),
-                            anyLong(),
-                            anyLong(),
-                            any(), // practiceRevisionId
-                            anyString(),
-                            anyLong(),
-                            anyLong(),
-                            any(),
-                            anyString(),
-                            severityCaptor.capture(),
-                            any(),
-                            any(),
-                            anyString(),
-                            any(),
-                            anyString());
-            return severityCaptor.getValue();
-        }
-
-        @Test
-        @DisplayName("a NOT_MET observation keeps its severity")
-        void notMetKeepsSeverity() {
-            assertThat(capturedSeverityFor(validObservation("pr-description-quality", Outcome.NOT_MET)))
-                    .isEqualTo("MINOR");
-        }
-
-        @Test
-        @DisplayName("a MET observation carries no severity")
-        void metCarriesNoSeverity() {
-            assertThat(capturedSeverityFor(validObservation("pr-description-quality", Outcome.MET)))
-                    .isNull();
-        }
-
-        @Test
-        @DisplayName("a NOT_APPLICABLE observation carries no severity")
-        void shouldPersistNoSeverityForNotApplicable() {
-            assertThat(capturedSeverityFor(validObservation("pr-description-quality", null)))
-                    .isNull();
-        }
-    }
-
-    @Nested
-    class Idempotency {
-
-        @Test
-        void duplicateKeyWithoutReadableOriginalIsRejected() {
-            when(observationRepository.insertIfAbsent(
-                            any(),
-                            anyString(),
-                            any(),
-                            anyLong(),
-                            anyLong(),
-                            any(),
-                            // practiceRevisionId
-                            anyString(),
-                            anyLong(),
-                            anyLong(),
-                            any(),
-                            anyString(),
-                            any(),
-                            any(),
-                            any(),
-                            anyString(),
-                            any(),
-                            anyString()))
-                    .thenReturn(0);
-
-            var observations = List.of(validObservation("pr-description-quality", Outcome.MET));
-
-            assertThatThrownBy(() -> publishVerified(testJob, observations))
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("unavailable for retry");
-        }
-
-        @Test
-        void keyFormat() {
-            var observations = List.of(validObservation("pr-description-quality", Outcome.MET));
-
-            publishVerified(testJob, observations);
-
-            ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
-            verify(observationRepository)
-                    .insertIfAbsent(
-                            any(),
-                            keyCaptor.capture(),
-                            any(),
-                            anyLong(),
-                            anyLong(),
-                            any(), // practiceRevisionId
-                            anyString(),
-                            anyLong(),
-                            anyLong(),
-                            any(),
-                            anyString(),
-                            isNull(),
-                            any(),
-                            any(),
-                            anyString(),
-                            any(),
-                            anyString());
-
-            String key = keyCaptor.getValue();
-            assertThat(key).isEqualTo("pr-description-quality:scm.pull_request:456:" + testJob.getId());
-        }
-    }
-
-    @Nested
-    class RecordedResultCounts {
-
-        @Test
-        void correctCounts() {
-            Practice otherPractice = new Practice();
-            ReflectionTestUtils.setField(otherPractice, "id", 20L);
-            otherPractice.setSlug("error-handling");
-            PracticeTestEvidence.configure(otherPractice, ArtifactKinds.PULL_REQUEST);
-            otherPractice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
-            admit(otherPractice, 22L);
-
-            var observations = List.of(
-                    validObservation("pr-description-quality", Outcome.MET),
-                    validObservation("error-handling", Outcome.NOT_MET));
-
-            var result = publishVerified(testJob, observations);
-
-            assertThat(result.inserted()).isEqualTo(2);
-            assertThat(result.discardedDuplicate()).isZero();
-        }
-    }
-
-    @Nested
-    class IssueRouting {
-
-        @Test
-        void routesToIssueTargetAndAuthorWhenArtifactKindIsIssue() {
-            when(reviewTargets.findIssue(999L))
-                    .thenReturn(Optional.of(new ReviewTargetQuery.Target(123L, "owner/repo", 12, 789L, false)));
-
-            ObjectNode meta = new ObjectMapper().createObjectNode();
-            meta.put("artifact_kind", ArtifactKinds.ISSUE.value());
-            meta.put("issue_id", 999L);
-            meta.put("repository_id", 123L);
-            meta.put("repository_full_name", "owner/repo");
-            meta.put("issue_number", 12);
-            UUID reviewSnapshotId = UUID.randomUUID();
-            meta.put("review_snapshot_id", reviewSnapshotId.toString());
-            testJob.setMetadata(meta);
-            when(observationRepository.lockIssueSnapshotForReview(1L, testJob.getId(), 999L))
-                    .thenReturn(Optional.of(reviewSnapshotId));
-
-            var observations = List.of(validObservation("pr-description-quality", Outcome.NOT_MET));
-            var result = publishVerified(testJob, observations);
-
-            assertThat(result.inserted()).isEqualTo(1);
-            verify(observationRepository)
-                    .insertIfAbsent(
-                            any(),
-                            eq("pr-description-quality:scm.issue:999:" + testJob.getId()),
-                            eq(testJob.getId()),
-                            anyLong(),
-                            anyLong(),
-                            eq(11L),
-                            eq("scm.issue"),
-                            eq(999L),
-                            eq(789L), // aboutUserId
-                            anyString(),
-                            eq("NOT_MET"), // outcome
-                            anyString(),
-                            any(),
-                            any(),
-                            anyString(),
-                            any(),
-                            anyString());
-        }
-
-        @ParameterizedTest
-        @ValueSource(strings = {"scm.issue.opened", "scm.issue.closed", "scm.issue.updated", "scm.issue.manual_review"})
-        void shouldRefuseWhenTheIssueSnapshotChangesAfterPreparation(String signal) {
-            when(reviewTargets.findIssue(999L))
-                    .thenReturn(Optional.of(new ReviewTargetQuery.Target(123L, "owner/repo", 12, 789L, false)));
-            ObjectNode metadata = objectMapper.createObjectNode();
-            metadata.put("artifact_kind", ArtifactKinds.ISSUE.value());
-            metadata.put("issue_id", 999L);
-            metadata.put("repository_id", 123L);
-            metadata.put("repository_full_name", "owner/repo");
-            metadata.put("issue_number", 12);
-            metadata.put("signal", signal);
-            metadata.put("review_snapshot_id", UUID.randomUUID().toString());
-            testJob.setMetadata(metadata);
-            var prepared = service.prepare(testJob, List.of(validObservation("pr-description-quality", Outcome.MET)));
-            when(observationRepository.lockIssueSnapshotForReview(1L, testJob.getId(), 999L))
-                    .thenReturn(Optional.of(UUID.randomUUID()));
-
-            assertThatThrownBy(() -> service.publish(testJob, prepared))
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("Issue changed after this review was submitted");
-            verify(observationRepository, never())
-                    .insertIfAbsent(
-                            any(),
-                            anyString(),
-                            any(),
-                            anyLong(),
-                            anyLong(),
-                            anyLong(),
-                            anyString(),
-                            anyLong(),
-                            anyLong(),
-                            anyString(),
-                            anyString(),
-                            anyString(),
-                            any(),
-                            any(),
-                            anyString(),
-                            any(),
-                            anyString());
-        }
-
-        @Test
-        void refusesAKindWithNoDeliveryRoute() {
-            ObjectNode meta = new ObjectMapper().createObjectNode();
-            meta.put("artifact_kind", "wiki.page");
-            testJob.setMetadata(meta);
-
-            var observations = List.of(validObservation("pr-description-quality", Outcome.NOT_MET));
-
-            assertThatThrownBy(() -> publishVerified(testJob, observations))
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("No delivery route for artifact kind: kind=wiki.page");
-        }
-    }
-
-    /** An undecided review owes a captured change a reading only through a practice pinned to read it. */
-    @Nested
-    class TheChangeWitness {
-
-        private static final String TITLE = "\"title\":\"Bump the lockfile\"";
-
-        private PracticeEvidenceRequirement required(String sourceKind) {
-            return new PracticeEvidenceRequirement(new SourceKind(sourceKind), EvidenceStance.REQUIRED);
-        }
-
-        /** Pins revision 11 reading {@code sourceKinds}; today's definition reads the change regardless. */
-        private void pinDescriptionPractice(String... sourceKinds) {
-            testPractice.setName("Describe what and why");
-            testPractice.setCriteria("Judge the description.");
-            testPractice.setEvidenceRequirements(
-                    Arrays.stream(sourceKinds).map(this::required).toList());
-            PracticeRevision pinned = new PracticeRevision(testPractice, 1);
-            ReflectionTestUtils.setField(pinned, "id", 11L);
-            when(practiceRevisionRepository.findByIdAndWorkspaceId(11L, 1L)).thenReturn(Optional.of(pinned));
-            testPractice.setEvidenceRequirements(
-                    List.of(required("scm.pull-request.core"), required("scm.pull-request.diff")));
-        }
-
-        private ValidatedObservation fromTheRecord(String slug) {
-            ValidatedObservation observation = validObservation(slug, null);
-            ObjectNode citation = firstCitation(observation);
-            citation.put("sourceKind", "scm.pull-request.core");
-            citation.put("artifactPath", "context/pull_request.json");
-            citation.put("path", "pull_request.json");
-            citation.put("startLine", 1);
-            citation.put("endLine", 1);
-            citation.put("quote", TITLE);
-            citation.remove("side");
-            ((ObjectNode) evidenceOf(observation).get("inapplicability"))
-                    .putArray("consulted")
-                    .add("scm.pull-request.core");
-            lenient()
-                    .when(cas.containsUtf8AtLines(testJob, "context/pull_request.json", "b".repeat(64), TITLE, 1, 1))
-                    .thenReturn(Optional.of(true));
-            return observation;
-        }
-
-        @Test
-        void admitsAnUndecidedReviewWhosePinnedPracticeNeverReadTheCapturedChange() {
-            pinDescriptionPractice("scm.pull-request.core");
-
-            var result = publishVerified(testJob, List.of(fromTheRecord("pr-description-quality")));
-
-            assertThat(result.inserted()).isEqualTo(1);
-            assertThat(storedCitation(result)
-                            .path("verification")
-                            .path("status")
-                            .asString())
-                    .isEqualTo("VERIFIED");
-        }
-
-        @Test
-        void refusesAnUndecidedReviewWhosePinnedPracticeReadsTheChangeWithoutAWitness() {
-            pinDescriptionPractice("scm.pull-request.core", "scm.pull-request.diff");
-
-            assertThatThrownBy(() -> service.prepare(testJob, List.of(fromTheRecord("pr-description-quality"))))
-                    .isInstanceOfSatisfying(
-                            ObservationsRefusedException.class,
-                            e -> assertThat(e.reasonCode()).isEqualTo("did_not_read_the_diff"))
-                    .hasMessageContaining("answered without reading the change");
-            verifyNoInteractions(observationRepository);
-        }
-
-        @Test
-        void aWithdrawnPracticeThatReadsTheChangeDoesNotBurdenTheReviewThatRemains() {
-            pinDescriptionPractice("scm.pull-request.core");
-            // The fixture's second practice reads the change, as a pull request practice does by default.
-            admitSecondPractice().setSourceCuratedSlug("withdrawn");
-            ReflectionTestUtils.setField(
-                    service,
-                    "fence",
-                    new AutomatedReviewFence(Map.of(
-                            "withdrawn",
-                            new PracticeDefinition(
-                                    "Withdrawn",
-                                    PracticeTestEvidence.signals(ArtifactKinds.PULL_REQUEST),
-                                    List.of(required("scm.pull-request.diff")),
-                                    Map.of(),
-                                    ActorRole.AUTHOR,
-                                    null,
-                                    "Criteria",
-                                    null,
-                                    PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST)
-                                            .withdrawnFor(new PracticeEvidenceLimitation(
-                                                    "AT_CLOSE_STATE_NOT_CAPTURED", "Nothing records the close.")),
-                                    null,
-                                    null,
-                                    null))));
-
-            var result = publishVerified(
-                    testJob, List.of(fromTheRecord("pr-description-quality"), fromTheRecord("pr-scope")));
-
-            assertThat(result.recorded())
-                    .extracting(ValidatedObservation::practiceSlug)
-                    .containsExactly("pr-description-quality");
-        }
-
-        @Test
-        void aDiffQuoteThatDoesNotVerifyWitnessesNothingForAPracticeThatReadsTheChange() {
-            pinDescriptionPractice("scm.pull-request.core", "scm.pull-request.diff");
-            admitSecondPractice();
-            ValidatedObservation misquoted = validObservation("pr-scope", null);
-            firstCitation(misquoted).put("quote", "insecure();,");
-
-            var observations = List.of(fromTheRecord("pr-description-quality"), misquoted);
-
-            assertThatThrownBy(() -> service.prepare(testJob, observations))
-                    .isInstanceOfSatisfying(
-                            ObservationsRefusedException.class,
-                            e -> assertThat(e.reasonCode()).isEqualTo("did_not_read_the_diff"));
-            verifyNoInteractions(observationRepository);
-        }
-
-        @Test
-        void admitsAMixedUndecidedReviewOnceThePracticeThatReadsTheChangeQuotesIt() {
-            pinDescriptionPractice("scm.pull-request.core");
-            Practice tests = new Practice();
-            ReflectionTestUtils.setField(tests, "id", 12L);
-            tests.setSlug("ships-tests-with-the-change");
-            tests.setName("Include tests with the change");
-            tests.setCriteria("Judge the tests.");
-            PracticeTestEvidence.configure(tests, ArtifactKinds.PULL_REQUEST);
-            tests.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
-            tests.setEvidenceRequirements(List.of(required("scm.pull-request.diff")));
-            tests.setWorkspace(testPractice.getWorkspace());
-            PracticeRevision testsRevision = new PracticeRevision(tests, 1);
-            ReflectionTestUtils.setField(testsRevision, "id", 13L);
-            when(practiceRevisionRepository.findByIdAndWorkspaceId(13L, 1L)).thenReturn(Optional.of(testsRevision));
-            EvidenceSnapshotFixtures.admittedPractice(
-                    (ObjectNode) Objects.requireNonNull(testJob.getEvidenceSnapshot()),
-                    "ships-tests-with-the-change",
-                    13L);
-
-            var result = publishVerified(
-                    testJob,
-                    List.of(
-                            fromTheRecord("pr-description-quality"),
-                            validObservation("ships-tests-with-the-change", null)));
-
-            assertThat(result.inserted()).isEqualTo(2);
-        }
+    @Test
+    void shouldRetainAnAdmissionRefusalForAHostInapplicabilityResult() {
+        var assigned = RuntimeReviewTestData.assignment(5L, null);
+        when(assignments.load(job)).thenReturn(List.of(assigned));
+        when(assignments.admissible(job)).thenReturn(List.of());
+        var check = new AppliesWhenCheck(
+                true,
+                "The change touches no Swift file.",
+                List.of(new AppliesWhenCheck.Clause(
+                        "CHANGED_PATH", new SourceKind("scm.pull-request.diff"), AppliesWhenCheck.Result.NOT_FOUND)));
+        var capture = (ObjectNode) Objects.requireNonNull(job.getCapture());
+        capture.putObject("readiness")
+                .putObject("applicability")
+                .set(assigned.practiceSlug(), mapper.valueToTree(check));
+        when(results.admit(eq(1L), eq(job.getReviewId()), eq(job.getId()), eq(0), any()))
+                .thenReturn(new AdmissionReceipt(
+                        List.of(),
+                        List.of(new WithheldItem(
+                                assigned.practice().practiceId(),
+                                assigned.item().itemId(),
+                                "ROLE_UNAVAILABLE"))));
+        service.prepare(job, new AdmissionRequestDTO(3, job.getReviewId(), job.getId(), 0, List.of(), List.of()))
+                .record(job);
+        assertThat(Objects.requireNonNull(job.getCapture())
+                        .path("withheld")
+                        .get(0)
+                        .path("reason")
+                        .asString())
+                .isEqualTo("ROLE_UNAVAILABLE");
     }
 }

@@ -1,10 +1,9 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
-import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
-import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
-import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.MentorChatRequest;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorVisibleTextSanitizer;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
+import de.tum.cit.aet.hephaestus.evidence.capture.ContentSource;
+import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessage;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
 import java.util.List;
@@ -31,8 +30,8 @@ public class CurrentThreadHistoryContentSource implements ContentSource {
     private final ObjectMapper objectMapper;
 
     @Override
-    public boolean supports(ContextRequest request) {
-        return request instanceof MentorChatRequest;
+    public boolean supports(MentorContextRequest request) {
+        return true;
     }
 
     @Override
@@ -42,8 +41,8 @@ public class CurrentThreadHistoryContentSource implements ContentSource {
 
     @Override
     @Transactional(readOnly = true)
-    public void contribute(ContextRequest request, Map<String, byte[]> files) {
-        MentorChatRequest req = (MentorChatRequest) request;
+    public void contribute(MentorContextRequest request, Map<String, byte[]> files) {
+        MentorContextRequest req = request;
         ObjectNode root = objectMapper.createObjectNode();
         root.put("threadId", req.threadId().toString());
         root.put("maxMessages", MAX_MESSAGES);
@@ -84,7 +83,7 @@ public class CurrentThreadHistoryContentSource implements ContentSource {
                 if (MentorVisibleTextSanitizer.isLeakedInternalAnalysis(text)) {
                     continue;
                 }
-            } else if (UIMessageChunk.DataObservation.PART_TYPE.equals(type)) {
+            } else if (UIMessageChunk.LinkParts.resultOf(part) != null) {
                 // Feedback the reply showed; a link stored before links carried text showed nothing.
                 text = part.path("data").path("text").asString("");
                 if (text.isBlank()) {

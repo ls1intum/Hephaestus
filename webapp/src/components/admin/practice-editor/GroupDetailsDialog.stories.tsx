@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent, waitFor } from "storybook/test";
 
-import { mockGroups } from "@/components/admin/practices/fixtures";
+import { catalogOrigin, mockGroups } from "@/components/admin/practices/fixtures";
 import { expectSettledVisible } from "@/stories/overlay";
 import { expectGenuinelyDisabled } from "@/test/controls";
 
@@ -55,12 +55,12 @@ export const FromTheCatalog: Story = {
 	args: {
 		group: {
 			...reviewReadyGroup,
-			catalogOrigin: { slug: reviewReadyGroup.slug, link: "UPDATE_AVAILABLE", sourceOffered: true },
+			catalogOrigin: catalogOrigin(reviewReadyGroup.slug, "UPDATE_WAITING"),
 		},
 	},
 	play: async () => {
-		await expectSettledVisible(await screen.findByText("Catalog changed, yours did not"));
-		await expect(screen.getByText(/Edit it to bring anything you want across/u)).toBeVisible();
+		await expectSettledVisible(await screen.findByText("Catalog update waiting"));
+		await expect(screen.getByText(/Reset to catalog brings them across/u)).toBeVisible();
 	},
 };
 

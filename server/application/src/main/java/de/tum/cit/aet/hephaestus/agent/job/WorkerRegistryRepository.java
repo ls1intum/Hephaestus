@@ -16,8 +16,8 @@ import org.springframework.stereotype.Repository;
 @WorkspaceAgnostic("Fleet-wide worker coordination; not workspace-scoped.")
 public interface WorkerRegistryRepository extends JpaRepository<WorkerRegistry, String> {
     @Query(
-            value =
-                    "SELECT worker_id FROM worker_registry WHERE last_heartbeat >= now() - make_interval(secs => :ttlSeconds)",
+            value = "SELECT worker_id FROM worker_registry WHERE last_heartbeat >= now() - make_interval(secs =>"
+                    + " :ttlSeconds)",
             nativeQuery = true)
     List<String> findLiveWorkerIds(@Param("ttlSeconds") long ttlSeconds);
 

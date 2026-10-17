@@ -115,7 +115,7 @@ describe("authorize", () => {
 	});
 
 	it.each([
-		{ type: "list-observations", workspaceSlug: "team" },
+		{ type: "list-results", workspaceSlug: "team" },
 		{ type: "get-work-feedback", workspaceSlug: "team" },
 	])("keeps $type to the inline frame", (value) => {
 		expect(authorize(request(value), inline, ID).allowed).toBe(true);
@@ -143,11 +143,9 @@ describe("requestSchema", () => {
 		{ type: "cancel-review", tabId: 1, workspaceSlug: "team", jobId: "not-a-uuid" },
 		{ type: "sign-in", registrationId: "a b" },
 		{ type: "sign-in-dev", username: "x;drop", admin: false },
-		{ type: "list-observations", workspaceSlug: "team", artifactId: 9 },
-		// Every developer's records, one observation's detail, feedback bodies and run changes are
-		// the web app's: the extension has no command for them.
-		{ type: "list-observations", workspaceSlug: "team", scope: "workspace" },
-		{ type: "get-observation", workspaceSlug: "team", observationId: JOB },
+		{ type: "list-results", workspaceSlug: "team", itemId: "9" },
+		{ type: "list-results", workspaceSlug: "team", scope: "workspace" },
+		{ type: "get-result", workspaceSlug: "team", resultId: JOB },
 		{ type: "get-feedback", workspaceSlug: "team", feedbackId: JOB },
 		{ type: "get-review-details", workspaceSlug: "team" },
 		{ type: "open-action", workspaceSlug: "team", action: { kind: "cancel-review", jobId: JOB } },
@@ -180,7 +178,7 @@ describe("the subject of a read", () => {
 		{ type: "get-context", subject: { kind: "tab", id: 4 } },
 		{ type: "get-context", subject: { ...ROW, tabId: 4 } },
 		// A list row's preview reads only the line and the reader's comments.
-		{ type: "list-observations", workspaceSlug: "team", subject: ROW },
+		{ type: "list-results", workspaceSlug: "team", subject: ROW },
 		// Changes and remembered choices are the page's own: a list row cannot name them.
 		{
 			type: "open-action",

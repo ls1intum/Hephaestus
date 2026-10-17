@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import type { PracticeStanding } from "@/api/types.gen";
+import type { PracticeStanding, ReviewedPractice } from "@/api/types.gen";
 import {
 	PracticeTabsList,
 	PracticeTabsRail,
@@ -24,14 +24,16 @@ import {
 	PracticeFeedbackCardSkeleton,
 } from "@/components/practice-vocabulary/PracticeFeedbackCard";
 import { StandingBadge, TrendNote } from "@/components/practice-vocabulary/StandingBadge";
+import { ReviewFeed, ReviewFeedSkeleton } from "@/components/profile/ReviewFeed";
 import {
-	EMPTY_REVIEW_RUN_FEED,
-	type ObservationControls,
-	type ReviewRunFeedState,
-} from "@/components/profile/review-runs";
-import { ReviewRunFeed, ReviewRunFeedSkeleton } from "@/components/profile/ReviewRunFeed";
+	EMPTY_REVIEW_FEED,
+	type FeedbackResponseControls,
+	type ReviewFeedState,
+} from "@/components/profile/reviews";
 import { DrawerBody } from "@/components/ui/drawer";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { problemStatusOf } from "@/lib/problem-detail";
 import { hasText } from "@/lib/text";
 
 import { NeverAppliedBadge } from "./FoldedPractices";
@@ -43,7 +45,7 @@ import { requestedReviewNote } from "./requested-review-note";
 
 const TAB_LABELS: Record<PracticeTab, string> = {
 	feedback: "Feedback",
-	observations: "Observations",
+	results: "Results",
 	guide: "Guide",
 };
 
@@ -55,11 +57,17 @@ export interface PracticeDetailLevelProps {
 	path: LevelPath;
 	/** Returns to the group's level under this one; a card's group name is a link only with it. */
 	onOpenGroup?: () => void;
-	/** The practice, as the standings carry it: the catalog's words and where the reader stands. */
-	practice?: PracticeStanding;
 	/**
-	 * The practice's picture and guide, which load on their own after the standing: the picture
-	 * joins the introduction, and a guide adds the Guide tab.
+	 * The practice, as the standings carry it: the catalog's words and where the reader stands.
+	 * Absent for a practice with no standing, which the level shows from its words and guidance
+	 * alone.
+	 */
+	practice?: PracticeStanding;
+	/** The name and words of a practice with no standing, from the workspace's catalog. */
+	described?: Pick<ReviewedPractice, "name" | "whyItMatters" | "whatGoodLooksLike">;
+	/**
+	 * The practice's guidance, which loads on its own after the standing: the picture joins the
+	 * introduction, and a guide adds the Guide tab.
 	 */
 	guidance: PracticeGuidanceState;
 	/**
@@ -68,7 +76,7 @@ export interface PracticeDetailLevelProps {
 	 */
 	tab: PracticeTab;
 	onTabChange?: (tab: PracticeTab) => void;
-	feed?: ReviewRunFeedState;
+	feed?: ReviewFeedState;
 	/** The developer's practice feedback; the level shows the cards written about this practice. */
 	feedbackCards?: PracticeFeedbackCardEntry[];
 	/**
@@ -78,8 +86,8 @@ export interface PracticeDetailLevelProps {
 	ratingProps?: (feedbackId: string) => FeedbackRatingProps;
 	/** How many rows the feed draws while its first page loads. */
 	skeletonRows: number;
-	/** The reader's response to an observation, from the route. */
-	observations?: ObservationControls;
+	/** The reader's responses to their feedback, from the route; without them none can be given. */
+	responses?: FeedbackResponseControls;
 	isLoading: boolean;
 	error?: unknown;
 	onRetry?: () => void;
@@ -101,61 +109,51 @@ function feedbackCardsOf(cards: PracticeFeedbackCardEntry[], practiceSlug: strin
 
 const NO_CARDS: PracticeFeedbackCardEntry[] = [];
 
-/**
- * One practice as the level over its group: the practice's introduction, then its tabs — the
- * feedback written about it, which the level opens on, what the reviews of the reader's work found,
- * and the practice guide when the practice has one. It is the deepest level, so it is the one that
- * carries the observations — the newest open once the reader turns to them and every earlier one a
- * press away, each opening and closing on its own.
- */
+const NO_WORDS = { whyItMatters: null, whatGoodLooksLike: null };
+
+const GUIDANCE_ONLY = "This practice offers guidance without automated review.";
+
 export function PracticeDetailLevel({
 	nested,
 	path,
 	onOpenGroup,
 	practice,
+	described,
 	guidance,
 	tab,
 	onTabChange,
-	feed = EMPTY_REVIEW_RUN_FEED,
+	feed = EMPTY_REVIEW_FEED,
 	feedbackCards = NO_CARDS,
 	ratingProps,
 	skeletonRows,
-	observations,
+	responses,
 	isLoading,
 	error,
 	onRetry,
 	neverApplied = false,
 }: PracticeDetailLevelProps) {
-	// The server narrows which runs reached the practice; the level narrows the same way and shows
-	// only that practice's observations instead of everything the run found.
-	const runs =
+	const reviews =
 		feed.status === "ready" && practice
-			? feed.runs
-					.map((run) => ({
-						...run,
-						observations: run.observations.filter(
-							(observation) => observation.practiceSlug === practice.slug,
-						),
+			? feed.reviews
+					.map((review) => ({
+						...review,
+						results: review.results.filter((result) => result.practiceSlug === practice.slug),
 					}))
-					.filter((run) => run.observations.length > 0)
+					.filter((review) => review.results.length > 0)
 			: [];
 	const feedback = practice
 		? feedbackCardsOf(feedbackCards, practice.slug)
 		: { open: undefined, resolved: [] };
 	const feedbackCount = (feedback.open ? 1 : 0) + feedback.resolved.length;
-	// What each tab counts is what it can show. The feedback cards arrive in one piece, so that
-	// count is always known; the observations are paged, so a number taken from the loaded pages
-	// would be short while earlier runs are still a press away, and would grow under the reader as
-	// they press. An unnumbered tab says less and nothing wrong, so the count waits for the last
-	// page.
+	// Feedback arrives whole; paged results cannot supply an exact tab count.
 	const counts: Partial<Record<PracticeTab, number>> = {
-		observations:
+		results:
 			feed.status === "ready" && !feed.hasMore
-				? runs.reduce((count, run) => count + run.observations.length, 0)
+				? reviews.reduce((count, review) => count + review.results.length, 0)
 				: undefined,
 		feedback: feedbackCount,
 	};
-	const guide = guidance.status === "ready" ? guidance.guide : undefined;
+	const guide = guidance.status === "ready" ? (guidance.guide ?? undefined) : undefined;
 	// The Guide tab exists only once a guide has arrived; until then, or without one, a link to it
 	// lands on the feedback.
 	const tabs = PRACTICE_TABS.filter((candidate) => candidate !== "guide" || guide !== undefined);
@@ -176,8 +174,8 @@ export function PracticeDetailLevel({
 			// The tabs and the one they open on, as they will be laid out.
 			<div className="flex flex-col gap-4">
 				<PracticeTabsSkeleton tabs={tabs.length} />
-				{shownTab === "observations" ? (
-					<ReviewRunFeedSkeleton rows={skeletonRows} />
+				{shownTab === "results" ? (
+					<ReviewFeedSkeleton rows={skeletonRows} />
 				) : (
 					<div className="flex flex-col gap-2.5" aria-busy="true">
 						<span className="sr-only">Loading feedback…</span>
@@ -199,7 +197,7 @@ export function PracticeDetailLevel({
 			/>
 		);
 	} else if (practice) {
-		const requestedNote = requestedReviewNote(practice, runs);
+		const requestedNote = requestedReviewNote(practice, reviews);
 		body = (
 			<>
 				{neverApplied && <p className="max-w-2xl text-sm">{NEVER_APPLIED.description}</p>}
@@ -230,7 +228,7 @@ export function PracticeDetailLevel({
 							description="Feedback about patterns in your work: the open card, then the ones that resolved, newest first."
 						>
 							{feedbackCount === 0 ? (
-								<FeedbackEmpty description="Feedback appears here once a review sees the same pattern in your work more than once. Feedback posted on a single piece of work stays there. Open its observation to find recorded comment links." />
+								<FeedbackEmpty description="Feedback appears here once a review sees the same pattern in your work more than once. Feedback posted on a single piece of work stays there. Open its result to find recorded comment links." />
 							) : (
 								<div className="flex flex-col gap-6">
 									{feedback.open && (
@@ -255,25 +253,25 @@ export function PracticeDetailLevel({
 							)}
 						</Section>
 					</TabsContent>
-					<TabsContent value="observations" className="min-w-0">
+					<TabsContent value="results" className="min-w-0">
 						<Section
 							size="lg"
-							title="Observations"
-							description="Reviews of your work that reached this practice, newest first: why each was noted, the evidence, and the next step."
+							title="Results"
+							description="Reviews of your work that reached this practice, newest first: what each recorded, the evidence, and the next step."
 						>
 							{hasText(requestedNote) && <p className="max-w-2xl text-sm">{requestedNote}</p>}
-							<ReviewRunFeed
+							<ReviewFeed
 								feed={feed}
-								runs={runs}
+								reviews={reviews}
 								skeletonRows={skeletonRows}
-								observations={observations}
+								responses={responses}
 								// The rows are this practice's own, so none repeats its name under the summary.
 								showPracticeName={false}
 								// Every row here reviews the same practice, so the newest is the one the reader
 								// came for; the rest are its history and wait for a press.
 								initiallyOpen="newest"
-								emptyTitle="No observations yet"
-								emptyDescription="An observation appears here after a review checks this practice against your work."
+								emptyTitle="No results yet"
+								emptyDescription="They appear after Hephaestus reviews your work."
 							/>
 						</Section>
 					</TabsContent>
@@ -288,12 +286,42 @@ export function PracticeDetailLevel({
 				</Tabs>
 			</>
 		);
-	} else {
+	} else if (guidance.status === "ready") {
+		body = (
+			<>
+				<p className="max-w-2xl text-sm">{GUIDANCE_ONLY}</p>
+				<PracticeIntro practice={described ?? NO_WORDS} guidance={guidance} />
+				{guide && (
+					// The guide uses h4 headings; its parent must be h3 to preserve the outline.
+					<Section size="lg" level={3} title="Practice guide">
+						<PracticeGuideMarkdown guide={guide} />
+					</Section>
+				)}
+			</>
+		);
+	} else if (guidance.status === "loading") {
+		body = (
+			<div className="flex max-w-2xl flex-col gap-2" aria-busy="true">
+				<span className="sr-only">Loading this practice…</span>
+				<Skeleton className="h-5 w-full" />
+				<Skeleton className="h-5 w-3/4" />
+			</div>
+		);
+	} else if (problemStatusOf(guidance.error) === 404) {
 		body = (
 			<p className="text-sm text-muted-foreground">
 				We could not find this practice. Check the link, or ask a workspace admin whether this
 				workspace reviews it.
 			</p>
+		);
+	} else {
+		// Any other failure says nothing about whether the practice exists, so it offers the retry.
+		body = (
+			<QueryErrorAlert
+				error={guidance.error}
+				title="We could not load this practice"
+				onRetry={guidance.onRetry}
+			/>
 		);
 	}
 
@@ -303,7 +331,7 @@ export function PracticeDetailLevel({
 				nested={nested}
 				path={path}
 				current="Practice"
-				title={practice?.name ?? "Practice"}
+				title={practice?.name ?? described?.name ?? "Practice"}
 				chips={
 					practice && (
 						<>
@@ -315,11 +343,11 @@ export function PracticeDetailLevel({
 									<StandingBadge
 										standing={practice.standing}
 										scope="practice"
-										support={practice.trendSupport}
+										support={practice.trendSupport ?? undefined}
 									/>
 									<TrendNote
-										direction={practice.direction}
-										support={practice.trendSupport}
+										direction={practice.direction ?? undefined}
+										support={practice.trendSupport ?? undefined}
 										scope="practice"
 									/>
 								</>

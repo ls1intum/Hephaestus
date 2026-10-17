@@ -6,13 +6,18 @@ import type {
 	FeedbackRatingProps,
 } from "@/components/practice-vocabulary/PracticeFeedbackCard";
 import {
+	type FeedbackResponseControls,
+	isEmptyFeedbackResponse,
+	responseRequestOf,
+} from "@/components/profile/reviews";
+import {
 	nextRating,
 	nextResolution,
 	opensNoteBand,
 	withComment,
-	withDispute,
-	withoutDispute,
-} from "@/hooks/use-in-app-feedback";
+	withDisagreement,
+	withoutDisagreement,
+} from "@/hooks/use-practice-page-feedback";
 
 /** What the reader said about one piece of feedback, and the band still open under it. */
 interface FeedbackRating {
@@ -22,11 +27,12 @@ interface FeedbackRating {
 
 /**
  * The ratings a story holds in place of the server, keyed by feedback id: the same contract
- * `useInAppFeedback` fulfils on the wire, without a network, and on the hook's own `nextRating`,
+ * `usePracticePageFeedback` fulfils on the wire, without a network, and on the hook's own `nextRating`,
  * `withComment` and `nextResolution` rules — a press on a rating opens the comment band, unless a
- * dispute stands; pressing the chosen rating again withdraws it and closes the band; Send and Skip close the band and keep the
- * rating; Addressed and Not applicable replace the answer, and a second press takes it back;
- * Disagree opens the dispute's band, whose Send writes the dispute, and takes a standing one back. The
+ * disagreement stands; pressing the chosen rating again withdraws it and closes the band; Send and
+ * Skip close the band and keep the rating; Addressed and Not applicable replace the answer, and a
+ * second press takes it back; Disagree opens the band that asks why, whose Send writes the
+ * disagreement, and takes a standing one back. The
  * card's state is the fixture's, since closing it is the server's to decide.
  */
 export function useFeedbackRatings() {
@@ -54,16 +60,16 @@ export function useFeedbackRatings() {
 		onSkipComment: () => update(feedbackId, (current) => current && { response: current.response }),
 		onDisagree: () =>
 			update(feedbackId, (current) =>
-				current?.response.resolution === "DISPUTED"
-					? { response: withoutDispute(current.response) }
+				current?.response.resolution === "DISAGREE"
+					? { response: withoutDisagreement(current.response) }
 					: {
 							response: current?.response ?? {},
-							openBand: current?.openBand === "dispute" ? undefined : "dispute",
+							openBand: current?.openBand === "disagreement" ? undefined : "disagreement",
 						},
 			),
-		onSendDispute: (comment) =>
+		onSendDisagreement: (comment) =>
 			update(feedbackId, (current) => ({
-				response: withDispute(current?.response, comment),
+				response: withDisagreement(current?.response, comment),
 			})),
 		onResolve: (answer) =>
 			update(feedbackId, (current) => ({
@@ -73,4 +79,28 @@ export function useFeedbackRatings() {
 	});
 
 	return { ratingProps };
+}
+
+/**
+ * The responses a story holds in place of the server, keyed by feedback id: the contract
+ * `useFeedbackResponseWrite` fulfils on the wire, without a network. A write applies its change over
+ * the response that stands and a response with nothing left in it is cleared, as the hook does.
+ * With `pending` a write never lands, so the story shows the response being written and every
+ * control waiting.
+ */
+export function useStoryFeedbackResponses({ pending = false } = {}): FeedbackResponseControls {
+	const [written, setWritten] = useState<ReadonlyMap<string, FeedbackResponseRequest>>(new Map());
+	const responseOf: FeedbackResponseControls["responseOf"] = (feedbackId, recorded) =>
+		written.get(feedbackId) ?? responseRequestOf(recorded);
+	const store = (feedbackId: string, response: FeedbackResponseRequest) =>
+		setWritten((current) => new Map(current).set(feedbackId, response));
+	return {
+		write: (feedbackId, recorded, change) => {
+			const response = { ...responseOf(feedbackId, recorded), ...change };
+			store(feedbackId, isEmptyFeedbackResponse(response) ? {} : response);
+		},
+		clear: (feedbackId) => store(feedbackId, {}),
+		responseOf,
+		pendingResponses: pending ? written : new Map(),
+	};
 }

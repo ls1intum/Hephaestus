@@ -32,8 +32,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * The installed-client schema as Liquibase creates it, not as Hibernate's {@code ddl-auto} does: the
@@ -92,6 +94,9 @@ class ClientSessionMigratedSchemaTest {
 
     @Autowired
     private AccountPurger accountPurger;
+
+    @Autowired
+    private PlatformTransactionManager transactions;
 
     @Test
     void shouldDeclareTheSessionAndAccountForeignKeysAsCascadingWhenTheChainIsMigrated() {
@@ -184,7 +189,8 @@ class ClientSessionMigratedSchemaTest {
         ClientSession kept = session(otherId, Instant.now().plus(Duration.ofDays(7)));
         UUID keptToken = token(otherId, kept.getId(), false);
 
-        accountPurger.purge(accountId);
+        new TransactionTemplate(transactions)
+                .executeWithoutResult(status -> accountPurger.purgeInCurrentTransaction(accountId));
 
         for (String table : List.of("client_session", "client_sign_in_handoff", "issued_jwt")) {
             assertThat(jdbc.queryForObject(

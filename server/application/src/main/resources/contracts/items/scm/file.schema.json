@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hephaestus.aet.cit.tum.de/contracts/items/scm/file.schema.json",
+  "type": "object",
+  "properties": {
+    "repositoryId": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]*$"
+    },
+    "providerId": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]*$"
+    },
+    "commitId": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "blobId": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+    }
+  },
+  "required": [
+    "repositoryId",
+    "providerId",
+    "commitId",
+    "path",
+    "blobId"
+  ],
+  "additionalProperties": false
+}

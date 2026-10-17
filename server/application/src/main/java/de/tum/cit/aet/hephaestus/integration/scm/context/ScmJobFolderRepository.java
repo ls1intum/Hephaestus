@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.context;
 
+import de.tum.cit.aet.hephaestus.integration.core.framework.MonitoredRepositoryScope;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.MonitoredRepositoryScope;
 import jakarta.persistence.QueryHint;
 import java.util.stream.Stream;
 import org.hibernate.jpa.HibernateHints;
@@ -18,8 +18,9 @@ import org.springframework.data.repository.query.Param;
 interface ScmJobFolderRepository extends Repository<Issue, Long> {
 
     String MONITORED_BY_WORKSPACE = "\n" + """
-         AND EXISTS (SELECT 1 FROM repository_to_monitor rtm JOIN repository r ON r.name_with_owner = rtm.name_with_owner
-                     AND\s""" + MonitoredRepositoryScope.NATIVE_RTM_R + """
+        AND EXISTS (SELECT 1 FROM repository_to_monitor rtm JOIN repository r ON r.name_with_owner = rtm.name_with_owner
+                    AND
+        """ + MonitoredRepositoryScope.NATIVE_RTM_R + """
 
                      WHERE rtm.workspace_id = :workspaceId AND r.id = i.repository_id)
         """;
@@ -42,20 +43,21 @@ interface ScmJobFolderRepository extends Repository<Issue, Long> {
     }
 
     @Query(value = """
-            SELECT (to_jsonb(i) || jsonb_build_object('synced_at', i.last_sync_at, 'labels', COALESCE(
-              (SELECT jsonb_agg(l.name ORDER BY l.name COLLATE "C") FROM issue_label il JOIN label l ON l.id = il.label_id
-               WHERE il.issue_id = i.id), '[]'::jsonb)))::text
-            FROM issue i
-            WHERE i.repository_id = :repositoryId AND i.deleted_at IS NULL
-            """ + MONITORED_BY_WORKSPACE + " ORDER BY i.number", nativeQuery = true)
+        SELECT (to_jsonb(i) || jsonb_build_object('synced_at', i.last_sync_at, 'labels', COALESCE(
+          (SELECT jsonb_agg(l.name ORDER BY l.name COLLATE "C") FROM issue_label il JOIN label l ON l.id = il.label_id
+           WHERE il.issue_id = i.id), '[]'::jsonb)))::text
+        FROM issue i
+        WHERE i.repository_id = :repositoryId AND i.deleted_at IS NULL
+        """ + MONITORED_BY_WORKSPACE + " ORDER BY i.number", nativeQuery = true)
     @QueryHints(@QueryHint(name = HibernateHints.HINT_FETCH_SIZE, value = "256"))
     Stream<String> streamWork(@Param("workspaceId") long workspaceId, @Param("repositoryId") long repositoryId);
 
     /** The general comments of every pull request, or of every other piece of work, in the repository. */
     @Query(
-            value = WORK_PART + " FROM issue_comment c JOIN issue i ON i.id = c.issue_id" + WORK_OF_REPOSITORY
-                    + " AND (i.issue_type IS NOT DISTINCT FROM 'PULL_REQUEST') = :pullRequests"
-                    + " ORDER BY i.number, c.id",
+            value = WORK_PART
+                    + " FROM issue_comment c JOIN issue i ON i.id = c.issue_id"
+                    + WORK_OF_REPOSITORY
+                    + " AND (i.issue_type IS NOT DISTINCT FROM 'PULL_REQUEST') = :pullRequests ORDER BY i.number, c.id",
             nativeQuery = true)
     @QueryHints(@QueryHint(name = HibernateHints.HINT_FETCH_SIZE, value = "256"))
     Stream<WorkPart> streamIssueComments(
@@ -64,40 +66,47 @@ interface ScmJobFolderRepository extends Repository<Issue, Long> {
             @Param("pullRequests") boolean pullRequests);
 
     @Query(
-            value = WORK_PART + " FROM pull_request_review_comment c JOIN issue i ON i.id = c.pull_request_id"
-                    + WORK_OF_REPOSITORY + " AND i.issue_type = 'PULL_REQUEST' ORDER BY i.number, c.id",
+            value = WORK_PART
+                    + " FROM pull_request_review_comment c JOIN issue i ON i.id = c.pull_request_id"
+                    + WORK_OF_REPOSITORY
+                    + " AND i.issue_type = 'PULL_REQUEST' ORDER BY i.number, c.id",
             nativeQuery = true)
     @QueryHints(@QueryHint(name = HibernateHints.HINT_FETCH_SIZE, value = "256"))
     Stream<WorkPart> streamReviewComments(
             @Param("workspaceId") long workspaceId, @Param("repositoryId") long repositoryId);
 
     @Query(
-            value = WORK_PART + " FROM pull_request_review c JOIN issue i ON i.id = c.pull_request_id"
-                    + WORK_OF_REPOSITORY + " AND i.issue_type = 'PULL_REQUEST' ORDER BY i.number, c.id",
+            value = WORK_PART
+                    + " FROM pull_request_review c JOIN issue i ON i.id = c.pull_request_id"
+                    + WORK_OF_REPOSITORY
+                    + " AND i.issue_type = 'PULL_REQUEST' ORDER BY i.number, c.id",
             nativeQuery = true)
     @QueryHints(@QueryHint(name = HibernateHints.HINT_FETCH_SIZE, value = "256"))
     Stream<WorkPart> streamReviews(@Param("workspaceId") long workspaceId, @Param("repositoryId") long repositoryId);
 
     @Query(
-            value = WORK_PART + " FROM pull_request_review_thread c JOIN issue i ON i.id = c.pull_request_id"
-                    + WORK_OF_REPOSITORY + " AND i.issue_type = 'PULL_REQUEST' ORDER BY i.number, c.id",
+            value = WORK_PART
+                    + " FROM pull_request_review_thread c JOIN issue i ON i.id = c.pull_request_id"
+                    + WORK_OF_REPOSITORY
+                    + " AND i.issue_type = 'PULL_REQUEST' ORDER BY i.number, c.id",
             nativeQuery = true)
     @QueryHints(@QueryHint(name = HibernateHints.HINT_FETCH_SIZE, value = "256"))
     Stream<WorkPart> streamReviewThreads(
             @Param("workspaceId") long workspaceId, @Param("repositoryId") long repositoryId);
 
     @Query(value = """
-            SELECT jsonb_build_object('id', i.id, 'number', i.number, 'title', i.title, 'state', i.state,
-              'author_id', i.author_id, 'url', i.html_url, 'synced_at', i.last_sync_at, 'repository', r.name_with_owner,
-              'repository_id', r.id, 'provider_id', r.provider_id)::text
-            FROM issue i JOIN repository r ON r.id = i.repository_id
-            WHERE i.repository_id = :repositoryId AND i.issue_type = :issueType AND i.deleted_at IS NULL
-              AND EXISTS (SELECT 1 FROM repository_to_monitor rtm
-                          WHERE rtm.workspace_id = :workspaceId AND rtm.name_with_owner = r.name_with_owner
-                            AND\s""" + MonitoredRepositoryScope.NATIVE_RTM_R + """
-            )
-            ORDER BY i.number
-            """, nativeQuery = true)
+        SELECT jsonb_build_object('id', i.id, 'number', i.number, 'title', i.title, 'state', i.state,
+          'author_id', i.author_id, 'url', i.html_url, 'synced_at', i.last_sync_at, 'repository', r.name_with_owner,
+          'repository_id', r.id, 'provider_id', r.provider_id)::text
+        FROM issue i JOIN repository r ON r.id = i.repository_id
+        WHERE i.repository_id = :repositoryId AND i.issue_type = :issueType AND i.deleted_at IS NULL
+          AND EXISTS (SELECT 1 FROM repository_to_monitor rtm
+                      WHERE rtm.workspace_id = :workspaceId AND rtm.name_with_owner = r.name_with_owner
+                        AND
+        """ + MonitoredRepositoryScope.NATIVE_RTM_R + """
+        )
+        ORDER BY i.number
+        """, nativeQuery = true)
     @QueryHints(@QueryHint(name = HibernateHints.HINT_FETCH_SIZE, value = "256"))
     Stream<String> streamInventory(
             @Param("workspaceId") long workspaceId,

@@ -152,7 +152,7 @@ function RootLayout() {
 							<UserViewBanner
 								name={userView.name}
 								workspace={userView.workspaceName}
-								hasAccount={userView.hasAccount}
+								unclaimed={userView.unclaimed}
 								onExit={exitUserView}
 							/>
 						)}

@@ -1,0 +1,98 @@
+package de.tum.cit.aet.hephaestus.core.auth;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountDirectory;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
+import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
+import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import org.junit.jupiter.api.Test;
+
+class AccountReferenceServiceTest extends BaseUnitTest {
+    private final AccountIdentityQuery identities = mock(AccountIdentityQuery.class);
+    private final AccountDirectory accounts = mock(AccountDirectory.class);
+    private final GitProviderRegistry providers = mock(GitProviderRegistry.class);
+    private final AccountReferenceService references = new AccountReferenceService(identities, accounts, providers);
+
+    @Test
+    void shouldExposeOnlyIdentityProfilesVisibleInTheRequestedWorkspace() {
+        when(accounts.find(42L))
+                .thenReturn(Optional.of(
+                        new AccountDirectory.AccountView(42L, Account.Status.ACTIVE, "Developer", null, null, true)));
+        when(identities.activeLinksForAccount(42L))
+                .thenReturn(List.of(
+                        new AccountIdentityQuery.IdentityView(1L, 10L, "github-native-key", ""),
+                        new AccountIdentityQuery.IdentityView(2L, 20L, "foreign-native-key", "foreign-team")));
+        when(providers.visibleInWorkspace(10L, 7L)).thenReturn(true);
+        when(providers.providerTypeName(10L)).thenReturn("GITHUB");
+        var key = new GitProviderRegistry.IdentityKey(10L, "github-native-key", "");
+        when(providers.profiles(Set.of(key)))
+                .thenReturn(Map.of(
+                        key,
+                        new GitProviderRegistry.IdentityProfile(
+                                "developer", "Current mirror name", "avatar", "profile")));
+
+        var reference = references.reference(7L, 42L);
+
+        assertThat(reference.id()).isEqualTo("42");
+        assertThat(reference.displayName()).isEqualTo("Developer");
+        assertThat(reference.avatarUrl()).isEqualTo("avatar");
+        assertThat(reference.identities()).singleElement().satisfies(identity -> {
+            assertThat(identity.provider()).isEqualTo("GITHUB");
+            assertThat(identity.login()).isEqualTo("developer");
+            assertThat(identity.displayName()).isEqualTo("Current mirror name");
+        });
+    }
+
+    @Test
+    void shouldKeepUnclaimedAccountIdentityWhenItsVisibleMirrorHasNoProfile() {
+        long accountId = 9_007_199_254_740_993L;
+        when(accounts.find(accountId))
+                .thenReturn(Optional.of(new AccountDirectory.AccountView(
+                        accountId, Account.Status.UNCLAIMED, "Roster developer", null, null, true)));
+        when(identities.activeLinksForAccount(accountId))
+                .thenReturn(List.of(new AccountIdentityQuery.IdentityView(1L, 10L, "unavailable-profile", "")));
+        when(providers.visibleInWorkspace(10L, 7L)).thenReturn(true);
+        when(providers.providerTypeName(10L)).thenReturn("GITLAB");
+
+        var reference = references.reference(7L, accountId);
+
+        assertThat(reference.id()).isEqualTo("9007199254740993");
+        assertThat(reference.status()).isEqualTo(Account.Status.UNCLAIMED);
+        assertThat(reference.avatarUrl()).isNull();
+        assertThat(reference.identities()).singleElement().satisfies(identity -> {
+            assertThat(identity.provider()).isEqualTo("GITLAB");
+            assertThat(identity.login()).isNull();
+            assertThat(identity.displayName()).isNull();
+            assertThat(identity.avatarUrl()).isNull();
+        });
+    }
+
+    @Test
+    void shouldResolveOnlyRequestedAccountsInOneBatch() {
+        var first = new AccountDirectory.AccountView(41L, Account.Status.ACTIVE, "First", null, null, true);
+        var second = new AccountDirectory.AccountView(42L, Account.Status.UNCLAIMED, "Second", null, null, true);
+        when(accounts.findAll(List.of(41L, 42L))).thenReturn(Map.of(41L, first, 42L, second));
+        when(identities.activeLinksForAccounts(List.of(41L, 42L))).thenReturn(Map.of());
+        var page = references.references(7L, List.of(41L, 42L));
+        assertThat(page.keySet()).containsExactlyInAnyOrder(41L, 42L);
+        assertThat(Objects.requireNonNull(page.get(41L)).displayName()).isEqualTo("First");
+        assertThat(Objects.requireNonNull(page.get(42L)).status()).isEqualTo(Account.Status.UNCLAIMED);
+    }
+
+    @Test
+    void shouldReportAccountNotFoundWhenTheAccountDoesNotExist() {
+        when(accounts.find(404L)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> references.reference(7L, 404L)).isInstanceOf(EntityNotFoundException.class);
+    }
+}

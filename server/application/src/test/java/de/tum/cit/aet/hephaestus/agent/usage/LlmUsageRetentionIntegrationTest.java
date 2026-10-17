@@ -70,10 +70,10 @@ class LlmUsageRetentionIntegrationTest extends AbstractWorkspaceIntegrationTest 
     private LlmUsageEvent event(Workspace workspace, Instant occurredAt) {
         LlmUsageEvent event = new LlmUsageEvent();
         event.setId(UUID.randomUUID());
-        event.setWorkspace(workspace);
-        event.setJobType(LlmUsageJobType.PULL_REQUEST_REVIEW);
+        event.setWorkspaceId(workspace.getId());
+        event.setJobType("PRACTICE_REVIEW");
         event.setSourceId(UUID.randomUUID());
-        event.setSourceType(LlmUsageSourceType.AGENT_JOB);
+        event.setSourceType(UsageSourceType.REVIEW_JOB);
         event.setOccurredAt(occurredAt);
         return event;
     }

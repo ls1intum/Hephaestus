@@ -29,11 +29,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Integration tests for GitHubPullRequestReviewMessageHandler.
- * <p>
- * Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
- */
 class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
@@ -109,7 +104,7 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
         workspace.setDisplayName("Hephaestus Test");
         workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         workspace.setPublicActivityEnabled(true);
-        workspace.setOrganization(org);
+        workspace.setOrganizationId(org.getId());
         workspace.setAccountLogin("HephaestusTest");
         workspace.setAccountType(AccountType.ORG);
         workspaceRepository.save(workspace);
@@ -216,7 +211,6 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
                 required(dismissEvent.pullRequest().getDatabaseId()),
                 dismissEvent.pullRequest().number());
 
-        // Create the review first (simulate submitted state) with the native ID that will be dismissed
         PullRequest pr = testPullRequest;
         PullRequestReview existingReview = new PullRequestReview();
         existingReview.setNativeId(required(dismissEvent.review().id()));

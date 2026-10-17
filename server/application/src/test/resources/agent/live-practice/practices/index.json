@@ -1,7 +1,7 @@
 [
-  {
-    "slug": "avoids-insecure-defaults-and-over-broad-permissions",
-    "name": "Hardcoded Secrets",
-    "category": "security"
-  }
+	{
+		"slug": "avoids-insecure-defaults-and-over-broad-permissions",
+		"name": "Hardcoded Secrets",
+		"category": "security"
+	}
 ]

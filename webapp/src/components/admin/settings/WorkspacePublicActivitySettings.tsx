@@ -22,7 +22,7 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@/co
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
-import { ARTIFACT_KIND, artifactKindNoun } from "@/lib/artifact-kinds";
+import { ITEM_KIND, itemKindNoun } from "@/lib/item-kinds";
 import { getProviderTerms, type ProviderType } from "@/lib/provider/provider-terms";
 import type { RefreshFailure } from "@/runtime/tanstack-query/infinite-list";
 
@@ -326,7 +326,7 @@ function PublishDialog({
 	onConfirm: () => void;
 }) {
 	const popupRef = useRef<HTMLDivElement>(null);
-	const pullRequests = artifactKindNoun(ARTIFACT_KIND.pullRequest, 2, providerType);
+	const pullRequests = itemKindNoun(ITEM_KIND.pullRequest, 2, providerType);
 	const repositories = getProviderTerms(providerType).repositories.toLowerCase();
 	return (
 		<AlertDialog open={open} onOpenChange={onOpenChange}>

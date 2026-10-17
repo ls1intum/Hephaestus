@@ -17,6 +17,7 @@ function EditorProof() {
 	const [diagnostics, setDiagnostics] = useState<number>();
 	const [models, setModels] = useState<number>();
 	const [otherPresent, setOtherPresent] = useState(false);
+	const [markers, setMarkers] = useState<number>();
 	async function checkWorker() {
 		await loader.init();
 		const model = monaco.editor
@@ -69,7 +70,7 @@ function EditorProof() {
 					value={script}
 					onChange={setScript}
 					readOnly={readOnly}
-					ariaLabel="Static analysis script"
+					ariaLabel="Practice script"
 					className="h-100 w-175"
 				/>
 			)}
@@ -86,6 +87,35 @@ function EditorProof() {
 				Check TypeScript worker
 			</button>
 			<output aria-label="TypeScript diagnostics">{diagnostics}</output>
+			<button
+				type="button"
+				onClick={() =>
+					setScript(
+						'import { definePracticeScript } from "../lib/practice-script.ts";\nexport default definePracticeScript;',
+					)
+				}
+			>
+				Use an unresolved import
+			</button>
+			<button type="button" onClick={() => setScript("export const = ;")}>
+				Use a syntax error
+			</button>
+			<button
+				type="button"
+				onClick={() => {
+					const model = monaco.editor
+						.getModels()
+						.find(({ uri }) => uri.authority === "hephaestus-editor");
+					setMarkers(
+						model === undefined
+							? undefined
+							: monaco.editor.getModelMarkers({ resource: model.uri }).length,
+					);
+				}}
+			>
+				Count markers
+			</button>
+			<output aria-label="Editor markers">{markers}</output>
 			<button
 				type="button"
 				onClick={() => {

@@ -10,7 +10,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.slack.api.model.block.LayoutBlock;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackWorkspaceResolver;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
@@ -100,10 +100,7 @@ class SlackOnboardingServiceTest extends BaseUnitTest {
         assertThat(blocks.toString()).contains("/auth/login?provider=slack&mode=link");
     }
 
-    private static User developer() {
-        var user = new User();
-        user.setId(314L);
-        user.setLogin("octocat");
-        return user;
+    private static AccountSummaryQuery.AccountSummary developer() {
+        return new AccountSummaryQuery.AccountSummary(314L, "octocat", null);
     }
 }

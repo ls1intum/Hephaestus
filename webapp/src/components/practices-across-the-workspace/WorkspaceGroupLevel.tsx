@@ -1,4 +1,3 @@
-import type { WorkspaceGroupSplit } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
 import { LevelHeader } from "@/components/layout/detail-drawer/LevelHeader";
@@ -7,16 +6,16 @@ import { GroupPill } from "@/components/practice-vocabulary/GroupPill";
 import { PracticePill } from "@/components/practice-vocabulary/PracticePill";
 import { DrawerBody } from "@/components/ui/drawer";
 
-import { GROUPS_LOAD_ERROR, OPEN_IN_YOUR_PROFILE } from "./across-workspace-copy";
+import { developersText, GROUPS_LOAD_ERROR, OPEN_IN_YOUR_PROFILE } from "./across-workspace-copy";
+import type { WorkspaceGroup } from "./workspace-groups";
 import { type ComparisonRow, WorkspaceComparisonTable } from "./WorkspaceComparisonTable";
-import { LevelSplit, SplitLegend } from "./WorkspaceSplitBar";
 
 /** `missing` when the page lists no group by the slug in the address. */
 export type WorkspaceGroupLevelState =
 	| { status: "loading" }
 	| { status: "error"; error: unknown; onRetry: () => void }
 	| { status: "missing" }
-	| { status: "ready"; group: WorkspaceGroupSplit };
+	| { status: "ready"; group: WorkspaceGroup };
 
 export interface WorkspaceGroupLevelProps {
 	nested?: boolean;
@@ -27,11 +26,6 @@ export interface WorkspaceGroupLevelProps {
 	focusPracticeSlug?: string;
 }
 
-/**
- * One practice group over Practices across the workspace: the group's split beside the title, then
- * each practice's split. The reader shows only as the You marker. Their own standing, trend and
- * next step stay in their Practice profile, which every row link and the level's footer open.
- */
 export function WorkspaceGroupLevel({
 	nested,
 	path,
@@ -46,33 +40,18 @@ export function WorkspaceGroupLevel({
 				nested={nested}
 				path={path}
 				current="Group"
-				title={group?.groupName ?? "Practice group"}
+				title={group?.name ?? "Practice group"}
 				loading={state.status === "loading"}
 				mark={
 					group && (
 						<GroupPill
 							size="lg"
-							slug={group.groupSlug}
-							name={group.groupName}
-							icon={group.groupIcon}
-							color={group.groupColor}
+							slug={group.slug}
+							name={group.name}
+							icon={group.icon ?? undefined}
+							color={group.color ?? undefined}
 						/>
 					)
-				}
-				aside={
-					state.status === "loading" || state.status === "ready" ? (
-						<LevelSplit
-							state={
-								state.status === "ready"
-									? {
-											status: "ready",
-											split: state.group.split,
-											yourStanding: state.group.yourStanding,
-										}
-									: state
-							}
-						/>
-					) : undefined
 				}
 			/>
 			<DrawerBody
@@ -109,26 +88,24 @@ function GroupPractices({
 		key: practice.practiceSlug,
 		name: practice.practiceName,
 		subject: <PracticePill name={practice.practiceName} />,
-		yourStanding: practice.yourStanding,
-		split: practice.split,
+		count: developersText(practice.developers),
+		outcomes: practice.outcomes,
 	}));
 	return (
-		<>
-			<SplitLegend scope="practice" />
-			<WorkspaceComparisonTable
-				aria-label={group === undefined ? "Practices" : `Practices of ${group.groupName}`}
-				subjectHead="Practices"
-				state={state.status === "ready" ? { status: "ready", rows } : { status: "loading" }}
-				empty={{
-					title: "No practices yet",
-					description: "Once your workspace reviews a practice in this group, it appears here.",
-				}}
-				rowLink={(row) => ({
-					text: OPEN_IN_YOUR_PROFILE,
-					onOpen: () => onGoToPractice(row.key),
-				})}
-				markedKey={focusPracticeSlug}
-			/>
-		</>
+		<WorkspaceComparisonTable
+			aria-label={group === undefined ? "Practices" : `Practices of ${group.name}`}
+			subjectHead="Practice"
+			countHead="Developers with results"
+			state={state.status === "ready" ? { status: "ready", rows } : { status: "loading" }}
+			empty={{
+				title: "No practices yet",
+				description: "Once your workspace reviews a practice in this group, it appears here.",
+			}}
+			rowLink={(row) => ({
+				text: OPEN_IN_YOUR_PROFILE,
+				onOpen: () => onGoToPractice(row.key),
+			})}
+			markedKey={focusPracticeSlug}
+		/>
 	);
 }

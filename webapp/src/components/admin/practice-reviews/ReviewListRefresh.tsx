@@ -10,6 +10,6 @@ export function ReviewListRefresh({
 	noun: string;
 }) {
 	return failure === undefined ? null : (
-		<QueryErrorAlert title={`These ${noun} may be out of date`} {...failure} />
+		<QueryErrorAlert title={`We could not refresh ${noun}`} {...failure} />
 	);
 }

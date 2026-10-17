@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
@@ -16,16 +17,16 @@ import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
-import de.tum.cit.aet.hephaestus.agent.job.DeliveryStatus;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
+import de.tum.cit.aet.hephaestus.agent.job.RuntimeJobTestData;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageEvent;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageEventRepository;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageJobType;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
-import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageSourceType;
+import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
+import de.tum.cit.aet.hephaestus.practices.spi.ProcessingStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
@@ -38,10 +39,13 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Pageable;
+import org.springframework.jdbc.core.JdbcTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 class AgentWorkspacePurgeIntegrationTest extends BaseIntegrationTest {
+
+    @Autowired
+    private JdbcTemplate jdbc;
 
     @Autowired
     private WorkspaceLifecycleService lifecycleService;
@@ -68,7 +72,7 @@ class AgentWorkspacePurgeIntegrationTest extends BaseIntegrationTest {
     private WorkspaceAgentBindingRepository bindingRepository;
 
     @Autowired
-    private AgentJobRepository jobRepository;
+    private ReviewJobRepository jobRepository;
 
     @Autowired
     private LlmUsageEventRepository usageRepository;
@@ -95,7 +99,7 @@ class AgentWorkspacePurgeIntegrationTest extends BaseIntegrationTest {
 
         lifecycleService.purgeWorkspace(purgedWorkspace.getWorkspaceSlug());
 
-        assertThat(jobRepository.findListRows(purgedWorkspace.getId(), null, Pageable.unpaged()))
+        assertThat(jobRepository.findByIdAndWorkspaceId(purgedData.jobId(), purgedWorkspace.getId()))
                 .isEmpty();
         assertThat(bindingRepository.findByWorkspaceId(purgedWorkspace.getId())).isEmpty();
         assertThat(modelRepository.findByWorkspaceId(purgedWorkspace.getId())).isEmpty();
@@ -120,20 +124,20 @@ class AgentWorkspacePurgeIntegrationTest extends BaseIntegrationTest {
     @Test
     void shouldExplainHowToResolvePendingFeedbackDeliveryBeforePurge() {
         Workspace workspace = workspaceRepository.save(TestEntities.activeWorkspace("pending-delivery"));
-        AgentJob job = new AgentJob();
-        job.setWorkspace(workspace);
-        job.setPurpose(AgentPurpose.PRACTICE_REVIEW);
-        job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-        job.setStatus(AgentJobStatus.COMPLETED);
-        job.setDeliveryStatus(DeliveryStatus.PENDING);
+        ReviewJob job = new ReviewJob();
+        RuntimeJobTestData.initialize(job, workspace.getId());
+
+        job.setStatus(ReviewJobStatus.COMPLETED);
+        job.setProcessingStatus(ProcessingStatus.PENDING);
         job.setConfigSnapshot(objectMapper.createObjectNode());
-        jobRepository.save(job);
+        jobRepository.save(RuntimeJobTestData.persistParent(jdbc, job));
 
         assertThatThrownBy(() -> lifecycleService.purgeWorkspace(workspace.getWorkspaceSlug()))
                 .isInstanceOf(WorkspacePurgeBlockedException.class)
                 .hasMessage(
-                        "You cannot delete this workspace while AI runs are queued, running, or waiting for feedback delivery. "
-                                + "Cancel queued and running runs, wait for pending feedback delivery to finish, then try again.");
+                        "You cannot delete this workspace while AI runs are queued, running, or waiting for feedback"
+                                + " delivery. Cancel queued and running runs, wait for pending feedback delivery to"
+                                + " finish, then try again.");
     }
 
     private AgentData seedAgentData(Workspace workspace, String suffix) {
@@ -142,7 +146,7 @@ class AgentWorkspacePurgeIntegrationTest extends BaseIntegrationTest {
         connection.setSlug("connection-" + suffix);
         connection.setDisplayName("Connection " + suffix);
         connection.setBaseUrl(LlmCatalogTestFixtures.BASE_URL);
-        connection.setApiProtocol(LlmCatalogTestFixtures.OPENAI_COMPLETIONS);
+        connection.setApiProtocol(LlmApiProtocol.OPENAI_COMPLETIONS);
         connection.setApiKey("secret-" + suffix);
         connection.setEnabled(true);
         connection = connectionRepository.save(connection);
@@ -166,26 +170,25 @@ class AgentWorkspacePurgeIntegrationTest extends BaseIntegrationTest {
         grant.setGrantedAt(Instant.now());
         grantRepository.save(grant);
 
-        AgentJob job = new AgentJob();
-        job.setWorkspace(workspace);
-        job.setPurpose(AgentPurpose.PRACTICE_REVIEW);
-        job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-        job.setStatus(AgentJobStatus.COMPLETED);
-        job.setDeliveryStatus(DeliveryStatus.DELIVERED);
-        job.setMetadata(objectMapper.createObjectNode().put("private", "content-" + suffix));
+        ReviewJob job = new ReviewJob();
+        RuntimeJobTestData.initialize(job, workspace.getId());
+
+        job.setStatus(ReviewJobStatus.COMPLETED);
+        job.setProcessingStatus(ProcessingStatus.DONE);
+        job.setCapture(objectMapper.createObjectNode().put("private", "content-" + suffix));
         job.setConfigSnapshot(objectMapper.createObjectNode().put("baseUrl", connection.getBaseUrl()));
-        job.setContainerLogs("private logs " + suffix);
-        job = jobRepository.save(job);
+
+        job = jobRepository.save(RuntimeJobTestData.persistParent(jdbc, job));
 
         LlmUsageEvent usage = new LlmUsageEvent();
         usage.setId(UUID.randomUUID());
-        usage.setWorkspace(workspace);
-        usage.setJobType(LlmUsageJobType.PULL_REQUEST_REVIEW);
-        usage.setSourceType(LlmUsageSourceType.AGENT_JOB);
+        usage.setWorkspaceId(workspace.getId());
+        usage.setJobType("PULL_REQUEST_REVIEW");
+        usage.setSourceType(UsageSourceType.REVIEW_JOB);
         usage.setSourceId(job.getId());
         usage.setOccurredAt(Instant.now());
-        usage.setPricingState(PricingState.UNPRICED);
-        usage.setFundingSource(FundingSource.WORKSPACE);
+        usage.setPricingState(UsagePricingState.UNPRICED);
+        usage.setFundingSource(UsageFundingSource.WORKSPACE);
         usageRepository.save(usage);
 
         return new AgentData(job.getId(), usage.getId());

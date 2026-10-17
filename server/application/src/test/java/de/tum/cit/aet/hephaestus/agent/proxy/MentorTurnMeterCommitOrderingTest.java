@@ -8,7 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -76,7 +76,7 @@ class MentorTurnMeterCommitOrderingTest extends BaseUnitTest {
     }
 
     private static ProxyRouting.BilledAttempt attempt(UUID turnId) {
-        return new ProxyRouting.BilledAttempt(LlmUsageSourceType.MENTOR_TURN, turnId, 1, BigDecimal.ZERO, null);
+        return new ProxyRouting.BilledAttempt(UsageSourceType.MENTOR_TURN, turnId, 1, BigDecimal.ZERO, null);
     }
 
     private static ProxyTokenUsage tokenUsage() {

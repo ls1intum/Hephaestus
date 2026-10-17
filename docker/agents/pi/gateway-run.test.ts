@@ -34,7 +34,7 @@ const PERSONAL = [
 ];
 
 /** One native session file as Pi 1.0 writes it: header, binding, opening, tool call and result, compaction. */
-function nativeSession(): string {
+function nativeSession(versionBinding?: Record<string, unknown>): string {
 	const at = "2026-10-09T12:00:00.000Z";
 	return `${[
 		{ type: "session", version: 3, id: "s1", timestamp: at, cwd: "/workspace" },
@@ -47,8 +47,11 @@ function nativeSession(): string {
 			data: {
 				phase: "practice",
 				practiceSlug: "jane-roe-practice",
-				practiceRevisionId: 12,
+				...(versionBinding ?? { practiceVersionId: "9007199254740993" }),
 				model: "Jane Roe",
+				jobId: "11111111-1111-4111-8111-111111111111",
+				workspaceId: "7",
+				openedAt: at,
 			},
 		},
 		{
@@ -78,6 +81,9 @@ function nativeSession(): string {
 						arguments: { path: "/workspace/inputs/people/7/person.json", token: CREDENTIAL },
 					},
 					{ type: "toolCall", id: "c2", name: "jane_roe_tool", arguments: {} },
+					{ type: "toolCall", id: "c3", name: "upsert_problem", arguments: { key: "jane-roe" } },
+					{ type: "toolCall", id: "c4", name: "remove_problem", arguments: { key: "jane-roe" } },
+					{ type: "toolCall", id: "c5", name: "read_problem", arguments: { key: "jane-roe" } },
 				],
 				api: "openai-responses",
 				provider: "hephaestus",
@@ -126,7 +132,7 @@ async function collected(context: TestContext) {
 	return { sessions, out };
 }
 
-void test("copies whole native sessions without the attempt credential and summarizes them as enums and numbers", async (context) => {
+void test("copies whole native sessions without the attempt credential and summarizes them without session prose", async (context) => {
 	const { sessions, out } = await collected(context);
 	const native = nativeSession();
 	await writeFile(
@@ -155,12 +161,12 @@ void test("copies whole native sessions without the attempt credential and summa
 			omitted: null,
 			summary: {
 				phase: "practice",
-				practiceRevisionId: 12,
+				practiceVersionId: "9007199254740993",
 				entries: 6,
 				assistantCalls: 1,
 				stopReasons: { toolUse: 1 },
 				usage: { input: 100, output: 20, cacheRead: 5, cacheWrite: 1 },
-				toolCalls: { read: 1, other: 1 },
+				toolCalls: { read: 1, other: 1, upsert_problem: 1, remove_problem: 1, read_problem: 1 },
 				toolErrors: 1,
 				compactions: 1,
 				modelFailures: {},
@@ -183,6 +189,43 @@ void test("copies whole native sessions without the attempt credential and summa
 		assert.ok(!text.includes(words), `the manifest carries ${words}`);
 	}
 	assert.equal(await readFile(path.join(out, "result.json"), "utf8"), "{}");
+});
+
+void test("retains only current canonical SQL-long version strings from native session bindings", async (context) => {
+	for (const { binding, expected } of [
+		{ binding: { practiceVersionId: "1" }, expected: "1" },
+		{ binding: { practiceVersionId: "9007199254740993" }, expected: "9007199254740993" },
+		{ binding: { practiceVersionId: "9223372036854775807" }, expected: "9223372036854775807" },
+		{ binding: {}, expected: null },
+		{ binding: { practiceRevisionId: 12 }, expected: null },
+		{ binding: { practiceVersionId: null }, expected: null },
+		{ binding: { practiceVersionId: 12 }, expected: null },
+		...[
+			"0",
+			"01",
+			"-1",
+			"+1",
+			"1.5",
+			"1e3",
+			" 12",
+			"12\n",
+			"9223372036854775808",
+			"100000000000000000000",
+			"Jane Roe",
+		].map((practiceVersionId) => ({ binding: { practiceVersionId }, expected: null })),
+	]) {
+		const { sessions, out } = await collected(context);
+		await writeFile(path.join(sessions, "session.jsonl"), nativeSession(binding));
+		await collectTraces(sessions, out, CREDENTIAL);
+		const text = await readFile(path.join(out, "traces", "manifest.json"), "utf8");
+		const { summary } = omission(traceManifest(text).sessions[0]);
+		assert.ok(typeof summary === "object" && summary !== null && "practiceVersionId" in summary);
+		assert.equal(summary.practiceVersionId, expected);
+		assert.ok(!("practiceRevisionId" in summary));
+		for (const words of [...PERSONAL, CREDENTIAL]) {
+			assert.ok(!text.includes(words), `the manifest carries ${words}`);
+		}
+	}
 });
 
 /** A native assistant message that failed, as the adapter wrote it, with text that must never be kept. */

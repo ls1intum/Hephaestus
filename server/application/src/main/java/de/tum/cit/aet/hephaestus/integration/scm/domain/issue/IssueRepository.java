@@ -6,7 +6,6 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -24,28 +23,11 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     @Query(value = "SELECT id FROM issue WHERE id = :id FOR SHARE", nativeQuery = true)
     Optional<Long> lockForReview(@Param("id") long id);
 
-    /**
-     * Serializes changes to one issue's review snapshot. {@code FOR NO KEY UPDATE} rather than {@code FOR UPDATE}: a
-     * new comment's foreign key takes {@code FOR KEY SHARE} on the issue, which this lock does not conflict with,
-     * while the review admission's {@link #lockForReview} {@code FOR SHARE} still waits for it.
-     */
-    @Query(value = "SELECT id FROM issue WHERE id = :id AND issue_type = 'ISSUE' FOR NO KEY UPDATE", nativeQuery = true)
-    Optional<Long> lockForSnapshotAdvance(@Param("id") long id);
-
     @Query(
             "SELECT i FROM Issue i WHERE i.repository.id = :repositoryId AND i.deletedAt IS NULL AND i.id > :after ORDER BY i.id")
     List<Issue> findLiveNoteParents(
             @Param("repositoryId") long repositoryId, @Param("after") long after, Pageable pageable);
 
-    @Transactional
-    @Modifying
-    @Query(value = """
-        UPDATE issue SET review_snapshot_id = :snapshotId, review_snapshot_digest = :digest
-        WHERE id = :issueId AND issue_type = 'ISSUE'
-          AND review_snapshot_digest IS DISTINCT FROM :digest
-        """, nativeQuery = true)
-    int advanceReviewSnapshot(
-            @Param("issueId") long issueId, @Param("snapshotId") UUID snapshotId, @Param("digest") String digest);
     /**
      * Finds an issue (not a pull request) by repository ID and number.
      * Uses {@code TYPE(i) = Issue} to exclude PullRequest subclass rows, which is
@@ -77,8 +59,8 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
      * {@code [total, completed]} row: the rollup a provider that syncs only the parent link never supplies.
      * {@code TYPE(i) = Issue} keeps a pull request out of the count even if one ever carried a parent.
      */
-    @Query("SELECT COUNT(i) AS total, COALESCE(SUM(CASE WHEN i.state = :closed THEN 1 ELSE 0 END), 0) AS completed "
-            + "FROM Issue i WHERE TYPE(i) = Issue AND i.parentIssue.id = :parentIssueId AND i.deletedAt IS NULL")
+    @Query(
+            "SELECT COUNT(i) AS total, COALESCE(SUM(CASE WHEN i.state = :closed THEN 1 ELSE 0 END), 0) AS completed FROM Issue i WHERE TYPE(i) = Issue AND i.parentIssue.id = :parentIssueId AND i.deletedAt IS NULL")
     ChildRollup countChildrenByParentIssueId(
             @Param("parentIssueId") long parentIssueId, @Param("closed") Issue.State closed);
 
@@ -91,8 +73,8 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     @Query("SELECT i FROM Issue i LEFT JOIN FETCH i.repository WHERE TYPE(i) = Issue AND i.id = :id")
     Optional<Issue> findByIdWithRepository(@Param("id") long id);
 
-    @Query("SELECT i FROM Issue i LEFT JOIN FETCH i.author LEFT JOIN FETCH i.repository "
-            + "WHERE TYPE(i) = Issue AND i.id = :id")
+    @Query(
+            "SELECT i FROM Issue i LEFT JOIN FETCH i.author LEFT JOIN FETCH i.repository WHERE TYPE(i) = Issue AND i.id = :id")
     Optional<Issue> findByIdWithAuthorAndRepository(@Param("id") long id);
 
     /**
@@ -106,8 +88,8 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
      * without the fetch that question is answered by a {@code LazyInitializationException} — or, worse
      * under a future session, by a null that refuses an issue's own author a review of their own work.
      */
-    @Query("SELECT i FROM Issue i LEFT JOIN FETCH i.repository LEFT JOIN FETCH i.author LEFT JOIN FETCH i.assignees "
-            + "WHERE TYPE(i) = Issue AND i.id = :id")
+    @Query(
+            "SELECT i FROM Issue i LEFT JOIN FETCH i.repository LEFT JOIN FETCH i.author LEFT JOIN FETCH i.assignees WHERE TYPE(i) = Issue AND i.id = :id")
     Optional<Issue> findByIdWithRepositoryAndAssignees(@Param("id") long id);
 
     /**
@@ -146,16 +128,14 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
      * @param repositoryIds the repository IDs to count for
      * @return one projection row per repository that has at least one live issue
      */
-    @Query("SELECT i.repository.id AS repositoryId, COUNT(i) AS itemCount FROM Issue i "
-            + "WHERE TYPE(i) = Issue AND i.deletedAt IS NULL AND i.repository.id IN :repositoryIds "
-            + "GROUP BY i.repository.id")
+    @Query(
+            "SELECT i.repository.id AS repositoryId, COUNT(i) AS itemCount FROM Issue i WHERE TYPE(i) = Issue AND i.deletedAt IS NULL AND i.repository.id IN :repositoryIds GROUP BY i.repository.id")
     List<RepositoryItemCountProjection> countIssuesGroupedByRepositoryIds(
             @Param("repositoryIds") Collection<Long> repositoryIds);
 
     /** Per-repository count of live pull/merge requests. Counterpart to {@link #countIssuesGroupedByRepositoryIds}. */
-    @Query("SELECT i.repository.id AS repositoryId, COUNT(i) AS itemCount FROM Issue i "
-            + "WHERE TYPE(i) = PullRequest AND i.deletedAt IS NULL AND i.repository.id IN :repositoryIds "
-            + "GROUP BY i.repository.id")
+    @Query(
+            "SELECT i.repository.id AS repositoryId, COUNT(i) AS itemCount FROM Issue i WHERE TYPE(i) = PullRequest AND i.deletedAt IS NULL AND i.repository.id IN :repositoryIds GROUP BY i.repository.id")
     List<RepositoryItemCountProjection> countPullRequestsGroupedByRepositoryIds(
             @Param("repositoryIds") Collection<Long> repositoryIds);
 
@@ -194,8 +174,8 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional
-    @Query("UPDATE Issue i SET i.deletedAt = :deletedAt WHERE TYPE(i) = Issue AND i.repository.id = :repositoryId "
-            + "AND i.number IN :numbers AND i.deletedAt IS NULL")
+    @Query(
+            "UPDATE Issue i SET i.deletedAt = :deletedAt WHERE TYPE(i) = Issue AND i.repository.id = :repositoryId AND i.number IN :numbers AND i.deletedAt IS NULL")
     int tombstoneIssuesByRepositoryIdAndNumbers(
             @Param("repositoryId") Long repositoryId,
             @Param("numbers") Collection<Integer> numbers,
@@ -211,27 +191,15 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional
     @Query(
-            "UPDATE Issue i SET i.deletedAt = :deletedAt WHERE TYPE(i) = PullRequest AND i.repository.id = :repositoryId "
-                    + "AND i.number IN :numbers AND i.deletedAt IS NULL")
+            "UPDATE Issue i SET i.deletedAt = :deletedAt WHERE TYPE(i) = PullRequest AND i.repository.id = :repositoryId AND i.number IN :numbers AND i.deletedAt IS NULL")
     int tombstonePullRequestsByRepositoryIdAndNumbers(
             @Param("repositoryId") Long repositoryId,
             @Param("numbers") Collection<Integer> numbers,
             @Param("deletedAt") Instant deletedAt);
 
-    /**
-     * Repository-wide issue inventory (pure issues, PullRequest subclass rows excluded) ordered
-     * newest-first by number, for the cross-artifact project-context telescope. The author is fetched
-     * up front to avoid a per-row lazy load; labels/comments/bodies are intentionally NOT fetched — the
-     * inventory is a compact "what else exists in this project" index, not a full body. Tombstones are
-     * excluded: something deleted upstream is no longer in the project.
-     *
-     * @param repositoryId the repository ID
-     * @param pageable the cap (newest N) — caller supplies {@code PageRequest.of(0, cap)}
-     * @return newest-first issues for the repository
-     */
-    @Query("SELECT i FROM Issue i LEFT JOIN FETCH i.author LEFT JOIN FETCH i.milestone "
-            + "WHERE TYPE(i) = Issue AND i.repository.id = :repositoryId AND i.deletedAt IS NULL "
-            + "ORDER BY i.number DESC")
+    /** Returns bounded issue metadata, excluding pull requests and tombstones; the author is fetched to avoid per-row loads. */
+    @Query(
+            "SELECT i FROM Issue i LEFT JOIN FETCH i.author LEFT JOIN FETCH i.milestone WHERE TYPE(i) = Issue AND i.repository.id = :repositoryId AND i.deletedAt IS NULL ORDER BY i.number DESC")
     List<Issue> findIssueInventoryByRepositoryId(@Param("repositoryId") long repositoryId, Pageable pageable);
 
     /**
@@ -239,16 +207,16 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
      * two facts that say whether the project has a labelling convention at all, without fetching the label
      * collection of every inventory row.
      */
-    @Query("SELECT COUNT(DISTINCT i.id) FROM Issue i JOIN i.labels l "
-            + "WHERE TYPE(i) = Issue AND i.repository.id = :repositoryId AND i.deletedAt IS NULL")
+    @Query(
+            "SELECT COUNT(DISTINCT i.id) FROM Issue i JOIN i.labels l WHERE TYPE(i) = Issue AND i.repository.id = :repositoryId AND i.deletedAt IS NULL")
     long countLabelledIssuesByRepositoryId(@Param("repositoryId") long repositoryId);
 
     @Query(
             "SELECT COUNT(i) FROM Issue i WHERE TYPE(i) = Issue AND i.repository.id = :repositoryId AND i.deletedAt IS NULL")
     long countIssuesByRepositoryId(@Param("repositoryId") long repositoryId);
 
-    @Query("SELECT DISTINCT l.name FROM Issue i JOIN i.labels l "
-            + "WHERE TYPE(i) = Issue AND i.repository.id = :repositoryId AND i.deletedAt IS NULL ORDER BY l.name")
+    @Query(
+            "SELECT DISTINCT l.name FROM Issue i JOIN i.labels l WHERE TYPE(i) = Issue AND i.repository.id = :repositoryId AND i.deletedAt IS NULL ORDER BY l.name")
     List<String> findLabelNamesInUseByRepositoryId(@Param("repositoryId") long repositoryId);
 
     /**
@@ -295,13 +263,8 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional
     @Query(
-            value = "UPDATE issue SET issue_type = :newType, " + "is_draft = COALESCE(is_draft, false), "
-                    + "is_merged = COALESCE(is_merged, false), "
-                    + "commits = COALESCE(commits, 0), "
-                    + "additions = COALESCE(additions, 0), "
-                    + "deletions = COALESCE(deletions, 0), "
-                    + "changed_files = COALESCE(changed_files, 0) "
-                    + "WHERE repository_id = :repositoryId AND number = :number AND issue_type = :currentType",
+            value =
+                    "UPDATE issue SET issue_type = :newType, is_draft = COALESCE(is_draft, false), is_merged = COALESCE(is_merged, false), commits = COALESCE(commits, 0), additions = COALESCE(additions, 0), deletions = COALESCE(deletions, 0), changed_files = COALESCE(changed_files, 0) WHERE repository_id = :repositoryId AND number = :number AND issue_type = :currentType",
             nativeQuery = true)
     int correctDiscriminator(
             @Param("repositoryId") long repositoryId,

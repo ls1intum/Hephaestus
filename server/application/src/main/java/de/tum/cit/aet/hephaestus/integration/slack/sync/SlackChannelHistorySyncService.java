@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.slack.sync;
 
 import com.slack.api.model.Message;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel;
@@ -53,6 +54,7 @@ import org.springframework.stereotype.Component;
  * window is simply re-fetched next night.
  */
 @Component
+@ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 public class SlackChannelHistorySyncService {
 

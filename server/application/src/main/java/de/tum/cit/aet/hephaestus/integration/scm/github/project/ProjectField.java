@@ -110,7 +110,6 @@ public class ProjectField {
      * For ITERATION: array of {id, title, startDate, duration}.
      */
     @Column(columnDefinition = "text")
-    @Nullable
     @ToString.Exclude
     private String options;
 

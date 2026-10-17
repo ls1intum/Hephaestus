@@ -27,7 +27,7 @@ import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceScopeFilter;
-import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewRepositoryTargetRepository;
+import de.tum.cit.aet.hephaestus.workspace.settings.ReviewScopeRepositoryRepository;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -35,11 +35,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationEventPublisher;
 
-/**
- * A credential the server cannot decrypt removes its own workspace from the sync enumerations
- * that span every workspace, while a lookup of that one workspace still fails with it.
- */
 class WorkspaceSyncTargetProviderEnumerationTest extends BaseUnitTest {
 
     private static final ConnectionConfig.GitLabConfig GITLAB_CONFIG = new ConnectionConfig.GitLabConfig(
@@ -76,13 +73,13 @@ class WorkspaceSyncTargetProviderEnumerationTest extends BaseUnitTest {
                 connectionService,
                 new NatsConnectionProperties(true, "nats://localhost:4222", null, null),
                 natsConsumerService,
-                mock(PracticeReviewRepositoryTargetRepository.class));
+                mock(ReviewScopeRepositoryRepository.class),
+                mock(ApplicationEventPublisher.class));
         lenient()
                 .when(workspaceScopeFilter.isRepositoryAllowed(any(RepositoryToMonitor.class)))
                 .thenReturn(true);
     }
 
-    /** A workspace that monitors one repository; its sync target id is ten times the workspace id. */
     private static Workspace workspace(long id) {
         Workspace workspace = new Workspace();
         workspace.setId(id);

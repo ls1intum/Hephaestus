@@ -9,7 +9,11 @@ const bundledCatalog = z
 	.object({
 		criteriaPreambles: z.record(z.string(), z.string()),
 		groups: z.array(
-			z.object({ practices: z.array(z.object({ slug: z.string(), criteria: z.string() })) }),
+			z.object({
+				practices: z.array(
+					z.object({ slug: z.string(), definition: z.object({ criteria: z.string() }) }),
+				),
+			}),
 		),
 	})
 	.parse(
@@ -29,7 +33,8 @@ describe("bundled practice preview fixture", () => {
 		const preamble = bundledCatalog.criteriaPreambles["docs.document"];
 		assert(practice, "The bundled catalog has no published-decisions practice");
 		assert(preamble !== undefined, "The bundled catalog has no document preamble");
-		expect(realPracticeDefinition.criteria).toBe(`${preamble}\n\n---\n\n${practice.criteria}`);
-		expect(realPracticeDefinition.criteria).not.toContain("NO_REVIEW_OCCASION");
+		expect(realPracticeDefinition.criteria).toBe(
+			`${preamble}\n\n---\n\n${practice.definition.criteria}`,
+		);
 	});
 });

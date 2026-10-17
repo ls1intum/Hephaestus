@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.outline.manifest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Capability;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest;
-import de.tum.cit.aet.hephaestus.integration.outline.domain.signal.DocsSignals;
+import de.tum.cit.aet.hephaestus.integration.docs.item.DocumentEvents;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Value;
@@ -49,13 +49,10 @@ public class OutlineManifest implements IntegrationManifest {
     @Override
     public ReviewContribution reviewContribution() {
         return new ReviewContribution(
-                Set.of(DocsSignals.DOCUMENT),
+                Set.of(DocumentEvents.DOCUMENT),
                 Map.of(
-                        DocsSignals.DOCUMENT,
-                        Set.of(
-                                DocsSignals.DOCUMENT_PUBLISHED,
-                                DocsSignals.DOCUMENT_UPDATED,
-                                DocsSignals.DOCUMENT_ARCHIVED)),
+                        DocumentEvents.DOCUMENT,
+                        Set.of(DocumentEvents.PUBLISHED, DocumentEvents.UPDATED, DocumentEvents.ARCHIVED)),
                 Map.of());
     }
 }

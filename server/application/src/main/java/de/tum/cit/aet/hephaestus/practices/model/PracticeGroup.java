@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.model;
 
+import de.tum.cit.aet.hephaestus.practices.GroupDefinition;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -10,11 +12,8 @@ import jakarta.persistence.ForeignKey;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
@@ -23,92 +22,82 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.ColumnDefault;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.CurrentTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.SourceType;
+import org.hibernate.generator.EventType;
+import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(
         name = "practice_group",
-        uniqueConstraints =
-                @UniqueConstraint(
-                        name = "uk_practice_group_workspace_slug",
-                        columnNames = {"workspace_id", "slug"}),
-        indexes =
-                @Index(
-                        name = "idx_practice_group_workspace_dashboard_visibility",
-                        columnList = "workspace_id, visible_in_practice_dashboards"))
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "uk_practice_group_workspace_id",
+                    columnNames = {"id", "workspace_id"}),
+            @UniqueConstraint(
+                    name = "uk_practice_group_workspace_slug",
+                    columnNames = {"workspace_id", "slug"})
+        })
 @Getter
 @Setter
 @NoArgsConstructor
 @ToString
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class PracticeGroup {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @EqualsAndHashCode.Include
     private Long id;
 
-    /**
-     * Owning workspace (tenancy binding). {@code fk_practice_group_workspace} carries no DB cascade: a
-     * workspace purge removes its groups explicitly in application code (mirrors {@code fk_practice_workspace}).
-     */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "workspace_id", nullable = false, foreignKey = @ForeignKey(name = "fk_practice_group_workspace"))
     @ToString.Exclude
     private Workspace workspace;
 
-    /** Stable machine key, unique per workspace; survives a {@link #name} rename. */
-    @Column(name = "slug", nullable = false, length = 64)
+    @Column(nullable = false, length = 64, updatable = false)
     private String slug;
 
-    /** Admin-renameable display label. */
-    @Column(name = "name", nullable = false, length = 128)
+    @Column(nullable = false, length = 128)
     private String name;
 
-    @Column(name = "description", columnDefinition = "TEXT")
+    @Column(columnDefinition = "text")
     private @Nullable String description;
 
-    @Column(name = "icon", length = 64)
+    @Column(length = 64)
     private @Nullable String icon;
 
-    @Column(name = "color", length = 32)
+    @Column(length = 32)
     private @Nullable String color;
 
-    @Column(name = "visible_in_practice_dashboards", nullable = false)
-    private boolean visibleInPracticeDashboards = true;
+    @Column(nullable = false)
+    @ColumnDefault("0")
+    private int position;
 
-    /** Null inherits the workspace default; practice-level autonomy takes precedence. */
-    @Column(name = "autonomy", length = PracticeAutonomy.MAX_LENGTH)
+    @Column(name = "shown_to_developers", nullable = false)
+    @ColumnDefault("true")
+    private boolean shownToDevelopers = true;
+
     @Enumerated(EnumType.STRING)
-    @Nullable
-    private PracticeAutonomy autonomy;
+    @Column(name = "feedback_mode", length = 16)
+    private @Nullable FeedbackMode feedbackMode;
 
-    /** Admin dashboard ordering. */
-    @Column(name = "display_order", nullable = false)
-    private int displayOrder = 0;
+    @Column(name = "catalog_slug", length = 64)
+    private @Nullable String catalogSlug;
 
-    /** Catalog slug retained across workspace edits. */
-    @Column(name = "source_curated_slug", length = 64)
-    private String sourceCuratedSlug;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "catalog_base", columnDefinition = "jsonb")
+    private @Nullable GroupDefinition catalogBase;
 
-    /** Catalog comparison fingerprint captured when the workspace copy is created. */
-    @Column(name = "source_curated_fingerprint", length = 64)
-    private String sourceCuratedFingerprint;
-
+    @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
+    @ColumnDefault("CURRENT_TIMESTAMP")
     private Instant createdAt;
 
+    @CurrentTimestamp(event = EventType.UPDATE, source = SourceType.VM)
     @Column(name = "updated_at")
-    private Instant updatedAt;
-
-    @PrePersist
-    public void prePersist() {
-        this.createdAt = Instant.now();
-        this.updatedAt = this.createdAt;
-    }
-
-    @PreUpdate
-    public void preUpdate() {
-        this.updatedAt = Instant.now();
-    }
+    private @Nullable Instant updatedAt;
 }

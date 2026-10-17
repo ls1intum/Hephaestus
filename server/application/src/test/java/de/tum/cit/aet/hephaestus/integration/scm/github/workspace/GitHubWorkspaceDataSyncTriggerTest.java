@@ -28,8 +28,8 @@ import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobTrigger;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.sync.GitHubDataSyncService;
+import de.tum.cit.aet.hephaestus.integration.scm.workspace.WorkspaceRepositoryMonitorService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepositoryMonitorService;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -220,7 +220,6 @@ class GitHubWorkspaceDataSyncTriggerTest extends BaseUnitTest {
         return provider;
     }
 
-    /** A provider whose value a test may not need, for example when the step that uses it is skipped. */
     private static <T> ObjectProvider<T> lazyProvider(T value) {
         @SuppressWarnings("unchecked")
         ObjectProvider<T> provider = mock(ObjectProvider.class);

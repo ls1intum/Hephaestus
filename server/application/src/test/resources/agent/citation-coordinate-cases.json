@@ -1,0 +1,42 @@
+[
+  {
+    "name": "second repeated quote",
+    "content": "Before\nExact quote\nAfter\nExact quote\n",
+    "quote": "Exact quote",
+    "startLine": 4,
+    "endLine": 4,
+    "expectedStartLine": 4
+  },
+  {
+    "name": "repeated quote at wrong coordinates",
+    "content": "Before\nExact quote\nAfter\nExact quote\n",
+    "quote": "Exact quote",
+    "startLine": 3,
+    "endLine": 3,
+    "expectedStartLine": null
+  },
+  {
+    "name": "unique relocation",
+    "content": "Before\nExact quote\nAfter\n",
+    "quote": "Exact quote",
+    "startLine": 1,
+    "endLine": 1,
+    "expectedStartLine": 2
+  },
+  {
+    "name": "unique relocation from outside the source",
+    "content": "Before\nExact quote\nAfter\n",
+    "quote": "Exact quote",
+    "startLine": 999,
+    "endLine": 999,
+    "expectedStartLine": 2
+  },
+  {
+    "name": "quote within a broader supplied span",
+    "content": "Before\nExact quote\nAfter\n",
+    "quote": "Exact quote",
+    "startLine": 1,
+    "endLine": 3,
+    "expectedStartLine": 2
+  }
+]

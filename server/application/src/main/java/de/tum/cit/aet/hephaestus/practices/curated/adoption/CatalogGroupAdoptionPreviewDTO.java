@@ -1,13 +1,17 @@
 package de.tum.cit.aet.hephaestus.practices.curated.adoption;
 
-import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedGroupRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.GroupDefinition;
 import java.util.List;
-import org.jspecify.annotations.NonNull;
 
 public record CatalogGroupAdoptionPreviewDTO(
-        @NonNull String slug,
-        @NonNull CuratedGroupRequestDTO definition,
-        @NonNull CatalogGroupDisposition disposition,
-        @NonNull List<CatalogPracticePreviewDTO> practices,
-        @NonNull List<CatalogGroupPracticeActionDTO> actions,
-        @NonNull String etag) {}
+        String slug,
+        GroupDefinition definition,
+        CatalogGroupDisposition disposition,
+        List<CatalogPracticePreviewDTO> practices,
+        List<CatalogGroupPracticeActionDTO> actions,
+        String etag) {
+    public CatalogGroupAdoptionPreviewDTO {
+        practices = List.copyOf(practices);
+        actions = List.copyOf(actions);
+    }
+}

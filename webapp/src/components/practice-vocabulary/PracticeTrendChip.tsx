@@ -1,11 +1,11 @@
 import { cn } from "cn";
 
-import type { PracticeTrend, TrendSupport } from "@/api/types.gen";
+import type { TrendSupport } from "@/api/types.gen";
 import { FOCUS_RING } from "@/components/common/focus";
 import { type StatusDef, statusToneClass } from "@/components/common/status-def";
 
 import type { StandingScope } from "./practice-group-standing-defs";
-import { PRACTICE_TREND_DEFS } from "./practice-trend-defs";
+import { PRACTICE_TREND_DEFS, type TrendDirection } from "./practice-trend-defs";
 import { formatTrendProvenance } from "./practice-trend-presentation";
 import { StatusTooltip } from "./StatusTooltip";
 
@@ -22,7 +22,7 @@ function TrendWords({ def }: { def: StatusDef }) {
 }
 
 export interface PracticeTrendChipProps {
-	direction: PracticeTrend["direction"];
+	direction: TrendDirection;
 	/**
 	 * The evidence behind the direction. Without it there is no provenance to give, so the tooltip
 	 * says the registry's sentence for the direction instead.

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 6,
+  "reviewId": "00000000-0000-0000-0000-000000001234",
+  "jobId": "00000000-0000-0000-0000-00000000abcd",
+  "attempt": 0,
+  "workspaceId": "99",
+  "prompt": "Review the pinned item. Read the staged inputs and submit results.",
+  "contextRoot": "context",
+  "repositoryRoot": "repos/reviewed",
+  "manifest": "INDEX.json",
+  "practiceIndex": "inputs/practices/index.json",
+  "compositionRequest": "inputs/feedback-composition.json",
+  "preparedFeedback": "inputs/history/prepared.json",
+  "practiceScripts": "work/practice-scripts/practices"
+}

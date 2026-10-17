@@ -1,20 +1,16 @@
 import { use, useId, useState } from "react";
+import { UnsavedPracticeDraft } from "@/components/admin/practice-editor/unsaved-practice-draft";
 
 import type {
+	AcceptPracticeReleaseRequest,
 	PracticeDefinition,
-	PracticeReleaseField,
 	PracticeReleaseProposal,
 } from "@/api/types.gen";
 import {
-	DEFAULT_DELIVERY_BEHAVIOR_TEXT,
-	deliveryBehaviorSentences,
-} from "@/components/admin/practice-editor/delivery-behavior-text";
-import {
-	PracticeGuideVersion,
-	PracticeVisualVersion,
-} from "@/components/admin/practice-editor/practice-guidance-version";
-import { UnsavedPracticeDraft } from "@/components/admin/practice-editor/unsaved-practice-draft";
-import { PRACTICE_DEFINITION_FIELDS } from "@/components/admin/practices/practice-definition-fields";
+	PRACTICE_DEFINITION_FIELDS,
+	type PracticeDefinitionField,
+} from "@/components/admin/practices/practice-definition-fields";
+import { PracticeDefinitionFieldValue } from "@/components/admin/practices/PracticeDefinitionFieldValue";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
 	AlertDialog,
@@ -39,86 +35,44 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 
-type Field = PracticeReleaseField["field"];
-type Choice = "CURRENT" | "OFFERED";
-
-const BASE_SOURCE = {
-	EXACT_ADOPTION: "The exact version previously accepted",
-	BUNDLED_DIGEST_MATCH: "A bundled version matched by its saved digest",
-	BUNDLED_FINGERPRINT_MATCH: "A bundled version matched by its review fingerprint",
-	REVISION_FINGERPRINT_MATCH:
-		"A recorded version matched by its saved source fingerprint. It may not show the original guidance or delivery. Choose a version for each changed field.",
-	CURRENT_DEFINITION:
-		"The current definition, because we could not verify the version you originally adopted. Choose a version for each changed field.",
-} satisfies Record<PracticeReleaseProposal["baseSource"], string>;
-
-/** One version of a field: a visual or guide with its pictures drawn, everything else as text. */
-function FieldVersion({ definition, field }: { definition: PracticeDefinition; field: Field }) {
-	if (field === "VISUAL" && definition.visual) {
-		return <PracticeVisualVersion visual={definition.visual} />;
-	}
-	if (field === "GUIDE" && definition.guide) {
-		return <PracticeGuideVersion guide={definition.guide} />;
-	}
-	return (
-		<pre className="max-h-48 overflow-auto font-sans text-xs break-words whitespace-pre-wrap">
-			{fieldText(definition, field)}
-		</pre>
-	);
-}
-
-function fieldText(definition: PracticeDefinition, field: Field): string {
-	if (field === "DELIVERY_BEHAVIOR") {
-		const sentences = deliveryBehaviorSentences(definition.deliveryBehavior);
-		return sentences.length > 0 ? sentences.join("\n") : DEFAULT_DELIVERY_BEHAVIOR_TEXT;
-	}
-	const value = definition[PRACTICE_DEFINITION_FIELDS[field].key];
-	if (value === undefined) {
-		return "Not set";
-	}
-	if (typeof value === "string") {
-		return value.length > 0 ? value : "Not set";
-	}
-	return JSON.stringify(value, null, 2);
-}
+type Choices = AcceptPracticeReleaseRequest["choices"];
+type Source = Choices[string];
 
 export interface PracticeReleaseReviewProps {
 	proposal: PracticeReleaseProposal;
 	pending: "accept" | "decline" | null;
-	onAccept: (choices: Record<string, Choice>) => void;
+	/**
+	 * What declining leaves in place and how to undo it. The instance catalog and a workspace both
+	 * render this review, and each has its own source of updates and its own way back to it.
+	 */
+	declineNote: string;
+	onAccept: (choices: Choices) => void;
 	onDecline: () => void;
 }
 
 export function PracticeReleaseReview({
 	proposal,
 	pending,
+	declineNote,
 	onAccept,
 	onDecline,
 }: PracticeReleaseReviewProps) {
 	const id = useId();
-	// Without a proved base, a local edit is indistinguishable from a catalog change, so nothing is chosen
-	// for the reader. A recorded version matched by fingerprint need not carry the original guidance.
-	const baseProved =
-		proposal.baseSource !== "CURRENT_DEFINITION" &&
-		proposal.baseSource !== "REVISION_FINGERPRINT_MATCH";
+	// Without the adopted version, local edits cannot be distinguished from the update's changes.
+	const base: PracticeDefinition | null = proposal.base;
+	const baseKnown = base !== null;
 	const [choices, setChoices] = useState(
 		() =>
-			new Map<Field, Choice>(
+			new Map<PracticeDefinitionField, Source>(
 				proposal.fields
-					.filter((field) => baseProved && field.offeredChanged && !field.conflict)
+					.filter((field) => baseKnown && field.offeredChanged && !field.conflict)
 					.map((field) => [field.field, "OFFERED"]),
 			),
 	);
 	const ready = proposal.fields.every((field) => !field.offeredChanged || choices.has(field.field));
 	const unsavedDraft = use(UnsavedPracticeDraft);
 	const [confirmingAccept, setConfirmingAccept] = useState(false);
-	const accept = () => {
-		const selected: Record<string, Choice> = {};
-		for (const [field, choice] of choices) {
-			selected[field] = choice;
-		}
-		onAccept(selected);
-	};
+	const accept = () => onAccept(Object.fromEntries(choices));
 	const submit = () => {
 		if (!ready) {
 			return;
@@ -142,46 +96,57 @@ export function PracticeReleaseReview({
 					update.
 				</p>
 			</div>
-			<Alert variant={baseProved ? "default" : "warning"}>
-				<AlertTitle>Comparison base</AlertTitle>
-				<AlertDescription>{BASE_SOURCE[proposal.baseSource]}</AlertDescription>
-			</Alert>
+			{!baseKnown && (
+				<Alert variant="warning">
+					<AlertTitle>The version you adopted is not recorded</AlertTitle>
+					<AlertDescription>
+						We cannot tell your edits from the changes in this update. Choose a version for each
+						changed field.
+					</AlertDescription>
+				</Alert>
+			)}
 			<Table bordered className="min-w-220 table-fixed">
 				<caption className="sr-only">
 					Changed fields in the adopted, current, and proposed versions
 				</caption>
 				<TableHeader>
 					<TableRow variant="static">
-						<TableHead className="w-38">Field</TableHead>
-						<TableHead>Base</TableHead>
-						<TableHead>Current</TableHead>
-						<TableHead>Proposed</TableHead>
-						<TableHead className="w-42">Use</TableHead>
+						<TableHead scope="col" className="w-38">
+							Field
+						</TableHead>
+						<TableHead scope="col">Base</TableHead>
+						<TableHead scope="col">Current</TableHead>
+						<TableHead scope="col">Proposed</TableHead>
+						<TableHead scope="col" className="w-42">
+							Use
+						</TableHead>
 					</TableRow>
 				</TableHeader>
 				<TableBody>
 					{proposal.fields.map(({ field, offeredChanged, conflict }) => (
 						<TableRow key={field} variant="static">
-							<TableHead scope="row" className="align-top font-medium">
-								{PRACTICE_DEFINITION_FIELDS[field].label}
-								{conflict && (
-									<Badge variant="warning" className="ml-2">
-										Conflict
-									</Badge>
-								)}
-								{!offeredChanged && (
-									<Badge variant="secondary" className="ml-2">
-										Local edit
-									</Badge>
-								)}
+							{/* A row header, muted like the column headers: the field is the key, and the three
+							    versions beside it are what the reader compares. */}
+							<TableHead scope="row" variant="body">
+								<span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+									{PRACTICE_DEFINITION_FIELDS[field].label}
+									{conflict && <Badge variant="warning">Conflict</Badge>}
+									{!offeredChanged && <Badge variant="secondary">Local edit</Badge>}
+								</span>
 							</TableHead>
-							{([proposal.base, proposal.current, proposal.offered] as const).map(
-								(definition, index) => (
-									<TableCell key={index} className="align-top whitespace-normal">
-										<FieldVersion definition={definition} field={field} />
-									</TableCell>
-								),
-							)}
+							<TableCell className="align-top whitespace-normal">
+								{base === null ? (
+									<span className="text-xs text-muted-foreground">Not recorded</span>
+								) : (
+									<PracticeDefinitionFieldValue definition={base} field={field} />
+								)}
+							</TableCell>
+							<TableCell className="align-top whitespace-normal">
+								<PracticeDefinitionFieldValue definition={proposal.current} field={field} />
+							</TableCell>
+							<TableCell className="align-top whitespace-normal">
+								<PracticeDefinitionFieldValue definition={proposal.offered} field={field} />
+							</TableCell>
 							<TableCell className="align-top">
 								{offeredChanged ? (
 									<RadioGroup
@@ -219,10 +184,7 @@ export function PracticeReleaseReview({
 					{pending === "decline" ? "Declining update…" : "Decline this update"}
 				</Button>
 			</div>
-			<p className="text-xs text-muted-foreground">
-				Declining leaves this practice unchanged. A different catalog version will be proposed
-				again.
-			</p>
+			<p className="text-xs text-muted-foreground">{declineNote}</p>
 			<AlertDialog open={confirmingAccept} onOpenChange={setConfirmingAccept}>
 				<AlertDialogContent>
 					<AlertDialogHeader>

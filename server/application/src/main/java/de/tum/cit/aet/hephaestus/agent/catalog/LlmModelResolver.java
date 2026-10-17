@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +35,7 @@ public class LlmModelResolver {
             LlmConnection c = instance.getConnection();
             return new ResolvedLlmModel(
                     c.getBaseUrl(),
-                    c.getApiProtocol(),
+                    c.getApiProtocol().wire(),
                     instance.getUpstreamModelId(),
                     instance.getContextWindow(),
                     instance.getMaxOutputTokens(),
@@ -48,13 +49,13 @@ public class LlmModelResolver {
             WorkspaceLlmConnection c = byo.getConnection();
             return new ResolvedLlmModel(
                     c.getBaseUrl(),
-                    c.getApiProtocol(),
+                    c.getApiProtocol().wire(),
                     byo.getUpstreamModelId(),
                     byo.getContextWindow(),
                     byo.getMaxOutputTokens(),
                     byo.getReasoningEffort());
         }
-        throw new IllegalStateException("The agent config must bind an available OpenAI-compatible model");
+        throw new IllegalStateException("The binding does not reference a model");
     }
 
     /**
@@ -86,10 +87,10 @@ public class LlmModelResolver {
     @Transactional(readOnly = true)
     public Optional<DataHandlingTier> dataHandlingTier(ConnectionRef ref) {
         if (ref.modelId() == null || ref.workspaceId() == null) return Optional.empty();
-        if (ref.scope() == FundingSource.INSTANCE) {
+        if (ref.scope() == UsageFundingSource.INSTANCE) {
             return llmModelRepository.findById(ref.modelId()).map(LlmModel::getDataHandlingTier);
         }
-        if (ref.scope() != FundingSource.WORKSPACE) return Optional.empty();
+        if (ref.scope() != UsageFundingSource.WORKSPACE) return Optional.empty();
         return workspaceLlmModelRepository
                 .findByIdAndWorkspaceId(ref.modelId(), ref.workspaceId())
                 .map(WorkspaceLlmModel::getDataHandlingTier);
@@ -98,21 +99,17 @@ public class LlmModelResolver {
     private boolean isUsable(LlmModel model, Long workspaceId) {
         boolean visible = model.getVisibility() == ModelVisibility.PUBLIC
                 || grantRepository.existsByIdModelIdAndIdWorkspaceId(model.getId(), workspaceId);
-        return (model.isEnabled()
-                && model.getConnection().isEnabled()
-                && isSupportedProtocol(model.getConnection().getApiProtocol())
-                && visible);
+        return model.isEnabled() && model.getConnection().isEnabled() && visible;
     }
 
     private boolean isUsable(WorkspaceLlmModel model, Long workspaceId) {
-        return (model.isEnabled()
+        return model.isEnabled()
                 && model.getConnection().isEnabled()
-                && isSupportedProtocol(model.getConnection().getApiProtocol())
-                && model.getWorkspace().getId().equals(workspaceId));
+                && model.getWorkspace().getId().equals(workspaceId);
     }
 
-    private static IllegalStateException unavailable() {
-        return new IllegalStateException("The configured OpenAI-compatible model is not available");
+    private static LlmModelUnavailableException unavailable() {
+        return new LlmModelUnavailableException("The configured model is not available");
     }
 
     @Transactional(readOnly = true)
@@ -128,14 +125,9 @@ public class LlmModelResolver {
         return null;
     }
 
-    /**
-     * Identifies WHICH connection row funds a config's binding, without exposing any credential
-     * material. Frozen into {@link de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot} so the proxy
-     * can re-resolve the live credential for an in-flight job without re-reading the config's
-     * (possibly since-changed) current binding.
-     */
+    /** Freeze the connection id without its credential so {@link ConfigSnapshot} can resolve a live credential for the same provider. */
     public record ConnectionRef(
-            @Nullable FundingSource scope,
+            @Nullable UsageFundingSource scope,
             @Nullable Long connectionId,
             @Nullable Long modelId,
             @Nullable Long workspaceId) {
@@ -162,7 +154,7 @@ public class LlmModelResolver {
         LlmModel instance = config.getInstanceModel();
         if (instance != null) {
             return new ConnectionRef(
-                    FundingSource.INSTANCE,
+                    UsageFundingSource.INSTANCE,
                     instance.getConnection().getId(),
                     instance.getId(),
                     config.getWorkspace().getId());
@@ -170,7 +162,7 @@ public class LlmModelResolver {
         WorkspaceLlmModel byo = config.getWorkspaceModel();
         if (byo != null) {
             return new ConnectionRef(
-                    FundingSource.WORKSPACE,
+                    UsageFundingSource.WORKSPACE,
                     byo.getConnection().getId(),
                     byo.getId(),
                     config.getWorkspace().getId());
@@ -185,7 +177,7 @@ public class LlmModelResolver {
      */
     @Transactional(readOnly = true)
     public @Nullable ProxyCredential resolveProxyCredential(ConnectionRef ref) {
-        if (ref.scope() == FundingSource.INSTANCE && ref.connectionId() != null) {
+        if (ref.scope() == UsageFundingSource.INSTANCE && ref.connectionId() != null) {
             if (!isUsableInstanceModel(ref)) {
                 return null;
             }
@@ -196,16 +188,15 @@ public class LlmModelResolver {
             return llmConnectionRepository
                     .findById(ref.connectionId())
                     .filter(LlmConnection::isEnabled)
-                    .filter(c -> isSupportedProtocol(c.getApiProtocol()))
                     .map(c -> new ProxyCredential(
                             c.getBaseUrl(),
-                            c.getApiProtocol(),
+                            c.getApiProtocol().wire(),
                             c.getAuthMode(),
                             model.getUpstreamModelId(),
                             blankToNull(c.getApiKey())))
                     .orElse(null);
         }
-        if (ref.scope() == FundingSource.WORKSPACE && ref.connectionId() != null) {
+        if (ref.scope() == UsageFundingSource.WORKSPACE && ref.connectionId() != null) {
             if (!isUsableWorkspaceModel(ref)) {
                 return null;
             }
@@ -219,10 +210,9 @@ public class LlmModelResolver {
             return workspaceLlmConnectionRepository
                     .findById(ref.connectionId())
                     .filter(WorkspaceLlmConnection::isEnabled)
-                    .filter(c -> isSupportedProtocol(c.getApiProtocol()))
                     .map(c -> new ProxyCredential(
                             c.getBaseUrl(),
-                            c.getApiProtocol(),
+                            c.getApiProtocol().wire(),
                             c.getAuthMode(),
                             model.getUpstreamModelId(),
                             blankToNull(c.getApiKey())))
@@ -261,9 +251,5 @@ public class LlmModelResolver {
 
     private static @Nullable String blankToNull(@Nullable String value) {
         return value != null && !value.isBlank() ? value : null;
-    }
-
-    private static boolean isSupportedProtocol(@Nullable String apiProtocol) {
-        return "openai-completions".equals(apiProtocol) || "openai-responses".equals(apiProtocol);
     }
 }

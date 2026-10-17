@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.core.conformance;
 
-import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest;
-import de.tum.cit.aet.hephaestus.integration.outline.domain.signal.DocumentArtifactDescriptor;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
+import de.tum.cit.aet.hephaestus.integration.docs.item.DocumentItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.outline.manifest.OutlineManifest;
 import java.util.List;
 
@@ -18,7 +18,7 @@ class OutlineManifestContractTest extends IntegrationManifestContractTest {
     }
 
     @Override
-    protected List<ArtifactDescriptor> descriptors() {
-        return List.of(new DocumentArtifactDescriptor());
+    protected List<ItemDescriptor> descriptors() {
+        return List.of(new DocumentItemDescriptor());
     }
 }

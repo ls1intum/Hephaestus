@@ -2,10 +2,6 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcommen
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.PostgresStringUtils;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -15,8 +11,13 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.RepositoryRef;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewthread.GitLabPullRequestReviewThreadProcessor;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Objects;
@@ -47,11 +48,15 @@ public class GitLabPullRequestReviewCommentProcessor {
     private final PullRequestReviewRepository reviewRepository;
     private final ApplicationEventPublisher eventPublisher;
 
+    private final Clock clock;
+
     public GitLabPullRequestReviewCommentProcessor(
             PullRequestReviewCommentRepository commentRepository,
             PullRequestRepository pullRequestRepository,
             PullRequestReviewRepository reviewRepository,
-            ApplicationEventPublisher eventPublisher) {
+            ApplicationEventPublisher eventPublisher,
+            Clock clock) {
+        this.clock = clock;
         this.commentRepository = commentRepository;
         this.pullRequestRepository = pullRequestRepository;
         this.reviewRepository = reviewRepository;
@@ -149,7 +154,7 @@ public class GitLabPullRequestReviewCommentProcessor {
 
         Optional<PullRequestReviewComment> existing =
                 commentRepository.findByNativeIdAndProviderId(nativeId, providerId);
-        // A note id is unique on the instance: a diff note stored under another merge request is never moved here.
+        // Instance-wide note ids cannot move a diff note to another merge request.
         if (existing.map(PullRequestReviewComment::getPullRequest)
                 .filter(parent -> !parent.getId().equals(context.pr().getId()))
                 .isPresent()) {
@@ -236,18 +241,19 @@ public class GitLabPullRequestReviewCommentProcessor {
         String sanitizedBody = PostgresStringUtils.sanitize(data.body());
         comment.setBody(sanitizedBody != null ? sanitizedBody : "");
 
-        // Path from position data: prefer new_path, fall back to old_path on deletion.
-        // filePath is GitLab's resolved path (equals new_path for additions/modifications, old_path for deletions).
+        // GitLab uses old_path for deleted files.
         String path = resolvePath(data);
         comment.setPath(path);
 
-        // Line numbers — preserve nullability semantics on the int/int columns (0 == "not present").
+        // Line numbers — preserve nullability semantics on the int/int columns (0 == "not
+        // present").
         // A note on a removed line has only old_line; that is its line, on the LEFT side below.
         Integer line = GitLabPullRequestReviewThreadProcessor.anchoredLine(data.newLine(), data.oldLine());
         comment.setLine(line != null ? line : 0);
         comment.setOriginalLine(data.oldLine() != null ? data.oldLine() : 0);
 
-        // Side: RIGHT if comment anchored on new side (new_line set), LEFT if only old_line present.
+        // Side: RIGHT if comment anchored on new side (new_line set), LEFT if only old_line
+        // present.
         comment.setSide(deriveSide(data.newLine(), data.oldLine()));
         // GraphQL DiffPosition doesn't expose a per-note multi-line range; start_side mirrors side.
         comment.setStartSide(comment.getSide());
@@ -297,10 +303,11 @@ public class GitLabPullRequestReviewCommentProcessor {
         return saved;
     }
 
-    private static EventContext createSyncContext(PullRequest pr, Long scopeId) {
+    private EventContext createSyncContext(PullRequest pr, Long scopeId) {
         RepositoryRef repoRef =
                 pr.getRepository() != null ? Objects.requireNonNull(RepositoryRef.from(pr.getRepository())) : null;
-        return EventContext.forSync(scopeId, Objects.requireNonNull(repoRef), IdentityProviderType.GITLAB);
+        return EventContext.forSync(
+                scopeId, Objects.requireNonNull(repoRef), IdentityProviderType.GITLAB, clock.instant());
     }
 
     /**

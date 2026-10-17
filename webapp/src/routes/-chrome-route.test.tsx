@@ -4,7 +4,7 @@ import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AdminWorkspaceView } from "@/api/types.gen";
-import { workspaceListItem } from "@/mocks/fixtures/workspaces";
+import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
 import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
 
@@ -23,12 +23,7 @@ describe("app chrome on a route with no workspace in the URL", () => {
 				HttpResponse.json([workspaceListItem("acme", { displayName: "Acme" })]),
 			),
 			http.get("*/workspaces/:workspaceSlug/members/me", () =>
-				HttpResponse.json({
-					role: "ADMIN",
-					userId: 42,
-					userLogin: "ada",
-					userName: "Ada Lovelace",
-				}),
+				HttpResponse.json(ownMembership("ADMIN")),
 			),
 		);
 	});

@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.usage;
 
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.core.TransactionCallbacks;
+import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -36,9 +37,11 @@ public class LlmUsageRecorder {
         this.meterRegistry = meterRegistry;
     }
 
+    /** @param searchUnits what Cohere reranking calls billed instead of tokens; 0 for every other sample */
     public record LlmUsageSample(
-            LlmUsageJobType jobType,
-            LlmUsageSourceType sourceType,
+            @Nullable UUID reviewId,
+            String jobType,
+            UsageSourceType sourceType,
             UUID sourceId,
             int sourceAttempt,
             @Nullable String model,
@@ -47,6 +50,7 @@ public class LlmUsageRecorder {
             long cacheReadTokens,
             long cacheWriteTokens,
             long reasoningTokens,
+            long searchUnits,
             int totalCalls,
             LlmPriceSnapshot price,
             UsageProvenance provenance,
@@ -64,20 +68,21 @@ public class LlmUsageRecorder {
         }
     }
 
-    /** A rate the frozen price is missing cannot be charged, so the whole event stops being priced. */
+    // Missing rates leave the whole event unpriced; search units require their own rate.
     private static boolean isPricedWithARateMissing(LlmUsageSample sample, LlmPriceSnapshot price) {
-        return (price.pricingState() == PricingState.PRICED
+        return (price.pricingState() == UsagePricingState.PRICED
                 && ((sample.inputTokens() > 0 && price.per1mInputUsd() == null)
                         || (sample.outputTokens() > 0 && price.per1mOutputUsd() == null)
                         || (sample.cacheReadTokens() > 0 && price.per1mCacheReadUsd() == null)
-                        || (sample.cacheWriteTokens() > 0 && price.per1mCacheWriteUsd() == null)));
+                        || (sample.cacheWriteTokens() > 0 && price.per1mCacheWriteUsd() == null)
+                        || sample.searchUnits() > 0));
     }
 
     /** Keeps the frozen rates: they still say what the attempt would have cost. */
     private static LlmPriceSnapshot asUnpriced(LlmPriceSnapshot price) {
         return new LlmPriceSnapshot(
                 price.fundingSource(),
-                PricingState.UNPRICED,
+                UsagePricingState.UNPRICED,
                 price.appliedPriceId(),
                 price.appliedWorkspaceModelId(),
                 price.per1mInputUsd(),
@@ -87,6 +92,14 @@ public class LlmUsageRecorder {
     }
 
     private boolean persist(Long workspaceId, LlmUsageSample sample, LlmPriceSnapshot quoted) {
+        int sourceAttempt = Math.max(0, sample.sourceAttempt());
+        long unreportedCalls = sample.sourceType() == UsageSourceType.MENTOR_TURN
+                ? 0
+                : usageRepository.sumUnreportedPracticeScriptCalls(
+                        workspaceId,
+                        sample.sourceId(),
+                        sourceAttempt,
+                        sample.sourceType().name());
         // A PRICED snapshot missing a rate would silently cost the tokens it does have a rate for.
         LlmPriceSnapshot price = isPricedWithARateMissing(sample, quoted) ? asUnpriced(quoted) : quoted;
         LlmPriceSnapshot.Cost computed = price.calculateCost(
@@ -96,10 +109,11 @@ public class LlmUsageRecorder {
         int inserted = usageRepository.insertIfAbsent(new LlmUsageInsert(
                 UUID.randomUUID(),
                 workspaceId,
-                sample.jobType().name(),
+                sample.reviewId(),
+                sample.jobType(),
                 sample.sourceType().name(),
                 sample.sourceId(),
-                Math.max(0, sample.sourceAttempt()),
+                sourceAttempt,
                 sample.model(),
                 Math.max(0, sample.inputTokens()),
                 Math.max(0, sample.outputTokens()),
@@ -118,6 +132,8 @@ public class LlmUsageRecorder {
                 price.per1mCacheReadUsd(),
                 price.per1mCacheWriteUsd(),
                 sample.provenance().name(),
+                Math.max(0, sample.searchUnits()),
+                Math.toIntExact(unreportedCalls),
                 sample.measurementVerification().name()));
         if (inserted == 0) {
             log.debug(
@@ -127,7 +143,7 @@ public class LlmUsageRecorder {
                     sample.sourceAttempt());
             return false;
         }
-        if (price.pricingState() == PricingState.UNPRICED) {
+        if (price.pricingState() == UsagePricingState.UNPRICED) {
             meterRegistry.counter(AgentMetrics.LLM_USAGE_UNCOSTED).increment();
         }
         registerBudgetAlert(workspaceId, price, cost);
@@ -143,7 +159,8 @@ public class LlmUsageRecorder {
             return;
         }
         log.warn(
-                "LLM cost clamped to fit the ledger column: clamp={}, storedUsd={}, sourceType={}, sourceId={}, sourceAttempt={}",
+                "LLM cost clamped to fit the ledger column: clamp={}, storedUsd={}, sourceType={}, sourceId={},"
+                        + " sourceAttempt={}",
                 computed.clamp(),
                 computed.usd(),
                 sample.sourceType(),
@@ -159,8 +176,8 @@ public class LlmUsageRecorder {
     }
 
     private void registerBudgetAlert(Long workspaceId, LlmPriceSnapshot price, @Nullable BigDecimal cost) {
-        if (price.fundingSource() != FundingSource.INSTANCE
-                || price.pricingState() != PricingState.PRICED
+        if (price.fundingSource() != UsageFundingSource.INSTANCE
+                || price.pricingState() != UsagePricingState.PRICED
                 || cost == null
                 || cost.signum() <= 0) {
             return;

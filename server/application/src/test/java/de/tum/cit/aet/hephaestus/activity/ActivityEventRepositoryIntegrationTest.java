@@ -17,13 +17,13 @@ import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -39,9 +39,6 @@ class ActivityEventRepositoryIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private ActivityEventService activityEventService;
-
-    @Autowired
-    private JdbcTemplate jdbc;
 
     @Autowired
     private WorkspaceRepository workspaceRepository;
@@ -218,12 +215,7 @@ class ActivityEventRepositoryIntegrationTest extends BaseIntegrationTest {
         var targetEvent = persistCommitCreatedEvent(targetCommit, null);
         var otherEvent = persistCommitCreatedEvent(otherCommit, null);
         activityEventRepository.flush();
-        jdbc.update(
-                "INSERT INTO person_suppression(id,provider_id,subject,team_key) VALUES (?,?,?,?)",
-                UUID.randomUUID(),
-                gitProvider.getId(),
-                "900",
-                "");
+        databaseTestUtils.erase(Objects.requireNonNull(gitProvider.getId()), "900", "");
         assertThat(activityEventService.backfillCommitActors(targetRepository.getId()))
                 .isEqualTo(1);
         assertThat(activityEventRepository

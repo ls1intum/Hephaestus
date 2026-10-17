@@ -1,15 +1,10 @@
 package de.tum.cit.aet.hephaestus.integration.core.conformance;
 
-import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
 import java.util.List;
 
-/**
- * The synthetic integration through the same suite as the shipped ones.
- *
- * <p>If this subclass ever needs an override the others do not, the suite has stopped being a contract
- * and started being a description of GitHub.
- */
+// This fixture must pass the shared suite without special overrides.
 class FixtureManifestContractTest extends IntegrationManifestContractTest {
 
     @Override
@@ -18,7 +13,7 @@ class FixtureManifestContractTest extends IntegrationManifestContractTest {
     }
 
     @Override
-    protected List<ArtifactDescriptor> descriptors() {
+    protected List<ItemDescriptor> descriptors() {
         return List.of(FixtureIntegration.descriptor());
     }
 }

@@ -15,23 +15,23 @@ import org.junit.jupiter.params.provider.ValueSource;
 class GeneratedPathsTest {
     @Test
     void shouldMarkOnlyGeneratedFilesWhenChangeMixesGeneratedAndHandWrittenWork() {
-        var policy = GeneratedPathReviewDTO.of(
+        var policy = GeneratedPaths.review(
                 List.of("src/api/**"), Set.of("src/api/client.ts", "src/api/nested/types.ts", "src/service.ts"));
-        assertThat(policy.paths()).containsExactly("src/api/client.ts", "src/api/nested/types.ts");
+        assertThat(policy.excludedPaths()).containsExactly("src/api/client.ts", "src/api/nested/types.ts");
         assertThat(policy.patterns()).containsExactly("src/api/**");
     }
 
     @Test
     void shouldMarkAllFilesWhenChangeContainsOnlyGeneratedFiles() {
-        var policy = GeneratedPathReviewDTO.of(
+        var policy = GeneratedPaths.review(
                 List.of("**/*.generated.ts"), Set.of("types.generated.ts", "src/types.generated.ts"));
-        assertThat(policy.paths()).containsExactly("src/types.generated.ts", "types.generated.ts");
+        assertThat(policy.excludedPaths()).containsExactly("src/types.generated.ts", "types.generated.ts");
     }
 
     @Test
     void shouldCheckBothNamesWhenGeneratedFileIsRenamed() {
-        var policy = GeneratedPathReviewDTO.of(List.of("generated/**"), Set.of("generated/old.ts", "src/new.ts"));
-        assertThat(policy.paths()).containsExactly("generated/old.ts");
+        var policy = GeneratedPaths.review(List.of("generated/**"), Set.of("generated/old.ts", "src/new.ts"));
+        assertThat(policy.excludedPaths()).containsExactly("generated/old.ts");
     }
 
     @Test
@@ -47,8 +47,7 @@ class GeneratedPathsTest {
 
     @Test
     void shouldClearClassificationWhenPatternsAreEmpty() {
-        assertThat(GeneratedPathReviewDTO.of(List.of(), Set.of("src/api/client.ts"))
-                        .paths())
+        assertThat(GeneratedPaths.review(List.of(), Set.of("src/api/client.ts")).excludedPaths())
                 .isEmpty();
         assertThat(GeneratedPaths.normalize(List.of(" b/** ", "a/**", "b/**"))).containsExactly("a/**", "b/**");
     }
@@ -58,14 +57,14 @@ class GeneratedPathsTest {
             strings = {"", " ", "/generated/**", "!generated/**", "../generated/**", "a/../b", "a\\b", "{path:.*}"})
     void shouldRejectUnsafeOrUnsupportedPatternSyntax(String pattern) {
         assertThatThrownBy(() -> GeneratedPaths.normalize(List.of(pattern)))
-                .isInstanceOf(InvalidReviewCoverageException.class);
+                .isInstanceOf(InvalidReviewScopeException.class);
     }
 
     @Test
     void shouldBoundPatternsWhenAdminSavesSettings() {
         assertThatThrownBy(() -> GeneratedPaths.normalize(Collections.nCopies(101, "a/**")))
-                .isInstanceOf(InvalidReviewCoverageException.class);
+                .isInstanceOf(InvalidReviewScopeException.class);
         assertThatThrownBy(() -> GeneratedPaths.normalize(List.of("a".repeat(513))))
-                .isInstanceOf(InvalidReviewCoverageException.class);
+                .isInstanceOf(InvalidReviewScopeException.class);
     }
 }

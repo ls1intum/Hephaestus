@@ -1,17 +1,12 @@
 import { CircleAlertIcon, InfoIcon, OctagonAlertIcon, TriangleAlertIcon } from "lucide-react";
 
-import type { ReviewObservation } from "@/api/types.gen";
+import type { Problem } from "@/api/types.gen";
 
 import type { StatusDefs } from "@/components/common/status-def";
 
-export type Severity = NonNullable<ReviewObservation["severity"]>;
+export type Severity = Problem["severity"];
 
-/**
- * How much a missed practice costs, ordered worst first.
- *
- * `CRITICAL` and `MAJOR` share the destructive variant, so the icon is what ranks them: an octagon
- * (a stop sign) outranks a triangle.
- */
+// Result severity is determined by its worst problem.
 export const SEVERITY_DEFS: StatusDefs<Severity> = {
 	CRITICAL: {
 		label: "Critical",
@@ -31,10 +26,10 @@ export const SEVERITY_DEFS: StatusDefs<Severity> = {
 		badgeVariant: "warning",
 		description: "Worth knowing about, but it does not block anything.",
 	},
-	INFO: {
-		label: "Informational",
+	TRIVIAL: {
+		label: "Trivial",
 		icon: InfoIcon,
 		badgeVariant: "secondary",
-		description: "Context for the author, with nothing being asked of them.",
+		description: "A small gap. Fix it when it is cheap.",
 	},
 };

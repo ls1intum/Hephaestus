@@ -73,15 +73,12 @@ export function reviewLevel(reviewId: string): DetailStackEntry<PracticeProfileD
 	return { kind: "review", id: reviewId };
 }
 
-/**
- * One review's own tab and filters, cleared when another review takes its place: a filter chosen
- * for one review could hide every practice of the next. The reviews list's filters stay.
- */
+/** Clear review-specific tabs, filters, and focus on a review switch so old filters cannot hide the next review. */
 export const REVIEW_SELECTION_CLEARED = {
 	reviewTab: undefined,
 	reviewGroup: undefined,
 	reviewPractice: undefined,
-	reviewWatches: undefined,
+	reviewResult: undefined,
 } satisfies PracticeGroupDetailSelection;
 
 /** The review level's tabs, from the `reviewTab` search param. */
@@ -125,13 +122,7 @@ export const ALL_PRACTICE_GROUPS_LEVEL: DetailStackEntry<PracticeProfileDetailLe
 	id: "all",
 };
 
-/**
- * The practice level's tabs: the feedback written about the practice, what the reviews found, and
- * the practice guide. The catalog's words on the practice open the level above them. The choice is
- * the `practiceTab` search param; the feedback leads and is where the level opens, and the level
- * shows the guide only for a practice that has one.
- */
-export const PRACTICE_TABS = ["feedback", "observations", "guide"] as const;
+export const PRACTICE_TABS = ["feedback", "results", "guide"] as const;
 
 export type PracticeTab = (typeof PRACTICE_TABS)[number];
 
@@ -145,7 +136,7 @@ export interface PracticeGroupDetailSelection {
 	reviewTab?: ReviewTab;
 	reviewGroup?: string;
 	reviewPractice?: string;
-	reviewWatches?: string;
+	reviewResult?: string;
 }
 
 /**
@@ -158,12 +149,6 @@ export type FeedbackTab = (typeof FEEDBACK_TABS)[number];
 
 export const DEFAULT_FEEDBACK_TAB: FeedbackTab = "open";
 
-/**
- * What the page itself reads out of the URL: the table's sort, the feedback tab, and the selection
- * inside the open levels — the practice level's tab, and the review levels' filters and tab. A
- * hand-typed value a surface cannot show reads as the default. Which observations are open is not
- * here: every one arrives open and closes on its own, and nothing addresses one.
- */
 const practiceProfileFilterSchema = z.object({
 	dir: z
 		.enum(SORT_DIRECTIONS)
@@ -177,8 +162,7 @@ const practiceProfileFilterSchema = z.object({
 	reviewTab: z.enum(REVIEW_TABS).default(DEFAULT_REVIEW_TAB).catch(DEFAULT_REVIEW_TAB),
 	reviewGroup: z.string().min(1).max(REVIEW_FILTER_MAX_LENGTH).optional().catch(undefined),
 	reviewPractice: z.string().min(1).max(REVIEW_FILTER_MAX_LENGTH).optional().catch(undefined),
-	// A signal name, free for the reason `reviewKind` is.
-	reviewWatches: z.string().min(1).max(REVIEW_FILTER_MAX_LENGTH).optional().catch(undefined),
+	reviewResult: z.uuid().optional().catch(undefined),
 });
 
 /** Each param at its default, which the route leaves out of the URL. */
@@ -206,5 +190,5 @@ export const PRACTICE_PROFILE_LEVEL_PARAMS = [
 	"reviewTab",
 	"reviewGroup",
 	"reviewPractice",
-	"reviewWatches",
+	"reviewResult",
 ] as const satisfies readonly (keyof PracticeGroupDetailSelection)[];

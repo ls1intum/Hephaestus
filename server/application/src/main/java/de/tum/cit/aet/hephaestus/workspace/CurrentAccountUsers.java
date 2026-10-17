@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.workspace;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
+import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
+import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry.ActorProfile;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,57 +13,53 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Resolves account-owned SCM actors by verified provider subject. Usernames can be reassigned
- * and cached actor references can become stale, so neither is identity evidence.
+ * Resolves account-owned SCM actors by verified provider subject. Usernames can be reassigned and
+ * cached actor references can become stale, so neither is identity evidence.
  */
 @Component
 @WorkspaceAgnostic("Resolves the principal's SCM user mirrors; not scoped to a single workspace")
 public class CurrentAccountUsers {
 
     private final AccountIdentityQuery accountIdentityQuery;
-    private final UserRepository userRepository;
+    private final GitProviderRegistry providers;
 
-    public CurrentAccountUsers(AccountIdentityQuery accountIdentityQuery, UserRepository userRepository) {
+    public CurrentAccountUsers(AccountIdentityQuery accountIdentityQuery, GitProviderRegistry providers) {
         this.accountIdentityQuery = accountIdentityQuery;
-        this.userRepository = userRepository;
+        this.providers = providers;
     }
 
     /** Resolve the authenticated account; absent or unlinked accounts own no SCM actors. */
     @Transactional(readOnly = true)
-    public List<User> resolve() {
+    public List<ActorProfile> resolve() {
         return SecurityUtils.getCurrentAccountId()
                 .map(this::resolveAccountUsers)
                 .orElseGet(List::of);
     }
 
-    /** Resolve one account without relying on the request's authentication (exports and provider events). */
+    /**
+     * Resolve one account without relying on the request's authentication (exports and provider
+     * events).
+     */
     @Transactional(readOnly = true)
-    public List<User> resolve(Long accountId) {
+    public List<ActorProfile> resolve(Long accountId) {
         return resolveAccountUsers(accountId);
     }
 
-    private List<User> resolveAccountUsers(Long accountId) {
-        // Preserve linking order: adding another identity must not change an existing representative actor.
-        Map<Long, User> byId = new LinkedHashMap<>();
-        for (AccountIdentityQuery.IdentityLinkView link : accountIdentityQuery.activeLinksForAccount(accountId)) {
-            resolveLinkUser(link)
-                    .filter(user -> user.getId() != null)
-                    .ifPresent(user -> byId.putIfAbsent(user.getId(), user));
+    private List<ActorProfile> resolveAccountUsers(Long accountId) {
+        // Preserve linking order: adding another identity must not change an existing
+        // representative actor.
+        Map<Long, ActorProfile> byId = new LinkedHashMap<>();
+        for (AccountIdentityQuery.IdentityView link : accountIdentityQuery.activeLinksForAccount(accountId)) {
+            resolveLinkUser(link).ifPresent(user -> byId.putIfAbsent(user.actorId(), user));
         }
         return List.copyOf(byId.values());
     }
 
-    private Optional<User> resolveLinkUser(AccountIdentityQuery.IdentityLinkView link) {
-        final long nativeId;
-        try {
-            nativeId = Long.parseLong(link.subject());
-        } catch (NumberFormatException exception) {
-            // Non-SCM identities (for example Slack and Outline) do not have numeric SCM subjects.
-            return Optional.empty();
-        }
-        if (nativeId <= 0) {
-            return Optional.empty();
-        }
-        return userRepository.findByNativeIdAndProviderId(nativeId, link.gitProviderId());
+    private Optional<ActorProfile> resolveLinkUser(AccountIdentityQuery.IdentityView link) {
+        if (!link.teamKey().isEmpty()) return Optional.empty();
+        return providers
+                .findActorId(link.providerId(), link.providerUserKey())
+                .flatMap(providers::actor)
+                .filter(ActorProfile::human);
     }
 }

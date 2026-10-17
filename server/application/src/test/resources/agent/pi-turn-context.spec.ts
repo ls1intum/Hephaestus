@@ -35,7 +35,7 @@ async function fixture(blockCompaction = false) {
 		agentDir: cwd,
 		settingsManager: settings,
 		...SANDBOX_RESOURCE_LOADER_OPTIONS,
-		systemPrompt: "Only recorded evidence authorizes an observation.",
+		systemPrompt: "Only recorded evidence authorizes a problem.",
 		extensionFactories: [
 			(api) => {
 				api.on("session_before_compact", async (event) => {
@@ -115,7 +115,7 @@ void test("a fitting complete turn needs no compaction", async () => {
 	}
 });
 
-void test("native compaction rebuilds the opening and current criteria before dispatch", async () => {
+void test("native compaction rebuilds the opening and current criteria before delivery", async () => {
 	const f = await fixture();
 	try {
 		f.seed();

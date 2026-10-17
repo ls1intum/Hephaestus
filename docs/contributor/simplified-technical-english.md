@@ -93,7 +93,7 @@ Tone changes with the situation.
 | **Warning** | Calm. Give notice before a loss. Name the consequence and the way out. | `This repository has no webhook. New pull requests will not be reviewed until you add one.` |
 | **Error** | Plain. Say what happened, then what to do next. | `We could not reach GitHub. Check the connection, then try again.` |
 | **Empty** | Helpful. Say why it is empty and what will appear. Offer the way to get it. | `No feedback yet. It appears here after Heph reviews your next pull request.` |
-| **Destructive** | Serious. Name the object and the consequence. Say if it can be undone. | `Delete practice "Code review"? This removes the practice and its observations. You cannot undo this.` |
+| **Destructive** | Serious. Name the object and the consequence. Say if it can be undone. | `Delete practice "Code review"? This removes the practice and its results. You cannot undo this.` |
 | **Onboarding** | Encouraging, one step at a time. Lead to the first result. | `Connect a repository to get your first feedback.` |
 | **Progress** | Present participle with a single ellipsis character. | `Saving…` |
 
@@ -285,7 +285,7 @@ Keep such sentences short. A green gate is not proof of full STE compliance.
 
 [Vale](https://vale.sh/) checks Markdown and MDX with a repository-owned style.
 The house oxlint rule `ui-text-voice` checks literal UI text in `webapp/src` and `extension/src`.
-Both read `.vale/words.json` and the product vocabulary.
+Both use `.vale/words.json` and the technical names from the two glossary owners.
 The [tool source record](https://github.com/hephaestus-build/Hephaestus/blob/main/.vale/README.md) gives the license, pins, and commands.
 
 Vale reports these errors in all docs:
@@ -331,6 +331,8 @@ They check text from variables, prompts, diagrams, and user-facing server messag
 4. Run `vp run gate:prose` and the scoped checks for that tree.
 
 The gate compares the list with the base branch and rejects removal.
+The gate follows Git-detected renames with at least 40% content similarity when the new path remains enforced.
+A deletion or a rename to a path outside the list still fails.
 
 A UI file needs no entry, because the lint configuration of each tree covers it.
 Run `vp -C webapp lint <path>` or `vp -C extension lint <path>` with a path relative to that tree.

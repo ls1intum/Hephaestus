@@ -2,424 +2,145 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
-import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
-import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
-import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceLimitation;
-import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
-import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
-import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
+import de.tum.cit.aet.hephaestus.practices.PracticeReadSource;
+import de.tum.cit.aet.hephaestus.practices.PracticeReads;
+import de.tum.cit.aet.hephaestus.practices.ReviewLimit;
+import de.tum.cit.aet.hephaestus.practices.ReviewedBy;
+import de.tum.cit.aet.hephaestus.practices.ScanDefinition;
+import de.tum.cit.aet.hephaestus.practices.spi.PinnedPractice;
+import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
-import tools.jackson.databind.node.ObjectNode;
 
-@ExtendWith(MockitoExtension.class)
 class PracticeCatalogInjectorTest extends BaseUnitTest {
-
-    private final JsonMapper objectMapper = JsonMapper.builder().build();
-
-    @Mock
-    private PracticeRepository practiceRepository;
-
-    private PracticeCatalogInjector injector;
-
-    @BeforeEach
-    void setUp() {
-        injector = new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults());
-    }
-
-    private Practice practice(String slug, SignalName... signals) {
-        Practice p = new Practice();
-        p.setSlug(slug);
-        p.setName(slug);
-        p.setCriteria("criteria for " + slug);
-        p.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
-        p.setCurrentRevision(revisionOf(p));
-        PracticeTestEvidence.configure(p, signals);
-        return p;
-    }
-
-    /** The current revision of {@code p}: the fields the index reads from it, copied from the practice. */
-    private static PracticeRevision revisionOf(Practice p) {
-        var revision = new PracticeRevision();
-        ReflectionTestUtils.setField(revision, "id", Math.abs((long) p.getSlug().hashCode()) + 1);
-        ReflectionTestUtils.setField(revision, "automatedReviewPolicy", p.getAutomatedReviewPolicy());
-        ReflectionTestUtils.setField(revision, "whyItMatters", p.getWhyItMatters());
-        return revision;
-    }
-
-    /**
-     * A workspace that has expressed no review opinion of its own, so every practice below it resolves to
-     * {@link PracticeAutonomy#DEFAULT}.
-     */
-    private Workspace workspace() {
-        Workspace ws = new Workspace();
-        ws.setId(1L);
-        return ws;
-    }
-
-    private AgentJob job(@Nullable SignalName signal) {
-        AgentJob j = new AgentJob();
-        j.setWorkspace(workspace());
-        j.setPracticeTriggerMode(signal == null ? TriggerMode.MANUAL : TriggerMode.AUTO);
-        if (signal != null) {
-            var meta = objectMapper.createObjectNode();
-            meta.put("signal", signal.value());
-            meta.putObject(PracticeCatalogInjector.REVIEW_STATE_METADATA_KEY).put("draftStatus", "NOT_DRAFT");
-            j.setMetadata(meta);
-        }
-        return j;
-    }
-
-    private AgentJob reviewerJob() {
-        AgentJob job = job(ScmSignals.PULL_REQUEST_REVIEWED);
-        var metadata = assertInstanceOf(ObjectNode.class, job.getMetadata());
-        metadata.put("about_user_id", 42L);
-        metadata.put("subject_role", ActorRole.REVIEWER.name());
-        return job;
-    }
-
-    private static String md(String slug) {
-        return SandboxLayout.PRACTICES_PREFIX + slug + ".md";
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {"{}", "{\"signal\":\"\"}", "{\"signal\":7}"})
-    void automaticReviewRequiresARecordedSignal(String metadata) {
-        when(practiceRepository.findByWorkspaceIdAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST))
-                .thenReturn(List.of(practice("describe", ScmSignals.PULL_REQUEST_OPENED)));
-        var job = job(ScmSignals.PULL_REQUEST_OPENED);
-        job.setMetadata(objectMapper.readTree(metadata));
-        assertThatThrownBy(() -> injector.resolveEligiblePractices(job, ArtifactKinds.PULL_REQUEST))
-                .isInstanceOf(JobPreparationException.class)
-                .hasMessage("Automatic review requires a recorded signal");
-    }
-
     @Test
-    void missingSelectedStateCannotAdmitAnAutomaticReview() {
-        when(practiceRepository.findByWorkspaceIdAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST))
-                .thenReturn(List.of(practice("describe", ScmSignals.PULL_REQUEST_OPENED)));
-        var job = job(ScmSignals.PULL_REQUEST_OPENED);
-        ((ObjectNode) Objects.requireNonNull(job.getMetadata()))
-                .remove(PracticeCatalogInjector.REVIEW_STATE_METADATA_KEY);
-        assertThatThrownBy(() -> injector.resolveEligiblePractices(job, ArtifactKinds.PULL_REQUEST))
-                .isInstanceOf(JobPreparationException.class);
-    }
-
-    @Test
-    void manualReviewDoesNotApplyAutomaticStateRestrictions() {
-        when(practiceRepository.findByWorkspaceIdAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST))
-                .thenReturn(List.of(practice("describe", ScmSignals.PULL_REQUEST_OPENED)));
-        var job = job(ScmSignals.PULL_REQUEST_OPENED);
-        job.setPracticeTriggerMode(TriggerMode.MANUAL);
-        ((ObjectNode) Objects.requireNonNull(job.getMetadata()))
-                .remove(PracticeCatalogInjector.REVIEW_STATE_METADATA_KEY);
-        assertThat(injector.resolveEligiblePractices(job, ArtifactKinds.PULL_REQUEST))
-                .extracting(Practice::getSlug)
-                .containsExactly("describe");
-    }
-
-    @Test
-    @DisplayName("a trigger event materialises only the practices that declare it")
-    void filtersToTriggerMatchingPractices() {
-        when(practiceRepository.findByWorkspaceIdAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST))
-                .thenReturn(List.of(
-                        practice("authoring", ScmSignals.PULL_REQUEST_OPENED),
-                        practice("retrospective", ScmSignals.PULL_REQUEST_MERGED),
-                        practice("reviewer", ScmSignals.PULL_REQUEST_REVIEWED)));
-        Map<String, byte[]> files = new HashMap<>();
-
-        injector.inject(files, job(ScmSignals.PULL_REQUEST_MERGED), ArtifactKinds.PULL_REQUEST);
-
-        assertThat(files).containsKey(md("retrospective"));
-        assertThat(files).doesNotContainKey(md("authoring"));
-        assertThat(files).doesNotContainKey(md("reviewer"));
-    }
-
-    @Test
-    @DisplayName("a recheck materialises the practices admission rechecked beside those its signal occasions")
-    void shouldAddTheRecheckedPracticesToThoseTheSignalOccasions() {
-        when(practiceRepository.findByWorkspaceIdAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST))
-                .thenReturn(List.of(
-                        practice("describe", ScmSignals.PULL_REQUEST_OPENED),
-                        practice("sized", ScmSignals.PULL_REQUEST_OPENED),
-                        practice("tests", ScmSignals.PULL_REQUEST_SYNCHRONIZED)));
-        AgentJob job = job(ScmSignals.PULL_REQUEST_SYNCHRONIZED);
-        var metadata = assertInstanceOf(ObjectNode.class, job.getMetadata());
-        metadata.putArray(AgentJob.RECHECKED_PRACTICES_METADATA_KEY).add("describe");
-
-        assertThat(injector.resolveEligiblePractices(job, ArtifactKinds.PULL_REQUEST))
-                .extracting(Practice::getSlug)
-                .containsExactly("describe", "tests");
-        Map<String, byte[]> files = new HashMap<>();
-        injector.inject(files, job, ArtifactKinds.PULL_REQUEST);
-        // Read under its own requirements, not the push's, so its evidence is still required of the capture.
-        var describe = objectMapper
-                .readTree(Objects.requireNonNull(files.get(SandboxLayout.PRACTICES_PREFIX + "index.json")))
-                .get(0);
-        assertThat(describe.path("slug").asString()).isEqualTo("describe");
-        assertThat(describe.path("readsSources").isEmpty()).isFalse();
-    }
-
-    @Test
-    @DisplayName("a review of a draft materialises only the practices that review drafts, as the gate admitted")
-    void shouldSelectOnlyDraftPracticesWhenTheWorkWasADraft() {
-        Practice reviewsDrafts = practice("handoff", ScmSignals.PULL_REQUEST_OPENED);
-        reviewsDrafts.setSignals(List.of(ScmSignals.PULL_REQUEST_OPENED));
-        reviewsDrafts.setEvidenceRequirements(PracticeTestEvidence.needsFor(ArtifactKinds.PULL_REQUEST));
-        reviewsDrafts.setReviewWhen(Map.of());
-        reviewsDrafts.setSubject(ActorRole.AUTHOR);
-        reviewsDrafts.setPrecondition(null);
-        when(practiceRepository.findByWorkspaceIdAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST))
-                .thenReturn(List.of(reviewsDrafts, practice("describe", ScmSignals.PULL_REQUEST_OPENED)));
-        AgentJob job = job(ScmSignals.PULL_REQUEST_OPENED);
-        assertInstanceOf(ObjectNode.class, job.getMetadata())
-                .set(
-                        PracticeCatalogInjector.REVIEW_STATE_METADATA_KEY,
-                        objectMapper.createObjectNode().put("draftStatus", "DRAFT"));
-        Map<String, byte[]> files = new HashMap<>();
-
-        injector.inject(files, job, ArtifactKinds.PULL_REQUEST);
-
-        assertThat(files).containsKey(md("handoff"));
-        assertThat(files).doesNotContainKey(md("describe"));
-    }
-
-    @Test
-    void shouldSelectOnlyReviewerPracticesWhenSubmittedReviewNamesReviewer() {
-        Practice author = practice("author-engagement", ScmSignals.PULL_REQUEST_REVIEWED);
-        Practice reviewer = practice("review-comment-quality", ScmSignals.PULL_REQUEST_REVIEWED);
-        reviewer.setSignals(List.of(ScmSignals.PULL_REQUEST_REVIEWED));
-        reviewer.setEvidenceRequirements(PracticeTestEvidence.needsFor(ArtifactKinds.PULL_REQUEST));
-        reviewer.setReviewWhen(Map.of("draftStatus", Set.of("NOT_DRAFT")));
-        reviewer.setSubject(ActorRole.REVIEWER);
-        reviewer.setPrecondition(null);
-        when(practiceRepository.findByWorkspaceIdAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST))
-                .thenReturn(List.of(author, reviewer));
-        Map<String, byte[]> files = new HashMap<>();
-
-        injector.inject(files, reviewerJob(), ArtifactKinds.PULL_REQUEST);
-
-        assertThat(files).containsKey(md("review-comment-quality"));
-        assertThat(files).doesNotContainKey(md("author-engagement"));
-    }
-
-    @Test
-    @DisplayName("a job with no trigger event keeps the full focus set (manual request)")
-    void noTriggerEventKeepsFullSet() {
-        when(practiceRepository.findByWorkspaceIdAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST))
-                .thenReturn(List.of(
-                        practice("authoring", ScmSignals.PULL_REQUEST_OPENED),
-                        practice("retrospective", ScmSignals.PULL_REQUEST_MERGED)));
-        Map<String, byte[]> files = new HashMap<>();
-
-        injector.inject(files, job(null), ArtifactKinds.PULL_REQUEST);
-
-        assertThat(files).containsKey(md("authoring"));
-        assertThat(files).containsKey(md("retrospective"));
-    }
-
-    @Test
-    @DisplayName("a trigger event that matches nothing fails closed")
-    void noMatchFailsClosed() {
-        when(practiceRepository.findByWorkspaceIdAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST))
-                .thenReturn(List.of(
-                        practice("authoring", ScmSignals.PULL_REQUEST_OPENED),
-                        practice("retrospective", ScmSignals.PULL_REQUEST_MERGED)));
-        Map<String, byte[]> files = new HashMap<>();
-
-        assertThatThrownBy(() -> injector.inject(
-                        files, job(SignalName.of("scm.pull_request.rebased")), ArtifactKinds.PULL_REQUEST))
-                .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("No active scm.pull_request practices");
-        assertThat(files).isEmpty();
-    }
-
-    @Test
-    @DisplayName("a slug that violates the ABI pattern is rejected before it can escape the practices/ prefix")
-    void abiSlugViolationThrows() {
-        // Defense-in-depth: slugs are interpolated into filesystem paths, so a mis-seeded slug with a path
-        // traversal must be rejected, not written to disk.
-        when(practiceRepository.findByWorkspaceIdAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST))
-                .thenReturn(List.of(practice("../escape", ScmSignals.PULL_REQUEST_OPENED)));
-
-        assertThatThrownBy(() -> injector.inject(new HashMap<>(), job(null), ArtifactKinds.PULL_REQUEST))
-                .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("ABI pattern");
-    }
-
-    @Test
-    @DisplayName("a job with no workspace throws JobPreparationException")
-    void noWorkspaceThrows() {
-        AgentJob job = new AgentJob();
-
-        assertThatThrownBy(() -> injector.inject(new HashMap<>(), job, ArtifactKinds.PULL_REQUEST))
-                .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("no workspace");
-    }
-
-    @Test
-    @DisplayName("an empty active-practice set throws JobPreparationException")
-    void emptyFocusSetThrows() {
-        when(practiceRepository.findByWorkspaceIdAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST))
-                .thenReturn(List.of());
-
-        assertThatThrownBy(() -> injector.inject(new HashMap<>(), job(null), ArtifactKinds.PULL_REQUEST))
-                .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("No active");
-    }
-
-    @Test
-    @DisplayName("a practice whose effective autonomy is OFF is not staged, and one that inherits its autonomy is")
-    void offPracticesAreFilteredOutAfterTheTierIsResolved() {
-        // The repository does not filter by autonomy: a `autonomy <> 'OFF'` predicate would answer UNKNOWN
-        // for the null column that means "inherit", making the inheritance chain vanish from the
-        // catalogue. The injector resolves the chain and filters here instead.
-        Practice off = practice("silenced", ScmSignals.PULL_REQUEST_OPENED);
-        off.setAutonomy(PracticeAutonomy.OFF);
-        Practice inherits = practice("authoring", ScmSignals.PULL_REQUEST_OPENED);
-        when(practiceRepository.findByWorkspaceIdAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST))
-                .thenReturn(List.of(off, inherits));
-        Map<String, byte[]> files = new HashMap<>();
-
-        injector.inject(files, job(null), ArtifactKinds.PULL_REQUEST);
-
-        assertThat(files).containsKey(md("authoring"));
-        assertThat(files).doesNotContainKey(md("silenced"));
-    }
-
-    @Test
-    @DisplayName("inject writes index.json and the per-slug criteria, and skips blank precompute scripts")
-    void injectWritesCatalogArtifactsAndSkipsBlankPrecompute() {
-        Practice withScript = practice("authoring", ScmSignals.PULL_REQUEST_OPENED);
-        withScript.setPrecomputeScript("export default () => ({});");
-        Practice blankScript = practice("retrospective", ScmSignals.PULL_REQUEST_MERGED);
-        blankScript.setPrecomputeScript("   "); // blank → no .ts written
-        when(practiceRepository.findByWorkspaceIdAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST))
-                .thenReturn(List.of(withScript, blankScript));
-        Map<String, byte[]> files = new HashMap<>();
-
-        injector.inject(files, job(null), ArtifactKinds.PULL_REQUEST);
-
-        // index.json lists both practices (group falls back to the slug when ungrouped).
-        String index = new String(files.get(SandboxLayout.PRACTICES_PREFIX + "index.json"), StandardCharsets.UTF_8);
-        assertThat(index).contains("authoring").contains("retrospective");
-        // A pointer to where this practice's author expects the answer — not a fence. What may be cited
-        // is what the run staged, and INDEX.json is where that is stated, once.
-        assertThat(index).contains("readsSources").contains("scm.pull-request.diff");
-        assertThat(index).doesNotContain("allowedSources");
+    void shouldStageOnlyAssignedPinnedDefinitionsAndScripts() throws IOException {
+        var mapper = new JsonMapper();
+        var files = new LinkedHashMap<String, byte[]>();
+        var pinned = RuntimeReviewTestData.assignment(5L, "export default {};");
+        new PracticeCatalogInjector(mapper).inject(files, List.of(pinned), ReviewKind.ITEM, Map.of());
         assertThat(files)
-                .containsKey(md("authoring"))
-                .containsKey(md("retrospective"))
-                .doesNotContainKey(SandboxLayout.PRACTICES_PREFIX + "all-criteria.md");
-        // Only the populated precompute script is written; the blank one is skipped.
-        assertThat(files).containsKey(SandboxLayout.PRECOMPUTE_PREFIX + "practices/authoring.ts");
-        assertThat(files).doesNotContainKey(SandboxLayout.PRECOMPUTE_PREFIX + "practices/retrospective.ts");
+                .containsOnlyKeys(
+                        SandboxLayout.PRACTICES_PREFIX + "index.json",
+                        SandboxLayout.PRACTICES_PREFIX + "clear-names.md",
+                        SandboxLayout.PRACTICE_SCRIPT_PRACTICES_PREFIX + "clear-names.ts");
+        assertThat(new String(files.get(SandboxLayout.PRACTICES_PREFIX + "clear-names.md"), StandardCharsets.UTF_8))
+                .isEqualTo("Use clear names.");
+        var index = mapper.readTree(files.get(SandboxLayout.PRACTICES_PREFIX + "index.json"));
+        var fixture = mapper.readTree(Files.readString(Path.of("src/test/resources/agent/practice-index.json")));
+        assertThat(index).isEqualTo(fixture);
     }
 
     @Test
-    @DisplayName("staged criteria tell the model which claims the evidence cannot support")
-    void injectAppendsKnownLimitationsToCriteria() {
-        Practice limited = practice("authoring", ScmSignals.PULL_REQUEST_OPENED);
-        PracticeAutomatedReviewPolicy policy = limited.getAutomatedReviewPolicy();
-        limited.setAutomatedReviewPolicy(new PracticeAutomatedReviewPolicy(
-                policy.sourceContractVersion(),
-                policy.automatedReview(),
-                policy.whenEvidenceIsInsufficient(),
-                List.of(new PracticeEvidenceLimitation(
-                        "RUNTIME_BEHAVIOR_NOT_OBSERVED",
-                        "Repository evidence does not establish behavior in a deployed runtime.")),
-                null));
-        Practice unlimited = practice("retrospective", ScmSignals.PULL_REQUEST_OPENED);
-        when(practiceRepository.findByWorkspaceIdAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST))
-                .thenReturn(List.of(limited, unlimited));
-        Map<String, byte[]> files = new HashMap<>();
-
-        injector.inject(files, job(null), ArtifactKinds.PULL_REQUEST);
-
-        String staged = new String(files.get(md("authoring")), StandardCharsets.UTF_8);
-        assertThat(staged)
-                .contains("criteria for authoring")
-                .contains("## What this evidence cannot show")
-                .contains("Repository evidence does not establish behavior in a deployed runtime.");
-        assertThat(new String(files.get(md("retrospective")), StandardCharsets.UTF_8))
-                .doesNotContain("## What this evidence cannot show");
+    void shouldStageNoAuthoredScriptForTheBuiltInProgram() {
+        var files = new LinkedHashMap<String, byte[]>();
+        new PracticeCatalogInjector(new JsonMapper())
+                .inject(files, List.of(RuntimeReviewTestData.assignment(null, null)), ReviewKind.ITEM, Map.of());
+        assertThat(files).doesNotContainKey(SandboxLayout.PRACTICE_SCRIPT_PRACTICES_PREFIX + "clear-names.ts");
     }
 
     @Test
-    void shouldCarryWhyItMattersAndKnownLimitationsWhenIndexingPractices() {
-        Practice limited = practice("authoring", ScmSignals.PULL_REQUEST_OPENED);
-        limited.setWhyItMatters("Clear descriptions help reviewers.");
-        PracticeAutomatedReviewPolicy policy = limited.getAutomatedReviewPolicy();
-        limited.setAutomatedReviewPolicy(new PracticeAutomatedReviewPolicy(
-                policy.sourceContractVersion(),
-                policy.automatedReview(),
-                policy.whenEvidenceIsInsufficient(),
-                List.of(new PracticeEvidenceLimitation(
-                        "RUNTIME_BEHAVIOR_NOT_OBSERVED",
-                        "Repository evidence does not establish behavior in a deployed runtime.")),
-                null));
-        limited.setCurrentRevision(revisionOf(limited));
-        Practice plain = practice("retrospective", ScmSignals.PULL_REQUEST_OPENED);
-        when(practiceRepository.findByWorkspaceIdAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST))
-                .thenReturn(List.of(limited, plain));
-        Map<String, byte[]> files = new HashMap<>();
-
-        injector.inject(files, job(null), ArtifactKinds.PULL_REQUEST);
-
-        JsonNode index =
-                objectMapper.readTree(Objects.requireNonNull(files.get(SandboxLayout.PRACTICES_PREFIX + "index.json")));
-        JsonNode authoring = index.path(0);
-        assertThat(authoring.path("slug").asString()).isEqualTo("authoring");
-        assertThat(authoring.path("whyItMatters").asString()).isEqualTo("Clear descriptions help reviewers.");
-        assertThat(authoring.path("knownLimitations").size()).isEqualTo(1);
-        assertThat(authoring.path("knownLimitations").path(0).asString())
-                .isEqualTo("Repository evidence does not establish behavior in a deployed runtime.");
-        JsonNode retrospective = index.path(1);
-        assertThat(retrospective.path("slug").asString()).isEqualTo("retrospective");
-        assertThat(retrospective.path("whyItMatters").isNull()).isTrue();
-        assertThat(retrospective.path("knownLimitations").isArray()).isTrue();
-        assertThat(retrospective.path("knownLimitations").isEmpty()).isTrue();
+    void scanIndexCarriesOnlyTheFrozenGrantAndTheScanReadRequirements() {
+        var mapper = new JsonMapper();
+        var pinned = scanAssignment();
+        for (var paths : List.of(List.<String>of(), List.of("docs/rules.md"))) {
+            var files = new LinkedHashMap<String, byte[]>();
+            new PracticeCatalogInjector(mapper)
+                    .inject(files, List.of(pinned), ReviewKind.SCAN, Map.of(pinned.id(), paths));
+            var entry = mapper.readTree(files.get(SandboxLayout.PRACTICES_PREFIX + "index.json"))
+                    .get(0);
+            assertThat(entry.path("contextPaths")).isEqualTo(mapper.valueToTree(paths));
+            assertThat(entry.path("readsSources")).isEqualTo(mapper.valueToTree(List.of("docs.document.core")));
+            assertThat(entry.path("exhaustiveSources")).isEqualTo(entry.path("readsSources"));
+        }
     }
 
-    /** Resolves every workspace to the unset defaults — AUTOMATIC autonomy, reach on the work. */
-    private static WorkspaceReviewDefaultsProvider workspaceDefaults() {
-        WorkspaceReviewDefaultsProvider provider = mock(WorkspaceReviewDefaultsProvider.class);
-        lenient().when(provider.forWorkspace(anyLong())).thenReturn(WorkspaceReviewDefaults.UNSET);
-        return provider;
+    @Test
+    void shouldStageAuthoredReviewLimits() {
+        var original = RuntimeReviewTestData.assignment(null, null);
+        var p = original.practice();
+        var d = p.definition();
+        var limit = new ReviewLimit("context", "Cannot judge behavior outside the captured document.");
+        var definition = new PracticeDefinition(
+                d.name(),
+                d.reviewOn(),
+                d.appliesWhen(),
+                d.about(),
+                d.reads(),
+                new ReviewedBy(d.reviewedBy().by(), d.reviewedBy().humanReason(), List.of(limit)),
+                d.criteria(),
+                d.script(),
+                d.scan(),
+                d.lineNotes(),
+                d.guidance());
+        var assignment = new ReviewAssignmentSnapshot(
+                original.id(),
+                original.item(),
+                original.version(),
+                original.developerId(),
+                original.practiceSlug(),
+                new PinnedPractice(p.practiceId(), p.practiceVersionId(), definition, p.reviewDigest(), p.method()));
+        var mapper = JsonMapper.builder().build();
+        var files = new LinkedHashMap<String, byte[]>();
+        new PracticeCatalogInjector(mapper).inject(files, List.of(assignment), ReviewKind.ITEM, Map.of());
+        assertThat(mapper.readTree(files.get(SandboxLayout.PRACTICES_PREFIX + "index.json"))
+                        .get(0)
+                        .path("knownLimitations"))
+                .isEqualTo(mapper.valueToTree(List.of(limit.description())));
+    }
+
+    @Test
+    void missingScanGrantIsRefusedRatherThanExposingAllCapturedPaths() {
+        assertThatThrownBy(() -> new PracticeCatalogInjector(new JsonMapper())
+                        .inject(new LinkedHashMap<>(), List.of(scanAssignment()), ReviewKind.SCAN, Map.of()))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("Missing frozen scan context grant");
+    }
+
+    static ReviewAssignmentSnapshot scanAssignment() {
+        var original = RuntimeReviewTestData.assignment(null, null);
+        var p = original.practice();
+        var d = p.definition();
+        var scan = new ScanDefinition(
+                original.item().kind(),
+                List.of("**"),
+                List.of(),
+                List.of("docs/*.md"),
+                new PracticeReads(
+                        "2.0.0",
+                        List.of(new PracticeReadSource(new SourceKind("docs.document.core"), ReadNeed.COMPLETE))));
+        var definition = new PracticeDefinition(
+                d.name(),
+                d.reviewOn(),
+                d.appliesWhen(),
+                d.about(),
+                d.reads(),
+                d.reviewedBy(),
+                d.criteria(),
+                d.script(),
+                scan,
+                d.lineNotes(),
+                d.guidance());
+        return new ReviewAssignmentSnapshot(
+                original.id(),
+                original.item(),
+                original.version(),
+                original.developerId(),
+                original.practiceSlug(),
+                new PinnedPractice(p.practiceId(), p.practiceVersionId(), definition, p.reviewDigest(), p.method()));
     }
 }

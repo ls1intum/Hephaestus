@@ -11,7 +11,7 @@ import { ChannelHistorySheet } from "./ChannelHistorySheet";
 const CONSENT_EVENTS_URL = "*/slack/channels/:slackChannelId/consent-events";
 
 const channel: SlackMonitoredChannel = {
-	id: 1,
+	id: "1",
 	slackTeamId: "T0000000000",
 	slackChannelId: "C02ACTIVE002",
 	channelName: "team-standup",
@@ -23,29 +23,41 @@ const channel: SlackMonitoredChannel = {
 
 const events: SlackChannelConsentEvent[] = [
 	{
-		id: 4,
+		id: "4",
 		slackChannelId: channel.slackChannelId,
 		toState: "ACTIVE",
 		fromState: "PAUSED",
 		createdAt: daysBefore(1),
 		reason: "Course resumed",
+		actorAccountId: "7",
 	},
 	{
-		id: 3,
+		id: "3",
 		slackChannelId: channel.slackChannelId,
 		toState: "PAUSED",
 		fromState: "ACTIVE",
 		createdAt: daysBefore(4),
 		reason: "Exam week",
+		actorAccountId: "7",
 	},
 	{
-		id: 2,
+		id: "2",
 		slackChannelId: channel.slackChannelId,
 		toState: "ACTIVE",
 		fromState: "PENDING",
 		createdAt: daysBefore(7),
+		reason: null,
+		actorAccountId: "7",
 	},
-	{ id: 1, slackChannelId: channel.slackChannelId, toState: "PENDING", createdAt: daysBefore(9) },
+	{
+		id: "1",
+		slackChannelId: channel.slackChannelId,
+		toState: "PENDING",
+		fromState: null,
+		createdAt: daysBefore(9),
+		reason: null,
+		actorAccountId: "7",
+	},
 ];
 
 const meta = {

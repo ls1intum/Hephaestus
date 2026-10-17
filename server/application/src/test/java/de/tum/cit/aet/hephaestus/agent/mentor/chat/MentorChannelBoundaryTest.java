@@ -20,7 +20,7 @@ class MentorChannelBoundaryTest extends HephaestusArchitectureTest {
 
     private static final String WEB_ADAPTER = "..agent.mentor.chat..";
     private static final String SYNC_PUSH_WEB_ADAPTER = "..integration.core.sync.push..";
-    private static final String SSE_EMITTER = "org.springframework.web.servlet.mvc.method.annotation.SseEmitter";
+    private static final String SSE_EMITTER = "SseEmitter";
 
     @Test
     @DisplayName("SseEmitter is confined to the web mentor adapter package")

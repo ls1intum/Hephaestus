@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, within } from "storybook/test";
 
-import type { PracticeReviewOverview } from "@/api/types.gen";
+import type { ReviewOverview } from "@/api/types.gen";
 import { withStandardPage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/stories/reflow";
 
@@ -14,11 +14,10 @@ import {
 import type { OverviewRegionState, PreviousReviewPeriodState } from "./review-states";
 import { ReviewPipeline } from "./ReviewPipeline";
 
-/** The thirty days before: fewer reviews, as many observations, more feedback. */
-const PREVIOUS: PracticeReviewOverview = {
+const PREVIOUS: ReviewOverview = {
 	...quietPracticeReviewOverview,
-	reviews: { completed: 30, failed: 0, timedOut: 0, cancelled: 0, running: 0, queued: 0 },
-	observations: { met: 40, notMet: 30, notApplicable: 5, undetermined: 3 },
+	reviews: { complete: 30, partial: 0, failed: 0, cancelled: 0, running: 0, queued: 0 },
+	results: { met: 40, notMet: 30, doesNotApply: 5, couldNotDetermine: 3 },
 	feedback: { ...feedbackCounts([]), delivered: 30 },
 };
 
@@ -28,21 +27,20 @@ const READY: OverviewRegionState = {
 	stale: false,
 };
 
-/** A course day's feedback: 120 pieces, 20 of them replaced, so 100 prepared; 30 withheld. */
-const COURSE_DAY: PracticeReviewOverview = {
+const COURSE_DAY: ReviewOverview = {
 	...practiceReviewOverview,
 	feedback: {
 		...feedbackCounts([]),
 		delivered: 60,
-		prepared: 5,
+		ready: 5,
 		failed: 2,
-		suppressed: 30,
-		discarded: 3,
-		superseded: 20,
+		withheld: 30,
+		rejected: 3,
+		replaced: 20,
 	},
 };
 
-function readyOf(overview: PracticeReviewOverview): OverviewRegionState {
+function readyOf(overview: ReviewOverview): OverviewRegionState {
 	return { status: "ready", overview, stale: false };
 }
 
@@ -83,19 +81,16 @@ export const Default: Story = {
 		const stages = canvas.getByRole("list", { name: "Stages" });
 		await expect(stages).not.toHaveAttribute("aria-busy");
 		// Each total is set against the period before it, without a verdict either way.
-		canvas.getByText("8 more than the previous 30 days");
+		canvas.getByText("9 more than the previous 30 days");
 		canvas.getByText("Same as the previous 30 days");
-		canvas.getByText("6 fewer than the previous 30 days");
+		canvas.getByText("5 fewer than the previous 30 days");
 		// No tile links to its list: the tab above opens the same one, so a second way there is noise.
 		await expect(within(stages).queryByRole("link")).not.toBeInTheDocument();
 		within(stages).getByText("Reviews");
-		// Reviews still going have no outcome yet: they come last in the row, quiet, with the share
-		// that failed or timed out after them. How many run and wait right now is the queue's to say,
-		// so the tile does not split them.
 		await expect(
 			within(canvas.getByRole("list", { name: "Reviews not finished yet" })).getByRole("listitem"),
 		).toHaveTextContent("3 not finished yet");
-		canvas.getByText("failed or timed out", { exact: false });
+		await expect(canvas.getByTitle("3 of 35 finished reviews")).toHaveTextContent("9% failed");
 		await expect(canvas.queryByText(/\brunning\b/u)).not.toBeInTheDocument();
 		// Every tile has the same rows: title, figure, comparison, chart, then the row of figures, so
 		// the charts of the tiles side by side stand at the same height and are as tall.
@@ -109,22 +104,22 @@ export const Default: Story = {
 			within(canvas.getByRole("list", { name: "Reviews by outcome" }))
 				.getAllByRole("listitem")
 				.map((item) => item.textContent),
-		).toEqual(["31 completed", "2 failed", "1 timed out", "1 canceled"]);
+		).toEqual(["31 complete", "1 partial", "3 failed", "1 cancelled"]);
 		await expect(
 			within(canvas.getByRole("list", { name: "Feedback by delivery" }))
 				.getAllByRole("listitem")
 				.map((item) => item.textContent),
 		).toEqual([
 			"3 awaiting approval",
-			"1 prepared",
+			"1 ready",
 			"14 delivered",
+			"1 delivery unconfirmed",
 			"4 withheld",
 			"1 failed to deliver",
 			"1 replaced by newer",
 		]);
-		// The marked-incorrect count overlaps the observations' outcomes, so it is listed apart.
 		await expect(
-			within(canvas.getByRole("list", { name: "Observations checked by an admin" })).getByRole(
+			within(canvas.getByRole("list", { name: "Results checked by an admin" })).getByRole(
 				"listitem",
 			),
 		).toHaveTextContent("3 marked incorrect");

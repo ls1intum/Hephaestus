@@ -5,12 +5,13 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetHeadroom;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
-import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageSourceType;
+import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
+import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -40,7 +41,8 @@ class ProxyBudgetGateTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        gate = new ProxyBudgetGate(budgetService);
+        gate = new ProxyBudgetGate(
+                budgetService, new PracticeReviewProperties(false, 15, 5, null, 12, 16000, 3, 200_000, 1000));
     }
 
     private static LlmBudgetHeadroom instanceCapOfOneDollar() {
@@ -51,7 +53,7 @@ class ProxyBudgetGateTest extends BaseUnitTest {
         return new LlmBudgetHeadroom(null, null, false, BigDecimal.ZERO, ONE_DOLLAR, false);
     }
 
-    private static ProxyRouting routing(@Nullable FundingSource scope, @Nullable String spentSoFarUsd) {
+    private static ProxyRouting routing(@Nullable UsageFundingSource scope, @Nullable String spentSoFarUsd) {
         return new ProxyRouting(
                 "job:test",
                 "openai-completions",
@@ -63,11 +65,13 @@ class ProxyBudgetGateTest extends BaseUnitTest {
                 spentSoFarUsd == null
                         ? null
                         : new ProxyRouting.BilledAttempt(
-                                LlmUsageSourceType.AGENT_JOB,
+                                UsageSourceType.REVIEW_JOB,
                                 UUID.randomUUID(),
                                 0,
                                 new BigDecimal(spentSoFarUsd),
-                                "worker-1"));
+                                "worker-1"),
+                null,
+                null);
     }
 
     @Nested
@@ -80,10 +84,10 @@ class ProxyBudgetGateTest extends BaseUnitTest {
             LlmBudgetHeadroom headroom = instanceCapOfOneDollar();
             when(budgetService.headroom(WORKSPACE_ID)).thenReturn(headroom);
 
-            assertThat(headroom.decide().blocks(FundingSource.INSTANCE))
+            assertThat(headroom.decide().blocks(UsageFundingSource.INSTANCE))
                     .as("the ledger alone allows both of these calls")
                     .isFalse();
-            assertThat(gate.isBlocked(routing(FundingSource.INSTANCE, ownSpendUsd)))
+            assertThat(gate.isBlocked(routing(UsageFundingSource.INSTANCE, ownSpendUsd)))
                     .isEqualTo(blocked);
         }
 
@@ -92,8 +96,10 @@ class ProxyBudgetGateTest extends BaseUnitTest {
         void theAttemptSpendIsFreshEvenWhenTheLedgerVerdictIsCached() {
             when(budgetService.headroom(WORKSPACE_ID)).thenReturn(instanceCapOfOneDollar());
 
-            assertThat(gate.isBlocked(routing(FundingSource.INSTANCE, "0.60"))).isFalse();
-            assertThat(gate.isBlocked(routing(FundingSource.INSTANCE, "1.20"))).isTrue();
+            assertThat(gate.isBlocked(routing(UsageFundingSource.INSTANCE, "0.60")))
+                    .isFalse();
+            assertThat(gate.isBlocked(routing(UsageFundingSource.INSTANCE, "1.20")))
+                    .isTrue();
 
             verify(budgetService, times(1)).headroom(WORKSPACE_ID);
         }
@@ -110,7 +116,8 @@ class ProxyBudgetGateTest extends BaseUnitTest {
                     .thenReturn(new LlmBudgetHeadroom(
                             new BigDecimal("500.00"), ONE_DOLLAR, false, BigDecimal.ZERO, null, false));
 
-            assertThat(gate.isBlocked(routing(FundingSource.WORKSPACE, "9.99"))).isFalse();
+            assertThat(gate.isBlocked(routing(UsageFundingSource.WORKSPACE, "9.99")))
+                    .isFalse();
         }
 
         @Test
@@ -118,7 +125,8 @@ class ProxyBudgetGateTest extends BaseUnitTest {
         void aWorkspaceFundedAttemptIsJudgedAgainstItsOwnCap() {
             when(budgetService.headroom(WORKSPACE_ID)).thenReturn(workspaceCapOfOneDollar());
 
-            assertThat(gate.isBlocked(routing(FundingSource.WORKSPACE, "1.00"))).isTrue();
+            assertThat(gate.isBlocked(routing(UsageFundingSource.WORKSPACE, "1.00")))
+                    .isTrue();
         }
 
         @Test
@@ -130,10 +138,6 @@ class ProxyBudgetGateTest extends BaseUnitTest {
         }
     }
 
-    /**
-     * A mentor turn has no {@code agent_job} row, so it needs a meter of its own: a route the gate finds
-     * nothing to charge against spends without limit for the whole length of a turn.
-     */
     @Nested
     @DisplayName("a mentor turn is bounded by its own completed calls, exactly like a job attempt")
     class AMentorTurn {
@@ -141,8 +145,8 @@ class ProxyBudgetGateTest extends BaseUnitTest {
         private final MentorProxyCredentialRegistry credentials = new MentorProxyCredentialRegistry();
 
         private static final LlmPriceSnapshot TEN_DOLLARS_PER_MILLION_INPUT = new LlmPriceSnapshot(
-                FundingSource.INSTANCE,
-                PricingState.PRICED,
+                UsageFundingSource.INSTANCE,
+                UsagePricingState.PRICED,
                 1L,
                 null,
                 new BigDecimal("10"),
@@ -157,7 +161,7 @@ class ProxyBudgetGateTest extends BaseUnitTest {
                     new MentorProxyCredentialRegistry.Route(
                             "openai-responses",
                             "https://frozen.example.com/v1",
-                            FundingSource.INSTANCE,
+                            UsageFundingSource.INSTANCE,
                             7L,
                             8L,
                             WORKSPACE_ID));
@@ -166,7 +170,7 @@ class ProxyBudgetGateTest extends BaseUnitTest {
             if (inputTokens > 0) {
                 credentials.accumulate(meter.turnId(), new ProxyTokenUsage(inputTokens, 0, 0, 0, 0));
             }
-            return credentials.validate(token).orElseThrow();
+            return credentials.authenticate(token).flatMap(credentials::resolve).orElseThrow();
         }
 
         /** At $10 per million input tokens, 100k tokens is $1.00 — the whole cap; 90k is still under it. */
@@ -176,7 +180,7 @@ class ProxyBudgetGateTest extends BaseUnitTest {
             LlmBudgetHeadroom headroom = instanceCapOfOneDollar();
             when(budgetService.headroom(WORKSPACE_ID)).thenReturn(headroom);
 
-            assertThat(headroom.decide().blocks(FundingSource.INSTANCE))
+            assertThat(headroom.decide().blocks(UsageFundingSource.INSTANCE))
                     .as("the ledger alone allows both of these turns")
                     .isFalse();
             assertThat(gate.isBlocked(turnThatHasSpent(inputTokens))).isEqualTo(blocked);
@@ -192,16 +196,46 @@ class ProxyBudgetGateTest extends BaseUnitTest {
         void aRouteWithNoLiveExecutionIsJudgedOnTheLedgerAlone() {
             when(budgetService.headroom(WORKSPACE_ID)).thenReturn(instanceCapOfOneDollar());
 
-            assertThat(gate.isBlocked(routing(FundingSource.INSTANCE, null))).isFalse();
+            assertThat(gate.isBlocked(routing(UsageFundingSource.INSTANCE, null)))
+                    .isFalse();
         }
 
         @Test
         @DisplayName("an unattributable route with no workspace never blocks, and never queries the ledger")
         void aRouteWithNoWorkspaceFailsOpen() {
             ProxyRouting noWorkspace = new ProxyRouting(
-                    "job:legacy", "openai-completions", "https://frozen.example.com/v1", null, null, null, null, null);
+                    "job:legacy",
+                    "openai-completions",
+                    "https://frozen.example.com/v1",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
 
             assertThat(gate.isBlocked(noWorkspace)).isFalse();
+        }
+    }
+
+    @Nested
+    class DirectModelCap {
+
+        @ParameterizedTest
+        @CsvSource({"199999, 999, false", "200000, 0, true", "0, 999, false", "0, 1000, true", "199999, 1000, true"})
+        void shouldRefuseWhenTheAttemptsDirectModelTokensOrSearchUnitsReachTheirLimit(
+                long tokens, long searchUnits, boolean reached) {
+            var attempt = new ProxyRouting.BilledAttempt(
+                    UsageSourceType.PRACTICE_SCRIPT_RERANKING,
+                    UUID.randomUUID(),
+                    0,
+                    BigDecimal.ZERO,
+                    "worker",
+                    tokens,
+                    searchUnits);
+
+            assertThat(gate.isDirectModelCapReached(attempt)).isEqualTo(reached);
         }
     }
 }

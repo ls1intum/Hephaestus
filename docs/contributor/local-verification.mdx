@@ -39,8 +39,8 @@ The command compares committed, staged, unstaged, untracked, and deleted paths w
 | Changed path                                                                                                                                                                                         | Task                                  |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
 | `webapp/**`                                                                                                                                                                                          | `affected:webapp`                     |
-| `server/**` outside the agent and precompute resources                                                                                                                                               | `affected:server`                     |
-| `server/**/resources/{agent,practices/precompute}/**`, `docker/agents/**`                                                                                                                            | `affected:agents`                     |
+| `server/**` outside the agent and practice script resources                                                                                                                                          | `affected:server`                     |
+| `server/**/resources/{agent,practices/scripts}/**`, `docker/agents/**`                                                                                                                               | `affected:agents`                     |
 | `docs/**`                                                                                                                                                                                            | `affected:docs`                       |
 | `docs/images/readme/**`                                                                                                                                                                              | `affected:docs` and `affected:webapp` |
 | `.github/**`, `.claude/**`, `.agents/**`, `.changeset/**`, `scripts/**`, `webapp/tools/oxlint/**`, root package and tsconfig files, generated artifacts, `AGENTS.md`, `CLAUDE.md`, or any other path | `quality`                             |
@@ -218,7 +218,7 @@ Oxlint lints.
 Oxfmt formats, sorts imports, and sorts Tailwind classes.
 One rule set has multiple layers.
 The root `.oxlintrc.json` is the base for every TypeScript file and the config for the Node trees.
-These trees are the agent runner, precompute, `scripts/**`, `load-tests/**`, and the task graph.
+These trees are the agent runner, the practice script toolkit, `scripts/**`, `load-tests/**`, and the task graph.
 `oxlint.react.jsonc` is the React layer.
 
 `oxlint.app.jsonc` adds the application compiler, Vitest, and Storybook policy for `webapp/.oxlintrc.json` and `extension/.oxlintrc.json`.

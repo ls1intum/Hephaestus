@@ -1,8 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
 
-import type { CatalogPracticeSummary } from "@/api/types.gen";
-import { mockAuthorDeclaredEvidenceValidation } from "@/mocks/fixtures/practice";
+import type { AdoptablePractice } from "@/components/admin/practices/catalog-adoption";
 
 import { AvailablePracticeList } from "./AvailablePracticeList";
 
@@ -12,35 +11,35 @@ import { AvailablePracticeList } from "./AvailablePracticeList";
 const detailParamOf = (link: HTMLElement) =>
 	new URL(link.getAttribute("href") ?? "", "https://example.test").searchParams.get("detail");
 
-const describeWhatAndWhy: CatalogPracticeSummary = {
+const describeWhatAndWhy: AdoptablePractice = {
 	slug: "describe-what-and-why",
 	name: "Describe what changed and why",
-	artifactKind: "scm.pull_request",
+	kind: "scm.pull_request",
 	groupSlug: "review-ready-work",
 	groupName: "Review-ready work",
 	availability: "AVAILABLE",
-	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
+	reviewedBy: { by: "HEPHAESTUS", humanReason: null, limits: [] },
 };
 
-const reviewScope: CatalogPracticeSummary = {
+const reviewScope: AdoptablePractice = {
 	slug: "review-scope",
 	name: "Keep pull requests focused",
-	artifactKind: "scm.pull_request",
+	kind: "scm.pull_request",
 	groupSlug: "review-ready-work",
 	groupName: "Review-ready work",
 	availability: "ADOPTED",
-	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
+	reviewedBy: { by: "HEPHAESTUS", humanReason: null, limits: [] },
 };
 
-const issueContext: CatalogPracticeSummary = {
+const issueContext: AdoptablePractice = {
 	slug: "issue-context",
 	name: "Include enough issue context",
-	artifactKind: "scm.issue",
+	kind: "scm.issue",
 	availability: "SLUG_CONFLICT",
-	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
+	reviewedBy: { by: "HEPHAESTUS", humanReason: null, limits: [] },
 };
 
-const practices: CatalogPracticeSummary[] = [describeWhatAndWhy, reviewScope, issueContext];
+const practices: AdoptablePractice[] = [describeWhatAndWhy, reviewScope, issueContext];
 
 /**
  * Grouping is not optional and adopted entries are not shown twice, so the list has no display

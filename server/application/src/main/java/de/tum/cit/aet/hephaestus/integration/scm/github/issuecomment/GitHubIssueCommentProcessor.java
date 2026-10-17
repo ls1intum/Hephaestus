@@ -1,9 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -19,6 +16,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestR
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.BaseGitHubProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.GitHubIssueDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment.dto.GitHubIssueCommentEventDTO.GitHubCommentDTO;
@@ -421,8 +421,7 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
         populateBaseIssueFields(issue, dto, repository, context);
         Issue saved = issueRepository.save(issue);
         log.info(
-                "Created stub Issue from comment webhook (will be hydrated by issue webhook or sync): "
-                        + "issueId={}, issueNumber={}, repoName={}",
+                "Created stub Issue from comment webhook (will be hydrated by issue webhook or sync): issueId={}, issueNumber={}, repoName={}",
                 saved.getId(),
                 saved.getNumber(),
                 repository.getNameWithOwner());
@@ -465,8 +464,7 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
 
         PullRequest saved = pullRequestRepository.save(pr);
         log.info(
-                "Created stub PullRequest from comment webhook (will be hydrated by PR webhook or sync): "
-                        + "prId={}, prNumber={}, repoName={}",
+                "Created stub PullRequest from comment webhook (will be hydrated by PR webhook or sync): prId={}, prNumber={}, repoName={}",
                 saved.getId(),
                 saved.getNumber(),
                 repository.getNameWithOwner());
@@ -531,8 +529,8 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
      */
     private Issue.@Nullable State convertState(@Nullable String state) {
         if (state == null) {
-            log.warn("Issue state is null when creating stub from comment webhook, defaulting to OPEN. "
-                    + "This may indicate missing data in webhook payload.");
+            log.warn(
+                    "Issue state is null when creating stub from comment webhook, defaulting to OPEN. This may indicate missing data in webhook payload.");
             return Issue.State.OPEN;
         }
         return switch (state.toUpperCase(Locale.ROOT)) {

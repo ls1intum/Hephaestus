@@ -1,0 +1,77 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"type": "object",
+	"properties": {
+		"channel": {
+			"type": "string"
+		},
+		"threadTs": {
+			"type": "string"
+		},
+		"messages": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"properties": {
+					"ts": {
+						"type": "string"
+					},
+					"author": {
+						"type": [
+							"string",
+							"null"
+						]
+					},
+					"accountId": {
+						"anyOf": [
+							{
+								"type": "string",
+								"pattern": "^[1-9][0-9]*$"
+							},
+							{
+								"type": "null"
+							}
+						]
+					},
+					"authorLogin": {
+						"type": "string"
+					},
+					"authorName": {
+						"type": "string"
+					},
+					"text": {
+						"type": [
+							"string",
+							"null"
+						]
+					},
+					"edited": {
+						"type": "boolean",
+						"const": true
+					}
+				},
+				"required": [
+					"ts",
+					"author",
+					"accountId",
+					"text"
+				]
+			}
+		},
+		"messageCount": {
+			"type": "integer",
+			"minimum": -9007199254740991,
+			"maximum": 9007199254740991
+		},
+		"truncated": {
+			"type": "boolean"
+		}
+	},
+	"required": [
+		"channel",
+		"threadTs",
+		"messages",
+		"messageCount",
+		"truncated"
+	]
+}

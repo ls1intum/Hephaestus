@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.profile;
 
-import de.tum.cit.aet.hephaestus.practices.observation.PracticeStandingService;
+import de.tum.cit.aet.hephaestus.practices.result.trend.PracticeTrendService;
 import java.time.Duration;
 import java.time.Instant;
 import org.jspecify.annotations.Nullable;
@@ -18,7 +18,7 @@ import org.jspecify.annotations.Nullable;
 public record OverviewWindow(Instant since, Instant until) {
 
     /** The span a window with no previous run to open at falls back to. */
-    public static final Duration LOOKBACK = Duration.ofDays(PracticeStandingService.LOOKBACK_DAYS);
+    public static final Duration LOOKBACK = Duration.ofDays(PracticeTrendService.LOOKBACK_DAYS);
 
     public OverviewWindow {
         if (!since.isBefore(until)) {

@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.outline.domain;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.integration.outline.documentation.OutlineDocumentAccess;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -21,22 +22,42 @@ import org.springframework.transaction.annotation.Transactional;
 public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument, Long> {
     /** AI readers exclude controlled native creator, editor and collaborator identities. Mirror writes do not. */
     String PERSON_PROJECTION_GUARD = """
-            AND NOT EXISTS (SELECT 1 FROM PersonSuppression s, IdentityProvider p, Connection c
-              WHERE s.providerId=p.id AND c.id=d.connectionId AND c.workspace.id=:workspaceId
+            AND EXISTS (SELECT 1 FROM Connection active WHERE active.id=d.connectionId AND active.workspace.id=:workspaceId
+              AND active.kind=de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind.OUTLINE
+              AND active.state=de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState.ACTIVE)
+            AND NOT EXISTS (SELECT 1 FROM Identity i, IdentityProvider p, Connection c, Account a
+              WHERE i.providerId=p.id AND i.account.id=a.id AND c.id=d.connectionId AND c.workspace.id=:workspaceId
                 AND p.type=de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType.OUTLINE
-                AND p.serverUrl=FUNCTION('jsonb_extract_path_text',c.config,'serverUrl') AND s.teamKey=''
-                AND (s.subject=d.createdBySubject OR s.subject=d.updatedBySubject
-                  OR FUNCTION('jsonb_exists',d.collaboratorSubjects,s.subject)=TRUE))
-            """;
+                AND p.serverUrl=FUNCTION('jsonb_extract_path_text',c.config,'serverUrl')
+                AND i.teamKey=COALESCE(c.instanceKey,'')
+                AND a.aiChoice=de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice.NO_AI
+                AND (i.providerUserKey=d.createdBySubject OR i.providerUserKey=d.updatedBySubject
+                  OR FUNCTION('jsonb_exists',d.collaboratorSubjects,i.providerUserKey)=TRUE))
+        AND NOT EXISTS (SELECT 1 FROM IdentityRestriction s, IdentityProvider p, Connection c
+          WHERE s.kind=de.tum.cit.aet.hephaestus.core.privacy.IdentityRestriction.Kind.ERASED AND s.providerId=p.id AND c.id=d.connectionId AND c.workspace.id=:workspaceId
+            AND p.type=de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType.OUTLINE
+            AND p.serverUrl=FUNCTION('jsonb_extract_path_text',c.config,'serverUrl') AND s.teamKey=COALESCE(c.instanceKey,'')
+            AND (s.providerUserKey=d.createdBySubject OR s.providerUserKey=d.updatedBySubject
+              OR FUNCTION('jsonb_exists',d.collaboratorSubjects,s.providerUserKey)=TRUE))
+        """;
 
     String PERSON_PROJECTION_SQL_GUARD = """
-            AND NOT EXISTS (SELECT 1 FROM person_suppression s
-              JOIN identity_provider p ON p.id=s.provider_id
-              JOIN connection c ON c.id=d.connection_id AND c.workspace_id=:workspaceId
-              WHERE p.type='OUTLINE' AND p.server_url=c.config->>'serverUrl' AND s.team_key=''
-                AND (s.subject=d.created_by_subject OR s.subject=d.updated_by_subject
-                  OR jsonb_exists(d.collaborator_subjects,s.subject)))
-            """;
+            AND EXISTS (SELECT 1 FROM connection active WHERE active.id=d.connection_id AND active.workspace_id=:workspaceId
+              AND active.kind='OUTLINE' AND active.state='ACTIVE')
+            AND NOT EXISTS (SELECT 1 FROM identity i JOIN identity_provider p ON p.id=i.provider_id
+              JOIN account a ON a.id=i.account_id JOIN connection c ON c.id=d.connection_id AND c.workspace_id=:workspaceId
+              WHERE p.type='OUTLINE' AND p.server_url=c.config->>'serverUrl' AND i.team_key=COALESCE(c.instance_key,'')
+                AND a.ai_choice='NO_AI' AND (i.provider_user_key=d.created_by_subject OR i.provider_user_key=d.updated_by_subject
+                  OR jsonb_exists(d.collaborator_subjects,i.provider_user_key)))
+        AND NOT EXISTS (SELECT 1 FROM identity_restriction s
+          JOIN identity_provider p ON p.id=s.provider_id
+          JOIN connection c ON c.id=d.connection_id AND c.workspace_id=:workspaceId
+          WHERE s.kind='ERASED' AND p.type='OUTLINE' AND p.server_url=c.config->>'serverUrl' AND s.team_key=COALESCE(c.instance_key,'')
+            AND (s.provider_user_key=d.created_by_subject OR s.provider_user_key=d.updated_by_subject
+              OR jsonb_exists(d.collaborator_subjects,s.provider_user_key)))
+        """;
+
+    boolean existsByWorkspaceIdAndId(Long workspaceId, Long id);
 
     long deleteByWorkspaceId(Long workspaceId);
 
@@ -48,8 +69,8 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
             Long workspaceId, Long connectionId, String collectionId);
 
     /** Live document counts by collection — one query for the whole admin list. Each element is {@code [collectionId, count]}. */
-    @Query("SELECT d.collectionId, COUNT(d) FROM OutlineDocument d WHERE d.workspaceId = :workspaceId "
-            + "AND d.connectionId = :connectionId AND d.deletedAt IS NULL GROUP BY d.collectionId")
+    @Query(
+            "SELECT d.collectionId, COUNT(d) FROM OutlineDocument d WHERE d.workspaceId = :workspaceId AND d.connectionId = :connectionId AND d.deletedAt IS NULL GROUP BY d.collectionId")
     List<Object[]> countLiveByCollection(
             @Param("workspaceId") long workspaceId, @Param("connectionId") long connectionId);
 
@@ -60,44 +81,26 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
     Optional<OutlineDocument> findByWorkspaceIdAndConnectionIdAndDocumentId(
             Long workspaceId, Long connectionId, String documentId);
 
-    @Query("SELECT d.id AS id, d.documentId AS sourceId, d.collectionSlug AS collectionSlug, d.slug AS slug, "
-            + "(d.deletedAt IS NOT NULL) AS deleted, (d.bodyMarkdown IS NOT NULL) AS bodyAvailable "
-            + "FROM OutlineDocument d WHERE d.workspaceId=:workspaceId AND d.id IN :ids "
-            + PERSON_PROJECTION_GUARD)
-    List<DocumentAccessRow> findAccessByWorkspaceIdAndIdIn(
-            @Param("workspaceId") long workspaceId, @Param("ids") Collection<Long> ids);
-
     /**
      * The body-free diff set the reconcile runs against. {@code LENGTH(body_markdown)} is evaluated in Postgres,
      * so no Markdown body crosses the wire or lands on the heap.
      */
-    @Query("SELECT new de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnapshot("
-            + "d.id, d.documentId, d.collectionId, d.collectionSlug, d.parentDocumentId, d.title, d.slug, "
-            + "d.archivedAt, d.outlineUpdatedAt, d.contentHash, d.deletedAt, LENGTH(d.bodyMarkdown), d.version) "
-            + "FROM OutlineDocument d "
-            + "WHERE d.workspaceId = :workspaceId AND d.connectionId = :connectionId")
+    @Query(
+            "SELECT new de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnapshot(d.id, d.documentId, d.collectionId, d.collectionSlug, d.parentDocumentId, d.title, d.slug, d.archivedAt, d.outlineUpdatedAt, d.contentHash, d.deletedAt, LENGTH(d.bodyMarkdown), d.version, d.createdBySubject) FROM OutlineDocument d WHERE d.workspaceId = :workspaceId AND d.connectionId = :connectionId")
     List<OutlineDocumentSnapshot> findSnapshotsByWorkspaceIdAndConnectionId(
             @Param("workspaceId") long workspaceId, @Param("connectionId") long connectionId);
 
     /** One collection's mirrored rows, body-free — the scope of a collection-delete tombstone sweep. */
-    @Query("SELECT new de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnapshot("
-            + "d.id, d.documentId, d.collectionId, d.collectionSlug, d.parentDocumentId, d.title, d.slug, "
-            + "d.archivedAt, d.outlineUpdatedAt, d.contentHash, d.deletedAt, LENGTH(d.bodyMarkdown), d.version) "
-            + "FROM OutlineDocument d "
-            + "WHERE d.workspaceId = :workspaceId AND d.connectionId = :connectionId "
-            + "AND d.collectionId = :collectionId")
+    @Query(
+            "SELECT new de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnapshot(d.id, d.documentId, d.collectionId, d.collectionSlug, d.parentDocumentId, d.title, d.slug, d.archivedAt, d.outlineUpdatedAt, d.contentHash, d.deletedAt, LENGTH(d.bodyMarkdown), d.version, d.createdBySubject) FROM OutlineDocument d WHERE d.workspaceId = :workspaceId AND d.connectionId = :connectionId AND d.collectionId = :collectionId")
     List<OutlineDocumentSnapshot> findSnapshotsByCollectionId(
             @Param("workspaceId") long workspaceId,
             @Param("connectionId") long connectionId,
             @Param("collectionId") String collectionId);
 
     /** One mirrored document's snapshot — the webhook targeted-refresh routing lookup (no body loaded). */
-    @Query("SELECT new de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnapshot("
-            + "d.id, d.documentId, d.collectionId, d.collectionSlug, d.parentDocumentId, d.title, d.slug, "
-            + "d.archivedAt, d.outlineUpdatedAt, d.contentHash, d.deletedAt, LENGTH(d.bodyMarkdown), d.version) "
-            + "FROM OutlineDocument d "
-            + "WHERE d.workspaceId = :workspaceId AND d.connectionId = :connectionId "
-            + "AND d.documentId = :documentId")
+    @Query(
+            "SELECT new de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnapshot(d.id, d.documentId, d.collectionId, d.collectionSlug, d.parentDocumentId, d.title, d.slug, d.archivedAt, d.outlineUpdatedAt, d.contentHash, d.deletedAt, LENGTH(d.bodyMarkdown), d.version, d.createdBySubject) FROM OutlineDocument d WHERE d.workspaceId = :workspaceId AND d.connectionId = :connectionId AND d.documentId = :documentId")
     Optional<OutlineDocumentSnapshot> findSnapshotByDocumentId(
             @Param("workspaceId") long workspaceId,
             @Param("connectionId") long connectionId,
@@ -113,21 +116,20 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
      * The linked-document lookup: matches reference tokens against either the document id or the slug, so a raw id
      * or a URL's trailing segment both resolve.
      */
-    @Query("SELECT d FROM OutlineDocument d WHERE d.workspaceId = :workspaceId "
-            + "AND (d.documentId IN :refs OR d.slug IN :refs) " + PERSON_PROJECTION_GUARD)
+    @Query(
+            "SELECT d FROM OutlineDocument d WHERE d.workspaceId = :workspaceId AND (d.documentId IN :refs OR d.slug IN :refs) "
+                    + PERSON_PROJECTION_GUARD)
     List<OutlineDocument> findByWorkspaceIdAndReferenceIn(
-            @Param("workspaceId") long workspaceId, @Param("refs") Collection<String> refs);
-
-    @Query("SELECT d.id AS id, d.documentId AS sourceId, d.collectionSlug AS collectionSlug, d.slug AS slug, "
-            + "(d.deletedAt IS NOT NULL) AS deleted, (d.bodyMarkdown IS NOT NULL) AS bodyAvailable "
-            + "FROM OutlineDocument d WHERE d.workspaceId = :workspaceId "
-            + "AND (d.documentId IN :refs OR d.slug IN :refs) " + PERSON_PROJECTION_GUARD)
-    List<DocumentAccessRow> findAccessByWorkspaceIdAndReferenceIn(
             @Param("workspaceId") long workspaceId, @Param("refs") Collection<String> refs);
 
     @Query("SELECT d FROM OutlineDocument d WHERE d.workspaceId=:workspaceId AND d.id=:documentId "
             + PERSON_PROJECTION_GUARD)
     Optional<OutlineDocument> findByWorkspaceIdAndIdForProjection(
+            @Param("workspaceId") long workspaceId, @Param("documentId") long documentId);
+
+    @Query(
+            "SELECT new de.tum.cit.aet.hephaestus.integration.outline.documentation.OutlineDocumentAccess(d.workspaceId,d.id,d.connectionId,d.createdBySubject,d.updatedBySubject,d.collaboratorSubjects,d.deletedAt) FROM OutlineDocument d WHERE d.workspaceId=:workspaceId AND d.id=:documentId")
+    Optional<OutlineDocumentAccess> findAccess(
             @Param("workspaceId") long workspaceId, @Param("documentId") long documentId);
 
     /**
@@ -153,15 +155,10 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
      * {@code left(...)} bound is a correctness guard and not an optimisation.
      */
     @Query(
-            value = "SELECT d.* FROM outline_document d WHERE d.workspace_id = :workspaceId "
-                    + PERSON_PROJECTION_SQL_GUARD
-                    + "AND deleted_at IS NULL AND body_markdown IS NOT NULL "
-                    + "AND to_tsvector('simple', coalesce(title, '') || ' ' || left(coalesce(body_markdown, ''), 900000)) "
-                    + "@@ websearch_to_tsquery('simple', :query) "
-                    + "ORDER BY ts_rank(to_tsvector('simple', coalesce(title, '') || ' ' || "
-                    + "left(coalesce(body_markdown, ''), 900000)), "
-                    + "websearch_to_tsquery('simple', :query)) DESC, outline_updated_at DESC NULLS LAST, id ASC "
-                    + "LIMIT :limit",
+            value =
+                    "SELECT d.* FROM outline_document d WHERE d.workspace_id = :workspaceId "
+                            + PERSON_PROJECTION_SQL_GUARD
+                            + "AND deleted_at IS NULL AND body_markdown IS NOT NULL AND to_tsvector('simple', coalesce(title, '') || ' ' || left(coalesce(body_markdown, ''), 900000)) @@ websearch_to_tsquery('simple', :query) ORDER BY ts_rank(to_tsvector('simple', coalesce(title, '') || ' ' || left(coalesce(body_markdown, ''), 900000)), websearch_to_tsquery('simple', :query)) DESC, outline_updated_at DESC NULLS LAST, id ASC LIMIT :limit",
             nativeQuery = true)
     List<OutlineDocument> searchByRelevance(
             @Param("workspaceId") long workspaceId, @Param("query") String query, @Param("limit") int limit);
@@ -179,8 +176,8 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
      * aggregate; coalesces an all-null/empty workspace to 0.
      */
     @Query(
-            value = "SELECT COALESCE(SUM(octet_length(body_markdown)), 0) FROM outline_document "
-                    + "WHERE workspace_id = :workspaceId",
+            value =
+                    "SELECT COALESCE(SUM(octet_length(body_markdown)), 0) FROM outline_document WHERE workspace_id = :workspaceId",
             nativeQuery = true)
     long sumBodySizeByWorkspaceId(@Param("workspaceId") long workspaceId);
 
@@ -198,9 +195,8 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
      * {@code octet_length(...)} projection.
      */
     @Query(
-            value = "SELECT id, octet_length(body_markdown) FROM outline_document "
-                    + "WHERE workspace_id = :workspaceId AND body_markdown IS NOT NULL "
-                    + "ORDER BY last_materialized_at ASC NULLS FIRST, id ASC LIMIT :limit",
+            value =
+                    "SELECT id, octet_length(body_markdown) FROM outline_document WHERE workspace_id = :workspaceId AND body_markdown IS NOT NULL ORDER BY last_materialized_at ASC NULLS FIRST, id ASC LIMIT :limit",
             nativeQuery = true)
     List<Object[]> findEvictionCandidates(@Param("workspaceId") long workspaceId, @Param("limit") int limit);
 
@@ -218,8 +214,8 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
     @Modifying
     @Transactional
     @Query(
-            value = "UPDATE outline_document SET body_markdown = NULL, body_evicted_at = now() "
-                    + "WHERE workspace_id = :workspaceId AND id IN (:ids)",
+            value =
+                    "UPDATE outline_document SET body_markdown = NULL, body_evicted_at = now() WHERE workspace_id = :workspaceId AND id IN (:ids)",
             nativeQuery = true)
     int evictBodies(@Param("workspaceId") long workspaceId, @Param("ids") List<Long> ids);
 
@@ -228,10 +224,8 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
      * collection is named as Outline shows it, never by its url id, which is a random slug nobody reads;
      * a collection whose name was never captured leaves it null.
      */
-    @Query("SELECT d.id AS id, d.title AS title, c.name AS collectionName FROM OutlineDocument d "
-            + "LEFT JOIN OutlineCollection c ON c.workspaceId = d.workspaceId AND c.connectionId = d.connectionId "
-            + "AND c.collectionId = d.collectionId "
-            + "WHERE d.workspaceId = :workspaceId AND d.id IN (:ids)")
+    @Query(
+            "SELECT d.id AS id, d.title AS title, c.name AS collectionName FROM OutlineDocument d LEFT JOIN OutlineCollection c ON c.workspaceId = d.workspaceId AND c.connectionId = d.connectionId AND c.collectionId = d.collectionId WHERE d.workspaceId = :workspaceId AND d.id IN (:ids)")
     List<DocumentLabel> findLabels(@Param("workspaceId") long workspaceId, @Param("ids") Collection<Long> ids);
 
     interface DocumentLabel {
@@ -244,27 +238,12 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
         String getCollectionName();
     }
 
-    interface DocumentAccessRow {
-        Long getId();
-
-        @Nullable
-        String getSourceId();
-
-        @Nullable
-        String getCollectionSlug();
-
-        @Nullable
-        String getSlug();
-
-        boolean getDeleted();
-
-        boolean getBodyAvailable();
-    }
-
     interface PersonSourceIdentityRow {
         long getProviderId();
 
         String getSubject();
+
+        String getTeamId();
     }
 
     @WorkspaceAgnostic("Instance-admin person selection pins an exact provider and native identity across workspaces")
@@ -276,20 +255,21 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
                     SELECT d.created_by_subject AS subject UNION SELECT d.updated_by_subject
                     UNION SELECT jsonb_array_elements_text(COALESCE(d.collaborator_subjects,'[]'::jsonb))
                 ) authors
-                 WHERE p.id=:providerId AND authors.subject=:subject
+                 WHERE p.id=:providerId AND authors.subject=:subject AND COALESCE(c.instance_key,'')=:teamId
         """, nativeQuery = true)
-    List<Long> findPersonSourceIds(@Param("providerId") long providerId, @Param("subject") String subject);
+    List<Long> findPersonSourceIds(
+            @Param("providerId") long providerId, @Param("subject") String subject, @Param("teamId") String teamId);
 
     @Query(value = """
-        SELECT DISTINCT p.id AS providerId,authors.subject AS subject
+        SELECT DISTINCT p.id AS providerId,authors.subject AS subject,COALESCE(c.instance_key,'') AS teamId
                 FROM outline_document d JOIN connection c ON c.id=d.connection_id AND c.workspace_id=d.workspace_id
                 JOIN identity_provider p ON p.type='OUTLINE' AND p.server_url=c.config->>'serverUrl'
                 CROSS JOIN LATERAL (
                     SELECT d.created_by_subject AS subject UNION SELECT d.updated_by_subject
                     UNION SELECT jsonb_array_elements_text(COALESCE(d.collaborator_subjects,'[]'::jsonb))
                 ) authors
-                 WHERE d.workspace_id=:workspaceId AND d.id=:artifactId AND authors.subject IS NOT NULL AND authors.subject<>''
+                 WHERE d.workspace_id=:workspaceId AND d.id=:documentId AND authors.subject IS NOT NULL AND authors.subject<>''
         """, nativeQuery = true)
     List<PersonSourceIdentityRow> findPersonSourceIdentities(
-            @Param("workspaceId") long workspaceId, @Param("artifactId") long artifactId);
+            @Param("workspaceId") long workspaceId, @Param("documentId") long documentId);
 }

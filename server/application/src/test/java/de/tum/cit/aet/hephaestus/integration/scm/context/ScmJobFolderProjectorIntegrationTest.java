@@ -2,12 +2,11 @@ package de.tum.cit.aet.hephaestus.integration.scm.context;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.core.auth.spi.PeopleRegistry;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonCopyIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCopyRecorder;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
@@ -34,18 +33,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchCompletion;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchInsert;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacement;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
-import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
+import de.tum.cit.aet.hephaestus.integration.scm.feedback.ScmReviewFixtures;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
@@ -63,6 +51,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -124,18 +113,6 @@ class ScmJobFolderProjectorIntegrationTest extends AbstractWorkspaceIntegrationT
     private PersonDataCopyRecorder personCopies;
 
     @Autowired
-    private AgentJobRepository jobs;
-
-    @Autowired
-    private FeedbackRepository feedback;
-
-    @Autowired
-    private FeedbackPlacementRepository placements;
-
-    @Autowired
-    private FeedbackDispatchRepository dispatches;
-
-    @Autowired
     private TransactionTemplate transactions;
 
     @Autowired
@@ -145,14 +122,21 @@ class ScmJobFolderProjectorIntegrationTest extends AbstractWorkspaceIntegrationT
 
     private User author;
     private Workspace workspace;
-    private int position;
+
+    @Autowired
+    private JdbcTemplate jdbc;
+
+    @Autowired
+    private ItemIndexService itemWriter;
+
+    @Autowired
+    private PeopleRegistry people;
 
     @BeforeEach
     void seedWorkspace() {
         author = persistUser("label-author");
         workspace = createWorkspace("labels", "Labels", "labels-org", AccountType.ORG, author);
         connect(workspace, IntegrationKind.GITHUB, new ConnectionConfig.GitHubPatConfig("labels-org", null, Set.of()));
-        position = 0;
     }
 
     @Test
@@ -177,7 +161,7 @@ class ScmJobFolderProjectorIntegrationTest extends AbstractWorkspaceIntegrationT
         assertThat(records)
                 .filteredOn(record -> record.format() == Format.JSON)
                 .extracting(record -> record.value().path("labels").toString())
-                .as("the same order as the captured issue context, and an explicit empty array when unlabelled")
+                .as("the same order as the captured issue context, and an explicit empty array" + " when unlabelled")
                 .containsExactly("[\"Documentation\",\"area: api\",\"bug\"]", "[]", "[\"bug\"]");
     }
 
@@ -199,7 +183,6 @@ class ScmJobFolderProjectorIntegrationTest extends AbstractWorkspaceIntegrationT
                 .containsExactly("issues/1/record.json", "issues/1/description.md", "issues/1/comments.jsonl");
     }
 
-    /** A full name is unique only per provider, so each inventory row carries the ids that tell two apart. */
     @Test
     void shouldStreamEachInventoryRowWithItsOwnRepositoryAndProviderWhenTwoProvidersShareAFullName() {
         Repository onGitHub = repository("labels-org/twins", workspace);
@@ -343,11 +326,12 @@ class ScmJobFolderProjectorIntegrationTest extends AbstractWorkspaceIntegrationT
         comment(work, 5_005, "Consider a smaller scope.");
         comment(neighbour, 6_001, "Thanks, fixed in the next commit.");
 
-        // A summary placement, a finished dispatch, and a legacy job reference, the last by another workspace.
+        // Every confirmed delivery uses the final copy ledger, including a second workspace.
         placement(work, "IC_kwDOsummary", url + "#issuecomment-5002");
-        dispatch(job(workspace, work, null), "IC_kwDOdispatch", url + "#issuecomment-5003");
-        job(other, work, "5004");
-        // An identity nothing in the mirror carries, and a delivery recorded on other work, exclude nothing here.
+        placement(work, "IC_kwDOdispatch", url + "#issuecomment-5003");
+        reviewFixtures().delivered(other.getId(), work, "5004", null, DAY);
+        // An identity nothing in the mirror carries, and a delivery recorded on other work, exclude
+        // nothing here.
         placement(work, "IC_kwDOunmapped", null);
         placement(neighbour, "IC_kwDOneighbour", url + "#issuecomment-5005");
 
@@ -487,59 +471,10 @@ class ScmJobFolderProjectorIntegrationTest extends AbstractWorkspaceIntegrationT
     }
 
     private void placement(Issue work, String ref, @Nullable String url) {
-        AgentJob job = job(workspace, work, null);
-        Feedback summary = feedback.save(Feedback.builder()
-                .agentJobId(job.getId())
-                .workspaceId(workspace.getId())
-                .artifactKind(ArtifactKinds.ISSUE)
-                .artifactId(work.getId())
-                .recipientUserId(author.getId())
-                .aboutUserId(author.getId())
-                .channel(FeedbackChannel.IN_CONTEXT)
-                .position(position++)
-                .deliveryState(FeedbackDeliveryState.DELIVERED)
-                .source(FeedbackSource.AGENT)
-                .createdAt(DAY)
-                .build());
-        placements.save(FeedbackPlacement.builder()
-                .feedback(summary)
-                .placementType(PlacementType.SUMMARY)
-                .postedCommentRef(ref)
-                .postedCommentUrl(url)
-                .build());
+        reviewFixtures().delivered(workspace.getId(), work, ref, url, DAY);
     }
 
-    private AgentJob job(Workspace scope, Issue work, @Nullable String legacySummary) {
-        AgentJob job = new AgentJob();
-        job.setWorkspace(scope);
-        job.setJobType(AgentJobType.ISSUE_REVIEW);
-        job.setArtifactKind(ArtifactKinds.ISSUE);
-        job.setMetadata(mapper.valueToTree(Map.of("issue_id", work.getId())));
-        job.setConfigSnapshot(mapper.valueToTree(Map.of("model", "test")));
-        job.setDeliveryCommentId(legacySummary);
-        return jobs.save(job);
-    }
-
-    private void dispatch(AgentJob job, String ref, String url) {
-        UUID id = UUID.randomUUID();
-        long scope = job.getWorkspace().getId();
-        transactions.executeWithoutResult(status -> {
-            assertThat(dispatches.insertIfAbsent(new FeedbackDispatchInsert(
-                            id,
-                            "delivery-" + id,
-                            scope,
-                            job.getId(),
-                            null,
-                            "AUTOMATIC_REVIEW_PACKAGE",
-                            "Body",
-                            "[]",
-                            "{}")))
-                    .isOne();
-            assertThat(dispatches.claim(id, scope, "test", Instant.now().plusSeconds(60), 8, 0))
-                    .isOne();
-            assertThat(dispatches.finish(new FeedbackDispatchCompletion(
-                            id, scope, "test", "SENT", ref, url, null, null, "[]", Instant.now())))
-                    .isOne();
-        });
+    private ScmReviewFixtures reviewFixtures() {
+        return new ScmReviewFixtures(jdbc, itemWriter, people, transactions, mapper);
     }
 }

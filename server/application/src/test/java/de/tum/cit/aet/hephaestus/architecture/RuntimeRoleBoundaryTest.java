@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWebhookRole;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWorkerRole;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import java.time.Clock;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +43,9 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
      * listing them here would just duplicate the WebhookConfiguration gate.
      */
     private static final Map<String, String> EXPECTED_GATES = Map.ofEntries(
+            Map.entry(
+                    "de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController",
+                    RuntimeRole.SERVER_PROPERTY),
             Map.entry(
                     "de.tum.cit.aet.hephaestus.integration.core.webhook.WebhookConfiguration",
                     RuntimeRole.WEBHOOK_PROPERTY),
@@ -134,7 +138,40 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
             // registers its gauges — permanent zeros in agent.queue.* / mentor.in_flight.* from pods that
             // never sample. Gate the bean, not just the tick.
             Map.entry("de.tum.cit.aet.hephaestus.agent.job.AgentQueueHealthSampler", RuntimeRole.SERVER_PROPERTY),
-            Map.entry("de.tum.cit.aet.hephaestus.agent.job.AgentJobRetentionService", RuntimeRole.SERVER_PROPERTY),
+            Map.entry("de.tum.cit.aet.hephaestus.agent.job.ReviewJobRetentionService", RuntimeRole.SERVER_PROPERTY),
+            Map.entry(
+                    "de.tum.cit.aet.hephaestus.integration.scm.github.lifecycle.GitHubLifecycleListener",
+                    RuntimeRole.SERVER_PROPERTY),
+            Map.entry(
+                    "de.tum.cit.aet.hephaestus.integration.scm.github.workspace.GitHubWorkspaceProvisioningAdapter",
+                    RuntimeRole.SERVER_PROPERTY),
+            Map.entry(
+                    "de.tum.cit.aet.hephaestus.integration.scm.github.workspace.GitHubInstallationReconciler",
+                    RuntimeRole.SERVER_PROPERTY),
+            Map.entry(
+                    "de.tum.cit.aet.hephaestus.integration.slack.retention.SlackWorkspaceContentEraser",
+                    RuntimeRole.SERVER_PROPERTY),
+            Map.entry(
+                    "de.tum.cit.aet.hephaestus.integration.slack.retention.SlackRetentionPurger",
+                    RuntimeRole.SERVER_PROPERTY),
+            Map.entry(
+                    "de.tum.cit.aet.hephaestus.integration.slack.retention.SlackWorkspacePurgeAdapter",
+                    RuntimeRole.SERVER_PROPERTY),
+            Map.entry(
+                    "de.tum.cit.aet.hephaestus.integration.scm.github.installation.GitHubInstallationTargetMessageHandler",
+                    RuntimeRole.SERVER_PROPERTY),
+            Map.entry(
+                    "de.tum.cit.aet.hephaestus.integration.scm.github.installation.GitHubInstallationRepositoriesMessageHandler",
+                    RuntimeRole.SERVER_PROPERTY),
+            Map.entry(
+                    "de.tum.cit.aet.hephaestus.integration.scm.github.installation.GitHubInstallationMessageHandler",
+                    RuntimeRole.SERVER_PROPERTY),
+            Map.entry(
+                    "de.tum.cit.aet.hephaestus.integration.scm.github.repository.GitHubRepositoryMessageHandler",
+                    RuntimeRole.SERVER_PROPERTY),
+            Map.entry(
+                    "de.tum.cit.aet.hephaestus.practices.review.PracticeReviewCoverageService",
+                    RuntimeRole.SERVER_PROPERTY),
             // Product feedback is a member- and admin-facing web surface, and SurveyService reads research
             // consent through a port only the server role implements.
             Map.entry("de.tum.cit.aet.hephaestus.productfeedback.FeedbackController", RuntimeRole.SERVER_PROPERTY),
@@ -146,6 +183,7 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
             Map.entry("de.tum.cit.aet.hephaestus.productfeedback.FeedbackService", RuntimeRole.SERVER_PROPERTY),
             Map.entry("de.tum.cit.aet.hephaestus.productfeedback.SurveyService", RuntimeRole.SERVER_PROPERTY),
             Map.entry("de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorInFlightReaper", RuntimeRole.SERVER_PROPERTY),
+            Map.entry("de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorChatController", RuntimeRole.SERVER_PROPERTY),
             // ADR 0006: the LLM proxy runs beside the sandbox on the WORKER, and only there.
             Map.entry("de.tum.cit.aet.hephaestus.agent.proxy.LlmProxyController", RuntimeRole.WORKER_PROPERTY),
             Map.entry("de.tum.cit.aet.hephaestus.agent.proxy.LlmProxySecurityConfig", RuntimeRole.WORKER_PROPERTY),
@@ -252,6 +290,7 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
                 ConditionalOnServerRole.class.getName(),
                 ConditionalOnWorkerRole.class.getName(),
                 ConditionalOnWebhookRole.class.getName(),
+                ConditionalOnCaptureRole.class.getName(),
                 "de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewayConfiguration.sandboxGatewayBucketResolver()",
                 "de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtConfiguration");
         List<String> gated = classes.stream()
@@ -283,9 +322,9 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
                 .collect(Collectors.toList());
 
         assertThat(hosts)
-                .as(
-                        "@EnableScheduling (direct or meta-annotated) must appear on exactly one class (ServerSchedulingConfig); "
-                                + "any other @Scheduled host relies on its absence on the webhook role to no-op silently — keep that invariant load-bearing.")
+                .as("@EnableScheduling (direct or meta-annotated) must appear on exactly one class"
+                        + " (ServerSchedulingConfig); any other @Scheduled host relies on its absence on the"
+                        + " webhook role to no-op silently — keep that invariant load-bearing.")
                 .containsExactly("de.tum.cit.aet.hephaestus.core.runtime.ServerSchedulingConfig");
     }
 
@@ -300,15 +339,15 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
                         "de.tum.cit.aet.hephaestus.workspace..",
                         "de.tum.cit.aet.hephaestus.activity..",
                         "de.tum.cit.aet.hephaestus.agent..")
-                .because(
-                        "webhook receiver is a pure publish-only role; depending on workspace/activity/agent would re-introduce "
-                                + "the wiring leaks runtime testing already exposed (ObjectProvider cascade, etc.) and break role isolation")
+                .because("webhook receiver is a pure publish-only role; depending on workspace/activity/agent would"
+                        + " re-introduce the wiring leaks runtime testing already exposed (ObjectProvider cascade,"
+                        + " etc.) and break role isolation")
                 .check(classes);
     }
 
     /**
      * Every ungated bean that injects a server-gated bean crash-loops the worker and webhook pods at
-     * context refresh — a failure no test tier can see, because none boots with
+     * context refresh. Full role-context tests must resolve those dependencies with
      * {@code hephaestus.runtime.server.enabled=false}. {@link java.time.Clock} is injected by beans that
      * must load on every role — the config-audit recorder among them — so gating its provider breaks both
      * pods with the whole suite green.
@@ -359,6 +398,8 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
      */
     private static final List<String> CROSS_ROLE_AUTH_SPI_IMPLS = List.of(
             "de.tum.cit.aet.hephaestus.core.auth.AccountIdentityQueryService",
+            // Worker capture reads account choices and status through this neutral data-access port.
+            "de.tum.cit.aet.hephaestus.core.auth.AccountDirectoryService",
             "de.tum.cit.aet.hephaestus.core.auth.AccountRoleQueryService",
             "de.tum.cit.aet.hephaestus.core.auth.AccountSummaryQueryService");
 
@@ -382,26 +423,27 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
                 .collect(Collectors.toList());
 
         assertThat(ungated)
-                .as(
-                        "Every core.auth stereotype bean must carry @ConditionalOnServerRole — the auth web/auth surface is server-role only")
+                .as("Every core.auth stereotype bean must carry @ConditionalOnServerRole — the auth web/auth"
+                        + " surface is server-role only")
                 .isEmpty();
     }
 
     @Test
-    void mentorBeansWireUnconditionally() {
+    void mentorBeansHaveNoCapabilityGate() {
         List<String> stillGated = UNCONDITIONAL_MENTOR_BEANS.stream()
                 .map(fqn -> classes.stream()
                         .filter(c -> c.getFullName().equals(fqn))
                         .findFirst()
                         .orElseThrow(() -> new AssertionError("Expected class not found in ArchUnit scan: " + fqn)))
-                .filter(clazz ->
-                        conditionalOnPropertyAnnotations(clazz).findAny().isPresent())
+                .filter(clazz -> conditionalOnPropertyAnnotations(clazz)
+                        .flatMap(ConditionalRef::propertyNames)
+                        .anyMatch(name -> !isRoleProperty(name)))
                 .map(JavaClass::getFullName)
                 .collect(Collectors.toList());
 
         assertThat(stillGated)
-                .as("Mentor beans must wire unconditionally — Heph is always offered (per-workspace readiness "
-                        + "is the mentor model binding), not behind a capability flag.")
+                .as("Mentor availability uses the workspace model binding. Runtime roles control deployment; "
+                        + "a capability flag must not remove mentor support.")
                 .isEmpty();
     }
 

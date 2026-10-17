@@ -1,12 +1,16 @@
 package de.tum.cit.aet.hephaestus.integration.slack.mentor;
 
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorChannel;
+import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorTurnReceipt;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackSendException;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -19,7 +23,6 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Streams mentor output to Slack with bounded buffering and retry. */
 public class SlackStreamingMentorChannel implements MentorChannel {
 
     private static final Logger log = LoggerFactory.getLogger(SlackStreamingMentorChannel.class);
@@ -78,11 +81,16 @@ public class SlackStreamingMentorChannel implements MentorChannel {
     /** The whole reply reached Slack and its stream was stopped; a prefix does not count. */
     private final AtomicBoolean replyDelivered = new AtomicBoolean(false);
 
+    private final AtomicBoolean visibilityUnconfirmed = new AtomicBoolean(false);
+    private final AtomicReference<@Nullable UUID> chatMessageId = new AtomicReference<>();
+    private final AtomicReference<@Nullable Instant> writeStartedAt = new AtomicReference<>();
+    private final AtomicReference<@Nullable Instant> confirmedAt = new AtomicReference<>();
+
     private final AtomicBoolean silentModeSuppressed = new AtomicBoolean(false);
 
     private volatile @Nullable Runnable disconnectHook;
     /** The streaming message ts: {@code null} until the first successful open, set exactly once ({@link #openOrAppend}). */
-    private final AtomicReference<String> streamTs = new AtomicReference<>();
+    private final AtomicReference<@Nullable String> streamTs = new AtomicReference<>();
     /** Serializes the open-or-append decision so the stream is opened exactly once across the flush + runner threads. */
     private final ReentrantLock streamLock = new ReentrantLock();
 
@@ -148,11 +156,23 @@ public class SlackStreamingMentorChannel implements MentorChannel {
         if (done.get() || terminated.get()) {
             return;
         }
-        if (chunk instanceof UIMessageChunk.TextDelta delta) {
+        if (chunk instanceof UIMessageChunk.Start start) {
+            UUID id = start.messageId();
+            if (id != null) {
+                UUID prior = chatMessageId.get();
+                if (prior != null && !prior.equals(id))
+                    throw new IllegalArgumentException("A transport handles one chat turn");
+                if (!chatMessageId.compareAndSet(null, id) && !id.equals(chatMessageId.get()))
+                    throw new IllegalArgumentException("A transport handles one chat turn");
+            }
+        } else if (chunk instanceof UIMessageChunk.TextDelta delta) {
             append(delta.delta());
             ensureFlushing();
-        } else if (chunk instanceof UIMessageChunk.DataObservation observation) {
-            appendFeedback(observation.data().text());
+        } else if (chunk instanceof UIMessageChunk.DataResult link) {
+            appendFeedback(link.data().text());
+            ensureFlushing();
+        } else if (chunk instanceof UIMessageChunk.DataProblem link) {
+            appendFeedback(link.data().text());
             ensureFlushing();
         } else if (chunk instanceof UIMessageChunk.TurnError error) {
             // Surface mid-turn errors in the visible stream rather than dropping them.
@@ -195,7 +215,22 @@ public class SlackStreamingMentorChannel implements MentorChannel {
         if (replyDelivered.get()) {
             return DeliveryOutcome.DELIVERED;
         }
+        if (visibilityUnconfirmed.get() || streamTs.get() != null) return DeliveryOutcome.UNCONFIRMED;
         return silentModeSuppressed.get() ? DeliveryOutcome.INSTANCE_SILENCED : DeliveryOutcome.NOT_DELIVERED;
+    }
+
+    @Override
+    public Optional<MentorTurnReceipt> receipt() {
+        UUID id = chatMessageId.get();
+        if (id == null) return Optional.empty();
+        String ts = streamTs.get();
+        return Optional.of(new MentorTurnReceipt(
+                id,
+                ts == null ? null : channel + ":" + ts,
+                null,
+                writeStartedAt.get(),
+                confirmedAt.get(),
+                deliveryOutcome() == DeliveryOutcome.UNCONFIRMED));
     }
 
     private void append(String text) {
@@ -292,6 +327,11 @@ public class SlackStreamingMentorChannel implements MentorChannel {
             consecutiveFailures = 0;
             consecutiveRateLimits = 0;
         } catch (SlackSendException e) {
+            if (e.visibilityUnknown()) {
+                visibilityUnconfirmed.set(true);
+                terminate();
+                return;
+            }
             if (isTerminal(e)) {
                 terminate();
                 return;
@@ -317,7 +357,7 @@ public class SlackStreamingMentorChannel implements MentorChannel {
                 }
                 return;
             }
-            // Transient (5xx / transport): retry next tick, counting toward the abort budget.
+            // A proven rejection can retry without repeating a possibly visible write.
             if (++consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
                 log.warn(
                         "Slack stream giving up after {} transient failures (channel={}): {}",
@@ -332,21 +372,26 @@ public class SlackStreamingMentorChannel implements MentorChannel {
         }
     }
 
-    /**
-     * Open the stream on the first call, append on every later one — serialized on {@link #streamLock} so a late
-     * flush tick and the terminal write can never both call {@code startStream} (exactly one open). {@code streamTs}
-     * is only set on a successful open, so a failed open leaves the stream un-opened and the next call retries it.
-     * Throws the {@link SlackSendException} unchanged so callers keep their transient/gone handling.
-     */
+    // Serialize stream opening; only an acknowledged open sets streamTs, and unknown visibility must not cause a
+    // repeated write.
     private void openOrAppend(String text) {
         streamLock.lock();
         try {
+            if (terminated.get() || visibilityUnconfirmed.get())
+                throw new SlackSendException(workspaceId, channel, "stream_visibility_unknown");
             String ts = streamTs.get();
             if (ts == null) {
+                writeStartedAt.compareAndSet(null, Instant.now());
                 streamTs.set(slack.startStream(workspaceId, channel, threadTs, text));
             } else {
                 slack.appendStream(workspaceId, channel, ts, text);
             }
+        } catch (SlackSendException e) {
+            if (e.visibilityUnknown()) visibilityUnconfirmed.set(true);
+            throw e;
+        } catch (RuntimeException e) {
+            visibilityUnconfirmed.set(true);
+            throw new SlackSendException(workspaceId, channel, "stream_visibility_unknown", e);
         } finally {
             streamLock.unlock();
         }
@@ -399,8 +444,10 @@ public class SlackStreamingMentorChannel implements MentorChannel {
             if (ts != null && !terminated.get()) {
                 slack.stopStream(workspaceId, channel, ts, List.of());
                 replyDelivered.set(written && flusherStopped);
+                if (written && flusherStopped) confirmedAt.compareAndSet(null, Instant.now());
             }
         } catch (Exception e) {
+            if (e instanceof SlackSendException failure && failure.visibilityUnknown()) visibilityUnconfirmed.set(true);
             // Terminals never throw (contract). A gone recipient just means the stream is already finalized.
             log.debug("Slack stream finalize skipped (channel={}): {}", channel, e.getMessage());
         }
@@ -418,6 +465,11 @@ public class SlackStreamingMentorChannel implements MentorChannel {
                 openOrAppend(text);
                 return true;
             } catch (SlackSendException e) {
+                if (e.visibilityUnknown()) {
+                    visibilityUnconfirmed.set(true);
+                    terminate();
+                    return false;
+                }
                 if (isTerminal(e)) {
                     terminate();
                     return false;

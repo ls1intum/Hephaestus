@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, waitFor, within } from "storybook/test";
 
+import type { ReviewOverview } from "@/api/types.gen";
 import { withStandardPage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/stories/reflow";
 import { levelsOpenedBy } from "@/test/detail-stack";
@@ -60,10 +61,10 @@ export const Default: Story = {
 				.map((header) => header.textContent.trim()),
 		).toEqual([
 			"Practice",
-			"Number of observations",
+			"Results",
 			"Not met",
-			"Not applicable",
-			"Undetermined",
+			"Does not apply",
+			"Could not determine",
 			"Marked incorrect",
 			"Feedback delivered",
 			"Open",
@@ -112,8 +113,6 @@ export const Default: Story = {
 			within(busiest).queryByRole("button", { name: /^Track/u }),
 		).not.toBeInTheDocument();
 		await expect(within(busiest).queryByRole("link", { name: /^Trace/u })).not.toBeInTheDocument();
-		// 18 + 9 + 4 + 2 observations, each outcome out of them; 7 of the 12 pieces of feedback
-		// composed about it were delivered. No percentage, and no (i) speaks of one.
 		await expect(cellsOf(busiest).slice(0, 6)).toEqual([
 			"33",
 			"9 of 33",
@@ -122,11 +121,9 @@ export const Default: Story = {
 			"1 of 33",
 			"7 of 12",
 		]);
-		await userEvent.click(
-			canvas.getByRole("button", { name: "How Number of observations is counted" }),
-		);
+		await userEvent.click(canvas.getByRole("button", { name: "How Results is counted" }));
 		await expect(
-			await screen.findByRole("dialog", { name: "How Number of observations is counted" }),
+			await screen.findByRole("dialog", { name: "How Results is counted" }),
 		).not.toHaveTextContent("percentage");
 		await userEvent.keyboard("{Escape}");
 		// A practice that fired twice and led to no feedback still reads as a row, its feedback a
@@ -138,13 +135,11 @@ export const Default: Story = {
 		// once, so where a piece about two practices counts in both rows, the line under the table
 		// says so.
 		await expect(cellsOf(canvas.getByRole("row", { name: /^All practices/u })).slice(0, 6)).toEqual(
-			["78", "27 of 78", "10 of 78", "6 of 78", "3 of 78", "14 of 23"],
+			["78", "27 of 78", "10 of 78", "6 of 78", "3 of 78", "14 of 24"],
 		);
 		await expect(
 			canvas.getByText(/^Feedback delivered adds up to 16 across the practices, but 14 pieces/u),
 		).toBeVisible();
-		// Nothing is marked, so the ones with the most marked incorrect, then undetermined, lead; the
-		// rest stay busiest first.
 		await expect(
 			within(table)
 				.getAllByRole("row")
@@ -157,8 +152,7 @@ export const Default: Story = {
 			"Tests name the behaviour",
 			"Product language",
 		]);
-		// Below 20 observations no practice is marked, whatever its shares.
-		await expect(canvas.queryByText("Often undecided")).not.toBeInTheDocument();
+		await expect(canvas.queryByText("Often could not determine")).not.toBeInTheDocument();
 		// A practice that recorded nothing is not a row, and no line under the table counts it.
 		await expect(canvas.queryByText(/recorded nothing/u)).not.toBeInTheDocument();
 		await expect(
@@ -168,32 +162,29 @@ export const Default: Story = {
 };
 
 /** The busiest first, then two practices that a course would want to look at. */
-const MARKED_PRACTICES = {
+const MARKED_PRACTICES: ReviewOverview = {
 	...practiceReviewOverview,
 	practices: [
 		...practiceReviewOverview.practices,
 		{
 			feedback: feedbackCounts([]),
+			group: null,
 			practiceSlug: "wiki-docs",
 			practiceName: "Wiki pages are kept up to date",
-			observations: { met: 0, notMet: 0, notApplicable: 29, undetermined: 1 },
-			observationsInvalidated: 0,
+			results: { met: 0, notMet: 0, doesNotApply: 29, couldNotDetermine: 1 },
+			resultsMarkedIncorrect: 0,
 		},
 		{
 			feedback: feedbackCounts([]),
+			group: null,
 			practiceSlug: "resolve-open-threads",
 			practiceName: "Open threads are resolved",
-			observations: { met: 8, notMet: 4, notApplicable: 1, undetermined: 9 },
-			observationsInvalidated: 0,
+			results: { met: 8, notMet: 4, doesNotApply: 1, couldNotDetermine: 9 },
+			resultsMarkedIncorrect: 0,
 		},
 	],
 };
 
-/**
- * "Mostly not applicable" from 90 % not applicable, "Often undecided" from 30 % undetermined, each from
- * 20 observations: the marked practices lead, the stronger marker first, and "Busiest first" puts
- * the table back in the server's order.
- */
 export const NeedsALookFirst: Story = {
 	args: {
 		state: readyReviewOverview(MARKED_PRACTICES),
@@ -221,17 +212,17 @@ export const NeedsALookFirst: Story = {
 		]);
 		const wiki = canvas.getByRole("row", { name: /Wiki pages/u });
 		await expect(
-			within(wiki).getByText("Mostly not applicable").closest("[data-marker]"),
+			within(wiki).getByText("Mostly does not apply").closest("[data-marker]"),
 		).toHaveAttribute(
 			"title",
-			"Not applicable in 29 of 30 observations. Consider turning it off for this workspace.",
+			"Does not apply in 29 of 30 results. Consider turning it off for this workspace.",
 		);
 		const threads = canvas.getByRole("row", { name: /Open threads/u });
 		await expect(
-			within(threads).getByText("Often undecided").closest("[data-marker]"),
+			within(threads).getByText("Often could not determine").closest("[data-marker]"),
 		).toHaveAttribute(
 			"title",
-			"Undetermined in 9 of 22 observations. The review may lack the evidence to decide.",
+			"Could not determine in 9 of 22 results. The review may lack the evidence to decide.",
 		);
 
 		const sort = canvas.getByRole("combobox", { name: "Sort" });
@@ -240,7 +231,7 @@ export const NeedsALookFirst: Story = {
 		// runs past the page's edge.
 		const list = await screen.findByRole("listbox", { name: "Sort" });
 		const trigger = sort.getBoundingClientRect();
-		// Measured once its opening animation, which scales it from 95 %, has finished.
+		// Measured once its opening animation, which scales it from 95%, has finished.
 		await waitFor(async () => {
 			const popup = list.getBoundingClientRect();
 			await expect(popup.top).toBeGreaterThanOrEqual(trigger.bottom);
@@ -298,21 +289,16 @@ export const LongNamesAndMarkers: Story = {
 		await expect(name).toHaveAttribute("title", expect.stringContaining("with every change"));
 		await expect(name.scrollWidth).toBeGreaterThan(name.clientWidth);
 		// The marker sits on the name's line, not under it.
-		const marker = canvas.getByText("Mostly not applicable").closest("[data-marker]");
+		const marker = canvas.getByText("Mostly does not apply").closest("[data-marker]");
 		await expect(marker?.parentElement).toBe(name.parentElement);
 	},
 };
 
-/**
- * "Thin controllers" is turned off today. Its counts are history, so the table hides it and says how
- * many it hides; "Show turned-off practices" brings it back. The state is read now, not from when its
- * observations were made.
- */
 export const TurnedOffPracticeHidden: Story = {
 	args: {
 		practices: workspacePractices.map((practice) =>
 			practice.slug === "thin-controllers"
-				? { ...practice, autonomy: { ...practice.autonomy, effective: "OFF" as const } }
+				? { ...practice, feedbackMode: { ...practice.feedbackMode, effective: "OFF" } }
 				: practice,
 		),
 	},
@@ -363,9 +349,7 @@ export const FilteredByGroup: Story = {
 		]);
 		// The totals stay those of every practice, and the line under the table says what is hidden.
 		await expect(
-			canvas.getByText(
-				"The totals include 3 practices that the filters hide, with 24 observations.",
-			),
+			canvas.getByText("The totals include 3 practices that the filters hide, with 24 results."),
 		).toBeVisible();
 	},
 };
@@ -387,7 +371,7 @@ export const TurnedOffInAnotherGroup: Story = {
 	args: {
 		practices: workspacePractices.map((practice) =>
 			practice.slug === "thin-controllers"
-				? { ...practice, autonomy: { ...practice.autonomy, effective: "OFF" as const } }
+				? { ...practice, feedbackMode: { ...practice.feedbackMode, effective: "OFF" } }
 				: practice,
 		),
 		filter: { groups: ["testing"], showTurnedOff: false, onChange: fn() },

@@ -1,235 +1,77 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
-import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
-import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.JobJwt;
-import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtInvalidException;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtVerifier;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.math.BigDecimal;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.util.Optional;
-import java.util.regex.Pattern;
+import java.util.List;
+import org.apache.hc.core5.net.InetAddressUtils;
 import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.filter.OncePerRequestFilter;
-import tools.jackson.databind.ObjectMapper;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.ProviderManager;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationConverter;
+import org.springframework.security.web.authentication.AuthenticationFilter;
+import org.springframework.security.web.util.matcher.IpAddressMatcher;
 
-/**
- * Spring Security filter that authenticates requests to the LLM proxy using proxy-scoped bearer
- * tokens: an {@code AgentJob}'s job token, or a mentor session's registry-minted token (the mentor's
- * interactive sandbox is not an {@code AgentJob} row).
- *
- * <p>Defense-in-depth: rejects requests from non-private IPs, since only Docker-internal traffic
- * should reach these endpoints.
- */
-public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
-
-    private static final Logger log = LoggerFactory.getLogger(JobTokenAuthenticationFilter.class);
-
-    private static final String BEARER_PREFIX = "Bearer ";
-    private static final String LLM_PROXY_SCOPE = "llm_proxy";
+public final class JobTokenAuthenticationFilter extends AuthenticationFilter {
+    static final String PRACTICE_SCRIPT_PATH = "/internal/llm/practice-script/";
     private static final String RUNTIME_PATH = "/internal/llm/runtime/";
+    public static final String PRACTICE_SCRIPT_PRACTICE_HEADER = "x-hephaestus-practice";
 
-    private final AgentJobRepository agentJobRepository;
-    private final WorkerJwtVerifier jwtVerifier;
-    private final MentorProxyCredentialRegistry mentorRegistry;
-    private final ObjectMapper objectMapper;
-    private final String workerId;
+    private static final BearerTokenAuthenticationConverter CONVERTER = converter();
+    private static final List<IpAddressMatcher> PRIVATE_RANGES = List.of(
+            new IpAddressMatcher("10.0.0.0/8"),
+            new IpAddressMatcher("172.16.0.0/12"),
+            new IpAddressMatcher("192.168.0.0/16"),
+            new IpAddressMatcher("127.0.0.0/8"),
+            new IpAddressMatcher("169.254.0.0/16"),
+            new IpAddressMatcher("::1"),
+            new IpAddressMatcher("fe80::/10"),
+            new IpAddressMatcher("fc00::/7"));
 
     JobTokenAuthenticationFilter(
-            AgentJobRepository agentJobRepository,
-            WorkerJwtVerifier jwtVerifier,
-            MentorProxyCredentialRegistry mentorRegistry,
-            ObjectMapper objectMapper,
+            ReviewJobRepository jobs,
+            WorkerJwtVerifier verifier,
+            MentorProxyCredentialRegistry mentors,
             String workerId) {
-        this.agentJobRepository = agentJobRepository;
-        this.jwtVerifier = jwtVerifier;
-        this.mentorRegistry = mentorRegistry;
-        this.objectMapper = objectMapper;
-        this.workerId = workerId;
+        super(
+                new ProviderManager(new JobTokenAuthenticationProvider(jobs, verifier, mentors, workerId)),
+                JobTokenAuthenticationFilter::convert);
+        setSuccessHandler((request, response, authentication) -> {});
+        setFailureHandler((request, response, failure) -> response.setStatus(
+                failure instanceof JobTokenAuthenticationProvider.WorkerOwnershipConflict
+                        ? HttpServletResponse.SC_CONFLICT
+                        : HttpServletResponse.SC_UNAUTHORIZED));
     }
 
-    @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-            throws ServletException, IOException {
-        if (!isPrivateIp(request.getRemoteAddr())) {
-            log.warn("LLM proxy request from non-private IP: {}", request.getRemoteAddr());
-            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden");
-            return;
-        }
-
-        String token = extractProxyToken(request);
-        if (token == null || token.isBlank()) {
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Missing bearer token");
-            return;
-        }
-
-        Optional<ProxyRouting> routing = mentorRegistry.validate(token);
-        if (routing.isEmpty()) {
-            JobJwt jwt;
-            try {
-                if (!(jwtVerifier.verify(token) instanceof JobJwt jobJwt)) {
-                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid or expired token");
-                    return;
-                }
-                jwt = jobJwt;
-            } catch (WorkerJwtInvalidException e) {
-                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid or expired token");
-                return;
+    private static BearerTokenAuthenticationConverter converter() {
+        var converter = new BearerTokenAuthenticationConverter();
+        converter.setAuthenticationDetailsSource(incoming -> {
+            String path = incoming.getRequestURI();
+            String runtimeJobId = null;
+            if (path.startsWith(RUNTIME_PATH)) {
+                int end = path.indexOf('/', RUNTIME_PATH.length());
+                runtimeJobId = path.substring(RUNTIME_PATH.length(), end < 0 ? path.length() : end);
             }
-            if (!jwt.scopes().contains(LLM_PROXY_SCOPE)) {
-                response.sendError(HttpServletResponse.SC_FORBIDDEN, "Insufficient token scope");
-                return;
-            }
-            if (!matchesRuntimeJob(request, jwt)) {
-                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid runtime URL for token");
-                return;
-            }
-            Optional<AgentJob> job = agentJobRepository.findByIdWithWorkspace(jwt.jobId());
-            routing = resolveJobRouting(jwt, job);
-            if (routing.isEmpty() && isResultUpload(request, jwt) && isOwnedByAnotherWorker(jwt, job)) {
-                response.sendError(HttpServletResponse.SC_CONFLICT, "Job is owned by another worker");
-                return;
-            }
-        }
-        if (routing.isEmpty()) {
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid or expired token");
-            return;
-        }
-
-        SecurityContextHolder.getContext().setAuthentication(new JobTokenAuthentication(routing.get()));
-        try {
-            filterChain.doFilter(request, response);
-        } finally {
-            SecurityContextHolder.clearContext();
-        }
+            return new RequestIdentity(
+                    runtimeJobId,
+                    "POST".equals(incoming.getMethod()) && runtimeJobId != null && path.endsWith("/result"));
+        });
+        return converter;
     }
 
-    private boolean isOwnedByAnotherWorker(JobJwt jwt, Optional<AgentJob> optionalJob) {
-        return optionalJob
-                .filter(job -> job.getStatus() == AgentJobStatus.RUNNING
-                        && job.getWorkspace().getId().equals(jwt.workspaceId())
-                        && job.getRetryCount() == jwt.attempt())
-                .map(job -> job.getWorkerId() != null && !workerId.equals(job.getWorkerId()))
-                .orElse(false);
+    private static @Nullable Authentication convert(HttpServletRequest request) {
+        if (!isPrivateIp(request.getRemoteAddr())) throw new BadCredentialsException("Private gateway required");
+        var authentication = CONVERTER.convert(request);
+        if (authentication == null) throw new BadCredentialsException("Bearer credential required");
+        return authentication;
     }
 
-    private static boolean isResultUpload(HttpServletRequest request, JobJwt jwt) {
-        return "POST".equals(request.getMethod())
-                && request.getRequestURI().equals(RUNTIME_PATH + jwt.jobId() + "/result");
-    }
-
-    private static boolean matchesRuntimeJob(HttpServletRequest request, JobJwt jwt) {
-        String path = request.getRequestURI();
-        if (!path.startsWith(RUNTIME_PATH)) {
-            return true;
-        }
-        int end = path.indexOf('/', RUNTIME_PATH.length());
-        String pathJobId = path.substring(RUNTIME_PATH.length(), end < 0 ? path.length() : end);
-        return pathJobId.equals(jwt.jobId().toString());
-    }
-
-    private Optional<ProxyRouting> resolveJobRouting(JobJwt jwt, Optional<AgentJob> optionalJob) {
-        if (optionalJob.isEmpty()) {
-            return Optional.empty();
-        }
-        AgentJob job = optionalJob.get();
-        if (!workerId.equals(job.getWorkerId())
-                || job.getStatus() != AgentJobStatus.RUNNING
-                || !job.getWorkspace().getId().equals(jwt.workspaceId())
-                || job.getRetryCount() != jwt.attempt()) {
-            return Optional.empty();
-        }
-        if (job.getConfigSnapshot() == null) {
-            log.warn("RUNNING job {} has no config snapshot — cannot route proxy request", job.getId());
-            return Optional.empty();
-        }
-        ConfigSnapshot snapshot;
-        try {
-            snapshot = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
-        } catch (RuntimeException e) {
-            log.warn("Failed to parse config snapshot for job {}: {}", job.getId(), e.getMessage());
-            return Optional.empty();
-        }
-        return Optional.of(new ProxyRouting(
-                "job:" + job.getId(),
-                snapshot.apiProtocol(),
-                snapshot.baseUrl(),
-                snapshot.connectionScope(),
-                snapshot.connectionId(),
-                snapshot.modelId(),
-                job.getWorkspace().getId(),
-                new ProxyRouting.BilledAttempt(
-                        LlmUsageSourceType.AGENT_JOB,
-                        job.getId(),
-                        job.getRetryCount(),
-                        spentSoFarUsd(job, snapshot),
-                        job.getWorkerId())));
-    }
-
-    /**
-     * Priced at the rates frozen onto the row at admission, so what the gate judges an attempt on
-     * cannot drift from what the ledger will charge it. Reasoning tokens are deliberately absent from
-     * the arguments: they are already counted inside the output bucket.
-     */
-    private static BigDecimal spentSoFarUsd(AgentJob job, ConfigSnapshot snapshot) {
-        LlmPriceSnapshot price = snapshot.priceSnapshot();
-        if (price == null) {
-            return BigDecimal.ZERO;
-        }
-        BigDecimal cost = price.calculateCost(
-                        zeroIfNull(job.getLlmTotalInputTokens()),
-                        zeroIfNull(job.getLlmTotalOutputTokens()),
-                        zeroIfNull(job.getLlmCacheReadTokens()),
-                        zeroIfNull(job.getLlmCacheWriteTokens()))
-                .usd();
-        return cost != null ? cost : BigDecimal.ZERO;
-    }
-
-    private static long zeroIfNull(@Nullable Integer tokens) {
-        return tokens != null ? tokens : 0L;
-    }
-
-    /**
-     * {@code Authorization: Bearer} is the only shape accepted: also honouring provider-key headers
-     * would blur the sandbox's trust boundary with the upstream provider's.
-     */
-    private @Nullable String extractProxyToken(HttpServletRequest request) {
-        String auth = request.getHeader("Authorization");
-        if (auth != null && auth.regionMatches(true, 0, BEARER_PREFIX, 0, BEARER_PREFIX.length())) {
-            String bearer = auth.substring(BEARER_PREFIX.length()).trim();
-            if (!bearer.isBlank()) {
-                return bearer;
-            }
-        }
-
-        return null;
-    }
-
-    /** Matches numeric IPv4 or IPv6 address literals (rejects hostnames to avoid DNS resolution). */
-    private static final Pattern IP_LITERAL_PATTERN = Pattern.compile("^[0-9]{1,3}(\\.[0-9]{1,3}){3}$|^[0-9a-fA-F:]+$");
+    record RequestIdentity(@Nullable String runtimeJobId, boolean resultUpload) {}
 
     static boolean isPrivateIp(@Nullable String ip) {
-        if (ip == null || !IP_LITERAL_PATTERN.matcher(ip).matches()) {
-            return false;
-        }
-        try {
-            InetAddress addr = InetAddress.getByName(ip);
-            return addr.isSiteLocalAddress() || addr.isLoopbackAddress() || addr.isLinkLocalAddress();
-        } catch (UnknownHostException e) {
-            return false;
-        }
+        if (ip == null || (!InetAddressUtils.isIPv4(ip) && !InetAddressUtils.isIPv6(ip))) return false;
+        return PRIVATE_RANGES.stream().anyMatch(range -> range.matches(ip));
     }
 }

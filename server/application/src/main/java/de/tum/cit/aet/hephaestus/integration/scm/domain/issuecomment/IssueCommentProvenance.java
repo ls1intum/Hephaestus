@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.DeliveredIssueCommentLookup;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -24,14 +25,14 @@ public class IssueCommentProvenance {
     }
 
     public Set<Long> deliveredIds(long issueId) {
-        return nativeIds(deliveries.findForIssue(issueId));
+        return nativeIds(deliveries.findForIssue(issueId, ScmItemEvents.ISSUE));
     }
 
     /** {@link #deliveredIds} for every issue of a repository the workspace monitors, read at once. */
     public Map<Long, Set<Long>> deliveredIdsByIssue(long workspaceId, long repositoryId) {
         Map<Long, Set<Long>> ids = new HashMap<>();
         deliveries
-                .findForRepository(workspaceId, repositoryId)
+                .findForRepository(workspaceId, repositoryId, ScmItemEvents.ISSUE)
                 .forEach((issue, found) -> ids.put(issue, nativeIds(found)));
         return Map.copyOf(ids);
     }

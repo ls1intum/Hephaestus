@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.context;
 
+import de.tum.cit.aet.hephaestus.evidence.capture.EvidenceDirectory;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.LinkedHashMap;

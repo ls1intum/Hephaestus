@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.DeliveredIssueCommentLookup;
 import de.tum.cit.aet.hephaestus.integration.core.spi.DeliveredIssueCommentLookup.DeliveredComment;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Map;
@@ -32,21 +33,22 @@ class IssueCommentProvenanceTest extends BaseUnitTest {
 
     @Test
     void shouldReadNativeIdsFromRecordedProviderIdentities() {
-        when(deliveries.findForIssue(42L)).thenReturn(RECORDED);
+        when(deliveries.findForIssue(42L, ScmItemEvents.ISSUE)).thenReturn(RECORDED);
 
         assertThat(provenance.deliveredIds(42L)).isEqualTo(Set.of(600L, 601L, 602L));
     }
 
     @Test
     void shouldKeepEvidenceWhenRecordedIdentitiesCannotIdentifyAMirroredComment() {
-        when(deliveries.findForIssue(42L)).thenReturn(UNUSABLE);
+        when(deliveries.findForIssue(42L, ScmItemEvents.ISSUE)).thenReturn(UNUSABLE);
 
         assertThat(provenance.deliveredIds(42L)).isEmpty();
     }
 
     @Test
     void shouldReadEachIssuesIdentitiesOnItsOwnWhenARepositoryIsReadAtOnce() {
-        when(deliveries.findForRepository(5L, 9L)).thenReturn(Map.of(42L, RECORDED, 43L, UNUSABLE));
+        when(deliveries.findForRepository(5L, 9L, ScmItemEvents.ISSUE))
+                .thenReturn(Map.of(42L, RECORDED, 43L, UNUSABLE));
 
         assertThat(provenance.deliveredIdsByIssue(5L, 9L))
                 .isEqualTo(Map.of(42L, Set.of(600L, 601L, 602L), 43L, Set.of()));

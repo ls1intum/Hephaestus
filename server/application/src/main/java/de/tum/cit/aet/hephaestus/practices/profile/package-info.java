@@ -4,8 +4,10 @@
  *
  * <p>Read-only and self-scoped like the standings it is derived from: the developer is the caller, never a
  * parameter. Nothing here is stored. The window is {@link
- * de.tum.cit.aet.hephaestus.practices.profile.OverviewWindow}; its rules are in
+ * OverviewWindow}; its rules are in
  * {@code docs/contributor/practice-review-glossary.mdx} § Practice profile overview.
  */
-@org.jspecify.annotations.NullMarked
+@NullMarked
 package de.tum.cit.aet.hephaestus.practices.profile;
+
+import org.jspecify.annotations.NullMarked;

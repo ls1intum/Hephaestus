@@ -5,15 +5,20 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
+import de.tum.cit.aet.hephaestus.core.auth.spi.PeopleRegistry;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.graphql.FragmentMergingDocumentSource;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
 import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener.MembershipChangedEvent;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewSubject;
 import de.tum.cit.aet.hephaestus.integration.core.spi.TeamMembershipListener;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationMemberRole;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationMembership;
@@ -43,24 +48,21 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectA
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabRouteAdmission;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabWorkspaceLinkService;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewCoverageService;
-import de.tum.cit.aet.hephaestus.practices.review.ReviewSubjectStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
-import de.tum.cit.aet.hephaestus.workspace.HiddenFormerMember;
-import de.tum.cit.aet.hephaestus.workspace.HiddenFormerMemberRepository;
+import de.tum.cit.aet.hephaestus.workspace.Membership;
+import de.tum.cit.aet.hephaestus.workspace.Membership.WorkspaceRole;
+import de.tum.cit.aet.hephaestus.workspace.MembershipRepository;
+import de.tum.cit.aet.hephaestus.workspace.MembershipService;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipRepository;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
-import de.tum.cit.aet.hephaestus.workspace.settings.ReviewPersonMode;
-import de.tum.cit.aet.hephaestus.workspace.settings.ReviewRepositoryMode;
 import de.tum.cit.aet.hephaestus.workspace.settings.ReviewRepositoryTarget;
+import de.tum.cit.aet.hephaestus.workspace.settings.ReviewScopeMode;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
+import de.tum.cit.aet.hephaestus.workspace.spi.MembershipReviewSelection;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -69,6 +71,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
@@ -88,12 +91,6 @@ import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
-/**
- * A workspace on a course subgroup whose students hold access through the parent group, and whose tutors are listed
- * only by a team subgroup. GitLab is stood in for at the HTTP boundary: the real {@code GetGroup},
- * {@code GetGroupDescendants} and {@code GetGroupMembers} documents are sent and recorded JSON answers parsed; the
- * rows, the workspace roster, review eligibility and review coverage behind them are real.
- */
 class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private GitLabProjectAdmission projectAdmission;
@@ -107,6 +104,9 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
     private static final long ASSISTANT = 1002L;
     private static final long TUTOR = 1003L;
     private static final long OWNER_ID = 999L;
+
+    @Autowired
+    private ItemIndexService itemWriter;
 
     @Autowired
     private IdentityProviderRepository providers;
@@ -124,13 +124,13 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
     private ConnectionRepository connections;
 
     @Autowired
-    private WorkspaceMembershipRepository memberships;
+    private MembershipRepository memberships;
 
     @Autowired
-    private WorkspaceMembershipService membershipService;
+    private MembershipService membershipService;
 
     @Autowired
-    private HiddenFormerMemberRepository hiddenFormerMembers;
+    private MembershipReviewSelection reviewSelection;
 
     @Autowired
     private UserRepository users;
@@ -215,10 +215,10 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
 
         workspace = WorkspaceTestFixtures.persistGitLabWorkspace(
                 workspaces, connections, WorkspaceTestFixtures.gitLabPatWorkspace(COURSE), GITLAB_URL);
-        workspace.setOrganization(course);
+        workspace.setOrganizationId(course.getId());
         workspace = workspaces.save(workspace);
         owner = users.save(TestUserFactory.createUser(OWNER_ID, "owner", gitLab));
-        membershipService.createMembership(workspace, owner.getId(), WorkspaceRole.OWNER);
+        membershipService.createMembership(workspace, ensureAccount(owner), WorkspaceRole.OWNER);
 
         GitLabGraphQlClientProvider clients = mock(GitLabGraphQlClientProvider.class);
         when(clients.forScope(anyLong())).thenReturn(gitLabClient());
@@ -269,13 +269,12 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
                 .isEqualTo(2);
 
         assertThat(relationsAsked.get("GetGroupMembers " + COURSE))
-                .as("the connected group's effective members, as GET /groups/:id/members/all lists them")
+                .as("the connected group's effective members, as GET /groups/:id/members/all" + " lists them")
                 .isEqualTo(List.of("DIRECT", "INHERITED", "SHARED_FROM_GROUPS"));
         assertThat(groupRoleOf(STUDENT)).contains(OrganizationMemberRole.MEMBER);
         assertThat(groupRoleOf(ASSISTANT)).contains(OrganizationMemberRole.ADMIN);
         assertThat(workspaceRoleOf(ASSISTANT)).contains(WorkspaceRole.ADMIN);
-        assertThat(membershipService.practiceReviewEligibleUserIds(workspace.getId()))
-                .contains(userId(STUDENT), userId(ASSISTANT));
+        assertThat(eligibleAccounts()).contains(accountId(userId(STUDENT)), accountId(userId(ASSISTANT)));
     }
 
     @Test
@@ -285,7 +284,8 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
                 page(false, member(STUDENT, "student", 30), member(ASSISTANT, "assistant", 40)));
         memberSync.syncGroupMemberships(workspace.getId(), COURSE, course);
 
-        // Page one lists only the assistant's lower direct grant; page two, with the inherited one, is unreadable.
+        // Page one lists only the assistant's lower direct grant; page two, with the inherited one,
+        // is unreadable.
         answer(
                 "GetGroupMembers " + COURSE,
                 page(true, member(ASSISTANT, "assistant", 30)),
@@ -317,8 +317,7 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
         assertThat(teamSync.syncTeamsForGroup(workspace.getId(), COURSE).complete())
                 .isFalse();
         assertThat(workspaceRoleOf(TUTOR)).contains(WorkspaceRole.MEMBER);
-        assertThat(membershipService.practiceReviewEligibleUserIds(workspace.getId()))
-                .contains(tutor.getId());
+        assertThat(eligibleAccounts()).contains(accountId(tutor.getId()));
 
         answerTeamSync(page(false), page(false));
         assertThat(teamSync.syncTeamsForGroup(workspace.getId(), COURSE).complete())
@@ -327,8 +326,7 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
                 .as("a team's own grants; the team hierarchy carries what it inherits")
                 .isEqualTo(GitLabGroupMemberResponse.TEAM_RELATIONS);
         assertThat(workspaceRoleOf(TUTOR)).isEmpty();
-        assertThat(membershipService.practiceReviewEligibleUserIds(workspace.getId()))
-                .doesNotContain(tutor.getId());
+        assertThat(eligibleAccounts()).doesNotContain(accountId(tutor.getId()));
         assertThat(workspaceRoleOf(STUDENT)).contains(WorkspaceRole.MEMBER);
     }
 
@@ -336,8 +334,8 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
     void shouldRemoveAHiddenStudentGitLabNoLongerListsAndHideThemAgainWhenTheyReturn() {
         answer("GetGroupMembers " + COURSE, page(false, member(STUDENT, "student", 30)));
         memberSync.syncGroupMemberships(workspace.getId(), COURSE, course);
-        WorkspaceMembership hidden = memberships
-                .findByWorkspace_IdAndUser_Id(workspace.getId(), userId(STUDENT))
+        Membership hidden = memberships
+                .findByWorkspace_IdAndId_AccountId(workspace.getId(), accountId(userId(STUDENT)))
                 .orElseThrow();
         hidden.setHidden(true);
         memberships.save(hidden);
@@ -345,18 +343,23 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
         answer("GetGroupMembers " + COURSE, page(false));
         memberSync.syncGroupMemberships(workspace.getId(), COURSE, course);
         assertThat(workspaceRoleOf(STUDENT)).isEmpty();
-        assertThat(membershipService.practiceReviewEligibleUserIds(workspace.getId()))
-                .doesNotContain(userId(STUDENT));
-        assertThat(hiddenFormerMembers.existsById(new HiddenFormerMember.Key(workspace.getId(), userId(STUDENT))))
+        assertThat(eligibleAccounts()).doesNotContain(accountId(userId(STUDENT)));
+        assertThat(memberships
+                        .findByWorkspace_IdAndId_AccountId(workspace.getId(), accountId(userId(STUDENT)))
+                        .map(member -> member.isHidden() && member.getLeftAt() != null)
+                        .orElse(false))
                 .isTrue();
 
         answer("GetGroupMembers " + COURSE, page(false, member(STUDENT, "student", 30)));
         memberSync.syncGroupMemberships(workspace.getId(), COURSE, course);
         assertThat(memberships
-                        .findByWorkspace_IdAndUser_Id(workspace.getId(), userId(STUDENT))
-                        .map(WorkspaceMembership::isHidden))
+                        .findByWorkspace_IdAndId_AccountId(workspace.getId(), accountId(userId(STUDENT)))
+                        .map(Membership::isHidden))
                 .contains(true);
-        assertThat(hiddenFormerMembers.existsById(new HiddenFormerMember.Key(workspace.getId(), userId(STUDENT))))
+        assertThat(memberships
+                        .findByWorkspace_IdAndId_AccountId(workspace.getId(), accountId(userId(STUDENT)))
+                        .map(member -> member.isHidden() && member.getLeftAt() != null)
+                        .orElse(false))
                 .isFalse();
     }
 
@@ -367,9 +370,10 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
                 .orElseGet(
                         () -> providers.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
         User ownerOnGitHub = users.save(TestUserFactory.createUser(OWNER_ID, "owner", gitHub));
-        membershipService.createMembership(workspace, ownerOnGitHub.getId(), WorkspaceRole.OWNER);
+        membershipService.createMembership(workspace, ensureAccount(ownerOnGitHub), WorkspaceRole.OWNER);
         User studentOnGitHub = users.save(TestUserFactory.createUser(STUDENT, "student", gitHub));
-        // An earlier GitLab account under the same username; GitLab identifies people by id, not by name.
+        // An earlier GitLab account under the same username; GitLab identifies people by id, not by
+        // name.
         User formerStudentName = users.save(TestUserFactory.createUser(2001L, "student", gitLab));
         answer("GetGroupMembers " + COURSE, page(false, member(STUDENT, "student", 30)));
 
@@ -381,50 +385,57 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
         assertThat(workspaceRoleOf(ownerOnGitHub)).contains(WorkspaceRole.OWNER);
         assertThat(workspaceRoleOf(studentOnGitHub)).isEmpty();
         assertThat(workspaceRoleOf(formerStudentName)).isEmpty();
-        assertThat(membershipService.practiceReviewEligibleUserIds(workspace.getId()))
+        assertThat(eligibleAccounts())
                 .as("the owner's GitHub profile authors no GitLab work")
-                .containsExactlyInAnyOrder(userId(STUDENT), owner.getId());
+                .containsExactlyInAnyOrder(accountId(userId(STUDENT)), accountId(owner.getId()));
         assertThat(coverage.summary(workspace, 0).eligiblePeople()).isEqualTo(2);
     }
 
-    /**
-     * The reported bug: a student who reaches the course subgroup only through its parent group opens a merge
-     * request in a selected repository, against a selected base branch, and marks it ready. Until the roster
-     * lists them the gate waits on them rather than on the repository; once it does, the same check admits them.
-     */
     @Test
     void shouldAdmitAnInheritedAuthorAtTheReadyOccasionOnASelectedRepositoryAndBaseBranch() {
         String project = COURSE + "/team-1/project";
+        var repository = new Repository();
+        repository.setNativeId(7002L);
+        repository.setProvider(gitLab);
+        repository.setName("project");
+        repository.setNameWithOwner(project);
+        repository.setDefaultBranch("main");
+        repository = repositories.saveAndFlush(repository);
+        long repositoryItemId = itemWriter
+                .upsert(new ItemRegistration(
+                        workspace.getId(), ScmItemEvents.REPOSITORY, repository.getId(), null, null))
+                .itemId();
         RepositoryToMonitor monitor = new RepositoryToMonitor();
         monitor.setNameWithOwner(project);
+        monitor.setNativeId(7002L);
         monitor.setWorkspace(workspace);
         monitors.save(monitor);
         coverage.replace(
                 workspace,
                 new WorkspaceReviewScope(
-                        ReviewRepositoryMode.SELECTED,
-                        ReviewPersonMode.ALL_ELIGIBLE,
-                        List.of(new ReviewRepositoryTarget(project, List.of("main"))),
+                        ReviewScopeMode.SELECTED,
+                        ReviewScopeMode.ALL,
+                        List.of(new ReviewRepositoryTarget(repositoryItemId, List.of("main"))),
                         List.of()));
         workspace = workspaces.save(workspace);
         User student = users.save(TestUserFactory.createUser(STUDENT, "student", gitLab));
+        ensureAccount(student);
         PullRequest ready = mergeRequest(student, "main");
 
-        var beforeSync = coverage.assess(workspace, project, ready.getBaseRefName(), ready.reviewSubject(), true);
-        assertThat(beforeSync.admitted()).isFalse();
-        assertThat(beforeSync.repositoryMatched()).isTrue();
-        assertThat(beforeSync.branchMatched()).isTrue();
-        assertThat(beforeSync.subjectStatus()).isEqualTo(ReviewSubjectStatus.UNLINKED);
+        assertThat(coverage.admits(
+                        workspace, repositoryItemId, ready.getBaseRefName(), accountId(student.getId()), true))
+                .isFalse();
 
         answer("GetGroupMembers " + COURSE, page(false, member(STUDENT, "student", 30)));
         memberSync.syncGroupMemberships(workspace.getId(), COURSE, course);
 
-        assertThat(coverage.admits(workspace, project, ready.getBaseRefName(), ready.reviewSubject()))
+        assertThat(coverage.admits(
+                        workspace, repositoryItemId, ready.getBaseRefName(), accountId(student.getId()), true))
                 .isTrue();
-        assertThat(coverage.admits(workspace, project, "develop", ready.reviewSubject()))
+        assertThat(coverage.admits(workspace, repositoryItemId, "develop", accountId(student.getId()), true))
                 .as("the base branch still has to be selected")
                 .isFalse();
-        assertThat(coverage.admits(workspace, project, "main", new ReviewSubject(owner.getId(), false)))
+        assertThat(coverage.admits(workspace, repositoryItemId, "main", Long.MAX_VALUE, true))
                 .isFalse();
     }
 
@@ -436,17 +447,17 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
         memberSync.syncGroupMemberships(workspace.getId(), COURSE, course);
         assertThat(workspaceRoleOf(STUDENT)).contains(WorkspaceRole.MEMBER);
 
-        // GraphQL lists an e-mail invitation nobody has accepted with no user; REST /members/all leaves it out.
+        // GraphQL lists an e-mail invitation nobody has accepted with no user; REST /members/all
+        // leaves it out.
         answer("GetGroupMembers " + COURSE, page(false, member(ASSISTANT, "assistant", 40), """
-                        {"user":null,"accessLevel":{"stringValue":"DEVELOPER","integerValue":30}}
-                        """));
+            {"user":null,"accessLevel":{"stringValue":"DEVELOPER","integerValue":30}}
+            """));
         assertThat(memberSync.syncGroupMemberships(workspace.getId(), COURSE, course))
                 .isEqualTo(1);
 
         assertThat(groupRoleOf(STUDENT)).isEmpty();
         assertThat(workspaceRoleOf(STUDENT)).isEmpty();
-        assertThat(membershipService.practiceReviewEligibleUserIds(workspace.getId()))
-                .doesNotContain(userId(STUDENT));
+        assertThat(eligibleAccounts()).doesNotContain(accountId(userId(STUDENT)));
         assertThat(workspaceRoleOf(ASSISTANT)).contains(WorkspaceRole.ADMIN);
         assertThat(workspaceRoleOf(owner)).contains(WorkspaceRole.OWNER);
     }
@@ -468,9 +479,9 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
         monitor.setWorkspace(workspace);
         monitors.save(monitor);
         answer("GetProjectMembers " + path, """
-                {"data":{"project":{"projectMembers":{"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[
-                 {"user":null,"accessLevel":{"stringValue":"DEVELOPER","integerValue":30}},%s]}}}}
-                """.formatted(member(STUDENT, "student", 30)));
+            {"data":{"project":{"projectMembers":{"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[
+             {"user":null,"accessLevel":{"stringValue":"DEVELOPER","integerValue":30}},%s]}}}}
+            """.formatted(member(STUDENT, "student", 30)));
 
         assertThat(collaboratorSync
                         .syncCollaboratorsForRepository(workspace.getId(), project)
@@ -531,8 +542,8 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
                 "GetGroupMembers " + COURSE,
                 page(false, member(STUDENT, "student", 30), member(ASSISTANT, "assistant", 40)));
         memberSync.syncGroupMemberships(workspace.getId(), COURSE, course);
-        WorkspaceMembership hidden = memberships
-                .findByWorkspace_IdAndUser_Id(workspace.getId(), userId(STUDENT))
+        Membership hidden = memberships
+                .findByWorkspace_IdAndId_AccountId(workspace.getId(), accountId(userId(STUDENT)))
                 .orElseThrow();
         hidden.setHidden(true);
         memberships.save(hidden);
@@ -542,7 +553,10 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
 
         assertThat(groupRoleOf(STUDENT)).isEmpty();
         assertThat(workspaceRoleOf(STUDENT)).isEmpty();
-        assertThat(hiddenFormerMembers.existsById(new HiddenFormerMember.Key(workspace.getId(), userId(STUDENT))))
+        assertThat(memberships
+                        .findByWorkspace_IdAndId_AccountId(workspace.getId(), accountId(userId(STUDENT)))
+                        .map(member -> member.isHidden() && member.getLeftAt() != null)
+                        .orElse(false))
                 .isTrue();
         assertThat(workspaceRoleOf(ASSISTANT)).as("nobody else is reconciled").contains(WorkspaceRole.ADMIN);
         assertThat(workspaceRoleOf(owner)).contains(WorkspaceRole.OWNER);
@@ -552,8 +566,8 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
         organizationMembershipListener.onMemberAdded(
                 new MembershipChangedEvent(course.getId(), COURSE, userId(STUDENT), "student", "DEVELOPER"));
         assertThat(memberships
-                        .findByWorkspace_IdAndUser_Id(workspace.getId(), userId(STUDENT))
-                        .map(WorkspaceMembership::isHidden))
+                        .findByWorkspace_IdAndId_AccountId(workspace.getId(), accountId(userId(STUDENT)))
+                        .map(Membership::isHidden))
                 .contains(true);
     }
 
@@ -601,15 +615,20 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
                 .findFirst();
     }
 
+    private Set<Long> eligibleAccounts() {
+        return reviewSelection.eligibleAccountIds(workspace.getId());
+    }
+
     private Optional<WorkspaceRole> workspaceRoleOf(long nativeId) {
         return users.findByNativeIdAndProviderId(nativeId, Objects.requireNonNull(gitLab.getId()))
                 .flatMap(user -> workspaceRoleOf(user));
     }
 
     private Optional<WorkspaceRole> workspaceRoleOf(User user) {
-        return memberships
-                .findByWorkspace_IdAndUser_Id(workspace.getId(), user.getId())
-                .map(WorkspaceMembership::getRole);
+        return accountId(user)
+                .flatMap(id -> memberships.findByWorkspace_IdAndId_AccountId(workspace.getId(), id))
+                .filter(member -> member.getLeftAt() == null)
+                .map(Membership::getRole);
     }
 
     private Long userId(long nativeId) {
@@ -632,33 +651,32 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
         return team;
     }
 
-    /** One team sync of the course group and its subgroup team-1, whose members GitLab lists as given. */
     private void answerTeamSync(String courseMembers, String teamOneMembers) {
         answer("GetGroup " + COURSE, """
-                {"data":{"group":{%s,"parent":null}}}
-                """.formatted(group(COURSE_ID, COURSE)));
+            {"data":{"group":{%s,"parent":null}}}
+            """.formatted(group(COURSE_ID, COURSE)));
         answer("GetGroupDescendants " + COURSE, """
-                {"data":{"group":{"descendantGroups":{"pageInfo":{"hasNextPage":false,"endCursor":null},
-                 "nodes":[{%s,"parent":{"id":"gid://gitlab/Group/%d","fullPath":"%s"}}]}}}}
-                """.formatted(group(TEAM_1, COURSE + "/team-1"), COURSE_ID, COURSE));
+            {"data":{"group":{"descendantGroups":{"pageInfo":{"hasNextPage":false,"endCursor":null},
+             "nodes":[{%s,"parent":{"id":"gid://gitlab/Group/%d","fullPath":"%s"}}]}}}}
+            """.formatted(group(TEAM_1, COURSE + "/team-1"), COURSE_ID, COURSE));
         answer("GetGroupMembers " + COURSE, courseMembers);
         answer("GetGroupMembers " + COURSE + "/team-1", teamOneMembers);
     }
 
     private static String group(long id, String fullPath) {
         return """
-                "id":"gid://gitlab/Group/%d","fullPath":"%s","name":"%s","avatarUrl":null,"webUrl":"%s/%s",
-                "description":null,"visibility":"private"
-                """.formatted(id, fullPath, fullPath.substring(fullPath.lastIndexOf('/') + 1), GITLAB_URL, fullPath)
+            "id":"gid://gitlab/Group/%d","fullPath":"%s","name":"%s","avatarUrl":null,"webUrl":"%s/%s",
+            "description":null,"visibility":"private"
+            """.formatted(id, fullPath, fullPath.substring(fullPath.lastIndexOf('/') + 1), GITLAB_URL, fullPath)
                 .strip();
     }
 
     private static String member(long nativeId, String username, int accessLevel) {
         return """
-                {"user":{"id":"gid://gitlab/User/%d","username":"%s","name":"%s","avatarUrl":null,
-                 "webUrl":"%s/%s","publicEmail":null},
-                 "accessLevel":{"stringValue":"%s","integerValue":%d}}
-                """.formatted(
+            {"user":{"id":"gid://gitlab/User/%d","username":"%s","name":"%s","avatarUrl":null,
+             "webUrl":"%s/%s","publicEmail":null},
+             "accessLevel":{"stringValue":"%s","integerValue":%d}}
+            """.formatted(
                         nativeId,
                         username,
                         username,
@@ -670,8 +688,8 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
 
     private static String page(boolean hasNextPage, String... members) {
         return """
-                {"data":{"group":{"groupMembers":{"pageInfo":{"hasNextPage":%s,"endCursor":%s},"nodes":[%s]}}}}
-                """.formatted(hasNextPage, hasNextPage ? "\"next\"" : "null", String.join(",", members));
+            {"data":{"group":{"groupMembers":{"pageInfo":{"hasNextPage":%s,"endCursor":%s},"nodes":[%s]}}}}
+            """.formatted(hasNextPage, hasNextPage ? "\"next\"" : "null", String.join(",", members));
     }
 
     private void answer(String operationAndGroup, String... pages) {
@@ -685,7 +703,7 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
                     .map(Deque::poll)
                     .orElse(null);
             assertThat(answer)
-                    .as("GitLab was asked more than the test answered: %s", lastRequest)
+                    .as("GitLab was asked more than the test answered:" + " %s", lastRequest)
                     .isNotNull();
             return Mono.just(ClientResponse.create(HttpStatus.OK)
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
@@ -696,7 +714,8 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
             @Override
             public Mono<ClientGraphQlResponse> intercept(ClientGraphQlRequest request, Chain chain) {
                 Matcher name = operation.matcher(request.getDocument());
-                lastRequest = (name.find() ? name.group(1) : "") + " "
+                lastRequest = (name.find() ? name.group(1) : "")
+                        + " "
                         + request.getVariables().get("fullPath");
                 Object relations = request.getVariables().get("relations");
                 if (relations != null) {
@@ -715,5 +734,28 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
                         List.of(new ClassPathResource("graphql/gitlab/fragments/GitLabUserFields.graphql"))))
                 .interceptor(recordRequest)
                 .build();
+    }
+
+    @Autowired
+    private AccountIdentityQuery accountIdentities;
+
+    @Autowired
+    private PeopleRegistry people;
+
+    private long ensureAccount(User user) {
+        return people.ensureHuman(
+                new PersonIdentity(
+                        Objects.requireNonNull(user.getProvider().getId()), Long.toString(user.getNativeId()), null),
+                user.getLogin());
+    }
+
+    private long accountId(long mirrorId) {
+        var user = users.findById(mirrorId).orElseThrow();
+        return accountId(user).orElseThrow();
+    }
+
+    private Optional<Long> accountId(User user) {
+        return accountIdentities.resolveAccountId(
+                Objects.requireNonNull(user.getProvider().getId()), Long.toString(user.getNativeId()), null);
     }
 }

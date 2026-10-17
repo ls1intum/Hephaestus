@@ -1,19 +1,15 @@
 import type { FacetSource } from "@/components/common/FacetMultiSelect";
 
 import { practiceGroups, workspaceMembers, workspacePractices } from "./fixtures";
-import {
-	groupFacetOptions,
-	type PracticeFacetOption,
-	practiceFacetOptions,
-} from "./ObservationFilters";
+import { groupFacetOptions, type PracticeFacetOption, practiceFacetOptions } from "./ResultFilters";
 import type { ReviewPeople } from "./ReviewPersonFacet";
 
 /** The options of the shared scope's facets, loaded, for the stories of every review list. */
 export const STORY_PEOPLE: ReviewPeople = {
 	options: workspaceMembers.map((member) => ({
-		userId: member.userId,
-		label: member.userName ?? `#${member.userId}`,
-		secondary: member.userLogin,
+		accountId: member.account.id,
+		label: member.account.displayName ?? `#${member.account.id}`,
+		secondary: member.account.identities[0]?.login ?? undefined,
 	})),
 	capped: false,
 	isLoading: false,

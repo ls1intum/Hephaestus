@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessage;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -38,7 +38,7 @@ class CurrentThreadHistoryContentSourceTest extends BaseUnitTest {
         CurrentThreadHistoryContentSource source =
                 new CurrentThreadHistoryContentSource(chatMessageRepository, objectMapper);
         Map<String, byte[]> files = new HashMap<>();
-        source.contribute(new ContextRequest.MentorChatRequest(1L, 2L, threadId), files);
+        source.contribute(new MentorContextRequest(1L, 2L, threadId, null), files);
 
         JsonNode root = objectMapper.readTree(files.get(CurrentThreadHistoryContentSource.OUTPUT_KEY));
         assertThat(root.get("threadId").asString()).isEqualTo(threadId.toString());
@@ -51,7 +51,7 @@ class CurrentThreadHistoryContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("omits legacy assistant text parts that are leaked internal analysis")
+    @DisplayName("omits assistant text that exposes internal analysis")
     void omitsLeakedInternalAnalysisFromAssistantHistory() throws Exception {
         UUID threadId = UUID.randomUUID();
         ChatMessage assistant = message(
@@ -65,7 +65,7 @@ class CurrentThreadHistoryContentSourceTest extends BaseUnitTest {
         CurrentThreadHistoryContentSource source =
                 new CurrentThreadHistoryContentSource(chatMessageRepository, objectMapper);
         Map<String, byte[]> files = new HashMap<>();
-        source.contribute(new ContextRequest.MentorChatRequest(1L, 2L, threadId), files);
+        source.contribute(new MentorContextRequest(1L, 2L, threadId, null), files);
 
         JsonNode messages = objectMapper
                 .readTree(files.get(CurrentThreadHistoryContentSource.OUTPUT_KEY))
@@ -75,35 +75,43 @@ class CurrentThreadHistoryContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    void remembersTheFeedbackAReplyShowedAndNothingForAnObservationItOnlyNamed() throws Exception {
+    void remembersTheFeedbackAReplyShowedAndNothingForAResultItOnlyNamed() throws Exception {
         UUID threadId = UUID.randomUUID();
         ChatMessage assistant =
                 message(ChatMessage.Role.ASSISTANT, "Let me look.", Instant.parse("2026-01-01T00:00:00Z"));
         var parts = (ArrayNode) assistant.getParts();
         parts.addObject()
-                .put("type", "data-observation")
+                .put("type", "data-result")
                 .put("id", "named")
                 .putObject("data")
-                .put("observationId", UUID.randomUUID().toString());
+                .put("resultId", UUID.randomUUID().toString());
         parts.addObject()
-                .put("type", "data-observation")
+                .put("type", "data-result")
                 .put("id", "shown")
                 .putObject("data")
-                .put("observationId", UUID.randomUUID().toString())
+                .put("resultId", UUID.randomUUID().toString())
                 .put("text", "Name the trade-off in the description.");
+        parts.addObject()
+                .put("type", "data-problem")
+                .put("id", "problem")
+                .putObject("data")
+                .put("resultId", UUID.randomUUID().toString())
+                .put("problemId", UUID.randomUUID().toString())
+                .put("text", "Line 12 retries without a limit.");
         parts.addObject().put("type", "text").put("text", "What made you choose it?");
         when(chatMessageRepository.findContextMessages(1L, 2L, threadId, null)).thenReturn(List.of(assistant));
 
         CurrentThreadHistoryContentSource source =
                 new CurrentThreadHistoryContentSource(chatMessageRepository, objectMapper);
         Map<String, byte[]> files = new HashMap<>();
-        source.contribute(new ContextRequest.MentorChatRequest(1L, 2L, threadId), files);
+        source.contribute(new MentorContextRequest(1L, 2L, threadId, null), files);
 
         assertThat(objectMapper
                         .readTree(files.get(CurrentThreadHistoryContentSource.OUTPUT_KEY))
                         .at("/messages/0/text")
                         .asString())
-                .isEqualTo("Let me look.\nName the trade-off in the description.\nWhat made you choose it?");
+                .isEqualTo("Let me look.\nName the trade-off in the description.\nLine 12 retries without a limit.\n"
+                        + "What made you choose it?");
     }
 
     private ChatMessage message(ChatMessage.Role role, String text, Instant createdAt) {

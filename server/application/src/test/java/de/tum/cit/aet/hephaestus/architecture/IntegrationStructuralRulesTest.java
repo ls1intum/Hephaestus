@@ -98,7 +98,8 @@ class IntegrationStructuralRulesTest extends HephaestusArchitectureTest {
             Set<String> actual = children.map(p -> p.getFileName().toString()).collect(Collectors.toSet());
             // {identity} owns the OIDC login adapters (ADR 0017). It lives here rather than in core.auth
             // because core.auth must never import integration.*.
-            Set<String> expected = Set.of("core", "scm", "slack", "identity", "outline", "package-info.java");
+            Set<String> expected =
+                    Set.of("core", "scm", "chat", "docs", "slack", "identity", "outline", "package-info.java");
             assertThat(actual).isEqualTo(expected);
         }
     }

@@ -12,7 +12,7 @@ const request = {
 	state: "PREVIEW",
 	expiresAt: daysAfter(2),
 	counts: {
-		observation: 4,
+		practice_result: 4,
 		feedback: 2,
 		chat_thread: 1,
 		slack_message: 6,
@@ -152,7 +152,7 @@ export const ActionRejected: Story = {
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("alert")).toHaveTextContent("The preview scope changed.");
-		await expect(canvas.getByRole("cell", { name: "observation" })).toBeVisible();
+		await expect(canvas.getByRole("cell", { name: "practice_result" })).toBeVisible();
 	},
 };
 
@@ -162,7 +162,7 @@ export const Downloading: Story = {
 		await expect(canvas.getByRole("button", { name: "Downloading…" })).toBeDisabled();
 		await expect(canvas.getByRole("button", { name: "Erase data…" })).toBeDisabled();
 		await expect(canvas.getByLabelText("Account ID")).toBeDisabled();
-		await expect(canvas.getByRole("cell", { name: "observation" })).toBeVisible();
+		await expect(canvas.getByRole("cell", { name: "practice_result" })).toBeVisible();
 	},
 };
 
@@ -178,7 +178,7 @@ export const Running: Story = {
 	args: {
 		state: {
 			...ready,
-			request: { ...request, state: "ERASING", completed: { feedback: 2, observation: 4 } },
+			request: { ...request, state: "ERASING", completed: { feedback: 2, practice_result: 4 } },
 		},
 	},
 	play: async ({ canvas }) => {
@@ -216,7 +216,7 @@ export const Complete: Story = {
 				state: "COMPLETE",
 				scope: undefined,
 				completed: {
-					observation: 4,
+					practice_result: 4,
 					feedback: 2,
 					chat_thread: 1,
 					slack_message: 6,

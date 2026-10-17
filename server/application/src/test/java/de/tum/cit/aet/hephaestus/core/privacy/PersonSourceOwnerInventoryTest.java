@@ -15,18 +15,18 @@ import org.springframework.jdbc.core.JdbcTemplate;
 class PersonSourceOwnerInventoryTest extends BaseUnitTest {
     @Test
     void shouldRejectMissingSourceAttributionOwnersBeforeProcessingCanStart() {
-        assertThatThrownBy(() -> new PersonSuppressionService(
-                        mock(JdbcTemplate.class), List.of(), mock(PersonDataCopyFence.class)))
+        assertThatThrownBy(() -> new IdentityRestrictionService(
+                                mock(JdbcTemplate.class), List.of(), mock(PersonDataCopyFence.class))
+                        .isSourceSuppressed(1L, "chat.thread", 1L))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("exactly one");
+                .hasMessageContaining("attribution owner");
     }
 
     @Test
     void shouldRejectDuplicateSourceAttributionOwnersBeforeProcessingCanStart() {
         var owner = mock(PersonSourceIdentityContributor.class);
-        when(owner.artifactKinds())
-                .thenReturn(Set.of("scm.issue", "scm.pull_request", "chat.conversation_thread", "docs.document"));
-        assertThatThrownBy(() -> new PersonSuppressionService(
+        when(owner.itemKinds()).thenReturn(Set.of("scm.issue", "scm.pull_request", "chat.thread", "docs.document"));
+        assertThatThrownBy(() -> new IdentityRestrictionService(
                         mock(JdbcTemplate.class), List.of(owner, owner), mock(PersonDataCopyFence.class)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("exactly one");

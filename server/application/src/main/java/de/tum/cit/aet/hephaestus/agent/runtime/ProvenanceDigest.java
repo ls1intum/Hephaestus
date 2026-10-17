@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.runtime;
 
-import de.tum.cit.aet.hephaestus.agent.context.EvidenceDirectory;
+import de.tum.cit.aet.hephaestus.evidence.capture.EvidenceDirectory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;

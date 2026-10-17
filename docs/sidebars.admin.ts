@@ -28,8 +28,10 @@ const sidebars: SidebarsConfig = {
 			items: [
 				"practice-catalog",
 				"writing-practices",
+				"practice-scripts",
 				"ai-providers",
 				"practice-review",
+				"practice-scans",
 				"practice-review-operations",
 				"product-feedback",
 			],
@@ -75,7 +77,7 @@ const sidebars: SidebarsConfig = {
 						{ type: "doc", id: "dsms/processor-checklist", label: "Processor Checklist (Art. 28)" },
 						{
 							type: "doc",
-							id: "dsms/artifact-source-governance",
+							id: "dsms/item-source-governance",
 							label: "Artifact-Source Governance",
 						},
 						{ type: "doc", id: "dsms/personal-data-map", label: "Personal-Data Map" },

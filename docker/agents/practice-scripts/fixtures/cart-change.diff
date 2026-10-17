@@ -1,0 +1,16 @@
+diff --git a/src/cart.ts b/src/cart.ts
+--- a/src/cart.ts
++++ b/src/cart.ts
+@@ -1,1 +1,12 @@
+ export class Cart {
++  // increment the item count by one
++  count += 1;
++  // retry once: the payment API drops the first call after an idle period
++  await pay(order).catch(() => pay(order));
++  // TODO clean this up before release
++  const legacy = true;
++  // timeout in seconds
++  const timeoutMs = 30_000;
++  // TEMP hardcoded for the demo, remove before merge
++  const discount = 0.5;
++}

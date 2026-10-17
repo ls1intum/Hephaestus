@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.slack.events;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackParticipantConsentRepository;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -15,14 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code SlackPersonErasureService}.
  */
 @Service
+@ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 public class SlackParticipantConsentService {
-
-    /** Provenance stamped on an App Home consent decision (fits {@code source VARCHAR(32)}). */
-    static final String SOURCE_SLACK_APP_HOME = "SLACK_APP_HOME";
-
-    /** Provenance stamped when a member uses the in-channel notice button. */
-    static final String SOURCE_SLACK_CHANNEL_NOTICE = "SLACK_CHANNEL_NOTICE";
 
     private final SlackParticipantConsentRepository participantConsentRepository;
 
@@ -39,7 +35,7 @@ public class SlackParticipantConsentService {
         if (slackUserId == null || slackUserId.isBlank()) {
             return;
         }
-        participantConsentRepository.optOutOfIngestion(workspaceId, slackUserId, SOURCE_SLACK_CHANNEL_NOTICE);
+        participantConsentRepository.optOutOfIngestion(workspaceId, slackUserId);
     }
 
     @Transactional
@@ -47,6 +43,6 @@ public class SlackParticipantConsentService {
         if (slackUserId == null || slackUserId.isBlank()) {
             return;
         }
-        participantConsentRepository.optInToIngestion(workspaceId, slackUserId, SOURCE_SLACK_APP_HOME);
+        participantConsentRepository.optInToIngestion(workspaceId, slackUserId);
     }
 }

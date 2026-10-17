@@ -1,0 +1,80 @@
+package de.tum.cit.aet.hephaestus.practices.review.model;
+
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewMethod;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewPracticeStatus;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.IdClass;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import java.io.Serializable;
+import java.util.UUID;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Builder.Default;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+import org.jspecify.annotations.Nullable;
+import tools.jackson.databind.JsonNode;
+
+@Entity
+@Table(
+        name = "review_practice",
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "uk_review_practice_tenant",
+                    columnNames = {"review_id", "practice_id", "workspace_id"})
+        })
+@IdClass(ReviewPractice.Id.class)
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ReviewPractice {
+
+    @jakarta.persistence.Id
+    @Column(name = "review_id", nullable = false)
+    private UUID reviewId;
+
+    @jakarta.persistence.Id
+    @Column(name = "practice_id", nullable = false)
+    private long practiceId;
+
+    @Column(name = "workspace_id", nullable = false)
+    private long workspaceId;
+
+    @Column(name = "practice_version_id")
+    private @Nullable Long practiceVersionId;
+
+    @Default
+    @Enumerated(EnumType.STRING)
+    @ColumnDefault("'QUEUED'")
+    @Column(name = "status", nullable = false, length = 16)
+    private ReviewPracticeStatus status = ReviewPracticeStatus.QUEUED;
+
+    @Column(name = "reason", length = 48)
+    private @Nullable String reason;
+
+    @Column(name = "items_listed")
+    private @Nullable Integer itemsListed;
+
+    @Column(name = "listing_complete")
+    private @Nullable Boolean listingComplete;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "capture_decision", columnDefinition = "jsonb")
+    private @Nullable JsonNode captureDecision;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "method", columnDefinition = "jsonb")
+    private @Nullable ReviewMethod method;
+
+    public record Id(UUID reviewId, long practiceId) implements Serializable {}
+}

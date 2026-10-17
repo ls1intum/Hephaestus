@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWorkerRole;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.DistributionSummary;
@@ -10,7 +12,6 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /** Everything the LLM proxy records or decides about a request's cost. */
@@ -34,6 +35,7 @@ public class ProxyAccounting {
     private final DistributionSummary gatewayRequestSize;
     private final Counter gatewayThrottled;
     private final Counter gatewayLimiterErrors;
+    private final Counter practiceScriptUnattributed;
 
     ProxyAccounting(
             ProxyBudgetGate budgetGate,
@@ -61,6 +63,9 @@ public class ProxyAccounting {
         this.gatewayLimiterErrors = Counter.builder(AgentMetrics.SANDBOX_GATEWAY_LIMITER_ERRORS)
                 .description("Sandbox gateway requests served without a rate-limit decision")
                 .register(meterRegistry);
+        this.practiceScriptUnattributed = Counter.builder(AgentMetrics.LLM_PROXY_PRACTICE_SCRIPT_UNATTRIBUTED)
+                .description("Practice script calls refused because they named no valid practice")
+                .register(meterRegistry);
     }
 
     /**
@@ -68,13 +73,22 @@ public class ProxyAccounting {
      * spend, which the ledger cannot see until the run ends.
      */
     public boolean refuseForBudget(ProxyRouting routing) {
-        if (!budgetGate.isBlocked(routing)) {
-            return false;
+        return countedRefusal(
+                budgetGate.isBlocked(routing), routing, UsageFundingSource.capTag(routing.connectionScope()));
+    }
+
+    public boolean refuseForDirectModelCap(ProxyRouting routing, ProxyRouting.BilledAttempt attempt) {
+        return countedRefusal(budgetGate.isDirectModelCapReached(attempt), routing, "practice_script_attempt");
+    }
+
+    // Monthly and per-attempt limits have different owners; count refusal against the cap that blocked it.
+    private boolean countedRefusal(boolean refused, ProxyRouting routing, String cap) {
+        if (refused) {
+            meterRegistry
+                    .counter(AgentMetrics.LLM_PROXY_BUDGET_BLOCKED, "apiProtocol", routing.apiProtocol(), "cap", cap)
+                    .increment();
         }
-        meterRegistry
-                .counter(AgentMetrics.LLM_PROXY_BUDGET_BLOCKED, "apiProtocol", routing.apiProtocol())
-                .increment();
-        return true;
+        return refused;
     }
 
     /**
@@ -87,23 +101,54 @@ public class ProxyAccounting {
                 .increment();
     }
 
+    // Every direct call must name a valid practice so its spend can be attributed.
+    public void recordUnattributedPracticeScript() {
+        practiceScriptUnattributed.increment();
+    }
+
     /**
      * Never throws: a body this cannot read must not turn a call the provider already served — and
      * already charged us for — into an error for the runner. Counted instead, since an unreadable body
      * means this call's tokens were billed to nobody.
+     *
+     * @param practiceScript the practice script call; {@code null} for every other call
+     * @return the usage that was recorded; {@code null} when the body reports none or cannot be read
      */
-    public void recordUsage(ProxyRouting.BilledAttempt attempt, byte[] upstreamBody, boolean responsesProtocol) {
+    public @Nullable ProxyTokenUsage recordUsage(
+            ProxyRouting.BilledAttempt attempt,
+            @Nullable PracticeScriptCall practiceScript,
+            LlmApiProtocol protocol,
+            byte[] upstreamBody) {
+        ProxyTokenUsage usage;
         try {
-            JsonNode parsed = objectMapper.readTree(upstreamBody);
-            recordUsage(attempt, ProxyTokenUsage.from(parsed, responsesProtocol));
+            usage = ProxyTokenUsage.from(objectMapper.readTree(upstreamBody), protocol);
         } catch (Exception e) {
             log.warn("Could not parse upstream usage for {} — this call's tokens go unbilled", attempt.sourceId(), e);
             recordMalformedUsage(attempt);
+            // An unreadable body is not also an absent one: the practice script row still counts the
+            // call, and only the unparseable counter records the gap.
+            if (practiceScript != null) {
+                usageAccumulator.accumulatePracticeScript(attempt, practiceScript, null);
+            }
+            return null;
         }
+        recordUsage(attempt, practiceScript, usage);
+        return usage;
     }
 
-    /** Counts served responses without reported usage by source type; never estimates tokens or provider charges. */
-    public void recordUsage(ProxyRouting.BilledAttempt attempt, @Nullable ProxyTokenUsage usage) {
+    /**
+     * A practice script call counts on its row even when its provider reports no tokens, so the row shows
+     * every call. A practice script call on the chat model also goes into the job's own counters, because the
+     * review's ledger row bills the chat model. A served response without reported usage is counted by
+     * source type; tokens and provider charges are never estimated.
+     */
+    public void recordUsage(
+            ProxyRouting.BilledAttempt attempt,
+            @Nullable PracticeScriptCall practiceScript,
+            @Nullable ProxyTokenUsage usage) {
+        if (practiceScript != null) {
+            usageAccumulator.accumulatePracticeScript(attempt, practiceScript, usage);
+        }
         if (usage == null) {
             meterRegistry
                     .counter(
@@ -114,8 +159,9 @@ public class ProxyAccounting {
             return;
         }
         switch (attempt.sourceType()) {
-            case AGENT_JOB -> usageAccumulator.accumulate(attempt, usage);
+            case REVIEW_JOB -> usageAccumulator.accumulate(attempt, usage);
             case MENTOR_TURN -> mentorTurnUsageAccumulator.accumulate(attempt, usage);
+            case PRACTICE_SCRIPT_DECISION, PRACTICE_SCRIPT_EMBEDDING, PRACTICE_SCRIPT_RERANKING -> {}
         }
     }
 

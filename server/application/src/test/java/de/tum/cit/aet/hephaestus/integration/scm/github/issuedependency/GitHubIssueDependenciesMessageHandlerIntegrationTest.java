@@ -30,11 +30,6 @@ import org.springframework.core.io.ClassPathResource;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Drives {@link GitHubIssueDependenciesMessageHandler} with the recorded {@code issue_dependencies} deliveries:
- * issue #1 of {@code HephaestusTest/NewRepository} marked as blocked by #2 and then unmarked, each change
- * reported once from each side.
- */
 class GitHubIssueDependenciesMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     private static final int BLOCKED_NUMBER = 1;
@@ -101,7 +96,7 @@ class GitHubIssueDependenciesMessageHandlerIntegrationTest extends BaseIntegrati
         workspace.setDisplayName("Hephaestus Test");
         workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         workspace.setPublicActivityEnabled(true);
-        workspace.setOrganization(organization);
+        workspace.setOrganizationId(organization.getId());
         workspace.setAccountLogin("HephaestusTest");
         workspace.setAccountType(AccountType.ORG);
         workspaceRepository.save(workspace);

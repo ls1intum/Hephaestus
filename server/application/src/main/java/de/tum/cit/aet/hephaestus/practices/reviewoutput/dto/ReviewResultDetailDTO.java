@@ -1,0 +1,91 @@
+package de.tum.cit.aet.hephaestus.practices.reviewoutput.dto;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemRefDTO;
+import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackDisagreementDTO;
+import de.tum.cit.aet.hephaestus.practices.feedback.dto.ReviewBoundFeedbackDTO;
+import de.tum.cit.aet.hephaestus.practices.result.dto.ProblemDTO;
+import de.tum.cit.aet.hephaestus.practices.result.dto.ResultEvidenceDTO;
+import de.tum.cit.aet.hephaestus.practices.result.dto.ResultExampleDTO;
+import de.tum.cit.aet.hephaestus.practices.review.dto.ReviewDeveloperDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.Currentness;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultCoverage;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
+import de.tum.cit.aet.hephaestus.practices.spi.Severity;
+import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import org.jspecify.annotations.Nullable;
+
+@JsonInclude(JsonInclude.Include.ALWAYS)
+public record ReviewResultDetailDTO(
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID id,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID reviewId,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) ItemRefDTO item,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String practiceSlug,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String practiceName,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) ResultOutcome outcome,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        Severity severity,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        String summary,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) ReviewOrigin origin,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Instant recordedAt,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Currentness currentness,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        Instant markedIncorrectAt,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        Instant acceptedAt,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, type = "string", pattern = "^[1-9][0-9]*$") @Nullable
+        String practiceVersionId,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        Integer practiceVersionNumber,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        String itemVersion,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        String explanation,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        ResultEvidenceDTO evidence,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<ProblemDTO> problems,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        ResultExampleDTO example,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        ResultCoverage coverage,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        Instant endedAt,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        ResultEndReason endReason,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        ReviewDeveloperDTO developer,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int evidenceVersion,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean evidenceHidden,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<ResultMarkDTO> marks,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<FeedbackDisagreementDTO> disagreements,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<ReviewBoundFeedbackDTO> feedback) {
+    public ReviewResultDetailDTO {
+        problems = List.copyOf(problems);
+        marks = List.copyOf(marks);
+        disagreements = List.copyOf(disagreements);
+        feedback = List.copyOf(feedback);
+    }
+}

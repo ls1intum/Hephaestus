@@ -99,9 +99,9 @@ class MentorInFlightReaperTest extends BaseUnitTest {
                 .isNotNull();
         assertThat(lock.name()).isEqualTo("mentor-in-flight-reaper");
         assertThat(lock.lockAtMostFor())
-                .as(
-                        "without its own bound the sweep falls back to ShedLockConfig's 30-minute default, so a crashed pod "
-                                + "holds the lock across far more of this two-minute sweep's ticks than its own runtime warrants")
+                .as("without its own bound the sweep falls back to ShedLockConfig's 30-minute default, so a"
+                        + " crashed pod holds the lock across far more of this two-minute sweep's ticks than its"
+                        + " own runtime warrants")
                 .isNotBlank();
     }
 

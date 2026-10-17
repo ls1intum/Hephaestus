@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.slack.events;
 
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorSlackThreadService;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorSlackThread;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorSlackThreadRepository;
 import java.util.UUID;
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
  * the transactional proxy boundary; the caller performs Slack I/O after the transaction returns.
  */
 @Component
+@ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 public class MentorSlackThreadLinker {
 

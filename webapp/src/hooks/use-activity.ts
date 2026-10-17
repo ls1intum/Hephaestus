@@ -3,13 +3,23 @@ import { skipToken, useInfiniteQuery, useQuery, useQueryClient } from "@tanstack
 import {
 	getActivityFacetsOptions,
 	getActivityPeopleOptions,
-	getActivityPersonOptions,
-	getActivityPersonWorkInfiniteOptions,
-	getActivityPersonWorkOptions,
-	getActivityWorkInfiniteOptions,
-	getActivityWorkOptions,
+	getActivityPersonQueryKey,
+	getActivityPersonWorkInfiniteQueryKey,
+	getActivityPersonWorkQueryKey,
+	getActivityWorkInfiniteQueryKey,
+	getActivityWorkQueryKey,
 	getOpenWorkOptions,
+	getOwnActivityQueryKey,
+	getOwnActivityWorkInfiniteQueryKey,
+	getOwnActivityWorkQueryKey,
 } from "@/api/@tanstack/react-query.gen";
+import {
+	getActivityPerson,
+	getOwnActivity,
+	getActivityPersonWork,
+	getOwnActivityWork,
+	getActivityWork,
+} from "@/api/sdk.gen";
 import type { ActivityPeople, ActivityWork } from "@/api/types.gen";
 import type { ActivityOverviewState } from "@/components/activity/activity-buckets";
 import type { ActivityKind } from "@/components/activity/activity-kind-defs";
@@ -53,6 +63,8 @@ const WORK_PAGE_SIZE = 30;
 
 /** The largest page the server serves, for reading the rest of a timeline at once to copy it. */
 const COPY_PAGE_SIZE = 100;
+
+const firstCursor: string | undefined = undefined;
 
 function scopeQuery({ period, team, repo }: ActivityScope) {
 	return { ...periodQuery(period), team, repo: repo && repo.length > 0 ? [...repo] : undefined };
@@ -142,22 +154,54 @@ export function useActivityFacets({ enabled = true, ...scope }: ActivityRequest)
  */
 export function useActivityPerson({
 	userId,
+	own = false,
 	enabled = true,
 	...scope
-}: ActivityRequest & { userId: number | undefined }): ActivityOverviewState {
+}: ActivityRequest &
+	(
+		| { own: true; userId?: never }
+		| { own?: false; userId: number | undefined }
+	)): ActivityOverviewState {
 	const { workspaceSlug, team, repo, period } = scope;
-	const path = { workspaceSlug, userId: userId ?? 0 };
+	const optionsFor = (query: ReturnType<typeof scopeQuery>) => {
+		if (!own && userId !== undefined) {
+			const request = { path: { workspaceSlug, userId }, query };
+			return {
+				queryKey: getActivityPersonQueryKey(request),
+				queryFn: async ({ signal }: { signal: AbortSignal }) => {
+					const { data } = await getActivityPerson({ ...request, signal, throwOnError: true });
+					return data;
+				},
+			};
+		}
+		const request = { path: { workspaceSlug }, query };
+		return {
+			queryKey: getOwnActivityQueryKey(request),
+			queryFn: async ({ signal }: { signal: AbortSignal }) => {
+				const { data } = await getOwnActivity({ ...request, signal, throwOnError: true });
+				return data;
+			},
+		};
+	};
+	const subjectKnown = own || userId !== undefined;
+	const options = optionsFor(scopeQuery(scope));
 	const query = useQuery({
-		...getActivityPersonOptions({ path, query: scopeQuery(scope) }),
+		...options,
+		queryFn: subjectKnown ? options.queryFn : skipToken,
+		enabled,
 		placeholderData: keepSameSubject({ workspaceSlug, userId, team, repo }),
-		enabled: enabled && userId !== undefined,
 	});
 	const current = query.isPlaceholderData ? undefined : query.data;
 	const before = current && previousPeriod(period, current);
+	const earlierOptions = optionsFor({ ...scopeQuery(scope), ...before?.query });
 	const earlier = useQuery({
-		...getActivityPersonOptions({ path, query: { ...scopeQuery(scope), ...before?.query } }),
-		enabled: enabled && userId !== undefined && before !== undefined,
+		...earlierOptions,
+		queryFn: subjectKnown ? earlierOptions.queryFn : skipToken,
+		enabled: enabled && before !== undefined,
 	});
+	if (!enabled || !subjectKnown) {
+		return { status: "loading" };
+	}
 	return panelState(query, (data) =>
 		query.isPlaceholderData
 			? { status: "ready" as const, overview: overviewOf(data), stale: true as const }
@@ -193,19 +237,22 @@ export function useOpenWork({
 	return panelState(query, (openWork) => ({ status: "ready" as const, openWork, login }));
 }
 
-interface ActivityWorkRequest extends ActivityRequest {
-	/** One person's timeline; without one, everyone's in the scope. */
-	userId?: number;
-	kinds?: readonly ActivityKind[];
-	/** How a copy of the timeline reads: its heading's words before the period, and its provider. */
-	copy: {
-		/** Whose work, and of which category: "Reviews · Ada Lovelace". */
-		title: string;
-		providerType: ProviderType;
-		/** Several people's timeline, whose copied lines say whose work each was. */
-		people: boolean;
+type ActivityWorkRequest = ActivityRequest &
+	(
+		| { own: true; workspace?: never; userId?: never }
+		| { own?: false; workspace: true; userId?: never }
+		| { own?: false; workspace?: false; userId: number | undefined }
+	) & {
+		kinds?: readonly ActivityKind[];
+		/** How a copy of the timeline reads: its heading's words before the period, and its provider. */
+		copy: {
+			/** Whose work, and of which category: "Reviews · Ada Lovelace". */
+			title: string;
+			providerType: ProviderType;
+			/** Several people's timeline, whose copied lines say whose work each was. */
+			people: boolean;
+		};
 	};
-}
 
 /**
  * The timeline, one piece of work per row, newest first, a page at a time — and a copy of all of
@@ -214,6 +261,8 @@ interface ActivityWorkRequest extends ActivityRequest {
  */
 export function useActivityWork({
 	userId,
+	own = false,
+	workspace = false,
 	kinds,
 	copy,
 	enabled = true,
@@ -222,32 +271,58 @@ export function useActivityWork({
 	const { workspaceSlug, team, repo, period } = scope;
 	const queryClient = useQueryClient();
 	const filter = { ...scopeQuery(scope), kinds: kinds && [...kinds] };
-	const workspaceOptions = getActivityWorkInfiniteOptions({
-		path: { workspaceSlug },
-		query: { ...filter, size: WORK_PAGE_SIZE },
-	});
-	const workspaceQuery = useInfiniteQuery({
-		...workspaceOptions,
-		initialPageParam: { path: { workspaceSlug }, query: { cursor: undefined } },
+	const path = { workspaceSlug, ...(userId === undefined ? {} : { userId }) };
+	const request = { path, query: { ...filter, size: WORK_PAGE_SIZE } };
+	const subjectKnown = own || workspace || userId !== undefined;
+	const reader = (() => {
+		if (own || !subjectKnown) {
+			return {
+				key: (query: typeof request.query & { cursor?: string }) =>
+					getOwnActivityWorkQueryKey({ path, query }),
+				infiniteKey: getOwnActivityWorkInfiniteQueryKey(request),
+				read: async (query: typeof request.query & { cursor?: string }, signal?: AbortSignal) =>
+					getOwnActivityWork({ path, query, signal, throwOnError: true }),
+			};
+		}
+		if (userId !== undefined) {
+			const personPath = { workspaceSlug, userId };
+			return {
+				key: (query: typeof request.query & { cursor?: string }) =>
+					getActivityPersonWorkQueryKey({ path: personPath, query }),
+				infiniteKey: getActivityPersonWorkInfiniteQueryKey({ ...request, path: personPath }),
+				read: async (query: typeof request.query & { cursor?: string }, signal?: AbortSignal) =>
+					getActivityPersonWork({ path: personPath, query, signal, throwOnError: true }),
+			};
+		}
+		return {
+			key: (query: typeof request.query & { cursor?: string }) =>
+				getActivityWorkQueryKey({ path, query }),
+			infiniteKey: getActivityWorkInfiniteQueryKey(request),
+			read: async (query: typeof request.query & { cursor?: string }, signal?: AbortSignal) =>
+				getActivityWork({ path, query, signal, throwOnError: true }),
+		};
+	})();
+	const query = useInfiniteQuery({
+		queryKey: reader.infiniteKey,
+		queryFn: subjectKnown
+			? async ({ pageParam, signal }) => {
+					const { data } = await reader.read({ ...request.query, cursor: pageParam }, signal);
+					return data;
+				}
+			: skipToken,
+		enabled,
+		initialPageParam: firstCursor,
 		getNextPageParam: (last) => last.nextCursor ?? undefined,
-		placeholderData: keepSameSubject({ workspaceSlug, team, repo, kinds }),
-		enabled: enabled && userId === undefined,
+		placeholderData: keepSameSubject({
+			workspaceSlug,
+			userId,
+			team,
+			repo,
+			kinds,
+			operation: reader.infiniteKey[0]._id,
+		}),
 	});
-	useQueryReadRefusal(workspaceOptions.queryKey, workspaceQuery.isError, workspaceQuery.error);
-	const personPath = { workspaceSlug, userId: userId ?? 0 };
-	const personOptions = getActivityPersonWorkInfiniteOptions({
-		path: personPath,
-		query: { ...filter, size: WORK_PAGE_SIZE },
-	});
-	const personQuery = useInfiniteQuery({
-		...personOptions,
-		initialPageParam: { path: personPath, query: { cursor: undefined } },
-		getNextPageParam: (last) => last.nextCursor ?? undefined,
-		placeholderData: keepSameSubject({ workspaceSlug, userId, team, repo, kinds }),
-		enabled: enabled && userId !== undefined,
-	});
-	useQueryReadRefusal(personOptions.queryKey, personQuery.isError, personQuery.error);
-	const query = userId === undefined ? workspaceQuery : personQuery;
+	useQueryReadRefusal(reader.infiniteKey, query.isError, query.error);
 
 	const everything = async (): Promise<ActivityWork[]> => {
 		// A placeholder is the previous period's timeline, so a copy of this period starts over.
@@ -256,17 +331,15 @@ export function useActivityWork({
 		// `null` asks for the first page; `undefined` is past the last one.
 		let cursor: string | null | undefined = pages.length === 0 ? null : pages.at(-1)?.nextCursor;
 		while (cursor !== undefined) {
-			const request = { ...filter, cursor: cursor ?? undefined, size: COPY_PAGE_SIZE };
-			const page =
-				userId === undefined
-					? await queryClient.query({
-							...getActivityWorkOptions({ path: { workspaceSlug }, query: request }),
-							retry: false,
-						})
-					: await queryClient.query({
-							...getActivityPersonWorkOptions({ path: personPath, query: request }),
-							retry: false,
-						});
+			const pageRequest = { ...filter, cursor: cursor ?? undefined, size: COPY_PAGE_SIZE };
+			const page = await queryClient.query({
+				queryKey: reader.key(pageRequest),
+				retry: false,
+				queryFn: async ({ signal }) => {
+					const { data } = await reader.read(pageRequest, signal);
+					return data;
+				},
+			});
 			items.push(...page.content);
 			cursor = page.nextCursor;
 		}
@@ -287,9 +360,7 @@ export function useActivityWork({
 			({ count }) => `Copied ${count} ${count === 1 ? "item" : "items"} as Markdown`,
 		);
 
-	// A disabled query still hands back what the cache holds under its key — for a person not known
-	// yet, that is everyone's timeline, which must never pass for theirs.
-	if (!enabled) {
+	if (!enabled || !subjectKnown) {
 		return { status: "loading" };
 	}
 	return infiniteListState(query, (pages) => ({

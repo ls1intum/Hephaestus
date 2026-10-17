@@ -101,7 +101,7 @@ export function scopesFor(paths: string[]): Scope[] {
 			if (serverInputsOfTheWebapp.some((pattern) => pattern.test(path))) {
 				scopes.add("server");
 				scopes.add("webapp");
-			} else if (/\/resources\/(?:agent|practices\/precompute)\//u.test(path)) {
+			} else if (/\/resources\/(?:agent|practices\/scripts)\//u.test(path)) {
 				scopes.add("agents");
 			} else {
 				scopes.add("server");

@@ -1,141 +1,167 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataWriteFence;
+import de.tum.cit.aet.hephaestus.core.security.UserViewContextHolder;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackResolutionCountsDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackResponseDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackResponseRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.Reaction;
-import de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.response.FeedbackResponse;
+import de.tum.cit.aet.hephaestus.practices.feedback.response.FeedbackResponseRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.CurrentDeveloperLookup;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackResolution;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackUsefulness;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
-import java.util.EnumMap;
-import java.util.Map;
+import java.time.Clock;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
-@Transactional
 @RequiredArgsConstructor
+@Transactional
 public class FeedbackResponseService {
 
-    private static final Logger log = LoggerFactory.getLogger(FeedbackResponseService.class);
-
-    private final ReactionRepository reactionRepository;
+    private final FeedbackResponseRepository responses;
     private final FeedbackRepository feedbackRepository;
+    private final FeedbackVisibilityService visibility;
     private final CurrentDeveloperLookup currentDeveloperLookup;
-    private final FeedbackWithdrawalRepository withdrawalRepository;
+    private final Clock clock;
+    private final PersonDataWriteFence privacy;
 
     public FeedbackResponseDTO replaceResponse(
-            WorkspaceContext workspaceContext, UUID feedbackId, FeedbackResponseRequestDTO request) {
-        long recipientId = currentDeveloperLookup.currentDeveloperIdElseThrow();
-        // A withdrawn card takes no new answer, whatever a stale page still shows; the answers given before stay
-        // readable and removable. The row lock is the one the withdrawal takes, so the two cannot interleave. It is
-        // the first load of the row: Hibernate refuses to lock a read-only entity already in the session.
-        feedbackRepository.lockByIdAndWorkspaceId(feedbackId, workspaceContext.id());
-        Feedback feedback = requireDeliveredFeedback(workspaceContext.id(), feedbackId, recipientId);
-        validate(request);
-        if (withdrawalRepository.findActive(workspaceContext.id(), feedbackId).isPresent()) {
+            WorkspaceContext workspace, UUID feedbackId, FeedbackResponseRequestDTO request) {
+        requireActualDeveloper();
+        return respond(
+                workspace.id(),
+                feedbackId,
+                currentDeveloperLookup.currentDeveloperIdElseThrow(),
+                request.resolution(),
+                request.usefulness(),
+                request.comment());
+    }
+
+    public FeedbackResponseDTO respond(
+            long workspaceId,
+            UUID feedbackId,
+            long developerId,
+            @Nullable FeedbackResolution resolution,
+            @Nullable FeedbackUsefulness usefulness,
+            @Nullable String comment) {
+        validate(resolution, usefulness, comment);
+        requireWritable(developerId);
+        requireShown(workspaceId, feedbackId, developerId, true);
+        if (visibility.withdrawn(workspaceId, feedbackId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This feedback was withdrawn.");
         }
-
-        Optional<FeedbackResponseDTO> current = currentResponse(feedbackId, recipientId);
-        if (current.filter(response -> sameResponse(response, request)).isPresent()) {
-            return current.get();
+        var current = responses.findCurrent(workspaceId, feedbackId);
+        if (current.filter(row -> row.getResolution() == resolution
+                        && row.getUsefulness() == usefulness
+                        && Objects.equals(row.getComment(), comment))
+                .isPresent()) {
+            return FeedbackResponseDTO.from(current.get());
         }
-
-        Reaction response = Reaction.builder()
-                .feedback(feedback)
-                .reactorUserId(recipientId)
-                .usefulness(request.usefulness())
-                .resolution(request.resolution())
-                .explanation(request.comment())
-                .build();
-        reactionRepository.save(response);
-
-        log.info(
-                "Replaced feedback response: feedbackId={}, usefulness={}, resolution={}, recipientUserId={}",
-                feedbackId,
-                response.getUsefulness(),
-                response.getResolution(),
-                recipientId);
-        return currentResponse(feedbackId, recipientId).orElseGet(() -> FeedbackResponseDTO.none(feedbackId));
+        return append(workspaceId, feedbackId, resolution, usefulness, comment);
     }
 
-    public void deleteResponse(WorkspaceContext workspaceContext, UUID feedbackId) {
-        long recipientId = currentDeveloperLookup.currentDeveloperIdElseThrow();
-        Feedback feedback = requireDeliveredFeedback(workspaceContext.id(), feedbackId, recipientId);
-        if (currentResponse(feedbackId, recipientId).isEmpty()) {
-            return;
+    public FeedbackResponseDTO deleteResponse(WorkspaceContext workspace, UUID feedbackId) {
+        requireActualDeveloper();
+        long developerId = currentDeveloperLookup.currentDeveloperIdElseThrow();
+        requireWritable(developerId);
+        requireShown(workspace.id(), feedbackId, developerId, true);
+        var current = responses.findCurrent(workspace.id(), feedbackId);
+        if (current.filter(
+                        row -> row.getResolution() == null && row.getUsefulness() == null && row.getComment() == null)
+                .isPresent()) {
+            return FeedbackResponseDTO.from(current.get());
         }
-        reactionRepository.save(
-                Reaction.builder().feedback(feedback).reactorUserId(recipientId).build());
-        log.info("Deleted feedback response: feedbackId={}, recipientUserId={}", feedbackId, recipientId);
-    }
-
-    private boolean sameResponse(FeedbackResponseDTO current, FeedbackResponseRequestDTO replacement) {
-        return (current.usefulness() == replacement.usefulness()
-                && current.resolution() == replacement.resolution()
-                && Objects.equals(current.comment(), replacement.comment()));
+        return append(workspace.id(), feedbackId, null, null, null);
     }
 
     @Transactional(readOnly = true)
-    public Optional<FeedbackResponseDTO> getResponse(WorkspaceContext workspaceContext, UUID feedbackId) {
-        Optional<Long> recipient = currentDeveloperLookup.currentDeveloperId();
-        if (recipient.isEmpty()) {
-            return Optional.empty();
-        }
-        long recipientId = recipient.get();
-        requireDeliveredFeedback(workspaceContext.id(), feedbackId, recipientId);
-        return currentResponse(feedbackId, recipientId);
+    public FeedbackResponseDTO getResponse(WorkspaceContext workspace, UUID feedbackId) {
+        requireShown(workspace.id(), feedbackId, currentDeveloperLookup.currentDeveloperIdElseThrow(), false);
+        return responses
+                .findCurrent(workspace.id(), feedbackId)
+                .map(FeedbackResponseDTO::from)
+                .orElseGet(FeedbackResponseDTO::empty);
     }
 
     @Transactional(readOnly = true)
-    public FeedbackResolutionCountsDTO getResolutionCounts(WorkspaceContext workspaceContext) {
-        Optional<Long> recipient = currentDeveloperLookup.currentDeveloperId();
-        if (recipient.isEmpty()) {
+    public FeedbackResolutionCountsDTO getResolutionCounts(WorkspaceContext workspace) {
+        var developer = currentDeveloperLookup.currentDeveloperId();
+        if (developer.isEmpty()) {
             return new FeedbackResolutionCountsDTO(0L, 0L, 0L);
         }
-        long recipientId = recipient.get();
-        Map<FeedbackResolution, Long> counts = new EnumMap<>(FeedbackResolution.class);
-        reactionRepository
-                .countByReactorAndWorkspaceGroupByAction(recipientId, workspaceContext.id())
-                .forEach(projection ->
-                        counts.put(FeedbackResolution.valueOf(projection.getAction()), projection.getCount()));
-        return new FeedbackResolutionCountsDTO(
-                counts.getOrDefault(FeedbackResolution.ADDRESSED, 0L),
-                counts.getOrDefault(FeedbackResolution.DISPUTED, 0L),
-                counts.getOrDefault(FeedbackResolution.NOT_APPLICABLE, 0L));
+        var counts = responses.countCurrentResolutions(workspace.id(), developer.get());
+        long addressed = 0;
+        long disagree = 0;
+        long notApplicable = 0;
+        for (var row : counts) {
+            switch (row.getResolution()) {
+                case ADDRESSED -> addressed = row.getCount();
+                case DISAGREE -> disagree = row.getCount();
+                case NOT_APPLICABLE -> notApplicable = row.getCount();
+            }
+        }
+        return new FeedbackResolutionCountsDTO(addressed, disagree, notApplicable);
     }
 
-    private Optional<FeedbackResponseDTO> currentResponse(UUID feedbackId, long recipientId) {
-        return reactionRepository
-                .findCurrentResponse(feedbackId, recipientId)
-                .filter(current -> current.getUsefulness() != null || current.getResolution() != null)
-                .map(current -> FeedbackResponseDTO.from(feedbackId, current));
+    private FeedbackResponseDTO append(
+            long workspaceId,
+            UUID feedbackId,
+            @Nullable FeedbackResolution resolution,
+            @Nullable FeedbackUsefulness usefulness,
+            @Nullable String comment) {
+        return FeedbackResponseDTO.from(responses.save(FeedbackResponse.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(workspaceId)
+                .feedbackId(feedbackId)
+                .resolution(resolution)
+                .usefulness(usefulness)
+                .comment(comment)
+                .createdAt(clock.instant())
+                .build()));
     }
 
-    private Feedback requireDeliveredFeedback(long workspaceId, UUID feedbackId, long recipientId) {
-        return feedbackRepository
-                .findByIdAndWorkspaceIdAndRecipientUserIdAndDeliveryState(
-                        feedbackId, workspaceId, recipientId, FeedbackDeliveryState.DELIVERED)
+    private Feedback requireShown(long workspaceId, UUID feedbackId, long developerId, boolean lock) {
+        Feedback feedback = (lock
+                        ? feedbackRepository.lockByIdAndWorkspaceId(feedbackId, workspaceId)
+                        : feedbackRepository.findByIdAndWorkspaceId(feedbackId, workspaceId))
+                .filter(row -> row.getDeveloperId() == developerId && row.getDeliveredAt() != null)
                 .orElseThrow(() -> new EntityNotFoundException("Feedback", feedbackId.toString()));
+        return feedback;
     }
 
-    private void validate(FeedbackResponseRequestDTO request) {
-        if (request.usefulness() == null && request.resolution() == null) {
-            throw new IllegalArgumentException("A feedback response needs a usefulness rating or a resolution.");
+    private void requireWritable(long developerId) {
+        if (!privacy.holdForAccountWrite(developerId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Your account cannot change feedback responses.");
         }
-        if (request.resolution() == FeedbackResolution.DISPUTED
-                && (request.comment() == null || request.comment().isBlank())) {
-            throw new IllegalArgumentException("If you dispute feedback, add a comment.");
+    }
+
+    private static void validate(
+            @Nullable FeedbackResolution resolution,
+            @Nullable FeedbackUsefulness usefulness,
+            @Nullable String comment) {
+        if (resolution == null && usefulness == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choose a resolution or a usefulness rating.");
         }
+        if (comment != null && comment.length() > 2000) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Keep your comment within 2,000 characters.");
+        }
+        if (resolution == FeedbackResolution.DISAGREE && (comment == null || comment.isBlank())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Add a comment to explain your disagreement.");
+        }
+    }
+
+    private static void requireActualDeveloper() {
+        if (UserViewContextHolder.get() != null)
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN, "You cannot change feedback while viewing another account.");
     }
 }

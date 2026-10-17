@@ -5,15 +5,17 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.integration.scm.context.MentorContextQueryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.context.MergeReadinessContentSource;
+import de.tum.cit.aet.hephaestus.integration.scm.context.RecentAuthoredWorkContentSource;
+import de.tum.cit.aet.hephaestus.integration.scm.context.ScmMentorWorkQuery;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -25,10 +27,13 @@ import tools.jackson.databind.ObjectMapper;
 class RecentAuthoredWorkContentSourceTest extends BaseUnitTest {
 
     @Mock
-    UserRepository userRepository;
+    AccountSummaryQuery accounts;
 
     @Mock
     MentorContextQueryRepository queryRepository;
+
+    @Mock
+    ScmMentorWorkQuery work;
 
     @Spy
     ObjectMapper objectMapper = new ObjectMapper();
@@ -37,30 +42,30 @@ class RecentAuthoredWorkContentSourceTest extends BaseUnitTest {
     RecentAuthoredWorkContentSource source;
 
     @Test
-    void shouldPublishMergedPullRequestResourceUsingItsArtifactId() {
-        User user = new User();
-        user.setLogin("student");
-        when(userRepository.findById(2L)).thenReturn(Optional.of(user));
+    void shouldPublishMergedPullRequestResourcesUsingItsSourceId() {
+        when(accounts.findAllByIds(List.of(2L)))
+                .thenReturn(Map.of(2L, new AccountSummaryQuery.AccountSummary(2, "Student", null)));
+        when(work.actorIds(1L, 2L)).thenReturn(List.of(200L));
         PullRequest merged = new PullRequest();
         merged.setId(4009553323L);
         merged.setNumber(9);
         merged.setTitle("Add the simulator note");
         merged.setState(Issue.State.MERGED);
-        when(queryRepository.findRecentAuthoredPullRequests(eq(1L), eq(2L), any(Pageable.class)))
+        when(queryRepository.findRecentAuthoredPullRequests(eq(1L), eq(List.of(200L)), any(Pageable.class)))
                 .thenReturn(List.of(merged));
         Issue issue = new Issue();
         issue.setId(77L);
         issue.setNumber(14);
         issue.setTitle("Follow up on the runtime check");
         issue.setState(Issue.State.OPEN);
-        when(queryRepository.findRecentAuthoredIssues(eq(1L), eq(2L), any(Pageable.class)))
+        when(queryRepository.findRecentAuthoredIssues(eq(1L), eq(List.of(200L)), any(Pageable.class)))
                 .thenReturn(List.of(issue));
 
         JsonNode payload = source.buildPayload(1L, 2L);
 
         String resource = payload.get("pullRequests").get(0).get("resource").asString();
         assertThat(resource).isEqualTo("inputs/context/merge_readiness/4009553323.json");
-        assertThat(MergeReadinessContentSource.artifactIdOf(resource)).contains(4009553323L);
+        assertThat(MergeReadinessContentSource.pullRequestIdOf(resource)).contains(4009553323L);
         assertThat(payload.get("issues").get(0).has("resource")).isFalse();
 
         String pullRequestReviews =
@@ -69,9 +74,9 @@ class RecentAuthoredWorkContentSourceTest extends BaseUnitTest {
                 payload.get("issues").get(0).get("reviewsResource").asString();
         assertThat(pullRequestReviews).isEqualTo("inputs/context/review_attempts/pull_request/4009553323.json");
         assertThat(issueReviews).isEqualTo("inputs/context/review_attempts/issue/77.json");
-        assertThat(ReviewAttemptsContentSource.workOf(pullRequestReviews))
-                .contains(new AgentJobRepository.ScmWork(AgentJobType.PULL_REQUEST_REVIEW, 4009553323L));
-        assertThat(ReviewAttemptsContentSource.workOf(issueReviews))
-                .contains(new AgentJobRepository.ScmWork(AgentJobType.ISSUE_REVIEW, 77L));
+        assertThat(ReviewAttemptsContentSource.selectionOf(pullRequestReviews))
+                .contains(new ReviewAttemptsContentSource.ItemSelection(new ItemKind("scm.pull_request"), 4009553323L));
+        assertThat(ReviewAttemptsContentSource.selectionOf(issueReviews))
+                .contains(new ReviewAttemptsContentSource.ItemSelection(new ItemKind("scm.issue"), 77L));
     }
 }

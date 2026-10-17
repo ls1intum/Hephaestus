@@ -10,7 +10,6 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
-import de.tum.cit.aet.hephaestus.agent.documentation.DocumentReviewTrigger;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
@@ -29,7 +28,8 @@ import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.Sy
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocument;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
-import de.tum.cit.aet.hephaestus.integration.outline.domain.signal.OutlineDocumentSignalRecorder;
+import de.tum.cit.aet.hephaestus.integration.outline.identity.OutlineRosterIdentityResolver;
+import de.tum.cit.aet.hephaestus.integration.outline.item.OutlineDocumentEventRecorder;
 import de.tum.cit.aet.hephaestus.integration.outline.lifecycle.OutlineWebhookRegistrar;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
@@ -43,7 +43,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
-import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -99,8 +98,8 @@ class OutlineDocumentSyncFixtureMappingTest extends BaseUnitTest {
     private OutlineDocumentSyncService service() {
         OutlineProperties properties = new OutlineProperties(
                 new OutlineProperties.Sync(100), new OutlineProperties.Cache(200), Duration.ofDays(30));
-        OutlineMirrorWriter mirrorWriter =
-                new OutlineMirrorWriter(new OutlineMirrorTransactions(documentRepository, collectionRepository));
+        OutlineMirrorWriter mirrorWriter = new OutlineMirrorWriter(new OutlineMirrorTransactions(
+                documentRepository, collectionRepository, mock(OutlineRosterIdentityResolver.class)));
         return new OutlineDocumentSyncService(
                 connectionService,
                 outlineApiClient,
@@ -110,10 +109,7 @@ class OutlineDocumentSyncFixtureMappingTest extends BaseUnitTest {
                 properties,
                 mirrorWriter,
                 new OutlineMirrorRetentionService(documentRepository, mirrorWriter, properties),
-                mock(OutlineDocumentSignalRecorder.class),
-                // No review trigger: this suite is about mirroring, and a node that cannot submit a review
-                // still records every signal — which is exactly the ObjectProvider's absent case.
-                new StaticListableBeanFactory().getBeanProvider(DocumentReviewTrigger.class));
+                mock(OutlineDocumentEventRecorder.class));
     }
 
     @BeforeEach

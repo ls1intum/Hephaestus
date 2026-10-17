@@ -3,9 +3,11 @@ package de.tum.cit.aet.hephaestus.agent.proxy;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.ObjectMapper;
 
@@ -17,9 +19,9 @@ class ProxyTokenUsageTest extends BaseUnitTest {
     @ValueSource(strings = {"cache_write_tokens", "created_cache_tokens"})
     void readsSupportedChatCacheWriteFields(String field) throws Exception {
         var body = MAPPER.readTree("""
-                {"usage":{"prompt_tokens":100,"completion_tokens":2,
-                "prompt_tokens_details":{"cached_tokens":20,"%s":30}}}
-                """.formatted(field));
+            {"usage":{"prompt_tokens":100,"completion_tokens":2,
+            "prompt_tokens_details":{"cached_tokens":20,"%s":30}}}
+            """.formatted(field));
 
         assertThat(ProxyTokenUsage.from(body, false)).isEqualTo(new ProxyTokenUsage(50, 2, 0, 20, 30));
     }
@@ -28,9 +30,9 @@ class ProxyTokenUsageTest extends BaseUnitTest {
     @ValueSource(strings = {"prompt_cache_hit_tokens", "cached_tokens"})
     void readsSupportedChatCacheReadFields(String field) throws Exception {
         var body = MAPPER.readTree("""
-                {"usage":{"prompt_tokens":100,"completion_tokens":2,"%s":20,
-                "prompt_tokens_details":{"created_cache_tokens":30}}}
-                """.formatted(field));
+            {"usage":{"prompt_tokens":100,"completion_tokens":2,"%s":20,
+            "prompt_tokens_details":{"created_cache_tokens":30}}}
+            """.formatted(field));
 
         assertThat(ProxyTokenUsage.from(body, false)).isEqualTo(new ProxyTokenUsage(50, 2, 0, 20, 30));
     }
@@ -38,10 +40,10 @@ class ProxyTokenUsageTest extends BaseUnitTest {
     @Test
     void nestedChatReadCountTakesPrecedenceOverFallbacks() throws Exception {
         var body = MAPPER.readTree("""
-                {"usage":{"prompt_tokens":100,"completion_tokens":2,
-                "prompt_cache_hit_tokens":40,"cached_tokens":50,
-                "prompt_tokens_details":{"cached_tokens":20,"created_cache_tokens":30}}}
-                """);
+            {"usage":{"prompt_tokens":100,"completion_tokens":2,
+            "prompt_cache_hit_tokens":40,"cached_tokens":50,
+            "prompt_tokens_details":{"cached_tokens":20,"created_cache_tokens":30}}}
+            """);
 
         assertThat(ProxyTokenUsage.from(body, false)).isEqualTo(new ProxyTokenUsage(50, 2, 0, 20, 30));
     }
@@ -49,10 +51,10 @@ class ProxyTokenUsageTest extends BaseUnitTest {
     @Test
     void cacheHitCountTakesPrecedenceOverTopLevelReadCount() throws Exception {
         var body = MAPPER.readTree("""
-                {"usage":{"prompt_tokens":100,"completion_tokens":2,
-                "prompt_cache_hit_tokens":20,"cached_tokens":50,
-                "prompt_tokens_details":{"created_cache_tokens":30}}}
-                """);
+            {"usage":{"prompt_tokens":100,"completion_tokens":2,
+            "prompt_cache_hit_tokens":20,"cached_tokens":50,
+            "prompt_tokens_details":{"created_cache_tokens":30}}}
+            """);
 
         assertThat(ProxyTokenUsage.from(body, false)).isEqualTo(new ProxyTokenUsage(50, 2, 0, 20, 30));
     }
@@ -61,9 +63,9 @@ class ProxyTokenUsageTest extends BaseUnitTest {
     @ValueSource(strings = {"-1", "1.5", "2147483648", "\"20\""})
     void rejectsInvalidChatCacheReadFallback(String value) throws Exception {
         var body = MAPPER.readTree("""
-                {"usage":{"prompt_tokens":100,"completion_tokens":2,
-                "prompt_cache_hit_tokens":%s,"cached_tokens":20}}
-                """.formatted(value));
+            {"usage":{"prompt_tokens":100,"completion_tokens":2,
+            "prompt_cache_hit_tokens":%s,"cached_tokens":20}}
+            """.formatted(value));
 
         assertThatIllegalArgumentException().isThrownBy(() -> ProxyTokenUsage.from(body, false));
     }
@@ -71,9 +73,9 @@ class ProxyTokenUsageTest extends BaseUnitTest {
     @Test
     void responsesDoNotReadCompletionsOnlyCacheFields() throws Exception {
         var body = MAPPER.readTree("""
-                {"usage":{"input_tokens":100,"output_tokens":2,
-                "prompt_cache_hit_tokens":20,"cached_tokens":50}}
-                """);
+            {"usage":{"input_tokens":100,"output_tokens":2,
+            "prompt_cache_hit_tokens":20,"cached_tokens":50}}
+            """);
 
         assertThat(ProxyTokenUsage.from(body, true)).isEqualTo(new ProxyTokenUsage(100, 2, 0, 0, 0));
     }
@@ -81,9 +83,9 @@ class ProxyTokenUsageTest extends BaseUnitTest {
     @Test
     void readsResponsesCacheWrites() throws Exception {
         var body = MAPPER.readTree("""
-                {"usage":{"input_tokens":100,"output_tokens":2,
-                "input_tokens_details":{"cached_tokens":20,"cache_write_tokens":30}}}
-                """);
+            {"usage":{"input_tokens":100,"output_tokens":2,
+            "input_tokens_details":{"cached_tokens":20,"cache_write_tokens":30}}}
+            """);
 
         assertThat(ProxyTokenUsage.from(body, true)).isEqualTo(new ProxyTokenUsage(50, 2, 0, 20, 30));
     }
@@ -115,5 +117,85 @@ class ProxyTokenUsageTest extends BaseUnitTest {
     @Test
     void missingUsageReturnsNull() throws Exception {
         assertThat(ProxyTokenUsage.from(MAPPER.readTree("{}"), false)).isNull();
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+            delimiter = '|',
+            value = {
+                "openai-decisions|{\"usage\":{\"input_tokens\":40,\"output_tokens\":3}}|40|3",
+                "openai-embeddings|{\"usage\":{\"prompt_tokens\":12,\"total_tokens\":12}}|12|0",
+                "cohere-rerank|{\"usage\":{\"total_tokens\":30,\"prompt_tokens\":25}}|30|0",
+                "cohere-rerank|{\"usage\":{\"prompt_tokens\":25}}|25|0",
+                "openai-completions|{\"usage\":{\"prompt_tokens\":9,\"completion_tokens\":1}}|9|1",
+                "openai-responses|{\"usage\":{\"input_tokens\":7,\"output_tokens\":2}}|7|2"
+            })
+    void shouldReadTheUsageShapeOfEachProtocolWhenAPracticeScriptCallIsServed(
+            String protocol, String body, int input, int output) throws Exception {
+        var usage = ProxyTokenUsage.from(
+                MAPPER.readTree(body), LlmApiProtocol.parse(protocol).orElseThrow());
+
+        assertThat(usage).isEqualTo(new ProxyTokenUsage(input, output, 0, 0, 0));
+    }
+
+    @Test
+    void shouldCountNoTokensWhenARerankingProviderReportsNone() throws Exception {
+        assertThat(ProxyTokenUsage.from(
+                        MAPPER.readTree("{\"usage\":{\"search_units\":1}}"), LlmApiProtocol.COHERE_RERANK))
+                .isNull();
+        assertThat(ProxyTokenUsage.from(MAPPER.readTree("{\"results\":[]}"), LlmApiProtocol.COHERE_RERANK))
+                .isNull();
+    }
+
+    // Cohere v2 reranking bills search units under meta.billed_units, without token counts.
+    @ParameterizedTest
+    @ValueSource(strings = {"3", "3.0"})
+    void shouldReadTheSearchUnitsWhenCohereBillsARerankInThem(String units) throws Exception {
+        var body = MAPPER.readTree("{\"id\":\"r1\",\"results\":[{\"index\":0,\"relevance_score\":0.9}],"
+                + "\"meta\":{\"api_version\":{\"version\":\"2\"},\"billed_units\":{\"search_units\":" + units
+                + "}}}");
+
+        assertThat(ProxyTokenUsage.from(body, LlmApiProtocol.COHERE_RERANK))
+                .isEqualTo(new ProxyTokenUsage(0, 0, 0, 0, 0, 3));
+    }
+
+    @Test
+    void shouldKeepTheTokensAndTheSearchUnitsWhenARerankingProviderReportsBoth() throws Exception {
+        var body =
+                MAPPER.readTree("{\"usage\":{\"total_tokens\":30},\"meta\":{\"billed_units\":{\"search_units\":1}}}");
+
+        assertThat(ProxyTokenUsage.from(body, LlmApiProtocol.COHERE_RERANK))
+                .isEqualTo(new ProxyTokenUsage(30, 0, 0, 0, 0, 1));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"1.5", "-1", "\"2\""})
+    void shouldRejectSearchUnitsWhenTheyAreNotAWholeCount(String units) throws Exception {
+        var body = MAPPER.readTree("{\"meta\":{\"billed_units\":{\"search_units\":" + units + "}}}");
+
+        assertThatIllegalArgumentException().isThrownBy(() -> ProxyTokenUsage.from(body, LlmApiProtocol.COHERE_RERANK));
+    }
+
+    // Decision responses may omit output usage because they produce no text; reported input still bills.
+    @ParameterizedTest
+    @CsvSource(
+            delimiter = '|',
+            value = {
+                "{\"answers\":[],\"usage\":{\"input_tokens\":40,\"output_tokens\":3,\"total_tokens\":43}}|40|3",
+                "{\"answers\":[],\"usage\":{\"input_tokens\":40,\"total_tokens\":40}}|40|0",
+                "{\"answers\":[],\"usage\":{\"input_tokens\":40,\"output_tokens\":null}}|40|0"
+            })
+    void shouldBillTheInputWhenADecisionUsageHasOrLacksTheOutputCount(String body, int input, int output)
+            throws Exception {
+        assertThat(ProxyTokenUsage.from(MAPPER.readTree(body), LlmApiProtocol.OPENAI_DECISIONS))
+                .isEqualTo(new ProxyTokenUsage(input, output, 0, 0, 0));
+    }
+
+    @Test
+    void shouldRejectADecisionUsageWhenItLacksTheInputCount() throws Exception {
+        var body = MAPPER.readTree("{\"usage\":{\"output_tokens\":3}}");
+
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> ProxyTokenUsage.from(body, LlmApiProtocol.OPENAI_DECISIONS));
     }
 }

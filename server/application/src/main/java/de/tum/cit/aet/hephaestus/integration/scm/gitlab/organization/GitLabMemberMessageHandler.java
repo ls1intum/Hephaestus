@@ -5,10 +5,10 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener.MembershipChangedEvent;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationMemberRole;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationMembershipRepository;
@@ -116,7 +116,8 @@ public class GitLabMemberMessageHandler extends AbstractIntegrationMessageHandle
                 safeUsername,
                 event.groupAccess());
 
-        // On a connection route the event only says that a membership changed: the membership stored is the one GitLab
+        // On a connection route the event only says that a membership changed: the membership
+        // stored is the one GitLab
         // reports now, so a forged or stale event can neither grant, change nor remove access.
         Optional<GitLabRouteAdmission.AdmittedRoute> route = GitLabRouteAdmission.current();
         if (route.isPresent()) {
@@ -177,8 +178,10 @@ public class GitLabMemberMessageHandler extends AbstractIntegrationMessageHandle
             }
             if (highest == null) {
                 userRepository.findByNativeIdAndProviderId(userId, providerId).ifPresent(user -> {
-                    // No effective access to the group is no direct grant in it either, so the group's own team,
-                    // which would otherwise keep them in the workspace until the next team sync, drops them too.
+                    // No effective access to the group is no direct grant in it
+                    // either, so the group's own team,
+                    // which would otherwise keep them in the workspace until the
+                    // next team sync, drops them too.
                     teamRepository
                             .findByNativeIdAndProviderId(membership.groupId(), providerId)
                             .ifPresent(team ->
@@ -287,7 +290,8 @@ public class GitLabMemberMessageHandler extends AbstractIntegrationMessageHandle
                     name,
                     avatarUrl,
                     "", // htmlUrl not available in member webhook payload
-                    // The hook carries no bot flag: a stored type stays, and only a new user's is guessed.
+                    // The hook carries no bot flag: a stored type stays, and only a new
+                    // user's is guessed.
                     null,
                     GitLabUserClassifier.insertionType(login, null),
                     null,
@@ -303,7 +307,8 @@ public class GitLabMemberMessageHandler extends AbstractIntegrationMessageHandle
             return;
         }
 
-        // The event names one direct grant; an inherited one may be higher, so it never lowers the stored role.
+        // The event names one direct grant; an inherited one may be higher, so it never lowers the
+        // stored role.
         OrganizationMemberRole role = mapGroupAccess(event.groupAccess());
         boolean storedAdmin = membershipRepository
                 .findByOrganizationIdAndUserId(org.getId(), user.getId())

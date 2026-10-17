@@ -36,7 +36,8 @@ import tools.jackson.databind.JsonNode;
     @JsonSubTypes.Type(value = UIMessageChunk.ToolOutputError.class, name = "tool-output-error"),
     @JsonSubTypes.Type(value = UIMessageChunk.TurnError.class, name = "error"),
     @JsonSubTypes.Type(value = UIMessageChunk.DataMentorStatus.class, name = "data-mentor-status"),
-    @JsonSubTypes.Type(value = UIMessageChunk.DataObservation.class, name = "data-observation"),
+    @JsonSubTypes.Type(value = UIMessageChunk.DataResult.class, name = "data-result"),
+    @JsonSubTypes.Type(value = UIMessageChunk.DataProblem.class, name = "data-problem"),
 })
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public sealed interface UIMessageChunk {
@@ -187,7 +188,7 @@ public sealed interface UIMessageChunk {
 
     /**
      * Fatal error during the turn; emitter completes after this chunk. The AI SDK calls it {@code error}, which
-     * is its type id above; the Java name avoids shadowing {@code java.lang.Error}.
+     * is its type id above; the Java name avoids shadowing {@code Error}.
      */
     record TurnError(String errorText) implements UIMessageChunk {}
 
@@ -232,49 +233,98 @@ public sealed interface UIMessageChunk {
     }
 
     /**
-     * Hephaestus-specific data part emitted when Pi calls the {@code link_observation} custom tool: the feedback
-     * the mentor wrote about one observation, shown to the developer as part of the reply. Permanent (NOT
-     * transient), and the only place those words live — they are not Pi assistant text, so they never enter the
-     * streamed-text verification. Each link gets its own {@code id}, because the AI SDK merges a data part into an
-     * earlier one with the same type and id.
+     * Hephaestus-specific data part emitted when Pi calls the {@code link_result} custom tool: the feedback the mentor
+     * wrote about one practice result, shown to the developer as part of the reply. Permanent (NOT transient), and the
+     * only place those words live — they are not Pi assistant text, so they never enter the streamed-text
+     * verification. Each link gets its own {@code id}, because the AI SDK merges a data part into an earlier one with
+     * the same type and id.
      */
-    record DataObservation(
+    record DataResult(
             @JsonProperty("id") UUID id,
-            @JsonProperty("data") DataObservationPayload data) implements UIMessageChunk {
-        public static final String PART_TYPE = "data-observation";
+            @JsonProperty("data") DataResultPayload data) implements UIMessageChunk {
+        public static final String PART_TYPE = "data-result";
 
-        public DataObservation {
+        public DataResult {
             Objects.requireNonNull(id, "id");
             Objects.requireNonNull(data, "data");
         }
 
-        public record DataObservationPayload(UUID observationId, String text) {}
+        public record DataResultPayload(UUID resultId, String text) {}
 
-        public static DataObservation of(UUID observationId, String text) {
-            return new DataObservation(UUID.randomUUID(), new DataObservationPayload(observationId, text));
+        public static DataResult of(UUID resultId, String text) {
+            return new DataResult(UUID.randomUUID(), new DataResultPayload(resultId, text));
+        }
+    }
+
+    /**
+     * Hephaestus-specific data part emitted when Pi calls the {@code link_problem} custom tool: the feedback the
+     * mentor wrote about one located problem, with the result it belongs to. Permanent, like {@link DataResult}.
+     */
+    record DataProblem(
+            @JsonProperty("id") UUID id,
+            @JsonProperty("data") DataProblemPayload data) implements UIMessageChunk {
+        public static final String PART_TYPE = "data-problem";
+
+        public DataProblem {
+            Objects.requireNonNull(id, "id");
+            Objects.requireNonNull(data, "data");
         }
 
+        public record DataProblemPayload(UUID resultId, UUID problemId, String text) {}
+
+        public static DataProblem of(UUID resultId, UUID problemId, String text) {
+            return new DataProblem(UUID.randomUUID(), new DataProblemPayload(resultId, problemId, text));
+        }
+    }
+
+    final class LinkParts {
+
+        private LinkParts() {}
+
         /**
-         * The observations a stored reply showed the developer feedback about, in order: its data-observation
-         * parts that carry text. A part stored before links carried text showed nothing, so it names none.
+         * The results a stored reply showed the developer feedback about, in order: one per link part that carries
+         * text, its problem's result for a problem link. A part stored before links carried text showed nothing, so
+         * it names none.
          */
-        public static List<UUID> shownObservationIds(@Nullable JsonNode parts) {
+        public static List<UUID> shownResultIds(@Nullable JsonNode parts) {
             List<UUID> shown = new ArrayList<>();
             if (parts == null || !parts.isArray()) {
                 return shown;
             }
             for (JsonNode part : parts) {
-                JsonNode data = part.path("data");
-                if (PART_TYPE.equals(part.path("type").asString(""))
-                        && !data.path("text").asString("").isBlank()) {
-                    try {
-                        shown.add(UUID.fromString(data.path("observationId").asString("")));
-                    } catch (IllegalArgumentException unreadable) {
-                        // Not a link this server wrote; it settles nothing.
-                    }
+                UUID result = resultOf(part);
+                if (result != null
+                        && !part.path("data").path("text").asString("").isBlank()) {
+                    shown.add(result);
                 }
             }
             return shown;
+        }
+
+        public static @Nullable UUID resultOf(JsonNode part) {
+            String type = part.path("type").asString("");
+            JsonNode data = part.path("data");
+            String id;
+            if (DataResult.PART_TYPE.equals(type) || DataProblem.PART_TYPE.equals(type)) {
+                id = data.path("resultId").asString("");
+            } else {
+                return null;
+            }
+            try {
+                return UUID.fromString(id);
+            } catch (IllegalArgumentException unreadable) {
+                // Not a link this server wrote; it settles nothing.
+                return null;
+            }
+        }
+
+        public static @Nullable UUID problemOf(JsonNode part) {
+            if (!DataProblem.PART_TYPE.equals(part.path("type").asString(""))) return null;
+            try {
+                return UUID.fromString(part.path("data").path("problemId").asString(""));
+            } catch (IllegalArgumentException unreadable) {
+                return null;
+            }
         }
     }
 }

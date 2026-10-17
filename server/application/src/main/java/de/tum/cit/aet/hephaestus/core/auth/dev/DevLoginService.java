@@ -133,6 +133,7 @@ public class DevLoginService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
         String email = username.trim().toLowerCase(Locale.ROOT) + DEV_EMAIL_DOMAIN;
+        accountRepository.lockContactEmail(email);
         Account account = accountRepository.findByPrimaryEmail(email).orElseGet(() -> {
             Account fresh = new Account(displayName != null && !displayName.isBlank() ? displayName : username);
             fresh.setPrimaryEmail(email);

@@ -16,7 +16,7 @@ import org.mockito.Mock;
 class AgentQueueHealthSamplerTest extends BaseUnitTest {
 
     @Mock
-    private AgentJobRepository jobRepository;
+    private ReviewJobRepository jobRepository;
 
     private MeterRegistry registry;
     private AgentQueueHealthSampler sampler;
@@ -73,9 +73,9 @@ class AgentQueueHealthSamplerTest extends BaseUnitTest {
         return registry.get(name).gauge().value();
     }
 
-    private static AgentJobRepository.QueueHealthSnapshot snapshot(
+    private static ReviewJobRepository.QueueHealthSnapshot snapshot(
             long depth, @Nullable Instant oldestAvailableAt, long held, long running) {
-        return new AgentJobRepository.QueueHealthSnapshot() {
+        return new ReviewJobRepository.QueueHealthSnapshot() {
             @Override
             public long getDepth() {
                 return depth;

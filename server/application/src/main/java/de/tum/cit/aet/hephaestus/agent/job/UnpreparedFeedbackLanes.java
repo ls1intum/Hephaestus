@@ -7,19 +7,19 @@ import org.jspecify.annotations.Nullable;
 /**
  * A finished job and which of its two feedback-preparation lanes has no record of having run.
  *
- * @param inChatPreparedAt when the conversational lane finished, or {@code null} if it never did
- * @param inAppPreparedAt when the in-app lane finished, or {@code null} if it never did
+ * @param conversationPreparedAt when the conversational lane finished, or {@code null} if it never did
+ * @param practicePagePreparedAt when the in-app lane finished, or {@code null} if it never did
  */
 public record UnpreparedFeedbackLanes(
         UUID agentJobId,
         Long workspaceId,
-        @Nullable Instant inChatPreparedAt,
-        @Nullable Instant inAppPreparedAt) {
+        @Nullable Instant conversationPreparedAt,
+        @Nullable Instant practicePagePreparedAt) {
     public boolean inChatPending() {
-        return inChatPreparedAt == null;
+        return conversationPreparedAt == null;
     }
 
     public boolean inAppPending() {
-        return inAppPreparedAt == null;
+        return practicePagePreparedAt == null;
     }
 }

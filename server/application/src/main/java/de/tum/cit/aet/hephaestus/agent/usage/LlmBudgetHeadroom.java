@@ -36,21 +36,22 @@ public record LlmBudgetHeadroom(
      *     purses rather than to neither. Fail-safe, not fail-open.
      * @param inFlightUsd already-incurred spend the ledger cannot see yet; never negative
      */
-    public LlmBudgetDecision decideWith(@Nullable FundingSource purse, BigDecimal inFlightUsd) {
+    public LlmBudgetDecision decideWith(@Nullable UsageFundingSource purse, BigDecimal inFlightUsd) {
         return new LlmBudgetDecision(
                 reason(
                         instanceSpentUsd,
                         instanceBudgetUsd,
                         instanceHasUnpricedSpend,
-                        chargedTo(FundingSource.INSTANCE, purse, inFlightUsd)),
+                        chargedTo(UsageFundingSource.INSTANCE, purse, inFlightUsd)),
                 reason(
                         workspaceSpentUsd,
                         workspaceBudgetUsd,
                         workspaceHasUnpricedSpend,
-                        chargedTo(FundingSource.WORKSPACE, purse, inFlightUsd)));
+                        chargedTo(UsageFundingSource.WORKSPACE, purse, inFlightUsd)));
     }
 
-    private static BigDecimal chargedTo(FundingSource cap, @Nullable FundingSource purse, BigDecimal inFlightUsd) {
+    private static BigDecimal chargedTo(
+            UsageFundingSource cap, @Nullable UsageFundingSource purse, BigDecimal inFlightUsd) {
         if (inFlightUsd.signum() <= 0) {
             return BigDecimal.ZERO;
         }

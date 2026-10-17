@@ -331,9 +331,9 @@ class DockerClientOperationsTest extends BaseUnitTest {
                     .build()
                     .getObjectMapper()
                     .readValue("""
-                            {"Name": "hephaestus-sandbox-default--abc", "Id": "net-1",
-                             "Created": "2026-08-21T12:00:00.123456789+02:00", "Driver": "bridge", "Internal": true}
-                            """, Network.class);
+                        {"Name": "hephaestus-sandbox-default--abc", "Id": "net-1",
+                         "Created": "2026-08-21T12:00:00.123456789+02:00", "Driver": "bridge", "Internal": true}
+                        """, Network.class);
 
             when(cmd.exec()).thenReturn(List.of(network));
 
@@ -494,9 +494,9 @@ class DockerClientOperationsTest extends BaseUnitTest {
         @Test
         void shouldReportARunningContainerWithItsStart() throws Exception {
             inspecting("""
-                    {"Id": "3f2a9c1b7d4e00", "Config": {"Hostname": "3f2a9c1b7d4e"},
-                     "State": {"Running": true, "StartedAt": "2026-09-30T13:49:58.1Z"}}
-                    """);
+                {"Id": "3f2a9c1b7d4e00", "Config": {"Hostname": "3f2a9c1b7d4e"},
+                 "State": {"Running": true, "StartedAt": "2026-09-30T13:49:58.1Z"}}
+                """);
 
             assertThat(ops.inspectContainerIdentity("worker"))
                     .contains(new DockerOperations.ContainerIdentity(
@@ -506,8 +506,8 @@ class DockerClientOperationsTest extends BaseUnitTest {
         @Test
         void shouldReportAStatedStopEvenWithoutAStart() throws Exception {
             inspecting("""
-                    {"Id": "3f2a9c1b7d4e00", "State": {"Running": false}}
-                    """);
+                {"Id": "3f2a9c1b7d4e00", "State": {"Running": false}}
+                """);
 
             assertThat(ops.inspectContainerIdentity("worker"))
                     .hasValueSatisfying(

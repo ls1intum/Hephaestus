@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.outline.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -29,28 +30,42 @@ class OutlineDocumentSearchIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private WorkspaceRepository workspaceRepository;
 
+    @Autowired
+    private ConnectionRepository connections;
+
     private long workspaceId;
+    private long connectionId;
 
     @BeforeEach
     void setUp() {
         Workspace workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("outline-search"));
         workspaceId = workspace.getId();
+        connectionId = OutlineTestFixtures.connection(connections, workspace).getId();
 
         seed(
                 workspaceId,
+                connectionId,
                 "doc-strong",
                 "Deployment rollback procedure",
                 "How we run a deployment and the rollback steps. Every deployment needs a rollback plan.",
                 null);
         seed(
                 workspaceId,
+                connectionId,
                 "doc-weak",
                 "Team handbook",
                 "General onboarding notes. Mentions deployment once in passing.",
                 null);
-        seed(workspaceId, "doc-unrelated", "Holiday party planning", "Venue, catering, and music ideas.", null);
         seed(
                 workspaceId,
+                connectionId,
+                "doc-unrelated",
+                "Holiday party planning",
+                "Venue, catering, and music ideas.",
+                null);
+        seed(
+                workspaceId,
+                connectionId,
                 "doc-tombstoned",
                 "Deployment rollback runbook",
                 "Full deployment rollback terms, but removed upstream.",
@@ -67,7 +82,13 @@ class OutlineDocumentSearchIntegrationTest extends BaseIntegrationTest {
     @Test
     void neverLeaksAnotherWorkspacesDocuments() {
         Workspace other = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("outline-search-other"));
-        seed(other.getId(), "doc-foreign", "Deployment rollback procedure", "Deployment rollback everywhere.", null);
+        seed(
+                other.getId(),
+                OutlineTestFixtures.connection(connections, other).getId(),
+                "doc-foreign",
+                "Deployment rollback procedure",
+                "Deployment rollback everywhere.",
+                null);
 
         List<OutlineDocument> hits = documentRepository.searchByRelevance(other.getId(), "deployment OR rollback", 10);
 
@@ -91,7 +112,7 @@ class OutlineDocumentSearchIntegrationTest extends BaseIntegrationTest {
         while (huge.length() < 1_300_000) {
             huge.append("lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor ");
         }
-        seed(workspaceId, "doc-huge", "Enormous appendix", huge.toString(), null);
+        seed(workspaceId, connectionId, "doc-huge", "Enormous appendix", huge.toString(), null);
 
         assertThat(documentRepository.searchByRelevance(workspaceId, "deployment OR rollback", 10))
                 .extracting(OutlineDocument::getDocumentId)
@@ -104,16 +125,22 @@ class OutlineDocumentSearchIntegrationTest extends BaseIntegrationTest {
                 .containsExactly("doc-huge");
     }
 
-    private void seed(long workspace, String documentId, String title, String body, @Nullable Instant deletedAt) {
+    private void seed(
+            long workspace,
+            long connection,
+            String documentId,
+            String title,
+            String body,
+            @Nullable Instant deletedAt) {
         OutlineDocument doc = new OutlineDocument();
         doc.setWorkspaceId(workspace);
-        doc.setConnectionId(1L);
+        doc.setConnectionId(connection);
         doc.setDocumentId(documentId);
         doc.setCollectionId("col-1");
         doc.setCollectionSlug("ops");
         doc.setSlug(documentId);
         doc.setTitle(title);
-        doc.setBodyMarkdown(body);
+        doc.setBodyMarkdown(deletedAt == null ? body : null);
         doc.setDeletedAt(deletedAt);
         documentRepository.save(doc);
     }

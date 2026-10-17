@@ -2,8 +2,8 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerProperties;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -16,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
@@ -31,7 +32,7 @@ class WorkerRegistryOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     private static final long LEASE_TTL_SECONDS = 60;
 
     @Autowired
-    private AgentJobRepository jobRepository;
+    private ReviewJobRepository jobRepository;
 
     @Autowired
     private WorkerRegistryRepository workerRegistryRepository;
@@ -44,6 +45,9 @@ class WorkerRegistryOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private TransactionTemplate transactionTemplate;
+
+    @Autowired
+    private JdbcTemplate jdbc;
 
     // This context has worker.enabled=true and NO hephaestus.worker.control.endpoint — the exact
     // topology where orphan recovery would otherwise silently no-op. required=false so a regression
@@ -105,19 +109,15 @@ class WorkerRegistryOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         // requeueOrphan is @Modifying — wrap in a tx, as the sweeper does. Fenced on worker_id:
         // "w-stale" is the row's actual owner both times, so the fence itself doesn't
         // block the second call; status alone (no longer RUNNING after the first win) does.
-        String newToken = AgentJob.generateJobToken();
-        int firstWin = transactionTemplate.execute(s -> jobRepository.requeueOrphan(
-                id, "w-stale", 5, Instant.now(), newToken, AgentJob.computeTokenHash(newToken)));
-        String secondToken = AgentJob.generateJobToken();
-        int secondWin = transactionTemplate.execute(s -> jobRepository.requeueOrphan(
-                id, "w-stale", 5, Instant.now(), secondToken, AgentJob.computeTokenHash(secondToken)));
+        int firstWin = transactionTemplate.execute(s -> jobRepository.requeueOrphan(id, "w-stale", 5, Instant.now()));
+        int secondWin = transactionTemplate.execute(s -> jobRepository.requeueOrphan(id, "w-stale", 5, Instant.now()));
         assertThat(firstWin).isEqualTo(1);
         assertThat(secondWin).isEqualTo(0); // already QUEUED — lost the race
 
-        AgentJob requeued = jobRepository.findById(id).orElseThrow();
-        assertThat(requeued.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
+        ReviewJob requeued = jobRepository.findById(id).orElseThrow();
+        assertThat(requeued.getStatus()).isEqualTo(ReviewJobStatus.QUEUED);
         assertThat(requeued.getWorkerId()).isNull();
-        assertThat(requeued.getRetryCount()).isEqualTo(1);
+        assertThat(requeued.getAttempt()).isEqualTo(1);
     }
 
     @Test
@@ -155,14 +155,16 @@ class WorkerRegistryOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     }
 
     private UUID runningJob(String workerId, Instant startedAt) {
-        AgentJob job = new AgentJob();
-        job.setWorkspace(workspace);
-        job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-        job.setStatus(AgentJobStatus.RUNNING);
+        ReviewJob job = new ReviewJob();
+        RuntimeJobTestData.initialize(job, workspace.getId());
+
+        job.setStatus(ReviewJobStatus.RUNNING);
         job.setConfigSnapshot(objectMapper.createObjectNode());
         job.setWorkerId(workerId);
         job.setStartedAt(startedAt);
-        return jobRepository.saveAndFlush(job).getId();
+        return jobRepository
+                .saveAndFlush(RuntimeJobTestData.persistParent(jdbc, job))
+                .getId();
     }
 
     private void registerWorker(String workerId, Instant lastHeartbeat) {

@@ -1,17 +1,11 @@
-/**
- * Pads a money figure so its decimal point lands where every other row's does — `tabular-nums`
- * equalises glyph *width* but not a missing `.00`. `visibility: hidden` keeps the space that
- * `display: none` would collapse, and `aria-hidden` keeps the pad out of the accessible name.
- */
-export function MoneyCell({ children }: { children: string }) {
-	return (
-		<>
-			{children}
-			{!children.includes(".") && (
-				<span className="invisible" aria-hidden>
-					.00
-				</span>
-			)}
-		</>
-	);
+export interface MoneyCellProps {
+	/** `null` where the cell has no figure, such as an average over nothing: a muted dash. */
+	children: string | null;
+}
+
+export function MoneyCell({ children }: MoneyCellProps) {
+	if (children == null) {
+		return <span className="text-muted-foreground">—</span>;
+	}
+	return children;
 }

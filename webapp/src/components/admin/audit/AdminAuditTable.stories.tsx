@@ -239,8 +239,8 @@ export const ColumnCountMatchesHeader: Story = {
 	},
 };
 
-/** An accountless viewed user is attributable without pretending that they were signed in. */
-export const AccountlessUserView: Story = {
+// Unclaimed accounts still require their account id for a user view.
+export const UnclaimedAccountView: Story = {
 	args: {
 		state: loaded([
 			{
@@ -250,7 +250,7 @@ export const AccountlessUserView: Story = {
 				result: "SUCCESS",
 				elevatedViaInstanceAdmin: true,
 				accountId: 7,
-				viewedUserId: 99,
+				viewedAccountId: 99,
 				workspaceId: 12,
 				account: { id: 7, displayName: "Grace Hopper" },
 				details:
@@ -265,7 +265,7 @@ export const AccountlessUserView: Story = {
 			canvas.getByRole("button", { name: "View details for User view authorized, Grace Hopper" }),
 		).toBeVisible();
 		await userEvent.click(canvas.getByRole("button", { name: /^View details for/u }));
-		await expectSettledVisible(await screen.findByText("Viewed user"));
+		await expectSettledVisible(await screen.findByText("Viewed account"));
 		screen.getByText("#99");
 	},
 };

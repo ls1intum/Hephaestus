@@ -4,10 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.awaitility.Awaitility.await;
 
+import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerJobCancelDispatcher;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerSession;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerSessionRegistry;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerTokenDenylistService;
+import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CancelJob;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CapacityReport;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.FrameCodec;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.FrameEnvelope;
@@ -50,6 +52,9 @@ class WorkerControlChannelIntegrationTest extends BaseIntegrationTest {
     WorkerSessionRegistry workerSessions;
 
     @Autowired
+    WorkerJobCancelDispatcher workerStops;
+
+    @Autowired
     ObjectMapper objectMapper;
 
     @Autowired(required = false)
@@ -61,7 +66,7 @@ class WorkerControlChannelIntegrationTest extends BaseIntegrationTest {
         WorkerJwtIssuer.IssuedWorkerJwt jwt = jwtIssuer.issue(workerId);
         FrameCodec codec = new FrameCodec(objectMapper);
 
-        CapturingListener listener = new CapturingListener();
+        CapturingListener listener = new CapturingListener(codec);
         WebSocket ws = HttpClient.newBuilder()
                 .build()
                 .newWebSocketBuilder()
@@ -96,6 +101,10 @@ class WorkerControlChannelIntegrationTest extends BaseIntegrationTest {
                         assertThat(session).isPresent();
                         assertThat(session.get().lastCapacity()).isEqualTo(report);
                     });
+            UUID jobId = UUID.randomUUID();
+            assertThat(workerStops.sendCancel(workerId, jobId, "user-cancel")).isTrue();
+            assertThat(listener.cancelled.get(5, TimeUnit.SECONDS))
+                    .isEqualTo(new CancelJob(jobId.toString(), "user-cancel"));
         } finally {
             ws.sendClose(WebSocket.NORMAL_CLOSURE, "test done").get(5, TimeUnit.SECONDS);
         }
@@ -105,6 +114,16 @@ class WorkerControlChannelIntegrationTest extends BaseIntegrationTest {
                 .pollInterval(Duration.ofMillis(100))
                 .untilAsserted(() ->
                         assertThat(workerSessions.findByWorkerId(workerId)).isEmpty());
+    }
+
+    @Test
+    void shouldReportNoStopRequestWhenNoWorkerIsConnected() {
+        assertThat(workerStops.sendCancel("absent-" + UUID.randomUUID(), UUID.randomUUID(), "user-cancel"))
+                .isFalse();
+        assertThat(workerStops.sendCancel(null, UUID.randomUUID(), "user-cancel"))
+                .isFalse();
+        assertThat(workerStops.sendCancel("  ", UUID.randomUUID(), "user-cancel"))
+                .isFalse();
     }
 
     @Test
@@ -154,7 +173,9 @@ class WorkerControlChannelIntegrationTest extends BaseIntegrationTest {
                 .build()
                 .newWebSocketBuilder()
                 .header("Authorization", "Bearer " + jwt.token())
-                .buildAsync(URI.create("ws://localhost:" + port + "/api/workers/connect"), new CapturingListener())
+                .buildAsync(
+                        URI.create("ws://localhost:" + port + "/api/workers/connect"),
+                        new CapturingListener(new FrameCodec(objectMapper)))
                 .get(10, TimeUnit.SECONDS));
         assertThat(failure)
                 .as("revoked-JWT upgrade must fail; 401 manifests as a build-async error")
@@ -162,6 +183,13 @@ class WorkerControlChannelIntegrationTest extends BaseIntegrationTest {
     }
 
     private static final class CapturingListener implements WebSocket.Listener {
+        private final FrameCodec codec;
+        private final StringBuilder pending = new StringBuilder();
+        private final CompletableFuture<CancelJob> cancelled = new CompletableFuture<>();
+
+        CapturingListener(FrameCodec codec) {
+            this.codec = codec;
+        }
 
         @Override
         public void onOpen(WebSocket webSocket) {
@@ -170,6 +198,12 @@ class WorkerControlChannelIntegrationTest extends BaseIntegrationTest {
 
         @Override
         public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
+            pending.append(data);
+            if (last) {
+                var envelope = codec.decode(pending.toString());
+                pending.setLength(0);
+                if (envelope.payload() instanceof CancelJob stop) cancelled.complete(stop);
+            }
             webSocket.request(1);
             return CompletableFuture.completedFuture(null);
         }

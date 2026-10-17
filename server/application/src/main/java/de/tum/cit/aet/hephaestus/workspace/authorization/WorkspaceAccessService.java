@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.workspace.authorization;
 
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.core.security.WorkspaceElevationContext;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
+import de.tum.cit.aet.hephaestus.workspace.Membership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContextHolder;
 import java.util.Set;
@@ -17,8 +17,9 @@ public class WorkspaceAccessService {
     private static final Logger log = LoggerFactory.getLogger(WorkspaceAccessService.class);
 
     /**
-     * Requires a nonempty workspace context. Instance admins satisfy ADMIN checks, not OWNER checks;
-     * the workspace filter supplies an elevated context when they have no explicit membership.
+     * Requires a nonempty workspace context. Instance admins satisfy ADMIN checks, not OWNER
+     * checks; the workspace filter supplies an elevated context when they have no explicit
+     * membership.
      */
     public boolean hasRole(WorkspaceRole requiredRole) {
         WorkspaceContext context = WorkspaceContextHolder.getContext();
@@ -41,14 +42,14 @@ public class WorkspaceAccessService {
 
         if (requiredRole != WorkspaceRole.OWNER && SecurityUtils.isSuperAdmin()) {
             log.debug(
-                    "Granted role check: reason=superAdminElevation, requiredRole={}, workspaceSlug={}",
+                    "Granted role check: reason=superAdminElevation, requiredRole={}," + " workspaceSlug={}",
                     requiredRole,
                     context.slug());
             return true;
         }
 
         log.debug(
-                "Denied role check: reason=insufficientRole, userRoles={}, requiredRole={}, workspaceSlug={}",
+                "Denied role check: reason=insufficientRole, userRoles={}, requiredRole={}," + " workspaceSlug={}",
                 userRoles,
                 requiredRole,
                 context.slug());

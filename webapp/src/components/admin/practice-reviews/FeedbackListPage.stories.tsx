@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, waitFor, within } from "storybook/test";
 
+import { parseSearch } from "@/lib/router-search";
+
 import type { ReviewFeedback } from "@/api/types.gen";
 import type { FacetSource } from "@/components/common/FacetMultiSelect";
 import type { PagedListState } from "@/runtime/tanstack-query/infinite-list";
@@ -14,23 +16,24 @@ import {
 	locationCounts,
 	manyFeedback,
 	practiceGroups,
+	reviewAccounts,
 	reviewFeedback,
 	selects,
 	workspaceMembers,
 	workspacePractices,
 } from "./fixtures";
-import { practiceFacetOptions } from "./ObservationFilters";
+import { practiceFacetOptions } from "./ResultFilters";
 import { type FeedbackSearch, feedbackQuery, REVIEW_PAGE_SIZE } from "./review-search";
 import type { ReviewPeople } from "./ReviewPersonFacet";
 import { STORY_GROUPS } from "./story-scope-sources";
 
-const GRACE_ID = workspaceMembers.find((member) => member.userLogin === "grace")?.userId ?? 0;
+const GRACE_ID = reviewAccounts.grace.id;
 
 const PEOPLE: ReviewPeople = {
-	options: workspaceMembers.map((member) => ({
-		userId: member.userId,
-		label: member.userName ?? `#${member.userId}`,
-		secondary: member.userLogin,
+	options: workspaceMembers.map(({ account }) => ({
+		accountId: account.id,
+		label: account.displayName ?? `#${account.id}`,
+		secondary: account.identities[0]?.login ?? undefined,
 	})),
 	capped: false,
 	isLoading: false,
@@ -71,11 +74,12 @@ function feedbackPage(
 		(row) =>
 			(!query.from || row.createdAt >= new Date(query.from)) &&
 			(!query.to || row.createdAt < new Date(query.to)) &&
-			selects(query.deliveryState, row.deliveryState) &&
-			selects(query.location, row.location) &&
-			selects(query.suppressionReason, row.suppressionReason) &&
-			(query.recipientUserId === undefined || row.recipient?.id === query.recipientUserId),
-		query.size,
+			selects(query.state, row.state) &&
+			selects(query.destination, row.destination) &&
+			(query.location === undefined || row.location === query.location) &&
+			selects(query.stopReason, row.stopReason) &&
+			(query.developerId === undefined || row.developer.accountId === query.developerId),
+		REVIEW_PAGE_SIZE,
 	);
 }
 
@@ -89,14 +93,18 @@ const meta = {
 	tags: ["autodocs"],
 	args: {
 		workspaceSlug: "demo",
-		search: { deliveryState: undefined, withheldFamily: undefined, location: undefined },
+		search: {
+			state: undefined,
+			destination: undefined,
+			withheldFamily: undefined,
+			location: undefined,
+		},
 		onSearchChange: fn(),
 		feedback: pool(reviewFeedback),
 		groups: STORY_GROUPS,
 		practices: PRACTICES,
 		people: PEOPLE,
-		// Recomputed in `render` from the pool and the recipient filtered to, as the route's query is.
-		recipientCounts: { status: "ready", counts: [] },
+		developerCounts: { status: "ready", counts: [] },
 	},
 	// The screen is controlled: with a frozen `search` prop every facet reads as dead. The rows are
 	// recomputed from that search the way the route's query would be re-run.
@@ -111,17 +119,17 @@ const meta = {
 						onSearchChange(patch);
 					}}
 					feedback={feedbackPage(args.feedback, search)}
-					recipientCounts={
-						args.recipientCounts.status === "ready"
+					developerCounts={
+						args.developerCounts.status === "ready"
 							? {
 									status: "ready",
 									counts: locationCounts(
 										(args.feedback.status === "ready" ? args.feedback.rows : []).filter(
-											(row) => row.recipient?.id === search.recipientUserId,
+											(row) => row.developer.accountId === search.developerId,
 										),
 									),
 								}
-							: args.recipientCounts
+							: args.developerCounts
 					}
 				/>
 			)}
@@ -145,7 +153,7 @@ function comboboxes(group: HTMLElement) {
  */
 export const Default: Story = {
 	play: async ({ canvas }) => {
-		await canvas.findByText("12 pieces of feedback.");
+		await canvas.findByText("20 pieces of feedback.");
 		// The same order as on every tab: the scope, which applies to every tab, then this list's own
 		// facets and its sort, all in one row.
 		const scope = canvas.getByRole("group", { name: "Applies to every tab" });
@@ -153,15 +161,15 @@ export const Default: Story = {
 		within(scope).getByRole("button", { name: "Composed" });
 		const filters = canvas.getByRole("group", { name: "Filters" });
 		await expect(comboboxes(filters).slice(0, 3)).toStrictEqual([
-			"Outcome",
-			"Channel",
+			"Delivery",
+			"Destination",
 			"Why withheld",
 		]);
 		within(filters).getByRole("combobox", { name: /Sort/u });
 		await expect(canvas.queryByRole("button", { name: /More filters/u })).toBeNull();
-		canvas.getByTitle("Nearly the same as other feedback from the same review.");
+		canvas.getByTitle("It said nothing the developer was not already told.");
 		canvas.getByTitle("Found while reviewing past work, which is measured but never sent.");
-		canvas.getByTitle("The developer has opted out of AI feedback.");
+		canvas.getByTitle("Feedback to this person is turned off in this workspace.");
 		canvas.getByTitle("The work was already merged, so a note on it would arrive too late.");
 	},
 };
@@ -180,67 +188,55 @@ export const LongFeedbackReadsAsProse: Story = {
 	},
 };
 
-export const FilterToOneRecipient: Story = {
+export const FilterToOneDeveloper: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas, userEvent }) => {
-		await canvas.findByText("12 pieces of feedback.");
+		await canvas.findByText("20 pieces of feedback.");
 		await userEvent.click(canvas.getByRole("combobox", { name: "Developer" }));
 		const listbox = await screen.findByRole("listbox");
 		await userEvent.click(
 			await within(listbox).findByRole("option", { name: /Katherine Johnson/u }),
 		);
 		await canvas.findByRole("combobox", { name: "Developer: Katherine Johnson" });
-		await canvas.findByText("3 pieces of feedback match your filters.");
-		// The person filtered to leads the list with everything addressed to them.
+		await canvas.findByText("5 pieces of feedback match your filters.");
 		await canvas.findByRole("heading", { name: "Feedback for Katherine Johnson" });
 	},
 };
 
-/**
- * A recipient in a row opens the list filtered to them, which leads with their summary: every
- * piece addressed to them by delivery and by channel, each count a link to exactly those rows.
- */
-export const RecipientSummary: Story = {
+export const DeveloperSummary: Story = {
 	args: {
 		search: {
-			deliveryState: undefined,
+			state: undefined,
+			destination: undefined,
 			withheldFamily: undefined,
 			location: undefined,
-			recipientUserId: GRACE_ID,
+			developerId: GRACE_ID,
 		},
 	},
 	parameters: { chromatic: { viewports: [320, 1440] } },
 	play: async ({ canvas }) => {
 		await canvas.findByRole("heading", { name: "Feedback for Grace Hopper" });
-		// The summary's table comes first; the list's own table is named.
-		const table = canvas.getAllByRole("table").find((each) => !each.hasAttribute("aria-label"));
-		if (table === undefined) {
-			throw new Error("The recipient summary has no table");
-		}
+		const table = canvas.getByRole("table", { name: "Feedback for Grace Hopper by where it goes" });
 		await expect(within(table).getByRole("cell", { name: "With Heph in Slack" })).toBeVisible();
 		await expect(within(table).getByRole("cell", { name: "In conversation" })).toBeVisible();
-		// The legend is text; the table's counts open the rows they count.
-		const legend = canvas.getByRole("list", { name: "Feedback by delivery" });
-		within(legend).getByText("prepared", { exact: false });
-		await expect(within(legend).queryByRole("link")).not.toBeInTheDocument();
 		const [count] = within(table).getAllByRole("link");
-		await expect(count).toHaveAttribute(
-			"href",
-			expect.stringContaining(`recipientUserId=${GRACE_ID}`),
-		);
+		await expect(
+			parseSearch(new URL(String(count?.getAttribute("href")), window.location.origin).search),
+		).toMatchObject({ developerId: "9", location: "HEPH" });
 	},
 };
 
 /** The summary waits in its shape, and says so when the counts fail, without hiding the rows. */
-export const RecipientSummaryFailed: Story = {
+export const DeveloperSummaryFailed: Story = {
 	args: {
 		search: {
-			deliveryState: undefined,
+			state: undefined,
+			destination: undefined,
 			withheldFamily: undefined,
 			location: undefined,
-			recipientUserId: GRACE_ID,
+			developerId: GRACE_ID,
 		},
-		recipientCounts: { status: "error", error: { status: 500 }, onRetry: fn() },
+		developerCounts: { status: "error", error: { status: 500 }, onRetry: fn() },
 	},
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
@@ -256,7 +252,7 @@ export const RecipientSummaryFailed: Story = {
 export const EveryRowNamesItsLocation: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
-		await canvas.findByText("12 pieces of feedback.");
+		await canvas.findByText("20 pieces of feedback.");
 		const table = within(canvas.getByRole("table", { name: "Feedback" }));
 		await expect(table.getAllByText("On GitHub").length).toBeGreaterThan(0);
 		await expect(table.getAllByText("On GitLab").length).toBeGreaterThan(0);
@@ -265,23 +261,22 @@ export const EveryRowNamesItsLocation: Story = {
 	},
 };
 
-/** The channel facet offers each channel split by provider, and filters to exactly that provider. */
-export const FilterToOneProvider: Story = {
+export const FilterToOneDestination: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas, userEvent }) => {
-		await canvas.findByText("12 pieces of feedback.");
-		const trigger = canvas.getByRole("combobox", { name: "Channel" });
+		await canvas.findByText("20 pieces of feedback.");
+		const trigger = canvas.getByRole("combobox", { name: "Destination" });
 		await userEvent.click(trigger);
-		const listbox = await screen.findByRole("listbox", { name: "Channel options" });
-		for (const name of ["On GitHub", "On GitLab", "With Heph in the app", "With Heph in Slack"]) {
+		const listbox = await screen.findByRole("listbox", { name: "Destination options" });
+		for (const name of ["On the work", "In conversation", "On the practice page"]) {
 			within(listbox).getByRole("option", { name: new RegExp(name, "u") });
 		}
-		await userEvent.click(within(listbox).getByRole("option", { name: /On GitLab/u }));
+		await userEvent.click(within(listbox).getByRole("option", { name: /In conversation/u }));
 		await userEvent.click(trigger);
-		await canvas.findByText(/matches? your filters\./u);
+		await canvas.findByText(/match(?:es)? your filters\./u);
 		const table = within(canvas.getByRole("table", { name: "Feedback" }));
 		await expect(table.queryByText("On GitHub")).not.toBeInTheDocument();
-		await expect(table.getAllByText("On GitLab").length).toBeGreaterThan(0);
+		await expect(table.getAllByText("In conversation").length).toBeGreaterThan(0);
 	},
 };
 
@@ -303,7 +298,7 @@ export const WhyWithheldFacetOpen: Story = {
 export const FilterToOneWithholdingFamily: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas, userEvent }) => {
-		await canvas.findByText("12 pieces of feedback.");
+		await canvas.findByText("20 pieces of feedback.");
 		const trigger = canvas.getByRole("combobox", { name: "Why withheld" });
 		await userEvent.click(trigger);
 		const listbox = await screen.findByRole("listbox", { name: "Why withheld options" });
@@ -311,16 +306,18 @@ export const FilterToOneWithholdingFamily: Story = {
 		// Closed again: these facets are multi-select and stay open after a choice, so the next facet
 		// would otherwise put a second listbox on screen.
 		await userEvent.click(trigger);
-		await canvas.findByText("1 piece of feedback matches your filters.");
-		canvas.getByTitle("Nearly the same as other feedback from the same review.");
+		await canvas.findByText("2 pieces of feedback match your filters.");
+		canvas.getByTitle("It said nothing the developer was not already told.");
 
-		// A place nothing under that family went to, so the two filters intersect to nothing.
-		await userEvent.click(canvas.getByRole("combobox", { name: "Channel" }));
-		const places = await screen.findByRole("listbox", { name: "Channel options" });
-		await userEvent.click(await within(places).findByRole("option", { name: /In conversation/u }));
+		await userEvent.click(canvas.getByRole("combobox", { name: "Destination" }));
+		const destinations = await screen.findByRole("listbox", { name: "Destination options" });
+		await userEvent.click(
+			await within(destinations).findByRole("option", { name: /On the practice page/u }),
+		);
+		await userEvent.keyboard("{Escape}");
 		await canvas.findByText("No feedback matches these filters");
 		await userEvent.click(canvas.getByRole("button", { name: "Clear all filters" }));
-		await canvas.findByText("12 pieces of feedback.");
+		await canvas.findByText("20 pieces of feedback.");
 	},
 };
 
@@ -331,7 +328,7 @@ export const FilterToOneWithholdingFamily: Story = {
 export const SortOldestFirst: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ args, canvas, userEvent }) => {
-		await canvas.findByText("12 pieces of feedback.");
+		await canvas.findByText("20 pieces of feedback.");
 		await userEvent.click(canvas.getByRole("combobox", { name: /Sort/u }));
 		await userEvent.click(await screen.findByRole("option", { name: "Oldest first" }));
 		await expect(args.onSearchChange).toHaveBeenLastCalledWith(
@@ -361,7 +358,7 @@ export const Mobile: Story = {
 		viewport: { defaultViewport: "reflow" },
 	},
 	play: async ({ canvas }) => {
-		await canvas.findByText("12 pieces of feedback.");
+		await canvas.findByText("20 pieces of feedback.");
 		await expectNoPageOverflow();
 	},
 };
@@ -406,7 +403,7 @@ export const RefreshFailed: Story = {
 		}),
 	},
 	play: async ({ canvas, userEvent }) => {
-		await canvas.findByText("These pieces of feedback may be out of date");
+		await canvas.findByText("We could not refresh feedback");
 		await expect(canvas.getByRole("table").querySelectorAll("tbody tr").length).toBeGreaterThan(0);
 		await userEvent.click(canvas.getByRole("button", { name: "Retry" }));
 		await expect(retryRefresh).toHaveBeenCalledOnce();

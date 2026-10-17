@@ -37,8 +37,9 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
      */
     static List<Object[]> chunkFixtures() {
         UUID messageId = UUID.fromString("11111111-2222-3333-4444-555555555555");
-        UUID observationId = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+        UUID resultId = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
         UUID partId = UUID.fromString("bbbbbbbb-cccc-dddd-eeee-ffffffffffff");
+        UUID problemId = UUID.fromString("cccccccc-dddd-eeee-ffff-000000000000");
         UIMessageChunk.MessageMetadata finishMeta = new UIMessageChunk.MessageMetadata(
                 "openai/gpt-oss-120b", new UIMessageChunk.MessageMetadata.Usage(655, 65, null, null, 720), 0.0042);
         ObjectNode toolOutput = NODES.objectNode().put("status", "ok").put("count", 7);
@@ -107,7 +108,7 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
                 // NON_NULL: finishReason omitted, but messageMetadata kept.
                 // data-* envelope shape per AI SDK strict-object schema:
                 // {type, id?, data: unknown, transient?: boolean}. status is transient (banner only);
-                // observation is permanent (linked chip in message history).
+                // result is permanent (linked chip in message history).
                 new Object[] {
                     UIMessageChunk.DataMentorStatus.of(
                             UIMessageChunk.DataMentorStatus.State.WARMING_UP, "container-cold"),
@@ -115,13 +116,24 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
                             + "\"data\":{\"state\":\"warming-up\",\"reason\":\"container-cold\"},\"transient\":true}",
                 },
                 new Object[] {
-                    new UIMessageChunk.DataObservation(
-                            partId,
-                            new UIMessageChunk.DataObservation.DataObservationPayload(observationId, "Say why.")),
-                    "{\"type\":\"data-observation\",\"id\":\"" + partId
-                            + "\",\"data\":{\"observationId\":\""
-                            + observationId
+                    new UIMessageChunk.DataResult(
+                            partId, new UIMessageChunk.DataResult.DataResultPayload(resultId, "Say why.")),
+                    "{\"type\":\"data-result\",\"id\":\"" + partId
+                            + "\",\"data\":{\"resultId\":\""
+                            + resultId
                             + "\",\"text\":\"Say why.\"}}",
+                },
+                new Object[] {
+                    new UIMessageChunk.DataProblem(
+                            partId,
+                            new UIMessageChunk.DataProblem.DataProblemPayload(
+                                    resultId, problemId, "Log it before the retry.")),
+                    "{\"type\":\"data-problem\",\"id\":\"" + partId
+                            + "\",\"data\":{\"resultId\":\""
+                            + resultId
+                            + "\",\"problemId\":\""
+                            + problemId
+                            + "\",\"text\":\"Log it before the retry.\"}}",
                 },
                 new Object[] {
                     new UIMessageChunk.TurnError("container died mid-turn"),
@@ -139,8 +151,8 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
     }
 
     // A `dataChunkDiscriminatorSpelling` test would be pure duplication: the parameterised
-    // chunkFixtures test above already pins the exact JSON for `data-mentor-status` and
-    // `data-observation` chunks, and a Jackson SNAKE_CASE override would fail those fixture tests
+    // chunkFixtures test above already pins the exact JSON for `data-mentor-status`, `data-result` and
+    // `data-problem` chunks, and a Jackson SNAKE_CASE override would fail those fixture tests
     // BEFORE reaching the spelling assertion.
 
     @Test
@@ -156,8 +168,8 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
         for (JsonSubTypes.Type t : ann.value()) {
             registered.add(t.value());
         }
-        // Sealed interface auto-permits its directly-nested record subtypes plus DataMentorStatus /
-        // DataObservation which are top-level nested records. Reflectively enumerate permits via the
+        // Sealed interface auto-permits its directly-nested record subtypes, DataMentorStatus, DataResult and
+        // DataProblem included. Reflectively enumerate permits via the
         // class-level `getPermittedSubclasses()` (Java 17+).
         Class<?>[] permitted = UIMessageChunk.class.getPermittedSubclasses();
         assertThat(permitted).as("sealed permits resolves").isNotEmpty();
@@ -170,6 +182,59 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
         assertThat(missing)
                 .as("Every UIMessageChunk subtype must be listed in @JsonSubTypes (missing: %s)", missing)
                 .isEmpty();
+    }
+
+    @Test
+    void shouldReadEveryStoredLinkByItsResultWhenTheReplyShowedFeedback() {
+        UUID linkedResult = UUID.randomUUID();
+        UUID problemResult = UUID.randomUUID();
+        UUID problem = UUID.randomUUID();
+        var parts = NODES.arrayNode();
+        parts.addObject().put("type", "text").put("text", "Let me look.");
+        parts.addObject()
+                .put("type", "data-result")
+                .put("id", "a")
+                .putObject("data")
+                .put("resultId", linkedResult.toString())
+                .put("text", "Say why.");
+        parts.addObject()
+                .put("type", "data-problem")
+                .put("id", "b")
+                .putObject("data")
+                .put("resultId", problemResult.toString())
+                .put("problemId", problem.toString())
+                .put("text", "Log it before the retry.");
+        assertThat(UIMessageChunk.LinkParts.shownResultIds(parts)).containsExactly(linkedResult, problemResult);
+        assertThat(UIMessageChunk.LinkParts.problemOf(parts.get(2))).isEqualTo(problem);
+        assertThat(UIMessageChunk.LinkParts.problemOf(parts.get(1))).isNull();
+        assertThat(UIMessageChunk.LinkParts.resultOf(parts.get(0))).isNull();
+    }
+
+    @Test
+    void shouldNameNoResultWhenAStoredLinkShowedNothingOrCannotBeRead() {
+        var parts = NODES.arrayNode();
+        parts.addObject()
+                .put("type", "data-result")
+                .put("id", "untexted")
+                .putObject("data")
+                .put("resultId", UUID.randomUUID().toString());
+        parts.addObject()
+                .put("type", "data-result")
+                .put("id", "blank")
+                .putObject("data")
+                .put("resultId", UUID.randomUUID().toString())
+                .put("text", "  ");
+        parts.addObject()
+                .put("type", "data-problem")
+                .put("id", "unreadable")
+                .putObject("data")
+                .put("resultId", "not-a-uuid")
+                .put("problemId", UUID.randomUUID().toString())
+                .put("text", "Log it.");
+
+        assertThat(UIMessageChunk.LinkParts.shownResultIds(parts)).isEmpty();
+        assertThat(UIMessageChunk.LinkParts.shownResultIds(null)).isEmpty();
+        assertThat(UIMessageChunk.LinkParts.shownResultIds(NODES.objectNode())).isEmpty();
     }
 
     @ParameterizedTest

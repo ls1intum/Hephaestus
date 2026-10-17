@@ -1,25 +1,25 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import java.io.Serial;
-import java.util.List;
+import java.util.Set;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
-/**
- * A validated proxy-scoped bearer token — either an {@code AgentJob}'s job token or a mentor session's
- * registry-minted token. The resolved {@link ProxyRouting} is the principal.
- */
+// Token scopes become SCOPE_ authorities, as Spring hasScope requires.
 class JobTokenAuthentication extends AbstractAuthenticationToken {
 
     @Serial
     private static final long serialVersionUID = 1L;
 
-    // Proxy authentication is stateless request-local routing, never an HTTP session or serialized token.
+    // why: AuthenticationFilter stores this identity in RequestAttributeSecurityContextRepository only.
     @SuppressWarnings("serial")
-    private final ProxyRouting routing;
+    private final ProxyIdentity identity;
 
-    JobTokenAuthentication(ProxyRouting routing) {
-        super(List.of());
-        this.routing = routing;
+    JobTokenAuthentication(ProxyIdentity identity, Set<String> scopes) {
+        super(scopes.stream()
+                .map(scope -> new SimpleGrantedAuthority("SCOPE_" + scope))
+                .toList());
+        this.identity = identity;
         setAuthenticated(true);
     }
 
@@ -29,7 +29,7 @@ class JobTokenAuthentication extends AbstractAuthenticationToken {
     }
 
     @Override
-    public ProxyRouting getPrincipal() {
-        return routing;
+    public ProxyIdentity getPrincipal() {
+        return identity;
     }
 }

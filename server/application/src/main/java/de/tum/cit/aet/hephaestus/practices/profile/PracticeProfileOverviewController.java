@@ -1,7 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.profile;
 
-import de.tum.cit.aet.hephaestus.practices.observation.PracticeStandingService;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.PracticeProfileOverviewDTO;
+import de.tum.cit.aet.hephaestus.practices.result.trend.PracticeTrendService;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
  * The practice profile's overview, for the calling developer and nobody else: like the standings it is read
  * off, there is no user parameter on this route.
  */
+@ConditionalOnServerRole
 @WorkspaceScopedController
 @PreAuthorize("@workspaceSecure.isMember()")
 @RequestMapping("/practice-profile")
@@ -28,12 +30,12 @@ public class PracticeProfileOverviewController {
 
     @GetMapping("/overview")
     @Operation(
-            operationId = "getPracticeProfileOverview",
+            operationId = "getOwnPracticeProfileOverview",
             summary = "What was met, what changed and which work was reviewed since the run before the latest one",
             description = "Returns the practices met as a strength, every change to a standing, trend, group or"
                     + " piece of feedback inside the window, and the work reviewed inside it, as structured"
                     + " events. The window opens at the run before the latest one and closes now; with no such"
-                    + " run it spans the standing's look-back of " + PracticeStandingService.LOOKBACK_DAYS
+                    + " run it spans the standing's look-back of " + PracticeTrendService.LOOKBACK_DAYS
                     + " days.")
     @ApiResponse(responseCode = "200", description = "Practice profile overview returned")
     public ResponseEntity<PracticeProfileOverviewDTO> getOverview(WorkspaceContext workspaceContext) {

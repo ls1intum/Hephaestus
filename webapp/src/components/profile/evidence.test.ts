@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { EvidenceCitation } from "@/api/types.gen";
+import type { EvidenceCitation, ResultEvidence } from "@/api/types.gen";
 import {
 	evidenceLineRangeLabel,
 	splitPath,
@@ -10,86 +10,98 @@ import {
 function citation(overrides: Partial<EvidenceCitation> = {}): EvidenceCitation {
 	return {
 		sourceKind: "scm.pull-request.diff",
-		artifactPath: "owner/repo#1",
+		sourcePath: "owner/repo#1",
 		path: "src/Main.java",
 		side: "NEW",
+		commit: null,
 		startLine: 42,
 		endLine: 44,
 		quote: "a();\nb();",
-		quoteRedacted: false,
+		verification: null,
 		...overrides,
 	};
 }
 
+const NO_EVIDENCE: ResultEvidence = {
+	citations: [],
+	openQuestions: [],
+	search: null,
+	inapplicability: null,
+};
+
 describe("toEvidenceLocations", () => {
 	it("carries a quote with the lines it came from", () => {
-		expect(toEvidenceLocations({ citations: [citation()] })).toStrictEqual([
+		expect(toEvidenceLocations([citation()])).toStrictEqual([
 			{
 				path: "src/Main.java",
 				startLine: 42,
 				endLine: 44,
 				sourceKind: "scm.pull-request.diff",
 				side: "NEW",
-				revision: undefined,
+				commit: undefined,
 				snippet: "a();\nb();",
-				redacted: false,
 			},
 		]);
 	});
 
 	it("keeps the source kind, which decides whether the numbers are lines at all", () => {
-		const [location] = toEvidenceLocations({
-			citations: [citation({ sourceKind: "slack.conversation.thread", side: undefined })],
-		});
+		const [location] = toEvidenceLocations([
+			citation({ sourceKind: "slack.conversation.thread", side: null }),
+		]);
 
 		expect(location?.sourceKind).toBe("slack.conversation.thread");
 		expect(location?.side).toBeUndefined();
 	});
 
-	it("keeps a redacted citation, so a withheld quote stays distinguishable from an unquoted one", () => {
-		const [location] = toEvidenceLocations({
-			citations: [citation({ quote: undefined, quoteRedacted: true })],
-		});
+	it("keeps the place of a citation that recorded no quote", () => {
+		const [location] = toEvidenceLocations([citation({ quote: null })]);
 
 		expect(location?.snippet).toBeUndefined();
-		expect(location?.redacted).toBe(true);
-
 		expect(location?.path).toBe("src/Main.java");
 	});
 
+	it("keeps a historical citation that recorded neither file nor lines", () => {
+		const [location] = toEvidenceLocations([
+			citation({ path: null, startLine: null, endLine: null }),
+		]);
+
+		expect(location?.path).toBeUndefined();
+		expect(location?.startLine).toBeUndefined();
+		expect(location?.snippet).toBe("a();\nb();");
+	});
+
 	it("preserves the commit that a historical quote was verified against", () => {
-		const revision = "a".repeat(40);
-		const [location] = toEvidenceLocations({ citations: [citation({ revision })] });
-		expect(location?.revision).toBe(revision);
+		const commit = "a".repeat(40);
+		const [location] = toEvidenceLocations([citation({ commit })]);
+		expect(location?.commit).toBe(commit);
 	});
 
 	it("preserves the order the reviewer recorded", () => {
-		const locations = toEvidenceLocations({
-			citations: [citation({ path: "b.java" }), citation({ path: "a.java" })],
-		});
+		const locations = toEvidenceLocations([
+			citation({ path: "b.java" }),
+			citation({ path: "a.java" }),
+		]);
 
 		expect(locations.map((location) => location.path)).toStrictEqual(["b.java", "a.java"]);
 	});
 
 	it("folds the two sides of one changed line into one location", () => {
-		const locations = toEvidenceLocations({
-			citations: [
-				citation({
-					path: "src/pagination.ts",
-					side: "OLD",
-					startLine: 4,
-					endLine: 4,
-					quote: "-export const PAGE_SIZE = 25;",
-				}),
-				citation({
-					path: "src/pagination.ts",
-					side: "NEW",
-					startLine: 4,
-					endLine: 4,
-					quote: "+export const PAGE_SIZE = 20;",
-				}),
-			],
-		});
+		const locations = toEvidenceLocations([
+			citation({
+				path: "src/pagination.ts",
+				side: "OLD",
+				startLine: 4,
+				endLine: 4,
+				quote: "-export const PAGE_SIZE = 25;",
+			}),
+			citation({
+				path: "src/pagination.ts",
+				side: "NEW",
+				startLine: 4,
+				endLine: 4,
+				quote: "+export const PAGE_SIZE = 20;",
+			}),
+		]);
 
 		expect(locations).toStrictEqual([
 			{
@@ -97,7 +109,6 @@ describe("toEvidenceLocations", () => {
 				startLine: 4,
 				endLine: 4,
 				sourceKind: "scm.pull-request.diff",
-				redacted: false,
 				change: {
 					before: "-export const PAGE_SIZE = 25;",
 					after: "+export const PAGE_SIZE = 20;",
@@ -106,83 +117,74 @@ describe("toEvidenceLocations", () => {
 		]);
 	});
 
-	it("never folds two citations of different artifacts, whose line numbers say nothing about each other", () => {
-		const locations = toEvidenceLocations({
-			citations: [
-				citation({ artifactPath: "owner/repo#1", side: "OLD", quote: "-a();" }),
-				citation({ artifactPath: "owner/repo#2", side: "NEW", quote: "+a();" }),
-			],
-		});
+	it("never folds two citations of different sources, whose line numbers say nothing about each other", () => {
+		const locations = toEvidenceLocations([
+			citation({ sourcePath: "owner/repo#1", side: "OLD", quote: "-a();" }),
+			citation({ sourcePath: "owner/repo#2", side: "NEW", quote: "+a();" }),
+		]);
 
 		expect(locations).toHaveLength(2);
 		expect(locations.every((location) => location.change === undefined)).toBe(true);
 	});
 
 	it("keeps neither side's commit on a folded block: each side was read at its own", () => {
-		const [location] = toEvidenceLocations({
-			citations: [
-				citation({ side: "OLD", revision: "a".repeat(40), quote: "-a();" }),
-				citation({ side: "NEW", revision: "b".repeat(40), quote: "+a();" }),
-			],
-		});
+		const [location] = toEvidenceLocations([
+			citation({ side: "OLD", commit: "a".repeat(40), quote: "-a();" }),
+			citation({ side: "NEW", commit: "b".repeat(40), quote: "+a();" }),
+		]);
 
 		expect(location?.change).toStrictEqual({ before: "-a();", after: "+a();" });
-		expect(location?.revision).toBeUndefined();
+		expect(location?.commit).toBeUndefined();
 		expect(location?.side).toBeUndefined();
 	});
 
 	it("folds a pair cited new side first, and keeps before before after", () => {
-		const [location] = toEvidenceLocations({
-			citations: [citation({ quote: "after();" }), citation({ side: "OLD", quote: "before();" })],
-		});
+		const [location] = toEvidenceLocations([
+			citation({ quote: "after();" }),
+			citation({ side: "OLD", quote: "before();" }),
+		]);
 
 		expect(location?.change).toStrictEqual({ before: "before();", after: "after();" });
 	});
 
 	it("leaves two sides of different lines as two locations", () => {
-		const locations = toEvidenceLocations({
-			citations: [
-				citation({ side: "OLD", startLine: 4, endLine: 4 }),
-				citation({ side: "NEW", startLine: 9, endLine: 9 }),
-			],
-		});
+		const locations = toEvidenceLocations([
+			citation({ side: "OLD", startLine: 4, endLine: 4 }),
+			citation({ side: "NEW", startLine: 9, endLine: 9 }),
+		]);
 
 		expect(locations).toHaveLength(2);
 		expect(locations.every((location) => location.change === undefined)).toBe(true);
 	});
 
-	it("never folds a withheld quote away, so the redaction keeps its own block", () => {
-		const locations = toEvidenceLocations({
-			citations: [
-				citation({ side: "OLD", quote: undefined, quoteRedacted: true }),
-				citation({ side: "NEW", quote: "b();" }),
-			],
-		});
+	it("never folds a side that recorded no quote, so its place keeps its own block", () => {
+		const locations = toEvidenceLocations([
+			citation({ side: "OLD", quote: null }),
+			citation({ side: "NEW", quote: "b();" }),
+		]);
 
 		expect(locations).toHaveLength(2);
-		expect(locations[0]?.redacted).toBe(true);
+		expect(locations[0]?.snippet).toBeUndefined();
 	});
 
 	it("folds every quote of one object source into the block that first named it", () => {
-		const core = { sourceKind: "scm.pull-request.core", side: undefined } as const;
-		const locations = toEvidenceLocations({
-			citations: [
-				citation({
-					...core,
-					path: "inputs/context/metadata.json",
-					startLine: 4,
-					endLine: 4,
-					quote: '"title" : "Page size"',
-				}),
-				citation({
-					...core,
-					path: "inputs/context/metadata.json",
-					startLine: 9,
-					endLine: 9,
-					quote: '"body" : ""',
-				}),
-			],
-		});
+		const core = { sourceKind: "scm.pull-request.core", side: null } as const;
+		const locations = toEvidenceLocations([
+			citation({
+				...core,
+				path: "inputs/context/metadata.json",
+				startLine: 4,
+				endLine: 4,
+				quote: '"title" : "Page size"',
+			}),
+			citation({
+				...core,
+				path: "inputs/context/metadata.json",
+				startLine: 9,
+				endLine: 9,
+				quote: '"body" : ""',
+			}),
+		]);
 
 		expect(locations).toHaveLength(1);
 		expect(locations[0]?.snippet).toBe('"title" : "Page size"\n"body" : ""');
@@ -190,34 +192,29 @@ describe("toEvidenceLocations", () => {
 	});
 
 	it("leaves two object sources apart, and never folds a code citation by its file", () => {
-		const locations = toEvidenceLocations({
-			citations: [
-				citation({ sourceKind: "scm.pull-request.core", side: undefined, quote: "a" }),
-				citation({ sourceKind: "slack.conversation.thread", side: undefined, quote: "b" }),
-				citation({ path: "src/Main.java", startLine: 1, endLine: 1, quote: "c" }),
-				citation({ path: "src/Main.java", startLine: 9, endLine: 9, quote: "d" }),
-			],
-		});
+		const locations = toEvidenceLocations([
+			citation({ sourceKind: "scm.pull-request.core", side: null, quote: "a" }),
+			citation({ sourceKind: "slack.conversation.thread", side: null, quote: "b" }),
+			citation({ path: "src/Main.java", startLine: 1, endLine: 1, quote: "c" }),
+			citation({ path: "src/Main.java", startLine: 9, endLine: 9, quote: "d" }),
+		]);
 
 		expect(locations.map((location) => location.snippet)).toStrictEqual(["a", "b", "c", "d"]);
 	});
 
-	it("never folds a withheld quote into a source's block", () => {
-		const core = { sourceKind: "scm.pull-request.core", side: undefined } as const;
-		const locations = toEvidenceLocations({
-			citations: [
-				citation({ ...core, quote: undefined, quoteRedacted: true }),
-				citation({ ...core, quote: '"body" : ""' }),
-			],
-		});
+	it("never folds a citation that recorded no quote into a source's block", () => {
+		const core = { sourceKind: "scm.pull-request.core", side: null } as const;
+		const locations = toEvidenceLocations([
+			citation({ ...core, quote: null }),
+			citation({ ...core, quote: '"body" : ""' }),
+		]);
 
 		expect(locations).toHaveLength(2);
-		expect(locations[0]?.redacted).toBe(true);
+		expect(locations[0]?.snippet).toBeUndefined();
 	});
 
-	it("treats absent evidence as no citations", () => {
-		expect(toEvidenceLocations(undefined)).toStrictEqual([]);
-		expect(toEvidenceLocations({ citations: [] })).toStrictEqual([]);
+	it("treats no citations as no locations", () => {
+		expect(toEvidenceLocations([])).toStrictEqual([]);
 	});
 });
 
@@ -242,7 +239,6 @@ describe("evidenceLineRangeLabel", () => {
 				startLine: 62,
 				endLine: 62,
 				sourceKind: "scm.pull-request.diff",
-				redacted: false,
 			}),
 		).toBe("line 62");
 	});
@@ -254,9 +250,12 @@ describe("evidenceLineRangeLabel", () => {
 				startLine: 62,
 				endLine: 70,
 				sourceKind: "scm.pull-request.diff",
-				redacted: false,
 			}),
 		).toBe("lines 62 to 70");
+	});
+
+	it("says nothing for a citation that recorded no lines", () => {
+		expect(evidenceLineRangeLabel({ sourceKind: "scm.pull-request.diff" })).toBeUndefined();
 	});
 });
 
@@ -264,7 +263,7 @@ describe("toEvidenceCheck", () => {
 	it("says where a search looked, what it read and how far the absence reaches", () => {
 		expect(
 			toEvidenceCheck({
-				citations: [],
+				...NO_EVIDENCE,
 				search: {
 					lookedFor: "a test exercising the new branch",
 					consulted: ["scm.pull-request.diff", "scm.repository.tree"],
@@ -281,18 +280,18 @@ describe("toEvidenceCheck", () => {
 		]);
 	});
 
-	it("says what the practice looks for and the fact that left it nothing to judge", () => {
+	it("says when the practice applies and the fact that left it nothing to judge", () => {
 		expect(
 			toEvidenceCheck({
-				citations: [],
+				...NO_EVIDENCE,
 				inapplicability: {
-					subject: "how a change handles a timeout",
+					prerequisite: "a change that calls out of the process",
 					consulted: ["scm.pull-request.diff"],
 					ruledOutBy: "nothing in the diff calls out of the process",
 				},
 			}),
 		).toStrictEqual([
-			{ term: "Looks for", detail: "how a change handles a timeout" },
+			{ term: "Applies when", detail: "a change that calls out of the process" },
 			{ term: "Read", detail: "The code changes" },
 			{
 				term: "Nothing to judge because",
@@ -301,19 +300,19 @@ describe("toEvidenceCheck", () => {
 		]);
 	});
 
-	it("says the question that was left open and what would have answered it", () => {
+	it("leaves open questions to their own section, so they never read as a check", () => {
 		expect(
 			toEvidenceCheck({
-				citations: [],
-				undecidability: {
-					openQuestion: "whether the rename was asked for",
-					wouldSettleIt: "the review thread the description points at",
-				},
+				...NO_EVIDENCE,
+				openQuestions: [
+					{
+						openQuestion: "whether the rename was asked for",
+						wouldSettleIt: "the review thread the description points at",
+						citation: null,
+					},
+				],
 			}),
-		).toStrictEqual([
-			{ term: "Open question", detail: "whether the rename was asked for" },
-			{ term: "Would settle it", detail: "the review thread the description points at" },
-		]);
+		).toStrictEqual([]);
 	});
 
 	it("names an unknown source kind generically and drops the pair when nothing was consulted", () => {
@@ -322,17 +321,21 @@ describe("toEvidenceCheck", () => {
 			boundary: "the files this change touches",
 		};
 		expect(
-			toEvidenceCheck({ citations: [], search: { ...search, consulted: ["future.source"] } })[1],
+			toEvidenceCheck({
+				...NO_EVIDENCE,
+				search: { ...search, consulted: ["future.source"] },
+			})[1],
 		).toStrictEqual({ term: "Read", detail: "Another source" });
 		expect(
-			toEvidenceCheck({ citations: [], search: { ...search, consulted: [] } }).map(
-				({ term }) => term,
-			),
+			toEvidenceCheck({
+				...NO_EVIDENCE,
+				search: { ...search, consulted: [] },
+			}).map(({ term }) => term),
 		).toStrictEqual(["Looked for", "How far it reached"]);
 	});
 
-	it("has nothing to say about an observation with no warrant at all", () => {
-		expect(toEvidenceCheck(undefined)).toStrictEqual([]);
-		expect(toEvidenceCheck({ citations: [] })).toStrictEqual([]);
+	it("has nothing to say about a result with no warrant at all", () => {
+		expect(toEvidenceCheck(null)).toStrictEqual([]);
+		expect(toEvidenceCheck(NO_EVIDENCE)).toStrictEqual([]);
 	});
 });

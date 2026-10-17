@@ -17,10 +17,10 @@ const groupPillVariants = cva("flex shrink-0 items-center justify-center", {
 });
 
 export interface GroupPillProps extends VariantProps<typeof groupPillVariants> {
-	slug?: string;
-	name?: string;
-	icon?: string;
-	color?: string;
+	slug?: string | null;
+	name?: string | null;
+	icon?: string | null;
+	color?: string | null;
 	srLabel?: boolean;
 	className?: string;
 }

@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { adminListAuthEventsInfiniteQueryKey } from "@/api/@tanstack/react-query.gen";
 import type { AuthEventView, ConfigAuditEntryView } from "@/api/types.gen";
 import type { Wire } from "@/lib/dates";
-import { workspaceListItem } from "@/mocks/fixtures/workspaces";
+import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
 import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter } from "@/test/router-harness";
 
@@ -84,7 +84,7 @@ beforeEach(() => {
 			HttpResponse.json([workspaceListItem("acme"), workspaceListItem("other", { id: 2 })]),
 		),
 		http.get("*/workspaces/:workspaceSlug/members/me", () =>
-			HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "octocat" }),
+			HttpResponse.json(ownMembership("ADMIN")),
 		),
 	);
 });

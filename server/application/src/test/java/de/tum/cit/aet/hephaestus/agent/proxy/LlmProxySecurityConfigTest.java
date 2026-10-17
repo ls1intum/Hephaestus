@@ -4,15 +4,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.InstanceOfAssertFactories.type;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
+import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
 import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewayProperties;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
+import de.tum.cit.aet.hephaestus.agent.job.RuntimeJobTestData;
 import de.tum.cit.aet.hephaestus.agent.runtime.worker.testing.WorkerPropertiesFixtures;
 import de.tum.cit.aet.hephaestus.core.auth.ratelimit.BucketResolver;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.JobJwt;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtVerifier;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import io.github.bucket4j.Bucket;
@@ -20,6 +23,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.http.Cookie;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -29,7 +33,11 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -53,10 +61,10 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final int GATEWAY_PORT = 9081;
     private static final int APPLICATION_PORT = 9080;
-    private static final SandboxGatewayProperties GATEWAY = new SandboxGatewayProperties(GATEWAY_PORT, 16, 120);
+    private static final SandboxGatewayProperties GATEWAY = new SandboxGatewayProperties(GATEWAY_PORT, 16, 1);
 
     @Mock
-    private AgentJobRepository jobRepository;
+    private ReviewJobRepository jobRepository;
 
     @Mock
     private WorkerJwtVerifier jwtVerifier;
@@ -70,6 +78,8 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
     @Mock
     private MentorTurnUsageAccumulator mentorTurnUsageAccumulator;
 
+    private final MentorProxyCredentialRegistry mentorRegistry = new MentorProxyCredentialRegistry();
+    private final Map<String, Bucket> buckets = new HashMap<>();
     private FilterChainProxy chains;
     private final AtomicReference<@Nullable Authentication> servedAs = new AtomicReference<>();
 
@@ -81,15 +91,18 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
         var config = new LlmProxySecurityConfig();
         var accounting = new ProxyAccounting(
                 budgetGate, usageAccumulator, mentorTurnUsageAccumulator, new SimpleMeterRegistry(), OBJECT_MAPPER);
-        BucketResolver resolver = (key, configuration) ->
-                Bucket.builder().addLimit(configuration.getBandwidths()[0]).build();
+        BucketResolver resolver = (key, configuration) -> buckets.computeIfAbsent(
+                key,
+                ignored -> Bucket.builder()
+                        .addLimit(configuration.getBandwidths()[0])
+                        .build());
         chains = new FilterChainProxy(List.of(
                 config.llmProxyFilterChain(
                         httpSecurity(context),
                         GATEWAY,
                         jobRepository,
                         jwtVerifier,
-                        new MentorProxyCredentialRegistry(),
+                        mentorRegistry,
                         resolver,
                         accounting,
                         OBJECT_MAPPER,
@@ -113,9 +126,9 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
     void hidesTheSandboxCapabilitiesFromTheApplicationConnector() throws Exception {
         assertThat(answerTo("POST", "/internal/llm/responses", APPLICATION_PORT))
                 .isEqualTo(404);
-        assertThat(answerTo("POST", "/internal/llm/admit-observations", APPLICATION_PORT))
+        assertThat(answerTo("POST", "/internal/llm/admit-results", APPLICATION_PORT))
                 .isEqualTo(404);
-        assertThat(answerTo("POST", "/internal/llm/complete-public-review", APPLICATION_PORT))
+        assertThat(answerTo("POST", "/internal/llm/prepare-feedback", APPLICATION_PORT))
                 .isEqualTo(404);
     }
 
@@ -130,6 +143,17 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
 
         assertThat(answerTo("POST", "/internal/llm/responses", GATEWAY_PORT, oversized))
                 .isEqualTo(413);
+    }
+
+    @Test
+    void refusesOversizedFeedbackPreparationBeforeAuthentication() throws Exception {
+        assertThat(answerTo(
+                        "POST",
+                        "/internal/llm/prepare-feedback",
+                        GATEWAY_PORT,
+                        new byte[GATEWAY.maxRequestBytes() + 1]))
+                .isEqualTo(413);
+        Mockito.verifyNoInteractions(jobRepository, jwtVerifier);
     }
 
     /** The result upload is bounded by the archive budget, not by the model-call bound. */
@@ -159,17 +183,17 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
 
     @Test
     void shouldRejectCookieAndQueryCredentialsWhenNoBearerHeaderIsPresent() throws Exception {
-        AgentJob job = runningJobOnAttempt(1);
-        when(jobRepository.findByIdWithWorkspace(job.getId())).thenReturn(Optional.of(job));
+        ReviewJob job = runningJobOnAttempt(1);
+        when(jobRepository.findById(job.getId())).thenReturn(Optional.of(job));
         when(jwtVerifier.verify("current-attempt")).thenReturn(jobJwt(job, 1));
         assertThat(answerToTokenCall("current-attempt")).isEqualTo(200);
 
         for (String path : List.of(
                 "/internal/llm/responses",
                 "/internal/llm/chat/completions",
-                "/internal/llm/admit-observations",
+                "/internal/llm/admit-results",
                 "/internal/llm/public-feedback-history",
-                "/internal/llm/complete-public-review")) {
+                "/internal/llm/prepare-feedback")) {
             MockHttpServletRequest request = request("POST", path, GATEWAY_PORT);
             request.setCookies(
                     new Cookie("__Host-HEPHAESTUS_AT", "current-attempt"), new Cookie("JSESSIONID", "current-attempt"));
@@ -187,8 +211,8 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
      */
     @Test
     void servesACapabilityCallAsTheAttemptItsTokenNames() throws Exception {
-        AgentJob job = runningJobOnAttempt(1);
-        when(jobRepository.findByIdWithWorkspace(job.getId())).thenReturn(Optional.of(job));
+        ReviewJob job = runningJobOnAttempt(1);
+        when(jobRepository.findById(job.getId())).thenReturn(Optional.of(job));
         when(jwtVerifier.verify("current-attempt")).thenReturn(jobJwt(job, 1));
         when(jwtVerifier.verify("dead-attempt")).thenReturn(jobJwt(job, 0));
 
@@ -196,19 +220,19 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
         assertThat(servedAs.get())
                 .isNotNull()
                 .extracting(Authentication::getPrincipal)
-                .asInstanceOf(type(ProxyRouting.class))
-                .extracting(ProxyRouting::principalDescription)
+                .asInstanceOf(type(ProxyIdentity.class))
+                .extracting(ProxyIdentity::description)
                 .isEqualTo("job:" + job.getId());
 
         assertThat(answerToTokenCall("dead-attempt")).isEqualTo(401);
         assertThat(servedAs.get()).isNull();
     }
 
-    @Test
-    void servesPublicHistoryOnlyOnTheGatewayForTheAuthenticatedCurrentAttempt() throws Exception {
-        String path = "/internal/llm/public-feedback-history";
-        AgentJob job = runningJobOnAttempt(1);
-        when(jobRepository.findByIdWithWorkspace(job.getId())).thenReturn(Optional.of(job));
+    @ParameterizedTest
+    @ValueSource(strings = {"/internal/llm/public-feedback-history", "/internal/llm/prepare-feedback"})
+    void servesCompositionOnlyOnTheGatewayForTheAuthenticatedCurrentAttempt(String path) throws Exception {
+        ReviewJob job = runningJobOnAttempt(1);
+        when(jobRepository.findById(job.getId())).thenReturn(Optional.of(job));
         when(jwtVerifier.verify("current-attempt")).thenReturn(jobJwt(job, 1));
         when(jwtVerifier.verify("dead-attempt")).thenReturn(jobJwt(job, 0));
         MockHttpServletRequest current = request("POST", path, GATEWAY_PORT);
@@ -217,8 +241,8 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
         assertThat(servedAs.get())
                 .isNotNull()
                 .extracting(Authentication::getPrincipal)
-                .asInstanceOf(type(ProxyRouting.class))
-                .extracting(ProxyRouting::principalDescription)
+                .asInstanceOf(type(ProxyIdentity.class))
+                .extracting(ProxyIdentity::description)
                 .isEqualTo("job:" + job.getId());
         MockHttpServletRequest stale = request("POST", path, GATEWAY_PORT);
         stale.addHeader("Authorization", "Bearer dead-attempt");
@@ -229,6 +253,89 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
         assertThat(answerTo("POST", path, APPLICATION_PORT)).isEqualTo(404);
         assertThat(answerTo("POST", path, GATEWAY_PORT, new byte[GATEWAY.maxRequestBytes() + 1]))
                 .isEqualTo(413);
+    }
+
+    @Test
+    void shouldServeThePracticeScriptRouteOnTheGatewayWhenTheJobTokenCallsIt() throws Exception {
+        String path = "/internal/llm/practice-script/chat/chat/completions";
+        ReviewJob job = runningJobOnAttempt(1);
+        when(jobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        when(jwtVerifier.verify("job-token")).thenReturn(jobJwt(job, 1));
+
+        MockHttpServletRequest practiceScript = request("POST", path, GATEWAY_PORT);
+        practiceScript.addHeader("Authorization", "Bearer job-token");
+        assertThat(answerTo(practiceScript)).isEqualTo(200);
+        assertThat(servedAs.get())
+                .isNotNull()
+                .extracting(Authentication::getPrincipal)
+                .asInstanceOf(type(ProxyIdentity.class))
+                .extracting(ProxyIdentity::description)
+                .isEqualTo("job:" + job.getId());
+        assertThat(answerTo("POST", path, APPLICATION_PORT)).isEqualTo(404);
+        assertThat(answerTo("POST", path, GATEWAY_PORT, new byte[GATEWAY.maxRequestBytes() + 1]))
+                .isEqualTo(413);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "POST,/internal/llm/chat/completions",
+        "POST,/internal/llm/responses",
+        "POST,/internal/llm/practice-script/chat/chat/completions",
+        "POST,/internal/llm/admit-results",
+        "POST,/internal/llm/public-feedback-history",
+        "GET,/internal/llm/runtime/{job}",
+        "GET,/internal/llm/runtime/{job}/workspace",
+        "GET,/internal/llm/runtime/{job}/frames",
+        "POST,/internal/llm/runtime/{job}/result"
+    })
+    void shouldServeEveryCapabilityWhenTheJobsOneTokenCallsIt(String method, String path) throws Exception {
+        ReviewJob job = runningJobOnAttempt(1);
+        when(jobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        when(jwtVerifier.verify("job-token")).thenReturn(jobJwt(job, 1));
+        MockHttpServletRequest request =
+                request(method, path.replace("{job}", job.getId().toString()), GATEWAY_PORT);
+        request.addHeader("Authorization", "Bearer job-token");
+
+        assertThat(answerTo(request)).isEqualTo(200);
+        assertThat(servedAs.get()).isNotNull();
+    }
+
+    @Test
+    void shouldRefuseATokenWhenItCarriesOnlyTheRetiredPracticeScriptScope() throws Exception {
+        ReviewJob job = runningJobOnAttempt(1);
+        when(jobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        when(jwtVerifier.verify("practice-script-token")).thenReturn(jobJwt(job, 1, "llm_practice_script"));
+        MockHttpServletRequest request =
+                request("POST", "/internal/llm/practice-script/chat/chat/completions", GATEWAY_PORT);
+        request.addHeader("Authorization", "Bearer practice-script-token");
+
+        assertThat(answerTo(request)).isEqualTo(403);
+        assertThat(servedAs.get()).isNull();
+        assertThat(answerToTokenCall("practice-script-token")).isEqualTo(403);
+    }
+
+    @Test
+    void refusesAJobTokenWithoutTheProxyScope() throws Exception {
+        ReviewJob job = runningJobOnAttempt(1);
+        when(jobRepository.findById(job.getId())).thenReturn(Optional.of(job));
+        when(jwtVerifier.verify("unscoped")).thenReturn(jobJwt(job, 1, "other"));
+
+        assertThat(answerToTokenCall("unscoped")).isEqualTo(403);
+        assertThat(servedAs.get()).isNull();
+    }
+
+    @Test
+    void refusesAMentorCredentialOnThePracticeScriptRoute() throws Exception {
+        String mentorToken = mentorRegistry.mint(
+                UUID.randomUUID(),
+                new MentorProxyCredentialRegistry.Route(
+                        "openai-completions", "https://api.example.com/v1", null, null, null, null));
+        MockHttpServletRequest request =
+                request("POST", "/internal/llm/practice-script/chat/chat/completions", GATEWAY_PORT);
+        request.addHeader("Authorization", "Bearer " + mentorToken);
+
+        assertThat(answerTo(request)).isEqualTo(403);
+        assertThat(servedAs.get()).isNull();
     }
 
     private int answerTo(String method, String path, int localPort) throws Exception {
@@ -274,43 +381,48 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
         return response.getStatus();
     }
 
-    private AgentJob runningJobOnAttempt(int attempt) {
+    private ReviewJob runningJobOnAttempt(int attempt) {
         Workspace workspace = new Workspace();
         workspace.setId(7L);
-        AgentJob job = new AgentJob();
+        ReviewJob job = new ReviewJob();
         job.setId(UUID.randomUUID());
-        job.setWorkspace(workspace);
-        job.setStatus(AgentJobStatus.RUNNING);
+        RuntimeJobTestData.initialize(job, workspace.getId());
+        job.setStatus(ReviewJobStatus.RUNNING);
         job.setWorkerId("test-worker");
-        job.setRetryCount(attempt);
+        job.setAttempt(attempt);
         job.setConfigSnapshot(new ConfigSnapshot(
                         ConfigSnapshot.SCHEMA_VERSION,
-                        "openai-responses",
-                        "https://api.example.com/v1",
-                        "catalog-model",
+                        new FrozenModel(
+                                LlmApiProtocol.parse("openai-responses").orElseThrow(),
+                                "https://api.example.com/v1",
+                                "catalog-model",
+                                null,
+                                null,
+                                null,
+                                workspace.getId(),
+                                null,
+                                null,
+                                null),
                         null,
                         null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        workspace.getId(),
                         600,
                         false,
-                        null,
                         null)
                 .toJson(OBJECT_MAPPER));
         return job;
     }
 
-    private static JobJwt jobJwt(AgentJob job, int attempt) {
+    private static JobJwt jobJwt(ReviewJob job, int attempt) {
+        return jobJwt(job, attempt, "llm_proxy");
+    }
+
+    private static JobJwt jobJwt(ReviewJob job, int attempt, String scope) {
         Instant now = Instant.now();
         return new JobJwt(
                 job.getId(),
-                job.getWorkspace().getId(),
+                job.getWorkspaceId(),
                 attempt,
-                Set.of("llm_proxy"),
+                Set.of(scope),
                 UUID.randomUUID().toString(),
                 now,
                 now.plusSeconds(60));

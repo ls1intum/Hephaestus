@@ -21,7 +21,8 @@ public record UpdateLlmModelPriceRequestDTO(
         @NotNull
         @Schema(
                 description =
-                        "PRICED shows the price itself; NO_CHARGE is a deliberate no-cost declaration; UNPRICED shows \"No price set\"")
+                        "PRICED shows the price itself; NO_CHARGE is a deliberate no-cost declaration; UNPRICED shows"
+                                + " \"No price set\"")
         PricingMode pricingMode,
 
         @Nullable

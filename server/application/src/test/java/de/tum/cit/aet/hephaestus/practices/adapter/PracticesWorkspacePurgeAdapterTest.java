@@ -1,81 +1,67 @@
 package de.tum.cit.aet.hephaestus.practices.adapter;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.inOrder;
 
-import de.tum.cit.aet.hephaestus.practices.PracticeGroupRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluationRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData.Scenario;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
+import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.InOrder;
-import org.mockito.Mock;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.transaction.annotation.Transactional;
 
-class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
+@Import(ReviewIntegrationData.class)
+class PracticesWorkspacePurgeAdapterTest extends BaseIntegrationTest {
+    @Autowired
+    ReviewIntegrationData data;
 
-    @Mock
-    private FeedbackRepository feedbackRepository;
-
-    @Mock
-    private DeliveryPolicyEvaluationRepository evaluationRepository;
-
-    @Mock
-    private FeedbackDispatchRepository dispatchRepository;
-
-    @Mock
-    private ObservationRepository observationRepository;
-
-    @Mock
-    private PracticeRepository practiceRepository;
-
-    @Mock
-    private PracticeGroupRepository practiceGroupRepository;
-
-    private PracticesWorkspacePurgeAdapter adapter;
+    Scenario scenario;
 
     @BeforeEach
     void setUp() {
-        adapter = new PracticesWorkspacePurgeAdapter(
-                evaluationRepository,
-                dispatchRepository,
-                feedbackRepository,
-                observationRepository,
-                practiceRepository,
-                practiceGroupRepository);
+        databaseTestUtils.cleanDatabase();
+        scenario = data.scenario();
     }
 
-    @Test
-    void deleteWorkspaceData_deletesAllPracticesData() {
-        Long workspaceId = 789L;
+    @Autowired
+    PracticesWorkspacePurgeAdapter purge;
 
-        adapter.deleteWorkspaceData(workspaceId);
-
-        // The FK-driven dependency order is load-bearing (feedback has a RESTRICT FK; practices clear the
-        // practice -> practice_group references before groups are removed). Assert the ORDER, not just the
-        // calls, so a reordering refactor fails the unit test instead of only failing on a real DB.
-        InOrder inOrder = inOrder(
-                evaluationRepository,
-                dispatchRepository,
-                feedbackRepository,
-                observationRepository,
-                practiceRepository,
-                practiceGroupRepository);
-        inOrder.verify(evaluationRepository).deleteAllByWorkspaceId(workspaceId);
-        inOrder.verify(dispatchRepository).deleteAllByWorkspaceId(workspaceId);
-        inOrder.verify(feedbackRepository).deleteAllByWorkspaceId(workspaceId);
-        inOrder.verify(observationRepository).deleteAllByPracticeWorkspaceId(workspaceId);
-        inOrder.verify(practiceRepository).deleteAllByWorkspaceId(workspaceId);
-        inOrder.verify(practiceGroupRepository).deleteAllByWorkspaceId(workspaceId);
-    }
+    @Autowired
+    JdbcClient jdbc;
 
     @Test
-    @DisplayName("runs before default-order purge contributors")
-    void getOrder_returnsNegativeValue() {
-        assertThat(adapter.getOrder()).isLessThan(0);
+    @Transactional
+    void purgeDeletesFinalRowsOnlyForItsWorkspace() {
+        var mine = data.result(scenario, ResultOutcome.NOT_MET, Instant.now());
+        var other = data.result(data.scenario(), ResultOutcome.MET, Instant.now());
+        purge.deleteWorkspaceData(mine.getWorkspaceId());
+        assertThat(jdbc.sql("SELECT EXISTS(SELECT 1 FROM result WHERE workspace_id=:ws AND id=:id)")
+                        .param("ws", mine.getWorkspaceId())
+                        .param("id", mine.getId())
+                        .query(Boolean.class)
+                        .single())
+                .isFalse();
+        assertThat(jdbc.sql("SELECT EXISTS(SELECT 1 FROM result WHERE workspace_id=:ws AND id=:id)")
+                        .param("ws", other.getWorkspaceId())
+                        .param("id", other.getId())
+                        .query(Boolean.class)
+                        .single())
+                .isTrue();
+        assertThat(jdbc.sql("SELECT EXISTS(SELECT 1 FROM review WHERE workspace_id=:ws AND id=:id)")
+                        .param("ws", mine.getWorkspaceId())
+                        .param("id", mine.getReviewId())
+                        .query(Boolean.class)
+                        .single())
+                .isFalse();
+        assertThat(jdbc.sql("SELECT EXISTS(SELECT 1 FROM review WHERE workspace_id=:ws AND id=:id)")
+                        .param("ws", other.getWorkspaceId())
+                        .param("id", other.getReviewId())
+                        .query(Boolean.class)
+                        .single())
+                .isTrue();
     }
 }

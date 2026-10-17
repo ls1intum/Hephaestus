@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, screen } from "storybook/test";
 
+import { currentDefinition } from "@/components/admin/practices/practice-definition-fields";
 import { listOpenedBy } from "@/test/detail-stack";
 
 import { workspacePractices } from "./fixtures";
@@ -10,6 +11,7 @@ const thinControllers = workspacePractices.find((p) => p.slug === "thin-controll
 if (!thinControllers) {
 	throw new Error("The practice fixtures no longer cover thin-controllers");
 }
+const { name, guidance } = currentDefinition(thinControllers);
 
 const meta = {
 	component: ReviewPracticeLink,
@@ -17,8 +19,8 @@ const meta = {
 	tags: ["autodocs"],
 	args: {
 		practiceSlug: thinControllers.slug,
-		practiceName: thinControllers.name,
-		group: { slug: "code-quality", name: "Code quality" },
+		practiceName: name,
+		group: { slug: "code-quality", name: "Code quality", icon: null, color: null },
 		practice: thinControllers,
 	},
 } satisfies Meta<typeof ReviewPracticeLink>;
@@ -29,7 +31,7 @@ type Story = StoryObj<typeof meta>;
 export const WithTheHoverCard: Story = {
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.hover(canvas.getByRole("link", { name: /Thin controllers/u }));
-		await screen.findByText(thinControllers.whyItMatters ?? "");
+		await screen.findByText(guidance.whyItMatters ?? "");
 	},
 };
 
@@ -37,13 +39,12 @@ export const WithoutThePracticeRecord: Story = {
 	args: { practice: undefined },
 	play: async ({ canvas, userEvent }) => {
 		const link = canvas.getByRole("link", { name: /Thin controllers/u });
-		// The link stands on its own: without the record it still opens the practice's observations.
 		await expect(listOpenedBy(link)).toEqual({
-			list: "observations",
+			list: "results",
 			search: { practiceSlug: "thin-controllers" },
 		});
 		await userEvent.hover(link);
-		await expect(screen.queryByText(thinControllers.whyItMatters ?? "")).not.toBeInTheDocument();
+		await expect(screen.queryByText(guidance.whyItMatters ?? "")).not.toBeInTheDocument();
 	},
 };
 
@@ -55,7 +56,7 @@ export const GroupIsAMarkNotAWord: Story = {
 };
 
 export const PracticeWithNoGroup: Story = {
-	args: { group: undefined },
+	args: { group: null },
 	play: async ({ canvas }) => {
 		await expect(canvas.queryByTitle("Code quality")).not.toBeInTheDocument();
 		canvas.getByRole("link", { name: "Thin controllers" });

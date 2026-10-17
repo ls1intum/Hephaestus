@@ -30,10 +30,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
-/**
- * Workspace registry endpoints under /workspaces that operate outside of a specific workspace slug;
- * slugged routes live in {@link WorkspaceController} via {@code @WorkspaceScopedController}.
- */
 @RestController
 @RequestMapping("/workspaces")
 @RequiredArgsConstructor
@@ -49,8 +45,8 @@ public class WorkspaceRegistryController {
     @GetMapping("/providers")
     @Operation(
             summary = "List available workspace creation providers",
-            description =
-                    "Returns available workspace providers with their configuration. Public endpoint — no authentication required.")
+            description = "Returns available workspace providers with their configuration. Public"
+                    + " endpoint — no authentication required.")
     @SecurityRequirements
     @PreAuthorize("permitAll()")
     public ResponseEntity<WorkspaceProvidersDTO> getProviders() {

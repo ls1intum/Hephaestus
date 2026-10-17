@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { ReviewContext as ReviewContextDTO } from "~/api/types.gen";
+import type {
+	ItemRef,
+	OwnItemTrace,
+	ReviewContext as ReviewContextDTO,
+	ReviewRequestOutcome,
+} from "~/api/types.gen";
 import {
 	type ActionApi,
 	type ActionDependencies,
@@ -18,8 +23,47 @@ import { WorkerError } from "~/background/errors";
 const PAGE = "https://github.com/acme/project/pull/1";
 const SOURCE_TAB = 10;
 const WINDOW_TAB = 20;
-const JOB = "0b7c1a52-0d3e-4c55-8a0b-1d2e3f4a5b6c";
-const WORK = { id: "16", kind: "scm.pull_request", label: "#1", provider: "GITHUB" as const };
+const ITEM: ItemRef = {
+	id: "16",
+	kind: "scm.pull_request",
+	parentId: null,
+	provider: "GITHUB",
+	label: "#1",
+	title: "Fixture",
+	url: PAGE,
+	container: "acme/project",
+	path: null,
+	removedAt: null,
+};
+const OTHER_ITEM: ItemRef = { ...ITEM, id: "99", label: "#9" };
+const ANSWER: ReviewContextDTO = {
+	workspaceId: "1001",
+	workspaceSlug: "team",
+	item: ITEM,
+	requestAllowed: true,
+	canInspectReviewDetails: false,
+	reasonDescription: null,
+};
+const TRACE: OwnItemTrace = {
+	item: ITEM,
+	review: {
+		id: "0b7c1a52-0d3e-4c55-8a0b-1d2e3f4a5b6c",
+		kind: "ITEM",
+		item: ITEM,
+		itemVersion: "abc",
+		origin: "REQUEST",
+		status: "QUEUED",
+		createdAt: "2026-09-26T11:00:00Z",
+		completedAt: null,
+	},
+	events: [{ name: "Review requested", occurredAt: "2026-09-26T11:00:00Z" }],
+	results: [],
+};
+const SUBMITTED: ReviewRequestOutcome = {
+	status: "SUBMITTED",
+	reviewId: TRACE.review.id,
+	reason: null,
+};
 
 /** A worker's view of one GitHub pull request, with a store that can hold a read mid-way. */
 function harness() {
@@ -27,36 +71,16 @@ function harness() {
 	let stored: unknown;
 	let clock = 1_000_000;
 	let gate: (() => Promise<void>) | undefined;
-	let answer: ReviewContextDTO = {
-		work: WORK,
-		canRequestReview: true,
-		canInspectReviewDetails: false,
-	};
+	let answer = ANSWER;
 	const api = {
 		generation: 7,
 		assertCurrent: async () => undefined,
 		workspaces: async () => [],
 		workspace: async () => undefined,
 		resolve: vi.fn<ActionApi["resolve"]>(async () => answer),
-		trace: vi.fn<ActionApi["trace"]>(async () => ({
-			artifactId: 16,
-			artifactKind: "scm.pull_request",
-			reviewedWork: { ...WORK, title: "Fixture" },
-			practices: [],
-			signals: [
-				{
-					id: "s1",
-					discoveredVia: "MANUAL",
-					displayName: "Review requested",
-					occurredAt: "2026-09-26T11:00:00Z",
-					revision: "abc",
-					signal: "manual",
-					state: "TRIGGERED",
-					reviewId: JOB,
-				},
-			],
-		})),
-		requestReview: vi.fn<ActionApi["requestReview"]>(async () => ({ status: "SUBMITTED" })),
+
+		trace: vi.fn<ActionApi["trace"]>(async () => TRACE),
+		requestReview: vi.fn<ActionApi["requestReview"]>(async () => SUBMITTED),
 	} satisfies ActionApi;
 	const directory = new WorkspaceDirectory();
 	vi.spyOn(directory, "sites").mockResolvedValue([
@@ -177,6 +201,17 @@ describe("one pending action, confirmed once", () => {
 		expect(h.stored).toBeUndefined();
 	});
 
+	it("asks for a review of the exact item the tab resolved to, and reports it started", async () => {
+		const h = harness();
+		const id = await h.launch();
+		expect(h.stored).toMatchObject({ itemId: ITEM.id, pageUrl: PAGE, workspaceSlug: "team" });
+		await expect(confirmAction(h.env, h.deps, id, WINDOW_TAB)).resolves.toStrictEqual({
+			kind: "request-review",
+			status: "SUBMITTED",
+		});
+		expect(h.api.requestReview.mock.calls).toStrictEqual([["team", ITEM.id]]);
+	});
+
 	it("never sends again after an answer was lost, a reload, or a restarted worker", async () => {
 		const h = harness();
 		const id = await h.launch();
@@ -200,14 +235,39 @@ describe("one pending action, confirmed once", () => {
 		const id = await h.launch();
 		h.api.requestReview.mockResolvedValueOnce({
 			status: "REFUSED",
+			reviewId: null,
 			reason: "COOLDOWN_ACTIVE",
-			reasonDescription: "This work was reviewed a moment ago.",
 		});
 		await expect(confirmAction(h.env, h.deps, id, WINDOW_TAB)).resolves.toStrictEqual({
 			kind: "request-review",
 			status: "REFUSED",
-			reasonDescription: "This work was reviewed a moment ago.",
+			reasonDescription: "The work was reviewed recently, so it waits before another review.",
 		});
+	});
+
+	it("reports a refusal without a reason as one, without inventing a sentence", async () => {
+		const h = harness();
+		const id = await h.launch();
+		h.api.requestReview.mockResolvedValueOnce({
+			status: "REFUSED",
+			reviewId: null,
+			reason: null,
+		});
+		await expect(confirmAction(h.env, h.deps, id, WINDOW_TAB)).resolves.toStrictEqual({
+			kind: "request-review",
+			status: "REFUSED",
+			reasonDescription: undefined,
+		});
+	});
+
+	it("reports the server's refusal of the reader as forbidden, not as an unknown outcome", async () => {
+		const h = harness();
+		const id = await h.launch();
+		h.api.requestReview.mockRejectedValueOnce(new WorkerError("forbidden", "Not yours to ask."));
+		await expect(confirmAction(h.env, h.deps, id, WINDOW_TAB)).rejects.toMatchObject({
+			code: "forbidden",
+		});
+		expect(h.api.requestReview).toHaveBeenCalledOnce();
 	});
 
 	it("says the outcome is unknown when the session changed while the request was out", async () => {
@@ -233,7 +293,7 @@ describe("a replaced intent", () => {
 		const confirming = confirmAction(h.env, h.deps, old, WINDOW_TAB);
 		await reading.promise;
 		const newer = await h.launch();
-		release.resolve({ work: WORK, canRequestReview: true, canInspectReviewDetails: false });
+		release.resolve(ANSWER);
 		await expect(confirming).rejects.toMatchObject({ code: "expired" });
 		await discardAction(h.deps, old, WINDOW_TAB);
 		expect(h.stored).toMatchObject({ id: newer });
@@ -299,7 +359,7 @@ describe("the confirmation tab binding", () => {
 		await expect(previewAction(h.env, h.deps, id, WINDOW_TAB)).resolves.toMatchObject({
 			action: { kind: "request-review" },
 			workspace: { slug: "team" },
-			work: { id: "16" },
+			item: ITEM,
 		});
 		for (const other of [SOURCE_TAB, 21]) {
 			await expect(previewAction(h.env, h.deps, id, other)).rejects.toMatchObject({
@@ -363,6 +423,28 @@ describe("what an intent is bound to", () => {
 		expect(h.stored).toBeUndefined();
 	});
 
+	it("discards it when the same page now resolves to another item, and sends nothing", async () => {
+		const h = harness();
+		const id = await h.launch();
+		h.answer({ item: OTHER_ITEM });
+		await expect(confirmAction(h.env, h.deps, id, WINDOW_TAB)).rejects.toMatchObject({
+			code: "expired",
+		});
+		expect(h.api.requestReview).not.toHaveBeenCalled();
+		expect(h.stored).toBeUndefined();
+	});
+
+	it("discards it when the server no longer knows the item, and sends nothing", async () => {
+		const h = harness();
+		const id = await h.launch();
+		h.answer({ item: null });
+		await expect(confirmAction(h.env, h.deps, id, WINDOW_TAB)).rejects.toMatchObject({
+			code: "stale",
+		});
+		expect(h.api.requestReview).not.toHaveBeenCalled();
+		expect(h.stored).toBeUndefined();
+	});
+
 	it("discards it after the session generation moved", async () => {
 		const h = harness();
 		const id = await h.launch();
@@ -376,7 +458,7 @@ describe("what an intent is bound to", () => {
 	it("rechecks the reader's standing before sending", async () => {
 		const h = harness();
 		const id = await h.launch();
-		h.answer({ canRequestReview: false });
+		h.answer({ requestAllowed: false });
 		await expect(confirmAction(h.env, h.deps, id, WINDOW_TAB)).rejects.toMatchObject({
 			code: "forbidden",
 		});
@@ -385,7 +467,7 @@ describe("what an intent is bound to", () => {
 
 	it("refuses a request from a reader who may not ask, before any window opens", async () => {
 		const h = harness();
-		h.answer({ canRequestReview: false });
+		h.answer({ requestAllowed: false });
 		await expect(
 			openAction(h.env, h.deps, SOURCE_TAB, "team", { kind: "request-review" }),
 		).rejects.toMatchObject({ code: "forbidden" });

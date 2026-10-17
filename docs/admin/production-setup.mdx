@@ -61,14 +61,14 @@ Rotate integration credential keys with the [credential-key rotation procedure](
 These deployment settings complement the install table. `LEGAL_PROFILE` and
 `HEPHAESTUS_RESEARCH_ORGANIZATION` also ship in the self-host `.env.example`:
 
-| Variable                                                                                          | Purpose                                                                                                                                                                                                                                                                           |
-| ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `HEPHAESTUS_PUBLIC_ACTIVITY_ENABLED` | Supplies the public activity instance default (`false`). A stored administrator choice takes precedence. Workspace publication also requires its own setting. See [Public activity pages](./public-activity). |
-| `HEPHAESTUS_PUBLIC_ACTIVITY_REPOSITORY_VISIBILITY_MAX_AGE` | Limits public visibility to recent successful repository syncs (`48h`). Use twice your metadata sync interval. See [Public activity pages](./public-activity). |
-| `LEGAL_PROFILE`                                                                                   | Selects a bundled imprint/privacy profile. Use `tumaet` only for the canonical AET deployment. Self-hosters leave it empty. They mount `/legal-overrides/`. See [Legal Pages](./legal-pages).                                                                                     |
+| Variable                                                                                          | Purpose                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `HEPHAESTUS_PUBLIC_ACTIVITY_ENABLED`                                                              | Supplies the public activity instance default (`false`). A stored administrator choice takes precedence. Workspace publication also requires its own setting. See [Public activity pages](./public-activity).                                                                                                                                                                          |
+| `HEPHAESTUS_PUBLIC_ACTIVITY_REPOSITORY_VISIBILITY_MAX_AGE`                                        | Limits public visibility to recent successful repository syncs (`48h`). Use twice your metadata sync interval. See [Public activity pages](./public-activity).                                                                                                                                                                                                                         |
+| `LEGAL_PROFILE`                                                                                   | Selects a bundled imprint/privacy profile. Use `tumaet` only for the canonical AET deployment. Self-hosters leave it empty. They mount `/legal-overrides/`. See [Legal Pages](./legal-pages).                                                                                                                                                                                          |
 | `HEPHAESTUS_RESEARCH_ORGANIZATION`                                                                | Names the organization that runs optional research on this deployment. With a value, first-login setup asks each account **Allow research use of your data?** and shows this name. Empty by default. With no value, it never asks. A change to the value asks every account again. Read the operator obligations in [Legal Pages](./legal-pages#the-optional-research-question) first. |
-| `HEPHAESTUS_INTEGRATION_OAUTH_SUCCESS_REDIRECT` / `HEPHAESTUS_INTEGRATION_OAUTH_FAILURE_REDIRECT` | Post-callback landing URLs for integration OAuth. Success defaults to `/integrations?status=success`, failure to the success base + `?status=error`. Set absolute URLs when the SPA host differs from the API host.                                                               |
-| `springdoc.api-docs.enabled` / `springdoc.swagger-ui.enabled`                                     | Publish the OpenAPI description at `/v3/api-docs` and the interactive Swagger UI. Both default to `false`.                                                                                                                                                                        |
+| `HEPHAESTUS_INTEGRATION_OAUTH_SUCCESS_REDIRECT` / `HEPHAESTUS_INTEGRATION_OAUTH_FAILURE_REDIRECT` | Post-callback landing URLs for integration OAuth. Success defaults to `/integrations?status=success`, failure to the success base + `?status=error`. Set absolute URLs when the SPA host differs from the API host.                                                                                                                                                                    |
+| `springdoc.api-docs.enabled` / `springdoc.swagger-ui.enabled`                                     | Publish the OpenAPI description at `/v3/api-docs` and the interactive Swagger UI. Both default to `false`.                                                                                                                                                                                                                                                                             |
 
 :::caution CAUTION: The enabled API description needs no authentication
 
@@ -88,7 +88,7 @@ They do **not** forward these settings:
 - **`HEPHAESTUS_AUTH_ISSUER`:** `application-server` fixes it at `https://${APP_HOSTNAME}`.
 - **`SPRINGDOC_API_DOCS_ENABLED` and `SPRINGDOC_SWAGGER_UI_ENABLED`:** Compose does not forward them.
 - **The two OAuth redirect variables:** no Compose file passes them through, so defaults still apply.
-- **`HEPHAESTUS_DEV_SEED_ENABLED`:** a flag for local development only. It adds endpoints that write practice revisions and feedback. Never set it in production.
+- **`HEPHAESTUS_DEV_SEED_ENABLED`:** a flag for local development only. It adds endpoints that write practice versions and feedback. Never set it in production.
 
 Values for these settings only in `docker/.env` have no effect.
 To change the issuer, change `APP_HOSTNAME`.
@@ -308,7 +308,7 @@ For a GitLab practice-review rollout, enable this bundle together:
 | `GITLAB_OAUTH_BASE_URL`           | GitLab instance for login. Defaults to `https://gitlab.com`. For self-hosted GitLab, set the instance URL, such as `https://gitlab.lrz.de`.                                                                                                                                                                                                                                                                           |
 | `GITLAB_OAUTH_DISPLAY_NAME`       | Login-button label, default `GitLab`. Example: `gitlab.lrz.de`.                                                                                                                                                                                                                                                                                                                                                       |
 | `GITLAB_DEFAULT_SERVER_URL`       | The one GitLab instance for workspace creation, sync, and checkout, not login. Falls back to `GITLAB_OAUTH_BASE_URL`. Give the application server and every worker the same value.                                                                                                                                                                                                                                    |
-| `GITLAB_ENABLED`                  | Enables GitLab on the application server and every worker. The webhook receiver does not read it. Without it, a worker cannot check out merge requests. Each claimed GitLab review fails preparation with `SCM Git preparation is unavailable`. It stops before any observation.                                                                                                                                      |
+| `GITLAB_ENABLED`                  | Enables GitLab on the application server and every worker. The webhook receiver does not read it. Without it, a worker cannot check out merge requests. Each claimed GitLab review fails preparation with `SCM Git preparation is unavailable`. It stops before any result.                                                                                                                                           |
 | `GITLAB_WORKSPACE_CREATION`       | Enables GitLab workspace creation in the UI and API                                                                                                                                                                                                                                                                                                                                                                   |
 | `WEBHOOK_SECRET`                  | Instance-wide secret for GitHub webhook verification and operator-created GitLab hooks on shared `POST /webhooks/gitlab` (`X-Gitlab-Token`). Hephaestus group hooks instead use the connection endpoint and signed route credential. See `WEBHOOK_ROUTING_SECRET`. For manually supplied signing tokens on GitLab 19.0 and later, only the signature verifies the hook. This value must then be that `whsec_…` token. |
 | `WEBHOOK_ROUTING_SECRET`          | Signs each Hephaestus-registered GitLab group hook token. Each hook can deliver only for its registered GitLab connection. Requires at least 32 characters. Must differ from `WEBHOOK_SECRET` and every encryption key. Give the application server and webhook receiver the same value. Required for every production deployment, including GitHub-only instances. Compose and readiness reject absent values.       |
@@ -376,7 +376,7 @@ The connection page shows the observed expiry date, **no expiry**, or unknown ex
 It never shows the token.
 Replace refused or expiring tokens there.
 GitHub App installation tokens renew automatically without expiry action.
-**GitHub personal access token expiry is not tracked** in 1.0.
+**GitHub personal access token expiry is not tracked**.
 Workspace admins must track and replace them.
 
 Slack revocation alerts and Outline expiry information stay unchanged.
@@ -500,7 +500,7 @@ Migrated legacy attempts may lack an admission price snapshot.
 These usage records have no confirmed cost and are **excluded from monthly totals**.
 Missing rates and unverified measurements are separate reasons for an unavailable cost.
 The reported total is then a lower bound on spend.
-The UI shows the confirmed total and a separate count of usage records with unavailable cost across both purses.
+The UI shows the confirmed total and a separate count of runs with unavailable cost across both purses.
 
 The purse reads **UNVERIFIABLE** instead of **WITHIN**.
 **EXHAUSTED** still takes priority.
@@ -521,7 +521,7 @@ Use the private endpoint and example rules in [Scrape metrics](./observability.m
 
 - `llm.budget.exhausted`: increments once per usage event whose confirmed contribution crosses the workspace's monthly **instance** cap.
   This is your funded purse and the one that alerts you.
-- `llm.budget.blocked`: tagged by admission-point `surface`, including `agent_job` and `mentor`.
+- `llm.budget.blocked`: tagged by admission-point `surface`, including `review_job` and `mentor`.
   The agent-job tag also has `cap`, which names the purse that refused work.
 
 Each EXHAUSTED transition logs a WARN, visible in Sentry if configured.

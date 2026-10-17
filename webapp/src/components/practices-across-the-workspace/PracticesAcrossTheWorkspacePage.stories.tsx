@@ -4,11 +4,9 @@ import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
 
 import {
 	ACROSS_WORKSPACE,
-	ACROSS_WORKSPACE_TILES,
 	EMPTY_WORKSPACE,
 	MANY_GROUPS_WORKSPACE,
-	NOBODY_TILES,
-	NOBODY_WORKSPACE,
+	NO_RESULTS_WORKSPACE,
 } from "@/stories/practices-across-the-workspace-story-data";
 import { expectNoPageOverflow } from "@/stories/reflow";
 
@@ -29,9 +27,6 @@ const meta = {
 	parameters: { layout: "fullscreen" },
 	args: {
 		state: { status: "ready", overview: ACROSS_WORKSPACE },
-		tiles: { status: "ready", tiles: ACROSS_WORKSPACE_TILES },
-		window: "DAYS_30",
-		onWindowChange: fn(),
 		onOpenGroup: fn(),
 	},
 } satisfies Meta<typeof PracticesAcrossTheWorkspacePage>;
@@ -43,9 +38,10 @@ const groupsTable = (canvas: {
 	getByRole: (role: "table", options: { name: string }) => HTMLElement;
 }) => within(canvas.getByRole("table", { name: "All practice groups" }));
 
-const figuresSection = (canvas: {
-	getByRole: (role: "heading", options: { level: number; name: string }) => HTMLElement;
-}) => canvas.getByRole("heading", { level: 2, name: "Your figures" }).closest("section");
+const groupRow = (canvas: Parameters<typeof groupsTable>[0], name: string) =>
+	groupsTable(canvas)
+		.getAllByRole("row")
+		.find((each) => each.textContent.startsWith(name));
 
 /** Presses an (i) and returns its panel, which opens in a portal outside the canvas. */
 async function openTip(canvas: { getByRole: typeof screen.getByRole }, name: string) {
@@ -63,72 +59,36 @@ async function closeTip() {
 
 export const Default: Story = {
 	play: async ({ canvas, args }) => {
-		// A standing is an AI reading of the work, never a grade: the page says so before any count,
-		// in one line, and its (i) says why.
 		await expect(canvas.getByText(/Not a grade\.$/u)).toBeVisible();
 		const about = within(await openTip(canvas, "About this page"));
 		await expect(about.getByText("Not a grade:")).toBeVisible();
-		await expect(
-			about.getByText(/each standing comes from AI review of their work and can be wrong\./u),
-		).toBeVisible();
+		await expect(about.getByText("No names:")).toBeVisible();
 		await closeTip();
-		// The long explanations wait behind an (i): none of them is on the page itself.
-		await expect(canvas.queryByText("Grey band:")).toBeNull();
-		await expect(canvas.queryByText(/Every bar shows all its counts/u)).toBeNull();
-		// The tiles' (i) says plainly what grey and lower mean, each line led by its term in bold, and
-		// holds no count and no window, so it reads the same for every filter.
-		const figures = within(await openTip(canvas, "About your figures"));
-		await expect(figures.getByText("Grey band:")).toBeVisible();
-		await expect(figures.getByText("Grey band:").tagName).toBe("STRONG");
-		// Four short groups, each a labelled group under its own heading.
-		for (const heading of [
-			"What you see",
-			"How to read it",
-			"When the band is missing",
-			"What counts",
-		]) {
-			await expect(figures.getByRole("group", { name: heading })).toBeVisible();
-		}
 		await expect(
-			figures.getByText("lower than for most developers.", { exact: false }),
+			canvas.getByText("Results for the 28 developers whose work this workspace reviews."),
 		).toBeVisible();
-		const figuresPanel = await screen.findByRole("dialog", { name: "About your figures" });
-		await expect(figuresPanel.textContent).not.toMatch(/\d|last 30 days/u);
-		await closeTip();
-		// The legend's (i) says what grey means, and that small counts show too.
-		const bars = within(await openTip(canvas, "About the bars"));
-		await expect(bars.getByText("Grey, None yet:")).toBeVisible();
-		await expect(bars.getByText(/^no standing yet\./u)).toBeVisible();
 		await expect(
-			bars.getByText(
-				/Every bar shows all its counts, however small\. So a small count can let others tell where you stand\./u,
-			),
-		).toBeVisible();
-		await closeTip();
-		// A group with parts of one, two and none draws like any other.
-		await expect(
-			groupsTable(canvas).getByRole("img", {
-				name: "28 developers with a current standing in this workspace: 1 Needs attention, 0 Mixed feedback, 2 Going well, 25 none yet. The You marker is on none yet.",
-			}),
-		).toBeVisible();
-		// Only the tiles read the window: the toggle sits in their section, and the bars name none.
-		await expect(figuresSection(canvas)).toContainElement(
-			canvas.getByRole("toolbar", { name: "Time range" }),
-		);
-		// The window is the section's description, not its heading.
-		await expect(canvas.getByText("Last 30 days", { selector: "p" })).toBeVisible();
-		await expect(
-			canvas.getByRole("heading", { level: 2, name: "All practice groups" }).closest("section")
-				?.textContent,
-		).not.toMatch(/30 days|90 days|All time/u);
-		const table = groupsTable(canvas);
-		await expect(
-			table.getByRole("img", {
-				name: "28 developers with a current standing in this workspace: 7 Needs attention, 6 Mixed feedback, 8 Going well, 7 none yet. The You marker is on Needs attention.",
-			}),
-		).toBeVisible();
+			groupsTable(canvas)
+				.getAllByRole("row")
+				.slice(1)
+				.map((each) => each.textContent.split(/\d/u)[0]),
+		).toStrictEqual([
+			"Acting on review feedback",
+			"Communicating in the open",
+			"Packaging work for review",
+			"Testing your changes",
+		]);
+		await expect(canvas.queryByText("Sign your commits")).toBeNull();
+		// Result counts add across practices; developer counts can overlap and must not be added.
+		const packaging = groupRow(canvas, "Packaging work for review");
+		await expect(packaging).toHaveTextContent("5 practices");
+		await expect(packaging).toHaveTextContent("Met 43");
+		await expect(packaging).toHaveTextContent("Not met 25");
+		await expect(packaging).toHaveTextContent("Does not apply 5");
+		await expect(packaging).toHaveTextContent("Could not determine 3");
+		await expect(packaging?.textContent).not.toMatch(/developer/u);
 		await userEvent.click(
-			table.getByRole("button", { name: "Open group Packaging work for review" }),
+			groupsTable(canvas).getByRole("button", { name: "Open group Packaging work for review" }),
 		);
 		await expect(args.onOpenGroup).toHaveBeenCalledWith("review-ready-work");
 	},
@@ -138,32 +98,17 @@ export const Default: Story = {
 export const GroupOpen: Story = {
 	args: { openGroupSlug: "review-ready-work" },
 	play: async ({ canvas }) => {
-		const row = groupsTable(canvas)
-			.getAllByRole("row")
-			.find((each) => each.textContent.startsWith("Packaging work for review"));
-		await expect(row).toHaveAttribute("data-state", "open");
+		await expect(groupRow(canvas, "Packaging work for review")).toHaveAttribute(
+			"data-state",
+			"open",
+		);
 	},
 };
 
-/** Nobody has a standing yet: no tile has a range, and no bar counts anybody. */
-export const NobodyYet: Story = {
-	args: {
-		state: { status: "ready", overview: NOBODY_WORKSPACE },
-		tiles: { status: "ready", tiles: NOBODY_TILES },
-	},
+export const NoResultsYet: Story = {
+	args: { state: { status: "ready", overview: NO_RESULTS_WORKSPACE } },
 	play: async ({ canvas }) => {
-		await expect(
-			within(await openTip(canvas, "About your figures")).getByText(
-				"no developer has a standing yet.",
-				{ exact: false },
-			),
-		).toBeVisible();
-		await closeTip();
-		await expect(canvas.getAllByText("No developer is counted here yet.")).toHaveLength(3);
-		// Nobody has open feedback, so that tile says so in place of a band at nought.
-		await expect(canvas.getByText("Most developers here have no open feedback.")).toBeVisible();
-		// Once for the whole table, not once per group.
-		await expect(canvas.getAllByText("No developer has a standing yet.")).toHaveLength(1);
+		await expect(groupsTable(canvas).getAllByText("No current results")).toHaveLength(4);
 	},
 };
 
@@ -173,23 +118,6 @@ export const ManyGroups: Story = {
 	play: async ({ canvas }) => {
 		const table = groupsTable(canvas);
 		await expect(table.getAllByRole("button", { name: /^Open group /u })).toHaveLength(26);
-	},
-};
-
-/** Another window on its way: the last figures stay, and only their section is busy. */
-export const SwitchingWindow: Story = {
-	args: {
-		tiles: { status: "ready", tiles: ACROSS_WORKSPACE_TILES, stale: true },
-		window: "DAYS_90",
-	},
-	play: async ({ canvas }) => {
-		const table = canvas.getByRole("table", { name: "All practice groups" });
-		await expect(table).toBeVisible();
-		await expect(figuresSection(canvas)).toHaveAttribute("aria-busy", "true");
-		await expect(canvas.getByText("Pieces of work reviewed")).toBeVisible();
-		await expect(
-			canvas.getByRole("heading", { level: 2, name: "All practice groups" }).closest("section"),
-		).not.toHaveAttribute("aria-busy");
 	},
 };
 
@@ -216,7 +144,6 @@ async function loadingLine(canvas: { findByRole: typeof screen.findByRole }) {
 
 const LOADING_ARGS = {
 	state: { status: "loading" },
-	tiles: { status: "loading" },
 } satisfies Partial<PracticesAcrossTheWorkspacePageProps>;
 
 /**
@@ -226,7 +153,6 @@ const LOADING_ARGS = {
 export const Loading: Story = {
 	args: LOADING_ARGS,
 	play: async ({ canvas }) => {
-		await expect(figuresSection(canvas)).toHaveAttribute("aria-busy", "true");
 		await expect(groupsSection(canvas)).toHaveAttribute("aria-busy", "true");
 		await expect(canvas.getByRole("table", { name: "All practice groups" })).toHaveAttribute(
 			"aria-busy",
@@ -249,7 +175,7 @@ export const LoadingSlow: Story = {
 		canvas.getByText(LOADING_STATUS, { selector: "[role=status]" });
 		await expect(canvas.queryByText(SLOW_LOAD_SHORT, { selector: "[role=status]" })).toBeNull();
 		const wait = within(await openTip(canvas, "About the wait"));
-		await expect(wait.getByText("A large course:")).toBeVisible();
+		await expect(wait.getByText("A large workspace:")).toBeVisible();
 		await closeTip();
 	},
 };
@@ -267,7 +193,7 @@ export const LoadingPhone: Story = {
 		await expectNoPageOverflow();
 		const line = await loadingLine(canvas);
 		await expect(line.getBoundingClientRect().height).toBeLessThanOrEqual(24);
-		const heading = canvas.getByRole("heading", { level: 2, name: "Your figures" });
+		const heading = canvas.getByRole("heading", { level: 2, name: "All practice groups" });
 		await expect(line.getBoundingClientRect().bottom).toBeLessThanOrEqual(
 			heading.getBoundingClientRect().top,
 		);
@@ -289,15 +215,11 @@ function CountsArrive(props: PracticesAcrossTheWorkspacePageProps) {
 
 /** Where each region sits and how tall it is, to compare the loading page with the loaded one. */
 function layoutOf(canvas: Parameters<NonNullable<Story["play"]>>[0]["canvas"]) {
-	const figures = figuresSection(canvas);
 	const groups = groupsSection(canvas);
-	const tiles = figures === null ? [] : [...figures.querySelectorAll("li")];
 	const firstRow = canvas
 		.getByRole("table", { name: "All practice groups" })
 		.querySelector("tbody tr");
 	return {
-		figuresHeight: figures?.getBoundingClientRect().height,
-		tileHeights: tiles.map((tile) => tile.getBoundingClientRect().height),
 		groupsTop: groups?.getBoundingClientRect().top,
 		rowHeight: firstRow?.getBoundingClientRect().height,
 	};
@@ -307,59 +229,24 @@ function layoutOf(canvas: Parameters<NonNullable<Story["play"]>>[0]["canvas"]) {
 export const LoadingToLoaded: Story = {
 	render: (args) => <CountsArrive {...args} />,
 	play: async ({ canvas }) => {
-		await expect(figuresSection(canvas)).toHaveAttribute("aria-busy", "true");
 		await expect(groupsSection(canvas)).toHaveAttribute("aria-busy", "true");
 		const loading = layoutOf(canvas);
 		await userEvent.click(canvas.getByRole("button", { name: "Counts arrive" }));
 		await canvas.findByRole("button", { name: "Open group Packaging work for review" });
-		await expect(figuresSection(canvas)).not.toHaveAttribute("aria-busy");
 		await expect(groupsSection(canvas)).not.toHaveAttribute("aria-busy");
 		await expect(layoutOf(canvas)).toStrictEqual(loading);
 	},
 };
 
-/**
- * On a phone, two tiles share a row and a title wraps: the figures keep their height as the counts
- * arrive. The press that loads them scrolls the page, so only the figures are compared.
- */
-export const LoadingToLoadedPhone: Story = {
-	render: (args) => <CountsArrive {...args} />,
-	globals: { viewport: { value: "phone390" } },
-	play: async ({ canvas }) => {
-		const figures = () => {
-			const { figuresHeight, tileHeights } = layoutOf(canvas);
-			return { figuresHeight, tileHeights };
-		};
-		const loading = figures();
-		await userEvent.click(canvas.getByRole("button", { name: "Counts arrive" }));
-		await canvas.findByRole("button", { name: "Open group Packaging work for review" });
-		await expect(figures()).toStrictEqual(loading);
-	},
-};
-
 const onRetryOverview = fn();
 
-/** Every region reads the overview, so its failure takes the page, with no window toggle to press. */
 export const LoadError: Story = {
 	args: { state: { status: "error", error: new Error("Network down"), onRetry: onRetryOverview } },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("We could not load the practice groups")).toBeVisible();
-		await expect(canvas.queryByRole("toolbar", { name: "Time range" })).toBeNull();
+		await expect(canvas.queryByRole("table")).toBeNull();
 		await userEvent.click(canvas.getByRole("button", { name: "Retry" }));
 		await expect(onRetryOverview).toHaveBeenCalledOnce();
-	},
-};
-
-const onRetryTiles = fn();
-
-/** The window's figures failed: their section says so, and the bars, which read no window, stay. */
-export const TilesLoadError: Story = {
-	args: { tiles: { status: "error", error: new Error("Network down"), onRetry: onRetryTiles } },
-	play: async ({ canvas }) => {
-		await expect(canvas.getByText("We could not load your figures")).toBeVisible();
-		await expect(canvas.getByRole("table", { name: "All practice groups" })).toBeVisible();
-		await userEvent.click(canvas.getByRole("button", { name: "Retry" }));
-		await expect(onRetryTiles).toHaveBeenCalledOnce();
 	},
 };
 

@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.issue;
 
-import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewSubject;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.BaseGitServiceEntity;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuetype.IssueType;
@@ -57,8 +56,6 @@ import org.jspecify.annotations.Nullable;
 @NoArgsConstructor
 @ToString(callSuper = true)
 public class Issue extends BaseGitServiceEntity {
-
-    /** Changes on every reviewable issue transition, even when content returns to an earlier state. */
     @Nullable
     @Column(name = "review_snapshot_id", insertable = false, updatable = false)
     private UUID reviewSnapshotId;
@@ -70,12 +67,6 @@ public class Issue extends BaseGitServiceEntity {
     /** Categorical scheduling facts recorded by the SCM mirror; absent state remains unknown. */
     public Map<String, String> reviewState() {
         return state == null ? Map.of() : Map.of("state", state.name());
-    }
-
-    public ReviewSubject reviewSubject() {
-        return author == null
-                ? ReviewSubject.MISSING
-                : new ReviewSubject(author.getId(), author.getType() == User.Type.USER);
     }
 
     private int number;
@@ -115,25 +106,8 @@ public class Issue extends BaseGitServiceEntity {
      */
     private @Nullable Instant lastSyncAt;
 
-    /**
-     * Tombstone: when set, this issue/pull request no longer exists upstream.
-     *
-     * <p>Written by the {@code RECONCILIATION} deletion sweep (which set-differences the full
-     * upstream number set against the local rows) and by the {@code issues.transferred} webhook.
-     * A tombstone rather than a row deletion because {@code feedback.artifact_id},
-     * {@code observation.artifact_id} (NOT NULL) and {@code activity_event.target_id} point at
-     * this row by bare id with no foreign key — a hard delete would orphan them silently rather
-     * than fail loudly. Keeping the row keeps those lookups resolvable.
-     *
-     * <p>Deliberately reversible: the sweep infers deletion from <em>absence</em> from a listing,
-     * which is fallible in a way an explicit webhook event is not. {@code upsertCore} clears this
-     * back to {@code null}, so an item that reappears upstream — or one a faulty sweep tombstoned
-     * — is resurrected by the next ordinary sync with no operator intervention. That is why a
-     * pending signal re-offered while this is set is held rather than retired.
-     *
-     * <p>Which surfaces filter and which deliberately do not, and why there is no entity-level
-     * {@code @SQLRestriction}, is decided in ADR 0024 § which reads honour a drift tombstone.
-     */
+    // Retain source ids for item and activity references. Sync can clear a tombstone when an item reappears.
+    // Read-specific filtering is defined in ADR 0024.
     @Column(name = "deleted_at")
     private @Nullable Instant deletedAt;
 

@@ -2,15 +2,18 @@ package de.tum.cit.aet.hephaestus.agent.adapter;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.agent.handler.RetainedFeedbackTestData;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.spi.DeliveredPullRequestCommentLookup;
 import de.tum.cit.aet.hephaestus.integration.core.spi.DeliveredPullRequestCommentLookup.CommentIds;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewComment;
@@ -21,38 +24,33 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchCompletion;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchInsert;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacement;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopyRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
-import de.tum.cit.aet.hephaestus.practices.feedback.PlacementAnchorKind;
-import de.tum.cit.aet.hephaestus.practices.feedback.PlacementAnchorSide;
-import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.time.Instant;
-import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.transaction.support.TransactionTemplate;
-import tools.jackson.databind.ObjectMapper;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /** The comments on one pull request that a workspace's own delivery records name, matched against the mirror. */
 class DeliveredPullRequestCommentAdapterIntegrationTest extends AbstractWorkspaceIntegrationTest {
+    @Autowired
+    private ItemIndexService itemWriter;
 
     @Autowired
-    private DeliveredPullRequestCommentAdapter lookup;
+    private JdbcTemplate jdbc;
+
+    private long recipientAccountId;
+
+    @Autowired
+    private DeliveredPullRequestCommentLookup lookup;
 
     @Autowired
     private RepositoryRepository repositories;
@@ -70,27 +68,14 @@ class DeliveredPullRequestCommentAdapterIntegrationTest extends AbstractWorkspac
     private PullRequestReviewCommentRepository inlineComments;
 
     @Autowired
-    private AgentJobRepository jobs;
-
-    @Autowired
     private FeedbackRepository feedback;
 
     @Autowired
-    private FeedbackPlacementRepository placements;
-
-    @Autowired
-    private FeedbackDispatchRepository dispatches;
-
-    @Autowired
-    private ObjectMapper mapper;
-
-    @Autowired
-    private TransactionTemplate transactions;
+    private FeedbackCopyRepository copies;
 
     private Workspace workspace;
     private Workspace elsewhere;
     private User owner;
-    private int position;
 
     @BeforeEach
     void setUp() {
@@ -98,7 +83,7 @@ class DeliveredPullRequestCommentAdapterIntegrationTest extends AbstractWorkspac
         owner = persistUser("provenance-owner");
         workspace = createWorkspace("provenance", "Provenance", "provenance", AccountType.ORG, owner);
         elsewhere = createWorkspace("provenance-other", "Other", "provenance-other", AccountType.ORG, owner);
-        position = 0;
+        recipientAccountId = accountId(owner);
     }
 
     @Test
@@ -111,45 +96,34 @@ class DeliveredPullRequestCommentAdapterIntegrationTest extends AbstractWorkspac
         for (long note : new long[] {201, 202, 209}) inline(work, note);
         general(otherWork, 301, "Another merge request");
 
-        placement(
-                save(workspace, work, FeedbackDeliveryState.SUPERSEDED),
-                PlacementType.SUMMARY,
-                "gid://gitlab/Note/101",
-                null);
-        placement(
-                save(workspace, work, FeedbackDeliveryState.FAILED),
-                PlacementType.LOCATION_COMMENT,
-                "gid://gitlab/Note/102",
-                null);
-        placement(
-                save(workspace, work, FeedbackDeliveryState.DELIVERED),
-                PlacementType.INLINE,
+        copy(save(workspace, work, FeedbackState.REPLACED), FeedbackCopyKind.SUMMARY, "gid://gitlab/Note/101", null);
+        copy(save(workspace, work, FeedbackState.FAILED), FeedbackCopyKind.FILE_NOTE, "gid://gitlab/Note/102", null);
+        copy(
+                save(workspace, work, FeedbackState.DELIVERED),
+                FeedbackCopyKind.LINE_NOTE,
                 "gid://gitlab/DiffNote/201",
                 null);
-        placement(save(workspace, work, FeedbackDeliveryState.DELIVERED), PlacementType.SUMMARY, null, null);
-        AgentJob job = job(workspace, work, "103");
-        dispatch(job, "gid://gitlab/Note/104", null, """
-                [{"deliveryKey":"a","path":"src/A.java","startLine":4,"disposition":"POSTED",
-                  "externalRef":"gid://gitlab/Note/202","placement":"LINE"},
-                 {"deliveryKey":"b","path":"src/A.java","startLine":9,"disposition":"FAILED",
-                  "externalRef":null,"writeMayHaveStarted":false}]""");
+        copy(save(workspace, work, FeedbackState.DELIVERED), FeedbackCopyKind.SUMMARY, null, null);
+        copy(save(workspace, work, FeedbackState.DELIVERED), FeedbackCopyKind.SUMMARY, "103", null);
+        copy(save(workspace, work, FeedbackState.DELIVERED), FeedbackCopyKind.SUMMARY, "gid://gitlab/Note/104", null);
+        copy(
+                save(workspace, work, FeedbackState.DELIVERED),
+                FeedbackCopyKind.LINE_NOTE,
+                "gid://gitlab/DiffNote/202",
+                null);
         // Identities that exist on this merge request, but were recorded for other work or another workspace.
-        placement(
-                save(workspace, otherWork, FeedbackDeliveryState.DELIVERED),
-                PlacementType.SUMMARY,
+        copy(
+                save(workspace, otherWork, FeedbackState.DELIVERED),
+                FeedbackCopyKind.SUMMARY,
                 "gid://gitlab/Note/109",
                 null);
-        placement(
-                save(elsewhere, work, FeedbackDeliveryState.DELIVERED),
-                PlacementType.INLINE,
-                "gid://gitlab/Note/209",
-                null);
+        copy(save(elsewhere, work, FeedbackState.DELIVERED), FeedbackCopyKind.LINE_NOTE, "gid://gitlab/Note/209", null);
 
-        assertThat(lookup.findForPullRequest(workspace.getId(), work.getId()))
+        assertThat(lookup.findForPullRequest(workspace.getId(), work.getId(), ScmItemEvents.PULL_REQUEST))
                 .isEqualTo(new CommentIds(Set.of(101L, 102L, 103L, 104L), Set.of(201L, 202L)));
-        assertThat(lookup.findForPullRequest(elsewhere.getId(), work.getId()))
+        assertThat(lookup.findForPullRequest(elsewhere.getId(), work.getId(), ScmItemEvents.PULL_REQUEST))
                 .isEqualTo(new CommentIds(Set.of(), Set.of(209L)));
-        assertThat(lookup.findForPullRequest(workspace.getId(), otherWork.getId()))
+        assertThat(lookup.findForPullRequest(workspace.getId(), otherWork.getId(), ScmItemEvents.PULL_REQUEST))
                 .isEqualTo(new CommentIds(Set.of(), Set.of()));
     }
 
@@ -163,25 +137,21 @@ class DeliveredPullRequestCommentAdapterIntegrationTest extends AbstractWorkspac
         inline(work, 5_001);
         inline(work, 6_001);
 
-        placement(
-                save(workspace, work, FeedbackDeliveryState.SUPERSEDED),
-                PlacementType.SUMMARY,
+        copy(
+                save(workspace, work, FeedbackState.REPLACED),
+                FeedbackCopyKind.SUMMARY,
                 "IC_kwDOsummary",
                 url + "#issuecomment-5001");
-        placement(
-                save(workspace, work, FeedbackDeliveryState.DELIVERED),
-                PlacementType.INLINE,
+        copy(
+                save(workspace, work, FeedbackState.DELIVERED),
+                FeedbackCopyKind.LINE_NOTE,
                 "PRRC_kwDOinline",
                 url + "#discussion_r6001");
         // Neither a GitLab identity nor an opaque reference without its permalink names a GitHub comment.
-        placement(
-                save(workspace, work, FeedbackDeliveryState.DELIVERED),
-                PlacementType.SUMMARY,
-                "gid://gitlab/Note/7001",
-                null);
-        job(workspace, work, "IC_kwDOunmapped");
+        copy(save(workspace, work, FeedbackState.DELIVERED), FeedbackCopyKind.SUMMARY, "gid://gitlab/Note/7001", null);
+        copy(save(workspace, work, FeedbackState.DELIVERED), FeedbackCopyKind.SUMMARY, "IC_kwDOunmapped", null);
 
-        assertThat(lookup.findForPullRequest(workspace.getId(), work.getId()))
+        assertThat(lookup.findForPullRequest(workspace.getId(), work.getId(), ScmItemEvents.PULL_REQUEST))
                 .isEqualTo(new CommentIds(Set.of(5_001L), Set.of(6_001L)));
     }
 
@@ -238,68 +208,13 @@ class DeliveredPullRequestCommentAdapterIntegrationTest extends AbstractWorkspac
         inlineComments.save(comment);
     }
 
-    private Feedback save(Workspace scope, PullRequest work, FeedbackDeliveryState state) {
-        AgentJob job = job(scope, work, null);
-        return feedback.save(Feedback.builder()
-                .agentJobId(job.getId())
-                .workspaceId(scope.getId())
-                .artifactKind(ArtifactKinds.PULL_REQUEST)
-                .artifactId(work.getId())
-                .recipientUserId(owner.getId())
-                .aboutUserId(owner.getId())
-                .channel(FeedbackChannel.IN_CONTEXT)
-                .position(position++)
-                .deliveryState(state)
-                .source(FeedbackSource.AGENT)
-                .createdAt(Instant.now())
-                .build());
+    private Feedback save(Workspace scope, PullRequest work, FeedbackState state) {
+        var item = itemWriter.upsert(
+                new ItemRegistration(scope.getId(), new ItemKind("scm.pull_request"), work.getId(), null, null));
+        return RetainedFeedbackTestData.onWork(jdbc, feedback, item, recipientAccountId, state);
     }
 
-    private void placement(Feedback parent, PlacementType type, @Nullable String ref, @Nullable String url) {
-        boolean located = type == PlacementType.INLINE || type == PlacementType.LOCATION_COMMENT;
-        placements.save(FeedbackPlacement.builder()
-                .feedback(parent)
-                .placementType(type)
-                .postedCommentRef(ref)
-                .postedCommentUrl(url)
-                .anchorKind(located ? PlacementAnchorKind.LINE : null)
-                .anchorPath(located ? "src/A.java" : null)
-                .anchorStartLine(located ? 4 : null)
-                .anchorSide(located ? PlacementAnchorSide.NEW : null)
-                .build());
-    }
-
-    private AgentJob job(Workspace scope, PullRequest work, @Nullable String legacySummary) {
-        AgentJob job = new AgentJob();
-        job.setWorkspace(scope);
-        job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-        job.setArtifactKind(ArtifactKinds.PULL_REQUEST);
-        job.setMetadata(mapper.valueToTree(Map.of("pull_request_id", work.getId())));
-        job.setConfigSnapshot(mapper.valueToTree(Map.of("model", "test")));
-        job.setDeliveryCommentId(legacySummary);
-        return jobs.save(job);
-    }
-
-    private void dispatch(AgentJob job, String ref, @Nullable String url, String deliveredPlacements) {
-        UUID id = UUID.randomUUID();
-        long scope = job.getWorkspace().getId();
-        transactions.executeWithoutResult(status -> {
-            assertThat(dispatches.insertIfAbsent(new FeedbackDispatchInsert(
-                            id,
-                            "delivery-" + id,
-                            scope,
-                            job.getId(),
-                            null,
-                            "AUTOMATIC_REVIEW_PACKAGE",
-                            "Body",
-                            "[]",
-                            "{}")))
-                    .isOne();
-            assertThat(dispatches.claim(id, scope, "test", Instant.now().plusSeconds(60), 8, 0))
-                    .isOne();
-            assertThat(dispatches.finish(new FeedbackDispatchCompletion(
-                            id, scope, "test", "SENT", ref, url, null, null, deliveredPlacements, Instant.now())))
-                    .isOne();
-        });
+    private void copy(Feedback parent, FeedbackCopyKind type, @Nullable String ref, @Nullable String url) {
+        copies.saveAndFlush(RetainedFeedbackTestData.posted(parent, type, 0, ref, url));
     }
 }

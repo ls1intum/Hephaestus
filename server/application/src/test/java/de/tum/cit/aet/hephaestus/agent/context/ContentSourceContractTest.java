@@ -17,16 +17,6 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Enforces the {@link ContentSource} contract (ADR: integration content = EXTRACT+LOAD of raw native
- * objects only; no practice-dependent Transform in a connector). A connector that names a practice or
- * pre-renders a observation is, by definition, code in the wrong layer — this test makes that structural.
- *
- * <p>Scope: the SCM-side sources under {@code agent.context.providers} (the mentor content sources under
- * {@code providers.mentor} are core-native projections, out of scope). A connector that computes
- * practice-shaped features from the mounted worktree (as {@code TestPresenceContentSource} /
- * {@code BranchGraphContentSource} would) is the Transform-in-the-wrong-layer this test forbids.
- */
 class ContentSourceContractTest extends BaseUnitTest {
 
     private static final Path PROVIDERS_DIR = resolveDir(
@@ -45,7 +35,7 @@ class ContentSourceContractTest extends BaseUnitTest {
                 assertThat(src)
                         .as(
                                 "%s names the practice '%s' — a connector must not encode practice-dependent logic "
-                                        + "(move it to the precompute script or the agent)",
+                                        + "(move it to the practice script or the agent)",
                                 provider.getFileName(), slug)
                         .doesNotContain(slug);
             }
@@ -92,8 +82,8 @@ class ContentSourceContractTest extends BaseUnitTest {
     @DisplayName("catalogue slugs are the practices', never their groups'")
     void shouldReadPracticeSlugsButNotGroupSlugsWhenParsingTheCatalogue() {
         JsonNode catalogue = JSON.readTree("""
-                {"groups": [{"slug": "communication", "practices": [{"slug": "ready-and-traceable-handoff"}]}]}
-                """);
+            {"groups": [{"slug": "communication", "practices": [{"slug": "ready-and-traceable-handoff"}]}]}
+            """);
 
         assertThat(practiceSlugs(catalogue)).containsExactly("ready-and-traceable-handoff");
     }

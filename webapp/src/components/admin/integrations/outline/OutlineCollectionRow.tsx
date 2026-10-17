@@ -130,7 +130,7 @@ export function OutlineCollectionRow({
 							</PopoverContent>
 						</Popover>
 					)}
-					{collection.exportsSkippedForBudget !== undefined &&
+					{collection.exportsSkippedForBudget !== null &&
 						collection.exportsSkippedForBudget > 0 && (
 							<Popover>
 								{/* A property of the last pass, so it sits with the pass's other outcome (the sync

@@ -63,7 +63,7 @@ public class MentorSandboxPreparer {
     // Closing the scope is the operation; its binding is intentionally unread.
     @SuppressWarnings("try")
     private void prepareSandbox(InteractiveSandboxService sandboxService, long workspaceId, long developerId) {
-        if (personSuppression.isUserSuppressed(developerId)) return;
+        if (personSuppression.isAccountSuppressed(developerId)) return;
         // tryLock, never lock: a turn that holds the sandbox attaches for itself, and a prepare must not queue it.
         var lock = turnLock.tryAcquireSandboxLock(new MentorTurnLock.SandboxKey(workspaceId, developerId));
         if (lock.isEmpty()) {

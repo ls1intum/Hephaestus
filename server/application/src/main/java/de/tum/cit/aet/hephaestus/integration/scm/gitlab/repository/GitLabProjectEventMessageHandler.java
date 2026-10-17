@@ -6,8 +6,8 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -81,9 +81,10 @@ public class GitLabProjectEventMessageHandler extends AbstractIntegrationMessage
             return;
         }
 
-        // On a connection route admission has already stored the project as GitLab reports it to the connection and
-        // adjusted this workspace's monitor; the payload's id and path are never written, and the shared repository
-        // row is never deleted, since GitLab not reporting a project to one connection does not prove it is gone.
+        // On a connection route admission has already stored the project as GitLab reports it to
+        // the connection and adjusted this workspace's monitor; the payload's id and path are never
+        // written, and the shared repository row is never deleted, since GitLab not reporting a
+        // project to one connection does not prove it is gone.
         if (GitLabRouteAdmission.current().isPresent()) {
             return;
         }

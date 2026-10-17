@@ -4,7 +4,7 @@ import type {
 	PublicActivity,
 	UserInfo,
 } from "@/api/types.gen";
-import { ARTIFACT_KIND, artifactKindNoun } from "@/lib/artifact-kinds";
+import { ITEM_KIND, itemKindNoun } from "@/lib/item-kinds";
 import type { ProviderType } from "@/lib/provider/provider-terms";
 import { hasText } from "@/lib/text";
 
@@ -64,6 +64,6 @@ export function publicPeopleRows({ people, from, to, highlights }: PublicActivit
 
 /** What the Contributions total counts, said under the table's heading on every page that shows it. */
 export function contributionsNote(providerType: ProviderType): string {
-	const pullRequests = artifactKindNoun(ARTIFACT_KIND.pullRequest, 2, providerType);
+	const pullRequests = itemKindNoun(ITEM_KIND.pullRequest, 2, providerType);
 	return `Contributions total ${pullRequests} opened, distinct ${pullRequests} reviewed, and issues opened in the selected period. Merges and comments are excluded from this total.`;
 }

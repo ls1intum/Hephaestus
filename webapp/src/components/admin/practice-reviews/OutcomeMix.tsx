@@ -77,12 +77,11 @@ export interface OutcomeMixProps {
 	total: number;
 	slots: readonly OutcomeSlot[];
 	/**
-	 * Counts that overlap the parts — a met observation marked incorrect is still a met
-	 * observation — listed last in the same row, under their own name, quiet, and
+	 * Counts that overlap the parts — a met result marked incorrect is still a met
+	 * result — listed last in the same row, under their own name, quiet, and
 	 * never added to the total. No threshold colours them: they are a correction, not an outcome.
 	 */
 	flags?: { label: string; slots: readonly OutcomeSlot[] };
-	/** The total's noun for its count: "observations", "pieces of feedback". */
 	noun: (total: number) => string;
 	/** The legend's accessible name. */
 	label: string;
@@ -94,7 +93,7 @@ export interface OutcomeMixProps {
 	/** Drawn between the total and the legend: the total over time. */
 	children?: ReactNode;
 	/**
-	 * A last item of the legend's row that is no count, such as a rate: "8 % failed or timed out".
+	 * A last item of the legend's row that is no count, such as a rate: "8% failed or timed out".
 	 * Drawn after the flags, in the same row.
 	 */
 	trailing?: ReactNode;

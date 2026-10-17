@@ -10,23 +10,11 @@ import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Per-workspace overrides for practice-review trigger/delivery policy. Embedded on
- * {@link de.tum.cit.aet.hephaestus.workspace.Workspace}.
- *
- * <p>PATCH {@code null} means "no change"; to reset a field back to inherit, name it in the PATCH
- * {@code reset} set (see {@link #reset(java.util.Set)}).
- */
+/** PATCH null preserves an override; name the field in {@link #reset(java.util.Set)} to restore inheritance. */
 @Embeddable
 @Getter
 @Setter
 public class PracticeReviewSettings {
-
-    /** Unused; kept one release under deprecate-then-remove so schema and entity agree meanwhile. */
-    @Deprecated(forRemoval = true)
-    @Column(name = "practice_skip_drafts")
-    @Nullable
-    private Boolean skipDrafts;
 
     /** Deliver feedback even to already-merged PRs/MRs. */
     @Column(name = "practice_deliver_to_merged")
@@ -39,14 +27,14 @@ public class PracticeReviewSettings {
     private Integer cooldownMinutes;
 
     @Enumerated(EnumType.STRING)
-    @ColumnDefault("'ALL_MONITORED'")
-    @Column(name = "practice_repository_coverage_mode", nullable = false, length = 24)
-    private ReviewRepositoryMode repositoryCoverageMode = ReviewRepositoryMode.ALL_MONITORED;
+    @ColumnDefault("'ALL'")
+    @Column(name = "review_scope_repositories", nullable = false, length = 24)
+    private ReviewScopeMode reviewScopeRepositories = ReviewScopeMode.ALL;
 
     @Enumerated(EnumType.STRING)
-    @ColumnDefault("'ALL_ELIGIBLE'")
-    @Column(name = "practice_person_coverage_mode", nullable = false, length = 24)
-    private ReviewPersonMode personCoverageMode = ReviewPersonMode.ALL_ELIGIBLE;
+    @ColumnDefault("'ALL'")
+    @Column(name = "review_scope_people", nullable = false, length = 24)
+    private ReviewScopeMode reviewScopePeople = ReviewScopeMode.ALL;
 
     @Enumerated(EnumType.STRING)
     @ColumnDefault("'ACTIVE'")
@@ -62,9 +50,9 @@ public class PracticeReviewSettings {
     private long configVersion;
 
     // Kept as a String because the workspace module cannot depend on the practices module.
-    @Column(name = "practice_default_autonomy", length = 16)
+    @Column(name = "practice_default_feedback_mode", length = 16)
     @Nullable
-    private String defaultAutonomy;
+    private String defaultFeedbackMode;
 
     public boolean resolveDeliverToMerged(boolean fallback) {
         return deliverToMerged != null ? deliverToMerged : fallback;
@@ -81,11 +69,11 @@ public class PracticeReviewSettings {
     }
 
     public void applyRollout(
-            @Nullable ReviewRepositoryMode repositoryMode,
-            @Nullable ReviewPersonMode personMode,
+            @Nullable ReviewScopeMode repositoryMode,
+            @Nullable ReviewScopeMode personMode,
             @Nullable PracticeDeliveryStatus deliveryStatus) {
-        if (repositoryMode != null) this.repositoryCoverageMode = repositoryMode;
-        if (personMode != null) this.personCoverageMode = personMode;
+        if (repositoryMode != null) this.reviewScopeRepositories = repositoryMode;
+        if (personMode != null) this.reviewScopePeople = personMode;
         if (deliveryStatus != null) this.deliveryStatus = deliveryStatus;
     }
 
@@ -98,13 +86,13 @@ public class PracticeReviewSettings {
     }
 
     /**
-     * PATCH semantics, same as the scalars. Clearing back to the autonomy vocabulary's own default is a
-     * {@link PracticeReviewField#DEFAULT_AUTONOMY} reset, not a null here — otherwise a client that
+     * PATCH semantics, same as the scalars. Clearing back to the feedback mode default is a {@link
+     * PracticeReviewField#DEFAULT_FEEDBACK_MODE} reset, not a null here — otherwise a client that
      * simply omitted the field would silently reset it.
      */
-    public void applyDefaultAutonomy(@Nullable String tierName) {
+    public void applyDefaultFeedbackMode(@Nullable String tierName) {
         if (tierName != null) {
-            this.defaultAutonomy = tierName;
+            this.defaultFeedbackMode = tierName;
         }
     }
 
@@ -114,15 +102,11 @@ public class PracticeReviewSettings {
             return;
         }
         for (PracticeReviewField field : fields) {
-            // Switch EXPRESSION, not statement: the compiler then forces every constant to be handled
+            // Switch EXPRESSION, not statement: the compiler then forces every constant to be
+            // handled
             // here. The yielded value is unused; the exhaustiveness check is the point.
             boolean ignored =
                     switch (field) {
-                        // Kept so a reset request naming this field from an older client is still understood.
-                        case SKIP_DRAFTS -> {
-                            this.skipDrafts = null;
-                            yield true;
-                        }
                         case DELIVER_TO_MERGED -> {
                             this.deliverToMerged = null;
                             yield true;
@@ -132,12 +116,12 @@ public class PracticeReviewSettings {
                             yield true;
                         }
                         case REVIEW_SCOPE -> {
-                            this.repositoryCoverageMode = ReviewRepositoryMode.ALL_MONITORED;
-                            this.personCoverageMode = ReviewPersonMode.ALL_ELIGIBLE;
+                            this.reviewScopeRepositories = ReviewScopeMode.ALL;
+                            this.reviewScopePeople = ReviewScopeMode.ALL;
                             yield true;
                         }
-                        case DEFAULT_AUTONOMY -> {
-                            this.defaultAutonomy = null;
+                        case DEFAULT_FEEDBACK_MODE -> {
+                            this.defaultFeedbackMode = null;
                             yield true;
                         }
                     };

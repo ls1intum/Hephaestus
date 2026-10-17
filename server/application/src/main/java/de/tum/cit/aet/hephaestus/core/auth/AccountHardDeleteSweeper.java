@@ -17,24 +17,13 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Enforces the GDPR Art. 17 hard-delete that {@code AccountService.softDelete} promises: once
- * {@code deleted_at} is older than the {@link AuthProperties#deleteCooldown} grace period, this sweep
- * removes the account's personal / auth data and flips it to {@link Account.Status#DELETED}.
+ * Completes account erasure after the configured delete cooldown through
+ * {@link AccountPurger#purge(Long)} and the exact-person erasure coordinator.
  *
- * <h2>What it purges</h2>
- * The account's child auth rows — {@code identity_link}, {@code account_feature}, {@code issued_jwt},
- * {@code account_export} — carry an {@code ON DELETE CASCADE} FK on {@code account_id}, but because we
- * keep a minimal {@code account} tombstone (status DELETED, PII cleared) rather than deleting the row,
- * that cascade never fires. So the children are deleted explicitly. The tombstone preserves referential
- * integrity for retained, lawful-basis rows (e.g. {@code auth_event}, GDPR Art. 30 audit data with its
- * own 12-month retention) and makes the terminal DELETED state observable.
- *
- * <h2>Git activity mirror (Art. 17(3))</h2>
- * The git-provider activity mirror ({@code integration.scm.domain.user.User}) is a separate read-only
- * entity recording authorship; it is referenced FROM {@code identity_link} ({@code external_actor_id}),
- * not the other way around, so deleting the identity links severs the personal ↔ mirror association
- * automatically. The activity graph itself is retained under the Art. 17(3) public-archive carve-out
- * and is out of scope for this sweep.
+ * <p>Each owning module removes its dependent personal proof and feedback before memberships and
+ * identities. Evidence copies require physical cleanup acknowledgement. Unresolved external copies
+ * keep erasure pending. The final step retains a minimal account tombstone and redacts retained audit
+ * references.
  */
 @ConditionalOnServerRole
 @Component
@@ -43,7 +32,6 @@ public class AccountHardDeleteSweeper {
 
     private static final Logger log = LoggerFactory.getLogger(AccountHardDeleteSweeper.class);
 
-    /** Page size for the erasure backlog — one bounded transaction set per account, not one giant one. */
     private static final int PAGE_SIZE = 100;
 
     private final AccountRepository accountRepository;
@@ -90,9 +78,12 @@ public class AccountHardDeleteSweeper {
         Instant cutoff = clock.instant().minus(properties.deleteCooldown());
         int purged = 0;
         int failed = 0;
-        // Always fetch page 0: a successful purge flips the account to DELETED so it drops out of the
-        // result set, advancing the window naturally. We stop when a page is empty (backlog drained) or
-        // when a page made ZERO progress (every purge threw) — otherwise the same failing rows would be
+        // Always fetch page 0: a successful purge flips the account to DELETED so it drops out of
+        // the
+        // result set, advancing the window naturally. We stop when a page is empty (backlog
+        // drained) or
+        // when a page made ZERO progress (every purge threw) — otherwise the same failing rows
+        // would be
         // re-fetched forever. Failed accounts stay DELETING and are retried on the next sweep.
         while (true) {
             List<Long> page = accountRepository.findDeletingPastCooldown(cutoff, PageRequest.of(0, PAGE_SIZE));
@@ -108,7 +99,7 @@ public class AccountHardDeleteSweeper {
                 } catch (RuntimeException e) {
                     failed++;
                     log.error(
-                            "auth.account: hard-delete FAILED for accountId={} (skipped, will retry next sweep)",
+                            "auth.account: hard-delete FAILED for accountId={} (skipped, will retry" + " next sweep)",
                             id,
                             e);
                 }

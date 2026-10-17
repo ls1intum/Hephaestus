@@ -16,7 +16,6 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
@@ -36,6 +35,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabUserLookup;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookLabel;
@@ -292,8 +292,8 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName(
-                "an update that pushed commits raises Synchronized, whether GitLab names oldrev or only the head moved")
+        @DisplayName("an update that pushed commits raises Synchronized, whether GitLab names oldrev or"
+                + " only the head moved")
         void shouldRaiseSynchronizedWhenAnUpdateMovesTheHead() {
             PullRequest pr = createPullRequestEntity();
             pr.setHeadRefOid("a".repeat(40));
@@ -458,8 +458,8 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName(
-                "processMerged() stores the merge and publishes PullRequestClosed(wasMerged=true), leaving the merge to offerMerge")
+        @DisplayName("processMerged() stores the merge and publishes PullRequestClosed(wasMerged=true),"
+                + " leaving the merge to offerMerge")
         void processMergedPublishesEvents() {
             PullRequest pr = createPullRequestEntity();
             // 2 calls: stale+isNew check (process), post-upsert fetch (upsertMergeRequest)
@@ -495,7 +495,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             assertThat(hasPullRequestMerged).isFalse();
         }
 
-        /** The stored merge request at the hook's head, with its author resolvable and a decision on record. */
         private PullRequest storedForApprovalHook() {
             PullRequest pr = createPullRequestEntity();
             pr.setNativeId(RAW_MR_ID);
@@ -536,7 +535,8 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                     createApprovalEvent("approved", "opened", APPROVAL_HEAD), createContext());
 
             assertThat(result).isNotNull();
-            // GitLab fires the hook from the reloaded merge request: the approver may have withdrawn since, so the
+            // GitLab fires the hook from the reloaded merge request: the approver may have
+            // withdrawn since, so the
             // approver list the readiness read takes next is what records the approval.
             assertThat(pr.getReviews()).isEmpty();
             verify(reviewRepository, never()).save(any(PullRequestReview.class));
@@ -794,7 +794,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             when(pullRequestRepository.findForUpdateByRepositoryIdAndNumber(REPO_ID, MR_IID))
                     .thenReturn(Optional.of(pr));
 
-            // Create an event with older updatedAt ("2024-01-15T10:00:00Z") than the existing entity
             GitLabMergeRequestEventDTO event = createEvent("update", "opened", false);
             PullRequest result = processor.process(event, createContext());
 
@@ -992,7 +991,8 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
 
         @Test
         void shouldNotInventATransitionForAMergeRequestSyncIsSeeingForTheFirstTime() {
-            // No prior row to diff against, so a backfill must not read as a wave of new transitions.
+            // No prior row to diff against, so a backfill must not read as a wave of new
+            // transitions.
             when(pullRequestRepository.findForUpdateByRepositoryIdAndNumber(REPO_ID, MR_IID))
                     .thenReturn(Optional.empty());
             when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID))
@@ -1439,7 +1439,8 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID))
                     .thenReturn(Optional.of(pr));
 
-            // Stub the author user lookup (processFromSync resolves the MR author via gitLabUserService)
+            // Stub the author user lookup (processFromSync resolves the MR author via
+            // gitLabUserService)
             User author = createUserEntity();
             lenient()
                     .when(gitLabUserService.findOrCreateUser(
@@ -1525,11 +1526,8 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @ParameterizedTest
-        @CsvSource(
-                nullValues = "none",
-                value = {"false, none", "false, old-head", "true, old-head"})
-        void shouldInventNoHeadAndKeepNoDateAnOpenMergeRequestsReadCannotHaveRecorded(
-                boolean withdrawn, @Nullable String storedHead) {
+        @ValueSource(booleans = {false, true})
+        void shouldInventNoHeadAndKeepNoDateAnOpenMergeRequestsReadCannotHaveRecorded(boolean withdrawn) {
             PullRequest pr = createPullRequestEntity();
             pr.setNativeId(RAW_MR_ID);
             User approver = createApproverEntity();
@@ -1540,7 +1538,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             noted.setState(PullRequestReview.State.APPROVED);
             noted.setHtmlUrl("https://gitlab.com/gitlab-org/gitlab/-/merge_requests/5#approvals");
             noted.setSubmittedAt(notedAt);
-            noted.setCommitId(storedHead);
             if (withdrawn) {
                 noted.setState(PullRequestReview.State.DISMISSED);
                 noted.setDismissed(true);
@@ -1624,9 +1621,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                     null);
             processor.processFromSync(syncData, ProcessingContext.forSync(1L, testRepo));
 
-            // approvedBy lists who approves, not when nor which head. GitLab's own dates are read only once merged, so
-            // a date on an open merge request is no native one and goes. A head stored for the approval, renewed or
-            // unchanged, was a guess and goes too.
+            // Open-merge-request approvals identify neither a date nor an approved commit.
             assertThat(noted.getState()).isEqualTo(PullRequestReview.State.APPROVED);
             assertThat(noted.getSubmittedAt()).isNull();
             assertThat(noted.getCommitId()).isNull();
@@ -1707,7 +1702,6 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             review.setAuthor(approver);
             review.setState(PullRequestReview.State.APPROVED);
             review.setPullRequest(pr);
-            review.setCommitId(APPROVAL_HEAD);
             pr.addReview(review);
             when(pullRequestRepository.findForUpdateByRepositoryIdAndNumber(REPO_ID, MR_IID))
                     .thenReturn(Optional.of(pr));
@@ -1719,9 +1713,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             review.setSubmittedAt(materialVersion);
             assertThat(read(snapshot(actualApproval), readAt)).isTrue();
             assertThat(review.getSubmittedAt()).isEqualTo(actualApproval);
-            assertThat(review.getCommitId())
-                    .as("a head an earlier version guessed for the approval goes with the read")
-                    .isNull();
+            assertThat(review.getCommitId()).isNull();
             verify(eventPublisher, never()).publishEvent(any(ScmDomainEvent.ReviewSubmitted.class));
 
             assertThat(read(null, readAt.plusSeconds(1))).isTrue();
@@ -1742,7 +1734,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
 
             assertThat(review.getSubmittedAt()).isEqualTo(actualApproval);
             assertThat(review.getCommitId())
-                    .as("GitLab's approval date names no approved revision")
+                    .as("GitLab's approval date names no approved commit")
                     .isNull();
         }
 

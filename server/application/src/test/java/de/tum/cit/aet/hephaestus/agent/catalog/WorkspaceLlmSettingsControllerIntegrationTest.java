@@ -6,17 +6,13 @@ import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.Membership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-/**
- * The endpoint answers with an instance-wide fact and never reads its
- * {@link de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext}, so the body is identical
- * whoever asks: only the status code can tell you the membership gate ran.
- */
+// The response body is instance-wide; only the HTTP status proves that the workspace membership gate ran.
 class WorkspaceLlmSettingsControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
@@ -60,7 +56,7 @@ class WorkspaceLlmSettingsControllerIntegrationTest extends AbstractWorkspaceInt
         // Login must match @WithMentorUser's default "mentor" principal so the membership resolver
         // finds this exact row.
         User member = persistUser("mentor");
-        ensureWorkspaceMembership(workspace, member, WorkspaceRole.MEMBER);
+        ensureMembership(workspace, member, WorkspaceRole.MEMBER);
 
         webTestClient
                 .get()
@@ -79,7 +75,7 @@ class WorkspaceLlmSettingsControllerIntegrationTest extends AbstractWorkspaceInt
         // app_admin elevation, which would admit this call for the wrong reason.
         User admin = persistUser("mentor");
         Workspace own = createWorkspace("llmsettings-own-ws", "Own", "llmsettings-own-org", AccountType.ORG, admin);
-        ensureWorkspaceMembership(own, admin, WorkspaceRole.ADMIN);
+        ensureMembership(own, admin, WorkspaceRole.ADMIN);
 
         Workspace other = createWorkspace(
                 "llmsettings-other-ws",

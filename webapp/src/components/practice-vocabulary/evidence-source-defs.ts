@@ -31,7 +31,7 @@ export interface EvidenceSourceDef extends StatusDef {
 /** sourceKind is an open wire string; use evidenceSourceDef for its unknown-kind fallback. */
 const EVIDENCE_SOURCE_DEFS: Record<string, EvidenceSourceDef> = {
 	"scm.pull-request.core": {
-		label: "The pull request itself",
+		label: "The reviewed work itself",
 		icon: GitPullRequestIcon,
 		badgeVariant: "outline",
 		description: "Its title, description and state, as the author wrote them.",
@@ -45,7 +45,7 @@ const EVIDENCE_SOURCE_DEFS: Record<string, EvidenceSourceDef> = {
 		locator: "code",
 	},
 	"scm.pull-request.comments": {
-		label: "Comments on the pull request",
+		label: "Comments on the reviewed work",
 		icon: MessageSquareIcon,
 		badgeVariant: "outline",
 		description: "What people said on the request as a whole.",
@@ -91,7 +91,7 @@ const EVIDENCE_SOURCE_DEFS: Record<string, EvidenceSourceDef> = {
 		label: "Linked issues and requests",
 		icon: LinkIcon,
 		badgeVariant: "outline",
-		description: "Work the reviewed item points at, for the intent behind it.",
+		description: "Issues and requests that the reviewed work links to, for the intent behind it.",
 		locator: "object",
 	},
 	"scm.review-threads": {
@@ -122,8 +122,8 @@ const EVIDENCE_SOURCE_DEFS: Record<string, EvidenceSourceDef> = {
 		description: "Team documentation the reviewed work links to, such as a guideline.",
 		locator: "object",
 	},
-	"hephaestus.observation-history": {
-		label: "Earlier observations",
+	"hephaestus.result-history": {
+		label: "Earlier results",
 		icon: HistoryIcon,
 		badgeVariant: "outline",
 		description: "What past reviews of this developer’s work already recorded.",

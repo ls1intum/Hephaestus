@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.workurl;
 
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -42,7 +42,7 @@ public final class ReviewedWorkUrls {
     }
 
     /** The work a supported page shows, named as inside its provider: repository path, kind and number. */
-    public record WorkAddress(String repositoryName, ArtifactKind kind, int number) {}
+    public record WorkAddress(String repositoryName, ItemKind kind, int number) {}
 
     private static final String HTTPS = "https";
     private static final int DEFAULT_HTTPS_PORT = 443;
@@ -164,11 +164,11 @@ public final class ReviewedWorkUrls {
         return switch (segments.get(2)) {
             case "pull" ->
                 isGitHubPullRequestTail(tail)
-                        ? Optional.of(new WorkAddress(repositoryName, ScmSignals.PULL_REQUEST, number.get()))
+                        ? Optional.of(new WorkAddress(repositoryName, ScmItemEvents.PULL_REQUEST, number.get()))
                         : Optional.empty();
             case "issues" ->
                 tail.isEmpty()
-                        ? Optional.of(new WorkAddress(repositoryName, ScmSignals.ISSUE, number.get()))
+                        ? Optional.of(new WorkAddress(repositoryName, ScmItemEvents.ISSUE, number.get()))
                         : Optional.empty();
             default -> Optional.empty();
         };
@@ -202,11 +202,11 @@ public final class ReviewedWorkUrls {
         return switch (segments.get(marker + 1)) {
             case "merge_requests" ->
                 tail.isEmpty() || (tail.size() == 1 && GITLAB_MERGE_REQUEST_TABS.contains(tail.get(0)))
-                        ? Optional.of(new WorkAddress(repositoryName, ScmSignals.PULL_REQUEST, number.get()))
+                        ? Optional.of(new WorkAddress(repositoryName, ScmItemEvents.PULL_REQUEST, number.get()))
                         : Optional.empty();
             case "issues", "work_items" ->
                 tail.isEmpty()
-                        ? Optional.of(new WorkAddress(repositoryName, ScmSignals.ISSUE, number.get()))
+                        ? Optional.of(new WorkAddress(repositoryName, ScmItemEvents.ISSUE, number.get()))
                         : Optional.empty();
             default -> Optional.empty();
         };

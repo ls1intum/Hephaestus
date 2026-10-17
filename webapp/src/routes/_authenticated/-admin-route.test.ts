@@ -7,6 +7,7 @@ import { isRecord } from "@/lib/is-record";
 import { ROUTER_SEARCH } from "@/lib/router-search";
 import { hasText } from "@/lib/text";
 import { currentUser } from "@/mocks/fixtures/auth";
+import { ownMembership } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
 import { routeTree } from "@/routeTree.gen";
 
@@ -75,7 +76,7 @@ describe("admin tab titles", () => {
 		mockAppRole("APP_ADMIN");
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/members/me", () =>
-				HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
+				HttpResponse.json(ownMembership("ADMIN")),
 			),
 		);
 		const router = newRouter(url);

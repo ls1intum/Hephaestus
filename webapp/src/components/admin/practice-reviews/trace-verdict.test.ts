@@ -1,53 +1,35 @@
 import { assert, describe, expect, it } from "vitest";
 
-import type { ReviewLineage, TracedSignal } from "@/api/types.gen";
+import type { ItemEvent, ReviewLineage } from "@/api/types.gen";
 
-import {
-	LINEAGE_FB,
-	LINEAGE_OBS,
-	lineageDisputedAndResolved,
-	lineageObservationFocus,
-	wholeReview,
-} from "./lineage-fixtures";
+import { lineageRecords } from "./lineage-chain";
+import { lineageItemFocus, storyLineage } from "./lineage-fixtures";
 import {
 	LINEAGE_STATE_CASES,
-	type LineageStateGroup,
 	lineageStateCase,
 	STATE_FEEDBACK_ID,
-	STATE_OBSERVATION_ID,
+	STATE_RESULT_ID,
 } from "./lineage-state-fixtures";
 import type { TraceNode } from "./review-trace";
 import { traceVerdict, unreviewedVerdict } from "./trace-verdict";
 
 const REVIEW: TraceNode = { kind: "review" };
 const feedbackNode = (id: string): TraceNode => ({ kind: "feedback", id });
-const observationNode = (id: string): TraceNode => ({ kind: "observation", id });
+const resultNode = (id: string): TraceNode => ({ kind: "result", id });
 
 function verdictOf(key: string, node: TraceNode = REVIEW) {
-	const { lineage, reviewOutcome } = lineageStateCase(key);
-	return traceVerdict(lineage, node, reviewOutcome);
+	return traceVerdict(lineageStateCase(key).lineage, node);
 }
 
-/** Every record a case's chain lists, so every verdict the story can draw is read. */
 function nodesOf(lineage: ReviewLineage): TraceNode[] {
+	const { results, feedback } = lineageRecords(lineage);
 	return [
 		REVIEW,
 		{ kind: "work" },
-		...lineage.observations.map((entry) => observationNode(entry.id)),
-		...lineage.feedback.map((entry) => feedbackNode(entry.id)),
+		...results.map((entry) => resultNode(entry.id)),
+		...feedback.map((entry) => feedbackNode(entry.id)),
 	];
 }
-
-describe("omitted chain ownership", () => {
-	it("does not attribute omitted or foreign records to the selected review", () => {
-		const lineage = { ...wholeReview, moreObservations: 9, moreFeedback: 7 };
-		const { sentence } = traceVerdict(lineage, REVIEW);
-		expect(sentence).toMatch(
-			/9 additional observations and 7 additional pieces of feedback in the chain are not listed/u,
-		);
-		expect(sentence).not.toMatch(/composed 12|recorded 12/u);
-	});
-});
 
 describe("traceVerdict on every state", () => {
 	const cases = Object.entries(LINEAGE_STATE_CASES).flatMap(([group, entries]) =>
@@ -56,7 +38,7 @@ describe("traceVerdict on every state", () => {
 
 	it.each(cases)("%s / %s says one sentence and ends the path", (_group, _key, entry) => {
 		for (const node of nodesOf(entry.lineage)) {
-			const { sentence, end } = traceVerdict(entry.lineage, node, entry.reviewOutcome);
+			const { sentence, end } = traceVerdict(entry.lineage, node);
 			expect(sentence).toMatch(/^[A-Z].*\.$/u);
 			// One sentence: no full stop before the last one.
 			expect(sentence.slice(0, -1)).not.toMatch(/\.\s/u);
@@ -64,310 +46,231 @@ describe("traceVerdict on every state", () => {
 		}
 	});
 
-	it("says the same for the same chain, with no clock and no model", () => {
-		const { lineage } = lineageStateCase("responses");
+	it("says the same for the same graph, with no clock and no model", () => {
+		const { lineage } = lineageStateCase("delivery-states");
 		expect(traceVerdict(lineage, REVIEW)).toStrictEqual(traceVerdict(lineage, REVIEW));
 	});
 });
 
-/** One check per state group, with the sentence the decision named where it named one. */
-describe("traceVerdict by state group", () => {
-	const checks: Record<LineageStateGroup, () => void> = {
-		review: () => {
-			expect(verdictOf("queued").sentence).toBe(
-				"This review waits in the queue and has observed nothing yet.",
-			);
-			expect(verdictOf("on-hold").sentence).toBe(
-				"This review is on hold (AI budget pause) and has observed nothing yet.",
-			);
-			expect(verdictOf("running").end).toMatchObject({ kind: "open", label: "Open" });
-			expect(verdictOf("completed").sentence).toBe(
-				"This review ran 9 min after a 10 s wait and composed 1 piece of feedback; it reached the developer.",
-			);
-			expect(verdictOf("failed").sentence).toBe(
-				"This review failed after 9 min and recorded 1 observation, but composed no feedback.",
-			);
-			expect(verdictOf("timed-out").end.kind).toBe("lost");
-			expect(verdictOf("cancelled").sentence).toBe(
-				"This review was canceled after 50 s with nothing recorded.",
-			);
-			expect(verdictOf("insufficient-evidence").sentence).toBe(
-				"This review assessed nothing: the evidence it needed was missing or unreadable.",
-			);
-			expect(verdictOf("coalesced").sentence).toContain("it was coalesced with an earlier review");
-			expect(verdictOf("record-gone").end.label).toBe("Not known");
-		},
-		trigger: () => {
-			// What started the review is the rail's first step, not the verdict's subject.
-			expect(verdictOf("trigger-merged").sentence).toBe(verdictOf("trigger-ready").sentence);
-		},
-		merge: () => {
-			expect(
-				verdictOf("merged-during", feedbackNode(lastFeedbackId("merged-during"))).sentence,
-			).toBe(
-				"This feedback did not reach the developer: the work was merged 7 min before it was composed.",
-			);
-			expect(verdictOf("started-by-merge", feedbackNode(STATE_FEEDBACK_ID)).sentence).toBe(
-				"This feedback did not reach the developer, by design: the merge started this review, so the work was already merged.",
-			);
-			expect(verdictOf("merged-before", feedbackNode(STATE_FEEDBACK_ID)).end).toMatchObject({
-				kind: "lost",
-				reason: "withheld (already merged)",
-			});
-		},
-		observations: () => {
-			expect(verdictOf("not-met-silent", observationNode(STATE_OBSERVATION_ID)).sentence).toBe(
-				"This observation was not met but led to no feedback, so the developer was not told.",
-			);
-			expect(verdictOf("marked-incorrect", observationNode(STATE_OBSERVATION_ID)).sentence).toBe(
-				"This observation was marked incorrect and led to 2 pieces of feedback; one was delivered and has no answer yet, and one was withheld (observation marked incorrect).",
-			);
-			expect(verdictOf("later-review-wrote", observationNode(STATE_OBSERVATION_ID)).end.label).toBe(
-				"Elsewhere",
-			);
-			expect(verdictOf("empty").sentence).toBe(
-				"This review ran 9 min after a 10 s wait and recorded no observation.",
-			);
-		},
-		location: () => {
-			const { lineage } = lineageStateCase("locations");
-			const slack = lineage.feedback.find((entry) => entry.location === "SLACK");
-			expect(slack).toBeDefined();
-			expect(verdictOf("locations", feedbackNode(slack?.id ?? "")).sentence).toBe(
-				"This feedback reached the developer with Heph in Slack 20 s after it was composed and has no answer yet.",
-			);
-		},
-		delivery: () => {
-			expect(verdictOf("shown-then-withheld", feedbackNode(STATE_FEEDBACK_ID)).sentence).toBe(
-				"This feedback reached the developer on their practice pages, then was withheld: the author, repository, or base branch is no longer covered by practice review.",
-			);
-			// Ten different ends are counted by kind, not listed one by one.
-			expect(verdictOf("delivery-states", observationNode(STATE_OBSERVATION_ID)).sentence).toBe(
-				"This observation led to 10 pieces of feedback; four are still open, five did not arrive, and one has no known end.",
-			);
-		},
-		withholding: () => {
-			const { lineage } = lineageStateCase("withholding-families");
-			const optedOut = lineage.feedback.find(
-				(entry) => entry.suppressionReason === "RECIPIENT_OPTED_OUT",
-			);
-			expect(verdictOf("withholding-families", feedbackNode(optedOut?.id ?? "")).sentence).toBe(
-				"This feedback did not reach the developer: the developer has opted out of AI feedback.",
-			);
-			expect(verdictOf("withholding-families").end).toMatchObject({ kind: "lost" });
-		},
-		decision: () => {
-			const { lineage } = lineageStateCase("decisions");
-			const [awaiting, , rejected, withdrawn] = lineage.feedback;
-			expect(verdictOf("decisions", feedbackNode(awaiting?.id ?? "")).end).toMatchObject({
-				kind: "open",
-				reason: "it awaits an admin’s approval",
-			});
-			expect(verdictOf("decisions", feedbackNode(rejected?.id ?? "")).sentence).toBe(
-				"This feedback did not reach the developer: an admin rejected it.",
-			);
-			expect(verdictOf("decisions", feedbackNode(withdrawn?.id ?? "")).sentence).toBe(
-				"This feedback reached the developer on their practice pages, then an admin withdrew it.",
-			);
-			// A prepared card can be withdrawn before it was delivered: nothing says it reached them.
-			assert(withdrawn?.withdrawnAt !== undefined);
-			const prepared = { ...withdrawn, deliveryState: "PREPARED" as const, deliveredAt: undefined };
-			const unsent = {
-				...lineage,
-				feedback: lineage.feedback.map((entry) => (entry.id === withdrawn.id ? prepared : entry)),
-			};
-			expect(traceVerdict(unsent, feedbackNode(withdrawn.id))).toMatchObject({
-				sentence: "This feedback did not reach the developer: an admin withdrew it first.",
-				end: { kind: "lost", reason: "an admin withdrew it before it reached the developer" },
-			});
-		},
-		response: () => {
-			const { lineage } = lineageStateCase("responses");
-			const [answered, , disputed] = lineage.feedback;
-			// An admin learns that the developer answered, never how they rated it.
-			expect(verdictOf("responses", feedbackNode(answered?.id ?? ""))).toMatchObject({
-				sentence:
-					"This feedback reached the developer on GitHub 30 s after it was composed, and they answered it; their answer stays private to them.",
-				end: { kind: "answered", reason: "the developer answered it; how stays private to them" },
-			});
-			expect(verdictOf("responses", feedbackNode(disputed?.id ?? "")).sentence).toBe(
-				"This feedback reached the developer on GitHub 30 s after it was composed, but they disputed it.",
-			);
-			expect(verdictOf("responses").end.kind).toBe("worked");
-		},
-		volume: () => {
-			expect(verdictOf("many-feedback").sentence).toBe(
-				"This review ran 9 min after a 10 s wait and composed 10 pieces of feedback; all 10 reached the developer.",
-			);
-		},
-	};
+describe("traceVerdict on a review", () => {
+	it("says where a review waits or runs", () => {
+		expect(verdictOf("queued").sentence).toBe(
+			"This review waits in the queue and has recorded nothing yet.",
+		);
+		expect(verdictOf("running")).toMatchObject({
+			sentence: "This review remains open and has recorded 2 results so far.",
+			end: { kind: "open", label: "Open" },
+		});
+	});
 
-	it.each(Object.entries(checks))("%s", (_group, check) => {
-		expect(check).not.toThrow();
+	it("says how long a review took and how much of its feedback reached the developer", () => {
+		expect(verdictOf("complete")).toMatchObject({
+			sentence:
+				"This review completed after 9 min and composed 1 piece of feedback; it reached the developer.",
+			end: { kind: "delivered", reason: "it reached the developer on GitHub" },
+		});
+		expect(verdictOf("many-feedback").sentence).toBe(
+			"This review completed after 9 min and composed 10 pieces of feedback; all 10 reached the developer.",
+		);
+	});
+
+	it("says a stopped review ended before it composed feedback", () => {
+		expect(verdictOf("failed").sentence).toBe(
+			"This review failed after 9 min and recorded 1 result, but composed no feedback.",
+		);
+		expect(verdictOf("cancelled")).toMatchObject({
+			sentence: "This review was cancelled after 1 min with nothing recorded.",
+			end: { kind: "lost" },
+		});
+	});
+
+	it("says a partial review left some of the work unreviewed", () => {
+		expect(verdictOf("scan-many-jobs").sentence).toMatch(
+			/^This review closed after .+ with some of the work not reviewed and recorded \d+ results, but composed no feedback\.$/u,
+		);
+	});
+
+	it("says a review with no result recorded none", () => {
+		expect(verdictOf("empty")).toMatchObject({
+			sentence: "This review completed after 9 min and recorded no result.",
+			end: { kind: "none" },
+		});
+	});
+
+	it("counts only the review's own results, not an earlier review's", () => {
+		expect(verdictOf("answered-earlier").sentence).toBe(
+			"This review completed after 9 min and composed 1 piece of feedback; it reached the developer.",
+		);
+	});
+
+	it("says it cannot tell when the record of the review is gone", () => {
+		expect(verdictOf("record-gone").end.label).toBe("Not known");
+	});
+
+	it("never calls the reviews of work with several of them gone", () => {
+		const { item, reviews } = lineageRecords(lineageItemFocus);
+		const [review] = reviews;
+		assert(item !== undefined);
+		assert(review !== undefined);
+		const lineage = storyLineage({
+			root: { kind: "ITEM", id: item.id },
+			item,
+			reviews: [review, { ...review, id: "11111111-1111-1111-1111-222222222222" }],
+			results: [],
+			feedback: [],
+		});
+		expect(traceVerdict(lineage, { kind: "work" })).toMatchObject({
+			sentence: "This work has 2 reviews, so open one to see what it did.",
+			end: { kind: "none", label: "Several reviews" },
+		});
 	});
 });
 
-function lastFeedbackId(key: string): string {
-	const { lineage } = lineageStateCase(key);
-	return lineage.feedback.at(-1)?.id ?? "";
-}
-
-describe("traceVerdict on the review the stories tell", () => {
-	it("tells the whole review with its wait, its run and how much reached the developer", () => {
-		expect(traceVerdict(wholeReview, REVIEW).sentence).toBe(
-			"This review ran 1 h 27 min after a 20 s wait and composed 5 pieces of feedback; 3 reached the developer.",
-		);
+describe("traceVerdict on a result", () => {
+	it("says a not met result with no feedback left the developer untold", () => {
+		expect(verdictOf("not-met-silent", resultNode(STATE_RESULT_ID))).toMatchObject({
+			sentence: "This result was not met but led to no feedback, so the developer was not told.",
+			end: { kind: "lost" },
+		});
 	});
 
-	it("says a review a newer one replaced assessed nothing, rather than that it found nothing", () => {
-		const { sentence, end } = traceVerdict(wholeReview, REVIEW, "SUPERSEDED");
-		expect(sentence).toBe(
-			"This review assessed nothing: a newer review of the same work replaced it while it waited, and that review carries its practices.",
-		);
-		expect(end.kind).toBe("none");
+	it("counts many different ends by kind, with the best one naming the path", () => {
+		expect(verdictOf("delivery-states", resultNode(STATE_RESULT_ID))).toMatchObject({
+			sentence:
+				"This result led to 8 pieces of feedback; one was delivered, two are still open, four did not arrive, and one has no known end.",
+			end: { kind: "delivered" },
+		});
 	});
 
-	it("tells an observation by what became of each piece written from it", () => {
-		expect(
-			traceVerdict(lineageObservationFocus, observationNode(LINEAGE_OBS.cache404)).sentence,
-		).toBe("This observation led to 1 piece of feedback; it was delivered and answered.");
-		const { sentence, end } = traceVerdict(
-			lineageDisputedAndResolved,
-			observationNode(LINEAGE_OBS.cache404),
-		);
-		expect(sentence).toBe(
-			"This observation led to 2 pieces of feedback; one was delivered and disputed, and one was delivered and resolved by the work.",
-		);
-		// The best end of any piece names the path.
-		expect(end.kind).toBe("worked");
-	});
-
-	it("says when the work was merged against when a withheld piece was written", () => {
-		expect(traceVerdict(wholeReview, feedbackNode(LINEAGE_FB.afterMerge)).sentence).toBe(
-			"This feedback did not reach the developer: the work was merged 7 min before it was composed.",
-		);
-	});
-
-	it("keeps a delivered piece open since it was delivered", () => {
-		const { end } = traceVerdict(wholeReview, feedbackNode(LINEAGE_FB.praise));
-		expect(end).toMatchObject({ kind: "open", reason: "delivered, no answer yet" });
-		expect(end.since?.toISOString()).toBe("2026-07-28T13:43:00.000Z");
-	});
-
-	it("falls back to the review for a record the chain does not list", () => {
-		expect(traceVerdict(wholeReview, feedbackNode("missing"))).toStrictEqual(
-			traceVerdict(wholeReview, REVIEW),
-		);
+	it("says a met result needed no feedback", () => {
+		const { results } = lineageRecords(lineageStateCase("not-met-silent").lineage);
+		const met = results.find((entry) => entry.outcome === "MET");
+		assert(met !== undefined);
+		expect(verdictOf("not-met-silent", resultNode(met.id)).end).toMatchObject({
+			kind: "none",
+			reason: "it was met, so nothing had to be sent",
+		});
 	});
 });
 
-describe("traceVerdict on a prepared piece, by its channel", () => {
-	const pieceId = lineageObservationFocus.feedback[0]?.id ?? "";
-	const prepared = (channel: "IN_CONTEXT" | "IN_APP" | "IN_CHAT"): ReviewLineage => ({
-		...lineageObservationFocus,
-		feedback: lineageObservationFocus.feedback.map((entry) =>
-			entry.id === pieceId
-				? {
-						...entry,
-						channel,
-						deliveryState: "PREPARED",
-						deliveredAt: undefined,
-						response: undefined,
-					}
-				: entry,
-		),
+describe("traceVerdict on a piece of feedback", () => {
+	const piece = feedbackNode(STATE_FEEDBACK_ID);
+
+	it("names where a delivered piece reached the developer", () => {
+		expect(verdictOf("destination-on-work", piece).sentence).toBe(
+			"This feedback reached the developer on GitHub.",
+		);
+		expect(verdictOf("destination-conversation", piece).sentence).toBe(
+			"This feedback reached the developer in conversation.",
+		);
 	});
 
 	it.each([
-		["IN_CONTEXT", "it is prepared to be posted on the work", "prepared to be posted on the work"],
-		["IN_APP", "it is prepared for their practice pages", "prepared for their practice pages"],
-		[
-			"IN_CHAT",
-			"it is prepared for their next conversation with Heph",
-			"prepared for a conversation",
-		],
-	] as const)("names where a %s piece goes", (channel, sentence, clause) => {
-		const lineage = prepared(channel);
-		expect(traceVerdict(lineage, feedbackNode(pieceId)).sentence).toBe(
+		["destination-on-work", "it is ready to be posted on the work"],
+		["destination-practice-page", "it is ready for their practice pages"],
+		["destination-conversation", "it is ready for their next conversation with Heph"],
+	] as const)("names where a ready piece goes in %s", (key, sentence) => {
+		const lineage = withFeedback(lineageStateCase(key).lineage, {
+			state: "READY",
+			deliveredAt: null,
+		});
+		expect(traceVerdict(lineage, piece).sentence).toBe(
 			`This feedback has not reached the developer yet: ${sentence}.`,
 		);
-		expect(traceVerdict(lineage, observationNode(LINEAGE_OBS.cache404)).sentence).toContain(clause);
+	});
+
+	it("says an admin withdrew a piece, before or after it reached the developer", () => {
+		expect(verdictOf("withdrawn", piece).sentence).toBe(
+			"This feedback reached the developer on the practice page, then an admin withdrew it.",
+		);
+		const unsent = withFeedback(lineageStateCase("state-ready").lineage, { withdrawn: true });
+		expect(traceVerdict(unsent, piece)).toMatchObject({
+			sentence: "This feedback did not reach the developer: an admin withdrew it first.",
+			end: { kind: "lost", reason: "an admin withdrew it before it reached the developer" },
+		});
+	});
+
+	it("says what stopped a piece on its way", () => {
+		expect(verdictOf("state-rejected", piece).sentence).toBe(
+			"This feedback did not reach the developer: an admin rejected it.",
+		);
+		expect(verdictOf("state-awaiting-approval", piece).end).toMatchObject({
+			kind: "open",
+			reason: "it awaits an admin’s approval",
+		});
+		expect(verdictOf("state-unconfirmed", piece).end.label).toBe("Not known");
+	});
+
+	it("falls back to the review for a record the graph does not hold", () => {
+		const { lineage } = lineageStateCase("complete");
+		expect(traceVerdict(lineage, feedbackNode("missing"))).toStrictEqual(
+			traceVerdict(lineage, REVIEW),
+		);
 	});
 });
 
-it("never says a prepared piece on the work or the practice pages goes to a conversation", () => {
-	for (const channel of ["IN_CONTEXT", "IN_APP"] as const) {
-		const lineage: ReviewLineage = {
-			...lineageObservationFocus,
-			feedback: lineageObservationFocus.feedback.map((entry) => ({
-				...entry,
-				channel,
-				deliveryState: "PREPARED",
-				deliveredAt: undefined,
-				response: undefined,
-			})),
-		};
-		for (const node of nodesOf(lineage)) {
-			expect(traceVerdict(lineage, node).sentence).not.toMatch(/conversation/u);
-		}
-	}
-});
-
-/** A moment of work no review started on, as the recorded work names its latest. */
-function moment(overrides: Partial<TracedSignal>): TracedSignal {
+function withFeedback(
+	lineage: ReviewLineage,
+	change: Partial<NonNullable<ReviewLineage["nodes"][number]["feedback"]>>,
+): ReviewLineage {
 	return {
-		discoveredVia: "EVENT",
-		displayName: "Marked ready for review",
-		id: "signal-1",
+		...lineage,
+		nodes: lineage.nodes.map((node) =>
+			node.feedback === null ? node : { ...node, feedback: { ...node.feedback, ...change } },
+		),
+	};
+}
+
+function event(overrides: Partial<ItemEvent>): ItemEvent {
+	return {
+		decidedAt: null,
+		foundBy: "WEBHOOK",
+		id: "event-1",
+		itemId: "1",
+		itemVersion: "abc",
+		name: "pull_request.ready_for_review",
 		occurredAt: new Date("2026-10-08T08:00:00Z"),
-		revision: "abc",
-		signal: "READY",
-		state: "SUPPRESSED",
+		reason: null,
+		reviewId: null,
+		state: "WITHHELD",
 		...overrides,
 	};
 }
 
 describe("unreviewedVerdict", () => {
-	const off = {
-		stateReason: "PRACTICES_DISABLED",
-		stateReasonDescription:
-			"Practice reviews are turned off for this workspace. Hephaestus tries again when they are turned on.",
-	} as const;
+	const off = { reason: "PRACTICES_DISABLED" } as const;
 
-	it("says a queued moment waits, not that reviews are off, while they are on", () => {
-		const verdict = unreviewedVerdict(moment({ state: "PENDING", ...off }), true);
+	it("says a waiting event waits, not that practice review is off, while it is on", () => {
+		const verdict = unreviewedVerdict(event({ state: "WAITING", ...off }), true);
 		expect(verdict.sentence).toBe(
-			"No review has started on this work yet: it is queued for review.",
+			"No review has started on this work yet: it waits before a review starts.",
 		);
-		expect(verdict.end).toMatchObject({ kind: "open", label: "Queued for review" });
+		expect(verdict.end).toMatchObject({ kind: "open", label: "Waiting" });
 		expect(verdict.end.reason).not.toMatch(/turned off/u);
 	});
 
-	it("says why a queued moment waits where the reason still holds", () => {
-		const verdict = unreviewedVerdict(moment({ state: "PENDING", ...off }), false);
-		expect(verdict.sentence).toBe(
-			"No review has started on this work yet: it is queued for review.",
-		);
-		expect(verdict.end.reason).toMatch(/^Practice reviews are turned off/u);
+	it("says why a waiting event waits where the reason still holds", () => {
+		const verdict = unreviewedVerdict(event({ state: "WAITING", ...off }), false);
+		expect(verdict.end.reason).toMatch(/^Practice review is turned off/u);
 	});
 
-	it("says reviews were off for a refused moment once they are on again", () => {
-		const verdict = unreviewedVerdict(moment(off), true);
+	it("says practice review was off for a withheld event once it is on again", () => {
+		const verdict = unreviewedVerdict(event(off), true);
 		expect(verdict.sentence).toBe(
-			"No review started on this work: practice reviews were turned off for this workspace when it happened.",
+			"No review started on this work: practice review was turned off for this workspace when it happened.",
 		);
 		expect(verdict.end.kind).toBe("lost");
 	});
 
-	it("says reviews are off while they are off", () => {
-		expect(unreviewedVerdict(moment(off), false).sentence).toBe(
-			"No review started on this work: practice reviews are turned off for this workspace.",
+	it("says practice review is off while it is off", () => {
+		expect(unreviewedVerdict(event(off), false).sentence).toBe(
+			"No review started on this work: practice review is turned off for this workspace.",
 		);
 	});
 
-	it("says a deferred moment waits to see if the work keeps changing", () => {
-		expect(unreviewedVerdict(moment({ state: "DEFERRED" }), true).sentence).toBe(
-			"No review has started on this work yet: Hephaestus waits to see if it keeps changing.",
+	it("says what the event's state means where no reason is recorded", () => {
+		expect(unreviewedVerdict(event({ state: "EXPIRED" }), true).sentence).toBe(
+			"No review started on this work: the event waited too long and no review started.",
 		);
 	});
 });

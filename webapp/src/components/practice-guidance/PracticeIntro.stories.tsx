@@ -6,10 +6,12 @@ import { precedes } from "@/test/dom";
 
 import { type PracticeGuidanceState, PracticeIntro } from "./PracticeIntro";
 
-const ready = {
-	status: "ready",
-	visual: bundledGuidance.visual,
-	guide: bundledGuidance.guide,
+const ready = { status: "ready", ...bundledGuidance } satisfies PracticeGuidanceState;
+
+const wordsOnly = {
+	...ready,
+	visual: null,
+	guide: null,
 } satisfies PracticeGuidanceState;
 
 /**
@@ -54,7 +56,7 @@ export const Default: Story = {
 
 /** A practice with words and no picture: what good looks like stands under its own label. */
 export const WordsOnly: Story = {
-	args: { guidance: { status: "ready" } },
+	args: { guidance: wordsOnly },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("heading", { name: "What good looks like" })).toBeVisible();
 		await expect(canvas.getByText(bundledPractice.whatGoodLooksLike)).toBeVisible();
@@ -97,7 +99,10 @@ export const LoadFailed: Story = {
 
 /** The catalog has nothing to say about the practice and it has no picture, so nothing is drawn. */
 export const Empty: Story = {
-	args: { practice: {}, guidance: { status: "ready" } },
+	args: {
+		practice: { whyItMatters: null, whatGoodLooksLike: null },
+		guidance: wordsOnly,
+	},
 	play: async ({ canvas }) => {
 		await expect(canvas.queryByRole("region", { name: "Introduction" })).toBeNull();
 	},

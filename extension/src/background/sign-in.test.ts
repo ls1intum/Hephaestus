@@ -50,7 +50,7 @@ describe("signInUrl", () => {
 		});
 	});
 
-	it("starts a development sign-in on its own door", () => {
+	it("starts a development sign-in at its own endpoint", () => {
 		const url = new URL(signInUrl(instance, { kind: "dev", username: "e2e", admin: true }, params));
 		expect(url.pathname).toBe("/api/auth/dev-login/client");
 		expect(url.searchParams.get("username")).toBe("e2e");

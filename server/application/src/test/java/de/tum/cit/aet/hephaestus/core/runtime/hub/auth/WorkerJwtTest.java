@@ -79,6 +79,15 @@ class WorkerJwtTest extends BaseUnitTest {
     }
 
     @Test
+    void shouldCarryOnlyTheProxyScopeWhenIssuedUntilADeadline() {
+        Instant deadline = Instant.now().plusSeconds(600);
+
+        JobJwt jwt = (JobJwt) verifier.verify(issuer.issueForJobUntil(UUID.randomUUID(), 42L, 0, deadline));
+
+        assertThat(jwt.scopes()).containsExactly(WorkerJwtIssuer.LLM_PROXY_SCOPE);
+    }
+
+    @Test
     void expiredJobTokenRejected() {
         WorkerSigningKey active = keyRing.active();
         Instant past = Instant.now().minusSeconds(120);

@@ -6,15 +6,15 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.common.ScmTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitAuthorResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.util.CommitUtils;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.RepositoryRef;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
@@ -22,6 +22,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlSync
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlSyncCoordinator.GraphQlClassificationContext;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.GitHubUserProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -106,6 +107,7 @@ public class CommitAuthorEnrichmentService {
     private final GitHubExceptionClassifier exceptionClassifier;
     private final GitHubUserProcessor userProcessor;
     private final ApplicationEventPublisher eventPublisher;
+    private final Clock clock;
 
     /**
      * Enriches unresolved commit authors/committers for a repository.
@@ -187,7 +189,8 @@ public class CommitAuthorEnrichmentService {
 
         int total = enrichedByEmail + enrichedByApi;
 
-        // Signal downstream consumers (the activity ledger) that commit author identities
+        // ItemEventDefinition downstream consumers (the activity ledger) that commit author
+        // identities
         // for this repository have been reconciled. The activity module listens for this
         // event and backfills COMMIT_CREATED rows whose actor_id was NULL at ingest time.
         // Must publish regardless of which phase did the work — a Phase-2-only enrichment
@@ -198,7 +201,8 @@ public class CommitAuthorEnrichmentService {
                     EventContext.forSync(
                             scopeId,
                             Objects.requireNonNull(RepositoryRef.from(repository)),
-                            IdentityProviderType.GITHUB)));
+                            IdentityProviderType.GITHUB,
+                            clock.instant())));
         }
 
         log.info(

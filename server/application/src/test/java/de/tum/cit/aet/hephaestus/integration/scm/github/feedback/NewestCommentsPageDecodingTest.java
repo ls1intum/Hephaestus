@@ -7,14 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssueCom
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.Test;
 
-/**
- * Every other test of {@code GitHubSummaryChannel.findExistingSummary} stubs
- * {@code ClientResponseField.toEntity} and hands back an already-built connection, so no JSON is decoded:
- * were {@code hasPreviousPage}/{@code startCursor} dropped on the way in, the scan would report a confirmed
- * {@code ABSENT} after one page and license a duplicate summary on any thread longer than the page size.
- *
- * <p>The payload is a verbatim page from api.github.com (issue comments, {@code last: 1}), cursors included.
- */
+// Decode real pagination fields: losing hasPreviousPage or startCursor could falsely authorize a duplicate summary.
 class NewestCommentsPageDecodingTest extends BaseUnitTest {
 
     private static final String LIVE_PAGE = """

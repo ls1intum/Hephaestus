@@ -1,7 +1,7 @@
 import { type UseQueryResult, useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 
-import type { WorkItem, WorkspaceMembership } from "@/api/types.gen";
+import type { WorkspaceMembership } from "@/api/types.gen";
 import { ACTIVITY_CATEGORY_DEFS } from "@/components/activity/activity-kind-defs";
 import { periodFromSearch, periodSearch } from "@/components/activity/activity-period";
 import {
@@ -14,16 +14,13 @@ import {
 } from "@/components/activity/activity-search";
 import { ActivityDetailDrawer } from "@/components/activity/ActivityDetailDrawer";
 import { type ActivityAccount, ActivityPage } from "@/components/activity/ActivityPage";
-import type { OpenWorkReviewNow } from "@/components/activity/OpenWorkSections";
 import { workLogTitle } from "@/components/activity/work-log-markdown";
 import { useDetailStack } from "@/components/layout/detail-drawer/use-detail-stack";
 import { buttonVariants } from "@/components/ui/button";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useActivityPerson, useActivityWork, useOpenWork } from "@/hooks/use-activity";
-import { useRequestPracticeReview } from "@/hooks/use-request-practice-review";
-import { ARTIFACT_KIND } from "@/lib/artifact-kinds";
 import { pageHead } from "@/lib/page-title";
-import { toScmProviderType } from "@/lib/provider/provider-terms";
+import { type ProviderType, toScmProviderType } from "@/lib/provider/provider-terms";
 import { useSearchState, carriedSearchParams } from "@/lib/search-params";
 import { hasText } from "@/lib/text";
 import { useAuth } from "@/runtime/auth/AuthContext";
@@ -43,27 +40,22 @@ function Activity() {
 	const search = Route.useSearch();
 	const setSearch = useSearchState();
 	const { userView } = useAuth();
-	// The login the server knows this account by here — in a user view, the viewed member's. Never the
-	// sign-in name, which may be another linked identity's.
-	const membership = useQuery(workspaceMembershipQueryOptions(workspaceSlug));
-	const userLogin = membership.data?.userLogin;
-	const login = hasText(userLogin) ? userLogin : undefined;
 	const { workspaces } = useActiveWorkspaceSlug();
 	const workspace = workspaces.find((candidate) => candidate.workspaceSlug === workspaceSlug);
 	const providerType = toScmProviderType(workspace?.providerType);
+	const membership = useQuery(workspaceMembershipQueryOptions(workspaceSlug));
+	const login = membership.data && providerLogin(membership.data, providerType);
 
 	const detailStack = parseActivityStack(search.detail, SELF_ACTIVITY_LEVEL_KINDS);
 	const stackControls = useDetailStack();
 	const openCategory = detailStack.at(-1)?.target;
 
 	const period = periodFromSearch(search);
-	const userId = membership.data?.userId;
-	// Your own activity by your account, which the server counts even while you are hidden.
 	const scope = {
 		workspaceSlug,
 		period,
-		userId,
-		enabled: login !== undefined && userId !== undefined,
+		own: true as const,
+		enabled: login !== undefined,
 	};
 	const category = openCategory?.kind === "activity" ? openCategory.category : undefined;
 	const openWork = useOpenWork({ workspaceSlug, login });
@@ -86,23 +78,11 @@ function Activity() {
 		enabled: scope.enabled && category !== undefined,
 	});
 
-	const review = useRequestPracticeReview(workspaceSlug);
-	// Only where practices review the work; a user view reads the member's page and never spends
-	// their workspace's budget.
-	const reviewNow: OpenWorkReviewNow | undefined =
-		userView === undefined && workspace?.practicesEnabled === true
-			? {
-					onReviewNow: (work) =>
-						review.ask({ artifactKind: artifactKindOf(work), artifactId: work.id }),
-					requesting: review.asking?.artifactId,
-				}
-			: undefined;
-
 	return (
 		<>
 			<ActivityPage
 				providerType={providerType}
-				account={accountOf(membership, userView === undefined)}
+				account={accountOf(membership, login, userView === undefined)}
 				period={period}
 				onPeriodChange={(next) => {
 					void setSearch((previous) => ({ ...previous, ...periodSearch(next) }), {
@@ -113,7 +93,6 @@ function Activity() {
 				openWork={openWork}
 				overview={overview}
 				timeline={timeline}
-				reviewNow={reviewNow}
 			/>
 			<ActivityDetailDrawer
 				stack={login === undefined ? [] : detailStack}
@@ -127,9 +106,15 @@ function Activity() {
 	);
 }
 
-/** The kind the review request names: open work is only ever a pull request or an issue. */
-function artifactKindOf(work: Pick<WorkItem, "type">): string {
-	return work.type === "PULL_REQUEST" ? ARTIFACT_KIND.pullRequest : ARTIFACT_KIND.issue;
+// Activity uses this workspace provider's identity, including in user view; the sign-in identity can differ.
+function providerLogin(
+	membership: WorkspaceMembership,
+	providerType: ProviderType,
+): string | undefined {
+	const identityLogin = membership.account.identities.find(
+		(identity) => identity.provider === providerType,
+	)?.login;
+	return hasText(identityLogin) ? identityLogin : undefined;
 }
 
 /**
@@ -138,6 +123,7 @@ function artifactKindOf(work: Pick<WorkItem, "type">): string {
  */
 function accountOf(
 	membership: UseQueryResult<WorkspaceMembership>,
+	login: string | undefined,
 	offerSettings: boolean,
 ): ActivityAccount {
 	if (membership.isPending) {
@@ -152,8 +138,7 @@ function accountOf(
 			},
 		};
 	}
-	const login = membership.data.userLogin;
-	if (hasText(login)) {
+	if (login !== undefined) {
 		return { status: "ready", login };
 	}
 	return {

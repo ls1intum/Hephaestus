@@ -1,6 +1,6 @@
 import { addDays, addMonths, format, isSameYear, max, min } from "date-fns";
 
-import type { TimeBucketSize } from "@/api/types.gen";
+import type { ReviewOverview } from "@/api/types.gen";
 import type { PanelState } from "@/components/common/panel-state";
 import { formatDayRange, formatUtcDayRange, formatUtcShortDay } from "@/lib/dates";
 
@@ -12,7 +12,7 @@ import {
 	UTC_WEEK_MS,
 } from "./activity-tally";
 
-export type BucketSize = TimeBucketSize;
+export type BucketSize = ReviewOverview["bucket"];
 
 /** The instants a view counts between: from inclusive, to exclusive. */
 export interface DateSpan {

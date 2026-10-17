@@ -1,14 +1,9 @@
 import { z } from "zod";
 
-import type { ReviewedWorkRef } from "~/api/types.gen";
+import type { ItemRef } from "~/api/types.gen";
 import type { WorkspaceChoice } from "~/shared/review-context";
 
-/**
- * The review change the practice review on a provider page can start: asking for a review. It is only
- * ever about the work the worker reads from that tab, and it does not happen there: the page asks the
- * worker to open the extension's own confirmation window (`action.html`), which no provider page can
- * frame or cover. Cancelling a run or retrying its results is a workspace admin's, in the web app.
- */
+/** Review requests require the extension's own confirmation window, bound to the worker's current tab. */
 export const reviewActionSchema = z.strictObject({ kind: z.literal("request-review") });
 
 export type ReviewAction = z.infer<typeof reviewActionSchema>;
@@ -21,13 +16,13 @@ export interface ActionPreview {
 	action: ReviewAction;
 	instanceHost: string;
 	workspace: WorkspaceChoice;
-	work: ReviewedWorkRef;
+	item: ItemRef;
 }
 
-/** What became of a confirmed action, in the server's words. */
+/** What became of a confirmed action, based on the server's answer. */
 export interface ActionOutcome {
 	kind: "request-review";
 	status: "SUBMITTED" | "REFUSED";
-	/** The server's own sentence for why nothing started; shown verbatim. */
+	/** The shared explanation for the server's refusal code. */
 	reasonDescription?: string;
 }

@@ -6,18 +6,12 @@ import { expectNoPageOverflow } from "@/stories/reflow";
 import { precedes } from "@/test/dom";
 
 import { PracticeReviewsLayout } from "./PracticeReviewsLayout";
-import type { RunsSearch } from "./review-search";
-import { ReviewRunFilters } from "./ReviewRunFilters";
+import { ResultFilters } from "./ResultFilters";
+import type { ResultsSearch } from "./review-search";
 import { ReviewScopeFilters } from "./ReviewScopeFilters";
 import { ReviewSelectionBar } from "./ReviewSelectionBar";
 import { STORY_GROUPS, STORY_PEOPLE, STORY_PRACTICES } from "./story-scope-sources";
 
-/**
- * The page's header and its four sections, drawn as line tabs but made of links, since each changes
- * the URL. The scope and the tracked record are in one row above the tabs, because they apply to
- * every tab; a tab's own filters stay below the tabs. Which scope a section link carries is read
- * from the URL, so it is proved by the route's tests.
- */
 const meta = {
 	component: PracticeReviewsLayout,
 	parameters: {
@@ -36,21 +30,20 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const UNFILTERED: RunsSearch = { status: undefined, resultProcessing: undefined };
+const UNFILTERED: ResultsSearch = { outcome: undefined, severity: undefined };
 
-const SCOPED: RunsSearch = {
+const SCOPED: ResultsSearch = {
 	...UNFILTERED,
-	subjectUserId: STORY_PEOPLE.options[0]?.userId,
+	developerId: STORY_PEOPLE.options[0]?.accountId,
 	practiceSlug: [STORY_PRACTICES.options[0]?.value ?? ""],
 	from: "2026-09-01",
 	to: "2026-09-10",
 };
 
-/** The Reviews tab as the route draws it: its filters, then its list. */
-function ReviewsTab({ search }: { search: RunsSearch }) {
+function ResultsTab({ search }: { search: ResultsSearch }) {
 	return (
-		<section aria-label="Practice reviews" className="space-y-4">
-			<ReviewRunFilters
+		<section aria-label="Practice results" className="space-y-4">
+			<ResultFilters
 				search={search}
 				onPatch={fn()}
 				onReset={fn()}
@@ -60,7 +53,7 @@ function ReviewsTab({ search }: { search: RunsSearch }) {
 				people={STORY_PEOPLE}
 				total={7}
 			/>
-			<p className="text-sm text-muted-foreground">The reviews render here.</p>
+			<p className="text-sm text-muted-foreground">The results render here.</p>
 		</section>
 	);
 }
@@ -75,7 +68,7 @@ const TRACKING = (
 );
 
 /** The row above the tabs, the tabs, and the tab's own filters below them, in document order. */
-function placement(canvas: Parameters<NonNullable<Story["play"]>>[0]["canvas"]) {
+function layoutOf(canvas: Parameters<NonNullable<Story["play"]>>[0]["canvas"]) {
 	const scope = canvas.getByRole("group", { name: "Applies to every tab" });
 	const sections = canvas.getByRole("navigation", { name: "Practice review sections" });
 	const filters = canvas.getByRole("group", { name: "Filters" });
@@ -89,36 +82,33 @@ export const Default: Story = {
 		await expect(sections.getAllByRole("link").map((link) => link.textContent)).toEqual([
 			"Overview",
 			"Reviews",
-			"Observations",
+			"Results",
+			"Problems",
 			"Feedback",
 		]);
 		await expect(sections.getByRole("link", { name: "Reviews" })).toHaveAttribute(
 			"href",
-			"/w/demo/admin/practices/reviews/runs",
+			"/w/demo/admin/practices/reviews",
 		);
 		canvas.getByText("The section renders here.");
 	},
 };
 
-/**
- * On a list, the scope's facets are above the tabs, labelled as applying to every tab. The tab's own
- * Status, Result processing and the count stay below the tabs.
- */
 export const ScopeAboveTheTabs: Story = {
-	args: { children: <ReviewsTab search={UNFILTERED} /> },
-	parameters: { router: { initialUrl: "/w/demo/admin/practices/reviews/runs" } },
+	args: { children: <ResultsTab search={UNFILTERED} /> },
+	parameters: { router: { initialUrl: "/w/demo/admin/practices/reviews/results" } },
 	play: async ({ canvas }) => {
-		const { scope, sections, filters } = placement(canvas);
+		const { scope, sections, filters } = layoutOf(canvas);
 		await expect(precedes(scope, sections)).toBe(true);
 		await expect(precedes(sections, filters)).toBe(true);
 		canvas.getByText("Applies to every tab");
 		for (const name of ["Developer", "Group", "Practice"]) {
 			within(scope).getByRole("combobox", { name });
 		}
-		within(scope).getByRole("button", { name: "Created" });
-		within(filters).getByRole("combobox", { name: "Status" });
-		within(filters).getByRole("combobox", { name: "Result processing" });
-		within(filters).getByText("7 reviews.");
+		within(scope).getByRole("button", { name: "Recorded" });
+		within(filters).getByRole("combobox", { name: "Outcome" });
+		within(filters).getByRole("combobox", { name: "Severity" });
+		within(filters).getByText("7 results.");
 		// No scope is set, so there is nothing to clear.
 		await expect(
 			within(scope).queryByRole("button", { name: "Clear scope" }),
@@ -131,10 +121,10 @@ export const ScopeAboveTheTabs: Story = {
  * are all in the row above the tabs. Only the tab's own filters are below them.
  */
 export const ScopeAndTracking: Story = {
-	args: { children: <ReviewsTab search={SCOPED} />, selection: TRACKING },
-	parameters: { router: { initialUrl: "/w/demo/admin/practices/reviews/runs" } },
+	args: { children: <ResultsTab search={SCOPED} />, selection: TRACKING },
+	parameters: { router: { initialUrl: "/w/demo/admin/practices/reviews/results" } },
 	play: async ({ canvas }) => {
-		const { scope, sections, filters } = placement(canvas);
+		const { scope, sections, filters } = layoutOf(canvas);
 		await expect(precedes(scope, sections)).toBe(true);
 		within(scope).getByRole("button", { name: "Clear scope" });
 		await expect(within(scope).getByRole("combobox", { name: /^Developer/u })).toHaveTextContent(
@@ -159,7 +149,11 @@ export const OverviewKeepsTheScope: Story = {
 		children: (
 			<ReviewScopeFilters
 				tab="overview"
-				scope={{ personId: STORY_PEOPLE.options[0]?.userId, from: "2026-09-01", to: "2026-09-10" }}
+				scope={{
+					developerId: STORY_PEOPLE.options[0]?.accountId,
+					from: "2026-09-01",
+					to: "2026-09-10",
+				}}
 				onChange={fn()}
 				onClear={fn()}
 				dateTitle="Dates"
@@ -184,16 +178,15 @@ export const OverviewKeepsTheScope: Story = {
 	},
 };
 
-/** At 320px the row above the tabs wraps, and four sections share the track, with no sideways scroll. */
 export const Reflow: Story = {
-	args: { children: <ReviewsTab search={SCOPED} />, selection: TRACKING },
+	args: { children: <ResultsTab search={SCOPED} />, selection: TRACKING },
 	parameters: {
 		viewport: { defaultViewport: "reflow" },
 		chromatic: { viewports: [320] },
-		router: { initialUrl: "/w/demo/admin/practices/reviews/runs" },
+		router: { initialUrl: "/w/demo/admin/practices/reviews/results" },
 	},
 	play: async ({ canvas }) => {
-		const { scope, sections } = placement(canvas);
+		const { scope, sections } = layoutOf(canvas);
 		await expect(precedes(scope, sections)).toBe(true);
 		await expectNoPageOverflow();
 	},
@@ -213,7 +206,7 @@ export const CurrentSection: Story = {
 		);
 		// Overview's address is a prefix of every other section's, so it is the one a fuzzy match would
 		// also mark.
-		for (const name of ["Overview", "Reviews", "Observations"]) {
+		for (const name of ["Overview", "Reviews", "Results", "Problems"]) {
 			await expect(sections.getByRole("link", { name })).not.toHaveAttribute("aria-current");
 		}
 		await expect(sections.queryByRole("tab")).not.toBeInTheDocument();
@@ -227,23 +220,25 @@ export const CurrentSection: Story = {
  */
 export const TabCounts: Story = {
 	args: {
-		children: <ReviewsTab search={SCOPED} />,
-		counts: { runs: 1688, observations: 13_308, feedback: 1951 },
+		children: <ResultsTab search={SCOPED} />,
+		counts: { reviews: 1688, results: 13_308, problems: 4210, feedback: 1951 },
 	},
-	parameters: { router: { initialUrl: "/w/demo/admin/practices/reviews/runs" } },
+	parameters: { router: { initialUrl: "/w/demo/admin/practices/reviews/results" } },
 	play: async ({ canvas }) => {
 		const sections = within(canvas.getByRole("navigation", { name: "Practice review sections" }));
 		await expect(sections.getAllByRole("link").map((link) => link.textContent)).toEqual([
 			"Overview",
 			"Reviews1,688",
-			"Observations13,308",
+			"Results13,308",
+			"Problems4,210",
 			"Feedback1,951",
 		]);
-		await expect(sections.getByRole("link", { name: "Reviews, 1,688" })).toHaveAttribute(
+		await expect(sections.getByRole("link", { name: "Results, 13,308" })).toHaveAttribute(
 			"aria-current",
 			"page",
 		);
-		sections.getByRole("link", { name: "Observations, 13,308" });
+		sections.getByRole("link", { name: "Reviews, 1,688" });
+		sections.getByRole("link", { name: "Problems, 4,210" });
 		sections.getByRole("link", { name: "Feedback, 1,951" });
 		await expect(sections.getByText("13,308")).toHaveClass("tabular-nums");
 	},
@@ -254,12 +249,12 @@ export const TabCounts: Story = {
  * count known to be nothing says 0, which an unknown one never does.
  */
 export const TabCountsLoading: Story = {
-	args: { counts: { observations: 0 } },
-	parameters: { router: { initialUrl: "/w/demo/admin/practices/reviews/runs" } },
+	args: { counts: { results: 0 } },
+	parameters: { router: { initialUrl: "/w/demo/admin/practices/reviews/results" } },
 	play: async ({ canvas }) => {
 		const sections = within(canvas.getByRole("navigation", { name: "Practice review sections" }));
 		sections.getByRole("link", { name: "Reviews" });
-		sections.getByRole("link", { name: "Observations, 0" });
+		sections.getByRole("link", { name: "Results, 0" });
 		sections.getByRole("link", { name: "Feedback" });
 	},
 };
@@ -267,13 +262,13 @@ export const TabCountsLoading: Story = {
 /** At 320px the counted tabs wrap onto a second line, with no sideways scroll. */
 export const TabCountsReflow: Story = {
 	args: {
-		children: <ReviewsTab search={SCOPED} />,
-		counts: { runs: 1688, observations: 13_308, feedback: 1951 },
+		children: <ResultsTab search={SCOPED} />,
+		counts: { reviews: 1688, results: 13_308, problems: 4210, feedback: 1951 },
 	},
 	parameters: {
 		viewport: { defaultViewport: "reflow" },
 		chromatic: { viewports: [320] },
-		router: { initialUrl: "/w/demo/admin/practices/reviews/runs" },
+		router: { initialUrl: "/w/demo/admin/practices/reviews/results" },
 	},
 	play: async () => {
 		await expectNoPageOverflow();

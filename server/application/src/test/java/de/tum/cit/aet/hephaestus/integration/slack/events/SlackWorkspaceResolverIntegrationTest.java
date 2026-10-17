@@ -1,10 +1,12 @@
 package de.tum.cit.aet.hephaestus.integration.slack.events;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
@@ -13,12 +15,15 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 
-/** The test schema is Hibernate-generated, so the one-active-Slack-per-team index is absent here. */
 class SlackWorkspaceResolverIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
     private ConnectionRepository connectionRepository;
+
+    @Autowired
+    private ConnectionService connections;
 
     @Test
     void shouldResolveNothingWhenTeamHasNoActiveConnection() {
@@ -39,16 +44,20 @@ class SlackWorkspaceResolverIntegrationTest extends AbstractWorkspaceIntegration
     }
 
     @Test
-    void shouldResolveNothingWhenTeamHasTwoActiveConnections() {
+    void shouldPreserveOwnerWhenAnotherWorkspaceTriesToActivateTheSameTeam() {
         String team = uniqueTeam();
-        connectSlack(newWorkspace(), team, IntegrationState.ACTIVE);
-        connectSlack(newWorkspace(), team, IntegrationState.ACTIVE);
+        Workspace owner = newWorkspace();
+        Workspace otherWorkspace = newWorkspace();
+        connectSlack(owner, team, IntegrationState.ACTIVE);
 
-        assertThat(resolver().resolveWorkspaceId(team)).isEmpty();
+        assertThatThrownBy(() -> connectSlack(otherWorkspace, team, IntegrationState.ACTIVE))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("uq_connection_one_active_slack_per_team");
+        assertThat(resolver().resolveWorkspaceId(team)).contains(owner.getId());
     }
 
     private SlackWorkspaceResolver resolver() {
-        return new SlackWorkspaceResolver(connectionRepository);
+        return new SlackWorkspaceResolver(connections);
     }
 
     private static String uniqueTeam() {

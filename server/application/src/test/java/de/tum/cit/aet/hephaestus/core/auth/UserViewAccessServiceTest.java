@@ -12,8 +12,8 @@ import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventData;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventWriter;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.auth.spi.UserViewAccess;
 import de.tum.cit.aet.hephaestus.core.auth.stepup.RecentSignInPolicy;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -35,7 +35,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 @Tag("unit")
 class UserViewAccessServiceTest extends BaseUnitTest {
-    private final IdentityLinkRepository identityLinks = mock(IdentityLinkRepository.class);
+    private final IdentityRepository identityLinks = mock(IdentityRepository.class);
     private final AuthEventWriter writer = mock(AuthEventWriter.class);
     private final UserViewAccessService service = new UserViewAccessService(
             identityLinks, new AuthEventLogger(writer), new JsonMapper(), mock(RecentSignInPolicy.class));
@@ -62,8 +62,9 @@ class UserViewAccessServiceTest extends BaseUnitTest {
 
         AuthEventData event = written();
         assertThat(event.actingAccountId()).isEqualTo(42L);
-        assertThat(event.accountId()).isNull();
-        assertThat(event.viewedUserId()).isEqualTo(99L);
+        assertThat(event.accountId()).isEqualTo(42L);
+        assertThat(event.viewedAccountId()).isNull();
+        assertThat(event.viewedActorId()).isEqualTo(99L);
         assertThat(event.workspaceId()).isEqualTo(7L);
         assertThat(event.details())
                 .contains("\"reason\":\"Investigate missing feedback\"")
@@ -76,7 +77,7 @@ class UserViewAccessServiceTest extends BaseUnitTest {
 
         service.record(7L, 99L, 3L, "Support", "/read");
 
-        assertThat(written().accountId()).isEqualTo(3L);
+        assertThat(written().viewedAccountId()).isEqualTo(3L);
     }
 
     @Test
@@ -113,11 +114,10 @@ class UserViewAccessServiceTest extends BaseUnitTest {
         var account = new Account("Viewed account");
         account.setId(3L);
         account.setStatus(Account.Status.DELETING);
-        var link = new IdentityLink();
+        var link = new Identity();
         link.setAccount(account);
         link.setProviderId(55L);
-        link.setSubject("123");
-        link.setExternalActorId(100L);
+        link.setProviderUserKey("123");
         when(identityLinks.findActiveScmLinks(List.of(55L), List.of("123", "124")))
                 .thenReturn(List.of(link));
 

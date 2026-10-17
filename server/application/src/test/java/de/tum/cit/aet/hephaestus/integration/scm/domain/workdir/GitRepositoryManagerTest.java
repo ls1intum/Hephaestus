@@ -4,6 +4,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.tum.cit.aet.hephaestus.integration.core.fabric.EvidenceSpool;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitDetails;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitFileChange.ChangeType;
@@ -125,7 +126,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
             String first = commit(git, "docs: describe usage");
             Files.writeString(source.resolve("a.txt"), "a\n");
             Files.writeString(source.resolve("b.txt"), "b\n");
-            String second = commit(git, "feat: add a and b\n\nCloses #7");
+            String second = commit(git, "feat: add a and b\n\n\nCloses #7\n");
             prepare();
 
             Map<String, CommitDetails> commits = new HashMap<>();
@@ -146,6 +147,8 @@ class GitRepositoryManagerTest extends BaseUnitTest {
             assertThat(Objects.requireNonNull(commits.get(second)).message()).isEqualTo("feat: add a and b");
             assertThat(Objects.requireNonNull(commits.get(second)).messageBody())
                     .isEqualTo("Closes #7");
+            assertThat(Objects.requireNonNull(commits.get(second)).rawMessage())
+                    .isEqualTo("feat: add a and b\n\n\nCloses #7\n");
             assertThat(Objects.requireNonNull(commits.get(second)).parentShas()).containsExactly(first);
         }
     }
@@ -200,6 +203,41 @@ class GitRepositoryManagerTest extends BaseUnitTest {
     }
 
     @Test
+    void shouldCaptureScanFilesWithoutHistoryOrAuthorMetadata() throws Exception {
+        try (Git git = repository()) {
+            Files.writeString(source.resolve("scan.txt"), "first\n");
+            String pinned = commit(git, "Pinned scan");
+            Files.writeString(source.resolve("scan.txt"), "later\n");
+            commit(git, "Later changes");
+            prepare();
+            Path staged;
+            try (var snapshot = manager.readScanSnapshot(KEY, pinned, Set.of("scan.txt"))) {
+                staged = snapshot.stagingDir();
+                assertThat(Files.readString(staged.resolve("scan.txt"))).isEqualTo("first\n");
+                assertThat(staged.resolve(".git")).doesNotExist();
+                assertThat(staged.resolve("README.md")).doesNotExist();
+                assertThat(snapshot.visitedFiles()).isEqualTo(1);
+                assertThat(snapshot.commitSha()).isEqualTo(pinned);
+                assertThat(snapshot.complete()).isTrue();
+            }
+            assertThat(staged).doesNotExist();
+        }
+    }
+
+    @Test
+    void shouldReportAnUnavailablePermittedScanPathAsPartial() throws Exception {
+        try (Git git = repository()) {
+            String pinned = head(git);
+            prepare();
+            try (var snapshot = manager.readScanSnapshot(KEY, pinned, Set.of("README.md", "missing.txt"))) {
+                assertThat(snapshot.complete()).isFalse();
+                assertThat(snapshot.limitations()).containsExactly("SCAN_PATH_UNAVAILABLE");
+                assertThat(snapshot.visitedFiles()).isEqualTo(1);
+            }
+        }
+    }
+
+    @Test
     void shouldStageFullSourceHistoryAndBinariesWhenReadingASnapshot() throws Exception {
         try (Git git = repository()) {
             Files.writeString(source.resolve("large.txt"), "source\n".repeat(300_000));
@@ -213,8 +251,8 @@ class GitRepositoryManagerTest extends BaseUnitTest {
             try (var snapshot = manager.readTreeSnapshot(KEY, sha)) {
                 staging = snapshot.stagingDir();
                 assertThat(staging).startsWith(fabric);
-                assertThat(staging.getFileName().toString()).startsWith(GitRepositoryManager.GIT_SNAPSHOT_PREFIX);
-                assertThat(GitRepositoryManager.isCurrentProcessSpool(staging)).isTrue();
+                assertThat(staging.getFileName().toString()).startsWith(EvidenceSpool.PREFIX);
+                assertThat(EvidenceSpool.isCurrentProcess(staging)).isTrue();
                 assertThat(snapshot.complete()).isTrue();
                 assertThat(snapshot.commitSha()).isEqualTo(sha);
                 assertThat(snapshot.visitedFiles()).isEqualTo(4);
@@ -322,10 +360,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         }
     }
 
-    /**
-     * A writer that continues a review is given the checkout its capture had: the same tree, limits and exclusions,
-     * from the original commits alone, however the branches moved since. Nothing current comes with it.
-     */
     @Test
     void shouldRestoreTheOriginalCheckoutFromItsOwnCommitsAfterTheBranchesMoved() throws Exception {
         try (Git git = repository()) {
@@ -359,7 +393,8 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 }
             }
 
-            // An original commit the mirror does not hold is refused before anything is staged, not replaced.
+            // An original commit the mirror does not hold is refused before anything is staged, not
+            // replaced.
             assertThatThrownBy(() -> manager.readOriginalSnapshot(KEY, original, List.of("d".repeat(40))))
                     .isInstanceOf(GitRepositoryManager.GitOperationException.class);
             // The original bound still applies.
@@ -769,8 +804,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
     private List<Path> stagingDirectories() throws IOException {
         if (!Files.isDirectory(fabric)) return List.of();
         try (Stream<Path> entries = Files.list(fabric)) {
-            return entries.filter(
-                            path -> path.getFileName().toString().startsWith(GitRepositoryManager.GIT_SNAPSHOT_PREFIX))
+            return entries.filter(path -> path.getFileName().toString().startsWith(EvidenceSpool.PREFIX))
                     .toList();
         }
     }

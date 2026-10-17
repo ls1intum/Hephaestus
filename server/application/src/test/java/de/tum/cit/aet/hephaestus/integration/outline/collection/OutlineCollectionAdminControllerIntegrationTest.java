@@ -35,8 +35,8 @@ import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.Membership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -127,7 +127,7 @@ class OutlineCollectionAdminControllerIntegrationTest extends AbstractWorkspaceI
     @DisplayName("non-admin cannot reach the collection control plane → 403")
     void nonAdmin_forbidden() {
         User mentor = persistUser("mentor");
-        ensureWorkspaceMembership(workspace, mentor, WorkspaceRole.MEMBER);
+        ensureMembership(workspace, mentor, WorkspaceRole.MEMBER);
 
         listRequest().expectStatus().isForbidden().expectBody(Void.class);
         registerRequest(COLLECTION_ID).expectStatus().isForbidden().expectBody(Void.class);
@@ -377,6 +377,11 @@ class OutlineCollectionAdminControllerIntegrationTest extends AbstractWorkspaceI
         seedDocument("doc-live");
         OutlineDocument tombstoned = seedDocument("doc-gone");
         tombstoned.setDeletedAt(Instant.parse("2026-01-01T00:00:00Z"));
+        tombstoned.setBodyMarkdown(null);
+        tombstoned.setContentHash(null);
+        tombstoned.setCreatedBySubject(null);
+        tombstoned.setUpdatedBySubject(null);
+        tombstoned.setCollaboratorSubjects(null);
         documentRepository.save(tombstoned);
 
         ConnectionSyncStatusDTO status = syncStatusRequest()

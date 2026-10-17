@@ -1,23 +1,21 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
 import {
-	getPracticeDefinitionOptionsQueryKey,
-	getPracticeGuidanceOptions,
 	getPracticeQueryKey,
-	listGroupsQueryKey,
+	getPracticeGuidanceOptions,
+	getPracticeDefinitionOptionsQueryKey,
+	listPracticeGroupsQueryKey,
 	listPracticesQueryKey,
 } from "@/api/@tanstack/react-query.gen";
-import type { CatalogPracticePreview } from "@/api/types.gen";
-import { mockPractices } from "@/components/admin/practices/fixtures";
+import { definitionOf, mockDefinitionOptions } from "@/components/admin/practice-editor/fixtures";
+
+import type {
+	AdoptablePractice,
+	PracticeAdoptionPreview,
+} from "@/components/admin/practices/catalog-adoption";
 import { stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
-import {
-	mockAuthorDeclaredEvidenceValidation,
-	mockPracticeDefinitionOptions,
-	mockPullRequestReviewFields,
-	mockPullRequestPolicy,
-} from "@/mocks/fixtures/practice";
+import type { Wire } from "@/lib/dates";
 import { server } from "@/mocks/server";
 import {
 	ROUTE_RENDER_WAIT,
@@ -26,37 +24,53 @@ import {
 	testQueryClient,
 } from "@/test/router-harness";
 
+import {
+	practiceSetupHandlers,
+	practicesHandlers,
+	wireGuidance,
+	wirePractice,
+} from "./-practice-server";
+
 vi.setConfig({ testTimeout: 20_000 });
 
-const preview: CatalogPracticePreview = {
+const definition = definitionOf({
+	name: "Describe what changed and why",
+	criteria: "Explain the change and why it is needed.",
+});
+
+const preview: Wire<PracticeAdoptionPreview> = {
 	slug: "describe-what-and-why",
+	kind: "scm.pull_request",
 	availability: "AVAILABLE",
 	etag: '"reviewed-plan"',
-	initialAutonomy: "HUMAN_APPROVAL",
-	sourceReviewRuleFingerprint: mockAuthorDeclaredEvidenceValidation.reviewRuleFingerprint,
+	initialFeedbackMode: "APPROVE_FIRST",
+	offeredDigest: "sha256:describe-what-and-why",
 	group: {
 		slug: "review-ready-work",
 		disposition: "CREATE_CATALOG_GROUP",
-		definition: { name: "Review-ready work" },
+		definition: { name: "Review-ready work", description: null, icon: null, color: null },
 	},
-	definition: {
-		name: "Describe what changed and why",
-		artifactKind: "scm.pull_request",
-		...mockPullRequestReviewFields,
-		deliveryBehavior: { summaryOnly: false },
-		automatedReviewPolicy: mockPullRequestPolicy,
-		automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
-		criteria: "Explain the change and why it is needed.",
-		whyItMatters: "Reviewers need intent.",
-		whatGoodLooksLike: "A concise summary and motivation.",
-		groupSlug: "review-ready-work",
-	},
+	definition,
 };
 
-/**
- * The preview as it stands, then as it stands after someone else changed it — the shape a 412 is
- * about. A handler is where setup is allowed to branch; a test body is not.
- */
+function summary(
+	slug: string,
+	name: string,
+	kind: string,
+	availability: AdoptablePractice["availability"],
+	groupSlug?: string,
+): Wire<AdoptablePractice> {
+	return {
+		slug,
+		name,
+		kind,
+		availability,
+		groupSlug,
+		groupName: groupSlug === undefined ? undefined : "Review-ready work",
+		reviewedBy: { by: "HEPHAESTUS", humanReason: null, limits: [] },
+	};
+}
+
 function planChangedAfterTheFirstRead() {
 	let reads = 0;
 	return http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption/:slug", () => {
@@ -65,17 +79,14 @@ function planChangedAfterTheFirstRead() {
 		return HttpResponse.json({
 			...preview,
 			definition: {
-				...preview.definition,
-				criteria: changed
-					? "Updated review rule that must be reviewed."
-					: preview.definition.criteria,
+				...definition,
+				criteria: changed ? "Updated review rule that must be reviewed." : definition.criteria,
 			},
 			etag: changed ? '"updated-plan"' : preview.etag,
 		});
 	});
 }
 
-/** The preview once, and then nothing: the refresh a 412 asks for is itself allowed to fail. */
 function planUnreadableAfterTheFirstRead() {
 	let reads = 0;
 	return http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption/:slug", () => {
@@ -93,12 +104,10 @@ function planUnreadableAfterTheFirstRead() {
 const LIBRARY = "/w/acme/admin/practices?library=true";
 const REVIEWING = `${LIBRARY}&detail=catalog-practice:${preview.slug}`;
 
-const workspacePractice = {
-	...mockPractices[0],
+const workspacePractice = wirePractice({
 	slug: "already-mine",
-	name: "Already mine",
-	groupSlug: undefined,
-};
+	definition: definitionOf({ name: "Already mine" }),
+});
 
 const PRACTICE_PATH = `*/workspaces/acme/practices/${workspacePractice.slug}`;
 const DEFINITION_OPTIONS_PATH = "*/workspaces/acme/practices/definition-options";
@@ -118,7 +127,7 @@ function serveEditorReads() {
 		// Before `:practiceSlug`, which would otherwise answer these paths. MSW takes the first match.
 		http.get(DEFINITION_OPTIONS_PATH, () => {
 			reads.push("definition options");
-			return HttpResponse.json(mockPracticeDefinitionOptions);
+			return HttpResponse.json(mockDefinitionOptions);
 		}),
 		http.get("*/workspaces/:workspaceSlug/practices/releases", () => HttpResponse.json([])),
 		http.get(GROUPS_PATH, () => {
@@ -159,57 +168,22 @@ function groupDraftName() {
 
 describe("catalog adoption over practice setup", () => {
 	beforeEach(() => {
-		server.use(
-			http.get("*/workspaces/:workspaceSlug/practices/definition-options", () =>
-				HttpResponse.json(mockPracticeDefinitionOptions),
-			),
-			http.get("*/workspaces/:workspaceSlug/practice-groups", () => HttpResponse.json([])),
-			http.get("*/workspaces/:workspaceSlug/practices", () => HttpResponse.json([])),
-			http.get("*/workspaces/:workspaceSlug/practices/releases", () => HttpResponse.json([])),
-			http.get("*/workspaces/:workspaceSlug/members/me", () =>
-				HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
-			),
-			http.get("*/workspaces", () =>
-				HttpResponse.json([
-					{
-						id: 1,
-						workspaceSlug: "acme",
-						displayName: "Acme",
-						providerType: "GITHUB",
-						status: "ACTIVE",
-						practicesEnabled: false,
-					},
-				]),
-			),
-		);
+		server.use(...practiceSetupHandlers());
 	});
 
 	it("shows every included practice in the catalog and distinguishes adoption states", async () => {
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption", () =>
 				HttpResponse.json([
-					{
-						slug: preview.slug,
-						name: preview.definition.name,
-						artifactKind: "scm.pull_request",
-						groupSlug: "review-ready-work",
-						availability: "AVAILABLE",
-						automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
-					},
-					{
-						slug: "already-there",
-						name: "Already there",
-						artifactKind: "scm.issue",
-						availability: "ADOPTED",
-						automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
-					},
-					{
-						slug: "issue-context",
-						name: "Include enough issue context",
-						artifactKind: "scm.issue",
-						availability: "SLUG_CONFLICT",
-						automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
-					},
+					summary(
+						preview.slug,
+						definition.name,
+						"scm.pull_request",
+						"AVAILABLE",
+						"review-ready-work",
+					),
+					summary("already-there", "Already there", "scm.issue", "ADOPTED"),
+					summary("issue-context", "Include enough issue context", "scm.issue", "SLUG_CONFLICT"),
 				]),
 			),
 		);
@@ -229,14 +203,13 @@ describe("catalog adoption over practice setup", () => {
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption", () =>
 				HttpResponse.json([
-					{
-						slug: preview.slug,
-						name: preview.definition.name,
-						artifactKind: "scm.pull_request",
-						groupSlug: "review-ready-work",
-						availability: "AVAILABLE",
-						automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
-					},
+					summary(
+						preview.slug,
+						definition.name,
+						"scm.pull_request",
+						"AVAILABLE",
+						"review-ready-work",
+					),
 				]),
 			),
 			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption/:slug", () =>
@@ -262,20 +235,7 @@ describe("catalog adoption over practice setup", () => {
 	});
 
 	it("opens a workspace practice read-only over the tree instead of in the edit form", async () => {
-		server.use(
-			http.get("*/workspaces/:workspaceSlug/practices", () =>
-				HttpResponse.json([workspacePractice]),
-			),
-			// Declared before the `:practiceSlug` handler below, which would otherwise match this path
-			// with `practiceSlug === "definition-options"`. MSW takes the first match in order.
-			http.get("*/workspaces/:workspaceSlug/practices/definition-options", () =>
-				HttpResponse.json(mockPracticeDefinitionOptions),
-			),
-			http.get("*/workspaces/:workspaceSlug/practices/releases", () => HttpResponse.json([])),
-			http.get("*/workspaces/:workspaceSlug/practices/:practiceSlug", () =>
-				HttpResponse.json(workspacePractice),
-			),
-		);
+		server.use(...practicesHandlers([workspacePractice]));
 
 		const { router } = renderRouteAtWithRouter("/w/acme/admin/practices");
 		fireEvent.click(await screen.findByRole("link", { name: "Already mine" }, ROUTE_RENDER_WAIT));
@@ -300,7 +260,7 @@ describe("catalog adoption over practice setup", () => {
 			}),
 			staleTime: 30_000,
 		};
-		queryClient.setQueryData(guidanceOptions.queryKey, { practiceSlug: preview.slug });
+		queryClient.setQueryData(guidanceOptions.queryKey, wireGuidance(preview.slug, null));
 		const seenIfMatch = vi.fn();
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption", () =>
@@ -310,17 +270,13 @@ describe("catalog adoption over practice setup", () => {
 				HttpResponse.json(preview),
 			),
 			http.get("*/workspaces/:workspaceSlug/practices/:practiceSlug/guidance", () =>
-				HttpResponse.json({
-					practiceSlug: preview.slug,
-					guide: { markdown: "Adopted guide", figures: {} },
-				}),
+				HttpResponse.json(wireGuidance(preview.slug, "Adopted guide")),
 			),
 			http.post("*/workspaces/:workspaceSlug/practice-catalog/adoption/:slug", ({ request }) => {
 				seenIfMatch(request.headers.get("If-Match"));
-				return HttpResponse.json(
-					{ ...mockPractices[0], slug: preview.slug, name: preview.definition.name },
-					{ status: 201 },
-				);
+				return HttpResponse.json(wirePractice({ slug: preview.slug, definition }), {
+					status: 201,
+				});
 			}),
 		);
 
@@ -340,7 +296,7 @@ describe("catalog adoption over practice setup", () => {
 		});
 	});
 
-	it("requires review again after a 412", async () => {
+	it("requires review again when the plan changed before the add", async () => {
 		const seenIfMatch = vi.fn();
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption", () =>
@@ -350,7 +306,11 @@ describe("catalog adoption over practice setup", () => {
 			http.post("*/workspaces/:workspaceSlug/practice-catalog/adoption/:slug", ({ request }) => {
 				seenIfMatch(request.headers.get("If-Match"));
 				return HttpResponse.json(
-					{ title: "Precondition Failed", status: 412, detail: "The adoption preview changed." },
+					{
+						title: "Practice adoption preview changed",
+						status: 412,
+						detail: "The preview changed.",
+					},
 					{ status: 412 },
 				);
 			}),
@@ -363,13 +323,11 @@ describe("catalog adoption over practice setup", () => {
 		// `role="alert"` announces the change without pulling focus off the action.
 		const changed = await screen.findByRole("alert");
 		expect(changed.textContent).toContain("The catalog changed while you were reading");
-		// The rule is what a 412 is about, so open the disclosure that holds it and check the panel
-		// is showing the refetched one rather than the plan that was just rejected.
 		fireEvent.click(await screen.findByRole("button", { name: "How it decides" }));
 		await screen.findByText("Updated review rule that must be reviewed.");
 	});
 
-	it("does not claim the latest preview is shown when refreshing after a 412 fails", async () => {
+	it("does not claim the latest preview is shown when refreshing after a stale precondition fails", async () => {
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption", () =>
 				HttpResponse.json([]),
@@ -377,7 +335,11 @@ describe("catalog adoption over practice setup", () => {
 			planUnreadableAfterTheFirstRead(),
 			http.post("*/workspaces/:workspaceSlug/practice-catalog/adoption/:slug", () =>
 				HttpResponse.json(
-					{ title: "Precondition Failed", status: 412, detail: "The adoption preview changed." },
+					{
+						title: "Practice adoption preview changed",
+						status: 412,
+						detail: "The preview changed.",
+					},
 					{ status: 412 },
 				),
 			),
@@ -395,18 +357,23 @@ describe("catalog adoption over practice setup", () => {
 			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption", () =>
 				HttpResponse.json([]),
 			),
+			http.get(
+				"*/workspaces/:workspaceSlug/practice-catalog/adoption/:slug",
+				() => HttpResponse.json(preview),
+				{ once: true },
+			),
 			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption/:slug", () =>
-				HttpResponse.json(preview),
+				HttpResponse.json({ ...preview, availability: "ADOPTED" }),
 			),
 			http.post("*/workspaces/:workspaceSlug/practice-catalog/adoption/:slug", () =>
 				HttpResponse.json(
 					{
 						type: "about:blank",
 						title: "Conflict",
-						status: 409,
+						status: 412,
 						detail: "A workspace practice already uses this slug.",
 					},
-					{ status: 409 },
+					{ status: 412 },
 				),
 			),
 		);
@@ -438,21 +405,24 @@ describe("catalog adoption over practice setup", () => {
 		fireEvent.change(screen.getByRole("textbox", { name: /What to look for/u }), {
 			target: { value: "Check that the description says why." },
 		});
+		fireEvent.click(screen.getByRole("button", { name: "Choose sources" }));
+		const details = await screen.findByRole("radiogroup", {
+			name: "How Pull request details is read",
+		});
+		fireEvent.click(within(details).getByRole("radio", { name: "Required" }));
 		fireEvent.click(screen.getByRole("button", { name: "Create practice" }));
 
-		await waitFor(
-			() =>
-				expect(created).toHaveBeenCalledWith(
-					expect.objectContaining({
-						name: "Explain the change",
-						criteria: "Check that the description says why.",
-					}),
-				),
-			ROUTE_RENDER_WAIT,
-		);
-		expect(created).toHaveBeenCalledWith(
-			expect.objectContaining({ name: "Explain the change", slug: "explain-the-change" }),
-		);
+		await waitFor(() => expect(created).toHaveBeenCalledOnce(), ROUTE_RENDER_WAIT);
+		expect(created.mock.lastCall?.[0]).toMatchObject({
+			slug: "explain-the-change",
+			kind: "scm.pull_request",
+			groupSlug: null,
+			position: null,
+			definition: {
+				name: "Explain the change",
+				criteria: "Check that the description says why.",
+			},
+		});
 		// The level goes; the tree it was opened over is what the reader lands on.
 		await waitFor(
 			() => expect(stackInSearch(router.state.location.search.detail)).toStrictEqual([]),
@@ -536,7 +506,7 @@ describe("catalog adoption over practice setup", () => {
 				"practice-new:draft",
 				"Create practice",
 				GROUPS_PATH,
-				listGroupsQueryKey({ path: { workspaceSlug: "acme" } }),
+				listPracticeGroupsQueryKey({ path: { workspaceSlug: "acme" } }),
 			],
 		] as const)(
 			"%s keeps the draft when its %s refresh fails, and Retry reads only that again",
@@ -592,7 +562,17 @@ describe("catalog adoption over practice setup", () => {
 				),
 				http.get(PRACTICE_PATH, () => {
 					served.push(200);
-					return HttpResponse.json({ ...workspacePractice, name: "Renamed elsewhere" });
+					return HttpResponse.json({
+						...workspacePractice,
+						name: "Renamed elsewhere",
+						currentVersion: {
+							...workspacePractice.currentVersion,
+							definition: {
+								...workspacePractice.currentVersion.definition,
+								name: "Renamed elsewhere",
+							},
+						},
+					});
 				}),
 			);
 			const refreshPractice = async () => {

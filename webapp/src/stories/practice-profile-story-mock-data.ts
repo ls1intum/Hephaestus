@@ -1,57 +1,70 @@
-/**
- * The developer's practice profile as the wire carries it, for the stories and the tests: the
- * reviewed work every practice-profile fixture names, the workspace's groups, the developer's
- * standing in each and on each practice, and one overview — the events behind the group and practice
- * sentences and the latest-run chip — on the same groups and practices as the
- * feedback card fixtures. The pages read the server.
- */
 import type {
-	PracticeGroup,
+	GroupRef,
+	ItemRef,
 	PracticeGroupStanding,
 	PracticeProfileOverview,
 	PracticeStanding,
 	ProfileChange,
-	ReviewedWorkRef,
+	ProfileReviewRef,
 	TrendSupport,
 } from "@/api/types.gen";
-import { ARTIFACT_KIND } from "@/lib/artifact-kinds";
+import { ITEM_KIND } from "@/lib/item-kinds";
 
 import { inStoryYear } from "./story-clock";
 
-/**
- * Reviewed work as the wire names it, for every practice-profile fixture. The pull requests and
- * issues are real ones in the development workspace's test repositories, so every link lands on
- * the page it names; the prose around them is the mockup's. A conversation has no page there and
- * stays plain text until the wire contract carries an address for it.
- */
 const PULL_REQUESTS = "https://github.com/HephaestusTest/practice-validation/pull/";
 const ISSUES = "https://github.com/HephaestusTest/MaxTestRepo/issues/";
 
-export const pullRequest = (number: number): ReviewedWorkRef => ({
-	id: String(number),
-	kind: ARTIFACT_KIND.pullRequest,
-	provider: "GITHUB",
-	label: `#${number}`,
-	url: `${PULL_REQUESTS}${number}`,
-	container: "HephaestusTest/practice-validation",
+const item = (fields: Pick<ItemRef, "id" | "kind" | "label"> & Partial<ItemRef>): ItemRef => ({
+	parentId: null,
+	provider: null,
+	title: null,
+	url: null,
+	container: null,
+	path: null,
+	removedAt: null,
+	...fields,
 });
 
-export const issue = (number: number): ReviewedWorkRef => ({
-	id: String(number),
-	kind: ARTIFACT_KIND.issue,
-	provider: "GITHUB",
-	label: `#${number}`,
-	url: `${ISSUES}${number}`,
-	container: "HephaestusTest/MaxTestRepo",
-});
+export const pullRequest = (number: number): ItemRef =>
+	item({
+		id: String(1000 + number),
+		kind: ITEM_KIND.pullRequest,
+		provider: "GITHUB",
+		label: `#${number}`,
+		url: `${PULL_REQUESTS}${number}`,
+		container: "HephaestusTest/practice-validation",
+	});
 
-/** A Slack channel by name, "#releases"; the name is its id as well. */
-export const conversation = (label: string): ReviewedWorkRef => ({
-	id: label,
-	kind: ARTIFACT_KIND.conversationThread,
-	provider: "SLACK",
-	label,
-});
+export const issue = (number: number): ItemRef =>
+	item({
+		id: String(2000 + number),
+		kind: ITEM_KIND.issue,
+		provider: "GITHUB",
+		label: `#${number}`,
+		url: `${ISSUES}${number}`,
+		container: "HephaestusTest/MaxTestRepo",
+	});
+
+const CHANNELS = ["#releases", "#incidents", "#backend-review"];
+
+export const conversation = (label: string): ItemRef =>
+	item({
+		id: String(3000 + CHANNELS.indexOf(label) + 1),
+		kind: ITEM_KIND.thread,
+		provider: "SLACK",
+		label,
+	});
+
+export const document = (id: number, title: string): ItemRef =>
+	item({
+		id: String(4000 + id),
+		kind: ITEM_KIND.document,
+		provider: "OUTLINE",
+		label: title,
+		title,
+		url: `https://outline.example.com/doc/${id}`,
+	});
 
 /** Enough work on both sides of the comparison for a trend to be read. */
 export const wellSupported: TrendSupport = {
@@ -61,82 +74,64 @@ export const wellSupported: TrendSupport = {
 	opportunitiesUntilComparable: 0,
 	standingWork: 4,
 	reviewedWork: 11,
-	reviewedWorkKind: ARTIFACT_KIND.pullRequest,
+	reviewedWorkKind: ITEM_KIND.pullRequest,
 	bundleSize: 4,
 	ropeHalfWidth: 0.15,
 	credibilityThreshold: 0.9,
 	calendarSpanDays: 12,
 	comparablePractices: 2,
 	eligiblePractices: 3,
+	firstOpportunityAt: inStoryYear("08-28T10:00"),
+	lastOpportunityAt: inStoryYear("09-09T14:10"),
 };
 
-function group(
-	id: number,
-	slug: string,
-	name: string,
-	visual: { icon: string; color: string; description: string },
-): PracticeGroup {
-	return {
-		id,
-		slug,
-		name,
-		description: visual.description,
-		displayOrder: id,
-		visibleInPracticeDashboards: true,
-		autonomy: { effective: "AUTOMATIC", inherited: true, source: "WORKSPACE" },
-		icon: visual.icon,
-		color: visual.color,
-		createdAt: inStoryYear("01-01T00:00"),
-	};
-}
-
-/** The group the detail levels open in their stories and tests: the first of the catalog. */
-export const packagingGroup = group(1, "review-ready-work", "Packaging work for review", {
-	icon: "Package",
-	color: "sky",
-	description:
-		"Make changes easy to review before asking for feedback. Use one concern per change, a description that says what moved and why, and evidence that it works.",
+const group = (slug: string, name: string, icon: string, color: string): GroupRef => ({
+	slug,
+	name,
+	icon,
+	color,
 });
 
+/** The group the detail levels open in their stories and tests: the first of the catalog. */
+export const packagingGroup = group(
+	"review-ready-work",
+	"Packaging work for review",
+	"Package",
+	"sky",
+);
+
 /** The shipped catalog's groups, by slug, so the overview's sentences find their rows. */
-export const groups: PracticeGroup[] = [
+export const groups: GroupRef[] = [
 	packagingGroup,
-	group(2, "acting-on-review-feedback", "Acting on review feedback", {
-		icon: "MessageSquareReply",
-		color: "cyan",
-		description: "Answer every review comment and close the threads before merging.",
-	}),
-	group(3, "communication", "Communicating in the open", {
-		icon: "MessageCircle",
-		color: "violet",
-		description: "Ask and answer so a teammate can act on it.",
-	}),
-	group(4, "constructive-code-review", "Reviewing a teammate's work constructively", {
-		icon: "Eye",
-		color: "teal",
-		description: "Give review that moves the work forward.",
-	}),
-	group(5, "testing-discipline", "Testing your changes", {
-		icon: "TestTube",
-		color: "amber",
-		description: "Ship tests with the change and keep the suite honest.",
-	}),
+	group("acting-on-review-feedback", "Acting on review feedback", "MessageSquareReply", "cyan"),
+	group("communication", "Communicating in the open", "MessageCircle", "violet"),
+	group("constructive-code-review", "Reviewing a teammate's work constructively", "Eye", "teal"),
+	group("testing-discipline", "Testing your changes", "TestTube", "amber"),
 ];
 
 const groupStanding = (
 	slug: string,
 	standing: PracticeGroupStanding["standing"],
-	direction?: PracticeGroupStanding["direction"],
-): PracticeGroupStanding => ({
-	groupSlug: slug,
-	groupName: groups.find((candidate) => candidate.slug === slug)?.name ?? slug,
-	standing,
-	direction,
-	trendSupport: direction ? wellSupported : undefined,
-	observations: [],
-	sources: standing === "NOT_OBSERVED" ? [] : [{ workKind: ARTIFACT_KIND.pullRequest, count: 6 }],
-	feedbackSpanDays: standing === "NOT_OBSERVED" ? undefined : 42,
-});
+	direction: PracticeGroupStanding["direction"] = null,
+): PracticeGroupStanding => {
+	const ref = groups.find((candidate) => candidate.slug === slug);
+	return {
+		groupSlug: slug,
+		groupName: ref?.name ?? slug,
+		groupDescription: null,
+		groupIcon: ref?.icon ?? null,
+		groupColor: ref?.color ?? null,
+		standing,
+		direction,
+		trendSupport: direction ? wellSupported : null,
+		results: [],
+		sources: standing === "NOT_OBSERVED" ? [] : [{ itemKind: ITEM_KIND.pullRequest, count: 6 }],
+		feedbackSince: standing === "NOT_OBSERVED" ? null : inStoryYear("07-30T09:00"),
+		feedbackSpanDays: standing === "NOT_OBSERVED" ? null : 42,
+		guidance: null,
+		guidanceSource: null,
+	};
+};
 
 /** Where the developer stands in the group the detail levels open. */
 export const packagingStanding = groupStanding(packagingGroup.slug, "DEVELOPING", "DECLINING");
@@ -149,20 +144,34 @@ export const groupStandings: Record<string, PracticeGroupStanding> = {
 	"testing-discipline": groupStanding("testing-discipline", "NOT_OBSERVED"),
 };
 
+export const practiceStandingOf = (
+	fields: Pick<PracticeStanding, "slug" | "name" | "standing"> & Partial<PracticeStanding>,
+): PracticeStanding => ({
+	groupSlug: null,
+	groupName: null,
+	direction: null,
+	doesNotApplyOnly: false,
+	trendSupport: null,
+	whyItMatters: null,
+	whatGoodLooksLike: null,
+	strengths: [],
+	toWorkOn: [],
+	...fields,
+});
+
 const practice = (
 	groupSlug: string,
 	slug: string,
 	name: string,
 	standing: PracticeStanding["standing"],
-): PracticeStanding => ({
-	slug,
-	name,
-	groupSlug,
-	groupName: groups.find((candidate) => candidate.slug === groupSlug)?.name,
-	standing,
-	strengths: [],
-	toWorkOn: [],
-});
+): PracticeStanding =>
+	practiceStandingOf({
+		slug,
+		name,
+		groupSlug,
+		groupName: groups.find((candidate) => candidate.slug === groupSlug)?.name ?? null,
+		standing,
+	});
 
 /** Every practice with a standing, grouped as the tables list them. */
 export const practicesByGroup: Record<string, PracticeStanding[]> = {
@@ -270,7 +279,14 @@ export const practicesByGroup: Record<string, PracticeStanding[]> = {
 
 export const practiceStandings: PracticeStanding[] = Object.values(practicesByGroup).flat();
 
-const LATEST_RUN_AT = inStoryYear("09-09T14:10");
+const LATEST_REVIEW_AT = inStoryYear("09-09T14:10");
+
+export const LATEST_REVIEW: ProfileReviewRef = {
+	reviewId: "5d1e2a3b-0000-4000-8000-000000000909",
+	at: LATEST_REVIEW_AT,
+	item: pullRequest(22),
+	status: "COMPLETE",
+};
 
 const PACKAGING = { groupSlug: "review-ready-work", groupName: "Packaging work for review" };
 const COMMUNICATION = { groupSlug: "communication", groupName: "Communicating in the open" };
@@ -286,9 +302,17 @@ const change = (
 	rest: Partial<ProfileChange> = {},
 ): ProfileChange => ({
 	type,
-	at: LATEST_RUN_AT,
+	at: LATEST_REVIEW_AT,
+	practiceSlug: null,
+	practiceName: null,
 	...inGroup,
 	...onPractice,
+	cleanNeeded: null,
+	direction: null,
+	feedbackId: null,
+	from: null,
+	to: null,
+	resolvedBy: null,
 	evidence: [],
 	...rest,
 });
@@ -365,7 +389,7 @@ const COMMUNICATION_CHANGES: ProfileChange[] = [
 		},
 	),
 	change(
-		"FIRST_OBSERVED",
+		"FIRST_RECORDED",
 		COMMUNICATION,
 		{
 			practiceSlug: "posts-clear-status-and-blocker-updates",
@@ -419,15 +443,10 @@ const REVIEWING_CHANGES: ProfileChange[] = [
 	),
 ];
 
-/**
- * A run in which three practices of one group made the same move and a fourth made its own: what
- * the "All practice groups" table's group cell has to say in three bullets rather than six. One group moved
- * where a practice under it moved, so it rides on that practice's bullet; the other moved where
- * none of its practices did, so it is a bullet of its own.
- */
 export const SHARED_TRANSITION_OVERVIEW: PracticeProfileOverview = {
-	latestRun: { reviewId: "run-2026-09-09", at: LATEST_RUN_AT, reviewedWork: pullRequest(22) },
-	window: { since: inStoryYear("09-02T09:00"), until: LATEST_RUN_AT },
+	latestReview: LATEST_REVIEW,
+	reviewedItems: [pullRequest(22)],
+	window: { since: inStoryYear("09-02T09:00"), until: LATEST_REVIEW_AT },
 	changes: [
 		change(
 			"TREND_TURNED",
@@ -457,7 +476,7 @@ export const SHARED_TRANSITION_OVERVIEW: PracticeProfileOverview = {
 			{ from: "UNCERTAIN", to: "IMPROVING", evidence: [pullRequest(22)] },
 		),
 		change(
-			"FIRST_OBSERVED",
+			"FIRST_RECORDED",
 			PACKAGING,
 			{
 				practiceSlug: "ready-and-traceable-handoff",
@@ -488,9 +507,9 @@ export const SHARED_TRANSITION_OVERVIEW: PracticeProfileOverview = {
 	],
 };
 
-/** The overview the stories show: one run, eleven changes, one of them a group moving. */
 export const OVERVIEW_FIXTURE: PracticeProfileOverview = {
-	latestRun: { reviewId: "run-2026-09-09", at: LATEST_RUN_AT, reviewedWork: pullRequest(22) },
-	window: { since: inStoryYear("09-02T09:00"), until: LATEST_RUN_AT },
+	latestReview: LATEST_REVIEW,
+	reviewedItems: [pullRequest(22)],
+	window: { since: inStoryYear("09-02T09:00"), until: LATEST_REVIEW_AT },
 	changes: [...PACKAGING_CHANGES, ...COMMUNICATION_CHANGES, ...REVIEWING_CHANGES],
 };

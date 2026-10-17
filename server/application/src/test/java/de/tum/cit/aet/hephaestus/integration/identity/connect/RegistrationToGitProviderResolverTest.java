@@ -3,9 +3,12 @@ package de.tum.cit.aet.hephaestus.integration.identity.connect;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
@@ -18,11 +21,6 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
-/**
- * Unit tests for {@link RegistrationToGitProviderResolver}, the {@code GitProviderRegistry} SPI impl:
- * given a login provider's {@code (type, baseUrl)}, it upserts the {@code git_provider} row keyed on
- * the canonical server-url origin (scheme + host + explicit non-default port).
- */
 @Tag("unit")
 class RegistrationToGitProviderResolverTest {
 
@@ -34,7 +32,22 @@ class RegistrationToGitProviderResolverTest {
     void setup() {
         gitProviderRepository = mock(IdentityProviderRepository.class);
         userRepository = mock(UserRepository.class);
-        resolver = new RegistrationToGitProviderResolver(gitProviderRepository, userRepository);
+        resolver = new RegistrationToGitProviderResolver(
+                gitProviderRepository, userRepository, mock(ConnectionRepository.class));
+    }
+
+    @Test
+    void shouldReadOnlyExistingEquivalentProviderOriginsWithoutRegisteringOne() {
+        when(gitProviderRepository.findAllByType(IdentityProviderType.OUTLINE))
+                .thenReturn(List.of(stamped(IdentityProviderType.OUTLINE, "HTTPS://Outline.Example.test:443/", 4)));
+        assertThat(resolver.findProviderId("OUTLINE", "https://outline.example.test/path"))
+                .contains(4L);
+        assertThat(resolver.findProviderId("OUTLINE", "https://another.example.test"))
+                .isEmpty();
+        assertThat(resolver.findProviderId("OUTLINE", "not a URL")).isEmpty();
+        assertThat(resolver.findProviderId("GITLAB", "https://outline.example.test"))
+                .isEmpty();
+        verify(gitProviderRepository, never()).save(any(IdentityProvider.class));
     }
 
     @Test
@@ -52,44 +65,32 @@ class RegistrationToGitProviderResolverTest {
         verifyNoInteractions(userRepository);
     }
 
-    private void stubSaveStampsId(long id) {
-        when(gitProviderRepository.save(any(IdentityProvider.class))).thenAnswer(inv -> {
-            IdentityProvider p = inv.getArgument(0);
-            setId(p, id);
-            return p;
-        });
+    private void stubRegistration(IdentityProviderType type, String origin, long id) {
+        when(gitProviderRepository.findByTypeAndServerUrl(type, origin))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(stamped(type, origin, id)));
     }
 
     @Test
     void upsertsGithubComOrigin() {
-        stubSaveStampsId(7L);
-        when(gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com"))
-                .thenReturn(Optional.empty());
+        stubRegistration(IdentityProviderType.GITHUB, "https://github.com", 7L);
 
         assertThat(resolver.resolveProviderId("GITHUB", "https://github.com")).isEqualTo(7L);
     }
 
     @Test
     void selfHostedGitlabOriginStripsPath() {
-        stubSaveStampsId(8L);
-        when(gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.example.test"))
-                .thenReturn(Optional.empty());
+        stubRegistration(IdentityProviderType.GITLAB, "https://gitlab.example.test", 8L);
 
-        resolver.resolveProviderId("GITLAB", "https://gitlab.example.test/sub/path");
-
-        // Save is keyed on the bare origin, not the full base URL.
-        when(gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.example.test"))
-                .thenReturn(Optional.of(stamped(IdentityProviderType.GITLAB, "https://gitlab.example.test", 8L)));
+        assertThat(resolver.resolveProviderId("GITLAB", "https://gitlab.example.test/sub/path"))
+                .isEqualTo(8L);
         assertThat(resolver.resolveProviderId("GITLAB", "https://gitlab.example.test/sub/path"))
                 .isEqualTo(8L);
     }
 
     @Test
     void preservesExplicitPort() {
-        stubSaveStampsId(9L);
-        when(gitProviderRepository.findByTypeAndServerUrl(
-                        IdentityProviderType.GITLAB, "https://gitlab.example.test:8443"))
-                .thenReturn(Optional.empty());
+        stubRegistration(IdentityProviderType.GITLAB, "https://gitlab.example.test:8443", 9L);
 
         assertThat(resolver.resolveProviderId("GITLAB", "https://gitlab.example.test:8443"))
                 .isEqualTo(9L);

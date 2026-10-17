@@ -75,16 +75,9 @@ Authentication retention still removes old partitions.
 
 ## Check person-data exports
 
-Direct person-data exports now return these TEXT values as JSON Strings.
-An old JSONB String keeps its decoded String value.
-An old structured object or array becomes a String that contains canonical JSON text.
-This includes connection audit detail and configuration snapshots in membership-subject exports.
-JSON null becomes a null value.
-The JSON String `"null"` remains the literal String `null`.
-
-Check export consumers that previously read nested objects or arrays from these fields.
-Parse the String as JSON only where the consumer requires that structure.
-The release does not add a compatibility reader or change the export projection.
+The [release migration entry](https://github.com/hephaestus-build/Hephaestus/blob/main/MIGRATION.md) owns the person-data export change.
+Check consumers that read the affected fields.
+Parse a String as JSON only where the consumer requires that structure.
 
 ## Recover the previous release
 

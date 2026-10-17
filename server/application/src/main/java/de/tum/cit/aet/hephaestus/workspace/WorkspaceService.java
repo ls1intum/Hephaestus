@@ -4,11 +4,11 @@ import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.core.security.ScmOrigin;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.connection.identity.AuthenticatedGitProviderUserService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.identity.GitLabWorkspaceInstance;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -16,7 +16,6 @@ import de.tum.cit.aet.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.UpdateWorkspaceFeaturesRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.events.WorkspaceCreatedEvent;
 import de.tum.cit.aet.hephaestus.workspace.exception.WorkspaceSlugConflictException;
-import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamSettingsService;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -25,41 +24,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.server.ResponseStatusException;
 
-/**
- * Central service for workspace management operations.
- *
- * <h2>Responsibilities</h2>
- * <ul>
- *   <li><b>Workspace creation:</b> Creates workspaces with owner membership</li>
- *   <li><b>Slug management:</b> Renames with redirect history via {@link WorkspaceSlugService}</li>
- *   <li><b>Settings delegation:</b> Forwards to {@link WorkspaceSettingsService}</li>
- * </ul>
- *
- * <h2>Related Services</h2>
- * For other workspace operations, use the specialized services:
- * <ul>
- *   <li>{@link WorkspaceQueryService} – Read-only queries and lookups</li>
- *   <li>{@link WorkspaceLifecycleService} – Status transitions (suspend/resume/purge)</li>
- *   <li>{@link de.tum.cit.aet.hephaestus.integration.scm.github.lifecycle.GitHubLifecycleListener} – GitHub App installation handling</li>
- *   <li>{@link WorkspaceRepositoryMonitorService} – Repository monitoring configuration</li>
- *   <li>{@link WorkspaceActivationService} – Activation/startup orchestration</li>
- *   <li>{@link WorkspaceTeamSettingsService} – Workspace-scoped team settings</li>
- *   <li>{@link WorkspaceTeamLabelService} – Team/label associations</li>
- * </ul>
- *
- * <h2>Multi-Tenancy Note</h2>
- * This service is workspace-agnostic: it manages workspaces themselves (the tenant root),
- * not data within workspaces. Methods take workspace slug or {@link WorkspaceContext} as parameters.
- *
- * @see Workspace
- * @see WorkspaceContext
- * @see WorkspaceTeamSettingsService
- */
 @Service
 @WorkspaceAgnostic("Manages workspaces themselves - the tenant root, not data within workspaces")
 public class WorkspaceService {
@@ -71,13 +42,12 @@ public class WorkspaceService {
     // Core repositories
     private final WorkspaceRepository workspaceRepository;
     private final CurrentAccountUsers currentAccountUsers;
-    private final AuthenticatedGitProviderUserService authenticatedGitProviderUserService;
     private final GitLabWorkspaceInstance gitLabWorkspaceInstance;
 
     // Services
     private final WorkspaceSlugService workspaceSlugService;
     private final WorkspaceSettingsService workspaceSettingsService;
-    private final WorkspaceMembershipService workspaceMembershipService;
+    private final MembershipService workspaceMembershipService;
     private final ConnectionService connectionService;
 
     private final ApplicationEventPublisher eventPublisher;
@@ -86,17 +56,15 @@ public class WorkspaceService {
     public WorkspaceService(
             WorkspaceRepository workspaceRepository,
             CurrentAccountUsers currentAccountUsers,
-            AuthenticatedGitProviderUserService authenticatedGitProviderUserService,
             GitLabWorkspaceInstance gitLabWorkspaceInstance,
             WorkspaceSlugService workspaceSlugService,
             WorkspaceSettingsService workspaceSettingsService,
-            WorkspaceMembershipService workspaceMembershipService,
+            MembershipService workspaceMembershipService,
             ConnectionService connectionService,
             ApplicationEventPublisher eventPublisher,
             PlatformTransactionManager transactionManager) {
         this.workspaceRepository = workspaceRepository;
         this.currentAccountUsers = currentAccountUsers;
-        this.authenticatedGitProviderUserService = authenticatedGitProviderUserService;
         this.gitLabWorkspaceInstance = gitLabWorkspaceInstance;
         this.workspaceSlugService = workspaceSlugService;
         this.workspaceSettingsService = workspaceSettingsService;
@@ -148,8 +116,8 @@ public class WorkspaceService {
 
     /**
      * Creates a workspace from a DTO and provisions the matching {@link IntegrationKind}
-     * Connection. The PAT travels through {@code ConnectionService.rotateBearerToken}
-     * which encrypts at rest under the registry's AES-256-GCM converter.
+     * Connection. The PAT travels through {@code ConnectionService.rotateBearerToken} which
+     * encrypts at rest under the registry's AES-256-GCM converter.
      */
     @Transactional
     public Workspace createWorkspace(CreateWorkspaceRequestDTO request) {
@@ -174,22 +142,30 @@ public class WorkspaceService {
                         ? request.serverUrl().trim()
                         : null;
 
-        // Creation has no workspace identity yet. The owner is the account's verified actor on the workspace's
+        // Creation has no workspace identity yet. The owner is the account's verified actor on the
+        // workspace's
         // provider, never one of its other links.
         Long ownerUserId;
         if (SecurityUtils.getCurrentAccountId().isEmpty()) {
             ownerUserId = request.ownerUserId();
         } else if (isGitLab) {
-            ownerUserId = authenticatedGitProviderUserService
-                    .resolveOrProvisionCurrentGitLabUser(Objects.requireNonNull(serverUrl))
-                    .getId();
+            var owners = currentAccountUsers.resolve().stream()
+                    .filter(actor -> actor.providerType().equals(IdentityProviderType.GITLAB.name())
+                            && ScmOrigin.of(actor.serverUrl()).equals(ScmOrigin.of(serverUrl)))
+                    .map(actor -> actor.actorId())
+                    .toList();
+            if (owners.size() != 1)
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Connect exactly one GitLab account on this instance before creating a workspace.");
+            ownerUserId = owners.getFirst();
         } else {
             ownerUserId = currentAccountUsers.resolve().stream()
-                    .filter(user -> user.getProvider().getType() == IdentityProviderType.GITHUB)
-                    .map(user -> Objects.requireNonNull(user.getId()))
+                    .filter(user -> user.providerType().equals(IdentityProviderType.GITHUB.name()))
+                    .map(user -> user.actorId())
                     .findFirst()
                     .orElseThrow(() -> new AccessForbiddenException(
-                            "Connect your GitHub account before you create a GitHub workspace."));
+                            "Connect your GitHub account before you create" + " a GitHub workspace."));
         }
 
         Workspace workspace =
@@ -249,19 +225,21 @@ public class WorkspaceService {
     private void createOwnerRole(Workspace workspace, @Nullable Long ownerUserId) {
         if (ownerUserId == null) {
             log.warn("Workspace has no owner user: workspaceSlug={}", workspace.getWorkspaceSlug());
-            throw new IllegalStateException("We could not create this workspace because your account has no "
-                    + "connected GitHub or GitLab account. Connect one in User settings, then try again.");
+            throw new IllegalStateException("We could not create this workspace because your account has no connected"
+                    + " GitHub or GitLab account. Connect one in User settings, then try"
+                    + " again.");
         }
-        workspaceMembershipService.createMembership(workspace, ownerUserId, WorkspaceMembership.WorkspaceRole.OWNER);
+        workspaceMembershipService.createMembership(
+                workspace, workspaceMembershipService.accountIdForUser(ownerUserId), Membership.WorkspaceRole.OWNER);
     }
 
     @Transactional
     public Workspace updateAccountLogin(Long workspaceId, String accountLogin) {
         Workspace workspace = workspaceRepository
                 .findById(workspaceId)
-                .orElseThrow(
-                        () -> new IllegalArgumentException(
-                                "We could not find that workspace. It may have been deleted. Reload the page to see what is current."));
+                .orElseThrow(() -> new IllegalArgumentException("We could not find that workspace. It may have been"
+                        + " deleted. Reload the page to see what is"
+                        + " current."));
 
         if (!Objects.equals(workspace.getAccountLogin(), accountLogin)) {
             workspace.setAccountLogin(accountLogin);

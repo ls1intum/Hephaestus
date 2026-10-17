@@ -1,8 +1,10 @@
 package de.tum.cit.aet.hephaestus.integration.slack.manifest;
 
+import de.tum.cit.aet.hephaestus.integration.chat.item.ThreadEvents;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Capability;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest;
+import java.util.Map;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -44,6 +46,6 @@ public class SlackManifest implements IntegrationManifest {
      */
     @Override
     public ReviewContribution reviewContribution() {
-        return ReviewContribution.none();
+        return new ReviewContribution(Set.of(ThreadEvents.THREAD), Map.of(), Map.of());
     }
 }

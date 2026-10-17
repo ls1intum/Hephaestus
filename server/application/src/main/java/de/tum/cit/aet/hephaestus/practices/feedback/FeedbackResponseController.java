@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackResolutionCountsDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackResponseDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackResponseRequestDTO;
@@ -28,13 +29,14 @@ import org.springframework.web.bind.annotation.RequestMapping;
 @RequestMapping("/practices/feedback")
 @Tag(name = "Feedback Response", description = "Recipient responses to delivered practice feedback")
 @RequiredArgsConstructor
+@ConditionalOnServerRole
 public class FeedbackResponseController {
 
     private final FeedbackResponseService responseService;
 
     @PutMapping("/{feedbackId}/response")
     @Operation(
-            operationId = "replaceFeedbackResponse",
+            operationId = "replaceOwnFeedbackResponse",
             summary = "Replace the response to delivered feedback",
             description = "Sets the complete current response. Repeating the same request has no effect.")
     @ApiResponse(responseCode = "200", description = "Response replaced")
@@ -58,41 +60,31 @@ public class FeedbackResponseController {
     }
 
     @GetMapping("/{feedbackId}/response")
-    @Operation(operationId = "getFeedbackResponse", summary = "Get the current feedback response")
-    @ApiResponse(responseCode = "200", description = "Current response returned")
-    @ApiResponse(
-            responseCode = "204",
-            description = "No response is currently recorded",
-            content = @Content(schema = @Schema(hidden = true)))
+    @Operation(operationId = "getOwnFeedbackResponse", summary = "Get the current feedback response")
+    @ApiResponse(responseCode = "200", description = "Complete current response returned")
     @ApiResponse(
             responseCode = "404",
             description = "Delivered feedback not found for the current recipient",
             content = @Content(schema = @Schema(hidden = true)))
     public ResponseEntity<FeedbackResponseDTO> current(
             WorkspaceContext workspaceContext, @PathVariable UUID feedbackId) {
-        return responseService
-                .getResponse(workspaceContext, feedbackId)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.noContent().build());
+        return ResponseEntity.ok(responseService.getResponse(workspaceContext, feedbackId));
     }
 
     @DeleteMapping("/{feedbackId}/response")
-    @Operation(operationId = "deleteFeedbackResponse", summary = "Delete the response to delivered feedback")
-    @ApiResponse(
-            responseCode = "204",
-            description = "Response deleted or no response was recorded",
-            content = @Content(schema = @Schema(hidden = true)))
+    @Operation(operationId = "clearOwnFeedbackResponse", summary = "Clear the response to delivered feedback")
+    @ApiResponse(responseCode = "200", description = "Complete cleared response returned")
     @ApiResponse(
             responseCode = "404",
             description = "Delivered feedback not found for the current recipient",
             content = @Content(schema = @Schema(hidden = true)))
-    public ResponseEntity<Void> delete(WorkspaceContext workspaceContext, @PathVariable UUID feedbackId) {
-        responseService.deleteResponse(workspaceContext, feedbackId);
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<FeedbackResponseDTO> delete(
+            WorkspaceContext workspaceContext, @PathVariable UUID feedbackId) {
+        return ResponseEntity.ok(responseService.deleteResponse(workspaceContext, feedbackId));
     }
 
     @GetMapping("/resolution-counts")
-    @Operation(operationId = "getFeedbackResolutionCounts", summary = "Get feedback resolution counts")
+    @Operation(operationId = "getOwnFeedbackResolutionCounts", summary = "Get feedback resolution counts")
     public ResponseEntity<FeedbackResolutionCountsDTO> resolutionCounts(WorkspaceContext workspaceContext) {
         return ResponseEntity.ok(responseService.getResolutionCounts(workspaceContext));
     }

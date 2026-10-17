@@ -58,6 +58,7 @@ Where both are paused, the provider cap comes first, because that is the one the
 
 "Shared-model budget" and "provider cap" are the words that reach the screen.
 This includes the meters' accessible names: "Shared-model budget used" and "Provider cap used by Acme".
+The screen names each purse: **Shared models** for the host's money, and **Own provider** for the workspace's own.
 
 The wire is not consistent with this and does not need to be.
 Both caps are *written* through the same field, `monthlyBudgetUsd`.
@@ -85,6 +86,15 @@ Its `PRICED` option needs separate text: "Price per 1M tokens".
 `priceLabel` renders a priced model as its numbers.
 These numbers cannot label a radio.
 
+The usage tables use "No price set" as the heading of a count, `unpricedEventCount` on the wire.
+It counts runs, not usage rows: a review attempt or a Heph turn with at least one `UNPRICED` row counts one time.
+A usage row of a model for practice scripts counts toward the run of its review.
+The table by practice counts reviews instead, because its other count is **Reviews**.
+`usage-utils.ts#UNPRICED_RUNS` owns the heading.
+
+The alerts say "N runs have no price".
+They name no purse, because the count covers both purses.
+
 Two other surfaces answer a *different* question and correctly use different words.
 The instance model table's readiness column says "Price missing".
 It ranks one blocker against others: "Connection off", "Model off", and "No workspace access".
@@ -109,8 +119,11 @@ For budget state, the copy says what happens ("paused", "resumes"), not which en
   Use `<$0.01` for a nonzero amount too small for cents.
   Use plain cents otherwise.
 - **`formatCapUsd`** — a cap someone typed, rendered the way they typed it: `$50`, not `$50.00`.
+- **`formatAverageUsd`** — an average spend, such as **Avg per run**.
+  One column has one number of decimals, which `averageFractionDigits` takes from all its averages, the total included.
+  The [worked example](/admin/ai-providers#worked-example) owns the decimal places and display thresholds.
 
-`—` is the rendering for absent in all three.
+`formatRateUsd`, `formatCostUsd` and `formatCapUsd` render an absent value as `—`.
 
 ## Rule 6 — Client-side money arithmetic is display-only, and may never decide anything
 
@@ -178,7 +191,7 @@ Historical priced amounts remain in spend totals without gaining a verification 
 Do not repair verification decisions with manual database edits.
 This distinction does not recover late provider usage or establish complete call coverage.
 
-`unpricedEventCount` counts ledger usage records across both purses, not runs or provider calls.
+`unpricedEventCount` follows the run-count definition in [Rule 4](#rule-4--never-render-a-pricing-or-budget-enum).
 It is not a per-purse count and must not be used as one in budget banners.
 
 ## Where the words are enforced

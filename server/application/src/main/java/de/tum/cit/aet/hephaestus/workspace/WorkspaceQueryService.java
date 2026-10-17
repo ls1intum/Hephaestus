@@ -3,40 +3,27 @@ package de.tum.cit.aet.hephaestus.workspace;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.WorkspaceSubdomainProperties;
 import de.tum.cit.aet.hephaestus.core.security.ScmOrigin;
+import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.core.security.UserViewContextHolder;
 import de.tum.cit.aet.hephaestus.core.settings.spi.PublicActivityPolicy;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WorkspaceProviderAvailability;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceListItemDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceProvidersDTO;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Read-only query service for workspace lookups.
- * <p>
- * This service provides query methods for finding and listing workspaces
- * without modifying state. All methods are read-only transactions.
- *
- * <p>Workspace-agnostic: This service manages workspaces themselves, operating
- * at the admin/registry level. It answers "which workspaces exist?" not
- * "what data is in a workspace?".
- */
+// Workspace registry lookups span tenants; they must not read data inside a workspace.
 @Service
 @Transactional(readOnly = true)
 @WorkspaceAgnostic("Manages workspaces themselves - operates at admin/registry level")
@@ -47,17 +34,11 @@ public class WorkspaceQueryService {
             .thenComparing(Workspace::getWorkspaceSlug, String.CASE_INSENSITIVE_ORDER);
 
     private final WorkspaceRepository workspaceRepository;
-    private final WorkspaceMembershipRepository workspaceMembershipRepository;
+    private final MembershipRepository workspaceMembershipRepository;
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
-    private final CurrentAccountUsers currentAccountUsers;
     private final ConnectionService connectionService;
     private final PublicActivityPolicy publicActivityPolicy;
 
-    /**
-     * Per-kind availability ports — keyed for O(1) lookup when building the providers DTO.
-     * Each vendor adapter contributes one impl; the query service stays kind-agnostic and
-     * delegates the "is this provider exposable to the wizard?" decision back to the adapter.
-     */
     private final Map<IntegrationKind, WorkspaceProviderAvailability> providerAvailability;
 
     private final WorkspaceProperties workspaceProperties;
@@ -66,9 +47,8 @@ public class WorkspaceQueryService {
 
     public WorkspaceQueryService(
             WorkspaceRepository workspaceRepository,
-            WorkspaceMembershipRepository workspaceMembershipRepository,
+            MembershipRepository workspaceMembershipRepository,
             RepositoryToMonitorRepository repositoryToMonitorRepository,
-            CurrentAccountUsers currentAccountUsers,
             ConnectionService connectionService,
             PublicActivityPolicy publicActivityPolicy,
             WorkspaceProperties workspaceProperties,
@@ -78,7 +58,6 @@ public class WorkspaceQueryService {
         this.workspaceRepository = workspaceRepository;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
-        this.currentAccountUsers = currentAccountUsers;
         this.connectionService = connectionService;
         this.publicActivityPolicy = publicActivityPolicy;
         this.workspaceProperties = workspaceProperties;
@@ -91,12 +70,6 @@ public class WorkspaceQueryService {
         this.providerAvailability = map;
     }
 
-    /**
-     * Maps a {@link Workspace} entity to a {@link WorkspaceDTO}, hydrating the
-     * integration-mode metadata from the active Connection(s). Exposed here so
-     * controllers don't have to inject {@link ConnectionService} just to call the
-     * DTO factory (keeps controllers under the 5-constructor-param arch rule).
-     */
     public WorkspaceDTO toWorkspaceDTO(Workspace workspace) {
         return WorkspaceDTO.from(workspace, connectionService, workspaceAddress(workspace));
     }
@@ -106,8 +79,8 @@ public class WorkspaceQueryService {
     }
 
     /**
-     * Builds {@link WorkspaceListItemDTO}s for every workspace accessible to the
-     * current authenticated user. During a user view, only the viewed workspace.
+     * Builds {@link WorkspaceListItemDTO}s for every workspace accessible to the current
+     * authenticated user. During a user view, only the viewed workspace.
      */
     public List<WorkspaceListItemDTO> findAccessibleWorkspaceListItems() {
         boolean publicActivityAllowed = publicActivityPolicy.allowed();
@@ -123,7 +96,6 @@ public class WorkspaceQueryService {
                 .toList();
     }
 
-    /** The source-control provider of the workspace's active connection; none when no connection is bound. */
     public @Nullable IdentityProviderType scmProviderType(Workspace workspace) {
         return connectionService
                 .findActiveProviderKind(workspace.getId())
@@ -134,10 +106,10 @@ public class WorkspaceQueryService {
     /**
      * Returns available workspace creation providers based on server configuration.
      *
-     * <p>Resolves each provider's hint through the {@link WorkspaceProviderAvailability} SPI
-     * — the query service itself is provider-agnostic. The DTO still carries kind-specific
-     * fields because the wizard UI ultimately renders kind-specific flows; the boundary
-     * between SPI and DTO is the {@code installationUrl} / {@code defaultServerUrl} string.
+     * <p>Resolves each provider's hint through the {@link WorkspaceProviderAvailability} SPI — the
+     * query service itself is provider-agnostic. The DTO still carries kind-specific fields because
+     * the wizard UI ultimately renders kind-specific flows; the boundary between SPI and DTO is the
+     * {@code installationUrl} / {@code defaultServerUrl} string.
      */
     public WorkspaceProvidersDTO getAvailableProviders() {
         WorkspaceProviderAvailability ghAvail = providerAvailability.get(IntegrationKind.GITHUB);
@@ -178,41 +150,21 @@ public class WorkspaceQueryService {
     }
 
     /**
-     * Returns workspaces in which the current account has a membership.
-     * An unauthenticated caller receives an empty list.
+     * Returns workspaces in which the current account has a membership. An unauthenticated caller
+     * receives an empty list.
      *
      * @return list of accessible workspaces for the current user
      */
     public List<Workspace> findAccessibleWorkspaces() {
-        // Union across ALL of the account's linked identities (ADR 0017): a single account can mirror
-        // several SCM users (one per provider login), so a member signed in via one provider must still
-        // see workspaces they belong to under another. See CurrentAccountUsers.
-        return findAccessibleWorkspaces(currentAccountUsers.resolve());
-    }
-
-    /**
-     * Returns the union of the given SCM users' memberships. An empty user set yields no workspaces.
-     * Only ACTIVE workspaces
-     * are included - SUSPENDED and PURGED workspaces are excluded. Passing several users is how a single
-     * account's multiple linked identities are unioned.
-     *
-     * @param currentUsers the SCM users (the account's identity mirrors) to check accessibility for
-     * @return list of accessible workspaces
-     */
-    public List<Workspace> findAccessibleWorkspaces(Collection<User> currentUsers) {
-        Set<Long> userIds = currentUsers.stream()
-                .filter(u -> u != null && u.getId() != null)
-                .map(User::getId)
-                .collect(Collectors.toSet());
-
-        if (userIds.isEmpty()) {
-            return List.of();
-        }
-
-        // Fetch memberships across every identity and load workspaces by ID
-        var memberships = workspaceMembershipRepository.findByUser_IdIn(userIds);
+        var viewed = UserViewContextHolder.get();
+        Long accountId =
+                viewed == null ? SecurityUtils.getCurrentAccountId().orElse(null) : Long.valueOf(viewed.accountId());
+        if (accountId == null) return List.of();
+        var memberships = workspaceMembershipRepository.findById_AccountId(accountId).stream()
+                .filter(member -> member.getLeftAt() == null)
+                .toList();
         var workspaceIds = memberships.stream()
-                .map(WorkspaceMembership::getWorkspace)
+                .map(Membership::getWorkspace)
                 .map(Workspace::getId)
                 .distinct()
                 .toList();
@@ -227,8 +179,8 @@ public class WorkspaceQueryService {
     }
 
     /**
-     * Find a workspace by GitHub App installation ID. Joins through the GitHub
-     * Connection's {@code instance_key} (the durable identity).
+     * Find a workspace by GitHub App installation ID. Joins through the GitHub Connection's {@code
+     * instance_key} (the durable identity).
      */
     public Optional<Workspace> findByGitHubInstallationId(Long installationId) {
         return workspaceRepository.findByInstallationId(installationId);
@@ -246,22 +198,23 @@ public class WorkspaceQueryService {
 
     /**
      * Resolve the workspace slug responsible for a given repository.
-     * <p>
-     * Priority:
+     *
+     * <p>Priority:
+     *
      * <ol>
-     *   <li>Explicit repository monitor (authoritative)</li>
-     *   <li>Workspace account login matching repository owner (one-to-one enforced by business model)</li>
+     *   <li>Explicit repository monitor (authoritative)
+     *   <li>Workspace account login matching repository owner (one-to-one enforced by business
+     *       model)
      * </ol>
      *
-     * @param repository the repository to resolve the workspace slug for
+     * @param nameWithOwner the repository, as owner/name, to resolve the workspace slug for
      * @return the workspace slug if a unique mapping can be established, empty otherwise
      */
-    public Optional<String> resolveWorkspaceSlug(Repository repository) {
-        if (repository == null || isBlank(repository.getNameWithOwner())) {
+    public Optional<String> resolveWorkspaceSlug(String nameWithOwner) {
+        if (isBlank(nameWithOwner)) {
             return Optional.empty();
         }
 
-        var nameWithOwner = repository.getNameWithOwner();
         var monitor = repositoryToMonitorRepository.findByNameWithOwner(nameWithOwner);
         if (monitor.isPresent()) {
             Workspace workspace = monitor.get().getWorkspace();

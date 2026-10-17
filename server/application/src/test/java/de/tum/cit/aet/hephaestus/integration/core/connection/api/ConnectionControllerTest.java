@@ -31,8 +31,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.Membership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.net.URI;
 import java.time.Instant;
@@ -59,14 +59,6 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.test.util.ReflectionTestUtils;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Pure unit tests for {@link ConnectionController}. Exercises the controller directly
- * against mocked collaborators — no Spring context, no MockMvc — so failures point
- * at controller logic, not framework wiring.
- *
- * <p>The arch-test {@code haveSecurityAnnotationIfEndpoint} already covers the
- * {@code @PreAuthorize} wiring; here we verify behaviour.
- */
 class ConnectionControllerTest extends BaseUnitTest {
 
     @Mock
@@ -97,7 +89,8 @@ class ConnectionControllerTest extends BaseUnitTest {
         githubStrategy = new FakeStrategy(IntegrationKind.GITHUB);
         gitlabStrategy = new FakeStrategy(IntegrationKind.GITLAB);
         // admin.manifests() is the single source of truth for capability lookups in the controller;
-        // wire it lazily-lenient so list/read/suspend/reactivate tests don't all need to restate it.
+        // wire it lazily-lenient so list/read/suspend/reactivate tests don't all need to restate
+        // it.
         lenient().when(admin.manifests()).thenReturn(manifests);
         controller = new ConnectionController(
                 admin, connectionService, objectMapper, List.of(githubStrategy, gitlabStrategy));
@@ -214,7 +207,7 @@ class ConnectionControllerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("initiate with no registered strategy throws IllegalArgumentException (→ 400 via advice)")
+    @DisplayName("initiate with no registered strategy throws IllegalArgumentException (→ 400 via" + " advice)")
     void initiate_unknownKind_throwsBadRequest() {
         ConnectionController bare = new ConnectionController(admin, connectionService, objectMapper, List.of());
         InitiateConnectionRequestDTO req = new InitiateConnectionRequestDTO(IntegrationKind.SLACK, Map.of());
@@ -309,7 +302,6 @@ class ConnectionControllerTest extends BaseUnitTest {
         assertThat(req.getValue().eventType()).isEqualTo("DISCONNECT");
     }
 
-    /** Only the strategy can erase the integration's data, so without one the connection stays as it is. */
     @Test
     void updateStatus_toUninstalledWithoutStrategy_isRefused() {
         long workspaceId = 42L;
@@ -402,11 +394,6 @@ class ConnectionControllerTest extends BaseUnitTest {
         assertThat(problem.getTitle()).isEqualTo("Resource not found");
     }
 
-    /**
-     * Minimal admin {@link WorkspaceContext} for the given workspace id. The controller only reads
-     * {@code id()}; the filter + {@code @RequireAtLeastWorkspaceAdmin} guard (covered by integration
-     * tests) supply the real context at runtime.
-     */
     private static WorkspaceContext ctx(long workspaceId) {
         return new WorkspaceContext(
                 workspaceId,

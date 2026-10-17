@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
+import de.tum.cit.aet.hephaestus.core.exception.PreconditionFailedException;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.core.settings.InstanceSettingsAdminController.InstanceSettingsDTO;
 import de.tum.cit.aet.hephaestus.core.settings.spi.SilentModeQuery;
@@ -26,6 +27,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -161,6 +164,28 @@ class InstanceSettingsAdminControllerIntegrationTest extends AbstractWorkspaceIn
         assertThat(getSettings().etag()).isEqualTo(engaged.etag());
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @WithAdminUser
+    void shouldKeepSilentModeEngagedWhenTheTagDoesNotIdentifyAnExactVersion(boolean weak) {
+        var engaged = patchSilentMode(Map.of("engaged", true), null);
+        webTestClient
+                .patch()
+                .uri("/admin/settings/silent-mode")
+                .headers(actorHeaders())
+                .header(HttpHeaders.IF_MATCH, weak ? "W/" + engaged.etag() : "*")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("engaged", false))
+                .exchange()
+                .expectStatus()
+                .isEqualTo(412)
+                .expectBody()
+                .jsonPath("$.title")
+                .isEqualTo("This changed after you loaded it");
+        assertThat(getSettings().silentModeEngaged()).isTrue();
+        assertThat(getSettings().etag()).isEqualTo(engaged.etag());
+    }
+
     @Test
     @WithAdminUser
     void shouldRejectReleaseWhenIfMatchIsMissing() {
@@ -214,7 +239,7 @@ class InstanceSettingsAdminControllerIntegrationTest extends AbstractWorkspaceIn
             assertThat(engage.get(10, TimeUnit.SECONDS)).isNull();
             Exception releaseFailure = release.get(10, TimeUnit.SECONDS);
             if (releaseFailure != null) {
-                assertThat(releaseFailure).isInstanceOf(StaleInstanceSettingsException.class);
+                assertThat(releaseFailure).isInstanceOf(PreconditionFailedException.class);
             }
         }
 

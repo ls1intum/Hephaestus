@@ -14,7 +14,7 @@ if (!firstFeedback) {
 }
 
 const postedFeedback = reviewFeedback.find(
-	(item) => item.channel === "IN_CONTEXT" && item.deliveryState === "DELIVERED",
+	(item) => item.destination === "ON_WORK" && item.state === "DELIVERED",
 );
 if (!postedFeedback) {
 	throw new Error("The review fixtures must contain delivered feedback on the work");
@@ -50,26 +50,17 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Every outcome, on both places feedback can go, with a withheld row from each reason family. No
- * column previews the text: a row is told apart by its time, channel, work and recipient.
- */
 export const Default: Story = {
 	play: async ({ canvas }) => {
 		await expect(
 			within(canvas.getByRole("table", TABLE))
 				.getAllByRole("columnheader")
 				.map((head) => head.textContent),
-		).toEqual(["Composed", "Channel", "Work", "Recipient", "Outcome", "Actions", "Open"]);
-		// The outcome is its icon and label in its own column. A conversation row's outcome is refined
-		// by its place, and still begins with the stem of the stored state so the Outcome facet remains
-		// findable from the row.
-		await expect(canvas.getAllByText("Prepared for conversation").length).toBeGreaterThan(0);
+		).toEqual(["Composed", "Destination", "Work", "Developer", "Delivery", "Actions", "Open"]);
+		await expect(canvas.getAllByText("Ready for conversation").length).toBeGreaterThan(0);
 		await expect(canvas.getAllByText("Delivered in conversation").length).toBeGreaterThan(0);
 		await expect(canvas.getAllByText("Failed to deliver").length).toBeGreaterThan(0);
 		await expect(canvas.getAllByText("Replaced by newer").length).toBeGreaterThan(0);
-		// A row opens one thing, its sheet; Track and Trace end it. The review and the recipient are text.
-		// The head's (i) is the one button outside the rows.
 		await expect(canvas.getAllByRole("button")).toHaveLength(reviewFeedback.length + 1);
 		await expect(canvas.queryByRole("link", { name: "a review" })).not.toBeInTheDocument();
 		await expect(canvas.getAllByRole("link")).toHaveLength(reviewFeedback.length * 2);
@@ -79,17 +70,23 @@ export const Default: Story = {
 		await expect(canvas.getAllByText("The developer’s choice").length).toBeGreaterThan(0);
 		await expect(canvas.getAllByText("Housekeeping").length).toBeGreaterThan(0);
 		canvas.getByTitle("The work was already merged, so a note on it would arrive too late.");
-		canvas.getByTitle("The developer has opted out of AI feedback.");
-		canvas.getByTitle("Nearly the same as other feedback from the same review.");
+		canvas.getByTitle("Feedback to this person is turned off in this workspace.");
+		canvas.getByTitle("It said nothing the developer was not already told.");
 		// No text is previewed, private or not.
 		await expect(canvas.queryByText(/Before this thread scrolls away/u)).toBeNull();
 		await expect(canvas.queryByText(PRIVATE_FEEDBACK_TEXT)).toBeNull();
-		// Each row is named by where it went, for whom and on which work, so no two read alike.
 		const names = canvas
 			.getAllByRole("link", { name: /^Open feedback /u })
 			.map((link) => link.getAttribute("aria-label"));
-		await expect(new Set(names).size).toBe(names.length);
-		await expect(names[0]).toMatch(/^Open feedback .+ for .+/u);
+		await expect(names).toHaveLength(20);
+		await expect(
+			new Set(
+				canvas
+					.getAllByRole("link", { name: /^Open feedback /u })
+					.map((link) => link.getAttribute("href")),
+			).size,
+		).toBe(20);
+		await expect(names[0]).toMatch(/^Open feedback .+/u);
 		// A row opens its feedback over the list rather than navigating away from it.
 		await expect(canvas.getAllByRole("link").map(levelsOpenedBy)).toContainEqual([
 			`feedback:${firstFeedback.id}`,
@@ -157,12 +154,11 @@ export const PostedWithCrLf: Story = {
 	},
 };
 
-/** Feedback with no text still names its row by channel, recipient and work. */
 export const WithoutAPreview: Story = {
 	args: {
 		state: {
 			status: "ready",
-			feedback: [{ ...firstFeedback, bodyPreview: undefined, bodyTruncated: false }],
+			feedback: [{ ...firstFeedback, bodyPreview: null, bodyTruncated: false }],
 		},
 	},
 	parameters: { chromatic: { viewports: [1440] } },
@@ -172,8 +168,8 @@ export const WithoutAPreview: Story = {
 	},
 };
 
-const githubWork = reviewFeedback.find((item) => item.location === "GITHUB")?.reviewedWork;
-const gitlabWork = reviewFeedback.find((item) => item.location === "GITLAB")?.reviewedWork;
+const githubItem = reviewFeedback.find((item) => item.location === "GITHUB")?.item ?? null;
+const gitlabItem = reviewFeedback.find((item) => item.location === "GITLAB")?.item ?? null;
 
 /**
  * One row per location. Each names where its feedback went in words and with the provider's mark: a
@@ -188,51 +184,51 @@ export const EveryLocation: Story = {
 				{
 					...firstFeedback,
 					id: "location-github",
-					channel: "IN_CONTEXT",
+					destination: "ON_WORK",
 					location: "GITHUB",
-					reviewedWork: githubWork,
+					item: githubItem,
 				},
 				{
 					...firstFeedback,
 					id: "location-gitlab",
-					channel: "IN_CONTEXT",
+					destination: "ON_WORK",
 					location: "GITLAB",
-					reviewedWork: gitlabWork,
+					item: gitlabItem,
 				},
 				{
 					...firstFeedback,
 					id: "location-other-work",
-					channel: "IN_CONTEXT",
+					destination: "ON_WORK",
 					location: "OTHER_WORK",
-					reviewedWork: undefined,
+					item: null,
 				},
 				{
 					...firstFeedback,
 					id: "location-heph",
-					channel: "IN_CHAT",
+					destination: "CONVERSATION",
 					location: "HEPH",
-					deliveryState: "DELIVERED",
+					state: "DELIVERED",
 				},
 				{
 					...firstFeedback,
 					id: "location-slack",
-					channel: "IN_CHAT",
+					destination: "CONVERSATION",
 					location: "SLACK",
-					deliveryState: "DELIVERED",
+					state: "DELIVERED",
 				},
 				{
 					...firstFeedback,
 					id: "location-next-conversation",
-					channel: "IN_CHAT",
+					destination: "CONVERSATION",
 					location: "NEXT_CONVERSATION",
-					deliveryState: "PREPARED",
+					state: "READY",
 				},
 				{
 					...firstFeedback,
 					id: "location-practice-pages",
-					channel: "IN_APP",
+					destination: "PRACTICE_PAGE",
 					location: "PRACTICE_PAGES",
-					deliveryState: "DELIVERED",
+					state: "DELIVERED",
 				},
 			],
 		},
@@ -245,7 +241,7 @@ export const EveryLocation: Story = {
 		canvas.getByText("With Heph in the app");
 		canvas.getByText("With Heph in Slack");
 		canvas.getByText("In conversation");
-		canvas.getByText("On their practice pages");
+		canvas.getByText("On the practice page");
 		await expectNoPageOverflow();
 	},
 };
@@ -307,7 +303,7 @@ export const Dark: Story = {
 export const Tracked: Story = {
 	parameters: {
 		router: {
-			initialUrl: `/?feedbackId=${firstFeedback.id}&agentJobId=${firstFeedback.agentJobId}&selected=true`,
+			initialUrl: `/?feedbackId=${firstFeedback.id}&reviewId=${firstFeedback.reviewId}&selected=true`,
 		},
 	},
 	play: async ({ canvas }) => {

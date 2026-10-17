@@ -8,7 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountWorkspaceMembershipQuery;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountMembershipQuery;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
@@ -56,7 +56,7 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
     private CredentialBundleConverter credentialBundleConverter;
 
     @Mock
-    private AccountWorkspaceMembershipQuery membershipQuery;
+    private AccountMembershipQuery membershipQuery;
 
     @Mock
     private PlatformTransactionManager transactionManager;
@@ -136,8 +136,8 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName(
-            "completeConnection stamps instance_key on a fresh PENDING row + transitions ACTIVE with the captured actorRef")
+    @DisplayName("completeConnection stamps instance_key on a fresh PENDING row + transitions ACTIVE"
+            + " with the captured actorRef")
     void complete_stampsInstanceKeyAndTransitions() {
         Connection pending = newConnection(7L, 42L, IntegrationKind.SLACK, null, IntegrationState.PENDING);
         ConnectFinalization.Completed completed =
@@ -327,8 +327,9 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
 
         assertThatThrownBy(() -> service.completeConnection(pending, verifiedInstallation(4242L), 5L))
                 .isInstanceOf(OAuthCallbackService.InstanceConnectedElsewhereException.class)
-                .hasMessage("This GitHub App installation is already connected to the Hephaestus workspace"
-                        + " \"Acme Engineering\" (acme-eng). Disconnect GitHub there before you connect it here.");
+                .hasMessage("This GitHub App installation is already connected to the Hephaestus"
+                        + " workspace \"Acme Engineering\" (acme-eng). Disconnect GitHub there"
+                        + " before you connect it here.");
         verify(connectionRepository, never()).save(any());
         verify(connectionService, never()).transition(any(), any());
     }
@@ -342,8 +343,8 @@ class OAuthCallbackServiceTest extends BaseUnitTest {
 
         assertThatThrownBy(() -> service.completeConnection(pending, verifiedInstallation(4242L), 5L))
                 .isInstanceOf(OAuthCallbackService.InstanceConnectedElsewhereException.class)
-                .hasMessage("This GitHub App installation is already connected to another Hephaestus workspace."
-                        + " A workspace admin there must disconnect GitHub first.");
+                .hasMessage("This GitHub App installation is already connected to another Hephaestus"
+                        + " workspace. A workspace admin there must disconnect GitHub first.");
     }
 
     @Test

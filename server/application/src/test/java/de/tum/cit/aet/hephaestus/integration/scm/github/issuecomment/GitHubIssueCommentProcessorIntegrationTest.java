@@ -3,6 +3,10 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
 import de.tum.cit.aet.hephaestus.activity.overview.ActivityQueryRepository;
@@ -12,7 +16,6 @@ import de.tum.cit.aet.hephaestus.core.time.TimeRange;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -25,6 +28,14 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier;
+import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlSyncCoordinator;
+import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncProperties;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssueComment;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssueCommentConnection;
+import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.GitHubIssueDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment.dto.GitHubIssueCommentEventDTO.GitHubCommentDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
@@ -32,7 +43,10 @@ import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.math.BigInteger;
+import java.net.URI;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -43,10 +57,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.data.domain.Limit;
+import org.springframework.graphql.client.ClientGraphQlResponse;
+import org.springframework.graphql.client.ClientResponseField;
+import org.springframework.graphql.client.GraphQlClient.RequestSpec;
+import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import reactor.core.publisher.Mono;
 
 class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
 
@@ -59,6 +79,9 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private GitHubIssueCommentProcessor processor;
+
+    @Autowired
+    private ApplicationContext applicationContext;
 
     @Autowired
     private IssueCommentRepository commentRepository;
@@ -148,7 +171,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         testWorkspace.setDisplayName("Test Workspace");
         testWorkspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         testWorkspace.setPublicActivityEnabled(true);
-        testWorkspace.setOrganization(org);
+        testWorkspace.setOrganizationId(org.getId());
         testWorkspace.setAccountLogin(TEST_ORG_LOGIN);
         testWorkspace.setAccountType(AccountType.ORG);
         testWorkspace = workspaceRepository.save(testWorkspace);
@@ -245,10 +268,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
                 Objects.requireNonNull(reloaded(comment).getIssue()).getId());
     }
 
-    /**
-     * GitHub numbers issues and pull requests in one space per repository: a stored pull request is the parent
-     * of a comment on its number, even beside an issue row with that number and a different native id.
-     */
+    // GitHub shares issue and pull-request numbers; the stored pull request determines a comment's canonical parent.
     @Nested
     class CanonicalPullRequestParent {
 
@@ -276,7 +296,8 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
 
         @Test
         void shouldMoveStoredCommentsOnceAndLeaveEveryOtherParent() {
-            // A retired issue row keeps its tombstone; only its comments move. Retired before any comment is
+            // A retired issue row keeps its tombstone; only its comments move. Retired before any
+            // comment is
             // stored, so saving the detached row cannot orphan one.
             testIssue.setDeletedAt(Instant.parse("2025-02-01T00:00:00Z"));
             testIssue = issueRepository.save(testIssue);
@@ -333,17 +354,17 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             IssueComment comment = storedComment(testIssue, 1);
             PullRequest pr = storedPullRequest(testRepository, 42, TEST_ISSUE_ID + 1);
             long actorId = Objects.requireNonNull(jdbc.queryForObject(
-                    "INSERT INTO \"user\"(native_id,provider_id,login,type) VALUES (?,?,?,'USER') RETURNING id",
+                    "INSERT INTO \"user\"(native_id,provider_id,login,type) VALUES" + " (?,?,?,'USER') RETURNING id",
                     Long.class,
                     77,
                     githubProvider.getId(),
                     "commenter"));
             UUID eventId = UUID.randomUUID();
             jdbc.update("""
-                    INSERT INTO activity_event(id,workspace_id,event_key,event_type,occurred_at,actor_id,
-                        repository_id,target_type,target_id,ingested_at)
-                    VALUES (?,?,'stored-comment','COMMENT_CREATED','2025-01-01 10:00:00Z',?,?,'issue_comment',?,now())
-                    """, eventId, testWorkspace.getId(), actorId, testRepository.getId(), comment.getId());
+                INSERT INTO activity_event(id,workspace_id,event_key,event_type,occurred_at,actor_id,
+                    repository_id,target_type,target_id,ingested_at)
+                VALUES (?,?,'stored-comment','COMMENT_CREATED','2025-01-01 10:00:00Z',?,?,'issue_comment',?,now())
+                """, eventId, testWorkspace.getId(), actorId, testRepository.getId(), comment.getId());
             var before = jdbc.queryForMap("SELECT * FROM activity_event WHERE id=?", eventId);
             var scope =
                     new ActivityScope(testWorkspace.getId(), Set.of(actorId), Set.of(), Set.of(testRepository.getId()));
@@ -640,7 +661,8 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         @Test
         void shouldUseExistingParentWhenItAlreadyExists() {
             GitHubCommentDTO commentDto = createCommentDTO(TEST_COMMENT_ID, "Comment on existing issue");
-            // Use testIssue's number (42) so that findByRepositoryIdAndNumber finds the existing issue
+            // Use testIssue's number (42) so that findByRepositoryIdAndNumber finds the existing
+            // issue
             GitHubIssueDTO issueDto = createIssueDTOForExistingIssue(testIssue.getNativeId(), testIssue.getNumber());
             ProcessingContext context = createContext();
 
@@ -783,6 +805,82 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(eventListener.ofType(ScmDomainEvent.CommentDeleted.class))
                     .isEmpty();
         }
+    }
+
+    @Test
+    void shouldCommitRemainingCommentsAcrossPagesWhenInputProviderIsDetached() {
+        assertDetachedCommentPagination(true);
+    }
+
+    @Test
+    void shouldCommitFullCommentsAcrossPagesWhenInputProviderIsDetached() {
+        assertDetachedCommentPagination(false);
+    }
+
+    private void assertDetachedCommentPagination(boolean remaining) {
+        Repository detachedRepository = Objects.requireNonNull(transactionTemplate.execute(
+                status -> repositoryRepository.findById(testRepository.getId()).orElseThrow()));
+        assertThat(Hibernate.isInitialized(detachedRepository.getProvider())).isFalse();
+        Issue detachedIssue = new Issue();
+        detachedIssue.setId(testIssue.getId());
+        detachedIssue.setNumber(testIssue.getNumber());
+        detachedIssue.setRepository(detachedRepository);
+
+        var provider = mock(GitHubGraphQlClientProvider.class);
+        var client = mock(HttpGraphQlClient.class);
+        var request = mock(RequestSpec.class);
+        when(provider.forScope(testWorkspace.getId())).thenReturn(client);
+        when(provider.getRateLimitRemaining(testWorkspace.getId())).thenReturn(5000);
+        when(client.documentName("GetIssueComments")).thenReturn(request);
+        when(request.variable(anyString(), any())).thenReturn(request);
+        ClientGraphQlResponse firstPage = commentPage(TEST_COMMENT_ID + 1, true);
+        ClientGraphQlResponse secondPage = commentPage(TEST_COMMENT_ID + 2, false);
+        when(request.execute()).thenReturn(Mono.just(firstPage)).thenReturn(Mono.just(secondPage));
+        var service = new GitHubIssueCommentSyncService(
+                provider,
+                processor,
+                applicationContext.getBean(GitHubSyncProperties.class),
+                applicationContext.getBean(GitHubExceptionClassifier.class),
+                applicationContext.getBean(GitHubGraphQlSyncCoordinator.class),
+                repositoryRepository);
+
+        Integer count = transactionTemplate.execute(status -> remaining
+                ? service.syncRemainingComments(testWorkspace.getId(), detachedIssue, "embedded-page")
+                : service.syncForIssue(testWorkspace.getId(), detachedIssue));
+
+        assertThat(count).isEqualTo(2);
+        for (long nativeId : List.of(TEST_COMMENT_ID + 1, TEST_COMMENT_ID + 2)) {
+            assertThat(commentRepository.findByNativeIdAndProviderId(nativeId, githubProviderId()))
+                    .hasValueSatisfying(comment -> {
+                        Issue parent = comment.getIssue();
+                        assertNotNull(parent);
+                        assertThat(parent.getId()).isEqualTo(testIssue.getId());
+                    });
+        }
+        assertThat(eventListener.ofType(ScmDomainEvent.CommentCreated.class)).hasSize(2);
+    }
+
+    private ClientGraphQlResponse commentPage(long nativeId, boolean hasNext) {
+        var comment = new GHIssueComment();
+        comment.setId("IC_" + nativeId);
+        comment.setFullDatabaseId(BigInteger.valueOf(nativeId));
+        comment.setBody("Captured pagination fixture");
+        comment.setUrl(URI.create("https://github.com/" + TEST_REPO_FULL_NAME + "/issues/42#issuecomment-" + nativeId));
+        comment.setCreatedAt(OffsetDateTime.parse("2026-10-17T12:00:00Z"));
+        comment.setUpdatedAt(OffsetDateTime.parse("2026-10-17T12:00:00Z"));
+        var pageInfo = new GHPageInfo();
+        pageInfo.setHasNextPage(hasNext);
+        pageInfo.setEndCursor("next-page");
+        var connection = new GHIssueCommentConnection();
+        connection.setNodes(List.of(comment));
+        connection.setTotalCount(2);
+        connection.setPageInfo(pageInfo);
+        var response = mock(ClientGraphQlResponse.class);
+        var field = mock(ClientResponseField.class);
+        when(response.isValid()).thenReturn(true);
+        when(response.field("repository.issue.comments")).thenReturn(field);
+        when(field.toEntity(GHIssueCommentConnection.class)).thenReturn(connection);
+        return response;
     }
 
     private Long githubProviderId() {

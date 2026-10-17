@@ -1,15 +1,15 @@
-import type { ReviewFeedback, ReviewFeedbackLocationCounts } from "@/api/types.gen";
+import type { ReasonCount, ReviewFeedback } from "@/api/types.gen";
 import type { FacetSource } from "@/components/common/FacetMultiSelect";
 import type { PanelState } from "@/components/common/panel-state";
 import type { PagedListState } from "@/runtime/tanstack-query/infinite-list";
 
+import { FeedbackDeveloperSummary } from "./FeedbackDeveloperSummary";
 import {
 	clearedFeedbackFacets,
 	clearedFeedbackFilters,
 	FeedbackFilters,
 	hasFeedbackFilter,
 } from "./FeedbackFilters";
-import { FeedbackRecipientSummary } from "./FeedbackRecipientSummary";
 import { FeedbackResults, type FeedbackResultsState } from "./FeedbackResults";
 import { clearedScope } from "./review-scope";
 import type { FeedbackSearch } from "./review-search";
@@ -20,7 +20,6 @@ import type { ScopeRecordFilter } from "./ReviewScopeFilters";
 import { ReviewTabIntro } from "./ReviewTabIntro";
 
 export interface FeedbackListPageProps {
-	/** Only the recipient summary needs it: its counts link to the list narrowed to them. */
 	workspaceSlug: string;
 	search: FeedbackSearch;
 	onSearchChange: (patch: Partial<FeedbackSearch>) => void;
@@ -29,11 +28,7 @@ export interface FeedbackListPageProps {
 	groups: FacetSource;
 	practices: FacetSource;
 	people: ReviewPeople;
-	/**
-	 * Everything addressed to the developer `search.recipientUserId` names, by location and delivery
-	 * state, whatever else the list is filtered to. Read only while that filter is set.
-	 */
-	recipientCounts: PanelState<{ counts: ReviewFeedbackLocationCounts[] }>;
+	developerCounts: PanelState<{ counts: ReasonCount[] }>;
 	/** The one record the scope is filtered to, by name, for its pill. */
 	record?: ScopeRecordFilter;
 }
@@ -58,17 +53,17 @@ export function FeedbackListPage({
 	groups,
 	practices,
 	people,
-	recipientCounts,
+	developerCounts,
 	record,
 }: FeedbackListPageProps) {
 	const rows = feedback.status === "ready" ? feedback.rows : [];
-	// Guarded on the filter being set: see `ObservationsListPage`. Unfiltered, row zero is whoever
+	// Guarded on the filter being set: see `ResultsListPage`. Unfiltered, row zero is whoever
 	// sorts first, and their name would be shown against a different person's id.
-	const filteredRecipient = search.recipientUserId == null ? undefined : rows[0]?.recipient;
-	const recipientName =
-		filteredRecipient?.name ??
-		filteredRecipient?.login ??
-		people.options.find((person) => person.userId === search.recipientUserId)?.label;
+	const filteredDeveloper = search.developerId === undefined ? undefined : rows[0]?.developer;
+	const developerName =
+		filteredDeveloper?.displayName ??
+		filteredDeveloper?.providerLogin ??
+		people.options.find((person) => person.accountId === search.developerId)?.label;
 	const hasFilter = hasFeedbackFilter(search);
 	const reset = () => onSearchChange(clearedFeedbackFilters());
 
@@ -84,15 +79,15 @@ export function FeedbackListPage({
 				practices={practices}
 				people={people}
 				total={feedback.status === "ready" ? feedback.total : undefined}
-				recipientName={recipientName}
+				developerName={developerName}
 				record={record}
 			/>
-			{search.recipientUserId !== undefined && (
-				<FeedbackRecipientSummary
+			{search.developerId !== undefined && (
+				<FeedbackDeveloperSummary
 					workspaceSlug={workspaceSlug}
-					recipientUserId={search.recipientUserId}
-					recipientName={recipientName}
-					state={recipientCounts}
+					developerId={search.developerId}
+					developerName={developerName}
+					state={developerCounts}
 				/>
 			)}
 			{feedback.status === "error" && (
@@ -103,7 +98,7 @@ export function FeedbackListPage({
 			{feedback.status === "loading" && <FeedbackResults state={{ status: "loading" }} />}
 			{feedback.status === "ready" && (
 				<>
-					<ReviewListRefresh failure={feedback.refreshFailure} noun="pieces of feedback" />
+					<ReviewListRefresh failure={feedback.refreshFailure} noun="feedback" />
 					<FeedbackResults state={resultsState(rows, hasFilter ? reset : undefined)} />
 					{rows.length > 0 && <ReviewListEnd {...feedback} noun="feedback" />}
 				</>

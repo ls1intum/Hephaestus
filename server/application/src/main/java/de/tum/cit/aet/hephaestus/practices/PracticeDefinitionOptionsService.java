@@ -1,75 +1,83 @@
 package de.tum.cit.aet.hephaestus.practices;
 
-import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalog;
-import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
-import de.tum.cit.aet.hephaestus.evidence.SourceKind;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventCoverage;
+import de.tum.cit.aet.hephaestus.practices.dto.ItemEventOptionDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDefinitionOptionsDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.PracticeEvidenceSourceOptionDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.PracticeReviewStateDimensionDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.PracticeSignalDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.PracticeSignalOptionDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.PracticeWorkTypeDefinitionOptionsDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.PracticeItemTypeOptionDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.ReadSourceOptionDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.StateDimensionDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.ApplicabilityClauseKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
 import java.util.List;
-import java.util.Set;
+import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
 @Service
+@RequiredArgsConstructor
 public class PracticeDefinitionOptionsService {
+    private final PracticeItemOptions items;
+    private final ClasspathSourceCatalogRegistry sources;
+    private final ItemEventCoverage coverage;
 
-    private final ArtifactSourceCatalogRegistry catalogs;
-    private final PracticeEvidenceDefaults defaults;
-    private final PracticeSignalOptions signalOptions;
-
-    public PracticeDefinitionOptionsService(
-            ArtifactSourceCatalogRegistry catalogs,
-            PracticeEvidenceDefaults defaults,
-            PracticeSignalOptions signalOptions) {
-        this.catalogs = catalogs;
-        this.defaults = defaults;
-        this.signalOptions = signalOptions;
-    }
-
-    public PracticeDefinitionOptionsDTO options() {
-        ArtifactSourceCatalog catalog = catalogs.current();
+    public PracticeDefinitionOptionsDTO options(@Nullable Long workspaceId) {
         return new PracticeDefinitionOptionsDTO(
-                catalog.version(),
-                signalOptions.authorableKinds().stream()
-                        .map(artifact -> options(catalog, artifact))
-                        .toList());
+                items.all().stream().map(item -> options(item, workspaceId)).toList(),
+                sources.current().version().value());
     }
 
-    private PracticeWorkTypeDefinitionOptionsDTO options(ArtifactSourceCatalog catalog, ArtifactKind artifact) {
-        Set<SourceKind> applicable = catalogs.requireSourcesFor(catalog.version(), artifact.value());
-        return new PracticeWorkTypeDefinitionOptionsDTO(
-                artifact,
-                signalOptions.bindableOptionsFor(artifact).stream()
-                        .map(option -> new PracticeSignalOptionDTO(
-                                option.signal(), option.displayName(), option.recommended()))
+    private PracticeItemTypeOptionDTO options(ItemDescriptor item, @Nullable Long workspaceId) {
+        var capabilities = item.reviewCapabilities();
+        var readSources = sources.current().sources().stream()
+                .filter(source -> source.appliesTo(item.kind().value()))
+                .map(source -> new ReadSourceOptionDTO(
+                        source.kind().value(),
+                        source.displayName(),
+                        source.completenessPolicy().supportsComplete()
+                                ? List.of(ReadNeed.REQUIRED, ReadNeed.COMPLETE, ReadNeed.OPTIONAL)
+                                : List.of(ReadNeed.REQUIRED, ReadNeed.OPTIONAL),
+                        source.citation()))
+                .toList();
+        return new PracticeItemTypeOptionDTO(
+                item.kind().value(),
+                item.displayName(),
+                item.events().stream()
+                        .filter(event -> event.bindableForAuthoring())
+                        .map(event -> new ItemEventOptionDTO(
+                                event.name().value(),
+                                event.displayName(),
+                                event.recommendedForAuthoring(),
+                                workspaceId != null
+                                        && coverage.connectedCoverage(workspaceId)
+                                                .contains(event.name()),
+                                coverage.raisedBy(event.name()).stream()
+                                        .sorted()
+                                        .toList()))
                         .toList(),
-                signalOptions
-                        .manualRequestOptionFor(artifact)
-                        .map(option -> new PracticeSignalDTO(option.signal(), option.displayName()))
-                        .orElse(null),
-                defaults.policyFor(artifact),
-                defaults.needsFor(artifact),
-                List.of(PracticeAutomatedReviewMode.LANGUAGE_MODEL),
-                catalog.sources().stream()
-                        .filter(source -> applicable.contains(source.kind()))
-                        .map(source -> new PracticeEvidenceSourceOptionDTO(
-                                source.kind().value(),
-                                source.displayName(),
-                                source.description(),
-                                source.selectionScope(),
-                                source.privacyClass(),
-                                source.requiredQuality(),
-                                source.completenessPolicy().supportsComplete()))
+                item.roles().stream().sorted().toList(),
+                readSources,
+                capabilities.reviewOnStateDimensions().stream()
+                        .map(dimension -> new StateDimensionDTO(
+                                dimension.key(),
+                                dimension.displayName(),
+                                dimension.values().stream()
+                                        .map(value -> new StateDimensionDTO.Value(value.value(), value.displayName()))
+                                        .toList()))
                         .toList(),
-                signalOptions.rolesFor(artifact).stream().sorted().toList(),
-                signalOptions.reviewWhenDimensionsFor(artifact).stream()
-                        .map(PracticeReviewStateDimensionDTO::from)
+                !capabilities.scanItemKinds().isEmpty(),
+                capabilities.scanItemKinds().stream()
+                        .map(kind -> kind.value())
+                        .sorted()
                         .toList(),
-                signalOptions.preconditionSupportedAspectsFor(artifact),
-                signalOptions.preconditionEvidenceCollectionsFor(artifact));
+                capabilities.appliesWhenSupportedAspects().stream()
+                        .sorted()
+                        .map(ApplicabilityClauseKind::valueOf)
+                        .toList(),
+                readSources.stream()
+                        .filter(source ->
+                                capabilities.appliesWhenEvidenceCollections().contains(source.source()))
+                        .toList());
     }
 }

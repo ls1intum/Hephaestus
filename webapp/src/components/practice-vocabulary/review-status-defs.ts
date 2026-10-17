@@ -1,32 +1,33 @@
 import {
 	CircleAlertIcon,
 	CircleCheckIcon,
+	CircleDashedIcon,
 	CircleSlashIcon,
 	ClockIcon,
+	EyeOffIcon,
+	HourglassIcon,
 	LoaderIcon,
-	PauseCircleIcon,
-	RadarIcon,
-	Repeat2Icon,
+	PackageXIcon,
 	TimerOffIcon,
 } from "lucide-react";
 
-import type { AgentJob } from "@/api/types.gen";
+import type { ReviewJob, ReviewPractice, ReviewRef, ReviewSummary } from "@/api/types.gen";
 
-import type { StatusDef, StatusDefs } from "@/components/common/status-def";
+import type { StatusDefs } from "@/components/common/status-def";
 
-export type ReviewStatus = AgentJob["status"];
-export type ResultProcessingStatus = NonNullable<AgentJob["deliveryStatus"]>;
+export type ReviewStatus = ReviewRef["status"];
+export type ReviewStopReason = NonNullable<ReviewSummary["stopReason"]>;
+export type ReviewPracticeStatus = ReviewPractice["status"];
+export type ReviewJobStatus = ReviewJob["status"];
+export type ReviewJobProcessingStatus = ReviewJob["processingStatus"];
 
-/**
- * Whether a review *ran*. Nothing here says anything about what it observed or who heard about it —
- * those are `outcome-defs` and `delivery-outcome-defs`.
- */
+// Review status describes execution; result outcomes and feedback delivery are separate facts.
 export const REVIEW_STATUS_DEFS: StatusDefs<ReviewStatus> = {
 	QUEUED: {
 		label: "Queued",
 		icon: ClockIcon,
 		badgeVariant: "secondary",
-		description: "Waiting to be picked up. A queued review may also be parked on a hold.",
+		description: "Waiting to be picked up.",
 	},
 	RUNNING: {
 		label: "Running",
@@ -34,17 +35,187 @@ export const REVIEW_STATUS_DEFS: StatusDefs<ReviewStatus> = {
 		badgeVariant: "secondary",
 		description: "Being run now. Results appear as it finishes.",
 	},
-	COMPLETED: {
-		label: "Completed",
+	COMPLETE: {
+		label: "Complete",
 		icon: CircleCheckIcon,
 		badgeVariant: "success",
 		description: "It ran to the end. Whether it found or sent anything is a separate question.",
+	},
+	PARTIAL: {
+		label: "Partial",
+		icon: CircleDashedIcon,
+		badgeVariant: "warning",
+		description:
+			"It closed with some work reviewed and some not. Its results cover only the work it reached.",
 	},
 	FAILED: {
 		label: "Failed",
 		icon: CircleAlertIcon,
 		badgeVariant: "destructive",
-		description: "It stopped on an error and produced no results.",
+		description: "It stopped on an error. Results it recorded before then still stand.",
+	},
+	CANCELLED: {
+		label: "Cancelled",
+		icon: CircleSlashIcon,
+		badgeVariant: "outline",
+		description: "It was stopped before it finished.",
+	},
+};
+
+/**
+ * How a review ended, as the developer's own surfaces read it: coarser than the admin console,
+ * since a partial review and a cancelled one both mean "it did not finish" to them.
+ */
+export const OWN_REVIEW_STATUS_DEFS: StatusDefs<ReviewStatus> = {
+	QUEUED: {
+		label: "Waiting",
+		icon: ClockIcon,
+		badgeVariant: "secondary",
+		description: "The review is waiting to start.",
+	},
+	RUNNING: {
+		label: "Running",
+		icon: LoaderIcon,
+		badgeVariant: "secondary",
+		description: "The review is running. What it records appears as it finishes.",
+	},
+	COMPLETE: {
+		label: "Completed",
+		icon: CircleCheckIcon,
+		badgeVariant: "success",
+		description: "The review ran to the end. Whether it found anything is a separate question.",
+	},
+	PARTIAL: {
+		label: "Did not finish",
+		icon: CircleDashedIcon,
+		badgeVariant: "warning",
+		description: "The review stopped before it finished. What it recorded up to then still stands.",
+	},
+	FAILED: {
+		label: "Failed",
+		icon: CircleAlertIcon,
+		badgeVariant: "destructive",
+		description: "The review stopped before it finished. What it recorded up to then still stands.",
+	},
+	CANCELLED: {
+		label: "Cancelled",
+		icon: CircleSlashIcon,
+		badgeVariant: "outline",
+		description: "The review was stopped before it finished.",
+	},
+};
+
+export function isActiveReview(status: ReviewStatus): boolean {
+	return status === "QUEUED" || status === "RUNNING";
+}
+
+/** Why a review stopped, as the server recorded it. */
+export const REVIEW_STOP_REASON_SENTENCES: Record<ReviewStopReason, string> = {
+	TIMED_OUT: "It ran past the time it is allowed and was stopped.",
+	EXECUTION_FAILED: "Running the review failed.",
+	PREPARATION_FAILED: "Preparing the review failed.",
+	PROCESSING_FAILED: "Processing the review’s results failed.",
+	PERSON_DATA_ERASED: "A person’s data was erased.",
+	STALE_ROLLOUT_REVISION: "Review settings changed while it waited.",
+	CANCELLED_BY_ADMIN: "A workspace admin cancelled it.",
+	REPLACED: "A newer review of the same work replaced it.",
+	LEGACY_FAILURE: "It failed before Hephaestus recorded why.",
+	EXECUTION_INCOMPLETE: "It did not review every practice it started.",
+	RESULT_WITHHELD: "Its results were withheld.",
+	READINESS_REFUSED: "Something the review needs was not ready.",
+	SUSPECT_LISTING: "The file listing changed too much to trust, so files were not removed.",
+	BUDGET: "The scan’s budget was used up.",
+	USAGE_UNVERIFIABLE: "We could not verify the cost of earlier model calls, so the scan stopped.",
+	DEADLINE: "The scan did not finish before its deadline.",
+	CANCELLED: "It was cancelled.",
+	ENUMERATION_FAILED: "Listing the repository’s files failed.",
+	ENUMERATION_LIMIT: "The repository has more files than one scan can list.",
+	NO_SCAN_PRACTICES: "No practice is included in scans.",
+	MODEL_CHANGED: "The assigned AI model changed while it ran.",
+	MODEL_UNAVAILABLE: "The assigned AI model was unavailable.",
+	ERROR: "It stopped on an error.",
+	LEGACY_SCOPE_UNKNOWN: "It ran before Hephaestus recorded what it covered.",
+	CONTRACT_CHANGED: "Hephaestus was upgraded while it waited, so it stopped.",
+};
+
+const REVIEW_WITHHELD_REASON_SENTENCES: Readonly<Record<string, string>> = {
+	...REVIEW_STOP_REASON_SENTENCES,
+	LEGACY_AMBIGUOUS_RESULTS:
+		"This review keeps several historical results for the same practice and work without choosing one as its answer.",
+	LEGACY_REUSE_UNBOUND:
+		"This review referred to an earlier result that could not be identified exactly.",
+};
+
+export function reviewReasonSentence(code: string | null): string | undefined {
+	return code !== null && Object.hasOwn(REVIEW_WITHHELD_REASON_SENTENCES, code)
+		? REVIEW_WITHHELD_REASON_SENTENCES[code]
+		: undefined;
+}
+
+/** Where one practice stands inside one review. Withheld is a decision with a reason, not a result. */
+export const REVIEW_PRACTICE_STATUS_DEFS: StatusDefs<ReviewPracticeStatus> = {
+	QUEUED: {
+		label: "Queued",
+		icon: ClockIcon,
+		badgeVariant: "secondary",
+		description: "Waiting for its turn in the review.",
+	},
+	READY: {
+		label: "Ready",
+		icon: HourglassIcon,
+		badgeVariant: "secondary",
+		description: "Everything it reads was captured.",
+	},
+	RUNNING: {
+		label: "Running",
+		icon: LoaderIcon,
+		badgeVariant: "secondary",
+		description: "Being reviewed now.",
+	},
+	DONE: {
+		label: "Done",
+		icon: CircleCheckIcon,
+		badgeVariant: "success",
+		description: "It recorded its results.",
+	},
+	WITHHELD: {
+		label: "Withheld",
+		icon: EyeOffIcon,
+		badgeVariant: "warning",
+		description: "It was not reviewed, for the recorded reason. This is not a result.",
+	},
+	FAILED: {
+		label: "Failed",
+		icon: CircleAlertIcon,
+		badgeVariant: "destructive",
+		description: "Reviewing it failed. It recorded no result.",
+	},
+};
+
+export const REVIEW_JOB_STATUS_DEFS: StatusDefs<ReviewJobStatus> = {
+	QUEUED: {
+		label: "Queued",
+		icon: ClockIcon,
+		badgeVariant: "secondary",
+		description: "Waiting for a worker.",
+	},
+	RUNNING: {
+		label: "Running",
+		icon: LoaderIcon,
+		badgeVariant: "secondary",
+		description: "A worker is running it.",
+	},
+	COMPLETED: {
+		label: "Completed",
+		icon: CircleCheckIcon,
+		badgeVariant: "success",
+		description: "It ran to the end.",
+	},
+	FAILED: {
+		label: "Failed",
+		icon: CircleAlertIcon,
+		badgeVariant: "destructive",
+		description: "It stopped on an error.",
 	},
 	TIMED_OUT: {
 		label: "Timed out",
@@ -53,108 +224,37 @@ export const REVIEW_STATUS_DEFS: StatusDefs<ReviewStatus> = {
 		description: "It ran past the time it is allowed and was stopped.",
 	},
 	CANCELLED: {
-		label: "Canceled",
+		label: "Cancelled",
 		icon: CircleSlashIcon,
 		badgeVariant: "outline",
-		description: "Somebody stopped it before it finished.",
+		description: "It was stopped before it finished.",
 	},
 };
 
-/** The Reviews tab's Status filter value for work on which no review started, which no review carries. */
-export const NO_REVIEW_STARTED = "NOT_STARTED";
-
-/**
- * The Reviews tab's Status filter value for a queued review that waits on a hold, such as the AI
- * budget: no status of its own, so the server takes it as `onHold` beside the listed statuses.
- */
-export const ON_HOLD = "ON_HOLD";
-
-/**
- * The Reviews tab's Status filter value for a queued review that a worker could pick up now: not on
- * a budget hold and not waiting before a retry. These are the reviews the queue counts as Waiting,
- * so its figure opens exactly them; the server takes it as `waiting` beside the listed statuses.
- */
-export const WAITING = "WAITING";
-
-export type ReviewStatusFilter =
-	| ReviewStatus
-	| typeof NO_REVIEW_STARTED
-	| typeof ON_HOLD
-	| typeof WAITING;
-
-/**
- * What the Reviews tab's Status filter offers: the work on which no review started, then every
- * status a review can have, with the queued reviews that wait now and those on hold after Queued. The first lists work instead of reviews, so it is never combined with
- * the others.
- */
-export const REVIEW_STATUS_FILTER_DEFS: StatusDefs<ReviewStatusFilter> = {
-	[NO_REVIEW_STARTED]: {
-		label: "No review started",
-		icon: RadarIcon,
+/** Whether one job's output was processed into results. Processing never proves delivery. */
+export const REVIEW_JOB_PROCESSING_DEFS: StatusDefs<ReviewJobProcessingStatus> = {
+	NONE: {
+		label: "Nothing to process",
+		icon: PackageXIcon,
 		badgeVariant: "outline",
-		description: "Work with recorded moments, none of which started a review, and why.",
-	},
-	QUEUED: REVIEW_STATUS_DEFS.QUEUED,
-	[WAITING]: {
-		label: "Waiting",
-		icon: ClockIcon,
-		badgeVariant: "secondary",
-		description:
-			"Queued and ready for a worker now: not on hold and not waiting before a retry. The queue counts these as Waiting.",
-	},
-	[ON_HOLD]: {
-		label: "On hold",
-		icon: PauseCircleIcon,
-		badgeVariant: "warning",
-		description:
-			"Queued and waiting on a hold, for example because the AI budget is used up. It continues on its own when the hold ends.",
-	},
-	RUNNING: REVIEW_STATUS_DEFS.RUNNING,
-	COMPLETED: REVIEW_STATUS_DEFS.COMPLETED,
-	FAILED: REVIEW_STATUS_DEFS.FAILED,
-	TIMED_OUT: REVIEW_STATUS_DEFS.TIMED_OUT,
-	CANCELLED: REVIEW_STATUS_DEFS.CANCELLED,
-};
-
-/** A review a newer one replaced: its status says it ran, this says it does not carry its practices. */
-export const REPLACED_REVIEW_STATUS: StatusDef = {
-	label: "Replaced",
-	icon: Repeat2Icon,
-	badgeVariant: "secondary",
-	description:
-		"A newer admitted review carries this review’s practices and may still be waiting or running.",
-};
-
-export function reviewStatusDef(review: Pick<AgentJob, "status" | "reviewOutcome">): StatusDef {
-	return review.reviewOutcome === "SUPERSEDED"
-		? REPLACED_REVIEW_STATUS
-		: REVIEW_STATUS_DEFS[review.status];
-}
-
-/**
- * Processing a review's results includes delivering its feedback automatically, so a failed
- * delivery fails processing too; processing that finished still does not establish publication. The
- * job's wire field is `deliveryStatus`; individual feedback records establish whether anything
- * reached a developer.
- */
-export const RESULT_PROCESSING_DEFS: StatusDefs<ResultProcessingStatus> = {
-	DELIVERED: {
-		label: "Results processed",
-		icon: CircleCheckIcon,
-		badgeVariant: "success",
-		description: "Result processing finished. Feedback may still await approval or be withheld.",
+		description: "The job produced no output to process.",
 	},
 	PENDING: {
-		label: "Results awaiting processing",
+		label: "Awaiting processing",
 		icon: ClockIcon,
 		badgeVariant: "secondary",
-		description: "The review results are waiting to be processed.",
+		description: "Its output is waiting to be processed.",
+	},
+	DONE: {
+		label: "Processed",
+		icon: CircleCheckIcon,
+		badgeVariant: "success",
+		description: "Its output was processed. Feedback may still await approval or be withheld.",
 	},
 	FAILED: {
-		label: "Result processing failed",
+		label: "Processing failed",
 		icon: CircleAlertIcon,
 		badgeVariant: "destructive",
-		description:
-			"Processing the review results, or delivering the feedback they produced, did not succeed.",
+		description: "Processing its output failed.",
 	},
 };

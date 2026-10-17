@@ -5,14 +5,20 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.privacy.PersonDataRequest.State;
 import de.tum.cit.aet.hephaestus.core.privacy.PersonDataService;
 import de.tum.cit.aet.hephaestus.core.privacy.PersonDataStoreReceipt;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonProcessingSuppression;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceIdentityContributor;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceScope;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmCaptureConsent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
@@ -32,6 +38,7 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.core.type.TypeReference;
@@ -55,6 +62,9 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
     private ExactPersonIdentityResolver resolver;
 
     @Autowired
+    private ScmCaptureConsent captureConsent;
+
+    @Autowired
     private PersonDataService personData;
 
     @Autowired
@@ -67,7 +77,46 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
     private AccountRepository accounts;
 
     @Autowired
-    private IdentityLinkRepository links;
+    private IdentityRepository links;
+
+    @Test
+    void shouldResolveDeclaredSourceBucketsWithoutKnowingTheContributorsItemKinds() {
+        var account = accounts.saveAndFlush(new Account("scope-" + UUID.randomUUID()));
+        var beans = new StaticListableBeanFactory();
+        beans.addBean("conversation", contributor(PersonSourceScope.CONVERSATIONS, List.of(5L, 2L, 5L)));
+        beans.addBean("document", contributor(PersonSourceScope.DOCUMENTS, List.of(11L)));
+        beans.addBean("scm", contributor(PersonSourceScope.SCM_SOURCES, List.of(13L)));
+        var declared = new ExactPersonIdentityResolver(
+                jdbc, beans.getBeanProvider(PersonSourceIdentityContributor.class), List.of());
+        var scope = declared.resolve(Objects.requireNonNull(account.getId()), List.of());
+        assertThat(scope.conversationIds()).containsExactly(2L, 5L);
+        assertThat(scope.outlineDocumentIds()).containsExactly(11L);
+        assertThat(scope.scmArtifactIds()).containsExactly(13L);
+    }
+
+    private static PersonSourceIdentityContributor contributor(PersonSourceScope scope, List<Long> sourceIds) {
+        return new PersonSourceIdentityContributor() {
+            @Override
+            public PersonSourceScope scope() {
+                return scope;
+            }
+
+            @Override
+            public Set<String> itemKinds() {
+                return Set.of("another.item");
+            }
+
+            @Override
+            public List<Long> sourceIds(PersonScope person) {
+                return sourceIds;
+            }
+
+            @Override
+            public List<PersonIdentity> identitiesForSource(long workspaceId, String itemKind, long sourceId) {
+                return List.of();
+            }
+        };
+    }
 
     @Test
     void shouldPreviewAndExportEveryRegisteredStoreForGitLabOnlyPerson() {
@@ -115,10 +164,19 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
         var target = user(canonical, 42);
         var aliasTarget = user(alias, 42);
         var unrelated = user(alias, 84);
-        var account = accounts.saveAndFlush(new Account("not-a-resolution-key"));
-        link(account, canonical, "42", null, target.getId());
+        var denied = new Account("not-a-resolution-key");
+        denied.setAiChoice(AiChoice.NO_AI);
+        denied.setAiChoiceAt(Instant.now());
+        var account = accounts.saveAndFlush(denied);
+        link(account, canonical, "42", null);
 
         var expected = List.of(identity(canonical, "42", null), identity(alias, "42", null));
+        assertThat(resolver.accountFor(identity(alias, "42", null))).contains(Objects.requireNonNull(account.getId()));
+        assertThat(resolver.accountFor(identity(alias, "84", null))).isEmpty();
+        assertThatThrownBy(() -> captureConsent.require(List.of(aliasTarget)))
+                .isInstanceOfSatisfying(
+                        ItemCaptureException.class,
+                        refusal -> assertThat(refusal.code()).isEqualTo(ItemCaptureCode.CONSENT_WITHHELD));
         var providerScope = resolver.resolve(null, List.of(identity(alias, "42", null)));
         assertThat(providerScope.accountId()).isEqualTo(account.getId());
         assertThat(providerScope.identities()).containsExactlyInAnyOrderElementsOf(expected);
@@ -137,8 +195,11 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
                 providers.saveAndFlush(new IdentityProvider(IdentityProviderType.GITLAB, "HTTPS://" + host + ":443/"));
         var first = accounts.saveAndFlush(new Account("first"));
         var second = accounts.saveAndFlush(new Account("second"));
-        link(first, canonical, "42", null, null);
-        link(second, alias, "42", null, null);
+        link(first, canonical, "42", null);
+        link(second, alias, "42", null);
+        assertThatThrownBy(() -> resolver.accountFor(identity(canonical, "42", null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("409");
         assertThatThrownBy(() -> resolver.resolve(null, List.of(identity(canonical, "42", null))))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("409");
@@ -148,14 +209,20 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void shouldHaveExactlyOneSourceAttributionOwnerForEachShippedArtifactKind() {
+    void shouldHaveExactlyOneSourceAttributionOwnerForEachShippedItemKind() {
         var kinds = sourceOwners.stream()
-                .flatMap(owner -> owner.artifactKinds().stream())
+                .flatMap(owner -> owner.itemKinds().stream())
                 .toList();
         assertThat(kinds)
                 .doesNotHaveDuplicates()
                 .containsExactlyInAnyOrder(
-                        "scm.issue", "scm.pull_request", "chat.conversation_thread", "docs.document");
+                        "scm.issue",
+                        "scm.pull_request",
+                        "scm.pull_request_review",
+                        "scm.repository",
+                        "scm.file",
+                        "chat.thread",
+                        "docs.document");
     }
 
     @Test
@@ -194,7 +261,7 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
                         "GITLAB",
                         "config",
                         "{\"serverUrl\":\"" + provider.getServerUrl() + "\"}"));
-        for (long sourceId : List.of(995202L, 995203L, 995204L, 995205L)) {
+        for (long sourceId : List.of(995202L, 995203L, 995204L, 995205L, 995208L)) {
             var source = new HashMap<String, Object>(Map.of(
                     "id",
                     sourceId,
@@ -229,7 +296,7 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
         }
         jdbc.update("INSERT INTO issue_assignee(issue_id,user_id) VALUES (?,?)", 995202L, target.getId());
         jdbc.update(
-                "INSERT INTO pull_request_requested_reviewers(pull_request_id,user_id) VALUES (?,?)",
+                "INSERT INTO pull_request_requested_reviewers(pull_request_id,user_id) VALUES" + " (?,?)",
                 995203L,
                 target.getId());
         seed.insert(
@@ -246,10 +313,25 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
                         "committer_id",
                         target.getId()));
         jdbc.update("INSERT INTO commit_pull_request(commit_id,pull_request_id) VALUES (?,?)", 995206L, 995204L);
+        seed.insert(
+                "pull_request_review_thread",
+                Map.of(
+                        "id",
+                        995209L,
+                        "native_id",
+                        995209L,
+                        "provider_id",
+                        provider.getId(),
+                        "pull_request_id",
+                        995208L,
+                        "resolved_by_id",
+                        target.getId(),
+                        "state",
+                        "RESOLVED"));
         var scope = resolver.resolve(null, List.of(identity(provider, "42", null)));
         assertThat(scope.userIds()).containsExactly(target.getId());
         assertThat(scope.scmArtifactIds())
-                .containsExactly(995202L, 995203L, 995204L)
+                .containsExactly(995202L, 995203L, 995204L, 995208L)
                 .doesNotContain(995205L);
         assertThat(resolver.resolve(null, List.of(identity(provider, "84", null)))
                         .scmArtifactIds())
@@ -261,12 +343,12 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
         var request = personData.preview(administratorId, null, List.of(identity(provider, "42", null)));
         personData.requestErasure(request.request().getId(), administratorId, true);
         for (long sourceId : scope.scmArtifactIds()) {
-            assertThat(suppression.isArtifactSuppressed(workspaceId, "scm.pull_request", sourceId))
+            assertThat(suppression.isSourceSuppressed(workspaceId, "scm.pull_request", sourceId))
                     .isTrue();
-            assertThat(suppression.isArtifactSuppressed(-1, "scm.pull_request", sourceId))
+            assertThat(suppression.isSourceSuppressed(-1, "scm.pull_request", sourceId))
                     .isFalse();
         }
-        assertThat(suppression.isArtifactSuppressed(workspaceId, "scm.pull_request", 995205L))
+        assertThat(suppression.isSourceSuppressed(workspaceId, "scm.pull_request", 995205L))
                 .isFalse();
         personData.run(request.request().getId());
         assertThat(personData.get(request.request().getId()).request().getState())
@@ -276,6 +358,7 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
         jdbc.update("DELETE FROM git_commit WHERE id=?", 995206L);
         jdbc.update("DELETE FROM issue_assignee WHERE issue_id=?", 995202L);
         jdbc.update("DELETE FROM pull_request_requested_reviewers WHERE pull_request_id=?", 995203L);
+        jdbc.update("DELETE FROM pull_request_review_thread WHERE id=?", 995209L);
         jdbc.update("DELETE FROM issue WHERE repository_id=?", repositoryId);
         jdbc.update("DELETE FROM repository_to_monitor WHERE native_id=?", repositoryId);
         jdbc.update("DELETE FROM repository WHERE id=?", repositoryId);
@@ -311,16 +394,17 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void shouldIncludeDisabledLinksAndResolveActorsByNativeKeyInsteadOfCachedActor() {
+    void shouldIncludeDisabledLinksWhenResolvingEveryLinkedNativeProfile() {
         var github = provider(IdentityProviderType.GITHUB);
         var gitlab = provider(IdentityProviderType.GITLAB);
         var first = user(github, 42);
         var second = user(gitlab, 84);
         var account = accounts.saveAndFlush(new Account("Subject"));
-        link(account, github, "42", null, null);
-        var disabled = link(account, gitlab, "84", null, null);
+        link(account, github, "42", null);
+        var disabled = link(account, gitlab, "84", null);
         disabled.setDisabledAt(Instant.now());
         links.saveAndFlush(disabled);
+        assertThat(resolver.accountFor(identity(gitlab, "84", null))).contains(Objects.requireNonNull(account.getId()));
 
         var scope = resolver.resolve(null, List.of(identity(github, "42", null)));
 
@@ -331,17 +415,18 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void shouldStopWhenCachedActorPointsAtAnotherPersonsProfile() {
+    void shouldResolveOnlyTheLinkedNativeProfileWhenAnotherProfileExists() {
         var github = provider(IdentityProviderType.GITHUB);
         var selected = user(github, 42);
         var other = user(github, 84);
         var account = accounts.saveAndFlush(new Account("Selected account"));
-        link(account, github, "42", null, other.getId());
+        link(account, github, "42", null);
+        assertThat(resolver.accountFor(identity(github, "42", null))).contains(Objects.requireNonNull(account.getId()));
 
-        assertThatThrownBy(() -> resolver.resolve(account.getId(), List.of()))
-                .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("409")
-                .hasMessageContaining("conflicting cached actor");
+        var scope = resolver.resolve(account.getId(), List.of());
+        assertThat(scope.accountId()).isEqualTo(account.getId());
+        assertThat(scope.identities()).containsExactly(identity(github, "42", null));
+        assertThat(scope.userIds()).containsExactly(selected.getId()).doesNotContain(other.getId());
         assertThat(users.findById(selected.getId())).isPresent();
         assertThat(users.findById(other.getId())).isPresent();
     }
@@ -351,7 +436,7 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
         var github = provider(IdentityProviderType.GITHUB);
         var account = accounts.saveAndFlush(new Account("Requested subject"));
         var other = accounts.saveAndFlush(new Account("Other person"));
-        link(other, github, "42", null, null);
+        link(other, github, "42", null);
 
         assertThatThrownBy(() -> resolver.resolve(account.getId(), List.of(identity(github, "42", null))))
                 .isInstanceOf(ResponseStatusException.class)
@@ -366,8 +451,8 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
         var github = provider(IdentityProviderType.GITHUB);
         var first = accounts.saveAndFlush(new Account("First"));
         var second = accounts.saveAndFlush(new Account("Second"));
-        link(first, github, "42", null, null);
-        link(second, github, "84", null, null);
+        link(first, github, "42", null);
+        link(second, github, "84", null);
 
         assertThatThrownBy(() ->
                         resolver.resolve(null, List.of(identity(github, "42", null), identity(github, "84", null))))
@@ -380,8 +465,8 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
         var slack = provider(IdentityProviderType.SLACK);
         var first = accounts.saveAndFlush(new Account("First Slack person"));
         var second = accounts.saveAndFlush(new Account("Second Slack person"));
-        link(first, slack, "U42", "T1", null);
-        link(second, slack, "U42", "T2", null);
+        link(first, slack, "U42", "T1");
+        link(second, slack, "U42", "T2");
 
         assertThat(resolver.resolve(null, List.of(identity(slack, "U42", "T1"))).accountId())
                 .isEqualTo(first.getId());
@@ -437,18 +522,13 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
         return new PersonIdentity(Objects.requireNonNull(provider.getId()), subject, teamId);
     }
 
-    private IdentityLink link(
-            Account account,
-            IdentityProvider provider,
-            String subject,
-            @Nullable String teamId,
-            @Nullable Long actorId) {
-        var link = new IdentityLink();
+    private Identity link(Account account, IdentityProvider provider, String subject, @Nullable String teamId) {
+        var link = new Identity();
         link.setAccount(account);
         link.setProviderId(Objects.requireNonNull(provider.getId()));
-        link.setSubject(subject);
-        link.setTeamId(teamId);
-        link.setExternalActorId(actorId);
+        link.setProviderUserKey(subject);
+        link.setTeamKey(teamId == null ? "" : teamId);
+
         return links.saveAndFlush(link);
     }
 
@@ -457,7 +537,7 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
         var outline = provider(IdentityProviderType.OUTLINE);
         var account = accounts.saveAndFlush(new Account("Outline person"));
         String subject = UUID.randomUUID().toString();
-        link(account, outline, subject, "outline-workspace", null);
+        link(account, outline, subject, "outline-workspace");
         var scope = resolver.resolve(null, List.of(identity(outline, subject, null)));
         assertThat(scope.accountId()).isEqualTo(account.getId());
         assertThat(scope.identities())
@@ -473,8 +553,8 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
         var first = accounts.saveAndFlush(new Account("First Outline person"));
         var second = accounts.saveAndFlush(new Account("Second Outline person"));
         String subject = UUID.randomUUID().toString();
-        link(first, outline, subject, "outline-workspace-a", null);
-        link(second, outline, subject, "outline-workspace-b", null);
+        link(first, outline, subject, "outline-workspace-a");
+        link(second, outline, subject, "outline-workspace-b");
         assertThatThrownBy(() -> resolver.resolve(null, List.of(identity(outline, subject, "outline-workspace-a"))))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("409");

@@ -14,10 +14,10 @@ Prepare DNS, TLS, and OAuth callbacks before you turn on the switch.
 
 The server uses these properties:
 
-| Property | Environment variable | Default |
-| --- | --- | --- |
-| `hephaestus.workspace.subdomains.enabled` | `HEPHAESTUS_WORKSPACE_SUBDOMAINS_ENABLED` | `false` |
-| `hephaestus.workspace.subdomains.base-domain` | `HEPHAESTUS_WORKSPACE_SUBDOMAINS_BASE_DOMAIN` | Empty |
+| Property                                      | Environment variable                          | Default |
+| --------------------------------------------- | --------------------------------------------- | ------- |
+| `hephaestus.workspace.subdomains.enabled`     | `HEPHAESTUS_WORKSPACE_SUBDOMAINS_ENABLED`     | `false` |
+| `hephaestus.workspace.subdomains.base-domain` | `HEPHAESTUS_WORKSPACE_SUBDOMAINS_BASE_DOMAIN` | Empty   |
 
 The base domain must use lowercase ASCII.
 It must not contain a scheme, port, or path.
@@ -80,13 +80,13 @@ The permissions follow [lego's Cloudflare provider](https://go-acme.github.io/le
 Use the same settings for the reference and single-host deployments.
 The proxy chooses one ACME challenge through these optional variables:
 
-| Variable | Default | With subdomains |
-| --- | --- | --- |
-| `ACME_CHALLENGE` | `httpchallenge.entrypoint` | `dnschallenge.provider` |
-| `ACME_CHALLENGE_VALUE` | `http` | Your lego DNS provider, such as `cloudflare` |
-| `TRAEFIK_DNS_CREDENTIALS_DIRECTORY` | `/etc/hephaestus/dns` | Absolute path to the proxy-only credential directory |
-| `TRAEFIK_DNS_CREDENTIAL_VARIABLE` | `CF_DNS_API_TOKEN_FILE` | Your provider's credential variable with the `_FILE` suffix |
-| `LEGO_EXPERIMENTAL_DNS_TCP_ONLY` | `false` | Set `true` only when DNS queries need TCP transport |
+| Variable                            | Default                    | With subdomains                                             |
+| ----------------------------------- | -------------------------- | ----------------------------------------------------------- |
+| `ACME_CHALLENGE`                    | `httpchallenge.entrypoint` | `dnschallenge.provider`                                     |
+| `ACME_CHALLENGE_VALUE`              | `http`                     | Your lego DNS provider, such as `cloudflare`                |
+| `TRAEFIK_DNS_CREDENTIALS_DIRECTORY` | `/etc/hephaestus/dns`      | Absolute path to the proxy-only credential directory        |
+| `TRAEFIK_DNS_CREDENTIAL_VARIABLE`   | `CF_DNS_API_TOKEN_FILE`    | Your provider's credential variable with the `_FILE` suffix |
+| `LEGO_EXPERIMENTAL_DNS_TCP_ONLY`    | `false`                    | Set `true` only when DNS queries need TCP transport         |
 
 For Cloudflare, create the credential directory with mode `0700`.
 Put only the raw zone-scoped token in its `token` file, with mode `0600`.

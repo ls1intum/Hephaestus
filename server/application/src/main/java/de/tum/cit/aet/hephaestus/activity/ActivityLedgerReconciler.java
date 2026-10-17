@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.activity;
 
 import de.tum.cit.aet.hephaestus.activity.spi.ActivityLedgerRepair;
-import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataWriteFence;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceActorSelector;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +17,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class ActivityLedgerReconciler implements ActivityLedgerRepair {
     private static final int CHUNK_SIZE = 1000;
     private final ActivityLedgerRepository repository;
-    private final PersonDataWriteFence writeFence;
+    private final ActivityPersonWriteAdmission admission;
     private final PlatformTransactionManager transactionManager;
     private final WorkspaceActorSelector actors;
 
@@ -64,7 +63,7 @@ public class ActivityLedgerReconciler implements ActivityLedgerRepair {
             return new Chunk(last, 0);
         }
         var candidates = repository.findChunkActors(repositoryId, source.name(), after, last);
-        var admitted = writeFence.holdForUserWrites(candidates);
+        var admitted = admission.holdActors(candidates);
         if (admitted.isEmpty()) return new Chunk(last, 0);
         return new Chunk(last, repository.insertChunk(workspaceId, repositoryId, source.name(), after, last, admitted));
     }

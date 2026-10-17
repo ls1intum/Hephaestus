@@ -7,68 +7,58 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 
-/** Three-way comparison and explicit field choices for both catalogue hops. */
 public final class PracticeDefinitionMerge {
-
     private PracticeDefinitionMerge() {}
 
-    public record FieldChange(PracticeDefinitionField field, boolean offeredChanged, boolean conflict) {}
+    public record FieldChange(
+            PracticeDefinitionField field, boolean changedLocally, boolean offeredChanged, boolean conflict) {}
 
     public static List<FieldChange> changes(
-            PracticeDefinition base, PracticeDefinition current, PracticeDefinition offered) {
+            @Nullable PracticeDefinition base, PracticeDefinition current, PracticeDefinition offered) {
         return Arrays.stream(PracticeDefinitionField.values())
-                .filter(field -> !Objects.equals(value(field, base), value(field, offered))
-                        || !Objects.equals(value(field, base), value(field, current)))
                 .map(field -> {
-                    boolean offeredChanged = !Objects.equals(value(field, base), value(field, offered));
-                    boolean currentChanged = !Objects.equals(value(field, base), value(field, current));
-                    return new FieldChange(field, offeredChanged, offeredChanged && currentChanged);
+                    Object original = base == null ? null : value(field, base);
+                    boolean local = !Objects.equals(original, value(field, current));
+                    boolean changed = !Objects.equals(original, value(field, offered));
+                    boolean conflict =
+                            local && changed && !Objects.equals(value(field, current), value(field, offered));
+                    return new FieldChange(field, local, changed, conflict);
                 })
+                .filter(change -> change.changedLocally() || change.offeredChanged())
                 .toList();
     }
 
     public static PracticeDefinition apply(
-            PracticeDefinition base,
+            @Nullable PracticeDefinition base,
             PracticeDefinition current,
             PracticeDefinition offered,
             Map<PracticeDefinitionField, PracticeReleaseChoice> choices) {
-        var changed = changes(base, current, offered).stream()
+        var required = changes(base, current, offered).stream()
                 .filter(FieldChange::offeredChanged)
                 .map(FieldChange::field)
                 .collect(Collectors.toSet());
-        if (!changed.equals(choices.keySet()) || choices.values().stream().anyMatch(Objects::isNull)) {
-            throw new IllegalArgumentException(
-                    "Choose the current or the offered value for every changed catalog field.");
+        if (!required.equals(choices.keySet()) || choices.values().stream().anyMatch(Objects::isNull)) {
+            throw new IllegalArgumentException("Choose the current or offered value for every changed catalog field.");
         }
         return new PracticeDefinition(
                 source(PracticeDefinitionField.NAME, current, offered, choices).name(),
-                source(PracticeDefinitionField.SIGNALS, current, offered, choices)
-                        .signals(),
-                source(PracticeDefinitionField.EVIDENCE_REQUIREMENTS, current, offered, choices)
-                        .evidenceRequirements(),
-                source(PracticeDefinitionField.REVIEW_WHEN, current, offered, choices)
-                        .reviewWhen(),
-                source(PracticeDefinitionField.SUBJECT, current, offered, choices)
-                        .subject(),
-                source(PracticeDefinitionField.PRECONDITION, current, offered, choices)
-                        .precondition(),
+                source(PracticeDefinitionField.REVIEW_ON, current, offered, choices)
+                        .reviewOn(),
+                source(PracticeDefinitionField.APPLIES_WHEN, current, offered, choices)
+                        .appliesWhen(),
+                source(PracticeDefinitionField.ABOUT, current, offered, choices).about(),
+                source(PracticeDefinitionField.READS, current, offered, choices).reads(),
+                source(PracticeDefinitionField.REVIEWED_BY, current, offered, choices)
+                        .reviewedBy(),
                 source(PracticeDefinitionField.CRITERIA, current, offered, choices)
                         .criteria(),
-                source(PracticeDefinitionField.PRECOMPUTE_SCRIPT, current, offered, choices)
-                        .precomputeScript(),
-                source(PracticeDefinitionField.AUTOMATED_REVIEW_POLICY, current, offered, choices)
-                        .automatedReviewPolicy(),
-                source(PracticeDefinitionField.WHY_IT_MATTERS, current, offered, choices)
-                        .whyItMatters(),
-                source(PracticeDefinitionField.WHAT_GOOD_LOOKS_LIKE, current, offered, choices)
-                        .whatGoodLooksLike(),
-                source(PracticeDefinitionField.GROUP_SLUG, current, offered, choices)
-                        .groupSlug(),
-                source(PracticeDefinitionField.DELIVERY_BEHAVIOR, current, offered, choices)
-                        .deliveryBehavior(),
-                source(PracticeDefinitionField.VISUAL, current, offered, choices)
-                        .visual(),
-                source(PracticeDefinitionField.GUIDE, current, offered, choices).guide());
+                source(PracticeDefinitionField.SCRIPT, current, offered, choices)
+                        .script(),
+                source(PracticeDefinitionField.SCAN, current, offered, choices).scan(),
+                source(PracticeDefinitionField.LINE_NOTES, current, offered, choices)
+                        .lineNotes(),
+                source(PracticeDefinitionField.GUIDANCE, current, offered, choices)
+                        .guidance());
     }
 
     private static PracticeDefinition source(
@@ -79,23 +69,19 @@ public final class PracticeDefinitionMerge {
         return choices.get(field) == PracticeReleaseChoice.OFFERED ? offered : current;
     }
 
-    private static @Nullable Object value(PracticeDefinitionField field, PracticeDefinition definition) {
+    public static @Nullable Object value(PracticeDefinitionField field, PracticeDefinition definition) {
         return switch (field) {
             case NAME -> definition.name();
-            case SIGNALS -> definition.signals();
-            case EVIDENCE_REQUIREMENTS -> definition.evidenceRequirements();
-            case REVIEW_WHEN -> definition.reviewWhen();
-            case SUBJECT -> definition.subject();
-            case PRECONDITION -> definition.precondition();
+            case REVIEW_ON -> definition.reviewOn();
+            case APPLIES_WHEN -> definition.appliesWhen();
+            case ABOUT -> definition.about();
+            case READS -> definition.reads();
+            case REVIEWED_BY -> definition.reviewedBy();
             case CRITERIA -> definition.criteria();
-            case PRECOMPUTE_SCRIPT -> definition.precomputeScript();
-            case AUTOMATED_REVIEW_POLICY -> definition.automatedReviewPolicy();
-            case WHY_IT_MATTERS -> definition.whyItMatters();
-            case WHAT_GOOD_LOOKS_LIKE -> definition.whatGoodLooksLike();
-            case GROUP_SLUG -> definition.groupSlug();
-            case DELIVERY_BEHAVIOR -> definition.deliveryBehavior();
-            case VISUAL -> definition.visual();
-            case GUIDE -> definition.guide();
+            case SCRIPT -> definition.script();
+            case SCAN -> definition.scan();
+            case LINE_NOTES -> definition.lineNotes();
+            case GUIDANCE -> definition.guidance();
         };
     }
 }

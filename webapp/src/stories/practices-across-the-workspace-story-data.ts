@@ -1,193 +1,142 @@
 import type {
-	PracticesAcrossWorkspace,
-	PracticesAcrossWorkspaceTiles,
-	WorkspaceGroupSplit,
-	WorkspacePracticeSplit,
-	WorkspaceSplit,
+	GroupRef,
+	OutcomeVector,
+	PracticeWorkspaceOverview,
+	PracticeWorkspaceTile,
 } from "@/api/types.gen";
+import type { WorkspaceGroup } from "@/components/practices-across-the-workspace/workspace-groups";
 
-type Group = Pick<WorkspaceGroupSplit, "groupSlug" | "groupName" | "groupIcon" | "groupColor">;
-
-const ACTING: Group = {
-	groupSlug: "acting-on-review-feedback",
-	groupName: "Acting on review feedback",
-	groupIcon: "MessageSquareReply",
-	groupColor: "cyan",
+const ACTING: GroupRef = {
+	slug: "acting-on-review-feedback",
+	name: "Acting on review feedback",
+	icon: "MessageSquareReply",
+	color: "cyan",
 };
-const COMMUNICATION: Group = {
-	groupSlug: "communication",
-	groupName: "Communicating in the open",
-	groupIcon: "MessageCircle",
-	groupColor: "violet",
+const COMMUNICATION: GroupRef = {
+	slug: "communication",
+	name: "Communicating in the open",
+	icon: "MessageCircle",
+	color: "violet",
 };
-const FAILURE: Group = {
-	groupSlug: "robust-error-handling",
-	groupName: "Handling failure well",
-	groupIcon: "ShieldAlert",
-	groupColor: "amber",
+const PACKAGING: GroupRef = {
+	slug: "review-ready-work",
+	name: "Packaging work for review",
+	icon: "Package",
+	color: "sky",
 };
-const PACKAGING: Group = {
-	groupSlug: "review-ready-work",
-	groupName: "Packaging work for review",
-	groupIcon: "Package",
-	groupColor: "sky",
-};
-const REVIEWING: Group = {
-	groupSlug: "constructive-code-review",
-	groupName: "Reviewing a teammate's work constructively",
-	groupIcon: "Eye",
-	groupColor: "teal",
-};
-const TESTING: Group = {
-	groupSlug: "testing-discipline",
-	groupName: "Testing your changes",
-	groupIcon: "TestTube",
-	groupColor: "red",
-};
-const ISSUES: Group = {
-	groupSlug: "actionable-issue-authoring",
-	groupName: "Writing issues a maintainer can act on",
-	groupIcon: "FileText",
-	groupColor: "sky",
-};
-const MAINTAINABLE: Group = {
-	groupSlug: "code-craftsmanship",
-	groupName: "Writing maintainable code",
-	groupIcon: "Wrench",
-	groupColor: "emerald",
+const TESTING: GroupRef = {
+	slug: "testing-discipline",
+	name: "Testing your changes",
+	icon: "TestTube",
+	color: "red",
 };
 
-/** The developers with a standing every story split is a part of. */
-const STORY_WITH_A_STANDING = 28;
+export const outcomes = ([met, notMet, doesNotApply, couldNotDetermine]: [
+	number,
+	number,
+	number,
+	number,
+]): OutcomeVector => ({ met, notMet, doesNotApply, couldNotDetermine });
 
-/** A split: Needs attention, Mixed feedback, Going well, and the rest of the total none yet. */
-export const threeWay = (
-	[needsAttention, mixedFeedback, goingWell]: [number, number, number],
-	total = STORY_WITH_A_STANDING,
-): WorkspaceSplit => ({
-	parts: [
-		{ standing: "DEVELOPING", developers: needsAttention },
-		{ standing: "MIXED", developers: mixedFeedback },
-		{ standing: "STRENGTH", developers: goingWell },
-	],
-	noneYet: total - needsAttention - mixedFeedback - goingWell,
-	developers: total,
-});
+export const NO_OUTCOMES: OutcomeVector = outcomes([0, 0, 0, 0]);
 
-/** A split with parts of one, two and nobody. */
-export const SMALL_PARTS: WorkspaceSplit = threeWay([1, 0, 2]);
-
-/** A split that counts nobody: no developer has a standing yet. */
-export const NOBODY: WorkspaceSplit = threeWay([0, 0, 0], 0);
-
-const practice = (
+const tile = (
+	group: GroupRef | null,
 	practiceSlug: string,
 	practiceName: string,
-	yourStanding: WorkspacePracticeSplit["yourStanding"],
-	split: WorkspaceSplit,
-): WorkspacePracticeSplit => ({ practiceSlug, practiceName, yourStanding, split });
+	developers: number,
+	counts: OutcomeVector,
+): PracticeWorkspaceTile => ({ practiceSlug, practiceName, group, developers, outcomes: counts });
 
-const group = (
-	of: Group,
-	yourStanding: WorkspaceGroupSplit["yourStanding"],
-	split: WorkspaceSplit,
-	practices: WorkspacePracticeSplit[] = [],
-): WorkspaceGroupSplit => ({ ...of, yourStanding, split, practices });
-
-/** Packaging’s five practices, two of them with small parts. */
-export const PACKAGING_PRACTICES: WorkspacePracticeSplit[] = [
-	practice(
+const PACKAGING_TILES: PracticeWorkspaceTile[] = [
+	tile(
+		PACKAGING,
 		"keep-the-diff-reviewable",
 		"Keep the diff reviewable in one sitting",
-		"DEVELOPING",
-		threeWay([7, 6, 8]),
+		21,
+		outcomes([14, 9, 2, 1]),
 	),
-	practice(
+	tile(
+		PACKAGING,
 		"explain-the-change",
 		"Explain what the change does and why",
-		"MIXED",
-		threeWay([6, 7, 8]),
+		21,
+		outcomes([12, 11, 0, 2]),
 	),
-	practice("scope-to-one-concern", "Scope the change to one concern", "NOT_OBSERVED", SMALL_PARTS),
-	practice(
+	tile(
+		PACKAGING,
+		"scope-to-one-concern",
+		"Scope the change to one concern",
+		3,
+		outcomes([2, 1, 0, 0]),
+	),
+	tile(
+		PACKAGING,
 		"mark-ready-and-link",
 		"Mark the change ready and link its issue",
-		"STRENGTH",
-		threeWay([2, 1, 3]),
+		0,
+		NO_OUTCOMES,
 	),
-	practice("keep-history-clean", "Keep the history readable", "STRENGTH", threeWay([6, 6, 9])),
+	tile(PACKAGING, "keep-history-clean", "Keep the history readable", 18, outcomes([15, 4, 3, 0])),
 ];
 
-/** More practices than the group's level holds, so its body has to scroll to its end. */
-export const MANY_PRACTICES: WorkspacePracticeSplit[] = Array.from({ length: 24 }, (_, index) =>
-	practice(`practice-${index + 1}`, `Practice ${index + 1}`, "MIXED", threeWay([6, 7, 8])),
-);
-
-/** The group the slide in stories open, with its practices. */
-export const PACKAGING_GROUP: WorkspaceGroupSplit = group(
-	PACKAGING,
-	"DEVELOPING",
-	threeWay([7, 6, 8]),
-	PACKAGING_PRACTICES,
-);
-
-/** Eight practice groups over 28 developers with a standing, two of them with small parts. */
-export const ACROSS_WORKSPACE: PracticesAcrossWorkspace = {
-	openFeedback: { yours: 3, middle: { low: 1, high: 4 } },
-	groups: [
-		group(ACTING, "MIXED", threeWay([6, 7, 7])),
-		group(COMMUNICATION, "DEVELOPING", threeWay([7, 7, 6])),
-		group(FAILURE, "NOT_OBSERVED", SMALL_PARTS),
-		PACKAGING_GROUP,
-		group(REVIEWING, "STRENGTH", threeWay([6, 6, 8])),
-		group(TESTING, "NOT_OBSERVED", threeWay([6, 6, 7])),
-		group(ISSUES, "NO_OPPORTUNITY", threeWay([6, 6, 7])),
-		group(MAINTAINABLE, "MIXED", threeWay([2, 3, 1])),
+export const ACROSS_WORKSPACE: PracticeWorkspaceOverview = {
+	developers: 28,
+	practices: [
+		tile(
+			ACTING,
+			"answer-every-comment",
+			"Answer every review comment",
+			20,
+			outcomes([16, 6, 1, 0]),
+		),
+		tile(
+			ACTING,
+			"re-request-review",
+			"Ask for review again after changes",
+			17,
+			outcomes([9, 10, 4, 1]),
+		),
+		tile(
+			COMMUNICATION,
+			"write-in-the-open",
+			"Discuss decisions where the team can see them",
+			12,
+			outcomes([8, 5, 9, 3]),
+		),
+		...PACKAGING_TILES,
+		tile(TESTING, "test-the-change", "Add tests for the change", 24, outcomes([10, 17, 2, 4])),
+		tile(null, "sign-commits", "Sign your commits", 9, outcomes([9, 0, 0, 0])),
 	],
 };
 
-/** The reader's figures over the last 30 days beside the middle half of 26 developers with a standing. */
-export const ACROSS_WORKSPACE_TILES: PracticesAcrossWorkspaceTiles = {
-	window: "DAYS_30",
-	developersWithAStandingInWindow: 26,
-	yourPractices: 18,
-	reviewedWork: { yours: 17, middle: { low: 11, high: 21 } },
-	practicesGoingWell: { yours: 6, middle: { low: 5, high: 9 } },
-	practicesNeedingAttention: { yours: 4, middle: { low: 2, high: 5 } },
-};
+export const PACKAGING_GROUP: WorkspaceGroup = { ...PACKAGING, practices: PACKAGING_TILES };
 
-/** Nobody has a standing in the window, the reader included, so no tile has a middle half. */
-export const NOBODY_TILES: PracticesAcrossWorkspaceTiles = {
-	...ACROSS_WORKSPACE_TILES,
-	developersWithAStandingInWindow: 0,
-	yourPractices: 0,
-	reviewedWork: { yours: 0 },
-	practicesGoingWell: { yours: 0 },
-	practicesNeedingAttention: { yours: 0 },
-};
+export const MANY_PRACTICES: PracticeWorkspaceTile[] = Array.from({ length: 24 }, (_, index) =>
+	tile(PACKAGING, `practice-${index + 1}`, `Practice ${index + 1}`, 12, outcomes([8, 5, 1, 0])),
+);
 
-/** Nobody has a standing yet: every split counts nobody, and nobody has open feedback. */
-export const NOBODY_WORKSPACE: PracticesAcrossWorkspace = {
+export const NO_RESULTS_WORKSPACE: PracticeWorkspaceOverview = {
 	...ACROSS_WORKSPACE,
-	openFeedback: { yours: 0, middle: { low: 0, high: 0 } },
-	groups: ACROSS_WORKSPACE.groups.map((each) => ({
+	practices: ACROSS_WORKSPACE.practices.map((each) => ({
 		...each,
-		yourStanding: undefined,
-		split: NOBODY,
-		practices: each.practices.map((one) => ({ ...one, yourStanding: undefined, split: NOBODY })),
+		developers: 0,
+		outcomes: NO_OUTCOMES,
 	})),
 };
 
-export const EMPTY_WORKSPACE: PracticesAcrossWorkspace = { ...ACROSS_WORKSPACE, groups: [] };
+export const EMPTY_WORKSPACE: PracticeWorkspaceOverview = { developers: 28, practices: [] };
 
 /** Many groups, every one listed. */
-export const MANY_GROUPS_WORKSPACE: PracticesAcrossWorkspace = {
-	...ACROSS_WORKSPACE,
-	groups: Array.from({ length: 26 }, (_, index) => ({
-		...group(
-			{ ...ACTING, groupSlug: `group-${index + 1}`, groupName: `Practice group ${index + 1}` },
-			"MIXED",
-			threeWay([6, 7, 7]),
+export const MANY_GROUPS_WORKSPACE: PracticeWorkspaceOverview = {
+	developers: 28,
+	practices: Array.from({ length: 26 }, (_, index) =>
+		tile(
+			{ ...ACTING, slug: `group-${index + 1}`, name: `Practice group ${index + 1}` },
+			`practice-${index + 1}`,
+			`Practice ${index + 1}`,
+			12,
+			outcomes([8, 5, 1, 0]),
 		),
-	})),
+	),
 };

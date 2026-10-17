@@ -3,17 +3,21 @@ package de.tum.cit.aet.hephaestus.agent.job;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ReviewSourceNotReadyException;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataAccessException;
 import org.springframework.transaction.TransactionException;
 
 /** A preparation operation and a cause classified by type, without sensitive exception text. */
-record PreparationFailure(Stage stage, Kind kind, JobPreparationException.Reason reason) {
+record PreparationFailure(Stage stage, Kind kind, JobPreparationException.Reason reason, List<String> exceptionTypes) {
 
     /** The owned operations before execution, in the order the executor runs them. */
     enum Stage {
@@ -38,6 +42,7 @@ record PreparationFailure(Stage stage, Kind kind, JobPreparationException.Reason
     enum Kind {
         SOURCE_NOT_READY("the reviewed source was not ready"),
         INPUT_PREPARATION("the review inputs could not be prepared"),
+        SOURCE_CAPTURE("the reviewed source could not be captured"),
         IO("a file or network operation failed"),
         DATABASE("a database operation failed"),
         UNKNOWN("the cause is not classified");
@@ -61,6 +66,18 @@ record PreparationFailure(Stage stage, Kind kind, JobPreparationException.Reason
         while (visited.add(current)) {
             if (current instanceof JobPreparationException preparation
                     && reason == JobPreparationException.Reason.UNCLASSIFIED) reason = preparation.reason();
+            if (current instanceof ItemCaptureException capture) {
+                kind = Kind.SOURCE_CAPTURE;
+                if (reason == JobPreparationException.Reason.UNCLASSIFIED)
+                    reason = switch (capture.code()) {
+                        case ITEM_REMOVED -> JobPreparationException.Reason.REVIEWED_WORK_UNAVAILABLE;
+                        case ITEM_NOT_VISIBLE, CONSENT_WITHHELD ->
+                            JobPreparationException.Reason.SOURCE_AUTHORITY_UNAVAILABLE;
+                        case VERSION_UNAVAILABLE -> JobPreparationException.Reason.REVIEW_RANGE_UNAVAILABLE;
+                        case SOURCE_NOT_READY, CAPTURE_FAILED ->
+                            JobPreparationException.Reason.REQUIRED_SOURCE_COLLECTION_FAILED;
+                    };
+            }
             if (current instanceof ReviewSourceNotReadyException) {
                 kind = Kind.SOURCE_NOT_READY;
                 break;
@@ -74,12 +91,23 @@ record PreparationFailure(Stage stage, Kind kind, JobPreparationException.Reason
                 break;
             }
             // Only preparation owners vouch for their wrapped cause; arbitrary and suppressed causes stay unknown.
-            if (!(current instanceof JobPreparationException || current instanceof EvidenceCollectionException)) break;
+            if (!(current instanceof JobPreparationException
+                    || current instanceof EvidenceCollectionException
+                    || current instanceof ItemCaptureException)) break;
             Throwable cause = current.getCause();
             if (cause == null) break;
             current = cause;
         }
-        return new PreparationFailure(stage, kind, reason);
+        return new PreparationFailure(stage, kind, reason, exceptionTypes(failure));
+    }
+
+    private static List<String> exceptionTypes(Throwable failure) {
+        var types = new ArrayList<String>();
+        Set<Throwable> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (@Nullable Throwable current = failure;
+                current != null && visited.add(current);
+                current = current.getCause()) types.add(current.getClass().getName());
+        return List.copyOf(types);
     }
 
     String reasonTag() {

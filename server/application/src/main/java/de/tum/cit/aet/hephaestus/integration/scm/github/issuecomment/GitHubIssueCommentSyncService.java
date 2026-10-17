@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
@@ -29,6 +30,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.common.GraphQlConnection
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssueCommentConnection;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issuecomment.dto.GitHubIssueCommentEventDTO.GitHubCommentDTO;
+import java.util.Objects;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,6 +75,7 @@ public class GitHubIssueCommentSyncService {
 
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubIssueCommentProcessor commentProcessor;
+    private final RepositoryRepository repositoryRepository;
     private final GitHubSyncProperties syncProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
     private final GitHubGraphQlSyncCoordinator graphQlSyncHelper;
@@ -84,12 +87,14 @@ public class GitHubIssueCommentSyncService {
             GitHubIssueCommentProcessor commentProcessor,
             GitHubSyncProperties syncProperties,
             GitHubExceptionClassifier exceptionClassifier,
-            GitHubGraphQlSyncCoordinator graphQlSyncHelper) {
+            GitHubGraphQlSyncCoordinator graphQlSyncHelper,
+            RepositoryRepository repositoryRepository) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.commentProcessor = commentProcessor;
         this.syncProperties = syncProperties;
         this.exceptionClassifier = exceptionClassifier;
         this.graphQlSyncHelper = graphQlSyncHelper;
+        this.repositoryRepository = repositoryRepository;
     }
 
     /**
@@ -132,7 +137,12 @@ public class GitHubIssueCommentSyncService {
             return 0;
         }
 
-        Repository repository = issue.getRepository();
+        // A caller can carry the issue across page transactions. Its provider proxy
+        // belongs to the old session, so build this transaction's context from the stored repository.
+        Repository repository = repositoryRepository
+                .findByIdWithOrganization(
+                        Objects.requireNonNull(issue.getRepository().getId()))
+                .orElseThrow(() -> new IllegalStateException("Repository no longer exists during comment sync"));
         String nameWithOwner = repository.getNameWithOwner();
         String safeNameWithOwner = sanitizeForLog(nameWithOwner);
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);
@@ -331,7 +341,12 @@ public class GitHubIssueCommentSyncService {
             return 0;
         }
 
-        Repository repository = issue.getRepository();
+        // A caller can carry the issue across page transactions. Its provider proxy
+        // belongs to the old session, so build this transaction's context from the stored repository.
+        Repository repository = repositoryRepository
+                .findByIdWithOrganization(
+                        Objects.requireNonNull(issue.getRepository().getId()))
+                .orElseThrow(() -> new IllegalStateException("Repository no longer exists during comment sync"));
         String nameWithOwner = repository.getNameWithOwner();
         String safeNameWithOwner = sanitizeForLog(nameWithOwner);
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);

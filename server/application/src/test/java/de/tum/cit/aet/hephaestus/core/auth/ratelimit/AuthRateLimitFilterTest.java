@@ -349,10 +349,10 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
                 mock(FilterChain.class));
         MockHttpServletRequest activity =
                 new MockHttpServletRequest("GET", "/workspaces/example/activity/members/alex/open-work");
-        activity.addHeader("X-User-View-User", "1");
+        activity.addHeader("X-User-View-Account", "1");
         f.doFilter(activity, new MockHttpServletResponse(), mock(FilterChain.class));
         MockHttpServletRequest conversation = new MockHttpServletRequest("GET", "/workspaces/other/mentor/threads/abc");
-        conversation.addHeader("X-User-View-User", "2");
+        conversation.addHeader("X-User-View-Account", "2");
         f.doFilter(conversation, new MockHttpServletResponse(), mock(FilterChain.class));
         f.doFilter(new MockHttpServletRequest("GET", "/user"), new MockHttpServletResponse(), mock(FilterChain.class));
 
@@ -421,7 +421,8 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
 
     @Test
     void spoofedXffCannotMintUnlimitedBucketsAcrossRequests() throws Exception {
-        // capacity 1: an attacker rotating the XFF value across requests must still collapse into the
+        // capacity 1: an attacker rotating the XFF value across requests must still collapse into
+        // the
         // SAME bucket (keyed by the unforgeable remote address) and get 429 on the second attempt.
         AuthRateLimitFilter f = filter(props(new AuthRateLimitProperties.Limit(1, Duration.ofMinutes(1))));
 
@@ -491,7 +492,7 @@ class AuthRateLimitFilterTest extends BaseUnitTest {
         AuthRateLimitFilter filter = new AuthRateLimitFilter(props(), throwing, objectMapper, metrics);
         MockHttpServletRequest request =
                 new MockHttpServletRequest("GET", "/workspaces/demo/activity/members/alex/open-work");
-        request.addHeader("X-User-View-User", "7");
+        request.addHeader("X-User-View-Account", "7");
         MockHttpServletResponse response = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
 

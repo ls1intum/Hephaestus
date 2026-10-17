@@ -7,8 +7,8 @@ import de.tum.cit.aet.hephaestus.agent.catalog.ResolvedLlmModel;
 import de.tum.cit.aet.hephaestus.agent.config.AgentBindingLimits;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiRuntimeFactory;
 import de.tum.cit.aet.hephaestus.agent.usage.AdmittedLlmModel;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -22,7 +22,7 @@ public record MentorLlmConfig(
         @Nullable Integer contextWindow,
         @Nullable Integer maxOutputTokens,
         @Nullable ReasoningEffort reasoningEffort,
-        @Nullable FundingSource connectionScope,
+        @Nullable UsageFundingSource connectionScope,
         @Nullable Long connectionId,
         @Nullable Long modelId,
         @Nullable Long workspaceId,

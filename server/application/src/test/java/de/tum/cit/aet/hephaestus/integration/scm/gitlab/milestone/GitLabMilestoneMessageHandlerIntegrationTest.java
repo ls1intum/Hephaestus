@@ -9,7 +9,6 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepositor
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
@@ -18,6 +17,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organizatio
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.milestone.dto.GitLabMilestoneEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
@@ -39,22 +39,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Integration tests for GitLabMilestoneMessageHandler.
- * <p>
- * Tests the full webhook handling flow: JSON fixtures &rarr; DTO &rarr; handler &rarr; processor &rarr; DB.
- * <p>
- * <b>Fixture values (milestone.create.json — Milestone IID #2):</b>
- * <ul>
- *   <li>Native ID: 18066</li>
- *   <li>IID: 2</li>
- *   <li>Title: "v2.0.0"</li>
- *   <li>Description: "Second major release"</li>
- *   <li>State: active &rarr; OPEN</li>
- *   <li>Due date: 2026-06-01</li>
- *   <li>Project ID: 246765</li>
- * </ul>
- */
 @Tag("integration")
 @DisplayName("GitLab Milestone Message Handler")
 class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
@@ -291,7 +275,7 @@ class GitLabMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         workspace.setDisplayName("HephaestusTest GitLab");
         workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         workspace.setPublicActivityEnabled(true);
-        workspace.setOrganization(org);
+        workspace.setOrganizationId(org.getId());
         workspace.setAccountLogin(FIXTURE_ORG_LOGIN);
         workspace.setAccountType(AccountType.ORG);
         workspace = workspaceRepository.save(workspace);

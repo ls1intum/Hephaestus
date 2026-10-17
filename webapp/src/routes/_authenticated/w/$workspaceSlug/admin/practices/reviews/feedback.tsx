@@ -2,8 +2,8 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 
 import {
-	countPracticeReviewFeedbackByLocationOptions,
-	listPracticeReviewFeedbackInfiniteOptions,
+	countReviewFeedbackByLocationOptions,
+	listReviewFeedbackInfiniteOptions,
 } from "@/api/@tanstack/react-query.gen";
 import { FeedbackListPage } from "@/components/admin/practice-reviews/FeedbackListPage";
 import { practiceReviewsHead } from "@/components/admin/practice-reviews/review-levels";
@@ -18,7 +18,7 @@ import { useReviewScopeSources } from "@/hooks/use-review-scope-sources";
 import { useScopeRecordFilter } from "@/hooks/use-scope-record-filter";
 import { useSearchState } from "@/lib/search-params";
 import { pagedListState } from "@/runtime/tanstack-query/infinite-list";
-import { pagedModelParams } from "@/runtime/tanstack-query/spring-page";
+import { springPageParams } from "@/runtime/tanstack-query/spring-page";
 import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 export const Route = createFileRoute(
@@ -37,24 +37,22 @@ function FeedbackListRoute() {
 		void setSearch((previous) => ({ ...previous, ...patch }), { replace: true });
 	};
 
-	const listOptions = listPracticeReviewFeedbackInfiniteOptions({
+	const listOptions = listReviewFeedbackInfiniteOptions({
 		path: { workspaceSlug },
 		query: feedbackQuery(search, REVIEW_PAGE_SIZE),
 	});
 	const feedbackQueryResult = useInfiniteQuery({
 		...listOptions,
-		...pagedModelParams,
+		...springPageParams,
 	});
 	useQueryReadRefusal(listOptions.queryKey, feedbackQueryResult.isError, feedbackQueryResult.error);
 	const { groups, practices, people } = useReviewScopeSources(workspaceSlug);
-	// Everything addressed to the recipient filtered to, whatever else is filtered: the summary is
-	// about the person, and its counts open the list narrowed to them alone.
-	const recipientCountsQuery = useQuery({
-		...countPracticeReviewFeedbackByLocationOptions({
+	const developerCountsQuery = useQuery({
+		...countReviewFeedbackByLocationOptions({
 			path: { workspaceSlug },
-			query: { recipientUserId: search.recipientUserId },
+			query: { developerId: search.developerId },
 		}),
-		enabled: search.recipientUserId !== undefined,
+		enabled: search.developerId !== undefined,
 	});
 
 	const record = useScopeRecordFilter(workspaceSlug, search);
@@ -69,7 +67,7 @@ function FeedbackListRoute() {
 			groups={groups}
 			practices={practices}
 			people={people}
-			recipientCounts={panelState(recipientCountsQuery, (counts) => ({
+			developerCounts={panelState(developerCountsQuery, (counts) => ({
 				status: "ready" as const,
 				counts,
 			}))}

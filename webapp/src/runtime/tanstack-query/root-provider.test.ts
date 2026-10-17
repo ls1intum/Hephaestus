@@ -5,7 +5,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 
 import { getJwksOptions } from "@/api/@tanstack/react-query.gen";
 import { problemStatusOf } from "@/lib/problem-detail";
-import { USER_VIEW_STORAGE_KEY } from "@/runtime/user-view/session";
+import { USER_VIEW_STORAGE_KEY, type UserViewSession } from "@/runtime/user-view/session";
 
 import { getContext } from "./root-provider";
 import { useQueryReadRefusal } from "./use-query-read-refusal";
@@ -150,12 +150,12 @@ it("never retries a read in a user view", async () => {
 			operatorAccountId: 1,
 			workspaceSlug: "acme",
 			workspaceName: "Acme",
-			userId: 2,
-			login: "grace",
+			accountId: "2",
+			providerLogin: "grace",
 			name: "Grace Hopper",
-			hasAccount: true,
+			unclaimed: false,
 			reason: "Support request",
-		}),
+		} satisfies UserViewSession),
 	);
 	try {
 		// The client decides from the session it starts with, as a user view starts with a page load.

@@ -71,10 +71,39 @@ export function PracticeDefinitionSkeleton() {
 	);
 }
 
+export interface PracticeReleaseSkeletonProps {
+	/** Changed fields to draw. The count is unknown until the update loads, so the caller guesses. */
+	rows: number;
+}
+
+/** Mirrors {@link PracticeReleaseReview}: its heading, the field comparison, and the two actions. */
+export function PracticeReleaseSkeleton({ rows }: PracticeReleaseSkeletonProps) {
+	return (
+		<div aria-busy="true">
+			<span className="sr-only">Loading the update…</span>
+			<div className="space-y-5" aria-hidden>
+				<div className="space-y-2">
+					<Skeleton className="h-6 w-full max-w-56" />
+					<Skeleton className="h-4 w-full max-w-lg" />
+				</div>
+				<div className="space-y-px">
+					{Array.from({ length: rows + 1 }, (_, index) => (
+						<Skeleton key={index} className="h-12 w-full" />
+					))}
+				</div>
+				<div className="flex flex-wrap gap-2">
+					<Skeleton className="h-9 w-44" />
+					<Skeleton className="h-9 w-40" />
+				</div>
+			</div>
+		</div>
+	);
+}
+
 export function ReviewSettingsSkeleton() {
 	return (
-		<div role="status">
-			<span className="sr-only">Loading review settings</span>
+		<div aria-busy="true">
+			<span className="sr-only">Loading review settings…</span>
 			<div className="space-y-8" aria-hidden>
 				{["status", "timing", "coverage", "delivery"].map((section) => (
 					<div key={section} className="space-y-4">

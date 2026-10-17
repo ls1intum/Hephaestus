@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.config;
 
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
@@ -10,11 +11,13 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditSnapshot;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
@@ -71,6 +74,7 @@ public class AgentBindingService {
 
         applyModel(binding, workspaceId, request.instanceModelId(), request.workspaceModelId());
         requireModelFillsSlot(binding);
+        requireModelKindFitsPurpose(binding, purpose);
         if (request.timeoutSeconds() != null) {
             binding.setTimeoutSeconds(request.timeoutSeconds());
         }
@@ -79,7 +83,7 @@ public class AgentBindingService {
         }
         if (request.allowInternet() != null) {
             // PracticePiAdapter enforces an internal network regardless of stored configuration.
-            if (request.allowInternet() && purpose == AgentPurpose.PRACTICE_REVIEW) {
+            if (request.allowInternet() && purpose != AgentPurpose.MENTOR) {
                 throw new IllegalArgumentException(
                         "Practice reviews run on an internal network. Only Heph can have internet access.");
             }
@@ -119,7 +123,8 @@ public class AgentBindingService {
             @Nullable Long workspaceModelId) {
         if ((instanceModelId == null) == (workspaceModelId == null)) {
             throw new IllegalArgumentException(
-                    "A binding must reference exactly one model. Use a shared model or a model from your own provider.");
+                    "A binding must reference exactly one model. Use a shared model or a model from your own"
+                            + " provider.");
         }
         if (instanceModelId != null) {
             LlmModel model = llmModelRepository
@@ -150,6 +155,37 @@ public class AgentBindingService {
         if (!llmModelResolver.isAvailable(binding)) {
             throw new IllegalArgumentException("This model is not available to this workspace.");
         }
+    }
+
+    private static void requireModelKindFitsPurpose(WorkspaceAgentBinding binding, AgentPurpose purpose) {
+        LlmApiProtocol protocol = boundProtocol(binding);
+        if (purpose.accepts(protocol)) {
+            return;
+        }
+        String needed = purpose == AgentPurpose.PRACTICE_DECISION
+                ? "a decision model or a chat completions model"
+                : kindName(purpose.kind()) + " model";
+        throw new IllegalArgumentException(
+                "This is " + kindName(protocol.kind()) + " model. Choose " + needed + " here.");
+    }
+
+    private static String kindName(ModelKind kind) {
+        return switch (kind) {
+            case CHAT -> "a chat";
+            case DECISION -> "a decision";
+            case EMBEDDING -> "an embedding";
+            case RERANKING -> "a reranking";
+        };
+    }
+
+    // applyModel must bind exactly one model before this lookup.
+    private static LlmApiProtocol boundProtocol(WorkspaceAgentBinding binding) {
+        LlmModel instance = binding.getInstanceModel();
+        return instance != null
+                ? instance.getConnection().getApiProtocol()
+                : Objects.requireNonNull(binding.getWorkspaceModel())
+                        .getConnection()
+                        .getApiProtocol();
     }
 
     private static DataHandlingTier declaredTier(WorkspaceAgentBinding binding) {

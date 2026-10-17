@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
@@ -27,6 +26,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.GitHubGraphQlTestMapper;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHActor;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPullRequest;
@@ -168,7 +168,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
         testWorkspace.setDisplayName("Hephaestus Test");
         testWorkspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         testWorkspace.setPublicActivityEnabled(true);
-        testWorkspace.setOrganization(testOrganization);
+        testWorkspace.setOrganizationId(testOrganization.getId());
         testWorkspace.setAccountLogin(FIXTURE_ORG_LOGIN);
         testWorkspace.setAccountType(AccountType.ORG);
         testWorkspace = workspaceRepository.save(testWorkspace);
@@ -553,7 +553,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(Objects.requireNonNull(retainedComment.getIssue()).getId())
                     .isEqualTo(stubbed.getId());
             assertThat(stored(30).getNativeId()).isEqualTo(PULL_REQUEST_ID);
-            // An older or equally old payload repairs the id and leaves the content it would have overwritten.
+            // An older or equally old payload repairs the id and leaves the content it would have
+            // overwritten.
             assertThat(hydrated.getBody()).isEqualTo(seconds > 0 ? "full body" : "stub body");
             assertThat(hydrated.getTitle()).isEqualTo(seconds > 0 ? "Test PR #30" : "Comment-first title");
             assertThat(hydrated.getState()).isEqualTo(seconds > 0 ? Issue.State.OPEN : Issue.State.CLOSED);
@@ -808,7 +809,6 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             });
         }
 
-        /** When a sync page was asked for, against the stored review requests' {@code STORED_AT}. */
         enum Page {
             OLDER(Duration.ofMinutes(-1)),
             EQUAL(Duration.ZERO),
@@ -821,10 +821,6 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             }
         }
 
-        /**
-         * A webhook stored the review requests, people and teams; a sync page carrying the same {@code updated_at}
-         * applies unless it was asked for before the webhook arrived, and applying it twice changes nothing.
-         */
         @ParameterizedTest
         @EnumSource(Page.class)
         void shouldApplyASyncPagesReviewRequestsUnlessItWasReadBeforeTheStoredWebhook(Page page) {
@@ -875,7 +871,6 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             return teamRepository.save(synced).getId();
         }
 
-        /** Pull request {@code number} as a sync reads it, asking for the reviews the DTO test lists. */
         private GHPullRequest readBySync(int number, int minutesLater) {
             GHPullRequest read = GitHubPullRequestDTOReviewRequestsTest.pullRequestAskingForReviews(number);
             read.setFullDatabaseId(BigInteger.valueOf(FIXTURE_PR_ID + number));
@@ -886,9 +881,9 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             read.setCreatedAt(OffsetDateTime.parse("2025-11-01T21:42:45Z"));
             read.setUpdatedAt(OffsetDateTime.parse("2025-11-01T21:42:45Z").plusMinutes(minutesLater));
             read.setAuthor(GitHubGraphQlTestMapper.create().readValue("""
-                            {"__typename": "User", "id": "U_kgDOAAB5Fw", "databaseId": 31031,
-                             "login": "pull-request-author"}
-                            """, GHActor.class));
+                {"__typename": "User", "id": "U_kgDOAAB5Fw", "databaseId": 31031,
+                 "login": "pull-request-author"}
+                """, GHActor.class));
             return read;
         }
 

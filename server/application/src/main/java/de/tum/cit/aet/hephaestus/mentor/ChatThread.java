@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.mentor;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -14,6 +13,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -33,7 +33,12 @@ import org.jspecify.annotations.NonNull;
  * The AI SDK extracts uses a linear conversation path from this tree structure.
  */
 @Entity
-@Table(name = "chat_thread")
+@Table(
+        name = "chat_thread",
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uk_chat_thread_tenant",
+                        columnNames = {"id", "workspace_id"}))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -65,23 +70,17 @@ public class ChatThread {
     @ColumnDefault("'WEB'")
     private ThreadSurface surface = ThreadSurface.WEB;
 
-    /**
-     * All messages in this thread. DB-side {@code ON DELETE CASCADE} (migration
-     * {@code mentor-1071-cascade-legacy-fks}) covers parent-delete propagation in a single
-     * statement; the JPA-level cascade would issue N per-row DELETEs for nothing. We keep
-     * {@code orphanRemoval} for collection-mutation semantics.
-     */
+    // Database cascade deletes the thread's messages in one statement; orphanRemoval covers collection edits.
     @OneToMany(mappedBy = "thread", fetch = FetchType.LAZY, orphanRemoval = true)
     @OrderBy("createdAt ASC")
     @ToString.Exclude
     @JsonIgnore
     private List<ChatMessage> allMessages = new ArrayList<>();
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
+    @Column(name = "account_id")
     @ToString.Exclude
     @JsonIgnore
-    private User user;
+    private Long accountId;
 
     @NonNull
     @ManyToOne(fetch = FetchType.LAZY)

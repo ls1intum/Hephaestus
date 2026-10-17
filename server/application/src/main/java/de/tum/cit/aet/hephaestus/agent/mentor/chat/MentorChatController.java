@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorAgentProperties;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Hidden;
@@ -28,6 +29,7 @@ import tools.jackson.databind.ObjectMapper;
  * SSE entry point for mentor chat. Sets the AI-SDK protocol header and submits a turn to the
  * mentor virtual-thread executor; the orchestration lives in {@link MentorChatService}.
  */
+@ConditionalOnServerRole
 @WorkspaceScopedController
 @RequestMapping("/mentor/chat")
 @Tag(name = "Mentor Chat", description = "Mentor chat SSE stream")
@@ -38,7 +40,7 @@ public class MentorChatController {
     private static final Logger log = LoggerFactory.getLogger(MentorChatController.class);
     private static final long EMITTER_TIMEOUT_MS = Duration.ofMinutes(10).toMillis();
 
-    private final MentorChatStarter mentorChatStarter;
+    private final MentorChatService mentorChatStarter;
     private final ObjectMapper objectMapperBean;
     private final MentorAgentProperties mentorAgentProperties;
 

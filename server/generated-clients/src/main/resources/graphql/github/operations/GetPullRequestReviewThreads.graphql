@@ -29,6 +29,8 @@ query GetPullRequestReviewThreads(
                     id
                     isResolved
                     isOutdated
+                    diffSide
+                    startDiffSide
                     comments(first: 1) {
                         nodes {
                             id

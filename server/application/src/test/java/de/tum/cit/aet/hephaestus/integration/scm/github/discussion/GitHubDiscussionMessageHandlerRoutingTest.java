@@ -8,7 +8,7 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.ProcessingContextFactory;
 import de.tum.cit.aet.hephaestus.integration.scm.github.discussion.dto.GitHubDiscussionEventDTO;
@@ -19,19 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * Action-level routing guard for {@link GitHubDiscussionMessageHandler}. The dispatcher round-trip test
- * proves discussion events reach this handler; this proves the handler routes each action to the right
- * processor method. Two behaviors are pinned here:
- *
- * <ul>
- *   <li><b>transferred → removal, not upsert.</b> A transfer moves the discussion out of the source
- *       repository; routing it to upsert would re-create the very phantom the transfer should retire —
- *       permanently, since discussions have no reconciliation sweep.</li>
- *   <li><b>unknown action → skip, not upsert.</b> Falling through to an upsert on an unrecognized action
- *       would let a future action meaning "removed" silently re-create a phantom.</li>
- * </ul>
- */
+// Transfers and unknown actions must not upsert a discussion that has left the source repository.
 class GitHubDiscussionMessageHandlerRoutingTest extends BaseUnitTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -103,7 +91,8 @@ class GitHubDiscussionMessageHandlerRoutingTest extends BaseUnitTest {
     }
 
     private static GitHubDiscussionEventDTO event(String action) throws Exception {
-        String json = "{\"action\":\"" + action
+        String json = "{\"action\":\""
+                + action
                 + "\",\"discussion\":{\"number\":7,\"database_id\":123},"
                 + "\"repository\":{\"full_name\":\"acme/widgets\"}}";
         return JSON.readValue(json, GitHubDiscussionEventDTO.class);

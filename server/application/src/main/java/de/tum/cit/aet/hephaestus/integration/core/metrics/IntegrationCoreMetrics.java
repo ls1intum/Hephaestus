@@ -9,8 +9,8 @@ public final class IntegrationCoreMetrics {
     public static final String INTEGRATION_SYNC_SSE_EVENTS = "integration.sync.sse.events";
     public static final String INTEGRATION_SYNC_SSE_SUBSCRIBERS = "integration.sync.sse.subscribers";
     public static final String INTEGRATION_SYNC_SSE_SUBSCRIPTIONS = "integration.sync.sse.subscriptions";
-    public static final String OAUTH_STATE_NONCE_PRUNED = "oauth.state.nonce.pruned";
     public static final String PRACTICE_REVIEW_REFUSED = "practice.review.refused";
+    public static final String OAUTH_STATE_NONCE_PRUNED = "oauth.state.nonce.pruned";
     public static final String WEBHOOK_PUBLISH = "webhook.publish";
     public static final String WEBHOOK_PUBLISH_RETRY = "webhook.publish.retry";
     public static final String WEBHOOK_REJECTED = "webhook.rejected";
@@ -25,8 +25,6 @@ public final class IntegrationCoreMetrics {
     public static final String WEBHOOK_STREAM_MESSAGES = "webhook.stream.messages";
     public static final String WEBHOOK_STREAM_OLDEST_MESSAGE_AGE = "webhook.stream.oldest.message.age";
     public static final String WEBHOOK_STREAM_POLL_AGE = "webhook.stream.poll.age";
-
-    public static final String REVIEW_OCCASIONS = "practice.review.occasions";
 
     private IntegrationCoreMetrics() {}
 }

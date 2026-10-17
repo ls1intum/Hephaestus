@@ -1,11 +1,10 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageJobType;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
 import de.tum.cit.aet.hephaestus.agent.usage.MeasurementVerification;
 import de.tum.cit.aet.hephaestus.agent.usage.UsageProvenance;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessage;
@@ -49,8 +48,9 @@ public class MentorInFlightAccounting {
                 chatMessageRepository.findLlmUsageById(message.getId()).orElse(MentorTurnLlmUsage.NONE);
         Long workspaceId = message.getThread().getWorkspace().getId();
         LlmUsageRecorder.LlmUsageSample sample = new LlmUsageRecorder.LlmUsageSample(
-                LlmUsageJobType.MENTOR_TURN,
-                LlmUsageSourceType.MENTOR_TURN,
+                null,
+                "MENTOR_TURN",
+                UsageSourceType.MENTOR_TURN,
                 message.getId(),
                 0,
                 MentorAdmissionMetadata.readModel(existingMetadata),
@@ -59,6 +59,7 @@ public class MentorInFlightAccounting {
                 observed.cacheReadTokens(),
                 observed.cacheWriteTokens(),
                 observed.reasoningTokens(),
+                0L,
                 Math.max(1, observed.totalCalls()),
                 price,
                 observed.hasBillableUsage() ? UsageProvenance.PROXY : UsageProvenance.NONE,

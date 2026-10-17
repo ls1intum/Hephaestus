@@ -7,9 +7,9 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRep
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
@@ -122,7 +122,8 @@ public class GitHubProjectItemMessageHandler extends AbstractIntegrationMessageH
 
         switch (actionType) {
             case DELETED -> {
-                // Resolve the item's synthetic PK via nodeId since getDatabaseId() returns the native ID.
+                // Resolve the item's synthetic PK via nodeId since getDatabaseId() returns the
+                // native ID.
                 // Delete events include project_node_id, so we can resolve the project first.
                 String itemNodeId = itemDto.nodeId();
                 String projNodeId = itemDto.projectNodeId();

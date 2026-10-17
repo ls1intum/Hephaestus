@@ -1,21 +1,20 @@
 import type {
+	ItemRef,
+	ProblemSummary,
+	ReviewBoundFeedback,
+	ReviewBoundResult,
 	ReviewLineage,
-	ReviewLineageFeedback,
-	ReviewLineageObservation,
-	ReviewedWorkRef,
+	ReviewLineageNode,
+	ReviewRef,
 } from "@/api/types.gen";
 import type { BadgeVariant, StatusDef } from "@/components/common/status-def";
-import { deliveryOutcome } from "@/components/practice-vocabulary/delivery-outcome-defs";
+import { deliveryOutcome } from "@/components/practice-vocabulary/delivery-state-defs";
 import {
 	FEEDBACK_LOCATION_DEFS,
 	type FeedbackLocation,
 } from "@/components/practice-vocabulary/feedback-location-defs";
 import { FEEDBACK_WITHDRAWN_DEF } from "@/components/practice-vocabulary/feedback-withdrawal-defs";
 import { OUTCOME_DEFS, type Outcome } from "@/components/practice-vocabulary/outcome-defs";
-import {
-	type WithholdingReason,
-	withholdingReasonSentence,
-} from "@/components/practice-vocabulary/withholding-defs";
 import { durationBetween } from "@/lib/dates";
 
 import { QUEUE_WAIT_THRESHOLDS } from "./review-attention-thresholds";
@@ -75,31 +74,88 @@ export function toneChip(variant: BadgeVariant): string {
 	return TONE_CHIP[variant];
 }
 
-/**
- * Where one piece of feedback appears. The lineage names the place as the feedback list does; a
- * record without one falls back to the channel, with the provider read from the work.
- */
-export function feedbackLocation(
-	feedback: Pick<ReviewLineageFeedback, "channel"> & { location?: FeedbackLocation },
-	work: ReviewedWorkRef | undefined,
-): FeedbackLocation {
-	if (feedback.location !== undefined) {
-		return feedback.location;
+export interface LineageResult extends ReviewBoundResult {
+	problems: ProblemSummary[];
+}
+
+export interface LineageFeedback extends ReviewBoundFeedback {
+	basis: string[];
+	problemBasis: string[];
+}
+
+export interface LineageRecords {
+	root: ReviewLineageNode | undefined;
+	item: ItemRef | undefined;
+	reviews: ReviewRef[];
+	results: LineageResult[];
+	feedback: LineageFeedback[];
+}
+
+// Edges to absent nodes cannot establish relationships.
+export function lineageRecords(lineage: ReviewLineage): LineageRecords {
+	const byKey = new Map(lineage.nodes.map((node) => [node.id, node]));
+	const targets = (from: string, kind: ReviewLineageNode["kind"]) =>
+		lineage.edges
+			.filter((edge) => edge.from === from)
+			.map((edge) => byKey.get(edge.to))
+			.filter((node) => node?.kind === kind);
+	const sources = (to: string, kind: ReviewLineageNode["kind"]) =>
+		lineage.edges
+			.filter((edge) => edge.to === to)
+			.map((edge) => byKey.get(edge.from))
+			.filter((node) => node?.kind === kind);
+	const item = lineage.nodes.find((node) => node.item !== null)?.item ?? undefined;
+	const reviews: ReviewRef[] = [];
+	const results: LineageResult[] = [];
+	const feedback: LineageFeedback[] = [];
+	for (const node of lineage.nodes) {
+		if (node.review !== null) {
+			reviews.push(node.review);
+		}
+		if (node.result !== null) {
+			const problems = targets(node.id, "PROBLEM")
+				.map((entry) => entry?.problem ?? null)
+				.filter((entry) => entry !== null);
+			results.push({ ...node.result, problems });
+		}
+		if (node.feedback !== null) {
+			const basis = sources(node.id, "RESULT")
+				.map((entry) => entry?.result?.id)
+				.filter((entry) => entry !== undefined);
+			const problemBasis = sources(node.id, "PROBLEM")
+				.map((entry) => entry?.problem?.id)
+				.filter((entry) => entry !== undefined);
+			feedback.push({ ...node.feedback, basis, problemBasis });
+		}
 	}
-	switch (feedback.channel) {
-		case "IN_CONTEXT": {
-			if (work?.provider === "GITHUB") {
+	return { root: byKey.get(lineage.rootId), item, reviews, results, feedback };
+}
+
+export function feedbackOf(
+	feedback: readonly LineageFeedback[],
+	resultId: string,
+): LineageFeedback[] {
+	return feedback.filter((entry) => entry.basis.includes(resultId));
+}
+
+export function feedbackLocation(
+	feedback: Pick<ReviewBoundFeedback, "destination">,
+	item: ItemRef | undefined,
+): FeedbackLocation {
+	switch (feedback.destination) {
+		case "ON_WORK": {
+			if (item?.provider === "GITHUB") {
 				return "GITHUB";
 			}
-			if (work?.provider === "GITLAB") {
+			if (item?.provider === "GITLAB") {
 				return "GITLAB";
 			}
 			return "OTHER_WORK";
 		}
-		case "IN_CHAT": {
+		case "CONVERSATION": {
 			return "NEXT_CONVERSATION";
 		}
-		case "IN_APP": {
+		case "PRACTICE_PAGE": {
 			return "PRACTICE_PAGES";
 		}
 	}
@@ -110,50 +166,14 @@ export function lowerFirst(value: string): string {
 	return value.charAt(0).toLowerCase() + value.slice(1);
 }
 
-/**
- * A few words for every withholding reason, short enough for one line of the story. The full
- * sentence stays with `withholdingReasonSentence`.
- */
-const SHORT_REASON: Record<WithholdingReason, string> = {
-	ARTIFACT_MERGED: "already merged",
-	REVIEW_CANCELLED: "review cancelled",
-	ARTIFACT_CLOSED: "work closed",
-	ARTIFACT_GONE: "work gone",
-	ARTIFACT_DRAFT: "still a draft",
-	COMPOSER_DEDUPED: "near duplicate",
-	COMPOSER_WITHHELD: "held back by the review",
-	REPEATS_DELIVERED_NOTE: "repeats a posted note",
-	OBSERVATION_INVALIDATED: "observation marked incorrect",
-	VOLUME_CAPPED: "over the volume limit",
-	RECIPIENT_OPTED_OUT: "developer opted out",
-	REACTED_DISPUTED: "disputed before",
-	REACTED_NOT_APPLICABLE: "marked not applicable before",
-	CONVERSATION_EXPIRED: "no conversation came",
-	BACKFILL_QUIET: "past work, never sent",
-	INSTANCE_SILENCED: "silent mode",
-	WORKSPACE_DELIVERY_PAUSED: "delivery paused",
-	ISSUE_SNAPSHOT_CHANGED: "issue changed",
-	EMPTY_AFTER_SANITIZE: "nothing left to send",
-	WORKSPACE_DISABLED: "feedback off here",
-	STALE_ROLLOUT_REVISION: "settings changed",
-	OUTSIDE_CURRENT_COVERAGE: "no longer covered",
-	APPROVAL_STALE: "approval out of date",
-	APPROVAL_NO_LONGER_ELIGIBLE: "approval no longer needed",
-	PRACTICE_REQUIRES_APPROVAL: "needs approval",
-	REVIEWED_REVISION_CHANGED: "change updated since",
-	PUBLIC_SUBJECT_INELIGIBLE: "not about the author’s work",
-};
-
-export function shortReason(reason: WithholdingReason): string {
-	return SHORT_REASON[reason];
+export function feedbackStatus(feedback: ReviewBoundFeedback): StatusDef {
+	return deliveryOutcome({ ...feedback, stopReason: null });
 }
 
 export interface BranchOutcome {
 	/** Icon and tone. */
 	def: StatusDef;
-	/** "Delivered on GitHub", "Withheld: already merged". */
 	text: string;
-	/** The full reason, where the short text cuts one. */
 	detail?: string;
 	/** When it happened, where the record says. */
 	at?: Date;
@@ -165,75 +185,65 @@ export interface BranchOutcome {
 	kind: "delivered" | "withheld" | "waiting" | "replaced" | "other";
 }
 
-/**
- * What became of one piece of feedback, in one line: where it landed, or why it did not. An
- * admin's withdrawal or rejection wins over the stored state, since that is the last thing that
- * happened to it; a piece shown and then withheld says both.
- */
+// An admin withdrawal overrides stored delivery state.
 export function branchOutcome(
-	feedback: ReviewLineageFeedback,
-	work: ReviewedWorkRef | undefined,
+	feedback: ReviewBoundFeedback,
+	item: ItemRef | undefined,
 ): BranchOutcome {
-	const def = deliveryOutcome(feedback);
-	const location = FEEDBACK_LOCATION_DEFS[feedbackLocation(feedback, work)];
-	if (feedback.withdrawnAt !== undefined) {
+	const def = feedbackStatus(feedback);
+	const location = FEEDBACK_LOCATION_DEFS[feedbackLocation(feedback, item)];
+	const at = feedback.deliveredAt ?? undefined;
+	if (feedback.withdrawn) {
 		return {
 			def: FEEDBACK_WITHDRAWN_DEF,
 			text: "Withdrawn by an admin",
-			// A prepared piece can be withdrawn too: only a recorded delivery says it was delivered.
 			detail: reachedDeveloper(feedback)
 				? `Delivered ${lowerFirst(location.label)}, then taken off them.`
 				: "Taken back before it reached the developer.",
-			at: feedback.withdrawnAt,
 			kind: "withheld",
 		};
 	}
-	if (feedback.deliveryState === "DISCARDED") {
-		return {
-			def,
-			text: "Rejected by an admin",
-			detail: "An admin decided it should not be sent.",
-			at: feedback.decidedAt,
-			kind: "withheld",
-		};
-	}
-	if (feedback.deliveryState === "AWAITING_APPROVAL") {
-		return { def, text: "Awaiting approval", kind: "waiting" };
-	}
-	if (feedback.deliveryState === "DELIVERED") {
-		return {
-			def,
-			text: `Delivered ${lowerFirst(location.label)}`,
-			at: feedback.deliveredAt,
-			kind: "delivered",
-		};
-	}
-	if (feedback.deliveryState === "SUPERSEDED") {
-		return { def, text: "Replaced by newer", at: feedback.replacedAt, kind: "replaced" };
-	}
-	if (feedback.suppressionReason !== undefined) {
-		const shownFirst = feedback.deliveredAt !== undefined;
-		let prefix = def.label;
-		if (feedback.deliveryState === "SUPPRESSED") {
-			prefix = shownFirst ? "Delivered, later withheld" : "Withheld";
+	switch (feedback.state) {
+		case "REJECTED": {
+			return {
+				def,
+				text: "Rejected by an admin",
+				detail: "An admin decided it should not be sent.",
+				kind: "withheld",
+			};
 		}
-		return {
-			def,
-			text: `${prefix}: ${shortReason(feedback.suppressionReason)}`,
-			detail: withholdingReasonSentence(feedback.suppressionReason),
-			at: feedback.deliveredAt,
-			kind: "withheld",
-		};
+		case "AWAITING_APPROVAL": {
+			return { def, text: def.label, kind: "waiting" };
+		}
+		case "READY": {
+			return { def, text: def.label, kind: "waiting" };
+		}
+		case "DELIVERED": {
+			return { def, text: `Delivered ${lowerFirst(location.label)}`, at, kind: "delivered" };
+		}
+		case "REPLACED": {
+			return { def, text: def.label, kind: "replaced" };
+		}
+		case "WITHHELD": {
+			return {
+				def,
+				text: at === undefined ? def.label : "Delivered, later withheld",
+				at,
+				kind: "withheld",
+			};
+		}
+		case "FAILED": {
+			return { def, text: def.label, kind: "withheld" };
+		}
+		case "UNCONFIRMED": {
+			return { def, text: def.label, kind: "other" };
+		}
 	}
-	if (feedback.deliveryState === "PREPARED" || feedback.deliveryState === "PARTIALLY_DELIVERED") {
-		return { def, text: def.label, at: feedback.deliveredAt, kind: "waiting" };
-	}
-	return { def, text: def.label, at: feedback.deliveredAt, kind: "other" };
 }
 
 /** Whether the developer could read it at some point, though it may not stand now. */
-export function reachedDeveloper(feedback: ReviewLineageFeedback): boolean {
-	return feedback.deliveryState === "DELIVERED" || feedback.deliveredAt !== undefined;
+export function reachedDeveloper(feedback: ReviewBoundFeedback): boolean {
+	return feedback.state === "DELIVERED" || feedback.deliveredAt !== null;
 }
 
 /** "+40 s", "+2 min", "+1 h 17 min", "+2 d 3 h": {@link durationText} with a sign, read between two steps. */
@@ -241,104 +251,73 @@ export function gapLabel(from: Date, to: Date): string {
 	return `${to.getTime() < from.getTime() ? "−" : "+"}${durationBetween(from, to)}`;
 }
 
-const OUTCOME_ORDER: readonly Outcome[] = ["NOT_MET", "MET", "UNDETERMINED", "NOT_APPLICABLE"];
+const OUTCOME_ORDER: readonly Outcome[] = [
+	"NOT_MET",
+	"MET",
+	"COULD_NOT_DETERMINE",
+	"DOES_NOT_APPLY",
+];
 
-/** The observations by verdict, worst first, with the zeroes left out. */
 export function verdictCounts(
-	observations: readonly ReviewLineageObservation[],
+	results: readonly ReviewBoundResult[],
 ): { outcome: Outcome; count: number }[] {
 	return OUTCOME_ORDER.map((outcome) => ({
 		outcome,
-		count: observations.filter((observation) => observation.outcome === outcome).length,
+		count: results.filter((result) => result.outcome === outcome).length,
 	})).filter((entry) => entry.count > 0);
 }
 
-/** "5 observations: 3 not met, 2 met". The ones the list leaves out are counted, not judged. */
-export function verdictSummary(lineage: Pick<ReviewLineage, "observations" | "moreObservations">) {
-	const total = lineage.observations.length + lineage.moreObservations;
-	const parts = verdictCounts(lineage.observations).map(
+export function verdictSummary(results: readonly ReviewBoundResult[]): string {
+	const parts = verdictCounts(results).map(
 		({ outcome, count }) => `${count} ${OUTCOME_DEFS[outcome].label.toLowerCase()}`,
 	);
-	if (lineage.moreObservations > 0) {
-		parts.push(`${lineage.moreObservations} not listed`);
-	}
-	return `${countOf(total, "observation", "observations")}: ${parts.join(", ")}`;
+	return `${countOf(results.length, "result", "results")}: ${parts.join(", ")}`;
 }
 
 export function countOf(count: number, singular: string, plural: string): string {
 	return `${count} ${count === 1 ? singular : plural}`;
 }
 
-export interface NumberedObservation {
-	observation: ReviewLineageObservation;
+export interface NumberedResult {
+	result: LineageResult;
 	number: number;
 }
 
-/** The numbered observations by id, as `numberedObservations` numbers them. */
-export type NumberedById = ReadonlyMap<string, NumberedObservation>;
+export type NumberedById = ReadonlyMap<string, NumberedResult>;
 
-/**
- * The observations in the order the chain numbers them: by when they were observed, then by id,
- * grouped by practice in the order a practice was first observed. The number is the position, from
- * 1. The order rests on the review alone, never on the record a trace was opened from or the order
- * the lineage lists them in, so an observation keeps its number in every trace of its review.
- */
-export function numberedObservations(
-	observations: readonly ReviewLineageObservation[],
-): NumberedObservation[] {
-	const byTime = [...observations].sort(
-		(a, b) => a.observedAt.getTime() - b.observedAt.getTime() || a.id.localeCompare(b.id, "en"),
+// Number results from their full review so every trace keeps the same identities.
+export function numberedResults(results: readonly LineageResult[]): NumberedResult[] {
+	const byTime = [...results].sort(
+		(a, b) => a.recordedAt.getTime() - b.recordedAt.getTime() || a.id.localeCompare(b.id, "en"),
 	);
-	const groups = new Map<string, ReviewLineageObservation[]>();
-	for (const observation of byTime) {
-		const group = groups.get(observation.practiceSlug) ?? [];
-		group.push(observation);
-		groups.set(observation.practiceSlug, group);
+	const groups = new Map<string, LineageResult[]>();
+	for (const result of byTime) {
+		const group = groups.get(result.practiceSlug) ?? [];
+		group.push(result);
+		groups.set(result.practiceSlug, group);
 	}
-	return [...groups.values()]
-		.flat()
-		.map((observation, index) => ({ observation, number: index + 1 }));
+	return [...groups.values()].flat().map((result, index) => ({ result, number: index + 1 }));
 }
 
-/**
- * Not-met observations of the review that led to no feedback of its own. A met, not applicable or
- * undetermined one rarely leads to feedback, so it is no loss; feedback a later review wrote from
- * one does not count for this review.
- */
-export function silentNotMet(lineage: ReviewLineage): ReviewLineageObservation[] {
-	const reviewId = lineage.review?.id;
-	return lineage.observations.filter(
-		(observation) =>
-			observation.outcome === "NOT_MET" &&
-			(reviewId === undefined || observation.agentJobId === reviewId) &&
-			observation.ownFeedbackCount === 0,
+export function silentNotMet(
+	records: Pick<LineageRecords, "results" | "feedback">,
+): LineageResult[] {
+	return records.results.filter(
+		(result) =>
+			result.outcome === "NOT_MET" && feedbackOf(records.feedback, result.id).length === 0,
 	);
 }
 
-/** How far the chain got, step by step: observed, written, reached the developer, answered. */
 export interface StageCounts {
-	observations: number;
+	results: number;
 	feedback: number;
 	reached: number;
-	answered: number;
-	resolvedByWork: number;
 }
 
-export function stageCounts(lineage: ReviewLineage): StageCounts {
-	// Only listed records belong to a known review; omitted chain records may belong to another.
-	const reviewId = lineage.review?.id;
-	const own = lineage.feedback.filter(
-		(entry) => reviewId === undefined || entry.agentJobId === reviewId,
-	);
-	const reached = own.filter(reachedDeveloper);
+export function stageCounts(records: Pick<LineageRecords, "results" | "feedback">): StageCounts {
 	return {
-		observations: lineage.observations.filter(
-			(entry) => reviewId === undefined || entry.agentJobId === reviewId,
-		).length,
-		feedback: own.length,
-		reached: reached.length,
-		answered: reached.filter((entry) => entry.response?.respondedAt !== undefined).length,
-		resolvedByWork: reached.filter((entry) => entry.response?.resolvedByWorkAt !== undefined)
-			.length,
+		results: records.results.length,
+		feedback: records.feedback.length,
+		reached: records.feedback.filter(reachedDeveloper).length,
 	};
 }

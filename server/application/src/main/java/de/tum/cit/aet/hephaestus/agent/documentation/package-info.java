@@ -3,6 +3,9 @@
  * documents. {@code integration.outline} owns the table and implements it, for the reason
  * {@code agent.conversation} gives.
  */
-@org.springframework.modulith.NamedInterface("documentation-source")
-@org.jspecify.annotations.NullMarked
+@NamedInterface("documentation-source")
+@NullMarked
 package de.tum.cit.aet.hephaestus.agent.documentation;
+
+import org.jspecify.annotations.NullMarked;
+import org.springframework.modulith.NamedInterface;

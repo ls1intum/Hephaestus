@@ -12,11 +12,11 @@ placeholder values, and test fixtures are not usable credentials by their names 
   what establishes that it is a credential. Never reproduce its value in feedback.
 - **MET:** a complete bounded search establishes no usable credential in the added code, including
   cases that use environment variables or a secret manager. Record the search boundary.
-- **NOT_APPLICABLE:** the captured change adds no code or configuration to review.
-- **UNDETERMINED:** complete captured evidence leaves the authenticity of a material secret-shaped
+- **DOES_NOT_APPLY:** the captured change adds no code or configuration to review.
+- **COULD_NOT_DETERMINE:** complete captured evidence leaves the authenticity of a material secret-shaped
   value unresolved. Name the question, without asserting exposure.
 
-Missing or truncated required capture stops the review and creates no observation.
+Missing or truncated required capture stops the review and creates no problem.
 
 ## Severity
 

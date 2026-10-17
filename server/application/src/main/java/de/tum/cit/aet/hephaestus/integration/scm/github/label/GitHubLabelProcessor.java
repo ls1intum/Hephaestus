@@ -1,14 +1,14 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.label;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.LabelIdUtils;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.github.label.dto.GitHubLabelDTO;
 import java.time.Instant;
 import java.util.Objects;
@@ -80,7 +80,8 @@ public class GitHubLabelProcessor {
             return null;
         }
 
-        // Always check by unique key (repository_id + name) FIRST - this is the constraint we enforce.
+        // Always check by unique key (repository_id + name) FIRST - this is the constraint we
+        // enforce.
         // This handles the case where GraphQL sync created a label with a deterministic nativeId,
         // then NATS replay sends a webhook with the actual GitHub databaseId.
         Optional<Label> existingOpt = labelRepository.findByRepositoryIdAndName(repository.getId(), dto.name());
@@ -94,10 +95,7 @@ public class GitHubLabelProcessor {
 
         Label label = existingOpt.orElseGet(Label::new);
 
-        // Set or update fields
-        // For labels, all fields including description are always updated (null values are allowed)
-        // CRITICAL: NEVER change the nativeId/provider of an existing (managed) entity - Hibernate will throw
-        // "identifier of an instance was altered" exception. Only set these for NEW entities.
+        // Hibernate forbids changing a managed entity's nativeId/provider identifier.
         if (isNew) {
             long nativeId = dto.id() != null ? dto.id() : generateDeterministicId(repository.getId(), dto.name());
             label.setNativeId(nativeId);

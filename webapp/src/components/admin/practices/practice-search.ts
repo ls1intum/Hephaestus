@@ -4,12 +4,12 @@ import {
 	type DetailStackEntry,
 	detailStackSchema,
 } from "@/components/layout/detail-drawer/detail-stack";
-import { ARTIFACT_KIND_VALUES } from "@/lib/artifact-kinds";
+import { ITEM_KIND_VALUES } from "@/lib/item-kinds";
 
 export const PRACTICE_SEARCH_PARAMS: ("focus" | "library")[] = ["focus", "library"];
 
 export const practiceSearchSchema = z.object({
-	focus: z.enum(ARTIFACT_KIND_VALUES).optional().catch(undefined),
+	focus: z.enum(ITEM_KIND_VALUES).optional().catch(undefined),
 	library: z.boolean().optional().catch(undefined),
 });
 

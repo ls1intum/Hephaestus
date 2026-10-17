@@ -1,5 +1,5 @@
 import type { TrendSupport } from "@/api/types.gen";
-import { artifactKindNoun, type WorkProvider } from "@/lib/artifact-kinds";
+import { itemKindNoun, type ItemProvider } from "@/lib/item-kinds";
 import { capitalise } from "@/lib/text";
 
 import { count as counted, spell } from "./feedback-text";
@@ -56,21 +56,11 @@ function allWork(work: number): string {
 /** Work of several kinds, or of a kind the wire does not name, as one noun. */
 const ANY_WORK = { one: "piece of work", many: "pieces of work" };
 
-/**
- * The registry's sentence, then what the standing rests on: the newest reviewed work it is read
- * from, and how much work was reviewed for the practice or the group in the look-back. Below
- * {@link EARLY_READ_BELOW} pieces it is an early read and says so instead of the registry's words.
- * A standing no live review counted keeps the registry's sentence alone.
- *
- * The work is named by its kind where every piece shares one ("pull requests", "merge requests" on
- * GitLab), else as "pieces of work". Both counts come from the server, from the same live reviews
- * the standing reads, so the sentence can never count more work than the observations show.
- */
 export function explainStanding(
 	standing: PracticeGroupStandingValue,
 	scope: StandingScope,
 	support: TrendSupport | undefined,
-	provider?: WorkProvider,
+	provider?: ItemProvider,
 ): string {
 	const { description } = standingDefs(scope)[standing];
 	const work = isSettledStanding(standing) ? standingWork(support) : undefined;
@@ -80,8 +70,8 @@ export function explainStanding(
 	const reviewed = Math.max(support.reviewedWork, work);
 	const kind = support.reviewedWorkKind;
 	const noun = (n: number) => {
-		if (kind !== undefined) {
-			return artifactKindNoun(kind, n, provider);
+		if (kind !== null) {
+			return itemKindNoun(kind, n, provider);
 		}
 		return n === 1 ? ANY_WORK.one : ANY_WORK.many;
 	};
@@ -126,7 +116,7 @@ export function formatTrendProvenance(
 
 	const span = support.calendarSpanDays;
 	const spanSentence =
-		span !== undefined && span > 0 ? ` Evidence spans ${counted(span, "day", "days")}.` : "";
+		span !== null && span > 0 ? ` Evidence spans ${counted(span, "day", "days")}.` : "";
 
 	if (direction === "INSUFFICIENT_EVIDENCE") {
 		const missing = support.opportunitiesUntilComparable;
@@ -141,10 +131,9 @@ export function formatTrendProvenance(
 		const comparable = support.comparablePractices;
 		const eligible = support.eligiblePractices;
 		// One clause with two counts: both digits as soon as either reaches ten.
-		const digits =
-			comparable !== undefined && eligible !== undefined && Math.max(comparable, eligible) >= 10;
+		const digits = comparable !== null && eligible !== null && Math.max(comparable, eligible) >= 10;
 		const coverage =
-			comparable !== undefined && eligible !== undefined
+			comparable !== null && eligible !== null
 				? ` ${capitalise(spell(comparable, digits))} of ${counted(eligible, "practice", "practices", digits)} here had enough evidence to compare.`
 				: "";
 		return `Across ${reviewedWork(opportunities)} in this group.${coverage}${spanSentence}`;

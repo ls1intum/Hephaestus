@@ -9,15 +9,14 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationalDeliveryReconciler;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.TranslatorState;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
 import de.tum.cit.aet.hephaestus.agent.usage.MeasurementVerification;
-import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageSourceType;
+import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessage;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
@@ -53,8 +52,8 @@ class MentorTurnCrashBillingTest extends BaseUnitTest {
     private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
 
     private static final LlmPriceSnapshot PRICE = new LlmPriceSnapshot(
-            FundingSource.INSTANCE,
-            PricingState.PRICED,
+            UsageFundingSource.INSTANCE,
+            UsagePricingState.PRICED,
             1L,
             null,
             new BigDecimal("10"),
@@ -76,7 +75,6 @@ class MentorTurnCrashBillingTest extends BaseUnitTest {
                 mock(ChatThreadRepository.class),
                 chatMessageRepository,
                 mock(WorkspaceRepository.class),
-                mock(ConversationalDeliveryReconciler.class),
                 usageRecorder,
                 noOpTransactionManager());
 
@@ -133,7 +131,7 @@ class MentorTurnCrashBillingTest extends BaseUnitTest {
                         any(),
                         argThat(recorded ->
                                 recorded.measurementVerification() == MeasurementVerification.UNVERIFIABLE));
-        assertThat(sample.getValue().sourceType()).isEqualTo(LlmUsageSourceType.MENTOR_TURN);
+        assertThat(sample.getValue().sourceType()).isEqualTo(UsageSourceType.MENTOR_TURN);
         assertThat(sample.getValue().sourceId()).isEqualTo(assistantId);
         assertThat(sample.getValue().inputTokens()).isEqualTo(6_000);
         assertThat(sample.getValue().outputTokens()).isEqualTo(900);
@@ -180,7 +178,7 @@ class MentorTurnCrashBillingTest extends BaseUnitTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("nothingToBillFrom")
     @DisplayName("a turn nobody observed is booked as a one-call, zero-token unverifiable event")
-    void aTurnWithNoObservationsAtAllStaysUnverifiable(String observation, Optional<MentorTurnLlmUsage> row) {
+    void aTurnWithNoResultsAtAllStaysUnverifiable(String practiceResult, Optional<MentorTurnLlmUsage> row) {
         when(chatMessageRepository.findLlmUsageById(assistantId)).thenReturn(row);
 
         persistence.interrupt(cookie(), startedTurnWithNoRunnerReport(), new IllegalStateException("runner died"));
@@ -193,7 +191,7 @@ class MentorTurnCrashBillingTest extends BaseUnitTest {
                 .record(
                         any(),
                         argThat(recorded -> recorded.measurementVerification() == MeasurementVerification.VERIFIED));
-        assertThat(sample.getValue().sourceType()).isEqualTo(LlmUsageSourceType.MENTOR_TURN);
+        assertThat(sample.getValue().sourceType()).isEqualTo(UsageSourceType.MENTOR_TURN);
         assertThat(sample.getValue().sourceId()).isEqualTo(assistantId);
         assertThat(sample.getValue().model()).isEqualTo("gpt-x");
         assertThat(sample.getValue().price()).isEqualTo(PRICE);

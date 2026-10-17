@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuetype.IssueType;
@@ -19,6 +18,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organizatio
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.GitHubIssueEventDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
@@ -41,28 +41,8 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Note: This test class does NOT use @Transactional because the issue processing
- * chain calls GitHubUserProcessor.findOrCreate() which uses REQUIRES_NEW propagation.
- * Having @Transactional here would cause connection pool deadlocks under parallel test
- * execution as the test transaction holds a connection while REQUIRES_NEW
- * needs an additional one. We use TransactionTemplate for lazy-loading assertions.
- * <p>
- * <b>Fixture Values (issues.opened.json - Issue #20):</b>
- * <ul>
- *   <li>ID: 3578496080</li>
- *   <li>Number: 20</li>
- *   <li>Title: "Webhook fixture: parent tracker"</li>
- *   <li>State: open</li>
- *   <li>Locked: false</li>
- *   <li>HTML URL: "https://github.com/HephaestusTest/TestRepository/issues/20"</li>
- *   <li>Created at: 2025-11-01T21:42:45Z</li>
- *   <li>Updated at: 2025-11-01T21:42:45Z</li>
- *   <li>Comments: 0</li>
- *   <li>Author: FelixTJDietrich (ID: 5898705)</li>
- *   <li>Label: etl-sample (ID: 9567656085)</li>
- * </ul>
- */
+// REQUIRES_NEW user writes need a free connection; an outer test transaction can deadlock the pool.
+// Use TransactionTemplate only for lazy-loading assertions.
 class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     // IDs from the actual GitHub webhook fixtures
@@ -80,7 +60,11 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private static final String FIXTURE_ISSUE_TITLE = "Webhook fixture: parent tracker";
     private static final String FIXTURE_ISSUE_HTML_URL = "https://github.com/HephaestusTest/TestRepository/issues/20";
     private static final String FIXTURE_ISSUE_BODY =
-            "This parent issue seeds webhook fixtures for our ETL pipeline.\n\nChecklist:\n- [ ] add sub tasks\n- [ ] wire dependencies\n- [ ] tidy up at the end";
+            "This parent issue seeds webhook fixtures for our ETL pipeline.\n\n"
+                    + "Checklist:\n"
+                    + "- [ ] add sub tasks\n"
+                    + "- [ ] wire dependencies\n"
+                    + "- [ ] tidy up at the end";
     private static final Instant FIXTURE_ISSUE_CREATED_AT = Instant.parse("2025-11-01T21:42:45Z");
     private static final Instant FIXTURE_ISSUE_UPDATED_AT = Instant.parse("2025-11-01T21:42:45Z");
     private static final int FIXTURE_ISSUE_COMMENTS_COUNT = 0;
@@ -801,7 +785,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         workspace.setDisplayName("Hephaestus Test");
         workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         workspace.setPublicActivityEnabled(true);
-        workspace.setOrganization(org);
+        workspace.setOrganizationId(org.getId());
         workspace.setAccountLogin(FIXTURE_ORG_LOGIN);
         workspace.setAccountType(AccountType.ORG);
         workspaceRepository.save(workspace);

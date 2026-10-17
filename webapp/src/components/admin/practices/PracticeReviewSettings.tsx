@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { cn } from "cn";
 import { AlertCircle } from "lucide-react";
 import { useState } from "react";
+import { z } from "zod";
 import type {
 	AgentBinding,
 	PracticeReviewSettings as PracticeReviewSettingsData,
@@ -23,9 +24,9 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { GeneratedPathsSettings } from "./GeneratedPathsSettings";
 import {
-	PracticeReviewCoverageSettings,
-	type PracticeReviewCoverageSettingsProps,
-} from "./PracticeReviewCoverageSettings";
+	PracticeReviewScopeSettings,
+	type PracticeReviewScopeSettingsProps,
+} from "./PracticeReviewScopeSettings";
 import { reviewModelRunnable } from "./review/review-readiness";
 
 export type PracticeReviewField = NonNullable<UpdatePracticeReviewSettingsRequest["reset"]>[number];
@@ -42,8 +43,8 @@ export interface PracticeReviewSettingsProps {
 		| { status: "ready"; binding?: AgentBinding };
 	workspace: {
 		enabled: boolean;
-		autoTriggerEnabled: boolean;
-		manualTriggerEnabled: boolean;
+		startsFromActivity: boolean;
+		startsOnRequest: boolean;
 		isSaving: boolean;
 		onUpdate: (settings: PracticeReviewWorkspaceUpdate) => void;
 	};
@@ -53,7 +54,7 @@ export interface PracticeReviewSettingsProps {
 		onUpdate: (settings: UpdatePracticeReviewSettingsRequest, sourceEtag?: string) => Promise<void>;
 		onReset: (field: PracticeReviewField) => void;
 	};
-	coverage: Pick<PracticeReviewCoverageSettingsProps, "preview" | "repositories" | "people">;
+	scope: Pick<PracticeReviewScopeSettingsProps, "preview" | "repositories" | "people">;
 }
 
 export function PracticeReviewSettings({
@@ -61,22 +62,22 @@ export function PracticeReviewSettings({
 	model,
 	workspace,
 	policy,
-	coverage,
+	scope,
 }: PracticeReviewSettingsProps) {
 	return (
 		<div className="space-y-8">
 			<ReviewStatusSection workspaceSlug={workspaceSlug} model={model} workspace={workspace} />
 			<ReviewTimingSection workspace={workspace} policy={policy} />
-			<PracticeReviewCoverageSettings
+			<PracticeReviewScopeSettings
 				settings={policy.settings}
-				preview={coverage.preview}
-				onSave={async (scope, sourceEtag) => policy.onUpdate({ reviewScope: scope }, sourceEtag)}
-				repositories={coverage.repositories}
-				people={coverage.people}
+				preview={scope.preview}
+				onSave={async (reviewScope, sourceEtag) => policy.onUpdate({ reviewScope }, sourceEtag)}
+				repositories={scope.repositories}
+				people={scope.people}
 			/>
 			<GeneratedPathsSettings
 				settings={policy.settings}
-				repositories={coverage.repositories}
+				repositories={scope.repositories}
 				isSaving={policy.isSaving}
 				onSave={policy.onUpdate}
 			/>
@@ -95,9 +96,16 @@ function ReviewStatusSection({
 
 	return (
 		<section className="space-y-4" aria-labelledby="review-status-heading">
-			<h2 id="review-status-heading" className="text-lg font-semibold">
-				Practice reviews
-			</h2>
+			<div className="space-y-1">
+				<h2 id="review-status-heading" className="text-lg font-semibold">
+					Automated review
+				</h2>
+				<p className="text-sm text-muted-foreground">
+					Hephaestus reviews new work against every practice it reviews automatically. Practices
+					reviewed by people or by nobody are left out. Feedback mode decides separately where
+					results become feedback.
+				</p>
+			</div>
 			<Field orientation="horizontal">
 				<FieldContent>
 					<FieldLabel htmlFor="practice-reviews-enabled">Start practice reviews</FieldLabel>
@@ -182,8 +190,7 @@ function ReviewTimingSection({
 	workspace,
 	policy,
 }: Pick<PracticeReviewSettingsProps, "workspace" | "policy">) {
-	const noWayIn =
-		workspace.enabled && !workspace.autoTriggerEnabled && !workspace.manualTriggerEnabled;
+	const noWayIn = workspace.enabled && !workspace.startsFromActivity && !workspace.startsOnRequest;
 
 	return (
 		<section className="space-y-4" aria-labelledby="review-timing-heading">
@@ -206,15 +213,15 @@ function ReviewTimingSection({
 			) : null}
 			<Field orientation="horizontal">
 				<FieldContent>
-					<FieldLabel htmlFor="trigger-auto">Start from work activity</FieldLabel>
+					<FieldLabel htmlFor="start-from-activity">Start from work activity</FieldLabel>
 					<FieldDescription>
-						A review starts when connected work reaches a practice trigger, such as opened, merged,
-						or published.
+						A review starts when connected work reaches an event a practice reviews on, such as
+						opened, merged, or published.
 					</FieldDescription>
 				</FieldContent>
 				<Switch
-					id="trigger-auto"
-					checked={workspace.autoTriggerEnabled}
+					id="start-from-activity"
+					checked={workspace.startsFromActivity}
 					disabled={workspace.isSaving}
 					onCheckedChange={(checked) =>
 						workspace.onUpdate({ practiceReviewAutoTriggerEnabled: checked })
@@ -223,16 +230,16 @@ function ReviewTimingSection({
 			</Field>
 			<Field orientation="horizontal">
 				<FieldContent>
-					<FieldLabel htmlFor="trigger-manual">Start requested reviews</FieldLabel>
+					<FieldLabel htmlFor="start-on-request">Start requested reviews</FieldLabel>
 					<FieldDescription>
-						Covers the <strong>Request review</strong> button, a backfill of past work, a recurring
-						check, and <code>/hephaestus review</code> in a GitLab merge request comment. Turning
+						Covers the <strong>Request review</strong> button, reviews of past work, recurring
+						checks, and <code>/hephaestus review</code> in a GitLab merge request comment. Turning
 						this off stops all of them.
 					</FieldDescription>
 				</FieldContent>
 				<Switch
-					id="trigger-manual"
-					checked={workspace.manualTriggerEnabled}
+					id="start-on-request"
+					checked={workspace.startsOnRequest}
 					disabled={workspace.isSaving}
 					onCheckedChange={(checked) =>
 						workspace.onUpdate({ practiceReviewManualTriggerEnabled: checked })
@@ -249,6 +256,8 @@ function ReviewTimingSection({
 	);
 }
 
+const cooldownSchema = z.coerce.number().int().min(0).max(1440);
+
 function CooldownField({
 	value,
 	overridden,
@@ -259,8 +268,8 @@ function CooldownField({
 	policy: PracticeReviewSettingsProps["policy"];
 }) {
 	const [draft, setDraft] = useState(String(value));
-	const parsed = Number(draft);
-	const invalid = draft.trim() === "" || !Number.isInteger(parsed) || parsed < 0 || parsed > 1440;
+	const parsed = cooldownSchema.safeParse(draft.trim() === "" ? undefined : draft);
+	const invalid = !parsed.success;
 
 	return (
 		<Field data-invalid={invalid || undefined}>
@@ -279,8 +288,8 @@ function CooldownField({
 				disabled={policy.isSaving}
 				onChange={(event) => setDraft(event.currentTarget.value)}
 				onBlur={() => {
-					if (!invalid && parsed !== value) {
-						void policy.onUpdate({ cooldownMinutes: parsed });
+					if (parsed.success && parsed.data !== value) {
+						void policy.onUpdate({ cooldownMinutes: parsed.data });
 					}
 				}}
 				className="max-w-32"
@@ -313,7 +322,8 @@ function FeedbackDeliverySection({ policy }: Pick<PracticeReviewSettingsProps, "
 					Sending feedback
 				</h2>
 				<p className="text-sm text-muted-foreground">
-					These settings apply to all comments and feedback from Heph in the workspace.
+					These settings apply to all comments and feedback from Hephaestus in the workspace. Each
+					practice’s feedback mode still decides whether its feedback waits for approval.
 				</p>
 			</div>
 			{paused ? (
@@ -321,10 +331,9 @@ function FeedbackDeliverySection({ policy }: Pick<PracticeReviewSettingsProps, "
 					<AlertCircle />
 					<AlertTitle>Sending is paused</AlertTitle>
 					<AlertDescription>
-						Reviews and in-app feedback continue, but no comments or feedback from Heph leave
-						Hephaestus. Automatic feedback is not queued for later delivery. Pending approvals
-						remain in the review queue, and a workspace owner or admin can decide them after
-						resuming.
+						Reviews and in-app feedback continue, but no comments or feedback leave Hephaestus.
+						Automatic feedback is not queued for later delivery. Pending approvals remain in the
+						review queue, and a workspace owner or admin can decide them after resuming.
 					</AlertDescription>
 				</Alert>
 			) : null}
@@ -335,7 +344,8 @@ function FeedbackDeliverySection({ policy }: Pick<PracticeReviewSettingsProps, "
 						<StatusBadge def={WORKSPACE_DELIVERY_STATUS_DEFS[settings.deliveryStatus]} />
 					</div>
 					<FieldDescription>
-						Pause all comments and feedback from Heph without stopping reviews or changing coverage.
+						Pause all comments and feedback from Hephaestus without stopping reviews or changing the
+						review scope.
 					</FieldDescription>
 				</FieldContent>
 				<Switch

@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.usage;
 
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRepricer.Outcome;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -65,20 +64,20 @@ public class LlmUsageRepricingSweeper {
      *
      * @return how many rows each outcome applied to
      */
-    public Map<Outcome, Integer> repriceNow(Instant now) {
+    public Map<LlmUsageRepricer.ResultOutcome, Integer> repriceNow(Instant now) {
         LlmBudgetService.MonthWindow window =
                 LlmBudgetService.MonthWindow.of(YearMonth.from(now.atOffset(ZoneOffset.UTC)));
         List<UnpricedLedgerRow> unpriced =
                 usageRepository.findUnpricedInWindow(window.from(), window.to(), PageRequest.of(0, MAX_ROWS_PER_PASS));
-        Map<Outcome, Integer> tally = new EnumMap<>(Outcome.class);
-        for (Outcome outcome : Outcome.values()) {
+        Map<LlmUsageRepricer.ResultOutcome, Integer> tally = new EnumMap<>(LlmUsageRepricer.ResultOutcome.class);
+        for (LlmUsageRepricer.ResultOutcome outcome : LlmUsageRepricer.ResultOutcome.values()) {
             tally.put(outcome, 0);
         }
         if (unpriced.isEmpty()) {
             return tally;
         }
         for (UnpricedLedgerRow row : unpriced) {
-            Outcome outcome;
+            LlmUsageRepricer.ResultOutcome outcome;
             try {
                 outcome = repricer.reprice(row);
             } catch (RuntimeException e) {
@@ -93,14 +92,14 @@ public class LlmUsageRepricingSweeper {
         }
         meterRegistry
                 .counter(AgentMetrics.LLM_USAGE_REPRICE_UNRESOLVED)
-                .increment(tally.getOrDefault(Outcome.UNIDENTIFIABLE, 0));
+                .increment(tally.getOrDefault(LlmUsageRepricer.ResultOutcome.UNIDENTIFIABLE, 0));
         log.info(
                 "llm.usage.reprice: {} unpriced event(s) this month; {} repriced, {} still awaiting a catalogue price, "
                         + "{} name a model this instance cannot identify",
                 unpriced.size(),
-                tally.get(Outcome.REPRICED),
-                tally.get(Outcome.STILL_UNPRICEABLE),
-                tally.get(Outcome.UNIDENTIFIABLE));
+                tally.get(LlmUsageRepricer.ResultOutcome.REPRICED),
+                tally.get(LlmUsageRepricer.ResultOutcome.STILL_UNPRICEABLE),
+                tally.get(LlmUsageRepricer.ResultOutcome.UNIDENTIFIABLE));
         return tally;
     }
 }

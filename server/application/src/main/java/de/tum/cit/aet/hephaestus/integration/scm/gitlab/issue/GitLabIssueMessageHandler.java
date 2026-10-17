@@ -3,8 +3,8 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.issue;
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventAction;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventType;
@@ -84,9 +84,10 @@ public class GitLabIssueMessageHandler extends AbstractIntegrationMessageHandler
             return;
         }
 
-        // Confidential issues are never (re)ingested. But an issue that flips public → confidential must
-        // also have any snapshot we mirrored while it was public purged — otherwise a stale public copy of
-        // now-restricted data lingers. Resolve the context first so we know the repository, then tombstone.
+        // Confidential issues are never (re)ingested. But an issue that flips public → confidential
+        // must also have any snapshot we mirrored while it was public purged — otherwise a stale
+        // public copy of now-restricted data lingers. Resolve the context first so we know the
+        // repository, then tombstone.
         if (event.isConfidential()) {
             log.debug(
                     "Confidential issue event: purging any public snapshot, iid={}",
@@ -103,8 +104,7 @@ public class GitLabIssueMessageHandler extends AbstractIntegrationMessageHandler
 
         switch (action) {
             case OPEN -> issueProcessor.process(event, context);
-            // UPDATE carries the changes diff — it is the only action GitLab has for a retitling, a
-            // relabelling and a due-date edit alike, so processUpdated reads that diff to tell them apart.
+            // GitLab uses UPDATE for title, label and due-date edits; its diff distinguishes them.
             case UPDATE -> issueProcessor.processUpdated(event, context);
             case CLOSE -> issueProcessor.processClosed(event, context);
             case REOPEN -> issueProcessor.processReopened(event, context);

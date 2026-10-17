@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
@@ -53,15 +54,40 @@ import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-/**
- * State-machine contract for {@link ConnectionService#transition}. Exercises the legal
- * path (one audit row, state mutated), the rejection path (no audit row, state untouched),
- * the same-state no-op, and the UNINSTALLED credential purge. {@link IntegrationStateTest}
- * covers the pure {@code canTransitionTo} predicate; this test covers the service that
- * enforces it.
- */
 @Tag("unit")
 class ConnectionServiceTest extends BaseUnitTest {
+
+    @Test
+    void shouldReturnEveryActiveConnectionOfTheRequestedKindWithinItsWorkspace() {
+        var first = connection(
+                56,
+                IntegrationKind.OUTLINE,
+                new ConnectionConfig.OutlineConfig("https://first.example.test", null, null, Set.of()));
+        var second = connection(
+                57,
+                IntegrationKind.OUTLINE,
+                new ConnectionConfig.OutlineConfig("https://second.example.test", null, null, Set.of()));
+        var github = connectionInState(IntegrationState.ACTIVE);
+        when(connectionRepository.findByWorkspaceIdAndState(7, IntegrationState.ACTIVE))
+                .thenReturn(List.of(first, github, second));
+        assertThat(service.findActiveConnections(7, IntegrationKind.OUTLINE)).containsExactly(first, second);
+        assertThat(service.findActiveConnections(8, IntegrationKind.OUTLINE)).isEmpty();
+    }
+
+    @Test
+    void shouldResolveExactlyOneActiveWorkspaceAndRefuseAnAmbiguousProviderInstance() {
+        when(connectionRepository.findWorkspaceIdsByKindAndInstanceKeyAndState(
+                        eq(IntegrationKind.SLACK), eq("T1"), eq(IntegrationState.ACTIVE), any()))
+                .thenReturn(List.of())
+                .thenReturn(List.of(1L))
+                .thenReturn(List.of(1L, 2L));
+        assertThat(service.findUniqueActiveWorkspaceId(IntegrationKind.SLACK, "T1"))
+                .isEmpty();
+        assertThat(service.findUniqueActiveWorkspaceId(IntegrationKind.SLACK, "T1"))
+                .contains(1L);
+        assertThat(service.findUniqueActiveWorkspaceId(IntegrationKind.SLACK, "T1"))
+                .isEmpty();
+    }
 
     @Mock
     private ConnectionRepository connectionRepository;
@@ -85,7 +111,8 @@ class ConnectionServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        // Stands in for the transaction a proxied call runs in, so after-commit work can be registered.
+        // Stands in for the transaction a proxied call runs in, so after-commit work can be
+        // registered.
         TransactionSynchronizationManager.initSynchronization();
         // Real converter so the credential-purge case operates on a genuine AES-GCM blob,
         // not a mock stand-in.
@@ -322,7 +349,8 @@ class ConnectionServiceTest extends BaseUnitTest {
     @Test
     void transition_toUninstalled_purgesAuthoritativelyWithoutFencing() {
         // System/vendor-driven uninstall (workspace PURGE, Slack app_uninstalled) is a statement of
-        // fact with no one to hand a 409 to and no retry behind it. A background reconcile must never
+        // fact with no one to hand a 409 to and no retry behind it. A background reconcile must
+        // never
         // be able to keep credentials on disk, so this path does not consult the sync fence at all.
         Connection connection = connectionInState(IntegrationState.ACTIVE);
         connection.setCredentials(new BearerToken("ghp-secret", null), credentialConverter);
@@ -363,7 +391,6 @@ class ConnectionServiceTest extends BaseUnitTest {
         verify(teardown).run();
     }
 
-    /** Suspended, a failing credential read cannot mark the disconnect transaction rollback-only. */
     @Test
     void disconnect_preparesTheTeardownWithTheTransactionSuspended() {
         Connection connection = connectionInState(IntegrationState.ACTIVE);
@@ -429,7 +456,6 @@ class ConnectionServiceTest extends BaseUnitTest {
 
         assertThatThrownBy(() -> service.disconnect(connection, disconnectRequest(), strategy))
                 .isInstanceOf(ConnectionBusyException.class)
-                // The 409 names the job and promises a retry, because the fence already asked it to stop.
                 .hasMessageContaining("active sync job 99")
                 .hasMessageContaining("Disconnect again");
 
@@ -456,12 +482,7 @@ class ConnectionServiceTest extends BaseUnitTest {
         verify(connectionRepository, never()).save(any());
     }
 
-    /**
-     * The unauthenticated webhook hot path: the subscription id from the delivery body selects which
-     * stored secret the HMAC is checked against. Contract: exactly one indexed lookup (never a scan
-     * over the connected fleet — {@code /webhooks/**} is exempt from the auth rate limiter), a forged
-     * id resolves to nothing, and a delivery can never select another workspace's secret.
-     */
+    // Webhooks bypass the auth limiter; resolve one subscription by its indexed id without scanning stored secrets.
     @Nested
     class FindOutlineSubscription {
 
@@ -527,7 +548,6 @@ class ConnectionServiceTest extends BaseUnitTest {
 
         @Test
         void aDeliveryForWorkspaceANeverSelectsWorkspaceBsSecret() {
-            // The query is keyed on the subscription id, so B's row is simply not in the result set.
             when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-a"))
                     .thenReturn(List.of(projection(1L, "secret-a")));
             when(connectionRepository.findOutlineSubscriptionsBySubscriptionId("sub-b"))
@@ -670,7 +690,6 @@ class ConnectionServiceTest extends BaseUnitTest {
         ReflectionTestUtils.setField(connection, "id", id);
     }
 
-    /** A GitHub App connection runs on no stored token: the write refuses one rather than overwriting its identity. */
     @Test
     void shouldRefuseToReplaceTheTokenOfAnAppInstallation() {
         Connection app = new Connection(

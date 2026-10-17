@@ -1,13 +1,11 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitAuthorResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
@@ -15,11 +13,13 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.MilestoneRepos
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.BaseGitHubProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.github.label.dto.GitHubLabelDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest.dto.GitHubPullRequestDTO;
@@ -157,11 +157,14 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
 
         Long providerId = Objects.requireNonNull(context.providerId(), "Pull request processing requires a provider");
 
-        // Skip the core upsert if existing data is as new (prevents stale webhooks from overwriting).
+        // Skip the core upsert if existing data is as new (prevents stale webhooks from
+        // overwriting).
         // Skip stale check for promotions — the entity needs all PR fields populated by the upsert.
         // The facts only the GraphQL sync carries still land: a webhook stored GitHub's updated_at
-        // first, and the sync row that follows carries the same moment with more in it. So do review
-        // requests received within the same second (sync-lifecycle.md § Reviewer lists are dated snapshots).
+        // first, and the sync row that follows carries the same moment with more in it. So do
+        // review
+        // requests received within the same second (sync-lifecycle.md § Reviewer lists are dated
+        // snapshots).
         if (!isNew && !promotedFromIssue) {
             PullRequest existing = existingOpt.get();
             if (existing.getUpdatedAt() != null
@@ -172,7 +175,8 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
                         existing.getId(),
                         existing.getUpdatedAt(),
                         dto.updatedAt());
-                // The provider's id for the pull request does not age: an older payload still carries it.
+                // The provider's id for the pull request does not age: an older payload still
+                // carries it.
                 boolean identityChanged = adoptCanonicalNativeId(existing, dbId, providerId);
                 boolean changed = !dto.updatedAt().isBefore(existing.getUpdatedAt())
                         && updateReviewRequests(dto, existing, providerId, context.observedAt());
@@ -184,7 +188,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
                 if (closingIssuesChanged) {
                     eventPublisher.publishEvent(new ScmDomainEvent.PullRequestUpdated(
                             ScmEventPayload.PullRequestData.from(stored),
-                            Set.of("relationships", ScmSignals.CLOSING_ISSUES_FIELD),
+                            Set.of("relationships", ScmItemEvents.CLOSING_ISSUES_FIELD),
                             EventContext.from(context)));
                 }
                 return stored;
@@ -236,19 +240,20 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
                 headRefOid,
                 baseRefOid,
                 mergedBy != null ? mergedBy.getId() : null,
-                null // mergeCommitSha: not written by this path; upsertMergeCommit upserts and links the merge commit
-                );
+                null);
 
         // Fetch the PR to get a managed entity and handle relationships
         PullRequest pr = pullRequestRepository
                 .findByRepositoryIdAndNumber(repository.getId(), dto.number())
-                .orElseThrow(() -> new IllegalStateException(
-                        "PullRequest not found after upsert: repositoryId=" + repository.getId()
-                                + ", number="
-                                + dto.number()));
+                .orElseThrow(() -> new IllegalStateException("PullRequest not found after upsert: repositoryId="
+                        + repository.getId()
+                        + ", number="
+                        + dto.number()));
 
-        // The upsert keeps the selected row's native id on a natural-key conflict: a promoted issue, a
-        // stale row, or a comment stub inserted after the lookup above. This row is the one it locked.
+        // The upsert keeps the selected row's native id on a natural-key conflict: a promoted
+        // issue, a
+        // stale row, or a comment stub inserted after the lookup above. This row is the one it
+        // locked.
         boolean identityChanged = adoptCanonicalNativeId(pr, dbId, providerId);
 
         boolean closingIssuesChanged = replaceClosingIssues(dto, pr, repository, context);
@@ -293,7 +298,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
                     changedFields.add("relationships");
                 }
                 if (closingIssuesChanged) {
-                    changedFields.add(ScmSignals.CLOSING_ISSUES_FIELD);
+                    changedFields.add(ScmItemEvents.CLOSING_ISSUES_FIELD);
                 }
                 eventPublisher.publishEvent(new ScmDomainEvent.PullRequestUpdated(
                         ScmEventPayload.PullRequestData.from(pr), changedFields, EventContext.from(context)));

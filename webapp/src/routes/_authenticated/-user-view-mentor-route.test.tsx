@@ -49,7 +49,7 @@ it("opens the viewed member's saved conversations", async () => {
 	let viewedUser: string | null = null;
 	server.use(
 		http.get("*/workspaces/:workspaceSlug/mentor/threads", ({ request }) => {
-			viewedUser = request.headers.get("X-User-View-User");
+			viewedUser = request.headers.get("X-User-View-Account");
 			return HttpResponse.json([]);
 		}),
 	);

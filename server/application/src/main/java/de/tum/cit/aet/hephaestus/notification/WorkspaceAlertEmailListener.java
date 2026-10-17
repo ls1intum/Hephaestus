@@ -2,7 +2,8 @@ package de.tum.cit.aet.hephaestus.notification;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountContactQuery;
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountWorkspaceMembershipQuery;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountMembershipQuery;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountMembershipQuery.Role;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IntegrationAttentionService;
 import de.tum.cit.aet.hephaestus.notification.email.EmailDeliveryMetrics;
@@ -28,7 +29,7 @@ import org.springframework.transaction.annotation.Propagation;
 @WorkspaceAgnostic("Delivery rechecks native account identity and current administration of the incident's workspace")
 public class WorkspaceAlertEmailListener {
     private final IntegrationAttentionService attention;
-    private final AccountWorkspaceMembershipQuery memberships;
+    private final AccountMembershipQuery memberships;
     private final AccountContactQuery contacts;
     private final NotificationSubscriptionService subscriptions;
     private final EmailRenderer renderer;
@@ -53,7 +54,7 @@ public class WorkspaceAlertEmailListener {
         var recipient = contacts.activeVerifiedPrimaryEmail(event.accountId());
         var workspace = memberships.membershipsForAccount(event.accountId()).stream()
                 .filter(membership -> membership.workspaceId() == change.workspaceId())
-                .filter(membership -> "ADMIN".equals(membership.role()) || "OWNER".equals(membership.role()))
+                .filter(membership -> membership.role() == Role.ADMIN || membership.role() == Role.OWNER)
                 .findFirst();
         if (recipient.isEmpty() || workspace.isEmpty()) {
             metrics.record(EmailKind.WORKSPACE_ALERT, EmailDeliveryResult.Outcome.NO_RECIPIENT);

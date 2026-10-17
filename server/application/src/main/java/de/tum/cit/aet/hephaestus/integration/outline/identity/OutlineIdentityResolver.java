@@ -1,11 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.outline.identity;
 
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountWorkspaceMembershipQuery;
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountWorkspaceMembershipQuery.WorkspaceMembershipView;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountMembershipQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
-import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -22,32 +19,28 @@ public class OutlineIdentityResolver {
 
     private final GitProviderRegistry gitProviderRegistry;
     private final AccountIdentityQuery accountIdentityQuery;
-    private final AccountWorkspaceMembershipQuery workspaceMembershipQuery;
+    private final AccountMembershipQuery workspaceMembershipQuery;
 
     public OutlineIdentityResolver(
             GitProviderRegistry gitProviderRegistry,
             AccountIdentityQuery accountIdentityQuery,
-            AccountWorkspaceMembershipQuery workspaceMembershipQuery) {
+            AccountMembershipQuery workspaceMembershipQuery) {
         this.gitProviderRegistry = gitProviderRegistry;
         this.accountIdentityQuery = accountIdentityQuery;
         this.workspaceMembershipQuery = workspaceMembershipQuery;
     }
 
     @Transactional(readOnly = true)
-    public Optional<Long> resolveMemberId(
+    public Optional<Long> resolveAccountId(
             long workspaceId, String serverUrl, @Nullable String teamId, String outlineSubject) {
-        if (outlineSubject.isBlank() || serverUrl.isBlank() || teamId == null || teamId.isBlank()) {
+        if (outlineSubject.isBlank() || serverUrl.isBlank()) {
             return Optional.empty();
         }
-        long outlineProviderId = gitProviderRegistry.resolveProviderId("OUTLINE", serverUrl);
-        return accountIdentityQuery
-                .resolveAccountId(outlineProviderId, outlineSubject, teamId)
-                .map(workspaceMembershipQuery::membershipsForAccount)
-                .orElseGet(List::of)
-                .stream()
-                .filter(view -> view.workspaceId() == workspaceId)
-                .map(WorkspaceMembershipView::memberId)
-                .filter(Objects::nonNull)
-                .findFirst();
+        return gitProviderRegistry
+                .findProviderId("OUTLINE", serverUrl)
+                .flatMap(outlineProviderId ->
+                        accountIdentityQuery.resolveAccountId(outlineProviderId, outlineSubject, teamId))
+                .filter(accountId -> workspaceMembershipQuery.membershipsForAccount(accountId).stream()
+                        .anyMatch(view -> view.workspaceId() == workspaceId));
     }
 }

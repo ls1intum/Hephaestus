@@ -1,13 +1,17 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat.wire;
 
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.mentor.ChatThread;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.practices.spi.CopyWriteFence;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
@@ -47,11 +51,46 @@ public final class TranslatorState {
     /** Final texts of the assistant messages verified this turn, in order; empty texts are not kept. */
     private final List<String> verifiedTexts = new ArrayList<>();
 
-    /**
-     * Links the server admitted this turn and the runner has not emitted yet, one per admission: a link to any other
-     * observation, or a second one an admission did not cover, is never shown or stored.
-     */
+    // Each server admission permits one emitted link; unadmitted and duplicate links remain hidden.
     private final Map<UUID, Integer> admittedLinks = new HashMap<>();
+
+    private final Map<UUID, CopyWriteFence> feedbackFences = new HashMap<>();
+    private final Map<UUID, Integer> admittedFeedback = new HashMap<>();
+    private final Set<UUID> shownFeedback = new HashSet<>();
+    private boolean feedbackClaimsClosed;
+
+    public synchronized boolean claimFeedback(UUID feedbackId, Supplier<Optional<CopyWriteFence>> claim) {
+        if (feedbackClaimsClosed || streamBroken) return false;
+        if (!feedbackFences.containsKey(feedbackId)) {
+            var fence = claim.get();
+            if (fence.isEmpty()) return false;
+            feedbackFences.put(feedbackId, fence.get());
+        }
+        admittedFeedback.merge(feedbackId, 1, Integer::sum);
+        return true;
+    }
+
+    public synchronized Map<UUID, CopyWriteFence> sealFeedbackClaims() {
+        feedbackClaimsClosed = true;
+        return Map.copyOf(feedbackFences);
+    }
+
+    public synchronized boolean consumeFeedbackAdmission(UUID feedbackId) {
+        return !feedbackClaimsClosed && consume(admittedFeedback, feedbackId);
+    }
+
+    public synchronized void recordFeedbackText(UUID feedbackId, String text) {
+        partsAccumulator.addObject().put("type", "text").put("text", text).put("state", "done");
+        shownFeedback.add(feedbackId);
+    }
+
+    public synchronized boolean hasShownFeedback(UUID feedbackId) {
+        return shownFeedback.contains(feedbackId);
+    }
+
+    private final Map<UUID, Integer> admittedProblemLinks = new HashMap<>();
+
+    private final Map<UUID, UUID> problemResults = new HashMap<>();
 
     /** Index in {@link #partsAccumulator} where the unverified assistant message's parts begin. */
     private int messagePartsStart;
@@ -99,7 +138,7 @@ public final class TranslatorState {
      * streaming mutators below: written once, before any runner event can race it.
      */
     @Nullable
-    private FundingSource connectionScope;
+    private UsageFundingSource connectionScope;
 
     @Nullable
     private Long connectionId;
@@ -114,7 +153,7 @@ public final class TranslatorState {
         this.assistantMessageId = assistantMessageId;
     }
 
-    public void bindConnection(@Nullable FundingSource connectionScope, @Nullable Long connectionId) {
+    public void bindConnection(@Nullable UsageFundingSource connectionScope, @Nullable Long connectionId) {
         this.connectionScope = connectionScope;
         this.connectionId = connectionId;
     }
@@ -133,7 +172,7 @@ public final class TranslatorState {
     }
 
     @Nullable
-    public FundingSource connectionScope() {
+    public UsageFundingSource connectionScope() {
         return connectionScope;
     }
 
@@ -288,32 +327,64 @@ public final class TranslatorState {
         return part;
     }
 
-    public synchronized void admitLink(UUID observationId) {
-        admittedLinks.merge(observationId, 1, Integer::sum);
+    public synchronized void admitLink(UUID resultId) {
+        admittedLinks.merge(resultId, 1, Integer::sum);
     }
 
-    /** Spends one admission of a link to {@code observationId}; false when none is left. */
-    public synchronized boolean consumeLinkAdmission(UUID observationId) {
-        Integer left = admittedLinks.get(observationId);
+    /**
+     * Admits one link to a problem and remembers the result it belongs to, which its part names beside it. Kept apart
+     * from result links, so a link of one kind never spends an admission of the other.
+     */
+    public synchronized void admitProblemLink(UUID problemId, UUID resultId) {
+        admittedProblemLinks.merge(problemId, 1, Integer::sum);
+        problemResults.put(problemId, resultId);
+    }
+
+    public synchronized @Nullable UUID resultOfLinkedProblem(UUID problemId) {
+        return problemResults.get(problemId);
+    }
+
+    public synchronized boolean consumeLinkAdmission(UUID resultId) {
+        return consume(admittedLinks, resultId);
+    }
+
+    public synchronized boolean consumeProblemLinkAdmission(UUID problemId) {
+        return consume(admittedProblemLinks, problemId);
+    }
+
+    private static boolean consume(Map<UUID, Integer> admitted, UUID id) {
+        Integer left = admitted.get(id);
         if (left == null) {
             return false;
         }
         if (left == 1) {
-            admittedLinks.remove(observationId);
+            admitted.remove(id);
         } else {
-            admittedLinks.put(observationId, left - 1);
+            admitted.put(id, left - 1);
         }
         return true;
     }
 
-    /** Stores the part exactly as {@code observation} went on the wire, so the reloaded reply matches the live one. */
-    public synchronized void recordDataObservation(UIMessageChunk.DataObservation observation) {
+    /** Stores the part exactly as {@code link} went on the wire, so the reloaded reply matches the live one. */
+    public synchronized void recordDataResult(UIMessageChunk.DataResult link) {
         ObjectNode part = nodes.objectNode();
-        part.put("type", UIMessageChunk.DataObservation.PART_TYPE);
-        part.put("id", observation.id().toString());
+        part.put("type", UIMessageChunk.DataResult.PART_TYPE);
+        part.put("id", link.id().toString());
         part.putObject("data")
-                .put("observationId", observation.data().observationId().toString())
-                .put("text", observation.data().text());
+                .put("resultId", link.data().resultId().toString())
+                .put("text", link.data().text());
+        partsAccumulator.add(part);
+    }
+
+    /** Stores the part exactly as {@code link} went on the wire, so the reloaded reply matches the live one. */
+    public synchronized void recordDataProblem(UIMessageChunk.DataProblem link) {
+        ObjectNode part = nodes.objectNode();
+        part.put("type", UIMessageChunk.DataProblem.PART_TYPE);
+        part.put("id", link.id().toString());
+        part.putObject("data")
+                .put("resultId", link.data().resultId().toString())
+                .put("problemId", link.data().problemId().toString())
+                .put("text", link.data().text());
         partsAccumulator.add(part);
     }
 

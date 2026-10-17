@@ -1,18 +1,21 @@
 package de.tum.cit.aet.hephaestus.agent.usage;
 
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRateLookup;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditSnapshot;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
@@ -30,7 +33,7 @@ public class LlmUsageService {
     private final LlmBudgetService llmBudgetService;
 
     private final ConfigAuditPort configAudit;
-    private final AgentJobRepository jobRepository;
+    private final ReviewJobRepository jobRepository;
 
     /** Display-only; no number it produces is ever compared against a budget. */
     private final FxRateLookup fxRateLookup;
@@ -40,7 +43,7 @@ public class LlmUsageService {
             WorkspaceRepository workspaceRepository,
             LlmBudgetService llmBudgetService,
             ConfigAuditPort configAudit,
-            AgentJobRepository jobRepository,
+            ReviewJobRepository jobRepository,
             FxRateLookup fxRateLookup) {
         this.usageRepository = usageRepository;
         this.workspaceRepository = workspaceRepository;
@@ -60,7 +63,7 @@ public class LlmUsageService {
         List<LlmUsageByJobTypeDTO> byJobType =
                 usageRepository.aggregateByJobType(workspaceId, window.from(), window.to()).stream()
                         .map(row -> new LlmUsageByJobTypeDTO(
-                                LlmUsageJobType.valueOf(row.getJobType()),
+                                row.getJobType(),
                                 row.getPricedTotalCostUsd(),
                                 row.getByoTotalCostUsd(),
                                 row.getUnpricedEventCount(),
@@ -81,11 +84,36 @@ public class LlmUsageService {
                         row.getEvents()))
                 .toList();
 
+        List<LlmUsageByPracticeDTO> byPractice =
+                usageRepository.aggregatePracticeScriptByPractice(workspaceId, window.from(), window.to()).stream()
+                        .map(row -> new LlmUsageByPracticeDTO(
+                                row.getPracticeSlug(),
+                                row.getPracticeName(),
+                                purposes(row.getModelKinds()),
+                                row.getReviews(),
+                                row.getCalls(),
+                                row.getInputTokens(),
+                                row.getOutputTokens(),
+                                row.getInstanceTotalCostUsd(),
+                                row.getOwnProviderTotalCostUsd(),
+                                row.getUnpricedEventCount()))
+                        .toList();
+        LlmUsageEventRepository.PracticeScriptTotalAggregate practiceScript =
+                usageRepository.aggregatePracticeScriptTotal(workspaceId, window.from(), window.to());
+        LlmUsagePracticeScriptTotalDTO practiceScriptTotal = new LlmUsagePracticeScriptTotalDTO(
+                practiceScript.getReviews(),
+                practiceScript.getCalls(),
+                practiceScript.getInputTokens(),
+                practiceScript.getOutputTokens(),
+                practiceScript.getInstanceTotalCostUsd(),
+                practiceScript.getOwnProviderTotalCostUsd(),
+                practiceScript.getUnpricedEventCount());
+
         BigDecimal pricedTotal = usageRepository.sumCost(workspaceId, window.from(), window.to());
         BigDecimal ownProviderTotal = usageRepository.sumByoCost(workspaceId, window.from(), window.to());
         BigDecimal instanceBudget = workspace.getMonthlyLlmBudgetUsd();
         BigDecimal ownProviderBudget = workspace.getMonthlyByoLlmBudgetUsd();
-        long uncosted = usageRepository.countUncosted(workspaceId, window.from(), window.to());
+        long unpricedRuns = usageRepository.countUnpricedRuns(workspaceId, window.from(), window.to());
         LlmBudgetVerdict instanceVerdict = LlmBudgetService.verdictFor(
                 pricedTotal,
                 usageRepository.existsUnpricedInstanceFunded(workspaceId, window.from(), window.to()),
@@ -95,19 +123,26 @@ public class LlmUsageService {
                 usageRepository.existsUnpricedWorkspaceFunded(workspaceId, window.from(), window.to()),
                 ownProviderBudget);
         LlmBudgetDecision decision = livePauseDecision(workspaceId, month);
+        boolean ownProviderInUse = ownProviderInUse(
+                month,
+                usageRepository.isOwnProviderConnected(workspaceId),
+                usageRepository.existsWorkspaceFunded(workspaceId, window.from(), window.to()));
         return new WorkspaceLlmUsageReportDTO(
                 month.toString(),
                 instanceBudget,
                 ownProviderBudget,
                 pricedTotal,
                 ownProviderTotal,
-                uncosted,
+                ownProviderInUse,
+                unpricedRuns,
                 instanceVerdict,
                 ownProviderVerdict,
-                decision.blocks(FundingSource.INSTANCE),
-                decision.blocks(FundingSource.WORKSPACE),
+                decision.blocks(UsageFundingSource.INSTANCE),
+                decision.blocks(UsageFundingSource.WORKSPACE),
                 byJobType,
                 byDay,
+                byPractice,
+                practiceScriptTotal,
                 fxRateLookup.forMonth(month).orElse(null));
     }
 
@@ -135,11 +170,31 @@ public class LlmUsageService {
         jobRepository.releaseBudgetHolds(workspaceId, Instant.now());
     }
 
+    /**
+     * Whether a month's report shows the workspace's own-provider purse. The ledger answers for every
+     * month: one own-provider row, priced or not, is use. For the current month, an own-provider model
+     * that work can run on also counts, so its admins can cap that purse before the first run. A
+     * connection has no history, so it says nothing about a past month.
+     */
+    static boolean ownProviderInUse(YearMonth month, boolean ownProviderConnected, boolean hasOwnProviderUsage) {
+        return hasOwnProviderUsage || (ownProviderConnected && isCurrentMonth(month));
+    }
+
+    static boolean isCurrentMonth(YearMonth month) {
+        return month.equals(YearMonth.now(ZoneOffset.UTC));
+    }
+
+    private static List<AgentPurpose> purposes(String modelKinds) {
+        List<ModelKind> kinds =
+                Arrays.stream(modelKinds.split(",")).map(ModelKind::valueOf).toList();
+        return AgentPurpose.practiceScript().stream()
+                .filter(purpose -> kinds.contains(purpose.kind()))
+                .toList();
+    }
+
     /** The live gate's verdict, which always evaluates against now — so a closed month pauses nothing. */
     private LlmBudgetDecision livePauseDecision(Long workspaceId, YearMonth month) {
-        return month.equals(YearMonth.now(ZoneOffset.UTC))
-                ? llmBudgetService.decide(workspaceId)
-                : LlmBudgetDecision.ALLOWED;
+        return isCurrentMonth(month) ? llmBudgetService.decide(workspaceId) : LlmBudgetDecision.ALLOWED;
     }
 
     /** {@code null} = uncapped. */

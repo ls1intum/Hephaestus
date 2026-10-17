@@ -4,15 +4,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuetype.IssueType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuetype.IssueTypeRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.IssueEvidenceVersion;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
@@ -23,6 +26,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.GitHubIssueDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.GitHubIssueTypeDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.label.dto.GitHubLabelDTO;
@@ -36,6 +41,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -46,6 +52,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionTemplate;
 
 class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
 
@@ -93,6 +100,15 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private RecordingScmEventListener eventListener;
+
+    @Autowired
+    private ItemIndexService items;
+
+    @Autowired
+    private IssueEvidenceVersion issueVersions;
+
+    @Autowired
+    private TransactionTemplate transactions;
 
     private Repository testRepository;
     private Workspace testWorkspace;
@@ -144,7 +160,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         testWorkspace.setDisplayName("Hephaestus Test");
         testWorkspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         testWorkspace.setPublicActivityEnabled(true);
-        testWorkspace.setOrganization(testOrganization);
+        testWorkspace.setOrganizationId(testOrganization.getId());
         testWorkspace.setAccountLogin(FIXTURE_ORG_LOGIN);
         testWorkspace.setAccountType(AccountType.ORG);
         testWorkspace = workspaceRepository.save(testWorkspace);
@@ -193,7 +209,6 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 );
     }
 
-    /** GitHub's issue payload for a pull request carries {@code pull_request}; it is never stored as an issue. */
     @Nested
     class PullRequestMarkedPayload {
 
@@ -249,10 +264,10 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         @Test
         void shouldRefuseAnUnmarkedIssuePayloadForAStoredPullRequestWithoutChangingNativeIdentity() {
             jdbc.update("""
-                    INSERT INTO issue(issue_type,native_id,provider_id,repository_id,number,
-                        created_at,state,comments_count,is_locked,is_merged,title,is_draft,additions,deletions,changed_files,commits)
-                    VALUES ('PULL_REQUEST',9201,?, ?,43,now(),'OPEN',0,false,false,'Pull request',false,0,0,0,0)
-                    """, githubProvider.getId(), testRepository.getId());
+                INSERT INTO issue(issue_type,native_id,provider_id,repository_id,number,
+                    created_at,state,comments_count,is_locked,is_merged,title,is_draft,additions,deletions,changed_files,commits)
+                VALUES ('PULL_REQUEST',9201,?, ?,43,now(),'OPEN',0,false,false,'Pull request',false,0,0,0,0)
+                """, githubProvider.getId(), testRepository.getId());
             var dto = createBasicIssueDto(9301L, 43);
 
             assertThat(processor.process(dto, createContext())).isNull();
@@ -263,7 +278,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 43))
                     .isEmpty();
             assertThat(jdbc.queryForObject(
-                            "SELECT native_id FROM issue WHERE repository_id=? AND number=43 AND issue_type='PULL_REQUEST'",
+                            "SELECT native_id FROM issue WHERE repository_id=? AND"
+                                    + " number=43 AND issue_type='PULL_REQUEST'",
                             Long.class,
                             testRepository.getId()))
                     .isEqualTo(9201L);
@@ -283,9 +299,37 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                             issue -> assertThat(issue.getDeletedAt()).isNull());
             assertThat(eventListener.ofType(ScmDomainEvent.IssueDeleted.class)).isEmpty();
 
+            var issue = issueRepository
+                    .findByRepositoryIdAndNumber(testRepository.getId(), 42)
+                    .orElseThrow();
+            var holder = items.upsert(new ItemRegistration(
+                    testWorkspace.getId(), ScmItemEvents.REPOSITORY, testRepository.getId(), null, null));
+            var item = items.upsert(new ItemRegistration(
+                    testWorkspace.getId(), ScmItemEvents.ISSUE, issue.getId(), holder.itemId(), null));
+            jdbc.update("""
+                    INSERT INTO issue_comment(native_id,provider_id,issue_id,body,html_url,author_association,created_at)
+                    VALUES (9104,?,?,'Discussion before deletion','https://github.com/comment/9104','MEMBER',now())
+                    """, githubProvider.getId(), issue.getId());
+            var version = Objects.requireNonNull(
+                    transactions.execute(ignored -> issueVersions.of(ScmEventPayload.IssueData.from(issueRepository
+                            .findByIdWithRepository(issue.getId())
+                            .orElseThrow()))));
+
             processor.processDeleted(createBasicIssueDto(9102L, 42), createContext());
             assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 42))
                     .isEmpty();
+            assertThat(jdbc.queryForObject(
+                            "SELECT removed_at IS NOT NULL FROM item WHERE workspace_id=? AND id=?",
+                            Boolean.class,
+                            item.workspaceId(),
+                            item.itemId()))
+                    .isTrue();
+            assertThat(jdbc.queryForList(
+                            "SELECT item_version FROM item_event WHERE workspace_id=? AND item_id=? AND name='scm.issue.deleted'",
+                            String.class,
+                            item.workspaceId(),
+                            item.itemId()))
+                    .containsExactly(version.value());
             assertThat(eventListener.ofType(ScmDomainEvent.IssueDeleted.class)).hasSize(1);
         }
     }
@@ -819,11 +863,6 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(issueRepository.count()).isEqualTo(countAfterFirst);
         }
 
-        /**
-         * Assignees live in a join table the atomic upsert cannot touch, so a change to them is reported
-         * under one name for labels and assignees alike — which is what the review pipeline reads to
-         * decide that a triage action moved evidence a practice can see.
-         */
         @Test
         void shouldReportRelationshipsWhenAnIssueIsAssigned() {
             Long issueId = 888999111L;
@@ -849,11 +888,6 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                     .satisfies(event -> assertThat(event.changedFields()).contains("relationships"));
         }
 
-        /**
-         * Locking an issue and commenting on it move no field the issue evidence is built from. The
-         * mirror still reports them, and reporting them under their own names is what lets the review
-         * pipeline decline the occasion instead of spending a review on evidence that did not move.
-         */
         @Test
         void shouldNameOnlyTheFieldsThatMovedWhenAnIssueIsLockedAndCommentedOn() {
             Long issueId = 888999222L;
@@ -1288,11 +1322,6 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                     });
         }
 
-        /**
-         * A native type is one of the fields the issue evidence is built from, so typing an issue that
-         * already exists has to be reported as a moved field — that, not the IssueTyped event, is what
-         * occasions the review of the retyped issue.
-         */
         @Test
         void shouldReportIssueTypeWhenAnExistingIssueIsTyped() {
             Long issueId = 888999333L;

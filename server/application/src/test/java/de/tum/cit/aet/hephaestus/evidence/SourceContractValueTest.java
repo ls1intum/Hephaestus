@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.agent.context.JobFolderIndex;
+import de.tum.cit.aet.hephaestus.agent.handler.EvidenceSnapshotFixtures;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -52,7 +53,8 @@ class SourceContractValueTest {
                 .isThrownBy(() -> new SourceCapture(
                         new SourceKind("scm.pull-request.diff"),
                         new SourceCaptureState.Unavailable(SourceAbsenceReason.NO_WORKING_COPY),
-                        List.of(new SourceArtifact("context/diff.patch", "text/x-diff", "a".repeat(64), 1))));
+                        EvidenceSnapshotFixtures.citation(new SourceKind("scm.pull-request.diff")),
+                        List.of(new CapturedSource("context/diff.patch", "text/x-diff", "a".repeat(64), 1))));
     }
 
     @Test
@@ -98,9 +100,9 @@ class SourceContractValueTest {
                 .isNotNull();
     }
 
-    private static ArtifactSourceContract source(
+    private static SourceContract source(
             RequiredCaptureQuality requiredQuality, boolean supportsComplete, boolean supportsEmpty) {
-        return new ArtifactSourceContract(
+        return new SourceContract(
                 new SourceKind("scm.example.source"),
                 "Example",
                 "An example source.",
@@ -115,12 +117,12 @@ class SourceContractValueTest {
                 Set.of(SourceAbsenceState.NOT_COLLECTED),
                 RetentionPolicy.AGENT_EVIDENCE_RETENTION,
                 ErasurePolicy.WORKSPACE_AND_PERSON_ERASURE,
-                Set.of("use-example"));
+                Set.of("use-example"),
+                new CitationCapabilities(CitationRequirement.FORBIDDEN, CitationRequirement.FORBIDDEN));
     }
 
-    private static ArtifactSourceContract source(
-            SourceAuthority authority, IdentityMode freshness, boolean supportsComplete) {
-        return new ArtifactSourceContract(
+    private static SourceContract source(SourceAuthority authority, IdentityMode freshness, boolean supportsComplete) {
+        return new SourceContract(
                 new SourceKind("scm.example.source"),
                 "Example",
                 "An example source.",
@@ -135,7 +137,8 @@ class SourceContractValueTest {
                 Set.of(SourceAbsenceState.NOT_COLLECTED),
                 RetentionPolicy.AGENT_EVIDENCE_RETENTION,
                 ErasurePolicy.WORKSPACE_AND_PERSON_ERASURE,
-                Set.of("use-example"));
+                Set.of("use-example"),
+                new CitationCapabilities(CitationRequirement.FORBIDDEN, CitationRequirement.FORBIDDEN));
     }
 
     @Test
@@ -144,7 +147,14 @@ class SourceContractValueTest {
 
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> new JobFolderIndex(
-                        new SourceContractVersion("1.2.0"), "a".repeat(64), "scm.pull_request", now, List.of()));
+                        new SourceContractVersion("1.2.0"),
+                        "a".repeat(64),
+                        "scm.pull_request",
+                        now,
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        List.of()));
         assertThatIllegalArgumentException()
                 .isThrownBy(
                         () -> new AutomatedReviewReadinessDecision("review-quality", now, true, List.of(), List.of()));
@@ -178,17 +188,17 @@ class SourceContractValueTest {
     }
 
     @Test
-    void shouldRejectNonCanonicalArtifactPaths() {
+    void shouldRejectNonCanonicalFilePaths() {
         for (String path : List.of("foo/..", "foo/../bar", "./foo", "foo\\bar")) {
             assertThatIllegalArgumentException()
-                    .isThrownBy(() -> new SourceArtifact(path, "application/json", "a".repeat(64), 1));
+                    .isThrownBy(() -> new CapturedSource(path, "application/json", "a".repeat(64), 1));
         }
     }
 
     @Test
-    void shouldRejectDuplicateArtifactPathsInACapture() {
-        SourceArtifact first = new SourceArtifact("context.json", "application/json", "a".repeat(64), 1);
-        SourceArtifact second = new SourceArtifact("context.json", "application/json", "b".repeat(64), 2);
+    void shouldRejectDuplicateFilePathsInACapture() {
+        CapturedSource first = new CapturedSource("context.json", "application/json", "a".repeat(64), 1);
+        CapturedSource second = new CapturedSource("context.json", "application/json", "b".repeat(64), 2);
 
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> new SourceCapture(
@@ -197,6 +207,7 @@ class SourceContractValueTest {
                                 SourceContentState.NON_EMPTY,
                                 SourceCompleteness.COMPLETE,
                                 new SourceCaptureFacts(Instant.parse("2026-08-03T10:00:00Z"), null, null, null)),
+                        EvidenceSnapshotFixtures.citation(new SourceKind("scm.pull-request.core")),
                         List.of(first, second)));
     }
 }

@@ -5,9 +5,6 @@ import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.workspace.exception.InsufficientWorkspacePermissionsException;
 import de.tum.cit.aet.hephaestus.workspace.exception.InvalidWorkspaceSlugException;
 import de.tum.cit.aet.hephaestus.workspace.exception.LastOwnerRemovalException;
-import de.tum.cit.aet.hephaestus.workspace.exception.RepositoryAlreadyMonitoredException;
-import de.tum.cit.aet.hephaestus.workspace.exception.RepositoryManagementNotAllowedException;
-import de.tum.cit.aet.hephaestus.workspace.exception.RepositoryProviderNotConnectedException;
 import de.tum.cit.aet.hephaestus.workspace.exception.WorkspaceLifecycleViolationException;
 import de.tum.cit.aet.hephaestus.workspace.exception.WorkspaceSlugConflictException;
 import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeBlockedException;
@@ -74,30 +71,6 @@ public class WorkspaceControllerAdvice {
                 HttpStatus.CONFLICT,
                 "Workspace owner required",
                 Objects.requireNonNullElse(exception.getMessage(), "The workspace must retain an owner"));
-    }
-
-    @ExceptionHandler(RepositoryAlreadyMonitoredException.class)
-    ProblemDetail handleRepositoryConflict(RepositoryAlreadyMonitoredException exception) {
-        return problem(
-                HttpStatus.CONFLICT,
-                "Repository already monitored",
-                userFacingDetail(Objects.requireNonNullElse(exception.getMessage(), "Unexpected error")));
-    }
-
-    @ExceptionHandler(RepositoryManagementNotAllowedException.class)
-    ProblemDetail handleRepositoryManagementNotAllowed(RepositoryManagementNotAllowedException exception) {
-        return problem(
-                HttpStatus.BAD_REQUEST,
-                "Repository management not allowed",
-                userFacingDetail(Objects.requireNonNullElse(exception.getMessage(), "Unexpected error")));
-    }
-
-    @ExceptionHandler(RepositoryProviderNotConnectedException.class)
-    ProblemDetail handleRepositoryProviderNotConnected(RepositoryProviderNotConnectedException exception) {
-        return problem(
-                HttpStatus.CONFLICT,
-                "Repository provider not connected",
-                userFacingDetail(Objects.requireNonNullElse(exception.getMessage(), "Unexpected error")));
     }
 
     @ExceptionHandler({WorkspaceLifecycleViolationException.class, WorkspacePurgeBlockedException.class})

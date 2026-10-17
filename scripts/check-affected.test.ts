@@ -241,11 +241,11 @@ await test("combines independent workspaces", () => {
 	]);
 });
 
-await test("selects the Node runtime and precompute trees", () => {
+await test("selects the Node runtime and practice script trees", () => {
 	assert.deepEqual(
 		scopesFor([
 			"server/application/src/main/resources/agent/main.ts",
-			"docker/agents/precompute/a.ts",
+			"docker/agents/practice-scripts/a.ts",
 		]),
 		["agents"],
 	);

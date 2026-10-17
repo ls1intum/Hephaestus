@@ -7,7 +7,7 @@ import { levelsOpenedBy } from "@/test/detail-stack";
 import { ReviewSelectionBar } from "./ReviewSelectionBar";
 
 const REVIEW_ID = "11111111-1111-1111-1111-111111111111";
-const OBSERVATION_ID = "66666666-6666-6666-6666-666666666666";
+const RESULT_ID = "66666666-6666-6666-6666-666666666666";
 
 /**
  * The record every tab is narrowed to, above them all. It is named by its record, never by its id,
@@ -45,43 +45,42 @@ export const Review: Story = {
 };
 
 /** A piece of work is named the way its provider writes it, with its title. No review read it yet. */
-export const Work: Story = {
+export const Item: Story = {
 	args: {
-		kind: "work",
+		kind: "item",
 		name: {
 			status: "ready",
 			name: "Pull request #1423 · Member-facing review activity: say why a practice stayed quiet",
 		},
-		trace: { kind: "work", id: "pull-request:1423" },
+		trace: { kind: "item", id: "42" },
 	},
 	play: async ({ canvas }) => {
 		canvas.getByText(
 			"Pull request #1423 · Member-facing review activity: say why a practice stayed quiet",
 		);
 		await expect(levelsOpenedBy(canvas.getByRole("link", { name: "Show trace" }))).toEqual([
-			"trace:work:pull-request:1423",
+			"trace:item:42",
 		]);
 	},
 };
 
-/** An observation is named by its own summary; its trace stands on it. */
-export const Observation: Story = {
+export const Result: Story = {
 	args: {
-		kind: "observation",
+		kind: "result",
 		name: { status: "ready", name: "The description does not say how the change was tested" },
-		trace: { kind: "observation", id: OBSERVATION_ID },
+		trace: { kind: "result", id: RESULT_ID },
 	},
 	play: async ({ canvas }) => {
 		canvas.getByText("The description does not say how the change was tested");
 		await expect(levelsOpenedBy(canvas.getByRole("link", { name: "Show trace" }))).toEqual([
-			`trace:observation:${OBSERVATION_ID}`,
+			`trace:result:${RESULT_ID}`,
 		]);
 	},
 };
 
 /** Until the record is read, the name is a placeholder. */
 export const Loading: Story = {
-	args: { kind: "work", name: { status: "loading" }, trace: undefined },
+	args: { kind: "item", name: { status: "loading" }, trace: undefined },
 	play: async ({ canvas }) => {
 		await expect(canvas.queryByRole("link", { name: "Show trace" })).not.toBeInTheDocument();
 		canvas.getByRole("button", { name: "Stop tracking (a piece of work)" });
@@ -91,12 +90,12 @@ export const Loading: Story = {
 /** A record that could not be read is still a selection the reader can see and clear. */
 export const NotRead: Story = {
 	args: {
-		kind: "observation",
+		kind: "result",
 		name: { status: "error", error: new Error("Not found"), onRetry: fn() },
 	},
 	play: async ({ canvas }) => {
-		canvas.getByText("an observation");
-		canvas.getByRole("button", { name: "Stop tracking (an observation)" });
+		canvas.getByText("a result");
+		canvas.getByRole("button", { name: "Stop tracking (a result)" });
 	},
 };
 
@@ -111,7 +110,7 @@ export const OnTheOverview: Story = {
 /** A long name truncates inside the chip rather than pushing the page sideways at 320px. */
 export const Reflow: Story = {
 	args: {
-		kind: "observation",
+		kind: "result",
 		name: {
 			status: "ready",
 			name: "The description says what changed but not why, and it does not say how the change was tested or which part of the system it touches",

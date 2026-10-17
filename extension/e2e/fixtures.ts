@@ -109,7 +109,6 @@ export const test = base.extend<{ context: BrowserContext; worker: Worker }>({
 
 export const OPTIONS_URL = `chrome-extension://${EXTENSION_ID}/options.html`;
 
-/** Connects the extension to the suite's server and signs in through the development door. */
 export async function signIn(
 	context: BrowserContext,
 	username: string,
@@ -203,7 +202,10 @@ export async function boxOf(
 		});
 }
 
-/** Observe only review mutations; navigation and reads must never send one. */
+/**
+ * Observe only review mutations: a review request, a review cancellation, and a feedback retry or
+ * decision. Navigation and reads must never send one.
+ */
 export function watchReviewMutations(context: BrowserContext): string[] {
 	const requests: string[] = [];
 	context.on("request", (request) => {
@@ -211,7 +213,9 @@ export function watchReviewMutations(context: BrowserContext): string[] {
 		if (
 			url.origin === SERVER_URL &&
 			request.method() !== "GET" &&
-			/\/(?:review-requests|cancel|delivery\/retry)$/u.test(url.pathname)
+			/\/practices\/(?:review-requests|reviews\/[^/]+\/cancel|reviews\/feedback\/[^/]+\/(?:retry|decisions))$/u.test(
+				url.pathname,
+			)
 		) {
 			requests.push(`${request.method()} ${url.pathname}`);
 		}

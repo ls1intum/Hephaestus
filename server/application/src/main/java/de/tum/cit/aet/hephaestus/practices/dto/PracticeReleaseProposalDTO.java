@@ -1,50 +1,28 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
-import de.tum.cit.aet.hephaestus.practices.AdoptedBaseSource;
-import de.tum.cit.aet.hephaestus.practices.CanonicalDigest;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
-import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionMerge;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-/** One offer and the exact three versions an administrator reviews before deciding. */
+@JsonInclude(JsonInclude.Include.ALWAYS)
 public record PracticeReleaseProposalDTO(
-        @NonNull String slug,
-        @NonNull PracticeDefinition base,
-        @NonNull PracticeDefinition current,
-        @NonNull PracticeDefinition offered,
-        @NonNull AdoptedBaseSource baseSource,
-        @NonNull String offeredDigest,
-        @NonNull String etag,
-        @Nullable Integer currentRevision,
-        @NonNull List<PracticeReleaseFieldDTO> fields) {
-    public static PracticeReleaseProposalDTO of(
-            String slug,
-            PracticeDefinition base,
-            PracticeDefinition current,
-            PracticeDefinition offered,
-            AdoptedBaseSource baseSource,
-            @Nullable Integer currentRevision) {
-        String offeredDigest = offered.exactFingerprint(slug);
-        String etag = new CanonicalDigest()
-                .add(slug)
-                .add(base.exactFingerprint(slug))
-                .add(current.exactFingerprint(slug))
-                .add(offeredDigest)
-                .addInt(currentRevision == null ? 0 : currentRevision)
-                .hex();
-        return new PracticeReleaseProposalDTO(
-                slug,
-                base,
-                current,
-                offered,
-                baseSource,
-                offeredDigest,
-                etag,
-                currentRevision,
-                PracticeDefinitionMerge.changes(base, current, offered).stream()
-                        .map(PracticeReleaseFieldDTO::from)
-                        .toList());
+        String practiceSlug,
+
+        @Schema(pattern = "^[1-9][0-9]*$", requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) @Nullable
+        String currentVersionId,
+
+        PracticeDefinition current,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) @Nullable
+        PracticeDefinition base,
+
+        PracticeDefinition offered,
+        String offeredDigest,
+        String etag,
+        List<PracticeReleaseFieldDTO> fields) {
+    public PracticeReleaseProposalDTO {
+        fields = List.copyOf(fields);
     }
 }

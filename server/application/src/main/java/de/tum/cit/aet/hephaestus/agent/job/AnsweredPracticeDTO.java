@@ -6,13 +6,13 @@ import org.jspecify.annotations.NonNull;
 
 @Schema(
         description = "A ready practice this review did not ask, because a completed review had already answered it on "
-                + "exactly the same code. Its observation belongs to that review; this review recorded none for it.")
+                + "exactly the same code. Its result belongs to that review; this review recorded none for it.")
 public record AnsweredPracticeDTO(
         @NonNull @Schema(description = "The practice left out")
         String practiceSlug,
 
-        @NonNull @Schema(description = "The practice revision the earlier answer was made under")
-        Long revisionId,
+        @NonNull @Schema(description = "The practice version the earlier answer was made under")
+        Long practiceVersionId,
 
-        @NonNull @Schema(description = "The completed review whose observation answers it")
+        @NonNull @Schema(description = "The completed review whose result answers it")
         UUID reviewId) {}

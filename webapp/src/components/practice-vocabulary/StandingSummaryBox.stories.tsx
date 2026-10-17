@@ -26,7 +26,7 @@ export const Default: Story = {
 			within(legend)
 				.getAllByRole("listitem")
 				.map((item) => item.textContent),
-		).toStrictEqual(["2Needs attention", "3Mixed", "6Going well", "1Not observed"]);
+		).toStrictEqual(["2Needs attention", "3Mixed", "6Going well", "1Not reviewed"]);
 	},
 };
 

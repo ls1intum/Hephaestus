@@ -1,10 +1,18 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import de.tum.cit.aet.hephaestus.practices.ClosedPracticeInput;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionField;
 import de.tum.cit.aet.hephaestus.practices.PracticeReleaseChoice;
 import jakarta.validation.constraints.NotNull;
 import java.util.Map;
-import org.jspecify.annotations.NonNull;
 
+@JsonInclude(JsonInclude.Include.ALWAYS)
 public record AcceptPracticeReleaseRequestDTO(
-        @NotNull @NonNull Map<PracticeDefinitionField, PracticeReleaseChoice> choices) {}
+        @JsonProperty(required = true) @NotNull Map<PracticeDefinitionField, @NotNull PracticeReleaseChoice> choices)
+        implements ClosedPracticeInput {
+    public AcceptPracticeReleaseRequestDTO {
+        choices = Map.copyOf(choices);
+    }
+}

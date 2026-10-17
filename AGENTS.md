@@ -12,7 +12,7 @@ It delivers practice feedback on the work itself, on the developer's own practic
 
 ## What we will not compromise on
 
-1. **Feedback earns trust or it is not sent.** A review passes through occasion, evidence capture, observation, and delivery.
+1. **Feedback earns trust or it is not sent.** A review passes through selection, evidence capture, result admission, and delivery.
    Each stage can stop with its own recorded reason.
    Never turn a capture failure into a claim about someone's work.
    Never report withheld feedback as missing evidence.
@@ -29,8 +29,8 @@ It delivers practice feedback on the work itself, on the developer's own practic
 4. **The artifact tested is the artifact shipped.** CI packages the server once.
    The OpenAPI spec, browser suite, and container image all come from that JAR.
    See `docs/contributor/ci-cd.mdx` § Build once.
-5. **One vocabulary.** The product words below are the only words, in UI, code, docs and release
-   notes alike.
+5. **One vocabulary.** Use the terms from [Product vocabulary](#product-vocabulary)
+   for product concepts in UI, code, docs and release notes.
 
 ## How we build
 
@@ -58,39 +58,16 @@ A maintainer's explicit instruction overrides any of it.
 If a rule conflicts with the current task, state the conflict.
 Get a decision instead of silently bypassing the rule.
 
-## A small glossary
+## Product vocabulary
 
-`docs/contributor/practice-feedback-language.md` owns the product vocabulary.
-`docs/contributor/practice-review-glossary.mdx` owns the review operation's terms.
-Define a term in one and cite it from the other.
-Use these words on every task:
+[Practice feedback language](docs/contributor/practice-feedback-language.md) owns product terms.
+[Practice review glossary](docs/contributor/practice-review-glossary.mdx) owns review and runtime terms.
+Use their exact names in prose, code, HTTP and release notes.
+Define each term in one owning page and cite it elsewhere.
+The sandboxed runtime is an agent. Heph and the application are not agents.
 
-- **you** — the agent reading this file and changing Hephaestus.
-- **we, maintainers** — the people building Hephaestus, who are talking to you now.
-- **workspace** — one team's tenant: its connected repositories, members, practices and feedback.
-  An **instance** is one running Hephaestus deployment hosting many workspaces.
-- **practice** — a defined way of working used to review work.
-  A **practice group** collects related practices.
-  Never use *rule*, *detector*, or *category* for these concepts.
-- **practice review** — one evidence-bounded operation: Hephaestus checks practices against one
-  piece of reviewed work and may record observations.
-- **observation** — one recorded result of reviewing one practice against one piece of reviewed
-  work. Never *finding*, *detection*.
-- **practice feedback**, shortened to **feedback** — guidance written from observations and addressed to a developer.
-  It is uncountable.
-  Write *3 pieces of feedback*, never *messages*.
-- **channel** — where one piece of feedback is meant to appear.
-- **delivery** — whether it was prepared, delivered, withheld, failed, or replaced.
-- **reviewed work** — a pull request, merge request, issue, conversation or document under review.
-  Say *pull request* or *merge request* when the provider is known.
-- **developer** — the person an observation is about.
-- **Heph** — the conversational assistant.
-  Its product area is **mentor**.
-  Neither Heph, the application, nor a review is an *agent*.
-  That word means the sandboxed runtime that executes a review.
-- **runtime role** — `server`, `worker` or `webhook`: the slice of one JAR a container boots.
-- **integration** — one connected provider: GitHub, GitLab, Slack or Outline, each with its own
-  adapter under `integration/`.
+In this file, **you** is the agent that reads it and changes Hephaestus.
+**We**, the maintainers, are the people who build Hephaestus and talk to you now.
 
 ## Hit every surface
 
@@ -110,10 +87,10 @@ State which entries applied:
   Commit all three.
 - **Schema.** An entity change needs a changelog and an ERD (`vp run db:draft-changelog`).
   A new workspace-owned table is workspace-scoped from its first migration.
-- **Channels.** Feedback appears on the reviewed work, on the developer's practice page, and in conversation.
-  A change to what feedback carries needs a decision per channel.
-- **Reverse states.** Include needs exclude, pause needs resume, customize needs reset. A one-way
-  door is a bug.
+- **Destinations.** Feedback appears on the reviewed work, on the developer's practice page, and in conversation.
+  A change to what feedback carries needs a decision per destination.
+- **Reverse states.** Include needs exclude, pause needs resume, customize needs reset. A change
+  that cannot be undone is a bug.
 - **Both admin consoles.** Instance-wide and per-workspace administration share components.
   A scope-specific field in a shared component silently breaks the other console.
   See `webapp/AGENTS.md` § Which admin console a component belongs to.
@@ -152,8 +129,8 @@ The SPA talks to the server only through the generated client.
   It runs through the Vite+ version pinned in `devDependencies`.
   `tsconfig.agents.json` type-checks these sources as one project:
   - The agent runner (`server/application/src/main/resources/agent/`).
-  - The precompute runner and lib (`docker/agents/precompute/`).
-  - The per-practice precompute scripts (`server/application/src/main/resources/practices/precompute/`).
+  - The practice script toolkit: the program host library, the child and the author tools (`docker/agents/practice-scripts/`).
+  - The bundled practice scripts (`server/application/src/main/resources/practices/scripts/`).
 
 Skills live in `.claude/skills/<name>/`.
 Claude Code and opencode read them there.
@@ -209,7 +186,7 @@ Do not copy a skill elsewhere.
 | `vp run check` | Every gate in the `quality` group in `vite.config.ts`: static analysis, formatting, agent tests, repository policy |
 | `vp run verify` | `check` plus the credential-free builds and test suites |
 | `vp run test:webapp` | Vitest |
-| `vp run test:agents` | Agent runtime and precompute specs, on Node |
+| `vp run test:agents` | Agent runtime and practice script specs, on Node |
 | `vp run test:server:unit` | Server unit tests — the other tiers are in `server/AGENTS.md` § Test tiers |
 
 Task naming, lint configuration, and cross-platform command conventions live in
@@ -245,7 +222,7 @@ Use that reference when naming tasks, changing those tools, or linting a single 
 - Stacked PRs follow `CONTRIBUTING.md` § Stacked Pull Requests through `/gh-stack`. A layer that
   cannot satisfy the normal PR, release and quality requirements on its own is not a layer.
 - When you monitor a PR, poll checks and comments newer than the last push.
-  Verify each bot finding against the source.
+  Verify each bot comment against the source.
   Fix the real ones.
   Dismiss the rest with a written reason.
   If nothing is new, stay quiet.
@@ -275,8 +252,8 @@ Every *Done when* bullet is a change that ships, never a measurement or a verdic
   A cast usually indicates that the upstream type is wrong.
   Use `satisfies`.
 - Validate anything crossing a trust boundary: a webhook body, a hand-parsed stream, or a `JSON.parse`.
-  Use a discriminated union, or a `zod` schema in the SPA.
-  The SPA is the only tree that has zod.
+  Use a discriminated union, or a `zod` schema in a tree that has zod.
+  Only the SPA, the extension and the practice script toolkit (`docker/agents/practice-scripts/`) have zod.
   Never log a token, a secret, or a raw request body.
 - A leading `_` marks what the language or a tool reads that way.
   Examples are an unused binding, a server field name, or a runtime global, never something private.

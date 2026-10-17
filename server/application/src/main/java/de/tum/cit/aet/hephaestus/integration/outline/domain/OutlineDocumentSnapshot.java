@@ -36,7 +36,8 @@ public record OutlineDocumentSnapshot(
         @Nullable String contentHash,
         @Nullable Instant deletedAt,
         @Nullable Integer bodyLength,
-        @Nullable Long version) {
+        @Nullable Long version,
+        @Nullable String createdBySubject) {
     /** Whether the document has been tombstoned (removed upstream). Mirrors {@link OutlineDocument#isDeleted()}. */
     public boolean isDeleted() {
         return deletedAt != null;
@@ -62,6 +63,7 @@ public record OutlineDocumentSnapshot(
                 doc.getContentHash(),
                 doc.getDeletedAt(),
                 doc.getBodyMarkdown() == null ? null : doc.getBodyMarkdown().length(),
-                doc.getVersion());
+                doc.getVersion(),
+                doc.getCreatedBySubject());
     }
 }

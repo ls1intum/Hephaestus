@@ -3,195 +3,92 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.tum.cit.aet.hephaestus.agent.context.FolderSource;
 import de.tum.cit.aet.hephaestus.agent.context.JobFolderIndex;
-import de.tum.cit.aet.hephaestus.agent.context.providers.PullRequestContentSource;
-import de.tum.cit.aet.hephaestus.agent.context.providers.RepositoryTreeContentSource;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
-import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
+import de.tum.cit.aet.hephaestus.evidence.CapturedSource;
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
-import de.tum.cit.aet.hephaestus.evidence.SourceArtifact;
 import de.tum.cit.aet.hephaestus.evidence.SourceCapture;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureFacts;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
-import de.tum.cit.aet.hephaestus.practices.PracticePreconditionClause;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
-import tools.jackson.databind.node.ObjectNode;
 
 class CapturedEvidenceTest extends BaseUnitTest {
-
-    private final JsonMapper mapper = JsonMapper.builder().build();
-
-    private static AgentJob jobWith(ObjectNode snapshot) {
-        var job = new AgentJob();
-        job.setId(UUID.randomUUID());
-        job.setEvidenceSnapshot(snapshot);
-        return job;
-    }
+    private final JsonMapper mapper = new JsonMapper();
+    private static final SourceKind CONTENT = new SourceKind("docs.document.core");
+    private static final SourceKind COMMENTS = new SourceKind("scm.pull-request.comments");
 
     @Test
-    void shouldReadBackTheManifestAnAttemptRecorded() {
-        Instant capturedAt = Instant.parse("2026-08-03T00:00:00Z");
-        String head = "b".repeat(40);
+    void readsOnlyAvailableSourcesAndTheirExactFileProof() {
+        Instant now = Instant.parse("2026-10-14T00:00:00Z");
         var manifest = new JobFolderIndex(
-                ArtifactSourceCatalogRegistry.CURRENT_VERSION,
+                ClasspathSourceCatalogRegistry.CURRENT_VERSION,
                 "0".repeat(64),
-                ArtifactKinds.PULL_REQUEST.value(),
-                capturedAt,
+                "docs.document",
+                now,
                 List.of(
                         new SourceCapture(
-                                PracticePreconditionClause.DIFF_SOURCE,
-                                new SourceCaptureState.Available(
-                                        SourceContentState.NON_EMPTY,
-                                        SourceCompleteness.PARTIAL,
-                                        new SourceCaptureFacts(
-                                                capturedAt, null, capturedAt, "a".repeat(40) + ":" + head),
-                                        List.of("TRUNCATED")),
-                                List.of(new SourceArtifact(
-                                        PullRequestContentSource.CHANGE_FILE, "application/json", "c".repeat(64), 7))),
-                        new SourceCapture(
-                                RepositoryTreeContentSource.KIND,
+                                CONTENT,
                                 new SourceCaptureState.Available(
                                         SourceContentState.NON_EMPTY,
                                         SourceCompleteness.COMPLETE,
-                                        new SourceCaptureFacts(capturedAt, null, null, head + ":" + "d".repeat(40))),
-                                List.of(new SourceArtifact(
-                                        SandboxLayout.REPO_MOUNT_RELATIVE + ".git/HEAD",
-                                        "text/plain",
-                                        "e".repeat(64),
-                                        41))),
+                                        new SourceCaptureFacts(now, null, null, "opaque:version"),
+                                        List.of()),
+                                EvidenceSnapshotFixtures.citation(CONTENT),
+                                List.of(new CapturedSource("context/document.md", "text/plain", "a".repeat(64), 8))),
                         new SourceCapture(
-                                new SourceKind("scm.pull-request.comments"),
+                                COMMENTS,
                                 new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND),
-                                List.of())));
-        ObjectNode snapshot = mapper.createObjectNode();
-        snapshot.set("manifest", mapper.valueToTree(manifest));
-
-        CapturedEvidence captured = CapturedEvidence.of(jobWith(snapshot), mapper);
-
-        assertThat(captured.contractVersion()).isEqualTo(ArtifactSourceCatalogRegistry.CURRENT_VERSION);
-        assertThat(captured.availableSources())
-                .containsExactlyInAnyOrder(PracticePreconditionClause.DIFF_SOURCE, RepositoryTreeContentSource.KIND);
-        assertThat(captured.artifact(PullRequestContentSource.CHANGE_FILE))
-                .isEqualTo(new CapturedEvidence.Artifact(PracticePreconditionClause.DIFF_SOURCE, "c".repeat(64)));
-        assertThat(captured.immutableIdentity(PracticePreconditionClause.DIFF_SOURCE))
-                .isEqualTo("a".repeat(40) + ":" + head);
-        assertThat(captured.pinnedHead()).isEqualTo(head);
-        assertThat(captured.reviewRange()).containsExactly("a".repeat(40), head);
-        assertThat(captured.requireArtifact(
-                                RepositoryTreeContentSource.KIND, SandboxLayout.REPO_MOUNT_RELATIVE + ".git/HEAD")
-                        .sha256())
-                .isEqualTo("e".repeat(64));
+                                EvidenceSnapshotFixtures.citation(COMMENTS),
+                                List.of())),
+                List.of(),
+                List.of(
+                                new SourceCapture(
+                                        CONTENT,
+                                        new SourceCaptureState.Available(
+                                                SourceContentState.NON_EMPTY,
+                                                SourceCompleteness.COMPLETE,
+                                                new SourceCaptureFacts(now, null, null, "opaque:version"),
+                                                List.of()),
+                                        EvidenceSnapshotFixtures.citation(CONTENT),
+                                        List.of(new CapturedSource(
+                                                "context/document.md", "text/plain", "a".repeat(64), 8))),
+                                new SourceCapture(
+                                        COMMENTS,
+                                        new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND),
+                                        EvidenceSnapshotFixtures.citation(COMMENTS),
+                                        List.of()))
+                        .stream()
+                        .flatMap(captureSource -> captureSource.files().stream()
+                                .map(captureFile -> new FolderSource(captureSource.kind(), captureFile)))
+                        .toList(),
+                List.of());
+        var capture = mapper.createObjectNode();
+        capture.set("manifest", mapper.valueToTree(manifest));
+        var job = new ReviewJob();
+        job.setCapture(capture);
+        var evidence = CapturedEvidence.of(job, mapper);
+        assertThat(evidence.contractVersion()).isEqualTo(ClasspathSourceCatalogRegistry.CURRENT_VERSION);
+        assertThat(evidence.availableSources()).containsExactly(CONTENT);
+        assertThat(evidence.requireFile(CONTENT, "context/document.md"))
+                .isEqualTo(new CapturedEvidence.FileProof(CONTENT, "a".repeat(64)));
+        assertThatThrownBy(() -> evidence.requireFile(COMMENTS, "context/document.md"))
+                .isInstanceOf(JobDeliveryException.class);
+        assertThatThrownBy(() -> evidence.requireFile(CONTENT, "context/missing.md"))
+                .isInstanceOf(JobDeliveryException.class);
     }
 
     @Test
-    void shouldRefuseASnapshotWhoseManifestThisRuntimeCannotRead() {
-        ObjectNode snapshot = mapper.createObjectNode();
-        snapshot.putObject("manifest").put("contractVersion", "1.3.0").putArray("sources");
-
-        assertThatThrownBy(() -> CapturedEvidence.of(jobWith(snapshot), mapper))
-                .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("not a readable manifest");
-    }
-
-    @Test
-    void shouldRefuseAnArtifactClaimedByTwoSources() {
-        ObjectNode snapshot = EvidenceSnapshotFixtures.snapshot(mapper);
-        EvidenceSnapshotFixtures.artifact(
-                snapshot,
-                EvidenceSnapshotFixtures.availableSource(snapshot, "scm.pull-request.core", null),
-                "context/shared.json",
-                "a".repeat(64));
-        EvidenceSnapshotFixtures.artifact(
-                snapshot,
-                EvidenceSnapshotFixtures.availableSource(snapshot, "scm.pull-request.comments", null),
-                "context/shared.json",
-                "b".repeat(64));
-
-        assertThatThrownBy(() -> CapturedEvidence.of(jobWith(snapshot), mapper))
-                .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("not a readable manifest");
-    }
-
-    @Test
-    void shouldRefuseAMisattributedArtifactWhileNamingTheSource() {
-        ObjectNode snapshot = EvidenceSnapshotFixtures.snapshot(mapper);
-        EvidenceSnapshotFixtures.artifact(
-                snapshot,
-                EvidenceSnapshotFixtures.availableSource(snapshot, "scm.pull-request.core", null),
-                SandboxLayout.REPO_MOUNT_RELATIVE + ".git/HEAD",
-                "a".repeat(64));
-        CapturedEvidence captured = CapturedEvidence.of(jobWith(snapshot), mapper);
-
-        assertThatThrownBy(() -> captured.requireArtifact(
-                        RepositoryTreeContentSource.KIND, SandboxLayout.REPO_MOUNT_RELATIVE + ".git/HEAD"))
-                .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("scm.repository.tree");
-        assertThatThrownBy(captured::pinnedHead)
-                .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("no pinned commit identity");
-    }
-
-    @Test
-    void shouldReadTheReviewRangeFromTheChangeTheDiffSourcePinned() {
-        String base = "a".repeat(40);
-        String head = "b".repeat(40);
-        ObjectNode snapshot = EvidenceSnapshotFixtures.snapshot(mapper);
-        EvidenceSnapshotFixtures.artifact(
-                snapshot,
-                EvidenceSnapshotFixtures.availableSource(
-                        snapshot, PracticePreconditionClause.DIFF_SOURCE.value(), base + ":" + head),
-                PullRequestContentSource.CHANGE_FILE,
-                "c".repeat(64));
-
-        assertThat(CapturedEvidence.of(jobWith(snapshot), mapper).reviewRange()).containsExactly(base, head);
-    }
-
-    @Test
-    void shouldRefuseAReviewRangeWhenNoChangeWasCaptured() {
-        ObjectNode snapshot = EvidenceSnapshotFixtures.snapshot(mapper);
-        ObjectNode diff = EvidenceSnapshotFixtures.availableSource(
-                snapshot, PracticePreconditionClause.DIFF_SOURCE.value(), "a".repeat(40) + ":" + "b".repeat(40));
-        EvidenceSnapshotFixtures.unavailable(snapshot, diff);
-
-        assertThatThrownBy(() -> CapturedEvidence.of(jobWith(snapshot), mapper).reviewRange())
-                .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("no pinned base and head");
-    }
-
-    @Test
-    void shouldRefuseAReviewRangeThatIsNotTwoCommitIds() {
-        List<@Nullable String> identities = new ArrayList<>();
-        identities.add("b".repeat(40));
-        identities.add("a".repeat(40) + ":" + "not-a-sha");
-        identities.add("x:y:z");
-        identities.add(null);
-        for (@Nullable String identity : identities) {
-            ObjectNode snapshot = EvidenceSnapshotFixtures.snapshot(mapper);
-            EvidenceSnapshotFixtures.artifact(
-                    snapshot,
-                    EvidenceSnapshotFixtures.availableSource(
-                            snapshot, PracticePreconditionClause.DIFF_SOURCE.value(), identity),
-                    PullRequestContentSource.CHANGE_FILE,
-                    "c".repeat(64));
-
-            assertThatThrownBy(
-                            () -> CapturedEvidence.of(jobWith(snapshot), mapper).reviewRange())
-                    .as("identity=%s", identity)
-                    .isInstanceOf(JobDeliveryException.class)
-                    .hasMessageContaining("no pinned base and head");
-        }
+    void refusesAnAttemptWithoutItsCapturedManifest() {
+        assertThatThrownBy(() -> CapturedEvidence.of(new ReviewJob(), mapper)).isInstanceOf(JobDeliveryException.class);
     }
 }

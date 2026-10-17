@@ -22,17 +22,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * Self-reports this worker's liveness into {@code worker_registry} on a timer.
- *
- * <p>The heartbeat must come from the JVM that actually executes jobs, never from the WSS control
- * channel: a worker can lose WSS while still running jobs, and orphaning those would double-execute
- * them. Only "this executor is gone" is a safe trigger for {@link AgentJobZombieSweeper} to hand a
- * RUNNING job to a sibling.
- *
- * <p>Manually scheduled rather than {@code @Scheduled}, because {@code @EnableScheduling} is server-role
- * only and this bean runs on worker pods.
- */
+// Heartbeats must come from the executing JVM; a lost WSS connection does not mean the worker stopped.
 @Component
 @ConditionalOnWorkerRole
 @ConditionalOnBooleanProperty(RuntimeRole.AGENT_ENABLED_PROPERTY)
@@ -67,7 +57,7 @@ public class WorkerLivenessReporter {
                 .register(meterRegistry);
     }
 
-    /** Must stay ordered ahead of {@code AgentJobExecutor.start()}, or its first claim looks orphaned. */
+    // Publish liveness before the first claim, or the sweeper can mistake it for an orphan.
     @EventListener(ApplicationReadyEvent.class)
     @Order(1)
     public void start() {
@@ -114,6 +104,6 @@ public class WorkerLivenessReporter {
         // Deliberately do NOT delete the registry row: drain is best-effort, so a job may still be
         // RUNNING, and deleting the row would orphan it into an immediate re-run by a sibling. Stopping
         // the heartbeat instead lets the lease expire, which recovers only genuinely-unfinished jobs.
-        // AgentJobZombieSweeper purges the row afterwards.
+        // ReviewJobZombieSweeper purges the row afterwards.
     }
 }

@@ -1,22 +1,33 @@
 import { assert, describe, expect, it } from "vitest";
 
-import { branchOutcome, silentNotMet, stageCounts } from "./lineage-chain";
+import type { ReviewBoundFeedback } from "@/api/types.gen";
+
+import { branchOutcome, lineageRecords, silentNotMet, stageCounts } from "./lineage-chain";
 import {
-	LINEAGE_FB,
-	LINEAGE_OBS,
+	EARLIER_REVIEW_ID,
+	LINEAGE_FEEDBACK,
+	LINEAGE_RESULT,
+	LINEAGE_REVIEW_ID,
+	lineageFeedbackFocus,
+	lineageProblemFocus,
+	lineageResultFocus,
 	wholeReview,
-	wholeReviewStartedByMerge,
 } from "./lineage-fixtures";
-import { lineageStateCase } from "./lineage-state-fixtures";
-import { mergeNote, parseTraceFocus, reviewMoments, traceStepKey, tracedBy } from "./review-trace";
+import { lineageStateCase, richReviewFixture } from "./lineage-state-fixtures";
+import { reviewStepState } from "./lineage-story";
+import { chainReview, ownResults, parseTraceFocus, traceStepKey, tracedBy } from "./review-trace";
+
+const whole = lineageRecords(wholeReview);
+const stateRecords = (key: string) => lineageRecords(lineageStateCase(key).lineage);
 
 describe("the record a review's page opens on", () => {
 	it("reads back what it writes", () => {
 		for (const focus of [
 			{ kind: "work" as const },
-			{ kind: "observations" as const },
-			{ kind: "observation" as const, id: LINEAGE_OBS.cache404 },
-			{ kind: "feedback" as const, id: LINEAGE_FB.card },
+			{ kind: "results" as const },
+			{ kind: "end" as const },
+			{ kind: "result" as const, id: LINEAGE_RESULT.cache404 },
+			{ kind: "feedback" as const, id: LINEAGE_FEEDBACK.onGitHub },
 		]) {
 			expect(parseTraceFocus(traceStepKey(focus))).toStrictEqual(focus);
 		}
@@ -24,157 +35,200 @@ describe("the record a review's page opens on", () => {
 
 	it("drops a value it cannot pin", () => {
 		expect(parseTraceFocus("review:1")).toBeUndefined();
-		expect(parseTraceFocus("observation:")).toBeUndefined();
+		expect(parseTraceFocus("moment:MERGED-1")).toBeUndefined();
+		expect(parseTraceFocus("result:")).toBeUndefined();
 		expect(parseTraceFocus(undefined)).toBeUndefined();
 	});
 });
 
+describe("the review a chain tells", () => {
+	it("is the review that recorded the record the graph was asked for", () => {
+		for (const lineage of [
+			wholeReview,
+			lineageResultFocus,
+			lineageProblemFocus,
+			lineageFeedbackFocus,
+		]) {
+			expect(chainReview(lineageRecords(lineage))?.id).toBe(LINEAGE_REVIEW_ID);
+		}
+	});
+
+	it("is none once the review's record is gone", () => {
+		expect(chainReview(stateRecords("record-gone"))).toBeUndefined();
+	});
+
+	it("leaves out a result an earlier review recorded", () => {
+		const records = stateRecords("answered-earlier");
+		const earlier = records.results.filter((result) => result.reviewId === EARLIER_REVIEW_ID);
+		expect(earlier.length).toBeGreaterThan(0);
+		expect(ownResults(records)).toHaveLength(records.results.length - earlier.length);
+	});
+});
+
 describe("the path a pinned node draws strong", () => {
-	it("runs from an observation to the feedback written from it", () => {
-		expect(tracedBy(wholeReview, { kind: "observation", id: LINEAGE_OBS.cache404 })).toStrictEqual({
-			observations: new Set([LINEAGE_OBS.cache404]),
-			feedback: new Set([LINEAGE_FB.onGitHub, LINEAGE_FB.card, LINEAGE_FB.afterMerge]),
+	it("keeps the rich review detail and trace on the same result and problem basis", () => {
+		const records = lineageRecords(richReviewFixture.lineage);
+		expect(records.results.map((result) => result.id)).toStrictEqual(
+			richReviewFixture.results.map((result) => result.id),
+		);
+		for (const detail of richReviewFixture.feedback) {
+			const linked = records.feedback.find((entry) => entry.id === detail.id);
+			assert(linked !== undefined);
+			expect(linked.basis).toStrictEqual([...new Set(detail.basis.map((basis) => basis.resultId))]);
+			const problemBasis = detail.basis.filter((basis) => basis.problemId !== null);
+			expect(linked.problemBasis).toStrictEqual(problemBasis.map((basis) => basis.problemId));
+			for (const basis of detail.basis) {
+				expect(richReviewFixture.resultsById.get(basis.resultId)?.id).toBe(basis.result.id);
+			}
+			for (const basis of problemBasis) {
+				assert(basis.problemId !== null);
+				expect(richReviewFixture.problemsById.get(basis.problemId)?.resultId).toBe(basis.resultId);
+			}
+		}
+		const { runtime } = richReviewFixture.review;
+		assert(runtime !== null);
+		const [run] = runtime.jobs;
+		assert(run !== undefined);
+		assert(run.startedAt !== null);
+		assert(run.completedAt !== null);
+		for (const result of richReviewFixture.results) {
+			expect(result.recordedAt.getTime()).toBeGreaterThanOrEqual(run.startedAt.getTime());
+			expect(result.recordedAt.getTime()).toBeLessThanOrEqual(run.completedAt.getTime());
+		}
+	});
+
+	it("keeps a problem-specific basis separate from its owning result and sibling problems", () => {
+		const problem = wholeReview.nodes.find((node) => node.problem !== null);
+		assert(problem !== undefined);
+		assert(problem.problem !== null);
+		const linked = lineageRecords({
+			...wholeReview,
+			edges: [
+				...wholeReview.edges,
+				{ from: problem.id, to: `feedback:${LINEAGE_FEEDBACK.onGitHub}`, relation: "BASIS" },
+				{ from: "problem:absent", to: `feedback:${LINEAGE_FEEDBACK.onGitHub}`, relation: "BASIS" },
+			],
+		});
+		expect(
+			linked.feedback.find((entry) => entry.id === LINEAGE_FEEDBACK.onGitHub)?.problemBasis,
+		).toStrictEqual([problem.problem.id]);
+		expect(
+			linked.feedback.find((entry) => entry.id === LINEAGE_FEEDBACK.praise)?.problemBasis,
+		).toStrictEqual([]);
+		expect(
+			linked.feedback.find((entry) => entry.id === LINEAGE_FEEDBACK.onGitHub)?.basis,
+		).toStrictEqual(whole.feedback.find((entry) => entry.id === LINEAGE_FEEDBACK.onGitHub)?.basis);
+	});
+
+	it("runs from a result to the feedback written from it", () => {
+		const traced = tracedBy(whole, { kind: "result", id: LINEAGE_RESULT.cache404 });
+		expect(traced?.results).toStrictEqual(new Set([LINEAGE_RESULT.cache404]));
+		expect(traced?.feedback.has(LINEAGE_FEEDBACK.onGitHub)).toBe(true);
+		expect(traced?.feedback.has(LINEAGE_FEEDBACK.withdrawn)).toBe(true);
+		expect(traced?.feedback.has(LINEAGE_FEEDBACK.praise)).toBe(false);
+	});
+
+	it("runs from a piece of feedback to every result it rests on", () => {
+		expect(tracedBy(whole, { kind: "feedback", id: LINEAGE_FEEDBACK.onGitHub })).toStrictEqual({
+			results: new Set([LINEAGE_RESULT.cache404, LINEAGE_RESULT.testNames]),
+			feedback: new Set([LINEAGE_FEEDBACK.onGitHub]),
 		});
 	});
 
-	it("leaves out what another review wrote when the review is pinned", () => {
-		const traced = tracedBy(wholeReview, { kind: "review" });
-		expect(traced?.feedback.has(LINEAGE_FB.earlier)).toBe(false);
-		expect(traced?.feedback.has(LINEAGE_FB.card)).toBe(true);
+	it("leaves out what another review recorded when the review is pinned", () => {
+		const records = stateRecords("answered-earlier");
+		const traced = tracedBy(records, { kind: "review" });
+		for (const result of records.results) {
+			expect(traced?.results.has(result.id)).toBe(result.reviewId !== EARLIER_REVIEW_ID);
+		}
 	});
 
 	it("dims nothing for the work", () => {
-		expect(tracedBy(wholeReview, { kind: "work" })).toBeUndefined();
+		expect(tracedBy(whole, { kind: "work" })).toBeUndefined();
 	});
 });
 
-describe("the merge and the review", () => {
-	it("says a review the merge started is by design", () => {
-		expect(mergeNote(wholeReviewStartedByMerge)).toStrictEqual({
-			tone: "by-design",
-			text: "The merge started this review. Practices that look at a merge run then by design. 1 piece of feedback was withheld as already merged.",
-		});
-	});
-
-	it("says a review that ran into the merge is a problem", () => {
-		expect(mergeNote(wholeReview)).toStrictEqual({
-			tone: "problem",
-			text: "The work merged while this review ran, 1 h 16 min after it started. 1 piece of feedback was withheld as already merged.",
-		});
-	});
-
-	it("lists what started the review, a push folded into it, the merge, and its end in order", () => {
-		expect(reviewMoments(wholeReview)).toMatchObject([
-			{ kind: "moment", moment: { kind: "READY", startedReview: true } },
-			{ kind: "review-started" },
-			{ kind: "moment", moment: { kind: "PUSHED", joinedReview: true } },
-			{ kind: "moment", moment: { kind: "MERGED" } },
-			{ kind: "review-finished" },
-		]);
-	});
-
-	it("tells a merge while the review waited in the queue from one while it ran", () => {
-		expect(mergeNote(lineageStateCase("merged-in-queue").lineage)?.text).toBe(
-			"The work merged while this review waited in the queue, 8 min before it started. 1 piece of feedback was withheld as already merged.",
-		);
-		expect(mergeNote(lineageStateCase("merged-before").lineage)?.text).toMatch(
-			/^The work merged 1 h 25 min before this review was asked for\./u,
-		);
-		expect(mergeNote(lineageStateCase("merged-after").lineage)?.tone).toBe("plain");
-		expect(mergeNote(lineageStateCase("never-merged").lineage)).toBeUndefined();
-	});
-
-	it("counts only a merge moment that started the review as the review's start", () => {
-		expect(mergeNote(lineageStateCase("merged-during").lineage)?.tone).toBe("problem");
-	});
-});
-
-function outcomes(key: string): string[] {
-	return lineageStateCase(key).lineage.feedback.map(
-		(entry) => branchOutcome(entry, undefined).text,
-	);
+function stepOf(key: string) {
+	const entry = lineageStateCase(key);
+	const review = chainReview(lineageRecords(entry.lineage));
+	assert(review !== undefined);
+	return reviewStepState(review, entry.review);
 }
 
+describe("the review's step", () => {
+	it("tells a withheld practice by its recorded reason, never as a review that saw nothing", () => {
+		const step = stepOf("withheld-practice");
+		expect(step.title).toBe("Review complete");
+		expect(step.assessedNothing).toMatch(/^2 practices were withheld with a recorded reason/u);
+		expect(step.assessedNothing).not.toMatch(/evidence/u);
+	});
+
+	it("says why a failed review stopped", () => {
+		const failed = stepOf("failed");
+		expect(failed.title).toBe("Review failed");
+		expect(failed.note).toBe("Running the review failed.");
+		expect(stepOf("timed-out").note).toBe("It ran past the time it is allowed and was stopped.");
+	});
+
+	it("gives an empty complete review, a failed one and a cancelled one distinct labels", () => {
+		const labels = ["empty", "failed", "cancelled"].map((key) => stepOf(key).def.label);
+		expect(new Set(labels).size).toBe(labels.length);
+		expect(stepOf("empty").assessedNothing).toBe(
+			"The review ran to the end and recorded no result.",
+		);
+	});
+});
+
+const piece = (overrides: Partial<ReviewBoundFeedback>): ReviewBoundFeedback => ({
+	id: "5e5e0009-0000-4000-8000-000000000001",
+	destination: "ON_WORK",
+	state: "DELIVERED",
+	deliveredAt: new Date("2026-07-28T13:41:30Z"),
+	withdrawn: false,
+	...overrides,
+});
+
 describe("what became of a piece of feedback", () => {
-	it("names an admin's decision and a withdrawal before the stored state", () => {
-		expect(outcomes("decisions")).toStrictEqual([
-			"Awaiting approval",
-			"Delivered on GitHub",
+	it("names an admin's withdrawal before the stored state", () => {
+		expect(branchOutcome(piece({ withdrawn: true }), undefined)).toMatchObject({
+			text: "Withdrawn by an admin",
+			kind: "withheld",
+		});
+		expect(branchOutcome(piece({ state: "REJECTED" }), undefined).text).toBe(
 			"Rejected by an admin",
-			"Withdrawn by an admin",
-		]);
+		);
 	});
 
 	it("says a withdrawn piece was delivered only where a delivery is recorded", () => {
-		const withdrawn = lineageStateCase("decisions").lineage.feedback.find(
-			(entry) => entry.withdrawnAt !== undefined,
-		);
-		assert(withdrawn?.deliveredAt !== undefined);
-		expect(branchOutcome(withdrawn, undefined).detail).toMatch(
+		expect(branchOutcome(piece({ withdrawn: true }), undefined).detail).toMatch(
 			/^Delivered .+, then taken off them\.$/u,
 		);
-		const prepared = { ...withdrawn, deliveryState: "PREPARED" as const, deliveredAt: undefined };
-		expect(branchOutcome(prepared, undefined)).toMatchObject({
-			text: "Withdrawn by an admin",
-			detail: "Taken back before it reached the developer.",
-		});
+		expect(
+			branchOutcome(piece({ withdrawn: true, state: "READY", deliveredAt: null }), undefined)
+				.detail,
+		).toBe("Taken back before it reached the developer.");
 	});
 
-	it("says a card was shown before it was withheld", () => {
-		expect(outcomes("shown-then-withheld")).toStrictEqual([
-			"Delivered, later withheld: no longer covered",
-		]);
+	it("says a piece was delivered before it was withheld", () => {
+		expect(branchOutcome(piece({ state: "WITHHELD" }), undefined).text).toBe(
+			"Delivered, later withheld",
+		);
 	});
 
-	it("dates a replaced piece by the piece that replaced it", () => {
-		const [, replaced] = lineageStateCase("replaced").lineage.feedback;
-		assert(replaced?.deliveryState === "SUPERSEDED");
-		expect(branchOutcome(replaced, undefined).at).toStrictEqual(replaced.replacedAt);
-	});
-
-	it("has a short reason for every withholding reason", () => {
-		expect(outcomes("withholding-families")).toStrictEqual([
-			"Withheld: work closed",
-			"Withheld: over the volume limit",
-			"Withheld: developer opted out",
-			"Withheld: observation marked incorrect",
-			"Withheld: near duplicate",
-		]);
+	it("tells a replaced piece apart from a lost one", () => {
+		expect(branchOutcome(piece({ state: "REPLACED" }), undefined).kind).toBe("replaced");
 	});
 });
 
 describe("what the chain lost", () => {
-	it("counts a not-met observation with no feedback of its own review, and nothing met", () => {
-		expect(silentNotMet(lineageStateCase("not-met-silent").lineage)).toHaveLength(1);
-		expect(silentNotMet(lineageStateCase("later-review-wrote").lineage)).toHaveLength(1);
+	it("counts a not-met result with no feedback, and nothing met", () => {
+		expect(silentNotMet(stateRecords("not-met-silent"))).toHaveLength(1);
 	});
 
-	it("counts only the feedback the review itself wrote", () => {
-		const counts = stageCounts(wholeReview);
-		const own = wholeReview.feedback.filter((entry) => entry.agentJobId === wholeReview.review?.id);
-		expect(own.length).toBeLessThan(wholeReview.feedback.length);
-		expect(counts.feedback).toBe(own.length);
-	});
-
-	it("keeps omitted chain records separate from the selected review's listed records", () => {
-		const lineage = { ...wholeReview, moreObservations: 9, moreFeedback: 7 };
-		const counts = stageCounts(lineage);
-		expect(counts.feedback).toBe(
-			wholeReview.feedback.filter((entry) => entry.agentJobId === wholeReview.review?.id).length,
-		);
-		expect(counts.observations).toBe(
-			wholeReview.observations.filter((entry) => entry.agentJobId === wholeReview.review?.id)
-				.length,
-		);
-	});
-
-	it("counts an answer apart from work that resolved it", () => {
-		expect(stageCounts(lineageStateCase("responses").lineage)).toStrictEqual({
-			observations: 3,
-			feedback: 8,
-			reached: 7,
-			answered: 5,
-			resolvedByWork: 1,
-		});
+	it("counts every piece the graph holds and those that reached the developer", () => {
+		const counts = stageCounts(whole);
+		expect(counts.results).toBe(whole.results.length);
+		expect(counts.feedback).toBe(whole.feedback.length);
+		expect(counts.reached).toBeLessThan(counts.feedback);
 	});
 });

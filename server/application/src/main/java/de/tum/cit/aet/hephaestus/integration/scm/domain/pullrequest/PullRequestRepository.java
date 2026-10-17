@@ -104,14 +104,14 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
 
     /**
      * Finds a pull request by ID with all associations needed by the practice review gate.
-     * <p>
-     * Eagerly fetches labels, assignees, repository, author, and mergedBy in a single query.
-     * The gate requires labels, assignees (step 6: assignee gate),
-     * and repository (step 3: workspace resolution). Author and mergedBy are needed by
-     * {@link de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload.PullRequestData#from(PullRequest)}
+     *
+     * <p>Eagerly fetches labels, assignees, repository, author, and mergedBy in a single query. The
+     * gate requires labels, assignees (step 6: assignee gate), and repository (step 3: workspace
+     * resolution). Author and mergedBy are needed by {@link
+     * de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload.PullRequestData#from(PullRequest)}
      * for the ReviewSubmitted path.
-     * <p>
-     * Uses {@code DISTINCT} because the Cartesian product of two {@code @ManyToMany} collections
+     *
+     * <p>Uses {@code DISTINCT} because the Cartesian product of two {@code @ManyToMany} collections
      * (labels × assignees) produces duplicate root rows that Hibernate de-duplicates.
      *
      * @param id the pull request ID
@@ -162,18 +162,16 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
      * pull request's own repository. A review names a candidate by its bare number, which only this
      * repository's issue can own.
      */
-    @Query("SELECT DISTINCT i FROM PullRequest p JOIN p.closingIssues i LEFT JOIN FETCH i.labels "
-            + "WHERE p.id = :id AND i.repository = p.repository ORDER BY i.number")
+    @Query(
+            "SELECT DISTINCT i FROM PullRequest p JOIN p.closingIssues i LEFT JOIN FETCH i.labels WHERE p.id = :id AND i.repository = p.repository ORDER BY i.number")
     List<Issue> findClosingIssuesById(@Param("id") Long id);
 
-    @Query("SELECT DISTINCT i.id FROM PullRequest p JOIN p.closingIssues i "
-            + "WHERE p.id = :id AND i.repository = p.repository ORDER BY i.id")
+    @Query(
+            "SELECT DISTINCT i.id FROM PullRequest p JOIN p.closingIssues i WHERE p.id = :id AND i.repository = p.repository ORDER BY i.id")
     List<Long> findClosingIssueIdsById(@Param("id") Long id);
 
-    @Query("SELECT DISTINCT p.id FROM PullRequest p JOIN p.closingIssues i "
-            + "WHERE i.id = :issueId AND i.repository = p.repository "
-            + "AND p.state = de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue$State.MERGED "
-            + "ORDER BY p.id")
+    @Query(
+            "SELECT DISTINCT p.id FROM PullRequest p JOIN p.closingIssues i WHERE i.id = :issueId AND i.repository = p.repository AND p.state = de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue$State.MERGED ORDER BY p.id")
     List<Long> findMergedClosingPullRequestIdsByIssueId(@Param("issueId") Long issueId);
 
     /** How many rows {@link #findClosingIssuesById} would return, without loading them. */
@@ -205,8 +203,8 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
      * @param pageable the cap (newest N) — caller supplies {@code PageRequest.of(0, cap)}
      * @return newest-first pull requests for the repository
      */
-    @Query("SELECT p FROM PullRequest p LEFT JOIN FETCH p.author LEFT JOIN FETCH p.milestone "
-            + "WHERE p.repository.id = :repositoryId AND p.deletedAt IS NULL ORDER BY p.number DESC")
+    @Query(
+            "SELECT p FROM PullRequest p LEFT JOIN FETCH p.author LEFT JOIN FETCH p.milestone WHERE p.repository.id = :repositoryId AND p.deletedAt IS NULL ORDER BY p.number DESC")
     List<PullRequest> findPullRequestInventoryByRepositoryId(
             @Param("repositoryId") long repositoryId, Pageable pageable);
 

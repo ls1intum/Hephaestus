@@ -1,18 +1,25 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
 import {
+	assignMemberRoleMutation,
 	getAllTeamsOptions,
-	getUsersWithTeamsOptions,
+	getOwnMembershipQueryKey,
 	getUsersWithTeamsQueryKey,
-	updateMemberVisibilityMutation,
+	listMembershipsOptions,
+	listMembershipsQueryKey,
+	setMemberHiddenMutation,
 } from "@/api/@tanstack/react-query.gen";
-import { adaptApiUserTeams } from "@/components/admin/members/user-teams";
+import type { WorkspaceMembership } from "@/api/types.gen";
+import {
+	WORKSPACE_ROLE_LABELS,
+	workspaceMemberRows,
+} from "@/components/admin/members/workspace-members";
 import { WorkspaceMembersPage } from "@/components/admin/members/WorkspaceMembersPage";
 import type { WorkspaceMembersTableView } from "@/components/admin/members/WorkspaceMembersTable";
+import { accountName } from "@/components/admin/users/account-labels";
 import { NoWorkspace } from "@/components/common/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { workspaceAdminHead } from "@/lib/page-title";
@@ -23,8 +30,8 @@ import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-ref
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/members")({
 	head: workspaceAdminHead("Members"),
 	validateSearch: z.object({
-		q: z.string().max(200).optional().catch(undefined),
-		team: z.string().optional().catch(undefined),
+		q: z.coerce.string().max(200).optional().catch(undefined),
+		team: z.coerce.string().optional().catch(undefined),
 		sort: z.enum(["name", "username"]).optional().catch(undefined),
 		desc: z
 			.union([z.boolean(), z.enum(["true", "false"]).transform((value) => value === "true")])
@@ -49,15 +56,29 @@ function AdminMembersContainer() {
 		error: workspaceError,
 	} = useActiveWorkspaceSlug();
 
-	// The members are the page; the teams are only the filter's options, read and retried on their own.
-	const usersQueryOptions = getUsersWithTeamsOptions({
+	const view: WorkspaceMembersTableView = {
+		q: search.q ?? "",
+		team: search.team ?? "all",
+		sort: search.sort ?? "name",
+		desc: search.desc ?? false,
+		page: search.page ?? 0,
+		size: search.size ?? 10,
+	};
+	const membersQueryOptions = listMembershipsOptions({
 		path: { workspaceSlug: workspaceSlug ?? "" },
+		query: {
+			q: hasText(view.q.trim()) ? view.q.trim() : undefined,
+			team: view.team === "all" ? undefined : view.team,
+			page: view.page,
+			size: view.size,
+			sort: [`${view.sort},${view.desc ? "desc" : "asc"}`],
+		},
 	});
-	const usersQuery = useQuery({
-		...usersQueryOptions,
-		enabled: Boolean(workspaceSlug) && (usersQueryOptions.enabled ?? true),
+	const membersQuery = useQuery({
+		...membersQueryOptions,
+		enabled: hasText(workspaceSlug),
 	});
-	useQueryReadRefusal(usersQueryOptions.queryKey, usersQuery.isError, usersQuery.error);
+	useQueryReadRefusal(membersQueryOptions.queryKey, membersQuery.isError, membersQuery.error);
 
 	const teamsQueryOptions = getAllTeamsOptions({
 		path: { workspaceSlug: workspaceSlug ?? "" },
@@ -69,65 +90,61 @@ function AdminMembersContainer() {
 	useQueryReadRefusal(teamsQueryOptions.queryKey, teamsQuery.isError, teamsQuery.error);
 
 	const queryClient = useQueryClient();
+	const membersKey = listMembershipsQueryKey({
+		path: { workspaceSlug: workspaceSlug ?? "" },
+	});
 	const toggleHidden = useMutation({
-		...updateMemberVisibilityMutation(),
+		...setMemberHiddenMutation(),
 		onSuccess: (_data, variables) => {
+			void queryClient.invalidateQueries({ queryKey: membersKey });
 			void queryClient.invalidateQueries({
 				queryKey: getUsersWithTeamsQueryKey({
 					path: { workspaceSlug: variables.path.workspaceSlug },
 				}),
 			});
 		},
-		onError: (error, variables) => {
+		onError: (error) => {
 			toast.error("We could not update visibility in workspace activity", {
-				description: `${problemDetailOf(error)} ${inWorkspace(variables.path.workspaceSlug)}`,
+				description: problemDetailOf(error),
 			});
 		},
 	});
+	const assignRole = useMutation({
+		...assignMemberRoleMutation(),
+		onSuccess: (updated) => {
+			toast.success(
+				`${accountName(updated.account)}’s role is now ${WORKSPACE_ROLE_LABELS[updated.role]}`,
+			);
+			void queryClient.invalidateQueries({ queryKey: membersKey });
+			// The admin may have changed their own role, which the navigation and guards read.
+			void queryClient.invalidateQueries({
+				queryKey: getOwnMembershipQueryKey({ path: { workspaceSlug: workspaceSlug ?? "" } }),
+			});
+		},
+		onError: (error) => {
+			toast.error("We could not change the role", { description: problemDetailOf(error) });
+		},
+	});
 
-	const handleToggleHidden = (userId: number, hidden: boolean) => {
+	const { mutate: changeHidden } = toggleHidden;
+	const { mutate: changeRole } = assignRole;
+	const handleToggleHidden = (accountId: string, hidden: boolean) => {
 		if (!hasText(workspaceSlug)) {
 			return;
 		}
-		toggleHidden.mutate({
-			path: { workspaceSlug, userId },
-			query: { hidden },
-		});
+		changeHidden({ path: { workspaceSlug, accountId }, body: { hidden } });
 	};
 
-	const users = (usersQuery.data?.map(adaptApiUserTeams) ?? [])
-		.map((user) => ({
-			...user,
-			teams: [...user.teams].sort((a, b) => a.name.localeCompare(b.name)),
-		}))
-		.sort((a, b) => a.user.name.localeCompare(b.user.name));
-	// A failed read offers no options: what it last returned is not what the reader may see now.
-	const teams = teamsQuery.isError
-		? []
-		: [...(teamsQuery.data ?? [])].sort((a, b) => a.name.localeCompare(b.name));
-	const isLoading = isWorkspaceLoading || usersQuery.isLoading;
-	// Only a team list that loaded can say the address names no team; until then its team still
-	// narrows the members, by the teams each member carries.
-	const teamUnknown =
-		hasText(search.team) &&
-		teamsQuery.isSuccess &&
-		!teamsQuery.isFetching &&
-		!teams.some((team) => team.id.toString() === search.team);
-	const selectedTeam = hasText(search.team) && !teamUnknown ? search.team : "all";
-	const view: WorkspaceMembersTableView = {
-		q: search.q ?? "",
-		team: selectedTeam,
-		sort: search.sort ?? "name",
-		desc: search.desc ?? false,
-		page: search.page ?? 0,
-		size: search.size ?? 10,
-	};
-
-	useEffect(() => {
-		if (teamUnknown) {
-			void navigate({ search: (previous) => ({ ...previous, team: undefined }), replace: true });
+	const handleRoleChange = (accountId: string, role: WorkspaceMembership["role"]) => {
+		if (!hasText(workspaceSlug)) {
+			return;
 		}
-	}, [navigate, teamUnknown]);
+		changeRole({ path: { workspaceSlug }, body: { accountId, role } });
+	};
+
+	const teams = teamsQuery.isError ? [] : (teamsQuery.data ?? []);
+	const members = workspaceMemberRows(membersQuery.data?.content ?? []);
+	const isLoading = isWorkspaceLoading || membersQuery.isPending;
 
 	if (!hasText(workspaceSlug) && !isWorkspaceLoading) {
 		return <NoWorkspace />;
@@ -135,12 +152,14 @@ function AdminMembersContainer() {
 
 	return (
 		<WorkspaceMembersPage
-			users={users}
+			members={members}
+			rowCount={membersQuery.data?.totalElements ?? 0}
 			teams={teams}
 			isLoading={isLoading || !hasText(workspaceSlug)}
-			error={workspaceError ?? usersQuery.error}
+			error={workspaceError ?? membersQuery.error}
 			onRetry={() => {
-				void usersQuery.refetch();
+				void membersQuery.refetch();
+				void teamsQuery.refetch();
 			}}
 			teamsError={teamsQuery.error}
 			teamsRetrying={teamsQuery.isFetching}
@@ -148,6 +167,8 @@ function AdminMembersContainer() {
 				void teamsQuery.refetch();
 			}}
 			onToggleHidden={handleToggleHidden}
+			onRoleChange={handleRoleChange}
+			pendingRoleAccountId={assignRole.isPending ? assignRole.variables.body.accountId : undefined}
 			view={view}
 			onViewChange={(patch) => {
 				void navigate({
@@ -190,8 +211,4 @@ function AdminMembersContainer() {
 			)}
 		/>
 	);
-}
-
-function inWorkspace(workspaceSlug: string): string {
-	return `In workspace ${workspaceSlug}.`;
 }

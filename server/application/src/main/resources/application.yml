@@ -118,6 +118,9 @@ spring:
     # reverted as the framework default in #24249). The cold-start overlap it bought is not worth that
     # footgun, so we keep bootstrap synchronous on the main thread for every profile.
     data:
+        web:
+            pageable:
+                max-page-size: 100
         jpa:
             repositories:
                 bootstrap-mode: default
@@ -549,30 +552,39 @@ hephaestus:
         # practices may make n times these model calls and output tokens (never less than three
         # practices' worth). The binding's timeout is only the safety ceiling of the whole run.
         practice-model-calls: ${PRACTICE_REVIEW_PRACTICE_MODEL_CALLS:12}
+        practice-concurrency: ${PRACTICE_REVIEW_PRACTICE_CONCURRENCY:3}
         practice-output-tokens: ${PRACTICE_REVIEW_PRACTICE_OUTPUT_TOKENS:16000}
-        # Fleet-wide limits on backfill campaigns (ReviewBackfillProperties). max-window and
-        # max-artifacts are the spend guard rails: a campaign wider than either is refused at preflight,
+        # The tokens, input and output together, that the direct model calls of one review attempt's practice
+        # programs may spend on all their slots: a sublimit of the attempt. The review session's own calls do
+        # not count against it. The proxy refuses further direct calls after this sum.
+        direct-model-tokens-per-attempt: ${PRACTICE_REVIEW_DIRECT_MODEL_TOKENS_PER_ATTEMPT:200000}
+        # The search units that the direct reranking calls of one review attempt may bill, for providers such
+        # as Cohere that bill search units instead of tokens. The proxy refuses further direct calls after
+        # this sum.
+        direct-model-search-units-per-attempt: ${PRACTICE_REVIEW_DIRECT_MODEL_SEARCH_UNITS_PER_ATTEMPT:1000}
+        # Fleet-wide limits on review batches (ReviewBatchProperties). max-window and
+        # max-items are the spend guard rails: a batch wider than either is refused at preflight,
         # before anything is confirmed and before anything is paid for.
         backfill:
-            # artifacts one driver tick offers to the review path; bounds how far a campaign can
+            # Items one driver tick offers to the review path; bounds how far a batch can
             # overshoot a budget cap it crosses mid-batch
             batch-size: ${PRACTICE_REVIEW_BACKFILL_BATCH_SIZE:25}
             max-window: ${PRACTICE_REVIEW_BACKFILL_MAX_WINDOW:400d}
-            max-artifacts: ${PRACTICE_REVIEW_BACKFILL_MAX_ARTIFACTS:5000}
+            max-items: ${PRACTICE_REVIEW_BACKFILL_MAX_ITEMS:5000}
             # how far back the estimator looks for completed reviews to price a new campaign from
             cost-history-window: ${PRACTICE_REVIEW_BACKFILL_COST_HISTORY_WINDOW:90d}
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # SIGNAL LEDGER (SignalLedgerProperties)
+    # ITEM EVENT LEDGER (ItemEventLedgerProperties)
     # ═══════════════════════════════════════════════════════════════════════════
-    # The pending-signal reaper: what happens to a signal the review gate refused. The blockers are
+    # The pending-event reaper: what happens to an event the review gate refused. The blockers are
     # operator actions (re-activate a workspace, re-point a binding, wait for a budget month to roll
     # over), so the retry interval is a human timescale — retrying fast only multiplies the refusal.
-    # A signal still refused after pending-lapse-after is retired rather than re-offered for ever.
-    signal-ledger:
-        pending-retry-after: ${SIGNAL_LEDGER_PENDING_RETRY_AFTER:1h}
-        pending-lapse-after: ${SIGNAL_LEDGER_PENDING_LAPSE_AFTER:7d}
-        sweep-batch-size: ${SIGNAL_LEDGER_SWEEP_BATCH_SIZE:200}
+    # An event still refused after pending-lapse-after expires.
+    item-event-ledger:
+        pending-retry-after: ${ITEM_EVENT_LEDGER_PENDING_RETRY_AFTER:1h}
+        pending-lapse-after: ${ITEM_EVENT_LEDGER_PENDING_LAPSE_AFTER:7d}
+        sweep-batch-size: ${ITEM_EVENT_LEDGER_SWEEP_BATCH_SIZE:200}
 
 
     sandbox:

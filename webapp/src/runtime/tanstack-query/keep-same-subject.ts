@@ -2,10 +2,13 @@ import { isRecord } from "@/lib/is-record";
 
 /** The part of a generated query key that says whose data, and of which kinds, a read is. */
 interface SubjectKey {
-	queryKey: readonly [{ path?: { workspaceSlug?: string; userId?: number }; query?: object }];
+	queryKey: readonly [
+		{ _id?: string; path?: { workspaceSlug?: string; userId?: number }; query?: object },
+	];
 }
 
 interface Subject {
+	operation?: string;
 	workspaceSlug: string;
 	userId?: number;
 	login?: string;
@@ -21,6 +24,7 @@ interface Subject {
  * repositories' or category's never do, and the region shows its skeleton instead.
  */
 export function keepSameSubject({
+	operation,
 	workspaceSlug,
 	userId,
 	login,
@@ -33,6 +37,7 @@ export function keepSameSubject({
 		const key = previousQuery?.queryKey[0];
 		const query = isRecord(key?.query) ? key.query : {};
 		const same =
+			(operation === undefined || key?._id === operation) &&
 			key?.path?.workspaceSlug === workspaceSlug &&
 			key.path.userId === userId &&
 			query.login === login &&

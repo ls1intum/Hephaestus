@@ -1,0 +1,5 @@
+{
+	"type": "link_problem",
+	"problemId": "bbbbbbbb-cccc-dddd-eeee-ffffffffffff",
+	"text": "The retry on line 42 swallows the IOException; log it before you retry."
+}

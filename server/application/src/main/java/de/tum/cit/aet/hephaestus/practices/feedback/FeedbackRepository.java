@@ -1,1167 +1,135 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheckStage;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackChecks;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
-@Repository
-@WorkspaceAgnostic("Feedback is scoped by a raw workspace_id scalar (cross-module FK), not a Workspace association")
-public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
+@Transactional
+public interface FeedbackRepository extends JpaRepository<Feedback, UUID>, JpaSpecificationExecutor<Feedback> {
+
+    Optional<Feedback> findByIdAndWorkspaceId(UUID id, long workspaceId);
+
+    List<Feedback> findByWorkspaceIdAndReviewIdOrderByCreatedAtAscIdAsc(long workspaceId, UUID reviewId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT f FROM Feedback f WHERE f.id = :id AND f.workspaceId = :workspaceId")
-    Optional<Feedback> lockByIdAndWorkspaceId(@Param("id") UUID id, @Param("workspaceId") Long workspaceId);
-
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Transactional
-    @Query(
-            value = "UPDATE feedback SET delivery_state = :targetState WHERE id = :id AND workspace_id = :workspaceId "
-                    + "AND delivery_state = 'AWAITING_APPROVAL'",
-            nativeQuery = true)
-    int decideProposal(
-            @Param("workspaceId") Long workspaceId, @Param("id") UUID id, @Param("targetState") String targetState);
-
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query(
-            value = "UPDATE feedback SET delivery_state = 'SUPPRESSED', suppression_reason = :reason "
-                    + "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state = 'AWAITING_APPROVAL'",
-            nativeQuery = true)
-    int suppressProposal(@Param("workspaceId") Long workspaceId, @Param("id") UUID id, @Param("reason") String reason);
-
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Transactional
-    @Query(
-            value =
-                    "UPDATE feedback SET delivery_state = 'DELIVERED', delivered_at = CURRENT_TIMESTAMP, suppression_reason = NULL "
-                            + "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state IN ('PREPARED', 'PARTIALLY_DELIVERED')",
-            nativeQuery = true)
-    int markApprovedDelivered(@Param("workspaceId") Long workspaceId, @Param("id") UUID id);
-
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Transactional
-    @Query(
-            value =
-                    "UPDATE feedback SET delivery_state = 'PARTIALLY_DELIVERED', suppression_reason = :reason "
-                            + "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state IN ('PREPARED', 'PARTIALLY_DELIVERED')",
-            nativeQuery = true)
-    int markApprovedPartiallyDelivered(
-            @Param("workspaceId") Long workspaceId, @Param("id") UUID id, @Param("reason") @Nullable String reason);
-
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Transactional
-    @Query(
-            value = "UPDATE feedback SET delivery_state = 'SUPPRESSED', suppression_reason = :reason "
-                    + "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state = 'PREPARED'",
-            nativeQuery = true)
-    int markApprovedSuppressed(
-            @Param("workspaceId") Long workspaceId, @Param("id") UUID id, @Param("reason") String reason);
+    Optional<Feedback> lockByIdAndWorkspaceId(@Param("id") UUID id, @Param("workspaceId") long workspaceId);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Transactional
-    @Query(
-            value =
-                    "UPDATE feedback SET delivery_state = 'FAILED', suppression_reason = NULL "
-                            + "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state IN ('PREPARED', 'PARTIALLY_DELIVERED')",
-            nativeQuery = true)
-    int markApprovedFailed(@Param("workspaceId") Long workspaceId, @Param("id") UUID id);
+    @Query("""
+        UPDATE Feedback f SET f.state = :state, f.stopReason = :reason,
+            f.deliveredAt = :deliveredAt WHERE f.id = :id AND f.workspaceId = :workspaceId
+        """)
+    int updateDelivery(
+            @Param("workspaceId") long workspaceId,
+            @Param("id") UUID id,
+            @Param("state") FeedbackState state,
+            @Param("reason") @Nullable FeedbackStopReason reason,
+            @Param("deliveredAt") @Nullable Instant deliveredAt);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Transactional
-    @Query(
-            value =
-                    "UPDATE feedback SET delivery_state = 'PARTIALLY_FAILED', suppression_reason = NULL "
-                            + "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state IN ('PREPARED', 'PARTIALLY_DELIVERED')",
-            nativeQuery = true)
-    int markApprovedPartiallyFailed(@Param("workspaceId") Long workspaceId, @Param("id") UUID id);
-
-    /** Idempotency guard for the ledger recorder: has this job already recorded this unit? */
-    boolean existsByAgentJobIdAndPosition(UUID agentJobId, Integer position);
-
-    Optional<Feedback> findByAgentJobIdAndPositionAndWorkspaceId(UUID agentJobId, Integer position, Long workspaceId);
-
-    Optional<Feedback> findByIdAndWorkspaceId(UUID id, Long workspaceId);
-
-    Optional<Feedback> findByIdAndWorkspaceIdAndRecipientUserIdAndDeliveryState(
-            UUID id, Long workspaceId, Long recipientUserId, FeedbackDeliveryState deliveryState);
-
-    /**
-     * Feedback counted by delivery state, one column per {@link FeedbackDeliveryState} value, as native select
-     * columns over {@code f}, so each count matches the operator feedback list filtered to that one state.
-     */
-    String STATE_COUNTS = """
-               COUNT(*) FILTER (WHERE f.delivery_state = 'AWAITING_APPROVAL') AS "awaitingApproval",
-               COUNT(*) FILTER (WHERE f.delivery_state = 'PREPARED') AS "prepared",
-               COUNT(*) FILTER (WHERE f.delivery_state = 'PARTIALLY_DELIVERED') AS "partiallyDelivered",
-               COUNT(*) FILTER (WHERE f.delivery_state = 'PARTIALLY_FAILED') AS "partiallyFailed",
-               COUNT(*) FILTER (WHERE f.delivery_state = 'DELIVERED') AS "delivered",
-               COUNT(*) FILTER (WHERE f.delivery_state = 'SUPERSEDED') AS "superseded",
-               COUNT(*) FILTER (WHERE f.delivery_state = 'SUPPRESSED') AS "suppressed",
-               COUNT(*) FILTER (WHERE f.delivery_state = 'FAILED') AS "failed",
-               COUNT(*) FILTER (WHERE f.delivery_state = 'DISCARDED') AS "discarded",
-               COUNT(*) FILTER (WHERE f.delivery_state = 'UNCONFIRMED') AS "unconfirmed"
-        """;
-
-    /**
-     * Feedback {@code f} joined to each observation {@code o} of its workspace it is bound to, in any role: the one
-     * definition of which practices a piece of feedback belongs to, shared by the per-practice counts and the practice
-     * filter of the operator feedback list so that a practice's count and its filtered list agree.
-     */
-    String WITH_BOUND_OBSERVATIONS = """
-            FROM feedback f
-            JOIN feedback_observation fo ON fo.feedback_id = f.id
-            JOIN observation o ON o.id = fo.observation_id AND o.workspace_id = f.workspace_id
-        """;
-
-    /** Feedback created in {@code [from, to)}, the window the operator feedback list filters by. */
-    String CREATED_IN_RANGE = """
-          AND f.created_at >= :from
-          AND f.created_at < :to
-        """;
-
-    @Query(value = "SELECT f.agent_job_id AS \"jobId\"," + STATE_COUNTS + """
-        FROM feedback f
-        WHERE f.workspace_id = :workspaceId
-          AND f.agent_job_id IN :jobIds
-        GROUP BY f.agent_job_id
-        """, nativeQuery = true)
-    List<ReviewFeedbackCounts> summarizeReviewFeedback(
-            @Param("workspaceId") Long workspaceId, @Param("jobIds") Collection<UUID> jobIds);
-
-    /**
-     * Feedback created in {@code [from, to)} by the time bucket it was created in, numbered from 1 as
-     * {@link de.tum.cit.aet.hephaestus.core.time.TimeBuckets#epochSeconds()} describes; buckets without feedback have
-     * no row.
-     */
-    @Query(value = """
-        SELECT width_bucket(extract(epoch from f.created_at), CAST(:starts AS bigint[])) AS "bucket",
-               COUNT(*) AS "total",
-        """ + STATE_COUNTS + """
-        FROM feedback f
-        WHERE f.workspace_id = :workspaceId
-        """ + CREATED_IN_RANGE + """
-        GROUP BY 1
-        """, nativeQuery = true)
-    List<BucketFeedbackCounts> summarizeFeedbackByBucket(
-            @Param("workspaceId") Long workspaceId,
-            @Param("from") Instant from,
-            @Param("to") Instant to,
-            @Param("starts") Long[] starts);
-
-    /**
-     * Feedback created in {@code [from, to)} by the practice of any observation it is bound to, in any role. One
-     * piece of feedback fusing several observations of a practice has a join row for each, so the derived table
-     * keeps one row per practice and piece of feedback; fusing observations of two practices, it counts for both.
-     */
-    @Query(
-            value = "SELECT f.practice_id AS \"practiceId\"," + STATE_COUNTS + """
-        FROM (
-            SELECT DISTINCT o.practice_id, f.id, f.delivery_state
-        """ + WITH_BOUND_OBSERVATIONS + """
-            WHERE f.workspace_id = :workspaceId
-        """
-                    + CREATED_IN_RANGE + """
-        ) f
-        GROUP BY f.practice_id
-        """,
-            nativeQuery = true)
-    List<PracticeFeedbackCounts> summarizeFeedbackByPractice(
-            @Param("workspaceId") Long workspaceId, @Param("from") Instant from, @Param("to") Instant to);
-
-    /** Feedback bound to each of these observations, in any role; an observation without feedback has no row. */
-    @Query(value = "SELECT fo.observation_id AS \"observationId\"," + STATE_COUNTS + """
-        FROM feedback_observation fo
-        JOIN feedback f ON f.id = fo.feedback_id
-        WHERE fo.observation_id IN :observationIds
-          AND f.workspace_id = :workspaceId
-        GROUP BY fo.observation_id
-        """, nativeQuery = true)
-    List<ObservationFeedbackCounts> summarizeFeedbackByObservation(
-            @Param("workspaceId") Long workspaceId, @Param("observationIds") Collection<UUID> observationIds);
-
-    /** How many pieces of feedback each run delivered to one developer and has not withdrawn. */
-    @Query(value = """
-        SELECT f.agent_job_id AS "jobId", COUNT(*) AS "delivered"
-        FROM feedback f
-        WHERE f.workspace_id = :workspaceId
-          AND f.recipient_user_id = :recipientUserId
-          AND f.agent_job_id IN :jobIds
-          AND f.delivery_state = 'DELIVERED'
-          AND NOT EXISTS (
-              SELECT 1 FROM feedback_withdrawal w
-              WHERE w.feedback_id = f.id AND w.workspace_id = f.workspace_id AND w.restored_at IS NULL)
-        GROUP BY f.agent_job_id
-        """, nativeQuery = true)
-    List<DeliveredFeedbackCount> countDeliveredByRun(
-            @Param("workspaceId") Long workspaceId,
-            @Param("recipientUserId") Long recipientUserId,
-            @Param("jobIds") Collection<UUID> jobIds);
-
-    interface DeliveredFeedbackCount {
-        UUID getJobId();
-
-        Long getDelivered();
-    }
-
-    /** The columns of {@link #STATE_COUNTS}. */
-    interface FeedbackStateCounts {
-        Long getAwaitingApproval();
-
-        Long getPrepared();
-
-        Long getPartiallyDelivered();
-
-        Long getPartiallyFailed();
-
-        Long getDelivered();
-
-        Long getSuperseded();
-
-        Long getSuppressed();
-
-        Long getFailed();
-
-        Long getDiscarded();
-
-        Long getUnconfirmed();
-    }
-
-    interface ReviewFeedbackCounts extends FeedbackStateCounts {
-        UUID getJobId();
-    }
-
-    interface BucketFeedbackCounts extends FeedbackStateCounts {
-        Integer getBucket();
-
-        Long getTotal();
-    }
-
-    interface PracticeFeedbackCounts extends FeedbackStateCounts {
-        Long getPracticeId();
-    }
-
-    interface ObservationFeedbackCounts extends FeedbackStateCounts {
-        UUID getObservationId();
-    }
-
-    /**
-     * The words of the summary last posted on a piece of work for one person, while they are still what the provider
-     * shows. "Last" is the order in which confirmed summary placements were recorded, since an approved note can be
-     * created long before it is posted; a summary still standing may have had line notes fail beside it. There are no
-     * words to compare when that summary no longer stands, or while any observation it cites is invalidated or
-     * restored without its posted copy settled back, because a correction edits the posted copy and keeps the stored
-     * body. An older summary is never used instead.
-     */
-    @Query(value = """
-        SELECT f.body FROM feedback f
-        WHERE f.id = (
-                SELECT placement.feedback_id FROM feedback_placement placement
-                JOIN feedback posted ON posted.id = placement.feedback_id
-                WHERE posted.workspace_id = :workspaceId
-                  AND posted.recipient_user_id = :recipientUserId
-                  AND posted.artifact_kind = :artifactKind
-                  AND posted.artifact_id = :artifactId
-                  AND posted.channel = 'IN_CONTEXT'
-                  AND placement.placement_type = 'SUMMARY'
-                  AND placement.posted_comment_ref IS NOT NULL
-                ORDER BY placement.created_at DESC, placement.id DESC
-                LIMIT 1)
-          AND f.delivery_state IN ('DELIVERED', 'PARTIALLY_DELIVERED', 'PARTIALLY_FAILED')
-          AND f.body IS NOT NULL
-          AND NOT EXISTS (
-                SELECT 1 FROM feedback_observation fo
-                JOIN observation_invalidation oi
-                  ON oi.observation_id = fo.observation_id AND oi.workspace_id = f.workspace_id
-                WHERE fo.feedback_id = f.id
-                  AND (oi.restored_at IS NULL OR oi.provider_copy NOT IN ('UPDATED', 'NONE')))
-        """, nativeQuery = true)
-    Optional<String> findLatestDeliveredNote(
+    @Query("""
+        UPDATE Feedback f SET f.state = :delivered, f.deliveredAt = :readAt
+         WHERE f.id = :id AND f.workspaceId = :workspaceId AND f.developerId = :developerId
+           AND f.destination = :destination AND f.state = :ready AND f.deliveredAt IS NULL
+        """)
+    int recordFirstRead(
             @Param("workspaceId") long workspaceId,
-            @Param("recipientUserId") long recipientUserId,
-            @Param("artifactKind") String artifactKind,
-            @Param("artifactId") long artifactId);
+            @Param("id") UUID id,
+            @Param("developerId") long developerId,
+            @Param("readAt") Instant readAt,
+            @Param("destination") FeedbackDestination destination,
+            @Param("ready") FeedbackState ready,
+            @Param("delivered") FeedbackState delivered);
 
-    /**
-     * Feedback said to its recipient: delivered, or delivered on the work with a recorded publication and later
-     * replaced by newer feedback. Replaced feedback without a recorded publication on the work is not history.
-     */
-    String SAID_TO_RECIPIENT = """
-        (f.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.DELIVERED
-         OR (f.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.SUPERSEDED
-             AND f.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.IN_CONTEXT
-             AND f.deliveredAt IS NOT NULL
-             AND EXISTS (
-                 SELECT p.id FROM FeedbackPlacement p
-                 WHERE p.feedbackId = f.id
-                   AND p.placementType IN (
-                       de.tum.cit.aet.hephaestus.practices.feedback.PlacementType.SUMMARY,
-                       de.tum.cit.aet.hephaestus.practices.feedback.PlacementType.INLINE,
-                       de.tum.cit.aet.hephaestus.practices.feedback.PlacementType.LOCATION_COMMENT)
-                   AND p.postedCommentRef IS NOT NULL AND TRIM(p.postedCommentRef) <> '')))
-        """;
-
-    /** Everything said to one person, without a review history window, newest first. */
-    @Query("SELECT f FROM Feedback f WHERE f.workspaceId = :workspaceId AND f.recipientUserId = :recipientUserId AND "
-            + SAID_TO_RECIPIENT
-            + " ORDER BY f.createdAt DESC, f.id DESC")
-    List<Feedback> findDeliveredForPersonHistory(
-            @Param("workspaceId") Long workspaceId, @Param("recipientUserId") Long recipientUserId);
-
-    @Query("SELECT f FROM Feedback f WHERE f.workspaceId = :workspaceId AND f.recipientUserId = :recipientUserId "
-            + "AND f.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.IN_CONTEXT "
-            + "AND f.artifactKind = :artifactKind AND f.artifactId = :artifactId AND "
-            + SAID_TO_RECIPIENT
-            + " ORDER BY f.createdAt DESC, f.id DESC")
-    List<Feedback> findDeliveredForPublicWorkHistory(
-            @Param("workspaceId") long workspaceId,
-            @Param("recipientUserId") long recipientUserId,
-            @Param("artifactKind") ArtifactKind artifactKind,
-            @Param("artifactId") long artifactId);
-
-    /** One row of that history, by the id a review cites. */
-    @Query("SELECT f FROM Feedback f WHERE f.id = :id AND f.workspaceId = :workspaceId AND " + SAID_TO_RECIPIENT)
-    Optional<Feedback> findPersonHistoryRecord(@Param("id") UUID id, @Param("workspaceId") long workspaceId);
-
-    /** {@link #findPersonHistoryRecord} for several ids at once. */
-    @Query("SELECT f FROM Feedback f WHERE f.id IN :ids AND f.workspaceId = :workspaceId AND " + SAID_TO_RECIPIENT)
-    List<Feedback> findPersonHistoryRecords(@Param("ids") Collection<UUID> ids, @Param("workspaceId") long workspaceId);
-
-    /** Delivered summary and inline-only feedback for a recipient, newest first. */
-    @Query("""
-        SELECT f FROM Feedback f
-        WHERE f.workspaceId = :workspaceId
-          AND f.recipientUserId = :recipientUserId
-          AND f.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.DELIVERED
-          AND f.createdAt >= :since
-        ORDER BY f.createdAt DESC
-        """)
-    List<Feedback> findRecentDeliveredForRecipient(
-            @Param("workspaceId") Long workspaceId,
-            @Param("recipientUserId") Long recipientUserId,
-            @Param("since") Instant since,
-            Pageable pageable);
-
-    /**
-     * The recipient's feedback since {@code since} that could have reached them, newest first: delivered in
-     * whole or part, a recorded failed delivery, or an unread card on their practice pages. Proposals, withheld
-     * and replaced units are the operator's to see. The body is loaded only for delivered units off the chat
-     * surface: a conversational unit's body is the composer's private notes to the mentor, never the words of a
-     * turn. Pass the last row's {@code createdAt} and {@code id} to read the next page; a write between pages
-     * cannot shift it.
-     */
-    @Query("""
-        SELECT f.id AS id, f.agentJobId AS agentJobId, f.channel AS channel, f.deliveryState AS deliveryState,
-               f.artifactKind AS artifactKind, f.artifactId AS artifactId,
-               f.createdAt AS createdAt, f.deliveredAt AS deliveredAt,
-               CASE WHEN f.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.DELIVERED
-                         AND f.channel <> de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.IN_CHAT
-                    THEN f.body END AS body
-        FROM Feedback f
-        WHERE f.workspaceId = :workspaceId
-          AND f.recipientUserId = :recipientUserId
-          AND f.createdAt >= :since
-          AND (f.deliveryState IN (
-                  de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.DELIVERED,
-                  de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.PARTIALLY_DELIVERED,
-                  de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.PARTIALLY_FAILED,
-                  de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.FAILED)
-              OR (f.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.IN_APP
-                  AND f.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.PREPARED))
-          AND (CAST(:beforeCreatedAt AS Instant) IS NULL
-              OR f.createdAt < :beforeCreatedAt
-              OR (f.createdAt = :beforeCreatedAt AND f.id < :beforeId))
-        ORDER BY f.createdAt DESC, f.id DESC
-        """)
-    List<RecipientFeedbackRow> findRecentReceivableForRecipient(
-            @Param("workspaceId") Long workspaceId,
-            @Param("recipientUserId") Long recipientUserId,
-            @Param("since") Instant since,
-            @Param("beforeCreatedAt") @Nullable Instant beforeCreatedAt,
-            @Param("beforeId") @Nullable UUID beforeId,
-            Pageable pageable);
-
-    interface RecipientFeedbackRow {
-        UUID getId();
-
-        UUID getAgentJobId();
-
-        FeedbackChannel getChannel();
-
-        FeedbackDeliveryState getDeliveryState();
-
-        @Nullable
-        ArtifactKind getArtifactKind();
-
-        @Nullable
-        Long getArtifactId();
-
-        Instant getCreatedAt();
-
-        @Nullable
-        Instant getDeliveredAt();
-
-        @Nullable
-        String getBody();
-    }
-
-    /**
-     * Everything already composed for a recipient that they have not received yet — every lane, newest
-     * first.
-     *
-     * <p>Deliberately not filtered by {@code createdAt}: a queued message is queued however long ago it
-     * was written, and a window that hid the old ones would let composition write a second message about
-     * a practice whose first message is still waiting to be read.
-     */
-    @Query("""
-        SELECT f FROM Feedback f
-        WHERE f.workspaceId = :workspaceId
-          AND f.recipientUserId = :recipientUserId
-          AND f.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.PREPARED
-        ORDER BY f.createdAt DESC
-        """)
-    List<Feedback> findPreparedForRecipient(
-            @Param("workspaceId") Long workspaceId, @Param("recipientUserId") Long recipientUserId, Pageable pageable);
-
-    /**
-     * Retires an open in-app card when a newer card about the same practice is prepared (compare-and-set).
-     * Separately posted public comments retain their own delivery records. The state predicate makes concurrent
-     * retries idempotent, and {@link #markSuperseded} is its twin for feedback still queued.
-     *
-     * @return {@code 1} when this caller retired it, {@code 0} when it was not delivered
-     */
-    @Modifying(flushAutomatically = true)
-    @Transactional
-    @Query(
-            value = "UPDATE feedback SET delivery_state = 'SUPERSEDED' "
-                    + "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state = 'DELIVERED'",
-            nativeQuery = true)
-    int supersedeDelivered(@Param("workspaceId") Long workspaceId, @Param("id") UUID id);
-
-    /**
-     * Finds the newest row regardless of delivery state so callers can distinguish a delivered row
-     * from one already superseded. Thread keys group related feedback, not unique PREPARED items.
-     * Recipient and workspace predicates enforce isolation independently of the key's hash.
-     */
     @Query(value = """
-        SELECT f.id FROM feedback f
-        WHERE f.workspace_id = :workspaceId
-          AND f.recipient_user_id = :recipientUserId
-          AND f.channel = :channel
-          AND f.thread_key = :threadKey
+        SELECT f.* FROM feedback f WHERE f.workspace_id = :workspaceId AND f.developer_id IN (:developerIds)
+          AND f.destination = 'PRACTICE_PAGE' AND f.state IN ('READY','DELIVERED')
         ORDER BY f.created_at DESC, f.id DESC
-        LIMIT 1
         """, nativeQuery = true)
-    Optional<UUID> findLatestOnThread(
-            @Param("workspaceId") Long workspaceId,
-            @Param("recipientUserId") Long recipientUserId,
-            @Param("channel") String channel,
-            @Param("threadKey") String threadKey);
+    List<Feedback> findReadablePracticePage(
+            @Param("workspaceId") long workspaceId, @Param("developerIds") Collection<Long> developerIds);
 
-    /**
-     * Atomically retires a selected PREPARED row without overwriting a concurrent delivery.
-     * Native because {@link Feedback} is {@code @Immutable}.
-     *
-     * @return 1 if retired, 0 if absent or no longer PREPARED
-     */
-    @Modifying(flushAutomatically = true)
-    @Transactional
-    @Query(
-            value = "UPDATE feedback SET delivery_state = 'SUPERSEDED' "
-                    + "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state = 'PREPARED'",
-            nativeQuery = true)
-    int markSuperseded(@Param("workspaceId") Long workspaceId, @Param("id") UUID id);
-
-    @Modifying(flushAutomatically = true)
-    @Transactional
-    @Query(
-            value = "UPDATE feedback SET delivery_state = 'SUPERSEDED' "
-                    + "WHERE workspace_id = :workspaceId AND thread_key = :threadKey AND id <> :keepId "
-                    + "AND delivery_state = 'AWAITING_APPROVAL'",
-            nativeQuery = true)
-    int supersedeUndecidedProposals(
-            @Param("workspaceId") Long workspaceId, @Param("threadKey") String threadKey, @Param("keepId") UUID keepId);
-
-    /**
-     * Whether a unit has been received. Asked only after a supersession compare-and-set matched nothing,
-     * to tell "the recipient read it first" — a thread that continues, so the replacement still points
-     * back at what it follows — from "the thread already moved on", where pointing back would fork the
-     * chain onto a row some other run has already claimed.
-     *
-     * <p>Native and by primary key so it reads the row rather than the persistence context, which still
-     * holds the pre-CAS state.
-     */
-    @Query(
-            value = "SELECT EXISTS (SELECT 1 FROM feedback f "
-                    + "WHERE f.id = :id AND f.workspace_id = :workspaceId AND f.delivery_state = 'DELIVERED')",
-            nativeQuery = true)
-    boolean isDelivered(@Param("workspaceId") Long workspaceId, @Param("id") UUID id);
-
-    /**
-     * The practice each of these units is about, read off its headline observation.
-     *
-     * <p>Staged onto {@code prepared.json} so a composer choosing to replace a queued message can tell
-     * <em>which practice</em> each queued message is about. Without it the thread keys on that file are
-     * opaque digests and the composer would be picking one blind — and on the conversation lane, whose
-     * body is composed at the turn, there is not even a body to guess from.
-     *
-     * <p>Both sides of the join carry {@code workspaceId}: the unit's own scalar and the practice behind
-     * the observation. One predicate is the tenancy boundary for one table, and this query spans two.
-     */
-    @Query("""
-        SELECT fo.feedback.id AS feedbackId, fo.observation.practice.slug AS practiceSlug
-        FROM FeedbackObservation fo
-        WHERE fo.feedback.id IN :feedbackIds
-          AND fo.feedback.workspaceId = :workspaceId
-          AND fo.observation.practice.workspace.id = :workspaceId
-          AND fo.role = de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole.PRIMARY
-          AND fo.ordinal = 0
-        """)
-    List<HeadlinePracticeRow> findHeadlinePractices(
-            @Param("workspaceId") Long workspaceId, @Param("feedbackIds") Collection<UUID> feedbackIds);
-
-    interface HeadlinePracticeRow {
-        UUID getFeedbackId();
-
-        String getPracticeSlug();
-    }
-
-    /**
-     * A workspace purge soft-deletes rather than dropping rows, so it never fires the RESTRICT FK on
-     * {@code feedback}; without this, feedback and its CASCADE children would persist indefinitely.
-     */
-    @Modifying
-    @Transactional
-    @Query("DELETE FROM Feedback f WHERE f.workspaceId = :workspaceId")
-    void deleteAllByWorkspaceId(@Param("workspaceId") Long workspaceId);
-
-    // Each erasure method below hard-deletes feedback for one workspace + artifact-kind scope. DB
-    // ON DELETE CASCADE clears feedback_observation/feedback_placement/feedback_reaction; the predicates keep
-    // every other tenant's and kind's rows untouched. Bulk JPQL delete, since the @Immutable entity forbids
-    // an ORM remove.
-
-    /**
-     * Erases {@code chat.conversation_thread} feedback by {@code artifact_id}, invoked through
-     * {@link ConversationFeedbackErasure} when a channel's consent is
-     * withdrawn.
-     *
-     * @return the number of pieces of feedback deleted
-     */
-    @Modifying
-    @Transactional
-    @Query("""
-        DELETE FROM Feedback f
-        WHERE f.workspaceId = :workspaceId
-          AND f.artifactKind = :artifactKind
-          AND f.artifactId IN :artifactIds
-        """)
-    int deleteFeedbackOfKind(
-            @Param("workspaceId") Long workspaceId,
-            @Param("artifactKind") ArtifactKind artifactKind,
-            @Param("artifactIds") Collection<Long> artifactIds);
-
-    default int deleteConversationThreadFeedback(Long workspaceId, Collection<Long> artifactIds) {
-        return deleteFeedbackOfKind(workspaceId, ArtifactKinds.CONVERSATION_THREAD, artifactIds);
-    }
-
-    /**
-     * Erases every {@code chat.conversation_thread} piece of feedback for a workspace, invoked on app-uninstall /
-     * workspace-purge.
-     *
-     * @return the number of pieces of feedback deleted
-     */
-    @Modifying
-    @Transactional
-    @Query("""
-        DELETE FROM Feedback f
-        WHERE f.workspaceId = :workspaceId
-          AND f.artifactKind IN :artifactKinds
-        """)
-    int deleteAllFeedbackOfKinds(
-            @Param("workspaceId") Long workspaceId, @Param("artifactKinds") Collection<ArtifactKind> artifactKinds);
-
-    default int deleteAllConversationThreadFeedback(Long workspaceId) {
-        return deleteAllFeedbackOfKinds(workspaceId, List.of(ArtifactKinds.CONVERSATION_THREAD));
-    }
-
-    /**
-     * Erases every {@code scm.pull_request} / {@code scm.issue} piece of feedback for a workspace, invoked when
-     * the SCM mirror is erased. These units hold mirrored third-party content directly, so they neither
-     * cascade with the repository delete nor survive it meaningfully.
-     *
-     * @return the number of pieces of feedback deleted
-     */
-    @Modifying
-    @Transactional
-    @Query("""
-        DELETE FROM Feedback f
-        WHERE f.workspaceId = :workspaceId
-          AND f.artifactKind IN :artifactKinds
-        """)
-    int deleteAllScmFeedbackOfKinds(
-            @Param("workspaceId") Long workspaceId, @Param("artifactKinds") Collection<ArtifactKind> artifactKinds);
-
-    default int deleteAllScmArtifactFeedback(Long workspaceId) {
-        return deleteAllScmFeedbackOfKinds(workspaceId, List.of(ArtifactKinds.PULL_REQUEST, ArtifactKinds.ISSUE));
-    }
-
-    /**
-     * Erases the {@code chat.conversation_thread} feedback a person is the subject of ({@code about_user_id}),
-     * invoked through
-     * {@link de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure#eraseConversationFeedbackAboutUser}
-     * for a person opt-out / account hard-delete.
-     *
-     * @return the number of pieces of feedback deleted
-     */
-    @Modifying
-    @Transactional
-    @Query("""
-        DELETE FROM Feedback f
-        WHERE f.workspaceId = :workspaceId
-          AND f.artifactKind = :artifactKind
-          AND f.aboutUserId = :aboutUserId
-        """)
-    int deleteFeedbackOfKindAboutUser(
-            @Param("workspaceId") Long workspaceId,
-            @Param("artifactKind") ArtifactKind artifactKind,
-            @Param("aboutUserId") Long aboutUserId);
-
-    default int deleteConversationThreadFeedbackAboutUser(Long workspaceId, Long aboutUserId) {
-        return deleteFeedbackOfKindAboutUser(workspaceId, ArtifactKinds.CONVERSATION_THREAD, aboutUserId);
-    }
-
-    /**
-     * Flips a PREPARED conversational unit to DELIVERED (compare-and-set): the {@code delivery_state='PREPARED'}
-     * predicate lets exactly one of N racing mentor turns win the flip, the rest see rowcount 0.
-     *
-     * @return {@code 1} on a clean flip, {@code 0} if the unit was no longer PREPARED
-     */
-    @Modifying
-    @Transactional
-    @Query(
-            value = "UPDATE feedback SET delivery_state = 'DELIVERED', delivered_at = :at "
-                    + "WHERE id = :id AND delivery_state = 'PREPARED'",
-            nativeQuery = true)
-    int markConversationDelivered(@Param("id") UUID id, @Param("at") Instant at);
-
-    /**
-     * Flips a PREPARED conversational unit to SUPPRESSED when instance Silent Mode blocked its transport
-     * attempt; the state predicate avoids overwriting a unit another transaction already delivered.
-     */
-    @Modifying
-    @Transactional
-    @Query(
-            value = "UPDATE feedback SET delivery_state = 'SUPPRESSED', suppression_reason = 'INSTANCE_SILENCED' "
-                    + "WHERE id = :id AND delivery_state = 'PREPARED'",
-            nativeQuery = true)
-    int markConversationSuppressedBySilentMode(@Param("id") UUID id);
-
-    @Modifying
-    @Transactional
-    @Query(
-            value = "UPDATE feedback SET delivery_state = 'SUPPRESSED', suppression_reason = :reason "
-                    + "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state = 'PREPARED'",
-            nativeQuery = true)
-    int markPreparedSuppressed(
-            @Param("id") UUID id, @Param("workspaceId") Long workspaceId, @Param("reason") String reason);
-
-    /**
-     * Stops every piece of feedback citing this observation that has not reached anyone yet, as a whole: a
-     * proposal awaiting approval, prepared feedback, and the undispatched rest of a partially delivered package.
-     * Delivered feedback keeps its state, because it was delivered.
-     *
-     * @return how many pieces of feedback this call stopped
-     */
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = """
-        UPDATE feedback f
-        SET delivery_state = CASE WHEN f.delivery_state = 'PARTIALLY_DELIVERED'
-                THEN 'PARTIALLY_DELIVERED' ELSE 'SUPPRESSED' END,
-            suppression_reason = :reason
-        WHERE f.workspace_id = :workspaceId
-          AND (f.delivery_state IN ('AWAITING_APPROVAL', 'PREPARED')
-               OR (f.delivery_state = 'PARTIALLY_DELIVERED' AND f.suppression_reason IS NULL))
-          AND EXISTS (
-              SELECT 1 FROM feedback_observation fo
-              WHERE fo.feedback_id = f.id AND fo.observation_id = :observationId
-          )
+        SELECT f.* FROM feedback f WHERE f.workspace_id = :workspaceId AND f.developer_id = :developerId
+          AND f.destination = 'PRACTICE_PAGE' AND f.state IN ('READY','DELIVERED')
+          AND EXISTS(SELECT 1 FROM feedback_basis b JOIN result r ON r.id = b.result_id AND r.workspace_id = b.workspace_id
+            JOIN practice p ON p.id = r.practice_id AND p.workspace_id = r.workspace_id
+            WHERE b.feedback_id = f.id AND b.workspace_id = f.workspace_id AND p.slug = :practiceSlug)
+        ORDER BY f.created_at DESC, f.id DESC LIMIT 1
         """, nativeQuery = true)
-    int suppressUndeliveredCiting(
-            @Param("workspaceId") Long workspaceId,
-            @Param("observationId") UUID observationId,
-            @Param("reason") String reason);
-
-    /**
-     * Newest PREPARED conversational units for a developer (as recipient) — the mentor's queue. The body on
-     * these rows is never the mentor's script: it is null, or the composer's notes to the mentor
-     * ({@link ConversationBriefBody}), and the words of the turn are composed at delivery either way.
-     */
-    @Query("""
-        SELECT f FROM Feedback f
-        WHERE f.workspaceId = :workspaceId
-          AND f.recipientUserId = :recipientUserId
-          AND f.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.IN_CHAT
-          AND f.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.PREPARED
-        ORDER BY f.createdAt DESC
-        """)
-    List<Feedback> findRecentPreparedConversationForRecipient(
-            @Param("workspaceId") Long workspaceId, @Param("recipientUserId") Long recipientUserId, Pageable pageable);
-
-    /**
-     * Whether this exact observation was already delivered in context to the recipient.
-     */
-    @Query("""
-        SELECT (COUNT(f) > 0) FROM Feedback f, FeedbackObservation fo
-        WHERE fo.feedback = f
-          AND fo.observation.id = :observationId
-          AND f.workspaceId = :workspaceId
-          AND f.recipientUserId = :recipientUserId
-          AND f.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.IN_CONTEXT
-          AND f.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.DELIVERED
-        """)
-    boolean existsDeliveredInContextForObservation(
-            @Param("workspaceId") Long workspaceId,
-            @Param("recipientUserId") Long recipientUserId,
-            @Param("observationId") UUID observationId);
-
-    /** Distinct workspaces holding at least one PREPARED conversational unit (TTL sweep enumeration). */
-    @Query("""
-        SELECT DISTINCT f.workspaceId FROM Feedback f
-        WHERE f.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.IN_CHAT
-          AND f.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.PREPARED
-        """)
-    List<Long> findWorkspaceIdsWithPreparedConversation();
-
-    /**
-     * Ages out every PREPARED conversational unit created before {@code cutoff} to SUPPRESSED /
-     * CONVERSATION_EXPIRED (native, since the {@code @Immutable} entity forbids an ORM update).
-     *
-     * @return the number of units expired
-     */
-    @Modifying
-    @Transactional
-    @Query(
-            value = "UPDATE feedback SET delivery_state = 'SUPPRESSED', suppression_reason = 'CONVERSATION_EXPIRED' "
-                    + "WHERE workspace_id = :workspaceId AND channel = 'IN_CHAT' "
-                    + "AND delivery_state = 'PREPARED' AND created_at < :cutoff",
-            nativeQuery = true)
-    int expirePreparedConversationBefore(@Param("workspaceId") Long workspaceId, @Param("cutoff") Instant cutoff);
-
-    int BODY_PREVIEW_LENGTH = 320;
-
-    /**
-     * The {@link FeedbackLocation} of feedback {@code f}, as a native text expression: the one definition that the
-     * operator list's column, its filter and the counts by location share, so a count and its filtered list agree.
-     * The provider of work is the integration of the review that composed the feedback, which is also where
-     * {@code ReviewedWorkRefDTO#provider} comes from. A conversation's provider is the surface of the thread whose turn
-     * the feedback is linked to. {@code chk_chat_thread_surface} allows only {@code WEB} and {@code SLACK_DM}. Every
-     * subquery carries the workspace by hand, as every query on this table does.
-     */
-    String LOCATION = """
-        (CASE f.channel
-            WHEN 'IN_APP' THEN 'PRACTICE_PAGES'
-            WHEN 'IN_CONTEXT' THEN COALESCE(
-                (SELECT CASE j.integration_kind WHEN 'GITHUB' THEN 'GITHUB' WHEN 'GITLAB' THEN 'GITLAB' END
-                 FROM agent_job j WHERE j.id = f.agent_job_id AND j.workspace_id = f.workspace_id),
-                'OTHER_WORK')
-            ELSE COALESCE(
-                (SELECT CASE t.surface WHEN 'SLACK_DM' THEN 'SLACK' ELSE 'HEPH' END
-                 FROM feedback_placement fp
-                 JOIN chat_message m ON m.id = fp.chat_message_id
-                 JOIN chat_thread t ON t.id = m.thread_id AND t.workspace_id = f.workspace_id
-                 WHERE fp.feedback_id = f.id
-                 ORDER BY fp.created_at, fp.id
-                 LIMIT 1),
-                'NEXT_CONVERSATION')
-        END)""";
-
-    /**
-     * Keeps feedback bound to an observation of a practice asked for, by {@link #WITH_BOUND_OBSERVATIONS}. The
-     * subquery's own {@code f} shadows the outer one.
-     */
-    String PRACTICE_FILTER = "AND (CAST(:#{#f.practiceSlugArray()} AS text[]) IS NULL OR f.id IN (SELECT f.id"
-            + WITH_BOUND_OBSERVATIONS
-            + " JOIN practice p ON p.id = o.practice_id WHERE f.workspace_id = :workspaceId"
-            + " AND p.slug = ANY(CAST(:#{#f.practiceSlugArray()} AS text[]))))\n";
-
-    /**
-     * Keeps feedback bound to an observation of a practice in a group asked for, the same way as
-     * {@link #PRACTICE_FILTER}. The group and the practice are the feedback's own workspace's.
-     */
-    String GROUP_FILTER = "AND (CAST(:#{#f.groupSlugArray()} AS text[]) IS NULL OR f.id IN (SELECT f.id"
-            + WITH_BOUND_OBSERVATIONS
-            + " JOIN practice p ON p.id = o.practice_id"
-            + " JOIN practice_group pg ON pg.id = p.practice_group_id AND pg.workspace_id = f.workspace_id"
-            + " WHERE f.workspace_id = :workspaceId"
-            + " AND pg.slug = ANY(CAST(:#{#f.groupSlugArray()} AS text[]))))\n";
-
-    String OPERATOR_PREDICATES = """
-          AND (CAST(:#{#f.deliveryStateNames()} AS text[]) IS NULL OR f.delivery_state = ANY(CAST(:#{#f.deliveryStateNames()} AS text[])))
-          AND (CAST(:#{#f.suppressionReasonNames()} AS text[]) IS NULL OR f.suppression_reason = ANY(CAST(:#{#f.suppressionReasonNames()} AS text[])))
-          AND (CAST(:#{#f.channelNames()} AS text[]) IS NULL OR f.channel = ANY(CAST(:#{#f.channelNames()} AS text[])))
-        """ + "  AND (CAST(:#{#f.locationNames()} AS text[]) IS NULL OR " + LOCATION
-            + " = ANY(CAST(:#{#f.locationNames()} AS text[])))\n" + """
-          AND (CAST(:#{#f.agentJobId()} AS uuid) IS NULL OR f.agent_job_id = CAST(:#{#f.agentJobId()} AS uuid))
-          AND (CAST(:#{#f.observationId()} AS uuid) IS NULL OR f.id IN (SELECT fo.feedback_id
-              FROM feedback_observation fo
-              JOIN observation o ON o.id = fo.observation_id AND o.workspace_id = :workspaceId
-              WHERE fo.observation_id = CAST(:#{#f.observationId()} AS uuid)))
-          AND (CAST(:#{#f.artifactKindValue()} AS text) IS NULL OR f.artifact_kind = CAST(:#{#f.artifactKindValue()} AS text))
-          AND (CAST(:#{#f.artifactId()} AS bigint) IS NULL OR f.artifact_id = CAST(:#{#f.artifactId()} AS bigint))
-          AND (CAST(:#{#f.recipientUserId()} AS bigint) IS NULL OR f.recipient_user_id = CAST(:#{#f.recipientUserId()} AS bigint))
-          AND (CAST(:#{#f.from()} AS timestamptz) IS NULL OR f.created_at >= CAST(:#{#f.from()} AS timestamptz))
-          AND (CAST(:#{#f.to()} AS timestamptz) IS NULL OR f.created_at < CAST(:#{#f.to()} AS timestamptz))
-        """ + PRACTICE_FILTER + GROUP_FILTER;
-
-    /**
-     * The operator's page of feedback.
-     *
-     * <p><b>IN_APP bodies are never returned here.</b> {@code IN_CONTEXT} bodies are already public on
-     * the pull request and {@code IN_CHAT} bodies are NULL by construction, so for those channels "operators
-     * can read feedback bodies" exposes nothing private. A {@code IN_APP} body is the first
-     * system-authored text about a named person that lives nowhere else — and in the course deployment
-     * the workspace admin is the instructor. {@link FeedbackChannel}'s own contract says every channel is
-     * developer-facing, "never to a mentor, instructor, or grader"; handing this one to an admin would
-     * make that statement false.
-     *
-     * <p>Operators still see that the unit exists, its channel, its state, its suppression reason, its
-     * recipient and how many observations fed it — everything needed to audit whether the pipeline
-     * behaved. They do not see what it said. Withheld in the projection rather than in a mapper so a
-     * second caller cannot forget, and mirrored in {@code ReviewFeedbackQueryService#get} for the detail
-     * route. This is the reversible direction: opening it up later is a decision somebody can take;
-     * un-publishing a body an instructor has already read is not a decision at all.
-     */
-    @Query(
-            value = "SELECT f.id AS \"id\"," + " f.agent_job_id AS \"agentJobId\","
-                    + " f.artifact_kind AS \"artifactKind\","
-                    + " f.artifact_id AS \"artifactId\","
-                    + " f.recipient_user_id AS \"recipientUserId\","
-                    + " f.about_user_id AS \"aboutUserId\","
-                    + " f.channel AS \"channel\","
-                    + " f.delivery_state AS \"deliveryState\","
-                    + " f.suppression_reason AS \"suppressionReason\","
-                    + " f.replaces_id AS \"replacesId\","
-                    + " f.created_at AS \"createdAt\","
-                    + " f.delivered_at AS \"deliveredAt\","
-                    + " " + LOCATION + " AS \"location\","
-                    +
-                    // IN_APP and IN_CHAT bodies are withheld from the operator surface in SQL rather than in
-                    // a mapper, so a second projection cannot forget. One is the developer's private page, the other
-                    // is the mentor's unspoken coaching move about them; see
-                    // ReviewFeedbackQueryService#bodyVisibleToOperator. Executed against a real database by
-                    // PracticeReviewOutputControllerIntegrationTest#withholdsAnInAppBodyFromEveryOperatorRoute.
-                    " CASE WHEN f.channel IN ('IN_APP', 'IN_CHAT') THEN NULL ELSE left(f.body, "
-                    + BODY_PREVIEW_LENGTH
-                    + ") END AS \"bodyPreview\","
-                    + " (f.channel NOT IN ('IN_APP', 'IN_CHAT') AND f.body IS NOT NULL AND length(f.body) > "
-                    + BODY_PREVIEW_LENGTH
-                    + ") AS \"bodyTruncated\","
-                    + " (SELECT count(*) FROM feedback_observation fo"
-                    + " JOIN observation o ON o.id = fo.observation_id"
-                    + " JOIN practice p ON p.id = o.practice_id"
-                    + " WHERE fo.feedback_id = f.id AND p.workspace_id = f.workspace_id) AS \"observationCount\""
-                    + " FROM feedback f WHERE f.workspace_id = :workspaceId"
-                    + OPERATOR_PREDICATES
-                    + " ORDER BY CASE WHEN :oldestFirst THEN f.created_at END ASC,"
-                    + " CASE WHEN :oldestFirst THEN f.id END ASC, f.created_at DESC, f.id DESC",
-            countQuery = "SELECT count(*) FROM feedback f WHERE f.workspace_id = :workspaceId" + OPERATOR_PREDICATES,
-            nativeQuery = true)
-    Page<OperatorFeedbackRow> findForWorkspace(
-            @Param("workspaceId") Long workspaceId,
-            @Param("f") FeedbackQueryFilter filter,
-            @Param("oldestFirst") boolean oldestFirst,
-            Pageable pageable);
-
-    interface OperatorFeedbackRow {
-        UUID getId();
-
-        UUID getAgentJobId();
-
-        /**
-         * The raw column: a native-query projection is mapped from JDBC types, with no converter run. Null with
-         * {@link #getArtifactId()} for feedback that is not anchored on a piece of work.
-         */
-        @Nullable
-        String getArtifactKind();
-
-        @Nullable
-        Long getArtifactId();
-
-        Long getRecipientUserId();
-
-        Long getAboutUserId();
-
-        FeedbackChannel getChannel();
-
-        FeedbackLocation getLocation();
-
-        FeedbackDeliveryState getDeliveryState();
-
-        @Nullable
-        FeedbackSuppressionReason getSuppressionReason();
-
-        @Nullable
-        UUID getReplacesId();
-
-        Instant getCreatedAt();
-
-        @Nullable
-        Instant getDeliveredAt();
-
-        @Nullable
-        String getBodyPreview();
-
-        Boolean getBodyTruncated();
-
-        Long getObservationCount();
-    }
-
-    /** The {@link FeedbackLocation} of one piece of feedback, by {@link #LOCATION}; empty when it is not here. */
-    @Query(
-            value = "SELECT " + LOCATION + " FROM feedback f WHERE f.id = :id AND f.workspace_id = :workspaceId",
-            nativeQuery = true)
-    Optional<String> findLocation(@Param("workspaceId") Long workspaceId, @Param("id") UUID id);
-
-    /**
-     * The operator feedback list's rows under {@code filter}, counted by {@link #LOCATION} and delivery state. A
-     * location with no feedback has no row.
-     */
-    @Query(
-            value = "SELECT f.location AS \"location\"," + STATE_COUNTS + """
-        FROM (
-            SELECT
-        """ + LOCATION + """
-             AS location, f.delivery_state
-            FROM feedback f WHERE f.workspace_id = :workspaceId
-        """ + OPERATOR_PREDICATES
-                    + """
-        ) f
-        GROUP BY f.location
-        """,
-            nativeQuery = true)
-    List<LocationFeedbackCounts> summarizeForWorkspaceByLocation(
-            @Param("workspaceId") Long workspaceId, @Param("f") FeedbackQueryFilter filter);
-
-    interface LocationFeedbackCounts extends FeedbackStateCounts {
-        FeedbackLocation getLocation();
-    }
-
-    /**
-     * The operator feedback list's rows under {@code filter} that carry a suppression reason, counted by that reason,
-     * and the withheld rows that carry none as one row with a null reason, so a reader takes both from one read. Only
-     * the reason and a number leave SQL: no body, rating or comment. A reason with no feedback has no row.
-     */
-    @Query(value = """
-        SELECT f.suppression_reason AS "reason", COUNT(*) AS "count"
-        FROM feedback f WHERE f.workspace_id = :workspaceId
-            AND (f.suppression_reason IS NOT NULL OR f.delivery_state = 'SUPPRESSED')
-        """ + OPERATOR_PREDICATES + """
-        GROUP BY f.suppression_reason
-        """, nativeQuery = true)
-    List<ReasonFeedbackCount> summarizeForWorkspaceByReason(
-            @Param("workspaceId") Long workspaceId, @Param("f") FeedbackQueryFilter filter);
-
-    interface ReasonFeedbackCount {
-        /** Null for withheld feedback whose reason is not recorded. */
-        @Nullable
-        FeedbackSuppressionReason getReason();
-
-        Long getCount();
-    }
-
-    /**
-     * How much of what was measured on one artifact actually reached a person, by practice, by the run
-     * that composed it and by its recipient; a piece of feedback has one run and one recipient, so summing the
-     * groups counts it once.
-     * {@code COUNT(DISTINCT f.id)} because one piece of feedback routinely fuses several observations of the
-     * same practice; counting join rows would multiply it.
-     */
-    @Query("""
-        SELECT o.practice.id AS practiceId, f.agentJobId AS reviewId, f.recipientUserId AS recipientUserId,
-               f.deliveryState AS deliveryState, f.suppressionReason AS suppressionReason,
-               COUNT(DISTINCT f.id) AS units
-        FROM FeedbackObservation fo JOIN fo.feedback f JOIN fo.observation o
-        WHERE f.workspaceId = :workspaceId
-          AND o.artifactKind = :artifactKind
-          AND o.artifactId = :artifactId
-        GROUP BY o.practice.id, f.agentJobId, f.recipientUserId, f.deliveryState, f.suppressionReason
-        """)
-    List<ArtifactFeedbackRow> summarizeForArtifact(
-            @Param("workspaceId") Long workspaceId,
-            @Param("artifactKind") ArtifactKind artifactKind,
-            @Param("artifactId") Long artifactId);
-
-    interface ArtifactFeedbackRow {
-        Long getPracticeId();
-
-        UUID getReviewId();
-
-        Long getRecipientUserId();
-
-        FeedbackDeliveryState getDeliveryState();
-
-        @Nullable
-        FeedbackSuppressionReason getSuppressionReason();
-
-        long getUnits();
-    }
-
-    //
-    // Every query below carries `workspace_id` by hand. `feedback` is scoped by a raw scalar with no
-    // Hibernate tenancy filter (see the @WorkspaceAgnostic reason on this interface), so on this table
-    // the predicate IS the tenancy boundary — and these rows are the first genuinely private,
-    // system-authored text about a named person, so a missing one leaks more than a count.
-
-    /** {@link #READABLE_IN_APP} without the recipient, for a query that names several. */
-    String READABLE_IN_APP_ROW = """
-          AND f.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.IN_APP
-          AND f.deliveryState IN (
-              de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.PREPARED,
-              de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.DELIVERED
-          )
-        """;
-
-    /**
-     * What the recipient may read on their own practice pages, as a JPQL predicate over {@code f}: their
-     * IN_APP feedback that was prepared or already read. Suppressed and superseded rows are excluded — the
-     * operator surface is where "we withheld this, and here is why" is answered; the developer's own surface
-     * shows what was actually said to them. Binds {@code :workspaceId} and {@code :recipientUserId}.
-     */
-    String READABLE_IN_APP = """
-          f.workspaceId = :workspaceId
-          AND f.recipientUserId = :recipientUserId
-        """ + READABLE_IN_APP_ROW;
-
-    /** Everything the recipient may read on their own practice pages ({@link #READABLE_IN_APP}), newest first. */
-    @Query("SELECT f FROM Feedback f WHERE " + READABLE_IN_APP + """
-        ORDER BY f.createdAt DESC, f.id DESC
-        """)
-    List<Feedback> findReadableInAppForRecipient(
-            @Param("workspaceId") Long workspaceId, @Param("recipientUserId") Long recipientUserId);
-
-    /**
-     * {@link #findReadableInAppForRecipient} for several recipients in one query, each recipient's rows newest
-     * first. The caller passes at least one recipient.
-     */
-    @Query("SELECT f FROM Feedback f WHERE f.workspaceId = :workspaceId AND f.recipientUserId IN :recipientUserIds"
-            + READABLE_IN_APP_ROW
-            + """
-        ORDER BY f.createdAt DESC, f.id DESC
-        """)
-    List<Feedback> findReadableInAppForRecipients(
-            @Param("workspaceId") Long workspaceId, @Param("recipientUserIds") Collection<Long> recipientUserIds);
-
-    /**
-     * The readable IN_APP feedback about one practice for the recipient, newest first — the cards a new card
-     * about the same practice follows. The same "about this practice" as {@link #lastInAppSurfacedAt}: the
-     * practice the card's bound evidence measures.
-     */
-    @Query("SELECT f FROM Feedback f WHERE " + READABLE_IN_APP + """
-          AND EXISTS (
-              SELECT 1 FROM FeedbackObservation fo
-              WHERE fo.feedback = f
-                AND fo.observation.practice.slug = :practiceSlug
-                AND fo.observation.practice.workspace.id = :workspaceId
-          )
-        ORDER BY f.createdAt DESC, f.id DESC
-        """)
-    List<Feedback> findReadableInAppForPractice(
-            @Param("workspaceId") Long workspaceId,
-            @Param("recipientUserId") Long recipientUserId,
-            @Param("practiceSlug") String practiceSlug,
-            Pageable pageable);
-
-    /**
-     * The recipient's readable IN_APP feedback prepared at or after {@code since}, newest first — what the
-     * practice profile reads for a window: feedback the window's runs composed is new, and feedback prepared
-     * inside the look-back may have been resolved by the work inside the window. Readable only, because
-     * feedback the page will never show is not news; bounded by time rather than paged, because the window
-     * decides which rows matter, not their count.
-     */
-    @Query("SELECT f FROM Feedback f WHERE " + READABLE_IN_APP + """
-          AND f.createdAt >= :since
-        ORDER BY f.createdAt DESC, f.id DESC
-        """)
-    List<Feedback> findReadableInAppPreparedSince(
-            @Param("workspaceId") Long workspaceId,
-            @Param("recipientUserId") Long recipientUserId,
-            @Param("since") Instant since);
-
-    /**
-     * Takes the row lock a withdrawal takes ({@link #lockByIdAndWorkspaceId}) on every card still waiting on the
-     * recipient's practice page, in id order. A page read takes it before it reads anything, so a withdrawal either
-     * commits first and the read sees it, or waits until the cards the read shows are recorded as delivered.
-     */
-    @Query(value = """
-                    SELECT f.id FROM feedback f
-                    WHERE f.workspace_id = :workspaceId AND f.recipient_user_id = :recipientUserId
-                      AND f.channel = 'IN_APP' AND f.delivery_state = 'PREPARED'
-                    ORDER BY f.id
-                    FOR UPDATE
-                    """, nativeQuery = true)
-    List<UUID> lockPreparedInAppForRecipient(
-            @Param("workspaceId") Long workspaceId, @Param("recipientUserId") Long recipientUserId);
-
-    /**
-     * Flips PREPARED in-app feedback to DELIVERED at the moment its recipient actually reads it — one
-     * statement for the whole page (compare-and-set, so two concurrent page loads cannot both claim a flip
-     * and the second sees it in the count).
-     *
-     * <p>This lane is the only one where "delivered" is a fact we can observe rather than infer: we own
-     * the surface. Recording it at write time instead would enter text nobody opened into the ledger as
-     * received, which would quietly corrupt the one delivery measurement the system can make honestly.
-     *
-     * <p>Native because {@link Feedback} is {@code @Immutable} — the ORM cannot update it.
-     *
-     * <p>A withdrawn card is never flipped: nobody was shown it.
-     *
-     * @return how many pieces of feedback this call flipped; one that was no longer PREPARED is not counted
-     */
-    @Modifying
-    @Transactional
-    @Query(value = """
-                    UPDATE feedback f SET delivery_state = 'DELIVERED', delivered_at = :at
-                    WHERE f.id IN (:ids) AND f.workspace_id = :workspaceId AND f.channel = 'IN_APP'
-                      AND f.delivery_state = 'PREPARED'
-                      AND NOT EXISTS (
-                          SELECT 1 FROM feedback_withdrawal w
-                          WHERE w.feedback_id = f.id AND w.workspace_id = f.workspace_id AND w.restored_at IS NULL)
-                    """, nativeQuery = true)
-    int markInAppDelivered(
-            @Param("workspaceId") Long workspaceId, @Param("ids") Collection<UUID> ids, @Param("at") Instant at);
-
-    /**
-     * When an IN_APP unit about this practice was last written for this recipient, whatever became of it
-     * — the cooldown that stops one practice being restated on every pull request.
-     *
-     * <p>Deliberately unfiltered by delivery state: the question is when we last said this, and a unit
-     * that was written and then superseded still said it.
-     */
-    @Query("""
-        SELECT MAX(f.createdAt) FROM Feedback f, FeedbackObservation fo
-        WHERE fo.feedback = f
-          AND fo.observation.practice.slug = :practiceSlug
-          AND fo.observation.practice.workspace.id = :workspaceId
-          AND f.workspaceId = :workspaceId
-          AND f.recipientUserId = :recipientUserId
-          AND f.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.IN_APP
-        """)
-    Optional<Instant> lastInAppSurfacedAt(
-            @Param("workspaceId") Long workspaceId,
-            @Param("recipientUserId") Long recipientUserId,
+    List<Feedback> findLatestPracticePage(
+            @Param("workspaceId") long workspaceId,
+            @Param("developerId") long developerId,
             @Param("practiceSlug") String practiceSlug);
+
+    @WorkspaceAgnostic("Verified account absorption moves the same person across all workspaces")
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Feedback f SET f.developerId = :claimedAccountId WHERE f.developerId =" + " :unclaimedAccountId")
+    int absorbDeveloper(
+            @Param("claimedAccountId") long claimedAccountId, @Param("unclaimedAccountId") long unclaimedAccountId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Feedback f SET f.checks = :checks WHERE f.id = :id AND f.workspaceId =" + " :workspaceId")
+    int updateChecks(
+            @Param("workspaceId") long workspaceId,
+            @Param("id") UUID id,
+            @Param("checks") Map<FeedbackCheckStage, FeedbackChecks> checks);
+
+    @Modifying(flushAutomatically = true)
+    @Query("UPDATE Feedback f SET f.replacesId = :previous WHERE f.id = :id AND f.workspaceId =" + " :workspaceId")
+    int recordReplacement(
+            @Param("workspaceId") long workspaceId, @Param("id") UUID id, @Param("previous") UUID previous);
+
+    @Query(value = """
+        SELECT f.* FROM feedback f WHERE f.workspace_id=:workspaceId AND f.item_id=:itemId AND f.developer_id=:developerId
+         AND f.destination='ON_WORK' AND EXISTS(SELECT 1 FROM feedback_copy c WHERE c.feedback_id=f.id AND c.workspace_id=f.workspace_id
+           AND c.kind='SUMMARY' AND c.state='POSTED' AND c.posted_at IS NOT NULL)
+         ORDER BY f.delivered_at DESC NULLS LAST,f.created_at DESC,f.id::text DESC LIMIT 1
+        """, nativeQuery = true)
+    Optional<Feedback> findLastConfirmedSummary(
+            @Param("workspaceId") long workspaceId,
+            @Param("itemId") long itemId,
+            @Param("developerId") long developerId);
+
+    @Query(value = """
+        SELECT f.* FROM feedback f WHERE f.workspace_id=:workspaceId AND f.destination='CONVERSATION' AND f.state='READY' AND f.created_at<:cutoff
+          AND NOT EXISTS(SELECT 1 FROM feedback_copy c WHERE c.workspace_id=f.workspace_id AND c.feedback_id=f.id AND (c.write_started_at IS NOT NULL OR c.posted_at IS NOT NULL))
+        """, nativeQuery = true)
+    List<Feedback> findExpiredConversation(@Param("workspaceId") long workspaceId, @Param("cutoff") Instant cutoff);
+
+    @WorkspaceAgnostic("System-wide expiry discovers workspaces; every mutation remains tenant-scoped")
+    @Query(value = """
+        SELECT DISTINCT f.workspace_id FROM feedback f WHERE f.destination='CONVERSATION' AND f.state='READY' AND f.created_at<:cutoff
+          AND NOT EXISTS(SELECT 1 FROM feedback_copy c WHERE c.workspace_id=f.workspace_id AND c.feedback_id=f.id AND (c.write_started_at IS NOT NULL OR c.posted_at IS NOT NULL))
+        """, nativeQuery = true)
+    List<Long> expiredConversationWorkspaces(@Param("cutoff") Instant cutoff);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = """
+        UPDATE feedback SET state='WITHHELD',stop_reason='CONVERSATION_EXPIRED' WHERE workspace_id=:workspaceId AND id=:id
+          AND destination='CONVERSATION' AND state='READY' AND created_at<:cutoff
+          AND NOT EXISTS(SELECT 1 FROM feedback_copy c WHERE c.workspace_id=feedback.workspace_id AND c.feedback_id=feedback.id
+            AND (c.write_started_at IS NOT NULL OR c.posted_at IS NOT NULL))
+        """, nativeQuery = true)
+    int expireConversation(
+            @Param("workspaceId") long workspaceId, @Param("id") UUID id, @Param("cutoff") Instant cutoff);
 }

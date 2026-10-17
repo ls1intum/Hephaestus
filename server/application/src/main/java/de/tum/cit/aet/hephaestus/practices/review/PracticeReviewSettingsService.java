@@ -5,7 +5,9 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.practices.review.dto.WorkspaceReviewScopeDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeReviewVolumeQuery;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -25,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
  * fleet default in {@link PracticeReviewProperties}.
  */
 @Service
+@ConditionalOnServerRole
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class PracticeReviewSettingsService {
@@ -39,10 +42,11 @@ public class PracticeReviewSettingsService {
         return toView(requireWorkspace(workspaceContext));
     }
 
-    public PracticeReviewCoveragePreviewDTO previewCoverage(
-            WorkspaceContext workspaceContext, WorkspaceReviewScope proposed) {
+    public PracticeReviewScopePreviewDTO previewCoverage(
+            WorkspaceContext workspaceContext, WorkspaceReviewScopeDTO proposed) {
         Workspace workspace = requireWorkspace(workspaceContext);
-        return coverageService.preview(workspace, proposed, recentVolume(workspace));
+        return coverageService.preview(
+                workspace, coverageService.fromWire(workspaceContext.id(), proposed), recentVolume(workspace));
     }
 
     @Transactional
@@ -68,14 +72,16 @@ public class PracticeReviewSettingsService {
             coverageService.replace(workspace, WorkspaceReviewScope.ALL);
         }
         if (req.reviewScope() != null) {
-            coverageService.replace(workspace, req.reviewScope());
+            coverageService.replace(workspace, coverageService.fromWire(workspaceContext.id(), req.reviewScope()));
         }
         if (req.generatedPaths() != null) {
             coverageService.patchGeneratedPaths(workspace, req.generatedPaths());
         }
         settings.applyRollout(null, null, req.deliveryStatus());
-        settings.applyDefaultAutonomy(
-                req.defaultAutonomy() == null ? null : req.defaultAutonomy().name());
+        settings.applyDefaultFeedbackMode(
+                req.defaultFeedbackMode() == null
+                        ? null
+                        : req.defaultFeedbackMode().name());
         var afterScope = coverageService.scope(workspace);
         PracticeReviewSnapshot after =
                 PracticeReviewSnapshot.of(settings, afterScope, coverageService.generatedPaths(workspace));
@@ -115,16 +121,16 @@ public class PracticeReviewSettingsService {
         int recentVolume = recentVolume(workspace);
         return new PracticeReviewSettingsDTO(
                 EntityTagPrecondition.format(Long.toString(s.getConfigVersion())),
-                s.getRolloutRevision(),
+                Long.toString(s.getRolloutRevision()),
                 s.resolveDeliverToMerged(reviewProperties.deliverToMerged()),
                 s.resolveCooldownMinutes(reviewProperties.cooldownMinutes()),
                 s.getDeliverToMerged(),
                 s.getCooldownMinutes(),
-                coverageService.scope(workspace),
+                coverageService.wireScope(workspace),
                 s.getDeliveryStatus(),
                 coverageService.summary(workspace, recentVolume),
-                defaults.defaultAutonomy(),
-                s.getDefaultAutonomy() == null ? null : PracticeAutonomy.valueOf(s.getDefaultAutonomy()),
+                defaults.defaultFeedbackMode(),
+                s.getDefaultFeedbackMode() == null ? null : FeedbackMode.valueOf(s.getDefaultFeedbackMode()),
                 coverageService.generatedPaths(workspace));
     }
 

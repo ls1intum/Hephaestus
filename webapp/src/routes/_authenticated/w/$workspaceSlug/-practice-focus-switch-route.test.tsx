@@ -5,7 +5,7 @@ import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
-import { workspaceListItem } from "@/mocks/fixtures/workspaces";
+import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
 import {
 	groups,
@@ -14,10 +14,7 @@ import {
 	packagingGroup,
 	practiceStandings,
 } from "@/stories/practice-profile-story-mock-data";
-import {
-	ACROSS_WORKSPACE,
-	ACROSS_WORKSPACE_TILES,
-} from "@/stories/practices-across-the-workspace-story-data";
+import { ACROSS_WORKSPACE } from "@/stories/practices-across-the-workspace-story-data";
 import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter } from "@/test/router-harness";
 
 // Mounting the real routes pulls in the whole app shell and its lazy modules.
@@ -52,15 +49,23 @@ beforeEach(() => {
 			HttpResponse.json([workspaceListItem("acme", { practicesEnabled: true })]),
 		),
 		http.get("*/workspaces/:workspaceSlug/members/me", () =>
-			HttpResponse.json({ role: "MEMBER", userId: 1, userLogin: "ada", userName: "Ada" }),
+			HttpResponse.json(ownMembership("MEMBER")),
 		),
 		http.get("*/workspaces/:workspaceSlug/practices/workspace-overview", () =>
 			HttpResponse.json(ACROSS_WORKSPACE),
 		),
-		http.get("*/workspaces/:workspaceSlug/practices/workspace-overview/tiles", () =>
-			HttpResponse.json(ACROSS_WORKSPACE_TILES),
-		),
 		http.get("*/workspaces/:workspaceSlug/practice-groups", () => HttpResponse.json(groups)),
+		http.get("*/workspaces/:workspaceSlug/practices/reviewed", () =>
+			HttpResponse.json(
+				practiceStandings.map((standing) => ({
+					slug: standing.slug,
+					name: standing.name,
+					group: groups.find((group) => group.slug === standing.groupSlug) ?? null,
+					whyItMatters: null,
+					whatGoodLooksLike: null,
+				})),
+			),
+		),
 		http.get("*/workspaces/:workspaceSlug/practice-groups/standings", () =>
 			HttpResponse.json(Object.values(groupStandings)),
 		),
@@ -70,9 +75,18 @@ beforeEach(() => {
 		http.get("*/workspaces/:workspaceSlug/practice-profile/overview", () =>
 			HttpResponse.json(OVERVIEW_FIXTURE),
 		),
-		http.get("*/workspaces/:workspaceSlug/practices/feedback/in-app", () => HttpResponse.json([])),
-		http.get("*/workspaces/:workspaceSlug/practice-groups/:groupSlug/review-runs", () =>
-			HttpResponse.json({ content: [], hasNext: false, page: 0, size: 10 }),
+		http.get("*/workspaces/:workspaceSlug/practices/feedback/practice-page", () =>
+			HttpResponse.json([]),
+		),
+		http.get("*/workspaces/:workspaceSlug/practice-groups/:groupSlug/reviews", () =>
+			HttpResponse.json({
+				content: [],
+				number: 0,
+				size: 10,
+				totalElements: 0,
+				totalPages: 0,
+				last: true,
+			}),
 		),
 	);
 });
@@ -136,7 +150,7 @@ describe("going between the Practice profile and Practices across the workspace"
 
 		// Each page read its data once; coming back asks for nothing again.
 		expect(readsOf("/practices/workspace-overview")).toBe(1);
-		expect(readsOf("/practices/feedback/in-app")).toBe(1);
+		expect(readsOf("/practices/feedback/practice-page")).toBe(1);
 		expect(readsOf("/practice-profile/overview")).toBe(1);
 
 		// Back leaves the pair in one step, to where the reader stood before the first switch.

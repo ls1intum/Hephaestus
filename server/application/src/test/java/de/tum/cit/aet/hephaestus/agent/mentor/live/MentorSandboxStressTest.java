@@ -3,8 +3,10 @@ package de.tum.cit.aet.hephaestus.agent.mentor.live;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorRunnerProfile;
+import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorRunnerClient;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiPlanSpec;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiRuntimeFactory;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.testconfig.LiveLlmCredentials;
 import de.tum.cit.aet.hephaestus.testconfig.LiveLlmTest;
 import de.tum.cit.aet.hephaestus.testconfig.PiSdkInstallation;
@@ -647,6 +649,16 @@ class MentorSandboxStressTest {
         Files.createDirectories(tmp.resolve(".sessions"));
         Files.createSymbolicLink(tmp.resolve("node_modules"), PiSdkInstallation.SDK_DIR.resolve("node_modules"));
         Files.copy(RUNNER, tmp.resolve("pi-mentor-runner.ts"));
+        for (String sidecar : new MentorRunnerProfile().sidecarScripts()) {
+            Files.copy(Path.of("src", "main", "resources", "agent", sidecar), tmp.resolve(sidecar));
+        }
+        Path library = tmp.resolve(SandboxLayout.PRACTICE_SCRIPT_LIBRARY_LINK);
+        Files.createDirectories(library.getParent());
+        Files.createSymbolicLink(
+                library,
+                Path.of("..", "..", "docker", "agents", "practice-scripts", "lib")
+                        .toAbsolutePath()
+                        .normalize());
 
         Path systemPromptDir = tmp.resolve("agent").resolve("mentor");
         Files.createDirectories(systemPromptDir);
@@ -665,8 +677,7 @@ class MentorSandboxStressTest {
                 true,
                 300,
                 new MentorRunnerProfile(),
-                Map.of(),
-                "");
+                Map.of());
         byte[] settingsBytes = factory.buildPiSettingsJson(spec.upstreamModelId());
 
         Path piHome = tmp.resolve(".pi-home");
@@ -825,8 +836,9 @@ class MentorSandboxStressTest {
         void helloOk(Duration timeout) {
             JsonNode resp = call("hello", MAPPER.createObjectNode(), timeout);
             int version = resp.path("result").path("protocolVersion").asInt(0);
-            if (version != 1) {
-                throw new IllegalStateException("expected protocolVersion=1, got " + version);
+            if (version != MentorRunnerClient.PROTOCOL_VERSION) {
+                throw new IllegalStateException(
+                        "expected protocolVersion=" + MentorRunnerClient.PROTOCOL_VERSION + ", got " + version);
             }
         }
 

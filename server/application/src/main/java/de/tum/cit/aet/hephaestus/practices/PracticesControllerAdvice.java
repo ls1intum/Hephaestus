@@ -1,12 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogConflictException;
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedPreconditionRequiredException;
-import de.tum.cit.aet.hephaestus.practices.curated.StaleCuratedEntryException;
-import de.tum.cit.aet.hephaestus.practices.curated.adoption.CatalogAdoptionPreconditionRequiredException;
-import de.tum.cit.aet.hephaestus.practices.curated.adoption.StaleCatalogAdoptionPlanException;
-import de.tum.cit.aet.hephaestus.practices.review.InvalidReviewCoverageException;
+import de.tum.cit.aet.hephaestus.practices.catalog.CatalogConflictException;
+import de.tum.cit.aet.hephaestus.practices.review.InvalidReviewScopeException;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewPreconditionRequiredException;
 import de.tum.cit.aet.hephaestus.practices.review.StalePracticeReviewSettingsException;
 import java.util.Objects;
@@ -18,13 +14,20 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-/**
- * Error mapper for practices-specific exceptions.
- * Kept in the practices module to avoid a cyclic dependency between practices and core.
- */
+// Practices exception handling stays in this module to avoid a dependency cycle with core.
 @RestControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class PracticesControllerAdvice {
+
+    @ExceptionHandler(StalePracticeVersionException.class)
+    ProblemDetail handleStaleVersion(StalePracticeVersionException exception) {
+        var detail = problem(
+                HttpStatus.CONFLICT,
+                "Practice version changed",
+                Objects.toString(exception.getMessage(), "The practice version changed."));
+        detail.setProperty("currentVersionId", exception.currentVersionId());
+        return detail;
+    }
 
     @ExceptionHandler(PracticeSlugConflictException.class)
     ProblemDetail handleSlugConflict(PracticeSlugConflictException exception) {
@@ -42,50 +45,18 @@ public class PracticesControllerAdvice {
                 Objects.toString(exception.getMessage(), "Request failed"));
     }
 
-    @ExceptionHandler(CuratedCatalogConflictException.class)
-    ProblemDetail handleCuratedConflict(CuratedCatalogConflictException exception) {
+    @ExceptionHandler(CatalogConflictException.class)
+    ProblemDetail handleCatalogConflict(CatalogConflictException exception) {
         return problem(
                 HttpStatus.CONFLICT,
                 "Practice catalog conflict",
                 Objects.toString(exception.getMessage(), "Request failed"));
     }
 
-    @ExceptionHandler(StaleCuratedEntryException.class)
-    ProblemDetail handleStaleCuratedEntry(StaleCuratedEntryException exception) {
-        return problem(
-                HttpStatus.PRECONDITION_FAILED,
-                "Practice catalog changed",
-                Objects.toString(exception.getMessage(), "Request failed"));
-    }
-
-    @ExceptionHandler(CuratedPreconditionRequiredException.class)
-    ProblemDetail handleCuratedPreconditionRequired(CuratedPreconditionRequiredException exception) {
-        return problem(
-                HttpStatus.PRECONDITION_REQUIRED,
-                "Practice catalog version required",
-                Objects.toString(exception.getMessage(), "Request failed"));
-    }
-
-    @ExceptionHandler(StaleCatalogAdoptionPlanException.class)
-    ProblemDetail handleStaleAdoptionPlan(StaleCatalogAdoptionPlanException exception) {
-        return problem(
-                HttpStatus.PRECONDITION_FAILED,
-                "Practice adoption preview changed",
-                Objects.toString(exception.getMessage(), "Request failed"));
-    }
-
-    @ExceptionHandler(CatalogAdoptionPreconditionRequiredException.class)
-    ProblemDetail handleAdoptionPreconditionRequired(CatalogAdoptionPreconditionRequiredException exception) {
-        return problem(
-                HttpStatus.PRECONDITION_REQUIRED,
-                "Practice adoption preview required",
-                Objects.toString(exception.getMessage(), "Request failed"));
-    }
-
     @ExceptionHandler(StalePracticeReviewSettingsException.class)
     ProblemDetail handleStaleReviewSettings(StalePracticeReviewSettingsException exception) {
         return problem(
-                HttpStatus.PRECONDITION_FAILED,
+                HttpStatus.CONFLICT,
                 "Practice review settings changed",
                 Objects.toString(exception.getMessage(), "Request failed"));
     }
@@ -98,27 +69,11 @@ public class PracticesControllerAdvice {
                 Objects.toString(exception.getMessage(), "Request failed"));
     }
 
-    @ExceptionHandler(PracticeReleasePreconditionRequiredException.class)
-    ProblemDetail handleReleasePreconditionRequired(PracticeReleasePreconditionRequiredException exception) {
-        return problem(
-                HttpStatus.PRECONDITION_REQUIRED,
-                "Practice release version required",
-                Objects.toString(exception.getMessage(), "Request failed"));
-    }
-
-    @ExceptionHandler(StalePracticeReleaseException.class)
-    ProblemDetail handleStaleRelease(StalePracticeReleaseException exception) {
-        return problem(
-                HttpStatus.PRECONDITION_FAILED,
-                "Practice release changed",
-                Objects.toString(exception.getMessage(), "Request failed"));
-    }
-
-    @ExceptionHandler(InvalidReviewCoverageException.class)
-    ProblemDetail handleInvalidReviewCoverage(InvalidReviewCoverageException exception) {
+    @ExceptionHandler(InvalidReviewScopeException.class)
+    ProblemDetail handleInvalidReviewScope(InvalidReviewScopeException exception) {
         return problem(
                 HttpStatus.BAD_REQUEST,
-                "Invalid practice review coverage",
+                "We could not save the review scope",
                 Objects.toString(exception.getMessage(), "Request failed"));
     }
 

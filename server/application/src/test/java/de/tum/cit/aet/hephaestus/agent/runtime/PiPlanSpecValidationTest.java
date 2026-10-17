@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.runtime;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -19,17 +18,7 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
 
     private static PiPlanSpec specWith(Map<String, byte[]> extraInputs) {
         return new PiPlanSpec(
-                "openai-completions",
-                "gpt-5.4-mini",
-                null,
-                null,
-                null,
-                "job-token",
-                true,
-                600,
-                PROFILE,
-                extraInputs,
-                "");
+                "openai-completions", "gpt-5.4-mini", null, null, null, "job-token", true, 600, PROFILE, extraInputs);
     }
 
     @Test
@@ -54,17 +43,7 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
     @Test
     void jobTokenIsAlwaysRequired() {
         assertThatThrownBy(() -> new PiPlanSpec(
-                        "openai-completions",
-                        "gpt-5.4-mini",
-                        null,
-                        null,
-                        null,
-                        null,
-                        false,
-                        600,
-                        PROFILE,
-                        Map.of(),
-                        ""))
+                        "openai-completions", "gpt-5.4-mini", null, null, null, null, false, 600, PROFILE, Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("jobToken");
     }
@@ -72,17 +51,7 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
     @Test
     void blankJobTokenRejected() {
         assertThatThrownBy(() -> new PiPlanSpec(
-                        "openai-completions",
-                        "gpt-5.4-mini",
-                        null,
-                        null,
-                        null,
-                        "  ",
-                        false,
-                        600,
-                        PROFILE,
-                        Map.of(),
-                        ""))
+                        "openai-completions", "gpt-5.4-mini", null, null, null, "  ", false, 600, PROFILE, Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("jobToken");
     }
@@ -90,7 +59,7 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
     @Test
     void blankApiProtocolRejected() {
         assertThatThrownBy(() -> new PiPlanSpec(
-                        "", "gpt-5.4-mini", null, null, null, "job-token", false, 600, PROFILE, Map.of(), ""))
+                        "", "gpt-5.4-mini", null, null, null, "job-token", false, 600, PROFILE, Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("apiProtocol");
     }
@@ -98,7 +67,7 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
     @Test
     void blankUpstreamModelIdRejected() {
         assertThatThrownBy(() -> new PiPlanSpec(
-                        "openai-completions", "  ", null, null, null, "job-token", false, 600, PROFILE, Map.of(), ""))
+                        "openai-completions", "  ", null, null, null, "job-token", false, 600, PROFILE, Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("upstreamModelId");
     }
@@ -115,8 +84,7 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
                         true,
                         PiRuntimeFactory.TIMEOUT_BUFFER_SECONDS,
                         PROFILE,
-                        Map.of(),
-                        ""))
+                        Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("TIMEOUT_BUFFER_SECONDS");
     }
@@ -151,29 +119,9 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
                         true,
                         600,
                         BLANK_SCRIPT_PROFILE,
-                        Map.of(),
-                        ""))
+                        Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("runnerScript");
-    }
-
-    @Test
-    void nullPrecomputeStepNormalizesToEmptyString() {
-        PiPlanSpec spec = new PiPlanSpec(
-                "openai-completions",
-                "gpt-5.4-mini",
-                null,
-                null,
-                null,
-                "job-token",
-                true,
-                600,
-                PROFILE,
-                Map.of(),
-                null);
-
-        // The null-coalesce protects PiRuntimeFactory's string concat from an NPE downstream.
-        assertThat(spec.precomputeStep()).isEmpty();
     }
 
     @Test
@@ -189,8 +137,7 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
                         false,
                         600,
                         PROFILE,
-                        Map.of(),
-                        ""));
+                        Map.of()));
     }
 
     @Test

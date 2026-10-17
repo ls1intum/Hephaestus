@@ -29,11 +29,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Read-only instance-admin viewer over the append-only {@code auth_event} log (see {@link AuthEvent}).
- * Guarded by the namespaced {@code app_admin} authority. Surfaces the acting account and the viewed
- * user so administrative actions and user views stay attributable to the administrator.
- */
 @ConditionalOnServerRole
 @RestController
 @RequestMapping("/admin/audit")
@@ -53,17 +48,15 @@ public class AuthAuditController {
         this.authAuditService = authAuditService;
     }
 
-    /** A human-readable account identity. {@code displayName}/{@code email} are null for deleted accounts. */
-    public record AccountRefDTO(
+    /**
+     * A human-readable account identity. {@code displayName}/{@code email} are null for deleted
+     * accounts.
+     */
+    public record AuthAuditAccountDTO(
             @NonNull Long id,
             @Nullable String displayName,
             @Nullable String email) {}
 
-    /**
-     * Optional query-param filters for the list/export endpoints, bound as a flattened
-     * {@link ParameterObject} so the handler stays under the parameter-count budget. All fields are
-     * optional; an absent field means "no constraint on that dimension".
-     */
     public record AuditFilterParams(
             @RequestParam(required = false) @Nullable Long accountId,
             @RequestParam(required = false) @Nullable Long actingAccountId,
@@ -89,11 +82,10 @@ public class AuthAuditController {
             @Schema(requiredMode = RequiredMode.REQUIRED) boolean elevatedViaInstanceAdmin,
             @Nullable Long accountId,
             @Nullable Long actingAccountId,
-            @Nullable Long viewedUserId,
-            // Resolved identities for accountId / actingAccountId (null when the account no longer exists);
-            // the raw ids stay for back-compat and so deleted-account rows are still attributable by id.
-            @Nullable AccountRefDTO account,
-            @Nullable AccountRefDTO actor,
+            @Nullable Long viewedActorId,
+            @Nullable Long viewedAccountId,
+            @Nullable AuthAuditAccountDTO account,
+            @Nullable AuthAuditAccountDTO actor,
             @Nullable String failureReason,
             @Nullable Long workspaceId,
             @Nullable String ipAddress,
@@ -123,11 +115,11 @@ public class AuthAuditController {
         AuthAuditService.AuditPage data = authAuditService.list(filter.toFilter(), PageRequest.of(0, EXPORT_MAX_ROWS));
         var identities = data.identities();
         StringBuilder csv = new StringBuilder();
-        // A new column is APPENDED, never inserted: an operator's parser keyed on column order keeps
+        // A new column is APPENDED, never inserted: an operator's parser keyed on column order
+        // keeps
         // working, and one keyed on the header picks the new column up.
-        csv.append("occurred_at_utc,event_type,result,account_id,account_name,account_email,"
-                + "acting_account_id,actor_name,actor_email,failure_reason,workspace_id,ip_address,user_agent,details,"
-                + "elevated_via_instance_admin,viewed_user_id\n");
+        csv.append(
+                "occurred_at_utc,event_type,result,account_id,account_name,account_email,acting_account_id,actor_name,actor_email,failure_reason,workspace_id,ip_address,user_agent,details,elevated_via_instance_admin,viewed_actor_id,viewed_account_id\n");
         for (AuthEvent e : data.events().getContent()) {
             AuthAuditService.AccountRef account = AuthAuditService.refOf(e.getAccountId(), identities);
             AuthAuditService.AccountRef actor = AuthAuditService.refOf(e.getActingAccountId(), identities);
@@ -149,7 +141,8 @@ public class AuthAuditController {
                             e.getUserAgent(),
                             e.getDetails(),
                             Boolean.toString(e.isElevatedViaInstanceAdmin()),
-                            str(e.getViewedUserId())));
+                            str(e.getViewedActorId()),
+                            str(e.getViewedAccountId())));
         }
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"audit-log.csv\"")
@@ -170,7 +163,8 @@ public class AuthAuditController {
                 e.isElevatedViaInstanceAdmin(),
                 e.getAccountId(),
                 e.getActingAccountId(),
-                e.getViewedUserId(),
+                e.getViewedActorId(),
+                e.getViewedAccountId(),
                 toRef(AuthAuditService.refOf(e.getAccountId(), identities)),
                 toRef(AuthAuditService.refOf(e.getActingAccountId(), identities)),
                 e.getFailureReason(),
@@ -180,7 +174,7 @@ public class AuthAuditController {
                 e.getDetails());
     }
 
-    private static @Nullable AccountRefDTO toRef(AuthAuditService.@Nullable AccountRef ref) {
-        return ref == null ? null : new AccountRefDTO(ref.id(), ref.displayName(), ref.email());
+    private static @Nullable AuthAuditAccountDTO toRef(AuthAuditService.@Nullable AccountRef ref) {
+        return ref == null ? null : new AuthAuditAccountDTO(ref.id(), ref.displayName(), ref.email());
     }
 }

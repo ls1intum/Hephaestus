@@ -9,10 +9,10 @@ import { StandingBadge } from "@/components/practice-vocabulary/StandingBadge";
 import { StatusTooltip } from "@/components/practice-vocabulary/StatusTooltip";
 import { TableCell, TableRow } from "@/components/ui/table";
 
-import { NEVER_APPLIED, NEVER_APPLIED_DEF, NOT_OBSERVED_YET } from "./practice-folds";
+import { NEVER_APPLIED, NEVER_APPLIED_DEF, NOT_REVIEWED_YET } from "./practice-folds";
 
-/** Why the items left the table: every review found they did not apply, or none observed them yet. */
-export type FoldReason = "never-applied" | "not-observed";
+/** Why the items left the table: every review found they did not apply, or none reviewed them yet. */
+export type FoldReason = "never-applied" | "not-reviewed";
 
 export interface FoldedPracticesProps {
 	/** How many practices or groups the fold holds; with none, it draws nothing. */
@@ -33,13 +33,13 @@ export interface FoldedPracticesProps {
 
 /** The words of a fold: its line, which counts nothing, and the sentence under it once open. */
 export function foldWords(reason: FoldReason, noun: "practice" | "group") {
-	if (reason === "not-observed") {
+	if (reason === "not-reviewed") {
 		return noun === "practice"
 			? {
-					label: NOT_OBSERVED_YET.practiceLabel,
-					description: NOT_OBSERVED_YET.practiceDescription,
+					label: NOT_REVIEWED_YET.practiceLabel,
+					description: NOT_REVIEWED_YET.practiceDescription,
 				}
-			: { label: NOT_OBSERVED_YET.groupLabel, description: NOT_OBSERVED_YET.groupDescription };
+			: { label: NOT_REVIEWED_YET.groupLabel, description: NOT_REVIEWED_YET.groupDescription };
 	}
 	return {
 		label: NEVER_APPLIED.label,
@@ -49,7 +49,7 @@ export function foldWords(reason: FoldReason, noun: "practice" | "group") {
 
 /**
  * The practices, or the groups, that left their table, folded into one row at its end.
- * Either every review found they did not apply to the reader's work, or no review has observed them
+ * Either every review found they did not apply to the reader's work, or no review has reviewed them
  * yet; each reason is its own fold, and neither reads as a gap.
  *
  * The fold is two `<tbody>` sections of the table above, passed through `PracticeTable`'s
@@ -138,7 +138,7 @@ export interface FoldedStandingCellProps {
 /**
  * The standing of a folded row: the badge alone. The fold already says why the row is there, so
  * the row does not repeat it with a trend note, a ring and counts. The badge follows the fold: a
- * group the server reads as "Nothing to report yet" still sits under "not observed yet".
+ * group the server reads as "Nothing to report yet" still sits under "not reviewed yet".
  */
 export function FoldedStandingCell({ scope, reason }: FoldedStandingCellProps) {
 	return (

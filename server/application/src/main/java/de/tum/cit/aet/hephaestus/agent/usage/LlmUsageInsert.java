@@ -6,13 +6,14 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Immutable row passed to the ledger's idempotent native insert: one component per column of
- * {@link LlmUsageEvent}, named after the column and in the column's order, which
- * {@code LlmUsageInsertContractTest} enforces position by position.
+ * Immutable row passed to the ledger's idempotent native insert: one component per column of {@link
+ * LlmUsageEvent}, named after the column and in the column's order, which {@code
+ * LlmUsageInsertContractTest} enforces position by position.
  */
 public record LlmUsageInsert(
         UUID id,
         Long workspaceId,
+        @Nullable UUID reviewId,
         String jobType,
         String sourceType,
         UUID sourceId,
@@ -35,4 +36,6 @@ public record LlmUsageInsert(
         @Nullable BigDecimal appliedPer1mCacheReadUsd,
         @Nullable BigDecimal appliedPer1mCacheWriteUsd,
         String usageProvenance,
+        long searchUnits,
+        int unreportedCalls,
         String measurementVerification) {}

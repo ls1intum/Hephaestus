@@ -6,8 +6,8 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationService;
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
@@ -31,7 +31,6 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
-/** Real provisioning and persistence, with the installation-status API controlled at its provider boundary. */
 @ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class GitHubInstallationMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
@@ -171,8 +170,8 @@ class GitHubInstallationMessageHandlerIntegrationTest extends BaseIntegrationTes
 
         assertThat(persistedWorkspace(event).getStatus()).isEqualTo(Workspace.WorkspaceStatus.ACTIVE);
         assertThat(output)
-                .contains(
-                        "Failed to verify installation status via API, skipping status update: installationId=78181208, error=fixture provider unavailable");
+                .contains("Failed to verify installation status via API, skipping status update:"
+                        + " installationId=78181208, error=fixture provider unavailable");
     }
 
     @Test

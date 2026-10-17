@@ -10,18 +10,21 @@ import { GlobalScopeSlot } from "./GlobalScopeRow";
 import { carriedScope, type ReviewScopeSearch } from "./review-scope";
 
 const SECTIONS = [
-	{ to: "/w/$workspaceSlug/admin/practices/reviews", label: "Overview", tab: "overview" },
-	{ to: "/w/$workspaceSlug/admin/practices/reviews/runs", label: "Reviews", tab: "runs" },
+	{ to: "/w/$workspaceSlug/admin/practices/reviews/overview", label: "Overview", tab: "overview" },
+	{ to: "/w/$workspaceSlug/admin/practices/reviews", label: "Reviews", tab: "reviews" },
+	{ to: "/w/$workspaceSlug/admin/practices/reviews/results", label: "Results", tab: "results" },
 	{
-		to: "/w/$workspaceSlug/admin/practices/reviews/observations",
-		label: "Observations",
-		tab: "observations",
+		to: "/w/$workspaceSlug/admin/practices/reviews/problems",
+		label: "Problems",
+		tab: "problems",
 	},
 	{ to: "/w/$workspaceSlug/admin/practices/reviews/feedback", label: "Feedback", tab: "feedback" },
 ] as const;
 
 /** How many each list tab holds under the shared scope; a tab whose count is not known yet is left out. */
-export type ReviewTabCounts = Partial<Record<"runs" | "observations" | "feedback", number>>;
+export type ReviewTabCounts = Partial<
+	Record<"reviews" | "results" | "problems" | "feedback", number>
+>;
 
 const COUNT_FORMAT = new Intl.NumberFormat("en-US");
 
@@ -42,14 +45,6 @@ export interface PracticeReviewsLayoutProps {
 	children: ReactNode;
 }
 
-/**
- * Practice reviews: an overview, then the lists behind it — the reviews, what they observed and the
- * feedback written from it. A review opens on its own page; an observation or a piece of feedback
- * opens as one level over whichever list the reader is on, so a list is never left to read it.
- *
- * The scope and the tracked record sit above the tabs, because they apply to every tab. Each tab
- * draws its scope there (`GlobalScopeRow`) and keeps its own filters below the tabs.
- */
 export function PracticeReviewsLayout({
 	workspaceSlug,
 	counts = NO_COUNTS,
@@ -86,7 +81,7 @@ export function PracticeReviewsLayout({
 												params={{ workspaceSlug }}
 												// Every tab keeps the shared scope: a person, practices, a date range and the
 												// selection. A tab's own facets stay behind.
-												search={(previous: ReviewScopeSearch) => carriedScope(tab, previous)}
+												search={(previous: ReviewScopeSearch) => carriedScope(previous)}
 												activeOptions={{ exact: true, includeSearch: false }}
 											/>
 										}

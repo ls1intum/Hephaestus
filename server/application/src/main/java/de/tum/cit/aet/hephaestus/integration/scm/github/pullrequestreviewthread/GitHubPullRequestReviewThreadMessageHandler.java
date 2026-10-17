@@ -3,8 +3,8 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreviewthread
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventAction;
@@ -75,7 +75,8 @@ public class GitHubPullRequestReviewThreadMessageHandler
             return;
         }
 
-        // Thread ID is the first comment's database ID (see GitHubPullRequestReviewCommentSyncService)
+        // Thread ID is the first comment's database ID (see
+        // GitHubPullRequestReviewCommentSyncService)
         Long threadId = threadDto.getFirstCommentId();
 
         log.debug(
@@ -99,7 +100,8 @@ public class GitHubPullRequestReviewThreadMessageHandler
         // Delegate thread state changes to processor
         switch (event.actionType()) {
             case GitHubEventAction.PullRequestReviewThread.RESOLVED -> {
-                // Thread ID is derived from the first comment. If no comments exist, we cannot process.
+                // Thread ID is derived from the first comment. If no comments exist, we cannot
+                // process.
                 if (threadId == null) {
                     log.warn(
                             "Skipped pull_request_review_thread event: reason=noCommentsInThread, action={}, prNumber={}, repoName={}",
@@ -113,12 +115,14 @@ public class GitHubPullRequestReviewThreadMessageHandler
                 // Ensure the sender (who resolved the thread) exists
                 User resolvedBy =
                         userProcessor.ensureExists(event.sender(), Objects.requireNonNull(context.providerId()));
-                // The payload dates the event; one without a date happened about now, since it just arrived.
+                // The payload dates the event; one without a date happened about now, since it just
+                // arrived.
                 Instant resolvedAt = event.updatedAt() != null ? event.updatedAt() : Instant.now();
                 threadProcessor.resolve(threadId, resolvedBy, resolvedAt, context);
             }
             case GitHubEventAction.PullRequestReviewThread.UNRESOLVED -> {
-                // Thread ID is derived from the first comment. If no comments exist, we cannot process.
+                // Thread ID is derived from the first comment. If no comments exist, we cannot
+                // process.
                 if (threadId == null) {
                     log.warn(
                             "Skipped pull_request_review_thread event: reason=noCommentsInThread, action={}, prNumber={}, repoName={}",

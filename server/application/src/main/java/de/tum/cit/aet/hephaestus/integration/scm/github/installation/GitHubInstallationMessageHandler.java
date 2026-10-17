@@ -2,15 +2,16 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.installation;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener.AccountType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener.InstallationData;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener.RepositorySnapshot;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationService;
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
@@ -29,6 +30,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Handles GitHub installation webhook events and provisions scopes.
  */
 @Component
+@ConditionalOnServerRole
 public class GitHubInstallationMessageHandler extends AbstractIntegrationMessageHandler<GitHubInstallationEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubInstallationMessageHandler.class);
@@ -134,14 +136,14 @@ public class GitHubInstallationMessageHandler extends AbstractIntegrationMessage
                     return;
                 }
             } catch (InstallationNotFoundException e) {
-                // Installation no longer exists on GitHub - do NOT create workspace for deleted installation
                 log.info(
                         "Installation no longer exists on GitHub, skipping workspace creation: installationId={}",
                         installationId);
                 return;
             } catch (RuntimeException e) {
                 // Network errors, credentials not configured, or other transient issues
-                // Proceed with activation - if installation is truly suspended, token minting will fail fast
+                // Proceed with activation - if installation is truly suspended, token minting will
+                // fail fast
                 log.warn(
                         "Could not verify installation status for created event, proceeding with activation: installationId={}, error={}",
                         installationId,

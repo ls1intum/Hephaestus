@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataStores;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataWriteFence;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentityResolver;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
@@ -53,7 +54,7 @@ class PersonDataJobResumptionIntegrationTest extends BaseIntegrationTest {
     private PersonDataRequestRepository requests;
 
     @Autowired
-    private PersonSuppressionService suppression;
+    private IdentityRestrictionService suppression;
 
     @Autowired
     private PersonDataWriteFence fence;
@@ -82,11 +83,7 @@ class PersonDataJobResumptionIntegrationTest extends BaseIntegrationTest {
         var other = users.saveAndFlush(TestUserFactory.createUser(84L, "other", provider));
         jdbc.update("UPDATE \"user\" SET name='Target profile' WHERE id=?", target.getId());
         jdbc.update("UPDATE \"user\" SET name='Other profile' WHERE id=?", other.getId());
-        for (long userId : List.of(Objects.requireNonNull(target.getId()), Objects.requireNonNull(other.getId()))) {
-            jdbc.update(
-                    "INSERT INTO user_preferences(user_id,participate_in_research,ai_review_enabled) VALUES (?,false,false)",
-                    userId);
-        }
+
         var administrator = new Account("Administrator");
         administrator.setAppRole(Account.AppRole.APP_ADMIN);
         long adminId =
@@ -100,11 +97,11 @@ class PersonDataJobResumptionIntegrationTest extends BaseIntegrationTest {
                         namedJdbc,
                         mapper,
                         "preferences_step",
-                        "user_preferences",
-                        "t.user_id = ANY(:users)",
-                        "user_id,participate_in_research,ai_review_enabled",
-                        "user_id",
-                        "",
+                        "user",
+                        "t.id = ANY(:users)",
+                        "id,avatar_url",
+                        "id",
+                        "avatar_url=NULL",
                         0) {
                     @Override
                     public void prepareErasure(PersonDataSelection selection) {
@@ -112,9 +109,9 @@ class PersonDataJobResumptionIntegrationTest extends BaseIntegrationTest {
                     }
 
                     @Override
-                    public long erase(PersonDataSelection selection) {
+                    public long erase(PersonDataSelection selection, PersonScope frozenScope) {
                         firstCalls.incrementAndGet();
-                        return super.erase(selection);
+                        return super.erase(selection, frozenScope);
                     }
                 };
         var profile =
@@ -129,9 +126,9 @@ class PersonDataJobResumptionIntegrationTest extends BaseIntegrationTest {
                         "name=NULL",
                         1) {
                     @Override
-                    public long erase(PersonDataSelection selection) {
+                    public long erase(PersonDataSelection selection, PersonScope frozenScope) {
                         secondCalls.incrementAndGet();
-                        long count = super.erase(selection);
+                        long count = super.erase(selection, frozenScope);
                         if (failOnce.getAndSet(false))
                             throw new IllegalStateException("PERSONAL-CONTENT-FAILURE-CANARY");
                         return count;
@@ -218,8 +215,8 @@ class PersonDataJobResumptionIntegrationTest extends BaseIntegrationTest {
     }
 
     private long preferenceCount(Long userId) {
-        return Objects.requireNonNull(
-                jdbc.queryForObject("SELECT count(*) FROM user_preferences WHERE user_id=?", Long.class, userId));
+        return Objects.requireNonNull(jdbc.queryForObject(
+                "SELECT count(*) FROM \"user\" WHERE id=? AND avatar_url IS NOT NULL", Long.class, userId));
     }
 
     private @Nullable String profileName(Long userId) {

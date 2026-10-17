@@ -1,130 +1,184 @@
 import type {
+	ItemRef,
+	ProblemSummary,
+	ReviewBoundFeedback,
+	ReviewBoundResult,
 	ReviewLineage,
-	ReviewLineageFeedback,
-	ReviewLineageObservation,
-	ReviewFeedbackDetail,
-	ReviewObservationDetail,
+	ReviewLineageEdge,
+	ReviewLineageNode,
+	ReviewRef,
 } from "@/api/types.gen";
-import type { FeedbackLocation } from "@/components/practice-vocabulary/feedback-location-defs";
 
 import {
+	boundResultOf,
 	feedbackDetail,
-	observationDetail,
-	reviewArtifact,
-	reviewObservationDetail,
+	problemDetail,
+	problemIdOf,
+	reviewFeedback,
+	reviewItem,
+	reviewRefOf,
+	reviewResults,
+	reviews,
 } from "./fixtures";
 
-/** The chain the fixture's records sit in, answered from the same records their levels read. */
-export function reviewLineage(kind: string, id: string): ReviewLineage {
-	if (kind === "FEEDBACK") {
-		return lineageOfFeedback(feedbackDetail(id));
+export type LineageKind = ReviewLineageNode["kind"];
+
+export const LINEAGE_RELATION = {
+	reviewedBy: "REVIEWED_BY",
+	recorded: "RECORDED",
+	records: "RECORDS",
+	basis: "BASIS",
+} as const;
+
+export type LineageRelation = (typeof LINEAGE_RELATION)[keyof typeof LINEAGE_RELATION];
+
+export function lineageKey(kind: LineageKind, id: string): string {
+	return `${kind.toLowerCase()}:${id}`;
+}
+
+const node = (
+	kind: LineageKind,
+	id: string,
+	fields: Partial<Omit<ReviewLineageNode, "id" | "kind">>,
+): ReviewLineageNode => ({
+	id: lineageKey(kind, id),
+	kind,
+	item: null,
+	review: null,
+	result: null,
+	problem: null,
+	feedback: null,
+	...fields,
+});
+
+export const lineageItemNode = (item: ItemRef) => node("ITEM", item.id, { item });
+export const lineageReviewNode = (review: ReviewRef) => node("REVIEW", review.id, { review });
+export const lineageResultNode = (result: ReviewBoundResult) =>
+	node("RESULT", result.id, { result });
+export const lineageProblemNode = (problem: ProblemSummary) =>
+	node("PROBLEM", problem.id, { problem });
+export const lineageFeedbackNode = (feedback: ReviewBoundFeedback) =>
+	node("FEEDBACK", feedback.id, { feedback });
+
+export function lineageEdge(
+	from: string,
+	to: string,
+	relation: LineageRelation,
+): ReviewLineageEdge {
+	return { from, to, relation };
+}
+
+export interface LineageResultSpec {
+	result: ReviewBoundResult;
+	problems?: ProblemSummary[];
+}
+
+export interface LineageFeedbackSpec {
+	feedback: ReviewBoundFeedback;
+	basis: string[];
+}
+
+export interface StoryLineageSpec {
+	root: { kind: LineageKind; id: string };
+	item: ItemRef;
+	reviews: ReviewRef[];
+	results: LineageResultSpec[];
+	feedback: LineageFeedbackSpec[];
+}
+
+export function storyLineage(spec: StoryLineageSpec): ReviewLineage {
+	const itemKey = lineageKey("ITEM", spec.item.id);
+	const nodes = new Map<string, ReviewLineageNode>([[itemKey, lineageItemNode(spec.item)]]);
+	const edges: ReviewLineageEdge[] = [];
+	for (const review of spec.reviews) {
+		const reviewNode = lineageReviewNode(review);
+		nodes.set(reviewNode.id, reviewNode);
+		edges.push(lineageEdge(itemKey, reviewNode.id, LINEAGE_RELATION.reviewedBy));
 	}
-	return lineageOfObservation(
-		kind === "OBSERVATION" ? observationDetail(id) : reviewObservationDetail,
-	);
+	for (const { result, problems = [] } of spec.results) {
+		const resultNode = lineageResultNode(result);
+		nodes.set(resultNode.id, resultNode);
+		edges.push(
+			lineageEdge(lineageKey("REVIEW", result.reviewId), resultNode.id, LINEAGE_RELATION.recorded),
+		);
+		for (const problem of problems) {
+			const problemNode = lineageProblemNode(problem);
+			nodes.set(problemNode.id, problemNode);
+			edges.push(lineageEdge(resultNode.id, problemNode.id, LINEAGE_RELATION.records));
+		}
+	}
+	for (const { feedback, basis } of spec.feedback) {
+		const feedbackNode = lineageFeedbackNode(feedback);
+		nodes.set(feedbackNode.id, feedbackNode);
+		for (const resultId of basis) {
+			edges.push(
+				lineageEdge(lineageKey("RESULT", resultId), feedbackNode.id, LINEAGE_RELATION.basis),
+			);
+		}
+	}
+	return {
+		rootId: lineageKey(spec.root.kind, spec.root.id),
+		nodes: [...nodes.values()],
+		edges: edges.filter((edge) => nodes.has(edge.from) && nodes.has(edge.to)),
+	};
 }
 
-/** The chain a piece of feedback's level reads, from the record the level shows. */
-export function lineageOfFeedback(feedback: ReviewFeedbackDetail): ReviewLineage {
+const boundFeedback = (id: string): ReviewBoundFeedback => {
+	const row = reviewFeedback.find((entry) => entry.id === id);
+	if (row === undefined) {
+		throw new Error(`No feedback ${id} in the fixture`);
+	}
 	return {
-		work: feedback.reviewedWork,
-		review: run(feedback.agentJobId, feedback.createdAt),
-		observations: feedback.observations.map((observation) => ({
-			id: observation.observationId,
-			agentJobId: feedback.agentJobId,
-			summary: observation.summary,
-			practiceSlug: observation.practiceSlug,
-			practiceName: observation.practiceName,
-			outcome: observation.outcome,
-			severity: observation.severity,
-			observedAt: observation.observedAt,
-			focus: true,
-			invalidated: false,
-			feedbackCount: 1,
-			ownFeedbackCount: 1,
+		id: row.id,
+		destination: row.destination,
+		state: row.state,
+		deliveredAt: row.deliveredAt,
+		withdrawn: row.withdrawn,
+	};
+};
+
+function reviewIdsFor(kind: LineageKind, id: string): string[] {
+	switch (kind) {
+		case "ITEM": {
+			return reviews.filter((review) => review.item.id === id).map((review) => review.id);
+		}
+		case "REVIEW": {
+			return [id];
+		}
+		case "RESULT": {
+			return reviewResults.filter((result) => result.id === id).map((result) => result.reviewId);
+		}
+		case "PROBLEM": {
+			return [problemDetail(id).reviewId];
+		}
+		case "FEEDBACK": {
+			return [...new Set(feedbackDetail(id).basis.map((entry) => entry.result.reviewId))];
+		}
+	}
+}
+
+export function reviewLineage(kind: LineageKind, id: string): ReviewLineage {
+	const reviewIds = new Set(reviewIdsFor(kind, id));
+	const held = reviews.filter((review) => reviewIds.has(review.id));
+	const [first] = held;
+	const item =
+		kind === "ITEM" || first === undefined
+			? (reviews.find((review) => review.item.id === id)?.item ?? reviewItem)
+			: first.item;
+	const feedback = reviewFeedback.filter((entry) => reviewIds.has(entry.reviewId));
+	return storyLineage({
+		root: { kind, id },
+		item,
+		reviews: held.map(reviewRefOf),
+		results: reviewResults
+			.filter((result) => reviewIds.has(result.reviewId))
+			.map((result) => ({ result: boundResultOf(result), problems: result.problems })),
+		feedback: feedback.map((entry) => ({
+			feedback: boundFeedback(entry.id),
+			basis: feedbackDetail(entry.id).basis.map((basis) => basis.resultId),
 		})),
-		moreObservations: 0,
-		reviewTrigger: "READY",
-		feedback: [
-			{
-				id: feedback.id,
-				agentJobId: feedback.agentJobId,
-				channel: feedback.channel,
-				deliveryState: feedback.deliveryState,
-				suppressionReason: feedback.suppressionReason,
-				createdAt: feedback.createdAt,
-				deliveredAt: feedback.deliveredAt,
-				placementCount: feedback.placements.length,
-				observationIds: feedback.observations.map((observation) => observation.observationId),
-				replacesId: feedback.replacesId,
-				focus: true,
-				location: feedback.location,
-			},
-		],
-		moreFeedback: 0,
-		workMoments: [],
-	};
+	});
 }
-
-/** The chain an observation's level reads, from the record the level shows. */
-export function lineageOfObservation(observation: ReviewObservationDetail): ReviewLineage {
-	return {
-		work: observation.reviewedWork,
-		review: run(observation.agentJobId, observation.observedAt),
-		observations: [
-			{
-				id: observation.id,
-				agentJobId: observation.agentJobId,
-				summary: observation.summary,
-				practiceSlug: observation.practiceSlug,
-				practiceName: observation.practiceName,
-				outcome: observation.outcome,
-				severity: observation.severity,
-				observedAt: observation.observedAt,
-				focus: true,
-				invalidated: observation.invalidations.some((entry) => entry.restoredAt === undefined),
-				feedbackCount: observation.feedback.length,
-				ownFeedbackCount: observation.feedback.filter(
-					(feedback) => feedback.agentJobId === observation.agentJobId,
-				).length,
-			},
-		],
-		moreObservations: 2,
-		reviewTrigger: "OPENED",
-		feedback: observation.feedback.map((feedback): ReviewLineageFeedback => ({
-			id: feedback.feedbackId,
-			agentJobId: feedback.agentJobId,
-			channel: feedback.channel,
-			deliveryState: feedback.deliveryState,
-			suppressionReason: feedback.suppressionReason,
-			createdAt: feedback.createdAt,
-			deliveredAt: feedback.deliveredAt,
-			placementCount: 1,
-			observationIds: [observation.id],
-			replacesId: feedbackDetail(feedback.feedbackId).replacesId,
-			focus: true,
-			location: feedbackDetail(feedback.feedbackId).location,
-		})),
-		moreFeedback: 0,
-		workMoments: [],
-	};
-}
-
-function run(id: string, createdAt: Date): NonNullable<ReviewLineage["review"]> {
-	return {
-		id,
-		status: "COMPLETED",
-		phase: "COMPLETED",
-		createdAt,
-		startedAt: createdAt,
-		model: "claude-sonnet-4-5",
-	};
-}
-
-// ------------------------------------------------------------------------------------------------
-// One review of a pull request, told several ways, for the chain's stories. Fixed instants, so a gap
-// between two steps reads the same in every run.
-// ------------------------------------------------------------------------------------------------
 
 export const LINEAGE_REVIEW_ID = "11111111-1111-1111-1111-111111111111";
 export const EARLIER_REVIEW_ID = "11111111-1111-1111-1111-000000000000";
@@ -132,418 +186,66 @@ export const EARLIER_REVIEW_ID = "11111111-1111-1111-1111-000000000000";
 export const at = (time: string): Date => new Date(`2026-07-28T${time}Z`);
 export const dayAt = (day: string, time: string): Date => new Date(`2026-${day}T${time}Z`);
 
-export const LINEAGE_OBS = {
+export const LINEAGE_RESULT = {
 	cache404: "66666666-6666-6666-6666-666666666666",
 	testNames: "77777777-7777-7777-7777-777777777777",
 	description: "88888888-8888-8888-8888-888888888888",
 	thinController: "55555555-5555-5555-5555-555555555555",
-	scoped: "5a5a5a5a-5555-5555-5555-555555555555",
 } as const;
 
-export const LINEAGE_FB = {
+export const LINEAGE_FEEDBACK = {
 	onGitHub: "44444444-4444-4444-4444-444444444444",
-	afterMerge: "bbbbbbbb-4444-4444-4444-444444444444",
 	praise: "33333333-3333-3333-3333-333333333333",
-	deduped: "aaaaaaaa-3333-3333-3333-333333333333",
-	card: "cccccccc-4444-4444-4444-444444444444",
-	earlier: "99999999-3333-3333-3333-333333333333",
-	invalidated: "dddddddd-4444-4444-4444-444444444444",
+	replaced: "99999999-3333-3333-3333-333333333333",
+	nothingNew: "aaaaaaaa-3333-3333-3333-333333333333",
+	withdrawn: "bbbbbbbb-3333-3333-3333-333333333333",
+	restored: "cccccccc-3333-3333-3333-333333333333",
+	rejected: "dddddddd-3333-3333-3333-333333333333",
+	markedIncorrect: "eeeeeeee-3333-3333-3333-333333333333",
 } as const;
 
-const OBS = LINEAGE_OBS;
-const FB = LINEAGE_FB;
+export const lineageResultFocus: ReviewLineage = reviewLineage("RESULT", LINEAGE_RESULT.cache404);
 
-/**
- * An observation of the chain's review. Its own feedback count follows the total unless the
- * override says a later review wrote some of it.
- */
-export const lineageObservation = (
-	id: string,
-	overrides: Partial<ReviewLineageObservation>,
-): ReviewLineageObservation => {
-	const base: ReviewLineageObservation = {
-		id,
-		agentJobId: LINEAGE_REVIEW_ID,
-		summary: "",
-		practiceSlug: "errors-carry-context",
-		practiceName: "Errors carry their context",
-		outcome: "NOT_MET",
-		observedAt: at("13:39:00"),
-		focus: false,
-		invalidated: false,
-		feedbackCount: 0,
-		ownFeedbackCount: 0,
-		...overrides,
-	};
-	return { ...base, ownFeedbackCount: overrides.ownFeedbackCount ?? base.feedbackCount };
-};
+export const lineageProblemFocus: ReviewLineage = reviewLineage(
+	"PROBLEM",
+	problemIdOf(LINEAGE_RESULT.cache404, 0),
+);
 
-/** Where a piece on each channel lands for the fixture's pull request, which is on GitHub. */
-const LOCATION_BY_CHANNEL: Record<ReviewLineageFeedback["channel"], FeedbackLocation> = {
-	IN_CONTEXT: "GITHUB",
-	IN_CHAT: "HEPH",
-	IN_APP: "PRACTICE_PAGES",
-};
+export const lineageFeedbackFocus: ReviewLineage = reviewLineage(
+	"FEEDBACK",
+	LINEAGE_FEEDBACK.onGitHub,
+);
 
-export const lineageFeedback = (
-	id: string,
-	observationIds: string[],
-	overrides: Partial<ReviewLineageFeedback>,
-): ReviewLineageFeedback => {
-	const base: ReviewLineageFeedback = {
-		id,
-		agentJobId: LINEAGE_REVIEW_ID,
-		channel: "IN_CONTEXT",
-		deliveryState: "DELIVERED",
-		createdAt: at("13:41:00"),
-		deliveredAt: at("13:41:30"),
-		placementCount: 1,
-		observationIds,
-		focus: false,
-		location: "GITHUB",
-		...overrides,
-	};
-	return { ...base, location: overrides.location ?? LOCATION_BY_CHANNEL[base.channel] };
-};
+export const lineageItemFocus: ReviewLineage = reviewLineage("ITEM", reviewItem.id);
 
-/** The review's five observations: three not met, two met. */
-function lineageObservations(
-	focus: readonly string[],
-	overrides: Partial<Record<string, Partial<ReviewLineageObservation>>> = {},
-): ReviewLineageObservation[] {
-	const base: ReviewLineageObservation[] = [
-		lineageObservation(OBS.cache404, {
-			summary: "A cache miss and a permission failure come back as the same 404",
-			severity: "MAJOR",
-			observedAt: at("13:39:00"),
-			feedbackCount: 2,
-		}),
-		lineageObservation(OBS.testNames, {
-			summary: "Three of the new tests are named after the method they call",
-			practiceSlug: "tests-name-the-behaviour",
-			practiceName: "Tests name the behaviour",
-			severity: "MINOR",
-			observedAt: at("13:38:00"),
-			feedbackCount: 1,
-		}),
-		lineageObservation(OBS.description, {
-			summary: "The description lists the files touched and stops there",
-			practiceSlug: "the-change-explains-itself",
-			practiceName: "The change explains itself",
-			severity: "INFO",
-			observedAt: at("13:37:00"),
-			feedbackCount: 1,
-		}),
-		lineageObservation(OBS.thinController, {
-			summary: "The controller delegates before it does anything else",
-			practiceSlug: "thin-controllers",
-			practiceName: "Thin controllers",
-			outcome: "MET",
-			observedAt: at("13:40:00"),
-			feedbackCount: 1,
-		}),
-		lineageObservation(OBS.scoped, {
-			summary: "Every new query names the workspace it reads",
-			practiceSlug: "workspace-scoped-queries",
-			practiceName: "Queries are scoped to the workspace",
-			outcome: "MET",
-			observedAt: at("13:40:00"),
-		}),
-	];
-	return base.map((entry) => {
-		const override = overrides[entry.id] ?? {};
-		return lineageObservation(entry.id, {
-			...entry,
-			...override,
-			ownFeedbackCount:
-				override.ownFeedbackCount ?? override.feedbackCount ?? entry.ownFeedbackCount,
-			focus: focus.includes(entry.id),
+export const wholeReview: ReviewLineage = reviewLineage("REVIEW", LINEAGE_REVIEW_ID);
+
+export const wholeReviewManyFeedback: ReviewLineage = (() => {
+	const extra = [
+		[LINEAGE_RESULT.thinController, LINEAGE_RESULT.testNames],
+		[LINEAGE_RESULT.description],
+		[LINEAGE_RESULT.description, LINEAGE_RESULT.cache404],
+		[LINEAGE_RESULT.cache404, LINEAGE_RESULT.thinController],
+		[LINEAGE_RESULT.testNames],
+		[LINEAGE_RESULT.thinController, LINEAGE_RESULT.description],
+	].map((basis, index) => {
+		const feedbackNode = lineageFeedbackNode({
+			id: `eeeeeeee-0000-4000-8000-00000000000${index}`,
+			destination: index % 2 === 0 ? "PRACTICE_PAGE" : "ON_WORK",
+			state: "DELIVERED",
+			deliveredAt: at(`13:4${index}:50`),
+			withdrawn: false,
 		});
+		return {
+			node: feedbackNode,
+			edges: basis.map((resultId) =>
+				lineageEdge(lineageKey("RESULT", resultId), feedbackNode.id, LINEAGE_RELATION.basis),
+			),
+		};
 	});
-}
-
-export const storyLineage = (overrides: Partial<ReviewLineage>): ReviewLineage => ({
-	work: reviewArtifact.reviewedWork,
-	review: {
-		id: LINEAGE_REVIEW_ID,
-		status: "COMPLETED",
-		phase: "COMPLETED",
-		createdAt: at("13:35:00"),
-		startedAt: at("13:35:00"),
-		model: "claude-sonnet-4-5",
-	},
-	reviewTrigger: "OPENED",
-	observations: lineageObservations([OBS.cache404]),
-	moreObservations: 0,
-	feedback: [],
-	moreFeedback: 0,
-	workMoments: [],
-	...overrides,
-});
-
-/** The rest of the review's feedback, which the traced path does not reach. */
-const untraced = [
-	lineageFeedback(FB.praise, [OBS.thinController], {
-		createdAt: at("13:42:00"),
-		deliveredAt: at("13:43:00"),
-	}),
-	lineageFeedback(FB.deduped, [OBS.description], {
-		deliveryState: "SUPPRESSED",
-		suppressionReason: "COMPOSER_DEDUPED",
-		deliveredAt: undefined,
-		placementCount: 0,
-	}),
-];
-
-const onGitHub = lineageFeedback(FB.onGitHub, [OBS.cache404, OBS.testNames], {
-	focus: true,
-	placementCount: 2,
-	response: { disputed: false, respondedAt: at("15:20:00") },
-});
-
-/** The observation in front led to one comment on the pull request, which the developer found helpful. */
-export const lineageObservationFocus: ReviewLineage = storyLineage({
-	feedback: [onGitHub, ...untraced],
-});
-
-/** A card on the developer's practice pages that rests on three of the review's observations. */
-export const lineageFeedbackFocus: ReviewLineage = storyLineage({
-	observations: lineageObservations([OBS.cache404, OBS.testNames, OBS.description]),
-	feedback: [
-		lineageFeedback(FB.card, [OBS.cache404, OBS.testNames, OBS.description], {
-			focus: true,
-			channel: "IN_APP",
-			createdAt: at("13:42:00"),
-			deliveredAt: dayAt("07-29", "08:14:00"),
-			placementCount: 0,
-		}),
-		...untraced,
-	],
-});
-
-/**
- * The review started when the work was marked ready. The work was merged more than an hour later,
- * and a piece of feedback composed after that was withheld: the review finished too late.
- */
-export const lineageMergedBeforeFinished: ReviewLineage = storyLineage({
-	reviewTrigger: "READY",
-	workMergedAt: at("14:51:00"),
-	feedback: [
-		onGitHub,
-		lineageFeedback(FB.afterMerge, [OBS.cache404], {
-			focus: true,
-			createdAt: at("14:58:00"),
-			deliveryState: "SUPPRESSED",
-			suppressionReason: "ARTIFACT_MERGED",
-			deliveredAt: undefined,
-			placementCount: 0,
-		}),
-		...untraced,
-	],
-});
-
-/** The merge started the review, so feedback withheld as already merged is by design. */
-export const lineageStartedByMerge: ReviewLineage = storyLineage({
-	reviewTrigger: "MERGED",
-	workMergedAt: at("13:20:00"),
-	feedback: [
-		lineageFeedback(FB.afterMerge, [OBS.cache404], {
-			focus: true,
-			createdAt: at("13:41:00"),
-			deliveryState: "SUPPRESSED",
-			suppressionReason: "ARTIFACT_MERGED",
-			deliveredAt: undefined,
-			placementCount: 0,
-		}),
-	],
-});
-
-/**
- * The developer disputed the comment on the pull request. The card on their practice pages they
- * found helpful, and some days later their work resolved it.
- */
-export const lineageDisputedAndResolved: ReviewLineage = storyLineage({
-	feedback: [
-		{
-			...onGitHub,
-			response: {
-				disputed: true,
-				disputeExplanation: "The two cases share a cause, so one status is right here.",
-				respondedAt: at("16:05:00"),
-			},
-		},
-		lineageFeedback(FB.card, [OBS.cache404], {
-			focus: true,
-			channel: "IN_APP",
-			createdAt: at("13:42:00"),
-			deliveredAt: dayAt("07-29", "08:14:00"),
-			placementCount: 0,
-			response: {
-				disputed: false,
-				respondedAt: dayAt("07-29", "08:20:00"),
-				resolvedByWorkAt: dayAt("08-06", "11:02:00"),
-			},
-		}),
-		...untraced,
-	],
-});
-
-// ------------------------------------------------------------------------------------------------
-// The same review whole, as the review's page reads it: eight observations, the feedback written
-// from them, one piece an earlier review wrote and this review's feedback replaced, and the
-// moments on the work. Every loss the chain can show happens once.
-// ------------------------------------------------------------------------------------------------
-
-export const WHOLE_OBS = {
-	...OBS,
-	swallowed: "6a6a6a6a-6666-6666-6666-666666666666",
-	migration: "5b5b5b5b-5555-5555-5555-555555555555",
-	readme: "5c5c5c5c-5555-5555-5555-555555555555",
-	/** Recorded by the earlier review, so this chain does not list it. */
-	earlier: "66666666-6666-6666-6666-000000000000",
-} as const;
-
-const wholeObservations = (): ReviewLineageObservation[] => [
-	...lineageObservations([], {
-		[OBS.cache404]: { feedbackCount: 3 },
-		[OBS.testNames]: { feedbackCount: 2 },
-		[OBS.description]: { invalidated: true, markedIncorrectAt: at("13:58:00") },
-		[OBS.thinController]: { feedbackCount: 1 },
-	}),
-	lineageObservation(WHOLE_OBS.swallowed, {
-		summary: "The retry wrapper drops the exception it caught and throws a new one",
-		severity: "MINOR",
-		observedAt: at("13:39:30"),
-		feedbackCount: 1,
-	}),
-	lineageObservation(WHOLE_OBS.migration, {
-		summary: "Cannot tell from the diff whether the migration runs before the new query",
-		practiceSlug: "workspace-scoped-queries",
-		practiceName: "Queries are scoped to the workspace",
-		outcome: "UNDETERMINED",
-		observedAt: at("13:40:30"),
-	}),
-	lineageObservation(WHOLE_OBS.readme, {
-		summary: "The work changes no public interface, so there is nothing to document",
-		practiceSlug: "public-interfaces-are-documented",
-		practiceName: "Public interfaces are documented",
-		outcome: "NOT_APPLICABLE",
-		observedAt: at("13:40:40"),
-	}),
-];
-
-const wholeFeedback = (): ReviewLineageFeedback[] => [
-	lineageFeedback(FB.onGitHub, [OBS.cache404, OBS.testNames], {
-		placementCount: 2,
-		replacesId: FB.earlier,
-		response: {
-			disputed: true,
-			disputeExplanation: "The two cases share a cause, so one status is right here.",
-			respondedAt: at("16:05:00"),
-		},
-	}),
-	lineageFeedback(FB.card, [OBS.cache404, WHOLE_OBS.swallowed, OBS.testNames], {
-		channel: "IN_APP",
-		createdAt: at("13:42:00"),
-		deliveredAt: dayAt("07-29", "08:14:00"),
-		placementCount: 0,
-		response: {
-			disputed: false,
-			respondedAt: dayAt("07-29", "08:20:00"),
-			resolvedByWorkAt: dayAt("08-06", "11:02:00"),
-		},
-	}),
-	lineageFeedback(FB.afterMerge, [OBS.cache404], {
-		createdAt: at("14:58:00"),
-		deliveryState: "SUPPRESSED",
-		suppressionReason: "ARTIFACT_MERGED",
-		deliveredAt: undefined,
-		placementCount: 0,
-	}),
-	lineageFeedback(FB.deduped, [OBS.description], {
-		createdAt: at("13:41:10"),
-		deliveryState: "SUPPRESSED",
-		suppressionReason: "COMPOSER_DEDUPED",
-		deliveredAt: undefined,
-		placementCount: 0,
-	}),
-	lineageFeedback(FB.praise, [OBS.thinController], {
-		createdAt: at("13:42:00"),
-		deliveredAt: at("13:43:00"),
-	}),
-	lineageFeedback(FB.earlier, [WHOLE_OBS.earlier], {
-		agentJobId: EARLIER_REVIEW_ID,
-		createdAt: at("09:12:00"),
-		deliveredAt: at("09:12:20"),
-		deliveryState: "SUPERSEDED",
-		replacedById: FB.onGitHub,
-	}),
-];
-
-/**
- * The review started when the work was marked ready, and the work merged while it still ran: the
- * note it wrote after the merge was withheld. That is the case the page has to make obvious.
- */
-export const wholeReview: ReviewLineage = storyLineage({
-	review: {
-		id: LINEAGE_REVIEW_ID,
-		status: "COMPLETED",
-		phase: "COMPLETED",
-		createdAt: at("13:35:00"),
-		startedAt: at("13:35:20"),
-		finishedAt: at("15:02:00"),
-		model: "claude-sonnet-4-5",
-	},
-	reviewTrigger: "READY",
-	workMergedAt: at("14:51:00"),
-	workMoments: [
-		{ kind: "OPENED", occurredAt: at("13:20:00"), startedReview: false, joinedReview: false },
-		{ kind: "READY", occurredAt: at("13:34:40"), startedReview: true, joinedReview: false },
-		{ kind: "PUSHED", occurredAt: at("14:20:00"), startedReview: false, joinedReview: true },
-		{ kind: "MERGED", occurredAt: at("14:51:00"), startedReview: false, joinedReview: false },
-	],
-	observations: wholeObservations(),
-	feedback: wholeFeedback(),
-});
-
-/** The merge started the review, so the note withheld as already merged is by design. */
-export const wholeReviewStartedByMerge: ReviewLineage = {
-	...wholeReview,
-	review: {
-		id: LINEAGE_REVIEW_ID,
-		status: "COMPLETED",
-		phase: "COMPLETED",
-		createdAt: at("14:51:20"),
-		startedAt: at("14:51:25"),
-		finishedAt: at("14:58:30"),
-		model: "claude-sonnet-4-5",
-	},
-	reviewTrigger: "MERGED",
-	workMoments: [
-		{ kind: "OPENED", occurredAt: at("13:20:00"), startedReview: false, joinedReview: false },
-		{ kind: "MERGED", occurredAt: at("14:51:00"), startedReview: true, joinedReview: false },
-	],
-	feedback: wholeFeedback().filter((entry) => entry.id !== FB.earlier),
-};
-
-/** Twelve pieces of feedback from the same eight observations, for the lines to cross. */
-export const wholeReviewManyFeedback: ReviewLineage = {
-	...wholeReview,
-	feedback: [
-		...wholeFeedback(),
-		...[
-			[OBS.thinController, OBS.scoped],
-			[WHOLE_OBS.readme],
-			[OBS.description, OBS.cache404],
-			[WHOLE_OBS.migration, OBS.scoped],
-			[OBS.testNames],
-			[WHOLE_OBS.swallowed, WHOLE_OBS.readme],
-		].map((observationIds, index) =>
-			lineageFeedback(`eeeeeeee-0000-4000-8000-00000000000${index}`, observationIds, {
-				channel: index % 2 === 0 ? "IN_APP" : "IN_CONTEXT",
-				createdAt: at(`13:4${index}:30`),
-				deliveredAt: at(`13:4${index}:50`),
-			}),
-		),
-	],
-};
+	return {
+		...wholeReview,
+		nodes: [...wholeReview.nodes, ...extra.map((entry) => entry.node)],
+		edges: [...wholeReview.edges, ...extra.flatMap((entry) => entry.edges)],
+	};
+})();

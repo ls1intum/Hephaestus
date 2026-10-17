@@ -1,19 +1,15 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-	autonomyRollupQueryKey,
+	getFeedbackModeRollupQueryKey,
 	getPracticeReviewSettingsQueryKey,
-	listGroupsQueryKey,
+	listPracticeGroupsQueryKey,
 	listPracticesQueryKey,
 	updatePracticeReviewSettingsMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type { PracticeReviewSettings, UpdatePracticeReviewSettingsRequest } from "@/api/types.gen";
+import type { PracticeReviewSettings } from "@/api/types.gen";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
 import { hasText } from "@/lib/text";
-
-export type PracticeReviewSettingsField = NonNullable<
-	UpdatePracticeReviewSettingsRequest["reset"]
->[number];
 
 export function usePracticeReviewSettingsMutation(
 	workspaceSlug: string,
@@ -41,19 +37,19 @@ export function usePracticeReviewSettingsMutation(
 					...(reset?.includes("REVIEW_SCOPE") === true
 						? {
 								reviewScope: {
-									repositoryMode: "ALL_MONITORED" as const,
-									personMode: "ALL_ELIGIBLE" as const,
-									repositories: [],
-									personUserIds: [],
+									people: "ALL" as const,
+									repositories: "ALL" as const,
+									accountIds: [],
+									selectedRepositories: [],
 								},
 							}
 						: {}),
 					...(patch.reviewScope ? { reviewScope: patch.reviewScope } : {}),
 					...(patch.deliveryStatus ? { deliveryStatus: patch.deliveryStatus } : {}),
-					...(patch.defaultAutonomy
+					...(patch.defaultFeedbackMode
 						? {
-								defaultAutonomy: patch.defaultAutonomy,
-								defaultAutonomyOverride: patch.defaultAutonomy,
+								defaultFeedbackMode: patch.defaultFeedbackMode,
+								defaultFeedbackModeOverride: patch.defaultFeedbackMode,
 							}
 						: {}),
 					...(patch.deliverToMerged === undefined
@@ -95,13 +91,13 @@ export function usePracticeReviewSettingsMutation(
 			}
 			void queryClient.invalidateQueries({ queryKey: settingsQueryKey });
 			void queryClient.invalidateQueries({
-				queryKey: autonomyRollupQueryKey({ path: { workspaceSlug } }),
+				queryKey: getFeedbackModeRollupQueryKey({ path: { workspaceSlug } }),
 			});
 			void queryClient.invalidateQueries({
 				queryKey: listPracticesQueryKey({ path: { workspaceSlug } }),
 			});
 			void queryClient.invalidateQueries({
-				queryKey: listGroupsQueryKey({ path: { workspaceSlug } }),
+				queryKey: listPracticeGroupsQueryKey({ path: { workspaceSlug } }),
 			});
 		},
 	});

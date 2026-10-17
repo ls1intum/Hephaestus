@@ -12,10 +12,10 @@ import static com.slack.api.model.block.element.BlockElements.button;
 import com.slack.api.model.block.LayoutBlock;
 import com.slack.api.model.block.composition.ConfirmationDialogObject;
 import com.slack.api.model.view.View;
-import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorReadinessQuery;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorRefusal;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorTurnRunner;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.slack.SlackHephaestusUiLinks;
 import de.tum.cit.aet.hephaestus.integration.slack.channel.SlackConsentBlocks;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
@@ -24,6 +24,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackParticipantConsen
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackWorkspaceResolver;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
+import de.tum.cit.aet.hephaestus.practices.spi.MentorReadinessQuery;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -33,6 +34,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 @Service
+@ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)
 public class SlackAppHomeService {
 
@@ -90,10 +92,11 @@ public class SlackAppHomeService {
         List<LayoutBlock> blocks = new ArrayList<>();
         blocks.add(header(h -> h.text(plainText("Hephaestus practice mentor"))));
         boolean mentorReady = mentorReadinessQuery.isReady(workspaceId);
-        Optional<User> developer = identityResolver.resolveDeveloper(workspaceId, teamId, slackUserId);
-        Optional<String> login = developer.map(User::getLogin);
+        Optional<AccountSummaryQuery.AccountSummary> developer =
+                identityResolver.resolveDeveloper(workspaceId, teamId, slackUserId);
+        Optional<String> login = developer.map(AccountSummaryQuery.AccountSummary::displayName);
         Optional<MentorRefusal> refusal = mentorReady
-                ? developer.flatMap(user -> mentorTurnRunner.refusal(workspaceId, user.getId()))
+                ? developer.flatMap(user -> mentorTurnRunner.refusal(workspaceId, user.id()))
                 : Optional.empty();
         boolean channelMessagesAllowed =
                 !participantConsentRepository.existsByWorkspaceIdAndSlackUserIdAndIngestionOptedOutTrue(
@@ -151,10 +154,10 @@ public class SlackAppHomeService {
                                 + (state.channelMessagesAllowed()
                                         ? "Allowed, " + activeChannelText
                                         : "Not allowed"))))),
-                section(s -> s.text(markdownText(
-                        "*Context and privacy.* Hephaestus can use your linked project work and new messages "
-                                + "you send in monitored channels. It does not read channel history from before the "
-                                + "channel was activated. It does not mentor in channels."))));
+                section(
+                        s -> s.text(
+                                markdownText(
+                                        "*Context and privacy.* Hephaestus can use your linked project work and new messages you send in monitored channels. It does not read channel history from before the channel was activated. It does not mentor in channels."))));
     }
 
     record HomeOverviewState(
@@ -172,8 +175,7 @@ public class SlackAppHomeService {
                 section(
                         s -> s.text(
                                 markdownText(
-                                        "*Account settings.* Use this Home tab to control how Hephaestus uses your Slack messages. "
-                                                + "Open Hephaestus to manage your sign-in, your connected accounts, and your research participation."))),
+                                        "*Account settings.* Use this Home tab to control how Hephaestus uses your Slack messages. Open Hephaestus to manage your sign-in, your connected accounts, and your research participation."))),
                 actions(a -> a.elements(asElements(button(b -> b.text(plainText("Open account settings"))
                         .url(url)
                         .actionId(ACTION_OPEN_HEPHAESTUS)
@@ -182,19 +184,15 @@ public class SlackAppHomeService {
 
     private static String leadText(HomeOverviewState state) {
         if (!state.mentorReady()) {
-            return ("*Mentor unavailable.* Heph is turned off or not set up for this workspace. "
-                    + "You can still manage your privacy here.");
+            return "*Mentor unavailable.* Heph is turned off or not set up for this workspace. You can still manage your privacy here.";
         }
         if (state.login().isEmpty()) {
-            return ("*Check your account access to use Heph.* You need an active Hephaestus account "
-                    + "that you linked to Slack. You also need a project identity in this workspace. "
-                    + "You can still manage channel-message privacy here.");
+            return "*Check your account access to use Heph.* You need an active Hephaestus account that you linked to Slack. You also need a project identity in this workspace. You can still manage channel-message privacy here.";
         }
         if (state.refusal().isPresent()) {
             return state.refusal().get().userMessage();
         }
-        return ("*AI mentor for software project practices.* In the Messages tab, ask about PRs, reviews, issues, "
-                + "tests, or team ways of working. The replies stay in DMs.");
+        return "*AI mentor for software project practices.* In the Messages tab, ask about PRs, reviews, issues, tests, or team ways of working. The replies stay in DMs.";
     }
 
     private static String stateIcon(boolean ok) {
@@ -203,9 +201,7 @@ public class SlackAppHomeService {
 
     List<LayoutBlock> channelMessageBlocks(boolean allowed) {
         String status = allowed
-                ? "*Channel-message context is allowed.* Hephaestus may use the new messages that you send in monitored "
-                        + "channels to personalize how it mentors you in private. If you turn this off, Hephaestus stops "
-                        + "future use and deletes the channel-message data that it collected from you."
+                ? "*Channel-message context is allowed.* Hephaestus may use the new messages that you send in monitored channels to personalize how it mentors you in private. If you turn this off, Hephaestus stops future use and deletes the channel-message data that it collected from you."
                 : "*Channel-message context is not allowed.* Hephaestus does not use your messages in monitored channels.";
         return List.of(
                 section(s -> s.text(markdownText(status))),
@@ -226,8 +222,9 @@ public class SlackAppHomeService {
     private static ConfirmationDialogObject channelMessageOptInConfirm() {
         return ConfirmationDialogObject.builder()
                 .title(plainText("Allow future channel messages?"))
-                .text(plainText("Hephaestus can then use the new messages that you send in monitored channels. "
-                        + "Hephaestus does not restore deleted data."))
+                .text(
+                        plainText(
+                                "Hephaestus can then use the new messages that you send in monitored channels. Hephaestus does not restore deleted data."))
                 .confirm(plainText("Allow future messages"))
                 .deny(plainText("Cancel"))
                 .build();

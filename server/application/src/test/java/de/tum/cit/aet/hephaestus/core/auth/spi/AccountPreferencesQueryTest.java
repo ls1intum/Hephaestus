@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.core.auth.spi;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.account.UserPreferences;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery.PreferencesView;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Optional;
@@ -19,7 +19,7 @@ class AccountPreferencesQueryTest extends BaseUnitTest {
 
         assertThat(defaultWithoutRow)
                 .isTrue()
-                .isEqualTo(new UserPreferences().isPracticeFeedbackDeliveryEnabled())
+                .isEqualTo(new Account("Defaults").isFeedbackDeliveryEnabled())
                 .isEqualTo(PreferencesView.PRACTICE_FEEDBACK_DELIVERY_ENABLED_BY_DEFAULT);
     }
 
@@ -37,11 +37,6 @@ class AccountPreferencesQueryTest extends BaseUnitTest {
         return new AccountPreferencesQuery() {
             @Override
             public Optional<PreferencesView> preferencesForAccount(Long accountId) {
-                return Optional.empty();
-            }
-
-            @Override
-            public Optional<PreferencesView> preferencesForUserId(long userId) {
                 return stored == null ? Optional.empty() : Optional.of(new PreferencesView(true, stored));
             }
         };

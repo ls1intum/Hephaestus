@@ -1,25 +1,18 @@
-import type { ObservationDetail, PracticeStanding, TrendSupport } from "@/api/types.gen";
+import type { PracticeStanding, ResultList, TrendSupport } from "@/api/types.gen";
 
 const NOTE = "A requested review is evidence only and does not change your standing.";
 
-/**
- * The sentence for a standing that reads "Needs attention" while the newest review of the practice
- * is a requested one, whoever asked for it, and found no problem. It needs live reviews behind the
- * standing: one read from requested reviews alone does move with them.
- * `trendSupport.opportunities` counts the live work that the trend reads.
- *
- * @param runs the practice's own reviews, newest first
- */
+// Requested reviews are evidence only; their clean result cannot replace a live standing.
 export function requestedReviewNote(
 	practice: Pick<PracticeStanding, "standing"> & {
-		trendSupport?: Pick<TrendSupport, "opportunities">;
+		trendSupport?: Pick<TrendSupport, "opportunities"> | null;
 	},
-	runs: readonly { observations: readonly Pick<ObservationDetail, "origin" | "outcome">[] }[],
+	reviews: readonly { results: readonly Pick<ResultList, "origin" | "outcome">[] }[],
 ): string | undefined {
-	const newest = runs[0]?.observations ?? [];
+	const newest = reviews[0]?.results ?? [];
 	const requestedAndClean =
 		newest.length > 0 &&
-		newest.every((observation) => observation.origin === "MANUAL" && observation.outcome === "MET");
+		newest.every((result) => result.origin === "REQUEST" && result.outcome === "MET");
 	const liveJudged = (practice.trendSupport?.opportunities ?? 0) > 0;
 	return practice.standing === "DEVELOPING" && liveJudged && requestedAndClean ? NOTE : undefined;
 }

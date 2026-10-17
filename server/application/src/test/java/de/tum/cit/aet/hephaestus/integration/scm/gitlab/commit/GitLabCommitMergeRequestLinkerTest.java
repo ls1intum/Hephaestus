@@ -18,13 +18,13 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitContributorRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlResponseHandler;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlResponseHandler.HandleResult;
@@ -34,7 +34,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabAdmissio
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.PassThroughTransactionTemplate;
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
@@ -109,6 +111,7 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
                 eventPublisher,
                 mock(),
                 new PassThroughTransactionTemplate(),
+                Clock.fixed(Instant.EPOCH, ZoneOffset.UTC),
                 projectAdmission);
 
         repository = new Repository();
@@ -499,10 +502,6 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
         return resp;
     }
 
-    /**
-     * Mocks the fallback {@code GetMergeRequestAllCommits} response shape:
-     * {@code project.mergeRequests.nodes[0].commits.{nodes,pageInfo}}.
-     */
     @SuppressWarnings("unchecked")
     private ClientGraphQlResponse mockFallbackMrCommitsPage(List<String> shas, GitLabPageInfo pageInfo) {
         ClientGraphQlResponse resp = mock(ClientGraphQlResponse.class);
@@ -529,10 +528,6 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
         return resp;
     }
 
-    /**
-     * Mocks the follow-up {@code GetMergeRequestCommits} response shape:
-     * {@code project.mergeRequests.nodes[0].commitsWithoutMergeCommits.{nodes,pageInfo}}.
-     */
     @SuppressWarnings("unchecked")
     private ClientGraphQlResponse mockNestedMrCommitsPage(List<String> shas, GitLabPageInfo pageInfo) {
         ClientGraphQlResponse resp = mock(ClientGraphQlResponse.class);
@@ -559,13 +554,7 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
         return resp;
     }
 
-    /**
-     * Builds the map shape that the linker reads from {@code project.mergeRequests.nodes[*]}.
-     *
-     * <p>{@code MergeRequest.iid} is {@code String!} in the checked-in schema, so GitLab sends {@code "42"} and
-     * never {@code 42}. Stubbing it as a number would exercise only the {@code Number} branch of the production
-     * extractor — the branch GitLab can never trigger.
-     */
+    // GitLab MergeRequest.iid is String!; numeric fixtures would test a shape the provider never sends.
     private static Map<String, Object> mrNode(
             int iid, List<String> shas, boolean nestedHasNextPage, @Nullable String nestedEndCursor) {
         Map<String, Object> pageInfoMap = new LinkedHashMap<>();
@@ -584,10 +573,6 @@ class GitLabCommitMergeRequestLinkerTest extends BaseUnitTest {
         return node;
     }
 
-    /**
-     * Builds an MR node with fully populated commit fields (sha + author fields)
-     * so that the author-attribution harvest can be exercised.
-     */
     private static Map<String, Object> mrNodeWithCommits(int iid, List<Map<String, Object>> commitNodes) {
         Map<String, Object> pageInfoMap = new LinkedHashMap<>();
         pageInfoMap.put("hasNextPage", false);

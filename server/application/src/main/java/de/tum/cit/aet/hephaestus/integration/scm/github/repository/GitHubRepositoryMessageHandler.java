@@ -2,14 +2,15 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.repository;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventAction;
@@ -43,6 +44,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  *      GitHub Repository Webhook Events</a>
  */
 @Component
+@ConditionalOnServerRole
 public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHandler<GitHubRepositoryEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubRepositoryMessageHandler.class);
@@ -66,9 +68,10 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
         super(
                 IntegrationKind.GITHUB,
                 // Org tier, not repository tier — see the class javadoc. Must stay in lockstep with
-                // GitHubSubjectKeyDeriver's org-scoping of the `repository` event: registering this on
-                // `repository.` again makes every repository lifecycle event resolve no handler and be
-                // ACK-dropped silently (WebhookFixtureHandlerResolutionTest guards exactly that).
+                // GitHubSubjectKeyDeriver's org-scoping of the `repository` event: registering this
+                // on `repository.` again makes every repository lifecycle event resolve no handler
+                // and be ACK-dropped silently (WebhookFixtureHandlerResolutionTest guards exactly
+                // that).
                 "organization." + GitHubEventType.REPOSITORY.getValue(),
                 GitHubRepositoryEventDTO.class,
                 deserializer,
@@ -237,7 +240,7 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
             return;
         }
 
-        // Both rows are this provider's: a native id or a name is unique only on its provider instance.
+        // Native ids and repository names are unique only within a provider instance.
         Long providerId = gitProviderRepository
                 .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
                 .map(IdentityProvider::getId)
@@ -271,8 +274,8 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
                                 safeNewFullName,
                                 nativeId));
 
-        // Always attempt the monitor re-key, even when no domain row is mirrored yet: the monitor is
-        // what the NATS filter is built from, so leaving it stale is the actual data-loss path.
+        // Always attempt the monitor re-key, even when no domain row is mirrored yet: the monitor
+        // is what the NATS filter is built from, so leaving it stale is the actual data-loss path.
         syncTargetProvider.reconcileSyncTargetsForRepository(providerId, nativeId, newFullName);
     }
 

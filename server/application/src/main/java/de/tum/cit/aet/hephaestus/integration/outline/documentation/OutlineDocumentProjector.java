@@ -1,13 +1,11 @@
 package de.tum.cit.aet.hephaestus.integration.outline.documentation;
 
-import de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonCopyIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCopyRecorder;
-import de.tum.cit.aet.hephaestus.core.security.OutlineOriginPolicy;
-import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
-import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
+import de.tum.cit.aet.hephaestus.integration.docs.item.DocumentProjection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocument;
@@ -28,17 +26,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Outline's implementation of the agent {@link DocumentProjection} SPI — the sole agent-facing reader of the
- * mirror; the agent consumes the projected payload, never the schema.
- *
- * <p>A document removed upstream or size-cap evicted projects as a marker rather than being dropped, so a link to
- * a vanished document still resolves to a placeholder. Reads are pure — the {@code readOnly} transaction enforces
- * that this projector never stamps {@code last_materialized_at}.
- *
- * <p>Authorship projects as-is; the workspace member id resolves lazily per batch (memoised per subject) through
- * {@link OutlineIdentityResolver}. An unlinked author degrades to name-only — no member id is ever stamped on the row.
+ * Missing or evicted documents project as absence markers; reads must not alter materialization state.
+ * Resolve authors through {@link OutlineIdentityResolver}; unlinked authors retain names without account ids.
  */
 @Component
+@ConditionalOnCaptureRole
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
 @Transactional(readOnly = true)
 public class OutlineDocumentProjector implements DocumentProjection {
@@ -48,8 +40,8 @@ public class OutlineDocumentProjector implements DocumentProjection {
     private final ConnectionService connectionService;
     private final OutlineIdentityResolver identityResolver;
     private final OutlineDocumentSelector documentSelector;
-    private final OutlineOriginPolicy originPolicy;
     private final PersonDataCopyRecorder personCopies;
+    private final OutlineDocumentPermission permission;
 
     public OutlineDocumentProjector(
             OutlineDocumentRepository documentRepository,
@@ -57,77 +49,46 @@ public class OutlineDocumentProjector implements DocumentProjection {
             ConnectionService connectionService,
             OutlineIdentityResolver identityResolver,
             OutlineDocumentSelector documentSelector,
-            OutlineOriginPolicy originPolicy,
-            PersonDataCopyRecorder personCopies) {
+            PersonDataCopyRecorder personCopies,
+            OutlineDocumentPermission permission) {
         this.documentRepository = documentRepository;
         this.collectionRepository = collectionRepository;
         this.connectionService = connectionService;
         this.identityResolver = identityResolver;
         this.documentSelector = documentSelector;
-        this.originPolicy = originPolicy;
         this.personCopies = personCopies;
+        this.permission = permission;
     }
 
     @Override
     public boolean workspaceReadable(long workspaceId) {
-        return isOriginApproved(workspaceId);
+        return permission.workspaceReadable(workspaceId);
     }
 
     @Override
     public List<ProjectedDocument> documentsForWorkspace(long workspaceId) {
-        if (!isOriginApproved(workspaceId)) return List.of();
-        AuthorContext authors = authorContext(workspaceId);
-        Map<String, String> collectionNames = collectionNames(workspaceId);
+        if (!permission.workspaceReadable(workspaceId)) return List.of();
+        Map<Long, AuthorContext> authors = new HashMap<>();
+        Map<CollectionKey, String> collectionNames = collectionNames(workspaceId);
         return documentRepository.findForProjection(workspaceId, Pageable.unpaged()).stream()
-                .map(doc -> project(doc, authors, collectionNames))
+                .filter(doc -> permission.permits(workspaceId, doc.getId()))
+                .map(doc -> project(doc, authorContext(doc, authors), collectionNames))
                 .toList();
     }
 
     @Override
     public Optional<ProjectedDocument> documentById(long workspaceId, long documentId) {
-        if (!isOriginApproved(workspaceId)) return Optional.empty();
+        if (!permission.permits(workspaceId, documentId)) return Optional.empty();
         return documentRepository
                 .findByWorkspaceIdAndIdForProjection(workspaceId, documentId)
-                .map(doc -> project(doc, authorContext(workspaceId), collectionNames(workspaceId)));
+                .map(doc -> project(doc, authorContext(doc, new HashMap<>()), collectionNames(workspaceId)));
     }
 
     @Override
     public List<ProjectedDocument> documentsByReference(long workspaceId, Collection<String> documentRefs) {
-        if (!isOriginApproved(workspaceId)) return List.of();
-        Set<String> tokens = referenceTokens(documentRefs);
-        if (tokens.isEmpty()) {
-            return List.of();
-        }
-        AuthorContext authors = authorContext(workspaceId);
-        Map<String, String> collectionNames = collectionNames(workspaceId);
-        return documentRepository.findByWorkspaceIdAndReferenceIn(workspaceId, tokens).stream()
-                .map(doc -> project(doc, authors, collectionNames))
-                .toList();
-    }
-
-    @Override
-    public List<DocumentAccess> documentAccessByReference(long workspaceId, Collection<String> documentRefs) {
-        if (!isOriginApproved(workspaceId)) return List.of();
-        Set<String> tokens = referenceTokens(documentRefs);
-        if (tokens.isEmpty()) {
-            return List.of();
-        }
-        return documentRepository.findAccessByWorkspaceIdAndReferenceIn(workspaceId, tokens).stream()
-                .map(OutlineDocumentProjector::documentAccess)
-                .toList();
-    }
-
-    @Override
-    public List<DocumentAccess> documentAccessById(long workspaceId, Collection<Long> documentIds) {
-        if (!isOriginApproved(workspaceId) || documentIds.isEmpty()) return List.of();
-        return documentRepository.findAccessByWorkspaceIdAndIdIn(workspaceId, documentIds).stream()
-                .map(OutlineDocumentProjector::documentAccess)
-                .toList();
-    }
-
-    private static Set<String> referenceTokens(Collection<String> documentRefs) {
+        if (!permission.workspaceReadable(workspaceId)) return List.of();
         if (documentRefs == null || documentRefs.isEmpty()) {
-            return Set.of();
+            return List.of();
         }
         // A reference is either a raw Outline document id or a document URL; match on the id and slug columns,
         // adding the last URL path segment as a candidate token so a link resolves to the mirrored row.
@@ -155,32 +116,35 @@ public class OutlineDocumentProjector implements DocumentProjection {
                 }
             }
         }
-        return tokens;
+        if (tokens.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, AuthorContext> authors = new HashMap<>();
+        Map<CollectionKey, String> collectionNames = collectionNames(workspaceId);
+        return documentRepository.findByWorkspaceIdAndReferenceIn(workspaceId, tokens).stream()
+                .filter(doc -> permission.permits(workspaceId, doc.getId()))
+                .map(doc -> project(doc, authorContext(doc, authors), collectionNames))
+                .toList();
     }
 
     @Override
     public List<ProjectedDocument> searchDocuments(long workspaceId, String queryText, int limit) {
-        if (!isOriginApproved(workspaceId)) return List.of();
+        if (!permission.workspaceReadable(workspaceId)) return List.of();
         List<OutlineDocument> hits = documentSelector.select(workspaceId, queryText, limit);
         if (hits.isEmpty()) {
             return List.of();
         }
-        AuthorContext authors = authorContext(workspaceId);
-        Map<String, String> collectionNames = collectionNames(workspaceId);
-        return hits.stream().map(doc -> project(doc, authors, collectionNames)).toList();
-    }
-
-    private boolean isOriginApproved(long workspaceId) {
-        return connectionService
-                .findActiveOutlineConfig(workspaceId)
-                .map(ConnectionConfig.OutlineConfig::serverUrl)
-                .filter(url -> url != null && !url.isBlank())
-                .filter(originPolicy::allows)
-                .isPresent();
+        Map<Long, AuthorContext> authors = new HashMap<>();
+        Map<CollectionKey, String> collectionNames = collectionNames(workspaceId);
+        return hits.stream()
+                .filter(doc -> permission.permits(workspaceId, doc.getId()))
+                .map(doc -> project(doc, authorContext(doc, authors), collectionNames))
+                .toList();
     }
 
     /** Maps a mirrored row to the agent view; a tombstoned/evicted document serves a null body. */
-    private ProjectedDocument project(OutlineDocument doc, AuthorContext authors, Map<String, String> collectionNames) {
+    private ProjectedDocument project(
+            OutlineDocument doc, AuthorContext authors, Map<CollectionKey, String> collectionNames) {
         connectionService
                 .findInWorkspace(doc.getWorkspaceId(), doc.getConnectionId())
                 .ifPresent(connection -> {
@@ -208,28 +172,24 @@ public class OutlineDocumentProjector implements DocumentProjection {
                 doc.getOutlineUpdatedAt(),
                 doc.getCreatedByName(),
                 doc.getCreatedBySubject(),
-                authors.memberIdFor(doc.getCreatedBySubject()),
+                authors.accountIdFor(doc.getCreatedBySubject()),
                 doc.getUpdatedByName(),
                 doc.getUpdatedBySubject(),
-                authors.memberIdFor(doc.getUpdatedBySubject()),
+                authors.accountIdFor(doc.getUpdatedBySubject()),
                 collaborators(doc, authors),
                 doc.isArchived(),
-                collectionNames.get(doc.getCollectionId()),
+                collectionNames.get(new CollectionKey(doc.getConnectionId(), doc.getCollectionId())),
                 doc.getLastMaterializedAt(),
                 doc.getDocumentId());
     }
 
-    /**
-     * The workspace's collection id → display name map, loaded once per projection call (mirrors
-     * {@link #authorContext}'s per-batch resolution). A collection with no captured name is absent from
-     * the map, so {@code Map#get} degrades to {@code null} — the graceful floor for {@link
-     * de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection.ProjectedDocument#collectionName}.
-     */
-    private Map<String, String> collectionNames(long workspaceId) {
-        Map<String, String> names = new HashMap<>();
+    private Map<CollectionKey, String> collectionNames(long workspaceId) {
+        Map<CollectionKey, String> names = new HashMap<>();
         for (OutlineCollection collection : collectionRepository.findByWorkspaceIdOrderByCreatedAtAsc(workspaceId)) {
             if (collection.getName() != null) {
-                names.put(collection.getCollectionId(), collection.getName());
+                names.put(
+                        new CollectionKey(collection.getConnectionId(), collection.getCollectionId()),
+                        collection.getName());
             }
         }
         return names;
@@ -257,28 +217,28 @@ public class OutlineDocumentProjector implements DocumentProjection {
             } else if (subject.equals(doc.getUpdatedBySubject())) {
                 name = doc.getUpdatedByName();
             }
-            result.add(new ProjectedDocument.Collaborator(subject, name, authors.memberIdFor(subject)));
+            result.add(new ProjectedDocument.Collaborator(subject, name, authors.accountIdFor(subject)));
         }
         return List.copyOf(result);
     }
 
-    /**
-     * The per-batch author-resolution context: the ACTIVE Outline connection's server URL and instance
-     * key (= Outline team UUID), resolved ONCE per projection call. Without an ACTIVE connection (or a
-     * config missing its server URL) authors degrade to name-only rather than failing the projection.
-     */
-    private AuthorContext authorContext(long workspaceId) {
-        Optional<Connection> active = connectionService.findActive(workspaceId, IntegrationKind.OUTLINE);
-        if (active.isEmpty() || !(active.get().getConfig() instanceof ConnectionConfig.OutlineConfig config)) {
-            return AuthorContext.unresolvable();
-        }
-        String serverUrl = config.serverUrl();
-        if (serverUrl == null || serverUrl.isBlank()) {
-            return AuthorContext.unresolvable();
-        }
-        return new AuthorContext(
-                identityResolver, workspaceId, serverUrl, active.get().getInstanceKey());
+    // Cache author resolution per connection because native identities are tenant-specific.
+    private AuthorContext authorContext(OutlineDocument document, Map<Long, AuthorContext> contexts) {
+        return contexts.computeIfAbsent(document.getConnectionId(), ignored -> {
+            var connection = connectionService.findInWorkspace(document.getWorkspaceId(), document.getConnectionId());
+            if (connection.isEmpty()
+                    || !(connection.get().getConfig() instanceof ConnectionConfig.OutlineConfig config)
+                    || config.serverUrl() == null
+                    || config.serverUrl().isBlank()) return AuthorContext.unresolvable();
+            return new AuthorContext(
+                    identityResolver,
+                    document.getWorkspaceId(),
+                    config.serverUrl(),
+                    connection.get().getInstanceKey());
+        });
     }
+
+    private record CollectionKey(long connectionId, String collectionId) {}
 
     /** Memoises resolver lookups so each distinct author subject resolves at most once per batch. */
     private static final class AuthorContext {
@@ -287,7 +247,7 @@ public class OutlineDocumentProjector implements DocumentProjection {
         private final long workspaceId;
         private final @Nullable String serverUrl;
         private final @Nullable String teamId;
-        private final Map<String, Optional<Long>> memberIdBySubject = new HashMap<>();
+        private final Map<String, Optional<Long>> accountIdBySubject = new HashMap<>();
 
         private AuthorContext(
                 @Nullable OutlineIdentityResolver resolver,
@@ -305,27 +265,17 @@ public class OutlineDocumentProjector implements DocumentProjection {
         }
 
         @Nullable
-        Long memberIdFor(@Nullable String subject) {
+        Long accountIdFor(@Nullable String subject) {
             if (resolver == null || serverUrl == null || subject == null || subject.isBlank()) {
                 return null;
             }
-            return memberIdBySubject
-                    .computeIfAbsent(subject, s -> resolver.resolveMemberId(workspaceId, serverUrl, teamId, s))
+            return accountIdBySubject
+                    .computeIfAbsent(subject, s -> resolver.resolveAccountId(workspaceId, serverUrl, teamId, s))
                     .orElse(null);
         }
     }
 
     private static String orEmpty(@Nullable String value) {
         return value == null ? "" : value;
-    }
-
-    private static DocumentAccess documentAccess(OutlineDocumentRepository.DocumentAccessRow row) {
-        return new DocumentAccess(
-                row.getId(),
-                row.getSourceId(),
-                orEmpty(row.getCollectionSlug()),
-                orEmpty(row.getSlug()),
-                row.getDeleted(),
-                row.getBodyAvailable());
     }
 }

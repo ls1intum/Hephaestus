@@ -14,21 +14,20 @@ export type AcceptPracticeReleaseRequest = {
  * One account-wide answer; model names belong only to workspace-specific views.
  */
 export type AccountAiChoice = {
-    choice?: 'NO_AI' | 'IN_HOUSE_ONLY' | 'CLOUD';
-    updatedAt?: string;
+    choice: 'NO_AI' | 'IN_HOUSE_ONLY' | 'CLOUD' | null;
+    updatedAt: string | null;
 };
 
 export type AccountAiChoiceRequest = {
     choice: 'NO_AI' | 'IN_HOUSE_ONLY' | 'CLOUD';
 };
 
-/**
- * A human-readable account identity. <code>displayName</code>/<code>email</code> are null for deleted accounts.
- */
 export type AccountRef = {
-    displayName?: string;
-    email?: string;
-    id: number;
+    avatarUrl: string | null;
+    displayName: string | null;
+    id: string;
+    identities: Array<ProviderIdentityRef>;
+    status: 'UNCLAIMED' | 'ACTIVE' | 'SUSPENDED' | 'DELETING' | 'DELETED';
 };
 
 /**
@@ -200,7 +199,7 @@ export type AdminAccountView = {
     displayName?: string;
     id?: number;
     primaryEmail?: string;
-    status: 'ACTIVE' | 'SUSPENDED' | 'DELETING' | 'DELETED';
+    status: 'UNCLAIMED' | 'ACTIVE' | 'SUSPENDED' | 'DELETING' | 'DELETED';
 };
 
 /**
@@ -227,7 +226,7 @@ export type AdminLlmUsageReport = {
 export type AdminWorkspaceLlmUsage = {
     displayName: string;
     /**
-     * Ledger usage records (job attempts / mentor turns) this month, either purse
+     * Runs this month, either purse: job attempts and mentor turns. Rows of models for practice scripts are not runs.
      */
     events: number;
     /**
@@ -250,6 +249,10 @@ export type AdminWorkspaceLlmUsage = {
      * The same verdict for the workspace's own-provider spend against its own cap.
      */
     ownProviderBudgetVerdict: 'WITHIN' | 'EXHAUSTED' | 'UNVERIFIABLE';
+    /**
+     * Whether this month has an own-provider purse to show for the workspace. Same rule as WorkspaceLlmUsageReport.ownProviderInUse.
+     */
+    ownProviderInUse: boolean;
     /**
      * The workspace's own cap in USD on its own-provider spend; null = uncapped. Read-only here — it governs the workspace's money, so only its own admins may change it.
      */
@@ -283,6 +286,57 @@ export type AdminWorkspaceView = {
     workspaceSlug: string;
 };
 
+export type AdmissionRequest = {
+    attempt?: number;
+    contractVersion?: number;
+    jobId?: string;
+    nonResults: Array<RuntimeNonResult>;
+    results?: Array<SubmittedResult>;
+    reviewId?: string;
+};
+
+export type AdmissionResponse = {
+    admissionDigest: string;
+    admitted: Array<AdmittedResult>;
+    attempt: number;
+    contractVersion: number;
+    conversationEligibility: ConversationEligibility | null;
+    jobId: string;
+    practicePageSupport: PracticePageSupport | null;
+    publicReviewed: boolean;
+    reviewId: string;
+    withheld: Array<Withheld>;
+};
+
+export type AdmittedProblem = {
+    basis: DutyBasis | IntroducedBasis | StateBasis | WorsenedBasis | null;
+    citations: Array<ProjectedCitation>;
+    explanation: string | null;
+    id: string;
+    key: string | null;
+    nextStep: string | null;
+    position: number;
+    publicEligible: boolean;
+    resultId: string;
+    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'TRIVIAL';
+    summary: string;
+};
+
+export type AdmittedResult = {
+    coverage: ClaimedCoverage | HostCoverage;
+    evidence: JsonNode;
+    example: JsonNode | null;
+    explanation: string | null;
+    itemId: string;
+    outcome: 'MET' | 'NOT_MET' | 'DOES_NOT_APPLY' | 'COULD_NOT_DETERMINE';
+    practiceSlug: string;
+    problems: Array<AdmittedProblem>;
+    publicEligible: boolean;
+    resultId: string;
+    summary: string | null;
+    summaryOnly: boolean;
+};
+
 /**
  * A workspace's agent binding for one purpose
  */
@@ -292,11 +346,15 @@ export type AgentBinding = {
     enabled: boolean;
     instanceModelId?: number;
     maxConcurrentJobs?: number;
-    purpose: 'PRACTICE_REVIEW' | 'MENTOR';
+    purpose: 'PRACTICE_REVIEW' | 'MENTOR' | 'PRACTICE_DECISION' | 'PRACTICE_EMBEDDING' | 'PRACTICE_RERANKING';
     /**
      * True when the bound model is available to run right now
      */
     ready: boolean;
+    /**
+     * The members this binding serves now, named by the tier of their choice: IN_HOUSE and CLOUD for the members who chose them, UNDECLARED for the members who have not chosen. A decision, embedding or reranking binding serves no member whose review model is stricter. Empty when the binding serves no member.
+     */
+    servedTiers: Array<'IN_HOUSE' | 'CLOUD' | 'UNDECLARED'>;
     timeoutSeconds?: number;
     workspaceModelId?: number;
 };
@@ -331,216 +389,8 @@ export type AgentBindingRequest = {
     workspaceModelId?: number;
 };
 
-/**
- * Agent job execution record (job_token intentionally omitted)
- */
-export type AgentJob = {
-    /**
-     * Ready practices this review did not ask because a completed review had already answered them on the same code; available on review detail after evidence capture. Empty when every ready practice was asked.
-     */
-    answeredPractices?: Array<AnsweredPractice>;
-    /**
-     * When this job becomes eligible to be claimed. In the future while the job is waiting — on a retry backoff, or on a hold. Read together with holdReason: a QUEUED job with availableAt in the future is waiting, not starved for workers.
-     */
-    availableAt: string;
-    /**
-     * Why a CANCELLED job was cancelled; available on job detail, absent otherwise
-     */
-    cancellationReason?: 'DRAIN_GRACEFUL' | 'DRAIN_IMMEDIATE' | 'BUDGET_EXHAUSTED' | 'MODEL_UNAVAILABLE' | 'MEMBER_AI_DECLINED' | 'PERSON_DATA_ERASED';
-    /**
-     * Timestamp when the job completed
-     */
-    completedAt?: string;
-    /**
-     * Frozen agent config at submit time (an INSTANCE-scoped connection's baseUrl is redacted to scheme://host; only a WORKSPACE-scoped connection's baseUrl is left intact)
-     */
-    configSnapshot: unknown;
-    /**
-     * The newer review that replaced this one; set only when reviewOutcome is SUPERSEDED
-     */
-    coveringJobId?: string;
-    /**
-     * Timestamp when the job was created
-     */
-    createdAt: string;
-    /**
-     * Git provider comment/note ID for posted feedback
-     */
-    deliveryCommentId?: string;
-    /**
-     * Result-processing status: null = not applicable, PENDING = awaiting processing, DELIVERED = processing finished, FAILED = processing error. Processing may include delivery; this status alone does not establish feedback publication.
-     */
-    deliveryStatus?: 'PENDING' | 'DELIVERED' | 'FAILED';
-    /**
-     * Human-readable error message
-     */
-    errorMessage?: string;
-    /**
-     * When the current attempt finished preparation, immediately before its sandbox was invoked, if it got that far. A retry resets it; absent on runs from before it was recorded.
-     */
-    executionStartedAt?: string;
-    /**
-     * Container exit code
-     */
-    exitCode?: number;
-    /**
-     * When this review first posted feedback on the work without waiting for an admin's approval; available on review detail, absent until then
-     */
-    firstFeedbackPostedAt?: string;
-    /**
-     * When a developer first read this review's feedback on their practice pages or in a conversation; available on review detail, absent until then
-     */
-    firstFeedbackReadAt?: string;
-    /**
-     * Frozen generated-path policy and changed paths marked generated; available on review detail after evidence capture
-     */
-    generatedPaths?: GeneratedPathReview;
-    /**
-     * Why a QUEUED job is waiting rather than eligible, when the reason is one an admin can undo. BUDGET = the payer is over its monthly LLM cap and the job resumes by itself once the cap is raised or the month rolls over. Absent means no such hold — a future availableAt is then an ordinary retry backoff.
-     */
-    holdReason?: string;
-    /**
-     * Job ID
-     */
-    id: string;
-    /**
-     * Job type
-     */
-    jobType: 'PULL_REQUEST_REVIEW' | 'ISSUE_REVIEW' | 'CONVERSATION_REVIEW' | 'DOCUMENT_REVIEW';
-    /**
-     * Tokens read from prompt cache
-     */
-    llmCacheReadTokens?: number;
-    /**
-     * Tokens written to prompt cache
-     */
-    llmCacheWriteTokens?: number;
-    /**
-     * LLM model used (e.g. gpt-5.4-mini, openai/gpt-oss-120b)
-     */
-    llmModel?: string;
-    /**
-     * Model version/snapshot date (e.g. 2026-03-17). Only jobs from before the model catalog carry one; absent on everything newer.
-     */
-    llmModelVersion?: string;
-    /**
-     * Total LLM API calls (steps) during execution
-     */
-    llmTotalCalls?: number;
-    /**
-     * Total input tokens consumed
-     */
-    llmTotalInputTokens?: number;
-    /**
-     * Total output tokens generated
-     */
-    llmTotalOutputTokens?: number;
-    /**
-     * Total reasoning/thinking tokens
-     */
-    llmTotalReasoningTokens?: number;
-    /**
-     * Job metadata (routing/display info)
-     */
-    metadata?: unknown;
-    /**
-     * Upstream model this job was admitted on, frozen at submit time (e.g. gpt-5.4-mini). Available from submission, unlike llmModel, which the runner reports only once the job has run.
-     */
-    model?: string;
-    /**
-     * Raw output is not returned by administrative job reads; use the authorized observation and feedback endpoints
-     */
-    output?: unknown;
-    /**
-     * When the whole review on the work was accepted. Independent of delivery and job/private completion; absent when no acceptance was recorded.
-     */
-    publicReviewAcceptedAt?: string;
-    /**
-     * Number of retry attempts
-     */
-    retryCount: number;
-    /**
-     * Safe observed closed-turn diagnostics from retained output; available only on terminal job detail, absent when retained turns cannot be safely read
-     */
-    reviewDiagnostics?: ReviewDiagnostics;
-    /**
-     * Why a COMPLETED run produced the observations it did. INSUFFICIENT_EVIDENCE means no model ran because required evidence was missing, unreadable, stale, or unauthorized — so no observations means nothing was assessed, not that nothing was wrong. COALESCED means no model ran because a completed review had already answered every ready practice on exactly the same code — its answers are listed in answeredPractices, and this run assessed nothing anew. SUPERSEDED means the waiting attempt was replaced by an admitted newer review of the same author's current work, named in coveringJobId, which carries this review's practices and may still be waiting or running; the replacement makes no additional assessment, and earlier attempt history remains. REVIEWED means the model ran against sufficient evidence.
-     */
-    reviewOutcome: 'REVIEWED' | 'INSUFFICIENT_EVIDENCE' | 'COALESCED' | 'SUPERSEDED';
-    /**
-     * When a worker claimed the current attempt and began preparing it. A retry resets it, so it never describes an earlier attempt.
-     */
-    startedAt?: string;
-    /**
-     * Current job status
-     */
-    status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
-    /**
-     * Work item reviewed by this job
-     */
-    target: ReviewRunTarget;
-    /**
-     * The id the job's log lines and spans carry, to find them in the logs; available on job detail
-     */
-    traceId?: string;
-    /**
-     * When the reviewed pull request or merge request was merged; available on review detail, absent for other work and for work that is not merged
-     */
-    workMergedAt?: string;
-};
-
-/**
- * The model usage and cost of a job, per attempt and in total
- */
-export type AgentJobUsage = {
-    /**
-     * One entry per attempt with recorded usage, first attempt first
-     */
-    attempts: Array<AgentJobUsageAttempt>;
-    /**
-     * The cost of every attempt in US dollars; absent when an attempt has no known price or no usage is recorded
-     */
-    totalCostUsd?: number;
-    /**
-     * Attempts whose price is not known
-     */
-    unpricedAttempts: number;
-};
-
-/**
- * The model usage and cost of one attempt of a job
- */
-export type AgentJobUsageAttempt = {
-    /**
-     * The zero-based attempt number, 0 for the first run
-     */
-    attempt: number;
-    cacheReadTokens: number;
-    cacheWriteTokens: number;
-    /**
-     * Cost in US dollars; absent while UNPRICED
-     */
-    costUsd?: number;
-    /**
-     * Who pays: the instance's shared models, or the workspace's own provider
-     */
-    fundingSource: 'INSTANCE' | 'WORKSPACE';
-    inputTokens: number;
-    /**
-     * The model the attempt called
-     */
-    model?: string;
-    /**
-     * When the usage was recorded
-     */
-    occurredAt: string;
-    outputTokens: number;
-    /**
-     * PRICED has a cost; NO_CHARGE is a real $0; UNPRICED means no price was known, so its cost is absent rather than $0
-     */
-    pricingState: 'PRICED' | 'NO_CHARGE' | 'UNPRICED';
-    reasoningTokens: number;
-    totalCalls: number;
+export type AiChoiceRequest = {
+    choice: 'NO_AI' | 'IN_HOUSE_ONLY' | 'CLOUD';
 };
 
 /**
@@ -553,66 +403,40 @@ export type Answer = {
     text?: string;
 };
 
-/**
- * A ready practice this review did not ask, because a completed review had already answered it on exactly the same code. Its observation belongs to that review; this review recorded none for it.
- */
-export type AnsweredPractice = {
-    /**
-     * The practice left out
-     */
-    practiceSlug: string;
-    /**
-     * The completed review whose observation answers it
-     */
-    reviewId: string;
-    /**
-     * The practice revision the earlier answer was made under
-     */
-    revisionId: number;
+export type AppliesWhen = {
+    anyOf: Array<AppliesWhenClause>;
+    otherwise: string;
 };
 
-/**
- * Every practice's answer for one artifact, and the occurrences those answers rest on
- */
-export type ArtifactTrace = {
-    artifactId: number;
-    artifactKind: string;
-    /**
-     * Every practice this workspace runs against this kind of work, the ones with something to report first, then the rest; ties broken by practice name
-     */
-    practices: Array<PracticeTraceEntry>;
-    /**
-     * The work as every surface names it: its provider, the label the provider writes ("#1423", "!1423"), its title, where it sits and where to open it; the link is absent for deleted work
-     */
-    reviewedWork: ReviewedWorkRef;
-    /**
-     * Everything recorded about this artifact, oldest first
-     */
-    signals: Array<TracedSignal>;
+export type AppliesWhenClause = {
+    changedPath?: Array<string>;
+    diffContains?: Array<string>;
+    hasItems?: string;
 };
 
-/**
- * Request to assign or update a user's role in a workspace
- */
 export type AssignRoleRequest = {
-    /**
-     * New role to assign (OWNER, ADMIN, MEMBER)
-     */
+    accountId: string;
     role: 'OWNER' | 'ADMIN' | 'MEMBER';
-    /**
-     * User ID of the member to update
-     */
-    userId: number;
+};
+
+/**
+ * A human-readable account identity. <code>displayName</code>/<code>email</code> are null for deleted
+ * accounts.
+ */
+export type AuthAuditAccount = {
+    displayName?: string;
+    email?: string;
+    id: number;
 };
 
 /**
  * One audit row, flattened for the admin viewer.
  */
 export type AuthEventView = {
-    account?: AccountRef;
+    account?: AuthAuditAccount;
     accountId?: number;
     actingAccountId?: number;
-    actor?: AccountRef;
+    actor?: AuthAuditAccount;
     details?: string;
     elevatedViaInstanceAdmin: boolean;
     eventType: string;
@@ -622,50 +446,9 @@ export type AuthEventView = {
     occurredAt: string;
     result: string;
     userAgent?: string;
-    viewedUserId?: number;
+    viewedAccountId?: number;
+    viewedActorId?: number;
     workspaceId?: number;
-};
-
-/**
- * The autonomy in force here, whether it was set here or inherited, and the level that decided it
- */
-export type AutonomyAssignment = {
-    /**
-     * The autonomy actually in force
-     */
-    effective: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
-    /**
-     * Whether autonomy is inherited
-     */
-    inherited: boolean;
-    /**
-     * The local override, or null when autonomy is inherited
-     */
-    override?: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
-    /**
-     * Which level decided the effective autonomy
-     */
-    source: 'PRACTICE' | 'GROUP' | 'WORKSPACE';
-};
-
-/**
- * Practice counts per autonomy state, for the workspace and each group
- */
-export type AutonomyRollup = {
-    /**
-     * Practice count per effective autonomy across the workspace
-     */
-    counts: {
-        [key: string]: number;
-    };
-    /**
-     * The same counts per group, in catalogue order
-     */
-    groups: Array<GroupAutonomyRollup>;
-    /**
-     * The workspace-level decision every group and practice falls back to
-     */
-    workspaceDefault: AutonomyAssignment;
 };
 
 /**
@@ -713,6 +496,10 @@ export type AvailableLlmModel = {
      */
     pricingMode: 'PRICED' | 'NO_CHARGE' | 'UNPRICED';
     /**
+     * The purposes a binding may assign this model to, from its connection's protocol
+     */
+    purposes: Array<'PRACTICE_REVIEW' | 'MENTOR' | 'PRACTICE_DECISION' | 'PRACTICE_EMBEDDING' | 'PRACTICE_RERANKING'>;
+    /**
      * Reasoning effort requested of the model; null sends none, the provider's default applies
      */
     reasoningEffort?: 'NONE' | 'MINIMAL' | 'LOW' | 'MEDIUM' | 'HIGH' | 'XHIGH' | 'MAX';
@@ -736,39 +523,60 @@ export type BackfillSummary = {
     state: string;
 };
 
-/**
- * Request to move a practice to a group or Unassigned
- */
+export type Basis = {
+    outcome: 'MET' | 'NOT_MET' | 'DOES_NOT_APPLY' | 'COULD_NOT_DETERMINE';
+    practiceSlug: string;
+    practiceVersionId: string | null;
+    resultId: string;
+};
+
 export type BindPracticeGroupRequest = {
-    /**
-     * Destination group slug; omit or set to null for Unassigned
-     */
-    groupSlug?: string | null;
+    groupSlug: string | null;
+};
+
+export type BoundModelSlot = {
+    kind: 'CHAT' | 'DECISION' | 'EMBEDDING' | 'RERANKING';
+    model: FrozenModel | null;
+    slot: string;
+};
+
+export type CancelScanRequest = {
+    status: 'CANCELLED';
+};
+
+export type Catalog = {
+    groups: Array<CatalogGroup>;
+    practices: Array<CatalogPractice>;
 };
 
 export type CatalogAdoptionGroup = {
-    definition?: CuratedGroupRequest;
-    disposition: 'UNASSIGNED' | 'REUSE_EXISTING_GROUP' | 'CREATE_CATALOG_GROUP';
+    definition?: GroupDefinition;
+    disposition?: 'UNASSIGNED' | 'REUSE_EXISTING_GROUP' | 'CREATE_CATALOG_GROUP';
     slug?: string;
 };
 
-export type CatalogEntryStatus = {
+export type CatalogGroup = {
     changeKind: 'NONE' | 'WORDING' | 'PRESENTATION' | 'REVIEW';
-    /**
-     * Strong entity tag to send in If-Match when updating this entry
-     */
+    color: string | null;
+    description: string | null;
     etag: string;
+    excluded: boolean;
+    icon: string | null;
+    name: string;
     offered: boolean;
+    position: number;
+    shipped: GroupDefinition | null;
+    slug: string;
     state: 'FROM_HEPHAESTUS' | 'EDITED_HERE' | 'UPDATE_WAITING' | 'YOURS' | 'NO_LONGER_SHIPPED';
 };
 
 export type CatalogGroupAdoptionPreview = {
-    actions: Array<CatalogGroupPracticeAction>;
-    definition: CuratedGroupRequest;
-    disposition: 'UNASSIGNED' | 'REUSE_EXISTING_GROUP' | 'CREATE_CATALOG_GROUP';
-    etag: string;
-    practices: Array<CatalogPracticePreview>;
-    slug: string;
+    actions?: Array<CatalogGroupPracticeAction>;
+    definition?: GroupDefinition;
+    disposition?: 'UNASSIGNED' | 'REUSE_EXISTING_GROUP' | 'CREATE_CATALOG_GROUP';
+    etag?: string;
+    practices?: Array<CatalogPracticePreview>;
+    slug?: string;
 };
 
 export type CatalogGroupAdoptionResult = {
@@ -776,48 +584,84 @@ export type CatalogGroupAdoptionResult = {
     moved: Array<Practice>;
 };
 
+export type CatalogGroupInput = {
+    color: string | null;
+    description: string | null;
+    icon: string | null;
+    name: string;
+    position: null | number;
+    slug: string;
+};
+
 export type CatalogGroupPracticeAction = {
     action: 'ADD' | 'MOVE_TO_GROUP' | 'KEEP' | 'BLOCKED';
     slug: string;
 };
 
-/**
- * The catalog entry a workspace copy came from and whether it differs now
- */
+export type CatalogGroupUpdate = {
+    color: string | null;
+    description: string | null;
+    icon: string | null;
+    name: string;
+    position: null | number;
+};
+
 export type CatalogOrigin = {
-    link: 'IN_SYNC' | 'LOCALLY_EDITED' | 'UPDATE_AVAILABLE' | 'DECLINED';
-    /**
-     * Slug of the catalog entry this copy was made from
-     */
+    catalogSlug: string | null;
+    localEdits: Array<'NAME' | 'REVIEW_ON' | 'APPLIES_WHEN' | 'ABOUT' | 'READS' | 'REVIEWED_BY' | 'CRITERIA' | 'SCRIPT' | 'SCAN' | 'LINE_NOTES' | 'GUIDANCE'>;
+    offeredDigest: string | null;
+    state: 'FROM_HEPHAESTUS' | 'EDITED_HERE' | 'UPDATE_WAITING' | 'YOURS' | 'NO_LONGER_SHIPPED';
+};
+
+export type CatalogPractice = {
+    changeKind: 'NONE' | 'WORDING' | 'PRESENTATION' | 'REVIEW';
+    definition: PracticeDefinition;
+    etag: string;
+    excluded: boolean;
+    groupSlug: string | null;
+    kind: string;
+    offered: boolean;
+    position: number;
+    shipped: PracticeDefinition | null;
     slug: string;
-    /**
-     * Whether new workspaces receive the source entry
-     */
-    sourceOffered: boolean;
+    state: 'FROM_HEPHAESTUS' | 'EDITED_HERE' | 'UPDATE_WAITING' | 'YOURS' | 'NO_LONGER_SHIPPED';
+};
+
+export type CatalogPracticeInput = {
+    definition: PracticeDefinitionInput;
+    groupSlug: string | null;
+    kind: string;
+    position: null | number;
+    slug: string;
 };
 
 export type CatalogPracticePreview = {
-    availability: 'AVAILABLE' | 'ADOPTED' | 'SLUG_CONFLICT';
-    definition: CuratedPracticeDefinition;
-    etag: string;
-    group: CatalogAdoptionGroup;
-    initialAutonomy: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
-    slug: string;
-    sourceReviewRuleFingerprint: string;
+    availability?: 'AVAILABLE' | 'ADOPTED' | 'SLUG_CONFLICT';
+    definition?: PracticeDefinition;
+    etag?: string;
+    group?: CatalogAdoptionGroup;
+    initialFeedbackMode?: 'OFF' | 'APPROVE_FIRST' | 'AUTOMATIC';
+    kind?: string;
+    offeredDigest?: string;
+    slug?: string;
 };
 
 export type CatalogPracticeSummary = {
-    artifactKind: string;
-    automatedReviewValidation: PracticeAutomatedReviewValidation;
-    availability: 'AVAILABLE' | 'ADOPTED' | 'SLUG_CONFLICT';
+    availability?: 'AVAILABLE' | 'ADOPTED' | 'SLUG_CONFLICT';
     groupName?: string;
     groupSlug?: string;
-    name: string;
-    slug: string;
-    /**
-     * the practice's rationale, so a row is triageable without opening it
-     */
+    kind?: string;
+    name?: string;
+    reviewedBy?: ReviewedBy;
+    slug?: string;
     whyItMatters?: string;
+};
+
+export type CatalogPracticeUpdate = {
+    definition: PracticeDefinitionInput;
+    groupSlug: string | null;
+    kind: string;
+    position: null | number;
 };
 
 /**
@@ -878,6 +722,36 @@ export type ChatThreadSummary = {
     title?: string;
 };
 
+export type CitationCapabilities = {
+    commit?: 'REQUIRED' | 'OPTIONAL' | 'FORBIDDEN';
+    side?: 'REQUIRED' | 'OPTIONAL' | 'FORBIDDEN';
+};
+
+export type CitationProof = {
+    itemSha256?: string;
+    quoteSha256?: string;
+    status?: 'VERIFIED';
+};
+
+export type CitationProofDto = {
+    itemSha256: string;
+    quoteSha256: string;
+    status: 'VERIFIED';
+};
+
+export type ClaimBasis = {
+    type: string;
+};
+
+export type ClaimedCoverage = Omit<ResultCoverage, 'source'> & {
+    checked?: number;
+    complete?: boolean;
+    omitted?: Array<CoverageOmission>;
+    selected?: number;
+    total?: number;
+    source: 'ClaimedCoverage';
+};
+
 export type ClientRefreshRequest = {
     refreshToken: string;
 };
@@ -898,6 +772,28 @@ export type ClientTokenRequest = {
     code: string;
     codeVerifier: string;
     redirectUri: string;
+};
+
+export type ClosedPracticePageSupport = {
+    readAt: string;
+    refusal: string | null;
+    state: 'UNAVAILABLE' | 'REFUSED';
+};
+
+export type CompletePracticePageSupport = {
+    practices: Array<PracticeSupport>;
+    readAt: string;
+    state: 'COMPLETE';
+};
+
+export type ComposedFeedback = {
+    destination?: 'ON_WORK' | 'PRACTICE_PAGE' | 'CONVERSATION';
+    notes?: Array<Note>;
+    page?: Page;
+    resultIds?: Array<string>;
+    summary?: string;
+    trace?: FeedbackCompositionTrace;
+    withheldReason?: 'VOLUME_CAPPED' | 'COMPOSER_WITHHELD' | 'NOTHING_NEW' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISAGREE' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'DELIVERY_UNCONFIRMED' | 'ITEM_GONE' | 'ITEM_CLOSED' | 'ITEM_MERGED' | 'ITEM_STATE_INELIGIBLE' | 'ISSUE_SNAPSHOT_CHANGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'NO_AI' | 'DELIVERY_OFF' | 'PERSON_SUPPRESSED' | 'RECIPIENT_UNAVAILABLE' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'FEEDBACK_OFF' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_SCOPE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'RESULT_MARKED_INCORRECT' | 'REVIEWED_VERSION_CHANGED' | 'REVIEW_CANCELLED' | 'EVIDENCE_NOT_PERMITTED' | 'NO_EVIDENCE' | 'UNCORROBORATED';
 };
 
 /**
@@ -942,7 +838,7 @@ export type ConfigAuditEntryView = {
      */
     elevatedViaInstanceAdmin: boolean;
     entityId?: string;
-    entityType?: 'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'ACTIVITY_AUTOMATION' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_GROUP' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_GROUP' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'REVIEW_BACKFILL_RUN' | 'REVIEW_SWEEP_SCHEDULE' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL';
+    entityType?: 'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'ACTIVITY_AUTOMATION' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_GROUP' | 'CATALOG_PRACTICE' | 'CATALOG_GROUP' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'REVIEW_BATCH' | 'REVIEW_SCHEDULE' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL';
     id?: number;
     newValue?: string;
     occurredAt?: string;
@@ -1145,20 +1041,44 @@ export type Contributor = {
     name: string;
 };
 
-/**
- * Request to add a group to the instance catalog
- */
-export type CreateCuratedGroupRequest = {
-    definition: CuratedGroupRequest;
-    slug: string;
+export type ConversationEligibility = {
+    readAt: string;
+    results: Array<ResultDecision>;
+    state: 'COMPLETE' | 'UNAVAILABLE' | 'REFUSED';
 };
 
-/**
- * Request to add a practice to the instance catalog
- */
-export type CreateCuratedPracticeRequest = {
-    definition: CuratedPracticeRequest;
-    slug: string;
+export type Copy = {
+    body: string | null;
+    endLine: null | number;
+    externalRef: string | null;
+    externalUrl: string | null;
+    id: string;
+    kind: 'SUMMARY' | 'LINE_NOTE' | 'FILE_NOTE' | 'CHAT_TURN';
+    path: string | null;
+    postedAt: string;
+    side: 'OLD' | 'NEW' | null;
+    startLine: null | number;
+    state: 'PLANNED' | 'WRITE_STARTED' | 'POSTED' | 'FAILED' | 'WITHHELD' | 'RETRACTED';
+};
+
+export type CopySupport = {
+    basedOn?: Array<Support>;
+    kind?: 'SUMMARY' | 'LINE_NOTE' | 'FILE_NOTE' | 'CHAT_TURN';
+    position?: number;
+};
+
+export type CoverageOmission = {
+    count?: number;
+    items?: Array<string>;
+    reason?: 'selection' | 'truncated' | 'unavailable' | 'budget' | 'deadline' | 'too-large' | 'off-format' | 'refused' | 'error' | 'cancelled';
+    what?: string;
+};
+
+export type CreateFeedbackDecisionRequest = {
+    action: 'APPROVE' | 'REJECT' | 'WITHDRAW' | 'RESTORE';
+    contentDigest?: string;
+    note?: string;
+    reasonCode?: 'INCORRECT' | 'MISSING_CONTEXT' | 'UNHELPFUL' | 'DUPLICATE' | 'INAPPROPRIATE_LOCATION' | 'OTHER';
 };
 
 /**
@@ -1172,7 +1092,7 @@ export type CreateLlmConnectionRequest = {
     /**
      * Wire protocol
      */
-    apiProtocol: string;
+    apiProtocol: 'openai-completions' | 'openai-responses' | 'openai-decisions' | 'openai-embeddings' | 'cohere-rerank';
     /**
      * Credential shape (default BEARER)
      */
@@ -1270,149 +1190,38 @@ export type CreateLoginProviderRequest = {
     type: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
 };
 
-/**
- * Request to create a new practice group
- */
 export type CreatePracticeGroupRequest = {
-    /**
-     * Optional palette colour key for the group's chip
-     */
-    color?: string;
-    /**
-     * What this group develops
-     */
-    description?: string;
-    /**
-     * Sort order within the workspace. Appended when omitted.
-     */
-    displayOrder?: number;
-    /**
-     * Optional lucide icon name giving the group a glanceable identity
-     */
-    icon?: string;
-    /**
-     * Human-readable name
-     */
+    color: string | null;
+    description: string | null;
+    icon: string | null;
     name: string;
-    /**
-     * URL-safe identifier unique within the workspace
-     */
+    position: null | number;
+    shownToDevelopers: boolean;
     slug: string;
 };
 
-/**
- * Request to create a new practice definition
- */
 export type CreatePracticeRequest = {
-    /**
-     * Versioned review settings; omit to use the recommended ones for the work type the signals name
-     */
-    automatedReviewPolicy?: PracticeAutomatedReviewPolicy;
-    /**
-     * Practice review criteria
-     */
-    criteria: string;
-    deliveryBehavior?: PracticeDeliveryBehavior;
-    evidenceRequirements: Array<PracticeEvidenceRequirement>;
-    /**
-     * Practice group to add the practice to. Omit or set to null for Unassigned.
-     */
-    groupSlug?: string | null;
-    /**
-     * Guide text and its figures; guidance, never review rules
-     */
-    guide?: PracticeGuide;
-    /**
-     * Human-readable name
-     */
-    name: string;
-    /**
-     * TypeScript/Node static analysis run before automated review
-     */
-    precomputeScript?: string;
-    precondition?: PracticePrecondition;
-    /**
-     * Automatic review state selections. An empty object imposes no state restrictions. Each selected dimension requires a nonempty set of non-null values offered by the work type descriptor. Values within a dimension are alternatives; all selected dimensions must match.
-     */
-    reviewWhen?: {
-        [key: string]: Array<string>;
-    };
-    signals: Array<string>;
-    /**
-     * URL-safe identifier unique within the workspace
-     */
+    definition: PracticeDefinitionInput;
+    groupSlug: string | null;
+    kind: string;
+    position: null | number;
     slug: string;
-    subject?: 'AUTHOR' | 'ASSIGNEE' | 'REVIEWER' | 'MERGER';
-    /**
-     * Developer-facing picture of the practice; guidance, never review rules
-     */
-    visual?: PracticeVisual;
-    /**
-     * Developer-facing exemplar; a concrete instance, not the review criteria
-     */
-    whatGoodLooksLike?: string;
-    /**
-     * Plain-language rationale shown to the developer
-     */
-    whyItMatters?: string;
 };
 
-/**
- * Ask for a campaign to be enumerated and costed. Creates nothing that spends money: the run comes back
- * awaiting confirmation, and only a subsequent status change starts it.
- */
-export type CreateReviewBackfillRunRequest = {
-    /**
-     * Kind of work to review
-     */
-    artifactKind: 'scm.pull_request' | 'scm.issue';
-    /**
-     * Window start, inclusive, over the artifact's creation time
-     */
-    fromAt: string;
-    /**
-     * Window end, exclusive
-     */
-    toAt: string;
+export type CreateResultMarkRequest = {
+    kind: 'INCORRECT' | 'ACCEPTED';
+    reason: string;
 };
 
-/**
- * The piece of work a review is being asked for
- */
+export type CreateReviewBatchRequest = {
+    budgetUsd: string | null;
+    from: string | null;
+    itemKind: string;
+    to: string | null;
+};
+
 export type CreateReviewRequest = {
-    /**
-     * The artifact's internal id, as the trace and review listings report it
-     */
-    artifactId: number;
-    /**
-     * The artifact kind's wire id, e.g. scm.pull_request. A raw string rather than a closed enum because kinds are an open vocabulary: a build that has never heard of a kind should refuse it by name, not fail to parse the request.
-     */
-    artifactKind: string;
-};
-
-/**
- * Create a standing instruction to sweep this workspace's recent work.
- *
- * <p>Unlike a backfill campaign there is no separate confirmation step: this request <em>is</em> the
- * authorisation to spend on the cadence it names, and it is recorded against the account that made it.
- *
- * <p>There is deliberately no repository or author list. Which repositories are reviewed is the
- * workspace's review scope and whose work is reviewed is the practice-review role; both already apply to
- * every review this workspace runs, a sweep included.
- */
-export type CreateReviewSweepScheduleRequest = {
-    /**
-     * Kind of work to sweep
-     */
-    artifactKind: 'scm.pull_request' | 'scm.issue';
-    /**
-     * How often the sweep runs
-     */
-    cadence: 'DAILY' | 'WEEKLY';
-    /**
-     * How far back each sweep looks, in days
-     */
-    lookbackDays: number;
+    itemId: string;
 };
 
 export type CreateSurvey = {
@@ -1436,7 +1245,7 @@ export type CreateWorkspaceLlmConnectionRequest = {
     /**
      * Wire protocol
      */
-    apiProtocol: string;
+    apiProtocol: 'openai-completions' | 'openai-responses' | 'openai-decisions' | 'openai-embeddings' | 'cohere-rerank';
     /**
      * Credential shape (default BEARER)
      */
@@ -1578,132 +1387,6 @@ export type CsrfToken = {
     token: string;
 };
 
-export type CuratedCatalog = {
-    customOrder: boolean;
-    /**
-     * Strong entity tag to send in If-Match when reordering this catalog
-     */
-    etag: string;
-    groups: Array<CuratedGroup>;
-    practices: Array<CuratedPracticeSummary>;
-    summary: CuratedCatalogSummary;
-};
-
-export type CuratedCatalogSummary = {
-    editedHere: number;
-    noLongerShipped: number;
-    notOffered: number;
-    total: number;
-    updatesChangingPresentation: number;
-    updatesChangingReview: number;
-    updatesChangingWordingOnly: number;
-    yours: number;
-};
-
-export type CuratedGroup = {
-    definition: CuratedGroupRequest;
-    position: number;
-    shipped?: CuratedGroupRequest;
-    slug: string;
-    status: CatalogEntryStatus;
-};
-
-/**
- * A complete curated practice group definition
- */
-export type CuratedGroupRequest = {
-    color?: string;
-    description?: string;
-    icon?: string;
-    name: string;
-};
-
-export type CuratedPractice = {
-    definition: CuratedPracticeDefinition;
-    position: number;
-    shipped?: CuratedPracticeDefinition;
-    slug: string;
-    status: CatalogEntryStatus;
-};
-
-/**
- * A resolved curated practice definition
- */
-export type CuratedPracticeDefinition = {
-    artifactKind: string;
-    automatedReviewPolicy: PracticeAutomatedReviewPolicy;
-    automatedReviewValidation: PracticeAutomatedReviewValidation;
-    criteria: string;
-    deliveryBehavior: PracticeDeliveryBehavior;
-    evidenceRequirements: Array<PracticeEvidenceRequirement>;
-    groupSlug?: string;
-    guide?: PracticeGuide;
-    name: string;
-    precomputeScript?: string;
-    precondition?: PracticePrecondition;
-    /**
-     * Automatic review state selections. An empty object imposes no state restrictions. Each selected dimension requires a nonempty set of non-null values offered by the work type descriptor. Values within a dimension are alternatives; all selected dimensions must match.
-     */
-    reviewWhen: {
-        [key: string]: Array<string>;
-    };
-    signals: Array<string>;
-    subject: 'AUTHOR' | 'ASSIGNEE' | 'REVIEWER' | 'MERGER';
-    visual?: PracticeVisual;
-    whatGoodLooksLike?: string;
-    whyItMatters?: string;
-};
-
-/**
- * A complete curated practice definition
- */
-export type CuratedPracticeRequest = {
-    /**
-     * Versioned review settings; omit to use the recommended settings for the selected work type
-     */
-    automatedReviewPolicy?: PracticeAutomatedReviewPolicy;
-    criteria: string;
-    /**
-     * Explicit intent to change the gate or the person judged
-     */
-    definitionChanges?: Array<'PRECONDITION' | 'SUBJECT'>;
-    deliveryBehavior?: PracticeDeliveryBehavior;
-    evidenceRequirements: Array<PracticeEvidenceRequirement>;
-    groupSlug?: string;
-    /**
-     * Guide text and its figures; guidance, never review rules
-     */
-    guide?: PracticeGuide;
-    name: string;
-    precomputeScript?: string;
-    precondition?: PracticePrecondition;
-    /**
-     * Automatic review state selections. An empty object imposes no state restrictions. Each selected dimension requires a nonempty set of non-null values offered by the work type descriptor. Values within a dimension are alternatives; all selected dimensions must match.
-     */
-    reviewWhen?: {
-        [key: string]: Array<string>;
-    };
-    signals: Array<string>;
-    subject?: 'AUTHOR' | 'ASSIGNEE' | 'REVIEWER' | 'MERGER';
-    /**
-     * Developer-facing picture of the practice; guidance, never review rules
-     */
-    visual?: PracticeVisual;
-    whatGoodLooksLike?: string;
-    whyItMatters?: string;
-};
-
-export type CuratedPracticeSummary = {
-    artifactKind: string;
-    automatedReview: PracticeAutomatedReview;
-    effectivelyOffered: boolean;
-    groupSlug?: string;
-    name: string;
-    position: number;
-    slug: string;
-    status: CatalogEntryStatus;
-};
-
 export type CurrentUserView = {
     accessTokenExpiresAt?: number;
     appRole?: string;
@@ -1720,121 +1403,40 @@ export type CurrentUserView = {
     username?: string;
 };
 
-export type DecideFeedbackProposalRequest = {
-    decision: 'APPROVED' | 'REJECTED';
-    rejectionNote?: string;
-    rejectionReason?: 'INCORRECT' | 'MISSING_CONTEXT' | 'UNHELPFUL' | 'DUPLICATE' | 'INAPPROPRIATE_PLACEMENT' | 'OTHER';
-};
-
-/**
- * The practice's authoritative display name and stable workspace slug.
- */
 export type DeliveredFeedbackPractice = {
     name: string;
     slug: string;
 };
 
-/**
- * The caller's in-context feedback with recorded provider comments on one authorized piece of work; no feedback bodies
- */
 export type DeliveredWorkFeedback = {
     feedback: Array<DeliveredWorkFeedbackItem>;
-    /**
-     * Older delivered feedback exists beyond this bounded view
-     */
-    hasMore: boolean;
-    work: ReviewedWorkRef;
+    item: ItemRef | null;
+};
+
+export type DeliveredWorkFeedbackCopy = {
+    endLine: null | number;
+    externalRef: string | null;
+    externalUrl: string | null;
+    id: string;
+    kind: 'SUMMARY' | 'LINE_NOTE' | 'FILE_NOTE' | 'CHAT_TURN';
+    path: string | null;
+    postedAt: string;
+    side: 'OLD' | 'NEW' | null;
+    startLine: null | number;
 };
 
 export type DeliveredWorkFeedbackItem = {
-    deliveredAt?: string;
+    copies: Array<DeliveredWorkFeedbackCopy>;
+    deliveredAt: string;
     id: string;
-    placements: Array<DeliveredWorkFeedbackPlacement>;
     practices: Array<DeliveredFeedbackPractice>;
 };
 
-export type DeliveredWorkFeedbackPlacement = {
-    /**
-     * Opaque recorded provider comment identity, for deduplication within this work only; never a URL
-     */
-    commentRef: string;
-    endLine?: number;
-    id: string;
-    path?: string;
-    /**
-     * Provider-returned link on this exact work, or a matching mirrored comment; absent when unavailable. A recorded placement is not a live existence check.
-     */
-    permalink?: string;
-    side?: 'OLD' | 'NEW';
-    startLine?: number;
-    type: 'SUMMARY' | 'INLINE' | 'CONVERSATION_TURN' | 'LOCATION_COMMENT';
-};
-
-export type DeliveryPolicyFactsSnapshot = {
-    artifactKind?: string;
-    baseBranch?: string;
-    branchMatched?: boolean;
-    contributingPractices?: Array<PracticeFact>;
-    deliveryStatus?: 'ACTIVE' | 'PAUSED';
-    personMatched?: boolean;
-    personMode?: 'ALL_ELIGIBLE' | 'SELECTED';
-    recipientConsent?: boolean;
-    repository?: string;
-    repositoryMatched?: boolean;
-    repositoryMode?: 'ALL_MONITORED' | 'SELECTED';
-    subject?: 'RESOLVED_LINKED_HUMAN' | 'MISSING' | 'NON_HUMAN' | 'UNLINKED';
-    triggerMode?: 'AUTO' | 'MANUAL';
-};
-
-export type DeliveryPolicyTrace = {
-    admittedRevision: number;
-    allowed: boolean;
-    checks: Array<DeliveryPolicyTraceCheck>;
-    decisiveReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'COMPOSER_WITHHELD' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ISSUE_SNAPSHOT_CHANGED' | 'ARTIFACT_MERGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'OBSERVATION_INVALIDATED' | 'REVIEWED_REVISION_CHANGED' | 'REVIEW_CANCELLED';
-    evaluatedAt: string;
-    evaluatedRevision?: number;
-    facts: DeliveryPolicyFactsSnapshot;
-    resolverVersion: string;
-    reviewId: string;
-    stage: 'COMPOSITION' | 'AUTOMATIC' | 'APPROVED' | 'EGRESS';
-    surface: 'ARTIFACT' | 'IN_APP' | 'CONVERSATION';
-};
-
-export type DeliveryPolicyTraceCheck = {
-    check: 'INSTANCE_SILENT_MODE' | 'WORKSPACE_ENABLED' | 'ROLLOUT_REVISION' | 'WORKSPACE_DELIVERY' | 'CURRENT_COVERAGE' | 'PRACTICE_AUTHORITY' | 'RECIPIENT_CONSENT' | 'ARTIFACT_ELIGIBILITY';
-    status: 'PASSED' | 'DENIED' | 'NOT_APPLICABLE' | 'NOT_REACHED';
-};
-
-/**
- * Per-practice observation summary for a developer
- */
-export type DeveloperPracticeSummary = {
-    /**
-     * Timestamp of most recent observation
-     */
-    lastObservedAt?: string;
-    /**
-     * Number of MET observations
-     */
-    met: number;
-    notApplicable: number;
-    /**
-     * Number of NOT_MET observations
-     */
-    notMet: number;
-    /**
-     * Practice name
-     */
-    practiceName: string;
-    /**
-     * Practice slug
-     */
-    practiceSlug: string;
-    /**
-     * Total number of observations
-     */
-    totalObservations: number;
-    undetermined: number;
+export type DutyBasis = Omit<ClaimBasis, 'type'> & {
+    criterionQuote?: string;
+    event?: number;
+    explanation?: string;
+    type: 'DutyBasis';
 };
 
 export type EmailTestRequest = {
@@ -1859,73 +1461,34 @@ export type EmailTestResponse = {
     to?: string;
 };
 
+export type Entry = {
+    basedOn: Array<Basis>;
+    body: string | null;
+    bodyUnavailable: boolean;
+    copies: Array<Copy>;
+    currentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
+    deliveredAt: string;
+    destination: 'ON_WORK' | 'PRACTICE_PAGE' | 'CONVERSATION';
+    id: string;
+    itemVersion: string | null;
+    state: 'AWAITING_APPROVAL' | 'READY' | 'DELIVERED' | 'UNCONFIRMED' | 'WITHHELD' | 'REJECTED' | 'REPLACED' | 'FAILED';
+    withdrawn: boolean;
+};
+
 export type ErasureRequest = {
     externalCopiesRemoved: boolean;
 };
 
-/**
- * A verified quote and its exact source location
- */
 export type EvidenceCitation = {
-    artifactPath: string;
-    endLine: number;
-    path: string;
-    quote?: string;
-    quoteRedacted: boolean;
-    revision?: string;
-    side?: 'OLD' | 'NEW';
+    commit: string | null;
+    endLine: null | number;
+    path: string | null;
+    quote: string | null;
+    side: 'OLD' | 'NEW' | null;
     sourceKind: string;
-    startLine: number;
-};
-
-/**
- * Why this practice had nothing to judge in this work
- */
-export type EvidenceInapplicability = {
-    /**
-     * The sources the review read to conclude this, by source kind
-     */
-    consulted: Array<string>;
-    /**
-     * The fact about this work that means there was nothing to look at
-     */
-    ruledOutBy: string;
-    /**
-     * What this practice looks for
-     */
-    subject: string;
-};
-
-/**
- * Where the review looked when it found nothing
- */
-export type EvidenceSearch = {
-    /**
-     * How far the search reached — the work this absence holds over
-     */
-    boundary: string;
-    /**
-     * The sources the review searched, by source kind
-     */
-    consulted: Array<string>;
-    /**
-     * What the review looked for in this work
-     */
-    lookedFor: string;
-};
-
-/**
- * What the review could not settle, and what would settle it
- */
-export type EvidenceUndecidability = {
-    /**
-     * The question this work left open
-     */
-    openQuestion: string;
-    /**
-     * What would have answered it
-     */
-    wouldSettleIt: string;
+    sourcePath: string | null;
+    startLine: null | number;
+    verification: CitationProofDto | null;
 };
 
 /**
@@ -1979,30 +1542,89 @@ export type FeedbackAccountRef = {
     id: number;
 };
 
-export type FeedbackApproval = {
-    actorAccountId?: number;
-    decidedAt?: string;
-    /**
-     * Display name of the admin who decided; null when not resolved or the account is erased
-     */
-    decidedBy?: string;
-    decision?: 'APPROVED' | 'REJECTED';
-    feedbackId?: string;
-    rejectionNote?: string;
-    rejectionReason?: 'INCORRECT' | 'MISSING_CONTEXT' | 'UNHELPFUL' | 'DUPLICATE' | 'INAPPROPRIATE_PLACEMENT' | 'OTHER';
+export type FeedbackBasis = {
+    ordinal: number;
+    problemId: string | null;
+    result: ReviewBoundResult;
+    resultId: string;
+};
+
+export type FeedbackCheck = {
+    allowed: boolean;
+    checkedAt: string;
+    facts: FeedbackCheckFacts;
+    reason: 'VOLUME_CAPPED' | 'COMPOSER_WITHHELD' | 'NOTHING_NEW' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISAGREE' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'DELIVERY_UNCONFIRMED' | 'ITEM_GONE' | 'ITEM_CLOSED' | 'ITEM_MERGED' | 'ITEM_STATE_INELIGIBLE' | 'ISSUE_SNAPSHOT_CHANGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'NO_AI' | 'DELIVERY_OFF' | 'PERSON_SUPPRESSED' | 'RECIPIENT_UNAVAILABLE' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'FEEDBACK_OFF' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_SCOPE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'RESULT_MARKED_INCORRECT' | 'REVIEWED_VERSION_CHANGED' | 'REVIEW_CANCELLED' | 'EVIDENCE_NOT_PERMITTED' | 'NO_EVIDENCE' | 'UNCORROBORATED' | null;
+    stage: 'COMPOSITION' | 'AUTOMATIC' | 'APPROVED' | 'EGRESS';
+};
+
+export type FeedbackCheckFacts = {
+    admittedRolloutRevision: string;
+    approvalCurrent: boolean;
+    currentVersion: boolean;
+    deliveryEnabled: boolean;
+    evaluatedRolloutRevision: string;
+    evidenceAllowed: boolean;
+    inScope: boolean;
+    incorrectBasis: boolean;
+    modelAllowed: boolean;
+    writeStarted: boolean;
 };
 
 /**
- * A developer's standing dispute of feedback written for them. The explanation is theirs, written to the workspace's administrators; the feedback's own text stays as private as its channel keeps it.
+ * Exact support and quiet decisions retained with the immutable preparation receipt.
  */
-export type FeedbackDispute = {
-    channel: 'IN_CONTEXT' | 'IN_CHAT' | 'IN_APP';
-    disputedAt: string;
-    /**
-     * Why the developer thinks the feedback is wrong, in their words
-     */
-    explanation: string;
+export type FeedbackCompositionTrace = {
+    copies?: Array<CopySupport>;
+    primaryResultId?: string;
+    replacesId?: string;
+    withheld?: Array<QuietDecision>;
+};
+
+export type FeedbackCopy = {
+    body: string | null;
+    chatMessageId: string | null;
+    endLine: null | number;
+    externalRef: string | null;
+    externalUrl: string | null;
+    id: string;
+    kind: 'SUMMARY' | 'LINE_NOTE' | 'FILE_NOTE' | 'CHAT_TURN';
+    lastError: string | null;
+    path: string | null;
+    position: number;
+    postedAt: string | null;
+    readback: 'ABSENT' | 'TRANSIENT' | 'UNKNOWN' | null;
+    side: 'OLD' | 'NEW' | null;
+    startLine: null | number;
+    state: 'PLANNED' | 'WRITE_STARTED' | 'POSTED' | 'FAILED' | 'WITHHELD' | 'RETRACTED';
+    stopReason: 'VOLUME_CAPPED' | 'COMPOSER_WITHHELD' | 'NOTHING_NEW' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISAGREE' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'DELIVERY_UNCONFIRMED' | 'ITEM_GONE' | 'ITEM_CLOSED' | 'ITEM_MERGED' | 'ITEM_STATE_INELIGIBLE' | 'ISSUE_SNAPSHOT_CHANGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'NO_AI' | 'DELIVERY_OFF' | 'PERSON_SUPPRESSED' | 'RECIPIENT_UNAVAILABLE' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'FEEDBACK_OFF' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_SCOPE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'RESULT_MARKED_INCORRECT' | 'REVIEWED_VERSION_CHANGED' | 'REVIEW_CANCELLED' | 'EVIDENCE_NOT_PERMITTED' | 'NO_EVIDENCE' | 'UNCORROBORATED' | null;
+    writeStartedAt: string | null;
+};
+
+export type FeedbackCopyCounts = {
+    failed: number;
+    planned: number;
+    posted: number;
+    retracted: number;
+    withheld: number;
+    writeStarted: number;
+};
+
+export type FeedbackDecision = {
+    action: 'APPROVE' | 'REJECT' | 'WITHDRAW' | 'RESTORE';
+    actor: AccountRef | null;
+    contentDigest: string | null;
+    decidedAt: string;
     feedbackId: string;
+    id: string;
+    note: string | null;
+    reasonCode: 'INCORRECT' | 'MISSING_CONTEXT' | 'UNHELPFUL' | 'DUPLICATE' | 'INAPPROPRIATE_LOCATION' | 'OTHER' | null;
+};
+
+export type FeedbackDisagreement = {
+    comment: string;
+    destination: 'ON_WORK' | 'PRACTICE_PAGE' | 'CONVERSATION';
+    feedbackId: string;
+    respondedAt: string;
 };
 
 export type FeedbackItem = {
@@ -2019,6 +1641,19 @@ export type FeedbackItem = {
     workspace?: FeedbackWorkspaceRef;
 };
 
+export type FeedbackModeAssignment = {
+    effective: 'OFF' | 'APPROVE_FIRST' | 'AUTOMATIC';
+    override: 'OFF' | 'APPROVE_FIRST' | 'AUTOMATIC' | null;
+    source: 'PRACTICE' | 'GROUP' | 'WORKSPACE' | 'INSTANCE';
+};
+
+export type FeedbackModeRollup = {
+    approveFirst: number;
+    automatic: number;
+    defaultMode: 'OFF' | 'APPROVE_FIRST' | 'AUTOMATIC';
+    off: number;
+};
+
 export type FeedbackRequest = {
     kind: 'IDEA' | 'BUG' | 'FEEDBACK';
     message: string;
@@ -2026,24 +1661,17 @@ export type FeedbackRequest = {
     userAgent?: string;
 };
 
-/**
- * Feedback resolution counts for the current developer
- */
 export type FeedbackResolutionCounts = {
-    addressed?: number;
-    disputed?: number;
-    notApplicable?: number;
+    addressed: number;
+    disagree: number;
+    notApplicable: number;
 };
 
-/**
- * The recipient's current assessment and resolution of delivered feedback
- */
 export type FeedbackResponse = {
-    comment?: string;
-    feedbackId: string;
-    resolution?: 'ADDRESSED' | 'DISPUTED' | 'NOT_APPLICABLE';
-    respondedAt?: string;
-    usefulness?: 'HELPFUL' | 'UNHELPFUL';
+    comment: string | null;
+    createdAt: string | null;
+    resolution: 'ADDRESSED' | 'DISAGREE' | 'NOT_APPLICABLE' | null;
+    usefulness: 'HELPFUL' | 'UNHELPFUL' | null;
 };
 
 /**
@@ -2051,57 +1679,37 @@ export type FeedbackResponse = {
  */
 export type FeedbackResponseRequest = {
     /**
-     * Optional explanation; required when resolution is DISPUTED.
+     * Optional explanation; required when resolution is DISAGREE.
      */
     comment?: string;
     /**
      * What the recipient decided to do with the feedback
      */
-    resolution?: 'ADDRESSED' | 'DISPUTED' | 'NOT_APPLICABLE';
+    resolution?: 'ADDRESSED' | 'DISAGREE' | 'NOT_APPLICABLE';
     /**
      * How useful the feedback was
      */
     usefulness?: 'HELPFUL' | 'UNHELPFUL';
 };
 
-/**
- * Distinct work artifacts of one kind that contributed feedback
- */
+export type FeedbackSend = {
+    action: 'POST' | 'RETRACT';
+    attemptCount: number;
+    createdAt: string;
+    feedbackId: string;
+    lastError: string | null;
+    nextAttemptAt: string;
+    state: 'PENDING' | 'SENDING' | 'UNCERTAIN' | 'DONE';
+    updatedAt: string;
+};
+
 export type FeedbackSourceCount = {
-    /**
-     * Distinct artifacts of this kind in the selected time period
-     */
     count: number;
-    /**
-     * The kind of work the feedback came from
-     */
-    workKind: string;
+    itemKind: string;
 };
 
 export type FeedbackTriage = {
     resolved: boolean;
-};
-
-/**
- * One withdrawal of a card from a developer's practice page, and its restoration if any
- */
-export type FeedbackWithdrawal = {
-    id: string;
-    reason: string;
-    /**
-     * Why it was restored; null while the withdrawal is in force
-     */
-    restorationReason?: string;
-    restoredAt?: string;
-    /**
-     * Who restored it; null while in force or once that account is erased
-     */
-    restoredBy?: string;
-    withdrawnAt: string;
-    /**
-     * Who withdrew it; null once that account is erased
-     */
-    withdrawnBy?: string;
 };
 
 /**
@@ -2126,6 +1734,16 @@ export type FirstLoginConsent = {
     termsAccepted: boolean;
 };
 
+export type FrozenModel = {
+    modelId: string;
+    options: {
+        [key: string]: JsonNode;
+    };
+    providerModelId: string;
+    providerProtocol: string;
+    reasoningEffort: string | null;
+};
+
 /**
  * Display-only currency conversion for the USD amounts in this response. Multiply a USD amount by ratePerUsd to get the display-currency estimate; always label it as an estimate and show rateDate, which is the date the rate was actually published on (not necessarily today), and attribute it to source.
  */
@@ -2148,15 +1766,11 @@ export type FxRateInfo = {
     source: 'ECB';
 };
 
-/**
- * Generated-path policy used by this review, not the repository's current settings
- */
 export type GeneratedPathReview = {
-    /**
-     * Changed paths marked generated, including both names of a rename
-     */
-    paths: Array<string>;
+    excludedPaths: Array<string>;
     patterns: Array<string>;
+    reason: string | null;
+    withheld: boolean;
 };
 
 /**
@@ -2249,61 +1863,33 @@ export type GitLabProvider = {
     defaultServerUrl?: string;
 };
 
-/**
- * One group's practice counts per effective autonomy state
- */
-export type GroupAutonomyRollup = {
-    /**
-     * The autonomy in force for this group, and where it came from
-     */
-    autonomy: AutonomyAssignment;
-    /**
-     * Practice count per effective autonomy in this group
-     */
-    counts: {
-        [key: string]: number;
-    };
-    /**
-     * Group name; null for the no-group group
-     */
-    groupName?: string;
-    /**
-     * Group slug; null groups the practices that belong to no group
-     */
-    groupSlug?: string;
-    /**
-     * Number of practices with an explicit autonomy override
-     */
-    overriddenCount: number;
+export type GroupDefinition = {
+    color: string | null;
+    description: string | null;
+    icon: string | null;
+    name: string;
 };
 
-/**
- * A practice the developer's newest work keeps meeting
- */
-export type HeldPractice = {
-    /**
-     * How many of the newest pieces of work in a row came back clean
-     */
-    cleanWork: number;
-    groupSlug?: string;
-    /**
-     * What the developer keeps doing, in the catalog's words; absent for a practice the catalog does not ship
-     */
-    holdsAs?: string;
-    practiceName: string;
-    practiceSlug: string;
-    /**
-     * When the oldest piece of work of the clean run was reviewed
-     */
-    since: string;
-    /**
-     * Artifact kind id most of that work is
-     */
-    workKind: string;
-    /**
-     * The provider most of that work lives at, which decides its noun: a GitLab scm.pull_request is a merge request; absent when no run that reviewed the work is left
-     */
-    workProvider?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
+export type GroupRef = {
+    color: string | null;
+    icon: string | null;
+    name: string;
+    slug: string;
+};
+
+export type History = {
+    feedback?: Array<Entry>;
+    item?: ItemRef;
+};
+
+export type HostCoverage = Omit<ResultCoverage, 'source'> & {
+    complete?: boolean;
+    failedReads?: number;
+    omitted?: Array<CoverageOmission>;
+    reads?: number;
+    receipts?: Array<ReadReceipt>;
+    truncatedReads?: number;
+    source: 'HostCoverage';
 };
 
 export type Identity = {
@@ -2340,116 +1926,10 @@ export type IdentityView = {
     username?: string;
 };
 
-/**
- * One piece of work that came back clean on the practice since the feedback was prepared
- */
-export type InAppCleanWork = {
-    /**
-     * When that piece was reviewed
-     */
-    reviewedAt: string;
-    /**
-     * The piece of work, as every surface names it
-     */
-    reviewedWork: ReviewedWorkRef;
-};
-
-/**
- * One piece of work the pattern was observed on
- */
-export type InAppEvidence = {
-    /**
-     * When the measurement behind this occurrence was taken
-     */
-    observedAt: string;
-    /**
-     * What the review made of this piece of work: a behaviour demonstrated, a trap avoided, something harmful done, or something needed left out
-     */
-    outcome: 'MET' | 'NOT_MET' | 'NOT_APPLICABLE' | 'UNDETERMINED';
-    /**
-     * The piece of work, as every surface names it
-     */
-    reviewedWork: ReviewedWorkRef;
-    /**
-     * What the review recorded on this piece of work
-     */
-    summary?: string;
-};
-
-/**
- * A process-level message on the developer's own practice pages
- */
-export type InAppFeedback = {
-    /**
-     * The message, as Markdown, without the headline and the next step; null once a workspace admin withdrew it
-     */
-    body?: string;
-    /**
-     * Clean pieces of work in a row on the practice that resolve this feedback
-     */
-    cleanNeeded: number;
-    /**
-     * The pieces of work in a row that came back clean on the practice since the feedback was prepared, each with the date it was reviewed, oldest first, at most cleanNeeded of them; a problem empties it, and once resolved these are exactly the pieces that resolved it
-     */
-    cleanWork: Array<InAppCleanWork>;
-    /**
-     * When it stopped being open: the earliest of the work completing its clean run, the developer answering that it is addressed or not applicable, and the practice changing its review rules after it was prepared; null while it is open
-     */
-    closedAt?: string;
-    /**
-     * What closed it, for the moment closedAt names; on a tie the work, then the developer, then the practice; null while it is open
-     */
-    closedBy?: 'WORK' | 'DEVELOPER' | 'PRACTICE_CHANGED';
-    /**
-     * The pieces of work the way of working was observed on, newest first
-     */
-    evidence: Array<InAppEvidence>;
-    /**
-     * Group display name; null when the practice has none
-     */
-    groupName?: string;
-    /**
-     * Group the practice sits in; null when the practice has none
-     */
-    groupSlug?: string;
-    /**
-     * Short headline naming the way of working, never the person
-     */
-    headline: string;
-    id: string;
-    /**
-     * The way of working to try next, on its own; null for feedback prepared without one
-     */
-    nextStep?: string;
-    practiceName: string;
-    /**
-     * Practice this feedback is about
-     */
-    practiceSlug: string;
-    /**
-     * When the message was composed
-     */
-    preparedAt: string;
-    /**
-     * When this developer first opened it; null until they have
-     */
-    readAt?: string;
-    /**
-     * The developer's current response to this feedback; null while they have none
-     */
-    response?: FeedbackResponse;
-    /**
-     * What good looks like, in the developer's framing
-     */
-    whatGoodLooksLike?: string;
-    /**
-     * Why this practice matters, in the developer's framing
-     */
-    whyItMatters?: string;
-    /**
-     * When a workspace admin withdrew it because what it said was wrong; the card then carries only its practice, whose name is the headline, and no message, next step, evidence, progress or closure
-     */
-    withdrawnAt?: string;
+export type InapplicabilityWarrant = {
+    consulted?: Array<string>;
+    prerequisite?: string;
+    ruledOutBy?: string;
 };
 
 /**
@@ -2541,6 +2021,110 @@ export type IntegrationCatalogEntry = {
     kind: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
 };
 
+export type IntroducedBasis = Omit<ClaimBasis, 'type'> & {
+    explanation?: string;
+    head?: number;
+    type: 'IntroducedBasis';
+};
+
+export type ItemEvent = {
+    decidedAt: string | null;
+    foundBy: 'WEBHOOK' | 'SYNC' | 'REQUEST' | 'BACKFILL' | 'SCHEDULE';
+    id: string;
+    itemId: string;
+    itemVersion: string | null;
+    name: string;
+    occurredAt: string;
+    reason: 'GATE_WITHHELD' | 'COOLDOWN_ACTIVE' | 'REQUEST_COOLDOWN_ACTIVE' | 'REQUESTER_QUOTA_EXHAUSTED' | 'CONCURRENT_DUPLICATE' | 'COALESCED' | 'OUT_OF_REVIEW_SCOPE' | 'BOT_AUTHOR' | 'BOT_REVIEWER' | 'STALE_ROLLOUT_REVISION' | 'WORKSPACE_INACTIVE' | 'PRACTICES_DISABLED' | 'NO_ACTIVE_PRACTICE' | 'REVIEW_MODEL_UNBOUND' | 'MEMBER_AI_DECLINED' | 'PERSON_DATA_ERASED' | 'FEEDBACK_MODE_OFF' | 'SUBJECT_UNLINKED' | 'MERGE_ACTOR_UNAVAILABLE' | 'MODEL_UNAVAILABLE' | 'BUDGET_EXHAUSTED' | 'ITEM_NOT_VISIBLE' | 'VERSION_SUPERSEDED' | 'PENDING_DEADLINE_EXCEEDED' | 'ITEM_GONE' | 'LEGACY_REVIEW_UNBOUND' | null;
+    reviewId: string | null;
+    state: 'RECORDED' | 'WAITING' | 'STARTED' | 'WITHHELD' | 'EXPIRED';
+};
+
+export type ItemEventOption = {
+    connected: boolean;
+    label: string;
+    name: string;
+    raisedBy: Array<'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE'>;
+    recommended: boolean;
+};
+
+export type ItemFact = {
+    name: string;
+    url: string | null;
+    value: string | null;
+};
+
+export type ItemFacts = {
+    facts: Array<ItemFact>;
+    item: ItemRef;
+};
+
+export type ItemRef = {
+    container: string | null;
+    id: string;
+    kind: string;
+    label: string;
+    parentId: string | null;
+    path: string | null;
+    provider: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE' | null;
+    removedAt: string | null;
+    title: string | null;
+    url: string | null;
+};
+
+export type ItemTrace = {
+    events: Array<ItemEvent>;
+    item: ItemRef;
+    practices: Array<PracticeTraceEntry>;
+    reviews: Array<ReviewRef>;
+};
+
+export type JsonNode = {
+    array?: boolean;
+    bigDecimal?: boolean;
+    bigInteger?: boolean;
+    binary?: boolean;
+    boolean?: boolean;
+    container?: boolean;
+    double?: boolean;
+    embeddedValue?: boolean;
+    empty?: boolean;
+    float?: boolean;
+    floatingPointNumber?: boolean;
+    int?: boolean;
+    integralNumber?: boolean;
+    long?: boolean;
+    missingNode?: boolean;
+    nodeType?: 'ARRAY' | 'BINARY' | 'BOOLEAN' | 'MISSING' | 'NULL' | 'NUMBER' | 'OBJECT' | 'POJO' | 'STRING';
+    null?: boolean;
+    number?: boolean;
+    object?: boolean;
+    pojo?: boolean;
+    short?: boolean;
+    string?: boolean;
+    /**
+     * @deprecated
+     */
+    textual?: boolean;
+    valueNode?: boolean;
+};
+
+export type JudgedScanReportItem = {
+    currentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
+    item: ItemRef;
+    itemVersion: string;
+    outcome: 'MET' | 'NOT_MET' | 'DOES_NOT_APPLY' | 'COULD_NOT_DETERMINE';
+    practiceName: string;
+    practiceSlug: string;
+    problemCount: number;
+    recordedAt: string;
+    resultId: string;
+    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'TRIVIAL' | null;
+    sourceReviewId: string;
+    status: 'JUDGED';
+    summary: string | null;
+};
+
 /**
  * Information about a label from a repository
  */
@@ -2575,12 +2159,26 @@ export type LatestRelease = {
     version: string;
 };
 
+export type LegacyFeedbackItem = {
+    itemId: string;
+};
+
 /**
  * A provider instance the current user is linked to: its type + server-url origin.
  */
 export type LinkedProvider = {
     serverUrl?: string;
     type?: string;
+};
+
+export type ListedScanReportItem = {
+    item: ItemRef;
+    itemVersion: string;
+    lastResult: ResultList | null;
+    practiceName: string;
+    practiceSlug: string;
+    reason: string | null;
+    status: 'LISTED';
 };
 
 /**
@@ -2594,7 +2192,7 @@ export type LlmConnection = {
     /**
      * Wire protocol
      */
-    apiProtocol: string;
+    apiProtocol: 'openai-completions' | 'openai-responses' | 'openai-decisions' | 'openai-embeddings' | 'cohere-rerank';
     /**
      * Credential shape
      */
@@ -2627,6 +2225,10 @@ export type LlmConnection = {
      * Connection ID
      */
     id: number;
+    /**
+     * The purposes a model on this connection can serve, from its protocol
+     */
+    purposes: Array<'PRACTICE_REVIEW' | 'MENTOR' | 'PRACTICE_DECISION' | 'PRACTICE_EMBEDDING' | 'PRACTICE_RERANKING'>;
     /**
      * Unique slug
      */
@@ -2792,6 +2394,9 @@ export type LlmProbeResult = {
  */
 export type LlmUsageByDay = {
     day: string;
+    /**
+     * Runs: job attempts and mentor turns. Rows of models for practice scripts are not runs.
+     */
     events: number;
     /**
      * Confirmed spend on shared (instance) models for this day, in USD.
@@ -2802,7 +2407,7 @@ export type LlmUsageByDay = {
      */
     ownProviderTotalCostUsd: number;
     /**
-     * Ledger usage records this day with unavailable cost because rates are missing or measurements are unverified. Excluded from both totals above.
+     * Runs this day with at least one ledger row whose cost is unavailable because a rate is missing or the measurement is unverified. A practice script row counts toward the run of its review. Those rows are excluded from both totals above.
      */
     unpricedEventCount: number;
 };
@@ -2814,7 +2419,7 @@ export type LlmUsageByJobType = {
     cacheReadTokens: number;
     cacheWriteTokens: number;
     /**
-     * Ledger events (jobs / mentor turns)
+     * Runs: job attempts and mentor turns. Rows of models for practice scripts are not runs.
      */
     events: number;
     inputTokens: number;
@@ -2822,7 +2427,7 @@ export type LlmUsageByJobType = {
      * Confirmed spend on shared (instance) models for this job type, in USD.
      */
     instanceTotalCostUsd: number;
-    jobType: 'PULL_REQUEST_REVIEW' | 'ISSUE_REVIEW' | 'CONVERSATION_REVIEW' | 'DOCUMENT_REVIEW' | 'MENTOR_TURN';
+    jobType: string;
     outputTokens: number;
     /**
      * Spend on this workspace's own connected provider(s) for this job type, in USD.
@@ -2833,7 +2438,69 @@ export type LlmUsageByJobType = {
      */
     totalCalls: number;
     /**
-     * Ledger usage records for this job type with unavailable cost because rates are missing or measurements are unverified. Excluded from both totals above.
+     * Runs of this job type with at least one ledger row whose cost is unavailable because a rate is missing or the measurement is unverified. A practice script row counts toward the run of its review. Those rows are excluded from both totals above.
+     */
+    unpricedEventCount: number;
+};
+
+/**
+ * The decision, embedding and reranking calls that one practice's script made in finished reviews this month. The cost of each review's calls is split between its practices by the priced tokens that each used.
+ */
+export type LlmUsageByPractice = {
+    calls: number;
+    inputTokens: number;
+    /**
+     * This practice's share of the spend on shared (instance) models, in USD.
+     */
+    instanceTotalCostUsd: number;
+    outputTokens: number;
+    /**
+     * This practice's share of the spend on this workspace's own provider(s), in USD.
+     */
+    ownProviderTotalCostUsd: number;
+    /**
+     * The practice name. Null when the slug names no current practice.
+     */
+    practiceName?: string;
+    /**
+     * The practice slug. Null for calls that cannot be split by practice any more, such as those of a deleted review.
+     */
+    practiceSlug?: string;
+    /**
+     * The models for practice scripts that the script called.
+     */
+    purposes: Array<'PRACTICE_REVIEW' | 'MENTOR' | 'PRACTICE_DECISION' | 'PRACTICE_EMBEDDING' | 'PRACTICE_RERANKING'>;
+    /**
+     * Reviews in which the script called a model for practice scripts. A review with several practices counts for each of them.
+     */
+    reviews: number;
+    /**
+     * Reviews with a practice script ledger row whose price is not yet known and that holds this practice's calls, each review counted once. Those rows are excluded from both totals above. A review with several practices counts for each of them.
+     */
+    unpricedEventCount: number;
+};
+
+/**
+ * The decision, embedding and reranking calls of finished reviews this month, in total. calls, inputTokens, outputTokens and both costs equal the sums of the byPractice entries. reviews and unpricedEventCount do not: one review can count for several practices there.
+ */
+export type LlmUsagePracticeScriptTotal = {
+    calls: number;
+    inputTokens: number;
+    /**
+     * Confirmed practice script spend on shared (instance) models, in USD.
+     */
+    instanceTotalCostUsd: number;
+    outputTokens: number;
+    /**
+     * Practice script spend on this workspace's own provider(s), in USD.
+     */
+    ownProviderTotalCostUsd: number;
+    /**
+     * Distinct reviews in which a practice script called a model for practice scripts.
+     */
+    reviews: number;
+    /**
+     * Distinct reviews with a practice script ledger row whose price is not yet known. Those rows are excluded from both totals above.
      */
     unpricedEventCount: number;
 };
@@ -2857,43 +2524,25 @@ export type LoginProviderView = {
     updatedAt: string;
 };
 
-export type MemberAiChoiceRequest = {
-    choice: 'NO_AI' | 'IN_HOUSE_ONLY' | 'CLOUD';
+export type MovePracticeRequest = {
+    groupSlug: string | null;
+    position: number;
 };
 
-export type ModelCallTiming = {
-    /**
-     * Sum of adapter spans in milliseconds; absent when no span was recorded
-     */
-    elapsedMs?: number;
-    /**
-     * Sum of failed or aborted adapter spans in milliseconds; absent when no span was recorded
-     */
-    failedElapsedMs?: number;
-    /**
-     * Largest recorded adapter span in milliseconds; absent when no span was recorded
-     */
-    maxElapsedMs?: number;
-    /**
-     * Timed calls with a recorded valid SDK response time
-     */
-    respondedCalls: number;
-    /**
-     * Sum of request-to-SDK-response times in milliseconds; absent when no response time was recorded
-     */
-    responseMs?: number;
-    /**
-     * Calls with a recorded valid adapter span; does not imply all calls were timed
-     */
-    timedCalls: number;
+export type NotReviewedScanReportItem = {
+    item: ItemRef;
+    itemVersion: string;
+    lastResult: ResultList | null;
+    practiceName: string;
+    practiceSlug: string;
+    reason: string | null;
+    status: 'NOT_REVIEWED';
 };
 
-export type ModelFailureCount = {
-    /**
-     * Observed failed or aborted calls; absent if a supplied count is invalid or its sum overflows
-     */
-    count?: number;
-    kind: 'HTTP_ERROR' | 'CONNECTION_TIMEOUT' | 'CONNECTION_ERROR' | 'STREAM_INCOMPLETE' | 'FINISH_REASON_ERROR' | 'STREAM_ERROR_EVENT' | 'RESPONSE_FAILED' | 'RESPONSE_STATUS_ERROR' | 'TOOL_CALL_INCOMPLETE' | 'ABORTED' | 'UNKNOWN';
+export type Note = {
+    body?: string;
+    citationIndex: number;
+    problemId?: string;
 };
 
 export type NotificationPreferences = {
@@ -2913,186 +2562,10 @@ export type NotificationPreferences = {
     workspaceAlerts: boolean;
 };
 
-/**
- * Full practice observation detail including delivered feedback and evidence
- */
-export type ObservationDetail = {
-    /**
-     * Artifact entity ID
-     */
-    artifactId: number;
-    /**
-     * Artifact type (e.g. PULL_REQUEST)
-     */
-    artifactKind: string;
-    /**
-     * Link to the reviewed artifact on its platform (null when it cannot be resolved)
-     */
-    artifactUrl?: string;
-    /**
-     * Whether an observation's claim still stands: its practice's review rules are unchanged and it was not superseded, which an issue's observations are when a change to its reviewable content is recorded. It says neither whether a later review ran nor whether the work changed since it was reviewed. Earlier observation standards and missing fingerprints are unverifiable under the current whole-practice standard
-     */
-    claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
-    /**
-     * The summary body of the newest eligible feedback about this observation to this developer (null when no summary body was recorded, including delivery through inline notes only)
-     */
-    deliveredFeedback?: string;
-    evidence?: ObservationEvidence;
-    /**
-     * Evidence-based rationale for the observation
-     */
-    evidenceRationale?: string;
-    /**
-     * Links to the comments on the reviewed work that carry the feedback behind feedbackResponse, summary first (null when that feedback was not delivered on the work or the platform returned no link)
-     */
-    feedbackCommentUrls?: Array<string>;
-    /**
-     * The developer's standing answer and response handle for the newest eligible feedback about this observation, including inline-only delivery with no summary body (null when no eligible feedback exists or the newest eligible feedback has failed delivery)
-     */
-    feedbackResponse?: FeedbackResponse;
-    /**
-     * Observation ID
-     */
-    id: string;
-    /**
-     * When a workspace admin marked this observation as incorrect; null while it stands. An invalidated observation counts toward nothing current.
-     */
-    invalidatedAt?: string;
-    /**
-     * The admin's reason for the invalidation; null while the observation stands
-     */
-    invalidationReason?: string;
-    /**
-     * The next step the review wrote about this observation, whether or not the feedback carrying it was delivered (null when it wrote none)
-     */
-    nextStep?: string;
-    /**
-     * When the observation was made
-     */
-    observedAt: string;
-    /**
-     * What occasioned the measurement; never mix origins in one trend line
-     */
-    origin: 'LIVE' | 'MANUAL' | 'BACKFILL';
-    /**
-     * Result of the practice review
-     */
-    outcome: 'MET' | 'NOT_MET' | 'NOT_APPLICABLE' | 'UNDETERMINED';
-    /**
-     * Practice name
-     */
-    practiceName: string;
-    /**
-     * Practice slug
-     */
-    practiceSlug: string;
-    /**
-     * Cross-run locus key; null when continuity is unavailable
-     */
-    recurrenceKey?: string;
-    /**
-     * Severity level (null unless outcome is NOT_MET)
-     */
-    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
-    /**
-     * Observation summary
-     */
-    summary: string;
-};
-
-/**
- * Verified, source-bound evidence for an observation
- */
-export type ObservationEvidence = {
-    citations: Array<EvidenceCitation>;
-    /**
-     * Why this practice had nothing to judge here; null unless the review recorded a reason
-     */
-    inapplicability?: EvidenceInapplicability;
-    /**
-     * Where the review looked when it found nothing; null unless it recorded a search
-     */
-    search?: EvidenceSearch;
-    /**
-     * What the review could not settle; null unless it recorded an open question
-     */
-    undecidability?: EvidenceUndecidability;
-};
-
-/**
- * One correction of an observation by a workspace admin, and its restoration if any
- */
-export type ObservationInvalidation = {
-    id: string;
-    invalidatedAt: string;
-    /**
-     * Who invalidated it; null once that account is erased
-     */
-    invalidatedBy?: string;
-    /**
-     * What became of the comments Hephaestus had already posted on the provider
-     */
-    providerCopy: 'PENDING' | 'NONE' | 'UPDATED' | 'INLINE_REMAINS' | 'UNRESOLVED';
-    reason: string;
-    /**
-     * Why it was restored; null while the invalidation is in force
-     */
-    restorationReason?: string;
-    restoredAt?: string;
-    /**
-     * Who restored it; null while in force or once that account is erased
-     */
-    restoredBy?: string;
-};
-
-/**
- * Practice observation summary for list views
- */
-export type ObservationList = {
-    /**
-     * Artifact entity ID
-     */
-    artifactId: number;
-    /**
-     * Artifact type (e.g. PULL_REQUEST)
-     */
-    artifactKind: string;
-    /**
-     * Whether an observation's claim still stands: its practice's review rules are unchanged and it was not superseded, which an issue's observations are when a change to its reviewable content is recorded. It says neither whether a later review ran nor whether the work changed since it was reviewed. Earlier observation standards and missing fingerprints are unverifiable under the current whole-practice standard
-     */
-    claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
-    /**
-     * Observation ID
-     */
-    id: string;
-    /**
-     * When the observation was made
-     */
-    observedAt: string;
-    /**
-     * What occasioned the measurement; never mix origins in one trend line
-     */
-    origin: 'LIVE' | 'MANUAL' | 'BACKFILL';
-    /**
-     * Result of the practice review
-     */
-    outcome: 'MET' | 'NOT_MET' | 'NOT_APPLICABLE' | 'UNDETERMINED';
-    /**
-     * Practice name
-     */
-    practiceName: string;
-    /**
-     * Practice slug
-     */
-    practiceSlug: string;
-    /**
-     * Severity level (null unless outcome is NOT_MET)
-     */
-    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
-    /**
-     * Observation summary
-     */
-    summary: string;
+export type OpenQuestion = {
+    citation: EvidenceCitation | null;
+    openQuestion: string;
+    wouldSettleIt: string;
 };
 
 /**
@@ -3123,10 +2596,10 @@ export type OptionCount = {
 };
 
 export type OutcomeVector = {
+    couldNotDetermine: number;
+    doesNotApply: number;
     met: number;
-    notApplicable: number;
     notMet: number;
-    undetermined: number;
 };
 
 /**
@@ -3140,7 +2613,7 @@ export type OutlineCollection = {
     /**
      * Collection color as configured in Outline
      */
-    color?: string;
+    color: string | null;
     /**
      * When the collection was registered for mirroring
      */
@@ -3148,7 +2621,7 @@ export type OutlineCollection = {
     /**
      * Collection description as shown in Outline
      */
-    description?: string;
+    description: string | null;
     /**
      * Live (non-tombstoned) mirrored document count
      */
@@ -3156,31 +2629,31 @@ export type OutlineCollection = {
     /**
      * Documents upstream reported for this collection at the last enumeration (coverage denominator)
      */
-    documentsUpstream?: number;
+    documentsUpstream: null | number;
     /**
      * Exports the last pass skipped because the shared budget ran out (0 on a clean pass)
      */
-    exportsSkippedForBudget?: number;
+    exportsSkippedForBudget: null | number;
     /**
      * Collection icon as configured in Outline
      */
-    icon?: string;
+    icon: string | null;
     /**
      * Internal registry row id
      */
-    id: number;
+    id: string;
     /**
      * Last sync failure for this collection, cleared on the next clean pass
      */
-    lastSyncError?: string;
+    lastSyncError: string | null;
     /**
      * When this collection last completed a full reconcile pass, if any
      */
-    lastSyncedAt?: string;
+    lastSyncedAt: string | null;
     /**
      * Collection name as shown in Outline, if known
      */
-    name?: string;
+    name: string | null;
     /**
      * Mirror lifecycle state (PAUSED freezes sync but keeps documents)
      */
@@ -3192,7 +2665,7 @@ export type OutlineCollection = {
     /**
      * Outline url id (the short slug in collection URLs)
      */
-    urlId?: string;
+    urlId: string | null;
 };
 
 /**
@@ -3255,44 +2728,50 @@ export type OutlineTokenStatus = {
     name?: string;
 };
 
-/**
- * The span the overview measured change over
- */
 export type OverviewWindow = {
-    /**
-     * The window opens after this moment: the run before the latest one
-     */
     since: string;
-    /**
-     * The window closes at this moment, and the profile is read as of it
-     */
     until: string;
 };
 
-export type PageMetadata = {
-    number?: number;
-    size?: number;
-    totalElements?: number;
-    totalPages?: number;
+export type OwnFeedbackCopyRef = {
+    externalUrl: string | null;
+    id: string;
+    kind: 'SUMMARY' | 'LINE_NOTE' | 'FILE_NOTE' | 'CHAT_TURN';
+    postedAt: string;
 };
 
-/**
- * Stable wire representation for the APIs that expose flat page metadata. Spring Data's PageImpl
- * is an implementation detail, not a JSON contract; these fields preserve the existing clients'
- * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
- */
-export type PageResponseDtoAgentJob = {
-    content?: Array<AgentJob>;
-    empty?: boolean;
-    first?: boolean;
-    last?: boolean;
-    number?: number;
-    numberOfElements?: number;
-    pageable?: Pageable;
-    size?: number;
-    sort?: Sort;
-    totalElements?: number;
-    totalPages?: number;
+export type OwnFeedbackRef = {
+    copies: Array<OwnFeedbackCopyRef>;
+    deliveredAt: string | null;
+    destination: 'ON_WORK' | 'PRACTICE_PAGE' | 'CONVERSATION';
+    id: string;
+    response: FeedbackResponse | null;
+    state: 'AWAITING_APPROVAL' | 'READY' | 'DELIVERED' | 'UNCONFIRMED' | 'WITHHELD' | 'REJECTED' | 'REPLACED' | 'FAILED';
+};
+
+export type OwnItemEvent = {
+    name: string;
+    occurredAt: string;
+};
+
+export type OwnItemTrace = {
+    events: Array<OwnItemEvent>;
+    item: ItemRef;
+    results: Array<ResultList>;
+    review: ReviewRef;
+};
+
+export type Page = {
+    body?: string;
+    nextStep?: string;
+    title?: string;
+};
+
+export type PageMetadata = {
+    number: number;
+    size: number;
+    totalElements: number;
+    totalPages: number;
 };
 
 /**
@@ -3301,17 +2780,17 @@ export type PageResponseDtoAgentJob = {
  * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
  */
 export type PageResponseDtoAuthEventView = {
-    content?: Array<AuthEventView>;
-    empty?: boolean;
-    first?: boolean;
-    last?: boolean;
-    number?: number;
-    numberOfElements?: number;
-    pageable?: Pageable;
-    size?: number;
-    sort?: Sort;
-    totalElements?: number;
-    totalPages?: number;
+    content: Array<AuthEventView>;
+    empty: boolean;
+    first: boolean;
+    last: boolean;
+    number: number;
+    numberOfElements: number;
+    pageable: Pageable;
+    size: number;
+    sort: Sort;
+    totalElements: number;
+    totalPages: number;
 };
 
 /**
@@ -3320,17 +2799,17 @@ export type PageResponseDtoAuthEventView = {
  * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
  */
 export type PageResponseDtoConfigAuditEntryView = {
-    content?: Array<ConfigAuditEntryView>;
-    empty?: boolean;
-    first?: boolean;
-    last?: boolean;
-    number?: number;
-    numberOfElements?: number;
-    pageable?: Pageable;
-    size?: number;
-    sort?: Sort;
-    totalElements?: number;
-    totalPages?: number;
+    content: Array<ConfigAuditEntryView>;
+    empty: boolean;
+    first: boolean;
+    last: boolean;
+    number: number;
+    numberOfElements: number;
+    pageable: Pageable;
+    size: number;
+    sort: Sort;
+    totalElements: number;
+    totalPages: number;
 };
 
 /**
@@ -3338,18 +2817,189 @@ export type PageResponseDtoConfigAuditEntryView = {
  * is an implementation detail, not a JSON contract; these fields preserve the existing clients'
  * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
  */
-export type PageResponseDtoObservationList = {
-    content?: Array<ObservationList>;
-    empty?: boolean;
-    first?: boolean;
-    last?: boolean;
-    number?: number;
-    numberOfElements?: number;
-    pageable?: Pageable;
-    size?: number;
-    sort?: Sort;
-    totalElements?: number;
-    totalPages?: number;
+export type PageResponseDtoItemEvent = {
+    content: Array<ItemEvent>;
+    empty: boolean;
+    first: boolean;
+    last: boolean;
+    number: number;
+    numberOfElements: number;
+    pageable: Pageable;
+    size: number;
+    sort: Sort;
+    totalElements: number;
+    totalPages: number;
+};
+
+/**
+ * Stable wire representation for the APIs that expose flat page metadata. Spring Data's PageImpl
+ * is an implementation detail, not a JSON contract; these fields preserve the existing clients'
+ * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
+ */
+export type PageResponseDtoItemRef = {
+    content: Array<ItemRef>;
+    empty: boolean;
+    first: boolean;
+    last: boolean;
+    number: number;
+    numberOfElements: number;
+    pageable: Pageable;
+    size: number;
+    sort: Sort;
+    totalElements: number;
+    totalPages: number;
+};
+
+/**
+ * Stable wire representation for the APIs that expose flat page metadata. Spring Data's PageImpl
+ * is an implementation detail, not a JSON contract; these fields preserve the existing clients'
+ * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
+ */
+export type PageResponseDtoProfileReview = {
+    content: Array<ProfileReview>;
+    empty: boolean;
+    first: boolean;
+    last: boolean;
+    number: number;
+    numberOfElements: number;
+    pageable: Pageable;
+    size: number;
+    sort: Sort;
+    totalElements: number;
+    totalPages: number;
+};
+
+/**
+ * Stable wire representation for the APIs that expose flat page metadata. Spring Data's PageImpl
+ * is an implementation detail, not a JSON contract; these fields preserve the existing clients'
+ * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
+ */
+export type PageResponseDtoResultList = {
+    content: Array<ResultList>;
+    empty: boolean;
+    first: boolean;
+    last: boolean;
+    number: number;
+    numberOfElements: number;
+    pageable: Pageable;
+    size: number;
+    sort: Sort;
+    totalElements: number;
+    totalPages: number;
+};
+
+/**
+ * Stable wire representation for the APIs that expose flat page metadata. Spring Data's PageImpl
+ * is an implementation detail, not a JSON contract; these fields preserve the existing clients'
+ * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
+ */
+export type PageResponseDtoReviewBatch = {
+    content: Array<ReviewBatch>;
+    empty: boolean;
+    first: boolean;
+    last: boolean;
+    number: number;
+    numberOfElements: number;
+    pageable: Pageable;
+    size: number;
+    sort: Sort;
+    totalElements: number;
+    totalPages: number;
+};
+
+/**
+ * Stable wire representation for the APIs that expose flat page metadata. Spring Data's PageImpl
+ * is an implementation detail, not a JSON contract; these fields preserve the existing clients'
+ * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
+ */
+export type PageResponseDtoReviewFeedback = {
+    content: Array<ReviewFeedback>;
+    empty: boolean;
+    first: boolean;
+    last: boolean;
+    number: number;
+    numberOfElements: number;
+    pageable: Pageable;
+    size: number;
+    sort: Sort;
+    totalElements: number;
+    totalPages: number;
+};
+
+/**
+ * Stable wire representation for the APIs that expose flat page metadata. Spring Data's PageImpl
+ * is an implementation detail, not a JSON contract; these fields preserve the existing clients'
+ * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
+ */
+export type PageResponseDtoReviewProblem = {
+    content: Array<ReviewProblem>;
+    empty: boolean;
+    first: boolean;
+    last: boolean;
+    number: number;
+    numberOfElements: number;
+    pageable: Pageable;
+    size: number;
+    sort: Sort;
+    totalElements: number;
+    totalPages: number;
+};
+
+/**
+ * Stable wire representation for the APIs that expose flat page metadata. Spring Data's PageImpl
+ * is an implementation detail, not a JSON contract; these fields preserve the existing clients'
+ * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
+ */
+export type PageResponseDtoReviewResult = {
+    content: Array<ReviewResult>;
+    empty: boolean;
+    first: boolean;
+    last: boolean;
+    number: number;
+    numberOfElements: number;
+    pageable: Pageable;
+    size: number;
+    sort: Sort;
+    totalElements: number;
+    totalPages: number;
+};
+
+/**
+ * Stable wire representation for the APIs that expose flat page metadata. Spring Data's PageImpl
+ * is an implementation detail, not a JSON contract; these fields preserve the existing clients'
+ * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
+ */
+export type PageResponseDtoReviewSummary = {
+    content: Array<ReviewSummary>;
+    empty: boolean;
+    first: boolean;
+    last: boolean;
+    number: number;
+    numberOfElements: number;
+    pageable: Pageable;
+    size: number;
+    sort: Sort;
+    totalElements: number;
+    totalPages: number;
+};
+
+/**
+ * Stable wire representation for the APIs that expose flat page metadata. Spring Data's PageImpl
+ * is an implementation detail, not a JSON contract; these fields preserve the existing clients'
+ * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
+ */
+export type PageResponseDtoScanSummary = {
+    content: Array<ScanSummary>;
+    empty: boolean;
+    first: boolean;
+    last: boolean;
+    number: number;
+    numberOfElements: number;
+    pageable: Pageable;
+    size: number;
+    sort: Sort;
+    totalElements: number;
+    totalPages: number;
 };
 
 /**
@@ -3358,17 +3008,17 @@ export type PageResponseDtoObservationList = {
  * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
  */
 export type PageResponseDtoSyncJob = {
-    content?: Array<SyncJob>;
-    empty?: boolean;
-    first?: boolean;
-    last?: boolean;
-    number?: number;
-    numberOfElements?: number;
-    pageable?: Pageable;
-    size?: number;
-    sort?: Sort;
-    totalElements?: number;
-    totalPages?: number;
+    content: Array<SyncJob>;
+    empty: boolean;
+    first: boolean;
+    last: boolean;
+    number: number;
+    numberOfElements: number;
+    pageable: Pageable;
+    size: number;
+    sort: Sort;
+    totalElements: number;
+    totalPages: number;
 };
 
 /**
@@ -3376,46 +3026,50 @@ export type PageResponseDtoSyncJob = {
  * is an implementation detail, not a JSON contract; these fields preserve the existing clients'
  * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
  */
-export type PageResponseDtoUserViewUser = {
-    content?: Array<UserViewUser>;
-    empty?: boolean;
-    first?: boolean;
-    last?: boolean;
-    number?: number;
-    numberOfElements?: number;
-    pageable?: Pageable;
-    size?: number;
-    sort?: Sort;
-    totalElements?: number;
-    totalPages?: number;
+export type PageResponseDtoUserViewAccount = {
+    content: Array<UserViewAccount>;
+    empty: boolean;
+    first: boolean;
+    last: boolean;
+    number: number;
+    numberOfElements: number;
+    pageable: Pageable;
+    size: number;
+    sort: Sort;
+    totalElements: number;
+    totalPages: number;
+};
+
+/**
+ * Stable wire representation for the APIs that expose flat page metadata. Spring Data's PageImpl
+ * is an implementation detail, not a JSON contract; these fields preserve the existing clients'
+ * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
+ */
+export type PageResponseDtoWorkspaceMembership = {
+    content: Array<WorkspaceMembership>;
+    empty: boolean;
+    first: boolean;
+    last: boolean;
+    number: number;
+    numberOfElements: number;
+    pageable: Pageable;
+    size: number;
+    sort: Sort;
+    totalElements: number;
+    totalPages: number;
 };
 
 export type Pageable = {
-    offset?: number;
-    pageNumber?: number;
-    pageSize?: number;
-    paged?: boolean;
-    sort?: Sort;
-    unpaged?: boolean;
+    offset: number;
+    pageNumber: number;
+    pageSize: number;
+    paged: boolean;
+    sort: Sort;
+    unpaged: boolean;
 };
 
 export type PagedModelFeedbackItem = {
     content?: Array<FeedbackItem>;
-    page?: PageMetadata;
-};
-
-export type PagedModelReviewFeedback = {
-    content?: Array<ReviewFeedback>;
-    page?: PageMetadata;
-};
-
-export type PagedModelReviewObservation = {
-    content?: Array<ReviewObservation>;
-    page?: PageMetadata;
-};
-
-export type PagedModelReviewRunSummary = {
-    content?: Array<ReviewRunSummary>;
     page?: PageMetadata;
 };
 
@@ -3426,11 +3080,6 @@ export type PagedModelSurvey = {
 
 export type PagedModelSurveyResponse = {
     content?: Array<SurveyResponse>;
-    page?: PageMetadata;
-};
-
-export type PagedModelTracedArtifact = {
-    content?: Array<TracedArtifact>;
     page?: PageMetadata;
 };
 
@@ -3469,449 +3118,96 @@ export type PersonDataScope = {
     identities: Array<Identity>;
 };
 
-/**
- * A practice's position in the catalog
- */
-export type PlacePracticeRequest = {
-    /**
-     * Destination group slug; omit to place the practice in Unassigned
-     */
-    groupSlug?: string;
-    /**
-     * Zero-based position in the destination
-     */
-    position: number;
-};
-
-/**
- * Practice definition for evaluating developer contributions
- */
 export type Practice = {
-    /**
-     * Kind of work this practice reviews, read off its signals
-     */
-    artifactKind: string;
-    automatedReviewPolicy: PracticeAutomatedReviewPolicy;
-    automatedReviewValidation: PracticeAutomatedReviewValidation;
-    /**
-     * Why Hephaestus never reviews this practice whatever its own policy says: the catalogue entry it was copied from withdrew automated review. Absent when its own policy decides.
-     */
-    automatedReviewWithdrawal?: PracticeEvidenceLimitation;
-    /**
-     * How much autonomy the system has over this practice, whether that was set here or inherited from its group or workspace, and which level decided it
-     */
-    autonomy: AutonomyAssignment;
-    catalogOrigin?: CatalogOrigin;
-    /**
-     * Timestamp when the practice was created
-     */
+    catalogOrigin: CatalogOrigin;
     createdAt: string;
-    /**
-     * Practice review criteria
-     */
-    criteria: string;
-    deliveryBehavior: PracticeDeliveryBehavior;
-    /**
-     * Position within its group (lowest first); ties broken by name
-     */
-    displayOrder: number;
-    evidenceRequirements: Array<PracticeEvidenceRequirement>;
-    /**
-     * Slug of the practice group this practice is bound to, if any
-     */
-    groupSlug?: string;
-    /**
-     * Developer-facing guide text and its figures (developer layer)
-     */
-    guide?: PracticeGuide;
-    /**
-     * Practice ID
-     */
-    id: number;
-    /**
-     * Human-readable name
-     */
-    name: string;
-    /**
-     * TypeScript/Node precompute script for static analysis before AI review
-     */
-    precomputeScript?: string;
-    precondition?: PracticePrecondition;
-    /**
-     * Automatic review state selections. An empty object imposes no state restrictions. Each selected dimension requires a nonempty set of non-null values offered by the work type descriptor. Values within a dimension are alternatives; all selected dimensions must match.
-     */
-    reviewWhen: {
-        [key: string]: Array<string>;
-    };
-    /**
-     * Signals that start a practice review
-     */
-    signals: Array<string>;
-    /**
-     * URL-safe identifier unique within workspace
-     */
+    currentVersion: PracticeVersion;
+    feedbackMode: FeedbackModeAssignment;
+    groupSlug: string | null;
+    id: string;
+    kind: string;
+    position: number;
     slug: string;
-    subject: 'AUTHOR' | 'ASSIGNEE' | 'REVIEWER' | 'MERGER';
-    /**
-     * Timestamp when the practice was last updated
-     */
-    updatedAt: string;
-    /**
-     * Developer-facing picture of the practice (developer layer)
-     */
-    visual?: PracticeVisual;
-    /**
-     * Developer-facing exemplar (developer layer)
-     */
-    whatGoodLooksLike?: string;
-    /**
-     * Developer-facing rationale (developer layer)
-     */
-    whyItMatters?: string;
+    updatedAt: string | null;
 };
 
-/**
- * Author-declared automated review and evidence sufficiency for one practice
- */
-export type PracticeAutomatedReview = {
-    /**
-     * Whether meeting every evidence requirement provides enough context to review the work
-     */
-    evidenceSufficiency: 'SUFFICIENT_WHEN_REQUIREMENTS_MET' | 'DECLARED_EVIDENCE_INSUFFICIENT' | 'NONE';
-    /**
-     * Implementation Hephaestus uses for automated review
-     */
-    mode: 'LANGUAGE_MODEL' | 'NONE';
-};
-
-/**
- * Author-defined automated review settings for one practice revision
- */
-export type PracticeAutomatedReviewPolicy = {
-    /**
-     * Automated review configuration; human review is a separate process
-     */
-    automatedReview: PracticeAutomatedReview;
-    /**
-     * Why this practice needs a human rather than automated review; present only when evidenceSufficiency is DECLARED_EVIDENCE_INSUFFICIENT
-     */
-    insufficiencyReason?: PracticeEvidenceLimitation;
-    /**
-     * Claims the selected evidence cannot support even when every requirement passes
-     */
-    knownLimitations: Array<PracticeEvidenceLimitation>;
-    /**
-     * Exact contract version that defines source kinds and source-state semantics
-     */
-    sourceContractVersion: string;
-    /**
-     * Conservative action when required evidence does not pass
-     */
-    whenEvidenceIsInsufficient: 'SKIP_AUTOMATED_REVIEW';
-};
-
-/**
- * Who stands behind a practice's automated-review policy, and which exact policy
- */
-export type PracticeAutomatedReviewValidation = {
-    /**
-     * SHA-256 digest of the exact automated-review policy
-     */
-    policyDigest: string;
-    /**
-     * Versioned fingerprint of the exact review rules
-     */
-    reviewRuleFingerprint: string;
-    /**
-     * Source contract the declared practice definition is written against
-     */
-    sourceContractVersion: string;
-    /**
-     * Validation lifecycle; authors cannot mark their own review policy as independently validated
-     */
-    status: 'AUTHOR_DECLARED';
-};
-
-/**
- * The authored standard and the occasion on which it is reviewed.
- */
 export type PracticeDefinition = {
-    automatedReviewPolicy: PracticeAutomatedReviewPolicy;
+    about: 'AUTHOR' | 'REVIEWER' | 'ASSIGNEE' | 'MERGER' | null;
+    appliesWhen: AppliesWhen | null;
     criteria: string;
-    deliveryBehavior: PracticeDeliveryBehavior;
-    evidenceRequirements: Array<PracticeEvidenceRequirement>;
-    groupSlug?: string;
-    guide?: PracticeGuide;
+    guidance: PracticeGuidance;
+    lineNotes: boolean;
     name: string;
-    precomputeScript?: string;
-    precondition?: PracticePrecondition;
-    /**
-     * Automatic review state selections. An empty object imposes no state restrictions. Each selected dimension requires a nonempty set of non-null values offered by the work type descriptor. Values within a dimension are alternatives; all selected dimensions must match.
-     */
-    reviewWhen: {
-        [key: string]: Array<string>;
-    };
-    signals: Array<string>;
-    subject: 'AUTHOR' | 'ASSIGNEE' | 'REVIEWER' | 'MERGER';
-    visual?: PracticeVisual;
-    whatGoodLooksLike?: string;
-    whyItMatters?: string;
+    reads: PracticeReads;
+    reviewOn: ReviewOn;
+    reviewedBy: ReviewedBy;
+    scan: ScanDefinition | null;
+    script: string | null;
 };
 
-/**
- * What a practice author may choose, per type of reviewed work
- */
+export type PracticeDefinitionInput = {
+    about: 'AUTHOR' | 'REVIEWER' | 'ASSIGNEE' | 'MERGER' | null;
+    appliesWhen: AppliesWhen | null;
+    criteria: string;
+    guidance: PracticeGuidance;
+    lineNotes: boolean;
+    name: string;
+    reads: PracticeReads;
+    reviewOn: ReviewOn;
+    reviewedBy: ReviewedByInput;
+    scan: ScanDefinition | null;
+    script: string | null;
+};
+
 export type PracticeDefinitionOptions = {
-    /**
-     * Source contract these options describe
-     */
-    sourceContractVersion: string;
-    workTypes: Array<PracticeWorkTypeDefinitionOptions>;
+    itemTypes: Array<PracticeItemTypeOption>;
+    sourceContract: string;
 };
 
-/**
- * Delivery choices declared by the practice author, not inferred from its slug.
- */
-export type PracticeDeliveryBehavior = {
-    overlapGroup?: string;
-    redundantToSlug?: string;
-    summaryOnly: boolean;
-};
-
-/**
- * One thing that blocked automated review, and how many reviews it affected
- */
-export type PracticeEvidenceBlocker = {
-    /**
-     * Readiness reason recorded for that source or practice
-     */
-    reasonCode: 'SOURCE_NOT_AVAILABLE' | 'SOURCE_INCOMPLETE' | 'SOURCE_EMPTY' | 'NO_AUTOMATED_REVIEW' | 'DECLARED_EVIDENCE_INSUFFICIENT' | 'SUBJECT_NOT_IN_THE_WORK';
-    /**
-     * Reviews this blocker affected
-     */
-    reviewsAffected: number;
-    /**
-     * Source that did not meet its requirement; absent when the practice itself runs no review
-     */
-    sourceKind?: string;
-};
-
-/**
- * Known claim that the selected evidence cannot support even when every requirement passes
- */
-export type PracticeEvidenceLimitation = {
-    /**
-     * Stable machine-readable identifier
-     */
-    code: string;
-    /**
-     * Plain-language explanation of the claim the evidence cannot support
-     */
-    description: string;
-};
-
-/**
- * Recent review readiness for one practice's evidence requirements
- */
-export type PracticeEvidenceOutcome = {
-    /**
-     * Blockers seen on the skipped reviews, most frequent first
-     */
-    blockersObserved: Array<PracticeEvidenceBlocker>;
-    /**
-     * Reviews that considered this practice
-     */
-    consideredReviews: number;
-    /**
-     * Practice this outcome describes
-     */
-    practiceSlug: string;
-    /**
-     * Reviews where the evidence met every requirement
-     */
-    reviewedCount: number;
-};
-
-/**
- * A source a practice reads and the stance it takes towards it
- */
-export type PracticeEvidenceRequirement = {
-    /**
-     * Stable source identifier from the selected source contract
-     */
-    sourceKind: string;
-    /**
-     * Whether an absent or degraded capture refuses the review
-     */
-    stance: 'REQUIRED' | 'EXHAUSTIVE' | 'CONTEXTUAL';
-};
-
-/**
- * An evidence source a practice on this kind of work may read
- */
-export type PracticeEvidenceSourceOption = {
-    description: string;
-    displayName: string;
-    privacyClass: 'INTERNAL' | 'PERSONAL' | 'SENSITIVE_PERSONAL';
-    /**
-     * What requiring this source demands of its capture; fixed by the source contract
-     */
-    requiredQuality: 'ANY_CAPTURE' | 'COMPLETE' | 'COMPLETE_AND_NON_EMPTY';
-    /**
-     * How much of the source one capture takes, and the bound past which it is no longer whole
-     */
-    selectionScope: string;
-    sourceKind: string;
-    /**
-     * Whether this source can be captured whole, and so whether a practice may rest a claim about what is absent from it on the capture
-     */
-    supportsExhaustiveEvidence: boolean;
-};
-
-export type PracticeFact = {
-    autonomy?: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
-    slug?: string;
-};
-
-/**
- * A practice group grouping related practices into a learning objective
- */
 export type PracticeGroup = {
-    /**
-     * How much autonomy the system has over every practice in this group that holds no autonomy of its own, whether that was set here or inherited from the workspace, and which level decided it
-     */
-    autonomy: AutonomyAssignment;
-    catalogOrigin?: CatalogOrigin;
-    /**
-     * Optional palette colour key for the group's chip
-     */
-    color?: string;
-    /**
-     * Timestamp when the group was created
-     */
+    catalogOrigin: CatalogOrigin;
+    color: string | null;
     createdAt: string;
-    /**
-     * What this group develops
-     */
-    description?: string;
-    /**
-     * Sort order within the workspace
-     */
-    displayOrder: number;
-    /**
-     * Optional lucide icon name for the group's chip
-     */
-    icon?: string;
-    /**
-     * Group ID
-     */
-    id: number;
-    /**
-     * Human-readable name
-     */
+    description: string | null;
+    feedbackMode: FeedbackModeAssignment;
+    icon: string | null;
+    id: string;
     name: string;
-    /**
-     * URL-safe identifier unique within the workspace
-     */
+    position: number;
+    shownToDevelopers: boolean;
     slug: string;
-    /**
-     * Timestamp when the group was last updated
-     */
-    updatedAt?: string;
-    /**
-     * Whether this group is shown in practice dashboards
-     */
-    visibleInPracticeDashboards: boolean;
+    updatedAt: string | null;
 };
 
-/**
- * A complete review run in a developer's practice-group history
- */
-export type PracticeGroupReviewRun = {
-    /**
-     * Every visible observation of the run, complete enough to open in place
-     */
-    observations: Array<ObservationDetail>;
-    reviewId: string;
-    reviewedAt: string;
-    reviewedWork: ReviewedWorkRef;
-};
-
-/**
- * A page of visible review runs
- */
-export type PracticeGroupReviewRunsPage = {
-    content: Array<PracticeGroupReviewRun>;
-    hasNext?: boolean;
-    page?: number;
-    size?: number;
-};
-
-/**
- * A developer's derived qualitative standing for one Group including 1<=n<many practices
- */
 export type PracticeGroupStanding = {
-    /**
-     * Evidence-weighted, opportunity-indexed direction across the group's practices
-     */
-    direction?: 'IMPROVING' | 'DECLINING' | 'UNCERTAIN' | 'INSUFFICIENT_EVIDENCE';
-    /**
-     * Oldest contributing observation, for provenance only (null without a verdict)
-     */
-    feedbackSince?: string;
-    /**
-     * Calendar span covered by the feedback, for provenance only; never a trend-analysis unit
-     */
-    feedbackSpanDays?: number;
-    /**
-     * Group name
-     */
+    direction: 'IMPROVING' | 'DECLINING' | 'UNCERTAIN' | 'INSUFFICIENT_EVIDENCE' | null;
+    feedbackSince: string | null;
+    feedbackSpanDays: null | number;
+    groupColor: string | null;
+    groupDescription: string | null;
+    groupIcon: string | null;
     groupName: string;
-    /**
-     * Group slug
-     */
     groupSlug: string;
-    /**
-     * Developer guidance aggregated from the group's feedback (null unless the standing is a verdict). The deterministic summary combines standing, next focus, and developer-facing catalog guidance.
-     */
-    guidance?: string;
-    /**
-     * How the guidance text was produced (null when there is no guidance)
-     */
-    guidanceSource?: 'RULE_BASED';
-    /**
-     * Supporting observations the standing derives from (problems first); empty without a verdict
-     */
-    observations: Array<PracticeStandingObservation>;
-    /**
-     * Distinct pieces of reviewed work the observations come from, per kind (provenance, not a score); empty without a verdict
-     */
+    guidance: string | null;
+    guidanceSource: 'RULE_BASED' | null;
+    results: Array<PracticeStandingResult>;
     sources: Array<FeedbackSourceCount>;
-    /**
-     * Derived qualitative standing across the group's practices
-     */
     standing: 'DEVELOPING' | 'STRENGTH' | 'MIXED' | 'NOT_OBSERVED' | 'NO_OPPORTUNITY';
-    /**
-     * Evidence support and provenance for the direction
-     */
-    trendSupport?: TrendSupport;
+    trendSupport: TrendSupport | null;
 };
 
-export type PracticeGroupTrend = {
-    group: PracticeTrend;
-    practices: Array<PracticeTrend>;
-};
-
-/**
- * The visual and the guide of one practice, as the practice panel shows them
- */
 export type PracticeGuidance = {
-    guide?: PracticeGuide;
-    /**
-     * URL-safe identifier unique within workspace
-     */
+    goingWell: string | null;
+    guide: PracticeGuide | null;
+    visual: PracticeVisual | null;
+    whatGoodLooksLike: string | null;
+    whyItMatters: string | null;
+};
+
+export type PracticeGuidanceDto = {
+    guide: PracticeGuide | null;
     practiceSlug: string;
-    visual?: PracticeVisual;
+    visual: PracticeVisual | null;
 };
 
 /**
@@ -3930,159 +3226,114 @@ export type PracticeGuide = {
     markdown: string;
 };
 
-/**
- * What must be in a piece of work for this practice to have anything to judge
- */
-export type PracticePrecondition = {
-    /**
-     * Alternative conditions; the practice applies when any condition holds
-     */
-    anyOf?: Array<PracticePreconditionClause>;
-    /**
-     * Explanation shown when complete evidence disproves every condition
-     */
-    skipReason: string;
+export type PracticeItemTypeOption = {
+    aboutRoles: Array<'AUTHOR' | 'REVIEWER' | 'ASSIGNEE' | 'MERGER'>;
+    applicabilityClauses: Array<'CHANGED_PATH' | 'DIFF_CONTAINS' | 'HAS_ITEMS'>;
+    applicabilitySources: Array<ReadSourceOption>;
+    events: Array<ItemEventOption>;
+    kind: string;
+    label: string;
+    readSources: Array<ReadSourceOption>;
+    reviewOnStateDimensions: Array<StateDimension>;
+    scanItemKinds: Array<string>;
+    scanSupported: boolean;
 };
 
-/**
- * One shape the subject a practice judges can take in a piece of work
- */
-export type PracticePreconditionClause = {
-    /**
-     * Globs; holds when the change touches a matching path
-     */
-    changedPathMatches?: Array<string>;
-    /**
-     * Literal strings; holds when the diff contains one of them
-     */
-    diffContains?: Array<string>;
-    /**
-     * Named evidence collection; holds when it has at least one entry
-     */
-    evidenceHasItems?: 'scm.review-threads' | 'scm.inline-review-comments' | 'scm.general-review-comments';
+export type PracticePageCleanWork = {
+    item: ItemRef;
+    recordedAt: string;
+    resultId: string;
+    reviewId: string;
 };
 
-/**
- * What was met, what changed and which work was reviewed over a window of the developer's reviews
- */
+export type PracticePageEvidence = {
+    item: ItemRef;
+    recordedAt: string;
+    resultId: string;
+    reviewId: string;
+    summary: string | null;
+};
+
+export type PracticePageFeedback = {
+    body: string | null;
+    cleanNeeded: number;
+    cleanWork: Array<PracticePageCleanWork>;
+    closedAt: string | null;
+    closedBy: 'WORK' | 'DEVELOPER' | 'PRACTICE_CHANGED' | null;
+    evidence: Array<PracticePageEvidence>;
+    groupName: string | null;
+    groupSlug: string | null;
+    headline: string;
+    id: string;
+    nextStep: string | null;
+    practiceName: string;
+    practiceSlug: string;
+    preparedAt: string;
+    readAt: string | null;
+    response: FeedbackResponse | null;
+    unverifiedHistory: boolean;
+    whatGoodLooksLike: string | null;
+    whyItMatters: string | null;
+    withdrawn: boolean;
+};
+
+export type PracticePageSupport = ({
+    state: 'COMPLETE';
+} & CompletePracticePageSupport) | ({
+    state: 'REFUSED' | 'UNAVAILABLE';
+} & ClosedPracticePageSupport);
+
 export type PracticeProfileOverview = {
-    /**
-     * Everything that changed in the window, newest first; one change per practice and type
-     */
     changes: Array<ProfileChange>;
-    /**
-     * Practices standing as a strength whose newest pieces of work are all clean, longest run first
-     *
-     * @deprecated
-     */
-    holdingUp?: Array<HeldPractice>;
-    /**
-     * The newest review run on the developer's work; absent before any ran
-     */
-    latestRun?: ReviewRunRef;
-    /**
-     * The pieces of work whose runs fall in the window, deduplicated, newest first
-     *
-     * @deprecated
-     */
-    reviewedWork?: Array<ReviewedWorkRef>;
-    /**
-     * The span every change below was measured over
-     */
+    latestReview: ProfileReviewRef | null;
+    reviewedItems: Array<ItemRef>;
     window: OverviewWindow;
 };
 
+export type PracticeReadSource = {
+    need: 'REQUIRED' | 'COMPLETE' | 'OPTIONAL';
+    source: string;
+};
+
+export type PracticeReads = {
+    contract: string;
+    sources: Array<PracticeReadSource>;
+};
+
 export type PracticeReleaseField = {
+    changedLocally: boolean;
     conflict: boolean;
-    field: 'NAME' | 'SIGNALS' | 'EVIDENCE_REQUIREMENTS' | 'REVIEW_WHEN' | 'SUBJECT' | 'PRECONDITION' | 'CRITERIA' | 'PRECOMPUTE_SCRIPT' | 'AUTOMATED_REVIEW_POLICY' | 'WHY_IT_MATTERS' | 'WHAT_GOOD_LOOKS_LIKE' | 'GROUP_SLUG' | 'DELIVERY_BEHAVIOR' | 'VISUAL' | 'GUIDE';
+    field: 'NAME' | 'REVIEW_ON' | 'APPLIES_WHEN' | 'ABOUT' | 'READS' | 'REVIEWED_BY' | 'CRITERIA' | 'SCRIPT' | 'SCAN' | 'LINE_NOTES' | 'GUIDANCE';
     offeredChanged: boolean;
 };
 
-/**
- * One offer and the exact three versions an administrator reviews before deciding.
- */
 export type PracticeReleaseProposal = {
-    base: PracticeDefinition;
-    baseSource: 'EXACT_ADOPTION' | 'BUNDLED_DIGEST_MATCH' | 'BUNDLED_FINGERPRINT_MATCH' | 'REVISION_FINGERPRINT_MATCH' | 'CURRENT_DEFINITION';
+    base: PracticeDefinition | null;
     current: PracticeDefinition;
-    currentRevision?: number;
+    currentVersionId: string | null;
     etag: string;
     fields: Array<PracticeReleaseField>;
     offered: PracticeDefinition;
     offeredDigest: string;
-    slug: string;
-};
-
-/**
- * Practice reviews, observations and feedback in one time bucket of a range
- */
-export type PracticeReviewBucket = {
-    /**
-     * Feedback created in the bucket within the range, in any delivery state
-     */
-    feedback: number;
-    /**
-     * Observations recorded in the bucket within the range
-     */
-    observations: number;
-    /**
-     * Practice reviews created in the bucket within the range, in any status
-     */
-    reviews: number;
-    /**
-     * When the bucket starts: midnight of its day, of its week's Monday or of its month's first day, in the requested time zone. The first bucket may start before the range.
-     */
-    start: string;
-};
-
-/**
- * What practice reviews recorded for one practice in a time range
- */
-export type PracticeReviewCounts = {
-    /**
-     * Feedback created in the range that is bound to an observation of this practice, whenever that observation was recorded; one piece of feedback bound to several practices counts for each
-     */
-    feedback: ReviewFeedbackCounts;
-    /**
-     * Practice group; null when the practice is Unassigned
-     */
-    group?: ReviewPracticeGroup;
-    /**
-     * Observations of this practice recorded in the range
-     */
-    observations: ReviewObservationCounts;
-    /**
-     * Of those observations, the ones an admin has marked incorrect and not restored
-     */
-    observationsInvalidated: number;
-    practiceName: string;
     practiceSlug: string;
 };
 
-export type PracticeReviewCoveragePreview = {
+export type PracticeReviewScopePreview = {
     /**
      * Effective coverage before the proposed change
      */
-    current: PracticeReviewCoverageSummary;
+    current: PracticeReviewScopeSummary;
     /**
      * Effective coverage if the proposed change is applied
      */
-    proposed: PracticeReviewCoverageSummary;
+    proposed: PracticeReviewScopeSummary;
     /**
      * Whether the proposal admits any repository, branch, or person excluded now
      */
     widens: boolean;
 };
 
-export type PracticeReviewCoverageSummary = {
-    /**
-     * Eligible linked members admitted by the people coverage axis
-     */
-    coveredPeople: number;
-    /**
-     * Monitored repositories admitted by the repository coverage axis
-     */
-    coveredRepositories: number;
+export type PracticeReviewScopeSummary = {
     /**
      * Eligible linked human members in the workspace
      */
@@ -4099,121 +3350,14 @@ export type PracticeReviewCoverageSummary = {
      * Workspace-wide practice-review jobs created during the estimate window
      */
     recentReviewVolume: number;
-};
-
-/**
- * Practice reviews, observations and feedback in a time range, in total, over time and by practice
- */
-export type PracticeReviewOverview = {
     /**
-     * How long each bucket is
+     * Eligible linked members admitted by the people coverage axis
      */
-    bucket: TimeBucketSize;
+    selectedPeople: number;
     /**
-     * Every bucket the range touches, oldest first, including empty ones
+     * Monitored repositories admitted by the repository coverage axis
      */
-    buckets: Array<PracticeReviewBucket>;
-    /**
-     * Feedback created in the range
-     */
-    feedback: ReviewFeedbackCounts;
-    /**
-     * Inclusive lower bound of the range counted, with its default filled in
-     */
-    from: string;
-    /**
-     * Observations recorded in the range
-     */
-    observations: ReviewObservationCounts;
-    /**
-     * Of those observations, the ones an admin has marked incorrect and not restored
-     */
-    observationsInvalidated: number;
-    /**
-     * Each practice with an observation recorded in the range or feedback created in the range on one of its observations, the most observed first, then by name
-     */
-    practices: Array<PracticeReviewCounts>;
-    /**
-     * Practice reviews created in the range
-     */
-    reviews: ReviewRunCounts;
-    /**
-     * Exclusive upper bound of the range counted, with its default filled in
-     */
-    to: string;
-};
-
-/**
- * The practice review queue of a workspace as it stands now, and how fast it empties
- */
-export type PracticeReviewQueue = {
-    /**
-     * Distinct workers running this workspace's practice reviews now, as the running jobs record them
-     */
-    activeWorkers: number;
-    /**
-     * When the queue was read; every wait and throughput window ends here
-     */
-    asOf: string;
-    /**
-     * Practice reviews that finished in the 24 hours before asOf, counted alike
-     */
-    finishedLastDay: number;
-    /**
-     * Practice reviews that finished in the hour before asOf, completed, failed or timed out; cancelled reviews are not counted
-     */
-    finishedLastHour: number;
-    /**
-     * finishedLastDay per hour, the throughput of the last 24 hours
-     */
-    finishedPerHourLastDay: number;
-    /**
-     * The head of the queue: the running reviews first, longest running first, then the waiting ones, longest waiting first, then the budget holds. At most 5 entries
-     */
-    head: Array<PracticeReviewQueueItem>;
-    /**
-     * Practice reviews queued now and held because the payer is over its monthly LLM cap
-     */
-    heldForBudget: number;
-    /**
-     * When the longest waiting of those was requested; absent when none waits. Holds for budget are left out, since they wait for the cap and not for a worker
-     */
-    oldestWaitingSince?: string;
-    /**
-     * Practice reviews running now
-     */
-    running: number;
-    /**
-     * Practice reviews queued now, other than those held for budget
-     */
-    waiting: number;
-};
-
-/**
- * One practice review queued or running now
- */
-export type PracticeReviewQueueItem = {
-    /**
-     * The developer the work is about, as the review names them; absent when it names none
-     */
-    developer?: ReviewSubject;
-    /**
-     * True when the review is queued and held for budget
-     */
-    heldForBudget: boolean;
-    /**
-     * The review
-     */
-    id: string;
-    /**
-     * Since when it is in its status: started for a running review; for a queued one, since it became available to a worker, which is its request unless it was requeued; for one held for budget, its request
-     */
-    since: string;
-    /**
-     * QUEUED or RUNNING
-     */
-    status: 'QUEUED' | 'RUNNING';
-    target: ReviewRunTarget;
+    selectedRepositories: number;
 };
 
 /**
@@ -4227,16 +3371,15 @@ export type PracticeReviewSettings = {
     /**
      * Raw override; null = inheriting the fleet default
      */
-    cooldownMinutesOverride?: number;
-    coverageSummary: PracticeReviewCoverageSummary;
+    cooldownMinutesOverride: null | number;
     /**
-     * Effective: how much autonomy the system has over practices and groups that hold no autonomy of their own — the bottom of the practice → group → workspace chain
+     * The default feedback mode when neither the practice nor its group selects one.
      */
-    defaultAutonomy: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
+    defaultFeedbackMode: 'OFF' | 'APPROVE_FIRST' | 'AUTOMATIC';
     /**
-     * Raw override; null = this workspace has never chosen, so HUMAN_APPROVAL applies
+     * Raw override; null inherits APPROVE_FIRST
      */
-    defaultAutonomyOverride?: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
+    defaultFeedbackModeOverride: 'OFF' | 'APPROVE_FIRST' | 'AUTOMATIC' | null;
     /**
      * Effective: deliver feedback to merged PRs/MRs
      */
@@ -4244,7 +3387,7 @@ export type PracticeReviewSettings = {
     /**
      * Raw override; null = inheriting the fleet default
      */
-    deliverToMergedOverride?: boolean;
+    deliverToMergedOverride: boolean | null;
     /**
      * Whether new external practice feedback may be sent
      */
@@ -4254,7 +3397,7 @@ export type PracticeReviewSettings = {
      */
     etag: string;
     /**
-     * Repository-root Ant-style generated-path patterns, keyed by monitored repository name
+     * Repository-root Ant-style generated-path patterns, keyed by monitored repository item ID
      */
     generatedPaths: {
         [key: string]: Array<string>;
@@ -4266,295 +3409,107 @@ export type PracticeReviewSettings = {
     /**
      * Monotonic rollout revision carried by automatically admitted review jobs
      */
-    revision: number;
+    revision: string;
+    scopeSummary: PracticeReviewScopeSummary;
 };
 
-export type PracticeReviewStateDimension = {
-    displayName: string;
-    key: string;
-    recommendedValues: Array<string>;
-    values: Array<PracticeReviewStateValue>;
+export type PracticeScriptAsOf = {
+    finishedAt: string;
+    jobId: string;
+    reviewId: string;
 };
 
-export type PracticeReviewStateValue = {
-    displayName: string;
-    value: string;
+export type PracticeScriptModel = {
+    cacheReadTokens: number;
+    cacheWriteTokens: number;
+    calls: number;
+    dataHandlingTier: 'IN_HOUSE' | 'CLOUD' | 'UNDECLARED' | null;
+    inputTokens: number;
+    kind: 'CHAT' | 'DECISION' | 'EMBEDDING' | 'RERANKING';
+    modelId: string | null;
+    outputTokens: number;
 };
 
-/**
- * Where the time of practice reviews went in a time range, stage by stage, and the reviews that need a look
- */
-export type PracticeReviewTiming = {
-    /**
-     * Until asked: from the moment on the work that started the review to its request, over the reviews a moment started before their request
-     */
-    asked: ReviewStageTiming;
-    /**
-     * Feedback created in the range and withheld because the work was already merged (ARTIFACT_MERGED)
-     */
-    feedbackWithheldAsMerged: number;
-    /**
-     * From the moment that started the review, or its request where no moment did, until it completed, one figure per review over the reviews that completed, whether they commented or not
-     */
-    finished: ReviewStageTiming;
-    /**
-     * Pull request and merge request reviews requested in the range that completed after the work was merged. The review list returns the same reviews with finishedAfterMerge.
-     */
-    finishedAfterMerge: number;
-    /**
-     * Of those, the reviews the merge itself started
-     */
-    finishedAfterMergeStartedByMerge: number;
-    /**
-     * Each stage's part of the time of the reviews that finished measures; absent when no review completed
-     */
-    finishedShares?: ReviewTimeShares;
-    /**
-     * Inclusive lower bound of the range measured, with its default filled in
-     */
-    from: string;
-    /**
-     * From the start of the model until the review ended, failed and timed-out runs included
-     */
-    model: ReviewStageTiming;
-    /**
-     * From acceptance of the review on the work (the end of the review for legacy runs) until it first posted feedback by itself; feedback that waited for an admin's approval is left out
-     */
-    posted: ReviewStageTiming;
-    /**
-     * From the claim until the model started, while the evidence was prepared
-     */
-    preparation: ReviewStageTiming;
-    /**
-     * From the request until a worker claimed the review; a retried review's earlier attempt counts as waiting
-     */
-    queue: ReviewStageTiming;
-    /**
-     * Not a stage of the review: from the end of the review until a developer first read its feedback on their practice pages or was shown it in a conversation
-     */
-    read: ReviewStageTiming;
-    /**
-     * Exclusive upper bound of the range measured, with its default filled in
-     */
-    to: string;
-    /**
-     * From the moment that started the review, or its request where no moment did, until it first posted feedback on the work by itself, one figure per review over the reviews that did
-     */
-    total: ReviewStageTiming;
-    /**
-     * Each stage's part of the time of the reviews that total measures; public execution ends at acceptance, even while private composition continues; absent when no review posted a comment
-     */
-    totalShares?: ReviewTimeShares;
-    /**
-     * Practice reviews queued now for longer than 10 minutes, whenever they were requested, other than those held for budget
-     */
-    waitingLong: number;
+export type PracticeScriptNeed = {
+    need: 'required' | 'optional';
+    slot: 'chat' | 'decision' | 'embedding' | 'reranking';
+    unmetTiers: Array<'IN_HOUSE' | 'CLOUD' | 'UNDECLARED'>;
 };
 
-/**
- * One version of a practice's definition and what changed in it
- */
-export type PracticeRevision = {
-    /**
-     * The parts of the definition that differ from the version before; empty for the first version and for a version recorded again without a change
-     */
-    changed: Array<'NAME' | 'SIGNALS' | 'EVIDENCE_REQUIREMENTS' | 'REVIEW_WHEN' | 'SUBJECT' | 'PRECONDITION' | 'CRITERIA' | 'PRECOMPUTE_SCRIPT' | 'AUTOMATED_REVIEW_POLICY' | 'WHY_IT_MATTERS' | 'WHAT_GOOD_LOOKS_LIKE' | 'GROUP_SLUG' | 'DELIVERY_BEHAVIOR' | 'VISUAL' | 'GUIDE'>;
-    createdAt: string;
-    id: number;
-    /**
-     * Whether what a review checks changed, so observations made before it no longer reflect the practice. A change to the wording around it, or to when it runs, does not count.
-     */
-    reviewRulesChanged: boolean;
-    /**
-     * 1 for the first version, counting up
-     */
-    revisionNumber: number;
+export type PracticeScriptRun = {
+    attempt: number;
+    durationMs: null | number;
+    error: string | null;
+    finishedAt: string;
+    jobId: string;
+    models: Array<PracticeScriptModel>;
+    practiceId: string;
+    practiceVersionId: string;
+    scriptKind: 'BUILTIN' | 'CUSTOM';
+    status: 'OK' | 'WITHHELD' | 'FAILED' | 'NOT_REACHED' | 'NOT_FINISHED';
+    stopReason: 'UNAVAILABLE' | 'BUDGET' | 'DEADLINE' | 'TOO_LARGE' | 'OFF_FORMAT' | 'REFUSED' | 'ERROR' | 'CANCELLED' | 'INVALID_SCRIPT' | 'INVALID_CANDIDATE' | null;
 };
 
-/**
- * A signal and the words a reader sees for it
- */
-export type PracticeSignal = {
-    /**
-     * What to print for the signal
-     */
-    displayName: string;
-    /**
-     * Signal name, for matching and linking; never printed
-     */
-    signal: string;
-};
-
-/**
- * A signal a practice can start an automated review on
- */
-export type PracticeSignalOption = {
-    displayName: string;
-    recommended: boolean;
-    signal: string;
-};
-
-/**
- * A developer's readable feedback for one practice
- */
-export type PracticeStanding = {
-    /**
-     * Opportunity-indexed direction of this practice's recent evidence
-     */
-    direction?: 'IMPROVING' | 'DECLINING' | 'UNCERTAIN' | 'INSUFFICIENT_EVIDENCE';
-    /**
-     * Group name this practice belongs to, if any
-     */
-    groupName?: string;
-    /**
-     * Group slug this practice belongs to, if any
-     */
-    groupSlug?: string;
-    /**
-     * Practice name
-     */
-    name: string;
-    /**
-     * True when the newest review of each piece of work in the look-back found that this practice did not apply to it; false when anything else was recorded, or nothing at all
-     */
-    notApplicableOnly?: boolean;
-    /**
-     * Practice slug
-     */
-    slug: string;
-    /**
-     * Where the developer stands on this practice, or why no standing could be formed
-     */
-    standing: 'DEVELOPING' | 'STRENGTH' | 'MIXED' | 'NOT_OBSERVED' | 'NO_OPPORTUNITY';
-    /**
-     * What the developer already does well here
-     */
-    strengths: Array<PracticeStandingObservation>;
-    /**
-     * Specific feedback to act on (highest-impact first)
-     */
-    toWorkOn: Array<PracticeStandingObservation>;
-    /**
-     * Evidence support and provenance for the direction
-     */
-    trendSupport?: TrendSupport;
-    /**
-     * A concrete picture of doing this well
-     */
-    whatGoodLooksLike?: string;
-    /**
-     * Why this practice matters, in plain language
-     */
-    whyItMatters?: string;
-};
-
-/**
- * A single piece of practice feedback to read and act on
- */
-export type PracticeStandingObservation = {
-    /**
-     * What to do — the text of the newest feedback that said something about this observation to this developer (null if nothing was said)
-     */
-    deliveredFeedback?: string;
-    /**
-     * Where in the work, e.g. "FrameRecorder.swift:212", when known
-     */
-    locator?: string;
-    /**
-     * Observation id — handle to open the full detail
-     */
-    observationId: string;
-    /**
-     * Why this observation was recorded. BACKFILL means it came from a review of past work rather than from something that just happened, and nothing was posted anywhere at the time.
-     */
-    origin: 'LIVE' | 'MANUAL' | 'BACKFILL';
-    /**
-     * MET or NOT_MET result supporting this standing
-     */
-    outcome: 'MET' | 'NOT_MET' | 'NOT_APPLICABLE' | 'UNDETERMINED';
-    /**
-     * Identifier of the reviewed work
-     */
-    reviewedWorkId: number;
-    /**
-     * Impact level (null unless NOT_MET)
-     */
-    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
-    /**
-     * The headline of the feedback
-     */
-    title: string;
-    /**
-     * The kind of reviewed work this is about
-     */
-    workKind: string;
-};
-
-/**
- * What became of one practice on this artifact, and whether anyone heard about it
- */
-export type PracticeTraceEntry = {
-    /**
-     * How much autonomy the workspace currently gives this practice, after inheritance
-     */
-    autonomy: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
-    /**
-     * When the answer was settled
-     */
-    decidedAt?: string;
-    /**
-     * Interventions actually delivered to a person
-     */
-    deliveredCount: number;
-    /**
-     * The outcome in a sentence, phrased as what would change it
-     */
-    explanation: string;
-    /**
-     * That group's name, as the workspace spells it; null when the practice has no group
-     */
-    groupName?: string;
-    /**
-     * Slug of the practice group this practice sits in; null for a practice the workspace files in no group
-     */
-    groupSlug?: string;
-    /**
-     * Measurements this practice produced on this artifact
-     */
-    observationCount: number;
-    /**
-     * The signal of the occurrence this answer is about, with its display name; null when nothing it watches happened
-     */
-    occasionedBy?: PracticeSignal;
-    /**
-     * That occurrence's id in this trace's signals list. The name alone cannot identify it — the same signal recurs on every revision — so this is what a link should follow.
-     */
-    occasionedById?: string;
-    outcome: 'REVIEWED' | 'RUNNING' | 'PENDING' | 'SKIPPED' | 'NOT_REACHED' | 'NOT_ASSESSABLE' | 'TURNED_OFF' | 'NOT_OCCASIONED' | 'DORMANT' | 'LAPSED' | 'FAILED';
+export type PracticeScriptSummary = {
+    asOf: PracticeScriptAsOf | null;
+    needs: Array<PracticeScriptNeed>;
     practiceName: string;
     practiceSlug: string;
-    /**
-     * The review this answer came from, when one ran
-     */
-    reviewId?: string;
-    /**
-     * The signals this practice watches, each with its display name
-     */
-    watches: Array<PracticeSignal>;
-    /**
-     * Why prepared feedback was withheld. Non-empty with observations present means we measured and deliberately said nothing.
-     */
-    withheldReasons: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'COMPOSER_WITHHELD' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ISSUE_SNAPSHOT_CHANGED' | 'ARTIFACT_MERGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'OBSERVATION_INVALIDATED' | 'REVIEWED_REVISION_CHANGED' | 'REVIEW_CANCELLED'>;
+    scriptChanged: boolean;
 };
 
-export type PracticeTrend = {
-    currentOutcomes?: OutcomeVector;
-    direction: 'IMPROVING' | 'DECLINING' | 'UNCERTAIN' | 'INSUFFICIENT_EVIDENCE';
-    opportunities: Array<TrendOpportunity>;
-    previousOutcomes?: OutcomeVector;
-    scope: 'GROUP' | 'PRACTICE';
+export type PracticeStanding = {
+    direction: 'IMPROVING' | 'DECLINING' | 'UNCERTAIN' | 'INSUFFICIENT_EVIDENCE' | null;
+    doesNotApplyOnly: boolean;
+    groupName: string | null;
+    groupSlug: string | null;
+    name: string;
     slug: string;
-    support: TrendSupport;
+    standing: 'DEVELOPING' | 'STRENGTH' | 'MIXED' | 'NOT_OBSERVED' | 'NO_OPPORTUNITY';
+    strengths: Array<PracticeStandingResult>;
+    toWorkOn: Array<PracticeStandingResult>;
+    trendSupport: TrendSupport | null;
+    whatGoodLooksLike: string | null;
+    whyItMatters: string | null;
+};
+
+export type PracticeStandingResult = {
+    deliveredFeedback: string | null;
+    item: ItemRef;
+    origin: 'EVENT' | 'REQUEST' | 'SCHEDULE' | 'BACKFILL';
+    outcome: 'MET' | 'NOT_MET' | 'DOES_NOT_APPLY' | 'COULD_NOT_DETERMINE';
+    resultId: string;
+    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'TRIVIAL' | null;
+    title: string;
+};
+
+export type PracticeSupport = {
+    decision: 'ADMIT' | 'FEEDBACK_OFF' | 'GATE_REFUSED' | 'NO_EVIDENCE' | 'UNCORROBORATED' | 'BACKFILL_HELD' | 'RECENTLY_SURFACED' | 'UNATTRIBUTABLE_SUBJECT';
+    occurrences: Array<SupportOccurrence>;
+    practiceSlug: string;
+    stopReason: 'VOLUME_CAPPED' | 'COMPOSER_WITHHELD' | 'NOTHING_NEW' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISAGREE' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'DELIVERY_UNCONFIRMED' | 'ITEM_GONE' | 'ITEM_CLOSED' | 'ITEM_MERGED' | 'ITEM_STATE_INELIGIBLE' | 'ISSUE_SNAPSHOT_CHANGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'NO_AI' | 'DELIVERY_OFF' | 'PERSON_SUPPRESSED' | 'RECIPIENT_UNAVAILABLE' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'FEEDBACK_OFF' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_SCOPE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'RESULT_MARKED_INCORRECT' | 'REVIEWED_VERSION_CHANGED' | 'REVIEW_CANCELLED' | 'EVIDENCE_NOT_PERMITTED' | 'NO_EVIDENCE' | 'UNCORROBORATED' | null;
+};
+
+export type PracticeTraceEntry = {
+    about: 'AUTHOR' | 'REVIEWER' | 'ASSIGNEE' | 'MERGER' | null;
+    feedbackMode: 'OFF' | 'APPROVE_FIRST' | 'AUTOMATIC';
+    practiceSlug: string;
+    results: ReviewResultCounts;
+    review: ReviewRef | null;
+    reviewOn: ReviewOn;
+    withheldReasons: Array<ReasonCount>;
+};
+
+export type PracticeVersion = {
+    changed: Array<'NAME' | 'REVIEW_ON' | 'APPLIES_WHEN' | 'ABOUT' | 'READS' | 'REVIEWED_BY' | 'CRITERIA' | 'SCRIPT' | 'SCAN' | 'LINE_NOTES' | 'GUIDANCE'>;
+    createdAt: string;
+    createdBy: AccountRef | null;
+    definition: PracticeDefinition | null;
+    id: string;
+    name: string | null;
+    number: number;
+    reviewChanged: boolean;
+    reviewDigest: string;
 };
 
 /**
@@ -4571,74 +3526,32 @@ export type PracticeVisual = {
     svg: string;
 };
 
-/**
- * Review timing, evidence choices, and recommended settings for one type of reviewed work
- */
-export type PracticeWorkTypeDefinitionOptions = {
-    allowedSources: Array<PracticeEvidenceSourceOption>;
-    artifactKind: string;
-    /**
-     * How a person asks for a review of this work type by hand, or absent where the work type admits no such request. Not an occasion to bind to: such a request reviews every practice on the work type whatever state the work is in.
-     */
-    manualReviewSignal?: PracticeSignal;
-    preconditionEvidenceCollections: Array<string>;
-    preconditionSupportedAspects: Array<string>;
-    /**
-     * Evidence a new binding on this work type starts with when the author says nothing
-     */
-    recommendedEvidenceRequirements: Array<PracticeEvidenceRequirement>;
-    recommendedPolicy: PracticeAutomatedReviewPolicy;
-    reviewWhenDimensions: Array<PracticeReviewStateDimension>;
-    /**
-     * The occasions a practice on this work type can be bound to. A review somebody asks for by hand is not among them — see manualReviewSignal.
-     */
-    signals: Array<PracticeSignalOption>;
-    subjectRoles: Array<'AUTHOR' | 'ASSIGNEE' | 'REVIEWER' | 'MERGER'>;
-    supportedAutomatedReviewModes: Array<'LANGUAGE_MODEL' | 'NONE'>;
+export type PracticeWorkspaceOverview = {
+    developers: number;
+    practices: Array<PracticeWorkspaceTile>;
 };
 
-/**
- * How the workspace's developers with a current standing split across the practice groups, counted in developers and never naming one, and the open feedback beside the reader's own. Nothing here reads a window; the tiles that do are read on their own
- */
-export type PracticesAcrossWorkspace = {
-    /**
-     * One row per practice group shown on the practice pages, in catalog order
-     */
-    groups: Array<WorkspaceGroupSplit>;
-    /**
-     * The reader's open feedback, counted by the rule the practice profile shows it open by, beside the middle half of every eligible developer's: both open now
-     */
-    openFeedback: WorkspaceTile;
+export type PracticeWorkspaceTile = {
+    developers: number;
+    group: GroupRef | null;
+    outcomes: OutcomeVector;
+    practiceName: string;
+    practiceSlug: string;
 };
 
-/**
- * The reader's figures over one window beside the middle half of the developers with a standing in it
- */
-export type PracticesAcrossWorkspaceTiles = {
-    /**
-     * Eligible developers with a standing in a practice group shown in the window, the developers the tiles compare
-     */
-    developersWithAStandingInWindow: number;
-    /**
-     * The reader's practices going well
-     */
-    practicesGoingWell: WorkspaceTile;
-    /**
-     * The reader's practices needing attention
-     */
-    practicesNeedingAttention: WorkspaceTile;
-    /**
-     * Pieces of the reader's work reviewed in the window
-     */
-    reviewedWork: WorkspaceTile;
-    /**
-     * The window the tiles read evidence over
-     */
-    window: 'ALL_TIME' | 'DAYS_30' | 'DAYS_90';
-    /**
-     * The practices the reader's profile lists, the denominator of the practice tiles
-     */
-    yourPractices: number;
+export type PrepareFeedbackRequest = {
+    attempt: number;
+    basisResultIds: Array<string>;
+    composition: Array<ComposedFeedback>;
+    jobId: string;
+    publicComposition: boolean;
+    reviewId: string;
+};
+
+export type PrepareFeedbackResponse = {
+    contentDigest: string;
+    feedbackIds: Array<string>;
+    preparedAt: string;
 };
 
 export type PreviewRequest = {
@@ -4657,7 +3570,7 @@ export type ProbeLlmConnectionRequest = {
     /**
      * Wire protocol
      */
-    apiProtocol: string;
+    apiProtocol: 'openai-completions' | 'openai-responses' | 'openai-decisions' | 'openai-embeddings' | 'cohere-rerank';
     /**
      * Credential shape (default BEARER)
      */
@@ -4666,6 +3579,26 @@ export type ProbeLlmConnectionRequest = {
      * Provider base URL
      */
     baseUrl: string;
+};
+
+export type Problem = {
+    basis: DutyBasis | IntroducedBasis | StateBasis | WorsenedBasis | null;
+    citations: Array<EvidenceCitation>;
+    explanation: string | null;
+    id: string;
+    key: string | null;
+    nextStep: string | null;
+    position: number;
+    resultId: string;
+    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'TRIVIAL';
+    summary: string;
+};
+
+export type ProblemChanges = {
+    absent: number;
+    new?: number;
+    unchanged: number;
+    updated: number;
 };
 
 export type ProblemDetail = {
@@ -4679,118 +3612,68 @@ export type ProblemDetail = {
     type?: string;
 };
 
-/**
- * One change on the developer's practice profile since the previous review run
- */
+export type ProblemSummary = {
+    id: string;
+    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'TRIVIAL';
+    summary: string;
+};
+
 export type ProfileChange = {
-    /**
-     * When it changed: the observation, the run that composed the feedback, or the response that did it
-     */
     at: string;
-    /**
-     * How many pieces of work in a row have to come back clean to resolve the feedback, for a FEEDBACK_RESET change: what the count fell back from
-     */
-    cleanNeeded?: number;
-    /**
-     * Which way a STANDING_MOVED or GROUP_MOVED went on the standing scale, for a move between two verdicts; null for a move into or out of a standing that is not a verdict
-     */
-    direction?: 'UP' | 'DOWN';
-    /**
-     * The reviewed work that drove the change, newest first: for feedback the work resolved, the pieces of work that came back clean; for feedback the work fell back on, the pieces that raised the problem again
-     */
-    evidence: Array<ReviewedWorkRef>;
-    /**
-     * The feedback this is about, for a feedback change
-     */
-    feedbackId?: string;
-    /**
-     * The standing or trend before, for a move or a turn
-     */
-    from?: string;
-    groupName?: string;
-    groupSlug?: string;
-    practiceName?: string;
-    practiceSlug?: string;
-    /**
-     * What resolved the feedback, for a FEEDBACK_RESOLVED change: the developer's work coming back clean, or the developer marking it addressed
-     */
-    resolvedBy?: 'WORK' | 'DEVELOPER';
-    /**
-     * The standing or trend now, for a move or a turn
-     */
-    to?: string;
-    /**
-     * What changed
-     */
-    type: 'FEEDBACK_NEW' | 'FEEDBACK_RESOLVED' | 'FEEDBACK_RESET' | 'STANDING_MOVED' | 'TREND_TURNED' | 'GROUP_MOVED' | 'FIRST_OBSERVED';
+    cleanNeeded: null | number;
+    direction: 'UP' | 'DOWN' | null;
+    evidence: Array<ItemRef>;
+    feedbackId: string | null;
+    from: string | null;
+    groupName: string | null;
+    groupSlug: string | null;
+    practiceName: string | null;
+    practiceSlug: string | null;
+    resolvedBy: 'WORK' | 'DEVELOPER' | null;
+    to: string | null;
+    type: 'FEEDBACK_NEW' | 'FEEDBACK_RESOLVED' | 'FEEDBACK_RESET' | 'STANDING_MOVED' | 'TREND_TURNED' | 'GROUP_MOVED' | 'FIRST_RECORDED';
 };
 
-/**
- * One review run on the developer's own work, with what it found about them
- */
-export type ProfileReviewRun = {
-    /**
-     * How many pieces of feedback from this run reached this developer
-     */
-    feedbackDelivered: number;
-    /**
-     * Where the feedback this run left on the work is read, at the provider; absent whenever the comment it landed in cannot be addressed from the work's own page
-     */
-    feedbackUrl?: string;
-    /**
-     * Whether this reader has standing to ask for a review of this work. False when the kind of work admits no request.
-     */
-    mayRequest: boolean;
-    /**
-     * What the run decided about each practice it observed for this developer
-     */
-    practices: ReviewPracticeOutcomes;
-    /**
-     * How many practices the run measured; absent when it wrote no coverage ledger
-     */
-    practicesEvaluated?: number;
+export type ProfileReview = {
+    feedback: Array<OwnFeedbackRef>;
+    results: Array<ResultList>;
+    review: ReviewRef;
+};
+
+export type ProfileReviewDetail = {
+    feedback: Array<OwnFeedbackRef>;
+    practiceOutcomes: OutcomeVector;
+    results: Array<ResultList>;
+    review: ReviewRef;
+    trace: OwnItemTrace;
+};
+
+export type ProfileReviewRef = {
+    at: string;
+    item: ItemRef;
     reviewId: string;
-    /**
-     * When the review recorded its newest observation about this developer
-     */
-    reviewedAt: string;
-    /**
-     * The piece of work the run reviewed
-     */
-    reviewedWork: ReviewedWorkRef;
-    /**
-     * Every practice counted in practices.toImprove, once each, in order of practice name
-     */
-    slippedPractices: Array<SlippedPractice>;
-    /**
-     * Where the review stands; absent when the review itself is no longer on record
-     */
-    status?: 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
-    /**
-     * What occasioned the review: MANUAL is one a person asked for; absent when the review itself is no longer on record
-     */
-    triggerMode?: 'AUTO' | 'MANUAL';
+    status: 'QUEUED' | 'RUNNING' | 'COMPLETE' | 'PARTIAL' | 'FAILED' | 'CANCELLED' | null;
 };
 
-/**
- * One review run on the developer's own work and what it observed about them
- */
-export type ProfileReviewRunDetail = {
-    /**
-     * Every visible observation the run made about this developer
-     */
-    observations: Array<ObservationDetail>;
-    run: ProfileReviewRun;
+export type ProjectedCitation = {
+    anchorable: boolean;
+    commit: string | null;
+    endLine: null | number;
+    index: number;
+    path: string | null;
+    quote: string | null;
+    side: 'OLD' | 'NEW' | null;
+    sourceKind: string;
+    sourcePath: string | null;
+    startLine: null | number;
+    verification: CitationProof | null;
 };
 
-/**
- * A page of the developer's own review runs, newest first
- */
-export type ProfileReviewRunsPage = {
-    content: Array<ProfileReviewRun>;
-    hasNext?: boolean;
-    page?: number;
-    size?: number;
+export type ProviderIdentityRef = {
+    avatarUrl: string | null;
+    displayName: string | null;
+    login: string | null;
+    provider: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
 };
 
 /**
@@ -4932,6 +3815,12 @@ export type PublicActivityWorkspaceSettings = {
     enabled: boolean;
 };
 
+export type PublicFeedbackHistory = {
+    contractVersion: number;
+    history: History;
+    readAt: string;
+};
+
 export type Question = {
     /**
      * a choice question also takes one free-text answer; false when a stored question omits it
@@ -4961,6 +3850,12 @@ export type QuestionSummary = {
     score?: number;
 };
 
+export type QuietDecision = {
+    basedOn?: Array<Support>;
+    reason?: string;
+    witnessIds?: Array<string>;
+};
+
 /**
  * Vendor API rate-limit observation, read from in-memory trackers (not persisted across restarts). Every field except observedAt is present only if the vendor actually reported it.
  */
@@ -4985,6 +3880,30 @@ export type RateLimitSnapshot = {
      * An observed 429's back-off deadline (observedAt + Retry-After); null if the vendor never told us to back off
      */
     throttledUntil?: string;
+};
+
+export type ReadReceipt = {
+    contentDigest?: string;
+    endLine?: number;
+    path?: string;
+    sourceKind?: string;
+    sourcePath?: string;
+    startLine?: number;
+    status?: 'COMPLETE' | 'TRUNCATED' | 'FAILED' | 'BINARY' | 'ABSENT';
+    version?: string;
+};
+
+export type ReadSourceOption = {
+    citation: CitationCapabilities;
+    label: string;
+    needs: Array<'REQUIRED' | 'COMPLETE' | 'OPTIONAL'>;
+    source: string;
+};
+
+export type ReasonCount = {
+    count: number;
+    description: string;
+    reason: string;
 };
 
 /**
@@ -5073,6 +3992,16 @@ export type ReleaseStatus = {
     status: 'DISABLED' | 'NOT_APPLICABLE' | 'NEVER_CHECKED' | 'CURRENT' | 'UPDATE_AVAILABLE' | 'FAILED';
 };
 
+export type RemovalGuard = {
+    previousFiles: number;
+    state: 'APPLIED' | 'NOT_NEEDED' | 'INCOMPLETE_LISTING' | 'SUSPECT_LISTING';
+    wouldRemove: number;
+};
+
+export type RemoveResultMarkRequest = {
+    reason: string;
+};
+
 /**
  * Request to rename a workspace's URL slug
  */
@@ -5083,28 +4012,8 @@ export type RenameWorkspaceSlugRequest = {
     newSlug: string;
 };
 
-/**
- * Reorder practice groups to match the supplied list
- */
-export type ReorderPracticeGroupsRequest = {
-    /**
-     * Group slugs in the desired display order
-     */
-    orderedSlugs: Array<string>;
-};
-
-/**
- * Reorder one group's practices to match the supplied list
- */
-export type ReorderPracticesRequest = {
-    /**
-     * Slug of the group whose practices are being reordered; null reorders the unassigned bucket
-     */
-    groupSlug?: string | null;
-    /**
-     * Practice slugs in the desired display order — the complete set for the group
-     */
-    orderedSlugs: Array<string>;
+export type ReorderRequest = {
+    slugs: Array<string>;
 };
 
 /**
@@ -5172,1224 +4081,682 @@ export type ResourceCounts = {
     total: number;
 };
 
-/**
- * A campaign as an admin sees it — before confirming, while it runs, and after it ends.
- */
-export type ReviewBackfillRun = {
-    artifactKind: string;
-    /**
-     * Who authorised the spend; absent until the run is confirmed
-     */
-    confirmedByAccountId?: number;
-    createdAt: string;
-    /**
-     * BACKFILL for a campaign an admin scoped by hand, SWEEP for one a recurring schedule opened
-     */
-    discoveredVia: 'EVENT' | 'SYNC' | 'MANUAL' | 'BACKFILL' | 'SWEEP';
-    estimatedArtifacts: number;
-    /**
-     * Forecast total spend in USD; absent when the workspace has no priced review history
-     */
-    estimatedCostUsd?: number;
-    /**
-     * artifacts whose submission threw, leaving no job and no recorded decision. Non-zero
-     * means this campaign's baseline has holes in it, which is why it is reported apart from a pass.
-     */
-    failedCount: number;
-    finishedAt?: string;
-    fromAt: string;
+export type ResultCoverage = {
+    source: string;
+};
+
+export type ResultDecision = {
+    decision: 'ADMIT' | 'FEEDBACK_OFF' | 'MENTOR_UNAVAILABLE' | 'GATE_REFUSED' | 'UNATTRIBUTABLE_SUBJECT' | 'HAS_INLINE_ANCHOR' | 'ALREADY_DELIVERED_ON_WORK' | 'REVIEWER_DEFERRED' | 'BACKFILL_QUIET';
+    resultId: string;
+    stopReason: 'VOLUME_CAPPED' | 'COMPOSER_WITHHELD' | 'NOTHING_NEW' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISAGREE' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'DELIVERY_UNCONFIRMED' | 'ITEM_GONE' | 'ITEM_CLOSED' | 'ITEM_MERGED' | 'ITEM_STATE_INELIGIBLE' | 'ISSUE_SNAPSHOT_CHANGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'NO_AI' | 'DELIVERY_OFF' | 'PERSON_SUPPRESSED' | 'RECIPIENT_UNAVAILABLE' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'FEEDBACK_OFF' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_SCOPE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'RESULT_MARKED_INCORRECT' | 'REVIEWED_VERSION_CHANGED' | 'REVIEW_CANCELLED' | 'EVIDENCE_NOT_PERMITTED' | 'NO_EVIDENCE' | 'UNCORROBORATED' | null;
+};
+
+export type ResultDetail = {
+    acceptedAt: string | null;
+    coverage: ClaimedCoverage | HostCoverage | null;
+    currentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
+    endReason: 'REPLACED' | 'OUTRANKED' | 'WORK_CHANGED' | 'REPAIRED' | 'REMOVED' | null;
+    endedAt: string | null;
+    evidence: ResultEvidence | null;
+    example: ResultExample | null;
+    explanation: string | null;
+    feedback: Array<OwnFeedbackRef>;
     id: string;
-    /**
-     * artifacts walked past without one: already measured at their current state, or
-     * refused by the review gate. The campaign looked at each of these and decided.
-     */
-    passedCount: number;
-    /**
-     * Set only while the run is PAUSED
-     */
-    pauseReason?: 'BUDGET_EXHAUSTED' | 'REVIEW_MODEL_UNBOUND' | 'WORKSPACE_UNAVAILABLE';
-    requestedByAccountId: number;
-    startedAt?: string;
-    status: 'AWAITING_CONFIRMATION' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
-    /**
-     * artifacts for which a review job was created
-     */
-    submittedCount: number;
-    /**
-     * The schedule that opened this run; absent for a campaign an admin scoped by hand
-     */
-    sweepScheduleId?: string;
-    toAt: string;
-};
-
-/**
- * Feedback composed from an observation
- */
-export type ReviewBoundFeedback = {
-    agentJobId: string;
-    channel: 'IN_CONTEXT' | 'IN_CHAT' | 'IN_APP';
-    createdAt: string;
-    /**
-     * When the message was placed; null if it was not delivered
-     */
-    deliveredAt?: string;
-    deliveryState: 'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'PARTIALLY_FAILED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED' | 'UNCONFIRMED';
-    feedbackId: string;
-    /**
-     * Whether the observation led the feedback or reinforced it
-     */
-    role: 'PRIMARY' | 'SUPPORTING';
-    /**
-     * Why delivery stopped; set on withheld or terminally partial feedback
-     */
-    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'COMPOSER_WITHHELD' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ISSUE_SNAPSHOT_CHANGED' | 'ARTIFACT_MERGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'OBSERVATION_INVALIDATED' | 'REVIEWED_REVISION_CHANGED' | 'REVIEW_CANCELLED';
-};
-
-/**
- * An observation that contributed to a piece of feedback
- */
-export type ReviewBoundObservation = {
-    /**
-     * Whether an observation's claim still stands: its practice's review rules are unchanged and it was not superseded, which an issue's observations are when a change to its reviewable content is recorded. It says neither whether a later review ran nor whether the work changed since it was reviewed. Earlier observation standards and missing fingerprints are unverifiable under the current whole-practice standard
-     */
-    claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
-    /**
-     * Practice group; null when the practice is Unassigned
-     */
-    group?: ReviewPracticeGroup;
-    observationId: string;
-    observedAt: string;
-    /**
-     * Render order within the feedback (lower renders earlier)
-     */
-    ordinal: number;
-    /**
-     * Result of the practice review
-     */
-    outcome: 'MET' | 'NOT_MET' | 'NOT_APPLICABLE' | 'UNDETERMINED';
+    item: ItemRef;
+    itemVersion: string | null;
+    markedIncorrectAt: string | null;
+    origin: 'EVENT' | 'REQUEST' | 'SCHEDULE' | 'BACKFILL';
+    outcome: 'MET' | 'NOT_MET' | 'DOES_NOT_APPLY' | 'COULD_NOT_DETERMINE';
     practiceName: string;
     practiceSlug: string;
-    /**
-     * Whether the observation leads the feedback or reinforces it
-     */
-    role: 'PRIMARY' | 'SUPPORTING';
-    /**
-     * Severity band (null unless outcome is NOT_MET)
-     */
-    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
-    /**
-     * Observation text; absent when source access cannot be verified
-     */
-    summary?: string;
+    practiceVersionId: string | null;
+    practiceVersionNumber: null | number;
+    problems: Array<Problem>;
+    recordedAt: string;
+    reviewId: string;
+    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'TRIVIAL' | null;
+    summary: string | null;
 };
 
-/**
- * The piece of reviewed work a provider page shows, and what the caller may do about it
- */
+export type ResultEvidence = {
+    citations: Array<EvidenceCitation>;
+    inapplicability: InapplicabilityWarrant | null;
+    openQuestions: Array<OpenQuestion>;
+    search: SearchWarrant | null;
+};
+
+export type ResultExample = {
+    citation: EvidenceCitation;
+    note: string;
+};
+
+export type ResultList = {
+    acceptedAt: string | null;
+    currentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
+    id: string;
+    item: ItemRef;
+    markedIncorrectAt: string | null;
+    origin: 'EVENT' | 'REQUEST' | 'SCHEDULE' | 'BACKFILL';
+    outcome: 'MET' | 'NOT_MET' | 'DOES_NOT_APPLY' | 'COULD_NOT_DETERMINE';
+    practiceName: string;
+    practiceSlug: string;
+    problems: Array<ProblemSummary>;
+    recordedAt: string;
+    reviewId: string;
+    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'TRIVIAL' | null;
+    summary: string | null;
+};
+
+export type ResultMark = {
+    createdAt: string;
+    createdBy: AccountRef | null;
+    id: string;
+    kind: 'INCORRECT' | 'ACCEPTED';
+    reason: string;
+    removalReason: string | null;
+    removedAt: string | null;
+    removedBy: AccountRef | null;
+    resultId: string;
+};
+
+export type ReusedScanReportItem = {
+    currentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
+    item: ItemRef;
+    itemVersion: string;
+    outcome: 'MET' | 'NOT_MET' | 'DOES_NOT_APPLY' | 'COULD_NOT_DETERMINE';
+    practiceName: string;
+    practiceSlug: string;
+    problemCount: number;
+    recordedAt: string;
+    resultId: string;
+    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'TRIVIAL' | null;
+    sourceReviewId: string;
+    status: 'REUSED';
+    summary: string | null;
+};
+
+export type Review = {
+    activeJobCount: number;
+    batchId: string | null;
+    completedAt: string | null;
+    createdAt: string;
+    feedback: ReviewFeedbackCounts;
+    id: string;
+    item: ItemRef;
+    itemVersion: string | null;
+    jobCount: number;
+    kind: 'ITEM' | 'SCAN';
+    model: string | null;
+    orderedAt: string;
+    origin: 'EVENT' | 'REQUEST' | 'SCHEDULE' | 'BACKFILL';
+    practices: Array<ReviewPractice>;
+    requestedBy: AccountRef | null;
+    results: ReviewResultCounts;
+    startedBy: ItemEvent | null;
+    status: 'QUEUED' | 'RUNNING' | 'COMPLETE' | 'PARTIAL' | 'FAILED' | 'CANCELLED';
+    stopReason: 'TIMED_OUT' | 'EXECUTION_FAILED' | 'PREPARATION_FAILED' | 'PROCESSING_FAILED' | 'PERSON_DATA_ERASED' | 'STALE_ROLLOUT_REVISION' | 'CANCELLED_BY_ADMIN' | 'REPLACED' | 'LEGACY_FAILURE' | 'EXECUTION_INCOMPLETE' | 'RESULT_WITHHELD' | 'READINESS_REFUSED' | 'SUSPECT_LISTING' | 'BUDGET' | 'USAGE_UNVERIFIABLE' | 'DEADLINE' | 'CANCELLED' | 'ENUMERATION_FAILED' | 'ENUMERATION_LIMIT' | 'NO_SCAN_PRACTICES' | 'MODEL_CHANGED' | 'MODEL_UNAVAILABLE' | 'ERROR' | 'LEGACY_SCOPE_UNKNOWN' | 'CONTRACT_CHANGED' | null;
+};
+
+export type ReviewBatch = {
+    budgetUsd: string | null;
+    confirmedBy: AccountRef | null;
+    createdAt: string;
+    estimatedCostUsd: string | null;
+    estimatedItems: number;
+    etag: string;
+    failedCount: number;
+    finishedAt: string | null;
+    from: string | null;
+    id: string;
+    itemKind: string;
+    origin: 'BACKFILL' | 'SCHEDULE';
+    pauseReason: 'BUDGET_EXHAUSTED' | 'REVIEW_MODEL_UNBOUND' | 'WORKSPACE_UNAVAILABLE' | 'PAUSED_BY_ADMIN' | null;
+    requestedBy: AccountRef | null;
+    reviewIds: Array<string>;
+    scheduleId: string | null;
+    skippedCount: number;
+    startedAt: string | null;
+    status: 'AWAITING_CONFIRMATION' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
+    submittedCount: number;
+    targetItemIds: string;
+    to: string | null;
+    version: string;
+};
+
+export type ReviewBoundFeedback = {
+    deliveredAt: string | null;
+    destination: 'ON_WORK' | 'PRACTICE_PAGE' | 'CONVERSATION';
+    id: string;
+    state: 'AWAITING_APPROVAL' | 'READY' | 'DELIVERED' | 'UNCONFIRMED' | 'WITHHELD' | 'REJECTED' | 'REPLACED' | 'FAILED';
+    withdrawn: boolean;
+};
+
+export type ReviewBoundResult = {
+    currentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
+    developer: ReviewDeveloper | null;
+    id: string;
+    item: ItemRef;
+    outcome: 'MET' | 'NOT_MET' | 'DOES_NOT_APPLY' | 'COULD_NOT_DETERMINE';
+    practiceName: string;
+    practiceSlug: string;
+    recordedAt: string;
+    reviewId: string;
+    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'TRIVIAL' | null;
+    summary: string | null;
+};
+
+export type ReviewBucket = {
+    feedback: number;
+    results: number;
+    reviews: number;
+    start: string;
+};
+
 export type ReviewContext = {
-    /**
-     * Whether the caller may read the review details behind this work — the runs, observations and the delivery of each piece of feedback — which is a workspace admin's view
-     */
     canInspectReviewDetails: boolean;
-    /**
-     * Whether the caller may ask for a review of this work: they are its author or an assignee, or a workspace admin, through one of their own linked accounts. It does not promise a review starts; the answer to the ask says whether one did, and why not
-     */
-    canRequestReview: boolean;
-    /**
-     * The work as this workspace mirrored it; its id and kind address the trace, observations and feedback about it
-     */
-    work: ReviewedWorkRef;
+    item: ItemRef | null;
+    reasonDescription: string | null;
+    requestAllowed: boolean;
+    workspaceId: string;
+    workspaceSlug: string;
 };
 
-/**
- * Observed closed turns from retained runner output, not live or complete execution telemetry
- */
-export type ReviewDiagnostics = {
-    phases: Array<ReviewPhaseDiagnostics>;
+export type ReviewDetail = {
+    activeJobCount: number;
+    batchId: string | null;
+    completedAt: string | null;
+    createdAt: string;
+    feedback: ReviewFeedbackCounts;
+    generatedPaths: GeneratedPathReview | null;
+    id: string;
+    item: ItemRef;
+    itemVersion: string | null;
+    jobCount: number;
+    kind: 'ITEM' | 'SCAN';
+    model: string | null;
+    orderedAt: string;
+    origin: 'EVENT' | 'REQUEST' | 'SCHEDULE' | 'BACKFILL';
+    practices: Array<ReviewPractice>;
+    requestedBy: AccountRef | null;
+    results: ReviewResultCounts;
+    runtime: ReviewRuntime | null;
+    stageTiming: Array<ReviewStageTiming>;
+    startedBy: ItemEvent | null;
+    status: 'QUEUED' | 'RUNNING' | 'COMPLETE' | 'PARTIAL' | 'FAILED' | 'CANCELLED';
+    stopReason: 'TIMED_OUT' | 'EXECUTION_FAILED' | 'PREPARATION_FAILED' | 'PROCESSING_FAILED' | 'PERSON_DATA_ERASED' | 'STALE_ROLLOUT_REVISION' | 'CANCELLED_BY_ADMIN' | 'REPLACED' | 'LEGACY_FAILURE' | 'EXECUTION_INCOMPLETE' | 'RESULT_WITHHELD' | 'READINESS_REFUSED' | 'SUSPECT_LISTING' | 'BUDGET' | 'USAGE_UNVERIFIABLE' | 'DEADLINE' | 'CANCELLED' | 'ENUMERATION_FAILED' | 'ENUMERATION_LIMIT' | 'NO_SCAN_PRACTICES' | 'MODEL_CHANGED' | 'MODEL_UNAVAILABLE' | 'ERROR' | 'LEGACY_SCOPE_UNKNOWN' | 'CONTRACT_CHANGED' | null;
+    usage: ReviewUsage;
+};
+
+export type ReviewDeveloper = {
+    accountId: string;
+    avatarUrl: string | null;
+    displayName: string | null;
+    providerLogin: string | null;
+};
+
+export type ReviewEvidenceOutcome = {
+    notReviewed: number;
+    outcomes: OutcomeVector;
+    practiceName: string;
+    practiceSlug: string;
+    withheld: number;
 };
 
 export type ReviewFeedback = {
-    agentJobId: string;
-    /**
-     * Leading characters of the composed body; null when the feedback carries no body
-     */
-    bodyPreview?: string;
+    bodyPreview: string | null;
     bodyTruncated: boolean;
-    channel: 'IN_CONTEXT' | 'IN_CHAT' | 'IN_APP';
+    copyCounts: FeedbackCopyCounts;
     createdAt: string;
-    /**
-     * When the feedback was placed; null if it was not delivered
-     */
-    deliveredAt?: string;
-    deliveryState: 'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'PARTIALLY_FAILED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED' | 'UNCONFIRMED';
+    deliveredAt: string | null;
+    destination: 'ON_WORK' | 'PRACTICE_PAGE' | 'CONVERSATION';
+    developer: ReviewDeveloper;
+    disagreedAt: string | null;
     id: string;
-    /**
-     * Where the feedback appears, by the provider that shows it: the channel split where the provider is known
-     */
+    item: ItemRef | null;
     location: 'GITHUB' | 'GITLAB' | 'OTHER_WORK' | 'HEPH' | 'SLACK' | 'NEXT_CONVERSATION' | 'PRACTICE_PAGES';
-    /**
-     * Number of observations used to compose the feedback
-     */
-    observationCount: number;
-    /**
-     * Who the feedback is addressed to; null when the identity is no longer resolvable
-     */
-    recipient?: ReviewSubject;
-    /**
-     * The feedback this one replaced; null on a first delivery
-     */
-    replacesId?: string;
-    /**
-     * Reviewed work the feedback targets; null when it is unanchored
-     */
-    reviewedWork?: ReviewedWorkRef;
-    /**
-     * Whose work the feedback addresses; may equal the recipient
-     */
-    subject?: ReviewSubject;
-    /**
-     * Why delivery stopped; set on withheld or terminally partial feedback
-     */
-    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'COMPOSER_WITHHELD' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ISSUE_SNAPSHOT_CHANGED' | 'ARTIFACT_MERGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'OBSERVATION_INVALIDATED' | 'REVIEWED_REVISION_CHANGED' | 'REVIEW_CANCELLED';
+    replacesId: string | null;
+    resultCount: number;
+    reviewId: string;
+    state: 'AWAITING_APPROVAL' | 'READY' | 'DELIVERED' | 'UNCONFIRMED' | 'WITHHELD' | 'REJECTED' | 'REPLACED' | 'FAILED';
+    stopReason: 'VOLUME_CAPPED' | 'COMPOSER_WITHHELD' | 'NOTHING_NEW' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISAGREE' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'DELIVERY_UNCONFIRMED' | 'ITEM_GONE' | 'ITEM_CLOSED' | 'ITEM_MERGED' | 'ITEM_STATE_INELIGIBLE' | 'ISSUE_SNAPSHOT_CHANGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'NO_AI' | 'DELIVERY_OFF' | 'PERSON_SUPPRESSED' | 'RECIPIENT_UNAVAILABLE' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'FEEDBACK_OFF' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_SCOPE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'RESULT_MARKED_INCORRECT' | 'REVIEWED_VERSION_CHANGED' | 'REVIEW_CANCELLED' | 'EVIDENCE_NOT_PERMITTED' | 'NO_EVIDENCE' | 'UNCORROBORATED' | null;
+    textHidden: boolean;
+    unverifiedHistory: boolean;
+    withdrawn: boolean;
 };
 
-/**
- * Counts of feedback, one per delivery state
- */
 export type ReviewFeedbackCounts = {
-    /**
-     * AWAITING_APPROVAL: waiting for an admin to approve or reject it
-     */
     awaitingApproval: number;
-    /**
-     * DELIVERED: delivered where it was meant to appear
-     */
     delivered: number;
-    /**
-     * DISCARDED: an admin rejected it instead of approving it; it is never delivered
-     */
-    discarded: number;
-    /**
-     * FAILED: delivery failed
-     */
     failed: number;
-    /**
-     * PARTIALLY_DELIVERED: some of its placements delivered, the rest still to deliver or suppressed
-     */
-    partiallyDelivered: number;
-    /**
-     * PARTIALLY_FAILED: delivery failed after some of its placements were delivered
-     */
-    partiallyFailed: number;
-    /**
-     * PREPARED: ready to deliver and not delivered yet
-     */
-    prepared: number;
-    /**
-     * SUPERSEDED: replaced by newer feedback
-     */
-    superseded: number;
-    /**
-     * SUPPRESSED: Hephaestus refused to deliver it, with a suppression reason
-     */
-    suppressed: number;
-    /**
-     * UNCONFIRMED: a conversation linked it with no record that it was shown, so it counts as neither delivered nor suppressed
-     */
+    ready: number;
+    rejected: number;
+    replaced: number;
     unconfirmed: number;
+    withheld: number;
 };
 
-/**
- * Full feedback detail including the stored composed body
- */
 export type ReviewFeedbackDetail = {
-    agentJobId: string;
-    /**
-     * Immutable human decision for this proposal, when one has been made
-     */
-    approval?: FeedbackApproval;
-    /**
-     * Stored composed body; null when none was produced, and always null on the IN_APP and IN_CHAT channels — neither the developer's practice pages nor the mentor's prepared context is readable by an operator
-     */
-    body?: string;
-    channel: 'IN_CONTEXT' | 'IN_CHAT' | 'IN_APP';
+    basis: Array<FeedbackBasis>;
+    body: string | null;
+    bodyPreview: string | null;
+    bodyTruncated: boolean;
+    checks: Array<FeedbackCheck>;
+    contentDigest: string | null;
+    copies: Array<FeedbackCopy>;
+    copyCounts: FeedbackCopyCounts;
     createdAt: string;
-    /**
-     * When the feedback was placed; null if it was not delivered
-     */
-    deliveredAt?: string;
-    /**
-     * Ordered delivery-policy evaluations for this feedback's review
-     */
-    deliveryPolicy: Array<DeliveryPolicyTrace>;
-    deliveryState: 'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'PARTIALLY_FAILED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED' | 'UNCONFIRMED';
-    /**
-     * Every delivery of a package carrying this feedback to the provider, oldest first: its state, attempts, next attempt and last error. Empty for feedback that never goes to a provider, and for feedback no delivery was started for.
-     */
-    dispatches: Array<ReviewFeedbackDispatch>;
-    /**
-     * The developer's standing dispute of this feedback; null while they do not dispute it
-     */
-    dispute?: FeedbackDispute;
+    decisions: Array<FeedbackDecision>;
+    deliveredAt: string | null;
+    destination: 'ON_WORK' | 'PRACTICE_PAGE' | 'CONVERSATION';
+    developer: ReviewDeveloper;
+    disagreedAt: string | null;
     id: string;
-    /**
-     * Where the feedback appears, by the provider that shows it: the channel split where the provider is known
-     */
+    item: ItemRef | null;
     location: 'GITHUB' | 'GITLAB' | 'OTHER_WORK' | 'HEPH' | 'SLACK' | 'NEXT_CONVERSATION' | 'PRACTICE_PAGES';
-    /**
-     * Source observations in render order
-     */
-    observations: Array<ReviewBoundObservation>;
-    /**
-     * Recorded placements; empty when none
-     */
-    placements: Array<ReviewPlacement>;
-    /**
-     * Exact ordered summary and inline messages covered by the approval decision
-     */
-    proposedPlacements: Array<ReviewProposedPlacement>;
-    /**
-     * Who the feedback is addressed to; null when the identity is no longer resolvable
-     */
-    recipient?: ReviewSubject;
-    /**
-     * The feedback this one replaced; null on a first delivery
-     */
-    replacesId?: string;
-    /**
-     * Reviewed source revision for an immutable approval package
-     */
-    reviewedRevision?: string;
-    /**
-     * Reviewed work the feedback targets; null when it is unanchored
-     */
-    reviewedWork?: ReviewedWorkRef;
-    /**
-     * Whose work the feedback addresses; may equal the recipient
-     */
-    subject?: ReviewSubject;
-    /**
-     * Why delivery stopped; set on withheld or terminally partial feedback
-     */
-    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'COMPOSER_WITHHELD' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ISSUE_SNAPSHOT_CHANGED' | 'ARTIFACT_MERGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'OBSERVATION_INVALIDATED' | 'REVIEWED_REVISION_CHANGED' | 'REVIEW_CANCELLED';
-    /**
-     * Cross-run continuity key tying successive deliveries together
-     */
-    threadKey?: string;
-    /**
-     * Every withdrawal of this card from the developer's practice page, newest first; empty when none
-     */
-    withdrawals: Array<FeedbackWithdrawal>;
+    replacesId: string | null;
+    response: FeedbackResponse | null;
+    resultCount: number;
+    reviewId: string;
+    sends: Array<FeedbackSend>;
+    state: 'AWAITING_APPROVAL' | 'READY' | 'DELIVERED' | 'UNCONFIRMED' | 'WITHHELD' | 'REJECTED' | 'REPLACED' | 'FAILED';
+    stopReason: 'VOLUME_CAPPED' | 'COMPOSER_WITHHELD' | 'NOTHING_NEW' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISAGREE' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'DELIVERY_UNCONFIRMED' | 'ITEM_GONE' | 'ITEM_CLOSED' | 'ITEM_MERGED' | 'ITEM_STATE_INELIGIBLE' | 'ISSUE_SNAPSHOT_CHANGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'NO_AI' | 'DELIVERY_OFF' | 'PERSON_SUPPRESSED' | 'RECIPIENT_UNAVAILABLE' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'FEEDBACK_OFF' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_SCOPE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'RESULT_MARKED_INCORRECT' | 'REVIEWED_VERSION_CHANGED' | 'REVIEW_CANCELLED' | 'EVIDENCE_NOT_PERMITTED' | 'NO_EVIDENCE' | 'UNCORROBORATED' | null;
+    textHidden: boolean;
+    unverifiedHistory: boolean;
+    withdrawn: boolean;
 };
 
-/**
- * One delivery of feedback to the provider and how its attempts went
- */
-export type ReviewFeedbackDispatch = {
-    /**
-     * How many times it was tried
-     */
-    attemptCount: number;
-    createdAt: string;
-    /**
-     * The provider's id of the delivered summary
-     */
-    deliveredExternalRef?: string;
-    /**
-     * Where the delivered summary can be opened on the provider
-     */
-    deliveredExternalUrl?: string;
-    /**
-     * AUTOMATIC_REVIEW_PACKAGE is the review's own package of every piece of feedback it posted without approval; APPROVED_REVIEW_PACKAGE is this approved proposal's package
-     */
-    destination: 'AUTOMATIC_REVIEW_PACKAGE' | 'APPROVED_REVIEW_PACKAGE';
+export type ReviewItemCounts = {
+    listed: number;
+    notReviewed: number;
+    reused: number;
+    reviewed: number;
+    withheld: number;
+};
+
+export type ReviewJob = {
+    attempt: number;
+    availableAt: string;
+    completedAt: string | null;
+    errorMessage: string | null;
+    exitCode: null | number;
     id: string;
-    /**
-     * The error of the last failed attempt, as the provider or the server reported it
-     */
-    lastError?: string;
-    /**
-     * When it is tried next; null once it was sent, held back or given up
-     */
-    nextAttemptAt?: string;
-    state: 'PENDING' | 'CLAIMED' | 'SENT' | 'SUPPRESSED' | 'UNCERTAIN' | 'FAILED';
-    /**
-     * Why it was held back; null unless the state is SUPPRESSED
-     */
-    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'COMPOSER_WITHHELD' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ISSUE_SNAPSHOT_CHANGED' | 'ARTIFACT_MERGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'OBSERVATION_INVALIDATED' | 'REVIEWED_REVISION_CHANGED' | 'REVIEW_CANCELLED';
-    updatedAt: string;
+    processingStatus: 'NONE' | 'PENDING' | 'DONE' | 'FAILED';
+    startedAt: string | null;
+    status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
+    traceId: string;
 };
 
-/**
- * Feedback at one location, one count per delivery state
- */
-export type ReviewFeedbackLocationCounts = {
-    /**
-     * The feedback at this location, by delivery state
-     */
-    feedback: ReviewFeedbackCounts;
-    /**
-     * Where the feedback appears, by the provider that shows it
-     */
-    location: 'GITHUB' | 'GITLAB' | 'OTHER_WORK' | 'HEPH' | 'SLACK' | 'NEXT_CONVERSATION' | 'PRACTICE_PAGES';
+export type ReviewLimit = {
+    code: string;
+    description: string;
 };
 
-/**
- * How much feedback was withheld for one reason
- */
-export type ReviewFeedbackReasonCount = {
-    /**
-     * The feedback withheld for this reason
-     */
-    count: number;
-    /**
-     * Why Hephaestus withheld it; absent for withheld feedback whose reason is not recorded
-     */
-    reason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'COMPOSER_WITHHELD' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ISSUE_SNAPSHOT_CHANGED' | 'ARTIFACT_MERGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'OBSERVATION_INVALIDATED' | 'REVIEWED_REVISION_CHANGED' | 'REVIEW_CANCELLED';
+export type ReviewLimitInput = {
+    code?: string | null;
+    description: string;
 };
 
-/**
- * How one record came about: the reviewed work, the review, its observations, the feedback written from them, where that feedback went and how the developer answered. Bounded: each list is capped and the count beside it says how many more there are
- */
 export type ReviewLineage = {
-    /**
-     * The feedback in the chain, newest first
-     */
-    feedback: Array<ReviewLineageFeedback>;
-    /**
-     * Feedback in the chain that the list leaves out
-     */
-    moreFeedback: number;
-    /**
-     * Observations of the review, or behind the listed feedback, that the list leaves out
-     */
-    moreObservations: number;
-    /**
-     * The observations in the chain, the ones the request names first
-     */
-    observations: Array<ReviewLineageObservation>;
-    /**
-     * The review that recorded the observations; null when its record is gone
-     */
-    review?: ReviewLineageRun;
-    /**
-     * What started the review, from the first moment on the work that names it; null when no recorded moment names the review
-     */
-    reviewTrigger?: 'OPENED' | 'READY' | 'PUSHED' | 'EDITED' | 'REVIEWED' | 'MERGED' | 'CLOSED' | 'PUBLISHED' | 'SETTLED' | 'REQUESTED' | 'BACKFILL' | 'SWEEP';
-    /**
-     * The work the review read; null when the review named no work
-     */
-    work?: ReviewedWorkRef;
-    /**
-     * When the reviewed pull request or merge request was merged; null for other work and for work that is not merged
-     */
-    workMergedAt?: string;
-    /**
-     * What happened on the work, oldest first: opened, pushed, merged and the like, each with its time and whether it started this review. Empty unless the request asks for the whole review; then the newest 30 at most
-     */
-    workMoments: Array<ReviewLineageMoment>;
+    edges: Array<ReviewLineageEdge>;
+    nodes: Array<ReviewLineageNode>;
+    rootId: string;
 };
 
-/**
- * A piece of feedback in a lineage, with where it went and how the developer answered
- */
-export type ReviewLineageFeedback = {
-    /**
-     * The review that composed it
-     */
-    agentJobId: string;
-    channel: 'IN_CONTEXT' | 'IN_CHAT' | 'IN_APP';
-    createdAt: string;
-    /**
-     * When an admin decided about it; null while nobody decided
-     */
-    decidedAt?: string;
-    /**
-     * What an admin decided about it before delivery; null while nobody decided
-     */
-    decision?: 'APPROVED' | 'REJECTED';
-    /**
-     * When it was placed; null if it was not delivered
-     */
-    deliveredAt?: string;
-    deliveryState: 'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'PARTIALLY_FAILED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED' | 'UNCONFIRMED';
-    /**
-     * Whether the request names this feedback, or the observation it names led to it
-     */
-    focus: boolean;
+export type ReviewLineageEdge = {
+    from: string;
+    relation: string;
+    to: string;
+};
+
+export type ReviewLineageNode = {
+    feedback: ReviewBoundFeedback | null;
     id: string;
-    /**
-     * Where it appears, by the provider that shows it: the channel split where the provider is known, as the feedback list names it
-     */
-    location: 'GITHUB' | 'GITLAB' | 'OTHER_WORK' | 'HEPH' | 'SLACK' | 'NEXT_CONVERSATION' | 'PRACTICE_PAGES';
-    /**
-     * Every observation it was written from, in render order
-     */
-    observationIds: Array<string>;
-    /**
-     * How many comments, notes or conversation turns placed it
-     */
-    placementCount: number;
-    /**
-     * When the newer feedback that replaced it was written; null while nothing did
-     */
-    replacedAt?: string;
-    /**
-     * The newer feedback that replaced it; null while nothing did
-     */
-    replacedById?: string;
-    /**
-     * The earlier feedback it replaced; null on a first delivery
-     */
-    replacesId?: string;
-    /**
-     * How the developer answered it; null while nothing stands
-     */
-    response?: ReviewLineageResponse;
-    /**
-     * Why delivery stopped; set on withheld or terminally partial feedback
-     */
-    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'COMPOSER_WITHHELD' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ISSUE_SNAPSHOT_CHANGED' | 'ARTIFACT_MERGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'OBSERVATION_INVALIDATED' | 'REVIEWED_REVISION_CHANGED' | 'REVIEW_CANCELLED';
-    /**
-     * When an admin withdrew it from the developer's practice pages; null unless a withdrawal is in force
-     */
-    withdrawnAt?: string;
+    item: ItemRef | null;
+    kind: 'ITEM' | 'REVIEW' | 'RESULT' | 'PROBLEM' | 'FEEDBACK';
+    problem: ProblemSummary | null;
+    result: ReviewBoundResult | null;
+    review: ReviewRef | null;
 };
 
-/**
- * One moment on the reviewed work, such as opened, pushed or merged
- */
-export type ReviewLineageMoment = {
-    /**
-     * Whether this moment came after the one that started the review and was folded into it, so it started no review of its own
-     */
-    joinedReview: boolean;
-    /**
-     * What happened, in the words a review trigger uses
-     */
-    kind: 'OPENED' | 'READY' | 'PUSHED' | 'EDITED' | 'REVIEWED' | 'MERGED' | 'CLOSED' | 'PUBLISHED' | 'SETTLED' | 'REQUESTED' | 'BACKFILL' | 'SWEEP';
-    /**
-     * When it happened upstream
-     */
-    occurredAt: string;
-    /**
-     * Whether this moment started the review
-     */
-    startedReview: boolean;
+export type ReviewMethod = {
+    epoch: number;
+    modelDigest: string;
+    models: Array<BoundModelSlot>;
 };
 
-/**
- * An observation in a lineage
- */
-export type ReviewLineageObservation = {
-    /**
-     * The review that recorded it
-     */
-    agentJobId: string;
-    /**
-     * How many pieces of feedback were written from it, by any review
-     */
-    feedbackCount: number;
-    /**
-     * Whether the request names this observation, or the feedback it names was written from it
-     */
-    focus: boolean;
-    id: string;
-    /**
-     * Whether a workspace admin marked it incorrect and has not restored it
-     */
-    invalidated: boolean;
-    /**
-     * When a workspace admin marked it incorrect; null unless it is marked incorrect now
-     */
-    markedIncorrectAt?: string;
-    observedAt: string;
-    outcome: 'MET' | 'NOT_MET' | 'NOT_APPLICABLE' | 'UNDETERMINED';
-    /**
-     * How many pieces of feedback the review that recorded it wrote from it; a later review may write more, which feedbackCount counts too
-     */
-    ownFeedbackCount: number;
-    practiceName: string;
-    practiceSlug: string;
-    /**
-     * Severity band (null unless outcome is NOT_MET)
-     */
-    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
-    /**
-     * Observation text; absent when source access cannot be verified
-     */
-    summary?: string;
+export type ReviewOn = {
+    events: Array<string>;
+    state: {
+        [key: string]: Array<string>;
+    };
 };
 
-/**
- * Whether the developer answered a piece of feedback, whether that answer disputes it, and whether their later work resolved it. Their rating, any other resolution and their private notes are never part of it. At least one of respondedAt and resolvedByWorkAt is set
- */
-export type ReviewLineageResponse = {
-    /**
-     * Why the developer disputes it, in their words to the workspace's admins; null unless disputed
-     */
-    disputeExplanation?: string;
-    /**
-     * Whether the answer that stands now disputes the feedback
-     */
-    disputed: boolean;
-    /**
-     * When their later work resolved it: three clean pieces of work in a row on the practice. Only feedback on their practice pages resolves this way; null while it has not
-     */
-    resolvedByWorkAt?: string;
-    /**
-     * When the developer's answer that stands now was given; null when only the work answered
-     */
-    respondedAt?: string;
-};
-
-/**
- * The review in a lineage
- */
-export type ReviewLineageRun = {
-    /**
-     * When the review was asked for
-     */
-    createdAt: string;
-    /**
-     * When the review finished; null while it runs
-     */
-    finishedAt?: string;
-    /**
-     * Why a queued review waits, where an admin can undo it, such as BUDGET; null otherwise
-     */
-    holdReason?: string;
-    id: string;
-    /**
-     * The language model the review used; null when it recorded none
-     */
-    model?: string;
-    /**
-     * Why a completed review recorded what it did: REVIEWED when the model ran, INSUFFICIENT_EVIDENCE when evidence could not be read and nothing was assessed, COALESCED when an earlier review on the same code had answered every practice, SUPERSEDED when a newer admitted review of the same work replaced it while it waited. Null until the review completed
-     */
-    outcome?: 'REVIEWED' | 'INSUFFICIENT_EVIDENCE' | 'COALESCED' | 'SUPERSEDED';
-    /**
-     * Where the review is, or how it ended, finer than status: a timeout or a cancellation
-     */
-    phase: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
-    /**
-     * When a worker picked the review up; null while it waits. It can be well after createdAt, the time it was asked for
-     */
-    startedAt?: string;
-    status: 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
-};
-
-/**
- * A practice review observation with its linked feedback outcomes
- */
-export type ReviewObservation = {
-    agentJobId: string;
-    /**
-     * Whether an observation's claim still stands: its practice's review rules are unchanged and it was not superseded, which an issue's observations are when a change to its reviewable content is recorded. It says neither whether a later review ran nor whether the work changed since it was reviewed. Earlier observation standards and missing fingerprints are unverifiable under the current whole-practice standard
-     */
-    claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
-    /**
-     * When the developer last disputed feedback written from this observation; null while nothing about it is disputed
-     */
-    disputedAt?: string;
-    /**
-     * Counts of linked feedback by delivery state
-     */
+export type ReviewOverview = {
+    bucket: 'DAY' | 'WEEK' | 'MONTH';
+    buckets: Array<ReviewBucket>;
     feedback: ReviewFeedbackCounts;
-    /**
-     * Practice group; null when the practice is Unassigned
-     */
-    group?: ReviewPracticeGroup;
-    id: string;
-    /**
-     * When a workspace admin invalidated this observation; null while it stands
-     */
-    invalidatedAt?: string;
-    observedAt: string;
-    /**
-     * What occasioned the measurement. BACKFILL came from a confirmed campaign over work that already existed, so it is not a point on the live trend line.
-     */
-    origin: 'LIVE' | 'MANUAL' | 'BACKFILL';
-    /**
-     * Result of the practice review
-     */
-    outcome: 'MET' | 'NOT_MET' | 'NOT_APPLICABLE' | 'UNDETERMINED';
+    from: string;
+    practices: Array<ReviewPracticeCounts>;
+    results: ReviewResultCounts;
+    resultsMarkedIncorrect: number;
+    reviews: ReviewStatusCounts;
+    to: string;
+};
+
+export type ReviewPractice = {
+    itemCounts: ReviewItemCounts;
+    number: null | number;
     practiceName: string;
     practiceSlug: string;
-    /**
-     * Cross-run locus key; null when continuity is unavailable
-     */
-    recurrenceKey?: string;
-    reviewedWork: ReviewedWorkRef;
-    /**
-     * Severity band (null unless outcome is NOT_MET)
-     */
-    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
-    /**
-     * Whose work the observation is about; null when the identity is no longer resolvable
-     */
-    subject?: ReviewSubject;
-    /**
-     * Observation text; absent when source access cannot be verified
-     */
-    summary?: string;
+    practiceVersionId: string | null;
+    reason: string | null;
+    results: ReviewResultCounts;
+    script: PracticeScriptRun | null;
+    status: 'QUEUED' | 'READY' | 'RUNNING' | 'DONE' | 'WITHHELD' | 'FAILED';
 };
 
-/**
- * Counts of observations by assessment
- */
-export type ReviewObservationCounts = {
-    met: number;
-    /**
-     * Practices whose subject did not occur in this work
-     */
-    notApplicable: number;
-    notMet: number;
-    /**
-     * Practices that looked at the evidence and could not settle the question either way; reported apart from notApplicable because one says there was nothing here to judge and the other says we could not tell
-     */
-    undetermined: number;
-};
-
-/**
- * An observation with evidence and linked feedback
- */
-export type ReviewObservationDetail = {
-    agentJobId: string;
-    /**
-     * Whether an observation's claim still stands: its practice's review rules are unchanged and it was not superseded, which an issue's observations are when a change to its reviewable content is recorded. It says neither whether a later review ran nor whether the work changed since it was reviewed. Earlier observation standards and missing fingerprints are unverifiable under the current whole-practice standard
-     */
-    claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
-    /**
-     * The developer's standing disputes of feedback written from this observation, newest first; empty when nothing about it is disputed
-     */
-    disputes: Array<FeedbackDispute>;
-    evidence?: ObservationEvidence;
-    evidenceRationale?: string;
-    /**
-     * Linked feedback, newest first
-     */
-    feedback: Array<ReviewBoundFeedback>;
-    /**
-     * Practice group; null when the practice is Unassigned
-     */
-    group?: ReviewPracticeGroup;
-    id: string;
-    /**
-     * Every correction by a workspace admin, newest first; the first is in force while it has no restoration
-     */
-    invalidations: Array<ObservationInvalidation>;
-    observedAt: string;
-    /**
-     * How the review that recorded it came about: LIVE from the work itself, MANUAL requested by a person, BACKFILL over work that predates the connection. A recurring sweep records LIVE.
-     */
-    origin: 'LIVE' | 'MANUAL' | 'BACKFILL';
-    /**
-     * Result of the practice review
-     */
-    outcome: 'MET' | 'NOT_MET' | 'NOT_APPLICABLE' | 'UNDETERMINED';
+export type ReviewPracticeCounts = {
+    feedback: ReviewFeedbackCounts;
+    group: GroupRef | null;
     practiceName: string;
-    /**
-     * Criteria revision selected as of job start, when available
-     */
-    practiceRevisionId?: number;
     practiceSlug: string;
-    /**
-     * Cross-run locus key; null when continuity is unavailable
-     */
-    recurrenceKey?: string;
-    reviewedWork: ReviewedWorkRef;
-    /**
-     * Severity band (null unless outcome is NOT_MET)
-     */
-    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
-    /**
-     * Whose work the observation is about; null when the identity is no longer resolvable
-     */
-    subject?: ReviewSubject;
-    /**
-     * Observation text; absent when source access cannot be verified
-     */
-    summary?: string;
-    /**
-     * When a later review of the same work superseded this observation; null while current
-     */
-    supersededAt?: string;
+    results: ReviewResultCounts;
+    resultsMarkedIncorrect: number;
 };
 
-/**
- * One fixed review phase; UNKNOWN includes legacy turns without an explicit recognized phase
- */
-export type ReviewPhaseDiagnostics = {
-    /**
-     * Observed assistant/model calls; absent if any count is unknown or the sum exceeds the bound
-     */
-    assistantCalls?: number;
-    /**
-     * Sum of observed closed turn durations in milliseconds; absent if any duration is unknown or the sum overflows
-     */
-    elapsedMs?: number;
-    /**
-     * Safe failure of the last model call in the latest closed turn of this phase; absent after recovery or when unknown
-     */
-    finalModelFailure?: TerminalModelFailure;
-    /**
-     * Adapter span totals; absent if any turn has absent, partial or invalid span totals
-     */
-    modelCallTiming?: ModelCallTiming;
-    /**
-     * Closed failure kinds recorded across these turns; empty means none recorded, absent means a turn has no readable counts
-     */
-    modelFailures?: Array<ModelFailureCount>;
-    phase: 'PRACTICE' | 'PUBLIC_REVIEW' | 'PRIVATE_FEEDBACK' | 'UNKNOWN';
-    /**
-     * Number of retained closed turn records
-     */
-    recordedTurns: number;
-};
-
-/**
- * A recorded message placement
- */
-export type ReviewPlacement = {
-    /**
-     * Last anchored line (1-based)
-     */
-    anchorEndLine?: number;
-    /**
-     * Anchor granularity; null for non-inline placements
-     */
-    anchorKind?: 'LINE' | 'RANGE' | 'FILE' | 'IMAGE';
-    /**
-     * Head-side path of the anchored file
-     */
-    anchorPath?: string;
-    /**
-     * Diff side of the anchor
-     */
-    anchorSide?: 'OLD' | 'NEW';
-    /**
-     * First anchored line (1-based)
-     */
-    anchorStartLine?: number;
-    /**
-     * Mentor chat-message identifier
-     */
-    chatMessageId?: string;
+export type ReviewProblem = {
+    acceptedAt: string | null;
+    currentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
+    developer: ReviewDeveloper | null;
+    disagreedAt: string | null;
+    endLine: null | number;
+    evidenceHidden: boolean;
+    group: GroupRef | null;
     id: string;
-    placementType: 'SUMMARY' | 'INLINE' | 'CONVERSATION_TURN' | 'LOCATION_COMMENT';
-    /**
-     * Provider-native comment identifier
-     */
-    postedCommentRef?: string;
-    /**
-     * Permalink of the posted provider comment; null when the provider gave none
-     */
-    postedCommentUrl?: string;
+    item: ItemRef;
+    markedIncorrectAt: string | null;
+    path: string | null;
+    practiceName: string;
+    practiceSlug: string;
+    recordedAt: string;
+    resultId: string;
+    reviewId: string;
+    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'TRIVIAL';
+    side: 'OLD' | 'NEW' | null;
+    sourceKind: string | null;
+    startLine: null | number;
+    summary: string;
 };
 
-export type ReviewPracticeGroup = {
-    /**
-     * Palette color key
-     */
-    color?: string;
-    /**
-     * Lucide icon name
-     */
-    icon?: string;
-    name: string;
-    slug: string;
+export type ReviewProblemDetail = {
+    acceptedAt: string | null;
+    currentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
+    developer: ReviewDeveloper | null;
+    disagreedAt: string | null;
+    endLine: null | number;
+    evidenceHidden: boolean;
+    group: GroupRef | null;
+    id: string;
+    item: ItemRef;
+    markedIncorrectAt: string | null;
+    path: string | null;
+    practiceName: string;
+    practiceSlug: string;
+    problem: Problem;
+    recordedAt: string;
+    result: ReviewBoundResult;
+    resultId: string;
+    reviewId: string;
+    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'TRIVIAL';
+    side: 'OLD' | 'NEW' | null;
+    sourceKind: string | null;
+    startLine: null | number;
+    summary: string;
 };
 
-/**
- * What one run decided about each practice it observed against the practice's whole positive standard, one count per practice however many observations it recorded; an invalidated observation decides nothing, and a met or not-met outcome recorded under an earlier or missing assessment scheme counts as undetermined. The practice profile counts only what the run observed about the calling developer
- */
-export type ReviewPracticeOutcomes = {
-    /**
-     * Practices with at least one counted met outcome and none not met
-     */
-    met: number;
-    /**
-     * Practices whose every counted outcome was not applicable
-     */
-    notApplicable: number;
-    /**
-     * Practices with at least one counted not-met outcome
-     */
-    notMet: number;
-    /**
-     * Practices the run could not settle: no counted met or not-met outcome, and not only not-applicable outcomes
-     */
-    undetermined: number;
+export type ReviewQueue = {
+    activeWorkers: number;
+    asOf: string;
+    finishedLastDay: number;
+    finishedLastHour: number;
+    finishedPerHourLastDay: number;
+    head: Array<ReviewQueueItem>;
+    heldForBudget: number;
+    oldestWaitingSince: string | null;
+    running: number;
+    waiting: number;
 };
 
-/**
- * One exact provider message included in a review awaiting approval
- */
-export type ReviewProposedPlacement = {
-    body: string;
-    /**
-     * Last 1-based line; null for a single-line comment or summary
-     */
-    endLine?: number;
-    /**
-     * Head-side file path; null for the summary
-     */
-    path?: string;
-    /**
-     * First 1-based line; null for the summary
-     */
-    startLine?: number;
-    type: 'SUMMARY' | 'INLINE' | 'CONVERSATION_TURN' | 'LOCATION_COMMENT';
+export type ReviewQueueItem = {
+    developer: ReviewDeveloper | null;
+    heldForBudget: boolean;
+    item: ItemRef;
+    jobId: string;
+    reviewId: string;
+    since: string;
+    status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
 };
 
-export type ReviewRepositoryTarget = {
-    /**
-     * Exact pull-request base branches to cover; empty covers every base branch
-     */
-    baseBranches: Array<string>;
-    /**
-     * Exact provider repository name, including its owner
-     */
-    nameWithOwner: string;
+export type ReviewRef = {
+    completedAt: string | null;
+    createdAt: string;
+    id: string;
+    item: ItemRef;
+    itemVersion: string | null;
+    kind: 'ITEM' | 'SCAN';
+    origin: 'EVENT' | 'REQUEST' | 'SCHEDULE' | 'BACKFILL';
+    status: 'QUEUED' | 'RUNNING' | 'COMPLETE' | 'PARTIAL' | 'FAILED' | 'CANCELLED';
 };
 
-/**
- * What came of asking for a review
- */
 export type ReviewRequestOutcome = {
-    /**
-     * The review that is now running; absent when none was started
-     */
-    jobId?: string;
-    /**
-     * The controlled-vocabulary reason nothing was started; absent when a review was started
-     */
-    reason?: 'GATE_SKIPPED' | 'COOLDOWN_ACTIVE' | 'REQUEST_COOLDOWN_ACTIVE' | 'REQUESTER_QUOTA_EXHAUSTED' | 'CONCURRENT_DUPLICATE' | 'COALESCED' | 'OUT_OF_REVIEW_SCOPE' | 'BOT_AUTHOR' | 'BOT_REVIEWER' | 'STALE_ROLLOUT_REVISION' | 'WORKSPACE_INACTIVE' | 'PRACTICES_DISABLED' | 'NO_ACTIVE_PRACTICE' | 'REVIEW_MODEL_UNBOUND' | 'MEMBER_AI_DECLINED' | 'PERSON_DATA_ERASED' | 'PRACTICE_AUTONOMY_OFF' | 'BUDGET_EXHAUSTED' | 'SUBJECT_UNLINKED' | 'MERGE_ACTOR_UNAVAILABLE' | 'MODEL_UNAVAILABLE' | 'ARTIFACT_NOT_VISIBLE' | 'PENDING_DEADLINE_EXCEEDED' | 'ARTIFACT_GONE';
-    /**
-     * The reason as one sentence for the person who asked. Render it verbatim: it is written next to the reason it explains so that every surface says the same thing, and a re-worded copy is how a screen and a support answer come to disagree.
-     */
-    reasonDescription?: string;
-    /**
-     * Whether a review is now running, or nothing was started
-     */
+    reason: 'GATE_WITHHELD' | 'COOLDOWN_ACTIVE' | 'REQUEST_COOLDOWN_ACTIVE' | 'REQUESTER_QUOTA_EXHAUSTED' | 'CONCURRENT_DUPLICATE' | 'COALESCED' | 'OUT_OF_REVIEW_SCOPE' | 'BOT_AUTHOR' | 'BOT_REVIEWER' | 'STALE_ROLLOUT_REVISION' | 'WORKSPACE_INACTIVE' | 'PRACTICES_DISABLED' | 'NO_ACTIVE_PRACTICE' | 'REVIEW_MODEL_UNBOUND' | 'MEMBER_AI_DECLINED' | 'PERSON_DATA_ERASED' | 'FEEDBACK_MODE_OFF' | 'SUBJECT_UNLINKED' | 'MERGE_ACTOR_UNAVAILABLE' | 'MODEL_UNAVAILABLE' | 'BUDGET_EXHAUSTED' | 'ITEM_NOT_VISIBLE' | 'VERSION_SUPERSEDED' | 'PENDING_DEADLINE_EXCEEDED' | 'ITEM_GONE' | 'LEGACY_REVIEW_UNBOUND' | null;
+    reviewId: string | null;
     status: 'SUBMITTED' | 'REFUSED';
 };
 
-/**
- * Counts of practice reviews by status
- */
-export type ReviewRunCounts = {
-    cancelled: number;
-    completed: number;
-    failed: number;
-    queued: number;
-    running: number;
-    timedOut: number;
-};
-
-/**
- * One review run on the developer's work
- */
-export type ReviewRunRef = {
-    /**
-     * When the review recorded its newest observation about this developer
-     */
-    at: string;
-    reviewId: string;
-    /**
-     * The piece of work the run reviewed
-     */
-    reviewedWork: ReviewedWorkRef;
-    /**
-     * Where the review stands; absent when the review itself is no longer on record
-     */
-    status?: 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
-};
-
-/**
- * A review run with observation and feedback outcome counts
- */
-export type ReviewRunSummary = {
-    createdAt: string;
-    /**
-     * The developers the run is about: everyone it recorded an observation about, or, before it recorded any, the person its work names; empty when neither is known
-     */
-    developers: Array<ReviewSubject>;
+export type ReviewResult = {
+    acceptedAt: string | null;
+    currentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
+    developer: ReviewDeveloper | null;
     feedback: ReviewFeedbackCounts;
-    /**
-     * True when a pull request or merge request review completed after its work was merged, as the timing's finishedAfterMerge counts it
-     */
-    finishedAfterMerge: boolean;
-    /**
-     * True when finishedAfterMerge and the merge itself started the review, so it could only finish after it
-     */
-    finishedAfterMergeStartedByMerge: boolean;
-    /**
-     * Why a queued review waits where an admin can undo it, such as BUDGET when it is held for the monthly LLM cap; absent unless the review is queued and held
-     */
-    holdReason?: string;
     id: string;
-    observations: ReviewObservationCounts;
-    /**
-     * What occasioned the run: LIVE as the work arrived, MANUAL when somebody asked for it, BACKFILL while catching up on work that predates the connection; absent when the run records an origin this release does not know
-     */
-    origin?: 'LIVE' | 'MANUAL' | 'BACKFILL';
-    /**
-     * The run's place among the practice reviews of its work, counted from 1 for the oldest; absent when the run names no work
-     */
-    positionOnWork?: number;
-    practices: ReviewPracticeOutcomes;
-    /**
-     * How many practices the run measured; absent when it wrote no coverage ledger
-     */
-    practicesEvaluated?: number;
-    /**
-     * Result-processing status: null = not applicable, PENDING = awaiting processing, DELIVERED = processing finished, FAILED = processing error. Processing may include delivery; this status alone does not establish feedback publication.
-     */
-    resultProcessing?: 'PENDING' | 'DELIVERED' | 'FAILED';
-    reviewOutcome: 'REVIEWED' | 'INSUFFICIENT_EVIDENCE' | 'COALESCED' | 'SUPERSEDED';
-    /**
-     * How many practice reviews its work has in all, so a row can say "Review 2 of 3"; absent when the run names no work
-     */
-    reviewsOnWork?: number;
-    /**
-     * Every practice counted in practices.notMet, once each, in order of practice name
-     */
-    slippedPractices: Array<SlippedPractice>;
-    status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
-    target: ReviewRunTarget;
+    item: ItemRef;
+    markedIncorrectAt: string | null;
+    origin: 'EVENT' | 'REQUEST' | 'SCHEDULE' | 'BACKFILL';
+    outcome: 'MET' | 'NOT_MET' | 'DOES_NOT_APPLY' | 'COULD_NOT_DETERMINE';
+    practiceName: string;
+    practiceSlug: string;
+    problemCount: number;
+    problems: Array<ProblemSummary>;
+    recordedAt: string;
+    reviewId: string;
+    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'TRIVIAL' | null;
+    summary: string | null;
 };
 
-/**
- * Work reviewed by an agent job
- */
-export type ReviewRunTarget = {
-    /**
-     * The reviewed work as every surface names it; absent when the run recorded no work
-     */
-    reviewedWork?: ReviewedWorkRef;
-    /**
-     * Heading the run is listed under, which a run without recorded work still needs
-     */
-    title: string;
-    type: string;
+export type ReviewResultCounts = {
+    couldNotDetermine: number;
+    doesNotApply: number;
+    met: number;
+    notMet: number;
 };
 
-/**
- * How long one stage of practice reviews took, over the reviews that passed through it
- */
-export type ReviewStageTiming = {
-    /**
-     * Reviews that passed through the stage and were measured
-     */
-    count: number;
-    /**
-     * The median duration in whole seconds; absent when no review was measured
-     */
-    medianSeconds?: number;
-    /**
-     * The 90th percentile duration in whole seconds; absent when no review was measured
-     */
-    p90Seconds?: number;
+export type ReviewResultDetail = {
+    acceptedAt: string | null;
+    coverage: ClaimedCoverage | HostCoverage | null;
+    currentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
+    developer: ReviewDeveloper | null;
+    disagreements: Array<FeedbackDisagreement>;
+    endReason: 'REPLACED' | 'OUTRANKED' | 'WORK_CHANGED' | 'REPAIRED' | 'REMOVED' | null;
+    endedAt: string | null;
+    evidence: ResultEvidence | null;
+    evidenceHidden: boolean;
+    evidenceVersion: number;
+    example: ResultExample | null;
+    explanation: string | null;
+    feedback: Array<ReviewBoundFeedback>;
+    id: string;
+    item: ItemRef;
+    itemVersion: string | null;
+    markedIncorrectAt: string | null;
+    marks: Array<ResultMark>;
+    origin: 'EVENT' | 'REQUEST' | 'SCHEDULE' | 'BACKFILL';
+    outcome: 'MET' | 'NOT_MET' | 'DOES_NOT_APPLY' | 'COULD_NOT_DETERMINE';
+    practiceName: string;
+    practiceSlug: string;
+    practiceVersionId: string | null;
+    practiceVersionNumber: null | number;
+    problems: Array<Problem>;
+    recordedAt: string;
+    reviewId: string;
+    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'TRIVIAL' | null;
+    summary: string | null;
 };
 
-export type ReviewSubject = {
-    avatarUrl?: string;
-    id: number;
-    /**
-     * Login on the source provider
-     */
-    login: string;
-    /**
-     * Display name, when known
-     */
-    name?: string;
+export type ReviewRuntime = {
+    jobs: Array<ReviewJob>;
 };
 
-/**
- * A standing instruction to review recent work on a cadence, as an admin sees it.
- */
-export type ReviewSweepSchedule = {
-    artifactKind: string;
+export type ReviewSchedule = {
+    budgetUsd: string | null;
     cadence: 'DAILY' | 'WEEKLY';
     createdAt: string;
-    createdByAccountId: number;
+    createdBy: AccountRef | null;
     enabled: boolean;
     id: string;
-    /**
-     * When a campaign was last opened from this schedule; absent until the first one
-     */
-    lastRunAt?: string;
-    /**
-     * how far back each sweep looks. Bounded at write time to twice the cadence and
-     * never more than a week, which is what keeps a sweep's observations admissible in the same trend line
-     * as reviews that events triggered.
-     */
-    lookbackDays: number;
-    /**
-     * when the next sweep is due. Shown because it is the only way to tell a schedule that
-     * is working from one whose workspace has been skipping it.
-     */
+    itemKind: string;
+    lastRunAt: string | null;
+    lookbackDays: null | number;
     nextRunAt: string;
+    updatedAt: string;
+    version: string;
 };
 
-/**
- * Each stage's part of the time of a set of whole reviews, from 0 to 1: its seconds summed over the set, divided by the reviews' summed seconds. The parts add up to 1
- */
+export type ReviewScheduleInput = {
+    budgetUsd: string | null;
+    cadence: 'DAILY' | 'WEEKLY';
+    enabled: boolean;
+    itemKind: string;
+    lookbackDays: null | number;
+};
+
+export type ReviewScopeRepository = {
+    baseBranches: Array<string>;
+    repositoryItemId: string;
+};
+
+export type ReviewStageTiming = {
+    completedAt: string | null;
+    durationMs: null | number;
+    stage: string;
+    startedAt: string | null;
+};
+
+export type ReviewStatusCounts = {
+    cancelled: number;
+    complete: number;
+    failed: number;
+    partial: number;
+    queued: number;
+    running: number;
+};
+
+export type ReviewSummary = {
+    activeJobCount: number;
+    batchId: string | null;
+    completedAt: string | null;
+    createdAt: string;
+    feedback: ReviewFeedbackCounts;
+    id: string;
+    item: ItemRef;
+    itemVersion: string | null;
+    jobCount: number;
+    kind: 'ITEM' | 'SCAN';
+    model: string | null;
+    orderedAt: string;
+    origin: 'EVENT' | 'REQUEST' | 'SCHEDULE' | 'BACKFILL';
+    practices: Array<ReviewPractice>;
+    requestedBy: AccountRef | null;
+    results: ReviewResultCounts;
+    startedBy: ItemEvent | null;
+    status: 'QUEUED' | 'RUNNING' | 'COMPLETE' | 'PARTIAL' | 'FAILED' | 'CANCELLED';
+    stopReason: 'TIMED_OUT' | 'EXECUTION_FAILED' | 'PREPARATION_FAILED' | 'PROCESSING_FAILED' | 'PERSON_DATA_ERASED' | 'STALE_ROLLOUT_REVISION' | 'CANCELLED_BY_ADMIN' | 'REPLACED' | 'LEGACY_FAILURE' | 'EXECUTION_INCOMPLETE' | 'RESULT_WITHHELD' | 'READINESS_REFUSED' | 'SUSPECT_LISTING' | 'BUDGET' | 'USAGE_UNVERIFIABLE' | 'DEADLINE' | 'CANCELLED' | 'ENUMERATION_FAILED' | 'ENUMERATION_LIMIT' | 'NO_SCAN_PRACTICES' | 'MODEL_CHANGED' | 'MODEL_UNAVAILABLE' | 'ERROR' | 'LEGACY_SCOPE_UNKNOWN' | 'CONTRACT_CHANGED' | null;
+};
+
 export type ReviewTimeShares = {
-    /**
-     * Until asked: from the moment on the work that started the review to its request; 0 where no moment started it
-     */
     asked: number;
-    /**
-     * With the model
-     */
     model: number;
-    /**
-     * Until the comment was posted; absent for reviews that are not measured to a comment
-     */
-    posted?: number;
-    /**
-     * Preparing the evidence
-     */
+    posted: number | null;
     preparation: number;
-    /**
-     * Waiting in the queue
-     */
     queue: number;
-    /**
-     * The whole run of the reviews without a recorded execution start, such as those recorded before it was, so it cannot be split into preparation and model; 0 when every review has one
-     */
     runUnsplit: number;
 };
 
-/**
- * The facts the provider reported about a piece of reviewed work
- */
-export type ReviewWorkFacts = {
-    /**
-     * Lines added
-     */
-    additions?: number;
-    artifactId: number;
-    artifactKind: string;
-    /**
-     * Who opened the work; absent when the account is unknown
-     */
-    author?: ReviewSubject;
-    /**
-     * Files changed
-     */
-    changedFiles?: number;
-    /**
-     * When the check state was last observed
-     */
-    checkObservedAt?: string;
-    /**
-     * The combined state of the checks on the head commit, when the provider reported one
-     */
-    checkState?: 'SUCCESS' | 'FAILURE' | 'PENDING' | 'CANCELLED' | 'NONE' | 'NO_PIPELINE' | 'SKIPPED';
-    closedAt?: string;
-    /**
-     * Commits on the work
-     */
-    commits?: number;
-    createdAt?: string;
-    /**
-     * Lines deleted
-     */
-    deletions?: number;
-    /**
-     * Whether a pull request or merge request is a draft; absent for an issue
-     */
-    draft?: boolean;
-    /**
-     * The commit at the head of the source branch
-     */
-    headRevision?: string;
-    /**
-     * When the work was last read from the provider
-     */
-    lastSyncAt?: string;
-    mergedAt?: string;
-    /**
-     * The branch the changes come from
-     */
-    sourceBranch?: string;
-    /**
-     * OPEN, CLOSED, or MERGED for a merged pull request or merge request
-     */
-    state: 'OPEN' | 'CLOSED' | 'MERGED';
-    /**
-     * Why an issue was closed or reopened
-     */
-    stateReason?: 'COMPLETED' | 'DUPLICATE' | 'NOT_PLANNED' | 'REOPENED' | 'UNKNOWN';
-    /**
-     * The branch the changes go into
-     */
-    targetBranch?: string;
-    updatedAt?: string;
+export type ReviewTiming = {
+    asked: ReviewTimingStage;
+    feedbackWithheldAsMerged: number;
+    finished: ReviewTimingStage;
+    finishedAfterMerge: number;
+    finishedAfterMergeStartedByMerge: number;
+    finishedShares: ReviewTimeShares | null;
+    from: string;
+    model: ReviewTimingStage;
+    posted: ReviewTimingStage;
+    preparation: ReviewTimingStage;
+    queue: ReviewTimingStage;
+    read: ReviewTimingStage;
+    to: string;
+    total: ReviewTimingStage;
+    totalShares: ReviewTimeShares | null;
+    waitingLong: number;
 };
 
-/**
- * Developer-facing view of a practice — criteria absent by construction
- */
+export type ReviewTimingStage = {
+    count: number;
+    medianSeconds: number | null;
+    p90Seconds: number | null;
+};
+
+export type ReviewUsage = {
+    attempts: Array<ReviewUsageAttempt>;
+    calls: number;
+    costUsd: string | null;
+    inputTokens: number;
+    outputTokens: number;
+    priced: boolean;
+};
+
+export type ReviewUsageAttempt = {
+    attempt: number;
+    cacheReadTokens: number;
+    cacheWriteTokens: number;
+    calls: number;
+    costUsd: string | null;
+    inputTokens: number;
+    jobId: string;
+    outputTokens: number;
+    pricingState: 'PRICED' | 'NO_CHARGE' | 'UNPRICED';
+    reasoningTokens: number;
+};
+
+export type ReviewedBy = {
+    by: 'HEPHAESTUS' | 'PEOPLE' | 'NOBODY';
+    humanReason: ReviewLimit | null;
+    limits: Array<ReviewLimit>;
+};
+
+export type ReviewedByInput = {
+    by: 'HEPHAESTUS' | 'PEOPLE' | 'NOBODY';
+    humanReason: ReviewLimitInput | null;
+    limits: Array<ReviewLimitInput>;
+};
+
 export type ReviewedPractice = {
-    /**
-     * Slug of the practice group this belongs to, if any
-     */
-    groupSlug?: string;
-    /**
-     * Human-readable name
-     */
+    group: GroupRef | null;
     name: string;
-    /**
-     * URL-safe identifier
-     */
     slug: string;
-    /**
-     * A concrete picture of doing this well
-     */
-    whatGoodLooksLike?: string;
-    /**
-     * Why this practice matters, in plain language
-     */
-    whyItMatters?: string;
-};
-
-/**
- * A piece of reviewed work as every surface names it: enough to print a link
- */
-export type ReviewedWorkRef = {
-    /**
-     * Where the work sits, by name: a pull request's or an issue's repository, a document's collection; a conversation's channel is its label
-     */
-    container?: string;
-    /**
-     * Identifier of the work within its kind
-     */
-    id: string;
-    /**
-     * Artifact kind id
-     */
-    kind: string;
-    /**
-     * Short label the page prints: "#22", "!425", "#backend-review" or a document title
-     */
-    label: string;
-    /**
-     * The provider the work lives at, which decides its noun: a GitLab scm.pull_request is a merge request; absent when the run that named the work is gone
-     */
-    provider?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
-    /**
-     * The work's own title where the label does not already say it: a pull request's or an issue's; a conversation thread has none and a document's is its label
-     */
-    title?: string;
-    /**
-     * The work's page at its provider, when the provider exposes one
-     */
-    url?: string;
+    whatGoodLooksLike: string | null;
+    whyItMatters: string | null;
 };
 
 /**
@@ -6442,6 +4809,170 @@ export type RunningRelease = {
     version: string;
 };
 
+/**
+ * An assigned practice that runtime execution could not complete, without an outcome about the work.
+ */
+export type RuntimeNonResult = {
+    practiceSlug: string;
+    reason: 'TIMED_OUT' | 'EXECUTION_FAILED' | 'PREPARATION_FAILED' | 'PROCESSING_FAILED' | 'PERSON_DATA_ERASED' | 'STALE_ROLLOUT_REVISION' | 'CANCELLED_BY_ADMIN' | 'REPLACED' | 'LEGACY_FAILURE' | 'EXECUTION_INCOMPLETE' | 'RESULT_WITHHELD' | 'READINESS_REFUSED' | 'SUSPECT_LISTING' | 'BUDGET' | 'USAGE_UNVERIFIABLE' | 'DEADLINE' | 'CANCELLED' | 'ENUMERATION_FAILED' | 'ENUMERATION_LIMIT' | 'NO_SCAN_PRACTICES' | 'MODEL_CHANGED' | 'MODEL_UNAVAILABLE' | 'ERROR' | 'LEGACY_SCOPE_UNKNOWN' | 'CONTRACT_CHANGED';
+};
+
+export type ScanAvailability = {
+    expired: boolean;
+    expiredProofPairs: number;
+    rawRetentionEndsAt: string | null;
+    withheldProofPairs: number;
+};
+
+export type ScanCounts = {
+    couldNotDetermine: number;
+    doesNotApply: number;
+    files: null | number;
+    met: number;
+    notMet: number;
+    notReviewed: number;
+    openProblems: number;
+    practiceItemPairs: null | number;
+    problems: number;
+    reused: number;
+    reviewed: number;
+    withheld: number;
+};
+
+export type ScanDefinition = {
+    context: Array<string>;
+    exclude: Array<string>;
+    include: Array<string>;
+    itemKind: string;
+    reads: PracticeReads;
+};
+
+export type ScanDetail = {
+    baselineScanId: string | null;
+    budgetUsd: string;
+    chargedCostUsd: string | null;
+    completedAt: string | null;
+    counts: ScanCounts;
+    createdAt: string;
+    id: string;
+    itemVersion: string;
+    origin: 'EVENT' | 'REQUEST' | 'SCHEDULE' | 'BACKFILL';
+    practiceCount: number;
+    practices: Array<ScanPracticeRef>;
+    progress: ScanProgress;
+    ref: string;
+    repository: ItemRef;
+    requestedBy: AccountRef | null;
+    startedAt: string | null;
+    status: 'QUEUED' | 'RUNNING' | 'COMPLETE' | 'PARTIAL' | 'FAILED' | 'CANCELLED';
+    stopReason: 'TIMED_OUT' | 'EXECUTION_FAILED' | 'PREPARATION_FAILED' | 'PROCESSING_FAILED' | 'PERSON_DATA_ERASED' | 'STALE_ROLLOUT_REVISION' | 'CANCELLED_BY_ADMIN' | 'REPLACED' | 'LEGACY_FAILURE' | 'EXECUTION_INCOMPLETE' | 'RESULT_WITHHELD' | 'READINESS_REFUSED' | 'SUSPECT_LISTING' | 'BUDGET' | 'USAGE_UNVERIFIABLE' | 'DEADLINE' | 'CANCELLED' | 'ENUMERATION_FAILED' | 'ENUMERATION_LIMIT' | 'NO_SCAN_PRACTICES' | 'MODEL_CHANGED' | 'MODEL_UNAVAILABLE' | 'ERROR' | 'LEGACY_SCOPE_UNKNOWN' | 'CONTRACT_CHANGED' | null;
+};
+
+export type ScanExcludedFile = {
+    itemId: string;
+    path: string;
+    reason: 'FILE_TOO_LARGE' | 'BINARY_FILE';
+    sizeBytes: number;
+};
+
+export type ScanPracticeRef = {
+    number: number;
+    practiceId: string;
+    practiceName: string;
+    practiceSlug: string;
+    practiceVersionId: string;
+    reviewDigest: string;
+};
+
+export type ScanPracticeReport = {
+    comparison: 'COMPARABLE' | 'FIRST_SCAN' | 'METHOD_CHANGED' | 'STANDARD_CHANGED' | 'INCOMPLETE' | 'MIXED';
+    counts: ScanCounts;
+    listingComplete: boolean;
+    method: ReviewMethod;
+    number: number;
+    practiceId: string;
+    practiceName: string;
+    practiceSlug: string;
+    practiceVersionId: string;
+    reason: string | null;
+    reviewDigest: string;
+    status: 'QUEUED' | 'READY' | 'RUNNING' | 'DONE' | 'WITHHELD' | 'FAILED';
+};
+
+export type ScanProgress = {
+    activeJobs: number;
+    listedPairs: null | number;
+    queuedJobs: number;
+    terminalPairs: number;
+};
+
+export type ScanReport = {
+    availability: ScanAvailability;
+    baselineScanId: string | null;
+    comparison: 'COMPARABLE' | 'FIRST_SCAN' | 'METHOD_CHANGED' | 'STANDARD_CHANGED' | 'INCOMPLETE' | 'MIXED';
+    complete: boolean;
+    counts: ScanCounts;
+    exclusions: null | Array<ScanExcludedFile>;
+    listingComplete: boolean;
+    notReviewedReasons: Array<ReasonCount>;
+    practices: Array<ScanPracticeReport>;
+    problemChanges: ProblemChanges;
+    recordedCounts: ScanCounts | null;
+    removalGuard: RemovalGuard;
+    scan: ScanSummary;
+    withheldReasons: Array<ReasonCount>;
+};
+
+export type ScanReportItem = (JudgedScanReportItem | ReusedScanReportItem | WithheldScanReportItem | ListedScanReportItem | NotReviewedScanReportItem) & {
+    status: string;
+};
+
+export type ScanReportItemsPage = {
+    content: Array<ScanReportItem>;
+    hasNext: boolean;
+    nextCursor: string | null;
+};
+
+export type ScanReportProblem = {
+    absentReason: 'REPAIRED' | null;
+    baselineState: 'NEW' | 'UNCHANGED' | 'UPDATED' | 'ABSENT' | null;
+    item: ItemRef;
+    practiceName: string;
+    practiceSlug: string;
+    previousProblemId: string | null;
+    problem: Problem;
+    resultId: string;
+};
+
+export type ScanReportProblemsPage = {
+    content: Array<ScanReportProblem>;
+    hasNext: boolean;
+    nextCursor: string | null;
+};
+
+export type ScanSummary = {
+    baselineScanId: string | null;
+    completedAt: string | null;
+    counts: ScanCounts;
+    createdAt: string;
+    id: string;
+    itemVersion: string;
+    origin: 'EVENT' | 'REQUEST' | 'SCHEDULE' | 'BACKFILL';
+    practiceCount: number;
+    ref: string;
+    repository: ItemRef;
+    requestedBy: AccountRef | null;
+    startedAt: string | null;
+    status: 'QUEUED' | 'RUNNING' | 'COMPLETE' | 'PARTIAL' | 'FAILED' | 'CANCELLED';
+    stopReason: 'TIMED_OUT' | 'EXECUTION_FAILED' | 'PREPARATION_FAILED' | 'PROCESSING_FAILED' | 'PERSON_DATA_ERASED' | 'STALE_ROLLOUT_REVISION' | 'CANCELLED_BY_ADMIN' | 'REPLACED' | 'LEGACY_FAILURE' | 'EXECUTION_INCOMPLETE' | 'RESULT_WITHHELD' | 'READINESS_REFUSED' | 'SUSPECT_LISTING' | 'BUDGET' | 'USAGE_UNVERIFIABLE' | 'DEADLINE' | 'CANCELLED' | 'ENUMERATION_FAILED' | 'ENUMERATION_LIMIT' | 'NO_SCAN_PRACTICES' | 'MODEL_CHANGED' | 'MODEL_UNAVAILABLE' | 'ERROR' | 'LEGACY_SCOPE_UNKNOWN' | 'CONTRACT_CHANGED' | null;
+};
+
+export type SearchWarrant = {
+    boundary?: string;
+    consulted?: Array<string>;
+    lookedFor?: string;
+};
+
 export type SessionView = {
     /**
      * what signed in
@@ -6456,6 +4987,22 @@ export type SessionView = {
     issuedAt?: string;
     jti: string;
     userAgent?: string;
+};
+
+export type SetCatalogStatusRequest = {
+    excluded: boolean;
+};
+
+export type SetFeedbackModeRequest = {
+    feedbackMode: 'OFF' | 'APPROVE_FIRST' | 'AUTOMATIC' | null;
+};
+
+export type SetMemberHiddenRequest = {
+    hidden: boolean;
+};
+
+export type SetReviewScheduleEnabledRequest = {
+    enabled?: boolean;
 };
 
 /**
@@ -6493,9 +5040,9 @@ export type SlackChannelCandidate = {
  */
 export type SlackChannelConsentEvent = {
     /**
-     * Workspace user id of the admin who made the change
+     * Account id of the admin who made the change
      */
-    actorUserId?: number;
+    actorAccountId: string | null;
     /**
      * When the transition was recorded
      */
@@ -6503,15 +5050,15 @@ export type SlackChannelConsentEvent = {
     /**
      * State the channel left (absent for the very first record)
      */
-    fromState?: 'PENDING' | 'ACTIVE' | 'PAUSED' | 'REVOKED';
+    fromState: 'PENDING' | 'ACTIVE' | 'PAUSED' | 'REVOKED' | null;
     /**
      * Audit entry id
      */
-    id: number;
+    id: string;
     /**
      * Optional free-text reason the admin supplied
      */
-    reason?: string;
+    reason: string | null;
     /**
      * Slack channel id the transition applied to
      */
@@ -6529,11 +5076,11 @@ export type SlackMonitoredChannel = {
     /**
      * Human-readable channel name, if known
      */
-    channelName?: string;
+    channelName: string | null;
     /**
      * When the in-channel consent announcement was posted (stamped on first activation)
      */
-    consentAnnouncedAt?: string;
+    consentAnnouncedAt: string | null;
     /**
      * Current per-channel consent lifecycle state
      */
@@ -6545,7 +5092,7 @@ export type SlackMonitoredChannel = {
     /**
      * Internal allow-list row id
      */
-    id: number;
+    id: string;
     /**
      * Number of workspace members who have opted out of ingestion (workspace-wide)
      */
@@ -6575,22 +5122,60 @@ export type SlackUserWorkspacePreferences = {
     workspaceSlug: string;
 };
 
-/**
- * A practice a run recorded a problem about
- */
-export type SlippedPractice = {
-    practiceName: string;
-    practiceSlug: string;
+export type Sort = {
+    empty: boolean;
+    sorted: boolean;
+    unsorted: boolean;
 };
 
-export type Sort = {
-    empty?: boolean;
-    sorted?: boolean;
-    unsorted?: boolean;
+export type StartScanRequest = {
+    budgetUsd: string;
+    expectedVersion: string | null;
+    practiceSlugs: null | Array<string>;
+    ref: string | null;
+    repositoryItemId: string;
+    reuse: boolean | null;
+};
+
+export type StateBasis = Omit<ClaimBasis, 'type'> & {
+    explanation?: string;
+    type: 'StateBasis';
+};
+
+export type StateDimension = {
+    label: string;
+    name: string;
+    values: Array<Value>;
 };
 
 export type SubmitSurvey = {
     answers: Array<Answer>;
+};
+
+export type SubmittedResult = {
+    candidate?: JsonNode;
+    itemId?: string;
+    itemVersion?: string;
+    practiceSlug?: string;
+    readReceipts?: Array<ReadReceipt>;
+};
+
+export type Support = {
+    problemId?: string;
+    resultId?: string;
+};
+
+export type SupportOccurrence = {
+    evidence: JsonNode | null;
+    explanation: string | null;
+    itemId: string;
+    itemKind: string;
+    origin: 'EVENT' | 'REQUEST' | 'SCHEDULE' | 'BACKFILL';
+    outcome: 'MET' | 'NOT_MET' | 'DOES_NOT_APPLY' | 'COULD_NOT_DETERMINE';
+    practiceVersionId: string | null;
+    recordedAt: string;
+    resultId: string;
+    summary: string;
 };
 
 export type Survey = {
@@ -6720,7 +5305,7 @@ export type SyncJob = {
     /**
      * Account id of the admin who triggered this job, if MANUAL
      */
-    triggeredByUserId?: number;
+    triggeredByAccountId?: number;
     /**
      * What kind of pass this is
      */
@@ -6917,133 +5502,21 @@ export type TeamSummary = {
     privacy?: 'SECRET' | 'VISIBLE';
 };
 
-export type TerminalModelFailure = {
-    /**
-     * Adapter failure time in epoch milliseconds; absent if unknown
-     */
-    at?: number;
-    kind: 'HTTP_ERROR' | 'CONNECTION_TIMEOUT' | 'CONNECTION_ERROR' | 'STREAM_INCOMPLETE' | 'FINISH_REASON_ERROR' | 'STREAM_ERROR_EVENT' | 'RESPONSE_FAILED' | 'RESPONSE_STATUS_ERROR' | 'TOOL_CALL_INCOMPLETE' | 'ABORTED' | 'UNKNOWN';
-    phase?: 'REQUEST' | 'RESPONSE_BODY';
-    /**
-     * Whether the native retry ended unsuccessfully; absent if no valid flag was recorded
-     */
-    retryEndedUnsuccessfully?: boolean;
-    source?: 'ADAPTER' | 'MISSING' | 'INVALID';
-    /**
-     * HTTP status from 400 through 599, for HTTP_ERROR only
-     */
-    status?: number;
-};
-
-/**
- * How long each bucket of a range is: a day for ranges up to 31 days, a week from Monday for ranges up to 184 days, a month for longer ones
- */
-export type TimeBucketSize = 'DAY' | 'WEEK' | 'MONTH';
-
-/**
- * An artifact this workspace recorded something about, and how much of it turned into review
- */
-export type TracedArtifact = {
-    artifactId: number;
-    artifactKind: string;
-    /**
-     * The latest of them: what happened, how we came to know, and why it started no review when it did not
-     */
-    lastSignal: TracedSignal;
-    lastSignalAt: string;
-    /**
-     * How many of them started a review
-     */
-    reviewedSignalCount: number;
-    /**
-     * The work as every surface names it: its provider, the label the provider writes ("#1423", "!1423"), its title, where it sits and where to open it; the link is absent for deleted work
-     */
-    reviewedWork: ReviewedWorkRef;
-    /**
-     * Occurrences recorded on this artifact
-     */
-    signalCount: number;
-};
-
-/**
- * One thing that happened to this artifact, and what the system did about it
- */
-export type TracedSignal = {
-    /**
-     * How we came to know: by event, by sync, by hand, or by backfill
-     */
-    discoveredVia: 'EVENT' | 'SYNC' | 'MANUAL' | 'BACKFILL' | 'SWEEP';
-    /**
-     * What to print for the signal, from the artifact kind's descriptor
-     */
-    displayName: string;
-    /**
-     * This occurrence's own identity; what a practice's occasionedById points at
-     */
-    id: string;
-    /**
-     * When it happened upstream; for a sync discovery, only as precise as the sync
-     */
-    occurredAt: string;
-    /**
-     * The review this occurrence started, when it started one
-     */
-    reviewId?: string;
-    /**
-     * Which version of the artifact this occurrence is about; the reason editing a description can be re-measured while the commits stay put
-     */
-    revision: string;
-    /**
-     * Signal name, for matching and linking; never printed
-     */
-    signal: string;
-    state: 'RECORDED' | 'DEFERRED' | 'TRIGGERED' | 'SUPPRESSED' | 'PENDING' | 'LAPSED';
-    /**
-     * Why it ended in that state; null once it triggered a review
-     */
-    stateReason?: 'GATE_SKIPPED' | 'COOLDOWN_ACTIVE' | 'REQUEST_COOLDOWN_ACTIVE' | 'REQUESTER_QUOTA_EXHAUSTED' | 'CONCURRENT_DUPLICATE' | 'COALESCED' | 'OUT_OF_REVIEW_SCOPE' | 'BOT_AUTHOR' | 'BOT_REVIEWER' | 'STALE_ROLLOUT_REVISION' | 'WORKSPACE_INACTIVE' | 'PRACTICES_DISABLED' | 'NO_ACTIVE_PRACTICE' | 'REVIEW_MODEL_UNBOUND' | 'MEMBER_AI_DECLINED' | 'PERSON_DATA_ERASED' | 'PRACTICE_AUTONOMY_OFF' | 'BUDGET_EXHAUSTED' | 'SUBJECT_UNLINKED' | 'MERGE_ACTOR_UNAVAILABLE' | 'MODEL_UNAVAILABLE' | 'ARTIFACT_NOT_VISIBLE' | 'PENDING_DEADLINE_EXCEEDED' | 'ARTIFACT_GONE';
-    /**
-     * That reason as one sentence for a reader. Render it verbatim: it is written next to the reason it explains, so every surface that explains a silence says the same thing
-     */
-    stateReasonDescription?: string;
-};
-
-export type TrendOpportunity = {
-    bundle: 'PREVIOUS' | 'CURRENT' | 'OLDER';
-    index: number;
-    occurredAt: string;
-    outcomes: OutcomeVector;
-    reviewedWorkId: number;
-    workKind: string;
-};
-
 export type TrendSupport = {
     bundleSize: number;
-    calendarSpanDays?: number;
-    comparablePractices?: number;
+    calendarSpanDays: null | number;
+    comparablePractices: null | number;
     credibilityThreshold: number;
     currentOpportunities: number;
-    eligiblePractices?: number;
-    firstOpportunityAt?: string;
-    lastOpportunityAt?: string;
-    /**
-     * Distinct pieces of reviewed work the trend rests on, across both bundles
-     */
+    eligiblePractices: null | number;
+    firstOpportunityAt: string | null;
+    lastOpportunityAt: string | null;
     opportunities: number;
     opportunitiesUntilComparable: number;
     previousOpportunities: number;
-    /**
-     * Distinct pieces of work in the look-back whose newest live review reached a verdict on this practice, or on any practice of this group; never below standingWork
-     */
     reviewedWork: number;
-    /**
-     * The kind every piece counted in reviewedWork shares; absent when they are of several kinds or there are none
-     */
-    reviewedWorkKind?: string;
+    reviewedWorkKind: string | null;
     ropeHalfWidth: number;
-    /**
-     * Distinct pieces of reviewed work the standing is read from: the newest decided pieces, at most bundleSize per practice, counted once across a group's practices
-     */
     standingWork: number;
 };
 
@@ -7073,27 +5546,6 @@ export type UpdateConnectionStatusRequest = {
      * Target lifecycle state. Admin-settable: ACTIVE, SUSPENDED, UNINSTALLED.
      */
     state: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
-};
-
-/**
- * Whether new workspaces receive this catalog entry
- */
-export type UpdateCuratedStatusRequest = {
-    status: 'AVAILABLE' | 'RETIRED';
-};
-
-/**
- * Withdraw a card from a developer's practice page, or restore it
- */
-export type UpdateFeedbackWithdrawalRequest = {
-    /**
-     * Why, kept with the withdrawal for the workspace's administrators
-     */
-    reason: string;
-    /**
-     * true withdraws the card; false restores it
-     */
-    withdrawn: boolean;
 };
 
 /**
@@ -7261,20 +5713,6 @@ export type UpdateNotificationPreferences = {
 };
 
 /**
- * Invalidate an observation that was wrong when recorded, or restore it
- */
-export type UpdateObservationValidityRequest = {
-    /**
-     * Why, kept with the correction; an invalidation reason is shown to the developer
-     */
-    reason: string;
-    /**
-     * false invalidates the observation; true restores it
-     */
-    valid: boolean;
-};
-
-/**
  * Transition a mirrored Outline collection to a target mirror state (pause / resume)
  */
 export type UpdateOutlineCollectionStateRequest = {
@@ -7284,105 +5722,17 @@ export type UpdateOutlineCollectionStateRequest = {
     state: 'ENABLED' | 'PAUSED';
 };
 
-/**
- * Set how much autonomy the system has here, or clear it back to inherit
- */
-export type UpdatePracticeAutonomyRequest = {
-    /**
-     * Local autonomy override. Null inherits from the group or workspace.
-     */
-    autonomy?: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
-};
-
-/**
- * Request to update an existing practice group (PATCH — only non-null fields applied)
- */
 export type UpdatePracticeGroupRequest = {
-    /**
-     * Optional palette colour key for the group's chip
-     */
-    color?: string;
-    /**
-     * What this group develops
-     */
-    description?: string;
-    /**
-     * Sort order within the workspace
-     */
-    displayOrder?: number;
-    /**
-     * Optional lucide icon name giving the group a glanceable identity
-     */
-    icon?: string;
-    /**
-     * Human-readable name
-     */
-    name?: string;
-    /**
-     * Whether this group is shown in practice dashboards
-     */
-    visibleInPracticeDashboards?: boolean;
+    color: string | null;
+    description: string | null;
+    icon: string | null;
+    name: string;
+    shownToDevelopers: boolean;
 };
 
-/**
- * Request to update a practice; omitted fields remain unchanged
- */
 export type UpdatePracticeRequest = {
-    /**
-     * Replacement review settings; omit to preserve them, or to take the recommended ones when the signals move the practice to a different kind of work
-     */
-    automatedReviewPolicy?: PracticeAutomatedReviewPolicy;
-    /**
-     * Optional fields to clear before applying supplied values
-     */
-    clear?: Array<'PRECONDITION' | 'PRECOMPUTE_SCRIPT' | 'WHY_IT_MATTERS' | 'WHAT_GOOD_LOOKS_LIKE' | 'VISUAL' | 'GUIDE'>;
-    /**
-     * Practice review criteria
-     */
-    criteria?: string;
-    /**
-     * Explicit intent to change the gate or the person judged
-     */
-    definitionChanges?: Array<'PRECONDITION' | 'SUBJECT'>;
-    deliveryBehavior?: PracticeDeliveryBehavior;
-    evidenceRequirements?: Array<PracticeEvidenceRequirement>;
-    /**
-     * Catalog placement to apply with the definition update; omit to leave unchanged
-     */
-    group?: BindPracticeGroupRequest;
-    /**
-     * Guide text and its figures; guidance, never review rules
-     */
-    guide?: PracticeGuide;
-    /**
-     * Human-readable name
-     */
-    name?: string;
-    /**
-     * TypeScript/Node static analysis run before automated review
-     */
-    precomputeScript?: string;
-    precondition?: PracticePrecondition;
-    /**
-     * Automatic review state selections. An empty object imposes no state restrictions. Each selected dimension requires a nonempty set of non-null values offered by the work type descriptor. Values within a dimension are alternatives; all selected dimensions must match.
-     */
-    reviewWhen?: {
-        [key: string]: Array<string>;
-    };
-    signals?: Array<string>;
-    subject?: 'AUTHOR' | 'ASSIGNEE' | 'REVIEWER' | 'MERGER';
-    /**
-     * Developer-facing picture of the practice; guidance, never review rules
-     */
-    visual?: PracticeVisual;
-    /**
-     * Concrete example shown to the developer; not review criteria
-     */
-    whatGoodLooksLike?: string;
-    /**
-     * Plain-language rationale shown to the developer
-     */
-    whyItMatters?: string;
+    definition: PracticeDefinitionInput;
+    expectedVersionId: string;
 };
 
 /**
@@ -7394,9 +5744,9 @@ export type UpdatePracticeReviewSettingsRequest = {
      */
     cooldownMinutes?: number;
     /**
-     * How much autonomy the system has over practices and groups that hold no autonomy of their own. The one decision that moves a whole workspace at once. Null leaves it unchanged; name DEFAULT_AUTONOMY in 'reset' to clear it.
+     * The default feedback mode. Null leaves it unchanged; DEFAULT_FEEDBACK_MODE in reset restores inheritance.
      */
-    defaultAutonomy?: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
+    defaultFeedbackMode?: 'OFF' | 'APPROVE_FIRST' | 'AUTOMATIC';
     /**
      * Deliver feedback to already-merged PRs/MRs
      */
@@ -7414,7 +5764,7 @@ export type UpdatePracticeReviewSettingsRequest = {
     /**
      * Fields to reset back to inherit
      */
-    reset?: Array<'SKIP_DRAFTS' | 'DELIVER_TO_MERGED' | 'COOLDOWN_MINUTES' | 'REVIEW_SCOPE' | 'DEFAULT_AUTONOMY'>;
+    reset?: Array<'DELIVER_TO_MERGED' | 'COOLDOWN_MINUTES' | 'REVIEW_SCOPE' | 'DEFAULT_FEEDBACK_MODE'>;
     /**
      * Replaces repository and person coverage wholesale. Null leaves it unchanged.
      */
@@ -7431,42 +5781,8 @@ export type UpdateRepositorySettingsRequest = {
     hiddenFromContributions: boolean;
 };
 
-/**
- * The lifecycle transitions an admin can ask for.
- *
- * <p><code>RUNNING</code> is the confirmation: it is the point at which somebody accepts the estimate they
- * were shown and authorises the spend. <code>CANCELLED</code> stops a campaign for good. Every other
- * transition — pausing on an exhausted budget, resuming when it clears, completing at the end of the
- * scope — belongs to the driver, and is refused here so the state on screen always reflects something
- * the system decided or something a person did, never a mixture.
- */
-export type UpdateReviewBackfillRunStatusRequest = {
-    /**
-     * RUNNING confirms the estimate and starts the campaign; CANCELLED stops it for good
-     */
-    status: 'RUNNING' | 'CANCELLED';
-};
-
-/**
- * Replace a sweep schedule's terms.
- *
- * <p>Every field is required: a schedule is three numbers that only mean anything together — a cadence
- * changed without its lookback can silently make a window illegal, or leave days nothing ever sweeps.
- * The artifact kind is not among them; a schedule for a different kind of work is a different schedule.
- */
-export type UpdateReviewSweepScheduleRequest = {
-    /**
-     * How often the sweep runs
-     */
-    cadence: 'DAILY' | 'WEEKLY';
-    /**
-     * Whether the scheduler acts on this row; a disabled schedule keeps its terms
-     */
-    enabled: boolean;
-    /**
-     * How far back each sweep looks, in days
-     */
-    lookbackDays: number;
+export type UpdateReviewBatchStatusRequest = {
+    status: 'AWAITING_CONFIRMATION' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
 };
 
 export type UpdateSilentModeRequest = {
@@ -7699,12 +6015,30 @@ export type UserTeams = {
     url: string;
 };
 
-export type UserViewUser = {
-    accountId?: number;
-    accountStatus?: string;
-    login: string;
-    name?: string;
-    userId: number;
+export type UserViewAccount = {
+    account: AccountRef;
+    accountId: string;
+    providerLogin: string | null;
+};
+
+export type Value = {
+    label?: string;
+    value?: string;
+};
+
+export type Withheld = {
+    itemId?: string;
+    practiceSlug?: string;
+    reason?: string;
+};
+
+export type WithheldScanReportItem = {
+    item: ItemRef;
+    itemVersion: string;
+    practiceName: string;
+    practiceSlug: string;
+    reason: string;
+    status: 'WITHHELD';
 };
 
 /**
@@ -7895,40 +6229,6 @@ export type WorkspaceAiOption = {
 };
 
 /**
- * One practice group: how the developers with a standing split across it, and where the reader is
- */
-export type WorkspaceGroupSplit = {
-    /**
-     * Group colour name
-     */
-    groupColor?: string;
-    /**
-     * Group icon name
-     */
-    groupIcon?: string;
-    /**
-     * Group name
-     */
-    groupName: string;
-    /**
-     * Group slug
-     */
-    groupSlug: string;
-    /**
-     * The group's practices review is admitted for, the same for every reader, each split on its own, in catalog order
-     */
-    practices: Array<WorkspacePracticeSplit>;
-    /**
-     * How the developers with a standing split across the group
-     */
-    split: WorkspaceSplit;
-    /**
-     * The reader's current standing in the group, the one their practice profile shows: the part they are marked in. Absent unless the split counts the reader
-     */
-    yourStanding?: 'DEVELOPING' | 'STRENGTH' | 'MIXED' | 'NOT_OBSERVED' | 'NO_OPPORTUNITY';
-};
-
-/**
  * Summary information about a workspace for list views
  */
 export type WorkspaceListItem = {
@@ -7985,7 +6285,7 @@ export type WorkspaceLlmConnection = {
     /**
      * Wire protocol
      */
-    apiProtocol: string;
+    apiProtocol: 'openai-completions' | 'openai-responses' | 'openai-decisions' | 'openai-embeddings' | 'cohere-rerank';
     /**
      * Credential shape
      */
@@ -8018,6 +6318,10 @@ export type WorkspaceLlmConnection = {
      * Connection ID
      */
     id: number;
+    /**
+     * The purposes a model on this connection can serve, from its protocol
+     */
+    purposes: Array<'PRACTICE_REVIEW' | 'MENTOR' | 'PRACTICE_DECISION' | 'PRACTICE_EMBEDDING' | 'PRACTICE_RERANKING'>;
     /**
      * Unique slug within the workspace
      */
@@ -8142,6 +6446,10 @@ export type WorkspaceLlmProbeResult = {
      * Whether the provider answered
      */
     reachable: boolean;
+    /**
+     * HTTP status returned by the provider, if any
+     */
+    statusCode?: number;
 };
 
 /**
@@ -8160,6 +6468,10 @@ export type WorkspaceLlmSettings = {
 export type WorkspaceLlmUsageReport = {
     byDay: Array<LlmUsageByDay>;
     byJobType: Array<LlmUsageByJobType>;
+    /**
+     * The decision, embedding and reranking calls of practice scripts, one entry per practice, most spend first. Their spend is already part of byJobType. Chat calls of practice scripts are in each review's own cost and not here.
+     */
+    byPractice: Array<LlmUsageByPractice>;
     /**
      * Display-only conversion when the instance has a display currency. Absent = show USD only.
      */
@@ -8189,6 +6501,10 @@ export type WorkspaceLlmUsageReport = {
      */
     ownProviderBudgetVerdict: 'WITHIN' | 'EXHAUSTED' | 'UNVERIFIABLE';
     /**
+     * Whether this month has an own-provider purse to show. True when the month has at least one own-provider call, priced or not, so a month of confirmed $0.00 calls counts. For the current month, also true when the workspace has an enabled own-provider model on an enabled connection, so its admins can set a provider cap before the first call. The spend and cap fields cannot answer this.
+     */
+    ownProviderInUse: boolean;
+    /**
      * Monthly cap in USD on spend this workspace pays for through its own connected provider; null = uncapped. Set by this workspace's own admins.
      */
     ownProviderMonthlyBudgetUsd?: number;
@@ -8201,49 +6517,29 @@ export type WorkspaceLlmUsageReport = {
      */
     ownProviderTotalCostUsd: number;
     /**
-     * Ledger usage records this month (either purse) with unavailable cost because rates are missing or measurements are unverified. They are excluded from both totals above, so a non-zero value means the real spend may be higher than shown.
+     * The byPractice entries in total, read from the ledger.
+     */
+    practiceScriptTotal: LlmUsagePracticeScriptTotal;
+    /**
+     * Runs this month (job attempts and mentor turns, either purse) with at least one ledger row whose cost is unavailable because a rate is missing or the measurement is unverified, each counted once. A practice script row counts toward the run of its review. Those rows are excluded from both totals above, so a non-zero value means the real spend may be higher than shown.
      */
     unpricedEventCount: number;
 };
 
-/**
- * A user's membership in a workspace
- */
 export type WorkspaceMembership = {
-    /**
-     * Timestamp when the membership was created
-     */
-    createdAt: string;
-    /**
-     * Whether this linked human member can be selected for practice-review coverage
-     */
+    account: AccountRef;
     eligibleForPracticeReview: boolean;
-    /**
-     * Whether the member is left out of workspace activity
-     */
     hidden: boolean;
-    /**
-     * Role of the user in this workspace (OWNER, ADMIN, MEMBER)
-     */
+    joinedAt: string;
+    leftAt: string | null;
+    reviewSelected: boolean;
     role: 'OWNER' | 'ADMIN' | 'MEMBER';
-    /**
-     * Unique identifier of the user
-     */
-    userId: number;
-    /**
-     * Login/username of the user
-     */
-    userLogin: string;
-    /**
-     * Display name of the user
-     */
-    userName?: string;
 };
 
 /**
- * One member's view of setup in one workspace. <code>aiChoice</code> is the account's answer, the same in
- * every workspace; <code>aiOptions</code> says what this workspace has set up under each answer, which is
- * what differs between workspaces.
+ * One member's view of setup in one workspace. <code>aiChoice</code> is the account's answer, the same
+ * in every workspace; <code>aiOptions</code> says what this workspace has set up under each answer,
+ * which is what differs between workspaces.
  */
 export type WorkspaceOnboarding = {
     aiChoice?: 'NO_AI' | 'IN_HOUSE_ONLY' | 'CLOUD';
@@ -8278,28 +6574,6 @@ export type WorkspaceOnboardingSettings = {
 };
 
 /**
- * One practice of a group: how the developers with a standing split, and where the reader is
- */
-export type WorkspacePracticeSplit = {
-    /**
-     * Practice name
-     */
-    practiceName: string;
-    /**
-     * Practice slug
-     */
-    practiceSlug: string;
-    /**
-     * How the developers with a standing split across the practice
-     */
-    split: WorkspaceSplit;
-    /**
-     * The reader's current standing in the practice, the one their practice profile shows: the part they are marked in. Absent unless the split counts the reader
-     */
-    yourStanding?: 'DEVELOPING' | 'STRENGTH' | 'MIXED' | 'NOT_OBSERVED' | 'NO_OPPORTUNITY';
-};
-
-/**
  * Available workspace creation providers and their configuration
  */
 export type WorkspaceProviders = {
@@ -8317,60 +6591,11 @@ export type WorkspaceProviders = {
     gitlab?: GitLabProvider;
 };
 
-/**
- * The middle half of the developers counted: the 25th to the 75th percentile
- */
-export type WorkspaceRange = {
-    /**
-     * The 75th percentile
-     */
-    high: number;
-    /**
-     * The 25th percentile
-     */
-    low: number;
-};
-
-/**
- * An empty repository selection admits no repository work; an empty person selection admits nobody. A selected repository without branches admits all its branches.
- */
 export type WorkspaceReviewScope = {
-    personMode: 'ALL_ELIGIBLE' | 'SELECTED';
-    personUserIds: Array<number>;
-    repositories: Array<ReviewRepositoryTarget>;
-    repositoryMode: 'ALL_MONITORED' | 'SELECTED';
-};
-
-/**
- * How the developers with a standing split across one practice group or one practice, counted in developers: a part per verdict, none yet, and their total
- */
-export type WorkspaceSplit = {
-    /**
-     * Every developer the split counts, the parts and none yet together, the reader included when counted
-     */
-    developers: number;
-    /**
-     * Developers with a standing in a group shown but none here
-     */
-    noneYet: number;
-    /**
-     * Developers at each verdict, Needs attention, Mixed feedback and Going well in that order
-     */
-    parts: Array<WorkspaceSplitPart>;
-};
-
-/**
- * The developers at one verdict in a split
- */
-export type WorkspaceSplitPart = {
-    /**
-     * Developers at the verdict, the reader included when counted
-     */
-    developers: number;
-    /**
-     * The verdict the part counts
-     */
-    standing: 'DEVELOPING' | 'MIXED' | 'STRENGTH';
+    accountIds: Array<string>;
+    people: 'ALL' | 'SELECTED';
+    repositories: 'ALL' | 'SELECTED';
+    selectedRepositories: Array<ReviewScopeRepository>;
 };
 
 /**
@@ -8413,18 +6638,11 @@ export type WorkspaceTeamSettings = {
     workspaceId: number;
 };
 
-/**
- * One figure: the reader's own value, then the middle half of the developers counted
- */
-export type WorkspaceTile = {
-    /**
-     * The workspace's middle half; absent while no developer is counted
-     */
-    middle?: WorkspaceRange;
-    /**
-     * The reader's own value
-     */
-    yours: number;
+export type WorsenedBasis = Omit<ClaimBasis, 'type'> & {
+    base?: number;
+    explanation?: string;
+    head?: number;
+    type: 'WorsenedBasis';
 };
 
 export type GetJwksData = {
@@ -8500,7 +6718,7 @@ export type AdminListConfigAuditEventsData = {
         workspaceId?: number;
         page?: number;
         size?: number;
-        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'ACTIVITY_AUTOMATION' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_GROUP' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_GROUP' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'REVIEW_BACKFILL_RUN' | 'REVIEW_SWEEP_SCHEDULE' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
+        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'ACTIVITY_AUTOMATION' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_GROUP' | 'CATALOG_PRACTICE' | 'CATALOG_GROUP' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'REVIEW_BATCH' | 'REVIEW_SCHEDULE' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
         entityId?: string;
         changedKey?: string;
         action?: Array<'CREATED' | 'UPDATED' | 'DELETED'>;
@@ -9093,83 +7311,74 @@ export type AdminExportPersonDataResponses = {
 
 export type AdminExportPersonDataResponse = AdminExportPersonDataResponses[keyof AdminExportPersonDataResponses];
 
-export type AdminGetCuratedCatalogData = {
+export type GetInstanceCatalogData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/admin/practice-catalog';
 };
 
-export type AdminGetCuratedCatalogResponses = {
+export type GetInstanceCatalogResponses = {
     /**
      * OK
      */
-    200: CuratedCatalog;
+    200: Catalog;
 };
 
-export type AdminGetCuratedCatalogResponse = AdminGetCuratedCatalogResponses[keyof AdminGetCuratedCatalogResponses];
+export type GetInstanceCatalogResponse = GetInstanceCatalogResponses[keyof GetInstanceCatalogResponses];
 
-export type AdminGetPracticeDefinitionOptionsData = {
+export type GetInstanceDefinitionOptionsData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/admin/practice-catalog/definition-options';
 };
 
-export type AdminGetPracticeDefinitionOptionsResponses = {
+export type GetInstanceDefinitionOptionsResponses = {
     /**
      * OK
      */
     200: PracticeDefinitionOptions;
 };
 
-export type AdminGetPracticeDefinitionOptionsResponse = AdminGetPracticeDefinitionOptionsResponses[keyof AdminGetPracticeDefinitionOptionsResponses];
+export type GetInstanceDefinitionOptionsResponse = GetInstanceDefinitionOptionsResponses[keyof GetInstanceDefinitionOptionsResponses];
 
-export type AdminCreateCuratedGroupData = {
-    body: CreateCuratedGroupRequest;
+export type CreateCatalogGroupData = {
+    body: CatalogGroupInput;
     path?: never;
     query?: never;
     url: '/admin/practice-catalog/groups';
 };
 
-export type AdminCreateCuratedGroupErrors = {
+export type CreateCatalogGroupResponses = {
     /**
-     * Slug already exists
+     * OK
      */
-    409: ProblemDetail;
+    200: CatalogGroup;
 };
 
-export type AdminCreateCuratedGroupError = AdminCreateCuratedGroupErrors[keyof AdminCreateCuratedGroupErrors];
+export type CreateCatalogGroupResponse = CreateCatalogGroupResponses[keyof CreateCatalogGroupResponses];
 
-export type AdminCreateCuratedGroupResponses = {
-    /**
-     * Group added
-     */
-    201: CuratedGroup;
-};
-
-export type AdminCreateCuratedGroupResponse = AdminCreateCuratedGroupResponses[keyof AdminCreateCuratedGroupResponses];
-
-export type AdminReorderCuratedGroupsData = {
-    body: ReorderPracticeGroupsRequest;
-    headers: {
-        'If-Match': string;
+export type ReorderCatalogGroupsData = {
+    body: ReorderRequest;
+    headers?: {
+        'If-Match'?: string;
     };
     path?: never;
     query?: never;
     url: '/admin/practice-catalog/groups/reorder';
 };
 
-export type AdminReorderCuratedGroupsResponses = {
+export type ReorderCatalogGroupsResponses = {
     /**
      * OK
      */
-    200: CuratedCatalog;
+    200: Catalog;
 };
 
-export type AdminReorderCuratedGroupsResponse = AdminReorderCuratedGroupsResponses[keyof AdminReorderCuratedGroupsResponses];
+export type ReorderCatalogGroupsResponse = ReorderCatalogGroupsResponses[keyof ReorderCatalogGroupsResponses];
 
-export type AdminGetCuratedGroupData = {
+export type GetCatalogGroupData = {
     body?: never;
     path: {
         slug: string;
@@ -9178,19 +7387,19 @@ export type AdminGetCuratedGroupData = {
     url: '/admin/practice-catalog/groups/{slug}';
 };
 
-export type AdminGetCuratedGroupResponses = {
+export type GetCatalogGroupResponses = {
     /**
-     * The group
+     * OK
      */
-    200: CuratedGroup;
+    200: CatalogGroup;
 };
 
-export type AdminGetCuratedGroupResponse = AdminGetCuratedGroupResponses[keyof AdminGetCuratedGroupResponses];
+export type GetCatalogGroupResponse = GetCatalogGroupResponses[keyof GetCatalogGroupResponses];
 
-export type AdminUpdateCuratedGroupData = {
-    body: CuratedGroupRequest;
-    headers: {
-        'If-Match': string;
+export type UpdateCatalogGroupData = {
+    body: CatalogGroupUpdate;
+    headers?: {
+        'If-Match'?: string;
     };
     path: {
         slug: string;
@@ -9199,32 +7408,19 @@ export type AdminUpdateCuratedGroupData = {
     url: '/admin/practice-catalog/groups/{slug}';
 };
 
-export type AdminUpdateCuratedGroupErrors = {
+export type UpdateCatalogGroupResponses = {
     /**
-     * The supplied ETag is stale
+     * OK
      */
-    412: ProblemDetail;
-    /**
-     * If-Match is required
-     */
-    428: ProblemDetail;
+    200: CatalogGroup;
 };
 
-export type AdminUpdateCuratedGroupError = AdminUpdateCuratedGroupErrors[keyof AdminUpdateCuratedGroupErrors];
+export type UpdateCatalogGroupResponse = UpdateCatalogGroupResponses[keyof UpdateCatalogGroupResponses];
 
-export type AdminUpdateCuratedGroupResponses = {
-    /**
-     * The group
-     */
-    200: CuratedGroup;
-};
-
-export type AdminUpdateCuratedGroupResponse = AdminUpdateCuratedGroupResponses[keyof AdminUpdateCuratedGroupResponses];
-
-export type AdminDeleteCuratedGroupOverrideData = {
+export type ResetCatalogGroupData = {
     body?: never;
-    headers: {
-        'If-Match': string;
+    headers?: {
+        'If-Match'?: string;
     };
     path: {
         slug: string;
@@ -9233,36 +7429,19 @@ export type AdminDeleteCuratedGroupOverrideData = {
     url: '/admin/practice-catalog/groups/{slug}/override';
 };
 
-export type AdminDeleteCuratedGroupOverrideErrors = {
+export type ResetCatalogGroupResponses = {
     /**
-     * Hephaestus ships no definition for this slug
+     * OK
      */
-    409: ProblemDetail;
-    /**
-     * The supplied ETag is stale
-     */
-    412: ProblemDetail;
-    /**
-     * If-Match is required
-     */
-    428: ProblemDetail;
+    200: CatalogGroup;
 };
 
-export type AdminDeleteCuratedGroupOverrideError = AdminDeleteCuratedGroupOverrideErrors[keyof AdminDeleteCuratedGroupOverrideErrors];
+export type ResetCatalogGroupResponse = ResetCatalogGroupResponses[keyof ResetCatalogGroupResponses];
 
-export type AdminDeleteCuratedGroupOverrideResponses = {
-    /**
-     * The group
-     */
-    200: CuratedGroup;
-};
-
-export type AdminDeleteCuratedGroupOverrideResponse = AdminDeleteCuratedGroupOverrideResponses[keyof AdminDeleteCuratedGroupOverrideResponses];
-
-export type AdminKeepCuratedGroupData = {
+export type AcknowledgeCatalogGroupData = {
     body?: never;
-    headers: {
-        'If-Match': string;
+    headers?: {
+        'If-Match'?: string;
     };
     path: {
         slug: string;
@@ -9271,32 +7450,19 @@ export type AdminKeepCuratedGroupData = {
     url: '/admin/practice-catalog/groups/{slug}/override/acknowledgement';
 };
 
-export type AdminKeepCuratedGroupErrors = {
+export type AcknowledgeCatalogGroupResponses = {
     /**
-     * The supplied ETag is stale
+     * OK
      */
-    412: ProblemDetail;
-    /**
-     * If-Match is required
-     */
-    428: ProblemDetail;
+    200: CatalogGroup;
 };
 
-export type AdminKeepCuratedGroupError = AdminKeepCuratedGroupErrors[keyof AdminKeepCuratedGroupErrors];
+export type AcknowledgeCatalogGroupResponse = AcknowledgeCatalogGroupResponses[keyof AcknowledgeCatalogGroupResponses];
 
-export type AdminKeepCuratedGroupResponses = {
-    /**
-     * The group
-     */
-    200: CuratedGroup;
-};
-
-export type AdminKeepCuratedGroupResponse = AdminKeepCuratedGroupResponses[keyof AdminKeepCuratedGroupResponses];
-
-export type AdminUpdateCuratedGroupStatusData = {
-    body: UpdateCuratedStatusRequest;
-    headers: {
-        'If-Match': string;
+export type SetCatalogGroupStatusData = {
+    body: SetCatalogStatusRequest;
+    headers?: {
+        'If-Match'?: string;
     };
     path: {
         slug: string;
@@ -9305,92 +7471,51 @@ export type AdminUpdateCuratedGroupStatusData = {
     url: '/admin/practice-catalog/groups/{slug}/status';
 };
 
-export type AdminUpdateCuratedGroupStatusErrors = {
+export type SetCatalogGroupStatusResponses = {
     /**
-     * The supplied ETag is stale
+     * OK
      */
-    412: ProblemDetail;
-    /**
-     * If-Match is required
-     */
-    428: ProblemDetail;
+    200: Catalog;
 };
 
-export type AdminUpdateCuratedGroupStatusError = AdminUpdateCuratedGroupStatusErrors[keyof AdminUpdateCuratedGroupStatusErrors];
+export type SetCatalogGroupStatusResponse = SetCatalogGroupStatusResponses[keyof SetCatalogGroupStatusResponses];
 
-export type AdminUpdateCuratedGroupStatusResponses = {
-    /**
-     * The updated catalog
-     */
-    200: CuratedCatalog;
-};
-
-export type AdminUpdateCuratedGroupStatusResponse = AdminUpdateCuratedGroupStatusResponses[keyof AdminUpdateCuratedGroupStatusResponses];
-
-export type AdminResetCuratedCatalogOrderData = {
+export type ResetCatalogOrderData = {
     body?: never;
-    headers: {
-        'If-Match': string;
+    headers?: {
+        'If-Match'?: string;
     };
     path?: never;
     query?: never;
     url: '/admin/practice-catalog/order';
 };
 
-export type AdminResetCuratedCatalogOrderResponses = {
+export type ResetCatalogOrderResponses = {
     /**
      * OK
      */
-    200: CuratedCatalog;
+    200: Catalog;
 };
 
-export type AdminResetCuratedCatalogOrderResponse = AdminResetCuratedCatalogOrderResponses[keyof AdminResetCuratedCatalogOrderResponses];
+export type ResetCatalogOrderResponse = ResetCatalogOrderResponses[keyof ResetCatalogOrderResponses];
 
-export type AdminCreateCuratedPracticeData = {
-    body: CreateCuratedPracticeRequest;
+export type CreateCatalogPracticeData = {
+    body: CatalogPracticeInput;
     path?: never;
     query?: never;
     url: '/admin/practice-catalog/practices';
 };
 
-export type AdminCreateCuratedPracticeErrors = {
-    /**
-     * Slug already exists
-     */
-    409: ProblemDetail;
-};
-
-export type AdminCreateCuratedPracticeError = AdminCreateCuratedPracticeErrors[keyof AdminCreateCuratedPracticeErrors];
-
-export type AdminCreateCuratedPracticeResponses = {
-    /**
-     * Practice added
-     */
-    201: CuratedPractice;
-};
-
-export type AdminCreateCuratedPracticeResponse = AdminCreateCuratedPracticeResponses[keyof AdminCreateCuratedPracticeResponses];
-
-export type AdminReorderCuratedPracticesData = {
-    body: ReorderPracticesRequest;
-    headers: {
-        'If-Match': string;
-    };
-    path?: never;
-    query?: never;
-    url: '/admin/practice-catalog/practices/reorder';
-};
-
-export type AdminReorderCuratedPracticesResponses = {
+export type CreateCatalogPracticeResponses = {
     /**
      * OK
      */
-    200: CuratedCatalog;
+    200: CatalogPractice;
 };
 
-export type AdminReorderCuratedPracticesResponse = AdminReorderCuratedPracticesResponses[keyof AdminReorderCuratedPracticesResponses];
+export type CreateCatalogPracticeResponse = CreateCatalogPracticeResponses[keyof CreateCatalogPracticeResponses];
 
-export type AdminGetCuratedPracticeData = {
+export type GetCatalogPracticeData = {
     body?: never;
     path: {
         slug: string;
@@ -9399,19 +7524,19 @@ export type AdminGetCuratedPracticeData = {
     url: '/admin/practice-catalog/practices/{slug}';
 };
 
-export type AdminGetCuratedPracticeResponses = {
+export type GetCatalogPracticeResponses = {
     /**
-     * The practice
+     * OK
      */
-    200: CuratedPractice;
+    200: CatalogPractice;
 };
 
-export type AdminGetCuratedPracticeResponse = AdminGetCuratedPracticeResponses[keyof AdminGetCuratedPracticeResponses];
+export type GetCatalogPracticeResponse = GetCatalogPracticeResponses[keyof GetCatalogPracticeResponses];
 
-export type AdminUpdateCuratedPracticeData = {
-    body: CuratedPracticeRequest;
-    headers: {
-        'If-Match': string;
+export type UpdateCatalogPracticeData = {
+    body: CatalogPracticeUpdate;
+    headers?: {
+        'If-Match'?: string;
     };
     path: {
         slug: string;
@@ -9420,32 +7545,40 @@ export type AdminUpdateCuratedPracticeData = {
     url: '/admin/practice-catalog/practices/{slug}';
 };
 
-export type AdminUpdateCuratedPracticeErrors = {
+export type UpdateCatalogPracticeResponses = {
     /**
-     * The supplied ETag is stale
+     * OK
      */
-    412: ProblemDetail;
-    /**
-     * If-Match is required
-     */
-    428: ProblemDetail;
+    200: CatalogPractice;
 };
 
-export type AdminUpdateCuratedPracticeError = AdminUpdateCuratedPracticeErrors[keyof AdminUpdateCuratedPracticeErrors];
+export type UpdateCatalogPracticeResponse = UpdateCatalogPracticeResponses[keyof UpdateCatalogPracticeResponses];
 
-export type AdminUpdateCuratedPracticeResponses = {
-    /**
-     * The practice
-     */
-    200: CuratedPractice;
+export type MoveCatalogPracticeData = {
+    body: MovePracticeRequest;
+    headers?: {
+        'If-Match'?: string;
+    };
+    path: {
+        slug: string;
+    };
+    query?: never;
+    url: '/admin/practice-catalog/practices/{slug}/group';
 };
 
-export type AdminUpdateCuratedPracticeResponse = AdminUpdateCuratedPracticeResponses[keyof AdminUpdateCuratedPracticeResponses];
+export type MoveCatalogPracticeResponses = {
+    /**
+     * OK
+     */
+    200: Catalog;
+};
 
-export type AdminDeleteCuratedPracticeOverrideData = {
+export type MoveCatalogPracticeResponse = MoveCatalogPracticeResponses[keyof MoveCatalogPracticeResponses];
+
+export type ResetCatalogPracticeData = {
     body?: never;
-    headers: {
-        'If-Match': string;
+    headers?: {
+        'If-Match'?: string;
     };
     path: {
         slug: string;
@@ -9454,36 +7587,19 @@ export type AdminDeleteCuratedPracticeOverrideData = {
     url: '/admin/practice-catalog/practices/{slug}/override';
 };
 
-export type AdminDeleteCuratedPracticeOverrideErrors = {
+export type ResetCatalogPracticeResponses = {
     /**
-     * Hephaestus ships no definition for this slug
+     * OK
      */
-    409: ProblemDetail;
-    /**
-     * The supplied ETag is stale
-     */
-    412: ProblemDetail;
-    /**
-     * If-Match is required
-     */
-    428: ProblemDetail;
+    200: CatalogPractice;
 };
 
-export type AdminDeleteCuratedPracticeOverrideError = AdminDeleteCuratedPracticeOverrideErrors[keyof AdminDeleteCuratedPracticeOverrideErrors];
+export type ResetCatalogPracticeResponse = ResetCatalogPracticeResponses[keyof ResetCatalogPracticeResponses];
 
-export type AdminDeleteCuratedPracticeOverrideResponses = {
-    /**
-     * The practice
-     */
-    200: CuratedPractice;
-};
-
-export type AdminDeleteCuratedPracticeOverrideResponse = AdminDeleteCuratedPracticeOverrideResponses[keyof AdminDeleteCuratedPracticeOverrideResponses];
-
-export type AdminKeepCuratedPracticeData = {
+export type AcknowledgeCatalogPracticeData = {
     body?: never;
-    headers: {
-        'If-Match': string;
+    headers?: {
+        'If-Match'?: string;
     };
     path: {
         slug: string;
@@ -9492,71 +7608,16 @@ export type AdminKeepCuratedPracticeData = {
     url: '/admin/practice-catalog/practices/{slug}/override/acknowledgement';
 };
 
-export type AdminKeepCuratedPracticeErrors = {
-    /**
-     * The supplied ETag is stale
-     */
-    412: ProblemDetail;
-    /**
-     * If-Match is required
-     */
-    428: ProblemDetail;
-};
-
-export type AdminKeepCuratedPracticeError = AdminKeepCuratedPracticeErrors[keyof AdminKeepCuratedPracticeErrors];
-
-export type AdminKeepCuratedPracticeResponses = {
-    /**
-     * The practice
-     */
-    200: CuratedPractice;
-};
-
-export type AdminKeepCuratedPracticeResponse = AdminKeepCuratedPracticeResponses[keyof AdminKeepCuratedPracticeResponses];
-
-export type AdminPlaceCuratedPracticeData = {
-    body: PlacePracticeRequest;
-    headers: {
-        'If-Match': string;
-    };
-    path: {
-        slug: string;
-    };
-    query?: never;
-    url: '/admin/practice-catalog/practices/{slug}/placement';
-};
-
-export type AdminPlaceCuratedPracticeResponses = {
+export type AcknowledgeCatalogPracticeResponses = {
     /**
      * OK
      */
-    200: CuratedCatalog;
+    200: CatalogPractice;
 };
 
-export type AdminPlaceCuratedPracticeResponse = AdminPlaceCuratedPracticeResponses[keyof AdminPlaceCuratedPracticeResponses];
+export type AcknowledgeCatalogPracticeResponse = AcknowledgeCatalogPracticeResponses[keyof AcknowledgeCatalogPracticeResponses];
 
-export type AdminDeclinePracticeReleaseData = {
-    body?: never;
-    headers: {
-        'If-Match': string;
-    };
-    path: {
-        slug: string;
-    };
-    query?: never;
-    url: '/admin/practice-catalog/practices/{slug}/release';
-};
-
-export type AdminDeclinePracticeReleaseResponses = {
-    /**
-     * OK
-     */
-    200: CuratedPractice;
-};
-
-export type AdminDeclinePracticeReleaseResponse = AdminDeclinePracticeReleaseResponses[keyof AdminDeclinePracticeReleaseResponses];
-
-export type AdminGetPracticeReleaseData = {
+export type GetCatalogPracticeReleaseData = {
     body?: never;
     path: {
         slug: string;
@@ -9565,19 +7626,19 @@ export type AdminGetPracticeReleaseData = {
     url: '/admin/practice-catalog/practices/{slug}/release';
 };
 
-export type AdminGetPracticeReleaseResponses = {
+export type GetCatalogPracticeReleaseResponses = {
     /**
      * OK
      */
     200: PracticeReleaseProposal;
 };
 
-export type AdminGetPracticeReleaseResponse = AdminGetPracticeReleaseResponses[keyof AdminGetPracticeReleaseResponses];
+export type GetCatalogPracticeReleaseResponse = GetCatalogPracticeReleaseResponses[keyof GetCatalogPracticeReleaseResponses];
 
-export type AdminAcceptPracticeReleaseData = {
+export type AcceptCatalogPracticeReleaseData = {
     body: AcceptPracticeReleaseRequest;
-    headers: {
-        'If-Match': string;
+    headers?: {
+        'If-Match'?: string;
     };
     path: {
         slug: string;
@@ -9586,19 +7647,19 @@ export type AdminAcceptPracticeReleaseData = {
     url: '/admin/practice-catalog/practices/{slug}/release';
 };
 
-export type AdminAcceptPracticeReleaseResponses = {
+export type AcceptCatalogPracticeReleaseResponses = {
     /**
      * OK
      */
-    200: CuratedPractice;
+    200: CatalogPractice;
 };
 
-export type AdminAcceptPracticeReleaseResponse = AdminAcceptPracticeReleaseResponses[keyof AdminAcceptPracticeReleaseResponses];
+export type AcceptCatalogPracticeReleaseResponse = AcceptCatalogPracticeReleaseResponses[keyof AcceptCatalogPracticeReleaseResponses];
 
-export type AdminUpdateCuratedPracticeStatusData = {
-    body: UpdateCuratedStatusRequest;
-    headers: {
-        'If-Match': string;
+export type SetCatalogPracticeStatusData = {
+    body: SetCatalogStatusRequest;
+    headers?: {
+        'If-Match'?: string;
     };
     path: {
         slug: string;
@@ -9607,27 +7668,14 @@ export type AdminUpdateCuratedPracticeStatusData = {
     url: '/admin/practice-catalog/practices/{slug}/status';
 };
 
-export type AdminUpdateCuratedPracticeStatusErrors = {
+export type SetCatalogPracticeStatusResponses = {
     /**
-     * The supplied ETag is stale
+     * OK
      */
-    412: ProblemDetail;
-    /**
-     * If-Match is required
-     */
-    428: ProblemDetail;
+    200: CatalogPractice;
 };
 
-export type AdminUpdateCuratedPracticeStatusError = AdminUpdateCuratedPracticeStatusErrors[keyof AdminUpdateCuratedPracticeStatusErrors];
-
-export type AdminUpdateCuratedPracticeStatusResponses = {
-    /**
-     * The practice
-     */
-    200: CuratedPractice;
-};
-
-export type AdminUpdateCuratedPracticeStatusResponse = AdminUpdateCuratedPracticeStatusResponses[keyof AdminUpdateCuratedPracticeStatusResponses];
+export type SetCatalogPracticeStatusResponse = SetCatalogPracticeStatusResponses[keyof SetCatalogPracticeStatusResponses];
 
 export type AdminListProductFeedbackData = {
     body?: never;
@@ -10308,6 +8356,54 @@ export type ListIdentityProvidersResponses = {
 };
 
 export type ListIdentityProvidersResponse = ListIdentityProvidersResponses[keyof ListIdentityProvidersResponses];
+
+export type AdmitResultsData = {
+    body: AdmissionRequest;
+    path?: never;
+    query?: never;
+    url: '/internal/llm/admit-results';
+};
+
+export type AdmitResultsResponses = {
+    /**
+     * OK
+     */
+    200: AdmissionResponse;
+};
+
+export type AdmitResultsResponse = AdmitResultsResponses[keyof AdmitResultsResponses];
+
+export type PrepareFeedbackData = {
+    body: PrepareFeedbackRequest;
+    path?: never;
+    query?: never;
+    url: '/internal/llm/prepare-feedback';
+};
+
+export type PrepareFeedbackResponses = {
+    /**
+     * OK
+     */
+    200: PrepareFeedbackResponse;
+};
+
+export type PrepareFeedbackResponse2 = PrepareFeedbackResponses[keyof PrepareFeedbackResponses];
+
+export type ReadPublicFeedbackHistoryData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/internal/llm/public-feedback-history';
+};
+
+export type ReadPublicFeedbackHistoryResponses = {
+    /**
+     * OK
+     */
+    200: PublicFeedbackHistory;
+};
+
+export type ReadPublicFeedbackHistoryResponse = ReadPublicFeedbackHistoryResponses[keyof ReadPublicFeedbackHistoryResponses];
 
 export type UnsubscribeEmailData = {
     body?: {
@@ -11138,6 +9234,112 @@ export type ListHiddenContributorsResponses = {
 
 export type ListHiddenContributorsResponse = ListHiddenContributorsResponses[keyof ListHiddenContributorsResponses];
 
+export type GetOwnActivityData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        /**
+         * Activity range
+         */
+        range?: '30d' | '90d' | '1y' | 'all' | 'custom';
+        from?: string;
+        to?: string;
+        team?: string;
+        repo?: Array<string>;
+    };
+    url: '/workspaces/{workspaceSlug}/activity/me';
+};
+
+export type GetOwnActivityErrors = {
+    /**
+     * A request parameter is not valid
+     */
+    400: ProblemDetail;
+    /**
+     * The caller is not a member of the workspace
+     */
+    403: ProblemDetail;
+    /**
+     * Workspace, contributor, team or repository not found
+     */
+    404: ProblemDetail;
+};
+
+export type GetOwnActivityError = GetOwnActivityErrors[keyof GetOwnActivityErrors];
+
+export type GetOwnActivityResponses = {
+    /**
+     * Your activity returned
+     */
+    200: ActivityPersonDetail;
+};
+
+export type GetOwnActivityResponse = GetOwnActivityResponses[keyof GetOwnActivityResponses];
+
+export type GetOwnActivityWorkData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        /**
+         * Activity range
+         */
+        range?: '30d' | '90d' | '1y' | 'all' | 'custom';
+        from?: string;
+        to?: string;
+        team?: string;
+        repo?: Array<string>;
+        /**
+         * Kinds of activity to list (repeatable); omit for every kind
+         */
+        kinds?: Array<'PULL_REQUEST_OPENED' | 'PULL_REQUEST_MERGED' | 'PULL_REQUEST_CLOSED' | 'REVIEW_APPROVED' | 'REVIEW_CHANGES_REQUESTED' | 'REVIEW_COMMENTED' | 'COMMENTED' | 'CODE_COMMENTED' | 'ISSUE_OPENED' | 'ISSUE_CLOSED'>;
+        /**
+         * The previous page's nextCursor; omit for the first page
+         */
+        cursor?: string;
+        /**
+         * Page size from 1 to 100; defaults to 30
+         */
+        size?: number;
+    };
+    url: '/workspaces/{workspaceSlug}/activity/me/work';
+};
+
+export type GetOwnActivityWorkErrors = {
+    /**
+     * A request parameter is not valid
+     */
+    400: ProblemDetail;
+    /**
+     * The caller is not a member of the workspace
+     */
+    403: ProblemDetail;
+    /**
+     * Workspace, contributor, team or repository not found
+     */
+    404: ProblemDetail;
+};
+
+export type GetOwnActivityWorkError = GetOwnActivityWorkErrors[keyof GetOwnActivityWorkErrors];
+
+export type GetOwnActivityWorkResponses = {
+    /**
+     * Your work listed
+     */
+    200: ActivityWorkPage;
+};
+
+export type GetOwnActivityWorkResponse = GetOwnActivityWorkResponses[keyof GetOwnActivityWorkResponses];
+
 export type GetOpenWorkData = {
     body?: never;
     path: {
@@ -11536,158 +9738,6 @@ export type ListAgentsResponses = {
 
 export type ListAgentsResponse = ListAgentsResponses[keyof ListAgentsResponses];
 
-export type ListAgentJobsData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: {
-        /**
-         * Filter by job status
-         */
-        status?: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
-        page?: number;
-        size?: number;
-    };
-    url: '/workspaces/{workspaceSlug}/agents/jobs';
-};
-
-export type ListAgentJobsResponses = {
-    /**
-     * Paginated job list
-     */
-    200: PageResponseDtoAgentJob;
-};
-
-export type ListAgentJobsResponse = ListAgentJobsResponses[keyof ListAgentJobsResponses];
-
-export type GetAgentJobData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        jobId: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/agents/jobs/{jobId}';
-};
-
-export type GetAgentJobErrors = {
-    /**
-     * Job not found in this workspace
-     */
-    404: unknown;
-};
-
-export type GetAgentJobResponses = {
-    /**
-     * Job detail returned
-     */
-    200: AgentJob;
-};
-
-export type GetAgentJobResponse = GetAgentJobResponses[keyof GetAgentJobResponses];
-
-export type CancelAgentJobData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        jobId: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/agents/jobs/{jobId}/cancel';
-};
-
-export type CancelAgentJobErrors = {
-    /**
-     * Job not found in this workspace
-     */
-    404: unknown;
-    /**
-     * Job already in terminal state
-     */
-    409: unknown;
-};
-
-export type CancelAgentJobResponses = {
-    /**
-     * Job cancelled
-     */
-    200: AgentJob;
-};
-
-export type CancelAgentJobResponse = CancelAgentJobResponses[keyof CancelAgentJobResponses];
-
-export type RetryAgentJobDeliveryData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        jobId: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/agents/jobs/{jobId}/delivery/retry';
-};
-
-export type RetryAgentJobDeliveryErrors = {
-    /**
-     * Job not found in this workspace
-     */
-    404: unknown;
-    /**
-     * Job not in a retryable state
-     */
-    409: unknown;
-};
-
-export type RetryAgentJobDeliveryResponses = {
-    /**
-     * Delivery retried
-     */
-    200: AgentJob;
-};
-
-export type RetryAgentJobDeliveryResponse = RetryAgentJobDeliveryResponses[keyof RetryAgentJobDeliveryResponses];
-
-export type GetAgentJobUsageData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        jobId: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/agents/jobs/{jobId}/usage';
-};
-
-export type GetAgentJobUsageErrors = {
-    /**
-     * Job not found in this workspace
-     */
-    404: unknown;
-};
-
-export type GetAgentJobUsageResponses = {
-    /**
-     * Usage returned
-     */
-    200: AgentJobUsage;
-};
-
-export type GetAgentJobUsageResponse = GetAgentJobUsageResponses[keyof GetAgentJobUsageResponses];
-
 export type DeleteAgentData = {
     body?: never;
     path: {
@@ -11695,7 +9745,7 @@ export type DeleteAgentData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        purpose: 'PRACTICE_REVIEW' | 'MENTOR';
+        purpose: 'PRACTICE_REVIEW' | 'MENTOR' | 'PRACTICE_DECISION' | 'PRACTICE_EMBEDDING' | 'PRACTICE_RERANKING';
     };
     query?: {
         dataHandlingTier?: 'IN_HOUSE' | 'CLOUD' | 'UNDECLARED';
@@ -11719,7 +9769,7 @@ export type ConfigureAgentData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        purpose: 'PRACTICE_REVIEW' | 'MENTOR';
+        purpose: 'PRACTICE_REVIEW' | 'MENTOR' | 'PRACTICE_DECISION' | 'PRACTICE_EMBEDDING' | 'PRACTICE_RERANKING';
     };
     query?: {
         dataHandlingTier?: 'IN_HOUSE' | 'CLOUD' | 'UNDECLARED';
@@ -11758,7 +9808,7 @@ export type ListWorkspaceConfigAuditEventsData = {
     query?: {
         page?: number;
         size?: number;
-        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'ACTIVITY_AUTOMATION' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_GROUP' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_GROUP' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'REVIEW_BACKFILL_RUN' | 'REVIEW_SWEEP_SCHEDULE' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
+        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'ACTIVITY_AUTOMATION' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_GROUP' | 'CATALOG_PRACTICE' | 'CATALOG_GROUP' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'REVIEW_BATCH' | 'REVIEW_SCHEDULE' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
         entityId?: string;
         changedKey?: string;
         action?: Array<'CREATED' | 'UPDATED' | 'DELETED'>;
@@ -12509,7 +10559,7 @@ export type GetLlmUsageReportResponses = {
 
 export type GetLlmUsageReportResponse = GetLlmUsageReportResponses[keyof GetLlmUsageReportResponses];
 
-export type ListMembersData = {
+export type ListMembershipsData = {
     body?: never;
     path: {
         /**
@@ -12518,28 +10568,34 @@ export type ListMembersData = {
         workspaceSlug: string;
     };
     query?: {
+        q?: string;
+        team?: string;
         /**
-         * Zero-based page index
+         * Zero-based page index (0..N)
          */
         page?: number;
         /**
-         * Results per page, capped at 100
+         * The size of the page to be returned
          */
         size?: number;
+        /**
+         * Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.
+         */
+        sort?: Array<string>;
     };
     url: '/workspaces/{workspaceSlug}/members';
 };
 
-export type ListMembersResponses = {
+export type ListMembershipsResponses = {
     /**
      * OK
      */
-    200: Array<WorkspaceMembership>;
+    200: PageResponseDtoWorkspaceMembership;
 };
 
-export type ListMembersResponse = ListMembersResponses[keyof ListMembersResponses];
+export type ListMembershipsResponse = ListMembershipsResponses[keyof ListMembershipsResponses];
 
-export type AssignRoleData = {
+export type AssignMemberRoleData = {
     body: AssignRoleRequest;
     path: {
         /**
@@ -12551,16 +10607,16 @@ export type AssignRoleData = {
     url: '/workspaces/{workspaceSlug}/members/assign';
 };
 
-export type AssignRoleResponses = {
+export type AssignMemberRoleResponses = {
     /**
      * OK
      */
     200: WorkspaceMembership;
 };
 
-export type AssignRoleResponse = AssignRoleResponses[keyof AssignRoleResponses];
+export type AssignMemberRoleResponse = AssignMemberRoleResponses[keyof AssignMemberRoleResponses];
 
-export type GetCurrentUserMembershipData = {
+export type GetOwnMembershipData = {
     body?: never;
     path: {
         /**
@@ -12572,14 +10628,14 @@ export type GetCurrentUserMembershipData = {
     url: '/workspaces/{workspaceSlug}/members/me';
 };
 
-export type GetCurrentUserMembershipResponses = {
+export type GetOwnMembershipResponses = {
     /**
      * OK
      */
     200: WorkspaceMembership;
 };
 
-export type GetCurrentUserMembershipResponse = GetCurrentUserMembershipResponses[keyof GetCurrentUserMembershipResponses];
+export type GetOwnMembershipResponse = GetOwnMembershipResponses[keyof GetOwnMembershipResponses];
 
 export type RemoveMemberData = {
     body?: never;
@@ -12588,10 +10644,10 @@ export type RemoveMemberData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        userId: number;
+        accountId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/members/{userId}';
+    url: '/workspaces/{workspaceSlug}/members/{accountId}';
 };
 
 export type RemoveMemberResponses = {
@@ -12603,54 +10659,49 @@ export type RemoveMemberResponses = {
 
 export type RemoveMemberResponse = RemoveMemberResponses[keyof RemoveMemberResponses];
 
-export type GetMemberData = {
+export type GetMembershipData = {
     body?: never;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        userId: number;
+        accountId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/members/{userId}';
+    url: '/workspaces/{workspaceSlug}/members/{accountId}';
 };
 
-export type GetMemberResponses = {
+export type GetMembershipResponses = {
     /**
      * OK
      */
     200: WorkspaceMembership;
 };
 
-export type GetMemberResponse = GetMemberResponses[keyof GetMemberResponses];
+export type GetMembershipResponse = GetMembershipResponses[keyof GetMembershipResponses];
 
-export type UpdateMemberVisibilityData = {
-    body?: never;
+export type SetMemberHiddenData = {
+    body: SetMemberHiddenRequest;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        userId: number;
+        accountId: string;
     };
-    query: {
-        /**
-         * Whether to leave the member out of workspace activity
-         */
-        hidden: boolean;
-    };
-    url: '/workspaces/{workspaceSlug}/members/{userId}/hidden';
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/members/{accountId}/hidden';
 };
 
-export type UpdateMemberVisibilityResponses = {
+export type SetMemberHiddenResponses = {
     /**
      * OK
      */
     200: WorkspaceMembership;
 };
 
-export type UpdateMemberVisibilityResponse = UpdateMemberVisibilityResponses[keyof UpdateMemberVisibilityResponses];
+export type SetMemberHiddenResponse = SetMemberHiddenResponses[keyof SetMemberHiddenResponses];
 
 export type PrepareMentorSandboxData = {
     body?: never;
@@ -12831,8 +10882,8 @@ export type GetMemberOnboardingResponses = {
 
 export type GetMemberOnboardingResponse = GetMemberOnboardingResponses[keyof GetMemberOnboardingResponses];
 
-export type UpdateMemberAiChoiceData = {
-    body: MemberAiChoiceRequest;
+export type UpdateAiChoiceData = {
+    body: AiChoiceRequest;
     path: {
         /**
          * Workspace slug
@@ -12843,14 +10894,14 @@ export type UpdateMemberAiChoiceData = {
     url: '/workspaces/{workspaceSlug}/onboarding/me/ai-choice';
 };
 
-export type UpdateMemberAiChoiceResponses = {
+export type UpdateAiChoiceResponses = {
     /**
      * OK
      */
     200: WorkspaceOnboarding;
 };
 
-export type UpdateMemberAiChoiceResponse = UpdateMemberAiChoiceResponses[keyof UpdateMemberAiChoiceResponses];
+export type UpdateAiChoiceResponse = UpdateAiChoiceResponses[keyof UpdateAiChoiceResponses];
 
 export type DismissMemberOnboardingData = {
     body?: never;
@@ -13285,29 +11336,7 @@ export type AdoptPracticeResponses = {
 
 export type AdoptPracticeResponse = AdoptPracticeResponses[keyof AdoptPracticeResponses];
 
-export type GetCuratedPracticeCatalogEntryData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        slug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practice-catalog/practices/{slug}';
-};
-
-export type GetCuratedPracticeCatalogEntryResponses = {
-    /**
-     * OK
-     */
-    200: CuratedPractice;
-};
-
-export type GetCuratedPracticeCatalogEntryResponse = GetCuratedPracticeCatalogEntryResponses[keyof GetCuratedPracticeCatalogEntryResponses];
-
-export type ListGroupsData = {
+export type ListPracticeGroupsData = {
     body?: never;
     path: {
         /**
@@ -13316,24 +11345,21 @@ export type ListGroupsData = {
         workspaceSlug: string;
     };
     query?: {
-        /**
-         * Return only groups shown in practice dashboards
-         */
-        visibleInPracticeDashboardsOnly?: boolean;
+        shownToDevelopersOnly?: boolean;
     };
     url: '/workspaces/{workspaceSlug}/practice-groups';
 };
 
-export type ListGroupsResponses = {
+export type ListPracticeGroupsResponses = {
     /**
-     * Groups returned
+     * OK
      */
     200: Array<PracticeGroup>;
 };
 
-export type ListGroupsResponse = ListGroupsResponses[keyof ListGroupsResponses];
+export type ListPracticeGroupsResponse = ListPracticeGroupsResponses[keyof ListPracticeGroupsResponses];
 
-export type CreateGroupData = {
+export type CreatePracticeGroupData = {
     body: CreatePracticeGroupRequest;
     path: {
         /**
@@ -13345,24 +11371,17 @@ export type CreateGroupData = {
     url: '/workspaces/{workspaceSlug}/practice-groups';
 };
 
-export type CreateGroupErrors = {
+export type CreatePracticeGroupResponses = {
     /**
-     * Group slug already exists in this workspace
-     */
-    409: unknown;
-};
-
-export type CreateGroupResponses = {
-    /**
-     * Group created
+     * Practice group created
      */
     201: PracticeGroup;
 };
 
-export type CreateGroupResponse = CreateGroupResponses[keyof CreateGroupResponses];
+export type CreatePracticeGroupResponse = CreatePracticeGroupResponses[keyof CreatePracticeGroupResponses];
 
-export type ReorderGroupsData = {
-    body: ReorderPracticeGroupsRequest;
+export type ReorderPracticeGroupsData = {
+    body: ReorderRequest;
     path: {
         /**
          * Workspace slug
@@ -13373,27 +11392,16 @@ export type ReorderGroupsData = {
     url: '/workspaces/{workspaceSlug}/practice-groups/reorder';
 };
 
-export type ReorderGroupsErrors = {
+export type ReorderPracticeGroupsResponses = {
     /**
-     * orderedSlugs is empty or contains duplicates
-     */
-    400: unknown;
-    /**
-     * A slug is unknown
-     */
-    404: unknown;
-};
-
-export type ReorderGroupsResponses = {
-    /**
-     * Groups reordered; the full ordered list is returned
+     * OK
      */
     200: Array<PracticeGroup>;
 };
 
-export type ReorderGroupsResponse = ReorderGroupsResponses[keyof ReorderGroupsResponses];
+export type ReorderPracticeGroupsResponse = ReorderPracticeGroupsResponses[keyof ReorderPracticeGroupsResponses];
 
-export type ListPracticeGroupStandingsData = {
+export type GetOwnGroupStandingsData = {
     body?: never;
     path: {
         /**
@@ -13405,47 +11413,16 @@ export type ListPracticeGroupStandingsData = {
     url: '/workspaces/{workspaceSlug}/practice-groups/standings';
 };
 
-export type ListPracticeGroupStandingsResponses = {
+export type GetOwnGroupStandingsResponses = {
     /**
      * Practice group standings returned
      */
     200: Array<PracticeGroupStanding>;
 };
 
-export type ListPracticeGroupStandingsResponse = ListPracticeGroupStandingsResponses[keyof ListPracticeGroupStandingsResponses];
+export type GetOwnGroupStandingsResponse = GetOwnGroupStandingsResponses[keyof GetOwnGroupStandingsResponses];
 
-export type DeleteGroupData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        groupSlug: string;
-    };
-    query?: {
-        deletePractices?: boolean;
-    };
-    url: '/workspaces/{workspaceSlug}/practice-groups/{groupSlug}';
-};
-
-export type DeleteGroupErrors = {
-    /**
-     * Group not found
-     */
-    404: unknown;
-};
-
-export type DeleteGroupResponses = {
-    /**
-     * Group deleted
-     */
-    204: void;
-};
-
-export type DeleteGroupResponse = DeleteGroupResponses[keyof DeleteGroupResponses];
-
-export type GetGroupData = {
+export type DeletePracticeGroupData = {
     body?: never;
     path: {
         /**
@@ -13458,23 +11435,38 @@ export type GetGroupData = {
     url: '/workspaces/{workspaceSlug}/practice-groups/{groupSlug}';
 };
 
-export type GetGroupErrors = {
+export type DeletePracticeGroupResponses = {
     /**
-     * Group not found
+     * Practice group deleted
      */
-    404: unknown;
+    204: void;
 };
 
-export type GetGroupResponses = {
+export type DeletePracticeGroupResponse = DeletePracticeGroupResponses[keyof DeletePracticeGroupResponses];
+
+export type GetPracticeGroupData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        groupSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-groups/{groupSlug}';
+};
+
+export type GetPracticeGroupResponses = {
     /**
-     * Group returned
+     * OK
      */
     200: PracticeGroup;
 };
 
-export type GetGroupResponse = GetGroupResponses[keyof GetGroupResponses];
+export type GetPracticeGroupResponse = GetPracticeGroupResponses[keyof GetPracticeGroupResponses];
 
-export type UpdateGroupData = {
+export type UpdatePracticeGroupData = {
     body: UpdatePracticeGroupRequest;
     path: {
         /**
@@ -13487,24 +11479,20 @@ export type UpdateGroupData = {
     url: '/workspaces/{workspaceSlug}/practice-groups/{groupSlug}';
 };
 
-export type UpdateGroupErrors = {
+export type UpdatePracticeGroupResponses = {
     /**
-     * Group not found
-     */
-    404: unknown;
-};
-
-export type UpdateGroupResponses = {
-    /**
-     * Group updated
+     * OK
      */
     200: PracticeGroup;
 };
 
-export type UpdateGroupResponse = UpdateGroupResponses[keyof UpdateGroupResponses];
+export type UpdatePracticeGroupResponse = UpdatePracticeGroupResponses[keyof UpdatePracticeGroupResponses];
 
-export type SetGroupAutonomyData = {
-    body: UpdatePracticeAutonomyRequest;
+export type ResetGroupToCatalogData = {
+    body?: never;
+    headers?: {
+        'If-Match'?: string;
+    };
     path: {
         /**
          * Workspace slug
@@ -13513,26 +11501,41 @@ export type SetGroupAutonomyData = {
         groupSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practice-groups/{groupSlug}/autonomy';
+    url: '/workspaces/{workspaceSlug}/practice-groups/{groupSlug}/catalog-customization';
 };
 
-export type SetGroupAutonomyErrors = {
+export type ResetGroupToCatalogResponses = {
     /**
-     * Group not found
-     */
-    404: unknown;
-};
-
-export type SetGroupAutonomyResponses = {
-    /**
-     * Autonomy updated; the response carries the autonomy now in force and where it came from
+     * OK
      */
     200: PracticeGroup;
 };
 
-export type SetGroupAutonomyResponse = SetGroupAutonomyResponses[keyof SetGroupAutonomyResponses];
+export type ResetGroupToCatalogResponse = ResetGroupToCatalogResponses[keyof ResetGroupToCatalogResponses];
 
-export type ListPracticeGroupReviewRunsData = {
+export type SetGroupFeedbackModeData = {
+    body: SetFeedbackModeRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        groupSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-groups/{groupSlug}/feedback-mode';
+};
+
+export type SetGroupFeedbackModeResponses = {
+    /**
+     * OK
+     */
+    200: PracticeGroup;
+};
+
+export type SetGroupFeedbackModeResponse = SetGroupFeedbackModeResponses[keyof SetGroupFeedbackModeResponses];
+
+export type ListOwnGroupReviewsData = {
     body?: never;
     path: {
         /**
@@ -13542,76 +11545,24 @@ export type ListPracticeGroupReviewRunsData = {
         groupSlug: string;
     };
     query?: {
-        practiceSlug?: string;
-        /**
-         * Only reviews of these artifact kinds, e.g. scm.pull_request (repeatable)
-         */
-        artifactKinds?: Array<string>;
-        severities?: Array<'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO'>;
-        /**
-         * Zero-based page, at most 100
-         */
+        itemKind?: string;
+        since?: string;
         page?: number;
-        /**
-         * Page size from 1 to 50
-         */
         size?: number;
     };
-    url: '/workspaces/{workspaceSlug}/practice-groups/{groupSlug}/review-runs';
+    url: '/workspaces/{workspaceSlug}/practice-groups/{groupSlug}/reviews';
 };
 
-export type ListPracticeGroupReviewRunsErrors = {
+export type ListOwnGroupReviewsResponses = {
     /**
-     * Invalid filter or pagination
+     * OK
      */
-    400: ProblemDetail;
-    /**
-     * Practice group not found
-     */
-    404: unknown;
+    200: PageResponseDtoProfileReview;
 };
 
-export type ListPracticeGroupReviewRunsError = ListPracticeGroupReviewRunsErrors[keyof ListPracticeGroupReviewRunsErrors];
+export type ListOwnGroupReviewsResponse = ListOwnGroupReviewsResponses[keyof ListOwnGroupReviewsResponses];
 
-export type ListPracticeGroupReviewRunsResponses = {
-    /**
-     * Paginated review runs returned
-     */
-    200: PracticeGroupReviewRunsPage;
-};
-
-export type ListPracticeGroupReviewRunsResponse = ListPracticeGroupReviewRunsResponses[keyof ListPracticeGroupReviewRunsResponses];
-
-export type GetPracticeGroupTrendData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        groupSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practice-groups/{groupSlug}/trend';
-};
-
-export type GetPracticeGroupTrendErrors = {
-    /**
-     * Practice group not found
-     */
-    404: unknown;
-};
-
-export type GetPracticeGroupTrendResponses = {
-    /**
-     * Practice-group trend returned
-     */
-    200: PracticeGroupTrend;
-};
-
-export type GetPracticeGroupTrendResponse = GetPracticeGroupTrendResponses[keyof GetPracticeGroupTrendResponses];
-
-export type GetPracticeProfileOverviewData = {
+export type GetOwnPracticeProfileOverviewData = {
     body?: never;
     path: {
         /**
@@ -13623,16 +11574,16 @@ export type GetPracticeProfileOverviewData = {
     url: '/workspaces/{workspaceSlug}/practice-profile/overview';
 };
 
-export type GetPracticeProfileOverviewResponses = {
+export type GetOwnPracticeProfileOverviewResponses = {
     /**
      * Practice profile overview returned
      */
     200: PracticeProfileOverview;
 };
 
-export type GetPracticeProfileOverviewResponse = GetPracticeProfileOverviewResponses[keyof GetPracticeProfileOverviewResponses];
+export type GetOwnPracticeProfileOverviewResponse = GetOwnPracticeProfileOverviewResponses[keyof GetOwnPracticeProfileOverviewResponses];
 
-export type ListPracticeProfileReviewRunsData = {
+export type ListOwnReviewsData = {
     body?: never;
     path: {
         /**
@@ -13641,77 +11592,44 @@ export type ListPracticeProfileReviewRunsData = {
         workspaceSlug: string;
     };
     query?: {
-        /**
-         * Zero-based page, at most 100
-         */
-        page?: number;
-        /**
-         * Page size from 1 to 50
-         */
-        size?: number;
-        /**
-         * Restrict to one kind of work, e.g. scm.pull_request
-         */
-        kind?: string;
-        /**
-         * Keep only runs whose newest observation about this developer came after this moment; the bound is exclusive
-         */
+        itemKind?: string;
         since?: string;
+        page?: number;
+        size?: number;
     };
-    url: '/workspaces/{workspaceSlug}/practice-profile/review-runs';
+    url: '/workspaces/{workspaceSlug}/practice-profile/reviews';
 };
 
-export type ListPracticeProfileReviewRunsErrors = {
+export type ListOwnReviewsResponses = {
     /**
-     * Unknown kind of work or invalid pagination
+     * OK
      */
-    400: ProblemDetail;
+    200: PageResponseDtoProfileReview;
 };
 
-export type ListPracticeProfileReviewRunsError = ListPracticeProfileReviewRunsErrors[keyof ListPracticeProfileReviewRunsErrors];
+export type ListOwnReviewsResponse = ListOwnReviewsResponses[keyof ListOwnReviewsResponses];
 
-export type ListPracticeProfileReviewRunsResponses = {
-    /**
-     * Review runs returned
-     */
-    200: ProfileReviewRunsPage;
-};
-
-export type ListPracticeProfileReviewRunsResponse = ListPracticeProfileReviewRunsResponses[keyof ListPracticeProfileReviewRunsResponses];
-
-export type GetPracticeProfileReviewRunData = {
+export type GetOwnReviewData = {
     body?: never;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        /**
-         * The review, as the list names it
-         */
         reviewId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practice-profile/review-runs/{reviewId}';
+    url: '/workspaces/{workspaceSlug}/practice-profile/reviews/{reviewId}';
 };
 
-export type GetPracticeProfileReviewRunErrors = {
+export type GetOwnReviewResponses = {
     /**
-     * No run with anything about the calling developer in this workspace
+     * OK
      */
-    404: ProblemDetail;
+    200: ProfileReviewDetail;
 };
 
-export type GetPracticeProfileReviewRunError = GetPracticeProfileReviewRunErrors[keyof GetPracticeProfileReviewRunErrors];
-
-export type GetPracticeProfileReviewRunResponses = {
-    /**
-     * Review run returned
-     */
-    200: ProfileReviewRunDetail;
-};
-
-export type GetPracticeProfileReviewRunResponse = GetPracticeProfileReviewRunResponses[keyof GetPracticeProfileReviewRunResponses];
+export type GetOwnReviewResponse = GetOwnReviewResponses[keyof GetOwnReviewResponses];
 
 export type ListPracticesData = {
     body?: never;
@@ -13722,17 +11640,14 @@ export type ListPracticesData = {
         workspaceSlug: string;
     };
     query?: {
-        /**
-         * Keep only the practices whose autonomy IN FORCE is exactly this one, inherited or not
-         */
-        autonomy?: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
+        feedbackMode?: 'OFF' | 'APPROVE_FIRST' | 'AUTOMATIC';
     };
     url: '/workspaces/{workspaceSlug}/practices';
 };
 
 export type ListPracticesResponses = {
     /**
-     * Practices returned
+     * OK
      */
     200: Array<Practice>;
 };
@@ -13751,19 +11666,6 @@ export type CreatePracticeData = {
     url: '/workspaces/{workspaceSlug}/practices';
 };
 
-export type CreatePracticeErrors = {
-    /**
-     * Practice group not found
-     */
-    404: ProblemDetail;
-    /**
-     * Practice slug already exists in this workspace
-     */
-    409: ProblemDetail;
-};
-
-export type CreatePracticeError = CreatePracticeErrors[keyof CreatePracticeErrors];
-
 export type CreatePracticeResponses = {
     /**
      * Practice created
@@ -13772,144 +11674,6 @@ export type CreatePracticeResponses = {
 };
 
 export type CreatePracticeResponse = CreatePracticeResponses[keyof CreatePracticeResponses];
-
-export type AutonomyRollupData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/autonomy';
-};
-
-export type AutonomyRollupResponses = {
-    /**
-     * Rollup returned
-     */
-    200: AutonomyRollup;
-};
-
-export type AutonomyRollupResponse = AutonomyRollupResponses[keyof AutonomyRollupResponses];
-
-export type ListBackfillRunsData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/backfill-runs';
-};
-
-export type ListBackfillRunsResponses = {
-    /**
-     * Campaigns returned
-     */
-    200: Array<ReviewBackfillRun>;
-};
-
-export type ListBackfillRunsResponse = ListBackfillRunsResponses[keyof ListBackfillRunsResponses];
-
-export type PreflightBackfillRunData = {
-    body: CreateReviewBackfillRunRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/backfill-runs';
-};
-
-export type PreflightBackfillRunErrors = {
-    /**
-     * The window is inverted, too long, or covers too many artifacts
-     */
-    400: ProblemDetail;
-    /**
-     * A backfill is already active for this workspace
-     */
-    409: ProblemDetail;
-};
-
-export type PreflightBackfillRunError = PreflightBackfillRunErrors[keyof PreflightBackfillRunErrors];
-
-export type PreflightBackfillRunResponses = {
-    /**
-     * Scope enumerated and priced
-     */
-    201: ReviewBackfillRun;
-};
-
-export type PreflightBackfillRunResponse = PreflightBackfillRunResponses[keyof PreflightBackfillRunResponses];
-
-export type GetBackfillRunData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        runId: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/backfill-runs/{runId}';
-};
-
-export type GetBackfillRunErrors = {
-    /**
-     * No such campaign in this workspace
-     */
-    404: ProblemDetail;
-};
-
-export type GetBackfillRunError = GetBackfillRunErrors[keyof GetBackfillRunErrors];
-
-export type GetBackfillRunResponses = {
-    /**
-     * Campaign returned
-     */
-    200: ReviewBackfillRun;
-};
-
-export type GetBackfillRunResponse = GetBackfillRunResponses[keyof GetBackfillRunResponses];
-
-export type UpdateBackfillRunStatusData = {
-    body: UpdateReviewBackfillRunStatusRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        runId: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/backfill-runs/{runId}/status';
-};
-
-export type UpdateBackfillRunStatusErrors = {
-    /**
-     * The campaign cannot make that transition from its current state
-     */
-    409: ProblemDetail;
-};
-
-export type UpdateBackfillRunStatusError = UpdateBackfillRunStatusErrors[keyof UpdateBackfillRunStatusErrors];
-
-export type UpdateBackfillRunStatusResponses = {
-    /**
-     * Campaign updated
-     */
-    200: ReviewBackfillRun;
-};
-
-export type UpdateBackfillRunStatusResponse = UpdateBackfillRunStatusResponses[keyof UpdateBackfillRunStatusResponses];
 
 export type GetPracticeDefinitionOptionsData = {
     body?: never;
@@ -13932,7 +11696,7 @@ export type GetPracticeDefinitionOptionsResponses = {
 
 export type GetPracticeDefinitionOptionsResponse = GetPracticeDefinitionOptionsResponses[keyof GetPracticeDefinitionOptionsResponses];
 
-export type GetInAppFeedbackData = {
+export type GetFeedbackModeRollupData = {
     body?: never;
     path: {
         /**
@@ -13941,17 +11705,17 @@ export type GetInAppFeedbackData = {
         workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/feedback/in-app';
+    url: '/workspaces/{workspaceSlug}/practices/feedback-modes';
 };
 
-export type GetInAppFeedbackResponses = {
+export type GetFeedbackModeRollupResponses = {
     /**
-     * In-app messages returned, newest first
+     * OK
      */
-    200: Array<InAppFeedback>;
+    200: FeedbackModeRollup;
 };
 
-export type GetInAppFeedbackResponse = GetInAppFeedbackResponses[keyof GetInAppFeedbackResponses];
+export type GetFeedbackModeRollupResponse = GetFeedbackModeRollupResponses[keyof GetFeedbackModeRollupResponses];
 
 export type GetOwnDeliveredWorkFeedbackData = {
     body?: never;
@@ -13976,7 +11740,28 @@ export type GetOwnDeliveredWorkFeedbackResponses = {
 
 export type GetOwnDeliveredWorkFeedbackResponse = GetOwnDeliveredWorkFeedbackResponses[keyof GetOwnDeliveredWorkFeedbackResponses];
 
-export type GetFeedbackResolutionCountsData = {
+export type GetOwnPracticePageFeedbackData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/feedback/practice-page';
+};
+
+export type GetOwnPracticePageFeedbackResponses = {
+    /**
+     * OK
+     */
+    200: Array<PracticePageFeedback>;
+};
+
+export type GetOwnPracticePageFeedbackResponse = GetOwnPracticePageFeedbackResponses[keyof GetOwnPracticePageFeedbackResponses];
+
+export type GetOwnFeedbackResolutionCountsData = {
     body?: never;
     path: {
         /**
@@ -13988,16 +11773,16 @@ export type GetFeedbackResolutionCountsData = {
     url: '/workspaces/{workspaceSlug}/practices/feedback/resolution-counts';
 };
 
-export type GetFeedbackResolutionCountsResponses = {
+export type GetOwnFeedbackResolutionCountsResponses = {
     /**
      * OK
      */
     200: FeedbackResolutionCounts;
 };
 
-export type GetFeedbackResolutionCountsResponse = GetFeedbackResolutionCountsResponses[keyof GetFeedbackResolutionCountsResponses];
+export type GetOwnFeedbackResolutionCountsResponse = GetOwnFeedbackResolutionCountsResponses[keyof GetOwnFeedbackResolutionCountsResponses];
 
-export type DeleteFeedbackResponseData = {
+export type ClearOwnFeedbackResponseData = {
     body?: never;
     path: {
         /**
@@ -14010,56 +11795,52 @@ export type DeleteFeedbackResponseData = {
     url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response';
 };
 
-export type DeleteFeedbackResponseErrors = {
+export type ClearOwnFeedbackResponseErrors = {
     /**
      * Delivered feedback not found for the current recipient
      */
     404: unknown;
 };
 
-export type DeleteFeedbackResponseResponses = {
+export type ClearOwnFeedbackResponseResponses = {
     /**
-     * Response deleted or no response was recorded
-     */
-    204: void;
-};
-
-export type DeleteFeedbackResponseResponse = DeleteFeedbackResponseResponses[keyof DeleteFeedbackResponseResponses];
-
-export type GetFeedbackResponseData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        feedbackId: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response';
-};
-
-export type GetFeedbackResponseErrors = {
-    /**
-     * Delivered feedback not found for the current recipient
-     */
-    404: unknown;
-};
-
-export type GetFeedbackResponseResponses = {
-    /**
-     * Current response returned
+     * Complete cleared response returned
      */
     200: FeedbackResponse;
-    /**
-     * No response is currently recorded
-     */
-    204: void;
 };
 
-export type GetFeedbackResponseResponse = GetFeedbackResponseResponses[keyof GetFeedbackResponseResponses];
+export type ClearOwnFeedbackResponseResponse = ClearOwnFeedbackResponseResponses[keyof ClearOwnFeedbackResponseResponses];
 
-export type ReplaceFeedbackResponseData = {
+export type GetOwnFeedbackResponseData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        feedbackId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response';
+};
+
+export type GetOwnFeedbackResponseErrors = {
+    /**
+     * Delivered feedback not found for the current recipient
+     */
+    404: unknown;
+};
+
+export type GetOwnFeedbackResponseResponses = {
+    /**
+     * Complete current response returned
+     */
+    200: FeedbackResponse;
+};
+
+export type GetOwnFeedbackResponseResponse = GetOwnFeedbackResponseResponses[keyof GetOwnFeedbackResponseResponses];
+
+export type ReplaceOwnFeedbackResponseData = {
     body: FeedbackResponseRequest;
     path: {
         /**
@@ -14072,7 +11853,7 @@ export type ReplaceFeedbackResponseData = {
     url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response';
 };
 
-export type ReplaceFeedbackResponseErrors = {
+export type ReplaceOwnFeedbackResponseErrors = {
     /**
      * Invalid response
      */
@@ -14087,16 +11868,16 @@ export type ReplaceFeedbackResponseErrors = {
     409: unknown;
 };
 
-export type ReplaceFeedbackResponseResponses = {
+export type ReplaceOwnFeedbackResponseResponses = {
     /**
      * Response replaced
      */
     200: FeedbackResponse;
 };
 
-export type ReplaceFeedbackResponseResponse = ReplaceFeedbackResponseResponses[keyof ReplaceFeedbackResponseResponses];
+export type ReplaceOwnFeedbackResponseResponse = ReplaceOwnFeedbackResponseResponses[keyof ReplaceOwnFeedbackResponseResponses];
 
-export type ListObservationsData = {
+export type ListReviewItemsData = {
     body?: never;
     path: {
         /**
@@ -14105,68 +11886,186 @@ export type ListObservationsData = {
         workspaceSlug: string;
     };
     query?: {
-        /**
-         * Filter by practice slug
-         */
-        practiceSlug?: string;
-        /**
-         * Filter by the practice group the observed practice belongs to
-         */
-        groupSlug?: string;
-        /**
-         * Filter by review outcome
-         */
-        outcome?: 'MET' | 'NOT_MET' | 'NOT_APPLICABLE' | 'UNDETERMINED';
-        /**
-         * Only observations on these kinds of reviewed work, e.g. scm.pull_request (repeatable)
-         */
-        artifactKinds?: Array<string>;
-        /**
-         * Exact reviewed-work kind; requires artifactId, e.g. scm.pull_request or scm.issue
-         */
-        artifactKind?: string;
-        /**
-         * Exact reviewed-work ID; requires artifactKind
-         */
-        artifactId?: number;
-        /**
-         * Only observations with these severities (repeatable); omit for all
-         */
-        severities?: Array<'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO'>;
-        /**
-         * Drop NOT_APPLICABLE rows — only observations where the practice actually applied
-         */
-        displayableOnly?: boolean;
-        /**
-         * Feed ordering: DATE (default) or SEVERITY (most severe first, ties newest-first)
-         */
-        sort?: 'DATE' | 'SEVERITY';
-        /**
-         * Ordering direction: for DATE newest/oldest first, for SEVERITY most/least severe first
-         */
-        direction?: 'ASC' | 'DESC';
-        /**
-         * Zero-based page
-         */
+        itemKind?: string;
         page?: number;
-        /**
-         * Page size from 1 to 100
-         */
         size?: number;
     };
-    url: '/workspaces/{workspaceSlug}/practices/observations';
+    url: '/workspaces/{workspaceSlug}/practices/items';
 };
 
-export type ListObservationsResponses = {
+export type ListReviewItemsResponses = {
     /**
-     * Paginated observations returned
+     * OK
      */
-    200: PageResponseDtoObservationList;
+    200: PageResponseDtoItemRef;
 };
 
-export type ListObservationsResponse = ListObservationsResponses[keyof ListObservationsResponses];
+export type ListReviewItemsResponse = ListReviewItemsResponses[keyof ListReviewItemsResponses];
 
-export type GetSummaryData = {
+export type ResolveLegacyFeedbackItemData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        artifactKind: string;
+        artifactId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/items/legacy-feedback/{artifactKind}/{artifactId}';
+};
+
+export type ResolveLegacyFeedbackItemResponses = {
+    /**
+     * OK
+     */
+    200: LegacyFeedbackItem;
+};
+
+export type ResolveLegacyFeedbackItemResponse = ResolveLegacyFeedbackItemResponses[keyof ResolveLegacyFeedbackItemResponses];
+
+export type GetReviewItemData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        itemId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/items/{itemId}';
+};
+
+export type GetReviewItemResponses = {
+    /**
+     * OK
+     */
+    200: ItemRef;
+};
+
+export type GetReviewItemResponse = GetReviewItemResponses[keyof GetReviewItemResponses];
+
+export type ListItemEventsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        itemId: string;
+    };
+    query?: {
+        page?: number;
+        size?: number;
+    };
+    url: '/workspaces/{workspaceSlug}/practices/items/{itemId}/events';
+};
+
+export type ListItemEventsResponses = {
+    /**
+     * OK
+     */
+    200: PageResponseDtoItemEvent;
+};
+
+export type ListItemEventsResponse = ListItemEventsResponses[keyof ListItemEventsResponses];
+
+export type GetItemFactsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        itemId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/items/{itemId}/facts';
+};
+
+export type GetItemFactsResponses = {
+    /**
+     * OK
+     */
+    200: ItemFacts;
+};
+
+export type GetItemFactsResponse = GetItemFactsResponses[keyof GetItemFactsResponses];
+
+export type GetOwnItemTraceData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        itemId: string;
+    };
+    query: {
+        reviewId: string;
+    };
+    url: '/workspaces/{workspaceSlug}/practices/items/{itemId}/own-trace';
+};
+
+export type GetOwnItemTraceResponses = {
+    /**
+     * OK
+     */
+    200: OwnItemTrace;
+};
+
+export type GetOwnItemTraceResponse = GetOwnItemTraceResponses[keyof GetOwnItemTraceResponses];
+
+export type ListOwnItemReviewsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        itemId: string;
+    };
+    query?: {
+        page?: number;
+        size?: number;
+    };
+    url: '/workspaces/{workspaceSlug}/practices/items/{itemId}/reviews';
+};
+
+export type ListOwnItemReviewsResponses = {
+    /**
+     * OK
+     */
+    200: PageResponseDtoProfileReview;
+};
+
+export type ListOwnItemReviewsResponse = ListOwnItemReviewsResponses[keyof ListOwnItemReviewsResponses];
+
+export type GetItemTraceData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        itemId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/items/{itemId}/trace';
+};
+
+export type GetItemTraceResponses = {
+    /**
+     * OK
+     */
+    200: ItemTrace;
+};
+
+export type GetItemTraceResponse = GetItemTraceResponses[keyof GetItemTraceResponses];
+
+export type ListPracticeScriptNeedsData = {
     body?: never;
     path: {
         /**
@@ -14175,46 +12074,17 @@ export type GetSummaryData = {
         workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/observations/summary';
+    url: '/workspaces/{workspaceSlug}/practices/practice-script-needs';
 };
 
-export type GetSummaryResponses = {
+export type ListPracticeScriptNeedsResponses = {
     /**
-     * Practice summaries returned
+     * OK
      */
-    200: Array<DeveloperPracticeSummary>;
+    200: Array<PracticeScriptSummary>;
 };
 
-export type GetSummaryResponse = GetSummaryResponses[keyof GetSummaryResponses];
-
-export type GetObservationData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        observationId: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/observations/{observationId}';
-};
-
-export type GetObservationErrors = {
-    /**
-     * Observation not found or not owned by current user
-     */
-    404: unknown;
-};
-
-export type GetObservationResponses = {
-    /**
-     * Observation detail returned
-     */
-    200: ObservationDetail;
-};
-
-export type GetObservationResponse = GetObservationResponses[keyof GetObservationResponses];
+export type ListPracticeScriptNeedsResponse = ListPracticeScriptNeedsResponses[keyof ListPracticeScriptNeedsResponses];
 
 export type ListPracticeReleasesData = {
     body?: never;
@@ -14310,7 +12180,7 @@ export type AcceptPracticeReleaseResponses = {
 export type AcceptPracticeReleaseResponse = AcceptPracticeReleaseResponses[keyof AcceptPracticeReleaseResponses];
 
 export type ReorderPracticesData = {
-    body: ReorderPracticesRequest;
+    body: ReorderRequest;
     path: {
         /**
          * Workspace slug
@@ -14321,23 +12191,167 @@ export type ReorderPracticesData = {
     url: '/workspaces/{workspaceSlug}/practices/reorder';
 };
 
-export type ReorderPracticesErrors = {
-    /**
-     * orderedSlugs is empty, has duplicates, or is not the group's complete set
-     */
-    400: ProblemDetail;
-};
-
-export type ReorderPracticesError = ReorderPracticesErrors[keyof ReorderPracticesErrors];
-
 export type ReorderPracticesResponses = {
     /**
-     * Practices reordered; the full ordered practice list is returned
+     * OK
      */
     200: Array<Practice>;
 };
 
 export type ReorderPracticesResponse = ReorderPracticesResponses[keyof ReorderPracticesResponses];
+
+export type ListOwnResultsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        practiceSlug?: string;
+        groupSlug?: string;
+        outcome?: 'MET' | 'NOT_MET' | 'DOES_NOT_APPLY' | 'COULD_NOT_DETERMINE';
+        itemKind?: string;
+        itemId?: string;
+        severity?: Array<'CRITICAL' | 'MAJOR' | 'MINOR' | 'TRIVIAL'>;
+        displayableOnly?: boolean;
+        sort?: 'NEWEST' | 'ACTIONABILITY';
+        page?: number;
+        size?: number;
+    };
+    url: '/workspaces/{workspaceSlug}/practices/results';
+};
+
+export type ListOwnResultsResponses = {
+    /**
+     * Paginated results returned
+     */
+    200: PageResponseDtoResultList;
+};
+
+export type ListOwnResultsResponse = ListOwnResultsResponses[keyof ListOwnResultsResponses];
+
+export type GetOwnResultData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        resultId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/results/{resultId}';
+};
+
+export type GetOwnResultErrors = {
+    /**
+     * Result not found or not owned by current user
+     */
+    404: unknown;
+};
+
+export type GetOwnResultResponses = {
+    /**
+     * Result detail returned
+     */
+    200: ResultDetail;
+};
+
+export type GetOwnResultResponse = GetOwnResultResponses[keyof GetOwnResultResponses];
+
+export type ListReviewBatchesData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        page?: number;
+        size?: number;
+    };
+    url: '/workspaces/{workspaceSlug}/practices/review-batches';
+};
+
+export type ListReviewBatchesResponses = {
+    /**
+     * OK
+     */
+    200: PageResponseDtoReviewBatch;
+};
+
+export type ListReviewBatchesResponse = ListReviewBatchesResponses[keyof ListReviewBatchesResponses];
+
+export type CreateReviewBatchData = {
+    body: CreateReviewBatchRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/review-batches';
+};
+
+export type CreateReviewBatchResponses = {
+    /**
+     * Created
+     */
+    201: ReviewBatch;
+};
+
+export type CreateReviewBatchResponse = CreateReviewBatchResponses[keyof CreateReviewBatchResponses];
+
+export type GetReviewBatchData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        batchId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/review-batches/{batchId}';
+};
+
+export type GetReviewBatchResponses = {
+    /**
+     * OK
+     */
+    200: ReviewBatch;
+};
+
+export type GetReviewBatchResponse = GetReviewBatchResponses[keyof GetReviewBatchResponses];
+
+export type UpdateReviewBatchStatusData = {
+    body: UpdateReviewBatchStatusRequest;
+    headers?: {
+        'If-Match'?: string;
+    };
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        batchId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/review-batches/{batchId}/status';
+};
+
+export type UpdateReviewBatchStatusResponses = {
+    /**
+     * OK
+     */
+    200: ReviewBatch;
+};
+
+export type UpdateReviewBatchStatusResponse = UpdateReviewBatchStatusResponses[keyof UpdateReviewBatchStatusResponses];
 
 export type ResolveReviewContextData = {
     body?: never;
@@ -14382,7 +12396,7 @@ export type ResolveReviewContextResponses = {
 
 export type ResolveReviewContextResponse = ResolveReviewContextResponses[keyof ResolveReviewContextResponses];
 
-export type RequestPracticeReviewData = {
+export type RequestReviewData = {
     body: CreateReviewRequest;
     path: {
         /**
@@ -14394,31 +12408,131 @@ export type RequestPracticeReviewData = {
     url: '/workspaces/{workspaceSlug}/practices/review-requests';
 };
 
-export type RequestPracticeReviewErrors = {
+export type RequestReviewResponses = {
     /**
-     * The artifact kind is not one that can be asked for
-     */
-    400: ProblemDetail;
-    /**
-     * The caller is neither the work's author or assignee nor a workspace admin
-     */
-    403: ProblemDetail;
-    /**
-     * No such artifact in this workspace
-     */
-    404: ProblemDetail;
-};
-
-export type RequestPracticeReviewError = RequestPracticeReviewErrors[keyof RequestPracticeReviewErrors];
-
-export type RequestPracticeReviewResponses = {
-    /**
-     * The ask was understood: a review is running, or the body names what stopped it
+     * OK
      */
     200: ReviewRequestOutcome;
 };
 
-export type RequestPracticeReviewResponse = RequestPracticeReviewResponses[keyof RequestPracticeReviewResponses];
+export type RequestReviewResponse = RequestReviewResponses[keyof RequestReviewResponses];
+
+export type ListReviewSchedulesData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/review-schedules';
+};
+
+export type ListReviewSchedulesResponses = {
+    /**
+     * OK
+     */
+    200: Array<ReviewSchedule>;
+};
+
+export type ListReviewSchedulesResponse = ListReviewSchedulesResponses[keyof ListReviewSchedulesResponses];
+
+export type CreateReviewScheduleData = {
+    body: ReviewScheduleInput;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/review-schedules';
+};
+
+export type CreateReviewScheduleResponses = {
+    /**
+     * Created
+     */
+    201: ReviewSchedule;
+};
+
+export type CreateReviewScheduleResponse = CreateReviewScheduleResponses[keyof CreateReviewScheduleResponses];
+
+export type DeleteReviewScheduleData = {
+    body?: never;
+    headers?: {
+        'If-Match'?: string;
+    };
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        scheduleId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/review-schedules/{scheduleId}';
+};
+
+export type DeleteReviewScheduleResponses = {
+    /**
+     * Deleted
+     */
+    204: void;
+};
+
+export type DeleteReviewScheduleResponse = DeleteReviewScheduleResponses[keyof DeleteReviewScheduleResponses];
+
+export type SetReviewScheduleEnabledData = {
+    body: SetReviewScheduleEnabledRequest;
+    headers?: {
+        'If-Match'?: string;
+    };
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        scheduleId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/review-schedules/{scheduleId}';
+};
+
+export type SetReviewScheduleEnabledResponses = {
+    /**
+     * OK
+     */
+    200: ReviewSchedule;
+};
+
+export type SetReviewScheduleEnabledResponse = SetReviewScheduleEnabledResponses[keyof SetReviewScheduleEnabledResponses];
+
+export type UpdateReviewScheduleData = {
+    body: ReviewScheduleInput;
+    headers?: {
+        'If-Match'?: string;
+    };
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        scheduleId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/review-schedules/{scheduleId}';
+};
+
+export type UpdateReviewScheduleResponses = {
+    /**
+     * OK
+     */
+    200: ReviewSchedule;
+};
+
+export type UpdateReviewScheduleResponse = UpdateReviewScheduleResponses[keyof UpdateReviewScheduleResponses];
 
 export type GetPracticeReviewSettingsData = {
     body?: never;
@@ -14465,7 +12579,7 @@ export type UpdatePracticeReviewSettingsResponses = {
 
 export type UpdatePracticeReviewSettingsResponse = UpdatePracticeReviewSettingsResponses[keyof UpdatePracticeReviewSettingsResponses];
 
-export type PreviewCoverageData = {
+export type PreviewReviewScopeData = {
     body: WorkspaceReviewScope;
     path: {
         /**
@@ -14474,17 +12588,17 @@ export type PreviewCoverageData = {
         workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/review-settings/coverage-preview';
+    url: '/workspaces/{workspaceSlug}/practices/review-settings/scope-preview';
 };
 
-export type PreviewCoverageResponses = {
+export type PreviewReviewScopeResponses = {
     /**
      * OK
      */
-    200: PracticeReviewCoveragePreview;
+    200: PracticeReviewScopePreview;
 };
 
-export type PreviewCoverageResponse = PreviewCoverageResponses[keyof PreviewCoverageResponses];
+export type PreviewReviewScopeResponse = PreviewReviewScopeResponses[keyof PreviewReviewScopeResponses];
 
 export type ListReviewedPracticesData = {
     body?: never;
@@ -14500,58 +12614,14 @@ export type ListReviewedPracticesData = {
 
 export type ListReviewedPracticesResponses = {
     /**
-     * Developer practices returned
+     * OK
      */
     200: Array<ReviewedPractice>;
 };
 
 export type ListReviewedPracticesResponse = ListReviewedPracticesResponses[keyof ListReviewedPracticesResponses];
 
-export type ListReviewedWorkReviewRunsData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        /**
-         * Kind of reviewed work, e.g. scm.pull_request
-         */
-        artifactKind: string;
-        artifactId: number;
-    };
-    query?: {
-        /**
-         * Zero-based page, at most 100
-         */
-        page?: number;
-        /**
-         * Page size from 1 to 50
-         */
-        size?: number;
-    };
-    url: '/workspaces/{workspaceSlug}/practices/reviewed-work/{artifactKind}/{artifactId}/review-runs';
-};
-
-export type ListReviewedWorkReviewRunsErrors = {
-    /**
-     * Unknown kind of work or invalid pagination
-     */
-    400: ProblemDetail;
-};
-
-export type ListReviewedWorkReviewRunsError = ListReviewedWorkReviewRunsErrors[keyof ListReviewedWorkReviewRunsErrors];
-
-export type ListReviewedWorkReviewRunsResponses = {
-    /**
-     * Paginated review runs returned
-     */
-    200: PracticeGroupReviewRunsPage;
-};
-
-export type ListReviewedWorkReviewRunsResponse = ListReviewedWorkReviewRunsResponses[keyof ListReviewedWorkReviewRunsResponses];
-
-export type ListPracticeReviewsData = {
+export type ListReviewsData = {
     body?: never;
     path: {
         /**
@@ -14562,81 +12632,38 @@ export type ListPracticeReviewsData = {
     query?: {
         page?: number;
         size?: number;
-        /**
-         * Statuses to list (repeatable); omit for every status
-         */
-        status?: Array<'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED'>;
-        /**
-         * Result-processing statuses to list (repeatable), such as FAILED for the reviews whose results can be processed again; omit for every review, including those without one
-         */
-        resultProcessing?: Array<'PENDING' | 'DELIVERED' | 'FAILED'>;
-        /**
-         * Inclusive lower bound on when the review was requested
-         */
+        status?: Array<'QUEUED' | 'RUNNING' | 'COMPLETE' | 'PARTIAL' | 'FAILED' | 'CANCELLED'>;
+        kind?: 'ITEM' | 'SCAN';
+        reviewId?: string;
+        itemId?: string;
+        developerId?: number;
+        practiceSlug?: string;
+        groupSlug?: string;
         from?: string;
-        /**
-         * Exclusive upper bound on when the review was requested
-         */
         to?: string;
-        /**
-         * Keep the reviews that recorded an observation about this developer that is not marked incorrect
-         */
-        subjectUserId?: number;
-        /**
-         * Keep the reviews that recorded an observation of any of these practices that is not marked incorrect (repeatable)
-         */
-        practiceSlug?: Array<string>;
-        /**
-         * Keep the reviews that recorded an observation of a practice in any of these groups that is not marked incorrect (repeatable)
-         */
-        groupSlug?: Array<string>;
-        /**
-         * Keep this one review
-         */
-        agentJobId?: string;
-        /**
-         * Keep the reviews of this kind of work, e.g. scm.pull_request
-         */
-        artifactKind?: string;
-        /**
-         * Keep the reviews of this one piece of work; requires artifactKind
-         */
-        artifactId?: number;
-        /**
-         * True keeps the pull request and merge request reviews that completed after the work was merged; false or omitted keeps every review
-         */
-        finishedAfterMerge?: boolean;
-        /**
-         * True also keeps the queued reviews on hold, such as those waiting for the AI budget; alone it keeps only those. False or omitted adds nothing to the status filter
-         */
-        onHold?: boolean;
-        /**
-         * True also keeps the queued reviews that wait for a worker now, as the queue counts them: not held for the AI budget and due now, not backing off before a retry. Alone it keeps only those. False or omitted adds nothing to the status filter
-         */
-        waiting?: boolean;
     };
     url: '/workspaces/{workspaceSlug}/practices/reviews';
 };
 
-export type ListPracticeReviewsErrors = {
+export type ListReviewsErrors = {
     /**
      * Invalid filter or pagination
      */
     400: ProblemDetail;
 };
 
-export type ListPracticeReviewsError = ListPracticeReviewsErrors[keyof ListPracticeReviewsErrors];
+export type ListReviewsError = ListReviewsErrors[keyof ListReviewsErrors];
 
-export type ListPracticeReviewsResponses = {
+export type ListReviewsResponses = {
     /**
      * Paginated review summaries returned
      */
-    200: PagedModelReviewRunSummary;
+    200: PageResponseDtoReviewSummary;
 };
 
-export type ListPracticeReviewsResponse = ListPracticeReviewsResponses[keyof ListPracticeReviewsResponses];
+export type ListReviewsResponse = ListReviewsResponses[keyof ListReviewsResponses];
 
-export type ListPracticeEvidenceOutcomesData = {
+export type GetReviewEvidenceOutcomesData = {
     body?: never;
     path: {
         /**
@@ -14648,16 +12675,16 @@ export type ListPracticeEvidenceOutcomesData = {
     url: '/workspaces/{workspaceSlug}/practices/reviews/evidence-outcomes';
 };
 
-export type ListPracticeEvidenceOutcomesResponses = {
+export type GetReviewEvidenceOutcomesResponses = {
     /**
      * Evidence outcomes returned
      */
-    200: Array<PracticeEvidenceOutcome>;
+    200: Array<ReviewEvidenceOutcome>;
 };
 
-export type ListPracticeEvidenceOutcomesResponse = ListPracticeEvidenceOutcomesResponses[keyof ListPracticeEvidenceOutcomesResponses];
+export type GetReviewEvidenceOutcomesResponse = GetReviewEvidenceOutcomesResponses[keyof GetReviewEvidenceOutcomesResponses];
 
-export type ListPracticeReviewFeedbackData = {
+export type ListReviewFeedbackData = {
     body?: never;
     path: {
         /**
@@ -14666,72 +12693,37 @@ export type ListPracticeReviewFeedbackData = {
         workspaceSlug: string;
     };
     query?: {
+        reviewId?: string;
+        itemId?: string;
+        itemKind?: string;
+        practiceSlug?: string;
+        groupSlug?: string;
+        developerId?: string;
+        destination?: Array<'ON_WORK' | 'PRACTICE_PAGE' | 'CONVERSATION'>;
+        state?: Array<'AWAITING_APPROVAL' | 'READY' | 'DELIVERED' | 'UNCONFIRMED' | 'WITHHELD' | 'REJECTED' | 'REPLACED' | 'FAILED'>;
+        location?: 'GITHUB' | 'GITLAB' | 'OTHER_WORK' | 'HEPH' | 'SLACK' | 'NEXT_CONVERSATION' | 'PRACTICE_PAGES';
+        stopReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_WITHHELD' | 'NOTHING_NEW' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISAGREE' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'DELIVERY_UNCONFIRMED' | 'ITEM_GONE' | 'ITEM_CLOSED' | 'ITEM_MERGED' | 'ITEM_STATE_INELIGIBLE' | 'ISSUE_SNAPSHOT_CHANGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'NO_AI' | 'DELIVERY_OFF' | 'PERSON_SUPPRESSED' | 'RECIPIENT_UNAVAILABLE' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'FEEDBACK_OFF' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_SCOPE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'RESULT_MARKED_INCORRECT' | 'REVIEWED_VERSION_CHANGED' | 'REVIEW_CANCELLED' | 'EVIDENCE_NOT_PERMITTED' | 'NO_EVIDENCE' | 'UNCORROBORATED'>;
+        withdrawn?: boolean;
+        disagreed?: boolean;
+        sort?: 'NEWEST' | 'OLDEST';
+        from?: string;
+        to?: string;
         page?: number;
         size?: number;
-        /**
-         * Sorting strategy. NEWEST and OLDEST order by when the feedback was created; ties by id.
-         */
-        sort?: 'NEWEST' | 'OLDEST';
-        deliveryState?: Array<'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'PARTIALLY_FAILED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED' | 'UNCONFIRMED'>;
-        suppressionReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'COMPOSER_WITHHELD' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ISSUE_SNAPSHOT_CHANGED' | 'ARTIFACT_MERGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'OBSERVATION_INVALIDATED' | 'REVIEWED_REVISION_CHANGED' | 'REVIEW_CANCELLED'>;
-        channel?: Array<'IN_CONTEXT' | 'IN_CHAT' | 'IN_APP'>;
-        /**
-         * Where the feedback appears, by the provider that shows it (repeatable): a channel split where the provider is known
-         */
-        location?: Array<'GITHUB' | 'GITLAB' | 'OTHER_WORK' | 'HEPH' | 'SLACK' | 'NEXT_CONVERSATION' | 'PRACTICE_PAGES'>;
-        agentJobId?: string;
-        /**
-         * Keep the feedback written from this observation
-         */
-        observationId?: string;
-        /**
-         * Kind of reviewed work, e.g. scm.pull_request
-         */
-        artifactKind?: string;
-        /**
-         * Artifact ID; requires artifactKind
-         */
-        artifactId?: number;
-        recipientUserId?: number;
-        /**
-         * Practices whose feedback to list (repeatable): feedback bound to an observation of any of them, in any role
-         */
-        practiceSlug?: Array<string>;
-        /**
-         * Practice groups whose feedback to list (repeatable): feedback bound to an observation of a practice in any of them
-         */
-        groupSlug?: Array<string>;
-        /**
-         * Inclusive lower bound
-         */
-        from?: string;
-        /**
-         * Exclusive upper bound
-         */
-        to?: string;
     };
     url: '/workspaces/{workspaceSlug}/practices/reviews/feedback';
 };
 
-export type ListPracticeReviewFeedbackErrors = {
+export type ListReviewFeedbackResponses = {
     /**
-     * Invalid filter or pagination
+     * OK
      */
-    400: ProblemDetail;
+    200: PageResponseDtoReviewFeedback;
 };
 
-export type ListPracticeReviewFeedbackError = ListPracticeReviewFeedbackErrors[keyof ListPracticeReviewFeedbackErrors];
+export type ListReviewFeedbackResponse = ListReviewFeedbackResponses[keyof ListReviewFeedbackResponses];
 
-export type ListPracticeReviewFeedbackResponses = {
-    /**
-     * Paginated feedback returned
-     */
-    200: PagedModelReviewFeedback;
-};
-
-export type ListPracticeReviewFeedbackResponse = ListPracticeReviewFeedbackResponses[keyof ListPracticeReviewFeedbackResponses];
-
-export type CountPracticeReviewFeedbackByLocationData = {
+export type CountReviewFeedbackByLocationData = {
     body?: never;
     path: {
         /**
@@ -14740,70 +12732,35 @@ export type CountPracticeReviewFeedbackByLocationData = {
         workspaceSlug: string;
     };
     query?: {
-        deliveryState?: Array<'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'PARTIALLY_FAILED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED' | 'UNCONFIRMED'>;
-        suppressionReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'COMPOSER_WITHHELD' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ISSUE_SNAPSHOT_CHANGED' | 'ARTIFACT_MERGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'OBSERVATION_INVALIDATED' | 'REVIEWED_REVISION_CHANGED' | 'REVIEW_CANCELLED'>;
-        channel?: Array<'IN_CONTEXT' | 'IN_CHAT' | 'IN_APP'>;
-        /**
-         * Where the feedback appears, by the provider that shows it (repeatable): a channel split where the provider is known
-         */
-        location?: Array<'GITHUB' | 'GITLAB' | 'OTHER_WORK' | 'HEPH' | 'SLACK' | 'NEXT_CONVERSATION' | 'PRACTICE_PAGES'>;
-        agentJobId?: string;
-        /**
-         * Keep the feedback written from this observation
-         */
-        observationId?: string;
-        /**
-         * Kind of reviewed work, e.g. scm.pull_request
-         */
-        artifactKind?: string;
-        /**
-         * Artifact ID; requires artifactKind
-         */
-        artifactId?: number;
-        recipientUserId?: number;
-        /**
-         * Practices whose feedback to list (repeatable): feedback bound to an observation of any of them, in any role
-         */
-        practiceSlug?: Array<string>;
-        /**
-         * Practice groups whose feedback to list (repeatable): feedback bound to an observation of a practice in any of them
-         */
-        groupSlug?: Array<string>;
-        /**
-         * Inclusive lower bound
-         */
+        reviewId?: string;
+        itemId?: string;
+        itemKind?: string;
+        practiceSlug?: string;
+        groupSlug?: string;
+        developerId?: string;
+        destination?: Array<'ON_WORK' | 'PRACTICE_PAGE' | 'CONVERSATION'>;
+        state?: Array<'AWAITING_APPROVAL' | 'READY' | 'DELIVERED' | 'UNCONFIRMED' | 'WITHHELD' | 'REJECTED' | 'REPLACED' | 'FAILED'>;
+        location?: 'GITHUB' | 'GITLAB' | 'OTHER_WORK' | 'HEPH' | 'SLACK' | 'NEXT_CONVERSATION' | 'PRACTICE_PAGES';
+        stopReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_WITHHELD' | 'NOTHING_NEW' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISAGREE' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'DELIVERY_UNCONFIRMED' | 'ITEM_GONE' | 'ITEM_CLOSED' | 'ITEM_MERGED' | 'ITEM_STATE_INELIGIBLE' | 'ISSUE_SNAPSHOT_CHANGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'NO_AI' | 'DELIVERY_OFF' | 'PERSON_SUPPRESSED' | 'RECIPIENT_UNAVAILABLE' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'FEEDBACK_OFF' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_SCOPE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'RESULT_MARKED_INCORRECT' | 'REVIEWED_VERSION_CHANGED' | 'REVIEW_CANCELLED' | 'EVIDENCE_NOT_PERMITTED' | 'NO_EVIDENCE' | 'UNCORROBORATED'>;
+        withdrawn?: boolean;
+        disagreed?: boolean;
+        sort?: 'NEWEST' | 'OLDEST';
         from?: string;
-        /**
-         * Exclusive upper bound
-         */
         to?: string;
     };
     url: '/workspaces/{workspaceSlug}/practices/reviews/feedback/locations';
 };
 
-export type CountPracticeReviewFeedbackByLocationErrors = {
+export type CountReviewFeedbackByLocationResponses = {
     /**
-     * Invalid filter
+     * OK
      */
-    400: ProblemDetail;
-    /**
-     * Workspace administrator access is required
-     */
-    403: ProblemDetail;
+    200: Array<ReasonCount>;
 };
 
-export type CountPracticeReviewFeedbackByLocationError = CountPracticeReviewFeedbackByLocationErrors[keyof CountPracticeReviewFeedbackByLocationErrors];
+export type CountReviewFeedbackByLocationResponse = CountReviewFeedbackByLocationResponses[keyof CountReviewFeedbackByLocationResponses];
 
-export type CountPracticeReviewFeedbackByLocationResponses = {
-    /**
-     * Counts by location returned
-     */
-    200: Array<ReviewFeedbackLocationCounts>;
-};
-
-export type CountPracticeReviewFeedbackByLocationResponse = CountPracticeReviewFeedbackByLocationResponses[keyof CountPracticeReviewFeedbackByLocationResponses];
-
-export type CountPracticeReviewFeedbackByReasonData = {
+export type CountReviewFeedbackByReasonData = {
     body?: never;
     path: {
         /**
@@ -14812,70 +12769,35 @@ export type CountPracticeReviewFeedbackByReasonData = {
         workspaceSlug: string;
     };
     query?: {
-        deliveryState?: Array<'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'PARTIALLY_FAILED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED' | 'UNCONFIRMED'>;
-        suppressionReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'COMPOSER_WITHHELD' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ISSUE_SNAPSHOT_CHANGED' | 'ARTIFACT_MERGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'OBSERVATION_INVALIDATED' | 'REVIEWED_REVISION_CHANGED' | 'REVIEW_CANCELLED'>;
-        channel?: Array<'IN_CONTEXT' | 'IN_CHAT' | 'IN_APP'>;
-        /**
-         * Where the feedback appears, by the provider that shows it (repeatable): a channel split where the provider is known
-         */
-        location?: Array<'GITHUB' | 'GITLAB' | 'OTHER_WORK' | 'HEPH' | 'SLACK' | 'NEXT_CONVERSATION' | 'PRACTICE_PAGES'>;
-        agentJobId?: string;
-        /**
-         * Keep the feedback written from this observation
-         */
-        observationId?: string;
-        /**
-         * Kind of reviewed work, e.g. scm.pull_request
-         */
-        artifactKind?: string;
-        /**
-         * Artifact ID; requires artifactKind
-         */
-        artifactId?: number;
-        recipientUserId?: number;
-        /**
-         * Practices whose feedback to list (repeatable): feedback bound to an observation of any of them, in any role
-         */
-        practiceSlug?: Array<string>;
-        /**
-         * Practice groups whose feedback to list (repeatable): feedback bound to an observation of a practice in any of them
-         */
-        groupSlug?: Array<string>;
-        /**
-         * Inclusive lower bound
-         */
+        reviewId?: string;
+        itemId?: string;
+        itemKind?: string;
+        practiceSlug?: string;
+        groupSlug?: string;
+        developerId?: string;
+        destination?: Array<'ON_WORK' | 'PRACTICE_PAGE' | 'CONVERSATION'>;
+        state?: Array<'AWAITING_APPROVAL' | 'READY' | 'DELIVERED' | 'UNCONFIRMED' | 'WITHHELD' | 'REJECTED' | 'REPLACED' | 'FAILED'>;
+        location?: 'GITHUB' | 'GITLAB' | 'OTHER_WORK' | 'HEPH' | 'SLACK' | 'NEXT_CONVERSATION' | 'PRACTICE_PAGES';
+        stopReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_WITHHELD' | 'NOTHING_NEW' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISAGREE' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'DELIVERY_UNCONFIRMED' | 'ITEM_GONE' | 'ITEM_CLOSED' | 'ITEM_MERGED' | 'ITEM_STATE_INELIGIBLE' | 'ISSUE_SNAPSHOT_CHANGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'NO_AI' | 'DELIVERY_OFF' | 'PERSON_SUPPRESSED' | 'RECIPIENT_UNAVAILABLE' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'FEEDBACK_OFF' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_SCOPE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'RESULT_MARKED_INCORRECT' | 'REVIEWED_VERSION_CHANGED' | 'REVIEW_CANCELLED' | 'EVIDENCE_NOT_PERMITTED' | 'NO_EVIDENCE' | 'UNCORROBORATED'>;
+        withdrawn?: boolean;
+        disagreed?: boolean;
+        sort?: 'NEWEST' | 'OLDEST';
         from?: string;
-        /**
-         * Exclusive upper bound
-         */
         to?: string;
     };
     url: '/workspaces/{workspaceSlug}/practices/reviews/feedback/reasons';
 };
 
-export type CountPracticeReviewFeedbackByReasonErrors = {
+export type CountReviewFeedbackByReasonResponses = {
     /**
-     * Invalid filter
+     * OK
      */
-    400: ProblemDetail;
-    /**
-     * Workspace administrator access is required
-     */
-    403: ProblemDetail;
+    200: Array<ReasonCount>;
 };
 
-export type CountPracticeReviewFeedbackByReasonError = CountPracticeReviewFeedbackByReasonErrors[keyof CountPracticeReviewFeedbackByReasonErrors];
+export type CountReviewFeedbackByReasonResponse = CountReviewFeedbackByReasonResponses[keyof CountReviewFeedbackByReasonResponses];
 
-export type CountPracticeReviewFeedbackByReasonResponses = {
-    /**
-     * Counts by reason returned
-     */
-    200: Array<ReviewFeedbackReasonCount>;
-};
-
-export type CountPracticeReviewFeedbackByReasonResponse = CountPracticeReviewFeedbackByReasonResponses[keyof CountPracticeReviewFeedbackByReasonResponses];
-
-export type GetPracticeReviewFeedbackData = {
+export type GetReviewFeedbackData = {
     body?: never;
     path: {
         /**
@@ -14888,25 +12810,16 @@ export type GetPracticeReviewFeedbackData = {
     url: '/workspaces/{workspaceSlug}/practices/reviews/feedback/{feedbackId}';
 };
 
-export type GetPracticeReviewFeedbackErrors = {
+export type GetReviewFeedbackResponses = {
     /**
-     * Feedback not found in this workspace
-     */
-    404: ProblemDetail;
-};
-
-export type GetPracticeReviewFeedbackError = GetPracticeReviewFeedbackErrors[keyof GetPracticeReviewFeedbackErrors];
-
-export type GetPracticeReviewFeedbackResponses = {
-    /**
-     * Feedback detail returned
+     * OK
      */
     200: ReviewFeedbackDetail;
 };
 
-export type GetPracticeReviewFeedbackResponse = GetPracticeReviewFeedbackResponses[keyof GetPracticeReviewFeedbackResponses];
+export type GetReviewFeedbackResponse = GetReviewFeedbackResponses[keyof GetReviewFeedbackResponses];
 
-export type GetFeedbackProposalDecisionData = {
+export type ListFeedbackDecisionsData = {
     body?: never;
     path: {
         /**
@@ -14916,20 +12829,20 @@ export type GetFeedbackProposalDecisionData = {
         feedbackId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/reviews/feedback/{feedbackId}/approval';
+    url: '/workspaces/{workspaceSlug}/practices/reviews/feedback/{feedbackId}/decisions';
 };
 
-export type GetFeedbackProposalDecisionResponses = {
+export type ListFeedbackDecisionsResponses = {
     /**
      * OK
      */
-    200: FeedbackApproval;
+    200: Array<FeedbackDecision>;
 };
 
-export type GetFeedbackProposalDecisionResponse = GetFeedbackProposalDecisionResponses[keyof GetFeedbackProposalDecisionResponses];
+export type ListFeedbackDecisionsResponse = ListFeedbackDecisionsResponses[keyof ListFeedbackDecisionsResponses];
 
-export type DecideFeedbackProposalData = {
-    body: DecideFeedbackProposalRequest;
+export type CreateFeedbackDecisionData = {
+    body: CreateFeedbackDecisionRequest;
     path: {
         /**
          * Workspace slug
@@ -14938,20 +12851,20 @@ export type DecideFeedbackProposalData = {
         feedbackId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/reviews/feedback/{feedbackId}/approval';
+    url: '/workspaces/{workspaceSlug}/practices/reviews/feedback/{feedbackId}/decisions';
 };
 
-export type DecideFeedbackProposalResponses = {
+export type CreateFeedbackDecisionResponses = {
     /**
-     * OK
+     * Feedback decision recorded
      */
-    200: FeedbackApproval;
+    201: FeedbackDecision;
 };
 
-export type DecideFeedbackProposalResponse = DecideFeedbackProposalResponses[keyof DecideFeedbackProposalResponses];
+export type CreateFeedbackDecisionResponse = CreateFeedbackDecisionResponses[keyof CreateFeedbackDecisionResponses];
 
-export type UpdatePracticeReviewFeedbackWithdrawalData = {
-    body: UpdateFeedbackWithdrawalRequest;
+export type RetryFeedbackData = {
+    body?: never;
     path: {
         /**
          * Workspace slug
@@ -14960,32 +12873,19 @@ export type UpdatePracticeReviewFeedbackWithdrawalData = {
         feedbackId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/reviews/feedback/{feedbackId}/withdrawal';
+    url: '/workspaces/{workspaceSlug}/practices/reviews/feedback/{feedbackId}/retry';
 };
 
-export type UpdatePracticeReviewFeedbackWithdrawalErrors = {
+export type RetryFeedbackResponses = {
     /**
-     * Feedback not found in this workspace
+     * Feedback retry accepted
      */
-    404: ProblemDetail;
-    /**
-     * The feedback is not on a practice page, or is not waiting to be read or shown there
-     */
-    409: ProblemDetail;
+    202: ReviewFeedbackDetail;
 };
 
-export type UpdatePracticeReviewFeedbackWithdrawalError = UpdatePracticeReviewFeedbackWithdrawalErrors[keyof UpdatePracticeReviewFeedbackWithdrawalErrors];
+export type RetryFeedbackResponse = RetryFeedbackResponses[keyof RetryFeedbackResponses];
 
-export type UpdatePracticeReviewFeedbackWithdrawalResponses = {
-    /**
-     * Feedback detail after the change
-     */
-    200: ReviewFeedbackDetail;
-};
-
-export type UpdatePracticeReviewFeedbackWithdrawalResponse = UpdatePracticeReviewFeedbackWithdrawalResponses[keyof UpdatePracticeReviewFeedbackWithdrawalResponses];
-
-export type GetPracticeReviewLineageData = {
+export type GetReviewLineageData = {
     body?: never;
     path: {
         /**
@@ -14994,194 +12894,26 @@ export type GetPracticeReviewLineageData = {
         workspaceSlug: string;
     };
     query: {
-        kind: 'OBSERVATION' | 'FEEDBACK' | 'REVIEW' | 'WORK';
-        /**
-         * The observation, feedback or review id; required unless kind is WORK
-         */
-        id?: string;
-        /**
-         * Kind of reviewed work, e.g. scm.pull_request; required when kind is WORK
-         */
-        artifactKind?: string;
-        /**
-         * Artifact ID; required when kind is WORK
-         */
-        artifactId?: number;
-        /**
-         * true lists the whole review around the record: every observation and piece of feedback of the review, up to 100 each, and the work's moments; false keeps the short chain
-         */
-        whole?: boolean;
+        kind: 'ITEM' | 'REVIEW' | 'RESULT' | 'PROBLEM' | 'FEEDBACK';
+        itemId?: string;
+        reviewId?: string;
+        resultId?: string;
+        problemId?: string;
+        feedbackId?: string;
     };
     url: '/workspaces/{workspaceSlug}/practices/reviews/lineage';
 };
 
-export type GetPracticeReviewLineageErrors = {
+export type GetReviewLineageResponses = {
     /**
-     * The parameters do not name a record of the requested kind
-     */
-    400: ProblemDetail;
-    /**
-     * Workspace administrator access is required
-     */
-    403: ProblemDetail;
-    /**
-     * Nothing of that kind and id was recorded in this workspace
-     */
-    404: ProblemDetail;
-};
-
-export type GetPracticeReviewLineageError = GetPracticeReviewLineageErrors[keyof GetPracticeReviewLineageErrors];
-
-export type GetPracticeReviewLineageResponses = {
-    /**
-     * Lineage returned
+     * OK
      */
     200: ReviewLineage;
 };
 
-export type GetPracticeReviewLineageResponse = GetPracticeReviewLineageResponses[keyof GetPracticeReviewLineageResponses];
+export type GetReviewLineageResponse = GetReviewLineageResponses[keyof GetReviewLineageResponses];
 
-export type ListPracticeReviewObservationsData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: {
-        page?: number;
-        size?: number;
-        /**
-         * Sorting strategy. ACTIONABILITY orders NOT_MET by severity (CRITICAL, MAJOR, MINOR, INFO), then MET, then NOT_APPLICABLE and UNDETERMINED together. Within each rank, observation time and ID are descending.
-         */
-        sort?: 'NEWEST' | 'ACTIONABILITY';
-        practiceSlug?: Array<string>;
-        groupSlug?: Array<string>;
-        /**
-         * Review outcomes to list (repeatable)
-         */
-        outcome?: Array<'MET' | 'NOT_MET' | 'NOT_APPLICABLE' | 'UNDETERMINED'>;
-        /**
-         * true for only the observations an admin has marked incorrect and not restored, false for only the others; omit for both
-         */
-        invalidated?: boolean;
-        /**
-         * true for only the observations the developer disputes feedback about, false for only the others; omit for both
-         */
-        disputed?: boolean;
-        severity?: Array<'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO'>;
-        agentJobId?: string;
-        /**
-         * Kind of reviewed work, e.g. scm.pull_request
-         */
-        artifactKind?: string;
-        /**
-         * Artifact ID; requires artifactKind
-         */
-        artifactId?: number;
-        subjectUserId?: number;
-        /**
-         * What occasioned the measurement: LIVE, MANUAL or BACKFILL
-         */
-        origin?: Array<'LIVE' | 'MANUAL' | 'BACKFILL'>;
-        /**
-         * Inclusive lower bound
-         */
-        from?: string;
-        /**
-         * Exclusive upper bound
-         */
-        to?: string;
-    };
-    url: '/workspaces/{workspaceSlug}/practices/reviews/observations';
-};
-
-export type ListPracticeReviewObservationsErrors = {
-    /**
-     * Invalid filter or pagination
-     */
-    400: ProblemDetail;
-};
-
-export type ListPracticeReviewObservationsError = ListPracticeReviewObservationsErrors[keyof ListPracticeReviewObservationsErrors];
-
-export type ListPracticeReviewObservationsResponses = {
-    /**
-     * Paginated observations returned
-     */
-    200: PagedModelReviewObservation;
-};
-
-export type ListPracticeReviewObservationsResponse = ListPracticeReviewObservationsResponses[keyof ListPracticeReviewObservationsResponses];
-
-export type GetPracticeReviewObservationData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        observationId: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/reviews/observations/{observationId}';
-};
-
-export type GetPracticeReviewObservationErrors = {
-    /**
-     * Observation not found in this workspace
-     */
-    404: ProblemDetail;
-};
-
-export type GetPracticeReviewObservationError = GetPracticeReviewObservationErrors[keyof GetPracticeReviewObservationErrors];
-
-export type GetPracticeReviewObservationResponses = {
-    /**
-     * Observation detail returned
-     */
-    200: ReviewObservationDetail;
-};
-
-export type GetPracticeReviewObservationResponse = GetPracticeReviewObservationResponses[keyof GetPracticeReviewObservationResponses];
-
-export type UpdatePracticeReviewObservationValidityData = {
-    body: UpdateObservationValidityRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        observationId: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/reviews/observations/{observationId}/validity';
-};
-
-export type UpdatePracticeReviewObservationValidityErrors = {
-    /**
-     * Observation not found in this workspace
-     */
-    404: ProblemDetail;
-    /**
-     * The observation is already in the requested state
-     */
-    409: ProblemDetail;
-};
-
-export type UpdatePracticeReviewObservationValidityError = UpdatePracticeReviewObservationValidityErrors[keyof UpdatePracticeReviewObservationValidityErrors];
-
-export type UpdatePracticeReviewObservationValidityResponses = {
-    /**
-     * Observation detail after the change
-     */
-    200: ReviewObservationDetail;
-};
-
-export type UpdatePracticeReviewObservationValidityResponse = UpdatePracticeReviewObservationValidityResponses[keyof UpdatePracticeReviewObservationValidityResponses];
-
-export type GetPracticeReviewOverviewData = {
+export type GetReviewOverviewData = {
     body?: never;
     path: {
         /**
@@ -15210,25 +12942,88 @@ export type GetPracticeReviewOverviewData = {
     url: '/workspaces/{workspaceSlug}/practices/reviews/overview';
 };
 
-export type GetPracticeReviewOverviewErrors = {
+export type GetReviewOverviewErrors = {
     /**
      * Invalid range or time zone
      */
     400: ProblemDetail;
 };
 
-export type GetPracticeReviewOverviewError = GetPracticeReviewOverviewErrors[keyof GetPracticeReviewOverviewErrors];
+export type GetReviewOverviewError = GetReviewOverviewErrors[keyof GetReviewOverviewErrors];
 
-export type GetPracticeReviewOverviewResponses = {
+export type GetReviewOverviewResponses = {
     /**
      * Practice reviews counted
      */
-    200: PracticeReviewOverview;
+    200: ReviewOverview;
 };
 
-export type GetPracticeReviewOverviewResponse = GetPracticeReviewOverviewResponses[keyof GetPracticeReviewOverviewResponses];
+export type GetReviewOverviewResponse = GetReviewOverviewResponses[keyof GetReviewOverviewResponses];
 
-export type GetPracticeReviewQueueData = {
+export type ListReviewProblemsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        reviewId?: string;
+        itemId?: string;
+        itemKind?: string;
+        practiceSlug?: string;
+        groupSlug?: string;
+        developerId?: number;
+        outcome?: Array<'MET' | 'NOT_MET' | 'DOES_NOT_APPLY' | 'COULD_NOT_DETERMINE'>;
+        severity?: Array<'CRITICAL' | 'MAJOR' | 'MINOR' | 'TRIVIAL'>;
+        currentness?: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
+        markedIncorrect?: boolean;
+        accepted?: boolean;
+        disagreed?: boolean;
+        from?: string;
+        to?: string;
+        resultId?: string;
+        path?: string;
+        openOnly?: boolean;
+        page?: number;
+        size?: number;
+    };
+    url: '/workspaces/{workspaceSlug}/practices/reviews/problems';
+};
+
+export type ListReviewProblemsResponses = {
+    /**
+     * OK
+     */
+    200: PageResponseDtoReviewProblem;
+};
+
+export type ListReviewProblemsResponse = ListReviewProblemsResponses[keyof ListReviewProblemsResponses];
+
+export type GetReviewProblemData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        problemId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/reviews/problems/{problemId}';
+};
+
+export type GetReviewProblemResponses = {
+    /**
+     * OK
+     */
+    200: ReviewProblemDetail;
+};
+
+export type GetReviewProblemResponse = GetReviewProblemResponses[keyof GetReviewProblemResponses];
+
+export type GetReviewQueueData = {
     body?: never;
     path: {
         /**
@@ -15240,51 +13035,144 @@ export type GetPracticeReviewQueueData = {
     url: '/workspaces/{workspaceSlug}/practices/reviews/queue';
 };
 
-export type GetPracticeReviewQueueResponses = {
+export type GetReviewQueueResponses = {
     /**
      * Practice review queue returned
      */
-    200: PracticeReviewQueue;
+    200: ReviewQueue;
 };
 
-export type GetPracticeReviewQueueResponse = GetPracticeReviewQueueResponses[keyof GetPracticeReviewQueueResponses];
+export type GetReviewQueueResponse = GetReviewQueueResponses[keyof GetReviewQueueResponses];
 
-export type ListPracticeReviewDeliveryChecksData = {
+export type ListReviewResultsData = {
     body?: never;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        agentJobId: string;
+    };
+    query?: {
+        reviewId?: string;
+        itemId?: string;
+        itemKind?: string;
+        practiceSlug?: string;
+        groupSlug?: string;
+        developerId?: number;
+        outcome?: Array<'MET' | 'NOT_MET' | 'DOES_NOT_APPLY' | 'COULD_NOT_DETERMINE'>;
+        severity?: Array<'CRITICAL' | 'MAJOR' | 'MINOR' | 'TRIVIAL'>;
+        currentness?: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
+        markedIncorrect?: boolean;
+        accepted?: boolean;
+        disagreed?: boolean;
+        from?: string;
+        to?: string;
+        sort?: 'NEWEST' | 'ACTIONABILITY';
+        page?: number;
+        size?: number;
+    };
+    url: '/workspaces/{workspaceSlug}/practices/reviews/results';
+};
+
+export type ListReviewResultsResponses = {
+    /**
+     * OK
+     */
+    200: PageResponseDtoReviewResult;
+};
+
+export type ListReviewResultsResponse = ListReviewResultsResponses[keyof ListReviewResultsResponses];
+
+export type GetReviewResultData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        resultId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/reviews/runs/{agentJobId}/delivery-checks';
+    url: '/workspaces/{workspaceSlug}/practices/reviews/results/{resultId}';
 };
 
-export type ListPracticeReviewDeliveryChecksErrors = {
+export type GetReviewResultResponses = {
     /**
-     * Invalid review id
+     * OK
      */
-    400: ProblemDetail;
-    /**
-     * Workspace administrator access is required
-     */
-    403: ProblemDetail;
+    200: ReviewResultDetail;
 };
 
-export type ListPracticeReviewDeliveryChecksError = ListPracticeReviewDeliveryChecksErrors[keyof ListPracticeReviewDeliveryChecksErrors];
+export type GetReviewResultResponse = GetReviewResultResponses[keyof GetReviewResultResponses];
 
-export type ListPracticeReviewDeliveryChecksResponses = {
-    /**
-     * Delivery checks returned
-     */
-    200: Array<DeliveryPolicyTrace>;
+export type ListResultMarksData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        resultId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/reviews/results/{resultId}/marks';
 };
 
-export type ListPracticeReviewDeliveryChecksResponse = ListPracticeReviewDeliveryChecksResponses[keyof ListPracticeReviewDeliveryChecksResponses];
+export type ListResultMarksResponses = {
+    /**
+     * OK
+     */
+    200: Array<ResultMark>;
+};
 
-export type GetPracticeReviewTimingData = {
+export type ListResultMarksResponse = ListResultMarksResponses[keyof ListResultMarksResponses];
+
+export type CreateResultMarkData = {
+    body: CreateResultMarkRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        resultId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/reviews/results/{resultId}/marks';
+};
+
+export type CreateResultMarkResponses = {
+    /**
+     * Created
+     */
+    201: ResultMark;
+};
+
+export type CreateResultMarkResponse = CreateResultMarkResponses[keyof CreateResultMarkResponses];
+
+export type RemoveResultMarkData = {
+    body: RemoveResultMarkRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        resultId: string;
+        markId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/reviews/results/{resultId}/marks/{markId}';
+};
+
+export type RemoveResultMarkResponses = {
+    /**
+     * OK
+     */
+    200: ResultMark;
+};
+
+export type RemoveResultMarkResponse = RemoveResultMarkResponses[keyof RemoveResultMarkResponses];
+
+export type GetReviewTimingData = {
     body?: never;
     path: {
         /**
@@ -15309,64 +13197,341 @@ export type GetPracticeReviewTimingData = {
     url: '/workspaces/{workspaceSlug}/practices/reviews/timing';
 };
 
-export type GetPracticeReviewTimingErrors = {
+export type GetReviewTimingErrors = {
     /**
      * Invalid range
      */
     400: ProblemDetail;
 };
 
-export type GetPracticeReviewTimingError = GetPracticeReviewTimingErrors[keyof GetPracticeReviewTimingErrors];
+export type GetReviewTimingError = GetReviewTimingErrors[keyof GetReviewTimingErrors];
 
-export type GetPracticeReviewTimingResponses = {
+export type GetReviewTimingResponses = {
     /**
      * Practice reviews measured
      */
-    200: PracticeReviewTiming;
+    200: ReviewTiming;
 };
 
-export type GetPracticeReviewTimingResponse = GetPracticeReviewTimingResponses[keyof GetPracticeReviewTimingResponses];
+export type GetReviewTimingResponse = GetReviewTimingResponses[keyof GetReviewTimingResponses];
 
-export type GetPracticeReviewWorkFactsData = {
+export type GetReviewData = {
     body?: never;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        /**
-         * Kind of work, e.g. scm.pull_request
-         */
-        artifactKind: string;
-        artifactId: number;
+        reviewId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/reviews/work/{artifactKind}/{artifactId}';
+    url: '/workspaces/{workspaceSlug}/practices/reviews/{reviewId}';
 };
 
-export type GetPracticeReviewWorkFactsErrors = {
+export type GetReviewResponses = {
     /**
-     * Not a pull request, merge request or issue
+     * OK
      */
-    404: ProblemDetail;
+    200: ReviewDetail;
 };
 
-export type GetPracticeReviewWorkFactsError = GetPracticeReviewWorkFactsErrors[keyof GetPracticeReviewWorkFactsErrors];
+export type GetReviewResponse = GetReviewResponses[keyof GetReviewResponses];
 
-export type GetPracticeReviewWorkFactsResponses = {
-    /**
-     * Facts returned
-     */
-    200: ReviewWorkFacts;
-    /**
-     * Nothing is stored about this work here: it is in no repository this workspace monitors, or the provider deleted it
-     */
-    204: void;
+export type CancelReviewData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        reviewId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/reviews/{reviewId}/cancel';
 };
 
-export type GetPracticeReviewWorkFactsResponse = GetPracticeReviewWorkFactsResponses[keyof GetPracticeReviewWorkFactsResponses];
+export type CancelReviewResponses = {
+    /**
+     * Completed
+     */
+    200: Review;
+    /**
+     * Accepted
+     */
+    202: Review;
+};
 
-export type ListPracticeStandingsData = {
+export type CancelReviewResponse = CancelReviewResponses[keyof CancelReviewResponses];
+
+export type ListReviewFeedbackChecksData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        reviewId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/reviews/{reviewId}/feedback-checks';
+};
+
+export type ListReviewFeedbackChecksResponses = {
+    /**
+     * OK
+     */
+    200: Array<FeedbackCheck>;
+};
+
+export type ListReviewFeedbackChecksResponse = ListReviewFeedbackChecksResponses[keyof ListReviewFeedbackChecksResponses];
+
+export type ListReviewPracticeScriptsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        reviewId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/reviews/{reviewId}/practice-scripts';
+};
+
+export type ListReviewPracticeScriptsResponses = {
+    /**
+     * OK
+     */
+    200: Array<PracticeScriptRun>;
+};
+
+export type ListReviewPracticeScriptsResponse = ListReviewPracticeScriptsResponses[keyof ListReviewPracticeScriptsResponses];
+
+export type GetReviewUsageData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        reviewId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/reviews/{reviewId}/usage';
+};
+
+export type GetReviewUsageResponses = {
+    /**
+     * OK
+     */
+    200: ReviewUsage;
+};
+
+export type GetReviewUsageResponse = GetReviewUsageResponses[keyof GetReviewUsageResponses];
+
+export type ListScansData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        repositoryItemId?: string;
+        status?: 'QUEUED' | 'RUNNING' | 'COMPLETE' | 'PARTIAL' | 'FAILED' | 'CANCELLED';
+        page?: number;
+        size?: number;
+    };
+    url: '/workspaces/{workspaceSlug}/practices/scans';
+};
+
+export type ListScansResponses = {
+    /**
+     * OK
+     */
+    200: PageResponseDtoScanSummary;
+};
+
+export type ListScansResponse = ListScansResponses[keyof ListScansResponses];
+
+export type StartScanData = {
+    body: StartScanRequest;
+    headers: {
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/scans';
+};
+
+export type StartScanResponses = {
+    /**
+     * Accepted
+     */
+    202: ScanSummary;
+};
+
+export type StartScanResponse = StartScanResponses[keyof StartScanResponses];
+
+export type GetScanData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        scanId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/scans/{scanId}';
+};
+
+export type GetScanResponses = {
+    /**
+     * OK
+     */
+    200: ScanDetail;
+};
+
+export type GetScanResponse = GetScanResponses[keyof GetScanResponses];
+
+export type GetScanReportData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        scanId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/scans/{scanId}/report';
+};
+
+export type GetScanReportResponses = {
+    /**
+     * OK
+     */
+    200: ScanReport;
+};
+
+export type GetScanReportResponse = GetScanReportResponses[keyof GetScanReportResponses];
+
+export type ListScanReportItemsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        scanId: string;
+    };
+    query?: {
+        cursor?: string;
+        size?: number;
+        practiceSlug?: string;
+        outcome?: 'MET' | 'NOT_MET' | 'DOES_NOT_APPLY' | 'COULD_NOT_DETERMINE';
+        status?: string;
+        reused?: boolean;
+        path?: string;
+    };
+    url: '/workspaces/{workspaceSlug}/practices/scans/{scanId}/report/items';
+};
+
+export type ListScanReportItemsResponses = {
+    /**
+     * OK
+     */
+    200: ScanReportItemsPage;
+};
+
+export type ListScanReportItemsResponse = ListScanReportItemsResponses[keyof ListScanReportItemsResponses];
+
+export type ListScanReportProblemsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        scanId: string;
+    };
+    query?: {
+        cursor?: string;
+        size?: number;
+        practiceSlug?: string;
+        severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'TRIVIAL';
+        path?: string;
+        baselineState?: 'NEW' | 'UNCHANGED' | 'UPDATED' | 'ABSENT';
+        openOnly?: boolean;
+    };
+    url: '/workspaces/{workspaceSlug}/practices/scans/{scanId}/report/problems';
+};
+
+export type ListScanReportProblemsResponses = {
+    /**
+     * OK
+     */
+    200: ScanReportProblemsPage;
+};
+
+export type ListScanReportProblemsResponse = ListScanReportProblemsResponses[keyof ListScanReportProblemsResponses];
+
+export type ExportScanSarifData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        scanId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/scans/{scanId}/report/sarif';
+};
+
+export type ExportScanSarifResponses = {
+    /**
+     * SARIF report
+     */
+    200: Blob | File;
+};
+
+export type ExportScanSarifResponse = ExportScanSarifResponses[keyof ExportScanSarifResponses];
+
+export type UpdateScanStatusData = {
+    body: CancelScanRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        scanId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/scans/{scanId}/status';
+};
+
+export type UpdateScanStatusResponses = {
+    /**
+     * Completed
+     */
+    200: ScanDetail;
+    /**
+     * Accepted
+     */
+    202: ScanDetail;
+};
+
+export type UpdateScanStatusResponse = UpdateScanStatusResponses[keyof UpdateScanStatusResponses];
+
+export type GetOwnPracticeStandingsData = {
     body?: never;
     path: {
         /**
@@ -15378,16 +13543,16 @@ export type ListPracticeStandingsData = {
     url: '/workspaces/{workspaceSlug}/practices/standings';
 };
 
-export type ListPracticeStandingsResponses = {
+export type GetOwnPracticeStandingsResponses = {
     /**
      * Practice standings returned
      */
     200: Array<PracticeStanding>;
 };
 
-export type ListPracticeStandingsResponse = ListPracticeStandingsResponses[keyof ListPracticeStandingsResponses];
+export type GetOwnPracticeStandingsResponse = GetOwnPracticeStandingsResponses[keyof GetOwnPracticeStandingsResponses];
 
-export type ListSweepSchedulesData = {
+export type GetPracticeWorkspaceTilesData = {
     body?: never;
     path: {
         /**
@@ -15396,249 +13561,19 @@ export type ListSweepSchedulesData = {
         workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/sweep-schedules';
+    url: '/workspaces/{workspaceSlug}/practices/tiles';
 };
 
-export type ListSweepSchedulesResponses = {
+export type GetPracticeWorkspaceTilesResponses = {
     /**
-     * Schedules returned
+     * OK
      */
-    200: Array<ReviewSweepSchedule>;
+    200: Array<PracticeWorkspaceTile>;
 };
 
-export type ListSweepSchedulesResponse = ListSweepSchedulesResponses[keyof ListSweepSchedulesResponses];
+export type GetPracticeWorkspaceTilesResponse = GetPracticeWorkspaceTilesResponses[keyof GetPracticeWorkspaceTilesResponses];
 
-export type CreateSweepScheduleData = {
-    body: CreateReviewSweepScheduleRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/sweep-schedules';
-};
-
-export type CreateSweepScheduleErrors = {
-    /**
-     * The kind cannot be swept, or the lookback is longer than the cadence allows
-     */
-    400: ProblemDetail;
-    /**
-     * This workspace already sweeps that kind of work
-     */
-    409: ProblemDetail;
-};
-
-export type CreateSweepScheduleError = CreateSweepScheduleErrors[keyof CreateSweepScheduleErrors];
-
-export type CreateSweepScheduleResponses = {
-    /**
-     * Schedule created
-     */
-    201: ReviewSweepSchedule;
-};
-
-export type CreateSweepScheduleResponse = CreateSweepScheduleResponses[keyof CreateSweepScheduleResponses];
-
-export type DeleteSweepScheduleData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        scheduleId: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/sweep-schedules/{scheduleId}';
-};
-
-export type DeleteSweepScheduleErrors = {
-    /**
-     * No such schedule in this workspace
-     */
-    404: ProblemDetail;
-};
-
-export type DeleteSweepScheduleError = DeleteSweepScheduleErrors[keyof DeleteSweepScheduleErrors];
-
-export type DeleteSweepScheduleResponses = {
-    /**
-     * Schedule removed
-     */
-    204: void;
-};
-
-export type DeleteSweepScheduleResponse = DeleteSweepScheduleResponses[keyof DeleteSweepScheduleResponses];
-
-export type ReplaceSweepScheduleData = {
-    body: UpdateReviewSweepScheduleRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        scheduleId: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/sweep-schedules/{scheduleId}';
-};
-
-export type ReplaceSweepScheduleErrors = {
-    /**
-     * No such schedule in this workspace
-     */
-    404: ProblemDetail;
-};
-
-export type ReplaceSweepScheduleError = ReplaceSweepScheduleErrors[keyof ReplaceSweepScheduleErrors];
-
-export type ReplaceSweepScheduleResponses = {
-    /**
-     * Schedule updated
-     */
-    200: ReviewSweepSchedule;
-};
-
-export type ReplaceSweepScheduleResponse = ReplaceSweepScheduleResponses[keyof ReplaceSweepScheduleResponses];
-
-export type ListTracedArtifactsData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: {
-        page?: number;
-        size?: number;
-        /**
-         * Restrict to one kind of work, e.g. scm.pull_request
-         */
-        artifactKind?: string;
-        /**
-         * Restrict to one piece of work; requires artifactKind
-         */
-        artifactId?: number;
-        /**
-         * Inclusive lower bound on when a signal occurred
-         */
-        from?: string;
-        /**
-         * Exclusive upper bound on when a signal occurred
-         */
-        to?: string;
-        /**
-         * Only the work none of whose signals in the window started a review, which is the work somebody expected a review on and did not get one
-         */
-        withoutReview?: boolean;
-    };
-    url: '/workspaces/{workspaceSlug}/practices/trace';
-};
-
-export type ListTracedArtifactsErrors = {
-    /**
-     * Unknown artifact kind, a backwards window or invalid pagination
-     */
-    400: ProblemDetail;
-    /**
-     * Workspace administrator access is required
-     */
-    403: ProblemDetail;
-};
-
-export type ListTracedArtifactsError = ListTracedArtifactsErrors[keyof ListTracedArtifactsErrors];
-
-export type ListTracedArtifactsResponses = {
-    /**
-     * Paginated artifacts returned
-     */
-    200: PagedModelTracedArtifact;
-};
-
-export type ListTracedArtifactsResponse = ListTracedArtifactsResponses[keyof ListTracedArtifactsResponses];
-
-export type GetArtifactTraceData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        /**
-         * Kind of work, e.g. scm.pull_request
-         */
-        artifactKind: string;
-        /**
-         * The artifact's identifier as the ledger stores it
-         */
-        artifactId: number;
-    };
-    query?: {
-        /**
-         * Answer for this review alone: every state, explanation and count is what this review made of the work. Omit it for every review of the work at once, which only a workspace admin may.
-         */
-        reviewId?: string;
-    };
-    url: '/workspaces/{workspaceSlug}/practices/trace/{artifactKind}/{artifactId}';
-};
-
-export type GetArtifactTraceErrors = {
-    /**
-     * Nothing recorded about this artifact in this workspace, the named review never ran on it, or the caller may not read it
-     */
-    404: ProblemDetail;
-};
-
-export type GetArtifactTraceError = GetArtifactTraceErrors[keyof GetArtifactTraceErrors];
-
-export type GetArtifactTraceResponses = {
-    /**
-     * Trace returned
-     */
-    200: ArtifactTrace;
-};
-
-export type GetArtifactTraceResponse = GetArtifactTraceResponses[keyof GetArtifactTraceResponses];
-
-export type GetOwnArtifactTraceData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        artifactKind: string;
-        artifactId: number;
-    };
-    query: {
-        reviewId: string;
-    };
-    url: '/workspaces/{workspaceSlug}/practices/trace/{artifactKind}/{artifactId}/own';
-};
-
-export type GetOwnArtifactTraceErrors = {
-    /**
-     * The caller has no accessible review on this work
-     */
-    404: ProblemDetail;
-};
-
-export type GetOwnArtifactTraceError = GetOwnArtifactTraceErrors[keyof GetOwnArtifactTraceErrors];
-
-export type GetOwnArtifactTraceResponses = {
-    /**
-     * The caller's trace returned
-     */
-    200: ArtifactTrace;
-};
-
-export type GetOwnArtifactTraceResponse = GetOwnArtifactTraceResponses[keyof GetOwnArtifactTraceResponses];
-
-export type GetPracticesAcrossWorkspaceData = {
+export type GetPracticeWorkspaceOverviewData = {
     body?: never;
     path: {
         /**
@@ -15650,37 +13585,14 @@ export type GetPracticesAcrossWorkspaceData = {
     url: '/workspaces/{workspaceSlug}/practices/workspace-overview';
 };
 
-export type GetPracticesAcrossWorkspaceResponses = {
+export type GetPracticeWorkspaceOverviewResponses = {
     /**
-     * Practices across the workspace returned
+     * OK
      */
-    200: PracticesAcrossWorkspace;
+    200: PracticeWorkspaceOverview;
 };
 
-export type GetPracticesAcrossWorkspaceResponse = GetPracticesAcrossWorkspaceResponses[keyof GetPracticesAcrossWorkspaceResponses];
-
-export type GetPracticesAcrossWorkspaceTilesData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query: {
-        window: 'ALL_TIME' | 'DAYS_30' | 'DAYS_90';
-    };
-    url: '/workspaces/{workspaceSlug}/practices/workspace-overview/tiles';
-};
-
-export type GetPracticesAcrossWorkspaceTilesResponses = {
-    /**
-     * The tiles for the window returned
-     */
-    200: PracticesAcrossWorkspaceTiles;
-};
-
-export type GetPracticesAcrossWorkspaceTilesResponse = GetPracticesAcrossWorkspaceTilesResponses[keyof GetPracticesAcrossWorkspaceTilesResponses];
+export type GetPracticeWorkspaceOverviewResponse = GetPracticeWorkspaceOverviewResponses[keyof GetPracticeWorkspaceOverviewResponses];
 
 export type DeletePracticeData = {
     body?: never;
@@ -15694,15 +13606,6 @@ export type DeletePracticeData = {
     query?: never;
     url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}';
 };
-
-export type DeletePracticeErrors = {
-    /**
-     * Practice not found
-     */
-    404: ProblemDetail;
-};
-
-export type DeletePracticeError = DeletePracticeErrors[keyof DeletePracticeErrors];
 
 export type DeletePracticeResponses = {
     /**
@@ -15726,18 +13629,9 @@ export type GetPracticeData = {
     url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}';
 };
 
-export type GetPracticeErrors = {
-    /**
-     * Practice not found
-     */
-    404: ProblemDetail;
-};
-
-export type GetPracticeError = GetPracticeErrors[keyof GetPracticeErrors];
-
 export type GetPracticeResponses = {
     /**
-     * Practice returned
+     * OK
      */
     200: Practice;
 };
@@ -15757,26 +13651,20 @@ export type UpdatePracticeData = {
     url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}';
 };
 
-export type UpdatePracticeErrors = {
-    /**
-     * Practice or practice group not found
-     */
-    404: ProblemDetail;
-};
-
-export type UpdatePracticeError = UpdatePracticeErrors[keyof UpdatePracticeErrors];
-
 export type UpdatePracticeResponses = {
     /**
-     * Practice updated
+     * OK
      */
     200: Practice;
 };
 
 export type UpdatePracticeResponse = UpdatePracticeResponses[keyof UpdatePracticeResponses];
 
-export type SetAutonomyData = {
-    body: UpdatePracticeAutonomyRequest;
+export type ResetPracticeToCatalogData = {
+    body?: never;
+    headers?: {
+        'If-Match'?: string;
+    };
     path: {
         /**
          * Workspace slug
@@ -15785,32 +13673,63 @@ export type SetAutonomyData = {
         practiceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/autonomy';
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/catalog-customization';
 };
 
-export type SetAutonomyErrors = {
+export type ResetPracticeToCatalogResponses = {
     /**
-     * The autonomy cannot be selected because this practice's review settings cannot run an automated review at any autonomy above OFF
-     */
-    400: ProblemDetail;
-    /**
-     * Practice not found
-     */
-    404: ProblemDetail;
-};
-
-export type SetAutonomyError = SetAutonomyErrors[keyof SetAutonomyErrors];
-
-export type SetAutonomyResponses = {
-    /**
-     * Autonomy updated; the response carries the autonomy now in force and where it came from
+     * OK
      */
     200: Practice;
 };
 
-export type SetAutonomyResponse = SetAutonomyResponses[keyof SetAutonomyResponses];
+export type ResetPracticeToCatalogResponse = ResetPracticeToCatalogResponses[keyof ResetPracticeToCatalogResponses];
 
-export type BindGroupData = {
+export type SetPracticeFeedbackModeData = {
+    body: SetFeedbackModeRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        practiceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/feedback-mode';
+};
+
+export type SetPracticeFeedbackModeResponses = {
+    /**
+     * OK
+     */
+    200: Practice;
+};
+
+export type SetPracticeFeedbackModeResponse = SetPracticeFeedbackModeResponses[keyof SetPracticeFeedbackModeResponses];
+
+export type MovePracticeData = {
+    body: MovePracticeRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        practiceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/group';
+};
+
+export type MovePracticeResponses = {
+    /**
+     * OK
+     */
+    200: Array<Practice>;
+};
+
+export type MovePracticeResponse = MovePracticeResponses[keyof MovePracticeResponses];
+
+export type BindPracticeGroupData = {
     body: BindPracticeGroupRequest;
     path: {
         /**
@@ -15823,26 +13742,20 @@ export type BindGroupData = {
     url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/group';
 };
 
-export type BindGroupErrors = {
+export type BindPracticeGroupResponses = {
     /**
-     * Practice or group not found
-     */
-    404: ProblemDetail;
-};
-
-export type BindGroupError = BindGroupErrors[keyof BindGroupErrors];
-
-export type BindGroupResponses = {
-    /**
-     * Practice moved
+     * OK
      */
     200: Practice;
 };
 
-export type BindGroupResponse = BindGroupResponses[keyof BindGroupResponses];
+export type BindPracticeGroupResponse = BindPracticeGroupResponses[keyof BindPracticeGroupResponses];
 
 export type GetPracticeGuidanceData = {
     body?: never;
+    headers?: {
+        'If-None-Match'?: string;
+    };
     path: {
         /**
          * Workspace slug
@@ -15854,60 +13767,16 @@ export type GetPracticeGuidanceData = {
     url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/guidance';
 };
 
-export type GetPracticeGuidanceErrors = {
-    /**
-     * Practice not found
-     */
-    404: ProblemDetail;
-};
-
-export type GetPracticeGuidanceError = GetPracticeGuidanceErrors[keyof GetPracticeGuidanceErrors];
-
 export type GetPracticeGuidanceResponses = {
     /**
-     * Guidance returned
+     * Practice guidance
      */
-    200: PracticeGuidance;
+    200: PracticeGuidanceDto;
 };
 
 export type GetPracticeGuidanceResponse = GetPracticeGuidanceResponses[keyof GetPracticeGuidanceResponses];
 
-export type PlacePracticeData = {
-    body: PlacePracticeRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        practiceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/placement';
-};
-
-export type PlacePracticeErrors = {
-    /**
-     * position is missing, negative, or beyond the destination
-     */
-    400: ProblemDetail;
-    /**
-     * Practice or group not found
-     */
-    404: ProblemDetail;
-};
-
-export type PlacePracticeError = PlacePracticeErrors[keyof PlacePracticeErrors];
-
-export type PlacePracticeResponses = {
-    /**
-     * Practice placed; the full updated practice list is returned
-     */
-    200: Array<Practice>;
-};
-
-export type PlacePracticeResponse = PlacePracticeResponses[keyof PlacePracticeResponses];
-
-export type ListPracticeRevisionsData = {
+export type ListPracticeVersionsData = {
     body?: never;
     path: {
         /**
@@ -15917,26 +13786,17 @@ export type ListPracticeRevisionsData = {
         practiceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/revisions';
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/versions';
 };
 
-export type ListPracticeRevisionsErrors = {
+export type ListPracticeVersionsResponses = {
     /**
-     * Practice not found
+     * OK
      */
-    404: ProblemDetail;
+    200: Array<PracticeVersion>;
 };
 
-export type ListPracticeRevisionsError = ListPracticeRevisionsErrors[keyof ListPracticeRevisionsErrors];
-
-export type ListPracticeRevisionsResponses = {
-    /**
-     * Versions returned
-     */
-    200: Array<PracticeRevision>;
-};
-
-export type ListPracticeRevisionsResponse = ListPracticeRevisionsResponses[keyof ListPracticeRevisionsResponses];
+export type ListPracticeVersionsResponse = ListPracticeVersionsResponses[keyof ListPracticeVersionsResponses];
 
 export type SubmitWorkspaceProductFeedbackData = {
     body: FeedbackRequest;
@@ -16347,7 +14207,7 @@ export type GetAllTeamsData = {
 
 export type GetAllTeamsResponses = {
     /**
-     * list of teams with their members and permissions
+     * OK
      */
     200: Array<TeamInfo>;
 };
@@ -16355,24 +14215,15 @@ export type GetAllTeamsResponses = {
 export type GetAllTeamsResponse = GetAllTeamsResponses[keyof GetAllTeamsResponses];
 
 export type UpdateTeamVisibilityData = {
-    /**
-     * whether to hide the team (body parameter, preferred)
-     */
     body?: boolean;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        /**
-         * the team ID
-         */
         id: number;
     };
     query?: {
-        /**
-         * whether to hide the team (query parameter, fallback)
-         */
         hidden?: boolean;
     };
     url: '/workspaces/{workspaceSlug}/team/{id}/visibility';
@@ -16380,7 +14231,7 @@ export type UpdateTeamVisibilityData = {
 
 export type UpdateTeamVisibilityResponses = {
     /**
-     * 200 OK on success, 404 if team not found
+     * OK
      */
     200: unknown;
 };
@@ -16462,9 +14313,6 @@ export type GetTeamSettingsData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        /**
-         * the team ID
-         */
         teamId: number;
     };
     query?: never;
@@ -16481,18 +14329,12 @@ export type GetTeamSettingsResponses = {
 export type GetTeamSettingsResponse = GetTeamSettingsResponses[keyof GetTeamSettingsResponses];
 
 export type UpdateTeamSettingsData = {
-    /**
-     * the update request containing the hidden flag
-     */
     body: UpdateTeamSettingsRequest;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        /**
-         * the team ID
-         */
         teamId: number;
     };
     query?: never;
@@ -16524,9 +14366,6 @@ export type GetLabelFiltersData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        /**
-         * the team ID
-         */
         teamId: number;
     };
     query?: never;
@@ -16549,13 +14388,7 @@ export type RemoveLabelFilterData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        /**
-         * the team ID
-         */
         teamId: number;
-        /**
-         * the label ID to remove as filter
-         */
         labelId: number;
     };
     query?: never;
@@ -16585,13 +14418,7 @@ export type AddLabelFilterData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        /**
-         * the team ID
-         */
         teamId: number;
-        /**
-         * the label ID to add as filter
-         */
         labelId: number;
     };
     query?: never;
@@ -16619,13 +14446,7 @@ export type GetRepositorySettingsData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        /**
-         * the team ID
-         */
         teamId: number;
-        /**
-         * the repository ID
-         */
         repositoryId: number;
     };
     query?: never;
@@ -16642,22 +14463,13 @@ export type GetRepositorySettingsResponses = {
 export type GetRepositorySettingsResponse = GetRepositorySettingsResponses[keyof GetRepositorySettingsResponses];
 
 export type UpdateRepositorySettingsData = {
-    /**
-     * the update request containing the hiddenFromContributions flag
-     */
     body: UpdateRepositorySettingsRequest;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        /**
-         * the team ID
-         */
         teamId: number;
-        /**
-         * the repository ID
-         */
         repositoryId: number;
     };
     query?: never;
@@ -16722,7 +14534,7 @@ export type ListUserViewUsersResponses = {
     /**
      * OK
      */
-    200: PageResponseDtoUserViewUser;
+    200: PageResponseDtoUserViewAccount;
 };
 
 export type ListUserViewUsersResponse = ListUserViewUsersResponses[keyof ListUserViewUsersResponses];
@@ -16731,7 +14543,7 @@ export type GetUserViewUserData = {
     body?: never;
     headers: {
         /**
-         * Why the administrator views this user: percent-encoded UTF-8, 1–500 characters
+         * Why the administrator views this account: percent-encoded UTF-8, 1–500 characters
          */
         'X-User-View-Reason': string;
     };
@@ -16740,17 +14552,17 @@ export type GetUserViewUserData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        userId: number;
+        accountId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/user-view/users/{userId}';
+    url: '/workspaces/{workspaceSlug}/user-view/users/{accountId}';
 };
 
 export type GetUserViewUserResponses = {
     /**
      * OK
      */
-    200: UserViewUser;
+    200: UserViewAccount;
 };
 
 export type GetUserViewUserResponse = GetUserViewUserResponses[keyof GetUserViewUserResponses];

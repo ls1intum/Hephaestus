@@ -2,11 +2,12 @@ package de.tum.cit.aet.hephaestus.practices;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.practices.model.Outcome;
-import de.tum.cit.aet.hephaestus.practices.model.Severity;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
+import de.tum.cit.aet.hephaestus.practices.spi.Severity;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
@@ -20,7 +21,7 @@ class CatalogCriteriaCasesTest extends BaseUnitTest {
                 var casesStream = getClass().getResourceAsStream("/practices/criteria-cases.json")) {
             assertThat(catalogueStream).isNotNull();
             assertThat(casesStream).isNotNull();
-            var catalogue = mapper.readTree(catalogueStream);
+            var catalogue = mapper.readTree(Objects.requireNonNull(catalogueStream));
             Set<String> slugs = new HashSet<>();
             for (var group : catalogue.path("groups")) {
                 for (var practice : group.path("practices")) {
@@ -28,7 +29,7 @@ class CatalogCriteriaCasesTest extends BaseUnitTest {
                 }
             }
             Set<String> ids = new HashSet<>();
-            for (var scenario : mapper.readTree(casesStream)) {
+            for (var scenario : mapper.readTree(Objects.requireNonNull(casesStream))) {
                 assertThat(ids.add(scenario.path("id").asString()))
                         .as("unique case ID")
                         .isTrue();
@@ -38,15 +39,15 @@ class CatalogCriteriaCasesTest extends BaseUnitTest {
                 assertThat(scenario.path("expected").properties()).isNotEmpty();
                 for (var expected : scenario.path("expected").properties()) {
                     assertThat(slugs).contains(expected.getKey());
-                    assertThat(Outcome.values())
-                            .extracting(Outcome::name)
+                    assertThat(ResultOutcome.values())
+                            .extracting(ResultOutcome::name)
                             .contains(expected.getValue().asString());
                 }
                 // Severity is asserted only where the case names one, and only an expected NOT_MET carries one.
                 for (var severity : scenario.path("expectedSeverity").properties()) {
                     assertThat(scenario.path("expected").path(severity.getKey()).asString())
                             .as("%s expects a severity only for NOT_MET", scenario.path("id"))
-                            .isEqualTo(Outcome.NOT_MET.name());
+                            .isEqualTo(ResultOutcome.NOT_MET.name());
                     assertThat(Severity.values())
                             .extracting(Severity::name)
                             .contains(severity.getValue().asString());

@@ -20,24 +20,8 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
- * OAuth2 user service for Outline registrations. Outline (v0.77+) is a plain OAuth2 provider —
- * <em>not</em> OIDC: it issues no id_token and has no discovery or GET-userinfo endpoint. Identity
- * comes from {@code POST {base}/api/auth.info} with the user's access token, which returns
- * {@code {data:{user:{id,name,email,avatarUrl}, team:{id,name}}}}.
- *
- * <p>This service performs that POST (the registration's userInfoUri, set by
- * {@code LoginProviderClientRegistrationRepository}, points at {@code /api/auth.info}) and flattens
- * the nested payload into top-level principal attributes: {@code id}, {@code name}, {@code email},
- * {@code avatar_url}, plus {@code team_id} — the flat key {@code AccountProvisioningService.teamIdOf}
- * already resolves, so the Outline team UUID lands on {@code IdentityLink.teamId} exactly like a
- * Slack workspace id. The principal keys on the immutable Outline user UUID ({@code id} — the
- * registration's userNameAttributeName), never a mutable name/email (nOAuth defence).
- *
- * <p>A missing user id or team id fails the login with an {@link OAuth2AuthenticationException}
- * (fail closed — a link without a stable subject or tenant key would corrupt identity resolution).
- * The outbound call rides the SSRF-guarded connector: the base URL is admin-configured (and
- * HTTPS/SSRF-validated on write), but defence in depth is the house rule for any URL that is not
- * ours. Routed ONLY for OUTLINE-typed registrations — see {@code AuthSecurityConfig#oauthUserService}.
+ * Outline supplies identity through POST /api/auth.info, without OIDC discovery or a userinfo endpoint.
+ * Both immutable user and team ids are required; missing ids cause {@link OAuth2AuthenticationException}.
  */
 public class OutlineAuthInfoUserService implements OAuth2UserService<OAuth2UserRequest, OAuth2User> {
 
@@ -92,8 +76,8 @@ public class OutlineAuthInfoUserService implements OAuth2UserService<OAuth2UserR
     }
 
     /**
-     * Flattens Outline's nested {@code {data:{user,team}}} payload into principal attributes.
-     * Fails closed when the user id or team id is missing.
+     * Flattens Outline's nested {@code {data:{user,team}}} payload into principal attributes. Fails
+     * closed when the user id or team id is missing.
      */
     static Map<String, Object> toAttributes(@Nullable Map<String, Object> body) {
         Map<String, Object> data = nestedObject(body, "data");

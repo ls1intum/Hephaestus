@@ -1,11 +1,11 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
-import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
-import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
-import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.MentorChatRequest;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.evidence.capture.ContentSource;
+import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
+import de.tum.cit.aet.hephaestus.integration.core.spi.MentorUserCounts;
+import de.tum.cit.aet.hephaestus.integration.core.spi.MentorWorkQuery;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -19,14 +19,7 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Materialises {@code inputs/context/user.json} for {@link MentorChatRequest}.
- *
- * <p>The provider does NOT decide whether a piece of data is relevant — the agent does, given the
- * full week/last-week numbers and a small set of pre-generated insight strings.
- *
- * <p>Personal context is read for each turn, not retained in a formatted-content cache.
- */
+// Read personal context for each turn; a formatted cache could retain stale personal data.
 @Component
 @RequiredArgsConstructor
 public class UserContentSource implements ContentSource {
@@ -37,13 +30,13 @@ public class UserContentSource implements ContentSource {
     /** Open-PR threshold above which we surface "you have a lot of open PRs" advice. */
     private static final int OPEN_PR_WARNING_THRESHOLD = 3;
 
-    private final UserRepository userRepository;
-    private final MentorContextQueryRepository queryRepository;
+    private final AccountSummaryQuery accounts;
+    private final MentorWorkQuery queryRepository;
     private final ObjectMapper objectMapper;
 
     @Override
-    public boolean supports(ContextRequest request) {
-        return request instanceof MentorChatRequest;
+    public boolean supports(MentorContextRequest request) {
+        return true;
     }
 
     @Override
@@ -56,8 +49,8 @@ public class UserContentSource implements ContentSource {
     /** Tx-on-contribute / not-on-buildPayload AOP convention documented at {@link MentorContextKeys}. */
     @Override
     @Transactional(readOnly = true)
-    public void contribute(ContextRequest request, Map<String, byte[]> files) {
-        MentorChatRequest req = (MentorChatRequest) request;
+    public void contribute(MentorContextRequest request, Map<String, byte[]> files) {
+        MentorContextRequest req = request;
         ObjectNode payload = buildPayload(req.workspaceId(), req.developerId());
         try {
             files.put(OUTPUT_KEY, objectMapper.writeValueAsBytes(payload));
@@ -69,9 +62,8 @@ public class UserContentSource implements ContentSource {
 
     /** Reads the current bounded context; formatted personal copies are not retained between turns. */
     public ObjectNode buildPayload(Long workspaceId, Long developerId) {
-        User user = userRepository
-                .findById(developerId)
-                .orElseThrow(() -> new EntityNotFoundException("User", developerId.toString()));
+        var account = accounts.findAllByIds(List.of(developerId)).get(developerId);
+        if (account == null) throw new EntityNotFoundException("Account", developerId.toString());
 
         Instant now = Instant.now();
         Instant weekAgo = now.minus(7, ChronoUnit.DAYS);
@@ -91,8 +83,7 @@ public class UserContentSource implements ContentSource {
         ObjectNode root = objectMapper.createObjectNode();
 
         ObjectNode userNode = root.putObject("user");
-        userNode.put("login", user.getLogin());
-        userNode.put("name", user.getName());
+        userNode.put("name", account.displayName());
 
         ObjectNode thisWeek = root.putObject("thisWeek");
         thisWeek.put("prsMerged", mergedThisWeek);

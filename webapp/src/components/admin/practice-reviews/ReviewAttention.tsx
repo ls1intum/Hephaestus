@@ -49,7 +49,7 @@ export interface AttentionRange {
 export function ReviewAttention({ approvals }: ReviewAttentionProps) {
 	let body: ReactNode;
 	if (approvals.state.status === "loading") {
-		body = <ReviewResultsSkeleton label="Loading what needs you" rows={1} />;
+		body = <ReviewResultsSkeleton label="Loading what needs you…" rows={1} />;
 	} else if (approvals.state.status === "ready" && approvals.state.total === 0) {
 		body = (
 			<p className="flex items-center gap-2 text-sm text-muted-foreground">

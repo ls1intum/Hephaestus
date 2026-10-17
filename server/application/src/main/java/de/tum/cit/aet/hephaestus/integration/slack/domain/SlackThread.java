@@ -25,10 +25,14 @@ import org.jspecify.annotations.Nullable;
 @Entity
 @Table(
         name = "slack_thread",
-        uniqueConstraints =
-                @UniqueConstraint(
-                        name = "uk_slack_thread",
-                        columnNames = {"workspace_id", "slack_channel_id", "slack_thread_ts"}))
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "uk_slack_thread_tenant",
+                    columnNames = {"id", "workspace_id"}),
+            @UniqueConstraint(
+                    name = "uk_slack_thread",
+                    columnNames = {"workspace_id", "slack_channel_id", "slack_thread_ts"})
+        })
 @Getter
 @Setter
 @NoArgsConstructor
@@ -66,10 +70,10 @@ public class SlackThread {
      * backs the {@code = ANY(...)} membership lookup, which stays a native query because Postgres array membership
      * has no portable JPQL form). {@code NOT NULL DEFAULT '{}'} — never null, empty until participants resolve.
      */
-    @Column(name = "participant_member_ids", nullable = false)
+    @Column(name = "participant_account_ids", nullable = false)
     @JdbcTypeCode(SqlTypes.ARRAY)
     @ColumnDefault("'{}'::bigint[]")
-    private long[] participantMemberIds = new long[0];
+    private long[] participantAccountIds = new long[0];
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

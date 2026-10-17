@@ -15,7 +15,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabWebhookContextResolver;
@@ -180,7 +180,6 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
 
             handler.onMessage(mockMessage(event));
 
-            // The change is published under the delivery the read completes, never as a new occurrence.
             var context = ArgumentCaptor.forClass(ProcessingContext.class);
             verify(mergeRequestProcessor)
                     .replaceClosingIssues(any(), eq(5), eq(List.of(41, 42)), any(), context.capture());
@@ -314,10 +313,6 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
                     null);
         }
 
-        /**
-         * GitLab sends {@code approval} for an approval that leaves approvals missing and {@code unapproval} for a
-         * withdrawal that leaves the approval rules met: the same acts as {@code approved} and {@code unapproved}.
-         */
         static Stream<Arguments> lifecycleActions() {
             BiConsumer<GitLabMergeRequestProcessor, GitLabMergeRequestEventDTO> closed =
                     (processor, event) -> processor.processClosed(eq(event), any(ProcessingContext.class));

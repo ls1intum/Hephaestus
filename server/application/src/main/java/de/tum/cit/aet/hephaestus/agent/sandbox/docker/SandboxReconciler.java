@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.agent.sandbox.docker;
 
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -22,7 +22,6 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
 
 /**
  * Detects and cleans up orphaned sandbox resources.
@@ -48,7 +47,7 @@ public class SandboxReconciler {
     /** A sandbox younger than this is never reaped, so a starting job is not mistaken for an abandoned one. */
     private static final Duration REAP_GRACE = Duration.ofMinutes(2);
 
-    private final AgentJobRepository jobRepository;
+    private final ReviewJobRepository jobRepository;
     private final SandboxContainerManager containerManager;
     private final SandboxNetworkManager networkManager;
     private final Counter orphanedContainers;
@@ -61,7 +60,7 @@ public class SandboxReconciler {
     private final SandboxCreator creator;
 
     public SandboxReconciler(
-            AgentJobRepository jobRepository,
+            ReviewJobRepository jobRepository,
             SandboxContainerManager containerManager,
             SandboxNetworkManager networkManager,
             SandboxVolumeManager volumeManager,
@@ -131,8 +130,8 @@ public class SandboxReconciler {
     private Optional<Set<UUID>> activeJobIds() {
         try {
             return Optional.of(
-                    jobRepository.findByStatusIn(List.of(AgentJobStatus.QUEUED, AgentJobStatus.RUNNING)).stream()
-                            .map(AgentJob::getId)
+                    jobRepository.findByStatusIn(List.of(ReviewJobStatus.QUEUED, ReviewJobStatus.RUNNING)).stream()
+                            .map(ReviewJob::getId)
                             .collect(Collectors.toSet()));
         } catch (Exception e) {
             log.warn("Skipping sandbox reconciliation — active jobs are unreadable: {}", e.getMessage());

@@ -91,7 +91,7 @@ export const OneHeightInEveryState: Story = {
 			{ state: { status: "not-found", instanceHost: "heph.example.test", workLabel: "#1" } },
 			{ feedback: { status: "ready", data: NO_FEEDBACK } },
 			{ feedback: { status: "error", message: "We could not load." } },
-			{ activity: "pending" },
+			{ activity: "RUNNING" },
 			{ stale: { message: "We could not reach Hephaestus." } },
 			{},
 		];
@@ -120,12 +120,12 @@ export const OneHeightInEveryState: Story = {
  */
 export const NotRefreshed: Story = {
 	args: {
-		activity: "pending",
+		activity: "RUNNING",
 		stale: { message: "We could not reach Hephaestus." },
 	},
 	play: async ({ canvas, args }) => {
 		await expect(canvas.getByRole("status")).toHaveTextContent(
-			/^Practice review: Not refreshed: We could not reach Hephaestus\. Last answer: · Review decision pending/u,
+			/^Practice review: Not refreshed: We could not reach Hephaestus\. Last answer: · Review running/u,
 		);
 		await userEvent.click(
 			canvas.getByRole("button", { name: "Retry refreshing the practice review" }),
@@ -226,11 +226,10 @@ export const FollowedInTwoWorkspaces: Story = {
 	},
 };
 
-/** A pending decision is said, and a list row still offers no request. */
-export const DecisionPending: Story = {
-	args: { activity: "pending" },
+export const ReviewRunning: Story = {
+	args: { activity: "RUNNING" },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("status")).toHaveTextContent(/Review decision pending/u);
+		await expect(canvas.getByRole("status")).toHaveTextContent(/Review running/u);
 		await expect(canvas.queryByRole("button", { name: /Request/u })).toBeNull();
 	},
 };

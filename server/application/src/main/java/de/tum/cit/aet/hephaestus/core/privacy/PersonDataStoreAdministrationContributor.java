@@ -63,7 +63,7 @@ final class PersonDataStoreAdministrationContributor implements PersonDataContri
     }
 
     @Override
-    public List<JsonNode> export(PersonDataSelection selection) {
+    public List<JsonNode> export(PersonDataSelection selection, PersonScope frozenScope) {
         List<JsonNode> rows = new ArrayList<>();
         for (var key : selection.rows())
             rows.addAll(jdbc.query(
@@ -76,7 +76,7 @@ final class PersonDataStoreAdministrationContributor implements PersonDataContri
     }
 
     @Override
-    public long erase(PersonDataSelection selection) {
+    public long erase(PersonDataSelection selection, PersonScope frozenScope) {
         long changed = 0;
         for (var key : selection.rows()) changed += jdbc.update("""
                 UPDATE person_data_request

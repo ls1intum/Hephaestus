@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.outline.sync;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocument;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnapshot;
@@ -28,6 +29,7 @@ import org.springframework.stereotype.Component;
  * <p>Losing twice is logged and skipped — the next reconcile re-diffs and converges.
  */
 @Component
+@ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
 public class OutlineMirrorWriter {
 

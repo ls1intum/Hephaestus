@@ -14,6 +14,7 @@ import { VISIBLE_REFRESH_MS } from "~/shared/review-context";
 import type { RpcRequest, RpcResult } from "~/shared/rpc";
 import { createQueryClient } from "~/ui/worker-state";
 import { InlineView } from "~/views/InlineView";
+import { EXTENSION_QUERY_KEYS } from "~/views/query-keys";
 
 /** What the worker answers each command with; a test swaps one to make a refresh fail. */
 const answers = new Map<RpcRequest["type"], () => RpcResult<unknown>>();
@@ -53,11 +54,7 @@ function subjectOf(request: RpcRequest): unknown {
 	return "subject" in request ? request.subject : undefined;
 }
 
-const PAGE_ONLY = new Set<RpcRequest["type"]>([
-	"list-observations",
-	"open-action",
-	"get-report-view",
-]);
+const PAGE_ONLY = new Set<RpcRequest["type"]>(["list-results", "open-action", "get-report-view"]);
 
 beforeEach(() => {
 	notifyManager.setNotifyFunction((notify) => act(notify));
@@ -111,22 +108,22 @@ it("says a failed feedback refresh failed, rather than keep old comments under a
 	expect(container.querySelector("[role=alert]")).not.toBeNull();
 });
 
-it("asks for the reader's observations only once the report is open", async () => {
+it("asks for the reader's results only once the report is open", async () => {
 	answers.set("get-report-view", ok({ expanded: false }));
-	answers.set("list-observations", ok(OWN_PAGE));
+	answers.set("list-results", ok(OWN_PAGE));
 	await act(async () => {
 		root.render(createElement(QueryClientProvider, { client }, createElement(InlineView)));
 	});
 	await vi.waitFor(() =>
 		expect(sent.some((request) => request.type === "get-work-feedback")).toBe(true),
 	);
-	expect(sent.some((request) => request.type === "list-observations")).toBe(false);
+	expect(sent.some((request) => request.type === "list-results")).toBe(false);
 	const toggle = container.querySelector<HTMLButtonElement>("button[aria-expanded=false]");
 	await act(async () => {
 		toggle?.click();
 	});
 	await vi.waitFor(() => expect(container.textContent).toContain(NOT_MET_ROW.summary));
-	expect(sent.filter((request) => request.type === "list-observations")).toHaveLength(1);
+	expect(sent.filter((request) => request.type === "list-results")).toHaveLength(1);
 });
 
 it("reads about a list row only as that row, and keeps no preference for it", async () => {
@@ -163,7 +160,7 @@ it("says a list row's preview is not current when its refresh fails, and keeps t
 		generation: 3,
 	}));
 	await act(async () => {
-		await client.refetchQueries({ queryKey: ["context"] });
+		await client.refetchQueries({ queryKey: EXTENSION_QUERY_KEYS.anyContext });
 	});
 	await vi.waitFor(() => expect(container.textContent).toContain("Not refreshed"));
 	// What it knew stays, marked, and the one way on is on the line.
@@ -173,9 +170,9 @@ it("says a list row's preview is not current when its refresh fails, and keeps t
 	).toStrictEqual(["Retry"]);
 });
 
-it("refreshes new and repaired observations while the report stays open", async () => {
+it("refreshes new and repaired results while the report stays open", async () => {
 	vi.useFakeTimers();
-	answers.set("list-observations", ok({ ...OWN_PAGE, rows: [], total: 0 }));
+	answers.set("list-results", ok({ ...OWN_PAGE, rows: [], total: 0 }));
 	answers.set("get-work-feedback", ok({ ...WORK_FEEDBACK, comments: [] }));
 	await act(async () => {
 		root.render(createElement(QueryClientProvider, { client }, createElement(InlineView)));
@@ -184,10 +181,10 @@ it("refreshes new and repaired observations while the report stays open", async 
 	await act(async () => {
 		await vi.advanceTimersByTimeAsync(100);
 	});
-	expect(container.textContent).toContain("No observations about your work here.");
+	expect(container.textContent).toContain("No results about your work here.");
 	expect(container.textContent).not.toContain(NOT_MET_ROW.summary);
 
-	answers.set("list-observations", ok(OWN_PAGE));
+	answers.set("list-results", ok(OWN_PAGE));
 	await act(async () => {
 		await vi.advanceTimersByTimeAsync(VISIBLE_REFRESH_MS);
 	});
@@ -195,7 +192,7 @@ it("refreshes new and repaired observations while the report stays open", async 
 
 	const repairedSummary = "The repaired description explains the purpose of the change.";
 	answers.set(
-		"list-observations",
+		"list-results",
 		ok({
 			...OWN_PAGE,
 			rows: [{ ...NOT_MET_ROW, outcome: "MET", summary: repairedSummary }],

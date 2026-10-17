@@ -4,7 +4,8 @@ import { ArrowLeftIcon, Users } from "lucide-react";
 import { z } from "zod";
 
 import { getUserViewUser } from "@/api/sdk.gen";
-import type { UserViewUser } from "@/api/types.gen";
+import type { UserViewAccount } from "@/api/types.gen";
+import { accountName } from "@/components/admin/users/account-labels";
 import { UserViewDialog } from "@/components/admin/users/UserViewDialog";
 import { UserViewUsersTable } from "@/components/admin/users/UserViewUsersTable";
 import { ConfirmAccessDialog } from "@/components/auth/ConfirmAccessDialog";
@@ -16,13 +17,17 @@ import { useConfirmAccess } from "@/hooks/use-confirm-access";
 import { useUserViewUsers, useUserViewWorkspace } from "@/hooks/use-user-view";
 import { problemDetailOf, stepUpChallengeOf } from "@/lib/problem-detail";
 import { pageParam, useSearchPatch } from "@/lib/search-params";
-import { hasText } from "@/lib/text";
 import { currentUserQueryOptions } from "@/runtime/auth/guard";
 import { startUserView } from "@/runtime/user-view/session";
 
 export const userViewSearchSchema = z.object({
 	page: z.number().int().nonnegative().optional().catch(undefined),
-	user: z.number().int().positive().optional().catch(undefined),
+	/** The account to view. A provider login is never an account id. */
+	account: z
+		.string()
+		.regex(/^[1-9][0-9]*$/u)
+		.optional()
+		.catch(undefined),
 });
 type Search = z.infer<typeof userViewSearchSchema>;
 
@@ -33,14 +38,16 @@ export function WorkspaceUsersRoute({
 	workspaceSlug: string;
 	search: Search;
 }) {
-	const { page: searchPage, user: selectedId } = search;
+	const { page: searchPage, account: selectedId } = search;
 	const updateSearch = useSearchPatch<Search>();
 	const page = searchPage ?? 0;
 	const workspace = useUserViewWorkspace(workspaceSlug);
 	const users = useUserViewUsers(workspaceSlug, page);
 	const operatorAccountId = useQuery(currentUserQueryOptions()).data?.id;
 	const target =
-		users.status === "ready" ? users.users.find((user) => user.userId === selectedId) : undefined;
+		users.status === "ready"
+			? users.users.find((user) => user.accountId === selectedId)
+			: undefined;
 
 	useClampedPage(page, users.status === "ready" ? users.totalPages : undefined, (next) =>
 		updateSearch({ page: pageParam(next) }),
@@ -61,16 +68,16 @@ export function WorkspaceUsersRoute({
 				state={users}
 				page={page}
 				onPageChange={(next) => updateSearch({ page: pageParam(next) })}
-				onView={(user) => updateSearch({ user: user.userId })}
+				onView={(user) => updateSearch({ account: user.accountId })}
 			/>
 			{target && operatorAccountId !== undefined && (
 				<UserViewEntry
-					key={`${workspaceSlug}:${target.userId}`}
+					key={`${workspaceSlug}:${target.accountId}`}
 					workspaceSlug={workspaceSlug}
 					workspaceName={workspace.status === "ready" ? workspace.displayName : workspaceSlug}
 					user={target}
 					operatorAccountId={operatorAccountId}
-					onClose={() => updateSearch({ user: undefined })}
+					onClose={() => updateSearch({ account: undefined })}
 				/>
 			)}
 		</PageLayout>
@@ -86,14 +93,14 @@ function UserViewEntry({
 }: {
 	workspaceSlug: string;
 	workspaceName: string;
-	user: UserViewUser;
+	user: UserViewAccount;
 	operatorAccountId: number;
 	onClose: () => void;
 }) {
 	const openView = useMutation({
 		mutationFn: async (reason: string) => {
 			const { data } = await getUserViewUser({
-				path: { workspaceSlug, userId: user.userId },
+				path: { workspaceSlug, accountId: user.accountId },
 				headers: { "X-User-View-Reason": encodeURIComponent(reason) },
 				throwOnError: true,
 			});
@@ -107,7 +114,7 @@ function UserViewEntry({
 		<>
 			{challenge === undefined && (
 				<UserViewDialog
-					name={user.name ?? user.login}
+					name={accountName(user.account)}
 					isPending={openView.isPending}
 					error={openView.isError ? problemDetailOf(openView.error) : undefined}
 					onClose={onClose}
@@ -118,10 +125,10 @@ function UserViewEntry({
 									operatorAccountId,
 									workspaceSlug,
 									workspaceName,
-									userId: data.userId,
-									login: data.login,
-									name: hasText(data.name) ? data.name : data.login,
-									hasAccount: data.accountId != null,
+									accountId: data.accountId,
+									providerLogin: data.providerLogin,
+									name: accountName(data.account),
+									unclaimed: data.account.status === "UNCLAIMED",
 									reason,
 								}),
 						})

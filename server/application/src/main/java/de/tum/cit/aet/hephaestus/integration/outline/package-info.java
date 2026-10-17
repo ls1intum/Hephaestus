@@ -1,17 +1,16 @@
-/**
- * Outline vendor adapter: mirrors allow-listed Outline collections into local documents and projects them
- * into the agent's context so design docs and decision records reach practice reviews. A closed Modulith
- * module — the agent reads through its own {@code agent::documentation-source} SPI, which this module
- * implements. It records document signals into the shared ledger but produces no observations
- * of its own — a review of a document is composed in the agent module, off that ledger.
- */
 @org.springframework.modulith.ApplicationModule(
         displayName = "Integration · Outline",
         allowedDependencies = {
+            "integration.chat::item",
+            "integration.docs::item",
+            "evidence",
+            "evidence::capture",
             "core::person-data",
             // Connection registry + SPI ports (credential provider, manifest, lifecycle listener, connect strategy).
             "integration.core",
+            "integration.core::framework",
             "integration.core::spi",
+            "integration.core::items",
             // OutlineWebhookMessageHandler rides the JetStream consumer lane (ADR 0023 §3).
             "integration.core::handler",
             // The scope consumer is reconciled when the stored subscription id changes.
@@ -30,10 +29,11 @@
             // Admin controllers sit behind the workspace admin guard and resolve the workspace via WorkspaceContext.
             "workspace::authorization",
             "workspace::context",
-            // Document authors resolve through auth SPI ports only — never core.auth or SCM domain types.
+            // Document authors resolve through auth SPI ports; consent reads the exported account control enums.
             "core::auth-spi",
+            "core::auth-types",
             // Outline owns outline_document and projects it to the agent one-way, so no cycle forms.
-            "agent::documentation-source",
+            "mentor::spi",
         })
 @org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.integration.outline;

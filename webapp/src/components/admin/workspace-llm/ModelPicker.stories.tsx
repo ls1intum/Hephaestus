@@ -1,19 +1,19 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent } from "storybook/test";
 
+import type { AvailableLlmModel } from "@/api/types.gen";
+import { AGENT_PURPOSE_DEFS } from "@/components/practice-vocabulary/agent-purpose-defs";
 import { Label } from "@/components/ui/label";
 import { expectGenuinelyDisabled } from "@/test/controls";
 
-import { mockAvailableModels } from "./fixtures";
+import {
+	mockAvailableModels,
+	mockDecisionModel,
+	mockReasoningDecisionModel,
+	mockRerankModel,
+} from "./fixtures";
 import { ModelPicker } from "./ModelPicker";
 
-/**
- * A model's declared data handling travels with its name: the tier line under each option and the
- * icon beside it are the same registry entry the tables and binding rows show, so an admin choosing
- * a model for a tier row never has to remember what it was declared as. The `tier` prop filters
- * rather than disables the other models: a disabled option would still have to be read past, and
- * the row already says which tier it holds.
- */
 const meta = {
 	component: ModelPicker,
 	parameters: { layout: "centered" },
@@ -24,12 +24,13 @@ const meta = {
 		availableModels: mockAvailableModels,
 		value: null,
 		onChange: fn(),
+		ownProviderAllowed: true,
 	},
 	decorators: [
-		(Story) => (
+		(Story, { args }) => (
 			<div className="w-80">
 				<Label id="review-model-label" htmlFor="review-model" className="mb-2">
-					Review model
+					{args.purpose === undefined ? "Review model" : AGENT_PURPOSE_DEFS[args.purpose].title}
 				</Label>
 				<Story />
 			</div>
@@ -44,6 +45,11 @@ export const Default: Story = {};
 
 export const SharedSelected: Story = {
 	args: { value: { scope: "SHARED", id: 1 } },
+	play: async ({ canvas }) => {
+		const trigger = canvas.getByRole("combobox");
+		await expect(trigger).toHaveTextContent(/^GPT-5\W?$/u);
+		await expect(trigger).not.toHaveTextContent("OpenAI production");
+	},
 };
 
 export const OwnProviderSelected: Story = {
@@ -69,10 +75,12 @@ export const Invalid: Story = {
 export const OpensAndListsGroups: Story = {
 	play: async ({ canvas }) => {
 		await userEvent.click(canvas.getByRole("combobox"));
-		await expect(await screen.findByRole("option", { name: /GPT-5 .* Cloud/u })).toBeVisible();
+		await expect(await screen.findByRole("option", { name: /^GPT-5, .*Cloud/u })).toBeVisible();
 		await expect(
-			await screen.findByRole("option", { name: /My OpenAI key .* Not declared/u }),
+			await screen.findByRole("option", { name: /^My OpenAI key, .*Not declared/u }),
 		).toBeVisible();
+		await expect(screen.getByText("Shared models")).toBeVisible();
+		await expect(screen.getByText("Own provider")).toBeVisible();
 	},
 };
 
@@ -81,7 +89,7 @@ export const FilteredToTier: Story = {
 	play: async ({ canvas }) => {
 		await userEvent.click(canvas.getByRole("combobox"));
 		await expect(
-			await screen.findByRole("option", { name: /Local Llama .* In-house/u }),
+			await screen.findByRole("option", { name: /^Local Llama.*, In-house/u }),
 		).toBeVisible();
 		await expect(screen.getAllByRole("option")).toHaveLength(1);
 	},
@@ -103,12 +111,88 @@ export const NoModelsForTier: Story = {
 			<ModelPicker {...args} />
 			<p id="model-picker-empty" className="text-sm text-muted-foreground">
 				No model declared as <span className="font-medium">Cloud</span> is available yet. Ask an
-				instance admin, or add one under your own providers.
+				instance admin, or add one to a provider under Your providers.
 			</p>
 		</div>
 	),
 	play: async ({ canvas }) => {
 		await expectGenuinelyDisabled(canvas.getByRole("combobox"));
 		await expect(screen.queryByRole("option")).not.toBeInTheDocument();
+	},
+};
+
+export const NoDecisionModelYet: Story = {
+	args: { purpose: "PRACTICE_DECISION", availableModels: [] },
+	play: async ({ canvas }) => {
+		const picker = canvas.getByRole("combobox", { name: "Decision model" });
+		await expectGenuinelyDisabled(picker);
+		await expect(picker).toHaveAccessibleDescription(
+			"No decision model yet. Connect a provider with the Decisions API under Your providers, then add its model.",
+		);
+		await expect(canvas.getByRole("link", { name: "Your providers" })).toHaveAttribute(
+			"href",
+			"#provider-panel",
+		);
+	},
+};
+
+export const NoEmbeddingModelOwnProvidersBlocked: Story = {
+	args: { purpose: "PRACTICE_EMBEDDING", availableModels: [], ownProviderAllowed: false },
+	play: async ({ canvas }) => {
+		await expect(
+			canvas.getByRole("combobox", { name: "Embedding model" }),
+		).toHaveAccessibleDescription("No embedding model yet. Ask an instance admin to share one.");
+	},
+};
+
+export const ReasoningDecisionModel: Story = {
+	args: {
+		purpose: "PRACTICE_DECISION",
+		availableModels: [mockDecisionModel, mockReasoningDecisionModel],
+		value: { scope: "SHARED", id: mockReasoningDecisionModel.id },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("combobox")).toHaveAccessibleDescription(
+			"This model reasons before it answers. Decisions need a model that answers at once with token probabilities.",
+		);
+	},
+};
+
+export const DecisionModelAnswersAtOnce: Story = {
+	args: {
+		purpose: "PRACTICE_DECISION",
+		availableModels: [mockDecisionModel, mockReasoningDecisionModel],
+		value: { scope: "SHARED", id: mockDecisionModel.id },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("combobox")).not.toHaveAccessibleDescription();
+	},
+};
+
+export const UnpricedReranker: Story = {
+	args: {
+		purpose: "PRACTICE_RERANKING",
+		availableModels: [mockRerankModel],
+		value: { scope: "SHARED", id: mockRerankModel.id },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("combobox")).toHaveAccessibleDescription(
+			"If this provider reports no tokens, its calls count as unpriced, which pauses reviews while their spend has a monthly budget. Ask an instance admin to set No metered API cost for a self-hosted reranker.",
+		);
+	},
+};
+
+const ownRerankModel: AvailableLlmModel = { ...mockRerankModel, scope: "WORKSPACE", id: 31 };
+
+export const UnpricedOwnReranker: Story = {
+	args: {
+		purpose: "PRACTICE_RERANKING",
+		availableModels: [ownRerankModel],
+		value: { scope: "WORKSPACE", id: ownRerankModel.id },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("combobox")).toHaveAccessibleDescription(
+			"If this provider reports no tokens, its calls count as unpriced, which pauses reviews while their spend has a monthly cap. Set No metered API cost on this model below for a self-hosted reranker.",
+		);
 	},
 };

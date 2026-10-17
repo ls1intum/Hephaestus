@@ -13,10 +13,10 @@ import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGateway;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.egress.SilentModeGraphQlClientFactory;
 import de.tum.cit.aet.hephaestus.integration.core.egress.SilentModeGraphQlInterceptor;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ApprovalChannel;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ApprovalWriter;
+import de.tum.cit.aet.hephaestus.integration.core.spi.LineNoteWriter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScmCommentReactionSink;
-import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryWriter;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.notification.email.EmailGateway;
 import java.util.function.Consumer;
@@ -37,11 +37,11 @@ class OutboundEgressArchitectureTest extends HephaestusArchitectureTest {
     void shouldDeclareEveryScmWriterAsGateway() {
         ArchRule rule = classes()
                 .that()
-                .areAssignableTo(SummaryChannel.class)
+                .areAssignableTo(SummaryWriter.class)
                 .or()
-                .areAssignableTo(InlineFeedbackChannel.class)
+                .areAssignableTo(LineNoteWriter.class)
                 .or()
-                .areAssignableTo(ApprovalChannel.class)
+                .areAssignableTo(ApprovalWriter.class)
                 .or()
                 .areAssignableTo(ScmCommentReactionSink.class)
                 .and()
@@ -73,11 +73,11 @@ class OutboundEgressArchitectureTest extends HephaestusArchitectureTest {
                 .that()
                 .areAnnotatedWith(OutboundEgressGateway.class)
                 .should()
-                .beAssignableTo(SummaryChannel.class)
+                .beAssignableTo(SummaryWriter.class)
                 .orShould()
-                .beAssignableTo(InlineFeedbackChannel.class)
+                .beAssignableTo(LineNoteWriter.class)
                 .orShould()
-                .beAssignableTo(ApprovalChannel.class)
+                .beAssignableTo(ApprovalWriter.class)
                 .orShould()
                 .beAssignableTo(ScmCommentReactionSink.class)
                 .orShould()

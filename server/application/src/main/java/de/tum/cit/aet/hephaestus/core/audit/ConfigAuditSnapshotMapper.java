@@ -9,25 +9,8 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditSnapshot;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Serializes snapshots for the audit trail.
- *
- * <p>Deliberately a dedicated mapper rather than the shared application one. Two settings are
- * load-bearing and must not drift with global config:
- *
- * <ul>
- *   <li>{@link JsonInclude.Include#ALWAYS} — a null field is meaningful state, not an absent one.
- *       {@code PracticeReviewSettings} uses null for "inherit the fleet default", so under
- *       {@code NON_NULL} the snapshots {@code {cooldownMinutes: 30}} and {@code {}} would differ only
- *       by a key's presence, so "the admin cleared the override back to inherit" would silently vanish
- *       from the diff.</li>
- *   <li>ISO-8601 timestamps rather than epoch numbers, so a snapshot stays readable years later.</li>
- * </ul>
- *
- * <p>Records serialize their components in declaration order, which is what makes the diff and no-op
- * suppression meaningful. The TEXT columns preserve the serialized snapshot,
- * including its key order, without JSON normalization.
- */
+// Audit snapshots must preserve null fields, ISO timestamps, and field order independently of application JSON
+// settings.
 final class ConfigAuditSnapshotMapper {
 
     private static final ObjectMapper MAPPER = JsonMapper.builder()

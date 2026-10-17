@@ -3,20 +3,20 @@
  * a developer sees. The folders are read by pattern, so a new practice's picture and guide appear
  * without a change here. Beside them, a picture that brings its own colors.
  */
-import type { PracticeGuidance, PracticeStanding } from "@/api/types.gen";
+import type { PracticeGuidance, PracticeGuidanceDto, PracticeStanding } from "@/api/types.gen";
 
 import bundledCatalog from "@bundled-practices";
 
 const GUIDED_SLUG = "scope-one-reviewable-change";
 
-/** A catalog practice as its schema allows it: the visual and the guide are optional. */
 interface BundledPractice {
 	slug: string;
-	name: string;
-	whyItMatters?: string;
-	whatGoodLooksLike?: string;
-	visual?: { file: string; alt: string };
-	guide?: string;
+	definition: {
+		name: string;
+		guidance: Pick<PracticeGuidance, "whyItMatters" | "whatGoodLooksLike" | "goingWell">;
+	};
+	visualResource?: { file: string; alt: string } | null;
+	guideResource?: string | null;
 }
 
 /** Guidance files keyed by their path from the guidance folder: `<slug>/guide.md`. */
@@ -49,29 +49,29 @@ function figuresOf(files: GuidanceFiles, slug: string) {
 
 /** One practice's words as its standing holds them and its guidance as the endpoint returns it. */
 function guidedPractice(files: GuidanceFiles, practice: BundledPractice) {
+	const { name, guidance: words } = practice.definition;
+	const { visualResource, guideResource } = practice;
 	return {
 		slug: practice.slug,
-		name: practice.name,
+		name,
 		practice: {
-			whyItMatters: practice.whyItMatters,
-			whatGoodLooksLike: practice.whatGoodLooksLike,
+			whyItMatters: words.whyItMatters,
+			whatGoodLooksLike: words.whatGoodLooksLike,
 		} satisfies Pick<PracticeStanding, "whyItMatters" | "whatGoodLooksLike">,
 		guidance: {
 			practiceSlug: practice.slug,
-			visual:
-				practice.visual === undefined
-					? undefined
-					: { svg: guidanceFile(files, practice.visual.file), alt: practice.visual.alt },
-			guide:
-				practice.guide === undefined
-					? undefined
-					: {
-							markdown: guidanceFile(files, practice.guide),
-							figures: figuresOf(files, practice.slug),
-						},
-		} satisfies PracticeGuidance,
+			visual: hasValue(visualResource)
+				? { svg: guidanceFile(files, visualResource.file), alt: visualResource.alt }
+				: null,
+			guide: hasValue(guideResource)
+				? { markdown: guidanceFile(files, guideResource), figures: figuresOf(files, practice.slug) }
+				: null,
+		} satisfies PracticeGuidanceDto,
 	};
 }
+
+const hasValue = <T>(value: T | null | undefined): value is T =>
+	value !== null && value !== undefined;
 
 /** Every bundled practice group, in catalog order, by slug and name. */
 export const bundledPracticeGroupNames = bundledCatalog.groups.map(({ slug, name }) => ({
@@ -126,10 +126,10 @@ function pilotPractice() {
 			const { whyItMatters, whatGoodLooksLike } = practice;
 			const splitOrder = guide?.figures["split-order"];
 			if (
-				whyItMatters !== undefined &&
-				whatGoodLooksLike !== undefined &&
-				visual !== undefined &&
-				guide !== undefined &&
+				whyItMatters !== null &&
+				whatGoodLooksLike !== null &&
+				visual !== null &&
+				guide !== null &&
 				splitOrder !== undefined
 			) {
 				const figures = { "split-order": splitOrder };

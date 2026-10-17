@@ -1,12 +1,7 @@
-// Derive work/change/ from the captured repository and pinned inputs/context/change.json range.
-// The server stages commits separately in inputs/context/commits.json for verifiable citations.
-// Hunk lines in diff.patch carry [L<n>]: NEW coordinates for additions/context, OLD for deletions.
-// description.authored.md keeps original description.md line numbers after template removal.
+// Build the change view from the captured checkout and pinned range before any script reads it.
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-
-import { SUPPORTED_SCHEMA_VERSION, resolveTaskPaths } from "./pi-task-paths.ts";
 
 export const CHANGE_ROOT = "work/change";
 
@@ -21,13 +16,18 @@ export function readChange(contextRoot: string): { base: string; head: string } 
 		typeof parsed === "object" && parsed !== null ? Reflect.get(parsed, "base_sha") : null;
 	const head: unknown =
 		typeof parsed === "object" && parsed !== null ? Reflect.get(parsed, "head_sha") : null;
-	if (typeof base !== "string" || typeof head !== "string" || !isSha(base) || !isSha(head)) {
+	if (
+		typeof base !== "string" ||
+		typeof head !== "string" ||
+		!isCommitId(base) ||
+		!isCommitId(head)
+	) {
 		throw new Error("change.json: expected base_sha and head_sha as full commit ids");
 	}
 	return { base, head };
 }
 
-function isSha(value: string): boolean {
+export function isCommitId(value: string): boolean {
 	return /^[0-9a-f]{40}$|^[0-9a-f]{64}$/u.test(value);
 }
 
@@ -173,7 +173,7 @@ function git(
 	return child.stdout;
 }
 
-/** What a pinned revision holds at a path, read from Git objects and never from the working tree. */
+/** What a pinned commit holds at a path, read from Git objects and never from the working tree. */
 export type PinnedBlob =
 	| { kind: "regular"; bytes: Buffer }
 	| { kind: "tooLarge"; size: number }
@@ -193,16 +193,16 @@ export function safeRepositoryPath(file: string): boolean {
 }
 
 /**
- * The regular file at `file` in `revision`, read whole only when Git's recorded size is within `limit`. A link, a
+ * The regular file at `file` in `commit`, read whole only when Git's recorded size is within `limit`. A link, a
  * submodule or a directory is named as not a regular file; its target is never followed.
  */
 export function readPinnedBlob(
 	repository: string,
-	revision: string,
+	commit: string,
 	file: string,
 	limit: number,
 ): PinnedBlob {
-	if (!isSha(revision) || !safeRepositoryPath(file)) {
+	if (!isCommitId(commit) || !safeRepositoryPath(file)) {
 		return { kind: "unsafe" };
 	}
 	let entry: RegExpExecArray | null;
@@ -213,7 +213,7 @@ export function readPinnedBlob(
 			"-l",
 			"-z",
 			"--full-tree",
-			revision,
+			commit,
 			"--",
 			file,
 		]).toString("utf8");
@@ -271,7 +271,7 @@ export function pinnedDiff(
 	head: string,
 	limit: number,
 ): PinnedDiff {
-	if (!isSha(base) || !isSha(head)) {
+	if (!isCommitId(base) || !isCommitId(head)) {
 		return { kind: "unreadable" };
 	}
 	const range = [base, head];
@@ -313,7 +313,7 @@ export function checkedOutCommit(repository: string): string | null {
 		const head = git(repository, ["rev-parse", "--verify", "HEAD^{commit}"])
 			.toString("utf8")
 			.trim();
-		return isSha(head) ? head : null;
+		return isCommitId(head) ? head : null;
 	} catch {
 		return null;
 	}
@@ -508,20 +508,4 @@ export function writeChangeView(
 export function readDescription(contextRoot: string): string | null {
 	const file = path.resolve(contextRoot, "description.md");
 	return existsSync(file) ? readFileSync(file, "utf8") : null;
-}
-
-if (import.meta.filename === process.argv[1]) {
-	const root = path.resolve(process.argv[2] ?? "/workspace");
-	const envelope: unknown = JSON.parse(readFileSync(path.resolve(root, "task.json"), "utf8"));
-	if (typeof envelope !== "object" || envelope === null) {
-		throw new Error("task.json: expected an envelope");
-	}
-	if (Reflect.get(envelope, "schemaVersion") !== SUPPORTED_SCHEMA_VERSION) {
-		throw new Error("task.json: unsupported schemaVersion");
-	}
-	const paths = resolveTaskPaths(root, envelope);
-	const change = readChange(paths.contextRoot);
-	if (change !== null) {
-		writeChangeView(root, paths.repositoryRoot, change, readDescription(paths.contextRoot));
-	}
 }

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.slack.events;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 public class SlackPersonErasureService {
 
@@ -30,35 +32,35 @@ public class SlackPersonErasureService {
     }
 
     @Transactional
-    public void eraseMember(long workspaceId, long memberId, @Nullable String slackUserId) {
-        erasePersonInternal(workspaceId, memberId, slackUserId);
+    public void eraseAccount(long workspaceId, long accountId, @Nullable String slackUserId) {
+        erasePersonInternal(workspaceId, accountId, slackUserId);
     }
 
     /**
-     * Erases channel-ingestion data only. Slack user id handles unlinked users; member id additionally erases
+     * Erases channel-ingestion data only. Slack user id handles unlinked users; account id additionally erases
      * derived conversation feedback for linked users.
      */
     @Transactional
-    public void erasePerson(long workspaceId, @Nullable Long memberId, @Nullable String slackUserId) {
-        erasePersonInternal(workspaceId, memberId, slackUserId);
+    public void erasePerson(long workspaceId, @Nullable Long accountId, @Nullable String slackUserId) {
+        erasePersonInternal(workspaceId, accountId, slackUserId);
     }
 
-    private void erasePersonInternal(long workspaceId, @Nullable Long memberId, @Nullable String slackUserId) {
+    private void erasePersonInternal(long workspaceId, @Nullable Long accountId, @Nullable String slackUserId) {
         int messagesBySlackId = 0;
         if (slackUserId != null && !slackUserId.isBlank()) {
             messagesBySlackId = messageRepository.deleteByWorkspaceIdAndAuthorSlackUserId(workspaceId, slackUserId);
         }
-        int messagesByMemberId =
-                memberId == null ? 0 : messageRepository.deleteByWorkspaceIdAndAuthorMemberId(workspaceId, memberId);
-        int threadsPruned = memberId == null ? 0 : threadRepository.pruneParticipant(workspaceId, memberId);
-        int derived = memberId == null
+        int messagesByAccountId =
+                accountId == null ? 0 : messageRepository.deleteByWorkspaceIdAndAuthorAccountId(workspaceId, accountId);
+        int threadsPruned = accountId == null ? 0 : threadRepository.pruneParticipant(workspaceId, accountId);
+        int derived = accountId == null
                 ? 0
-                : conversationFeedbackErasure.eraseConversationFeedbackAboutUser(workspaceId, memberId);
-        int messages = messagesBySlackId + messagesByMemberId;
+                : conversationFeedbackErasure.eraseConversationFeedbackAboutUser(workspaceId, accountId);
+        int messages = messagesBySlackId + messagesByAccountId;
         log.info(
-                "Slack person erasure: workspace={} member={} slackUser={} → messages={} threadsPruned={} derivedRows={}",
+                "Slack person erasure: workspace={} account={} slackUser={} → messages={} threadsPruned={} derivedRows={}",
                 workspaceId,
-                memberId,
+                accountId,
                 slackUserId,
                 messages,
                 threadsPruned,

@@ -11,7 +11,7 @@ public interface OrphanedJobRef {
 
     Long getWorkspaceId();
 
-    int getRetryCount();
+    int getAttempt();
 
     /**
      * The worker the job is RUNNING-owned by. Threaded back into the requeue CAS so the sweeper reclaims

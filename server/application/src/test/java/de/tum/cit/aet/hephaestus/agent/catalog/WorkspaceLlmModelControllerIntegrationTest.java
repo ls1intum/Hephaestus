@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.catalog;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
@@ -9,8 +10,8 @@ import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.Membership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.spi.AiModelBrand;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
 import java.time.Instant;
@@ -52,7 +53,7 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
                 slug,
                 "My Provider",
                 LlmCatalogTestFixtures.PUBLIC_BASE_URL,
-                "openai-completions",
+                LlmApiProtocol.OPENAI_COMPLETIONS,
                 LlmAuthMode.BEARER,
                 "sk-workspace-secret",
                 true,
@@ -339,6 +340,41 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
 
     @Test
     @WithAdminUser
+    void shouldNameThePurposesEachAvailableModelCanServeWhenListed() {
+        Workspace workspace = setupWorkspace("avail-purpose-ws");
+        LlmModel chat = seedInstanceModel("gpt-5-purpose-upstream", ModelVisibility.PUBLIC, true);
+        LlmConnection embeddingConnection = LlmCatalogTestFixtures.connection("instance-conn-" + System.nanoTime());
+        embeddingConnection.setApiProtocol(LlmApiProtocol.OPENAI_EMBEDDINGS);
+        LlmModel embedding = llmModelRepository.save(LlmCatalogTestFixtures.model(
+                llmConnectionRepository.save(embeddingConnection),
+                "instance-model-" + System.nanoTime(),
+                "text-embedding-purpose-upstream"));
+
+        List<AvailableLlmModelDTO> available = webTestClient
+                .get()
+                .uri("/workspaces/{slug}/llm/available-models", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(new ParameterizedTypeReference<List<AvailableLlmModelDTO>>() {})
+                .returnResult()
+                .getResponseBody();
+
+        assertThat(available)
+                .filteredOn(model -> model.id().equals(chat.getId()))
+                .singleElement()
+                .extracting(AvailableLlmModelDTO::purposes)
+                .isEqualTo(List.of(AgentPurpose.PRACTICE_REVIEW, AgentPurpose.MENTOR, AgentPurpose.PRACTICE_DECISION));
+        assertThat(available)
+                .filteredOn(model -> model.id().equals(embedding.getId()))
+                .singleElement()
+                .extracting(AvailableLlmModelDTO::purposes)
+                .isEqualTo(List.of(AgentPurpose.PRACTICE_EMBEDDING));
+    }
+
+    @Test
+    @WithAdminUser
     void availableModelsHidesAGrantedInstanceModelNotGrantedToThisWorkspace() {
         Workspace workspace = setupWorkspace("avail-grant-ws");
         LlmModel grantedElsewhere = seedInstanceModel("gpt-5-granted-upstream", ModelVisibility.GRANTED, true);
@@ -455,7 +491,7 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
         // Login must match @WithMentorUser's default "mentor" principal so the membership resolver
         // finds this exact row.
         User member = persistUser("mentor");
-        ensureWorkspaceMembership(workspace, member, WorkspaceRole.MEMBER);
+        ensureMembership(workspace, member, WorkspaceRole.MEMBER);
         String slug = workspace.getWorkspaceSlug();
 
         webTestClient
@@ -506,7 +542,7 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
         // app_admin elevation, which would let this call through for the wrong reason.
         User admin = persistUser("mentor");
         Workspace own = createWorkspace("wsmodel-own-ws", "Own", "wsmodel-own-org", AccountType.ORG, admin);
-        ensureWorkspaceMembership(own, admin, WorkspaceRole.ADMIN);
+        ensureMembership(own, admin, WorkspaceRole.ADMIN);
 
         Workspace other = createWorkspace(
                 "wsmodel-other-ws", "Other", "wsmodel-other-org", AccountType.ORG, persistUser("wsmodel-other-owner"));

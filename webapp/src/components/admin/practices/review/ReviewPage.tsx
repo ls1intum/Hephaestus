@@ -5,9 +5,9 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import type { ReviewRunningState } from "./review-readiness";
+import type { ReviewReadinessState } from "./review-readiness";
 import { REVIEW_SECTIONS, type ReviewSectionId } from "./review-sections";
-import { ReviewRunningBanner } from "./ReviewRunningBanner";
+import { ReviewReadinessBanner } from "./ReviewReadinessBanner";
 
 export interface ReviewPageProps {
 	section: ReviewSectionId;
@@ -16,7 +16,7 @@ export interface ReviewPageProps {
 	 * Absent until the workspace is known. The tabs render meanwhile rather than a spinner: a banner
 	 * that guessed at the answer would be reassuring on exactly the evidence it does not have.
 	 */
-	running: ReviewRunningState | undefined;
+	readiness: ReviewReadinessState | undefined;
 	/**
 	 * The three tab bodies, as elements. Passing an element does not run it — Base UI mounts only the
 	 * open panel — so the sections a reader has not opened cost nothing, which is the whole reason
@@ -25,18 +25,13 @@ export interface ReviewPageProps {
 	sections: Record<ReviewSectionId, ReactNode>;
 }
 
-/**
- * Tabs, not a stack: only the open section is in the document, so a section's data is fetched when
- * somebody asks for it, and the autonomy section's sticky summary strip cannot hang over another
- * section's settings.
- */
-export function ReviewPage({ section, onSectionChange, running, sections }: ReviewPageProps) {
+export function ReviewPage({ section, onSectionChange, readiness, sections }: ReviewPageProps) {
 	const active = REVIEW_SECTIONS.find((candidate) => candidate.id === section);
 
 	return (
 		<PageLayout>
 			<PageHeader icon={<ScanEye />} title="Review settings" description={active?.description} />
-			{running && <ReviewRunningBanner running={running} />}
+			{readiness && <ReviewReadinessBanner readiness={readiness} />}
 			<Tabs
 				value={section}
 				onValueChange={(next) => {

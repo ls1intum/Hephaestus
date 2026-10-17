@@ -2,56 +2,32 @@ package de.tum.cit.aet.hephaestus.practices.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactCatalog;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
-import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptionsFixture;
-import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventName;
 import java.util.Set;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-class DormantBindingTest extends BaseUnitTest {
-
-    private static final ArtifactCatalog ARTIFACTS = PracticeSignalOptionsFixture.catalog();
-
+@Tag("unit")
+class DormantBindingTest {
     @Test
-    void shouldNameTheMomentsAndTheIntegrationsThatReportThemInTheirOwnWords() {
-        var dormant = new DormantBinding(
+    void namesEventsAndProvidersWithoutRawKeys() {
+        var binding = new DormantBinding(
                 1L,
-                Set.of(ScmSignals.ISSUE_OPENED, ScmSignals.ISSUE_CLOSED),
+                Set.of(new ItemEventName("scm.issue.opened"), new ItemEventName("scm.issue.closed")),
                 Set.of(IntegrationKind.GITHUB, IntegrationKind.GITLAB));
-
-        String reason = dormant.reason(ARTIFACTS::signalDisplayName, DormantBindingTest::integration);
-
-        assertThat(reason)
-                .isEqualTo("Nothing connected to this workspace reports the moments this practice watches for "
-                        + "(Closed, Opened). GitHub or GitLab can report them.")
-                // A developer reads this on their own work's trace and cannot connect anything.
-                .doesNotContain("Connect", "scm.", "GITHUB", "GITLAB");
+        assertThat(binding.reason(
+                        e -> e.value().endsWith("opened") ? "Opened" : "Closed",
+                        p -> p == IntegrationKind.GITHUB ? "GitHub" : "GitLab"))
+                .isEqualTo("Nothing connected to this workspace reports the moments this practice watches for (Closed,"
+                        + " Opened). GitHub or GitLab can report them.");
     }
 
     @Test
-    void shouldSayWhenNothingCanEverReportTheMoments() {
-        var dormant = new DormantBinding(1L, Set.of(ScmSignals.PULL_REQUEST_MERGED), Set.of());
-
-        assertThat(dormant.reason(ARTIFACTS::signalDisplayName, DormantBindingTest::integration))
-                .isEqualTo(
-                        "Nothing that Hephaestus can connect reports the moments this practice watches for (Merged), "
-                                + "so no review ever covers this practice.");
-    }
-
-    @Test
-    void shouldNameASignalNoDescriptorDeclaresGenerically() {
-        var dormant = new DormantBinding(
-                1L, Set.of(SignalName.of("scm.pull_request.retired_moment")), Set.of(IntegrationKind.GITHUB));
-
-        assertThat(dormant.reason(ARTIFACTS::signalDisplayName, DormantBindingTest::integration))
-                .contains("(A moment this version no longer offers)")
-                .doesNotContain("scm.", "retired_moment");
-    }
-
-    private static String integration(IntegrationKind kind) {
-        return kind == IntegrationKind.GITLAB ? "GitLab" : "GitHub";
+    void distinguishesNoProducerFromAnUnconnectedProducer() {
+        var binding = new DormantBinding(1L, Set.of(new ItemEventName("scm.pull_request.merged")), Set.of());
+        assertThat(binding.reason(e -> "Merged", p -> "GitHub"))
+                .contains("Nothing that Hephaestus can connect")
+                .contains("Merged");
     }
 }

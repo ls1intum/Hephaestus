@@ -3,18 +3,17 @@ package de.tum.cit.aet.hephaestus.integration.core.spi;
 import java.util.List;
 import java.util.Set;
 
-/** Review limits and the finite authoring choices supported by one artifact domain. */
 public record ReviewCapabilities(
         List<ReviewLimitation> reviewLimitations,
-        List<ReviewStateDimension> reviewWhenDimensions,
-        Set<String> preconditionSupportedAspects,
-        Set<String> preconditionEvidenceCollections) {
-    public static final ReviewCapabilities NONE = new ReviewCapabilities(List.of(), List.of(), Set.of(), Set.of());
-
+        List<ReviewStateDimension> reviewOnStateDimensions,
+        Set<String> appliesWhenSupportedAspects,
+        Set<String> appliesWhenEvidenceCollections,
+        Set<ItemKind> scanItemKinds) {
     public ReviewCapabilities {
         reviewLimitations = List.copyOf(reviewLimitations);
-        reviewWhenDimensions = List.copyOf(reviewWhenDimensions);
-        preconditionSupportedAspects = Set.copyOf(preconditionSupportedAspects);
-        preconditionEvidenceCollections = Set.copyOf(preconditionEvidenceCollections);
+        reviewOnStateDimensions = List.copyOf(reviewOnStateDimensions);
+        appliesWhenSupportedAspects = Set.copyOf(appliesWhenSupportedAspects);
+        appliesWhenEvidenceCollections = Set.copyOf(appliesWhenEvidenceCollections);
+        scanItemKinds = Set.copyOf(scanItemKinds);
     }
 }

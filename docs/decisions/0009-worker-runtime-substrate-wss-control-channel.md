@@ -87,3 +87,7 @@ Corrects three names above. `WorkerControlFrame` permits `WorkerHello`, `WorkerW
 `Heartbeat`, `CapacityReport`, `ForceReconnect` and `CancelJob`, not the mentor session quartet the
 Protocol row of § Decision lists; the `HubSessionInbox` bridge of § Consequences and the
 `WorkerControlPublisher` seam of § Considered options exist nowhere in the repository.
+
+## Update — 2026-10-14 (#2656): the job table is renamed
+
+`agent_job` is renamed; see [ADR 0025](0025-agent-job-queue-on-postgresql.md#update--2026-10-14-2656-the-job-table-and-classes-are-renamed).

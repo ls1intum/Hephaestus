@@ -3,11 +3,6 @@ import type { ScopeRecordFilter } from "@/components/admin/practice-reviews/Revi
 
 import { useReviewSelection } from "./use-review-selection";
 
-/**
- * The one review, piece of work or observation a list is filtered to, named for its pill; undefined
- * when it filters to none, or when a crosshair picked it, which the selection bar shows instead. It
- * reads the same queries as the selection bar, so it asks for nothing twice.
- */
 export function useScopeRecordFilter(
 	workspaceSlug: string,
 	search: unknown,
@@ -22,5 +17,8 @@ export function useScopeRecordFilter(
 	) {
 		return undefined;
 	}
-	return { facet: read.selection.kind, name: read.filterName };
+	return {
+		facet: read.selection.kind,
+		name: read.filterName,
+	};
 }

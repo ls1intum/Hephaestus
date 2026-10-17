@@ -3,11 +3,12 @@ package de.tum.cit.aet.hephaestus.agent.usage;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.LlmProperties;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRate;
 import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRateLookup;
 import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRateRepository;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
+import de.tum.cit.aet.hephaestus.integration.core.spi.UsagePricingState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -45,7 +46,7 @@ class LlmUsageFxDisplayIntegrationTest extends AbstractWorkspaceIntegrationTest 
     private ConfigAuditPort configAudit;
 
     @Autowired
-    private AgentJobRepository jobRepository;
+    private ReviewJobRepository jobRepository;
 
     @Autowired
     private Clock clock;
@@ -139,14 +140,14 @@ class LlmUsageFxDisplayIntegrationTest extends AbstractWorkspaceIntegrationTest 
     private void seedEvent(Workspace workspace, String cost) {
         LlmUsageEvent event = new LlmUsageEvent();
         event.setId(UUID.randomUUID());
-        event.setWorkspace(workspace);
-        event.setJobType(LlmUsageJobType.PULL_REQUEST_REVIEW);
-        event.setSourceType(LlmUsageSourceType.AGENT_JOB);
+        event.setWorkspaceId(workspace.getId());
+        event.setJobType("PRACTICE_REVIEW");
+        event.setSourceType(UsageSourceType.REVIEW_JOB);
         event.setSourceId(UUID.randomUUID());
         event.setModel("claude-sonnet-5");
         event.setCostUsd(new BigDecimal(cost));
-        event.setPricingState(PricingState.PRICED);
-        event.setFundingSource(FundingSource.INSTANCE);
+        event.setPricingState(UsagePricingState.PRICED);
+        event.setFundingSource(UsageFundingSource.INSTANCE);
         event.setOccurredAt(
                 CURRENT.atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant().plusSeconds(3600));
         usageRepository.save(event);

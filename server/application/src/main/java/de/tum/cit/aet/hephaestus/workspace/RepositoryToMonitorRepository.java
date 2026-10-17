@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.MonitoredRepositoryScope;
+import de.tum.cit.aet.hephaestus.integration.core.framework.MonitoredRepositoryScope;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -13,10 +13,6 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Tracks which repositories each workspace monitors. Queries filter by workspace id or
- * {@code nameWithOwner}, which resolves workspace context during sync.
- */
 @Repository
 @WorkspaceAgnostic("Configuration table mapping repositories to workspaces")
 public interface RepositoryToMonitorRepository extends JpaRepository<RepositoryToMonitor, Long> {
@@ -33,27 +29,28 @@ public interface RepositoryToMonitorRepository extends JpaRepository<RepositoryT
 
     @Modifying
     @Transactional
-    @Query("UPDATE RepositoryToMonitor m SET m.historicalBackfillSyncError = :error WHERE m.id = :id")
+    @Query("UPDATE RepositoryToMonitor m SET m.historicalBackfillSyncError = :error WHERE m.id =" + " :id")
     int updateHistoricalBackfillSyncError(@Param("id") Long id, @Param("error") @Nullable String error);
 
     @Modifying
     @Transactional
-    @Query("UPDATE RepositoryToMonitor m SET m.unavailableRetryAt = :reservedUntil "
-            + "WHERE m.workspace.id = :workspaceId AND m.id = :id AND m.unavailableSince IS NOT NULL "
-            + "AND (m.unavailableRetryAt IS NULL OR m.unavailableRetryAt <= :now)")
+    @Query("UPDATE RepositoryToMonitor m SET m.unavailableRetryAt = :reservedUntil WHERE"
+            + " m.workspace.id = :workspaceId AND m.id = :id AND m.unavailableSince IS NOT NULL"
+            + " AND (m.unavailableRetryAt IS NULL OR m.unavailableRetryAt <= :now)")
     int reserveUnavailableRecheck(Long workspaceId, Long id, Instant now, Instant reservedUntil);
 
     @Modifying
     @Transactional
-    @Query("UPDATE RepositoryToMonitor m SET m.unavailableRetryAt = CASE WHEN m.unavailableSince IS NULL "
-            + "THEN cast(:now as Instant) ELSE cast(:retryAt as Instant) END, m.unavailableSince = COALESCE(m.unavailableSince, :now) "
-            + "WHERE m.workspace.id = :workspaceId AND m.id = :id")
+    @Query("UPDATE RepositoryToMonitor m SET m.unavailableRetryAt = CASE WHEN m.unavailableSince"
+            + " IS NULL THEN cast(:now as Instant) ELSE cast(:retryAt as Instant) END,"
+            + " m.unavailableSince = COALESCE(m.unavailableSince, :now) WHERE m.workspace.id ="
+            + " :workspaceId AND m.id = :id")
     int recordUnavailable(Long workspaceId, Long id, Instant now, Instant retryAt);
 
     @Modifying
     @Transactional
-    @Query("UPDATE RepositoryToMonitor m SET m.unavailableSince = NULL, m.unavailableRetryAt = NULL "
-            + "WHERE m.workspace.id = :workspaceId AND m.id = :id")
+    @Query("UPDATE RepositoryToMonitor m SET m.unavailableSince = NULL, m.unavailableRetryAt ="
+            + " NULL WHERE m.workspace.id = :workspaceId AND m.id = :id")
     int clearUnavailable(Long workspaceId, Long id);
 
     @Modifying
@@ -74,69 +71,81 @@ public interface RepositoryToMonitorRepository extends JpaRepository<RepositoryT
     Optional<RepositoryToMonitor> findByNameWithOwner(String nameWithOwner);
 
     /** Every workspace monitoring this repository, with workspace data ready for callers. */
-    @Query(
-            "SELECT m FROM RepositoryToMonitor m JOIN FETCH m.workspace WHERE m.nameWithOwner = :nameWithOwner ORDER BY m.workspace.id")
+    @Query("SELECT m FROM RepositoryToMonitor m JOIN FETCH m.workspace WHERE m.nameWithOwner ="
+            + " :nameWithOwner ORDER BY m.workspace.id")
     List<RepositoryToMonitor> findAllWithWorkspaceByNameWithOwner(@Param("nameWithOwner") String nameWithOwner);
 
-    /** Qualified monitors of one mirrored repository, with current workspace settings initialized. */
-    @Query("SELECT m FROM RepositoryToMonitor m JOIN FETCH m.workspace "
-            + "JOIN Repository r ON r.nameWithOwner = m.nameWithOwner WHERE r.id = :repositoryId AND "
-            + MonitoredRepositoryScope.FUNCTION
-            + "(m.workspace.id, m.nativeId, r.nativeId, r.provider.id) = true ORDER BY m.workspace.id")
-    List<RepositoryToMonitor> findAllWithWorkspaceByRepositoryId(@Param("repositoryId") Long repositoryId);
-
-    /**
-     * Finds every monitor tracking the repository with the given provider-stable id on {@code providerId} — across
-     * all workspaces whose SCM connection is registered under that provider, because a repository can be monitored by
-     * several tenants at once. A native id is unique only on its provider, so a monitor of another provider instance
-     * with the same id is not one of them. Used to re-key {@code nameWithOwner} after an upstream rename/transfer,
-     * where the name is exactly the value that has gone stale and so cannot be the lookup key.
-     */
+    /** Resolve monitors by provider-stable id across workspaces; a renamed path cannot serve as the lookup key. */
     @Query(
-            value = "SELECT rtm.* FROM repository_to_monitor rtm WHERE rtm.native_id = :nativeId AND "
+            value = "SELECT rtm.* FROM repository_to_monitor rtm WHERE rtm.native_id = :nativeId"
+                    + " AND "
                     + MonitoredRepositoryScope.NATIVE_RTM_SOURCE_PROVIDER,
             nativeQuery = true)
     List<RepositoryToMonitor> findByNativeIdOnSourceProvider(
             @Param("nativeId") Long nativeId, @Param("providerId") Long providerId);
 
-    /** A stored id is foreign only with a verified own-provider replacement and no own-provider owner of the old id. */
+    /**
+     * A stored id is foreign only with a verified own-provider replacement and no own-provider
+     * owner of the old id.
+     */
     @Query(
             value = """
-        SELECT EXISTS (SELECT 1 FROM repository_to_monitor rtm JOIN repository r ON r.native_id = :resolvedNativeId
-                       WHERE rtm.id = :monitorId AND\s""" + MonitoredRepositoryScope.NATIVE_RTM_SOURCE_OF_R + """
-        ) AND EXISTS (SELECT 1 FROM repository_to_monitor rtm JOIN repository r
-                       ON r.name_with_owner = rtm.name_with_owner AND r.native_id = rtm.native_id
-                       WHERE rtm.id = :monitorId AND NOT\s"""
-                    + MonitoredRepositoryScope.NATIVE_RTM_SOURCE_OF_R + """
-        ) AND NOT EXISTS (SELECT 1 FROM repository_to_monitor rtm JOIN repository r ON r.native_id = rtm.native_id
-                       WHERE rtm.id = :monitorId AND\s"""
-                    + MonitoredRepositoryScope.NATIVE_RTM_SOURCE_OF_R + """
-        )
-        """,
+                    SELECT EXISTS (SELECT 1 FROM repository_to_monitor rtm JOIN repository r ON r.native_id = :resolvedNativeId
+                                   WHERE rtm.id = :monitorId AND
+                    """
+                    + MonitoredRepositoryScope.NATIVE_RTM_SOURCE_OF_R
+                    + """
+                    ) AND EXISTS (SELECT 1 FROM repository_to_monitor rtm JOIN repository r
+                                   ON r.name_with_owner = rtm.name_with_owner AND r.native_id = rtm.native_id
+                                   WHERE rtm.id = :monitorId AND NOT
+                    """
+                    + MonitoredRepositoryScope.NATIVE_RTM_SOURCE_OF_R
+                    + """
+                    ) AND NOT EXISTS (SELECT 1 FROM repository_to_monitor rtm JOIN repository r ON r.native_id = rtm.native_id
+                                   WHERE rtm.id = :monitorId AND
+                    """
+                    + MonitoredRepositoryScope.NATIVE_RTM_SOURCE_OF_R
+                    + """
+                    )
+                    """,
             nativeQuery = true)
     boolean monitorHoldsAnotherInstancesId(
             @Param("monitorId") Long monitorId, @Param("resolvedNativeId") Long resolvedNativeId);
 
     /** Exact mirrored repository ids covered by one workspace, before its monitors are removed. */
     @Query(
-            value = "SELECT DISTINCT r.id FROM repository_to_monitor rtm JOIN repository r"
-                    + " ON r.name_with_owner = rtm.name_with_owner WHERE rtm.workspace_id = :workspaceId AND "
+            value = "SELECT DISTINCT r.id FROM repository_to_monitor rtm JOIN repository r ON"
+                    + " r.name_with_owner = rtm.name_with_owner WHERE rtm.workspace_id ="
+                    + " :workspaceId AND "
                     + MonitoredRepositoryScope.NATIVE_RTM_R,
             nativeQuery = true)
     List<Long> findSourceRepositoryIds(@Param("workspaceId") Long workspaceId);
 
+    /** This workspace's monitors of the exact source repository, including monitors without a native id. */
+    @Query(
+            value = "SELECT rtm.* FROM repository_to_monitor rtm JOIN repository r ON"
+                    + " r.name_with_owner = rtm.name_with_owner WHERE r.id = :repositoryId"
+                    + " AND rtm.workspace_id = :workspaceId AND "
+                    + MonitoredRepositoryScope.NATIVE_RTM_R,
+            nativeQuery = true)
+    List<RepositoryToMonitor> findByWorkspaceIdAndSourceRepositoryId(
+            @Param("workspaceId") Long workspaceId, @Param("repositoryId") Long repositoryId);
+
     /** Exact mirrored repository ids covered by the monitor being removed. */
     @Query(
-            value = "SELECT r.id FROM repository_to_monitor rtm JOIN repository r"
-                    + " ON r.name_with_owner = rtm.name_with_owner WHERE rtm.id = :monitorId AND "
+            value = "SELECT r.id FROM repository_to_monitor rtm JOIN repository r ON"
+                    + " r.name_with_owner = rtm.name_with_owner WHERE rtm.id = :monitorId AND "
                     + MonitoredRepositoryScope.NATIVE_RTM_R,
             nativeQuery = true)
     List<Long> findSourceRepositoryIdsOfMonitor(@Param("monitorId") Long monitorId);
 
-    /** Remaining monitors of this exact source repository; a foreign same-named repository does not count. */
+    /**
+     * Remaining monitors of this exact source repository; a foreign same-named repository does not
+     * count.
+     */
     @Query(
-            value = "SELECT COUNT(*) FROM repository_to_monitor rtm JOIN repository r"
-                    + " ON r.name_with_owner = rtm.name_with_owner WHERE r.id = :repositoryId AND "
+            value = "SELECT COUNT(*) FROM repository_to_monitor rtm JOIN repository r ON"
+                    + " r.name_with_owner = rtm.name_with_owner WHERE r.id = :repositoryId AND "
                     + MonitoredRepositoryScope.NATIVE_RTM_R,
             nativeQuery = true)
     long countForRepository(@Param("repositoryId") Long repositoryId);
@@ -144,7 +153,6 @@ public interface RepositoryToMonitorRepository extends JpaRepository<RepositoryT
     /** One workspace's monitors of the repository with the given provider-stable id. */
     List<RepositoryToMonitor> findByWorkspaceIdAndNativeId(Long workspaceId, Long nativeId);
 
-    /** How many workspaces monitor a repository — the orphan check before deleting a shared repository row. */
     long countByNameWithOwner(String nameWithOwner);
 
     /** Deletes all repository monitors for a workspace (workspace purge). */
@@ -155,16 +163,16 @@ public interface RepositoryToMonitorRepository extends JpaRepository<RepositoryT
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
-            UPDATE repository_to_monitor SET
-                backfill_repair_provider_count=:providerCount,
-                issue_backfill_high_water_mark=NULL, issue_backfill_checkpoint=NULL, issue_sync_cursor=NULL,
-                pull_request_backfill_high_water_mark=NULL, pull_request_backfill_checkpoint=NULL,
-                pull_request_sync_cursor=NULL, historical_backfill_sync_error=NULL
-            WHERE workspace_id=:workspaceId AND id=:syncTargetId
-              AND pull_request_backfill_high_water_mark IS NOT NULL
-              AND (pull_request_backfill_high_water_mark=0 OR pull_request_backfill_checkpoint<=0)
-              AND (backfill_repair_provider_count IS NULL OR :storedCount>=backfill_repair_provider_count)
-            """, nativeQuery = true)
+        UPDATE repository_to_monitor SET
+            backfill_repair_provider_count=:providerCount,
+            issue_backfill_high_water_mark=NULL, issue_backfill_checkpoint=NULL, issue_sync_cursor=NULL,
+            pull_request_backfill_high_water_mark=NULL, pull_request_backfill_checkpoint=NULL,
+            pull_request_sync_cursor=NULL, historical_backfill_sync_error=NULL
+        WHERE workspace_id=:workspaceId AND id=:syncTargetId
+          AND pull_request_backfill_high_water_mark IS NOT NULL
+          AND (pull_request_backfill_high_water_mark=0 OR pull_request_backfill_checkpoint<=0)
+          AND (backfill_repair_provider_count IS NULL OR :storedCount>=backfill_repair_provider_count)
+        """, nativeQuery = true)
     int restartCompletedBackfill(
             @Param("workspaceId") long workspaceId,
             @Param("syncTargetId") long syncTargetId,

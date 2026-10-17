@@ -20,6 +20,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -44,7 +45,9 @@ class MentorRunnerClientTest extends BaseUnitTest {
     private final CopyOnWriteArrayList<JsonNode> events = new CopyOnWriteArrayList<>();
     private final AtomicInteger streamLost = new AtomicInteger();
     private final AtomicReference<MentorRunnerClient.FetchContextRequest> lastFetchContext = new AtomicReference<>();
-    private final AtomicReference<MentorRunnerClient.LinkObservationRequest> lastLink = new AtomicReference<>();
+    private final AtomicReference<MentorRunnerClient.LinkRequest> lastLink = new AtomicReference<>();
+    private volatile Predicate<MentorRunnerClient.LinkRequest> admits = link -> false;
+
     private ScheduledExecutorService scheduler;
     private UUID threadId;
 
@@ -64,7 +67,7 @@ class MentorRunnerClientTest extends BaseUnitTest {
                 },
                 link -> {
                     lastLink.set(link);
-                    return false;
+                    return admits.test(link);
                 },
                 scheduler,
                 threadId);
@@ -98,10 +101,11 @@ class MentorRunnerClientTest extends BaseUnitTest {
         long id = request.get("id").asLong();
         assertThat(request.get("method").asString()).isEqualTo("hello");
 
-        sandbox.pushFrame(responseOf(id, mapper.createObjectNode().put("protocolVersion", 1)));
+        sandbox.pushFrame(
+                responseOf(id, mapper.createObjectNode().put("protocolVersion", MentorRunnerClient.PROTOCOL_VERSION)));
 
         JsonNode result = future.get(2, TimeUnit.SECONDS);
-        assertThat(result.get("protocolVersion").asInt()).isEqualTo(1);
+        assertThat(result.get("protocolVersion").asInt()).isEqualTo(MentorRunnerClient.PROTOCOL_VERSION);
     }
 
     @Test
@@ -187,7 +191,10 @@ class MentorRunnerClientTest extends BaseUnitTest {
         ObjectNode params = notification.putObject("params");
         params.put("threadId", threadId.toString());
         params.set(
-                "event", mapper.createObjectNode().put("type", "runner_ready").put("protocolVersion", 1));
+                "event",
+                mapper.createObjectNode()
+                        .put("type", "runner_ready")
+                        .put("protocolVersion", MentorRunnerClient.PROTOCOL_VERSION));
 
         sandbox.pushFrame(notification);
 
@@ -305,22 +312,33 @@ class MentorRunnerClientTest extends BaseUnitTest {
         assertThat(response.get("result").get("content").get("ok").asBoolean()).isTrue();
     }
 
-    /** Fields of any other shape are refused at once, the same way as an unknown observation, never left to time out. */
+    @Test
+    void shouldSpeakProtocolThree() {
+        assertThat(MentorRunnerClient.PROTOCOL_VERSION).isEqualTo(3);
+    }
+
     @ParameterizedTest
     @ValueSource(
             strings = {
-                "{\"threadId\":\"%s\",\"observationId\":{\"id\":\"3ec24178-2219-4af4-bebf-077c73a0435e\"}}",
-                "{\"threadId\":[\"%s\"],\"observationId\":\"3ec24178-2219-4af4-bebf-077c73a0435e\"}",
-                "{\"threadId\":\"%s\",\"observationId\":7}",
-                "{\"threadId\":\"%s\",\"observationId\":\"not-a-uuid\"}",
-                "[\"%s\"]"
+                "link_result|{\"threadId\":\"%s\",\"resultId\":{\"id\":\"3ec24178-2219-4af4-bebf-077c73a0435e\"}}",
+                "link_result|{\"threadId\":[\"%s\"],\"resultId\":\"3ec24178-2219-4af4-bebf-077c73a0435e\"}",
+                "link_result|{\"threadId\":\"%s\",\"resultId\":7}",
+                "link_result|{\"threadId\":\"%s\",\"resultId\":\"not-a-uuid\"}",
+                "link_result|{\"threadId\":\"%s\",\"problemId\":\"3ec24178-2219-4af4-bebf-077c73a0435e\"}",
+                "link_result|[\"%s\"]",
+                "link_problem|{\"threadId\":\"%s\",\"problemId\":7}",
+                "link_problem|{\"threadId\":\"%s\",\"problemId\":\"not-a-uuid\"}",
+                "link_problem|{\"threadId\":\"%s\",\"resultId\":\"3ec24178-2219-4af4-bebf-077c73a0435e\"}",
+                "link_problem|[\"%s\"]"
             })
-    void shouldRefuseALinkWhoseFieldsAreNotUuidStrings(String params) {
+    void shouldRefuseALinkWhoseFieldsAreNotUuidStrings(String methodAndParams) {
+        String[] parts = methodAndParams.split("\\|", 2);
         ObjectNode callback = mapper.createObjectNode();
         callback.put("jsonrpc", "2.0");
         callback.put("id", "cb-malformed");
-        callback.put("method", "link_observation");
-        callback.set("params", mapper.readTree(params.formatted(threadId)));
+        callback.put("method", parts[0]);
+        callback.set("params", mapper.readTree(parts[1].formatted(threadId)));
+        admits = link -> true;
 
         sandbox.pushFrame(callback);
 
@@ -329,6 +347,63 @@ class MentorRunnerClientTest extends BaseUnitTest {
         assertThat(response.path("error").path("message").asString()).isEqualTo(MentorRunnerClient.LINK_REFUSED);
         assertThat(response.has("result")).isFalse();
         assertThat(lastLink.get()).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"link_result", "link_problem"})
+    void shouldEchoTheLinkedIdWhenTheServerAdmitsTheLink(String method) {
+        UUID linkedId = UUID.randomUUID();
+        MentorRunnerClient.LinkKind kind =
+                "link_result".equals(method) ? MentorRunnerClient.LinkKind.RESULT : MentorRunnerClient.LinkKind.PROBLEM;
+        admits = link -> link.linkedId().equals(linkedId);
+
+        sandbox.pushFrame(linkCallback("cb-admitted", method, kind.idKey(), linkedId));
+
+        JsonNode response = sandbox.takeFrame();
+        assertThat(response.get("id").asString()).isEqualTo("cb-admitted");
+        assertThat(response.has("error")).isFalse();
+        assertThat(response.path("result").path(kind.idKey()).asString()).isEqualTo(linkedId.toString());
+        assertThat(response.path("result").size()).isEqualTo(1);
+        assertThat(lastLink.get()).isEqualTo(new MentorRunnerClient.LinkRequest(threadId, kind, linkedId));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"link_result", "link_problem"})
+    void shouldRefuseALinkWhenTheServerDoesNotKnowItsId(String method) {
+        MentorRunnerClient.LinkKind kind =
+                "link_result".equals(method) ? MentorRunnerClient.LinkKind.RESULT : MentorRunnerClient.LinkKind.PROBLEM;
+        UUID unknown = UUID.randomUUID();
+
+        sandbox.pushFrame(linkCallback("cb-unknown", method, kind.idKey(), unknown));
+
+        JsonNode response = sandbox.takeFrame();
+        assertThat(response.get("id").asString()).isEqualTo("cb-unknown");
+        assertThat(response.path("error").path("code").asInt()).isEqualTo(-32602);
+        assertThat(response.path("error").path("message").asString()).isEqualTo(MentorRunnerClient.LINK_REFUSED);
+        assertThat(response.has("result")).isFalse();
+        assertThat(lastLink.get()).isEqualTo(new MentorRunnerClient.LinkRequest(threadId, kind, unknown));
+    }
+
+    @Test
+    void shouldIgnoreALinkForAnotherThread() {
+        admits = link -> true;
+        ObjectNode callback = linkCallback(
+                "cb-foreign", "link_result", MentorRunnerClient.LinkKind.RESULT.idKey(), UUID.randomUUID());
+        ((ObjectNode) callback.get("params")).put("threadId", UUID.randomUUID().toString());
+
+        sandbox.pushFrame(callback);
+
+        sandbox.assertNoSentFrame();
+        assertThat(lastLink.get()).isNull();
+    }
+
+    private ObjectNode linkCallback(String id, String method, String idKey, UUID linkedId) {
+        ObjectNode callback = mapper.createObjectNode();
+        callback.put("jsonrpc", "2.0");
+        callback.put("id", id);
+        callback.put("method", method);
+        callback.putObject("params").put("threadId", threadId.toString()).put(idKey, linkedId.toString());
+        return callback;
     }
 
     @Test

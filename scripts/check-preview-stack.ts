@@ -107,7 +107,10 @@ const DELIBERATELY_OMITTED = new Set([
 	"TRACING_OTLP_ENABLED",
 	"TRACING_OTLP_ENDPOINT",
 	"PRACTICE_REVIEW_DELIVER_TO_MERGED",
+	"PRACTICE_REVIEW_DIRECT_MODEL_SEARCH_UNITS_PER_ATTEMPT",
+	"PRACTICE_REVIEW_DIRECT_MODEL_TOKENS_PER_ATTEMPT",
 	"PRACTICE_REVIEW_MAX_REQUESTS_PER_REQUESTER_PER_HOUR",
+	"PRACTICE_REVIEW_PRACTICE_CONCURRENCY",
 	"PRACTICE_REVIEW_PRACTICE_MODEL_CALLS",
 	"PRACTICE_REVIEW_PRACTICE_OUTPUT_TOKENS",
 	"PRACTICE_REVIEW_PROGRESS_FOOTER",
@@ -154,6 +157,8 @@ const SEED_POLICY = /<<'SQL'\n(?<sql>[\s\S]*?)\n[ \t]*SQL\n/u;
 const SEED_VERIFICATION = /LIVE=\$\$\(psql[^\n]*-c "(?<query>[\s\S]*?)"\)/u;
 const CHANGED_TABLE = /\b(?:UPDATE|DELETE FROM)[\s\n]+(?<table>[a-z_]+)/gu;
 const COUNTED_TABLE = /\bFROM[\s\n]+(?<table>[a-z_]+)/gu;
+const REVIEW_VERIFICATION_FUNCTION =
+	/CREATE OR REPLACE FUNCTION hephaestus_preview_review_live\(\) RETURNS bigint\s+LANGUAGE plpgsql AS '(?<body>(?:''|[^'])*)';/u;
 
 function tablesIn(sql: string, pattern: RegExp): Set<string> {
 	return new Set([...sql.matchAll(pattern)].flatMap((match) => match.groups?.table ?? []));
@@ -176,7 +181,15 @@ export function findSeedPolicyGaps(previewText: string): string[] {
 		return ["the seed loader marks a clone seeded without verifying its policy"];
 	}
 	const changed = tablesIn(policy, CHANGED_TABLE);
-	const counted = tablesIn(verification, COUNTED_TABLE);
+	let verificationSql = verification;
+	if (verification.includes("hephaestus_preview_review_live()")) {
+		const body = REVIEW_VERIFICATION_FUNCTION.exec(policy)?.groups?.body;
+		if (body === undefined) {
+			return ["the seed loader calls a review verification function it does not define"];
+		}
+		verificationSql += body.replaceAll("''", "'");
+	}
+	const counted = tablesIn(verificationSql, COUNTED_TABLE);
 	return [
 		...[...changed.difference(counted)]
 			.toSorted()

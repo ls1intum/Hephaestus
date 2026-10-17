@@ -1,45 +1,39 @@
-import type {
-	AgentJob,
-	ReviewLineage,
-	ReviewLineageFeedback,
-	ReviewLineageObservation,
-	TracedSignal,
-} from "@/api/types.gen";
+import type { ItemEvent, ItemRef, ReviewLineage, ReviewRef } from "@/api/types.gen";
 import type { BadgeVariant } from "@/components/common/status-def";
-import { SIGNAL_STATE_LABELS } from "@/components/practice-trace/trace-format";
 import { FEEDBACK_LOCATION_DEFS } from "@/components/practice-vocabulary/feedback-location-defs";
-import { withholdingReasonSentence } from "@/components/practice-vocabulary/withholding-defs";
+import {
+	ITEM_EVENT_REASON_SENTENCES,
+	ITEM_EVENT_STATE_DEFS,
+} from "@/components/practice-vocabulary/item-event-defs";
 import { durationBetween } from "@/lib/dates";
-import { hasText } from "@/lib/text";
 
-import { holdReasonCopy } from "./job-utils";
 import {
 	countOf,
 	feedbackLocation,
+	feedbackOf,
+	type LineageFeedback,
+	type LineageRecords,
+	type LineageResult,
+	lineageRecords,
 	lowerFirst,
 	reachedDeveloper,
-	shortReason,
 	silentNotMet,
 } from "./lineage-chain";
-import type { TraceNode } from "./review-trace";
-import { mergeTiming } from "./trace-bottleneck";
+import { chainReview, ownResults, type TraceNode } from "./review-trace";
 
 /**
  * How the path of the record in front ends, as the story's last step says it:
  *
- * - `worked`: the developer's work resolved it.
+ * - `delivered`: it reached the developer and stands.
  * - `lost`: it did not arrive, or no longer stands: withheld, rejected, replaced, failed.
- * - `open`: it is still on its way, or delivered with no answer yet; a review still runs.
- * - `answered`: the developer answered it, which stays private to them, or disputed it.
- * - `none`: nothing was sent, and nothing had to be: a met observation, a review with nothing to say.
+ * - `open`: it is still on its way or waits for an admin; a review still runs.
+ * - `none`: nothing was sent, and nothing had to be: a met result, a review with nothing to say.
  */
-export type TraceEndKind = "worked" | "lost" | "open" | "answered" | "none";
+export type TraceEndKind = "delivered" | "lost" | "open" | "none";
 
 export interface TraceEnd {
 	kind: TraceEndKind;
-	/** "Worked", "Did not arrive", "Open", "Answered", "No feedback". */
 	label: string;
-	/** What happened, after the label: "their work resolved it". */
 	reason: string;
 	/** When the path ended, where the record says. */
 	at?: Date;
@@ -56,30 +50,26 @@ export interface TraceVerdict {
 
 /** The end step's label for each way a path ends. */
 export const TRACE_END_LABELS: Record<TraceEndKind, string> = {
-	worked: "Worked",
+	delivered: "Delivered",
 	lost: "Did not arrive",
 	open: "Open",
-	answered: "Answered",
 	none: "No feedback",
 };
 
 /** The end step's dot for each way a path ends; `none` is hollow. */
 export const TRACE_END_TONES: Record<TraceEndKind, BadgeVariant> = {
-	worked: "success",
+	delivered: "success",
 	lost: "warning",
 	open: "secondary",
-	// Its own colour: amber already says lost or late, and an answer is neither.
-	answered: "default",
 	none: "outline",
 };
 
 /** Which end of several pieces names the path: the best thing that happened to any of them. */
 const END_RANK: Record<TraceEndKind, number> = {
-	worked: 0,
+	delivered: 0,
 	open: 1,
-	answered: 2,
-	lost: 3,
-	none: 4,
+	lost: 2,
+	none: 3,
 };
 
 function end(
@@ -95,58 +85,36 @@ function end(
 // One piece of feedback
 // ------------------------------------------------------------------------------------------------
 
-/**
- * What became of one piece of feedback, in three forms: its end step, a clause for a sentence
- * about several pieces ("was delivered and resolved by the work", singular and plural), and a
- * short phrase for a count ("resolved by the work").
- */
 interface FeedbackFate {
 	end: TraceEnd;
 	clause: readonly [singular: string, plural: string];
 	phrase: string;
 }
 
-/** "the work was closed before the feedback could be posted": a reason sentence inside a sentence. */
-function reasonClause(reason: NonNullable<ReviewLineageFeedback["suppressionReason"]>): string {
-	return lowerFirst(withholdingReasonSentence(reason)).replace(/\.$/u, "");
-}
-
-/** "withheld (near duplicate)": the reason in a few words, for a count. */
-function shortWithheld(feedback: ReviewLineageFeedback): string {
-	return feedback.suppressionReason === undefined
-		? "withheld"
-		: `withheld (${shortReason(feedback.suppressionReason)})`;
-}
-
-/**
- * Where a prepared piece is about to reach the developer, by its channel: posted on the work, shown
- * on their practice pages, or raised in their next conversation with Heph.
- */
-const PREPARED_FOR: Record<
-	ReviewLineageFeedback["channel"],
+const READY_FOR: Record<
+	LineageFeedback["destination"],
 	{ end: string; sentence: string; phrase: string }
 > = {
-	IN_CONTEXT: {
-		end: "it is prepared to be posted on the work",
-		sentence: "it is prepared to be posted on the work",
-		phrase: "prepared to be posted on the work",
+	ON_WORK: {
+		end: "it is ready to be posted on the work",
+		sentence: "it is ready to be posted on the work",
+		phrase: "ready to be posted on the work",
 	},
-	IN_APP: {
-		end: "it is prepared for the developer’s practice pages",
-		sentence: "it is prepared for their practice pages",
-		phrase: "prepared for their practice pages",
+	PRACTICE_PAGE: {
+		end: "it is ready for the developer’s practice pages",
+		sentence: "it is ready for their practice pages",
+		phrase: "ready for their practice pages",
 	},
-	IN_CHAT: {
-		end: "it is prepared for the next conversation with Heph",
-		sentence: "it is prepared for their next conversation with Heph",
-		phrase: "prepared for a conversation",
+	CONVERSATION: {
+		end: "it is ready for the next conversation with Heph",
+		sentence: "it is ready for their next conversation with Heph",
+		phrase: "ready for a conversation",
 	},
 };
 
-function feedbackFate(feedback: ReviewLineageFeedback): FeedbackFate {
-	const { response } = feedback;
-	if (feedback.withdrawnAt !== undefined) {
-		// A prepared piece can be withdrawn too: only a recorded delivery says it was delivered.
+function feedbackFate(feedback: LineageFeedback, item: ItemRef | undefined): FeedbackFate {
+	const at = feedback.deliveredAt ?? undefined;
+	if (feedback.withdrawn) {
 		const delivered = reachedDeveloper(feedback);
 		return {
 			end: end(
@@ -154,7 +122,6 @@ function feedbackFate(feedback: ReviewLineageFeedback): FeedbackFate {
 				delivered
 					? "an admin withdrew it after it was delivered"
 					: "an admin withdrew it before it reached the developer",
-				{ at: feedback.withdrawnAt },
 			),
 			clause: delivered
 				? ["was delivered, then withdrawn", "were delivered, then withdrawn"]
@@ -165,32 +132,32 @@ function feedbackFate(feedback: ReviewLineageFeedback): FeedbackFate {
 			phrase: "withdrawn by an admin",
 		};
 	}
-	switch (feedback.deliveryState) {
-		case "DISCARDED": {
+	switch (feedback.state) {
+		case "REJECTED": {
 			return {
-				end: end("lost", "an admin rejected it", { at: feedback.decidedAt }),
+				end: end("lost", "an admin rejected it"),
 				clause: ["was rejected by an admin", "were rejected by an admin"],
 				phrase: "rejected by an admin",
 			};
 		}
 		case "AWAITING_APPROVAL": {
 			return {
-				end: end("open", "it awaits an admin’s approval", { since: feedback.createdAt }),
+				end: end("open", "it awaits an admin’s approval"),
 				clause: ["awaits approval", "await approval"],
 				phrase: "awaiting approval",
 			};
 		}
-		case "PREPARED": {
-			const prepared = PREPARED_FOR[feedback.channel];
+		case "READY": {
+			const ready = READY_FOR[feedback.destination];
 			return {
-				end: end("open", prepared.end, { since: feedback.createdAt }),
-				clause: [`is ${prepared.phrase}`, `are ${prepared.phrase}`],
-				phrase: prepared.phrase,
+				end: end("open", ready.end),
+				clause: [`is ${ready.phrase}`, `are ${ready.phrase}`],
+				phrase: ready.phrase,
 			};
 		}
-		case "SUPERSEDED": {
+		case "REPLACED": {
 			return {
-				end: end("lost", "newer feedback replaced it", { at: feedback.replacedAt }),
+				end: end("lost", "newer feedback replaced it"),
 				clause: ["was replaced by newer feedback", "were replaced by newer feedback"],
 				phrase: "replaced by newer feedback",
 			};
@@ -202,218 +169,78 @@ function feedbackFate(feedback: ReviewLineageFeedback): FeedbackFate {
 				phrase: "failed to deliver",
 			};
 		}
-		case "PARTIALLY_FAILED": {
-			return {
-				end: end("lost", "only part of it was delivered, and the rest failed", {
-					at: feedback.deliveredAt,
-				}),
-				clause: ["was only partly delivered", "were only partly delivered"],
-				phrase: "only partly delivered",
-			};
-		}
 		case "UNCONFIRMED": {
 			return {
-				end: end("none", "no record says that the developer saw it", { label: "Not known" }),
+				end: end("none", "no record confirms that it reached the developer", {
+					label: "Not known",
+				}),
 				clause: ["is unconfirmed", "are unconfirmed"],
 				phrase: "unconfirmed",
 			};
 		}
-		case "SUPPRESSED": {
-			const shownFirst = feedback.deliveredAt !== undefined;
-			const why =
-				feedback.suppressionReason === undefined
-					? ""
-					: ` (${shortReason(feedback.suppressionReason)})`;
-			return {
-				end: end("lost", `${shownFirst ? "delivered, then withheld" : "withheld"}${why}`, {
-					at: feedback.deliveredAt,
-				}),
-				clause: shownFirst
-					? [`was delivered, then withheld${why}`, `were delivered, then withheld${why}`]
-					: [`was withheld${why}`, `were withheld${why}`],
-				phrase: shortWithheld(feedback),
-			};
-		}
-		case "PARTIALLY_DELIVERED": {
-			// A reason makes the partial delivery final: the rest was withheld and is not on its way.
-			if (feedback.suppressionReason !== undefined) {
-				const why = shortReason(feedback.suppressionReason);
-				return {
-					end: end("lost", `part of it was delivered, the rest was withheld (${why})`, {
-						at: feedback.deliveredAt,
-					}),
-					clause: [`was only partly delivered (${why})`, `were only partly delivered (${why})`],
-					phrase: `partly withheld (${why})`,
-				};
-			}
-			return {
-				end: end("open", "part of it is delivered, and the rest is on its way", {
-					since: feedback.deliveredAt,
-				}),
-				clause: ["is partly delivered", "are partly delivered"],
-				phrase: "partly delivered",
-			};
+		case "WITHHELD": {
+			return at === undefined
+				? {
+						end: end("lost", "it was withheld"),
+						clause: ["was withheld", "were withheld"],
+						phrase: "withheld",
+					}
+				: {
+						end: end("lost", "it was delivered, then withheld", { at }),
+						clause: ["was delivered, then withheld", "were delivered, then withheld"],
+						phrase: "delivered, then withheld",
+					};
 		}
 		case "DELIVERED": {
-			break;
+			const place = lowerFirst(FEEDBACK_LOCATION_DEFS[feedbackLocation(feedback, item)].label);
+			return {
+				end: end("delivered", `it reached the developer ${place}`, { at }),
+				clause: ["was delivered", "were delivered"],
+				phrase: "delivered",
+			};
 		}
 	}
-	const worked = [
-		response?.resolvedByWorkAt === undefined
-			? undefined
-			: { said: "resolved by the work", reason: "their work resolved it" },
-	].filter((entry) => entry !== undefined);
-	if (worked.length > 0) {
-		const said = worked.map((entry) => entry.said).join(", then ");
-		return {
-			end: end("worked", worked.map((entry) => entry.reason).join(", then "), {
-				at: response?.resolvedByWorkAt ?? response?.respondedAt,
-			}),
-			clause: [`was delivered and ${said}`, `were delivered and ${said}`],
-			phrase: said,
-		};
-	}
-	const declined = declinedAnswer(response);
-	if (declined !== undefined) {
-		return {
-			end: end(
-				"answered",
-				declined === "disputed"
-					? "the developer disputed it"
-					: "the developer answered it; how stays private to them",
-				{ at: response?.respondedAt },
-			),
-			clause: [`was delivered and ${declined}`, `were delivered and ${declined}`],
-			phrase: declined,
-		};
-	}
-	return {
-		end: end("open", "delivered, no answer yet", { since: feedback.deliveredAt }),
-		clause: ["was delivered and has no answer yet", "were delivered and have no answer yet"],
-		phrase: "delivered with no answer yet",
-	};
 }
 
-/**
- * How the developer answered where their work did not resolve it, as far as an admin may know: a
- * dispute, or that they answered at all. Their rating and other decisions stay private to them.
- */
-function declinedAnswer(response: ReviewLineageFeedback["response"]): string | undefined {
-	if (response?.disputed === true) {
-		return "disputed";
-	}
-	return response?.respondedAt === undefined ? undefined : "answered";
-}
-
-/** "30 s after it was composed", or nothing where there was no wait to tell. */
-function afterWritten(feedback: ReviewLineageFeedback, at: Date | undefined): string {
-	if (at === undefined || at.getTime() - feedback.createdAt.getTime() < 1000) {
-		return "";
-	}
-	return ` ${durationBetween(feedback.createdAt, at)} after it was composed`;
-}
-
-/** Whether a piece of feedback ended lost on its way, as its end step says: the filter's losses. */
-export function feedbackLost(feedback: ReviewLineageFeedback): boolean {
-	return feedbackFate(feedback).end.kind === "lost";
-}
-
-function feedbackSentence(lineage: ReviewLineage, feedback: ReviewLineageFeedback): string {
-	const place = lowerFirst(FEEDBACK_LOCATION_DEFS[feedbackLocation(feedback, lineage.work)].label);
+function feedbackSentence(feedback: LineageFeedback, item: ItemRef | undefined): string {
+	const place = lowerFirst(FEEDBACK_LOCATION_DEFS[feedbackLocation(feedback, item)].label);
 	const reached = `This feedback reached the developer ${place}`;
-	const { response } = feedback;
-	if (feedback.withdrawnAt !== undefined) {
+	if (feedback.withdrawn) {
 		return reachedDeveloper(feedback)
 			? `${reached}, then an admin withdrew it.`
 			: "This feedback did not reach the developer: an admin withdrew it first.";
 	}
-	switch (feedback.deliveryState) {
-		case "DISCARDED": {
+	switch (feedback.state) {
+		case "REJECTED": {
 			return "This feedback did not reach the developer: an admin rejected it.";
 		}
 		case "AWAITING_APPROVAL": {
 			return "This feedback has not reached the developer yet: it awaits an admin’s approval.";
 		}
-		case "PREPARED": {
-			return `This feedback has not reached the developer yet: ${PREPARED_FOR[feedback.channel].sentence}.`;
+		case "READY": {
+			return `This feedback has not reached the developer yet: ${READY_FOR[feedback.destination].sentence}.`;
 		}
-		case "SUPERSEDED": {
-			return feedback.deliveredAt === undefined
+		case "REPLACED": {
+			return feedback.deliveredAt === null
 				? "This feedback did not reach the developer: newer feedback replaced it."
 				: `${reached}, then newer feedback replaced it.`;
 		}
 		case "FAILED": {
 			return "This feedback did not reach the developer: it failed to deliver.";
 		}
-		case "PARTIALLY_FAILED": {
-			return `${reached} only in part: the rest failed to deliver.`;
-		}
-		case "PARTIALLY_DELIVERED": {
-			return feedback.suppressionReason === undefined
-				? `${reached} in part, and the rest is still on its way.`
-				: `${reached} in part; the rest was withheld: ${reasonClause(feedback.suppressionReason)}.`;
-		}
 		case "UNCONFIRMED": {
-			return "This feedback was linked in a conversation, but no record says that the developer saw it.";
+			return "This feedback was sent, but no record confirms that it reached the developer.";
 		}
-		case "SUPPRESSED": {
-			return withheldSentence(lineage, feedback, reached);
+		case "WITHHELD": {
+			return feedback.deliveredAt === null
+				? "This feedback did not reach the developer: it was withheld."
+				: `${reached}, then was withheld.`;
 		}
 		case "DELIVERED": {
-			break;
+			return `${reached}.`;
 		}
 	}
-	const arrived = `${reached}${afterWritten(feedback, feedback.deliveredAt)}`;
-	const resolvedFrom = feedback.deliveredAt ?? feedback.createdAt;
-	let resolved: string | undefined;
-	if (response?.resolvedByWorkAt !== undefined) {
-		// Delivery through an approval or a conversation can come after the work already resolved it.
-		resolved =
-			response.resolvedByWorkAt.getTime() < resolvedFrom.getTime()
-				? `their work had resolved it ${durationBetween(response.resolvedByWorkAt, resolvedFrom)} before it was delivered`
-				: `their work resolved it ${durationBetween(resolvedFrom, response.resolvedByWorkAt)} later`;
-	}
-	if (resolved !== undefined) {
-		return `${arrived}, and ${resolved}.`;
-	}
-	if (response?.disputed === true) {
-		return `${arrived}, but they disputed it.`;
-	}
-	if (response?.respondedAt !== undefined) {
-		return `${arrived}, and they answered it; their answer stays private to them.`;
-	}
-	return `${arrived} and has no answer yet.`;
 }
-
-function withheldSentence(
-	lineage: ReviewLineage,
-	feedback: ReviewLineageFeedback,
-	reached: string,
-): string {
-	const reason = feedback.suppressionReason;
-	if (feedback.deliveredAt !== undefined) {
-		return reason === undefined
-			? `${reached}, then was withheld.`
-			: `${reached}, then was withheld: ${reasonClause(reason)}.`;
-	}
-	const timing = reason === "ARTIFACT_MERGED" ? mergeTiming(feedback, lineage) : undefined;
-	if (timing?.where === "startedReview") {
-		return "This feedback did not reach the developer, by design: the merge started this review, so the work was already merged.";
-	}
-	if (timing?.merged !== undefined) {
-		const { merged } = timing;
-		return Math.abs(feedback.createdAt.getTime() - merged.getTime()) < 1000
-			? "This feedback did not reach the developer: the work was merged moments before it was composed."
-			: `This feedback did not reach the developer: the work was merged ${durationBetween(merged, feedback.createdAt)} before it was composed.`;
-	}
-	return reason === undefined
-		? "This feedback did not reach the developer: it was withheld."
-		: `This feedback did not reach the developer: ${reasonClause(reason)}.`;
-}
-
-// ------------------------------------------------------------------------------------------------
-// Several pieces: an observation's, a review's
-// ------------------------------------------------------------------------------------------------
 
 const NUMBER_WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
 
@@ -454,26 +281,22 @@ function fatesClause(fates: readonly FeedbackFate[]): string {
 	return joinAnd(parts);
 }
 
-// An answer says only that the developer answered: what they did with it stays private to them.
 const KIND_CLAUSE: Record<TraceEndKind, readonly [singular: string, plural: string]> = {
-	worked: ["worked", "worked"],
+	delivered: ["was delivered", "were delivered"],
 	open: ["is still open", "are still open"],
-	answered: ["was answered", "were answered"],
 	lost: ["did not arrive", "did not arrive"],
 	none: ["has no known end", "have no known end"],
 };
 
 const KIND_PHRASE: Record<TraceEndKind, string> = {
-	worked: "worked",
+	delivered: "delivered",
 	open: "open",
-	answered: "answered",
 	lost: "did not arrive",
 	none: "with no known end",
 };
 
-const KINDS: readonly TraceEndKind[] = ["worked", "open", "answered", "lost", "none"];
+const KINDS: readonly TraceEndKind[] = ["delivered", "open", "lost", "none"];
 
-/** "2 worked, 3 are still open, and 1 did not arrive": many different ends, counted by kind. */
 function kindsClause(fates: readonly FeedbackFate[]): string {
 	return joinAnd(
 		KINDS.map((kind) => ({ kind, count: fates.filter((fate) => fate.end.kind === kind).length }))
@@ -490,17 +313,17 @@ function joinAnd(parts: readonly string[]): string {
 }
 
 /** The end of several pieces' path: the best end any of them reached, with every end counted. */
-function endOfMany(feedback: readonly ReviewLineageFeedback[]): TraceEnd {
-	if (feedback.length === 0) {
+function endOfMany(fates: readonly FeedbackFate[]): TraceEnd {
+	const [only] = fates;
+	if (only === undefined) {
 		return end("none", "no feedback is listed");
 	}
-	const fates = feedback.map(feedbackFate);
-	if (fates.length === 1 && fates[0] !== undefined) {
-		return fates[0].end;
+	if (fates.length === 1) {
+		return only.end;
 	}
-	let best: FeedbackFate | undefined;
+	let best = only;
 	for (const fate of fates) {
-		if (best === undefined || END_RANK[fate.end.kind] < END_RANK[best.end.kind]) {
+		if (END_RANK[fate.end.kind] < END_RANK[best.end.kind]) {
 			best = fate;
 		}
 	}
@@ -518,92 +341,60 @@ function endOfMany(feedback: readonly ReviewLineageFeedback[]): TraceEnd {
 					.map(({ kind, count }) => `${count} ${KIND_PHRASE[kind]}`)
 					.join(", ")
 			: [...counts.entries()].map(([phrase, count]) => `${count} ${phrase}`).join(", ");
-	const kind = best?.end.kind ?? "none";
-	const since =
-		kind === "open"
-			? fates
-					.filter((fate) => fate.end.kind === "open")
-					.map((fate) => fate.end.since)
-					.find((at) => at !== undefined)
-			: undefined;
-	return end(kind, `${countOf(fates.length, "piece", "pieces")} of feedback: ${reason}`, {
-		since,
-	});
+	return end(best.end.kind, `${countOf(fates.length, "piece", "pieces")} of feedback: ${reason}`);
 }
 
-// ------------------------------------------------------------------------------------------------
-// An observation
-// ------------------------------------------------------------------------------------------------
+function isRunning(review: ReviewRef | undefined): boolean {
+	return review?.status === "QUEUED" || review?.status === "RUNNING";
+}
 
-function observationVerdict(
-	lineage: ReviewLineage,
-	observation: ReviewLineageObservation,
-): TraceVerdict {
-	const written = lineage.feedback
-		.filter((entry) => entry.observationIds.includes(observation.id))
-		.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-	const marked = observation.invalidated ? "This observation was marked incorrect" : undefined;
+function resultVerdict(records: LineageRecords, result: LineageResult): TraceVerdict {
+	const written = feedbackOf(records.feedback, result.id);
 	if (written.length > 0) {
-		const fates = written.map(feedbackFate);
-		const led = `led to ${countOf(written.length, "piece", "pieces")} of feedback`;
+		const fates = written.map((entry) => feedbackFate(entry, records.item));
 		return {
-			sentence: `${marked === undefined ? "This observation" : `${marked} and`} ${led}; ${fatesClause(fates)}.`,
-			end: endOfMany(written),
+			sentence: `This result led to ${countOf(written.length, "piece", "pieces")} of feedback; ${fatesClause(fates)}.`,
+			end: endOfMany(fates),
 		};
 	}
-	const phase = lineage.review?.phase;
-	const running = phase === "RUNNING" || phase === "QUEUED";
-	const stopped = phase === "FAILED" || phase === "TIMED_OUT" || phase === "CANCELLED";
-	if (marked !== undefined) {
-		return {
-			sentence: `${marked}, so no feedback from it reached the developer.`,
-			end: end("lost", "an admin marked it incorrect", { at: observation.markedIncorrectAt }),
-		};
-	}
-	switch (observation.outcome) {
+	const review = records.reviews.find((entry) => entry.id === result.reviewId);
+	switch (result.outcome) {
 		case "NOT_MET": {
-			if (running) {
+			if (isRunning(review)) {
 				return {
-					sentence: "This observation has led to no feedback yet, because the review still runs.",
-					end: end("open", "the review still runs", { since: lineage.review?.createdAt }),
+					sentence: "This result has led to no feedback yet, and the review remains open.",
+					end: end("open", "the review remains open", { since: review?.createdAt }),
 				};
 			}
-			if (stopped) {
+			if (review?.status === "FAILED" || review?.status === "CANCELLED") {
 				return {
 					sentence:
-						"This observation led to no feedback, because the review stopped before it composed any.",
+						"This result led to no feedback, because the review stopped before it composed any.",
 					end: end("lost", "the review stopped before it composed feedback", {
-						at: lineage.review?.finishedAt,
+						at: review.completedAt ?? undefined,
 					}),
 				};
 			}
-			if (observation.feedbackCount > observation.ownFeedbackCount) {
-				return {
-					sentence: "This observation led to no feedback in this review; a later review wrote it.",
-					end: end("none", "a later review wrote the feedback", { label: "Elsewhere" }),
-				};
-			}
 			return {
-				sentence:
-					"This observation was not met but led to no feedback, so the developer was not told.",
+				sentence: "This result was not met but led to no feedback, so the developer was not told.",
 				end: end("lost", "no feedback was written from it"),
 			};
 		}
 		case "MET": {
 			return {
-				sentence: "This observation was met and led to no feedback.",
+				sentence: "This result was met and led to no feedback.",
 				end: end("none", "it was met, so nothing had to be sent"),
 			};
 		}
-		case "NOT_APPLICABLE": {
+		case "DOES_NOT_APPLY": {
 			return {
-				sentence: "This observation did not apply to the work, so it led to no feedback.",
+				sentence: "This practice did not apply to the work, so the result led to no feedback.",
 				end: end("none", "the practice did not apply"),
 			};
 		}
-		case "UNDETERMINED": {
+		case "COULD_NOT_DETERMINE": {
 			return {
-				sentence: "This observation stayed undetermined, so it led to no feedback.",
+				sentence: "This result could not be determined, so it led to no feedback.",
 				end: end("none", "the review could not tell"),
 			};
 		}
@@ -614,164 +405,102 @@ function observationVerdict(
 // A review
 // ------------------------------------------------------------------------------------------------
 
-function reviewVerdict(
-	lineage: ReviewLineage,
-	reviewOutcome: AgentJob["reviewOutcome"] | undefined,
-): TraceVerdict {
-	const { review } = lineage;
+const STOPPED: Partial<Record<ReviewRef["status"], string>> = {
+	FAILED: "failed",
+	CANCELLED: "was cancelled",
+};
+
+function reviewVerdict(records: LineageRecords): TraceVerdict {
+	const review = chainReview(records);
+	if (review === undefined && records.reviews.length > 1) {
+		return {
+			sentence: `This work has ${countOf(records.reviews.length, "review", "reviews")}, so open one to see what it did.`,
+			end: end("none", "each review tells what it did", { label: "Several reviews" }),
+		};
+	}
 	if (review === undefined) {
 		return {
 			sentence: "The record of this review is gone, so this view cannot tell what it did.",
 			end: end("none", "the record of the review is gone", { label: "Not known" }),
 		};
 	}
-	const own = lineage.feedback
-		.filter((entry) => entry.agentJobId === review.id)
-		.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-	const observed = lineage.observations.filter((entry) => entry.agentJobId === review.id).length;
-	const recorded = countOf(observed, "observation", "observations");
-	const ranFrom = review.startedAt ?? review.createdAt;
-	const ran =
-		review.finishedAt === undefined ? undefined : durationBetween(ranFrom, review.finishedAt);
-	const waited =
-		review.startedAt !== undefined &&
-		review.startedAt.getTime() - review.createdAt.getTime() >= 1000
-			? durationBetween(review.createdAt, review.startedAt)
-			: undefined;
+	const results = ownResults(records);
+	const recordedIds = new Set(results.map((entry) => entry.id));
+	const own = records.feedback.filter((entry) => entry.basis.some((id) => recordedIds.has(id)));
+	const fates = own.map((entry) => feedbackFate(entry, records.item));
+	const recorded = countOf(results.length, "result", "results");
+	const took =
+		review.completedAt === null ? undefined : durationBetween(review.createdAt, review.completedAt);
 
-	if (lineage.moreObservations > 0 || lineage.moreFeedback > 0) {
-		const phase = {
-			QUEUED: "queued",
-			RUNNING: "running",
-			FAILED: "failed",
-			TIMED_OUT: "timed out",
-			CANCELLED: "canceled",
-			COMPLETED: "completed",
-		}[review.phase];
+	if (review.status === "QUEUED") {
 		return {
-			sentence: `This review is ${phase}; ${recorded} and ${countOf(own.length, "piece", "pieces")} of feedback from it are listed, while ${countOf(lineage.moreObservations, "additional observation", "additional observations")} and ${countOf(lineage.moreFeedback, "additional piece", "additional pieces")} of feedback in the chain are not listed.`,
+			sentence: "This review waits in the queue and has recorded nothing yet.",
+			end: end("open", "the review waits in the queue", { since: review.createdAt }),
+		};
+	}
+	if (review.status === "RUNNING") {
+		return {
+			sentence:
+				results.length === 0
+					? "This review remains open and has recorded no result yet."
+					: `This review remains open and has recorded ${recorded} so far.`,
+			end: end("open", "the review remains open", { since: review.createdAt }),
+		};
+	}
+	const how = STOPPED[review.status];
+	if (how !== undefined) {
+		const after = took === undefined ? "" : ` after ${took}`;
+		let what = `and composed ${countOf(own.length, "piece", "pieces")} of feedback`;
+		if (results.length === 0) {
+			what = "with nothing recorded";
+		} else if (own.length === 0) {
+			what = `and recorded ${recorded}, but composed no feedback`;
+		}
+		return {
+			sentence: `This review ${how}${after} ${what}.`,
 			end:
-				own.length > 0
-					? endOfMany(own)
-					: end("none", "unlisted chain records have no known review ownership", {
-							label: "Not known",
-						}),
+				own.length === 0
+					? end("lost", `the review ${how} before it composed feedback`, {
+							at: review.completedAt ?? undefined,
+						})
+					: endOfMany(fates),
 		};
 	}
-
-	switch (review.phase) {
-		case "QUEUED": {
-			const hold = review.holdReason;
-			if (hold !== undefined && hold.length > 0) {
-				const { label } = holdReasonCopy(hold);
-				return {
-					sentence: `This review is on hold (${label}) and has observed nothing yet.`,
-					end: end("open", `the review is on hold: ${label}`, { since: review.createdAt }),
-				};
-			}
-			return {
-				sentence: "This review waits in the queue and has observed nothing yet.",
-				end: end("open", "the review waits in the queue", { since: review.createdAt }),
-			};
-		}
-		case "RUNNING": {
-			return {
-				sentence:
-					observed === 0
-						? "This review still runs and has recorded no observation yet."
-						: `This review still runs and has recorded ${recorded} so far.`,
-				end: end("open", "the review still runs", { since: ranFrom }),
-			};
-		}
-		case "FAILED":
-		case "TIMED_OUT":
-		case "CANCELLED": {
-			const how = { FAILED: "failed", TIMED_OUT: "timed out", CANCELLED: "was canceled" }[
-				review.phase
-			];
-			const after = ran === undefined ? "" : ` after ${ran}`;
-			let what = `and composed ${countOf(own.length, "piece", "pieces")} of feedback`;
-			if (observed === 0) {
-				what = "with nothing recorded";
-			} else if (own.length === 0) {
-				what = `and recorded ${recorded}, but composed no feedback`;
-			}
-			return {
-				sentence: `This review ${how}${after} ${what}.`,
-				end:
-					own.length === 0
-						? end("lost", `the review ${how} before it composed feedback`, {
-								at: review.finishedAt,
-							})
-						: endOfMany(own),
-			};
-		}
-		case "COMPLETED": {
-			break;
-		}
-	}
-	if (reviewOutcome === "INSUFFICIENT_EVIDENCE") {
+	const after = took === undefined ? "" : ` after ${took}`;
+	const ran =
+		review.status === "PARTIAL"
+			? `closed${after} with some of the work not reviewed`
+			: `completed${after}`;
+	if (results.length === 0) {
 		return {
-			sentence: "This review assessed nothing: the evidence it needed was missing or unreadable.",
-			end: end("none", "nothing was assessed"),
+			sentence: `This review ${ran} and recorded no result.`,
+			end: end("none", "the review recorded no result"),
 		};
 	}
-	if (reviewOutcome === "COALESCED") {
+	if (own.length === 0) {
+		const silent = silentNotMet({ results, feedback: records.feedback }).length;
 		return {
-			sentence:
-				"This review assessed nothing anew: it was coalesced with an earlier review that had answered every practice on the same code.",
-			end: end("none", "an earlier review holds the answers"),
-		};
-	}
-	if (reviewOutcome === "SUPERSEDED") {
-		return {
-			sentence:
-				"This review assessed nothing: a newer review of the same work replaced it while it waited, and that review carries its practices.",
-			end: end("none", "a newer review carries its practices"),
-		};
-	}
-	const how = [
-		ran === undefined ? "completed" : `ran ${ran}`,
-		ran !== undefined && waited !== undefined ? `after a ${waited} wait` : undefined,
-	]
-		.filter((entry) => entry !== undefined)
-		.join(" ");
-	if (observed === 0) {
-		return {
-			sentence: `This review ${how} and recorded no observation.`,
-			end: end("none", "the review recorded no observation"),
-		};
-	}
-	const composed = own.length;
-	const silent = silentNotMet(lineage).length;
-	if (composed === 0) {
-		return {
-			sentence: `This review ${how} and recorded ${recorded}, but composed no feedback.`,
+			sentence: `This review ${ran} and recorded ${recorded}, but composed no feedback.`,
 			end:
 				silent > 0
 					? end(
 							"lost",
-							`${countOf(silent, "not-met observation", "not-met observations")} led to no feedback`,
+							`${countOf(silent, "not-met result", "not-met results")} led to no feedback`,
 						)
 					: end("none", "no feedback was composed"),
 		};
 	}
 	const reached = own.filter(reachedDeveloper).length;
-	let reachedText: string;
-	if (lineage.moreFeedback > 0) {
-		// The pieces not listed are not known to have reached anyone, nor known not to have.
-		reachedText = `${reached} of the ${own.length} listed reached the developer`;
-	} else if (reached === composed) {
+	let reachedText = `${reached} reached the developer`;
+	if (reached === own.length) {
 		reachedText =
-			composed === 1 ? "it reached the developer" : `all ${composed} reached the developer`;
+			own.length === 1 ? "it reached the developer" : `all ${own.length} reached the developer`;
 	} else if (reached === 0) {
 		reachedText = "none reached the developer";
-	} else {
-		reachedText = `${reached} reached the developer`;
 	}
 	return {
-		sentence: `This review ${how} and composed ${countOf(composed, "piece", "pieces")} of feedback; ${reachedText}.`,
-		end: endOfMany(own),
+		sentence: `This review ${ran} and composed ${countOf(own.length, "piece", "pieces")} of feedback; ${reachedText}.`,
+		end: endOfMany(fates),
 	};
 }
 
@@ -779,98 +508,67 @@ function reviewVerdict(
 // The record in front
 // ------------------------------------------------------------------------------------------------
 
-/**
- * The verdict on the record in front and the end of its path, read from the chain alone: no model
- * writes it, so the same chain always says the same thing. A review, its observations step and the
- * work tell the review; an observation and a piece of feedback tell themselves. A record the chain
- * does not list falls back to the review.
- */
-export function traceVerdict(
-	lineage: ReviewLineage,
-	here: TraceNode | undefined,
-	reviewOutcome?: AgentJob["reviewOutcome"],
-): TraceVerdict {
+export function traceVerdict(lineage: ReviewLineage, here: TraceNode | undefined): TraceVerdict {
+	const records = lineageRecords(lineage);
 	if (here?.kind === "feedback") {
-		const feedback = lineage.feedback.find((entry) => entry.id === here.id);
+		const feedback = records.feedback.find((entry) => entry.id === here.id);
 		if (feedback !== undefined) {
-			return { sentence: feedbackSentence(lineage, feedback), end: feedbackFate(feedback).end };
+			return {
+				sentence: feedbackSentence(feedback, records.item),
+				end: feedbackFate(feedback, records.item).end,
+			};
 		}
 	}
-	if (here?.kind === "observation") {
-		const observation = lineage.observations.find((entry) => entry.id === here.id);
-		if (observation !== undefined) {
-			return observationVerdict(lineage, observation);
+	if (here?.kind === "result") {
+		const result = records.results.find((entry) => entry.id === here.id);
+		if (result !== undefined) {
+			return resultVerdict(records, result);
 		}
 	}
-	return reviewVerdict(lineage, reviewOutcome);
+	return reviewVerdict(records);
 }
 
 // ------------------------------------------------------------------------------------------------
 // Work no review started on
 // ------------------------------------------------------------------------------------------------
 
-/** What the trace of work with no review says: its sentence on top and its end step. */
-export interface UnreviewedVerdict {
-	sentence: string;
-	end: TraceEnd;
-}
-
-/**
- * What the trace of work none of whose moments started a review says, from the state of its latest
- * moment. A moment still queued or waiting has not been refused, so the trace says it waits rather
- * than that no review started. A reason is said only where it still holds: "Practice reviews are
- * turned off" is said while they are off, and once they are on again a waiting moment just waits and
- * a refused one says they were off when it happened.
- */
 export function unreviewedVerdict(
-	moment: TracedSignal,
+	event: ItemEvent,
 	practicesEnabled: boolean | undefined,
-): UnreviewedVerdict {
-	const staleOff = moment.stateReason === "PRACTICES_DISABLED" && practicesEnabled === true;
+): TraceVerdict {
+	const staleOff = event.reason === "PRACTICES_DISABLED" && practicesEnabled === true;
 	const reason =
-		!staleOff && hasText(moment.stateReasonDescription)
-			? moment.stateReasonDescription.trim()
-			: undefined;
-	switch (moment.state) {
-		case "PENDING": {
+		event.reason === null || staleOff ? undefined : ITEM_EVENT_REASON_SENTENCES[event.reason];
+	switch (event.state) {
+		case "WAITING": {
 			return {
-				sentence: "No review has started on this work yet: it is queued for review.",
-				end: end("open", reason ?? "it is queued for review", {
-					label: "Queued for review",
-					since: moment.occurredAt,
-				}),
-			};
-		}
-		case "DEFERRED": {
-			return {
-				sentence:
-					"No review has started on this work yet: Hephaestus waits to see if it keeps changing.",
-				end: end("open", reason ?? "Hephaestus waits to see if it keeps changing", {
+				sentence: "No review has started on this work yet: it waits before a review starts.",
+				end: end("open", reason ?? "it waits before a review starts", {
 					label: "Waiting",
-					since: moment.occurredAt,
+					since: event.occurredAt,
 				}),
 			};
 		}
-		case "TRIGGERED": {
+		case "STARTED": {
 			return {
 				sentence: "A review started on this work.",
-				end: end("open", "a review started", { label: "Review started", at: moment.occurredAt }),
+				end: end("open", "a review started", { label: "Review started", at: event.occurredAt }),
 			};
 		}
 		case "RECORDED":
-		case "SUPPRESSED":
-		case "LAPSED": {
+		case "WITHHELD":
+		case "EXPIRED": {
 			break;
 		}
 	}
 	const why =
 		reason ??
 		(staleOff
-			? "Practice reviews were turned off for this workspace when it happened. They are on now."
-			: SIGNAL_STATE_LABELS[moment.state]);
+			? "Practice review was turned off for this workspace when it happened. It is on now."
+			: ITEM_EVENT_STATE_DEFS[event.state].description);
 	return {
 		sentence: `No review started on this work: ${lowerFirst(firstSentence(why))}.`,
-		end: end("lost", why, { label: "No review started", at: moment.occurredAt }),
+		end: end("lost", why, { label: "No review started", at: event.occurredAt }),
 	};
 }
 

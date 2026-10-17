@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.testconfig.MockSecurityContextUtils;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
+import de.tum.cit.aet.hephaestus.workspace.Membership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContextHolder;
 import java.util.Set;
@@ -212,7 +212,7 @@ class WorkspaceAccessServiceTest {
     }
 
     @Test
-    void hasRole_WithSuperAdminButNoWorkspaceMembership_DeniesAccess() {
+    void hasRole_WithSuperAdminButNoMembership_DeniesAccess() {
         // Given: Global admin user with no workspace membership
         SecurityContextHolder.setContext(MockSecurityContextUtils.createSecurityContext(
                 "admin-user", "admin-123", new String[] {"app_admin"}, "super-admin-token"));

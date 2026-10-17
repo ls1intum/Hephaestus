@@ -2,16 +2,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import {
-	decideFeedbackProposalMutation,
-	getPracticeReviewFeedbackOptions,
-	updatePracticeReviewFeedbackWithdrawalMutation,
+	createFeedbackDecisionMutation,
+	getReviewFeedbackOptions,
 } from "@/api/@tanstack/react-query.gen";
-import type { GetPracticeReviewFeedbackResponse } from "@/api/types.gen";
-import type { ProposalRejectionReason } from "@/components/admin/practice-reviews/proposal-rejection-vocabulary";
+import type { ReviewFeedbackDetail } from "@/api/types.gen";
 import type { ApprovalQueue } from "@/components/admin/practice-reviews/ProposalDecision";
 import { PRACTICE_REVIEW_READS } from "@/components/admin/practice-reviews/review-search";
 import { type PanelState, panelState } from "@/components/common/panel-state";
-import { isDeliveryInProgress } from "@/components/practice-vocabulary/delivery-outcome-defs";
+import { isDeliveryInProgress } from "@/components/practice-vocabulary/delivery-state-defs";
+import type { FeedbackDecisionReason } from "@/components/practice-vocabulary/feedback-decision-defs";
 import { problemDetailOf } from "@/lib/problem-detail";
 import { invalidateWorkspaceReads } from "@/runtime/tanstack-query/invalidate-workspace-reads";
 
@@ -20,22 +19,18 @@ import { awaitingApprovalOptions } from "./use-feedback-awaiting-approval";
 /** How often feedback still on its way out is re-read, until it lands or stops. */
 const DELIVERY_POLL_MS = 2000;
 
-/**
- * Every read a withdrawal moves: the admin's, and the developer's own reads that show a
- * practice-page card or count it.
- */
-const READS_OF_FEEDBACK_WITHDRAWAL: ReadonlySet<string> = new Set([
+const READS_OF_FEEDBACK_DECISION: ReadonlySet<string> = new Set([
 	...PRACTICE_REVIEW_READS,
-	"getPracticeProfileOverview",
-	"getInAppFeedback",
+	"getOwnPracticeProfileOverview",
+	"getOwnPracticePageFeedback",
 ]);
 
 interface FeedbackController {
-	feedback: PanelState<{ feedback: GetPracticeReviewFeedbackResponse }>;
+	feedback: PanelState<{ feedback: ReviewFeedbackDetail }>;
 	isDeciding: boolean;
 	onApprove: () => void;
-	onReject: (reason: ProposalRejectionReason, note?: string) => void;
-	onChangeWithdrawal: (withdrawn: boolean, reason: string) => Promise<unknown>;
+	onReject: (reason: FeedbackDecisionReason, note?: string) => void;
+	onChangeWithdrawal: (withdrawn: boolean, note: string) => Promise<unknown>;
 	isChangingWithdrawal: boolean;
 }
 
@@ -49,30 +44,32 @@ interface FeedbackControllerOptions {
 	onDecided?: () => void;
 }
 
-/** One piece of feedback as its level reads it, and the approval decision it may be waiting on. */
 export function useFeedbackController(
 	workspaceSlug: string,
 	feedbackId: string,
 	{ onDecided }: FeedbackControllerOptions = {},
 ): FeedbackController {
 	const queryClient = useQueryClient();
-	const feedbackOptions = getPracticeReviewFeedbackOptions({ path: { workspaceSlug, feedbackId } });
+	const path = { workspaceSlug, feedbackId };
+	const feedbackOptions = getReviewFeedbackOptions({ path });
 	const feedbackQuery = useQuery({
 		...feedbackOptions,
 		refetchInterval: ({ state: { data } }) =>
 			data !== undefined && isDeliveryInProgress(data) ? DELIVERY_POLL_MS : false,
 	});
-	const decision = useMutation({
-		...decideFeedbackProposalMutation(),
+	// Approvals bind the reviewed copy digest; a changed package requires a fresh read.
+	const contentDigest = feedbackQuery.data?.contentDigest ?? undefined;
+	const approval = useMutation({
+		...createFeedbackDecisionMutation(),
 		// Settled, not succeeded: a decision refused because someone else decided first still means
 		// the lists and counts have moved. Returned, so the decision stays pending until they are read
 		// again: the buttons cannot be pressed twice on the record just decided, and whatever moves on
 		// after it reads the queue as it is now.
 		onSettled: async () =>
-			invalidateWorkspaceReads(queryClient, workspaceSlug, PRACTICE_REVIEW_READS),
-		onSuccess: (_, variables) => {
+			invalidateWorkspaceReads(queryClient, workspaceSlug, READS_OF_FEEDBACK_DECISION),
+		onSuccess: (decision) => {
 			toast.success(
-				variables.body.decision === "APPROVED"
+				decision.action === "APPROVE"
 					? "Feedback approved. Delivery is being checked."
 					: "Feedback rejected",
 			);
@@ -85,14 +82,13 @@ export function useFeedbackController(
 	});
 
 	const withdrawal = useMutation({
-		...updatePracticeReviewFeedbackWithdrawalMutation(),
-		onSuccess: (updated, variables) => {
-			queryClient.setQueryData(feedbackOptions.queryKey, updated);
-			void invalidateWorkspaceReads(queryClient, workspaceSlug, READS_OF_FEEDBACK_WITHDRAWAL);
-			toast.success(variables.body.withdrawn ? "Feedback withdrawn" : "Feedback restored");
+		...createFeedbackDecisionMutation(),
+		onSettled: async () =>
+			invalidateWorkspaceReads(queryClient, workspaceSlug, READS_OF_FEEDBACK_DECISION),
+		onSuccess: (decision) => {
+			toast.success(decision.action === "WITHDRAW" ? "Feedback withdrawn" : "Feedback restored");
 		},
 		onError: (error) => {
-			void feedbackQuery.refetch();
 			toast.error("We could not change this feedback", { description: problemDetailOf(error) });
 		},
 	});
@@ -103,7 +99,7 @@ export function useFeedbackController(
 		// longer eligible" took the feedback out of approval, while "sending is paused" left it waiting
 		// — and the re-read above has already landed by the time this runs.
 		onError: () => {
-			const state = queryClient.getQueryData(feedbackOptions.queryKey)?.deliveryState;
+			const state = queryClient.getQueryData(feedbackOptions.queryKey)?.state;
 			if (state !== undefined && state !== "AWAITING_APPROVAL") {
 				onDecided?.();
 			}
@@ -111,23 +107,19 @@ export function useFeedbackController(
 	};
 	return {
 		feedback: panelState(feedbackQuery, (feedback) => ({ status: "ready" as const, feedback })),
-		isDeciding: decision.isPending,
-		onApprove: () =>
-			decision.mutate(
-				{ path: { workspaceSlug, feedbackId }, body: { decision: "APPROVED" } },
-				decided,
-			),
-		onReject: (rejectionReason, rejectionNote) =>
-			decision.mutate(
-				{
-					path: { workspaceSlug, feedbackId },
-					body: { decision: "REJECTED", rejectionReason, rejectionNote },
-				},
+		isDeciding: approval.isPending,
+		onApprove: () => approval.mutate({ path, body: { action: "APPROVE", contentDigest } }, decided),
+		onReject: (reasonCode, note) =>
+			approval.mutate(
+				{ path, body: { action: "REJECT", reasonCode, note, contentDigest } },
 				decided,
 			),
 		isChangingWithdrawal: withdrawal.isPending,
-		onChangeWithdrawal: async (withdrawn, reason) =>
-			withdrawal.mutateAsync({ path: { workspaceSlug, feedbackId }, body: { withdrawn, reason } }),
+		onChangeWithdrawal: async (withdrawn, note) =>
+			withdrawal.mutateAsync({
+				path,
+				body: { action: withdrawn ? "WITHDRAW" : "RESTORE", note },
+			}),
 	};
 }
 
@@ -158,7 +150,7 @@ export function useApprovalQueue(
 	}
 	return {
 		position: index + 1,
-		total: query.data?.page?.totalElements ?? ids.length,
+		total: query.data?.totalElements ?? ids.length,
 		previous: ids[index - 1],
 		next: ids[index + 1],
 	};
@@ -179,6 +171,6 @@ export function useNextInApprovalQueue(workspaceSlug: string, feedbackId: string
 			...awaitingApprovalOptions(workspaceSlug, APPROVAL_QUEUE_SIZE),
 			retry: false,
 		});
-		return page.content?.find((item) => item.id !== feedbackId)?.id;
+		return page.content.find((item) => item.id !== feedbackId)?.id;
 	};
 }

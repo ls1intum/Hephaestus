@@ -1,10 +1,12 @@
 package de.tum.cit.aet.hephaestus.integration.outline.sync;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocument;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnapshot;
+import de.tum.cit.aet.hephaestus.integration.outline.identity.OutlineRosterIdentityResolver;
 import java.time.Instant;
 import java.util.function.Consumer;
 import org.jspecify.annotations.Nullable;
@@ -26,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
  * its transaction rollback-only, so retrying inside it could never commit.
  */
 @Component
+@ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
 public class OutlineMirrorTransactions {
 
@@ -33,11 +36,15 @@ public class OutlineMirrorTransactions {
 
     private final OutlineDocumentRepository documentRepository;
     private final OutlineCollectionRepository collectionRepository;
+    private final OutlineRosterIdentityResolver people;
 
     public OutlineMirrorTransactions(
-            OutlineDocumentRepository documentRepository, OutlineCollectionRepository collectionRepository) {
+            OutlineDocumentRepository documentRepository,
+            OutlineCollectionRepository collectionRepository,
+            OutlineRosterIdentityResolver people) {
         this.documentRepository = documentRepository;
         this.collectionRepository = collectionRepository;
+        this.people = people;
     }
 
     /**
@@ -59,6 +66,7 @@ public class OutlineMirrorTransactions {
                     return fresh;
                 });
         mutator.accept(doc);
+        people.recordAuthors(doc);
         return OutlineDocumentSnapshot.of(documentRepository.saveAndFlush(doc));
     }
 

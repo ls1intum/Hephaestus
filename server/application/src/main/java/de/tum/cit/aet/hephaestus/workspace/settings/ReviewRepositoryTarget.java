@@ -1,23 +1,24 @@
 package de.tum.cit.aet.hephaestus.workspace.settings;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Positive;
 import java.util.List;
 import java.util.Objects;
 import org.jspecify.annotations.NonNull;
 
 public record ReviewRepositoryTarget(
-        @Schema(description = "Exact provider repository name, including its owner") @NonNull @NotBlank @Size(max = 255)
-        String nameWithOwner,
+        @Schema(description = "Workspace repository item id") @Positive
+        long repositoryItemId,
 
-        @Schema(description = "Exact pull-request base branches to cover; empty covers every base branch")
+        @Schema(description = "Exact pull-request base branches to cover; empty covers every base" + " branch")
         @NonNull
         @NotNull
         List<String> baseBranches) {
     public ReviewRepositoryTarget {
-        nameWithOwner = validValue(nameWithOwner, "repository name");
+        if (repositoryItemId <= 0) {
+            throw new IllegalArgumentException("repositoryItemId must be positive");
+        }
         baseBranches = normalize(baseBranches);
     }
 

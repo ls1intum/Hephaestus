@@ -8,7 +8,7 @@ import { UserViewBanner } from "./UserViewBanner";
 const meta = {
 	component: UserViewBanner,
 	tags: ["autodocs"],
-	args: { name: "Sam", workspace: "Engineering", hasAccount: true, onExit: fn() },
+	args: { name: "Sam", workspace: "Engineering", unclaimed: false, onExit: fn() },
 } satisfies Meta<typeof UserViewBanner>;
 
 export default meta;
@@ -24,10 +24,10 @@ export const Default: Story = {
 	},
 };
 
-export const WithoutAccount: Story = {
-	args: { hasAccount: false },
+export const UnclaimedAccount: Story = {
+	args: { unclaimed: true },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText(/no Hephaestus account yet/u)).toBeVisible();
+		await expect(canvas.getByText(/has not signed in yet/u)).toBeVisible();
 	},
 };
 
@@ -39,7 +39,7 @@ export const LongName: Story = {
 };
 
 export const Reflow: Story = {
-	args: { hasAccount: false },
+	args: { unclaimed: true },
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
 	play: expectNoPageOverflow,
 };

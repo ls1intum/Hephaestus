@@ -1,4 +1,4 @@
-import type { PracticeReviewOverview } from "@/api/types.gen";
+import type { ReviewOverview } from "@/api/types.gen";
 import type { PanelState } from "@/components/common/panel-state";
 
 export type ReviewSectionState<T> =
@@ -18,15 +18,15 @@ export type ReviewCountState =
 
 /** The period of the same length before the range, which a total is set against. */
 interface PreviousReviewPeriod {
-	overview: PracticeReviewOverview;
+	overview: ReviewOverview;
 }
 
 /**
  * The overview once it is in: current, or stale — the previous range's, standing in while the range
  * just chosen loads.
  */
-export type PracticeReviewOverviewState = PanelState<{
-	overview: PracticeReviewOverview;
+export type ReviewOverviewState = PanelState<{
+	overview: ReviewOverview;
 	stale: boolean;
 }>;
 
@@ -39,7 +39,7 @@ export type PreviousReviewPeriodState =
 	| { status: "none" };
 
 /** The overview as a region under the page draws it: the page reports a failure once, for all of them. */
-export type OverviewRegionState = Exclude<PracticeReviewOverviewState, { status: "error" }>;
+export type OverviewRegionState = Exclude<ReviewOverviewState, { status: "error" }>;
 
 /** The shape of a paged query this module reads, spelled out rather than taken as a
  * `UseQueryResult` so the element type is inferred from the page's own `content`. */
@@ -48,7 +48,7 @@ interface PagedQuery<T> {
 	isError: boolean;
 	error: unknown;
 	refetch: () => unknown;
-	data?: { content?: T[]; page?: { totalElements?: number } };
+	data?: { content: T[]; totalElements: number };
 }
 
 /**
@@ -76,5 +76,5 @@ export function toSectionState<T>(
 	if (stillRunning && items.length === 0) {
 		return { status: "pending" };
 	}
-	return { status: "ready", items, total: query.data?.page?.totalElements ?? 0 };
+	return { status: "ready", items, total: query.data?.totalElements ?? 0 };
 }

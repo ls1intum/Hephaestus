@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.activity;
 
 import de.tum.cit.aet.hephaestus.activity.metrics.ActivityMetrics;
 import de.tum.cit.aet.hephaestus.activity.spi.ActivityRecorder;
-import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataWriteFence;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -28,7 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ActivityEventService implements ActivityRecorder {
 
     private final ActivityEventRepository eventRepository;
-    private final PersonDataWriteFence writeFence;
+    private final ActivityPersonWriteAdmission admission;
     private final WorkspaceRepository workspaceRepository;
     private final Counter eventsRecordedCounter;
     private final Counter eventsDuplicateCounter;
@@ -41,9 +40,9 @@ public class ActivityEventService implements ActivityRecorder {
             ActivityEventRepository eventRepository,
             WorkspaceRepository workspaceRepository,
             MeterRegistry meterRegistry,
-            PersonDataWriteFence writeFence) {
+            ActivityPersonWriteAdmission admission) {
         this.eventRepository = eventRepository;
-        this.writeFence = writeFence;
+        this.admission = admission;
         this.workspaceRepository = workspaceRepository;
         this.eventsRecordedCounter = Counter.builder(ActivityMetrics.ACTIVITY_EVENTS_RECORDED)
                 .description("Number of activity events recorded")
@@ -62,7 +61,7 @@ public class ActivityEventService implements ActivityRecorder {
     public int backfillCommitActors(Long repositoryId) {
         var candidates = eventRepository.unresolvedCommitAuthors(repositoryId);
         if (candidates.isEmpty()) return 0;
-        var admitted = writeFence.holdForUserWrites(candidates);
+        var admitted = admission.holdActors(candidates);
         int updated = 0;
         // Bound SQL bind parameters without releasing any of the batch's native transaction locks.
         for (int first = 0; first < admitted.size(); first += 1000) {
@@ -107,7 +106,7 @@ public class ActivityEventService implements ActivityRecorder {
             @Nullable Repository repository,
             ActivityTargetType targetType,
             Long targetId) {
-        if (actor != null && !writeFence.holdForUserWrite(actor.getId())) return false;
+        if (actor != null && !admission.hold(actor)) return false;
         if (!workspaceRepository.existsById(workspaceId)) {
             eventsFailedCounter.increment();
             log.warn(

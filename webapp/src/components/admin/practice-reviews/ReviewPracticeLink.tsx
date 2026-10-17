@@ -1,7 +1,7 @@
 import { Link, useParams } from "@tanstack/react-router";
 
 import { cn } from "cn";
-import type { Practice, ReviewPracticeGroup } from "@/api/types.gen";
+import type { GroupRef, Practice } from "@/api/types.gen";
 import { PracticeDetailHoverCard } from "@/components/admin/practice-editor/PracticeDetailHoverCard";
 import { InlineLink } from "@/components/common/InlineLink";
 import { GroupPill } from "@/components/practice-vocabulary/GroupPill";
@@ -9,16 +9,12 @@ import { GroupPill } from "@/components/practice-vocabulary/GroupPill";
 export interface ReviewPracticeLinkProps {
 	practiceSlug: string;
 	practiceName: string;
-	group: ReviewPracticeGroup | undefined;
+	group: GroupRef | null;
 	practice?: Practice;
 	className?: string;
 }
 
-/**
- * Opens the Observations list filtered to the practice rather than Practice setup: the reader is
- * asking how the practice behaves, and Practice setup is one press from the counts above that list
- * when the answer is "change it".
- */
+// This link opens practice results; editing the definition belongs to the practice sheet.
 export function ReviewPracticeLink({
 	practiceSlug,
 	practiceName,
@@ -33,7 +29,7 @@ export function ReviewPracticeLink({
 		<InlineLink
 			render={
 				<Link
-					to="/w/$workspaceSlug/admin/practices/reviews/observations"
+					to="/w/$workspaceSlug/admin/practices/reviews/results"
 					params={{ workspaceSlug: workspaceSlug ?? "" }}
 					search={{ practiceSlug: [practiceSlug] }}
 				/>
@@ -54,7 +50,7 @@ export function ReviewPracticeLink({
 
 export interface ReviewPracticeNameProps {
 	practiceName: string;
-	group: ReviewPracticeGroup | undefined;
+	group: GroupRef | null;
 	className?: string;
 }
 
@@ -71,7 +67,7 @@ export function ReviewPracticeName({ practiceName, group, className }: ReviewPra
 	);
 }
 
-function PracticeGroupMark({ group }: { group: ReviewPracticeGroup | undefined }) {
+function PracticeGroupMark({ group }: { group: GroupRef | null }) {
 	if (!group) {
 		return null;
 	}

@@ -3,13 +3,17 @@ import {
 	type PublicReviewHistory,
 	SAME_WORK_LIMITS,
 } from "./pi-review-brief.ts";
+import { unwrapToolArguments } from "./pi-tool-validation.ts";
 
-export const CHANNELS = ["IN_CONTEXT", "IN_APP", "IN_CHAT"] as const;
-export type Channel = (typeof CHANNELS)[number];
+import { isJsonObject as isRecord } from "./work/practice-scripts/lib/core/json.ts";
+import { z } from "./work/practice-scripts/lib/core/practice-script.ts";
+
+export const DESTINATIONS = ["ON_WORK", "PRACTICE_PAGE", "CONVERSATION"] as const;
+export type Destination = (typeof DESTINATIONS)[number];
 
 /** The developer's practice pages and the mentor conversation; the reviewed work takes a review instead. */
-export const PRIVATE_CHANNELS = ["IN_APP", "IN_CHAT"] as const;
-export type PrivateChannel = (typeof PRIVATE_CHANNELS)[number];
+export const PRIVATE_DESTINATIONS = ["PRACTICE_PAGE", "CONVERSATION"] as const;
+export type PrivateDestination = (typeof PRIVATE_DESTINATIONS)[number];
 
 export const ACTIONS = ["NEW", "SUPERSEDE", "WITHHOLD"] as const;
 export type FeedbackAction = (typeof ACTIONS)[number];
@@ -24,15 +28,21 @@ export const PRIOR_ADVICE_REASONS: ReadonlySet<WithholdReason> = new Set([
 ]);
 
 /** ComposedReview.CONTRACT_VERSION: the server delivers no review from an envelope without it. */
-export const REVIEW_CONTRACT_VERSION = 2;
+export const REVIEW_CONTRACT_VERSION = 3;
 
-/** ComposedReview's bounds; a review over them is refused so the composer can correct it, never cut. */
-export const REVIEW_LIMITS = { summaryChars: 8000, inlineChars: 2000, inlineNotes: 30 } as const;
+export const REVIEW_TARGETS = { summaryChars: 600, inlineChars: 300, summaryPoints: 3 } as const;
+
+/** Leave room for necessary qualifications; refuse excessive text for correction, never cut it. */
+export const REVIEW_LIMITS = {
+	summaryChars: REVIEW_TARGETS.summaryChars * 2,
+	inlineChars: REVIEW_TARGETS.inlineChars * 2,
+	inlineNotes: 30,
+} as const;
 
 /** Partial view for coherence checks; pi-runner.ts owns the complete tool schema. */
-export interface ComposedFeedbackUnit {
+export interface ComposedFeedbackPiece {
 	action?: FeedbackAction;
-	channel?: Channel;
+	destination?: Destination;
 	practiceSlug?: string;
 	supersedesThreadKey?: string;
 	[key: string]: unknown;
@@ -40,29 +50,41 @@ export interface ComposedFeedbackUnit {
 
 export interface PreparedFeedbackTarget {
 	threadKey: string;
-	channel: Channel;
+	feedbackId: string;
+	destination: Destination;
 	practiceSlug: string;
 }
 
+/**
+ * What a text or a piece rests on, as the server records it: one admitted result, or one problem of it. The
+ * composer names either id; the reference always carries the result the id belongs to.
+ */
+export interface EvidenceRef {
+	resultId: string;
+	problemId?: string;
+}
+
+/** A line note's place: one citation of one problem. A result's own citations never anchor a note. */
 export interface ReviewAnchor {
-	observationId: string;
+	problemId: string;
 	citationIndex: number;
 }
 
 export interface ReviewSummary {
 	body: string;
-	basedOn: string[];
+	basedOn: EvidenceRef[];
 }
 
 export interface ReviewInlineNote {
 	body: string;
-	basedOn: string[];
+	basedOn: EvidenceRef[];
 	anchor: ReviewAnchor;
 }
 
 export interface ReviewWithheld {
-	basedOn: string[];
+	basedOn: EvidenceRef[];
 	reason: WithholdReason;
+	witnessIds: string[];
 }
 
 /**
@@ -85,18 +107,55 @@ export interface ComposedReview {
 export interface ComposedFeedbackEnvelope {
 	contractVersion?: number;
 	admissionDigest?: string | null;
-	observations?: unknown[];
+	results?: unknown[];
 	preparedTargets?: PreparedFeedbackTarget[];
-	units?: ComposedFeedbackUnit[];
+	feedback?: ComposedFeedbackPiece[];
 	review?: ComposedReview | null;
 }
 
-/** The fields of an admitted observation a review is checked against. */
-export interface ReviewedObservation {
+export interface ReviewedProblem {
+	problemId: string;
+	citations: readonly Record<string, unknown>[];
+}
+
+export interface ReviewedResult {
 	summaryOnly?: boolean;
 	practiceSlug: string;
 	outcome: unknown;
-	citations: readonly Record<string, unknown>[];
+	problems: readonly ReviewedProblem[];
+}
+
+export interface NamedEvidence<R> {
+	result: R;
+	ref: EvidenceRef;
+}
+
+export function namedEvidence<R extends { problems: readonly { problemId: string }[] }>(
+	results: ReadonlyMap<string, R>,
+): Map<string, NamedEvidence<R>> {
+	const named = new Map<string, NamedEvidence<R>>();
+	for (const [resultId, result] of results) {
+		named.set(resultId, { result, ref: { resultId } });
+		for (const { problemId } of result.problems) {
+			named.set(problemId, { result, ref: { resultId, problemId } });
+		}
+	}
+	return named;
+}
+
+export function evidenceRefs(
+	ids: readonly string[],
+	named: ReadonlyMap<string, { ref: EvidenceRef }>,
+): EvidenceRef[] {
+	const refs = new Map<string, EvidenceRef>();
+	for (const id of ids) {
+		const ref = named.get(id)?.ref;
+		if (ref === undefined) {
+			throw new Error(`${id} names no admitted result or problem`);
+		}
+		refs.set(`${ref.resultId}\u0000${ref.problemId ?? ""}`, ref);
+	}
+	return [...refs.values()];
 }
 
 /** Unevaluated practices support neither positive nor negative claims. */
@@ -112,56 +171,292 @@ export function notReachedNote(notReached: readonly string[]): string {
 	);
 }
 
-/** Private feedback rests on a problem of its own practice; history alone authorizes nothing. */
+// Private feedback requires this practice's admitted Not met result; history alone authorizes no claim.
 export function validateFeedbackEvidence(
 	primaryPractice: string,
 	basedOn: readonly string[],
-	observations: ReadonlyMap<string, { practiceSlug: string; outcome: unknown }>,
+	results: ReadonlyMap<
+		string,
+		{ practiceSlug: string; outcome: unknown; problems: readonly { problemId: string }[] }
+	>,
 ): string | null {
-	const unknown = basedOn.find((id) => !observations.has(id));
+	const named = namedEvidence(results);
+	const unknown = basedOn.find((id) => !named.has(id));
 	if (unknown !== undefined) {
-		// The ids of this practice's own observations are named, so the correction is one edit away:
-		// a session that wrote a digest or a citation here is looking at the wrong field.
-		const own = [...observations]
-			.filter(([, observation]) => observation.practiceSlug === primaryPractice)
-			.map(([id]) => id);
+		const own = [...results]
+			.filter(([, result]) => result.practiceSlug === primaryPractice)
+			.map(
+				([id, result]) =>
+					`${id}${result.problems.length > 0 ? ` (its problems: ${result.problems.map((problem) => problem.problemId).join(", ")})` : ""}`,
+			);
 		const hint =
 			own.length > 0
-				? `the admitted observation id(s) of ${primaryPractice} are: ${own.join(", ")}`
-				: `no admitted observation belongs to ${primaryPractice}`;
-		return `Evidence '${unknown}' does not name an admitted observation from this run (basedOn takes the \`id\` field of the admitted observations; ${hint}); skipped.`;
+				? `the admitted result of ${primaryPractice} is ${own.join(", ")}`
+				: `no admitted result belongs to ${primaryPractice}`;
+		return `Evidence '${unknown}' does not name an admitted result or problem from this run (basedOn takes a result's \`resultId\` or a problem's \`problemId\`; ${hint}); skipped.`;
 	}
 	if (
 		!basedOn.some((id) => {
-			const observation = observations.get(id);
-			return observation?.practiceSlug === primaryPractice && observation.outcome === "NOT_MET";
+			const result = named.get(id)?.result;
+			return result?.practiceSlug === primaryPractice && result.outcome === "NOT_MET";
 		})
 	) {
-		return `At least one basedOn observation must be NOT_MET for the primary practice '${primaryPractice}'; skipped.`;
+		return `At least one basedOn id must name the NOT_MET result of the primary practice '${primaryPractice}' or one of its problems; skipped.`;
+	}
+	if (basedOn.some((id) => named.get(id)?.result.outcome !== "NOT_MET")) {
+		return "Every supporting result must be NOT_MET for private feedback; skipped.";
 	}
 	return null;
 }
 
-export function undeliverableUnits(
+export function undeliverableFeedback(
 	envelope?: ComposedFeedbackEnvelope | null,
-): ComposedFeedbackUnit[] {
+): ComposedFeedbackPiece[] {
 	const prepared = new Set(
 		envelope?.preparedTargets?.map(
-			(target) => `${target.threadKey}\u0000${target.channel}\u0000${target.practiceSlug}`,
+			(target) => `${target.threadKey}\u0000${target.destination}\u0000${target.practiceSlug}`,
 		),
 	);
-	return (envelope?.units ?? []).filter((unit) => {
-		if (unit.action !== "SUPERSEDE") {
+	return (envelope?.feedback ?? []).filter((piece) => {
+		if (piece.action !== "SUPERSEDE") {
 			return false;
 		}
-		const target = unit.supersedesThreadKey;
+		const target = piece.supersedesThreadKey;
 		return (
 			target === undefined ||
-			unit.channel === undefined ||
-			unit.practiceSlug === undefined ||
-			!prepared.has(`${target}\u0000${unit.channel}\u0000${unit.practiceSlug}`)
+			piece.destination === undefined ||
+			piece.practiceSlug === undefined ||
+			!prepared.has(`${target}\u0000${piece.destination}\u0000${piece.practiceSlug}`)
 		);
 	});
+}
+
+/** One occurrence a PRACTICE_PAGE card may cite, as the server selected it after admission: one NOT_MET result. */
+export interface PracticePageSupportOccurrence {
+	resultId: string;
+	itemKind: string;
+	itemId: string;
+	outcome: "NOT_MET";
+	origin: "EVENT" | "REQUEST" | "SCHEDULE" | "BACKFILL";
+	summary: string;
+	explanation: string | null;
+	evidence: unknown;
+	practiceVersionId: string | null;
+	recordedAt: string;
+}
+
+export const PRACTICE_PAGE_DECISIONS = [
+	"ADMIT",
+	"FEEDBACK_OFF",
+	"GATE_REFUSED",
+	"NO_EVIDENCE",
+	"UNCORROBORATED",
+	"BACKFILL_HELD",
+	"RECENTLY_SURFACED",
+	"UNATTRIBUTABLE_SUBJECT",
+] as const;
+
+export const CONVERSATION_DECISIONS = [
+	"ADMIT",
+	"FEEDBACK_OFF",
+	"MENTOR_UNAVAILABLE",
+	"GATE_REFUSED",
+	"UNATTRIBUTABLE_SUBJECT",
+	"HAS_INLINE_ANCHOR",
+	"ALREADY_DELIVERED_ON_WORK",
+	"REVIEWER_DEFERRED",
+	"BACKFILL_QUIET",
+] as const;
+
+const FEEDBACK_STOP_REASONS = [
+	"VOLUME_CAPPED",
+	"COMPOSER_WITHHELD",
+	"NOTHING_NEW",
+	"REPEATS_DELIVERED_NOTE",
+	"REACTED_DISAGREE",
+	"REACTED_NOT_APPLICABLE",
+	"CONVERSATION_EXPIRED",
+	"DELIVERY_UNCONFIRMED",
+	"ITEM_GONE",
+	"ITEM_CLOSED",
+	"ITEM_MERGED",
+	"ITEM_STATE_INELIGIBLE",
+	"ISSUE_SNAPSHOT_CHANGED",
+	"PUBLIC_SUBJECT_INELIGIBLE",
+	"NO_AI",
+	"DELIVERY_OFF",
+	"PERSON_SUPPRESSED",
+	"RECIPIENT_UNAVAILABLE",
+	"EMPTY_AFTER_SANITIZE",
+	"INSTANCE_SILENCED",
+	"FEEDBACK_OFF",
+	"WORKSPACE_DISABLED",
+	"WORKSPACE_DELIVERY_PAUSED",
+	"STALE_ROLLOUT_REVISION",
+	"OUTSIDE_CURRENT_SCOPE",
+	"APPROVAL_STALE",
+	"APPROVAL_NO_LONGER_ELIGIBLE",
+	"PRACTICE_REQUIRES_APPROVAL",
+	"BACKFILL_QUIET",
+	"RESULT_MARKED_INCORRECT",
+	"REVIEWED_VERSION_CHANGED",
+	"REVIEW_CANCELLED",
+	"EVIDENCE_NOT_PERMITTED",
+	"NO_EVIDENCE",
+	"UNCORROBORATED",
+] as const;
+
+type FeedbackStopReason = (typeof FEEDBACK_STOP_REASONS)[number];
+
+export interface PracticePagePracticeSupport {
+	practiceSlug: string;
+	decision: (typeof PRACTICE_PAGE_DECISIONS)[number];
+	stopReason: FeedbackStopReason | null;
+	occurrences: PracticePageSupportOccurrence[];
+}
+
+export type PracticePageSupport =
+	| { state: "COMPLETE"; readAt: string; practices: PracticePagePracticeSupport[] }
+	| { state: "UNAVAILABLE" | "REFUSED"; readAt: string; refusal: string | null };
+
+export type ConversationEligibility =
+	| {
+			state: "COMPLETE";
+			readAt: string;
+			results: {
+				resultId: string;
+				decision: (typeof CONVERSATION_DECISIONS)[number];
+				stopReason: FeedbackStopReason | null;
+			}[];
+	  }
+	| { state: "UNAVAILABLE" | "REFUSED"; readAt: string };
+
+interface RoutedResult {
+	resultId: string;
+	practiceSlug: string;
+	outcome: unknown;
+}
+
+const instantSchema = z
+	.string()
+	.refine((value) => Number.isFinite(Date.parse(value)), "expected an instant");
+const supportOccurrenceSchema = z.strictObject({
+	resultId: z.string().min(1),
+	itemKind: z.string().min(1),
+	itemId: z.string().regex(/^[1-9][0-9]*$/u),
+	outcome: z.literal("NOT_MET"),
+	origin: z.enum(["EVENT", "REQUEST", "SCHEDULE", "BACKFILL"]),
+	summary: z.string(),
+	explanation: z
+		.string()
+		.nullish()
+		.transform((value) => value ?? null),
+	evidence: z.unknown().default(null),
+	practiceVersionId: z
+		.string()
+		.regex(/^[1-9][0-9]*$/u)
+		.nullish()
+		.transform((value) => value ?? null),
+	recordedAt: instantSchema,
+});
+const pageSupportSchema = z.discriminatedUnion("state", [
+	z.strictObject({
+		state: z.literal("COMPLETE"),
+		readAt: instantSchema,
+		practices: z.array(
+			z
+				.strictObject({
+					practiceSlug: z.string(),
+					decision: z.enum(PRACTICE_PAGE_DECISIONS),
+					stopReason: z.enum(FEEDBACK_STOP_REASONS).nullable(),
+					occurrences: z.array(supportOccurrenceSchema),
+				})
+				.refine((value) => value.decision !== "GATE_REFUSED" || value.stopReason !== null, {
+					path: ["stopReason"],
+					message: "a gate refusal requires its recorded reason",
+				}),
+		),
+	}),
+	z.strictObject({
+		state: z.enum(["UNAVAILABLE", "REFUSED"]),
+		readAt: instantSchema,
+		refusal: z
+			.string()
+			.nullish()
+			.transform((value) => value ?? null),
+	}),
+]);
+const conversationEligibilitySchema = z.discriminatedUnion("state", [
+	z.strictObject({
+		state: z.literal("COMPLETE"),
+		readAt: instantSchema,
+		results: z.array(
+			z
+				.strictObject({
+					resultId: z.string(),
+					decision: z.enum(CONVERSATION_DECISIONS),
+					stopReason: z.enum(FEEDBACK_STOP_REASONS).nullable(),
+				})
+				.refine((value) => value.decision !== "GATE_REFUSED" || value.stopReason !== null, {
+					path: ["stopReason"],
+					message: "a gate refusal requires its recorded reason",
+				}),
+		),
+	}),
+	z.strictObject({
+		state: z.enum(["UNAVAILABLE", "REFUSED"]),
+		readAt: instantSchema,
+		results: z.array(z.never()).default([]),
+	}),
+]);
+
+export function readPracticePageSupport(
+	value: unknown,
+	current: readonly RoutedResult[],
+): PracticePageSupport | null {
+	const parsed = pageSupportSchema.safeParse(value);
+	if (!parsed.success) {
+		return null;
+	}
+	const support = parsed.data;
+	if (support.state !== "COMPLETE") {
+		return support;
+	}
+	const expected = new Set(
+		current.filter((result) => result.outcome === "NOT_MET").map((result) => result.practiceSlug),
+	);
+	for (const practice of support.practices) {
+		if (
+			!expected.delete(practice.practiceSlug) ||
+			(practice.decision !== "ADMIT" && practice.occurrences.length > 0)
+		) {
+			return null;
+		}
+	}
+	return expected.size === 0 ? support : null;
+}
+
+export function readConversationEligibility(
+	value: unknown,
+	current: readonly RoutedResult[],
+): ConversationEligibility | null {
+	const parsed = conversationEligibilitySchema.safeParse(value);
+	if (!parsed.success) {
+		return null;
+	}
+	const eligibility = parsed.data;
+	if (eligibility.state !== "COMPLETE") {
+		return { state: eligibility.state, readAt: eligibility.readAt };
+	}
+	const expected = new Set(
+		current.filter((result) => result.outcome === "NOT_MET").map((result) => result.resultId),
+	);
+	for (const result of eligibility.results) {
+		if (!expected.delete(result.resultId)) {
+			return null;
+		}
+	}
+	return expected.size === 0 ? eligibility : null;
 }
 
 /** Kind and provider URL distinguish work without treating a display number as its identity. */
@@ -173,9 +468,6 @@ export function workIdentity(kind: unknown, url: unknown): string | undefined {
 		? `${kind}:${url}`
 		: undefined;
 }
-
-const isObject = (value: unknown): value is Record<string, unknown> =>
-	typeof value === "object" && value !== null && !Array.isArray(value);
 
 /** Where the server writes its own markers into a comment; a text carrying one would be read as the server's. */
 const RESERVED_MARKER = "<!--";
@@ -192,41 +484,26 @@ function listOf(value: unknown): unknown[] | null {
 	return value === undefined || value === null ? [] : null;
 }
 
-/**
- * The ids as sent, or null when basedOn is not an array of non-empty strings. Nothing is dropped from it: a text
- * whose support names something that is not an id says something no observation backs, so it is refused whole.
- */
 function idsOf(value: unknown): string[] | null {
-	if (!Array.isArray(value)) {
-		return null;
-	}
-	const ids: string[] = [];
-	for (const id of value) {
-		if (typeof id !== "string" || id.trim() === "") {
-			return null;
-		}
-		ids.push(id.trim());
-	}
-	return ids;
+	const parsed = feedbackIdsSchema.safeParse(value);
+	return parsed.success ? parsed.data : null;
 }
 
 const NOT_AN_ID_LIST =
-	"basedOn must be an array of observation id strings; a text resting on anything else is refused whole";
+	"basedOn must be an array of result and problem id strings; a text resting on anything else is refused whole";
 
-function integerOf(value: unknown): number | undefined {
-	if (typeof value === "number" && Number.isInteger(value)) {
-		return value;
-	}
-	return typeof value === "string" && /^\d+$/u.test(value.trim()) ? Number(value) : undefined;
-}
+type Named = ReadonlyMap<string, NamedEvidence<ReviewedResult>>;
 
-/** The problems with a text that is published as written: missing, too long, or carrying a reserved artifact. */
-function textProblem(value: unknown, limit: number): string | null {
+function textProblem(value: unknown, target: number, example: string): string | null {
 	if (typeof value !== "string" || value.trim() === "") {
 		return "body is required: the complete text, as the developer will read it";
 	}
-	if (value.length > limit) {
-		return `body must be at most ${limit} characters; this one is ${value.length}. Shorten it`;
+	if (value.length > target * 2) {
+		return (
+			`body must be at most ${target * 2} characters; this one is ${value.length}. Aim for ${target} characters. ` +
+			`Keep the supported concern, evidence, qualifications and next action; remove repetition. ` +
+			`Corrected text example (synthetic; use this work's facts): ${JSON.stringify(example)}. Send the whole review again`
+		);
 	}
 	if (value.includes(RESERVED_MARKER)) {
 		return "body may not contain an HTML comment (`<!--`); the server writes its own markers there";
@@ -237,136 +514,102 @@ function textProblem(value: unknown, limit: number): string | null {
 	return null;
 }
 
-/** The problems with what a part rests on: every id an admitted observation that decided something. */
-function supportProblem(
-	basedOn: readonly string[] | null,
-	observations: ReadonlyMap<string, ReviewedObservation>,
-): string | null {
+function supportProblem(basedOn: readonly string[] | null, named: Named): string | null {
 	if (basedOn === null) {
 		return NOT_AN_ID_LIST;
 	}
 	if (basedOn.length === 0) {
-		return "basedOn is required: the id of every admitted observation this text speaks about";
+		return "basedOn is required: the id of every admitted result or problem this text speaks about";
 	}
-	const unknown = basedOn.filter((id) => !observations.has(id));
+	const unknown = basedOn.filter((id) => !named.has(id));
 	if (unknown.length > 0) {
-		return `basedOn names ${unknown.join(", ")}, which is not one of the observations this review may rest on (basedOn takes their \`id\` field)`;
+		return `basedOn names ${unknown.join(", ")}, which is not one of the NOT_MET results or problems this review may rest on (basedOn takes their \`resultId\` or \`problemId\`)`;
 	}
-	const undecided = basedOn.filter((id) => {
-		const outcome = observations.get(id)?.outcome;
-		return outcome !== "MET" && outcome !== "NOT_MET";
-	});
-	if (undecided.length > 0) {
-		return `basedOn names ${undecided.join(", ")}, which decided nothing (not MET, not NOT_MET) and cannot carry a claim about the work`;
-	}
-	return null;
-}
-
-function anchorProblem(
-	observationId: string,
-	citationIndex: number,
-	observations: ReadonlyMap<string, ReviewedObservation>,
-	anchors: ReadonlySet<string>,
-): string | null {
-	const citation = observations.get(observationId)?.citations[citationIndex];
-	if (citation === undefined) {
-		return `${observationId} has no citation ${citationIndex}`;
-	}
-	if (citation.anchorable !== true) {
-		return `citation ${citationIndex} of ${observationId} is not a line of this change, so no note can sit on it`;
-	}
-	return anchors.has(`${observationId}#${citationIndex}`)
-		? `another note already sits on citation ${citationIndex} of ${observationId}`
+	const notConcerns = basedOn.filter((id) => named.get(id)?.result.outcome !== "NOT_MET");
+	return notConcerns.length > 0
+		? `basedOn names ${notConcerns.join(", ")}, which is not a NOT_MET result or one of its problems. The review on the work speaks only about NOT_MET results and their problems; it never acknowledges a MET result`
 		: null;
 }
 
-/** What the review decides for one NOT_MET observation: raise it, or withhold it for one of the reasons. */
+function anchorProblem(
+	anchor: ReviewAnchor,
+	basedOn: readonly string[],
+	named: Named,
+	anchors: ReadonlySet<string>,
+): string | null {
+	const { problemId, citationIndex } = anchor;
+	const entry = named.get(problemId);
+	if (entry === undefined) {
+		return `anchor names ${problemId}, which is not a problem this review may rest on`;
+	}
+	const problem = entry.result.problems.find((candidate) => candidate.problemId === problemId);
+	if (problem === undefined) {
+		return `anchor names ${problemId}, which is a result: a note sits on a citation of one of its problems, named by its problemId`;
+	}
+	if (!basedOn.includes(problemId) && !basedOn.includes(entry.ref.resultId)) {
+		return `anchor names ${problemId}, which this note's basedOn does not, itself or through its result`;
+	}
+	const citation = problem.citations[citationIndex];
+	if (citation === undefined) {
+		return `${problemId} has no citation ${citationIndex}`;
+	}
+	if (citation.anchorable !== true) {
+		return `citation ${citationIndex} of ${problemId} is not a line of this change, so no note can sit on it`;
+	}
+	return anchors.has(`${problemId}#${citationIndex}`)
+		? `another note already sits on citation ${citationIndex} of ${problemId}`
+		: null;
+}
+
 export const DISPOSITIONS = ["RAISE", ...WITHHOLD_REASONS] as const;
 export type Disposition = (typeof DISPOSITIONS)[number];
 
-function dispositionOf(value: unknown): Disposition | undefined {
-	const word = typeof value === "string" ? value.trim().toUpperCase().replaceAll("-", "_") : "";
-	return DISPOSITIONS.find((candidate) => candidate === word);
-}
-
-/** The observations a sent text names in basedOn, read from what was sent so a refused part still counts as spoken. */
-function spokenOf(value: Record<string, unknown>): Set<string> {
-	const summary = isObject(value.summary) ? (idsOf(value.summary.basedOn) ?? []) : [];
+function spokenOf(value: Record<string, unknown>, named: Named): Set<string> {
+	const summary = isRecord(value.summary) ? (idsOf(value.summary.basedOn) ?? []) : [];
 	const notes = (listOf(value.inline) ?? []).flatMap((note) =>
-		isObject(note) ? (idsOf(note.basedOn) ?? []) : [],
+		isRecord(note) ? (idsOf(note.basedOn) ?? []) : [],
 	);
-	return new Set([...summary, ...notes]);
+	return new Set([...summary, ...notes].flatMap((id) => named.get(id)?.ref.resultId ?? []));
 }
 
-/**
- * Every NOT_MET observation takes one decision, and the text keeps to it: a raised one is spoken about, a withheld one
- * is not. An observation whose decision was sent but refused is answered by that refusal, not as undecided.
- */
 function coverageProblems(
 	decided: ReadonlyMap<string, Disposition>,
 	named: ReadonlySet<string>,
 	spoken: ReadonlySet<string>,
-	observations: ReadonlyMap<string, ReviewedObservation>,
+	results: ReadonlyMap<string, ReviewedResult>,
 ): string[] {
 	const errors: string[] = [];
-	const missing = [...observations]
-		.filter(([id, observation]) => observation.outcome === "NOT_MET" && !named.has(id))
+	const missing = [...results]
+		.filter(([id, result]) => result.outcome === "NOT_MET" && !named.has(id))
 		.map(([id]) => id);
 	if (missing.length > 0) {
 		errors.push(
-			`${missing.join(", ")} has no decision; decide each NOT_MET observation: RAISE it, or withhold it with its reason`,
+			`${missing.join(", ")} has no decision; decide each NOT_MET result: RAISE it, or withhold it with its reason`,
 		);
 	}
 	for (const [id, disposition] of decided) {
 		if (disposition === "RAISE" && !spoken.has(id)) {
 			errors.push(
-				`${id} is decided RAISE, and no text speaks about it; speak about it, or decide again`,
+				`${id} is decided RAISE, and no text speaks about it or its problems; speak about it, or decide again`,
 			);
 		} else if (disposition !== "RAISE" && spoken.has(id)) {
 			errors.push(
-				`${id} is withheld as ${disposition}, and a text speaks about it; an observation is raised or withheld, never both`,
+				`${id} is withheld as ${disposition}, and a text speaks about it or its problems; a result is raised or withheld, never both`,
 			);
 		}
 	}
 	return errors;
 }
 
-function inlineSupportProblem(
-	basedOn: string[] | null,
-	observations: ReadonlyMap<string, ReviewedObservation>,
-): string | null {
-	return basedOn !== null && basedOn.some((id) => observations.get(id)?.summaryOnly === true)
-		? "this note rests on a practice that requires summary placement"
+function inlineSupportProblem(basedOn: string[] | null, named: Named): string | null {
+	return basedOn !== null && basedOn.some((id) => named.get(id)?.result.summaryOnly === true)
+		? "this note rests on a practice that requires summary location"
 		: null;
 }
 
-/** What a review is read against besides the observations it may rest on. */
 export interface ReviewContext {
 	/** The statements a withholding may name as where this work already received the advice. */
 	witnesses: ReadonlyMap<string, PriorAdviceWitness>;
-	/** The practices whose complete MET grounds and standard the model could read when it wrote this review. */
-	standardsInView: ReadonlySet<string>;
-}
-
-/** An acknowledgement is weighed against its whole standard, so a MET observation needs it in view. */
-function standardProblem(
-	basedOn: readonly string[] | null,
-	observations: ReadonlyMap<string, ReviewedObservation>,
-	standardsInView: ReadonlySet<string>,
-): string | null {
-	const unread = [
-		...new Set(
-			(basedOn ?? []).flatMap((id) => {
-				const observation = observations.get(id);
-				return observation?.outcome === "MET" && !standardsInView.has(observation.practiceSlug)
-					? [observation.practiceSlug]
-					: [];
-			}),
-		),
-	];
-	return unread.length === 0
-		? null
-		: `it rests on a MET observation of ${unread.join(", ")}, whose complete MET reference this review was not written with; read it with read_practice, and send the review in a later turn`;
 }
 
 /** ALREADY_SAID needs a recorded communication; NO_MATERIAL_CHANGE also needs advice available at capture. */
@@ -403,150 +646,129 @@ function witnessProblems(
 }
 
 /** The summary as sent, whole, or every reason it cannot be stored; an omitted or null summary is none. */
+const feedbackIdsSchema = z.array(z.string().trim().min(1));
+const reviewSummarySchema = z.strictObject({ body: z.string(), basedOn: feedbackIdsSchema });
+const reviewDecisionSchema = z.strictObject({
+	resultId: z.string().trim().min(1),
+	disposition: z.enum(DISPOSITIONS),
+	witnessIds: feedbackIdsSchema.nullish().transform((value) => value ?? []),
+});
+const inlineNoteSchema = z.strictObject({
+	body: z.string(),
+	basedOn: feedbackIdsSchema,
+	anchor: z.strictObject({
+		problemId: z.string().trim().min(1),
+		citationIndex: z.union([
+			z.int().nonnegative(),
+			z.string().trim().regex(/^\d+$/u).transform(Number),
+		]),
+	}),
+});
+const reviewToolInputSchema = z.strictObject({
+	decisions: z.array(reviewDecisionSchema),
+	summary: reviewSummarySchema.nullish(),
+	inline: z.array(inlineNoteSchema).nullish(),
+});
+const schemaErrors = (issues: readonly z.core.$ZodIssue[], prefix: string) =>
+	issues.map(
+		(issue) =>
+			`${prefix}${issue.path.length === 0 ? "" : `.${issue.path.join(".")}`}: ${issue.message}`,
+	);
+
 function readSummary(
-	value: unknown,
-	observations: ReadonlyMap<string, ReviewedObservation>,
-	standardsInView: ReadonlySet<string>,
+	value: z.infer<typeof reviewSummarySchema> | null | undefined,
+	named: Named,
 ): { summary: ReviewSummary | null; errors: string[] } {
 	if (value === undefined || value === null) {
 		return { summary: null, errors: [] };
 	}
-	if (!isObject(value)) {
-		return { summary: null, errors: ["summary: is one object with body and basedOn"] };
-	}
-	const basedOn = idsOf(value.basedOn);
+	const { body, basedOn } = value;
 	const problems = [
-		textProblem(value.body, REVIEW_LIMITS.summaryChars),
-		supportProblem(basedOn, observations),
-		standardProblem(basedOn, observations, standardsInView),
+		textProblem(
+			body,
+			REVIEW_TARGETS.summaryChars,
+			"The description names the change but omits its purpose. Add the reason so reviewers can judge the scope.",
+		),
+		supportProblem(basedOn, named),
 	].filter((problem): problem is string => problem !== null);
-	if (problems.length > 0 || typeof value.body !== "string" || basedOn === null) {
+	if (problems.length > 0) {
 		return { summary: null, errors: problems.map((problem) => `summary: ${problem}`) };
 	}
-	return { summary: { body: value.body, basedOn: [...new Set(basedOn)] }, errors: [] };
+	return { summary: { body, basedOn: evidenceRefs(basedOn, named) }, errors: [] };
 }
 
-/**
- * The decisions as sent, one per NOT_MET observation: each valid one by observation, every observation a decision
- * names, and every reason one is refused. A prior-advice reason names the statement that gave the advice.
- */
 function readDecisions(
-	value: unknown,
-	observations: ReadonlyMap<string, ReviewedObservation>,
+	value: z.infer<typeof reviewDecisionSchema>[],
+	results: ReadonlyMap<string, ReviewedResult>,
+	evidence: Named,
 	witnesses: ReadonlyMap<string, PriorAdviceWitness>,
 ): { decided: Map<string, Disposition>; named: Set<string>; errors: string[] } {
 	const decided = new Map<string, Disposition>();
 	const named = new Set<string>();
-	if (!Array.isArray(value)) {
-		return {
-			decided,
-			named,
-			errors: [
-				"decisions is required: an array with one decision for each NOT_MET observation, empty when there is none",
-			],
-		};
-	}
-	const sent: unknown[] = value;
 	const errors: string[] = [];
-	for (const [index, raw] of sent.entries()) {
+	for (const [index, decision] of value.entries()) {
 		const label = `decisions #${index + 1}`;
-		if (!isObject(raw)) {
-			errors.push(
-				`${label}: is one object with observationId, disposition and, for a prior advice, witnessIds`,
-			);
-			continue;
-		}
-		const id = typeof raw.observationId === "string" ? raw.observationId.trim() : "";
-		const disposition = dispositionOf(raw.disposition);
-		const witnessIds =
-			raw.witnessIds === undefined || raw.witnessIds === null ? [] : idsOf(raw.witnessIds);
+		const { resultId: id, disposition, witnessIds } = decision;
 		const problems: string[] = [];
-		const unknown = Object.keys(raw).filter(
-			(key) => key !== "observationId" && key !== "disposition" && key !== "witnessIds",
-		);
-		if (unknown.length > 0) {
-			problems.push(`unknown decision field(s): ${unknown.join(", ")}`);
-		}
-		if (id === "") {
-			problems.push("observationId is required: the `id` of one NOT_MET observation");
-		} else if (!observations.has(id)) {
-			problems.push(`${id} is not one of the observations this review may rest on`);
-		} else if (observations.get(id)?.outcome !== "NOT_MET") {
-			problems.push(`${id} is not a NOT_MET observation; only a problem takes a decision`);
+		const result = results.get(id);
+		const parent = evidence.get(id)?.ref.resultId;
+		if (result === undefined) {
+			problems.push(
+				parent === undefined
+					? `${id} is not one of the results this review may rest on`
+					: `${id} is a problem of ${parent}; a decision names its result's resultId`,
+			);
+		} else if (result.outcome !== "NOT_MET") {
+			problems.push(`${id} is not a NOT_MET result; only a result with problems takes a decision`);
 		} else if (named.has(id)) {
-			problems.push(`${id} already has a decision; each NOT_MET observation takes one`);
+			problems.push(`${id} already has a decision; each NOT_MET result takes one`);
 		}
-		if (observations.get(id)?.outcome === "NOT_MET") {
+		if (result?.outcome === "NOT_MET") {
 			named.add(id);
 		}
-		if (disposition === undefined) {
-			problems.push(`disposition must be one of ${DISPOSITIONS.join(", ")}`);
-		} else if (disposition === "RAISE") {
-			if (witnessIds === null || witnessIds.length > 0) {
-				problems.push("a raised observation names no witness");
+		if (disposition === "RAISE") {
+			if (witnessIds.length > 0) {
+				problems.push("a raised result names no witness");
 			}
 		} else {
 			problems.push(...witnessProblems(disposition, witnessIds, witnesses));
 		}
 		errors.push(...problems.map((problem) => `${label}: ${problem}`));
-		if (problems.length === 0 && disposition !== undefined) {
+		if (problems.length === 0) {
 			decided.set(id, disposition);
 		}
 	}
 	return { decided, named, errors };
 }
 
-/** Keep an explicit no-summary distinct from a primitive the SDK could coerce to null. */
-export function prepareReviewArguments(value: unknown) {
-	if (!isObject(value)) {
-		throw new Error("the review is one object with decisions, summary and inline");
-	}
-	if (value.summary !== undefined && value.summary !== null && !isObject(value.summary)) {
-		throw new Error(
-			"summary is one object with body and basedOn, or null when there is no comment",
-		);
-	}
-	return value;
+/** Validate before the SDK can coerce a malformed text or list into an empty review. */
+export function prepareReviewArguments(value: unknown): Record<string, unknown> {
+	const parsed = reviewToolInputSchema.parse(unwrapToolArguments(value));
+	return { ...parsed, summary: parsed.summary ?? null, inline: parsed.inline ?? [] };
 }
 
-/**
- * Reads one review as the composer sent it, or every reason it cannot be stored. A review is stored whole or not
- * at all: its decisions and texts were written together, so one wrong part sends the whole review back to be
- * corrected. The decisions are checked here and not stored as sent: each withheld one becomes the stored withholding
- * of its observation and reason, and a decision's witnessIds are not kept.
- *
- * @param lineNotes whether this work has lines a note can be placed on
- */
+/** Store the review whole: a refused part cannot be dropped while retaining decisions written with it. */
 export function readReview(
 	value: unknown,
-	observations: ReadonlyMap<string, ReviewedObservation>,
+	results: ReadonlyMap<string, ReviewedResult>,
 	lineNotes: boolean,
 	context: ReviewContext,
 ): { review: ComposedReview } | { errors: string[] } {
-	if (!isObject(value)) {
-		return { errors: ["the review is one object with decisions, summary and inline"] };
+	const parsed = reviewToolInputSchema.safeParse(value);
+	if (!parsed.success) {
+		return { errors: schemaErrors(parsed.error.issues, "review") };
 	}
+	const input = parsed.data;
 	const errors: string[] = [];
-	const unknownFields = Object.keys(value).filter(
-		(key) => key !== "decisions" && key !== "summary" && key !== "inline",
-	);
-	if (unknownFields.length > 0) {
-		errors.push(
-			`unknown review field(s): ${unknownFields.join(", ")} — a review takes decisions, summary and inline`,
-		);
-	}
-	const decisions = readDecisions(value.decisions, observations, context.witnesses);
+	const named = namedEvidence(results);
+	const decisions = readDecisions(input.decisions, results, named, context.witnesses);
 	errors.push(...decisions.errors);
 
-	const read = readSummary(value.summary, observations, context.standardsInView);
+	const read = readSummary(input.summary, named);
 	errors.push(...read.errors);
 	const { summary } = read;
 
-	const sentNotes = listOf(value.inline);
-	if (sentNotes === null) {
-		errors.push("inline must be an array of line notes");
-	}
-	const notes = sentNotes ?? [];
+	const notes = input.inline ?? [];
 	if (notes.length > REVIEW_LIMITS.inlineNotes) {
 		errors.push(
 			`inline: at most ${REVIEW_LIMITS.inlineNotes} line notes; this review has ${notes.length}`,
@@ -559,120 +781,109 @@ export function readReview(
 	const anchors = new Set<string>();
 	for (const [index, raw] of notes.entries()) {
 		const label = `inline #${index + 1}`;
-		if (!isObject(raw)) {
-			errors.push(`${label}: is one object with body, basedOn and anchor`);
-			continue;
-		}
-		const basedOn = idsOf(raw.basedOn);
+		const {
+			body,
+			basedOn,
+			anchor: { problemId, citationIndex },
+		} = raw;
 		const problems = [
-			textProblem(raw.body, REVIEW_LIMITS.inlineChars),
-			supportProblem(basedOn, observations),
-			standardProblem(basedOn, observations, context.standardsInView),
+			textProblem(
+				body,
+				REVIEW_TARGETS.inlineChars,
+				"This branch uses the token without a check. Validate it before use so an invalid token cannot reach the request.",
+			),
+			supportProblem(basedOn, named),
 		].filter((problem): problem is string => problem !== null);
-		const placementProblem = inlineSupportProblem(basedOn, observations);
+		const placementProblem = inlineSupportProblem(basedOn, named);
 		if (placementProblem !== null) {
 			problems.push(placementProblem);
 		}
-		const anchor = isObject(raw.anchor) ? raw.anchor : {};
-		const observationId =
-			typeof anchor.observationId === "string" ? anchor.observationId.trim() : "";
-		const citationIndex = integerOf(anchor.citationIndex);
-		if (observationId === "" || citationIndex === undefined) {
-			problems.push(
-				"anchor needs observationId and citationIndex, the line comes from that citation",
-			);
-		} else if (basedOn === null) {
-			// The support is already refused above; the anchor cannot be checked against it.
-		} else if (basedOn.includes(observationId)) {
-			const problem = anchorProblem(observationId, citationIndex, observations, anchors);
-			if (problem !== null) {
-				problems.push(problem);
-			}
-		} else {
-			problems.push(`anchor names ${observationId}, which this note's basedOn does not`);
+		const anchorError = anchorProblem({ problemId, citationIndex }, basedOn, named, anchors);
+		if (anchorError !== null) {
+			problems.push(anchorError);
 		}
 		errors.push(...problems.map((problem) => `${label}: ${problem}`));
-		if (
-			problems.length === 0 &&
-			typeof raw.body === "string" &&
-			citationIndex !== undefined &&
-			basedOn !== null
-		) {
-			anchors.add(`${observationId}#${citationIndex}`);
+		if (problems.length === 0) {
+			anchors.add(`${problemId}#${citationIndex}`);
 			inline.push({
-				body: raw.body,
-				basedOn: [...new Set(basedOn)],
-				anchor: { observationId, citationIndex },
+				body,
+				basedOn: evidenceRefs([...basedOn, problemId], named),
+				anchor: { problemId, citationIndex },
 			});
 		}
 	}
 
 	errors.push(
-		...coverageProblems(decisions.decided, decisions.named, spokenOf(value), observations),
+		...coverageProblems(decisions.decided, decisions.named, spokenOf(input, named), results),
 	);
 	const withheld: ReviewWithheld[] = [...decisions.decided].flatMap(([id, disposition]) =>
-		disposition === "RAISE" ? [] : [{ basedOn: [id], reason: disposition }],
+		disposition === "RAISE"
+			? []
+			: [
+					{
+						basedOn: [{ resultId: id }],
+						reason: disposition,
+						witnessIds:
+							input.decisions.find((decision) => decision.resultId === id)?.witnessIds ?? [],
+					},
+				],
 	);
 	return errors.length > 0 ? { errors } : { review: { summary, inline, withheld } };
 }
 
-/** Every observation the review decided about: what it says and what it withholds. */
 export function decidedByReview(review: ComposedReview | null | undefined): Set<string> {
 	if (!review) {
 		return new Set();
 	}
-	return new Set([
-		...(review.summary?.basedOn ?? []),
-		...review.inline.flatMap((note) => note.basedOn),
-		...review.withheld.flatMap((decision) => decision.basedOn),
-	]);
+	return new Set(
+		[
+			...(review.summary?.basedOn ?? []),
+			...review.inline.flatMap((note) => note.basedOn),
+			...review.withheld.flatMap((decision) => decision.basedOn),
+		].map((ref) => ref.resultId),
+	);
 }
 
-/**
- * The admitted observations the review on the work may rest on, whole: those admission marked publicEligible and
- * that decided something (MET or NOT_MET). The server decides eligibility (PublicReviewEligibility) and admits a
- * composed review by the same rule, so an observation it did not mark is left out entirely rather than shown with
- * parts removed — its words may carry what it drew on. Nothing of a decided observation is shortened; only the
- * verification digests of its citations are dropped, which say nothing a composer can use.
- */
-export function publicObservations(
-	observations: readonly Record<string, unknown>[],
+export function publicResults(
+	results: readonly Record<string, unknown>[],
 ): Record<string, unknown>[] {
-	return observations
-		.filter(
-			(observation) =>
-				observation.publicEligible === true &&
-				(observation.outcome === "MET" || observation.outcome === "NOT_MET"),
-		)
-		.map((observation) => {
-			const { evidence, citations, ...rest } = observation;
-			const { citations: _measured, ...branches } = isObject(evidence) ? evidence : {};
-			return {
-				...rest,
-				...(Object.keys(branches).length > 0 ? { evidence: branches } : {}),
-				citations: withoutDigests(citations),
-			};
-		});
+	return results
+		.filter((result) => result.publicEligible === true && result.outcome === "NOT_MET")
+		.map(({ citations, example, problems, ...rest }) => ({
+			...rest,
+			...(example === undefined
+				? {}
+				: {
+						example: isRecord(example)
+							? { ...example, citation: withoutDigest(example.citation) }
+							: example,
+					}),
+			citations: withoutDigests(citations),
+			problems: (Array.isArray(problems) ? problems : []).map((problem: unknown) =>
+				isRecord(problem) ? { ...problem, citations: withoutDigests(problem.citations) } : problem,
+			),
+		}));
 }
 
-/** Citations as a public reference shows them: quoted lines and coordinates, without verification digests. */
+function withoutDigest(citation: unknown): unknown {
+	if (!isRecord(citation)) {
+		return citation;
+	}
+	const { verification: _verification, ...shown } = citation;
+	return shown;
+}
+
 function withoutDigests(citations: unknown): unknown[] {
-	return (Array.isArray(citations) ? citations : []).map((citation: unknown) => {
-		if (!isObject(citation)) {
-			return citation;
-		}
-		const { verification: _verification, ...shown } = citation;
-		return shown;
-	});
+	return (Array.isArray(citations) ? citations : []).map(withoutDigest);
 }
 
 /** The native outcome-specific grounds of an abstention; generic prose is not a decided assessment. */
-export function qualificationEvidence(observation: {
+export function qualificationEvidence(result: {
 	outcome: unknown;
 	evidence?: unknown;
 }): Record<string, unknown> {
-	const branch = observation.outcome === "UNDETERMINED" ? "undecidability" : "inapplicability";
-	const evidence = isObject(observation.evidence) ? observation.evidence : {};
+	const branch = result.outcome === "COULD_NOT_DETERMINE" ? "openQuestions" : "inapplicability";
+	const evidence = isRecord(result.evidence) ? result.evidence : {};
 	return { [branch]: evidence[branch] };
 }
 
@@ -682,22 +893,19 @@ export function qualificationEvidence(observation: {
  * and the review decides nothing about them.
  */
 export function publicQualifications(
-	observations: readonly Record<string, unknown>[],
+	results: readonly Record<string, unknown>[],
 ): Record<string, unknown>[] {
-	return observations
+	return results
 		.filter(
-			(observation) =>
-				observation.publicEligible === true &&
-				(observation.outcome === "NOT_APPLICABLE" || observation.outcome === "UNDETERMINED"),
+			(result) =>
+				result.publicEligible === true &&
+				(result.outcome === "DOES_NOT_APPLY" || result.outcome === "COULD_NOT_DETERMINE"),
 		)
-		.map((observation) => ({
-			practiceSlug: observation.practiceSlug,
-			outcome: observation.outcome,
-			evidence: qualificationEvidence({
-				outcome: observation.outcome,
-				evidence: observation.evidence,
-			}),
-			citations: withoutDigests(observation.citations),
+		.map((result) => ({
+			practiceSlug: result.practiceSlug,
+			outcome: result.outcome,
+			evidence: qualificationEvidence({ outcome: result.outcome, evidence: result.evidence }),
+			citations: withoutDigests(result.citations),
 		}));
 }
 
@@ -705,7 +913,7 @@ export interface OwnPriorFeedback {
 	/** Null when the history names no feedback id: such an entry is context only. */
 	witnessId: string | null;
 	id?: unknown;
-	reviewedRevision?: unknown;
+	itemVersion?: unknown;
 	basedOn?: unknown;
 	deliveredAt: unknown;
 	body: unknown;
@@ -767,26 +975,19 @@ export function priorPublicFeedback(
 	readAt: string | null = capturedAt,
 ): OwnPriorFeedbackView {
 	const omissions: OwnHistoryOmissions = { oversizedEntries: 0, budgetEntries: 0 };
-	if (thisWork === undefined || !isObject(history) || !Array.isArray(history.feedback)) {
+	if (thisWork === undefined || !isRecord(history) || !Array.isArray(history.feedback)) {
 		return { feedback: [], omissions };
 	}
 	const projected = history.feedback.flatMap((entry: unknown): OwnPriorFeedback[] => {
-		if (!isObject(entry) || entry.channel !== "IN_CONTEXT" || entry.publicEligible !== true) {
+		if (!isRecord(entry) || entry.destination !== "ON_WORK" || entry.publicEligible !== true) {
 			return [];
 		}
-		const artifact = isObject(entry.artifact) ? entry.artifact : {};
-		if (workIdentity(artifact.kind, artifact.url) !== thisWork) {
+		const item = isRecord(entry.item) ? entry.item : {};
+		if (workIdentity(item.kind, item.url) !== thisWork) {
 			return [];
 		}
-		const {
-			id,
-			reviewedRevision,
-			basedOn,
-			deliveredAt,
-			body,
-			recordedClaimCurrentness,
-			withdrawn,
-		} = entry;
+		const { id, itemVersion, basedOn, deliveredAt, body, recordedClaimCurrentness, withdrawn } =
+			entry;
 		const witnessId = typeof id === "string" && FEEDBACK_ID.test(id) ? `feedback:${id}` : null;
 		// Stale words still record what was said here, so they can show novelty; only current ones stand as advice.
 		const recorded =
@@ -799,7 +1000,7 @@ export function priorPublicFeedback(
 			{
 				witnessId,
 				...(id === undefined ? {} : { id }),
-				...(reviewedRevision === undefined ? {} : { reviewedRevision }),
+				...(itemVersion === undefined ? {} : { itemVersion }),
 				...(basedOn === undefined ? {} : { basedOn }),
 				deliveredAt,
 				body,
@@ -854,22 +1055,23 @@ export function priorAdviceWitnesses(
 	return witnesses;
 }
 
-export const READ_PRACTICE_TOOL_DESCRIPTION =
-	"Show a practice's complete permitted MET observations, its whole staged standard, known limitations and " +
-	"candidate references to earlier feedback before acknowledging it. An opening MET entry is only an index; even " +
-	"when its standard accompanies a NOT_MET observation, its full MET grounds must be read. The reference is in " +
-	"view from your next turn, never another call in the same response. Nothing is published or stored by this call.";
-
 /** What report_review tells the model it does. The rules are applied by readReview, with every reason at once. */
 export const REVIEW_TOOL_DESCRIPTION =
-	"Store the final review on this piece of work. First decide each NOT_MET observation: RAISE it, or withhold it " +
-	"with your reason and, for advice this work already received, the statement that gave it. Then write the summary " +
-	"comment and any notes placed on lines of the change: they speak about every raised observation and no withheld " +
-	"one. Each body is published whole as written, with provider safety formatting and a fixed disclosure; nothing is " +
+	"Store the final review on this piece of work. First decide each NOT_MET result: RAISE it, or withhold it " +
+	"with your reason and, for advice this work already received, the statement that gave it. Write useful local notes first, " +
+	"then use the summary for a warranted point without a useful line note, or useful orientation. Do not repeat a note's diagnosis or action. " +
+	"Use summary:null when it adds nothing; without useful line notes, put the complete guidance in the summary. " +
+	"Together the texts speak about every raised result, itself or through " +
+	"its problems, and no withheld one. Each body is published whole as written, with provider safety formatting and a fixed disclosure; nothing is " +
 	"assembled from fragments. An accepted call is final and ends the composition. A missing or contradicted decision, " +
-	"invalid support, eligibility or placement, a witness that cannot stand as the advice, or an acknowledgement " +
-	"written without its practice's complete MET reference in view refuses the whole review, with every reason, so it can be " +
-	"corrected and sent again.";
+	"invalid support, eligibility or location, or a witness that cannot stand as the advice refuses the whole " +
+	"review, with every reason, so it can be corrected and sent again. " +
+	`Aim for at most ${REVIEW_TARGETS.summaryChars} characters and ${REVIEW_TARGETS.summaryPoints} points in the summary, ` +
+	`${REVIEW_TARGETS.inlineChars} characters and one local point per line note. Each point uses at most two short sentences: what, then why or next action. ` +
+	"No headings, internal labels or citation coordinates in the published text; refer to evidence in natural words or a short exact quote. " +
+	`A summary over ${REVIEW_LIMITS.summaryChars} characters or a note over ${REVIEW_LIMITS.inlineChars} is refused for correction, never truncated. ` +
+	'Input example with one useful line note: {"decisions":[{"resultId":"<admitted NOT_MET resultId>","disposition":"RAISE"}],"inline":[{"basedOn":["<its problemId>"],"body":"Explain the local concern and its remedy.","anchor":{"problemId":"<same problemId>","citationIndex":0}}],"summary":null}. ' +
+	"For a quiet review, use summary:null, inline:[] and a supported withholding decision for each result. Unused inline and witnessIds lists may be null or omitted.";
 
 /**
  * How the review is written. It ends the opening turn, after the criteria, so reference material is followed by the
@@ -877,48 +1079,49 @@ export const REVIEW_TOOL_DESCRIPTION =
  */
 export const WRITE_CONTRACT =
 	"## Writing the review\n" +
-	"Write from the observations each text rests on, within their qualifications. A declared affordance supports its bounded " +
+	"Write from the results and problems each text rests on, within their qualifications. A declared affordance supports its bounded " +
 	"benefit, not an unobserved runtime or test outcome. Keep each remedy on its recorded gap and leave unrelated " +
 	"behavior as it is; make another change a prerequisite only when the evidence establishes that dependency. " +
 	"You are not told whether the work is ready, so do not approve it, call it ready or blocked, or set conditions " +
 	"for merging it. Timing the evidence itself warrants is fine: a committed secret is removed and rotated before " +
 	"anyone relies on the history.\n\n" +
-	"Make each point fully once in this review:\n" +
+	`Aim for at most ${REVIEW_TARGETS.summaryChars} characters in the whole summary, with at most ${REVIEW_TARGETS.summaryPoints} points, ` +
+	`and ${REVIEW_TARGETS.inlineChars} characters per line note. Each point uses at most two short sentences: what is wrong, ` +
+	"then why it matters or what to do next. A small point needs a short explanation. Keep the evidence and its qualifications; " +
+	"cut repetition and withhold lesser concerns rather than dropping a material limit to fit. " +
+	"Write plain prose or a short list without headings or internal labels such as Situation:, Capability: or Evidence:. " +
+	"Say ‘the description’s closing line’ or use a short exact quote, not ‘description L2’, ‘description L16’ or citation indices. " +
+	"Use basedOn and anchors to identify the exact evidence; leave its coordinates in the source evidence.\n\n" +
+	"Make each point fully once in this review. Write useful line notes before deciding what the summary still needs:\n" +
 	"- A line note is one self-contained point about the code at its anchor: that local concern with its action and " +
-	"evidence, or that local acknowledgement. It is read alone, so it says its point completely. Several practices " +
+	"evidence. It is read alone, so it says its point completely. Several practices " +
 	"may support it when they describe that one event; it does not collect the review's other points.\n" +
-	"- The summary orients the reader: the guidance its NOT_MET observations warrant, most important first, and, " +
-	"selectively, a useful choice or repair the evidence shows. It carries every ask that is not " +
+	"- The summary orients the reader: the guidance its raised NOT_MET results warrant, most important first. It " +
+	"carries every ask that is not " +
 	"about one place in the code, such as the description, a reply to a reviewer or a work-wide change, unless it " +
 	"forms one point with the code at a line. When a point has no useful line note, the summary carries that point " +
 	"completely. It may name or locate a line note's topic, and then names that note's " +
-	"observations in basedOn, but it does not restate the note's diagnosis, action or acknowledgement.\n" +
-	"- An acknowledgement appears once, in the summary or on its line, and says briefly what the choice provides. It " +
-	"is never required, counted or used to cushion a concern; when nothing calls for action, the summary may describe " +
-	"that bounded result, or the review may say nothing.\n\n" +
-	"One observation may support notes at several places, and also the summary's overview of them.";
+	"results or problems in basedOn, but it does not restate the note's diagnosis or action. " +
+	"Use summary:null when the notes carry every ask and an overview adds no useful orientation.\n" +
+	"- The review speaks only about NOT_MET results and their problems. It never acknowledges or praises a MET " +
+	"result, and it does not use praise to cushion a concern. When no NOT_MET result is raised, the review says " +
+	"nothing: the summary is null and there are no line notes.\n\n" +
+	"One result or problem may support notes at several places, and also the summary's overview of them.";
 
-/** The practices of the public NOT_MET observations, each once: every one is decided against its whole standard. */
-function notMetPractices(reviewable: readonly Record<string, unknown>[]): string[] {
+function publicNotMetPractices(reviewable: readonly Record<string, unknown>[]): string[] {
 	return [
 		...new Set(
 			reviewable
-				.filter(
-					(observation) => observation.publicEligible === true && observation.outcome === "NOT_MET",
-				)
-				.map((observation) => String(observation.practiceSlug)),
+				.filter((result) => result.publicEligible === true && result.outcome === "NOT_MET")
+				.map((result) => String(result.practiceSlug)),
 		),
 	];
 }
 
-/**
- * What a staged standard is for in the review, wherever one is shown: the opening, a read, or a restored reference. The
- * criteria were written to assess the work; here they only qualify how its recorded observations are communicated.
- */
 export const STANDARD_REFERENCE =
-	"Reference, whole as staged: each standard explains what its practice's recorded observations were assessed " +
-	"against and the responses it accepts, and qualifies whether and how those observations may be communicated. It " +
-	"is not a request to assess the work again and raises no concern of its own.";
+	"Reference, whole as staged: each standard explains what its practice's recorded results were assessed " +
+	"against and the responses it accepts, and qualifies whether and how those results and their problems may " +
+	"be communicated. It is not a request to assess the work again and raises no concern of its own.";
 
 /** Each concern's complete grounds, limits, standard and candidate communication references, grouped by practice. */
 export function notMetReference(
@@ -926,27 +1129,27 @@ export function notMetReference(
 	stagedCriteria: (practiceSlug: string) => string | null,
 	practices: readonly ReviewPractice[] = [],
 	history: readonly OwnPriorFeedback[] = [],
-	reviewedRevision: string | null = null,
+	itemVersion: string | null = null,
 ): string {
-	const concerns = notMetPractices(reviewable).map((slug) => {
-		const observations = reviewable.filter(
+	const concerns = publicNotMetPractices(reviewable).map((slug) => {
+		const results = reviewable.filter(
 			(entry) =>
 				entry.publicEligible === true && entry.outcome === "NOT_MET" && entry.practiceSlug === slug,
 		);
-		return `${practiceStandard(slug, stagedCriteria).text}${practiceReference(slug, observations, practices, history, reviewedRevision)}`;
+		return `${practiceStandard(slug, stagedCriteria).text}${practiceReference(slug, results, practices, history, itemVersion)}`;
 	});
 	return concerns.length === 0
-		? "No public NOT_MET observation was admitted.\n"
+		? "No public NOT_MET result was admitted.\n"
 		: `${STANDARD_REFERENCE}\n${concerns.join("\n")}`;
 }
 
 /** Association by captured practice metadata only: these references decide neither a match nor novelty. */
 function practiceReference(
 	slug: string,
-	observations: readonly Record<string, unknown>[],
+	results: readonly Record<string, unknown>[],
 	practices: readonly ReviewPractice[],
 	history: readonly OwnPriorFeedback[],
-	reviewedRevision: string | null,
+	itemVersion: string | null,
 ): string {
 	const practice = practices.find((entry) => entry.slug === slug);
 	const candidatePriorWitnesses = history.flatMap((entry) => {
@@ -954,17 +1157,16 @@ function practiceReference(
 			entry.witnessId === null ||
 			(!entry.eligibleForAlreadySaid && !entry.eligibleForPriorAdvice) ||
 			!Array.isArray(entry.basedOn) ||
-			!entry.basedOn.some((support: unknown) => isObject(support) && support.practiceSlug === slug)
+			!entry.basedOn.some((support: unknown) => isRecord(support) && support.practiceSlug === slug)
 		) {
 			return [];
 		}
 		return [
 			{
 				witnessId: entry.witnessId,
-				reviewedRevision:
-					typeof entry.reviewedRevision === "string" ? entry.reviewedRevision : null,
+				itemVersion: typeof entry.itemVersion === "string" ? entry.itemVersion : null,
 				basedOn: entry.basedOn.filter(
-					(support: unknown) => isObject(support) && support.practiceSlug === slug,
+					(support: unknown) => isRecord(support) && support.practiceSlug === slug,
 				),
 				eligibleForAlreadySaid: entry.eligibleForAlreadySaid,
 				eligibleForPriorAdvice: entry.eligibleForPriorAdvice,
@@ -973,54 +1175,23 @@ function practiceReference(
 	});
 	return `\`\`\`json\n${JSON.stringify(
 		{
-			reviewedRevision,
+			itemVersion,
 			...(practice === undefined
 				? {}
 				: {
 						practice: {
 							slug: practice.slug,
 							name: practice.name,
-							...(practice.revisionId === undefined ? {} : { revisionId: practice.revisionId }),
+							...(practice.versionId === undefined ? {} : { versionId: practice.versionId }),
 							knownLimitations: practice.knownLimitations,
 						},
 					}),
-			observations,
+			results,
 			candidatePriorWitnesses,
 		},
 		null,
 		1,
 	)}\n\`\`\`\n`;
-}
-
-/** Full MET grounds and their reference, also retained whole after compaction. */
-export function consultedStandard(
-	standardText: string,
-	slug: string,
-	reviewable: readonly Record<string, unknown>[],
-	practices: readonly ReviewPractice[] = [],
-	history: readonly OwnPriorFeedback[] = [],
-	reviewedRevision: string | null = null,
-): string {
-	const grounds = reviewable.filter(
-		(observation) =>
-			observation.publicEligible === true &&
-			observation.outcome === "MET" &&
-			observation.practiceSlug === slug,
-	);
-	return `${standardText}The recorded MET observations of \`${slug}\`:\n${practiceReference(slug, grounds, practices, history, reviewedRevision)}`;
-}
-
-/** The practices read_practice may show: those with a public MET observation. */
-export function readablePractices(reviewable: readonly Record<string, unknown>[]): string[] {
-	return [
-		...new Set(
-			reviewable
-				.filter(
-					(observation) => observation.publicEligible === true && observation.outcome === "MET",
-				)
-				.map((observation) => String(observation.practiceSlug)),
-		),
-	];
 }
 
 /**
@@ -1061,9 +1232,9 @@ function criteriaBlock(slug: string, criteria: string | null): string {
 
 /** Offered before the body to orient generation; field order is not enforced. */
 const SUPPORT_FIRST =
-	"Choose these before writing the body: the id of every observation behind an assessment this body states, and no " +
-	"other. An observation named by another body does not support this one. A MET observation supports an " +
-	"acknowledgement, never a corrective request. Then write the body from exactly these.";
+	"Choose these before writing the body: the id of every NOT_MET result or problem behind a concern this body " +
+	"states, and no other: a result's resultId, or a problem's problemId for one located problem. " +
+	"One named by another body does not support this one. Then write the body from exactly these.";
 
 /** An id list the schema can offer: the ids themselves when there are any, since an empty enum is invalid. */
 function idList(ids: readonly string[], description: string) {
@@ -1075,38 +1246,30 @@ function idList(ids: readonly string[], description: string) {
 	};
 }
 
-/**
- * The parameters of report_review for one run, built from the same observations readReview checks against: one
- * decision for each NOT_MET observation comes first, each text names only decided observations of this run, and a
- * note sits only on one with a line of this change. A list with nothing it could name takes no items. The required
- * fields of each part are required here, so a missing one is answered by the provider's own validation; the texts
- * use null for no summary and an empty array for no notes. readReview stays the final check and answers each part by name.
- *
- * @param lineNotes whether this work has lines a note can be placed on
- * @param eligibleWitnesses every witnessId a decision may name; readReview checks which reason each one supports
- */
 export function reviewToolParameters(
-	observations: ReadonlyMap<string, ReviewedObservation>,
+	results: ReadonlyMap<string, ReviewedResult>,
 	lineNotes: boolean,
 	eligibleWitnesses: readonly string[],
 ) {
-	const ids = [...observations.keys()];
-	const decided = ids.filter((id) => {
-		const outcome = observations.get(id)?.outcome;
-		return outcome === "MET" || outcome === "NOT_MET";
-	});
-	if (decided.length === 0) {
-		throw new Error("report_review needs at least one decided observation to rest on");
+	const concerns = [...results].filter(([, result]) => result.outcome === "NOT_MET");
+	if (concerns.length === 0) {
+		throw new Error("report_review needs at least one NOT_MET result to rest on");
 	}
-	const notMet = ids.filter((id) => observations.get(id)?.outcome === "NOT_MET");
+	const notMet = concerns.map(([id]) => id);
+	const restable = concerns.flatMap(([id, result]) => [
+		id,
+		...result.problems.map((problem) => problem.problemId),
+	]);
 	const anchorable = lineNotes
-		? decided.filter(
-				(id) =>
-					observations.get(id)?.citations.some((citation) => citation.anchorable === true) === true,
+		? concerns.flatMap(([, result]) =>
+				result.problems
+					.filter((problem) => problem.citations.some((citation) => citation.anchorable === true))
+					.map((problem) => problem.problemId),
 			)
 		: [];
 	return {
 		type: "object",
+		additionalProperties: false,
 		required: ["decisions", "summary"],
 		properties: {
 			decisions: {
@@ -1114,14 +1277,15 @@ export function reviewToolParameters(
 				minItems: notMet.length,
 				maxItems: notMet.length,
 				description:
-					"Decided first: one decision for each NOT_MET observation, and none when there is none. RAISE means " +
-					"the texts below speak about it; any other disposition withholds it, and no text speaks about it.",
+					"Decided first: one decision for each NOT_MET result. RAISE means the " +
+					"texts below speak about it or its problems; any other disposition withholds it, and no text " +
+					"speaks about it or its problems.",
 				items: {
 					type: "object",
-					required: ["observationId", "disposition"],
+					additionalProperties: false,
+					required: ["resultId", "disposition"],
 					properties: {
-						observationId:
-							notMet.length > 0 ? { type: "string", enum: notMet } : { type: "string" },
+						resultId: { type: "string", enum: notMet },
 						disposition: { type: "string", enum: [...DISPOSITIONS] },
 						witnessIds: {
 							type: "array",
@@ -1137,50 +1301,38 @@ export function reviewToolParameters(
 					},
 				},
 			},
-			summary: {
-				type: ["object", "null"],
-				required: ["basedOn", "body"],
-				description:
-					"The one overview comment on the work: the guidance its NOT_MET observations warrant, a useful " +
-					"choice or repair the evidence shows, and points not carried by line notes. Send null when nothing " +
-					"on this work earns a comment of its own.",
-				properties: {
-					basedOn: idList(
-						decided,
-						`${SUPPORT_FIRST} If any of them may not go out, the whole comment stays unsaid.`,
-					),
-					body: {
-						type: "string",
-						minLength: 1,
-						maxLength: REVIEW_LIMITS.summaryChars,
-						description: "The whole comment in Markdown, written from the observations in basedOn.",
-					},
-				},
-			},
 			inline: {
 				type: "array",
 				maxItems: anchorable.length > 0 ? REVIEW_LIMITS.inlineNotes : 0,
 				description:
 					"Notes intended for cited lines of the change, each one self-contained point about the code at " +
-					"its line. Each placement can fail independently.",
+					"its line. Each location can fail independently.",
 				items: {
 					type: "object",
+					additionalProperties: false,
 					required: ["basedOn", "body", "anchor"],
 					properties: {
-						basedOn: idList(decided, `${SUPPORT_FIRST} It includes the anchor's observation.`),
+						basedOn: idList(
+							restable,
+							`${SUPPORT_FIRST} It includes the anchor's problem or that problem's result.`,
+						),
 						body: {
 							type: "string",
 							minLength: 1,
 							maxLength: REVIEW_LIMITS.inlineChars,
-							description: "The whole note in Markdown, written from the observations in basedOn.",
+							description:
+								`The whole note in Markdown, from the results and problems in basedOn. Aim for at most ${REVIEW_TARGETS.inlineChars} characters, ` +
+								"one point about this line, at most two short sentences: what, then why or next action. No headings, internal labels or citation coordinates.",
 						},
 						anchor: {
 							type: "object",
-							required: ["observationId", "citationIndex"],
+							additionalProperties: false,
+							required: ["problemId", "citationIndex"],
 							description:
-								"The line, as one citation of an observation in basedOn that is marked anchorable.",
+								"The line, as one citation marked anchorable of a problem that basedOn names, itself or " +
+								"through its result. A result's own citations take no note.",
 							properties: {
-								observationId:
+								problemId:
 									anchorable.length > 0 ? { type: "string", enum: anchorable } : { type: "string" },
 								citationIndex: { type: "integer", minimum: 0 },
 							},
@@ -1188,42 +1340,45 @@ export function reviewToolParameters(
 					},
 				},
 			},
-		},
-	};
-}
-
-/** read_practice names one practice it may show; an empty enum is invalid, so with none it offers a bare string. */
-export function readPracticeParameters(readable: readonly string[]) {
-	return {
-		type: "object",
-		required: ["practiceSlug"],
-		properties: {
-			practiceSlug: {
-				type: "string",
-				...(readable.length > 0 ? { enum: [...readable] } : {}),
+			summary: {
+				type: ["object", "null"],
+				additionalProperties: false,
+				required: ["basedOn", "body"],
 				description:
-					"The practice whose whole standard to show: one with a MET observation of this work.",
+					"Write after the useful line notes: guidance without a useful line note, or brief orientation, without " +
+					"repeating their diagnosis or action. With no useful line notes, carry the complete guidance here. " +
+					"It never acknowledges a MET result. Send null when it adds no useful comment of its own.",
+				properties: {
+					basedOn: idList(
+						restable,
+						`${SUPPORT_FIRST} If any of them may not go out, the whole comment stays unsaid.`,
+					),
+					body: {
+						type: "string",
+						minLength: 1,
+						maxLength: REVIEW_LIMITS.summaryChars,
+						description:
+							`The whole comment in Markdown, from the results and problems in basedOn. Aim for at most ${REVIEW_TARGETS.summaryChars} characters ` +
+							`and ${REVIEW_TARGETS.summaryPoints} points; at most two short sentences per point: what, then why or next action. No headings, internal labels or citation coordinates.`,
+					},
+				},
 			},
 		},
 	};
 }
 
-/** Explanatory context from the staged practice revision, not a new assessment. */
 export interface ReviewPractice {
 	slug: string;
 	name: string;
 	whyItMatters?: string;
 	knownLimitations: readonly string[];
-	/** Which revision of the practice was staged: it identifies the standard, not that the standard or the work changed. */
-	revisionId?: number;
+	versionId?: string;
 }
 
 /** Everything the review on the work is composed from; nothing else reaches its session. */
 export interface ReviewTurnInput {
-	/** The captured record of this same work, from buildSameWorkContext: it orients; observations own assessments. */
 	sameWork: string;
-	/** The decided observations of this work the review may rest on, whole, from publicObservations. */
-	observations: readonly Record<string, unknown>[];
+	results: readonly Record<string, unknown>[];
 	/** The limits recorded by the abstentions of this work, from publicQualifications: context, never support. */
 	qualifications: readonly Record<string, unknown>[];
 	/** What Hephaestus already said on this same work, from priorPublicFeedback. */
@@ -1233,7 +1388,6 @@ export interface ReviewTurnInput {
 	ownHistoryReadAt?: string;
 	/** The bounded captured public discussion of this same work, from buildPublicReviewHistory. */
 	captured: PublicReviewHistory;
-	/** Context on the practices of the decided observations. */
 	practices: readonly ReviewPractice[];
 	/** Practices this review did not reach at all. */
 	notReached: readonly string[];
@@ -1243,10 +1397,6 @@ export interface ReviewTurnInput {
 	stagedCriteria: (practiceSlug: string) => string | null;
 }
 
-/**
- * The opening reference: whole work and communication, full concerns, an index of optional recognition, and the limits
- * the abstentions recorded.
- */
 export function buildReviewTurn(input: ReviewTurnInput): string {
 	const own = ownHistoryText(input.alreadySaid, input.ownHistoryOmissions, input.ownHistoryReadAt);
 	const others =
@@ -1259,28 +1409,27 @@ export function buildReviewTurn(input: ReviewTurnInput): string {
 		input.qualifications.length === 0
 			? ""
 			: `### Recorded limits of this review
-Practices this review looked at and did not decide, or found not applicable, each with the limit it recorded and the lines it cited. They bound what the review may claim. They are not concerns or recognition: no text rests on them, and nothing is decided about them here.
+Practices this review looked at and did not decide, or found not applicable, each with the limit it recorded and the lines it cited. They bound what the review may claim. They are not concerns: no text rests on them, and nothing is decided about them here.
 \`\`\`json
-${JSON.stringify({ observations: input.qualifications }, null, 1)}
+${JSON.stringify({ results: input.qualifications }, null, 1)}
 \`\`\`
 `;
-	const placement = input.lineNotes
-		? "- Line notes: a note's `anchor` names one citation marked `anchorable` by its `observationId` and " +
-			"`citationIndex`. On GitHub it is a review comment on that line; on GitLab it is its own comment " +
-			"headed by a link to the line. Each body stands on its own, and each placement can fail independently.\n"
+	const location = input.lineNotes
+		? "- Line notes: a note's `anchor` names one citation marked `anchorable` of a problem, by the " +
+			"problem's `problemId` and the citation's `citationIndex`; a result's own citations take no note. " +
+			"On GitHub it is a review comment on that line; on GitLab it is a positioned discussion on the reviewed diff. " +
+			"If a diff position is unavailable or explicitly rejected, delivery can use a file note with a link to the reviewed code. " +
+			"Each body stands on its own, and each location can fail independently.\n"
 		: "- This work has no lines a note can sit on; everything goes in the summary.\n";
 	const concerns = notMetReference(
-		input.observations,
+		input.results,
 		input.stagedCriteria,
 		input.practices,
 		input.alreadySaid,
-		input.captured.reviewedRevision ?? null,
+		input.captured.itemVersion ?? null,
 	);
-	const recognition = input.observations
-		.filter((entry) => entry.publicEligible === true && entry.outcome === "MET")
-		.map((entry) => ({ id: entry.id, practiceSlug: entry.practiceSlug, summary: entry.summary }));
 	return `## The review to write
-The measurement of this work is finished. The captured work establishes its purpose and evidence. Earlier public communication records what was said, not current verification. Each concern below carries its recorded grounds and standard; optional recognition starts as an index and is read only when useful.
+The measurement of this work is finished. The captured work establishes its purpose and evidence. Earlier public communication records what was said, not current verification. Each concern below carries its recorded grounds and standard.
 
 ### The reviewed work, as captured
 ${input.sameWork}
@@ -1289,15 +1438,11 @@ ${said}
 ### Concerns to decide
 Candidate prior witness references associate captured practice metadata only. Read their complete statements above to judge whether the advice matches, remains warranted, or is worth repeating; a missing association does not establish novelty.
 ${concerns}
-### Optional recognition index
-\`\`\`json
-${JSON.stringify({ observations: recognition }, null, 1)}
-\`\`\`
 ${qualifications}
 ### Where the words go
 - The summary: one comment on the work.
-${placement}
-${notReachedNote(input.notReached)}${recognition.length > 0 ? "Before the review acknowledges a MET observation, use read_practice for its complete grounds and reference, including when its standard is already shown with a concern. A read is in view from your next turn. Then store" : "Store"} the whole review with one report_review call. It decides first: each NOT_MET observation is RAISE, and a text speaks about it, or withheld with its reason, and no text speaks about it. Writing nothing for the work is a decision too: it is still one final report_review call.
+${location}
+${notReachedNote(input.notReached)}Store the whole review with one report_review call. It decides first: each NOT_MET result is RAISE, and a text speaks about it or its problems, or withheld with its reason, and no text speaks about it or its problems. Writing nothing for the work is a decision too: it is still one final report_review call.
 
 ${WRITE_CONTRACT}`;
 }
