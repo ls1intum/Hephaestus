@@ -3,6 +3,7 @@ import { createMemoryHistory, createRouter } from "@tanstack/react-router";
 import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
+import { listWorkspacesQueryKey } from "@/api/@tanstack/react-query.gen";
 import { isRecord } from "@/lib/is-record";
 import { ROUTER_SEARCH } from "@/lib/router-search";
 import { hasText } from "@/lib/text";
@@ -19,14 +20,14 @@ const WORKSPACE_HOME = "/w/acme/practice-profile";
 // `router.load()` lazily imports each matched route's module, so a case pays its transform cost.
 vi.setConfig({ testTimeout: 15_000 });
 
-function newRouter(url?: string) {
+function newRouter(url?: string, queryClient = new QueryClient()) {
 	return createRouter({
 		...ROUTER_SEARCH,
 		routeTree,
 		...(hasText(url) ? { history: createMemoryHistory({ initialEntries: [url] }) } : {}),
 		context: {
 			// A fresh client per case: a shared cache would let one role's answer satisfy another's guard.
-			queryClient: new QueryClient(),
+			queryClient,
 			auth: undefined,
 		},
 	});
@@ -102,6 +103,71 @@ describe("workspace-admin route gate", () => {
 		);
 		mockMembership(null);
 		await expect(land("/w/tutors/admin/settings")).resolves.toBe("/w/tutors/admin/settings");
+	});
+
+	it("freshly verifies the same nonmember administration target on navigation during a member-list outage", async () => {
+		let targetReads = 0;
+		server.use(
+			http.get("*/user", () => HttpResponse.json(currentUser)),
+			http.get("*/workspaces/tutors", () => {
+				targetReads += 1;
+				return HttpResponse.json({ workspaceSlug: "tutors", displayName: "Tutors" });
+			}),
+		);
+		mockMembership(null);
+		const queryClient = new QueryClient();
+		const router = newRouter("/w/tutors/admin/settings", queryClient);
+		await router.load();
+		expect(router.state.location.pathname).toBe("/w/tutors/admin/settings");
+		const initialReads = targetReads;
+		server.use(http.get("*/workspaces", () => HttpResponse.json({ status: 503 }, { status: 503 })));
+		await queryClient.invalidateQueries({
+			queryKey: listWorkspacesQueryKey(),
+			refetchType: "none",
+		});
+		await router.navigate({
+			to: "/w/$workspaceSlug/admin/members",
+			params: { workspaceSlug: "tutors" },
+		});
+		expect(router.state.location.pathname).toBe("/w/tutors/admin/members");
+		expect(targetReads).toBeGreaterThan(initialReads);
+		const match = router.state.matches.find(
+			(candidate) => candidate.routeId === "/_authenticated/w/$workspaceSlug",
+		);
+		expect(match?.context).toMatchObject({
+			administrationWorkspace: { workspaceSlug: "tutors" },
+			workspace: undefined,
+		});
+	});
+
+	it("refuses navigation when fresh target verification fails during a member-list outage", async () => {
+		server.use(
+			http.get("*/user", () => HttpResponse.json(currentUser)),
+			http.get("*/workspaces/tutors", () =>
+				HttpResponse.json({ workspaceSlug: "tutors", displayName: "Tutors" }),
+			),
+		);
+		mockMembership(null);
+		const queryClient = new QueryClient();
+		const router = newRouter("/w/tutors/admin/settings", queryClient);
+		await router.load();
+		server.use(
+			http.get("*/workspaces", () => HttpResponse.json({ status: 503 }, { status: 503 })),
+			http.get("*/workspaces/tutors", () => HttpResponse.json({ status: 403 }, { status: 403 })),
+		);
+		await queryClient.invalidateQueries({
+			queryKey: listWorkspacesQueryKey(),
+			refetchType: "none",
+		});
+		await router.navigate({
+			to: "/w/$workspaceSlug/admin/members",
+			params: { workspaceSlug: "tutors" },
+		});
+		expect(
+			router.state.matches.find(
+				(candidate) => candidate.routeId === "/_authenticated/w/$workspaceSlug",
+			)?.status,
+		).toBe("error");
 	});
 
 	it.each([403, 404, 503])(
