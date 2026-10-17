@@ -150,13 +150,13 @@ function tableRows(container: HTMLElement) {
 }
 
 describe("the results' table", () => {
-	it("opens and folds on its own button", () => {
+	it("opens with every result and lets the reader fold and reopen the table", () => {
 		const { container } = renderTrace();
-		expect(tableRows(container)).toHaveLength(0);
-		fireEvent.click(screen.getByRole("button", { name: /^Show all \d+ results in the table$/u }));
 		expect(tableRows(container)).toHaveLength(whole.results.length);
 		fireEvent.click(screen.getByRole("button", { name: "Fold the table" }));
 		expect(tableRows(container)).toHaveLength(0);
+		fireEvent.click(screen.getByRole("button", { name: /^Show all \d+ results in the table$/u }));
+		expect(tableRows(container)).toHaveLength(whole.results.length);
 	});
 
 	it("opens with Expand all and folds with Collapse all", () => {

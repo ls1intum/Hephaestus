@@ -6,6 +6,7 @@ import type { BadgeVariant } from "@/components/common/status-def";
 import { OUTCOME_DEFS } from "@/components/practice-vocabulary/outcome-defs";
 import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { hasText } from "@/lib/text";
 
 import {
@@ -27,6 +28,14 @@ import { type RailStepProps, StoryNode, offPath, useStory } from "./TraceStoryNo
 import { CellLabel, TRACE_ROW_CELLS, TRACE_ROW_MAIN, TraceTable, traceRowGrid } from "./TraceTable";
 
 const RESULTS_OPEN = 12;
+
+/**
+ * Whether the trace stands on the review itself. Its results are then what the record is, not
+ * siblings of it, so their table opens at once and lists all of them.
+ */
+export function standsOnReview(here: TraceNode | undefined): boolean {
+	return here?.kind === "review" || here?.kind === "results";
+}
 
 export function resultRows(
 	numbered: NumberedResult[],
@@ -74,8 +83,8 @@ export function ResultsStep({
 	const extras = earlier.length > 0 ? [`${earlier.length} answered by an earlier review`] : [];
 	const inTable = new Set(rows.map(({ result }) => result.id));
 	const dotted = numbered.filter(({ result }) => !inTable.has(result.id));
-	const shownRows =
-		listed && !othersOpen && rows.length > RESULTS_OPEN ? rows.slice(0, RESULTS_OPEN) : rows;
+	const capped = listed && !othersOpen && !standsOnReview(here) && rows.length > RESULTS_OPEN;
+	const shownRows = capped ? rows.slice(0, RESULTS_OPEN) : rows;
 	const hiddenRows = rows.length - shownRows.length;
 	const folded = path !== undefined || self !== undefined;
 	let toggleText = `Show all ${countOf(numbered.length, "result", "results")} in the table`;
@@ -293,7 +302,7 @@ function ResultRow({
 	letters: ReadonlyMap<string, string>;
 	muted: boolean;
 }) {
-	const { display } = useStory();
+	const { display, factsOpen, here } = useStory();
 	const { result, number } = entry;
 	const outcome = OUTCOME_DEFS[result.outcome];
 	const severity = result.severity === null ? undefined : SEVERITY_DEFS[result.severity];
@@ -307,7 +316,15 @@ function ResultRow({
 				node={{ kind: "result", id: result.id }}
 				className={cn(traceRowGrid("results", display.times), "px-1.5 py-1.5")}
 				after={
-					result.problems.length > 0 && <TraceProblems problems={result.problems} number={number} />
+					result.problems.length > 0 && (
+						// "Expand all" opens, or folds, every result's problems over the reader's choices.
+						<TraceProblems
+							key={String(factsOpen)}
+							problems={result.problems}
+							number={number}
+							defaultOpen={factsOpen || sameTraceNode(here, { kind: "result", id: result.id })}
+						/>
+					)
 				}
 			>
 				<LineageResultChip
@@ -362,11 +379,56 @@ function ResultRow({
 	);
 }
 
+/** "1 major, 2 minor": how many problems of each severity, most severe first. */
+function severityMix(problems: readonly ProblemSummary[]): string {
+	return Object.entries(SEVERITY_DEFS)
+		.map(([severity, def]) => ({
+			def,
+			count: problems.filter((problem) => problem.severity === severity).length,
+		}))
+		.filter(({ count }) => count > 0)
+		.map(({ def, count }) => `${String(count)} ${def.label.toLowerCase()}`)
+		.join(", ");
+}
+
 /**
- * The problems a Not met result records, in recorded order, each with its severity. The row above
- * opens the result; each problem opens its own sheet over the trace.
+ * The problems a Not met result records, in recorded order, each with its severity. They fold to
+ * their count and severities, so a review with many problems does not bury its other results; the
+ * result the trace stands on opens with them shown. The row above opens the result; each problem
+ * opens its own sheet over the trace, with its evidence and next step.
  */
 function TraceProblems({
+	problems,
+	number,
+	defaultOpen,
+}: {
+	problems: readonly ProblemSummary[];
+	number: number;
+	defaultOpen: boolean;
+}) {
+	const summary = `${countOf(problems.length, "problem", "problems")}: ${severityMix(problems)}`;
+	return (
+		<div className="pb-1.5 pl-9 text-xs">
+			<Collapsible defaultOpen={defaultOpen} className="min-w-0">
+				<CollapsibleTrigger
+					aria-label={`${summary}, of result ${String(number)}`}
+					className="group inline-flex min-h-6 items-center gap-1 rounded-sm px-1 text-muted-foreground outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring"
+				>
+					<ChevronRightIcon
+						aria-hidden
+						className="size-3 shrink-0 transition-transform group-data-[panel-open]:rotate-90 motion-reduce:transition-none"
+					/>
+					{summary}
+				</CollapsibleTrigger>
+				<CollapsibleContent>
+					<TraceProblemList problems={problems} number={number} />
+				</CollapsibleContent>
+			</Collapsible>
+		</div>
+	);
+}
+
+function TraceProblemList({
 	problems,
 	number,
 }: {
@@ -377,7 +439,7 @@ function TraceProblems({
 	return (
 		<ul
 			aria-label={`Problems of result ${String(number)}`}
-			className="flex min-w-0 flex-col gap-0.5 pb-1.5 pl-9 text-xs"
+			className="flex min-w-0 flex-col gap-0.5"
 		>
 			{problems.map((problem, index) => {
 				const severity = SEVERITY_DEFS[problem.severity];

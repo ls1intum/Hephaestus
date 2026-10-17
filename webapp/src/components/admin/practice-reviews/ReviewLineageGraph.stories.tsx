@@ -15,7 +15,8 @@ import {
 	wholeReviewManyFeedback,
 } from "./lineage-fixtures";
 
-import { lineageStateCase, STATE_FEEDBACK_ID } from "./lineage-state-fixtures";
+import { lineageRecords, numberedResults } from "./lineage-chain";
+import { lineageStateCase, richReviewFixture, STATE_FEEDBACK_ID } from "./lineage-state-fixtures";
 import { connectorBox, LANE_PX } from "./LineageConnectors";
 import type { TraceNode } from "./review-trace";
 import { ReviewLineageGraph } from "./ReviewLineageGraph";
@@ -202,22 +203,39 @@ export const DeliveredFeedback: Story = {
 	},
 };
 
+/**
+ * A review's own trace opens on its results table, every row listed: the results are what the
+ * review is, not siblings. The table folds to the numbered dots and opens again on its own button.
+ */
 export const ResultTable: Story = {
 	args: { lineage: wholeReview, here: { kind: "review" } },
 	play: async ({ canvas, canvasElement, userEvent }) => {
 		const table = () => canvasElement.querySelector('[data-trace-table="results"]');
-		await expect(table()).toBeNull();
-		await userEvent.click(canvas.getByRole("button", { name: "Show all 4 results in the table" }));
+		const rows = () =>
+			canvas.getByRole("list", { name: "Results of this review" }).querySelectorAll(":scope > li");
 		await expect(showToggle(canvasElement, "Siblings")).toHaveAttribute("aria-pressed", "false");
-		// The table's own rows; a Not met row lists its problems under it.
-		await expect(
-			canvas.getByRole("list", { name: "Results of this review" }).querySelectorAll(":scope > li"),
-		).toHaveLength(4);
+		await expect(rows()).toHaveLength(4);
 		await expect(
 			table()?.querySelector(`[data-lineage-node="result:${LINEAGE_RESULT.cache404}"]`),
 		).toHaveTextContent(/Not met.*Major.*B, C, E/u);
 		await userEvent.click(canvas.getByRole("button", { name: "Fold the table" }));
 		await expect(table()).toBeNull();
+		await expect(canvas.getByRole("list", { name: "Results by number" })).toBeVisible();
+		await userEvent.click(canvas.getByRole("button", { name: "Show all 4 results in the table" }));
+		await expect(rows()).toHaveLength(4);
+	},
+};
+
+/** A trace that starts on one result keeps the review's other results folded to their dots. */
+export const ResultTraceFoldsTheOthers: Story = {
+	play: async ({ canvas, canvasElement }) => {
+		await expect(canvas.getByRole("list", { name: "Results on this path" })).toBeVisible();
+		await expect(
+			canvasElement.querySelectorAll('[data-trace-table="results"] [data-lineage-node]'),
+		).toHaveLength(1);
+		await expect(
+			canvas.getByRole("button", { name: /^Show all \d+ results in the table$/u }),
+		).toHaveAttribute("aria-expanded", "false");
 	},
 };
 
@@ -346,6 +364,116 @@ export const OnlyOnePractice: Story = {
 	play: async ({ canvasElement }) => {
 		const results = [...stepsOf(canvasElement).querySelectorAll('[data-lineage-node^="result:"]')];
 		await expect(results.length).toBeGreaterThan(0);
+	},
+};
+
+/**
+ * Only one outcome's results, and the feedback written from them. The verdict still speaks of the
+ * whole review, the results step says how many of them the filter shows, and the select offers
+ * only the outcomes the review has, each with its count.
+ */
+export const OnlyOneOutcome: Story = {
+	args: {
+		lineage: wholeReview,
+		here: { kind: "review" },
+		filter: { kind: "outcome", outcome: "MET" },
+	},
+	play: async ({ canvas, userEvent }) => {
+		await expect(canvas.getByText(/^It recorded 4 results: /u)).toBeVisible();
+		await expect(canvas.getByText("The filter shows 1 of them.")).toBeVisible();
+		await userEvent.click(canvas.getByRole("combobox", { name: "Steps" }));
+		await expectSettledVisible(await screen.findByRole("option", { name: "Only met (1)" }));
+		await expect(screen.getByRole("option", { name: "Only not met (3)" })).toBeVisible();
+		await expect(screen.queryByRole("option", { name: /^Only does not apply/u })).toBeNull();
+		await expect(screen.queryByRole("option", { name: /^Only could not determine/u })).toBeNull();
+	},
+};
+
+const richRecords = lineageRecords(richReviewFixture.lineage);
+const richNumber = new Map(
+	numberedResults(richRecords.results).map(({ result, number }) => [result.id, number]),
+);
+const richOutcome = new Map(richRecords.results.map((result) => [result.id, result.outcome]));
+const acrossOutcomes = richRecords.feedback.find(
+	(entry) =>
+		entry.basis.some((id) => richOutcome.get(id) === "MET") &&
+		entry.basis.some((id) => richOutcome.get(id) === "NOT_MET"),
+);
+if (acrossOutcomes === undefined) {
+	throw new Error("The rich review has feedback resting on a Met and a Not met result");
+}
+
+/**
+ * Only Met results, on a review whose feedback can rest on a Met and a Not met result at once. The
+ * table lists the Met results only, but that piece still names both results it rests on, by their
+ * numbers in the whole review: a filter narrows what shows, never what a record says.
+ */
+export const FilterKeepsWhatFeedbackRestsOn: Story = {
+	args: {
+		lineage: richReviewFixture.lineage,
+		here: { kind: "review" },
+		filter: { kind: "outcome", outcome: "MET" },
+	},
+	play: async ({ canvas, canvasElement }) => {
+		const met = richRecords.results.filter((result) => result.outcome === "MET");
+		await expect(
+			canvas.getByRole("list", { name: "Results of this review" }).querySelectorAll(":scope > li"),
+		).toHaveLength(met.length);
+		const row = canvasElement.querySelector(`[data-feedback-row="${acrossOutcomes.id}"]`);
+		const chips = [...(row?.querySelectorAll<HTMLElement>("[data-result-chip]") ?? [])];
+		await expect(
+			chips
+				.map((chip) => chip.dataset.resultId ?? "")
+				.sort((left, right) => left.localeCompare(right)),
+		).toStrictEqual([...acrossOutcomes.basis].sort((left, right) => left.localeCompare(right)));
+		await expect(chips.map((chip) => Number(chip.dataset.resultChip))).toStrictEqual(
+			acrossOutcomes.basis
+				.map((id) => richNumber.get(id))
+				.filter((number) => number !== undefined)
+				.sort((a, b) => a - b),
+		);
+	},
+};
+
+const PROBLEM_TOGGLE = /^\d+ problems?: .+, of result \d+$/u;
+const PROBLEM_LIST = /^Problems of result \d+$/u;
+
+/**
+ * A Not met row folds its problems to their count and severities, so many problems do not bury the
+ * other results. Each opens and folds again on its own, and "Expand all" opens every one.
+ */
+export const ProblemsFoldUnderTheirResult: Story = {
+	args: { lineage: wholeReview, here: { kind: "review" } },
+	play: async ({ canvas, userEvent }) => {
+		const toggles = canvas.getAllByRole("button", { name: PROBLEM_TOGGLE });
+		await expect(canvas.queryAllByRole("list", { name: PROBLEM_LIST })).toHaveLength(0);
+		const [toggle] = toggles;
+		if (toggle === undefined) {
+			throw new Error("The review has a Not met result with problems");
+		}
+		await expect(toggle).toHaveAttribute("aria-expanded", "false");
+		await userEvent.click(toggle);
+		await expect(toggle).toHaveAttribute("aria-expanded", "true");
+		const number = /of result (?<number>\d+)$/u.exec(toggle.getAttribute("aria-label") ?? "")
+			?.groups?.number;
+		const list = canvas.getByRole("list", { name: `Problems of result ${String(number)}` });
+		await expect(
+			within(list).getAllByRole("button", { name: /^Problem \d+ of result \d+: /u }).length,
+		).toBeGreaterThan(0);
+		await userEvent.click(toggle);
+		await expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+		await userEvent.click(canvas.getByRole("button", { name: "Expand all" }));
+		await expect(canvas.getAllByRole("list", { name: PROBLEM_LIST })).toHaveLength(toggles.length);
+	},
+};
+
+/** A trace that stands on a Not met result opens with that result's problems shown. */
+export const TracedResultShowsItsProblems: Story = {
+	play: async ({ canvas }) => {
+		const [list, ...others] = canvas.getAllByRole("list", { name: PROBLEM_LIST });
+		await expect(others).toHaveLength(0);
+		await expect(list).toBeVisible();
 	},
 };
 

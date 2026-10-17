@@ -1,32 +1,60 @@
 import type { ReviewLineage } from "@/api/types.gen";
+import { OUTCOME_DEFS, type Outcome } from "@/components/practice-vocabulary/outcome-defs";
 
-import { type LineageRecords, lineageRecords, silentNotMet } from "./lineage-chain";
+import { type LineageRecords, lineageRecords, silentNotMet, verdictCounts } from "./lineage-chain";
 import { feedbackLoss } from "./trace-bottleneck";
 
 /**
  * What a trace shows of its chain: everything, only the feedback, only what was lost on the way,
- * or only what one practice led to.
+ * or only what one practice or one outcome led to.
  */
 export type TraceFilter =
 	| { kind: "all" }
 	| { kind: "feedback" }
 	| { kind: "losses" }
-	| { kind: "practice"; practiceSlug: string };
+	| { kind: "practice"; practiceSlug: string }
+	| { kind: "outcome"; outcome: Outcome };
 
 export const ALL_STEPS: TraceFilter = { kind: "all" };
 
-/** The filter as the select writes it: `all`, `feedback`, `losses`, `practice:<slug>`. */
+/**
+ * The filter as the select writes it: `all`, `feedback`, `losses`, `practice:<slug>`,
+ * `outcome:<OUTCOME>`.
+ */
 export function traceFilterValue(filter: TraceFilter): string {
-	return filter.kind === "practice" ? `practice:${filter.practiceSlug}` : filter.kind;
+	switch (filter.kind) {
+		case "practice": {
+			return `practice:${filter.practiceSlug}`;
+		}
+		case "outcome": {
+			return `outcome:${filter.outcome}`;
+		}
+		case "all":
+		case "feedback":
+		case "losses": {
+			return filter.kind;
+		}
+	}
+}
+
+function isOutcome(value: string): value is Outcome {
+	return Object.hasOwn(OUTCOME_DEFS, value);
 }
 
 export function parseTraceFilter(value: string): TraceFilter {
 	if (value === "feedback" || value === "losses") {
 		return { kind: value };
 	}
-	return value.startsWith("practice:")
-		? { kind: "practice", practiceSlug: value.slice("practice:".length) }
-		: ALL_STEPS;
+	if (value.startsWith("practice:")) {
+		return { kind: "practice", practiceSlug: value.slice("practice:".length) };
+	}
+	const outcome = value.startsWith("outcome:") ? value.slice("outcome:".length) : "";
+	return isOutcome(outcome) ? { kind: "outcome", outcome } : ALL_STEPS;
+}
+
+/** The outcomes the trace's results have, with how many of each, in the verdict's order. */
+export function traceOutcomes(lineage: ReviewLineage): { outcome: Outcome; count: number }[] {
+	return verdictCounts(lineageRecords(lineage).results);
 }
 
 export function tracePractices(lineage: ReviewLineage): { slug: string; name: string }[] {
@@ -42,6 +70,17 @@ export function tracePractices(lineage: ReviewLineage): { slug: string; name: st
 /** What an active filter leaves out, in the words a rail says where a stage is empty under it. */
 export function hiddenByFilter(filter: TraceFilter): string {
 	return filter.kind === "losses" ? "Nothing lost on this path." : "Hidden by the filter.";
+}
+
+/**
+ * The records a filtered trace shows. The filter only picks which records show: a piece of feedback
+ * it keeps still rests on every result and problem it rests on in the whole chain, hidden or not,
+ * because `filteredLineage` drops the edges from the results it hides.
+ */
+export function shownRecords(whole: LineageRecords, shown: ReviewLineage): LineageRecords {
+	const records = lineageRecords(shown);
+	const keptFeedbackIds = new Set(records.feedback.map((entry) => entry.id));
+	return { ...records, feedback: whole.feedback.filter((entry) => keptFeedbackIds.has(entry.id)) };
 }
 
 export function filteredLineage(lineage: ReviewLineage, filter: TraceFilter): ReviewLineage {
@@ -97,15 +136,27 @@ function kept(
 			};
 		}
 		case "practice": {
-			const results = ids(
+			return withTheirFeedback(
+				records,
 				records.results.filter((result) => result.practiceSlug === filter.practiceSlug),
 			);
-			return {
-				results,
-				feedback: ids(
-					records.feedback.filter((entry) => entry.basis.some((id) => results.has(id))),
-				),
-			};
+		}
+		case "outcome": {
+			return withTheirFeedback(
+				records,
+				records.results.filter((result) => result.outcome === filter.outcome),
+			);
 		}
 	}
+}
+
+function withTheirFeedback(
+	records: LineageRecords,
+	chosen: readonly { id: string }[],
+): { results: ReadonlySet<string>; feedback: ReadonlySet<string> } {
+	const results = ids(chosen);
+	return {
+		results,
+		feedback: ids(records.feedback.filter((entry) => entry.basis.some((id) => results.has(id)))),
+	};
 }

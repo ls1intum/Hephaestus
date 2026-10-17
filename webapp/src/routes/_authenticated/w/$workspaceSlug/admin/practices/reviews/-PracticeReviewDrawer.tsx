@@ -603,6 +603,7 @@ function ItemLevelRead({ workspaceSlug, itemId, ...props }: LevelReadProps & { i
 				events: trace.events,
 			}))}
 			eventLabel={labelEvent}
+			reviews={traceQuery.data?.reviews}
 			facts={panelState(factsQuery, ({ facts }) => ({ status: "ready" as const, facts }))}
 			onRequestReview={
 				item !== undefined && REVIEWABLE_ON_DEMAND.has(item.kind)

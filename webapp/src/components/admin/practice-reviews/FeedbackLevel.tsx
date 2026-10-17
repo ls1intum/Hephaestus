@@ -38,10 +38,8 @@ import {
 	type FeedbackDecisionReason,
 	feedbackDecisionReasonLabel,
 } from "@/components/practice-vocabulary/feedback-decision-defs";
-import {
-	ADMIN_WITHHELD_TEXT,
-	type FeedbackDestination,
-} from "@/components/practice-vocabulary/feedback-destination-defs";
+import type { FeedbackDestination } from "@/components/practice-vocabulary/feedback-destination-defs";
+import { FEEDBACK_LOCATION_DEFS } from "@/components/practice-vocabulary/feedback-location-defs";
 import { FEEDBACK_RESOLUTION_DEFS } from "@/components/practice-vocabulary/feedback-resolution-defs";
 import {
 	FEEDBACK_SEND_ACTION_LABELS,
@@ -53,7 +51,6 @@ import { DrawerBody, DrawerFooter } from "@/components/ui/drawer";
 import { hasText } from "@/lib/text";
 
 import { CorrectionReasonPopover, type CorrectionReasonCopy } from "./CorrectionReason";
-import { feedbackOpeningLine } from "./feedback-preview";
 import { FeedbackBody } from "./FeedbackBody";
 import { FeedbackLocationLabel } from "./FeedbackLocationLabel";
 import { LevelBodySkeleton } from "./LevelBodySkeleton";
@@ -101,22 +98,13 @@ function inOrder(copies: readonly FeedbackCopy[]): FeedbackCopy[] {
 	return [...copies].sort((a, b) => a.position - b.position);
 }
 
-// Private feedback belongs to the developer; identify it by destination rather than its text.
+/**
+ * Who the feedback is for and where it goes, in the words of its row on the Feedback list. Never
+ * its text: "What it says" shows that once, and the text can be private to the developer or hidden.
+ */
 function feedbackTitle(feedback: FeedbackRecord): string {
-	const withheld = ADMIN_WITHHELD_TEXT[feedback.destination];
-	if (withheld !== undefined) {
-		return withheld.title;
-	}
-	if (feedback.textHidden) {
-		return "Feedback text hidden";
-	}
-	const body =
-		feedback.body ?? inOrder(feedback.copies).find((copy) => hasText(copy.body))?.body ?? undefined;
-	return (
-		ADMIN_WITHHELD_TEXT[feedback.destination]?.title ??
-		feedbackOpeningLine(body) ??
-		(hasText(body) ? "Opens with a quote from the work…" : "No recorded feedback text")
-	);
+	const where = FEEDBACK_LOCATION_DEFS[feedback.location].label;
+	return `For ${developerLabel(feedback.developer)} · ${where}`;
 }
 
 export function FeedbackLevel({

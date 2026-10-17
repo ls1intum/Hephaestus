@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import type { ItemEvent, ItemFact, ItemRef } from "@/api/types.gen";
+import type { ItemEvent, ItemFact, ItemRef, ReviewRef } from "@/api/types.gen";
 import { InlineLink } from "@/components/common/InlineLink";
 import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
@@ -13,6 +13,8 @@ import {
 	ITEM_EVENT_REASON_SENTENCES,
 	ITEM_EVENT_STATE_DEFS,
 } from "@/components/practice-vocabulary/item-event-defs";
+import { REVIEW_ORIGIN_DEFS } from "@/components/practice-vocabulary/review-origin-defs";
+import { REVIEW_STATUS_DEFS } from "@/components/practice-vocabulary/review-status-defs";
 import { DrawerBody, DrawerFooter } from "@/components/ui/drawer";
 import { itemKindLabel, itemName } from "@/lib/item-kinds";
 import { hasText } from "@/lib/text";
@@ -26,10 +28,12 @@ import {
 	SheetTechnical,
 } from "./RecordSheet";
 import { RequestReviewAction } from "./RequestReviewAction";
-import { itemLevel } from "./review-levels";
+import { itemLevel, reviewLevel } from "./review-levels";
 import { ReviewFact, ReviewFactGrid } from "./ReviewFactGrid";
 import { ReviewItemLink } from "./ReviewItem";
 import { ReviewLevelHeader } from "./ReviewLevelHeader";
+
+const NO_REVIEWS: readonly ReviewRef[] = [];
 
 export interface WorkLevelProps {
 	workspaceSlug: string;
@@ -37,6 +41,7 @@ export interface WorkLevelProps {
 	path: LevelPath;
 	item: PanelState<{ item: ItemRef }>;
 	events?: PanelState<{ events: ItemEvent[] }>;
+	reviews?: readonly ReviewRef[];
 	eventLabel: (name: string) => string;
 	facts?: PanelState<{ facts: ItemFact[] }>;
 	onRequestReview?: () => void;
@@ -51,6 +56,7 @@ export function WorkLevel({
 	path,
 	item: state,
 	events: eventsState,
+	reviews = NO_REVIEWS,
 	eventLabel,
 	facts: factsState,
 	onRequestReview,
@@ -61,6 +67,7 @@ export function WorkLevel({
 	const item = state.status === "ready" ? state.item : undefined;
 	const events = eventsState?.status === "ready" ? eventsState.events : [];
 	const latest = latestEvent(events);
+	const latestReview = reviews[0];
 	const header = (
 		<ReviewLevelHeader
 			nested={nested}
@@ -68,13 +75,30 @@ export function WorkLevel({
 			kind="item"
 			loading={state.status === "loading"}
 			chips={
-				latest && (
-					<SheetStatusLine
-						status={<StatusBadge def={ITEM_EVENT_STATE_DEFS[latest.state]} />}
-						figure={eventsFigure(events)}
-						at={{ label: "latest event", date: latest.occurredAt }}
-					/>
-				)
+				<div className="flex flex-col gap-2">
+					{state.status === "ready" && latestReview !== undefined && (
+						<SheetStatusLine
+							status={<StatusBadge def={REVIEW_STATUS_DEFS[latestReview.status]} />}
+							flag={<StatusBadge def={REVIEW_ORIGIN_DEFS[latestReview.origin]} />}
+							figure={
+								<InlineLink render={<DetailStackLink entry={reviewLevel(latestReview.id)} />}>
+									Open review
+								</InlineLink>
+							}
+							at={{
+								label: latestReview.completedAt === null ? "review created" : "review completed",
+								date: latestReview.completedAt ?? latestReview.createdAt,
+							}}
+						/>
+					)}
+					{latest && (
+						<SheetStatusLine
+							status={<StatusBadge def={ITEM_EVENT_STATE_DEFS[latest.state]} />}
+							figure={eventsFigure(events)}
+							at={{ label: "latest event", date: latest.occurredAt }}
+						/>
+					)}
+				</div>
 			}
 			title={item && (item.title ?? item.label)}
 			description={item && <ReviewItemLink item={item} />}
@@ -99,6 +123,7 @@ export function WorkLevel({
 		);
 	}
 	const history: SheetEvent[] = [
+		...reviews.map((review) => reviewEvent(review)),
 		...events.map((event) => itemEvent(event, eventLabel, workspaceSlug)),
 		...(item.removedAt === null
 			? []
@@ -144,7 +169,7 @@ export function WorkLevel({
 				</SheetSection>
 				<SheetSection
 					part="state"
-					description="Every event recorded on the work and what became of it."
+					description="Reviews of this work and what became of its recorded events."
 				>
 					{eventsState?.status === "loading" && <LevelBodySkeleton />}
 					{eventsState?.status === "error" && (
@@ -242,6 +267,23 @@ function itemEvent(
 						<RefusalFixLink workspaceSlug={workspaceSlug} reason={event.reason} />
 					</span>
 				)}
+			</>
+		),
+	};
+}
+
+function reviewEvent(review: ReviewRef): SheetEvent {
+	return {
+		key: `review:${review.id}`,
+		at: review.createdAt,
+		title: (
+			<InlineLink render={<DetailStackLink entry={reviewLevel(review.id)} />}>
+				{REVIEW_ORIGIN_DEFS[review.origin].label} review
+			</InlineLink>
+		),
+		detail: (
+			<>
+				Current status: <StatusBadge def={REVIEW_STATUS_DEFS[review.status]} />
 			</>
 		),
 	};

@@ -122,13 +122,12 @@ describe("feedback approval level", () => {
 		const theirs = seedCountingReads(queryClient, "other");
 		renderRouteAtWithRouter(FEEDBACK_LEVEL, queryClient);
 
-		// Titled by its first line, as its row is; the text itself is in the package below.
-		await screen.findByRole(
-			"heading",
-			{ name: /^Please keep the cache scoped/u },
-			ROUTE_RENDER_WAIT,
+		// The title identifies the recipient and destination; the proposal remains in its package.
+		await screen.findByRole("heading", { name: /^For /u }, ROUTE_RENDER_WAIT);
+		expect(screen.getAllByText(/Please keep the cache scoped/u).length).toBeGreaterThan(0);
+		expect(screen.getByRole("heading", { level: 2 }).textContent).not.toContain(
+			"Please keep the cache scoped",
 		);
-		expect(screen.getAllByText(/Please keep the cache scoped/u).length).toBeGreaterThan(1);
 		// The sheet is the feedback alone: what it was based on is its trace, not a link here.
 		expect(screen.queryByRole("group", { name: "How this came about" })).toBeNull();
 
@@ -162,11 +161,7 @@ describe("feedback approval level", () => {
 		);
 
 		renderRouteAtWithRouter(FEEDBACK_LEVEL);
-		await screen.findByRole(
-			"heading",
-			{ name: /^Please keep the cache scoped/u },
-			ROUTE_RENDER_WAIT,
-		);
+		await screen.findByRole("heading", { name: /^For /u }, ROUTE_RENDER_WAIT);
 		await userEvent.click(screen.getByRole("button", { name: "Reject feedback" }));
 		const dialog = await screen.findByRole("dialog", { name: "Reject this feedback" });
 		await userEvent.click(within(dialog).getByText("Missing important context"));
@@ -442,11 +437,7 @@ describe("feedback approval level", () => {
 				return found;
 			}, ROUTE_RENDER_WAIT);
 			await userEvent.click(row);
-			await screen.findByRole(
-				"dialog",
-				{ name: /^Please keep the cache scoped/u },
-				ROUTE_RENDER_WAIT,
-			);
+			await screen.findByRole("dialog", { name: /^For /u }, ROUTE_RENDER_WAIT);
 			expect(stackInSearch(router.state.location.search.detail)).toStrictEqual([
 				`feedback:${second.id}`,
 			]);

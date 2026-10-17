@@ -7,6 +7,7 @@ import { withPageBehind } from "@/stories/decorators";
 import { InLevelStack } from "@/stories/level-stack";
 import { settledDrawerPanel } from "@/stories/overlay";
 import { expectNoPanelOverflow } from "@/stories/reflow";
+import { listOpenedBy } from "@/test/detail-stack";
 
 import {
 	reviewDetailBackingOff,
@@ -122,7 +123,207 @@ export const PracticesWithTheirState: Story = {
 		await expect(withheld).toHaveTextContent("Withheld");
 		await expect(withheld).toHaveTextContent(/provider did not return them/u);
 		const done = list.querySelector('[data-practice-status="DONE"]');
-		await expect(done).toHaveTextContent(/Done.*result/u);
+		await expect(done).toHaveTextContent(/Done.*1 met/u);
+	},
+};
+
+const [firstPractice, secondPractice] = reviewDetailCompleted.practices;
+if (firstPractice === undefined || secondPractice === undefined) {
+	throw new Error("The completed review must have two practices");
+}
+
+/**
+ * Each finished practice's counts open the Results tab at exactly that practice's results of this
+ * review and that outcome, and its problems where it has a Not met result. Each link is named for
+ * its practice too, since the same count can stand on several rows.
+ */
+export const PracticeCountsOpenTheirResults: Story = {
+	args: {
+		review: ready({
+			...reviewDetailCompleted,
+			practices: [
+				{
+					...firstPractice,
+					status: "DONE",
+					reason: null,
+					results: { met: 0, notMet: 2, doesNotApply: 0, couldNotDetermine: 1 },
+				},
+				{
+					...secondPractice,
+					status: "DONE",
+					reason: null,
+					results: { met: 1, notMet: 0, doesNotApply: 0, couldNotDetermine: 0 },
+				},
+			],
+		}),
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		const list = within(panel.getByRole("list", { name: "Every practice in this review" }));
+		const reviewId = reviewDetailCompleted.id;
+		for (const [name, practice, outcome] of [
+			[`2 not met, ${firstPractice.practiceName}`, firstPractice, "NOT_MET"],
+			[
+				`1 could not determine, ${firstPractice.practiceName}`,
+				firstPractice,
+				"COULD_NOT_DETERMINE",
+			],
+			[`1 met, ${secondPractice.practiceName}`, secondPractice, "MET"],
+		] as const) {
+			const opened = listOpenedBy(list.getByRole("link", { name }));
+			await expect(opened.list).toBe("results");
+			await expect(opened.search).toMatchObject({
+				reviewId,
+				practiceSlug: practice.practiceSlug,
+				outcome,
+			});
+		}
+		const problems = listOpenedBy(
+			list.getByRole("link", { name: `View problems, ${firstPractice.practiceName}` }),
+		);
+		await expect(problems.list).toBe("problems");
+		await expect(problems.search).toMatchObject({
+			reviewId,
+			practiceSlug: firstPractice.practiceSlug,
+		});
+		await expect(
+			list.queryByRole("link", { name: `View problems, ${secondPractice.practiceName}` }),
+		).toBeNull();
+	},
+};
+
+export const ResultsRecordedWhileReady: Story = {
+	args: {
+		review: ready({
+			...reviewDetailRunning,
+			results: { met: 2, notMet: 1, doesNotApply: 0, couldNotDetermine: 0 },
+			practices: [
+				{
+					...firstPractice,
+					status: "READY",
+					reason: null,
+					script: null,
+					results: { met: 1, notMet: 1, doesNotApply: 0, couldNotDetermine: 0 },
+				},
+				{
+					...secondPractice,
+					status: "READY",
+					reason: null,
+					script: null,
+					results: { met: 0, notMet: 0, doesNotApply: 0, couldNotDetermine: 0 },
+				},
+				...reviewDetailCompleted.practices
+					.filter((practice) => practice.status === "WITHHELD")
+					.map((practice) => ({
+						...practice,
+						results: { met: 1, notMet: 0, doesNotApply: 0, couldNotDetermine: 0 },
+					})),
+			],
+		}),
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		const list = panel.getByRole("list", { name: "Every practice in this review" });
+		const [recorded, captured] = list.querySelectorAll('[data-practice-status="READY"]');
+		if (!(recorded instanceof HTMLElement) || !(captured instanceof HTMLElement)) {
+			throw new Error("Both practices must remain Ready");
+		}
+		await expect(recorded).toHaveTextContent("Results recorded so far");
+		await expect(recorded).toHaveTextContent("Ready");
+		for (const [name, outcome] of [
+			["1 met", "MET"],
+			["1 not met", "NOT_MET"],
+		] as const) {
+			const opened = listOpenedBy(
+				within(recorded).getByRole("link", { name: `${name}, ${firstPractice.practiceName}` }),
+			);
+			await expect(opened.list).toBe("results");
+			await expect(opened.search).toMatchObject({
+				reviewId: reviewDetailRunning.id,
+				practiceSlug: firstPractice.practiceSlug,
+				outcome,
+			});
+		}
+		const problems = listOpenedBy(
+			within(recorded).getByRole("link", { name: `View problems, ${firstPractice.practiceName}` }),
+		);
+		await expect(problems.list).toBe("problems");
+		await expect(problems.search).toMatchObject({
+			reviewId: reviewDetailRunning.id,
+			practiceSlug: firstPractice.practiceSlug,
+		});
+		await expect(captured).toHaveTextContent("Everything it reads was captured.");
+		await expect(within(captured).queryByRole("link")).toBeNull();
+		await expect(captured).not.toHaveTextContent("Results recorded so far");
+		await expect(list).not.toHaveTextContent(/It runs next|Done/u);
+		const withheld = list.querySelector('[data-practice-status="WITHHELD"]');
+		await expect(withheld).toHaveTextContent(/provider did not return them/u);
+		await expect(withheld).toHaveTextContent("1 met");
+	},
+};
+
+export const ActiveUsageNotRecordedYet: Story = {
+	args: {
+		review: ready({
+			...reviewDetailRunning,
+			usage: {
+				attempts: [],
+				calls: 0,
+				inputTokens: 0,
+				outputTokens: 0,
+				costUsd: "0",
+				priced: true,
+			},
+		}),
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		for (const label of [
+			"Cost",
+			"Review model calls",
+			"Tokens read",
+			"Tokens written",
+			"Cache tokens",
+		]) {
+			const fact = panel.getByText(label).closest("div");
+			await expect(fact).toHaveTextContent("Not recorded yet");
+		}
+	},
+};
+
+/**
+ * The review's feedback counts open the Feedback tab at exactly this review's feedback in that
+ * delivery family, as its result counts open the Results tab. Each count carries its family's mark.
+ */
+export const FeedbackCountsOpenTheirFeedback: Story = {
+	args: {
+		review: ready({
+			...reviewDetailCompleted,
+			feedback: {
+				awaitingApproval: 0,
+				ready: 0,
+				delivered: 2,
+				unconfirmed: 0,
+				withheld: 1,
+				rejected: 1,
+				replaced: 0,
+				failed: 0,
+			},
+		}),
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		const reviewId = reviewDetailCompleted.id;
+		for (const [name, state] of [
+			["2 delivered", "DELIVERED"],
+			["2 withheld", ["WITHHELD", "REJECTED", "REPLACED"]],
+		] as const) {
+			const link = panel.getByRole("link", { name });
+			const opened = listOpenedBy(link);
+			await expect(opened.list).toBe("feedback");
+			await expect(opened.search).toMatchObject({ reviewId, state });
+			await expect(link.parentElement?.querySelector("svg[aria-hidden]")).not.toBeNull();
+		}
 	},
 };
 

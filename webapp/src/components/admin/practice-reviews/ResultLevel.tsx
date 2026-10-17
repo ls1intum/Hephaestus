@@ -2,16 +2,24 @@ import { BadgeCheckIcon, CircleSlashIcon, Undo2Icon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { cn } from "cn";
-import type { OpenQuestion, ResultMark, ReviewResultDetail } from "@/api/types.gen";
+import type {
+	OpenQuestion,
+	ResultMark,
+	ReviewBoundFeedback,
+	ReviewResultDetail,
+} from "@/api/types.gen";
 import { accountName } from "@/components/admin/users/account-labels";
 import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { UNTRUSTED_MARKDOWN_PROSE, UntrustedMarkdown } from "@/components/common/UntrustedMarkdown";
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
+import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { Section } from "@/components/layout/Section";
 import { ProblemList } from "@/components/practice-problems/ProblemList";
 import { NON_CURRENT } from "@/components/practice-vocabulary/claim-currentness";
+import { deliveryOutcome } from "@/components/practice-vocabulary/delivery-state-defs";
+import { FEEDBACK_DECISION_DEFS } from "@/components/practice-vocabulary/feedback-decision-defs";
 import { FEEDBACK_DESTINATION_DEFS } from "@/components/practice-vocabulary/feedback-destination-defs";
 import {
 	DISAGREEMENT_DEFS,
@@ -37,7 +45,7 @@ import {
 } from "./RecordSheet";
 import { RESULT_WORDS_UNAVAILABLE, resultSummary } from "./result-words";
 import { citationLocation, ResultEvidence } from "./ResultEvidence";
-import { problemLevel } from "./review-levels";
+import { feedbackLevel, problemLevel } from "./review-levels";
 import { ResultOutcome } from "./ReviewBadges";
 import { ReviewFact, ReviewFactGrid } from "./ReviewFactGrid";
 import { ReviewItemLink } from "./ReviewItem";
@@ -176,7 +184,9 @@ export function ResultLevel({
 				<SheetSection part="details">
 					<div className="space-y-6">
 						{hasText(record.explanation) && (
-							<Section level={4} size="sm" title="Why this was raised">
+							// Every outcome carries an explanation, so its heading names none: a met or
+							// inapplicable result raised nothing.
+							<Section level={4} size="sm" title="Why this result">
 								{/* The review writes its explanation in Markdown, as the developer's own row shows it. */}
 								<div className={cn(UNTRUSTED_MARKDOWN_PROSE, "text-sm")}>
 									<UntrustedMarkdown>{record.explanation}</UntrustedMarkdown>
@@ -221,6 +231,12 @@ export function ResultLevel({
 									<ResultEvidence citations={citations} />
 								</Section>
 							)
+						)}
+						{/* Only what the record holds: none listed is no claim that none was written. */}
+						{record.feedback.length > 0 && (
+							<Section level={4} size="sm" title="Feedback">
+								<ResultFeedback feedback={record.feedback} />
+							</Section>
 						)}
 					</div>
 				</SheetSection>
@@ -271,6 +287,37 @@ export function ResultLevel({
 				)}
 			</DrawerFooter>
 		</>
+	);
+}
+
+/**
+ * The feedback written from this result: where each went and how far it got. Each opens its own
+ * sheet in this one's place, where its full delivery story and any reason it stopped are; Back
+ * returns here.
+ */
+function ResultFeedback({ feedback }: { feedback: readonly ReviewBoundFeedback[] }) {
+	return (
+		<ul aria-label="Feedback written from this result" className="flex min-w-0 flex-col gap-2">
+			{feedback.map((entry) => {
+				const destination = FEEDBACK_DESTINATION_DEFS[entry.destination].label;
+				// The bound record carries no stop reason, so a refined state reads as its base state.
+				const delivery = deliveryOutcome({ ...entry, stopReason: null });
+				return (
+					<li key={entry.id} className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
+						<DetailStackLink
+							entry={feedbackLevel(entry.id)}
+							single
+							aria-label={`${destination}, ${delivery.label}`}
+							className="font-medium underline-offset-4 hover:underline"
+						>
+							{destination}
+						</DetailStackLink>
+						<StatusBadge def={delivery} />
+						{entry.withdrawn && <StatusBadge def={FEEDBACK_DECISION_DEFS.WITHDRAW} />}
+					</li>
+				);
+			})}
+		</ul>
 	);
 }
 

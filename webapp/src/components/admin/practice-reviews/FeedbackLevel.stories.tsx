@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, waitFor, within } from "storybook/test";
 
 import type { FeedbackBasis, ReviewFeedbackDetail } from "@/api/types.gen";
+import { FEEDBACK_LOCATION_DEFS } from "@/components/practice-vocabulary/feedback-location-defs";
 import { withPageBehind } from "@/stories/decorators";
 import { InLevelStack } from "@/stories/level-stack";
 import { expectSettledVisible, settledDrawerPanel } from "@/stories/overlay";
@@ -31,6 +32,7 @@ import {
 } from "./fixtures";
 import { SHEET_SECTIONS } from "./RecordSheet";
 import { resultSummary } from "./result-words";
+import { developerLabel } from "./review-format";
 import { feedbackLevel } from "./review-levels";
 
 const ready = (feedback: ReviewFeedbackDetail) => ({ status: "ready" as const, feedback });
@@ -72,6 +74,12 @@ async function expectHeaderChip(panel: HTMLElement, label: string) {
 	await expect(precedes(within(panel).getByRole("heading", { level: 2 }), chip)).toBe(true);
 }
 
+/** The sheet's title: the developer and where the feedback goes, never its text. */
+function titleOf(feedback: ReviewFeedbackDetail): string {
+	const where = FEEDBACK_LOCATION_DEFS[feedback.location].label;
+	return `For ${developerLabel(feedback.developer)} · ${where}`;
+}
+
 function history(panel: HTMLElement) {
 	return within(within(panel).getByRole("list", { name: "History" }));
 }
@@ -80,10 +88,10 @@ export const Withheld: Story = {
 	play: async () => {
 		const panelElement = await settledDrawerPanel();
 		const panel = within(panelElement);
-		// Titled by its first line, as its row on the Feedback list is.
-		await expect(panel.getByRole("heading", { level: 2 })).toHaveTextContent(
-			/^The public response exposes a name/u,
-		);
+		// Titled by who it is for and where it goes, as its row is named; its text is said once, below.
+		const heading = panel.getByRole("heading", { level: 2 });
+		await expect(heading).toHaveTextContent(titleOf(reviewFeedbackDetail));
+		await expect(heading).not.toHaveTextContent(/public response/u);
 		await expectHeaderChip(panelElement, "Withheld");
 		const sections = [
 			SHEET_SECTIONS.what,
@@ -95,7 +103,7 @@ export const Withheld: Story = {
 		await expect(
 			panel
 				.getAllByRole("heading", { level: 3 })
-				.map((heading) => heading.textContent)
+				.map((sectionHeading) => sectionHeading.textContent)
 				.filter((text) => sections.includes(text)),
 		).toStrictEqual(sections);
 		// A sheet links its own relatives only: the results and problems the feedback rests on. A
@@ -676,7 +684,7 @@ export const HiddenSource: Story = {
 	},
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
-		panel.getByRole("heading", { level: 2, name: "Feedback text hidden" });
+		panel.getByRole("heading", { level: 2, name: titleOf(partialPackageFeedbackDetail) });
 		panel.getByText("Feedback text is hidden because access to its sources could not be verified.");
 		await expect(panel.queryByText(/No feedback text is recorded/u)).toBeNull();
 	},

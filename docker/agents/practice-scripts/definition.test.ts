@@ -492,26 +492,52 @@ void describe("practice programs and their direct models at the host", () => {
 });
 
 void describe("the attempt's direct model budget", () => {
-	void test("the budget holds when calls run at once: reservations are taken before the calls start", async () => {
-		await withStandIn(
-			async () => chatMessage("ok"),
-			async (standIn) => {
-				const budget = new ModelBudget(2300, MODEL_CONCURRENCY);
-				const review = reviewed(
-					await run(
-						"parallel-budget",
-						{ chat: { protocol: "openai-completions", modelId: "qwen" } },
-						standIn,
-						{
-							budget,
+	void test("the budget holds when calls run at once: reservations are taken before the calls start", async (t) => {
+		const attempted = Promise.withResolvers<undefined>();
+		let attempts = 0;
+		try {
+			await withStandIn(
+				async () => {
+					// Keep refunds behind all four real reservations, regardless of RPC scheduling.
+					await attempted.promise;
+					return chatMessage("ok");
+				},
+				async (standIn) => {
+					const budget = new ModelBudget(2300, MODEL_CONCURRENCY);
+					const runCall = budget.run.bind(budget);
+					t.mock.method(
+						budget,
+						"run",
+						async <T>(
+							reserve: number,
+							signal: AbortSignal,
+							call: () => Promise<{ value: T; tokens: number | undefined }>,
+						) => {
+							const outcome = runCall(reserve, signal, call);
+							attempts += 1;
+							if (attempts === 4) {
+								attempted.resolve(undefined);
+							}
+							return outcome;
 						},
-					),
-				);
-				assert.deepEqual(review.options.facts, { answered: 2, refused: 2 });
-				assert.equal(standIn.requests.length, 2);
-				assert.equal(budget.left, 2300 - 2 * 15);
-			},
-		);
+					);
+					const review = reviewed(
+						await run(
+							"parallel-budget",
+							{ chat: { protocol: "openai-completions", modelId: "qwen" } },
+							standIn,
+							{ budget },
+						),
+					);
+					assert.equal(attempts, 4);
+					assert.deepEqual(review.options.facts, { answered: 2, refused: 2 });
+					assert.equal(standIn.requests.length, 2);
+					assert.equal(budget.left, 2300 - 2 * 15);
+				},
+			);
+		} finally {
+			attempted.resolve(undefined);
+		}
 	});
 
 	void test("a call above what the attempt has left is unrated for its budget and never reaches the proxy", async () => {

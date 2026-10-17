@@ -3,6 +3,7 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import type { ReviewDetail, ReviewLineage } from "@/api/types.gen";
 import { useNow } from "@/components/common/use-now";
+import { OUTCOME_DEFS, type Outcome } from "@/components/practice-vocabulary/outcome-defs";
 import type { ReviewOrigin } from "@/components/practice-vocabulary/review-origin-defs";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +22,7 @@ import {
 	lineageRecords,
 	type NumberedById,
 	type NumberedResult,
+	numberedResults,
 } from "./lineage-chain";
 import {
 	feedbackLetters,
@@ -46,15 +48,17 @@ import {
 	ALL_STEPS,
 	filteredLineage,
 	parseTraceFilter,
+	shownRecords,
 	type TraceFilter,
 	traceFilterValue,
+	traceOutcomes,
 	tracePractices,
 } from "./trace-filter";
 import { traceVerdict } from "./trace-verdict";
 import { TraceBottleneckLine } from "./TraceBottleneckLine";
 import { TraceLegend } from "./TraceLegend";
 import { StageSteps } from "./TraceRailSteps";
-import { resultRows } from "./TraceResultTable";
+import { resultRows, standsOnReview } from "./TraceResultTable";
 import { traceStepFacts } from "./TraceStepFacts";
 import { type StoryContext, StoryNodes } from "./TraceStoryNode";
 
@@ -117,11 +121,17 @@ export function ReviewLineageGraph({
 	const [factsOpen, setFactsOpen] = useState(false);
 	const [legendOpen, setLegendOpen] = useState(false);
 	const [tableOpen, setTableOpen] = useState<boolean | undefined>(undefined);
+	const ownTable = standsOnReview(here);
 	const setAllOpen = (open: boolean) => {
 		setOthersOpen(open);
 		setSiblingsOpen(open);
 		setFactsOpen(open);
-		setTableOpen(open ? true : undefined);
+		// Collapse all folds a review's own table too; elsewhere the table follows the display again.
+		if (open) {
+			setTableOpen(true);
+		} else {
+			setTableOpen(ownTable ? false : undefined);
+		}
 	};
 	const box = useRef<HTMLDivElement>(null);
 	const rail = useRef<HTMLDivElement>(null);
@@ -129,17 +139,20 @@ export function ReviewLineageGraph({
 
 	const lineage = filteredLineage(full, filter);
 	const fullRecords = lineageRecords(full);
-	const records = lineageRecords(lineage);
+	const records = shownRecords(fullRecords, lineage);
 	const chain = chainReview(fullRecords);
 	const ownReview = review !== undefined && review.id === chain?.id ? review : undefined;
 	const { numbered, self } = storyResults(records, here, fullRecords);
 	const siblingsShown =
 		display.siblings || siblingsOpen || filtered || foldedOffPath(records, here, numbered, self);
-	const byId: NumberedById = new Map(numbered.map((entry) => [entry.result.id, entry]));
+	// What a piece of feedback rests on is named by the whole review's numbers, filtered or not.
+	const byId: NumberedById = new Map(
+		numberedResults(fullRecords.results).map((entry) => [entry.result.id, entry]),
+	);
 	const letters = feedbackLetters(fullRecords.feedback);
 	const told = storyFeedback(records, here, siblingsShown);
 	const path = siblingsShown ? undefined : pathResults(records, here, numbered, self);
-	const listed = tableOpen ?? (siblingsShown || display.connections);
+	const listed = tableOpen ?? (ownTable || siblingsShown || display.connections);
 	const expanded = othersOpen && siblingsOpen && factsOpen && listed;
 	const siblings: StorySiblings | undefined =
 		path === undefined
@@ -154,6 +167,7 @@ export function ReviewLineageGraph({
 	const lanes = display.connections ? connectorLanes(rows, told.shown) : [];
 	const hasStart = stages[0]?.items.some((item) => item.kind === "start") ?? false;
 	const practices = tracePractices(full);
+	const outcomes = traceOutcomes(full);
 
 	const recordOf = (node: TraceNode): RecordRef | undefined => {
 		switch (node.kind) {
@@ -233,7 +247,12 @@ export function ReviewLineageGraph({
 							verdict={verdict.sentence}
 						/>
 						<div data-trace-toolbar className="flex flex-wrap items-center gap-2">
-							<TraceFilterSelect value={filter} practices={practices} onChange={setFilter} />
+							<TraceFilterSelect
+								value={filter}
+								outcomes={outcomes}
+								practices={practices}
+								onChange={setFilter}
+							/>
 							<TraceDisplayControl
 								display={display}
 								onChange={setDisplay}
@@ -408,10 +427,12 @@ function foldedOffPath(
 
 function TraceFilterSelect({
 	value,
+	outcomes,
 	practices,
 	onChange,
 }: {
 	value: TraceFilter;
+	outcomes: readonly { outcome: Outcome; count: number }[];
 	practices: readonly { slug: string; name: string }[];
 	onChange: (filter: TraceFilter) => void;
 }) {
@@ -420,6 +441,12 @@ function TraceFilterSelect({
 		{ value: "all", label: "Every step" },
 		{ value: "feedback", label: "Only feedback" },
 		{ value: "losses", label: "Only what was lost" },
+		// A result keeps its number under an outcome filter, and the results step says how many of
+		// all the results it shows.
+		...outcomes.map(({ outcome, count }) => ({
+			value: traceFilterValue({ kind: "outcome", outcome }),
+			label: `Only ${OUTCOME_DEFS[outcome].label.toLowerCase()} (${String(count)})`,
+		})),
 		...practices.map((practice) => ({
 			value: traceFilterValue({ kind: "practice", practiceSlug: practice.slug }),
 			label: `Only ${practice.name}`,

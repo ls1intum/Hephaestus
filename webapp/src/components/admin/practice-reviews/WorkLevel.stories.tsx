@@ -1,3 +1,5 @@
+import type { ReviewRef } from "@/api/types.gen";
+
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, within } from "storybook/test";
 
@@ -23,6 +25,24 @@ import { WorkLevel } from "./WorkLevel";
 
 const retryItem = fn();
 const reviewItemEvents = itemEventsOf(reviewDetailCompleted);
+
+const requestedReview: ReviewRef = {
+	id: reviewDetailCompleted.id,
+	item: reviewItem,
+	itemVersion: reviewDetailCompleted.itemVersion,
+	kind: "ITEM",
+	origin: "REQUEST",
+	status: "RUNNING",
+	createdAt: reviewDetailCompleted.createdAt,
+	completedAt: null,
+};
+
+const withheldEvents = reviewItemEvents.slice(0, 1).map((event) => ({
+	...event,
+	state: "WITHHELD" as const,
+	reason: "GATE_WITHHELD" as const,
+	reviewId: null,
+}));
 
 const meta = {
 	component: WorkLevel,
@@ -160,20 +180,76 @@ export const ProviderFactsFailed: Story = {
 export const Loading: Story = {
 	args: {
 		item: { status: "loading" },
+		reviews: [requestedReview],
 		events: { status: "loading" },
 		facts: { status: "loading" },
 	},
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
 		await expect(panel.queryByRole("heading", { name: SHEET_SECTIONS.what })).toBeNull();
+		await expect(panel.queryByRole("link", { name: "Open review" })).toBeNull();
 	},
 };
 
 export const LoadFailed: Story = {
-	args: { item: { status: "error", error: new Error("Network down"), onRetry: retryItem } },
+	args: {
+		item: { status: "error", error: new Error("Network down"), onRetry: retryItem },
+		reviews: [requestedReview],
+	},
 	play: async ({ userEvent }) => {
 		const panel = within(await settledDrawerPanel());
+		await expect(panel.queryByRole("link", { name: "Open review" })).toBeNull();
 		await userEvent.click(panel.getByRole("button", { name: "Retry" }));
 		await expect(retryItem).toHaveBeenCalled();
+	},
+};
+
+export const RequestedReviewRunning: Story = {
+	args: {
+		events: { status: "ready", events: withheldEvents },
+		reviews: [requestedReview],
+		requestBlocked: "A review of this work is already queued or running.",
+	},
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		const panel = within(panelElement);
+		await expect(panelElement.querySelector("[data-sheet-status]")).toHaveTextContent("Running");
+		const history = within(panel.getByRole("list", { name: "History" }));
+		history.getByText("Running");
+		history.getByText(/Withheld/u);
+		await expect(levelsOpenedBy(history.getByRole("link", { name: "Requested review" }))).toEqual([
+			`review:${requestedReview.id}`,
+		]);
+		await expect(levelsOpenedBy(panel.getByRole("link", { name: "Open review" }))).toEqual([
+			`review:${requestedReview.id}`,
+		]);
+		await expect(panel.getByRole("button", { name: "Request review" })).toHaveAttribute(
+			"aria-disabled",
+			"true",
+		);
+	},
+};
+
+export const RequestedReviewComplete: Story = {
+	args: {
+		events: { status: "ready", events: withheldEvents },
+		reviews: [
+			{ ...requestedReview, status: "COMPLETE", completedAt: reviewDetailCompleted.completedAt },
+		],
+	},
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		const panel = within(panelElement);
+		await expect(panelElement.querySelector("[data-sheet-status]")).toHaveTextContent("Complete");
+		const history = within(panel.getByRole("list", { name: "History" }));
+		history.getByText("Complete");
+		history.getByText(/Withheld/u);
+		await expect(levelsOpenedBy(history.getByRole("link", { name: "Requested review" }))).toEqual([
+			`review:${requestedReview.id}`,
+		]);
+		await expect(panel.getByRole("button", { name: "Request review" })).not.toHaveAttribute(
+			"aria-disabled",
+			"true",
+		);
 	},
 };

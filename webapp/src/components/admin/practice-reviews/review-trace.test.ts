@@ -13,7 +13,7 @@ import {
 	lineageResultFocus,
 	wholeReview,
 } from "./lineage-fixtures";
-import { lineageStateCase } from "./lineage-state-fixtures";
+import { lineageStateCase, richReviewFixture } from "./lineage-state-fixtures";
 import { reviewStepState } from "./lineage-story";
 import { chainReview, ownResults, parseTraceFocus, traceStepKey, tracedBy } from "./review-trace";
 
@@ -66,6 +66,37 @@ describe("the review a chain tells", () => {
 });
 
 describe("the path a pinned node draws strong", () => {
+	it("keeps the rich review detail and trace on the same result and problem basis", () => {
+		const records = lineageRecords(richReviewFixture.lineage);
+		expect(records.results.map((result) => result.id)).toStrictEqual(
+			richReviewFixture.results.map((result) => result.id),
+		);
+		for (const detail of richReviewFixture.feedback) {
+			const linked = records.feedback.find((entry) => entry.id === detail.id);
+			assert(linked !== undefined);
+			expect(linked.basis).toStrictEqual([...new Set(detail.basis.map((basis) => basis.resultId))]);
+			const problemBasis = detail.basis.filter((basis) => basis.problemId !== null);
+			expect(linked.problemBasis).toStrictEqual(problemBasis.map((basis) => basis.problemId));
+			for (const basis of detail.basis) {
+				expect(richReviewFixture.resultsById.get(basis.resultId)?.id).toBe(basis.result.id);
+			}
+			for (const basis of problemBasis) {
+				assert(basis.problemId !== null);
+				expect(richReviewFixture.problemsById.get(basis.problemId)?.resultId).toBe(basis.resultId);
+			}
+		}
+		const { runtime } = richReviewFixture.review;
+		assert(runtime !== null);
+		const [run] = runtime.jobs;
+		assert(run !== undefined);
+		assert(run.startedAt !== null);
+		assert(run.completedAt !== null);
+		for (const result of richReviewFixture.results) {
+			expect(result.recordedAt.getTime()).toBeGreaterThanOrEqual(run.startedAt.getTime());
+			expect(result.recordedAt.getTime()).toBeLessThanOrEqual(run.completedAt.getTime());
+		}
+	});
+
 	it("keeps a problem-specific basis separate from its owning result and sibling problems", () => {
 		const problem = wholeReview.nodes.find((node) => node.problem !== null);
 		assert(problem !== undefined);

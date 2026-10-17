@@ -1,9 +1,15 @@
 import type {
+	EvidenceCitation,
+	FeedbackCopy,
 	ItemRef,
+	Problem,
 	ProblemSummary,
 	ReviewBoundFeedback,
 	ReviewBoundResult,
 	ReviewDetail,
+	ReviewFeedbackDetail,
+	ReviewProblemDetail,
+	ReviewResultDetail,
 	ReviewLineage,
 	ReviewPractice,
 	ReviewRef,
@@ -13,12 +19,15 @@ import {
 	boundFeedbackOf,
 	boundResultOf,
 	feedbackDetail,
+	feedbackCounts,
 	gitlabMergeRequest,
 	outlineDocument,
 	practiceNameOf,
 	pullRequestReviewItem,
 	reviewAccounts,
 	resultDetail,
+	resultCounts,
+	reviewProblemDetail,
 	reviewDetail,
 	reviewRefOf,
 	reviewDetailScanManyJobs,
@@ -33,6 +42,9 @@ import {
 	dayAt,
 	EARLIER_REVIEW_ID,
 	LINEAGE_REVIEW_ID,
+	LINEAGE_RELATION,
+	lineageKey,
+	lineageEdge,
 	type LineageFeedbackSpec,
 	type LineageResultSpec,
 	storyLineage,
@@ -378,24 +390,367 @@ const outcomeGrid: LineageResultSpec[] = [
 	}),
 ];
 
-const OUTCOMES = ["NOT_MET", "MET", "MET", "DOES_NOT_APPLY", "COULD_NOT_DETERMINE"] as const;
+const RICH_OUTCOMES = [
+	"MET",
+	"NOT_MET",
+	"MET",
+	"DOES_NOT_APPLY",
+	"COULD_NOT_DETERMINE",
+	"MET",
+	"NOT_MET",
+	"MET",
+	"DOES_NOT_APPLY",
+	"COULD_NOT_DETERMINE",
+	"NOT_MET",
+	"MET",
+	"MET",
+	"NOT_MET",
+	"DOES_NOT_APPLY",
+	"COULD_NOT_DETERMINE",
+	"MET",
+	"NOT_MET",
+	"MET",
+	"DOES_NOT_APPLY",
+	"NOT_MET",
+	"COULD_NOT_DETERMINE",
+	"MET",
+	"MET",
+] as const;
 
-const manyResults: LineageResultSpec[] = Array.from({ length: 24 }, (_, index) => {
-	const outcome = OUTCOMES[index % OUTCOMES.length] ?? "MET";
-	const resultId = id(5, index + 1);
-	return stateResult(
-		resultId,
-		{
-			summary: `Result ${index + 1} of a large review`,
+const RICH_PRACTICES = [
+	"Validate input at the boundary",
+	"Errors carry context",
+	"Keep controllers thin",
+	"Name tests after behaviour",
+	"Document configuration changes",
+	"Keep changes focused",
+	"Distinguish failure causes",
+	"Use product language",
+	"Explain dependency upgrades",
+	"Make retries bounded",
+	"Preserve the original cause",
+	"Keep transactions small",
+	"Make permissions explicit",
+	"Make failures actionable",
+	"Record architectural decisions",
+	"Explain operational limits",
+	"Keep side effects at the boundary",
+	"Test failure paths",
+	"Name the reviewed work",
+	"Document compatibility",
+	"Handle missing configuration",
+	"Capture external failures",
+	"Keep cleanup deterministic",
+	"Explain the change",
+] as const;
+
+const RICH_PROBLEM_COUNTS = [3, 3, 2, 2, 1, 1];
+
+function richCitation(index: number, document: boolean): EvidenceCitation {
+	return {
+		sourceKind: document ? "scm.repository.file" : "scm.pull-request.diff",
+		path: document ? "docs/operations/review-recovery.md" : `src/reviews/Boundary${index}.ts`,
+		sourcePath: null,
+		startLine: document ? 8 : 21,
+		endLine: document ? 8 : 21,
+		side: document ? null : "NEW",
+		commit: null,
+		quote: document
+			? "Retry the operation after checking the configured endpoint."
+			: 'throw new Error("Request failed");',
+		verification: null,
+	};
+}
+
+function richResults(firstRecordedAt: Date): ReviewResultDetail[] {
+	let notMet = 0;
+	return RICH_OUTCOMES.map((outcome, index) => {
+		const resultId = id(5, index + 1);
+		const practiceName = RICH_PRACTICES[index] ?? "Review the boundary";
+		let problemCount = 0;
+		if (outcome === "NOT_MET") {
+			problemCount = RICH_PROBLEM_COUNTS[notMet] ?? 0;
+			notMet += 1;
+		}
+		const problems: Problem[] = Array.from({ length: problemCount }, (_, position) => ({
+			id: id(11, (index + 1) * 10 + position),
+			resultId,
+			position,
+			key: `rich-${index + 1}-${position + 1}`,
+			severity: position === 0 ? "MAJOR" : "MINOR",
+			summary:
+				position === 0
+					? "The failure does not name the operation"
+					: `Recovery step ${position + 1} is missing for boundary ${index + 1}`,
+			explanation: `Boundary ${index + 1}, checkpoint ${position + 1}: the caller cannot distinguish a missing endpoint from an unavailable provider.`,
+			nextStep: `Name the failed operation and add the recovery step for boundary ${index + 1}, checkpoint ${position + 1}.`,
+			citations: [richCitation(index + 1, position === 2)],
+			basis: null,
+		}));
+		return resultDetail({
+			id: resultId,
+			reviewId: LINEAGE_REVIEW_ID,
+			item: gitlabMergeRequest,
+			practiceSlug: `rich-practice-${index + 1}`,
+			practiceName,
+			practiceVersionId: String(920_001 + index),
+			practiceVersionNumber: 1,
 			outcome,
-			severity: outcome === "NOT_MET" ? "MINOR" : null,
-			recordedAt: at(
-				`13:${String(36 + Math.floor(index / 6)).padStart(2, "0")}:${String((index % 6) * 10).padStart(2, "0")}`,
-			),
-		},
-		outcome === "NOT_MET" ? [problemOf(resultId, 0, "MINOR")] : [],
+			severity: problems[0]?.severity ?? null,
+			summary:
+				index === 1 || index === 6
+					? "Failures lose their context"
+					: `${practiceName}: reviewed boundary ${index + 1}`,
+			explanation: `This result concerns boundary ${index + 1}. The captured passage supports the recorded outcome for this practice.`,
+			recordedAt: new Date(firstRecordedAt.getTime() + index * 10_000),
+			problems,
+			evidence: {
+				citations: outcome === "MET" ? [richCitation(index + 1, false)] : [],
+				openQuestions: [],
+				inapplicability: null,
+				search: null,
+			},
+			marks: [],
+			disagreements: [],
+			feedback: [],
+			acceptedAt: null,
+			markedIncorrectAt: null,
+			example: null,
+			coverage: null,
+		});
+	});
+}
+
+/** One deterministic reading fixture; every list, detail and trace projects these same records. */
+export const richReviewFixture = (() => {
+	const createdAt = at("13:35:00");
+	const completedAt = at("13:40:00");
+	const results = richResults(new Date(createdAt.getTime() + 60_000));
+	const notMet = results.filter((result) => result.outcome === "NOT_MET");
+	const lateMet = results.at(-1);
+	if (lateMet === undefined || lateMet.outcome !== "MET") {
+		throw new globalThis.Error("The rich review must include a late Met result");
+	}
+	const destinations = [
+		"ON_WORK",
+		"ON_WORK",
+		"PRACTICE_PAGE",
+		"PRACTICE_PAGE",
+		"CONVERSATION",
+		"CONVERSATION",
+	] as const;
+	const states = [
+		"DELIVERED",
+		"WITHHELD",
+		"DELIVERED",
+		"FAILED",
+		"DELIVERED",
+		"DELIVERED",
+	] as const;
+	const feedback = notMet.map((result, index): ReviewFeedbackDetail => {
+		const sources = index === 0 ? [result, ...notMet.slice(1, 2)] : [result];
+		if (index === notMet.length - 1) {
+			sources.push(lateMet);
+		}
+		const basis = sources
+			.flatMap((source) => [
+				{ resultId: source.id, problemId: null, result: boundResultOf(source) },
+				...source.problems.map((problem) => ({
+					resultId: source.id,
+					problemId: problem.id,
+					result: boundResultOf(source),
+				})),
+			])
+			.map((entry, ordinal) => ({ ...entry, ordinal }));
+		const destination = destinations[index] ?? "ON_WORK";
+		const state = states[index] ?? "DELIVERED";
+		const composedAt = new Date(completedAt.getTime() + index * 60_000);
+		const deliveredAt = state === "DELIVERED" ? new Date(composedAt.getTime() + 30_000) : null;
+		let body = `Name the failed operation at boundary ${results.indexOf(result) + 1}, then explain its recovery step.`;
+		if (index === notMet.length - 1) {
+			body += ` Keep the explanation of the change at boundary ${results.indexOf(lateMet) + 1}, which this review recorded as Met.`;
+		}
+		const copy: FeedbackCopy = {
+			id: id(12, index + 1),
+			kind: destination === "CONVERSATION" ? "CHAT_TURN" : "SUMMARY",
+			position: 0,
+			body,
+			state: ({ DELIVERED: "POSTED", WITHHELD: "WITHHELD", FAILED: "FAILED" } as const)[state],
+			postedAt: deliveredAt,
+			writeStartedAt: state === "WITHHELD" ? null : new Date(composedAt.getTime() + 10_000),
+			externalRef: null,
+			externalUrl: null,
+			chatMessageId: null,
+			path: null,
+			startLine: null,
+			endLine: null,
+			side: null,
+			readback: null,
+			lastError: state === "FAILED" ? "The destination was unavailable." : null,
+			stopReason: state === "WITHHELD" ? "WORKSPACE_DELIVERY_PAUSED" : null,
+		};
+		return feedbackDetail({
+			id: id(6, index + 1),
+			reviewId: LINEAGE_REVIEW_ID,
+			item: gitlabMergeRequest,
+			destination,
+			state,
+			deliveredAt,
+			basis,
+			location: (
+				{
+					ON_WORK: "GITLAB",
+					PRACTICE_PAGE: "PRACTICE_PAGES",
+					CONVERSATION: "NEXT_CONVERSATION",
+				} as const
+			)[destination],
+			body,
+			contentDigest: null,
+			bodyPreview: body,
+			bodyTruncated: false,
+			resultCount: sources.length,
+			stopReason: state === "WITHHELD" ? "WORKSPACE_DELIVERY_PAUSED" : null,
+			copies: [copy],
+			sends: [],
+			decisions: [],
+			checks: [],
+			response: null,
+			copyCounts: {
+				planned: 0,
+				writeStarted: 0,
+				posted: copy.state === "POSTED" ? 1 : 0,
+				failed: copy.state === "FAILED" ? 1 : 0,
+				withheld: copy.state === "WITHHELD" ? 1 : 0,
+				retracted: 0,
+			},
+			createdAt: composedAt,
+			disagreedAt: null,
+			replacesId: null,
+			withdrawn: false,
+			textHidden: false,
+			unverifiedHistory: false,
+		});
+	});
+	for (const result of results) {
+		result.feedback = feedback
+			.filter((entry) => entry.basis.some((basis) => basis.resultId === result.id))
+			.map(boundFeedbackOf);
+	}
+	const problems: ReviewProblemDetail[] = results.flatMap((result) =>
+		result.problems.map((problem) => {
+			const [citation] = problem.citations;
+			return {
+				...reviewProblemDetail,
+				id: problem.id,
+				resultId: result.id,
+				reviewId: result.reviewId,
+				item: result.item,
+				developer: result.developer,
+				practiceSlug: result.practiceSlug,
+				practiceName: result.practiceName,
+				group: null,
+				recordedAt: result.recordedAt,
+				severity: problem.severity,
+				summary: problem.summary,
+				evidenceHidden: false,
+				path: citation?.path ?? null,
+				sourceKind: citation?.sourceKind ?? null,
+				startLine: citation?.startLine ?? null,
+				endLine: citation?.endLine ?? null,
+				side: citation?.side ?? null,
+				acceptedAt: null,
+				markedIncorrectAt: null,
+				disagreedAt: null,
+				result: boundResultOf(result),
+				problem,
+			};
+		}),
 	);
-});
+	const review = reviewDetail({
+		createdAt,
+		orderedAt: createdAt,
+		completedAt,
+		item: gitlabMergeRequest,
+		results: resultCounts(results.map((result) => result.outcome)),
+		feedback: feedbackCounts(feedback.map((entry) => entry.state)),
+		practices: results.map((result): ReviewPractice => ({
+			practiceSlug: result.practiceSlug,
+			practiceName: result.practiceName,
+			practiceVersionId: result.practiceVersionId,
+			number: 1,
+			status: "DONE",
+			reason: null,
+			script: null,
+			itemCounts: { listed: 1, reviewed: 1, reused: 0, withheld: 0, notReviewed: 0 },
+			results: resultCounts([result.outcome]),
+		})),
+	});
+	if (review.runtime === null || review.runtime.jobs.length !== 1) {
+		throw new globalThis.Error("The rich review must have one synthetic worker run");
+	}
+	const startedAt = new Date(review.createdAt.getTime() + 40_000);
+	const runCompletedAt = new Date(completedAt.getTime() - 5000);
+	review.runtime.jobs = review.runtime.jobs.map((job) => ({
+		...job,
+		availableAt: review.createdAt,
+		startedAt,
+		completedAt: runCompletedAt,
+	}));
+	review.stageTiming = [
+		{
+			stage: "RUN",
+			startedAt,
+			completedAt: runCompletedAt,
+			durationMs: runCompletedAt.getTime() - startedAt.getTime(),
+		},
+	];
+	if (review.startedBy !== null) {
+		review.startedBy = {
+			...review.startedBy,
+			itemId: review.item.id,
+			occurredAt: new Date(review.createdAt.getTime() - 20_000),
+			decidedAt: review.createdAt,
+		};
+	}
+	const lineage = storyLineage({
+		root: { kind: "REVIEW", id: review.id },
+		item: gitlabMergeRequest,
+		reviews: [reviewRefOf(review)],
+		results: results.map((result) => ({
+			result: boundResultOf(result),
+			problems: result.problems,
+		})),
+		feedback: feedback.map((entry) => ({
+			feedback: boundFeedbackOf(entry),
+			basis: [...new Set(entry.basis.map((source) => source.resultId))],
+		})),
+	});
+	lineage.edges.push(
+		...feedback.flatMap((entry) =>
+			entry.basis.flatMap((basis) =>
+				basis.problemId === null
+					? []
+					: [
+							lineageEdge(
+								lineageKey("PROBLEM", basis.problemId),
+								lineageKey("FEEDBACK", entry.id),
+								LINEAGE_RELATION.basis,
+							),
+						],
+			),
+		),
+	);
+	return {
+		review,
+		lineage,
+		results,
+		problems,
+		feedback,
+		resultsById: new Map(results.map((result) => [result.id, result])),
+		problemsById: new Map(problems.map((problem) => [problem.id, problem])),
+		feedbackById: new Map(feedback.map((entry) => [entry.id, entry])),
+	};
+})();
 
 const resultCases: LineageStateCase[] = [
 	withCase(
@@ -441,20 +796,12 @@ const resultCases: LineageStateCase[] = [
 	),
 	withCase("not-met-silent", "Not met, and no feedback written from it", chain({ feedback: [] })),
 	withCase("empty", "Complete with no result", chain({ results: [], feedback: [] })),
-	withCase(
-		"many-results",
-		"24 results",
-		chain({
-			results: manyResults,
-			feedback: manyResults
-				.filter((entry) => entry.result.outcome === "NOT_MET")
-				.map((entry, index) =>
-					stateFeedback(id(6, index + 1), [entry.result.id], {
-						deliveredAt: at(`13:4${index}:50`),
-					}),
-				),
-		}),
-	),
+	{
+		key: "many-results",
+		title: "24 results across practices, with 12 problems and six pieces of feedback",
+		lineage: richReviewFixture.lineage,
+		review: richReviewFixture.review,
+	},
 ];
 
 const DESTINATIONS = ["ON_WORK", "PRACTICE_PAGE", "CONVERSATION"] as const;

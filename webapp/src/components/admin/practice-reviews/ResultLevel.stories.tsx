@@ -3,12 +3,19 @@ import { expect, fn, screen, waitFor, within } from "storybook/test";
 import { RESULT_WORDS_UNAVAILABLE } from "./result-words";
 
 import type { AccountRef, ResultMark, ReviewResultDetail } from "@/api/types.gen";
+import {
+	DELIVERY_STATE_DEFS,
+	deliveryOutcome,
+} from "@/components/practice-vocabulary/delivery-state-defs";
+import { FEEDBACK_DECISION_DEFS } from "@/components/practice-vocabulary/feedback-decision-defs";
+import { FEEDBACK_DESTINATION_DEFS } from "@/components/practice-vocabulary/feedback-destination-defs";
 import { withPageBehind } from "@/stories/decorators";
 import { InLevelStack } from "@/stories/level-stack";
 import { expectSettledVisible, settledDrawerPanel } from "@/stories/overlay";
 import { expectNoPanelOverflow } from "@/stories/reflow";
 import { daysBefore, hoursBefore } from "@/stories/story-clock";
 import { expectGenuinelyDisabled } from "@/test/controls";
+import { levelsOpenedBy } from "@/test/detail-stack";
 import { precedes } from "@/test/dom";
 
 import { resultDetail, reviewResultDetail } from "./fixtures";
@@ -111,11 +118,11 @@ export const Default: Story = {
 			panel.queryByRole("group", { name: "How this came about" }),
 		).not.toBeInTheDocument();
 		const links = panel.queryAllByRole("link");
-		// A sheet links its own relatives only: the result's problems. A reference with nowhere to go
+		// A sheet links its own relatives: the result's problems and feedback. A reference with nowhere to go
 		// has no address.
 		for (const link of links) {
 			await expect(String(link.getAttribute("href"))).toMatch(
-				/^(?:https:\/\/|null$)|\?detail=problem:[^&]+$/u,
+				/^(?:https:\/\/|null$)|\?detail=(?:problem|feedback):[^&]+$/u,
 			);
 		}
 		await expect(
@@ -126,7 +133,7 @@ export const Default: Story = {
 			SHEET_SECTIONS.details,
 			SHEET_SECTIONS.technical,
 		]);
-		panel.getByRole("heading", { name: "Why this was raised", level: 4 });
+		panel.getByRole("heading", { name: "Why this result", level: 4 });
 		await expect(panel.getByText("Not met · 3 problems")).toBeVisible();
 		await expect(panel.getAllByText("Major")).toHaveLength(2);
 		await expect(panel.queryByText(/citations/u)).not.toBeInTheDocument();
@@ -271,7 +278,11 @@ export const Disagreed: Story = {
 		panel.getByText("The developer disagreed with feedback on the practice page");
 		panel.getByText("The retry is the caller's job here; this service only reports the failure.");
 		await expect(panel.queryByRole("alert")).toBeNull();
-		await expect(panel.queryByRole("link", { name: /practice page/u })).not.toBeInTheDocument();
+		await expect(
+			reviewResultDetail.feedback.map((entry) => `/?detail=feedback:${entry.id}`),
+		).toContain(
+			panel.getByRole("link", { name: "On the practice page, Delivered" }).getAttribute("href"),
+		);
 		panel.getByRole("button", { name: "Mark incorrect" });
 	},
 };
@@ -503,5 +514,80 @@ export const HiddenProblemEvidence: Story = {
 			"Quoted evidence is hidden because access to its sources could not be verified.",
 		);
 		await expect(panel.queryByText(/Nothing was quoted/u)).not.toBeInTheDocument();
+	},
+};
+
+const WITHHELD_ID = "f0000000-0000-4000-8000-000000000001";
+const CONVERSATION_ID = "f0000000-0000-4000-8000-000000000002";
+const WITHDRAWN_ID = "f0000000-0000-4000-8000-000000000003";
+
+/**
+ * The feedback written from the result, each named by where it went and how far it got, and each
+ * opening its own sheet in this one's place. A withdrawn piece says so.
+ */
+export const WithItsFeedback: Story = {
+	args: {
+		result: ready({
+			...reviewResultDetail,
+			feedback: [
+				{
+					id: WITHHELD_ID,
+					destination: "ON_WORK",
+					state: "WITHHELD",
+					deliveredAt: null,
+					withdrawn: false,
+				},
+				{
+					id: CONVERSATION_ID,
+					destination: "CONVERSATION",
+					state: "DELIVERED",
+					deliveredAt: hoursBefore(2),
+					withdrawn: false,
+				},
+				{
+					id: WITHDRAWN_ID,
+					destination: "PRACTICE_PAGE",
+					state: "DELIVERED",
+					deliveredAt: daysBefore(1),
+					withdrawn: true,
+				},
+			],
+		}),
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		const list = within(panel.getByRole("list", { name: "Feedback written from this result" }));
+		await expect(list.getAllByRole("listitem")).toHaveLength(3);
+		const conversation = deliveryOutcome({
+			destination: "CONVERSATION",
+			state: "DELIVERED",
+			stopReason: null,
+		});
+		for (const [name, id] of [
+			[
+				`${FEEDBACK_DESTINATION_DEFS.ON_WORK.label}, ${DELIVERY_STATE_DEFS.WITHHELD.label}`,
+				WITHHELD_ID,
+			],
+			[`${FEEDBACK_DESTINATION_DEFS.CONVERSATION.label}, ${conversation.label}`, CONVERSATION_ID],
+			[
+				`${FEEDBACK_DESTINATION_DEFS.PRACTICE_PAGE.label}, ${DELIVERY_STATE_DEFS.DELIVERED.label}`,
+				WITHDRAWN_ID,
+			],
+		] as const) {
+			await expect(levelsOpenedBy(list.getByRole("link", { name }))).toEqual([`feedback:${id}`]);
+		}
+		await expect(list.getAllByText(FEEDBACK_DECISION_DEFS.WITHDRAW.label)).toHaveLength(1);
+	},
+};
+
+/** A result whose record lists no feedback has no feedback section, and claims none. */
+export const WithoutFeedback: Story = {
+	args: { result: ready({ ...reviewResultDetail, feedback: [] }) },
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		await expect(panel.queryByRole("heading", { name: "Feedback", level: 4 })).toBeNull();
+		await expect(
+			panel.queryByRole("list", { name: "Feedback written from this result" }),
+		).toBeNull();
 	},
 };

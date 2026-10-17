@@ -16,6 +16,7 @@ import { accountName } from "@/components/admin/users/account-labels";
 import { InlineLink } from "@/components/common/InlineLink";
 import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { type StatusDef, statusToneClass } from "@/components/common/status-def";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
 import { Section } from "@/components/layout/Section";
@@ -51,7 +52,7 @@ import {
 	type TechnicalFact,
 } from "./RecordSheet";
 import { RequestReviewAction } from "./RequestReviewAction";
-import { feedbackSlots, resultSlots } from "./review-outcomes";
+import { feedbackSlots, type ReviewListTarget } from "./review-outcomes";
 import { ReviewActions } from "./ReviewActions";
 import { ReviewStatusMark } from "./ReviewBadges";
 import { ReviewDayTime } from "./ReviewDayTime";
@@ -83,14 +84,6 @@ function kindLabel(review: ReviewDetail): string {
 	return review.kind === "SCAN"
 		? "Scan"
 		: `Review of the ${itemKindNoun(review.item.kind, 1, review.item.provider)}`;
-}
-
-/** "5 met, 2 not met", the counted slots only, or undefined when none counts anything. */
-function countsLine(slots: readonly { count: number; label: string }[]): string | undefined {
-	const counted = slots.filter((slot) => slot.count > 0);
-	return counted.length === 0
-		? undefined
-		: counted.map((slot) => `${slot.count} ${slot.label}`).join(", ");
 }
 
 export const RUNTIME_EXPIRED = "Execution details are no longer available.";
@@ -256,50 +249,91 @@ const RESULT_OUTCOMES = [
 ] as const satisfies readonly (readonly [Outcome, keyof ReviewResultCounts])[];
 
 /**
- * The review's results by outcome, each opening the Results tab at exactly those results. The fact is
- * labelled Results, so the words name only the outcome. Problems sit under Not met results and are
- * not counted here: the link opens them without a figure the sheet does not hold.
+ * One count, marked with its registry's icon, that opens a list at exactly the rows it counts. The
+ * icon only repeats the word beside it.
+ */
+function CountLink({
+	workspaceSlug,
+	def,
+	text,
+	name,
+	destination,
+}: {
+	workspaceSlug: string;
+	def: StatusDef;
+	text: string;
+	/** Set where the same count can stand on several rows; it starts with `text`. */
+	name: string | undefined;
+	destination: ReviewListTarget;
+}) {
+	const Icon = def.icon;
+	return (
+		<span className="inline-flex items-center gap-1 whitespace-nowrap">
+			<Icon aria-hidden className={cn("size-3.5 shrink-0", statusToneClass(def.badgeVariant))} />
+			<InlineLink
+				tone="count"
+				aria-label={name}
+				render={<ReviewListLink workspaceSlug={workspaceSlug} destination={destination} />}
+			>
+				{text}
+			</InlineLink>
+		</span>
+	);
+}
+
+/**
+ * Results by outcome, each opening the Results tab at exactly those results: the review's, or one
+ * of its practices'. The words name only the outcome, since the fact or the row already says whose
+ * results they are. Problems sit under Not met results and are not counted here: the link opens
+ * them without a figure the sheet does not hold.
  */
 function ResultCountLinks({
 	workspaceSlug,
-	review,
+	counts,
+	scope,
+	practiceName,
+	empty,
 }: {
 	workspaceSlug: string;
-	review: ReviewDetail;
+	counts: ReviewResultCounts;
+	scope: { reviewId: string; practiceSlug?: string[] };
+	/** The practice the counts are of, which tells each link from the same count on another row. */
+	practiceName?: string;
+	/** What the counts read as when there are none. */
+	empty: string;
 }) {
-	const counted = RESULT_OUTCOMES.filter(([, key]) => review.results[key] > 0);
+	const counted = RESULT_OUTCOMES.filter(([, key]) => counts[key] > 0);
 	if (counted.length === 0) {
-		return "None";
+		return empty;
 	}
+	const named = (text: string) =>
+		practiceName === undefined ? undefined : `${text}, ${practiceName}`;
 	return (
 		<span>
-			{counted.map(([outcome, key], index) => (
-				<Fragment key={outcome}>
-					{index > 0 && ", "}
-					<InlineLink
-						tone="count"
-						render={
-							<ReviewListLink
-								workspaceSlug={workspaceSlug}
-								destination={{
-									list: "results",
-									search: { reviewId: review.id, outcome: [outcome] },
-								}}
-							/>
-						}
-					>
-						{`${String(review.results[key])} ${OUTCOME_DEFS[outcome].label.toLowerCase()}`}
-					</InlineLink>
-				</Fragment>
-			))}
-			{review.results.notMet > 0 && (
+			{counted.map(([outcome, key], index) => {
+				const text = `${String(counts[key])} ${OUTCOME_DEFS[outcome].label.toLowerCase()}`;
+				return (
+					<Fragment key={outcome}>
+						{index > 0 && ", "}
+						<CountLink
+							workspaceSlug={workspaceSlug}
+							def={OUTCOME_DEFS[outcome]}
+							text={text}
+							name={named(text)}
+							destination={{ list: "results", search: { ...scope, outcome: [outcome] } }}
+						/>
+					</Fragment>
+				);
+			})}
+			{counts.notMet > 0 && (
 				<>
 					{" · "}
 					<InlineLink
+						aria-label={named("View problems")}
 						render={
 							<ReviewListLink
 								workspaceSlug={workspaceSlug}
-								destination={{ list: "problems", search: { reviewId: review.id } }}
+								destination={{ list: "problems", search: scope }}
 							/>
 						}
 					>
@@ -307,6 +341,42 @@ function ResultCountLinks({
 					</InlineLink>
 				</>
 			)}
+		</span>
+	);
+}
+
+/** The review's feedback by delivery family, each opening the Feedback tab at exactly those. */
+function FeedbackCountLinks({
+	workspaceSlug,
+	review,
+}: {
+	workspaceSlug: string;
+	review: ReviewDetail;
+}) {
+	// An empty scope still names each family's states; the review narrows them to its own feedback.
+	const counted = feedbackSlots(review.feedback, {}).filter((slot) => slot.count > 0);
+	if (counted.length === 0) {
+		return "None";
+	}
+	return (
+		<span>
+			{counted.map((slot, index) => (
+				<Fragment key={slot.key}>
+					{index > 0 && ", "}
+					{slot.target?.list === "feedback" && (
+						<CountLink
+							workspaceSlug={workspaceSlug}
+							def={slot.def}
+							text={`${String(slot.count)} ${slot.label}`}
+							name={undefined}
+							destination={{
+								list: "feedback",
+								search: { ...slot.target.search, reviewId: review.id },
+							}}
+						/>
+					)}
+				</Fragment>
+			))}
 		</span>
 	);
 }
@@ -342,11 +412,16 @@ function ReviewWhat({
 				</span>
 			</ReviewFact>
 			<ReviewFact label="Results">
-				<ResultCountLinks workspaceSlug={workspaceSlug} review={review} />
+				<ResultCountLinks
+					workspaceSlug={workspaceSlug}
+					counts={review.results}
+					scope={{ reviewId: review.id }}
+					empty="None"
+				/>
 			</ReviewFact>
 			{review.kind !== "SCAN" && (
 				<ReviewFact label="Feedback">
-					{countsLine(feedbackSlots(review.feedback)) ?? "None"}
+					<FeedbackCountLinks workspaceSlug={workspaceSlug} review={review} />
 				</ReviewFact>
 			)}
 			{hasText(review.itemVersion) && (
@@ -421,10 +496,6 @@ export function reviewHistory(review: ReviewDetail): SheetEvent[] {
 	return events;
 }
 
-function resultsLine(practice: ReviewPractice): string {
-	return countsLine(resultSlots(practice.results)) ?? "No results";
-}
-
 function itemCountsLine(practice: ReviewPractice): string {
 	const { reviewed, reused, withheld, notReviewed, listed } = practice.itemCounts;
 	const counts: { count: number; label: string }[] = [
@@ -440,15 +511,12 @@ function itemCountsLine(practice: ReviewPractice): string {
 		.join(", ");
 }
 
+/** Why a practice that has not finished stands where it does; a finished one lists its results. */
 function practiceReason(practice: ReviewPractice): string | undefined {
-	if (practice.status === "DONE") {
-		return resultsLine(practice);
-	}
 	if (hasText(practice.reason)) {
 		return reviewReasonSentence(practice.reason) ?? practice.reason;
 	}
-	// Once its script has a run, the trace line under it says how that run went; the status's own
-	// sentence ("It runs next") describes a practice whose script has not started.
+	// Once its script has a run, the trace line under it says how that run went.
 	return practice.script === null
 		? REVIEW_PRACTICE_STATUS_DEFS[practice.status].description
 		: undefined;
@@ -474,47 +542,65 @@ function ReviewPracticeList({
 	const showStatus = review.practices.some((practice) => practice.status !== "DONE");
 	return (
 		<ul aria-label="Every practice in this review" className="divide-y rounded-xl border">
-			{review.practices.map((practice) => (
-				<li
-					key={practice.practiceSlug}
-					data-practice-status={practice.status}
-					className="@container px-3 py-2.5 text-sm"
-				>
-					<div
-						className={cn(
-							"grid min-w-0 items-start gap-x-4 gap-y-1.5",
-							showStatus
-								? "@lg:grid-cols-[9rem_minmax(0,1fr)_minmax(0,1fr)]"
-								: "@lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]",
-						)}
+			{review.practices.map((practice) => {
+				const hasResults = RESULT_OUTCOMES.some(([, key]) => practice.results[key] > 0);
+				const reason = practiceReason(practice);
+				return (
+					<li
+						key={practice.practiceSlug}
+						data-practice-status={practice.status}
+						className="@container px-3 py-2.5 text-sm"
 					>
-						{showStatus && (
-							<span>
-								<StatusBadge def={REVIEW_PRACTICE_STATUS_DEFS[practice.status]} />
-							</span>
-						)}
-						<span className="font-medium break-words">{practice.practiceName}</span>
-						<span className="flex min-w-0 flex-col gap-1 text-pretty text-muted-foreground">
-							{practiceReason(practice) !== undefined && <span>{practiceReason(practice)}</span>}
-							{review.kind === "SCAN" && itemCountsLine(practice) !== "" && (
-								<span className="text-xs">Files: {itemCountsLine(practice)}</span>
+						<div
+							className={cn(
+								"grid min-w-0 items-start gap-x-4 gap-y-1.5",
+								showStatus
+									? "@lg:grid-cols-[9rem_minmax(0,1fr)_minmax(0,1fr)]"
+									: "@lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]",
 							)}
-							{practice.script !== null && (
-								<span className="text-xs">
-									<PracticeScriptTraceLine
-										workspaceSlug={workspaceSlug}
-										practiceSlug={practice.practiceSlug}
-										practiceName={practice.practiceName}
-										reviewId={review.id}
-										run={practice.script}
-										details={false}
-									/>
+						>
+							{showStatus && (
+								<span>
+									<StatusBadge def={REVIEW_PRACTICE_STATUS_DEFS[practice.status]} />
 								</span>
 							)}
-						</span>
-					</div>
-				</li>
-			))}
+							<span className="font-medium break-words">{practice.practiceName}</span>
+							<span className="flex min-w-0 flex-col gap-1 text-pretty text-muted-foreground">
+								{practice.status !== "DONE" && hasResults && <span>Results recorded so far</span>}
+								{(practice.status === "DONE" || hasResults) && (
+									<span>
+										<ResultCountLinks
+											workspaceSlug={workspaceSlug}
+											counts={practice.results}
+											scope={{ reviewId: review.id, practiceSlug: [practice.practiceSlug] }}
+											practiceName={practice.practiceName}
+											empty="No results"
+										/>
+									</span>
+								)}
+								{practice.status !== "DONE" &&
+									(!hasResults || hasText(practice.reason)) &&
+									reason !== undefined && <span>{reason}</span>}
+								{review.kind === "SCAN" && itemCountsLine(practice) !== "" && (
+									<span className="text-xs">Files: {itemCountsLine(practice)}</span>
+								)}
+								{practice.script !== null && (
+									<span className="text-xs">
+										<PracticeScriptTraceLine
+											workspaceSlug={workspaceSlug}
+											practiceSlug={practice.practiceSlug}
+											practiceName={practice.practiceName}
+											reviewId={review.id}
+											run={practice.script}
+											details={false}
+										/>
+									</span>
+								)}
+							</span>
+						</div>
+					</li>
+				);
+			})}
 		</ul>
 	);
 }
@@ -613,6 +699,7 @@ function ReviewJobEntry({ job, position }: { job: ReviewJob; position: string })
 
 function technicalFacts(review: ReviewDetail): TechnicalFact[] {
 	const { usage } = review;
+	const usagePending = isActiveReview(review.status) && usage.attempts.length === 0;
 	let reasoning = 0;
 	let cacheRead = 0;
 	let cacheWrite = 0;
@@ -621,24 +708,33 @@ function technicalFacts(review: ReviewDetail): TechnicalFact[] {
 		cacheRead += attempt.cacheReadTokens;
 		cacheWrite += attempt.cacheWriteTokens;
 	}
+	const writtenTokens =
+		reasoning > 0
+			? `${formatTokens(usage.outputTokens)} (${formatTokens(reasoning)} of it reasoning)`
+			: formatTokens(usage.outputTokens);
 	const facts: TechnicalFact[] = [
 		{ label: "Review ID", value: <code>{review.id}</code>, copy: review.id },
-		{ label: "Cost", value: costText(usage) },
+		{ label: "Cost", value: usagePending ? "Not recorded yet" : costText(usage) },
 		{ label: "Model", value: hasText(review.model) ? review.model : "—" },
 		// The review's own calls: a practice script's decision, embedding and reranking calls are on
 		// the Practice scripts section above.
-		{ label: "Review model calls", value: formatTokens(usage.calls) },
-		{ label: "Tokens read", value: formatTokens(usage.inputTokens) },
+		{
+			label: "Review model calls",
+			value: usagePending ? "Not recorded yet" : formatTokens(usage.calls),
+		},
+		{
+			label: "Tokens read",
+			value: usagePending ? "Not recorded yet" : formatTokens(usage.inputTokens),
+		},
 		{
 			label: "Tokens written",
-			value:
-				reasoning > 0
-					? `${formatTokens(usage.outputTokens)} (${formatTokens(reasoning)} of it reasoning)`
-					: formatTokens(usage.outputTokens),
+			value: usagePending ? "Not recorded yet" : writtenTokens,
 		},
 		{
 			label: "Cache tokens",
-			value: `${formatTokens(cacheRead)} read · ${formatTokens(cacheWrite)} written`,
+			value: usagePending
+				? "Not recorded yet"
+				: `${formatTokens(cacheRead)} read · ${formatTokens(cacheWrite)} written`,
 		},
 	];
 	if (review.batchId !== null) {

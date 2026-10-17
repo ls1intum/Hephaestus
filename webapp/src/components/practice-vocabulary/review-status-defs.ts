@@ -164,7 +164,7 @@ export const REVIEW_PRACTICE_STATUS_DEFS: StatusDefs<ReviewPracticeStatus> = {
 		label: "Ready",
 		icon: HourglassIcon,
 		badgeVariant: "secondary",
-		description: "Everything it reads was captured. It runs next.",
+		description: "Everything it reads was captured.",
 	},
 	RUNNING: {
 		label: "Running",

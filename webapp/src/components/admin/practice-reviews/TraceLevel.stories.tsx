@@ -1,29 +1,28 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useSearch } from "@tanstack/react-router";
 import { useState } from "react";
 import { expect, fn, screen, waitFor, within } from "storybook/test";
 
+import { stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
 import { DetailDrawerStack } from "@/components/layout/detail-drawer/DetailDrawerStack";
+import { useDetailStack } from "@/components/layout/detail-drawer/use-detail-stack";
 import { eventLabel, untouchedItemTrace } from "@/components/practice-trace/fixtures";
 import { withPageBehind } from "@/stories/decorators";
-import { settledDrawerPanel } from "@/stories/overlay";
+import { expectSettledVisible, settledDrawerPanel } from "@/stories/overlay";
 
 import { FeedbackLevel } from "./FeedbackLevel";
-import { resultDetail, reviewDetail, reviewFeedbackDetail } from "./fixtures";
-import {
-	LINEAGE_FEEDBACK,
-	LINEAGE_RESULT,
-	LINEAGE_REVIEW_ID,
-	wholeReview,
-} from "./lineage-fixtures";
-import { lineageStateCase } from "./lineage-state-fixtures";
+import { feedbackDetail, problemDetail, resultDetail, reviewDetail } from "./fixtures";
+import { LINEAGE_FEEDBACK, LINEAGE_REVIEW_ID, wholeReview } from "./lineage-fixtures";
+import { lineageStateCase, richReviewFixture } from "./lineage-state-fixtures";
+import { ProblemLevel } from "./ProblemLevel";
 import { ResultLevel } from "./ResultLevel";
-import { levelRecord, type RecordRef, recordLevel, traceLevel } from "./review-layers";
-import type { PracticeReviewLevel } from "./review-levels";
+import { levelRecord, type RecordRef, recordLevel } from "./review-layers";
+import { parsePracticeReviewLevels } from "./review-levels";
+import { ReviewItemLink } from "./ReviewItem";
+import { ReviewLevel } from "./ReviewLevel";
 import { DEFAULT_TRACE_DISPLAY, FULL_TRACE_DISPLAY, type TraceDisplay } from "./trace-display";
 import { ALL_STEPS, type TraceFilter } from "./trace-filter";
 import { TraceLevel, type TraceLevelProps } from "./TraceLevel";
-
-const TRACE_ENTRY = traceLevel({ kind: "review", id: LINEAGE_REVIEW_ID });
 
 const [untouchedEvent] = untouchedItemTrace.events;
 if (untouchedEvent === undefined) {
@@ -33,20 +32,24 @@ const PATH = { behind: [{ label: "Practice reviews", depth: 0 }], onClose: fn() 
 
 /**
  * The trace and what opens over it, as the route stacks them: the wide trace, and one record's
- * sheet over it when a step is opened. The sheet is the same as from the record's row, and links
- * nowhere, so nothing opens deeper. Escape closes the sheet back to the trace, then the trace.
+ * sheet over it when a step is opened. Records resolve by ID; their links and Escape use the
+ * existing URL stack, so a Problem can return to the result it came from.
  */
 function TraceStack(props: Omit<TraceLevelProps, "path" | "onOpen">) {
-	const [stack, setStack] = useState<PracticeReviewLevel[]>([TRACE_ENTRY]);
+	const stack = useSearch({
+		strict: false,
+		select: (search) => parsePracticeReviewLevels(stackInSearch(search.detail)),
+	});
+	const controls = useDetailStack();
 	const [display, setDisplay] = useState<TraceDisplay>(props.display);
 	const [filter, setFilter] = useState<TraceFilter>(props.filter);
-	const open = (record: RecordRef) => setStack([TRACE_ENTRY, recordLevel(record)]);
+	const open = (record: RecordRef) => controls.open(recordLevel(record));
 	return (
-		<DetailDrawerStack stack={stack} onClose={(depth) => setStack(stack.slice(0, depth))}>
+		<DetailDrawerStack stack={stack} onClose={controls.close}>
 			{(entry, level) => {
 				const path = {
 					behind: level.depth === 0 ? PATH.behind : [...PATH.behind, { label: "Trace", depth: 1 }],
-					onClose: (depth: number) => setStack(stack.slice(0, depth)),
+					onClose: controls.close,
 				};
 				if (entry.kind === "trace") {
 					return (
@@ -68,7 +71,11 @@ function TraceStack(props: Omit<TraceLevelProps, "path" | "onOpen">) {
 						<FeedbackLevel
 							nested={level.nested}
 							path={path}
-							feedback={{ status: "ready", feedback: reviewFeedbackDetail }}
+							feedback={{
+								status: "ready",
+								feedback:
+									richReviewFixture.feedbackById.get(record.id) ?? feedbackDetail(record.id),
+							}}
 							isDeciding={false}
 							onApprove={fn()}
 							onReject={fn()}
@@ -77,16 +84,44 @@ function TraceStack(props: Omit<TraceLevelProps, "path" | "onOpen">) {
 						/>
 					);
 				}
-				return (
+				if (record?.kind === "problem") {
+					return (
+						<ProblemLevel
+							nested={level.nested}
+							path={path}
+							problem={{
+								status: "ready",
+								problem: richReviewFixture.problemsById.get(record.id) ?? problemDetail(record.id),
+							}}
+						/>
+					);
+				}
+				if (record?.kind === "review") {
+					return (
+						<ReviewLevel
+							workspaceSlug="hephaestus"
+							nested={level.nested}
+							path={path}
+							review={{ status: "ready", review: props.review ?? reviewDetail(record.id) }}
+							eventLabel={eventLabel}
+							onCancel={fn()}
+							cancelPending={false}
+						/>
+					);
+				}
+				return record?.kind === "result" ? (
 					<ResultLevel
 						nested={level.nested}
 						path={path}
-						result={{ status: "ready", result: resultDetail(LINEAGE_RESULT.cache404) }}
+						result={{
+							status: "ready",
+							result: richReviewFixture.resultsById.get(record.id) ?? resultDetail(record.id),
+						}}
 						onMark={fn(async () => undefined)}
 						onRemoveMark={fn(async () => undefined)}
 						isMarking={false}
 					/>
-				);
+				) : null;
 			}}
 		</DetailDrawerStack>
 	);
@@ -94,7 +129,10 @@ function TraceStack(props: Omit<TraceLevelProps, "path" | "onOpen">) {
 
 const meta = {
 	component: TraceLevel,
-	parameters: { layout: "fullscreen" },
+	parameters: {
+		layout: "fullscreen",
+		router: { initialUrl: `/?detail=trace:review:${LINEAGE_REVIEW_ID}` },
+	},
 	decorators: [withPageBehind],
 	tags: ["autodocs"],
 	args: {
@@ -289,5 +327,222 @@ export const LoadError: Story = {
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
 		await expect(panel.getByRole("button", { name: "Retry" })).toBeVisible();
+	},
+};
+
+const richReviewArgs = {
+	title: `Review of ${richReviewFixture.review.item.label}`,
+	description: <ReviewItemLink item={richReviewFixture.review.item} />,
+	chain: { status: "ready", lineage: richReviewFixture.lineage },
+	review: richReviewFixture.review,
+	display: DEFAULT_TRACE_DISPLAY,
+} satisfies Partial<TraceLevelProps>;
+
+export const RichReviewOverview: Story = {
+	args: richReviewArgs,
+	parameters: {
+		docs: {
+			description: {
+				story:
+					"Deterministic UI example with 24 results and 12 Problems. These records and the imported usage display are synthetic story data, not a live model review.",
+			},
+		},
+	},
+};
+
+export const RichReview: Story = {
+	args: richReviewArgs,
+	play: async ({ userEvent }) => {
+		let panel = within(await settledDrawerPanel());
+		let results = panel.getByRole("list", { name: "Results of this review" });
+		await expect(results.children).toHaveLength(24);
+		for (const [outcome, count] of [
+			["Met", 10],
+			["Not met", 6],
+			["Does not apply", 4],
+			["Could not determine", 4],
+		] as const) {
+			await expect(within(results).getAllByText(outcome, { exact: true })).toHaveLength(count);
+		}
+		for (const disclosure of within(results).getAllByRole("button", {
+			name: /^\d+ problems?: .*of result/u,
+		})) {
+			await userEvent.click(disclosure);
+		}
+		await expect(
+			within(results).getAllByRole("button", { name: /^Problem \d+ of result/u }),
+		).toHaveLength(12);
+
+		await userEvent.click(
+			within(results).getByRole("button", {
+				name: /Keep side effects at the boundary: reviewed boundary 17/u,
+			}),
+		);
+		let record = await screen.findByRole("dialog", {
+			name: "Keep side effects at the boundary: reviewed boundary 17",
+		});
+		await expectSettledVisible(record);
+		await expect(
+			within(record).getByText("Keep side effects at the boundary", { exact: true }),
+		).toBeVisible();
+		await userEvent.keyboard("{Escape}");
+		await waitFor(async () => {
+			await expect(screen.getAllByRole("dialog")).toHaveLength(1);
+		});
+
+		panel = within(await settledDrawerPanel());
+		results = panel.getByRole("list", { name: "Results of this review" });
+		await expect(results.children).toHaveLength(24);
+		await userEvent.click(
+			within(results).getByRole("button", {
+				name: /Errors carry context.*Failures lose their context/u,
+			}),
+		);
+		record = await screen.findByRole("dialog", { name: "Failures lose their context" });
+		await expectSettledVisible(record);
+		await expect(within(record).getByText("Errors carry context", { exact: true })).toBeVisible();
+		await userEvent.click(
+			within(record).getByRole("link", { name: "Recovery step 3 is missing for boundary 2" }),
+		);
+		const problem = await screen.findByRole("dialog", {
+			name: "Recovery step 3 is missing for boundary 2",
+		});
+		await expectSettledVisible(problem);
+		await expect(
+			within(problem).getByText(
+				"Name the failed operation and add the recovery step for boundary 2, checkpoint 3.",
+			),
+		).toBeVisible();
+		await userEvent.click(
+			within(problem).getByRole("link", { name: "Failures lose their context" }),
+		);
+		record = await screen.findByRole("dialog", { name: "Failures lose their context" });
+		await expectSettledVisible(record);
+		await expect(within(record).getByText("Errors carry context", { exact: true })).toBeVisible();
+		await userEvent.keyboard("{Escape}");
+		await waitFor(async () => {
+			await expect(screen.getAllByRole("dialog")).toHaveLength(1);
+		});
+
+		panel = within(await settledDrawerPanel());
+		results = panel.getByRole("list", { name: "Results of this review" });
+		await userEvent.click(
+			within(results).getByRole("button", {
+				name: /Distinguish failure causes.*Failures lose their context/u,
+			}),
+		);
+		record = await screen.findByRole("dialog", { name: "Failures lose their context" });
+		await expectSettledVisible(record);
+		await expect(
+			within(record).getByText("Distinguish failure causes", { exact: true }),
+		).toBeVisible();
+		await expect(
+			within(record).getByText("Recovery step 3 is missing for boundary 7"),
+		).toBeVisible();
+		await userEvent.keyboard("{Escape}");
+		await waitFor(async () => {
+			await expect(screen.getAllByRole("dialog")).toHaveLength(1);
+		});
+
+		panel = within(await settledDrawerPanel());
+		await userEvent.click(panel.getByRole("button", { name: /^Feedback A\s/u }));
+		await screen.findByRole("heading", { name: "What it says" });
+		let feedbackPanel = screen.getByRole("dialog");
+		await expectSettledVisible(feedbackPanel);
+		await expect(
+			within(feedbackPanel).getAllByText(
+				"Name the failed operation at boundary 2, then explain its recovery step.",
+				{ exact: true },
+			)[0],
+		).toBeVisible();
+		await expect(
+			within(feedbackPanel).getAllByRole("link", { name: "Failures lose their context" }),
+		).toHaveLength(2);
+		await expect(
+			within(feedbackPanel).getAllByRole("link", {
+				name: /^(?:One|Another) problem of this result:/u,
+			}),
+		).toHaveLength(6);
+		for (const [index, practice] of [
+			"Errors carry context",
+			"Distinguish failure causes",
+		].entries()) {
+			const link = within(feedbackPanel)
+				.getAllByRole("link", { name: "Failures lose their context" })
+				.at(index);
+			if (link === undefined) {
+				throw new globalThis.Error("Each result basis must remain independently navigable");
+			}
+			await userEvent.click(link);
+			const resultPanel = await screen.findByRole("dialog", {
+				name: "Failures lose their context",
+			});
+			await expectSettledVisible(resultPanel);
+			await expect(within(resultPanel).getByText(practice, { exact: true })).toBeVisible();
+			const related = within(resultPanel).getByRole("list", {
+				name: "Feedback written from this result",
+			});
+			await userEvent.click(within(related).getByRole("link", { name: "On the work, Delivered" }));
+			await screen.findByRole("heading", { name: "What it says" });
+			feedbackPanel = screen.getByRole("dialog");
+			await expectSettledVisible(feedbackPanel);
+			await expect(
+				within(feedbackPanel).getAllByText(
+					"Name the failed operation at boundary 2, then explain its recovery step.",
+					{ exact: true },
+				)[0],
+			).toBeVisible();
+		}
+		await userEvent.keyboard("{Escape}");
+		await screen.findByRole("group", { name: "How this came about" });
+		panel = within(await settledDrawerPanel());
+		await userEvent.click(panel.getByRole("combobox", { name: "Steps" }));
+		await userEvent.click(screen.getByRole("option", { name: "Only met (10)" }));
+		results = panel.getByRole("list", { name: "Results of this review" });
+		await expect(results.children).toHaveLength(10);
+		const mixedFeedback = panel.getByRole("button", { name: /^Feedback F\s/u });
+		await expect(within(mixedFeedback).getByText("21", { exact: true })).toBeVisible();
+		await expect(within(mixedFeedback).getByText("24", { exact: true })).toBeVisible();
+		await userEvent.click(mixedFeedback);
+		await screen.findByRole("heading", { name: "What it says" });
+		feedbackPanel = screen.getByRole("dialog");
+		await expectSettledVisible(feedbackPanel);
+		await expect(
+			within(feedbackPanel).getByRole("link", {
+				name: "Handle missing configuration: reviewed boundary 21",
+			}),
+		).toBeVisible();
+		await expect(
+			within(feedbackPanel).getByRole("link", { name: "Explain the change: reviewed boundary 24" }),
+		).toBeVisible();
+	},
+};
+
+const richResultFocus = richReviewFixture.results.find((result) => result.outcome === "NOT_MET");
+if (richResultFocus === undefined) {
+	throw new globalThis.Error("The rich review must include a Not met result");
+}
+
+export const RichResultPath: Story = {
+	args: {
+		...richReviewArgs,
+		here: { kind: "result", id: richResultFocus.id },
+	},
+	play: async ({ userEvent }) => {
+		const panel = within(await settledDrawerPanel());
+		await expect(panel.getByRole("list", { name: "Results on this path" }).children).toHaveLength(
+			1,
+		);
+		await userEvent.click(panel.getByRole("button", { name: "Show all 24 results in the table" }));
+		const listed = panel.getByRole("list", { name: "Results of this review" });
+		await expect(listed.children).toHaveLength(12);
+		await userEvent.click(panel.getByRole("button", { name: "Show 12 more results" }));
+		await expect(listed.children).toHaveLength(24);
+		await userEvent.click(
+			panel.getByRole("button", { name: "Show only the results on this path" }),
+		);
+		await expect(panel.getByRole("list", { name: "Results on this path" }).children).toHaveLength(
+			1,
+		);
 	},
 };
