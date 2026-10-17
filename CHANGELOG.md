@@ -1,5 +1,82 @@
 # Changelog
 
+## 0.94.0
+
+### Minor Changes
+
+- People have one account across connected identities and workspaces. Roster records can exist before sign-in. AI and external-feedback choices apply across your workspaces.
+- Operator review views withhold result text and evidence when source access can no longer be verified. The review’s outcome, practice, work and delivery history remain visible. Result summaries can be null in the operator API when this text is unavailable.
+
+  **Operators:** External clients of the operator review API must handle unavailable result summaries. The bundled interface handles this state. No manual database change is required.
+
+- Practice reviews record one result per practice: Met, Not met, Does not apply or Could not determine. Not met results list problems, each with its own severity and evidence.
+
+  Your earlier reviews stay readable after the upgrade when you still have access to their sources. They are labelled as unverified history and do not count as current proof until a new review runs.
+
+  **Operators:** This release changes the database, practice scripts and API together. Follow the migration guide to test a restore and prepare custom scripts before the outage.
+
+- Practice scripts can decide from captured records, ask a review model, or call the models assigned to the practice. Every script uses the same result contract and evidence checks. A script failure creates no claim about the work and never falls back to the built-in script. Direct model calls follow the developer's AI choice and the review's stricter model tier. Operators can inspect script execution, model use and cost for each practice.
+- Saving a practice definition creates a fixed practice version. The editor separates Review on, Applies when, About, Reviewed by and Feedback mode. Renaming a practice or moving it between groups keeps its results current. Off stops feedback at every destination while eligible reviews can still record results. Choose People or Nobody under Reviewed by to prevent automated review of a practice.
+- You can scan repositories on their monitored default branch with the same workspace practices that review changes. Start a scan through a repository schedule or the workspace scans API, then open its report in Scans. Scan reports distinguish files reviewed, reused results, withheld work and work not reviewed, and you can export a report as SARIF. An incomplete scan does not claim that problems were fixed or files disappeared.
+- Feedback responses keep resolution and usefulness separate. A disagreement does not change the result by itself. Admins can mark results incorrect or accepted, and remove those marks. An accepted mark removes the result from open-problem lists without changing its outcome or removing an incorrect mark.
+- Practice reviews require a matching runtime 7 agent image for incremental Problem drafts.
+
+  **Operators:** If you pin a custom agent image, update it with the application to an image that implements runtime contract 7. Verified release locks already select the matching application and agent images. Practice inputs and candidates remain on script contract 3.
+
+### Patch Changes
+
+- Review progress explains that practice checks finish before results are recorded, so a running review with no results does not imply that no checks are taking place.
+- Practice reviews that try to cite generated preparation now point back to captured evidence instead of reporting a missing repository file.
+
+  Public review summaries now focus on guidance that is not already covered by inline notes.
+
+- Practice reviews can read the pinned commit history when their permitted evidence includes pull request details and code changes. Reviews that only need pull request details continue without preparing a repository, and commit words remain subject to contributor consent.
+- Practice feedback is shorter and uses natural evidence references. Comments focus on the concern and next action without internal labels or repeated explanations.
+- Concurrent first sign-ins through a new provider instance now succeed and share one provider registration.
+- Problems and evidence quoted from the work's own title, description or conversation no longer show a captured file name as their location. The passage keeps its source and its quote, and only code passages show a file and lines.
+- A feedback sheet's Based on list now names each result once. When feedback rests on a whole result and on problems of the same result, the result shows a single time, with the whole result and each problem listed under it. Screen readers now announce each problem link by its visible text followed by the result it belongs to.
+- The practice profile now opens with your feedback directly under its header. The separate Going well section is gone. The header's standing ring still counts the practices that are going well, and each practice's results stay where they were. The practice group table again lists every group your workspace shows to developers, including a group with nothing to review yet, and never a group that your workspace hides. A group's panel shows the group's own description again.
+- Generated-path settings now load and save for the correct repository, including when repository names are unavailable. Editing or clearing one repository keeps the others unchanged.
+- Practice result details no longer reveal descriptive problem identifiers when access to their evidence is denied.
+- Historical review jobs no longer block completed reviews from finishing processing.
+- Practice reviews can build and correct individual problems before submitting their complete evidenced result. Problems become visible only after the complete result passes admission.
+- Correcting a review’s evidence fields no longer turns an unused optional question list into a request for a question. Undecided results still require the question the evidence leaves open, and Not met results still require their recorded problems.
+- Practice reviews now evaluate up to three practices at once, so slow model responses leave more time to cover the selected practices. Completed results remain available when the review deadline stops unfinished work. Operators can set `PRACTICE_REVIEW_PRACTICE_CONCURRENCY` from 1 to 32 to balance review time and resource use. Scan reviews remain serial.
+- Preview deployments can clone staging databases before or after the practice review upgrade. They pause review work and feedback delivery and remove staging credentials before startup.
+- Coolify previews bind management endpoints to loopback so generated container hostnames do not prevent startup.
+- Coolify previews start with dynamically assigned private ports for the database and review worker connection.
+- Operators can enable fresh GitLab reviews for one approved pull request preview with a separately isolated worker. Preview execution stays off by default, cloned review work is stopped, and only the clone database and raw API receive random private host bindings.
+- Review traces retain which specific problems a piece of feedback is based on, alongside the results that recorded them.
+- In Practice reviews, problems now open where you find them. A problem opens from the Problems list, from its result, from a trace and from a scan report, and its result opens from the problem. Back returns you to where you were. A feedback sheet links the results and problems it was written from. A review's result counts open the matching results, and **View problems** lists its problems. A trace lists each result's problems with their severity. A practice whose script already ran no longer says it runs next. Quoted evidence from a merge request or pull request is now labelled as the reviewed work.
+- Generated-path settings stay usable with many repositories. Each repository is one line that opens to its patterns. A search finds one by name or item ID, and **Show more repositories** loads the rest. Unsaved patterns stay put while you search or close a line. Removed repositories and items with no repository record are marked as such, and a removed one cannot be saved. Selected repositories in the review scope stay listed and counted even when removed. The scans list filters by status and by repository, and its empty state opens the repository schedule directly.
+- Practice reviews resolve evidence paths automatically and explain how to correct invalid citations. Exact quotation checks still apply.
+- Upgrades retain multiple historical results for the same review, practice and work, with their feedback and evidence.
+  The review explains when its historical results are ambiguous. No single result is selected as its answer.
+  Privacy erasure includes every retained result and its feedback when they contain a contributor's copied work.
+
+  Custom practices linked to the bundled catalog keep their positive phrase during upgrade.
+  Swift concurrency review instructions name `DispatchQueue` consistently.
+
+  Upgrades can convert more historical practice scripts while keeping customized criteria.
+
+- Feedback links already posted on pull requests and issues continue to open your review history after the practice model upgrade. A pull request's history also includes your results from reviews of that pull request.
+- Workspace settings now stop new automatic or requested practice reviews when their start option is off. Reviews of unchanged pull requests, merge requests and provider reviews can start from recorded work activity without losing their exact version.
+- Review traces distinguish returned worker invocations from reviews still awaiting server finalization, so that wait is no longer shown as worker running time.
+- Reviews can continue with available descriptions and discussions when a repository cannot be fetched.
+  Practices that require its diff or tree are withheld with a source availability reason.
+  Preparation failure logs include exception types and their cause chain without private exception messages.
+- When a workspace setting keeps a review from starting, the reason now says that the workspace’s settings did not allow it, instead of naming an unspecified check.
+- Read large reviews in one results table, filter by outcome, and expand each result's problems. Feedback retains its full basis when a filter hides some results. Result, problem and feedback counts open the matching records, and results link back to their feedback.
+
+  Work history now includes requested reviews. Active reviews show results recorded so far and distinguish usage that has not been recorded yet. Feedback titles identify the developer and destination without repeating or exposing its text.
+
+- Dedicated workers and webhook receivers start correctly when practice reviews are enabled.
+- Scans keep readable results with a visible Retry when a refresh fails, withdraw results when access is refused, and keep a cancellation tied to the scan you cancelled.
+- Review trace metadata keeps the selected model and exact practice version, including when transcript ownership permits only a summary.
+- Practice reviews recognize evidence already supplied in captured records and accept supported additive regressions. Valid repository citations can anchor line notes. Suppressed notes no longer hide independent notes, and private feedback failures preserve the finished public review.
+
+  Concurrent practice reviews use only each practice’s own supplied evidence and reads to decide whether it inspected the change.
+
 ## 0.93.5
 
 ### Patch Changes
