@@ -2479,6 +2479,52 @@ void describe("CI contract", () => {
 		assert.notEqual(unversioned.status, 0);
 	});
 
+	void test("revalidates a push whose range changes the version, wherever the bump sits in it", async (context) => {
+		const workflow = parseDocument(await readFile(".github/workflows/cicd.yml", "utf8"));
+		const bumpStep = namedStep(workflow, ["jobs", "detect-changes"], "Detect version bump");
+		assert.equal(bumpStep.getIn(["env", "PUSH_BEFORE"]), `\${{ github.event.before }}`);
+		const directory = await mkdtemp(path.join(tmpdir(), "version-bump-"));
+		context.after(async () => rm(directory, { recursive: true, force: true }));
+		const env = environmentForGitFixture();
+		const git = (...args: string[]) => {
+			const result = spawnSync("git", args, { cwd: directory, env, encoding: "utf8" });
+			assert.equal(result.status, 0, result.stderr);
+			return result.stdout.trim();
+		};
+		const commit = async (manifest: string, message: string) => {
+			await writeFile(path.join(directory, "package.json"), manifest);
+			git("add", ".");
+			git("-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-qm", message);
+			return git("rev-parse", "HEAD");
+		};
+		git("init", "-q");
+		const released = await commit('{"version":"0.1.0"}', "previous tip");
+		const bump = await commit('{"version":"0.2.0"}', "chore(release): version packages");
+		await writeFile(path.join(directory, "later.txt"), "a pull request queued behind it");
+		await commit('{"version":"0.2.0"}', "fix: queued behind the Version PR");
+		const output = path.join(directory, "output");
+		const detect = async (before: string) => {
+			await writeFile(output, "");
+			const result = spawnSync(
+				"bash",
+				["--noprofile", "--norc", "-e", "-c", String(bumpStep.get("run"))],
+				{
+					cwd: directory,
+					encoding: "utf8",
+					env: { ...env, PUSH_BEFORE: before, GITHUB_OUTPUT: output },
+				},
+			);
+			assert.equal(result.status, 0, result.stderr);
+			return readFile(output, "utf8");
+		};
+		// The last commit's parent already carries the new version; the replaced tip does not.
+		assert.equal(await detect(released), "changed=true\n");
+		assert.equal(await detect(bump), "changed=false\n");
+		for (const before of ["0".repeat(40), ""]) {
+			assert.equal(await detect(before), "changed=true\n", `before '${before}'`);
+		}
+	});
+
 	void test("fails the CI gate on the Version PR when its release evidence preflight did not", async () => {
 		// Every run that can satisfy the gate must require the candidate's own release evidence.
 		const workflow = parseDocument(await readFile(".github/workflows/cicd.yml", "utf8"));
@@ -2983,9 +3029,10 @@ void describe("CI contract", () => {
 		assert.equal(secretScan.get("image"), "ghcr.io/trufflesecurity/trufflehog");
 		assert.match(String(secretScan.get("version")), /^\d+\.\d+\.\d+@sha256:[a-f0-9]{64}$/u);
 		assert.equal(
-			secretScan.get("base"),
+			workflow.getIn([...scanPath, "env", "EVENT_BASE"]),
 			`\${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || '' }}`,
 		);
+		assert.equal(secretScan.get("base"), `\${{ env.EVENT_BASE }}`);
 		assert.equal(
 			secretScan.get("head"),
 			`\${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}`,
@@ -3038,6 +3085,71 @@ void describe("CI contract", () => {
 			.map((entry: unknown) => exceptionFault(entry, now))
 			.filter((fault) => fault !== undefined);
 		assert.deepEqual(faults, [], "security/trivy-dependency-ignore.yaml entries");
+	});
+
+	void test("judges released migrations against the base of every pre-merge event", async (context) => {
+		const workflow = parseDocument(
+			await readFile(".github/workflows/ci-security-scan.yml", "utf8"),
+		);
+		const scanPath = ["jobs", "security-scan"];
+		const baseline = namedStep(workflow, scanPath, "Resolve released-chain baseline");
+		assert.equal(baseline.get("env"), undefined, "the step reads the job's one EVENT_BASE");
+		assert.equal(
+			namedStep(workflow, scanPath, "Changelog immutability guard").get("if"),
+			"steps.baseline.outputs.base != ''",
+		);
+		const directory = await mkdtemp(path.join(tmpdir(), "released-chain-"));
+		context.after(async () => rm(directory, { recursive: true, force: true }));
+		const env = environmentForGitFixture();
+		const git = (...args: string[]) => {
+			const result = spawnSync("git", args, { cwd: directory, env, encoding: "utf8" });
+			assert.equal(result.status, 0, result.stderr);
+			return result.stdout.trim();
+		};
+		git("init", "-q");
+		git(
+			"-c",
+			"user.name=Test",
+			"-c",
+			"user.email=test@example.com",
+			"commit",
+			"-q",
+			"--allow-empty",
+			"-m",
+			"base",
+		);
+		const base = git("rev-parse", "HEAD");
+		const output = path.join(directory, "output");
+		const resolve = async (event: string, eventBase: string) => {
+			await writeFile(output, "");
+			const result = spawnSync(
+				"bash",
+				["--noprofile", "--norc", "-e", "-c", String(baseline.get("run"))],
+				{
+					cwd: directory,
+					encoding: "utf8",
+					env: { ...env, GITHUB_EVENT_NAME: event, EVENT_BASE: eventBase, GITHUB_OUTPUT: output },
+				},
+			);
+			return { failed: result.status !== 0, output: await readFile(output, "utf8") };
+		};
+		const unknown = "0".repeat(40);
+		// A merge group used to resolve no base and skip the guard; it is the last check before main.
+		for (const event of ["pull_request", "merge_group"]) {
+			assert.deepEqual(
+				await resolve(event, base),
+				{ failed: false, output: `base=${base}\n` },
+				event,
+			);
+			const unknownBase = await resolve(event, unknown);
+			assert.equal(unknownBase.failed, true, `${event} with an unknown base`);
+			const noBase = await resolve(event, "");
+			assert.equal(noBase.failed, true, `${event} without a base`);
+		}
+		assert.deepEqual(await resolve("push", base), { failed: false, output: `base=${base}\n` });
+		for (const before of [unknown, ""]) {
+			assert.deepEqual(await resolve("push", before), { failed: false, output: "base=\n" });
+		}
 	});
 
 	void test("rejects a dependency exception that names no subject or outlives the ceiling", () => {

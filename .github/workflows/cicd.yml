@@ -114,14 +114,20 @@ jobs:
         if: github.event_name == 'pull_request' && steps.release_candidate.outputs.release-candidate != 'true'
         uses: fkirc/skip-duplicate-actions@b974a9395958c231af965b70070979a577efa578 # v5.3.2
 
+      # A queue merge can push the version commit with later commits on top, so the version is read
+      # at the tip this push replaced. Without that tip the push is validated as a bump.
       - name: Detect version bump
         id: version_bump
         if: github.event_name == 'push'
+        env:
+          PUSH_BEFORE: ${{ github.event.before }}
         run: |
           current=$(jq -r .version package.json)
-          previous=$(git show HEAD^:package.json | jq -r .version)
-          changed=false
-          [ "$current" = "$previous" ] || changed=true
+          changed=true
+          if [ -n "$PUSH_BEFORE" ] && git cat-file -e "$PUSH_BEFORE^{commit}" 2>/dev/null; then
+            previous=$(git show "$PUSH_BEFORE:package.json" | jq -r .version)
+            [ "$current" != "$previous" ] || changed=false
+          fi
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
 
       - if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
