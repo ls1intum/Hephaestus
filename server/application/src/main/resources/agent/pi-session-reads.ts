@@ -59,7 +59,13 @@ export class SessionReads {
 
 	constructor(
 		root: string,
-		sources: readonly BriefSource[] = [],
+		{
+			required = [],
+			supplied = [],
+		}: {
+			required?: readonly string[];
+			supplied?: readonly BriefSource[];
+		} = {},
 		lineCount = (target: string) =>
 			readFileSync(path.resolve(root, target), "utf8").split("\n").length,
 		texts: readonly CitableText[] = [],
@@ -95,11 +101,14 @@ export class SessionReads {
 			}
 			this.#coveredBy.set(key, copies);
 		}
-		for (const source of sources) {
-			const key = this.#key(source.path);
+		for (const target of required) {
+			const key = this.#key(target);
 			this.#required.add(key);
 			this.ranges.expect(key);
+		}
+		for (const source of supplied) {
 			if (source.supplied && source.lines !== undefined) {
+				const key = this.#key(source.path);
 				this.#supplied.add(key);
 				this.ranges.add(key, 1, source.lines, source.lines);
 				this.#observedContent.add(key);

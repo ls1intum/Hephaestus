@@ -4,9 +4,12 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { executionReportSchema } from "../../../../../../docker/agents/practice-scripts/lib/core/contract.ts";
 import { z } from "../../../../../../docker/agents/practice-scripts/lib/core/practice-script.ts";
+import { buildBrief } from "../../../main/resources/agent/pi-review-brief.ts";
 import {
 	capturedLines,
+	readJsonFile,
 	runRunner,
 	SESSION_CANDIDATE,
 	stagePractices,
@@ -228,5 +231,97 @@ for (const command of [
 		);
 		assert.equal(exit.status, 0, exit.stderr);
 		assert.equal(capturedLines(cwd, "submitted").length, 1);
+	});
+}
+
+for (const mode of ["supplied", "omitted", "not-in-brief"] as const) {
+	void test(`a cited canonical linked source outside the file inventory gets only actual brief credit: ${mode}`, async (t) => {
+		const cwd = mkdtempSync(path.join(tmpdir(), "pi-linked-brief-coverage-"));
+		t.after(() => rmSync(cwd, { recursive: true, force: true }));
+		stagePractices(cwd, [{ slug: "test-practice" }]);
+		const manifestPath = path.join(cwd, "evidence/manifest.json");
+		const manifest = manifestSchema.parse(JSON.parse(readFileSync(manifestPath, "utf8")));
+		const canonical = `evidence/${mode === "not-in-brief" ? "other" : "linked_work_items/3"}.md`;
+		const quote = "The linked issue describes the intended authentication behavior.";
+		const text =
+			[quote, ...Array.from({ length: 13 }, (_, i) => `Captured detail ${i + 1}.`)].join("\n") +
+			(mode === "omitted" ? `\n${"omitted detail ".repeat(2000)}` : "");
+		mkdirSync(path.dirname(path.join(cwd, canonical)), { recursive: true });
+		writeFileSync(path.join(cwd, canonical), text);
+		// This unrelated omission is outside the practice's required sources and is never cited.
+		writeFileSync(path.join(cwd, "evidence/general_comments.json"), " ".repeat(30_000));
+		const linkedSource = "scm.linked-work-items";
+		const witness = "evidence/linked_work_items.json";
+		writeFileSync(path.join(cwd, witness), JSON.stringify({ workItems: [{ number: 3 }] }));
+		writeFileSync(
+			manifestPath,
+			JSON.stringify({
+				...manifest,
+				files: [...manifest.files, { kind: linkedSource, file: { path: witness } }],
+				sources: [
+					...manifest.sources,
+					{
+						kind: linkedSource,
+						citation: { side: "FORBIDDEN", commit: "FORBIDDEN" },
+						state: { availability: "AVAILABLE" },
+					},
+				],
+				citableTexts: [
+					{
+						source: linkedSource,
+						path: canonical,
+						side: "NEW",
+						commit: null,
+						stagedPath: canonical,
+						sha256: createHash("sha256").update(text).digest("hex"),
+					},
+				],
+			}),
+		);
+		const brief = buildBrief(cwd, { contextRoot: "evidence", repositoryRoot: "repos/primary" });
+		assert.equal(
+			brief.sources.find((source) => source.path === canonical)?.supplied,
+			mode === "not-in-brief" ? undefined : mode === "supplied",
+		);
+		assert.equal(
+			brief.sources.find((source) => source.path === "evidence/general_comments.json")?.supplied,
+			false,
+		);
+		const candidate = {
+			...SESSION_CANDIDATE,
+			problems: undefined,
+			outcome: "MET",
+			evidence: {},
+			citations: [
+				{
+					sourceKind: linkedSource,
+					sourcePath: witness,
+					path: canonical,
+					startLine: 1,
+					endLine: 1,
+					quote,
+				},
+			],
+		};
+		const exit = await runRunner(cwd, {}, { PI_HOST_SESSION_CANDIDATE: JSON.stringify(candidate) });
+		const complete = mode === "supplied";
+		assert.equal(exit.status, complete ? 0 : 1, exit.stderr);
+		const [entry] = executionReportSchema.parse(
+			readJsonFile(cwd, "out/practice-scripts.json"),
+		).practices;
+		assert.ok(entry);
+		if (complete) {
+			assert.equal(capturedLines(cwd, "submitted").length, 1);
+			assert.deepEqual(entry.reviewSessions, {
+				modelCalls: 1,
+				evidenceRefusals: 0,
+				formatRefusals: 0,
+			});
+			assert.doesNotMatch(exit.stderr, /Read the unread file lines/u);
+		} else {
+			assert.equal(entry.status, "failed");
+			assert.ok((entry.reviewSessions?.evidenceRefusals ?? 0) > 0);
+			assert.ok(exit.stderr.includes(canonical), exit.stderr);
+		}
 	});
 }
