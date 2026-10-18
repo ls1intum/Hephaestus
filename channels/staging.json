@@ -1,5 +1,5 @@
 {
 	"release": "v0.94.3",
 	"allowRollback": false,
-	"freeze": false
+	"freeze": true
 }
