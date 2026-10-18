@@ -108,8 +108,8 @@ function firstStart(review: ReviewDetail): Date | undefined {
 function reviewNow(review: ReviewDetail): string | undefined {
 	if (review.status === "PARTIAL") {
 		return review.kind === "SCAN"
-			? "It ended early, so its results cover only the work it reached."
-			: "It ended early, so its results and feedback cover only the work it reached.";
+			? "Its results cover only the work it reached."
+			: "Its results and feedback cover only the practices it reviewed.";
 	}
 	// The sentence names results, so a feedback count alone does not earn it.
 	if ((review.status === "FAILED" || review.status === "CANCELLED") && hasResults(review.results)) {
