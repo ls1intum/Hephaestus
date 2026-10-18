@@ -86,7 +86,7 @@ final class GitLabDiffPositions {
         return null;
     }
 
-    private static boolean validSha(@Nullable String sha) {
+    static boolean validSha(@Nullable String sha) {
         return sha != null && sha.matches("[0-9a-f]{40}|[0-9a-f]{64}");
     }
 }

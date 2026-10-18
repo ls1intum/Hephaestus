@@ -205,9 +205,15 @@ The range must intersect changed lines.
 
 GitHub creates a review comment.
 GitLab creates a positioned diff discussion with the pinned base, start and head commit references.
-Only a confirmed position rejection permits a file note with a static link to the reviewed code.
+Before delivery writes a line note, it reads the GitLab diff version for the pinned head and base.
+If that version is missing or the read fails, delivery does not write line notes or file notes.
+
+A file note links to the reviewed code.
+It is permitted for an anchor that identifies only a file.
+It is also permitted if the reviewed diff lacks the line, or GitLab rejects the position.
 An uncertain write retains its attempted receipt and cannot start the fallback.
 The receipt records the physical copy kind.
+
 Slack and Outline do not receive SCM line notes.
 
 Each copy retains the results and problems it communicates.
