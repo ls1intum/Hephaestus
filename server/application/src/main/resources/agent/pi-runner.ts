@@ -601,6 +601,17 @@ function newSessionState(): ReviewSessionState {
 	};
 }
 
+// A submit_result the model sent is counted when its turn finishes, which releases its mark; a call a
+// codemode script made is not among that turn's results.
+function answeredByTool(
+	scope: ReviewSessionState,
+	event: Extract<AgentSessionEvent, { type: "tool_execution_end" }>,
+): boolean {
+	return event.toolName === "submit_result" && event.parentToolCallId === undefined
+		? scope.answeredRefusals.has(event.toolCallId)
+		: scope.answeredRefusals.delete(event.toolCallId);
+}
+
 export async function runReviewJob(): Promise<void> {
 	function submittedList(value: unknown): { items: unknown[] } | { error: string } {
 		if (typeof value !== "string") {
@@ -2538,7 +2549,7 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 					if (
 						event.type === "tool_execution_end" &&
 						event.isError &&
-						!scope.answeredRefusals.delete(event.toolCallId)
+						!answeredByTool(scope, event)
 					) {
 						const result: unknown = event.result;
 						const reason = firstLine(toolResultText(result));
@@ -3104,7 +3115,7 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 							if (result.isError) {
 								review.requireSubmission = true;
 								// Schema validation happens before execute; those refusals spend the same allowance.
-								if (!reviewScope.answeredRefusals.has(result.toolCallId)) {
+								if (!reviewScope.answeredRefusals.delete(result.toolCallId)) {
 									countRefusal(slug);
 								}
 							}
