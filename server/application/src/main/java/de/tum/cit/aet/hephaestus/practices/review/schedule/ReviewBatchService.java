@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.integration.core.framework.ItemDescriptorRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLister;
 import de.tum.cit.aet.hephaestus.practices.review.ProductReferenceQuery;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
 import de.tum.cit.aet.hephaestus.practices.review.schedule.dto.CreateReviewBatchRequestDTO;
@@ -50,6 +51,7 @@ public class ReviewBatchService {
     private final ReviewRepository reviews;
     private final ProductReferenceQuery references;
     private final ItemDescriptorRegistry catalog;
+    private final List<ItemLister> listers;
     private final Clock clock;
     private final ConfigAuditPort audit;
     private final ReviewService reviewService;
@@ -62,7 +64,8 @@ public class ReviewBatchService {
     @Transactional
     public ReviewBatchDTO create(WorkspaceContext context, CreateReviewBatchRequestDTO request) {
         var descriptor = requireKind(request.itemKind());
-        if (!descriptor.memberKinds().isEmpty())
+        // A scan enumerates its root through a lister. Graph members, such as a pull request's reviews, do not.
+        if (listers.stream().anyMatch(lister -> lister.containerKind().equals(descriptor.kind())))
             throw new IllegalArgumentException("Use the scan API to review a repository.");
         validateWindow(request.from(), request.to());
         if (request.budgetUsd() != null)
