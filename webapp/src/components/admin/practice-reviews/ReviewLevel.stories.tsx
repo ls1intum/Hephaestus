@@ -14,6 +14,7 @@ import {
 	reviewDetailCancelledOnBudget,
 	reviewDetailCompleted,
 	reviewDetailExpiredRuntime,
+	reviewDetailPreparationFailed,
 	reviewDetailProcessingFailed,
 	reviewDetailQueued,
 	reviewDetailRunning,
@@ -30,6 +31,10 @@ import { reviewLevel } from "./review-levels";
 import { ReviewLevel, type ReviewLevelProps, RUNTIME_EXPIRED } from "./ReviewLevel";
 
 const ready = (review: ReviewDetail): ReviewLevelProps["review"] => ({ status: "ready", review });
+
+/** The value beside one of the sheet's fact labels. */
+const factValue = (panel: HTMLElement, label: string) =>
+	within(panel).getByText(label, { selector: "dt" }).nextElementSibling;
 
 const SCRIPTS: Record<string, PracticeScriptRun> = {
 	"thin-controllers": reviewPracticeScripts.fromCode,
@@ -414,7 +419,63 @@ export const TimedOut: Story = {
 			"It ran past the time it is allowed and was stopped.",
 		);
 		panel.getByText(/exceeded the 1200s timeout/u);
-		panel.getByText("Results it recorded before it stopped still stand.");
+		// It recorded no result, so the sheet does not say any remain.
+		await expect(panel.queryByText(/before it stopped/u)).toBeNull();
+	},
+};
+
+/** A review that stops after a practice finished keeps that practice's results. */
+export const TimedOutAfterSomeResults: Story = {
+	args: {
+		review: ready({
+			...reviewDetailTimedOut,
+			results: { met: 1, notMet: 1, doesNotApply: 0, couldNotDetermine: 0 },
+			practices: [
+				{
+					...firstPractice,
+					status: "DONE",
+					reason: null,
+					results: { met: 1, notMet: 1, doesNotApply: 0, couldNotDetermine: 0 },
+				},
+			],
+		}),
+	},
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		const panel = within(panelElement);
+		within(panel.getByRole("list", { name: "History" })).getByText(
+			"It ran past the time it is allowed and was stopped.",
+		);
+		panel.getByText("Results recorded before it stopped remain in this review.");
+		await expect(factValue(panelElement, "Results")).toHaveTextContent(
+			"1 met, 1 not met · View problems",
+		);
+	},
+};
+
+/**
+ * A review with no results or feedback to show says "None available", not "None": "None" would read
+ * as a clean result, and a review that failed in preparation checked nothing. Its version is an
+ * identifier, so it sits under Technical.
+ */
+export const FailedInPreparation: Story = {
+	args: { review: ready(reviewDetailPreparationFailed) },
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		const panel = within(panelElement);
+		await expect(factValue(panelElement, "Results")).toHaveTextContent(/^None available$/u);
+		await expect(factValue(panelElement, "Feedback")).toHaveTextContent(/^None available$/u);
+		await expect(panel.queryByText(/before it stopped/u)).toBeNull();
+		// One label in the whole sheet, and it is in Technical, not with the primary facts.
+		const version = panel.getByText("Reviewed version");
+		await expect(version.closest("[data-sheet-section]")).toHaveAttribute(
+			"data-sheet-section",
+			"technical",
+		);
+		await expect(version.nextElementSibling).toHaveTextContent(
+			String(reviewDetailPreparationFailed.itemVersion),
+		);
+		panel.getByRole("button", { name: "Copy reviewed version" });
 	},
 };
 

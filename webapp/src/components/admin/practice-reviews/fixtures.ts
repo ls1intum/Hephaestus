@@ -565,7 +565,13 @@ interface ReviewSpec {
 	feedback: FeedbackSpec[];
 }
 
-const ITEM_VERSION = "27f4e88c9f5a";
+const HEAD_COMMIT = "27f4e88c9f5aaaef81d7b2d4521929579f3541e6";
+
+/**
+ * A pull request's version as the server's `ScmVersion` writes it: base commit, head commit, and a
+ * SHA-256 of the title and description. Pages show it whole, so it is this long here too.
+ */
+const ITEM_VERSION = `scm.pull_request:v1:1405df66cbe219b0bf6355bc3d60361a8376b6b4:${HEAD_COMMIT}:d6910fe822015c9d16408bdafddf90c65c1f2f586875d17d247bba40cbfd0c32`;
 
 const diff = (
 	path: string,
@@ -577,7 +583,7 @@ const diff = (
 	sourcePath: "inputs/context/change.json",
 	path,
 	side: "NEW",
-	commit: ITEM_VERSION,
+	commit: HEAD_COMMIT,
 	startLine,
 	endLine,
 	quote,
@@ -710,7 +716,7 @@ export const REVIEW_FIXTURE: ReviewSpec[] = [
 							sourceKind: "scm.pull-request.diff",
 							path: "ReviewQueryService.java",
 							status: "COMPLETE",
-							version: ITEM_VERSION,
+							version: HEAD_COMMIT,
 						},
 					],
 				},
@@ -2636,6 +2642,16 @@ export const reviewDetailCancelledOnBudget: ReviewDetail = standaloneReview(
 	{ status: "CANCELLED", stopReason: "BUDGET" },
 	(summary) => jobsOf(summary, 1).map((job) => ({ ...job, startedAt: null, exitCode: null })),
 );
+
+/** It failed while preparing, before any model call, so it recorded no result and spent nothing. */
+export const reviewDetailPreparationFailed: ReviewDetail = {
+	...standaloneReview(
+		"0a0a0a0a-1111-4111-8111-000000000006",
+		{ status: "FAILED", stopReason: "PREPARATION_FAILED" },
+		(summary) => jobsOf(summary, 1),
+	),
+	usage: usageOf([]),
+};
 
 export const reviewUsageTwoAttempts: ReviewUsage = {
 	attempts: [

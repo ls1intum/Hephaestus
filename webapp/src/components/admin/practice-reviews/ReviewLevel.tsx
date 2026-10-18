@@ -111,8 +111,9 @@ function reviewNow(review: ReviewDetail): string | undefined {
 			? "It ended early, so its results cover only the work it reached."
 			: "It ended early, so its results and feedback cover only the work it reached.";
 	}
-	if (review.status === "FAILED" || review.status === "CANCELLED") {
-		return "Results it recorded before it stopped still stand.";
+	// The sentence names results, so a feedback count alone does not earn it.
+	if ((review.status === "FAILED" || review.status === "CANCELLED") && hasResults(review.results)) {
+		return "Results recorded before it stopped remain in this review.";
 	}
 	return undefined;
 }
@@ -248,6 +249,10 @@ const RESULT_OUTCOMES = [
 	["COULD_NOT_DETERMINE", "couldNotDetermine"],
 ] as const satisfies readonly (readonly [Outcome, keyof ReviewResultCounts])[];
 
+function hasResults(counts: ReviewResultCounts): boolean {
+	return RESULT_OUTCOMES.some(([, key]) => counts[key] > 0);
+}
+
 /**
  * One count, marked with its registry's icon, that opens a list at exactly the rows it counts. The
  * icon only repeats the word beside it.
@@ -356,7 +361,7 @@ function FeedbackCountLinks({
 	// An empty scope still names each family's states; the review narrows them to its own feedback.
 	const counted = feedbackSlots(review.feedback, {}).filter((slot) => slot.count > 0);
 	if (counted.length === 0) {
-		return "None";
+		return "None available";
 	}
 	return (
 		<span>
@@ -416,17 +421,12 @@ function ReviewWhat({
 					workspaceSlug={workspaceSlug}
 					counts={review.results}
 					scope={{ reviewId: review.id }}
-					empty="None"
+					empty="None available"
 				/>
 			</ReviewFact>
 			{review.kind !== "SCAN" && (
 				<ReviewFact label="Feedback">
 					<FeedbackCountLinks workspaceSlug={workspaceSlug} review={review} />
-				</ReviewFact>
-			)}
-			{hasText(review.itemVersion) && (
-				<ReviewFact label="Reviewed version">
-					<code className="break-all">{review.itemVersion}</code>
 				</ReviewFact>
 			)}
 			{review.kind === "SCAN" && (
@@ -543,7 +543,7 @@ function ReviewPracticeList({
 	return (
 		<ul aria-label="Every practice in this review" className="divide-y rounded-xl border">
 			{review.practices.map((practice) => {
-				const hasResults = RESULT_OUTCOMES.some(([, key]) => practice.results[key] > 0);
+				const recorded = hasResults(practice.results);
 				const reason = practiceReason(practice);
 				return (
 					<li
@@ -566,8 +566,8 @@ function ReviewPracticeList({
 							)}
 							<span className="font-medium break-words">{practice.practiceName}</span>
 							<span className="flex min-w-0 flex-col gap-1 text-pretty text-muted-foreground">
-								{practice.status !== "DONE" && hasResults && <span>Results recorded so far</span>}
-								{(practice.status === "DONE" || hasResults) && (
+								{practice.status !== "DONE" && recorded && <span>Results recorded so far</span>}
+								{(practice.status === "DONE" || recorded) && (
 									<span>
 										<ResultCountLinks
 											workspaceSlug={workspaceSlug}
@@ -579,7 +579,7 @@ function ReviewPracticeList({
 									</span>
 								)}
 								{practice.status !== "DONE" &&
-									(!hasResults || hasText(practice.reason)) &&
+									(!recorded || hasText(practice.reason)) &&
 									reason !== undefined && <span>{reason}</span>}
 								{review.kind === "SCAN" && itemCountsLine(practice) !== "" && (
 									<span className="text-xs">Files: {itemCountsLine(practice)}</span>
@@ -714,6 +714,15 @@ function technicalFacts(review: ReviewDetail): TechnicalFact[] {
 			: formatTokens(usage.outputTokens);
 	const facts: TechnicalFact[] = [
 		{ label: "Review ID", value: <code>{review.id}</code>, copy: review.id },
+		...(hasText(review.itemVersion)
+			? [
+					{
+						label: "Reviewed version",
+						value: <code>{review.itemVersion}</code>,
+						copy: review.itemVersion,
+					},
+				]
+			: []),
 		{ label: "Cost", value: usagePending ? "Not recorded yet" : costText(usage) },
 		{ label: "Model", value: hasText(review.model) ? review.model : "—" },
 		// The review's own calls: a practice script's decision, embedding and reranking calls are on
