@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.core.framework.RegisteredItemLabels
 import de.tum.cit.aet.hephaestus.integration.core.spi.MonitoredRepositoryQuery;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackVisibilityService;
 import de.tum.cit.aet.hephaestus.practices.result.ProblemRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ResultAdmissionPolicy;
 import de.tum.cit.aet.hephaestus.practices.result.ResultCommunicationRepository;
@@ -53,6 +54,7 @@ class ReviewRuntimeRoleContextTest extends BaseUnitTest {
             RegisteredItemLabels.class,
             ItemDescriptorRegistry.class,
             ResultCommunicationRepository.class,
+            FeedbackVisibilityService.class,
             ReviewRepository.class,
             ReviewPracticeRepository.class,
             PracticeVersionRepository.class,

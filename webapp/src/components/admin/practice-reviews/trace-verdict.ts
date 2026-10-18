@@ -467,10 +467,7 @@ function reviewVerdict(records: LineageRecords): TraceVerdict {
 		};
 	}
 	const after = took === undefined ? "" : ` after ${took}`;
-	const ran =
-		review.status === "PARTIAL"
-			? `closed${after} with some of the work not reviewed`
-			: `completed${after}`;
+	const ran = review.status === "PARTIAL" ? `closed as partial${after}` : `completed${after}`;
 	if (results.length === 0) {
 		return {
 			sentence: `This review ${ran} and recorded no result.`,

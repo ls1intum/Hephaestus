@@ -170,7 +170,11 @@ Repository scans have no developer and do not move your personal standing.
 
 Each row names the work and links to the original.
 It starts with the practices to improve: the first two by name, then a count of the rest.
-If there are none, it says *Nothing to improve*, or it says that the review stopped early or still runs.
+If there are none, a complete or partial review says *Some practices could not be determined* when a practice could not be determined.
+Otherwise a complete review says *Nothing to improve*, and a partial review says *Nothing to improve in what it reached*.
+A review that failed or was cancelled says *Stopped before it finished*.
+A review that waits or runs says so.
+
 Below that, it counts each practice once by its outcome: **Met**, **Does not apply**, or **Could not determine**.
 It then counts the practices the review reached, including those with no recorded result about you.
 
@@ -266,6 +270,11 @@ Feedback posted on a pull request, merge request, or issue stays on that work, n
 Under **Feedback**, select **Read the feedback comment** to open a recorded comment.
 If several comments carry the feedback, their links appear together.
 If no comment link was recorded, use the result’s link to the original work.
+
+Feedback that a workspace admin withdrew does not appear here, in **Reviews of your work**, or on a review.
+If the admin restores it, it returns with your earlier response.
+Its links then open only the comments that still carry the feedback.
+After a restore, a comment on a line keeps its withdrawal notice.
 
 A standing is read from your newest reviewed work, up to four pieces for each practice.
 Your latest work counts most, and older work counts less.

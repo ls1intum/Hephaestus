@@ -14,6 +14,7 @@ import type { ReviewBoundFeedback, ReviewDetail, ReviewLineage, ReviewRef } from
 import type { BadgeVariant } from "@/components/common/status-def";
 import { deliveryOutcome } from "@/components/practice-vocabulary/delivery-state-defs";
 import {
+	PARTIAL_REVIEW_SCOPE,
 	REVIEW_JOB_PROCESSING_DEFS,
 	REVIEW_STOP_REASON_SENTENCES,
 } from "@/components/practice-vocabulary/review-status-defs";
@@ -68,8 +69,9 @@ export type BottleneckStage = TraceStage;
  * The one thing a reader of a trace looks for first: where the path was lost, held or slowed, and
  * why, in one line next to the verdict.
  *
- * - `failed`: the review stopped before it finished.
- * - `lost`: feedback did not reach the developer, or no longer stands.
+ * - `failed`: the review failed or was cancelled before it finished.
+ * - `lost`: a result or feedback did not arrive or no longer stands. A partial review is placed
+ *   here, at its results, because it may have run to the end; its recorded reason says why.
  * - `slow`: everything arrived, but one wait took half an hour or more.
  * - `waiting`: the path is still on its way and waits on something named.
  * - `none`: nothing was lost and no wait stands out.
@@ -325,11 +327,13 @@ function reviewBottleneck(
 			};
 		}
 		case "PARTIAL": {
+			// A partial review may have stopped early or run to the end with a practice failed or
+			// withheld, so only the recorded reason says which; the line never assumes an early stop.
 			return {
-				kind: "failed",
+				kind: "lost",
 				stage: "review",
-				title: "Review did not finish",
-				text: `${because ?? "It stopped before it finished."} What it recorded up to then still stands.`,
+				title: "Partial review",
+				text: [because, PARTIAL_REVIEW_SCOPE[review.kind]].filter(hasText).join(" "),
 				tone: "warning",
 				icon: CircleDashedIcon,
 			};

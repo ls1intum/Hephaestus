@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
 import de.tum.cit.aet.hephaestus.practices.spi.Severity;
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,7 @@ import tools.jackson.databind.json.JsonMapper;
 public class ResultClaimWriter {
     private final ItemIndexService itemLocks;
     private final ResultRepository results;
+    private final ResultCurrentness currentness;
     private final ReviewRepository reviews;
     private final ProblemRepository problems;
     private final JsonMapper json;
@@ -52,7 +54,11 @@ public class ResultClaimWriter {
                 .coverage(json.valueToTree(c.coverage()))
                 .recordedAt(at)
                 .build();
-        var current = results.findCurrentClaim(ws, c.practiceId(), c.itemId(), c.developerId());
+        var stale = currentness.prepareClaim(ws, c.itemId(), c.itemVersion(), at);
+        if (stale != null) result.end(stale, at);
+        var current = stale == null
+                ? results.findCurrentClaim(ws, c.practiceId(), c.itemId(), c.developerId())
+                : Optional.<Result>empty();
         if (current.isPresent()) {
             var old = results.lockByIdAndWorkspaceId(current.orElseThrow().getId(), ws)
                     .orElseThrow();

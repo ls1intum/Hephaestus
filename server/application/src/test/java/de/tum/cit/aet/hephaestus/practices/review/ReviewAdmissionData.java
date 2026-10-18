@@ -58,6 +58,15 @@ public class ReviewAdmissionData {
 
     @Transactional
     public Pending pending(ReviewIntegrationData.Scenario scenario, Instant orderedAt, @Nullable Long developerId) {
+        return pending(scenario, orderedAt, developerId, "item-version-" + UUID.randomUUID());
+    }
+
+    @Transactional
+    public Pending pending(
+            ReviewIntegrationData.Scenario scenario,
+            Instant orderedAt,
+            @Nullable Long developerId,
+            String itemVersion) {
         var now = Instant.now();
         var review = reviews.saveAndFlush(Review.builder()
                 .id(UUID.randomUUID())
@@ -66,7 +75,7 @@ public class ReviewAdmissionData {
                 .origin(ReviewOrigin.REQUEST)
                 .requestedById(scenario.account().getId())
                 .status(ReviewStatus.RUNNING)
-                .itemVersion("item-version-" + UUID.randomUUID())
+                .itemVersion(itemVersion)
                 .createdAt(now)
                 .orderedAt(orderedAt)
                 .build());

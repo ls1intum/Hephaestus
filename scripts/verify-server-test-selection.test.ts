@@ -3,10 +3,10 @@ import { test } from "node:test";
 
 import { assertCoverage, testIdentities } from "./verify-server-test-selection.ts";
 
-void test("reads JUnit identities including skipped discovery and parameterized cases", () => {
+void test("reads skipped discovery identities including parameterized cases", () => {
 	assert.deepEqual(
 		testIdentities(
-			'<testsuite><testcase classname="Example" name="case[1]"><skipped/></testcase><testcase classname="Example" name="case[2]"/></testsuite>',
+			'<testsuite><testcase classname="Example" name="case[1]"><skipped/></testcase><testcase classname="Example" name="case[2]"><skipped/></testcase></testsuite>',
 		),
 		new Set(["Example#case[1]", "Example#case[2]"]),
 	);
@@ -22,4 +22,14 @@ void test("rejects missing tests, overlapping shards, unexpected tests and empty
 	assert.throws(() => assertCoverage(new Set(), [new Set()], true));
 	assert.throws(() => assertCoverage(inventory, [inventory, new Set()], true));
 	assert.doesNotThrow(() => assertCoverage(inventory, [inventory, new Set(["b"])], false));
+});
+
+void test("rejects executed tests as inventory evidence", () => {
+	for (const outcome of ["", '<failure message="Failed assertion"/>']) {
+		assert.throws(() =>
+			testIdentities(
+				`<testsuite><testcase classname="Example" name="executed">${outcome}</testcase></testsuite>`,
+			),
+		);
+	}
 });

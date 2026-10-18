@@ -42,11 +42,11 @@ If another environment was promoted first, the host applies its own request once
 { "release": "v1.2.3", "allowRollback": false, "freeze": false }
 ```
 
-| Field           | Effect                                             |
-| --------------- | -------------------------------------------------- |
-| `release`       | the `vX.Y.Z` release to apply when not frozen      |
-| `allowRollback` | permits one deliberate move backwards              |
-| `freeze`        | holds the environment where it is, for an incident |
+| Field           | Effect                                                                                         |
+| --------------- | ---------------------------------------------------------------------------------------------- |
+| `release`       | the `vX.Y.Z` release to apply when not frozen                                                  |
+| `allowRollback` | lets the host apply an older release or commit. It does not restore the database or any volume |
+| `freeze`        | holds the environment where it is, for an incident                                             |
 
 Staging can follow successful builds of `main` instead of releases. Its channel names a full
 `commit` SHA instead of `release`, plus an `images` map of digest-pinned references and a
@@ -237,18 +237,18 @@ Do not change the checkout underneath a tick.
 
 ## Operating it
 
-| You want to                                            | Do this                                                                  |
-| ------------------------------------------------------ | ------------------------------------------------------------------------ |
-| Move an environment                                    | Run the **Promote** workflow: pick the environment and release or commit |
-| Roll back                                              | Promote the older release with **allow-rollback**                        |
-| Hold an environment                                    | Promote with **freeze**                                                  |
-| Resume a held environment                              | Manually promote the desired release or commit with **freeze** cleared   |
-| Reapply Compose configuration                          | Promote the release or commit the host already runs                      |
-| Move a following host onto the commit's database image | Promote the commit with **refresh-database-image**                       |
-| Prevent new reconciliation runs                        | Use the timer-disable command below                                      |
-| See what a host runs                                   | Use the applied-record command below                                     |
-| See what was promoted to an environment, and when      | Open the environment's deployment history on GitHub                      |
-| Keep a release worktree while you work in it           | Lock it. See [What it keeps on disk](#what-it-keeps-on-disk)             |
+| You want to                                            | Do this                                                                                                                                                      |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Move an environment                                    | Run the **Promote** workflow: pick the environment and release or commit                                                                                     |
+| Roll back                                              | Pause reconciliation, then follow [Rollback](./install#rollback). After the database matches the older release, promote that release with **allow-rollback** |
+| Hold an environment                                    | Promote with **freeze**                                                                                                                                      |
+| Resume a held environment                              | Manually promote the desired release or commit with **freeze** cleared                                                                                       |
+| Reapply Compose configuration                          | Promote the release or commit the host already runs                                                                                                          |
+| Move a following host onto the commit's database image | Promote the commit with **refresh-database-image**                                                                                                           |
+| Prevent new reconciliation runs                        | Use the timer-disable command below                                                                                                                          |
+| See what a host runs                                   | Use the applied-record command below                                                                                                                         |
+| See what was promoted to an environment, and when      | Open the environment's deployment history on GitHub                                                                                                          |
+| Keep a release worktree while you work in it           | Lock it. See [What it keeps on disk](#what-it-keeps-on-disk)                                                                                                 |
 
 Timer-disable command:
 
@@ -440,7 +440,7 @@ A matching frontend version does not establish server, worker, webhook, database
 
 **It does not roll back a failed deploy.** A failed apply may leave some services updated. Schema
 migrations are forward-only. Older images may be incompatible with the migrated database. Promote a
-fix, or follow [Backup & Restore](./backup-restore.mdx) if database recovery is needed.
+fix, or follow [Rollback](./install#rollback) if database recovery is needed.
 
 **It does not manage anything it does not own.** The reconciler touches only the Compose projects
 named in `HEPHAESTUS_STACKS`. Containers belonging to anything else on the host are left alone.

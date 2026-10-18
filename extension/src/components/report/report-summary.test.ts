@@ -138,9 +138,11 @@ describe("report summary", () => {
 		).toBeUndefined();
 	});
 
-	it("names a review that could not finish on the line itself", () => {
+	// A partial review may have run to the end with a practice failed or withheld, so the line names
+	// its status and not a stop; a failed review still says it failed.
+	it("names a partial review on the line without saying it stopped, and a failed one as failed", () => {
 		expect(summarize(feedback(1), { trace: trace({ status: "PARTIAL" }) }).text).toBe(
-			"1 comment for you · reviewed 1 hr. ago · review did not finish",
+			"1 comment for you · reviewed 1 hr. ago · review partial",
 		);
 		expect(
 			summarize(feedback(1), { trace: trace({ status: "FAILED", completedAt: null }) }).text,

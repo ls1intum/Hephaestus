@@ -433,8 +433,10 @@ public class SyncJobService implements SmartLifecycle {
      *       and could stamp CANCELLED over a sync that had already finished successfully.
      * </ul>
      *
-     * <p>This returns without draining {@link #activeHandles}; the drain budget is
-     * {@code syncJobExecutor}'s {@code awaitTerminationSeconds}, at the next-lower lifecycle phase.
+     * <p>This returns without draining {@link #activeHandles}. The executor that runs a body owns its
+     * drain: {@code syncJobExecutor} for manual jobs, at the next-lower lifecycle phase, and the task
+     * scheduler's termination wait for scheduled jobs and the workspace syncs they wait for
+     * ({@code ServerSchedulingConfig}).
      */
     @Override
     public void stop(Runnable callback) {

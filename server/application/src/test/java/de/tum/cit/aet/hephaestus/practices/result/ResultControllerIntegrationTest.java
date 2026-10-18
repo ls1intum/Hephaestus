@@ -124,6 +124,20 @@ class ResultControllerIntegrationTest extends BaseIntegrationTest {
                 .param("feedback", feedback)
                 .param("at", Timestamp.from(at))
                 .update();
+        get("/practices/results/" + result.getId())
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.feedback[0].id")
+                .isEqualTo(feedback.toString())
+                .jsonPath("$.feedback[0].response.resolution")
+                .isEqualTo("DISAGREE")
+                .jsonPath("$.feedback[0].response.usefulness")
+                .isEqualTo("HELPFUL")
+                .jsonPath("$.feedback[0].copies[0].kind")
+                .isEqualTo("SUMMARY")
+                .jsonPath("$.feedback[0].copies[0].externalUrl")
+                .isEqualTo(url);
         jdbc.sql("INSERT INTO feedback_decision(id,workspace_id,feedback_id,action,actor_account_id,note,decided_at)"
                         + " VALUES(:id,:ws,:feedback,'WITHDRAW',:actor,'Withdraw this note.',:at)")
                 .param("id", UUID.randomUUID())
@@ -140,26 +154,27 @@ class ResultControllerIntegrationTest extends BaseIntegrationTest {
         assertThat(presentation.disagreements(result))
                 .singleElement()
                 .satisfies(row -> assertThat(row.comment()).isEqualTo("This is already covered."));
+        // The developer's own result leaves a withdrawn piece out; the admin's bound read above keeps it.
         get("/practices/results/" + result.getId())
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.feedback[0].id")
-                .isEqualTo(feedback.toString())
-                .jsonPath("$.feedback[0].response.resolution")
-                .isEqualTo("DISAGREE")
-                .jsonPath("$.feedback[0].response.usefulness")
-                .isEqualTo("HELPFUL")
-                .jsonPath("$.feedback[0].copies[0].kind")
-                .isEqualTo("SUMMARY")
-                .jsonPath("$.feedback[0].copies[0].externalUrl")
-                .isEqualTo(url);
+                .jsonPath("$.feedback.length()")
+                .isEqualTo(0);
         var other = data.scenario();
         assertThat(communication.boundFeedback(other.workspace().getId(), result.getId()))
                 .isEmpty();
         assertThat(communication.ownFeedback(
                         ws, Objects.requireNonNull(other.account().getId()), result.getId()))
                 .isEmpty();
+        jdbc.sql("INSERT INTO feedback_decision(id,workspace_id,feedback_id,action,actor_account_id,note,decided_at)"
+                        + " VALUES(:id,:ws,:feedback,'RESTORE',:actor,'Restore this note.',:at)")
+                .param("id", UUID.randomUUID())
+                .param("ws", ws)
+                .param("feedback", feedback)
+                .param("actor", scenarioAccountId)
+                .param("at", Timestamp.from(at.plusSeconds(2)))
+                .update();
         jdbc.sql("INSERT INTO feedback_response(id,workspace_id,feedback_id,resolution,created_at)"
                         + " VALUES(:id,:ws,:feedback,'ADDRESSED',:at)")
                 .param("id", UUID.randomUUID())

@@ -1,6 +1,9 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.item;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueProgress;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentProvenance;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository.StoredComment;
@@ -18,10 +21,13 @@ public class IssueEvidenceVersion {
 
     private final IssueCommentRepository comments;
     private final IssueCommentProvenance deliveredComments;
+    private final IssueRepository issues;
 
-    public IssueEvidenceVersion(IssueCommentRepository comments, IssueCommentProvenance deliveredComments) {
+    public IssueEvidenceVersion(
+            IssueCommentRepository comments, IssueCommentProvenance deliveredComments, IssueRepository issues) {
         this.comments = comments;
         this.deliveredComments = deliveredComments;
+        this.issues = issues;
     }
 
     /**
@@ -56,6 +62,19 @@ public class IssueEvidenceVersion {
         parts.addAll(issue.assignees().stream().sorted().toList());
         parts.add(null);
         parts.addAll(discussion);
+        issues.findByIdWithRepository(issue.id()).ifPresent(stored -> {
+            var children = stored.getSubIssuesTotal() == null || stored.getSubIssuesCompleted() == null
+                    ? issues.countChildrenByParentIssueId(issue.id(), Issue.State.CLOSED)
+                    : null;
+            var progress = IssueProgress.of(stored, children);
+            if (progress.source() != null) {
+                parts.add(null);
+                parts.add("subIssues");
+                parts.add(progress.source());
+                parts.add(String.valueOf(progress.total()));
+                parts.add(String.valueOf(progress.completed()));
+            }
+        });
         return ScmVersion.ofContentDigest(parts.toArray(String[]::new));
     }
 
