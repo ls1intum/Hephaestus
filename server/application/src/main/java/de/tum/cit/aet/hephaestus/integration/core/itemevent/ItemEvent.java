@@ -49,8 +49,15 @@ public class ItemEvent {
     @Column(name = "name", nullable = false, length = 128, updatable = false)
     private String name;
 
-    @Column(name = "item_version", nullable = false, columnDefinition = "text")
+    /** The exact evidence version, or null while the source cannot pin one for this occasion yet. */
+    @Nullable
+    @Column(name = "item_version", columnDefinition = "text")
     private String itemVersion;
+
+    /** The source's opaque fence for an occasion it could not pin; the version is pinned only while it holds. */
+    @Nullable
+    @Column(name = "pending_fence", length = 1024)
+    private String pendingFence;
 
     @Column(name = "occurred_at", nullable = false)
     private Instant occurredAt;

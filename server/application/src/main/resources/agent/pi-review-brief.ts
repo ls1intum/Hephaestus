@@ -115,6 +115,9 @@ export interface BriefSource {
 	path: string;
 	supplied: boolean;
 	lines?: number;
+	bytes?: number;
+	/** Why a captured file is not shown whole: over its own limit, over the brief's, or the index alone is over it. */
+	omitted?: "file-limit" | "brief-limit" | "index-limit";
 }
 
 /** Text and source coverage describe the same final brief, after all size limits. */
@@ -133,15 +136,22 @@ export function buildBrief(root: string, paths: BriefPaths, limits = DEFAULT_BRI
 			}
 			continue;
 		}
-		sources.set(candidate.label, { path: candidate.label, supplied: false });
 		const { size } = statSync(candidate.absolute);
+		const withheldAs = (omitted: NonNullable<BriefSource["omitted"]>) =>
+			sources.set(candidate.label, {
+				path: candidate.label,
+				supplied: false,
+				bytes: size,
+				omitted,
+			});
 		if (size === 0) {
 			empty.push(`\`${candidate.label}\``);
-			sources.set(candidate.label, { path: candidate.label, supplied: true, lines: 1 });
+			sources.set(candidate.label, { path: candidate.label, supplied: true, lines: 1, bytes: 0 });
 			continue;
 		}
 		const omission = `- \`${candidate.label}\` (${Math.ceil(size / 1024)} KB)`;
 		if (size > candidate.limit) {
+			withheldAs("file-limit");
 			withheld.push(omission);
 			continue;
 		}
@@ -158,6 +168,7 @@ export function buildBrief(root: string, paths: BriefPaths, limits = DEFAULT_BRI
 			: `### \`${candidate.label}\``;
 		const block = `${heading}\n${fenced(content, candidate.language)}`;
 		if (block.length > candidate.limit || used + block.length > limits.totalChars) {
+			withheldAs(block.length > candidate.limit ? "file-limit" : "brief-limit");
 			withheld.push(omission);
 			continue;
 		}
@@ -166,6 +177,7 @@ export function buildBrief(root: string, paths: BriefPaths, limits = DEFAULT_BRI
 			path: candidate.label,
 			supplied: true,
 			lines: raw.split("\n").length,
+			bytes: size,
 		});
 		used += block.length;
 	}
@@ -198,7 +210,13 @@ export function buildBrief(root: string, paths: BriefPaths, limits = DEFAULT_BRI
 	while (brief.length > limits.totalChars && blocks.length > 0) {
 		const removed = blocks.pop();
 		if (removed) {
-			sources.set(removed.path, { path: removed.path, supplied: false });
+			const { bytes } = sources.get(removed.path) ?? {};
+			sources.set(removed.path, {
+				path: removed.path,
+				supplied: false,
+				bytes,
+				omitted: "brief-limit",
+			});
 			withheld.unshift(removed.omission);
 		}
 		brief = render();
@@ -211,6 +229,7 @@ export function buildBrief(root: string, paths: BriefPaths, limits = DEFAULT_BRI
 		"The capture index exceeds the brief limit. Read the capture manifest and context files using the task paths.";
 	for (const source of sources.values()) {
 		source.supplied = false;
+		source.omitted ??= "index-limit";
 	}
 	return result(omitted.length <= limits.totalChars ? omitted : "");
 }

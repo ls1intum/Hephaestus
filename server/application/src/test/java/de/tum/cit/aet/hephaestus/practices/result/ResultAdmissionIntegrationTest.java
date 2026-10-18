@@ -654,7 +654,7 @@ class ResultAdmissionIntegrationTest extends AbstractResultAdmissionIntegrationT
                 input.workspaceId(),
                 input.itemId(),
                 new ItemEventName("scm.pull_request.edited"),
-                input.itemVersion(),
+                Objects.requireNonNull(input.itemVersion()),
                 at,
                 input.foundBy(),
                 input.actorUserId(),
@@ -685,7 +685,7 @@ class ResultAdmissionIntegrationTest extends AbstractResultAdmissionIntegrationT
                     input.workspaceId(),
                     input.itemId(),
                     input.name().value(),
-                    input.itemVersion(),
+                    Objects.requireNonNull(input.itemVersion()),
                     input.occurredAt(),
                     input.foundBy().name(),
                     input.actorUserId(),
@@ -880,7 +880,7 @@ class ResultAdmissionIntegrationTest extends AbstractResultAdmissionIntegrationT
     void shouldSettleAPermanentEventVersionConflictWithoutCreatingAReview() {
         var input = eventInput();
         var ref = productItems.require(input.workspaceId(), input.itemId());
-        var wanted = new ItemVersion(input.itemVersion(), null);
+        var wanted = new ItemVersion(Objects.requireNonNull(input.itemVersion()), null);
         var mismatch = ItemFixtures.snapshot(ref, Map.of())
                 .version(new ItemVersion("different-version", null))
                 .integration(

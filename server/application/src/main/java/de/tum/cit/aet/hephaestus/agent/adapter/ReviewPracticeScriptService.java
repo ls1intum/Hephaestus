@@ -10,6 +10,10 @@ import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptModelDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptRunDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewScriptQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
+import de.tum.cit.aet.hephaestus.practices.spi.ScriptKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ScriptNoResultCause;
+import de.tum.cit.aet.hephaestus.practices.spi.ScriptRunStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.ScriptStopReason;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -20,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.JsonNode;
 
 @Component
 @ConditionalOnServerRole
@@ -59,6 +64,7 @@ public class ReviewPracticeScriptService implements ReviewScriptQuery {
                                     usage.getCacheReadTokens(),
                                     usage.getCacheWriteTokens()))
                             .toList();
+                    JsonNode sessions = reviewSessions(run);
                     return new PracticeScriptRunDTO(
                             run.getId().getJobId(),
                             run.getId().getAttempt(),
@@ -67,14 +73,45 @@ public class ReviewPracticeScriptService implements ReviewScriptQuery {
                             run.getStatus(),
                             run.getScriptKind(),
                             run.getStopReason(),
+                            noResultCause(run, sessions),
                             run.getFinishedAt(),
                             run.getDurationMs() == null
                                     ? null
                                     : run.getDurationMs().longValue(),
                             run.getError(),
-                            models);
+                            models,
+                            sessions == null
+                                    ? null
+                                    : sessions.path("modelCalls").asInt(0));
                 })
                 .toList();
+    }
+
+    /** The runner's review-session counts, as the recorder stored them; null for a run recorded without them. */
+    private static @Nullable JsonNode reviewSessions(ScriptRun run) {
+        JsonNode calls = run.getCalls();
+        JsonNode sessions = calls == null ? null : calls.get(ScriptRun.REVIEW_SESSIONS);
+        return sessions != null && sessions.isObject() ? sessions : null;
+    }
+
+    /**
+     * A built-in only calls the review, so its OFF_FORMAT can only be a review session that ended without an accepted
+     * result. A counted schema refusal proves the wrong format, so the stop reason then stands alone. A custom script
+     * can also fail on its own direct model after its review, so the review-session counts prove nothing about it.
+     */
+    static @Nullable ScriptNoResultCause noResultCause(ScriptRun run, @Nullable JsonNode sessions) {
+        if (run.getScriptKind() != ScriptKind.BUILTIN
+                || run.getStatus() != ScriptRunStatus.FAILED
+                || run.getStopReason() != ScriptStopReason.OFF_FORMAT) {
+            return null;
+        }
+        if (sessions != null && sessions.path("evidenceRefusals").asInt(0) > 0) {
+            return ScriptNoResultCause.EVIDENCE_NOT_READ;
+        }
+        if (sessions != null && sessions.path("formatRefusals").asInt(0) > 0) {
+            return null;
+        }
+        return ScriptNoResultCause.SESSION_ENDED;
     }
 
     private static @Nullable String modelId(@Nullable PinnedPractice practice, ModelKind kind) {

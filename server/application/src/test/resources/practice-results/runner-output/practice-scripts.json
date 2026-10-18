@@ -18,6 +18,11 @@
 				"embedding": 0,
 				"reranking": 0
 			},
+			"reviewSessions": {
+				"modelCalls": 1,
+				"evidenceRefusals": 0,
+				"formatRefusals": 0
+			},
 			"coverageReached": {
 				"reads": 1,
 				"truncatedReads": 0,
@@ -48,6 +53,11 @@
 				"embedding": 0,
 				"reranking": 0
 			},
+			"reviewSessions": {
+				"modelCalls": 0,
+				"evidenceRefusals": 0,
+				"formatRefusals": 0
+			},
 			"coverageReached": {
 				"reads": 0,
 				"truncatedReads": 0,
@@ -71,6 +81,11 @@
 				"decision": 0,
 				"embedding": 0,
 				"reranking": 0
+			},
+			"reviewSessions": {
+				"modelCalls": 0,
+				"evidenceRefusals": 0,
+				"formatRefusals": 0
 			},
 			"coverageReached": {
 				"reads": 0,

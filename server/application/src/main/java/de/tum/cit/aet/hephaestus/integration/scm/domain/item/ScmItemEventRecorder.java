@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.item;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemEventService;
 import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.metrics.ReviewRefusalRecorder;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FoundBy;
@@ -9,10 +10,12 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventInput;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventName;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewRequestReason;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
@@ -43,9 +46,11 @@ public class ScmItemEventRecorder {
     private final MeterRegistry meters;
     private final IssueRepository issues;
     private final IssueEvidenceVersion issueVersions;
+    private final ItemEventService events;
 
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     public void onPullRequest(ScmDomainEvent.PullRequestEvent event) {
+        pinUnresolved(event.pullRequest().repository().id(), event.pullRequest().id());
         ItemEventName name =
                 switch (event) {
                     case ScmDomainEvent.PullRequestCreated ignored -> ScmItemEvents.PULL_REQUEST_OPENED;
@@ -90,7 +95,8 @@ public class ScmItemEventRecorder {
         if (event instanceof ScmDomainEvent.IssueUpdated updated
                 && !Collections.disjoint(updated.changedFields(), ScmItemEvents.LINKED_ISSUE_MATERIAL_FIELDS)) {
             var parents = queries.closingPullRequests(issue.id());
-            for (var parent : parents)
+            for (var parent : parents) {
+                pinUnresolved(parent.getRepositoryId(), parent.getSourceId());
                 record(
                         parent.getRepositoryId(),
                         parent.getSourceId(),
@@ -98,6 +104,7 @@ public class ScmItemEventRecorder {
                         null,
                         ScmItemEvents.PULL_REQUEST_LINKED_ISSUE_UPDATED,
                         event.context());
+            }
         }
     }
 
@@ -162,15 +169,32 @@ public class ScmItemEventRecorder {
                         .itemId();
             ItemRef item = writer.upsert(new ItemRegistration(workspace, kind, sourceId, parent, null));
             writer.restore(workspace, item.itemId());
+            // Serializes every event write on the item: an unresolved occasion has no unique key to settle a race.
+            writer.lock(workspace, item.itemId());
             ItemVersion version;
             try {
                 version = items.pin(item, null).version();
             } catch (ItemCaptureException unavailable) {
                 if (unavailable.code() != ItemCaptureCode.VERSION_UNAVAILABLE
                         && unavailable.code() != ItemCaptureCode.SOURCE_NOT_READY) throw unavailable;
-                // A partial provider read can update the mirror without proving an event version.
-                ReviewRefusalRecorder.record(
-                        meters, "submission", unavailable.code().name());
+                var fence = unavailable.code() == ItemCaptureCode.VERSION_UNAVAILABLE ? fence(item) : null;
+                if (fence == null) {
+                    // A partial provider read can update the mirror without proving an event version.
+                    ReviewRefusalRecorder.record(
+                            meters, "submission", unavailable.code().name());
+                    continue;
+                }
+                // GitLab stores the diff base after the hook; the occasion waits for it while its fence holds.
+                writer.record(new ItemEventInput(
+                        workspace,
+                        item.itemId(),
+                        name,
+                        null,
+                        fence,
+                        context.occurredAt(),
+                        context.isWebhook() ? FoundBy.WEBHOOK : FoundBy.SYNC,
+                        context.actorUserId(),
+                        null));
                 continue;
             }
             writer.record(new ItemEventInput(
@@ -182,6 +206,65 @@ public class ScmItemEventRecorder {
                     context.isWebhook() ? FoundBy.WEBHOOK : FoundBy.SYNC,
                     context.actorUserId(),
                     null));
+        }
+    }
+
+    /**
+     * Pins the occasions this pull request recorded before its version was known, once the mirror can prove one. The
+     * fence and the version are read in this transaction under the item lock, so an equal fence means the version
+     * differs from the occasion's only by the base. An occasion whose fence changed is withheld: the change is its own
+     * occasion, and the old one is never pinned to later work.
+     */
+    private void pinUnresolved(long repositoryId, long pullRequestId) {
+        var repository = repositories.findById(repositoryId).orElseThrow();
+        for (long workspace : queries.monitoredWorkspaces(repository.getNameWithOwner())) {
+            var item = writer.findSource(workspace, ScmItemEvents.PULL_REQUEST.value(), pullRequestId)
+                    .orElse(null);
+            if (item == null || events.unresolved(workspace, item.itemId()).isEmpty()) continue;
+            writer.lock(workspace, item.itemId());
+            String fence;
+            ItemVersion version = null;
+            try {
+                fence = items.pendingFence(item).orElseThrow();
+                version = items.pin(item, null).version();
+            } catch (ItemCaptureException unavailable) {
+                if (unavailable.code() == ItemCaptureCode.ITEM_REMOVED) {
+                    withhold(workspace, item.itemId(), ReviewRequestReason.ITEM_GONE);
+                    continue;
+                }
+                if (unavailable.code() != ItemCaptureCode.VERSION_UNAVAILABLE
+                        && unavailable.code() != ItemCaptureCode.SOURCE_NOT_READY
+                        && unavailable.code() != ItemCaptureCode.ITEM_NOT_VISIBLE) throw unavailable;
+                fence = fence(item);
+                if (fence == null) continue;
+            }
+            for (var event : events.unresolved(workspace, item.itemId())) {
+                if (!event.pendingFence().equals(fence))
+                    events.decide(
+                            workspace,
+                            event.id(),
+                            event.state(),
+                            ItemEventState.WITHHELD,
+                            ReviewRequestReason.VERSION_SUPERSEDED);
+                else if (version != null) events.pin(workspace, item.itemId(), event, version.value());
+            }
+        }
+    }
+
+    private void withhold(long workspace, long itemId, ReviewRequestReason reason) {
+        for (var event : events.unresolved(workspace, itemId))
+            events.decide(workspace, event.id(), event.state(), ItemEventState.WITHHELD, reason);
+    }
+
+    /** The item's pending fence, or null while the source cannot compose one (no head stored, or not visible). */
+    private @Nullable String fence(ItemRef item) {
+        try {
+            return items.pendingFence(item).orElse(null);
+        } catch (ItemCaptureException unavailable) {
+            if (unavailable.code() == ItemCaptureCode.VERSION_UNAVAILABLE
+                    || unavailable.code() == ItemCaptureCode.SOURCE_NOT_READY
+                    || unavailable.code() == ItemCaptureCode.ITEM_NOT_VISIBLE) return null;
+            throw unavailable;
         }
     }
 }

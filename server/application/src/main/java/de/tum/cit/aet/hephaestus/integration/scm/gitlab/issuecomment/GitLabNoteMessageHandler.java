@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMes
 import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmPullRequestItems;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -46,6 +47,7 @@ public class GitLabNoteMessageHandler extends AbstractIntegrationMessageHandler<
     private final GitLabUserService userService;
     private final GitLabReviewReconciler reviewReconciler;
     private final ApplicationEventPublisher eventPublisher;
+    private final ScmPullRequestItems pullRequestItems;
 
     GitLabNoteMessageHandler(
             GitLabIssueCommentProcessor issueCommentProcessor,
@@ -57,7 +59,8 @@ public class GitLabNoteMessageHandler extends AbstractIntegrationMessageHandler<
             GitLabReviewReconciler reviewReconciler,
             NatsMessageDeserializer deserializer,
             TransactionTemplate transactionTemplate,
-            ApplicationEventPublisher eventPublisher) {
+            ApplicationEventPublisher eventPublisher,
+            ScmPullRequestItems pullRequestItems) {
         super(
                 IntegrationKind.GITLAB,
                 GitLabEventType.NOTE.getValue(),
@@ -72,6 +75,7 @@ public class GitLabNoteMessageHandler extends AbstractIntegrationMessageHandler<
         this.reviewReconciler = reviewReconciler;
         this.pullRequestRepository = pullRequestRepository;
         this.eventPublisher = eventPublisher;
+        this.pullRequestItems = pullRequestItems;
     }
 
     @Override
@@ -253,7 +257,7 @@ public class GitLabNoteMessageHandler extends AbstractIntegrationMessageHandler<
         var user = event.user();
         Long providerId = context.providerId();
         Long scopeId = context.scopeId();
-        if (user == null || user.id() == null || providerId == null || scopeId == null) {
+        if (user == null || user.id() == null || providerId == null || scopeId == null || attrs.id() == null) {
             log.warn(
                     "Bot command: no identifiable author on the note payload, projectPath={}, mrIid={}, noteId={}",
                     safeProjectPath,
@@ -276,15 +280,27 @@ public class GitLabNoteMessageHandler extends AbstractIntegrationMessageHandler<
             return;
         }
 
+        // The scope is the workspace whose connection received the note; only its own item may be reviewed.
+        var item = pullRequestRepository
+                .findByRepositoryIdAndNumber(repository.getId(), mr.iid())
+                .flatMap(pull -> pullRequestItems.find(scopeId, pull.getId()))
+                .orElse(null);
+        if (item == null) {
+            log.warn(
+                    "Bot command: the workspace has no item for this merge request, projectPath={}, mrIid={}",
+                    safeProjectPath,
+                    mr.iid());
+            return;
+        }
+
         eventPublisher.publishEvent(new BotCommandReceivedEvent(
                 IntegrationKind.GITLAB,
-                repository.getId(),
-                mr.iid(),
+                scopeId,
+                item.itemId(),
                 attrs.note(),
                 username,
                 providerId,
                 user.id().longValue(),
-                attrs.id(),
-                scopeId));
+                attrs.id()));
     }
 }

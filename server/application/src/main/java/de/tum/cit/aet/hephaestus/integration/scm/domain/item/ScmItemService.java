@@ -145,11 +145,8 @@ public class ScmItemService implements ItemSource {
                     .find(item.kind(), Objects.requireNonNull(item.sourceId()))
                     .orElseThrow(ScmItemService::gone);
         }
-        if (work.getDeletedAt() != null) throw gone();
+        IntegrationRef integration = authorize(workItem, work);
         Repository repository = Objects.requireNonNull(work.getRepository());
-        ItemRef holder = items.parent(workItem, ScmItemEvents.REPOSITORY);
-        if (!Objects.equals(holder.sourceId(), repository.getId())) throw invisible();
-        IntegrationRef integration = repositories.authorize(item.workspaceId(), repository);
         List<RoleHolder> roles = new ArrayList<>();
         // The descriptor declares these review-state dimensions; practices match reviewOn.state against them.
         Map<String, String> state = new HashMap<>(work.reviewState());
@@ -181,8 +178,7 @@ public class ScmItemService implements ItemSource {
                         objectId(pull.getHeadRefOid()),
                         pull.getTitle(),
                         pull.getBody());
-                var linkedVersion = LinkedWorkItemContentSource.currentClosingMaterialVersion(
-                        pull, List.copyOf(pull.getClosingIssues()));
+                var linkedVersion = closingContext(pull);
                 if (linkedVersion.isPresent()) version = ScmVersion.withContext(version, linkedVersion.get());
             } else version = issueVersions.of(ScmEventPayload.IssueData.from(work));
         }
@@ -470,6 +466,39 @@ public class ScmItemService implements ItemSource {
                             Long.toString(user.getNativeId()),
                             null),
                     user.getType() == User.Type.USER));
+    }
+
+    /**
+     * The pending fence of a pull request item: {@link ScmVersion#pullRequestFence} over the same stored inputs and
+     * checks as {@link #pin}, without the diff base. It reads only the mirror.
+     */
+    @Transactional(readOnly = true, noRollbackFor = ItemCaptureException.class)
+    public Optional<String> pendingFence(ItemRef item) {
+        if (!item.kind().equals(ScmItemEvents.PULL_REQUEST)) return Optional.empty();
+        items.require(item);
+        var work = workLookup
+                .find(item.kind(), Objects.requireNonNull(item.sourceId(), "A pull request item has a source"))
+                .orElseThrow(ScmItemService::gone);
+        authorize(item, work);
+        if (!(work instanceof PullRequest pull)) return Optional.empty();
+        return Optional.of(ScmVersion.pullRequestFence(
+                objectId(pull.getHeadRefOid()),
+                pull.getBaseRefName(),
+                pull.getTitle(),
+                pull.getBody(),
+                closingContext(pull).orElse(null)));
+    }
+
+    private IntegrationRef authorize(ItemRef workItem, Issue work) {
+        if (work.getDeletedAt() != null) throw gone();
+        Repository repository = Objects.requireNonNull(work.getRepository());
+        ItemRef holder = items.parent(workItem, ScmItemEvents.REPOSITORY);
+        if (!Objects.equals(holder.sourceId(), repository.getId())) throw invisible();
+        return repositories.authorize(workItem.workspaceId(), repository);
+    }
+
+    private static Optional<ItemVersion> closingContext(PullRequest pull) {
+        return LinkedWorkItemContentSource.currentClosingMaterialVersion(pull, List.copyOf(pull.getClosingIssues()));
     }
 
     private static String objectId(@Nullable String value) {

@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.RoleHolder;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.ItemFixtures;
+import de.tum.cit.aet.hephaestus.workspace.MembershipRepository;
 import de.tum.cit.aet.hephaestus.workspace.authorization.WorkspaceAccessService;
 import java.util.List;
 import java.util.Map;
@@ -31,7 +32,8 @@ class ReviewRequestServiceTest extends BaseUnitTest {
             identities,
             access,
             mock(ReviewService.class),
-            mock(ReviewRequestPolicy.class));
+            mock(ReviewRequestPolicy.class),
+            mock(MembershipRepository.class));
 
     @Test
     void authorAndAssigneeCanRequestTheirOwnItem() {

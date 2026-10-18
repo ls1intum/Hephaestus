@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmPullRequestItems;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -105,7 +106,8 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
                 reviewReconciler,
                 deserializer,
                 transactionTemplate,
-                eventPublisher);
+                eventPublisher,
+                mock(ScmPullRequestItems.class));
 
         lenient()
                 .when(contextResolver.resolve(eq(PROJECT_PATH), any(), any()))

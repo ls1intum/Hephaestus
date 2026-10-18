@@ -295,6 +295,24 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
     }
 
     @Test
+    void shouldKeepTheRunnersReviewSessionCountsWhenTheReportNamesThemAndNoneOtherwise() {
+        List<PracticeScriptRunReport> runs = parse(report(
+                entry("comment-quality", "failed", "off-format")
+                        .set(
+                                "reviewSessions",
+                                MAPPER.readTree("{\"modelCalls\":6,\"evidenceRefusals\":4,\"formatRefusals\":1}"))
+                        .toString(),
+                ok("error-handling")));
+
+        assertThat(run(runs, "comment-quality").reviewSessions())
+                .containsExactlyInAnyOrderEntriesOf(
+                        Map.of("modelCalls", 6, "evidenceRefusals", 4, "formatRefusals", 1));
+        // A report from before the runner counted them says nothing, which is not zero.
+        assertThat(run(runs, "error-handling").reviewSessions()).isNull();
+        assertThat(failures()).isZero();
+    }
+
+    @Test
     void shouldKeepHowLongAProgramRanWhenTheRunnerSaysAndLeaveItOutOtherwise() {
         List<PracticeScriptRunReport> runs = parse(report(
                 entry("comment-quality", "ok", null).put("durationMs", 4200).toString(),
@@ -410,6 +428,7 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
                         null,
                         null,
                         null,
+                        null,
                         null));
         assertThat(failures()).isZero();
     }
@@ -483,6 +502,16 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
                         "models",
                         MAPPER.readTree("[{\"slot\":\"decision\",\"need\":\"required\",\"bound\":true,\"failures\":{}},"
                                 + "{\"slot\":\"decision\",\"need\":\"optional\",\"bound\":true,\"failures\":{}}]")),
+                entry -> entry.set("reviewSessions", MAPPER.readTree("{\"modelCalls\":3,\"evidenceRefusals\":0}")),
+                entry -> entry.set(
+                        "reviewSessions",
+                        MAPPER.readTree("{\"modelCalls\":-1,\"evidenceRefusals\":0,\"formatRefusals\":0}")),
+                // A program that did not start opened no review session.
+                entry -> entry.put("status", "not-reached")
+                        .put("stopReason", "deadline")
+                        .set(
+                                "reviewSessions",
+                                MAPPER.readTree("{\"modelCalls\":2,\"evidenceRefusals\":0,\"formatRefusals\":0}")),
                 entry -> entry.put("leads", 2));
     }
 

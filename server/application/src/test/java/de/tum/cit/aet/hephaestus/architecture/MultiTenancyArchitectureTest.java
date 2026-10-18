@@ -514,7 +514,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                         "ConversationFeedbackPreparedEvent", // carries workspaceId directly (Slack
                                         // nudge)
                                         "ApprovedFeedbackReadyEvent", // carries workspaceId directly
-                                        "BotCommand", // BotCommandReceivedEvent carries repositoryId → workspace
+                                        "BotCommand", // BotCommandReceivedEvent carries workspaceId directly
                                         "WorkspaceCreatedEvent", // Carries workspaceId + kind
                                         "ConnectionCredentialsReplacedEvent", // Carries workspaceId and connectionId
                                         // explicitly

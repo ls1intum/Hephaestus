@@ -17,7 +17,6 @@ import de.tum.cit.aet.hephaestus.practices.feedback.decision.FeedbackDecisionRep
 import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
-import de.tum.cit.aet.hephaestus.practices.review.feedbackmode.FeedbackModeResolver;
 import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheck;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheckFacts;
@@ -25,12 +24,12 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheckStage;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDecisionAction;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackModeQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
 import de.tum.cit.aet.hephaestus.workspace.Workspace.WorkspaceStatus;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeDeliveryStatus;
 import de.tum.cit.aet.hephaestus.workspace.settings.ReviewScopeMode;
 import java.time.Clock;
@@ -53,7 +52,7 @@ public class FeedbackGate {
     private final PracticeRepository practices;
     private final PracticeVersionRepository versions;
     private final ReviewRepository reviews;
-    private final WorkspaceRepository workspaces;
+    private final FeedbackModeQuery feedbackModes;
     private final EvidenceAuthorization evidence;
     private final PersonProcessingSuppression suppression;
     private final SilentModeQuery silentMode;
@@ -211,16 +210,10 @@ public class FeedbackGate {
     }
 
     private List<FeedbackMode> modes(List<Result> support, long workspaceId) {
-        String stored = workspaces
-                .findById(workspaceId)
-                .map(w -> w.getReviewSettings().getDefaultFeedbackMode())
-                .orElse(null);
-        FeedbackMode workspaceMode = stored == null ? null : FeedbackMode.valueOf(stored);
+        var modes = feedbackModes.effectiveModes(
+                workspaceId, support.stream().map(Result::getPracticeId).toList());
         return support.stream()
-                .map(result -> practices
-                        .findByIdAndWorkspaceId(result.getPracticeId(), workspaceId)
-                        .map(practice -> FeedbackModeResolver.effectiveModeOf(practice, workspaceMode))
-                        .orElse(FeedbackMode.OFF))
+                .map(result -> modes.getOrDefault(result.getPracticeId(), FeedbackMode.OFF))
                 .toList();
     }
 

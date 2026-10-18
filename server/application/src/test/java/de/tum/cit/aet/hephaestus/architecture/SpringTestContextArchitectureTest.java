@@ -67,6 +67,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             assignment("practices.feedback.AbstractFeedbackDeliveryIntegrationTest", "review-feedbackdelivery"),
             assignment("agent.adapter.EvidenceDeliveryAuthorizationIntegrationTest", "review-delivery-authorization"),
             assignment("practices.feedback.FeedbackGateIntegrationTest", "review-feedbackgate"),
+            assignment("agent.handler.PublicReviewEligibilityIntegrationTest", "review-feedbackgate"),
             assignment("practices.feedback.FeedbackPreparationReceiptIntegrationTest", "review-preparation-receipt"),
             assignment("practices.feedback.FeedbackHistoryQueryIntegrationTest", "review-feedbackhistoryquery"),
             assignment("practices.feedback.FeedbackReviewControllerIntegrationTest", "review-feedbackreviewcontroller"),
@@ -259,6 +260,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
     private static final Set<String> MOCKITO_BEAN_TESTS = names(
             "core.database.PracticeV1ReviewJobsIntegrationTest",
             "agent.adapter.EvidenceDeliveryAuthorizationIntegrationTest",
+            "agent.handler.PublicReviewEligibilityIntegrationTest",
             "practices.result.MigratedHistoryReadIntegrationTest",
             "agent.mentor.chat.MentorWorkerSplitIntegrationTest",
             "integration.scm.gitlab.credentials.GitLabTokenLifecycleIntegrationTest",

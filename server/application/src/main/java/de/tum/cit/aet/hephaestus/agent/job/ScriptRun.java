@@ -53,6 +53,13 @@ public class ScriptRun {
     @Column(name = "stop_reason", length = 32)
     private @Nullable ScriptStopReason stopReason;
 
+    /**
+     * The key in {@link #calls} of the runner's own review-session counts ({@code modelCalls},
+     * {@code evidenceRefusals}, {@code formatRefusals}). Runs recorded before the runner counted them lack it.
+     */
+    public static final String REVIEW_SESSIONS = "reviewSessions";
+
+    /** The host's calls by kind, and under {@link #REVIEW_SESSIONS} the runner's review-session counts. */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "calls", columnDefinition = "jsonb")
     private @Nullable JsonNode calls;

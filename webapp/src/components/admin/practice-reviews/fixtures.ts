@@ -3130,10 +3130,12 @@ const scriptRun = (
 		practiceId: practice?.id ?? "999",
 		practiceVersionId: practice?.currentVersion.id ?? "99901",
 		stopReason: null,
+		noResultCause: null,
 		finishedAt: new Date("2026-07-28T13:39:30Z"),
 		durationMs: 4200,
 		error: null,
 		models: [],
+		reviewModelCalls: null,
 		...fields,
 	};
 };
@@ -3177,6 +3179,24 @@ export const reviewPracticeScripts = {
 		scriptKind: "BUILTIN",
 		status: "OK",
 		durationMs: 900,
+		reviewModelCalls: 4,
+	}),
+	/** Six submissions, no reads: the evidence check refused four, the tool schema one, then the loop guard ended it. */
+	evidenceNotRead: scriptRun("the-change-explains-itself", {
+		scriptKind: "BUILTIN",
+		status: "FAILED",
+		stopReason: "OFF_FORMAT",
+		noResultCause: "EVIDENCE_NOT_READ",
+		durationMs: 48_300,
+		reviewModelCalls: 6,
+	}),
+	/** Recorded before the runner counted review sessions. */
+	builtInUnrecorded: scriptRun("the-change-explains-itself", {
+		scriptKind: "BUILTIN",
+		status: "FAILED",
+		stopReason: "OFF_FORMAT",
+		noResultCause: "SESSION_ENDED",
+		durationMs: 21_000,
 	}),
 	withheld: scriptRun("product-language", {
 		scriptKind: "CUSTOM",
@@ -3206,6 +3226,7 @@ export const reviewPracticeScripts = {
 		scriptKind: "CUSTOM",
 		status: "NOT_REACHED",
 		durationMs: null,
+		reviewModelCalls: 0,
 	}),
 	removedPractice: scriptRun("retired-practice", {
 		scriptKind: "CUSTOM",

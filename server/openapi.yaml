@@ -19131,12 +19131,31 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PracticeScriptModel"
+        noResultCause:
+          type:
+          - string
+          - "null"
+          description: "Why a run that stopped as OFF_FORMAT has no result, when the\
+            \ runner's counts or the built-in's contract prove it. Absent otherwise;\
+            \ then the stop reason stands alone."
+          enum:
+          - EVIDENCE_NOT_READ
+          - SESSION_ENDED
+          - null
         practiceId:
           type: string
           pattern: "^[1-9][0-9]*$"
         practiceVersionId:
           type: string
           pattern: "^[1-9][0-9]*$"
+        reviewModelCalls:
+          type:
+          - "null"
+          - integer
+          format: int32
+          description: "Model calls of the practice's review sessions, as the runner\
+            \ counted them. Not the calls the proxy billed: those are counted for\
+            \ the whole review. Absent when the runner did not record them."
         scriptKind:
           type: string
           enum:
@@ -19173,8 +19192,10 @@ components:
       - finishedAt
       - jobId
       - models
+      - noResultCause
       - practiceId
       - practiceVersionId
+      - reviewModelCalls
       - scriptKind
       - status
       - stopReason

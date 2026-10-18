@@ -61,3 +61,16 @@ export const OnTheReviewSheet: Story = {
 		await expect(canvas.queryByRole("link", { name: DETAILS })).not.toBeInTheDocument();
 	},
 };
+
+/** A built-in review whose results the evidence check refused reads as that, never as a format failure. */
+export const EvidenceNotRead: Story = {
+	args: { run: practiceScriptRuns.evidenceNotRead, details: false },
+	play: async ({ canvas }) => {
+		await expect(
+			canvas.getByText(
+				/^Built-in review stopped without a result: its result was refused because it had not read the evidence it needed\./u,
+			),
+		).toBeVisible();
+		await expect(canvas.queryByText(/wrong format/u)).not.toBeInTheDocument();
+	},
+};

@@ -6,6 +6,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyCapability;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultSnapshot;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackModeQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshotQuery;
 import java.util.List;
@@ -21,6 +23,7 @@ import org.springframework.stereotype.Component;
 public class PublicReviewEligibility {
     private final ReviewSnapshotQuery reviews;
     private final ItemDescriptorRegistry catalog;
+    private final FeedbackModeQuery feedbackModes;
 
     public Set<UUID> publicResultIds(ReviewJob job, List<AdmittedResultSnapshot> results) {
         var review = reviews.find(job.getWorkspaceId(), job.getReviewId());
@@ -32,6 +35,10 @@ public class PublicReviewEligibility {
                         .noneMatch(capability ->
                                 capability == CopyCapability.SUMMARY || capability == CopyCapability.LINE_NOTE))
             return Set.of();
+        // An OFF practice's result stays recorded; it only cannot support public feedback.
+        var modes = feedbackModes.effectiveModes(
+                job.getWorkspaceId(),
+                results.stream().map(result -> result.candidate().practiceId()).toList());
         return results.stream()
                 .filter(result -> result.candidate().developerId() != null
                         && result.candidate().itemId() == snapshot.item().itemId()
@@ -40,7 +47,8 @@ public class PublicReviewEligibility {
                                                 == result.candidate().practiceId()
                                         && practice.practiceVersionId()
                                                 == result.candidate().practiceVersionId()
-                                        && practice.definition().about() == AboutRole.AUTHOR))
+                                        && practice.definition().about() == AboutRole.AUTHOR)
+                        && modes.getOrDefault(result.candidate().practiceId(), FeedbackMode.OFF) != FeedbackMode.OFF)
                 .map(AdmittedResultSnapshot::id)
                 .collect(Collectors.toSet());
     }

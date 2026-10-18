@@ -1487,6 +1487,24 @@ if (scenario !== undefined && scenario !== "") {
 									);
 								}
 							}
+						} else if (
+							scenario === "scope-native-evidence-correction" ||
+							scenario === "scope-native-evidence-cap"
+						) {
+							// Each attempt cites a different line the change never had, so the tool refuses it on its
+							// evidence; the correction comes as the eighth attempt, or, for the cap, as the ninth.
+							const correctedAt = scenario === "scope-native-evidence-correction" ? 8 : 9;
+							content.push(
+								submitCall(
+									`evidence-${requests}`,
+									requests === correctedAt
+										? notMet(`Corrected ${slug}`)
+										: notMet(`Attempt ${requests} for ${slug}`, {
+												...changeCitation,
+												quote: `+ notInTheDiff${requests}();`,
+											}),
+								),
+							);
 						} else if (scenario === "scope-native-submit-nudge") {
 							if (requests === 1) {
 								content.push({ type: "text", text: "The review is complete." });
@@ -1633,6 +1651,8 @@ if (scenario !== undefined && scenario !== "") {
 							scenario !== "scope-native-submission-repair" &&
 							scenario !== "scope-native-submit-nudge" &&
 							scenario !== "scope-native-schema-cap" &&
+							scenario !== "scope-native-evidence-correction" &&
+							scenario !== "scope-native-evidence-cap" &&
 							!scenario.startsWith("scope-native-problem-")
 						) {
 							nudged = true;
@@ -3448,6 +3468,8 @@ if (scenario !== undefined && scenario !== "") {
 		"scope-native-submission-repair",
 		"scope-native-submit-nudge",
 		"scope-native-schema-cap",
+		"scope-native-evidence-correction",
+		"scope-native-evidence-cap",
 		"scope-cut-off",
 		"scope-recording-guard",
 		"scope-repeat",
@@ -3606,6 +3628,10 @@ if (scenario !== undefined && scenario !== "") {
 					"native review repairs an out-of-range citation and retired evidence fields using the exact tool errors",
 				"scope-native-schema-cap":
 					"native schema refusals stop at the same per-practice limit as candidate refusals",
+				"scope-native-evidence-correction":
+					"native evidence refusals spend the allowance once each, so a correction within the limit is recorded",
+				"scope-native-evidence-cap":
+					"native evidence refusals still stop at the per-practice limit",
 				"scope-cut-off":
 					"a truncated response in a prior practice does not consume the next session's correction chance",
 				"scope-recording-guard":
@@ -4093,6 +4119,8 @@ if (scenario !== undefined && scenario !== "") {
 								PI_PRACTICE_MODEL_CALLS:
 									new Map([
 										["scope-native-schema-cap", "12"],
+										["scope-native-evidence-correction", "12"],
+										["scope-native-evidence-cap", "12"],
 										["scope-native-problem-repair", "8"],
 										["scope-native-problem-isolation", "4"],
 										["scope-native-problem-compaction", "5"],
@@ -4449,6 +4477,36 @@ if (scenario !== undefined && scenario !== "") {
 								);
 							}
 							reached({ "test-practice": "NOT_REACHED", "second-practice": "NOT_REACHED" });
+							break;
+						}
+						case "scope-native-evidence-correction":
+						case "scope-native-evidence-cap": {
+							const corrected = stage === "scope-native-evidence-correction";
+							assert.equal(child.status, corrected ? 0 : 1, child.stderr);
+							for (const [session, slug] of [
+								[1, "test-practice"],
+								[2, "second-practice"],
+							] as const) {
+								assert.equal(
+									events.filter((event) => event.startsWith(`native-request:${session}:`)).length,
+									8,
+								);
+								assert.equal(
+									child.stderr.split(`result refused for ${slug}:`).length - 1,
+									corrected ? 7 : 8,
+								);
+							}
+							if (corrected) {
+								const candidates = candidatesIn(nodePath.join(cwd, "out/result.json"));
+								assert.equal(candidates.get("test-practice")?.summary, "Corrected test-practice");
+								assert.equal(
+									candidates.get("second-practice")?.summary,
+									"Corrected second-practice",
+								);
+								reached({ "test-practice": "EVALUATED", "second-practice": "EVALUATED" });
+							} else {
+								reached({ "test-practice": "NOT_REACHED", "second-practice": "NOT_REACHED" });
+							}
 							break;
 						}
 						case "scope-native-completion":

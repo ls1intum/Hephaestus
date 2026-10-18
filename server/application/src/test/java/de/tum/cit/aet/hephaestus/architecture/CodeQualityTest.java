@@ -169,6 +169,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     "FeedbackRepository.recordFirstRead",
                     "FeedbackSendRepository.settle",
                     "ItemEventRepository.insertIfAbsent",
+                    "ItemEventRepository.insertUnresolvedIfAbsent",
                     "ResultRepository.findReuseCandidate");
 
             ArchCondition<JavaClass> haveMethodsWithLimitedParams =

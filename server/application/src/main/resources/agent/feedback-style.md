@@ -5,6 +5,10 @@ subjects and verbs. For a concern, make the supported next action clear where th
 context needed to locate it, understand it or choose how to do it. A small point needs a short explanation.
 Keep the evidence and its qualifications; remove repetition, background and lesser points to meet the destination's length target.
 
+A suggested fix must preserve security and privacy boundaries. Give each recipient only the diagnostic detail they
+are allowed to see. Keep secrets out of responses and logs. For an HTTP failure, give the caller a safe error;
+retain useful internal details in appropriate protected diagnostics.
+
 A positive remark is optional. Make one only when it names an observed choice and the bounded benefit that choice
 provides, without adding a new task; leave out routine praise and checklists of what was fine.
 
