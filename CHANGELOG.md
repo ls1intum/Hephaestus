@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.94.5
+
+### Patch Changes
+
+- Feedback that a workspace admin withdrew no longer appears in a developer's own reviews and results, where it offered a response that was then refused and linked to comments that no longer carry it. If the admin restores it, it returns with the developer's earlier response, and its links open only the comments that still carry it. Admins still see the withdrawn feedback and its history.
+- Practice reviews notice parent issue progress when tracked child issues close, reopen, or move. Observations for superseded issue and pull request evidence stay in history instead of appearing current. Incomplete child inventories remain distinct from provider-reported progress.
+
+  A later author push does not retire observations about an unchanged submitted review.
+
+- The admin trace, the developer's own reviews and the scan report no longer say that a partial review stopped or did not finish. A partial review can run to the end and still leave a practice without a result, so these views now state only what its results cover. The trace names the recorded reason, which still says when a review ran out of time, and marks the Results stage. The developer's reviews show _Partial_ instead of _Did not finish_. A review that failed or was cancelled still says that it stopped.
+- When Hephaestus writes its review on a pull request or merge request, it now reads the whole file that each concern cites, with that file's complete section of the change, within its size limits. Before, it saw only the quoted lines of that code. A file is shown only when it matches the code captured for the review.
+- Restarting the application server during a scheduled sync now gives that sync up to the shutdown timeout (`SHUTDOWN_TIMEOUT`) to stop before the database closes. A sync that reaches its next checkpoint in that time records that it was cancelled, and the scheduled run releases its lock only after its workspace syncs have stopped. A provider error during that time is recorded as a failure. A sync that does not stop in time stays marked as running until it is reaped as abandoned, and its lock expires on its own.
+
 ## 0.94.4
 
 ### Patch Changes
