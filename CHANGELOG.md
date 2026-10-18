@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.94.2
+
+### Patch Changes
+
+- Practices limited to work that is ready for review now run for eligible pull request and merge request events. Feedback on that work is no longer withheld because the review and delivery checks use different draft states. Results and feedback no longer stay hidden solely because a contributor has never signed in. Privacy choices and account restrictions still apply, including through disconnected identity links.
+- GitLab line notes now require the matching reviewed diff. If that diff is missing or unreadable, those notes are not posted and can be retried. The link fallback remains for file anchors, lines absent from the reviewed diff, and positions that GitLab rejects.
+- A GitHub workspace that monitored the same repository twice starts its sync on startup again and runs practice reviews again. The upgrade merges the two monitors into the earlier one. A repository renamed while its webhook was missed, or whose name changed only in letter case, keeps its monitor, synced data and review settings, and no longer stops the workspace's startup sync. If the two monitors have different repository paths or different review settings, the upgrade stops and names both, so no path or setting is discarded.
+- A practice review that failed or was cancelled without results no longer says that its results still stand. When a review has no results or feedback to show, they read "None available" instead of "None". The full reviewed version moved to the review's Technical section, where you can copy it.
+- A review no longer fails for every practice when one practice reads a source that this version cannot capture for the reviewed work. That practice is withheld with a reason that says how to fix it, and the other practices are reviewed. If no assigned practice can be captured, the review stops before any AI model runs.
+
 ## 0.94.1
 
 ### Patch Changes
