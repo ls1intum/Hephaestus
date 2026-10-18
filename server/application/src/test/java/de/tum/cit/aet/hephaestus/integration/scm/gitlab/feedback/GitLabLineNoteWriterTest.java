@@ -8,10 +8,12 @@ import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -20,6 +22,7 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.evidence.CitationSide;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
+import de.tum.cit.aet.hephaestus.integration.core.egress.SilentModeGraphQlClientFactory;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyDisposition;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyForm;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyReceipt;
@@ -33,8 +36,12 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.LineNote;
 import de.tum.cit.aet.hephaestus.integration.scm.feedback.ScmFeedbackFixtures;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabRateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenService;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.credentials.GitLabCredentialHealthFilter;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -102,6 +109,52 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
         client = mock(HttpGraphQlClient.class);
         lenient().when(tokenService.resolveServerUrl(1L)).thenReturn(SERVER);
         lenient().when(tokenService.getAccessToken(1L)).thenReturn("glpat-test");
+    }
+
+    @Test
+    void shouldKeepTheBudgetReportedByRestAndStopTheNextPackageWhenItIsCritical() {
+        var meters = new SimpleMeterRegistry();
+        try {
+            var tracker = new GitLabRateLimitTracker(meters);
+            var trackedProvider = spy(new GitLabGraphQlClientProvider(
+                    client,
+                    tokenService,
+                    mock(CircuitBreaker.class),
+                    tracker,
+                    mock(SilentModeGraphQlClientFactory.class),
+                    mock(GitLabCredentialHealthFilter.class)));
+            doReturn(client).when(trackedProvider).forScope(1L);
+            channel = new GitLabLineNoteWriter(
+                    trackedProvider,
+                    rest.builder(),
+                    tokenService,
+                    egressGuard,
+                    ScmFeedbackFixtures.resolver(),
+                    diffVersions);
+            stubDiscussions(List.of(), BOT);
+            when(diffVersions.read(eq(1L), any(), any())).thenReturn(GitLabDiffPositionsTest.VERSION);
+            rest.answer(call -> ScriptedGitLabRest.respond(
+                            201, ScriptedGitLabRest.created(call, 987654, "DiffNote", 1, position -> position))
+                    .map(response -> response.mutate()
+                            .header("RateLimit-Limit", "100")
+                            .header("RateLimit-Remaining", "0")
+                            .build()));
+            var selected = ScmFeedbackFixtures.line(
+                    new FeedbackAnchor("new.java", null, 21, CitationSide.NEW), "fix", MARKER, "selected");
+
+            var first = channel.postImmutablePackage(target(), List.of(selected), fence);
+
+            assertThat(first.receipts())
+                    .singleElement()
+                    .satisfies(copy -> assertThat(copy.disposition()).isEqualTo(CopyDisposition.POSTED));
+            assertThat(tracker.isCritical(1L)).isTrue();
+            var next = channel.postImmutablePackage(target(), List.of(selected), fence);
+            assertThat(next.receipts()).noneMatch(copy -> copy.disposition() == CopyDisposition.POSTED);
+            assertThat(rest.calls()).hasSize(1);
+            assertThat(fence.attempts).hasSize(1);
+        } finally {
+            meters.close();
+        }
     }
 
     // The single line and the range are the two text positions of GitLab's "Create a new thread in the diff".

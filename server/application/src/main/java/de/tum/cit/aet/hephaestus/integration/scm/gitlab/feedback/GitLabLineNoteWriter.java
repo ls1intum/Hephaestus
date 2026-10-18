@@ -421,6 +421,7 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
                 ? request
                 : request.contentType(MediaType.APPLICATION_JSON).bodyValue(body);
         Answer answer = spec.exchangeToMono(response -> {
+                    gitLabProvider.updateRateLimit(scopeId, response.headers().asHttpHeaders());
                     int status = response.statusCode().value();
                     return response.statusCode().is2xxSuccessful()
                             ? response.bodyToMono(JsonNode.class)
