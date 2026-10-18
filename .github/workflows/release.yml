@@ -282,8 +282,11 @@ jobs:
           RELEASE_NOTES: ${{ needs.release-notes.outputs.notes }}
         run: |
           set -euo pipefail
-          # The release job has already proved that any existing release is a draft at this commit.
-          if gh release view "$TAG_NAME" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+          # The release job planned outside the promotion lock, so another run may have written this
+          # version since. Only an absent release or this commit's own draft takes this evidence.
+          state=$(node scripts/plan-release.ts --source "$TAG_NAME" "$SHA" absent draft) || {
+            echo "$state"; exit 1; }
+          if [ "$state" = draft ]; then
             echo "Resuming the existing draft $TAG_NAME."
             exit 0
           fi
@@ -313,9 +316,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG_NAME: ${{ needs.release.outputs.tag_name }}
+          SHA: ${{ needs.release.outputs.sha }}
           ASSET: ${{ steps.pin.outputs.asset-path }}
         run: |
           set -euo pipefail
+          # Assets replace those of this commit's own draft only.
+          node scripts/plan-release.ts --source "$TAG_NAME" "$SHA" draft
           # --clobber so a re-run over a resumed draft replaces its assets instead of failing on
           # every name that already exists.
           gh release upload "$TAG_NAME" \
@@ -531,9 +537,14 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG_NAME: ${{ needs.release.outputs.tag_name }}
+          RELEASE_SHA: ${{ needs.release.outputs.sha }}
         run: |
           set -euo pipefail
-          if [ "$(gh release view "$TAG_NAME" --repo "${{ github.repository }}" --json isDraft --jq .isDraft)" = true ]; then
+          # The draft, or the published release and its tag, must belong to the qualified commit
+          # before this run writes anything to it.
+          state=$(node scripts/plan-release.ts --source "$TAG_NAME" "$RELEASE_SHA" draft published) || {
+            echo "$state"; exit 1; }
+          if [ "$state" = draft ]; then
             gh release upload "$TAG_NAME" host-smoke/*.json --clobber --repo "${{ github.repository }}"
             gh release edit "$TAG_NAME" --repo "${{ github.repository }}" --draft=false
           else
@@ -546,6 +557,8 @@ jobs:
           fi
           [ "$(gh release view "$TAG_NAME" --repo "${{ github.repository }}" --json isImmutable --jq .isImmutable)" = true ] || {
             echo "::error::The published release is not immutable; refusing to promote image aliases"; exit 1; }
+          # Publication creates the tag at the draft's target. Aliases move only if it names this commit.
+          node scripts/plan-release.ts --source "$TAG_NAME" "$RELEASE_SHA" published
 
       - name: Promote verified image digests
         env:
