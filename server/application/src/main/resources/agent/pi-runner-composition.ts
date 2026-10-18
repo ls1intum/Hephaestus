@@ -916,12 +916,24 @@ export interface OwnPriorFeedback {
 	itemVersion?: unknown;
 	basedOn?: unknown;
 	deliveredAt: unknown;
+	/** The summary as delivered; the line and file notes are in notes. */
 	body: unknown;
+	/** The line and file notes as posted on the work; absent when none is. */
+	notes?: DeliveredNote[];
 	recordedClaimCurrentness: unknown;
 	withdrawn: unknown;
 	wordsUnavailable?: "COPY_AUTHORITY_UNAVAILABLE";
 	eligibleForPriorAdvice: boolean;
 	eligibleForAlreadySaid: boolean;
+}
+
+export interface DeliveredNote {
+	kind: "LINE_NOTE" | "FILE_NOTE";
+	path: unknown;
+	startLine: unknown;
+	endLine: unknown;
+	side: unknown;
+	body: string;
 }
 
 export interface OwnHistoryOmissions {
@@ -963,9 +975,34 @@ function deliveredBy(deliveredAt: unknown, capturedAt: string | null): boolean {
 }
 
 /**
+ * The note copies the history read returns with their words and still on the work. A copy read without text
+ * authority has no body, and a retracted one was taken off the work: neither supplies prior advice.
+ */
+function postedNotes(copies: unknown): DeliveredNote[] {
+	return (Array.isArray(copies) ? copies : []).flatMap((copy: unknown): DeliveredNote[] =>
+		isRecord(copy) &&
+		(copy.kind === "LINE_NOTE" || copy.kind === "FILE_NOTE") &&
+		copy.state === "POSTED" &&
+		typeof copy.body === "string" &&
+		copy.body.trim() !== ""
+			? [
+					{
+						kind: copy.kind,
+						path: copy.path,
+						startLine: copy.startLine,
+						endLine: copy.endLine,
+						side: copy.side,
+						body: copy.body,
+					},
+				]
+			: [],
+	);
+}
+
+/**
  * What was already said on this very piece of work, from the feedback history: only the review on the work, never
  * what reached the developer's own pages or conversations, and never anything about other work. Nothing missing is
- * filled in: an entry without an id, a time or a body is context, never prior advice.
+ * filled in: an entry without an id, a time or delivered words is context, never prior advice.
  */
 export function priorPublicFeedback(
 	history: unknown,
@@ -989,11 +1026,11 @@ export function priorPublicFeedback(
 		const { id, itemVersion, basedOn, deliveredAt, body, recordedClaimCurrentness, withdrawn } =
 			entry;
 		const witnessId = typeof id === "string" && FEEDBACK_ID.test(id) ? `feedback:${id}` : null;
+		const notes = postedNotes(entry.copies);
 		// Stale words still record what was said here, so they can show novelty; only current ones stand as advice.
 		const recorded =
 			witnessId !== null &&
-			typeof body === "string" &&
-			body.trim() !== "" &&
+			((typeof body === "string" && body.trim() !== "") || notes.length > 0) &&
 			(recordedClaimCurrentness === "CURRENT" || recordedClaimCurrentness === "STALE") &&
 			withdrawn !== true;
 		return [
@@ -1004,6 +1041,7 @@ export function priorPublicFeedback(
 				...(basedOn === undefined ? {} : { basedOn }),
 				deliveredAt,
 				body,
+				...(notes.length === 0 ? {} : { notes }),
 				recordedClaimCurrentness,
 				withdrawn,
 				...(entry.wordsUnavailable === "COPY_AUTHORITY_UNAVAILABLE"
