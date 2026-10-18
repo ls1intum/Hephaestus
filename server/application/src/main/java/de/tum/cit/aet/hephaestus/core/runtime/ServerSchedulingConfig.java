@@ -15,14 +15,14 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  *
  * <p>{@code matchIfMissing=true} preserves ADR 0005's DX invariant: zero env vars → full monolith
  * boots with scheduling enabled.
- * Build-only profiles introspect the HTTP contract or train the class archive and must not start background work.
+ * Test and build-only profiles exercise or inspect the application without automatic background work.
  *
  * <p>Worker-side sandbox and evidence-store maintenance is registered independently by
  * {@code SandboxMaintenanceConfiguration} and {@code JobEvidenceMaintenanceConfiguration}. Worker-only
  * deployments do not enable this server-wide scheduler; the stalled-write watchdog has its own thread so Docker cleanup cannot delay it.
  */
 @Configuration(proxyBeanMethods = false)
-@Profile("!specs & !cds-training")
+@Profile("!test & !specs & !cds-training")
 @ConditionalOnServerRole
 @EnableScheduling
 public class ServerSchedulingConfig {}

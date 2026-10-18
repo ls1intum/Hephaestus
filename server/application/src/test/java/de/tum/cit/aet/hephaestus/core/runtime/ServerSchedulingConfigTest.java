@@ -16,6 +16,7 @@ import org.springframework.util.ClassUtils;
 class ServerSchedulingConfigTest extends BaseUnitTest {
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
+            .withPropertyValues("spring.profiles.active=default")
             .withInitializer(new ConfigDataApplicationContextInitializer())
             .withConfiguration(AutoConfigurations.of(ClassUtils.resolveClassName(
                     "org.springframework.modulith.moments.autoconfigure.MomentsAutoConfiguration", null)))
@@ -38,8 +39,8 @@ class ServerSchedulingConfigTest extends BaseUnitTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"specs", "cds-training"})
-    void shouldNotScheduleBackgroundWorkInBuildProfiles(String profile) {
+    @ValueSource(strings = {"test", "specs", "cds-training"})
+    void shouldNotScheduleBackgroundWorkInTestAndBuildProfiles(String profile) {
         runner.withPropertyValues("spring.profiles.active=" + profile).run(context -> {
             assertThat(context).hasNotFailed();
             assertThat(context.getBeansOfType(ScheduledTaskHolder.class).values().stream()
