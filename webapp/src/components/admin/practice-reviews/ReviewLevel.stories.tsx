@@ -395,9 +395,7 @@ export const PartialScan: Story = {
 	},
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
-		await expect(
-			panel.getByText("It ended early, so its results cover only the work it reached."),
-		).toBeVisible();
+		await expect(panel.getByText("Its results cover only the work it reached.")).toBeVisible();
 		await expect(panel.getByText("Files: 3 reviewed, 1 reused, 4 listed")).toBeVisible();
 		await expect(panel.queryByText("Feedback", { exact: true })).not.toBeInTheDocument();
 	},
@@ -697,5 +695,11 @@ export const AmbiguousHistoricalResults: Story = {
 			),
 		).toBeVisible();
 		await expect(list.queryByText("LEGACY_AMBIGUOUS_RESULTS")).toBeNull();
+		// Partial is not an early stop: the History says why, and the sentence states only scope.
+		within(panel.getByRole("list", { name: "History" })).getByText("Its results were withheld.");
+		await expect(
+			panel.getByText("Its results and feedback cover only the practices it reviewed."),
+		).toBeVisible();
+		await expect(panel.queryByText(/ended early/u)).toBeNull();
 	},
 };
