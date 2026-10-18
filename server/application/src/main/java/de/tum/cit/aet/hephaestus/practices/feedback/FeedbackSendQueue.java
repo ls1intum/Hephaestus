@@ -59,6 +59,7 @@ public class FeedbackSendQueue {
      * attempt still holds the started copy, so the send only reads back and never creates a provider copy; planned
      * siblings are withheld as unconfirmed. The send keeps its attempt history and so its bounded readback cadence.
      * A withdrawal still needs that readback: a found copy can then be retracted, while absence releases its fence.
+     * A settled retraction counts too: it corrects only posted copies and never reads a started one back.
      * The caller holds the feedback row lock. The configuration audit trail records who asked for the readback,
      * and when, in that same transaction.
      */
@@ -66,8 +67,7 @@ public class FeedbackSendQueue {
     public void recheck(Feedback row) {
         long workspaceId = row.getWorkspaceId();
         UUID feedbackId = row.getId();
-        var send = sends.lockByFeedbackId(workspaceId, feedbackId)
-                .filter(s -> s.getAction() == FeedbackSendAction.POST && s.getState() == FeedbackSendState.DONE);
+        var send = sends.lockByFeedbackId(workspaceId, feedbackId).filter(s -> s.getState() == FeedbackSendState.DONE);
         int unknown = (int) copies.lockByFeedbackId(workspaceId, feedbackId).stream()
                 .filter(c -> c.getState() == FeedbackCopyState.WRITE_STARTED
                         && c.getWriteStartedAt() != null
@@ -79,14 +79,14 @@ public class FeedbackSendQueue {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT, "No copy of this feedback has unknown visibility to recheck.");
         boolean withdrawn = visibility.withdrawn(workspaceId, feedbackId);
+        var prior = send.get().getAction();
         int attempts = send.get().getAttempts();
         enqueue(row, FeedbackSendAction.POST, FeedbackSendState.PENDING);
         audit.record(ConfigAuditEntry.updated(
                 ConfigAuditEntityType.FEEDBACK_DELIVERY_RECHECK,
                 feedbackId,
                 workspaceId,
-                new FeedbackDeliveryRecheckSnapshot(
-                        FeedbackSendAction.POST, FeedbackSendState.DONE, attempts, unknown, withdrawn),
+                new FeedbackDeliveryRecheckSnapshot(prior, FeedbackSendState.DONE, attempts, unknown, withdrawn),
                 new FeedbackDeliveryRecheckSnapshot(
                         FeedbackSendAction.POST, FeedbackSendState.PENDING, attempts, unknown, withdrawn)));
     }

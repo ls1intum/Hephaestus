@@ -51,6 +51,18 @@ describe("deliveryCheck", () => {
 		expect(deliveryCheck(withdrawn)).toBe("available");
 	});
 
+	// A retraction skips a copy it has no reference for, so once it settles only a check reaches it.
+	it("offers a check once a retraction settled with a write still unknown", () => {
+		expect(deliveryCheck(unknownWrite({ send: { action: "RETRACT" } }))).toBe("available");
+	});
+
+	it.each(["PENDING", "SENDING", "UNCERTAIN"] as const)(
+		"reports no check while a retraction is %s: it does not read the write back",
+		(state) => {
+			expect(deliveryCheck(unknownWrite({ send: { action: "RETRACT", state } }))).toBeUndefined();
+		},
+	);
+
 	it.each(["PENDING", "SENDING", "UNCERTAIN"] as const)(
 		"reports a check in progress while the post is %s",
 		(state) => {
@@ -61,7 +73,6 @@ describe("deliveryCheck", () => {
 	it.each<[string, Checked]>([
 		["a conversation", unknownWrite({ destination: "CONVERSATION" })],
 		["the developer's practice pages", unknownWrite({ destination: "PRACTICE_PAGE" })],
-		["a removal", unknownWrite({ send: { action: "RETRACT" } })],
 		["no send", { ...unknownWrite(), sends: [] }],
 		["a write proved absent", unknownWrite({ copy: { state: "FAILED", readback: "ABSENT" } })],
 		["an absent readback on the started write", unknownWrite({ copy: { readback: "ABSENT" } })],

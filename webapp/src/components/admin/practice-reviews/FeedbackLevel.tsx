@@ -200,6 +200,9 @@ export function FeedbackLevel({
 
 	const { feedback: record } = state;
 	const awaitingApproval = record.state === "AWAITING_APPROVAL";
+	// Both recoveries queue the feedback's one send, so while either is asked for, or the withdrawal
+	// changes, the other would only be refused.
+	const recovering = isCheckingDelivery || isRetryingWithdrawal || isChangingWithdrawal;
 	return (
 		<>
 			{header}
@@ -262,21 +265,13 @@ export function FeedbackLevel({
 				canChangeWithdrawal(record) && (
 					<DrawerFooter>
 						{deliveryCheck(record) === "available" && (
-							<Button
-								variant="outline"
-								disabled={isCheckingDelivery || isChangingWithdrawal}
-								onClick={onCheckDelivery}
-							>
+							<Button variant="outline" disabled={recovering} onClick={onCheckDelivery}>
 								<SearchCheckIcon aria-hidden />
 								Check delivery
 							</Button>
 						)}
 						{withdrawalCorrection(record) === "retryable" && (
-							<Button
-								variant="outline"
-								disabled={isRetryingWithdrawal || isChangingWithdrawal}
-								onClick={onRetryWithdrawal}
-							>
+							<Button variant="outline" disabled={recovering} onClick={onRetryWithdrawal}>
 								<RotateCcwIcon aria-hidden />
 								Retry withdrawal
 							</Button>
@@ -831,13 +826,17 @@ function withdrawalCopy(feedback: FeedbackRecord): CorrectionReasonCopy {
 			placeholder: "Why the feedback was right after all…",
 		};
 	}
+	let description = WITHDRAW_DESCRIPTIONS[feedback.destination];
+	if (deliveryCheck(feedback) !== undefined) {
+		// Posted copies beside the unknown one are still retracted the usual way.
+		description = feedback.copies.some((copy) => copy.state === "POSTED")
+			? `Copies already posted on the work are retracted there. ${UNKNOWN_WRITE_WITHDRAW_DESCRIPTION}`
+			: UNKNOWN_WRITE_WITHDRAW_DESCRIPTION;
+	}
 	return {
 		trigger: "Withdraw feedback",
 		title: "Withdraw this feedback",
-		description:
-			deliveryCheck(feedback) === undefined
-				? WITHDRAW_DESCRIPTIONS[feedback.destination]
-				: UNKNOWN_WRITE_WITHDRAW_DESCRIPTION,
+		description,
 		placeholder: "What the feedback got wrong…",
 	};
 }
