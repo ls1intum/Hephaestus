@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.result;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackVisibilityService;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackDisagreementDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackResponseDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.OwnFeedbackCopyRefDTO;
@@ -47,6 +48,7 @@ public class ResultPresentation {
     private final ProblemRepository problems;
     private final ProductReferenceQuery references;
     private final ResultCommunicationRepository communication;
+    private final FeedbackVisibilityService visibility;
     private final JsonMapper json;
 
     public String name(ResultView view) {
@@ -237,10 +239,21 @@ public class ResultPresentation {
                 c.getOrDefault(FeedbackState.FAILED, 0));
     }
 
+    /**
+     * The developer's own feedback on a result. A withdrawn piece is left out, as the profile overview and the
+     * response guard read it: it accepts no response. A restore returns it with its earlier response.
+     */
     public List<OwnFeedbackRefDTO> ownFeedback(Result r) {
         var developer = r.getDeveloperId();
         if (developer == null) return List.of();
-        return communication.ownFeedback(r.getWorkspaceId(), developer, r.getId()).stream()
+        var rows = communication.ownFeedback(r.getWorkspaceId(), developer, r.getId());
+        var withdrawn = visibility.withdrawnAt(
+                r.getWorkspaceId(),
+                rows.stream()
+                        .map(ResultCommunicationRepository.OwnFeedback::getId)
+                        .toList());
+        return rows.stream()
+                .filter(row -> !withdrawn.containsKey(row.getId()))
                 .map(row -> {
                     var responded = row.getRespondedAt();
                     var response = responded == null

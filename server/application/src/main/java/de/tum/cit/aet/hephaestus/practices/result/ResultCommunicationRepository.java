@@ -36,9 +36,12 @@ public interface ResultCommunicationRepository extends Repository<Result, UUID> 
         """, nativeQuery = true)
     List<OwnFeedback> ownFeedback(long ws, long developer, UUID id);
 
+    // A retracted copy is a note or summary edited to the withdrawal notice, or one that is gone, so it no longer
+    // carries the feedback; only a posted copy is linked as the comment to read.
     @Query(
             value = "SELECT id,kind,external_url AS externalUrl,posted_at AS postedAt FROM feedback_copy"
-                    + " WHERE workspace_id=:ws AND feedback_id=:id AND posted_at IS NOT NULL ORDER BY position,id",
+                    + " WHERE workspace_id=:ws AND feedback_id=:id AND state='POSTED' AND posted_at IS NOT NULL"
+                    + " ORDER BY position,id",
             nativeQuery = true)
     List<OwnCopy> ownCopies(long ws, UUID id);
 
