@@ -17,6 +17,7 @@ import {
 	FAILED_SCAN,
 	FIRST_BASELINE_REPORT,
 	ITEM_ENTRIES,
+	JUDGED_ENTRY,
 	METHOD_CHANGED_REPORT,
 	PARTIAL_REPORT,
 	PARTIAL_SCAN,
@@ -26,7 +27,9 @@ import {
 	RUNNING_SCAN,
 	scanDetail,
 	scanReport,
+	scanSummary,
 	SUSPECT_LISTING_REPORT,
+	WITHHELD_ENTRY,
 	WITHHELD_NO_PROBLEMS_REPORT,
 } from "./fixtures";
 import { ScanReportPage } from "./ScanReportPage";
@@ -198,11 +201,72 @@ export const Partial: Story = {
 	play: async ({ canvas }) => {
 		await expect(
 			canvas.getByText(
-				/The scan did not finish\. These counts cover only the work it reached\. The scan’s budget was used up\./u,
+				"These counts cover only the work it reached. The scan’s budget was used up.",
 			),
 		).toBeVisible();
 		await expect(canvas.getByText("Not comparable")).toBeVisible();
 		await expect(canvas.getByRole("button", { name: "Export SARIF" })).toBeEnabled();
+	},
+};
+
+const metPairCounts = { ...EMPTY_COUNTS, files: 1, practiceItemPairs: 1, reviewed: 1, met: 1 };
+const withheldPairCounts = { ...EMPTY_COUNTS, files: 1, practiceItemPairs: 1, withheld: 1 };
+const partialWithheldScan = scanSummary({
+	...PARTIAL_SCAN,
+	stopReason: "RESULT_WITHHELD",
+	baselineScanId: null,
+	counts: { ...EMPTY_COUNTS, files: 1, practiceItemPairs: 2, reviewed: 1, met: 1, withheld: 1 },
+});
+const partialWithheldReport = scanReport(partialWithheldScan, {
+	comparison: "FIRST_SCAN",
+	problemChanges: { new: 0, unchanged: 0, updated: 0, absent: 0 },
+	withheldReasons: [{ reason: "MODEL_UNAVAILABLE", description: "model unavailable", count: 1 }],
+	notReviewedReasons: [],
+	removalGuard: { state: "NOT_NEEDED", previousFiles: 0, wouldRemove: 0 },
+});
+partialWithheldReport.practices = partialWithheldReport.practices.map((practice) => ({
+	...practice,
+	counts: practice.practiceSlug === "error-handling" ? metPairCounts : withheldPairCounts,
+	comparison: "FIRST_SCAN",
+	listingComplete: true,
+	status: "DONE",
+	reason: null,
+}));
+
+/**
+ * A partial scan that reviewed every file and withheld some results, with no problem recorded. The
+ * note and the Problems tab name what its results cover; neither says the scan stopped.
+ */
+export const PartialWithheldNoProblems: Story = {
+	args: {
+		state: loaded(partialWithheldScan, partialWithheldReport),
+		problems: list([]),
+		files: list([
+			{
+				...JUDGED_ENTRY,
+				sourceReviewId: partialWithheldScan.id,
+				outcome: "MET",
+				severity: null,
+				summary: null,
+				problemCount: 0,
+			},
+			{
+				...WITHHELD_ENTRY,
+				item: JUDGED_ENTRY.item,
+				itemVersion: JUDGED_ENTRY.itemVersion,
+				practiceSlug: "comment-quality",
+				practiceName: "Comments explain why",
+			},
+		]),
+	},
+	play: async ({ canvas }) => {
+		await expect(
+			canvas.getByText("These counts cover only the work it reached. Its results were withheld."),
+		).toBeVisible();
+		await expect(
+			canvas.getByRole("heading", { name: "No problems recorded in the work it reached" }),
+		).toBeVisible();
+		await expect(canvas.queryByText("This scan recorded no problems")).not.toBeInTheDocument();
 	},
 };
 
@@ -230,7 +294,7 @@ export const Failed: Story = {
 		await expect(canvas.queryByText("Listing incomplete")).not.toBeInTheDocument();
 		await expect(canvas.queryByText(/Not known yet/u)).not.toBeInTheDocument();
 		await expect(
-			canvas.getByRole("heading", { name: "No problems recorded before the scan stopped" }),
+			canvas.getByRole("heading", { name: "No problems recorded in the work it reached" }),
 		).toBeVisible();
 		await expect(canvas.queryByText("This scan recorded no problems")).not.toBeInTheDocument();
 

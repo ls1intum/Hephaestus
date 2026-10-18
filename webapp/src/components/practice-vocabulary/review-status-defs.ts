@@ -45,8 +45,7 @@ export const REVIEW_STATUS_DEFS: StatusDefs<ReviewStatus> = {
 		label: "Partial",
 		icon: CircleDashedIcon,
 		badgeVariant: "warning",
-		description:
-			"It closed with some work reviewed and some not. Its results cover only the work it reached.",
+		description: "Its results cover only the work it reached.",
 	},
 	FAILED: {
 		label: "Failed",
@@ -63,8 +62,9 @@ export const REVIEW_STATUS_DEFS: StatusDefs<ReviewStatus> = {
 };
 
 /**
- * How a review ended, as the developer's own surfaces read it: coarser than the admin console,
- * since a partial review and a cancelled one both mean "it did not finish" to them.
+ * How a review ended, as the developer's own surfaces read it. Those surfaces carry no stop reason,
+ * so each sentence must hold for every reason. A partial review may have run to the end with a
+ * practice failed or withheld, or may predate a record of what it covered, so it names only scope.
  */
 export const OWN_REVIEW_STATUS_DEFS: StatusDefs<ReviewStatus> = {
 	QUEUED: {
@@ -86,10 +86,10 @@ export const OWN_REVIEW_STATUS_DEFS: StatusDefs<ReviewStatus> = {
 		description: "The review ran to the end. Whether it found anything is a separate question.",
 	},
 	PARTIAL: {
-		label: "Did not finish",
+		label: "Partial",
 		icon: CircleDashedIcon,
 		badgeVariant: "warning",
-		description: "The review stopped before it finished. What it recorded up to then still stands.",
+		description: "The review’s results cover only the work it reached.",
 	},
 	FAILED: {
 		label: "Failed",
@@ -103,6 +103,16 @@ export const OWN_REVIEW_STATUS_DEFS: StatusDefs<ReviewStatus> = {
 		badgeVariant: "outline",
 		description: "The review was stopped before it finished.",
 	},
+};
+
+/**
+ * What a partial review's results cover, beside the recorded stop reason that says why. A partial
+ * review may have stopped early or run to the end with a practice failed or withheld, so this names
+ * only the scope and never the cause.
+ */
+export const PARTIAL_REVIEW_SCOPE: Record<ReviewRef["kind"], string> = {
+	ITEM: "Its results and feedback cover only the practices it reviewed.",
+	SCAN: "Its results cover only the work it reached.",
 };
 
 export function isActiveReview(status: ReviewStatus): boolean {

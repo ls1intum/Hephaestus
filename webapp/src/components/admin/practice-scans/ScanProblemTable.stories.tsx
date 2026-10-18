@@ -154,8 +154,12 @@ export const NoProblemsWithWithholding: Story = {
 	},
 };
 
-/** A failed scan has no problems because it reviewed nothing, not because the code is clean. */
-export const NoProblemsBeforeTheScanStopped: Story = {
+/**
+ * A scan that failed, was cancelled or closed partial, with no problem recorded. It covers only the work
+ * it reached, which may be none or every file with some results withheld, so the state claims neither a
+ * stop nor a clean result.
+ */
+export const NoProblemsInTheWorkItReached: Story = {
 	args: {
 		state: ready([]),
 		changes: { new: 0, unchanged: 0, updated: 0, absent: 0 },
@@ -163,9 +167,13 @@ export const NoProblemsBeforeTheScanStopped: Story = {
 	},
 	play: async ({ canvas }) => {
 		await expect(
-			canvas.getByRole("heading", { name: "No problems recorded before the scan stopped" }),
+			canvas.getByRole("heading", { name: "No problems recorded in the work it reached" }),
 		).toBeVisible();
-		await expect(canvas.getByText(/so this is not a clean result\./u)).toBeVisible();
+		await expect(
+			canvas.getByText(
+				"Its results cover only the work it reached, so this does not show that the code is clean.",
+			),
+		).toBeVisible();
 		await expect(canvas.queryByText("This scan recorded no problems")).not.toBeInTheDocument();
 	},
 };

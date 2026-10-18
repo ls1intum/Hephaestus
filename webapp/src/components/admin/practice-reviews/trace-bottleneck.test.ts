@@ -189,16 +189,42 @@ describe("traceBottleneck for the review itself", () => {
 		});
 	});
 
-	it("says a partial scan stopped early and that its results stand", () => {
-		const bottleneck = bottleneckOf("scan-many-jobs");
-		expect(bottleneck).toMatchObject({
-			kind: "failed",
-			title: "Review did not finish",
+	it("gives a partial scan's recorded reason and what its results cover", () => {
+		expect(bottleneckOf("scan-many-jobs")).toMatchObject({
+			kind: "lost",
+			stage: "review",
+			title: "Partial review",
+			text: "The scan’s budget was used up. Its results cover only the work it reached.",
 			tone: "warning",
 		});
-		expect(bottleneck.text).toBe(
-			`${REVIEW_STOP_REASON_SENTENCES.BUDGET} What it recorded up to then still stands.`,
-		);
+	});
+
+	// A partial review is not always an early stop: the recorded reason alone says which, and a real
+	// timeout still says it was stopped.
+	it.each([
+		[
+			"ran to the end with a practice failed",
+			"EXECUTION_INCOMPLETE",
+			"It did not review every practice it started. Its results and feedback cover only the practices it reviewed.",
+		],
+		[
+			"ran out of time",
+			"TIMED_OUT",
+			"It ran past the time it is allowed and was stopped. Its results and feedback cover only the practices it reviewed.",
+		],
+		[
+			"kept historical results without a settled answer",
+			"RESULT_WITHHELD",
+			"Its results were withheld. Its results and feedback cover only the practices it reviewed.",
+		],
+	] as const)("says a partial review that %s by its reason alone", (_, stopReason, text) => {
+		const { lineage } = lineageStateCase("complete");
+		const detail = detailOf("complete", { status: "PARTIAL", stopReason });
+		expect(traceBottleneck(lineage, REVIEW, detail, NOW)).toMatchObject({
+			kind: "lost",
+			title: "Partial review",
+			text,
+		});
 	});
 
 	it("says how long a queued review has waited", () => {

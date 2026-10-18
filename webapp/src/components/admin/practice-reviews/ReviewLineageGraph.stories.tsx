@@ -629,6 +629,47 @@ export const BottleneckReviewFailed: Story = {
 	},
 };
 
+/** The withheld-practice case, closed partial with the reason the server records for it. */
+function partialCaseArgs() {
+	const entry = lineageStateCase("withheld-practice");
+	const { review } = entry;
+	if (review === undefined) {
+		throw new Error("The withheld-practice case has no review detail");
+	}
+	return {
+		lineage: {
+			...entry.lineage,
+			nodes: entry.lineage.nodes.map((node) =>
+				node.review === null
+					? node
+					: { ...node, review: { ...node.review, status: "PARTIAL" as const } },
+			),
+		},
+		here: { kind: "review" } satisfies TraceNode,
+		review: { ...review, status: "PARTIAL" as const, stopReason: "EXECUTION_INCOMPLETE" as const },
+	};
+}
+
+/**
+ * A partial review that ran to the end with one practice withheld. The line gives the recorded reason
+ * and marks the results that are missing; it does not say the review stopped.
+ */
+export const BottleneckReviewPartial: Story = {
+	args: partialCaseArgs(),
+	play: async ({ canvasElement }) => {
+		const line = bottleneckOf(canvasElement);
+		await expect(line).toHaveTextContent(/^Partial review/u);
+		await expect(line).toHaveTextContent("It did not review every practice it started.");
+		await expect(line).not.toHaveTextContent(/did not finish|stopped before/u);
+		await expect(canvasElement.querySelector('[data-stage="results"]')).toHaveTextContent(
+			"Lost here",
+		);
+		await expect(canvasElement.querySelector('[data-stage="review"]')).not.toHaveTextContent(
+			"Stopped here",
+		);
+	},
+};
+
 /** At phone width the line and its strip wrap, and nothing scrolls sideways. */
 export const BottleneckNarrow: Story = {
 	args: stateCaseArgs("failed"),
