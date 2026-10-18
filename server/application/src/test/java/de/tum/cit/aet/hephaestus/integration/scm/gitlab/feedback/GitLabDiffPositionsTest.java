@@ -175,6 +175,28 @@ class GitLabDiffPositionsTest extends BaseUnitTest {
                 .isNull();
     }
 
+    // A header whose numbers do not fit an int is no hunk GitLab could mean: its lines are neither placed nor a crash.
+    @Test
+    void shouldPlaceNothingBelowAHunkHeaderWhoseNumbersDoNotFit() {
+        var oversized = new GitLabDiffPositions.Version(
+                1,
+                BASE,
+                START,
+                HEAD,
+                List.of(new GitLabDiffPositions.Diff(
+                        "new.java",
+                        "new.java",
+                        "@@ -1,1 +1,2 @@\n a\n+b\n@@ -99999999999,1 +99999999999,2 @@\n c\n+d\n",
+                        false,
+                        false)));
+
+        assertThat(GitLabDiffPositions.build(oversized, new FeedbackAnchor("new.java", null, 2, CitationSide.NEW)))
+                .extracting(Position::newLine)
+                .isEqualTo(2);
+        assertThat(GitLabDiffPositions.build(oversized, new FeedbackAnchor("new.java", null, 3, CitationSide.NEW)))
+                .isNull();
+    }
+
     @Test
     void shouldRefusePathsOnTheWrongSideAndLinesOutsideTheDiff() {
         assertThat(GitLabDiffPositions.build(VERSION, new FeedbackAnchor("old.java", null, 21, CitationSide.NEW)))

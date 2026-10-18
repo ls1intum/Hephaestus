@@ -775,6 +775,59 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
                 .satisfies(receipt -> assertThat(receipt.externalRef()).isEqualTo("gid://Note/7"));
     }
 
+    // The address and credential are resolved before the copy is fenced, so failing to resolve them requests nothing.
+    @Test
+    void shouldRequestNothingWhenTheAddressOrCredentialCannotBeResolvedLocally() {
+        stubResolvedMr();
+        stubDiscussions(List.of(), BOT);
+        when(diffVersions.read(eq(1L), any(), any())).thenReturn(GitLabDiffPositionsTest.VERSION);
+        var selected = ScmFeedbackFixtures.line(
+                new FeedbackAnchor("new.java", null, 21, CitationSide.NEW), "fix", MARKER, "selected");
+
+        when(tokenService.getAccessToken(1L))
+                .thenThrow(new IllegalStateException("The GitLab token could not be refreshed"));
+        var unrefreshed = channel.postImmutablePackage(target(), List.of(selected), fence);
+        // A valid credential is never reached: the address is resolved first.
+        lenient().doReturn("glpat-test").when(tokenService).getAccessToken(1L);
+        when(tokenService.resolveServerUrl(1L)).thenReturn("https://gitlab example.com");
+        var unaddressable = channel.postImmutablePackage(target(), List.of(selected), fence);
+
+        assertThat(List.of(unrefreshed, unaddressable))
+                .allSatisfy(result -> assertThat(result.receipts())
+                        .singleElement()
+                        .satisfies(receipt -> {
+                            assertThat(receipt.acknowledged()).isFalse();
+                            assertThat(receipt.writeMayHaveStarted()).isFalse();
+                        }));
+        assertThat(fence.attempts).isEmpty();
+        assertThat(rest.calls()).isEmpty();
+    }
+
+    @Test
+    void shouldKeepAnEarlierPostedCopyWhenALaterCredentialCannotBeResolved() {
+        stubResolvedMr();
+        stubDiscussions(List.of(), BOT);
+        when(diffVersions.read(eq(1L), any(), any())).thenReturn(WITHOUT_CITED_LINE);
+        when(tokenService.getAccessToken(1L))
+                .thenReturn("glpat-test")
+                .thenThrow(new IllegalStateException("The GitLab token could not be refreshed"));
+        rest.createAsAsked(987654, "DiscussionNote", 1);
+
+        CopyWriteResult result = channel.postImmutablePackage(
+                target(), List.of(item("fix-a", "result:a:0"), item("fix-b", "observation:b:0")), fence);
+
+        assertThat(result.receipts()).hasSize(2);
+        assertThat(result.receipts().getFirst()).satisfies(receipt -> {
+            assertThat(receipt.disposition()).isEqualTo(CopyDisposition.POSTED);
+            assertThat(receipt.externalRef()).isEqualTo("gid://gitlab/DiscussionNote/987654");
+        });
+        assertThat(result.receipts().getLast().writeMayHaveStarted()).isFalse();
+        assertThat(fence.attempts)
+                .containsExactly(
+                        List.of(ScmFeedbackFixtures.copyId("result:a:0").toString()));
+        assertThat(rest.calls()).hasSize(1);
+    }
+
     @Test
     void shouldReportALostCreateAsUnconfirmedAndStopAtARateLimitLeavingTheRestUnsent() {
         stubResolvedMr();

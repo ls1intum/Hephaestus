@@ -174,13 +174,23 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
                 completed.addAll(unrequested(rest, copies));
                 return CopyWriteResult.withheld(completed, deliveryKeys(rest));
             }
+            var position = pinnedDiff == null ? null : GitLabDiffPositions.build(pinnedDiff, diff);
+            Request request;
+            try {
+                request = request(scopeId, mr);
+            } catch (RuntimeException unavailable) {
+                // Resolved before the fence, so no provider request was made for this copy or the rest.
+                log.warn("GitLab feedback request could not be prepared: workspaceId={}", scopeId, unavailable);
+                completed.addAll(unrequested(rest, copies));
+                return CopyWriteResult.of(completed);
+            }
             if (!fence.beforeCreate(List.of(item.copyId()), List.copyOf(completed))) {
                 completed.addAll(unrequested(rest, copies));
                 return CopyWriteResult.of(completed);
             }
-            var position = pinnedDiff == null ? null : GitLabDiffPositions.build(pinnedDiff, diff);
-            Attempt attempt =
-                    position == null ? null : createDiffThread(scopeId, mr, projectUrl, scan.author(), item, position);
+            Attempt attempt = position == null
+                    ? null
+                    : createDiffThread(scopeId, request, mr, projectUrl, scan.author(), item, position);
             if (attempt == null) {
                 // The committed copy fence covers the fallback after a confirmed position rejection.
                 if (position != null) {
@@ -193,6 +203,7 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
                 }
                 attempt = createLocationThread(
                         scopeId,
+                        request,
                         mr,
                         projectUrl,
                         scan.author(),
@@ -240,6 +251,7 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
     // Only an explicit position rejection proves that a fallback cannot duplicate a created note.
     private @Nullable Attempt createDiffThread(
             long scopeId,
+            Request request,
             MrCoordinates mr,
             String projectUrl,
             long author,
@@ -248,11 +260,7 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
         String body = lineBody(item);
         Answer answer;
         try {
-            answer = exchange(
-                    scopeId,
-                    HttpMethod.POST,
-                    discussions(scopeId, mr, null),
-                    Map.of("body", body, "position", position.request()));
+            answer = exchange(scopeId, HttpMethod.POST, request, Map.of("body", body, "position", position.request()));
         } catch (RuntimeException failure) {
             log.warn(
                     "GitLab diff thread outcome unknown: workspaceId={}, file={}, line={}",
@@ -288,6 +296,7 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
     // A failed request can still create a thread; only a confirmed answer proves the copy and its form.
     private Attempt createLocationThread(
             long scopeId,
+            Request request,
             MrCoordinates mr,
             String projectUrl,
             long author,
@@ -296,7 +305,7 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
             UUID copyId) {
         Answer answer;
         try {
-            answer = exchange(scopeId, HttpMethod.POST, discussions(scopeId, mr, null), Map.of("body", body));
+            answer = exchange(scopeId, HttpMethod.POST, request, Map.of("body", body));
         } catch (RuntimeException failure) {
             log.warn(
                     "GitLab location thread outcome unknown: workspaceId={}, file={}, line={}",
@@ -403,10 +412,10 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
     }
 
     // A status is an answer; only transport failures and timeouts leave the outcome unknown to the caller.
-    private Answer exchange(long scopeId, HttpMethod method, URI uri, @Nullable Map<String, Object> body) {
+    private Answer exchange(long scopeId, HttpMethod method, Request target, @Nullable Map<String, Object> body) {
         var request = rest.method(method)
-                .uri(uri)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenService.getAccessToken(scopeId))
+                .uri(target.uri())
+                .header(HttpHeaders.AUTHORIZATION, target.authorization())
                 .attribute(GitLabGraphQlClientProvider.SCOPE_ID_ATTRIBUTE, scopeId);
         WebClient.RequestHeadersSpec<?> spec = body == null
                 ? request
@@ -424,6 +433,17 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
                 .block(GRAPHQL_TIMEOUT);
         if (answer == null) throw new IllegalStateException("GitLab answered without a response");
         return answer;
+    }
+
+    private record Request(URI uri, String authorization) {}
+
+    // The address and credential are local facts; resolving them is never part of a provider request.
+    private Request request(long scopeId, MrCoordinates mr) {
+        return request(scopeId, mr, null);
+    }
+
+    private Request request(long scopeId, MrCoordinates mr, @Nullable String discussion) {
+        return new Request(discussions(scopeId, mr, discussion), "Bearer " + tokenService.getAccessToken(scopeId));
     }
 
     private URI discussions(long scopeId, MrCoordinates mr, @Nullable String discussion) {
@@ -523,14 +543,16 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
                 continue;
             }
             LineNote item = expected.get(key);
-            CopyForm copyForm = item != null
-                            && note.get("author") instanceof Map<?, ?> author
-                            && currentUserId.equals(author.get("id"))
-                    ? copyForm(note, body, item, version, projectUrl)
-                    : null;
+            CopyForm copyForm = null;
+            boolean rangePending = false;
+            if (item != null
+                    && note.get("author") instanceof Map<?, ?> author
+                    && currentUserId.equals(author.get("id"))) {
+                copyForm = copyForm(note, body, item, version, projectUrl);
+                rangePending = copyForm == CopyForm.LINE_NOTE && placesRange(body, item);
+            }
             String url = note.get("url") instanceof String noteUrl ? noteUrl : null;
             Copy previous = copies.get(key);
-            boolean rangePending = copyForm == CopyForm.LINE_NOTE && item != null && placesRange(body, item);
             if (copyForm != null && (previous == null || !previous.verified())) {
                 copies.put(key, new Copy(true, noteId, discussionId, url, copyForm, rangePending));
             } else if (copyForm == null && previous == null) {
@@ -623,7 +645,7 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
         if (!SEGMENT.matcher(segment).matches())
             throw new FeedbackDeliveryException("A GitLab range thread has no readable identity");
         long noteId = GitLabSyncConstants.extractNumericId(copy.noteId());
-        Answer answer = exchange(scopeId, HttpMethod.GET, discussions(scopeId, mr, segment), null);
+        Answer answer = exchange(scopeId, HttpMethod.GET, request(scopeId, mr, segment), null);
         JsonNode thread = answer.json();
         if (answer.status() != 200 || thread == null || !thread.path("notes").isArray())
             throw new FeedbackDeliveryException("A GitLab range thread was not read");

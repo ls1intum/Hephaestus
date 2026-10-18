@@ -17,7 +17,8 @@ import org.jspecify.annotations.Nullable;
 
 /** Coordinates come from one immutable GitLab diff version, including both sides of context lines. */
 final class GitLabDiffPositions {
-    private static final Pattern HUNK = Pattern.compile("^@@ -(\\d+)(?:,\\d+)? \\+(\\d+)(?:,\\d+)? @@.*");
+    // At most nine digits fit an int, so a header GitLab could not mean is no hunk rather than a crash.
+    private static final Pattern HUNK = Pattern.compile("^@@ -(\\d{1,9})(?:,\\d+)? \\+(\\d{1,9})(?:,\\d+)? @@.*");
 
     private GitLabDiffPositions() {}
 
