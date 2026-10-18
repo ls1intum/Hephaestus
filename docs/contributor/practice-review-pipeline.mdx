@@ -247,6 +247,28 @@ Current source version, scope, consent, feedback mode, delivery pause and approv
 A work-state refusal does not erase the result.
 Practice-page and conversation feedback retain their own visibility checks.
 
+A public piece keeps the publication context of the history read that it was composed from.
+The history read issues the context and the history page from one snapshot.
+A new copy write needs two facts about the same work and the same developer.
+First, the context of other reviews' feedback is still current.
+Second, no write of another review has an unknown outcome.
+The write fence takes the item lock first, then reads both facts in one statement.
+
+A stale context withholds the piece as Public history changed.
+An unknown outcome withholds the piece as Public delivery unresolved.
+The admitted results do not change.
+A piece prepared before contexts existed counts as composed from an empty history.
+Readback, retraction and correction do not need these checks.
+
+Preparation refuses a public piece with a stale context and stores nothing.
+While its composer still runs, a fresh session composes again from a new history read, at most twice.
+A refused approval records its check before it answers.
+A stale context also records the withholding.
+An unknown outcome keeps the proposal awaiting approval.
+
+An admin can recheck a write with unknown visibility.
+The recheck only reads the copy back and never creates a copy.
+
 The [feedback model](./practice-feedback-schema.md#feedback-and-delivery) owns durable receipts.
 The [operator guide](/admin/practice-review) owns approval, retry and diagnosis procedures.
 

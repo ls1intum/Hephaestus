@@ -5,9 +5,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.handler.AdmissionConflictException;
+import de.tum.cit.aet.hephaestus.agent.handler.PublicationContextRefusedException;
 import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmissionRequestDTO;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.PrepareFeedbackRequestDTO;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.JobJwt;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.List;
@@ -49,6 +52,24 @@ class ResultAdmissionControllerTest extends BaseUnitTest {
                 .isInstanceOfSatisfying(
                         ResponseStatusException.class,
                         error -> Assertions.assertThat(error.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+    }
+
+    @Test
+    void shouldNameTheStaleHistoryInAPreparationRefusalThatPreparedNothing() {
+        var admission = mock(ResultAdmissionService.class);
+        var id = UUID.randomUUID();
+        var request = new PrepareFeedbackRequestDTO(UUID.randomUUID(), id, 0, List.of(), List.of(), true, null);
+        var now = Instant.now();
+        var jwt = new JobJwt(id, 1L, 0, Set.of("llm_proxy"), "test", now, now.plusSeconds(60));
+        var authentication = new JobTokenAuthentication(new ProxyIdentity(jwt, "worker", null), jwt.scopes());
+        when(admission.prepareFeedback(new ResultAdmissionService.AdmissionIdentity(id, 1L, 0, "worker"), request))
+                .thenThrow(new PublicationContextRefusedException(FeedbackStopReason.PUBLIC_HISTORY_CHANGED));
+        assertThatThrownBy(() -> new ResultAdmissionController(admission).prepareFeedback(request, authentication))
+                .isInstanceOfSatisfying(ResponseStatusException.class, error -> {
+                    Assertions.assertThat(error.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+                    Assertions.assertThat(error.getBody().getProperties())
+                            .containsEntry("code", "PUBLIC_HISTORY_CHANGED");
+                });
     }
 
     private static Stream<RuntimeException> attemptConflicts() {

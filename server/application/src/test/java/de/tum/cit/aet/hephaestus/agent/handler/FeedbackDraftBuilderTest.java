@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedback;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.PrepareFeedbackRequestDTO;
 import de.tum.cit.aet.hephaestus.evidence.CitationSide;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmittedProblemSnapshot;
@@ -20,9 +21,12 @@ import de.tum.cit.aet.hephaestus.practices.spi.ResultCandidate;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 class FeedbackDraftBuilderTest extends BaseUnitTest {
     @Test
@@ -48,10 +52,16 @@ class FeedbackDraftBuilderTest extends BaseUnitTest {
                 null);
         var drafts = FeedbackDraftBuilder.build(
                 job,
-                Set.of(resultId),
+                new PrepareFeedbackRequestDTO(
+                        job.getReviewId(),
+                        job.getId(),
+                        job.getAttempt(),
+                        List.copyOf(Set.of(resultId)),
+                        List.of(piece),
+                        piece.destination() == FeedbackDestination.ON_WORK,
+                        null),
                 List.of(new AdmittedResultSnapshot(resultId, candidate, List.of())),
                 List.of(),
-                List.of(piece),
                 Map.of());
         var draft = drafts.getFirst();
         assertThat(draft.id()).isEqualTo(FeedbackIds.onWork(1, job.getReviewId(), 5));
@@ -65,6 +75,7 @@ class FeedbackDraftBuilderTest extends BaseUnitTest {
 
     @Test
     void shouldRejectAComposerResultThatWasNotInTheFencedBasis() {
+        var job = RuntimeReviewTestData.job();
         var piece = new ComposedFeedback(
                 FeedbackDestination.CONVERSATION,
                 List.of(UUID.randomUUID()),
@@ -74,12 +85,24 @@ class FeedbackDraftBuilderTest extends BaseUnitTest {
                 new FeedbackCompositionTrace(List.of(), List.of(), null, null),
                 null);
         assertThatThrownBy(() -> FeedbackDraftBuilder.build(
-                        RuntimeReviewTestData.job(), Set.of(), List.of(), List.of(), List.of(piece), Map.of()))
+                        job,
+                        new PrepareFeedbackRequestDTO(
+                                job.getReviewId(),
+                                job.getId(),
+                                job.getAttempt(),
+                                List.copyOf(Set.of()),
+                                List.of(piece),
+                                piece.destination() == FeedbackDestination.ON_WORK,
+                                null),
+                        List.of(),
+                        List.of(),
+                        Map.of()))
                 .isInstanceOf(AdmissionConflictException.class);
     }
 
     @Test
     void shouldRejectDeveloperlessResultsAsFeedback() {
+        var job = RuntimeReviewTestData.job();
         UUID id = UUID.randomUUID();
         var candidate = mock(ResultCandidate.class);
         when(candidate.developerId()).thenReturn(null);
@@ -92,11 +115,17 @@ class FeedbackDraftBuilderTest extends BaseUnitTest {
                 new FeedbackCompositionTrace(List.of(), List.of(), null, null),
                 null);
         assertThatThrownBy(() -> FeedbackDraftBuilder.build(
-                        RuntimeReviewTestData.job(),
-                        Set.of(id),
+                        job,
+                        new PrepareFeedbackRequestDTO(
+                                job.getReviewId(),
+                                job.getId(),
+                                job.getAttempt(),
+                                List.copyOf(Set.of(id)),
+                                List.of(piece),
+                                piece.destination() == FeedbackDestination.ON_WORK,
+                                null),
                         List.of(new AdmittedResultSnapshot(id, candidate, List.of())),
                         List.of(),
-                        List.of(piece),
                         Map.of()))
                 .isInstanceOf(AdmissionConflictException.class);
     }
@@ -128,7 +157,14 @@ class FeedbackDraftBuilderTest extends BaseUnitTest {
                 null);
         var draft = FeedbackDraftBuilder.build(
                         job,
-                        Set.of(resultId, quietId),
+                        new PrepareFeedbackRequestDTO(
+                                job.getReviewId(),
+                                job.getId(),
+                                job.getAttempt(),
+                                List.copyOf(Set.of(resultId, quietId)),
+                                List.of(piece),
+                                piece.destination() == FeedbackDestination.ON_WORK,
+                                null),
                         List.of(
                                 new AdmittedResultSnapshot(
                                         resultId,
@@ -136,7 +172,6 @@ class FeedbackDraftBuilderTest extends BaseUnitTest {
                                         List.of(new AdmittedProblemSnapshot(problemId, mock(ProblemCandidate.class)))),
                                 new AdmittedResultSnapshot(quietId, candidate, List.of())),
                         List.of(),
-                        List.of(piece),
                         Map.of(
                                 new ComposedFeedback.Anchor(problemId, 0),
                                         new FeedbackAnchor("old.java", 4, 4, CitationSide.OLD),
@@ -171,13 +206,62 @@ class FeedbackDraftBuilderTest extends BaseUnitTest {
                 FeedbackDestination.PRACTICE_PAGE, List.of(resultId), null, List.of(), null, trace, page);
         var draft = FeedbackDraftBuilder.build(
                         job,
-                        Set.of(resultId),
+                        new PrepareFeedbackRequestDTO(
+                                job.getReviewId(),
+                                job.getId(),
+                                job.getAttempt(),
+                                List.copyOf(Set.of(resultId)),
+                                List.of(piece),
+                                piece.destination() == FeedbackDestination.ON_WORK,
+                                null),
                         List.of(new AdmittedResultSnapshot(resultId, candidate, List.of())),
                         List.of(),
-                        List.of(piece),
                         Map.of())
                 .getFirst();
         assertThat(draft.body()).isNull();
         assertThat(draft.page()).isEqualTo(new FeedbackDraft.Page(page.title(), page.body(), page.nextStep()));
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = FeedbackDestination.class,
+            names = {"ON_WORK", "CONVERSATION"})
+    void shouldBindOnlyPublicDraftsToTheRequestsContextRatherThanTheComposedTrace(FeedbackDestination destination) {
+        var job = RuntimeReviewTestData.job();
+        UUID resultId = UUID.randomUUID();
+        var candidate = mock(ResultCandidate.class);
+        when(candidate.developerId()).thenReturn(5L);
+        var trace = new FeedbackCompositionTrace(
+                        List.of(new FeedbackCompositionTrace.CopySupport(
+                                destination == FeedbackDestination.ON_WORK
+                                        ? FeedbackCopyKind.SUMMARY
+                                        : FeedbackCopyKind.CHAT_TURN,
+                                0,
+                                List.of(new FeedbackCompositionTrace.Support(resultId, null)))),
+                        List.of(),
+                        null,
+                        null)
+                .withPublicationContext("untrusted-composed-context");
+        var piece = new ComposedFeedback(
+                destination, List.of(resultId), "Cover the failure case.", List.of(), null, trace, null);
+        var request = new PrepareFeedbackRequestDTO(
+                job.getReviewId(),
+                job.getId(),
+                job.getAttempt(),
+                List.of(resultId),
+                List.of(piece),
+                destination == FeedbackDestination.ON_WORK,
+                "captured-request-context");
+        var draft = FeedbackDraftBuilder.build(
+                        job,
+                        request,
+                        List.of(new AdmittedResultSnapshot(resultId, candidate, List.of())),
+                        List.of(),
+                        Map.of())
+                .getFirst();
+        var stored = Objects.requireNonNull(draft.composition());
+        if (destination == FeedbackDestination.ON_WORK)
+            assertThat(stored.publicationContext()).isEqualTo("captured-request-context");
+        else assertThat(stored.publicationContext()).isNull();
     }
 }

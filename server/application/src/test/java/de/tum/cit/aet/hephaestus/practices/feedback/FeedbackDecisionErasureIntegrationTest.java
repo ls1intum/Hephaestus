@@ -155,7 +155,7 @@ class FeedbackDecisionErasureIntegrationTest extends AbstractFeedbackDeliveryInt
                         .findLatestVisibility(workspace.getId(), feedbackId)
                         .orElseThrow()
                         .getId())
-                .isEqualTo(withdrawal.getId());
+                .isEqualTo(withdrawal.decisionId());
         assertThat(current().getStopReason()).isNull();
         assertThat(provider.physical).isEmpty();
         decisionService.decide(

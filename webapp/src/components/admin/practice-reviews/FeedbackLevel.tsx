@@ -1,4 +1,4 @@
-import { EyeOffIcon, RotateCcwIcon, Undo2Icon } from "lucide-react";
+import { EyeOffIcon, RotateCcwIcon, SearchCheckIcon, Undo2Icon } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
 
 import type {
@@ -43,6 +43,7 @@ import { FEEDBACK_LOCATION_DEFS } from "@/components/practice-vocabulary/feedbac
 import { FEEDBACK_RESOLUTION_DEFS } from "@/components/practice-vocabulary/feedback-resolution-defs";
 import {
 	copiesStillOnWork,
+	deliveryCheck,
 	FEEDBACK_SEND_ACTION_LABELS,
 	FEEDBACK_SEND_STATE_DEFS,
 	type WithdrawalCorrection,
@@ -102,6 +103,12 @@ export interface FeedbackLevelProps {
 	 */
 	onRetryWithdrawal: () => void;
 	isRetryingWithdrawal: boolean;
+	/**
+	 * Asks the provider again whether a comment whose write was never confirmed appeared on the work.
+	 * It posts nothing. Offered only while the post has finished with that write still unknown.
+	 */
+	onCheckDelivery: () => void;
+	isCheckingDelivery: boolean;
 }
 
 function inOrder(copies: readonly FeedbackCopy[]): FeedbackCopy[] {
@@ -129,6 +136,8 @@ export function FeedbackLevel({
 	isChangingWithdrawal,
 	onRetryWithdrawal,
 	isRetryingWithdrawal,
+	onCheckDelivery,
+	isCheckingDelivery,
 }: FeedbackLevelProps) {
 	const feedback = state.status === "ready" ? state.feedback : undefined;
 	let flag: ReactNode;
@@ -251,6 +260,16 @@ export function FeedbackLevel({
 			) : (
 				canChangeWithdrawal(record) && (
 					<DrawerFooter>
+						{deliveryCheck(record) === "available" && (
+							<Button
+								variant="outline"
+								disabled={isCheckingDelivery || isChangingWithdrawal}
+								onClick={onCheckDelivery}
+							>
+								<SearchCheckIcon aria-hidden />
+								Check delivery
+							</Button>
+						)}
 						{withdrawalCorrection(record) === "retryable" && (
 							<Button
 								variant="outline"
@@ -614,6 +633,14 @@ function withdrawnOnWorkNow(feedback: FeedbackRecord): string {
 	const remaining = copiesStillOnWork(feedback.copies).length;
 	const one = remaining === 1;
 	const copies = one ? "one copy" : `${String(remaining)} copies`;
+	// An unknown write is settled by reading the work again, not by a removal.
+	const check = deliveryCheck(feedback);
+	if (check === "available") {
+		return `It is withdrawn, but ${copies} may still be on the work, because a write was never confirmed. Check delivery to find out. A comment found there is then retracted. The results behind it are unchanged.`;
+	}
+	if (check === "checking") {
+		return "It is withdrawn. Heph is confirming whether a comment it began writing appeared on the work. A comment found there is then retracted. The results behind it are unchanged.";
+	}
 	switch (withdrawalCorrection(feedback)) {
 		case "pending": {
 			return "It is withdrawn. Heph is still removing the copies it posted on the work. The results behind it are unchanged.";
@@ -649,7 +676,7 @@ function feedbackNow(feedback: FeedbackRecord): ReactNode {
 			return readyLine(feedback);
 		}
 		case "UNCONFIRMED": {
-			return "A conversation linked it, but its appearance was not recorded, so it does not count as delivered.";
+			return unconfirmedLine(feedback);
 		}
 		case "DELIVERED":
 		case "WITHHELD":
@@ -657,6 +684,24 @@ function feedbackNow(feedback: FeedbackRecord): ReactNode {
 		case "REPLACED":
 		case "FAILED": {
 			return undefined;
+		}
+	}
+}
+
+function unconfirmedLine(feedback: FeedbackRecord): string {
+	if (feedback.destination !== "ON_WORK") {
+		return "A conversation linked it, but its appearance was not recorded, so it does not count as delivered.";
+	}
+	// Only the approval stage holds later feedback; preparation and the write stop it instead.
+	switch (deliveryCheck(feedback)) {
+		case "available": {
+			return "A comment was being written to the work, but the provider has not confirmed whether it appeared. It does not count as delivered until that is known. Until then, later reviews post no new feedback for this developer on this work.";
+		}
+		case "checking": {
+			return "Heph is confirming whether a comment it began writing appeared on the work. Until the provider confirms it, it does not count as delivered.";
+		}
+		case undefined: {
+			return "A write to the work was not confirmed, so it does not count as delivered.";
 		}
 	}
 }

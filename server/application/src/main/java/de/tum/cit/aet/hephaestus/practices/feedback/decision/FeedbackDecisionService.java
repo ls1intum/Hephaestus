@@ -7,19 +7,23 @@ import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackBasisRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopyRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackGate;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPublicationContext;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSendQueue;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSendRepository;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheck;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheckStage;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackChecks;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDecisionAction;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDecisionInput;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDecisionOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDecisionReason;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackSendAction;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackSendState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.EnumMap;
@@ -50,9 +54,14 @@ public class FeedbackDecisionService {
     private final FeedbackContentDigest digests;
     private final PersonDataWriteFence privacy;
     private final FeedbackSendQueue sendQueue;
+    private final FeedbackPublicationContext publication;
 
+    /**
+     * Records a decision. A refused approval whose cause is the publication context returns, rather than throws, so
+     * its committed check, and for a changed context its withholding, stay with the feedback.
+     */
     @Transactional
-    public FeedbackDecision decide(
+    public FeedbackDecisionOutcome decide(
             long workspaceId, UUID feedbackId, long actorAccountId, FeedbackDecisionInput request) {
         var action = request.action();
         var reason = request.reason();
@@ -96,10 +105,14 @@ public class FeedbackDecisionService {
                     throw conflict("A result in this feedback is marked incorrect.");
                 var check = gate.evaluate(feedback, FeedbackCheckStage.APPROVED, false);
                 if (!check.allowed()) throw conflict("Current delivery policy does not permit approval.");
+                var refusal = publication.refusal(feedback).orElse(null);
+                if (refusal != null)
+                    check = new FeedbackCheck(check.stage(), false, refusal, check.checkedAt(), check.facts());
                 var checks = new EnumMap<FeedbackCheckStage, FeedbackChecks>(FeedbackCheckStage.class);
                 checks.putAll(feedback.getChecks());
                 checks.put(check.stage(), new FeedbackChecks(List.of(check), check.checkedAt()));
                 feedbackRepository.updateChecks(workspaceId, feedbackId, checks);
+                if (refusal != null) return refused(feedback, refusal);
             }
             feedbackRepository.updateDelivery(
                     workspaceId,
@@ -146,7 +159,29 @@ public class FeedbackDecisionService {
         if (action == FeedbackDecisionAction.APPROVE) {
             events.publishEvent(new ApprovedFeedbackReadyEvent(workspaceId, feedbackId));
         }
-        return decision;
+        return new FeedbackDecisionOutcome(
+                decision.getId(),
+                null,
+                action == FeedbackDecisionAction.APPROVE
+                        ? FeedbackState.READY
+                        : action == FeedbackDecisionAction.REJECT ? FeedbackState.REJECTED : feedback.getState());
+    }
+
+    /**
+     * A changed context is not accepted again for these words, so the proposal is withheld; an unresolved write
+     * of another review can still be read back, so the proposal keeps awaiting approval.
+     */
+    private FeedbackDecisionOutcome refused(Feedback feedback, FeedbackStopReason refusal) {
+        if (refusal != FeedbackStopReason.PUBLIC_HISTORY_CHANGED)
+            return new FeedbackDecisionOutcome(null, refusal, feedback.getState());
+        copies.withholdPlanned(feedback.getWorkspaceId(), feedback.getId(), refusal.name());
+        feedbackRepository.updateDelivery(
+                feedback.getWorkspaceId(),
+                feedback.getId(),
+                FeedbackState.WITHHELD,
+                refusal,
+                feedback.getDeliveredAt());
+        return new FeedbackDecisionOutcome(null, refusal, FeedbackState.WITHHELD);
     }
 
     private static void validate(

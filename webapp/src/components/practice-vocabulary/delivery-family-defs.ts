@@ -49,7 +49,7 @@ export const DELIVERY_FAMILY_DEFS: StatusDefs<DeliveryFamily> = {
 	),
 	UNCONFIRMED: familyDef(
 		"UNCONFIRMED",
-		"The conversation linked it, but its appearance was not recorded, so it counts as neither delivered nor withheld.",
+		"It may have appeared, but that was never confirmed, so it counts as neither delivered nor withheld.",
 	),
 	WITHHELD: familyDef(
 		"WITHHELD",

@@ -14,7 +14,7 @@ public interface FeedbackStore {
 
     void recordConversationReceipt(long workspaceId, CopyWriteFence fence, ConversationCopyReceipt receipt);
 
-    void decide(long workspaceId, UUID feedbackId, long actorId, FeedbackDecisionInput input);
+    FeedbackDecisionOutcome decide(long workspaceId, UUID feedbackId, long actorId, FeedbackDecisionInput input);
 
     void retry(long workspaceId, UUID feedbackId, long actorId);
 

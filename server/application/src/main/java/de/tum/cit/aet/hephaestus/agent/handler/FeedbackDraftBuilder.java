@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedback;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.PrepareFeedbackRequestDTO;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackBasisInput;
@@ -29,16 +30,17 @@ public final class FeedbackDraftBuilder {
 
     public static List<FeedbackDraft> build(
             ReviewJob job,
-            Set<UUID> allowedResults,
+            PrepareFeedbackRequestDTO request,
             List<AdmittedResultSnapshot> admitted,
             List<ResultHistoryEntry> historical,
-            List<ComposedFeedback> composition,
             Map<ComposedFeedback.Anchor, FeedbackAnchor> anchors) {
+        var allowedResults = Set.copyOf(request.basisResultIds());
+        @Nullable String publicationContext = request.publicComposition() ? request.publicationContext() : null;
         var byId = admitted.stream().collect(Collectors.toMap(AdmittedResultSnapshot::id, Function.identity()));
         var historyById =
                 historical.stream().collect(Collectors.toMap(ResultHistoryEntry::resultId, Function.identity()));
         var drafts = new ArrayList<FeedbackDraft>();
-        for (var piece : composition) {
+        for (var piece : request.composition()) {
             if (!allowedResults.containsAll(piece.resultIds())) throw new AdmissionConflictException();
             var support = piece.resultIds().stream()
                     .filter(byId::containsKey)
@@ -79,7 +81,9 @@ public final class FeedbackDraftBuilder {
                             FeedbackIds.conversation(
                                     job.getWorkspaceId(), job.getReviewId(), developer, piece.resultIds());
                     };
-            var trace = piece.trace();
+            var trace = piece.trace()
+                    .withPublicationContext(
+                            piece.destination() == FeedbackDestination.ON_WORK ? publicationContext : null);
             var allRefs = new ArrayList<FeedbackCompositionTrace.Support>();
             trace.copies().forEach(copy -> allRefs.addAll(copy.basedOn()));
             trace.withheld().forEach(decision -> allRefs.addAll(decision.basedOn()));

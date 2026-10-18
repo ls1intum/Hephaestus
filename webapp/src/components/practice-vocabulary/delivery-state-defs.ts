@@ -45,7 +45,8 @@ export const DELIVERY_STATE_DEFS: StatusDefs<DeliveryState> = {
 		label: "Delivery unconfirmed",
 		icon: CircleHelpIcon,
 		badgeVariant: "outline",
-		description: "The conversation linked this feedback, but its appearance was not recorded.",
+		description:
+			"It may have appeared, but that was never confirmed, so it does not count as delivered.",
 	},
 	WITHHELD: {
 		label: "Withheld",
@@ -87,6 +88,10 @@ const CONVERSATION_OVERRIDES = {
 		badgeVariant: "success",
 		description: "Heph showed it to the developer in a reply to their next chat.",
 	},
+	UNCONFIRMED: {
+		...DELIVERY_STATE_DEFS.UNCONFIRMED,
+		description: "The conversation linked this feedback, but its appearance was not recorded.",
+	},
 	EXPIRED: {
 		label: "Withheld, never raised",
 		icon: HourglassIcon,
@@ -119,6 +124,9 @@ export function deliveryOutcome(feedback: DeliveryFacts): StatusDef {
 		}
 		if (state === "DELIVERED") {
 			return CONVERSATION_OVERRIDES.DELIVERED;
+		}
+		if (state === "UNCONFIRMED") {
+			return CONVERSATION_OVERRIDES.UNCONFIRMED;
 		}
 		if (stopReason === "CONVERSATION_EXPIRED") {
 			return CONVERSATION_OVERRIDES.EXPIRED;

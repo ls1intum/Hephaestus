@@ -86,6 +86,8 @@ A developerless result cannot support feedback.
 `review.checks.feedbackComposition` retains each feedback proposal's exact support per copy and its quiet decisions with prior-advice witness IDs.
 The same record retains the primary result and any explicit conversation replacement target.
 Preparation rejects a replay that changes this record.
+For a public piece, the record also retains the publication context that the history read issued.
+The server sets it from the preparation request, and the composer cannot set it.
 These records share the review's existing JSON limit and require no additional table.
 
 The runtime passes practice-page title, body and next step through the practices SPI.

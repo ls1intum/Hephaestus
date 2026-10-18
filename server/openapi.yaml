@@ -384,6 +384,7 @@ paths:
             - WORKSPACE_BYO_LLM_BUDGET
             - REVIEW_BATCH
             - REVIEW_SCHEDULE
+            - FEEDBACK_DELIVERY_RECHECK
             - WORKSPACE_LLM_CONNECTION
             - WORKSPACE_LLM_MODEL
       - in: query
@@ -4221,6 +4222,7 @@ paths:
             - WORKSPACE_BYO_LLM_BUDGET
             - REVIEW_BATCH
             - REVIEW_SCHEDULE
+            - FEEDBACK_DELIVERY_RECHECK
             - WORKSPACE_LLM_CONNECTION
             - WORKSPACE_LLM_MODEL
       - in: query
@@ -8165,6 +8167,8 @@ paths:
             - EVIDENCE_NOT_PERMITTED
             - NO_EVIDENCE
             - UNCORROBORATED
+            - PUBLIC_HISTORY_CHANGED
+            - PUBLIC_DELIVERY_UNRESOLVED
       - in: query
         name: withdrawn
         required: false
@@ -8352,6 +8356,8 @@ paths:
             - EVIDENCE_NOT_PERMITTED
             - NO_EVIDENCE
             - UNCORROBORATED
+            - PUBLIC_HISTORY_CHANGED
+            - PUBLIC_DELIVERY_UNRESOLVED
       - in: query
         name: withdrawn
         required: false
@@ -8524,6 +8530,8 @@ paths:
             - EVIDENCE_NOT_PERMITTED
             - NO_EVIDENCE
             - UNCORROBORATED
+            - PUBLIC_HISTORY_CHANGED
+            - PUBLIC_DELIVERY_UNRESOLVED
       - in: query
         name: withdrawn
         required: false
@@ -8654,6 +8662,34 @@ paths:
               schema:
                 $ref: "#/components/schemas/FeedbackDecision"
           description: Feedback decision recorded
+      tags:
+      - feedback-review
+  /workspaces/{workspaceSlug}/practices/reviews/feedback/{feedbackId}/recheck:
+    post:
+      operationId: recheckFeedbackDelivery
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          maxLength: 51
+          minLength: 3
+          pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
+      - in: path
+        name: feedbackId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "202":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewFeedbackDetail"
+          description: Feedback delivery recheck accepted
       tags:
       - feedback-review
   /workspaces/{workspaceSlug}/practices/reviews/feedback/{feedbackId}/retry:
@@ -13224,6 +13260,8 @@ components:
           - EVIDENCE_NOT_PERMITTED
           - NO_EVIDENCE
           - UNCORROBORATED
+          - PUBLIC_HISTORY_CHANGED
+          - PUBLIC_DELIVERY_UNRESOLVED
     ConfigAuditActorRef:
       type: object
       description: |-
@@ -13313,6 +13351,7 @@ components:
           - WORKSPACE_BYO_LLM_BUDGET
           - REVIEW_BATCH
           - REVIEW_SCHEDULE
+          - FEEDBACK_DELIVERY_RECHECK
           - WORKSPACE_LLM_CONNECTION
           - WORKSPACE_LLM_MODEL
         id:
@@ -14877,6 +14916,8 @@ components:
           - EVIDENCE_NOT_PERMITTED
           - NO_EVIDENCE
           - UNCORROBORATED
+          - PUBLIC_HISTORY_CHANGED
+          - PUBLIC_DELIVERY_UNRESOLVED
           - null
         stage:
           type: string
@@ -14927,8 +14968,9 @@ components:
       - writeStarted
     FeedbackCompositionTrace:
       type: object
-      description: Exact support and quiet decisions retained with the immutable preparation
-        receipt.
+      description: |-
+        Exact support and quiet decisions retained with the immutable preparation receipt. A public piece also retains the
+         publication context of the history read it was composed from; the server sets it, never the composer.
       properties:
         copies:
           type: array
@@ -14937,6 +14979,8 @@ components:
         primaryResultId:
           type: string
           format: uuid
+        publicationContext:
+          type: string
         replacesId:
           type: string
           format: uuid
@@ -15066,6 +15110,8 @@ components:
           - EVIDENCE_NOT_PERMITTED
           - NO_EVIDENCE
           - UNCORROBORATED
+          - PUBLIC_HISTORY_CHANGED
+          - PUBLIC_DELIVERY_UNRESOLVED
           - null
         writeStartedAt:
           type:
@@ -19396,6 +19442,8 @@ components:
           - EVIDENCE_NOT_PERMITTED
           - NO_EVIDENCE
           - UNCORROBORATED
+          - PUBLIC_HISTORY_CHANGED
+          - PUBLIC_DELIVERY_UNRESOLVED
           - null
       required:
       - decision
@@ -19569,6 +19617,10 @@ components:
           format: uuid
         publicComposition:
           type: boolean
+        publicationContext:
+          type:
+          - string
+          - "null"
         reviewId:
           type: string
           format: uuid
@@ -19578,6 +19630,7 @@ components:
       - composition
       - jobId
       - publicComposition
+      - publicationContext
       - reviewId
     PrepareFeedbackResponse:
       type: object
@@ -20347,18 +20400,26 @@ components:
       - enabled
     PublicFeedbackHistory:
       type: object
+      description: |-
+        One authorized history read. <code>publicationContext</code> names this exact response: preparation of a public piece
+         composed from it must send it back unchanged.
       properties:
         contractVersion:
           type: integer
           format: int32
         history:
           $ref: "#/components/schemas/History"
+        publicationContext:
+          type:
+          - string
+          - "null"
         readAt:
           type: string
           format: date-time
       required:
       - contractVersion
       - history
+      - publicationContext
       - readAt
     Question:
       type: object
@@ -20864,6 +20925,8 @@ components:
           - EVIDENCE_NOT_PERMITTED
           - NO_EVIDENCE
           - UNCORROBORATED
+          - PUBLIC_HISTORY_CHANGED
+          - PUBLIC_DELIVERY_UNRESOLVED
           - null
       required:
       - decision
@@ -21934,6 +21997,8 @@ components:
           - EVIDENCE_NOT_PERMITTED
           - NO_EVIDENCE
           - UNCORROBORATED
+          - PUBLIC_HISTORY_CHANGED
+          - PUBLIC_DELIVERY_UNRESOLVED
           - null
         textHidden:
           type: boolean
@@ -22140,6 +22205,8 @@ components:
           - EVIDENCE_NOT_PERMITTED
           - NO_EVIDENCE
           - UNCORROBORATED
+          - PUBLIC_HISTORY_CHANGED
+          - PUBLIC_DELIVERY_UNRESOLVED
           - null
         textHidden:
           type: boolean

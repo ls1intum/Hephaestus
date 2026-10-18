@@ -37,6 +37,7 @@ export const ENTITY_TYPE_LABELS: Record<EntityType, string> = {
 	REVIEW_SCHEDULE: "Recurring check for new work",
 	WORKSPACE_LLM_CONNECTION: "Workspace AI provider",
 	WORKSPACE_LLM_MODEL: "Workspace model",
+	FEEDBACK_DELIVERY_RECHECK: "Feedback delivery check",
 	...RENAMED_ENTITY_TYPE_LABELS,
 };
 

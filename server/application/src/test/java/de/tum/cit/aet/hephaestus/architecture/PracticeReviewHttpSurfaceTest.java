@@ -23,7 +23,12 @@ class PracticeReviewHttpSurfaceTest extends HephaestusArchitectureTest {
                 .toList();
         assertThat(controllers).isNotEmpty();
         assertThat(controllers).allMatch(type -> type.isAnnotatedWith(RequireAtLeastWorkspaceAdmin.class));
-        Set<String> creates = Set.of("createResultMark", "createFeedbackDecision", "retryFeedback", "cancelReview");
+        Set<String> creates = Set.of(
+                "createResultMark",
+                "createFeedbackDecision",
+                "retryFeedback",
+                "recheckFeedbackDelivery",
+                "cancelReview");
         var unsupported = controllers.stream()
                 .flatMap(type -> type.getMethods().stream())
                 .filter(method -> method.isAnnotatedWith(RequestMapping.class)

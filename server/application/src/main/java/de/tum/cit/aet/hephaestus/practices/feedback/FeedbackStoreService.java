@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCompositionContext;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDecisionInput;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDecisionOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDraft;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackResolution;
@@ -162,8 +163,9 @@ public class FeedbackStoreService implements FeedbackStore {
     }
 
     @Override
-    public void decide(long workspaceId, UUID feedbackId, long actorId, FeedbackDecisionInput input) {
-        decisions.decide(workspaceId, feedbackId, actorId, input);
+    public FeedbackDecisionOutcome decide(
+            long workspaceId, UUID feedbackId, long actorId, FeedbackDecisionInput input) {
+        return decisions.decide(workspaceId, feedbackId, actorId, input);
     }
 
     @Override
@@ -206,6 +208,11 @@ public class FeedbackStoreService implements FeedbackStore {
                 null,
                 row.getDeliveredAt());
         sendQueue.queue(row, FeedbackSendAction.POST, FeedbackSendState.PENDING);
+    }
+
+    public void recheck(long workspaceId, UUID feedbackId, long actorId) {
+        if (actorId <= 0) throw new IllegalArgumentException("A recheck requires an authenticated account.");
+        sendQueue.recheck(lock(workspaceId, feedbackId));
     }
 
     /**

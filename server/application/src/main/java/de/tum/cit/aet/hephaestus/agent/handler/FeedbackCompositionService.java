@@ -14,6 +14,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCompositionContext;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackHistoryQuery;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStore;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticePageSupport;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryEntry;
@@ -24,7 +26,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
@@ -38,6 +39,7 @@ public class FeedbackCompositionService {
     private final ReviewAssignmentStore members;
     private final ResultHistoryQuery history;
     private final HistoryCopies copies;
+    private final FeedbackHistoryQuery publicHistory;
 
     public PrepareFeedbackResponseDTO prepare(
             ReviewJob job,
@@ -46,12 +48,27 @@ public class FeedbackCompositionService {
             Read context,
             Map<ComposedFeedback.Anchor, FeedbackAnchor> anchors,
             boolean publicAlreadyAccepted) {
-        var drafts = FeedbackDraftBuilder.build(
-                job, Set.copyOf(request.basisResultIds()), rows, context.support(), request.composition(), anchors);
+        var drafts = FeedbackDraftBuilder.build(job, request, rows, context.support(), anchors);
         boolean hasPublic = drafts.stream().anyMatch(draft -> draft.destination() == FeedbackDestination.ON_WORK);
         if (hasPublic && !request.publicComposition()) throw new AdmissionConflictException();
         if (request.publicComposition() && publicAlreadyAccepted && job.getPublicReviewDigest() == null)
             throw new AdmissionConflictException();
+        // An accepted package replays below by its digest; only a first acceptance is checked against current history.
+        if (request.publicComposition() && !publicAlreadyAccepted)
+            for (var draft : drafts) {
+                Long itemId = draft.itemId();
+                if (draft.destination() != FeedbackDestination.ON_WORK
+                        || draft.state() == FeedbackState.WITHHELD
+                        || draft.copies().isEmpty()
+                        || itemId == null) continue;
+                var refusal = publicHistory.publicationRefusal(
+                        job.getWorkspaceId(),
+                        itemId,
+                        job.getReviewId(),
+                        draft.developerId(),
+                        request.publicationContext());
+                if (refusal.isPresent()) throw new PublicationContextRefusedException(refusal.get());
+            }
         var prepared = feedback.prepareAll(job.getWorkspaceId(), job.getReviewId(), drafts);
         if (request.publicComposition()
                 && publicAlreadyAccepted

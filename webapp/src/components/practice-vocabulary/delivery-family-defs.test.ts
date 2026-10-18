@@ -22,6 +22,11 @@ describe("delivery families", () => {
 		expect([...grouped].sort()).toStrictEqual([...statusValues(DELIVERY_STATE_DEFS)].sort());
 	});
 
+	// A count holds unconfirmed feedback from every destination, so its words name none of them.
+	it("describes unconfirmed feedback without naming a destination", () => {
+		expect(DELIVERY_FAMILY_DEFS.UNCONFIRMED.description).not.toMatch(/conversation/iu);
+	});
+
 	it("gives every family its own icon", () => {
 		const icons = statusValues(DELIVERY_FAMILY_DEFS).map(
 			(family) => DELIVERY_FAMILY_DEFS[family].icon,
