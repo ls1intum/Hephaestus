@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.result;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountDirectory;
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentityResolver;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonProcessingSuppression;
 import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
@@ -23,10 +23,12 @@ import de.tum.cit.aet.hephaestus.practices.spi.ResultProofAccess;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewItemState;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.json.JsonMapper;
 
 @Component
@@ -41,7 +43,6 @@ public class ResultSourceAuthorization implements ResultProofAccess {
     private final ClasspathSourceCatalogRegistry sources;
     private final PersonProcessingSuppression suppression;
     private final PersonIdentityResolver people;
-    private final AccountIdentityQuery identities;
     private final AccountDirectory accounts;
     private final ProblemRepository problems;
     private final ProductItemRepository itemRows;
@@ -90,14 +91,22 @@ public class ResultSourceAuthorization implements ResultProofAccess {
             if (providers.size() != 1) return false;
             var provider = providers.getFirst();
             if (suppression.isSuppressed(provider.id(), copy.subject(), copy.teamId())) return false;
-            var account = identities
-                    .resolveAccountId(provider.id(), copy.subject(), copy.teamId())
-                    .flatMap(accounts::find);
-            if (account.isEmpty()
-                    || (account.orElseThrow().status() != Account.Status.ACTIVE
-                            && account.orElseThrow().status() != Account.Status.UNCLAIMED)
-                    || suppression.isAccountSuppressed(account.orElseThrow().id())
-                    || account.orElseThrow().aiChoice() == AiChoice.NO_AI) return false;
+            // Capture admits a contributor without an account, so only a linked owner adds controls.
+            // The exact closure includes disabled links, which the enabled-link query cannot see.
+            final Optional<Long> accountId;
+            try {
+                accountId = people.accountFor(new PersonIdentity(provider.id(), copy.subject(), copy.teamId()));
+            } catch (ResponseStatusException unattributable) {
+                return false;
+            }
+            if (accountId.isPresent()) {
+                var account = accounts.find(accountId.orElseThrow());
+                if (account.isEmpty()
+                        || (account.orElseThrow().status() != Account.Status.ACTIVE
+                                && account.orElseThrow().status() != Account.Status.UNCLAIMED)
+                        || suppression.isAccountSuppressed(account.orElseThrow().id())
+                        || account.orElseThrow().aiChoice() == AiChoice.NO_AI) return false;
+            }
         }
         for (var repositoryId : facts.repositoryIds()) {
             var repositories = itemRows.activeRepositoryIds(result.getWorkspaceId(), repositoryId);

@@ -151,8 +151,8 @@ public class ScmItemService implements ItemSource {
         if (!Objects.equals(holder.sourceId(), repository.getId())) throw invisible();
         IntegrationRef integration = repositories.authorize(item.workspaceId(), repository);
         List<RoleHolder> roles = new ArrayList<>();
-        Map<String, String> state = new HashMap<>();
-        state.put("state", work.getState().name());
+        // The descriptor declares these review-state dimensions; practices match reviewOn.state against them.
+        Map<String, String> state = new HashMap<>(work.reviewState());
         if (work instanceof PullRequest pull && !pull.getBaseRefName().isBlank())
             state.put("baseBranch", pull.getBaseRefName());
         ItemVersion version;
@@ -184,8 +184,6 @@ public class ScmItemService implements ItemSource {
                 var linkedVersion = LinkedWorkItemContentSource.currentClosingMaterialVersion(
                         pull, List.copyOf(pull.getClosingIssues()));
                 if (linkedVersion.isPresent()) version = ScmVersion.withContext(version, linkedVersion.get());
-                state.put("draft", Boolean.toString(pull.isDraft()));
-                state.put("merged", Boolean.toString(pull.isMerged()));
             } else version = issueVersions.of(ScmEventPayload.IssueData.from(work));
         }
         String noun = work instanceof PullRequest

@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepositor
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.framework.ItemDescriptorRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.itemevent.ItemEventRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
@@ -17,7 +18,9 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemMergeTimeQuery;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.MonitoredRepositoryQuery;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewStateValue;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RoleHolder;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.IssueContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.LinkedWorkItemContentSource;
@@ -69,6 +72,9 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private ItemIndexService writer;
+
+    @Autowired
+    private ItemDescriptorRegistry descriptors;
 
     @Autowired
     private IdentityProviderRepository providers;
@@ -261,6 +267,11 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
         assertThat(pullSnapshot.label().label()).isEqualTo(type == IdentityProviderType.GITLAB ? "!7" : "#7");
         assertThat(issueSnapshot.state()).doesNotContainKey("baseBranch");
         assertThat(pullSnapshot.state()).containsEntry("baseBranch", "main");
+        // Practices match reviewOn.state against these keys, so every declared dimension carries a declared value.
+        assertThat(pullSnapshot.state()).containsEntry("state", "OPEN").containsEntry("draftStatus", "NOT_DRAFT");
+        assertPublishesDeclaredState(issueSnapshot);
+        assertPublishesDeclaredState(pullSnapshot);
+        assertPublishesDeclaredState(sources.current(pullRef).orElseThrow());
         assertThat(pullSnapshot.label().noun())
                 .isEqualTo(type == IdentityProviderType.GITLAB ? "merge request" : "pull request");
         assertThat(pullSnapshot.roles()).anySatisfy(role -> {
@@ -621,5 +632,18 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
                         connections,
                         WorkspaceTestFixtures.gitLabPatWorkspace(slug).withSlug(slug),
                         url);
+    }
+
+    private void assertPublishesDeclaredState(ItemSnapshot snapshot) {
+        var dimensions = descriptors
+                .descriptorFor(snapshot.item().kind())
+                .orElseThrow()
+                .reviewCapabilities()
+                .reviewOnStateDimensions();
+        assertThat(dimensions)
+                .isNotEmpty()
+                .allSatisfy(dimension -> assertThat(dimension.values())
+                        .extracting(ReviewStateValue::value)
+                        .contains(snapshot.state().get(dimension.key())));
     }
 }

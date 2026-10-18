@@ -281,6 +281,38 @@ class MigratedHistoryReadIntegrationTest extends BaseIntegrationTest {
                 .isEqualTo(true);
     }
 
+    @Test
+    void shouldPermitAnUnlinkedCopiedContributorUntilADisabledLinkNamesAnInactiveAccount() {
+        var result = data.result(scenario, ResultOutcome.MET, Instant.now());
+        migrated(result, Objects.requireNonNull(result.getEvidence()).toString());
+        var job = producingJob(result);
+        var subject = "unlinked-" + UUID.randomUUID();
+        var payload = json.createObjectNode().put("dependencies", "COMPLETE");
+        payload.putArray("repositories");
+        payload.putArray("identities")
+                .addObject()
+                .put("providerType", "GITHUB")
+                .put("providerOrigin", "https://github.com")
+                .put("subject", subject);
+        receipt(job, payload.toString());
+        var providerId = provider();
+        assertThat(authorization.permitsHistory(
+                        scenario.workspace().getId(), result.getId(), SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW))
+                .isTrue();
+
+        var closed = data.member(scenario.workspace().getId());
+        jdbc.update("UPDATE account SET status='DELETING' WHERE id=?", closed.getId());
+        var link = new Identity();
+        link.setAccount(closed);
+        link.setProviderId(providerId);
+        link.setProviderUserKey(subject);
+        link.setDisabledAt(Instant.now());
+        identities.saveAndFlush(link);
+        assertThat(authorization.permitsHistory(
+                        scenario.workspace().getId(), result.getId(), SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW))
+                .isFalse();
+    }
+
     @ParameterizedTest
     @CsvSource({"PRACTICE_PAGE,0", "CONVERSATION,0", "ON_WORK,0", "PRACTICE_PAGE,1", "CONVERSATION,1", "ON_WORK,1"})
     void shouldKeepPrivateFeedbackOutOfOperatorProjectionsWithoutHidingItFromItsRecipient(
@@ -413,15 +445,20 @@ class MigratedHistoryReadIntegrationTest extends BaseIntegrationTest {
     }
 
     private long identity(Account account) {
+        var providerId = provider();
+        var identity = new Identity();
+        identity.setAccount(account);
+        identity.setProviderId(providerId);
+        identity.setProviderUserKey("history-" + account.getId());
+        identities.saveAndFlush(identity);
+        return providerId;
+    }
+
+    private long provider() {
         var provider = providers
                 .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
                 .orElseGet(() -> providers.saveAndFlush(
                         new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
-        var identity = new Identity();
-        identity.setAccount(account);
-        identity.setProviderId(Objects.requireNonNull(provider.getId()));
-        identity.setProviderUserKey("history-" + account.getId());
-        identities.saveAndFlush(identity);
         return Objects.requireNonNull(provider.getId());
     }
 
