@@ -66,7 +66,9 @@ sequenceDiagram
    It can capture evidence only for images published by its own run.
 
 3. **The merge is checked again.** The merge commit's push runs CI/CD in full.
-   A `main` push repeats source-validation legs only with a version bump, which this commit carries.
+   A `main` push repeats source-validation legs only when it changes the version.
+   CI compares the version with the tip that the push replaced.
+   Later commits in the same push cannot hide the bump.
    `release.yml` starts only after that run succeeds.
 4. **Merging the Version PR cuts the release.** The workflow resolves release image digests, then runs the evidence gate.
    Only then does it create the draft at the merge commit and attach evidence.

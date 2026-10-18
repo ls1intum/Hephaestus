@@ -23,6 +23,9 @@ jobs:
     env:
       # Build and test dependencies execute in CI and can affect shipped artifacts too.
       TRIVY_INCLUDE_DEV_DEPS: "true"
+      # The commit this event's change is measured from: the secret scan and the released-chain
+      # guard judge the same range.
+      EVENT_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -75,7 +78,7 @@ jobs:
           image: ghcr.io/trufflesecurity/trufflehog
           version: 3.97.4@sha256:562bc231afa9de3d04de44cfe624252b08207de1fc3cebc5e7ed92bed7f279e4
           path: ./
-          base: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || '' }}
+          base: ${{ env.EVENT_BASE }}
           head: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
           extra_args: --debug --only-verified --fail-on-scan-errors
 
@@ -123,24 +126,23 @@ jobs:
         with:
           install: "frozen"
 
+      # A pull request's run does not repeat when its base advances, so the merge group is where a
+      # migration that reached `main` since then is judged. Both need their base; only a push may lack one.
       - name: Resolve released-chain baseline
         id: baseline
         continue-on-error: true
         if: always()
-        env:
-          PUSH_BEFORE: ${{ github.event.before }}
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
           BASE=""
-          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
-            if ! git cat-file -e "$PR_BASE_SHA^{commit}" 2>/dev/null; then
-              echo "::error::PR base commit $PR_BASE_SHA is not in local history — this job needs fetch-depth: 0. Refusing to pass without checking."
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ] || [ "$GITHUB_EVENT_NAME" = "merge_group" ]; then
+            if [ -z "$EVENT_BASE" ] || ! git cat-file -e "$EVENT_BASE^{commit}" 2>/dev/null; then
+              echo "::error::Base commit ${EVENT_BASE:-<none>} is not in local history — this job needs fetch-depth: 0. Refusing to pass without checking."
               exit 1
             fi
-            BASE="$PR_BASE_SHA"
-          elif [ -n "$PUSH_BEFORE" ] && git cat-file -e "$PUSH_BEFORE^{commit}" 2>/dev/null; then
-            BASE="$PUSH_BEFORE"
+            BASE="$EVENT_BASE"
+          elif [ -n "$EVENT_BASE" ] && git cat-file -e "$EVENT_BASE^{commit}" 2>/dev/null; then
+            BASE="$EVENT_BASE"
           fi
           echo "base=$BASE" >> "$GITHUB_OUTPUT"
           echo "Baseline: ${BASE:-<none — no reachable previous tip, nothing to enforce>}"
