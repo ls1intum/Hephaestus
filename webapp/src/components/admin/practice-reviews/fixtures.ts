@@ -2456,11 +2456,9 @@ const JOB_STATUS_OF: Record<ReviewSummary["status"], ReviewJob["status"]> = {
 	CANCELLED: "CANCELLED",
 };
 
+/** Processing starts only when a job completes, so a queued or running job carries NONE, as the server sends it. */
 function processingOf(status: ReviewJob["status"]): ReviewJob["processingStatus"] {
-	if (status === "COMPLETED") {
-		return "DONE";
-	}
-	return status === "RUNNING" || status === "QUEUED" ? "PENDING" : "NONE";
+	return status === "COMPLETED" ? "DONE" : "NONE";
 }
 
 function exitCodeOf(status: ReviewJob["status"]): number | null {
