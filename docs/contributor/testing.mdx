@@ -148,11 +148,15 @@ The shared integration PostgreSQL container keeps its ephemeral data directory o
 cleanup still truncates every application table transactionally. SQL constraints and isolation checks
 remain enabled. This container does not prove storage durability across container restarts.
 
-`vp run test:server:selection` asks Gradle/JUnit to discover tests without executing them. It proves
-that non-live tests belong to a required tier and that integration shards are disjoint and complete.
+`vp run test:server:selection` runs dedicated Gradle/JUnit inventory tasks without executing tests.
+They use the same tier and shard selectors as the execution tasks.
+The command proves that non-live tests belong to a required tier and that integration shards are disjoint and complete.
 Required PR verification and `vp run verify` run this proof before the real suites. Discovery writes
 only to `application/build/test-selection/`, leaving execution reports and coverage untouched.
+
 Those discovery reports are not evidence that tests passed.
+Execution tasks do not accept the removed `-PtestSelection` property.
+Use the selection command for discovery.
 
 ## Live external-service tests
 
