@@ -153,6 +153,21 @@ public interface RepositoryToMonitorRepository extends JpaRepository<RepositoryT
     /** One workspace's monitors of the repository with the given provider-stable id. */
     List<RepositoryToMonitor> findByWorkspaceIdAndNativeId(Long workspaceId, Long nativeId);
 
+    /** The workspace's monitor of the repository with the given provider-stable id; a workspace holds at most one. */
+    Optional<RepositoryToMonitor> findOneByWorkspaceIdAndNativeId(Long workspaceId, Long nativeId);
+
+    /** A monitor at this path whose repository has not been resolved yet. */
+    Optional<RepositoryToMonitor> findByWorkspaceIdAndNameWithOwnerAndNativeIdIsNull(
+            Long workspaceId, String nameWithOwner);
+
+    /** Monitors at this path in any casing whose repository has not been resolved yet. */
+    List<RepositoryToMonitor> findByWorkspaceIdAndNameWithOwnerIgnoreCaseAndNativeIdIsNull(
+            Long workspaceId, String nameWithOwner);
+
+    boolean existsByWorkspaceIdAndNativeIdAndIdNot(Long workspaceId, Long nativeId, Long id);
+
+    boolean existsByWorkspaceIdAndNameWithOwnerAndIdNot(Long workspaceId, String nameWithOwner, Long id);
+
     long countByNameWithOwner(String nameWithOwner);
 
     /** Deletes all repository monitors for a workspace (workspace purge). */

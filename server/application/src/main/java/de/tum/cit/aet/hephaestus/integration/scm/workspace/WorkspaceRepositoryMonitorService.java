@@ -50,7 +50,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -205,6 +204,11 @@ public class WorkspaceRepositoryMonitorService {
             Repository repository = repositoryRepository
                     .findByNameWithOwnerAndProviderId(nameWithOwner, Objects.requireNonNull(provider.getId()))
                     .orElseThrow(() -> new EntityNotFoundException("Repository", nameWithOwner));
+            if (repositoryToMonitorRepository
+                    .findOneByWorkspaceIdAndNativeId(workspaceId, repository.getNativeId())
+                    .isPresent()) {
+                throw new RepositoryAlreadyMonitoredException(nameWithOwner);
+            }
             Workspace owner = workspaceRepository
                     .findById(workspaceId)
                     .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId));
@@ -410,33 +414,34 @@ public class WorkspaceRepositoryMonitorService {
             return Optional.empty();
         }
         Workspace workspace = workspaceOpt.get();
-        var monitorOpt =
-                repositoryToMonitorRepository.findByWorkspaceIdAndNameWithOwner(workspace.getId(), nameWithOwner);
+        Long workspaceId = workspace.getId();
+        // The id names the removed repository even after a rename; the path alone may name a repository reusing it.
+        var monitorOpt = expectedNativeId == null
+                ? repositoryToMonitorRepository.findByWorkspaceIdAndNameWithOwner(workspaceId, nameWithOwner)
+                : repositoryToMonitorRepository
+                        .findOneByWorkspaceIdAndNativeId(workspaceId, expectedNativeId)
+                        .or(() -> repositoryToMonitorRepository
+                                .findByWorkspaceIdAndNameWithOwnerAndNativeIdIsNull(workspaceId, nameWithOwner)
+                                .filter(monitor ->
+                                        repositoryToMonitorRepository
+                                                .findSourceRepositoryIdsOfMonitor(monitor.getId())
+                                                .stream()
+                                                .map(repositoryRepository::findById)
+                                                .flatMap(Optional::stream)
+                                                .anyMatch(repository ->
+                                                        expectedNativeId.equals(repository.getNativeId()))));
         if (monitorOpt.isEmpty()) {
+            log.debug("Skipped repository removal: reason=notMonitored, workspaceId={}", workspaceId);
             return workspaceOpt;
         }
+        removeMonitorAndOrphanedRepositories(workspace, monitorOpt.get());
+        return workspaceOpt;
+    }
 
-        RepositoryToMonitor monitor = monitorOpt.get();
-        if (expectedNativeId != null) {
-            boolean matches = monitor.getNativeId() != null
-                    ? expectedNativeId.equals(monitor.getNativeId())
-                    : repositoryToMonitorRepository.findSourceRepositoryIdsOfMonitor(monitor.getId()).stream()
-                            .map(repositoryRepository::findById)
-                            .flatMap(Optional::stream)
-                            .anyMatch(repository -> expectedNativeId.equals(repository.getNativeId()));
-            if (!matches) {
-                log.debug(
-                        "Skipped repository removal: reason=identityMismatch, workspaceId={}," + " monitorId={}",
-                        workspace.getId(),
-                        monitor.getId());
-                return workspaceOpt;
-            }
-        }
+    private void removeMonitorAndOrphanedRepositories(Workspace workspace, RepositoryToMonitor monitor) {
         List<Long> repositoryIds = repositoryToMonitorRepository.findSourceRepositoryIdsOfMonitor(monitor.getId());
-        var result = removeRepositoryMonitorInternal(workspace, monitor);
+        deleteRepositoryMonitor(workspace, monitor);
         repositoryIds.forEach(this::deleteRepositoryIfOrphaned);
-
-        return result;
     }
 
     @Transactional
@@ -478,10 +483,10 @@ public class WorkspaceRepositoryMonitorService {
                 .orElseThrow(() -> new IllegalStateException(
                         "GitHub is not set up on this instance. Ask your" + " instance operator to set it up."));
 
-        ensureRepositoryFromSnapshot(
-                workspace, provider, snapshot.id(), snapshot.nameWithOwner(), snapshot.name(), snapshot.isPrivate());
-
-        ensureRepositoryMonitorInternal(workspace, provider, snapshot.nameWithOwner(), true);
+        if (ensureRepositoryFromSnapshot(
+                workspace, provider, snapshot.id(), snapshot.nameWithOwner(), snapshot.name(), snapshot.isPrivate())) {
+            ensureRepositoryMonitorInternal(workspace, snapshot.id(), snapshot.nameWithOwner(), true);
+        }
     }
 
     /**
@@ -544,60 +549,57 @@ public class WorkspaceRepositoryMonitorService {
                     installationId);
         }
 
-        Set<String> desiredRepositories = allowedSnapshots.stream()
+        Set<Long> desiredIds = allowedSnapshots.stream()
+                .map(InstallationRepositoryEnumerator.InstallationRepository::id)
+                .collect(Collectors.toSet());
+        Set<String> desiredNames = allowedSnapshots.stream()
                 .map(snapshot -> snapshot.nameWithOwner())
                 .filter(name -> !StringUtils.isBlank(name))
                 .map(name -> name.toLowerCase(Locale.ENGLISH))
                 .collect(Collectors.toSet());
-
-        if (protectedRepositories != null) {
-            protectedRepositories.stream()
-                    .filter(name -> !StringUtils.isBlank(name))
-                    .filter(name -> workspaceScopeFilter.isRepositoryAllowed(name))
-                    .map(name -> name.toLowerCase(Locale.ENGLISH))
-                    .forEach(desiredRepositories::add);
-        }
+        Set<String> protectedNames = protectedRepositories == null
+                ? Set.of()
+                : protectedRepositories.stream()
+                        .filter(name -> !StringUtils.isBlank(name))
+                        .filter(name -> workspaceScopeFilter.isRepositoryAllowed(name))
+                        .map(name -> name.toLowerCase(Locale.ENGLISH))
+                        .collect(Collectors.toSet());
 
         IdentityProvider provider = gitProviderRepository
                 .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
                 .orElseThrow(() -> new IllegalStateException(
                         "GitHub is not set up on this instance. Ask your" + " instance operator to set it up."));
 
+        // Removal runs first so a path the installation now uses for another repository is free before it is
+        // monitored. A monitor with a native id is kept by that id, so a renamed repository keeps its monitor.
+        repositoryToMonitorRepository.findByWorkspaceId(workspace.getId()).stream()
+                .filter(monitor -> !StringUtils.isBlank(monitor.getNameWithOwner()))
+                .filter(monitor -> {
+                    String name = monitor.getNameWithOwner().toLowerCase(Locale.ENGLISH);
+                    boolean listed = monitor.getNativeId() != null
+                            ? desiredIds.contains(monitor.getNativeId())
+                            : desiredNames.contains(name);
+                    return !listed && !protectedNames.contains(name);
+                })
+                .forEach(monitor -> removeMonitorAndOrphanedRepositories(workspace, monitor));
+
         allowedSnapshots.forEach(snapshot -> {
-            ensureRepositoryFromSnapshot(
+            if (ensureRepositoryFromSnapshot(
                     workspace,
                     provider,
                     snapshot.id(),
                     snapshot.nameWithOwner(),
                     snapshot.name(),
-                    snapshot.isPrivate());
-            ensureRepositoryMonitorInternal(workspace, provider, snapshot.nameWithOwner(), deferSync);
+                    snapshot.isPrivate())) {
+                ensureRepositoryMonitorInternal(workspace, snapshot.id(), snapshot.nameWithOwner(), deferSync);
+            }
         });
-
-        repositoryToMonitorRepository.findByWorkspaceId(workspace.getId()).stream()
-                .filter(monitor -> !StringUtils.isBlank(monitor.getNameWithOwner()))
-                .filter(monitor ->
-                        !desiredRepositories.contains(monitor.getNameWithOwner().toLowerCase(Locale.ENGLISH)))
-                .forEach(monitor ->
-                        removeRepositoryMonitorInTransaction(installationId, monitor.getNameWithOwner(), null));
     }
 
     private Optional<IdentityProvider> sourceProvider(IntegrationKind kind, ConnectionConfig config) {
         return PersonSourceNamespace.from(kind.name(), SourceProviderNamespaces.configuredUrl(config))
                 .flatMap(namespace -> gitProviderRepository.findByTypeAndServerUrl(
                         IdentityProviderType.from(kind), namespace.serverUrl()));
-    }
-
-    // Resolve native ids on the exact provider; another provider's same-named repository cannot scope this monitor.
-    @Nullable
-    private Long resolveNativeId(String nameWithOwner, @Nullable IdentityProvider provider) {
-        if (StringUtils.isBlank(nameWithOwner) || provider == null || provider.getId() == null) {
-            return null;
-        }
-        return repositoryRepository
-                .findByNameWithOwnerAndProviderId(nameWithOwner, provider.getId())
-                .map(Repository::getNativeId)
-                .orElse(null);
     }
 
     private boolean shouldUseNats(Workspace workspace) {
@@ -628,8 +630,6 @@ public class WorkspaceRepositoryMonitorService {
     }
 
     private void persistRepositoryMonitor(Workspace workspace, RepositoryToMonitor monitor, boolean deferSync) {
-        // Use saveAndFlush to force immediate constraint check so callers can catch
-        // DataIntegrityViolationException
         repositoryToMonitorRepository.saveAndFlush(monitor);
         workspace.getRepositoriesToMonitor().add(monitor);
         workspaceRepository.save(workspace);
@@ -641,9 +641,8 @@ public class WorkspaceRepositoryMonitorService {
     // Consumers read committed monitors; refresh only after commit, never after rollback.
     private void announceRepositoryMonitor(Workspace workspace, RepositoryToMonitor monitor, boolean deferSync) {
         boolean repositoryAllowed = workspaceScopeFilter.isRepositoryAllowed(monitor);
-        if (shouldUseNats(workspace) && repositoryAllowed) {
-            Long workspaceId = workspace.getId();
-            afterCommit(() -> natsConsumerService.ifAvailable(svc -> svc.updateScopeConsumer(workspaceId)));
+        if (repositoryAllowed) {
+            refreshScopeConsumerAfterCommit(workspace);
         }
         if (deferSync) {
             log.debug(
@@ -678,57 +677,87 @@ public class WorkspaceRepositoryMonitorService {
         workspace.getRepositoriesToMonitor().remove(monitor);
         workspaceRepository.saveAndFlush(workspace);
         eventPublisher.publishEvent(new RepositoryMonitoringChangedEvent(workspace.getId(), repositoryIds));
+        refreshScopeConsumerAfterCommit(workspace);
+    }
+
+    /** The consumer builds its subject filters from committed monitors, so it is refreshed only after commit. */
+    private void refreshScopeConsumerAfterCommit(Workspace workspace) {
         if (shouldUseNats(workspace)) {
-            // Like announceRepositoryMonitor, the refresh waits for the commit that removes the
-            // monitor.
             Long workspaceId = workspace.getId();
             afterCommit(() -> natsConsumerService.ifAvailable(svc -> svc.updateScopeConsumer(workspaceId)));
         }
     }
 
-    private Optional<Workspace> ensureRepositoryMonitorInternal(
-            Workspace workspace, IdentityProvider provider, String nameWithOwner, boolean deferSync) {
-        if (workspace == null || StringUtils.isBlank(nameWithOwner)) {
-            return Optional.ofNullable(workspace);
+    /**
+     * Callers hold the workspace lock and have recorded the snapshot on the mirrored repository. The
+     * provider-stable id finds the monitor; GitHub paths are case-insensitive, so an unresolved monitor at the
+     * path in any casing is adopted. The monitor takes the installation's path when no other monitor holds it.
+     */
+    private void ensureRepositoryMonitorInternal(
+            Workspace workspace, long nativeId, String nameWithOwner, boolean deferSync) {
+        Long workspaceId = workspace.getId();
+        var existing = repositoryToMonitorRepository.findOneByWorkspaceIdAndNativeId(workspaceId, nativeId);
+        if (existing.isEmpty()) {
+            List<RepositoryToMonitor> unresolved =
+                    repositoryToMonitorRepository.findByWorkspaceIdAndNameWithOwnerIgnoreCaseAndNativeIdIsNull(
+                            workspaceId, nameWithOwner);
+            if (unresolved.size() > 1) {
+                log.warn(
+                        "Skipped repository monitor: reason=ambiguousUnresolvedMonitors, workspaceId={},"
+                                + " syncTargetIds={}, nativeId={}",
+                        workspaceId,
+                        unresolved.stream().map(RepositoryToMonitor::getId).toList(),
+                        nativeId);
+                return;
+            }
+            existing = unresolved.isEmpty() ? Optional.empty() : Optional.of(unresolved.getFirst());
         }
-
-        var existing =
-                repositoryToMonitorRepository.findByWorkspaceIdAndNameWithOwner(workspace.getId(), nameWithOwner);
-        if (existing.isPresent()) {
-            eventPublisher.publishEvent(new RepositoryMonitoringChangedEvent(
-                    workspace.getId(),
-                    repositoryToMonitorRepository.findSourceRepositoryIdsOfMonitor(
-                            existing.get().getId())));
-            return Optional.of(workspace);
-        }
-
-        RepositoryToMonitor monitor = new RepositoryToMonitor();
-        monitor.setNameWithOwner(nameWithOwner);
-        monitor.setNativeId(resolveNativeId(nameWithOwner, provider));
-        monitor.setWorkspace(workspace);
-
-        try {
+        if (existing.isEmpty()) {
+            RepositoryToMonitor monitor = new RepositoryToMonitor();
+            monitor.setNameWithOwner(nameWithOwner);
+            monitor.setNativeId(nativeId);
+            monitor.setWorkspace(workspace);
             persistRepositoryMonitor(workspace, monitor, deferSync);
-        } catch (DataIntegrityViolationException e) {
-            log.debug(
-                    "Repository monitor already exists (idempotent): repoName={}, workspaceId={}",
-                    LoggingUtils.sanitizeForLog(nameWithOwner),
-                    workspace.getId());
+            return;
         }
 
-        return Optional.of(workspace);
-    }
-
-    private Optional<Workspace> removeRepositoryMonitorInternal(Workspace workspace, RepositoryToMonitor monitor) {
-        if (workspace == null || monitor == null) {
-            return Optional.ofNullable(workspace);
+        RepositoryToMonitor monitor = existing.get();
+        boolean adopted = monitor.getNativeId() == null;
+        if (adopted) {
+            monitor.setNativeId(nativeId);
         }
-
-        deleteRepositoryMonitor(workspace, monitor);
-        return Optional.of(workspace);
+        boolean renamed = !nameWithOwner.equals(monitor.getNameWithOwner());
+        if (renamed
+                && repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwnerAndIdNot(
+                        workspaceId, nameWithOwner, monitor.getId())) {
+            log.warn(
+                    "Skipped repository monitor re-key: reason=nameHeldByAnotherMonitor, workspaceId={},"
+                            + " syncTargetId={}, nativeId={}",
+                    workspaceId,
+                    monitor.getId(),
+                    nativeId);
+            renamed = false;
+        }
+        if (renamed) {
+            log.info(
+                    "Re-keyed repository monitor to the installation's path: workspaceId={}, syncTargetId={},"
+                            + " oldName={}, newName={}",
+                    workspaceId,
+                    monitor.getId(),
+                    LoggingUtils.sanitizeForLog(monitor.getNameWithOwner()),
+                    LoggingUtils.sanitizeForLog(nameWithOwner));
+            monitor.setNameWithOwner(nameWithOwner);
+            refreshScopeConsumerAfterCommit(workspace);
+        }
+        if (adopted || renamed) {
+            repositoryToMonitorRepository.saveAndFlush(monitor);
+        }
+        eventPublisher.publishEvent(new RepositoryMonitoringChangedEvent(
+                workspaceId, repositoryToMonitorRepository.findSourceRepositoryIdsOfMonitor(monitor.getId())));
     }
 
-    private void ensureRepositoryFromSnapshot(
+    /** Whether the mirrored repository with this id now has the snapshot's path. */
+    private boolean ensureRepositoryFromSnapshot(
             Workspace workspace,
             IdentityProvider provider,
             long nativeId,
@@ -736,16 +765,24 @@ public class WorkspaceRepositoryMonitorService {
             String name,
             boolean isPrivate) {
         if (StringUtils.isBlank(nameWithOwner)) {
-            return;
+            return false;
         }
-
-        repositoryRepository.upsertFromSnapshot(
+        boolean recorded = repositoryRepository.upsertFromSnapshot(
                 nativeId,
                 Objects.requireNonNull(provider.getId()),
                 nameWithOwner,
                 name,
                 isPrivate,
                 workspace.getOrganizationId() != null ? workspace.getOrganizationId() : null);
+        if (!recorded) {
+            log.warn(
+                    "Skipped repository from installation: reason=pathHeldByAnotherRepository, workspaceId={},"
+                            + " nativeId={}, repoName={}",
+                    workspace.getId(),
+                    nativeId,
+                    LoggingUtils.sanitizeForLog(nameWithOwner));
+        }
+        return recorded;
     }
 
     private Workspace requireWorkspace(String slug) {
