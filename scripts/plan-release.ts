@@ -9,6 +9,9 @@
  * The upgrade seed is the latest published stable release, not the parent commit's version.
  * The new version must be newer than that release before image aliases can move forward.
  * The release notes start from the same release (`--notes`).
+ *
+ * The plan is read before the promotion lock, so another run of the same version can write first.
+ * Each locked step that writes or publishes the release checks its source again (`--source`).
  */
 import { appendFile, readFile } from "node:fs/promises";
 
@@ -89,6 +92,47 @@ export function assertCurrentStableRelease(version: string, releases: readonly R
 	if (latest === undefined || version !== formatVersion(latest)) {
 		throw new Error("Only the current stable release may promote image aliases");
 	}
+}
+
+/** What GitHub holds for a release tag now. */
+export interface ReleaseSource {
+	/** The release with this tag, draft or published; `undefined` when there is none. */
+	readonly release: { readonly isDraft: boolean; readonly targetCommitish: string } | undefined;
+	/** The commit the Git tag names; `undefined` while no tag exists, as for a draft. */
+	readonly tagCommit: string | undefined;
+}
+
+export type ReleaseSourceState = "absent" | "draft" | "published";
+
+const SOURCE_STATES: ReadonlySet<string> = new Set(["absent", "draft", "published"]);
+
+/**
+ * Where the release of `tag` stands for `sha`, the commit whose evidence a step is about to write.
+ * A draft or tag of another commit means another run established this version's source first, so
+ * this run must not attach to it, publish it or promote from it. A published release binds through
+ * its tag: a draft target does not move a tag that already exists.
+ */
+export function releaseSourceState(
+	tag: string,
+	sha: string,
+	source: ReleaseSource,
+): ReleaseSourceState {
+	if (source.tagCommit !== undefined && source.tagCommit !== sha) {
+		throw new Error(`tag ${tag} points to ${source.tagCommit}, not ${sha}`);
+	}
+	if (source.release === undefined) {
+		return "absent";
+	}
+	if (source.release.isDraft) {
+		if (source.release.targetCommitish !== sha) {
+			throw new Error(`draft ${tag} targets ${source.release.targetCommitish}, not ${sha}`);
+		}
+		return "draft";
+	}
+	if (source.tagCommit === undefined) {
+		throw new Error(`published ${tag} has no tag that binds it to ${sha}`);
+	}
+	return "published";
 }
 
 export function planRelease(
@@ -292,6 +336,78 @@ export async function hasPendingChangesets(sha: string, cwd?: string): Promise<b
 		.some((file) => /^\.changeset\/[^/]+\.md$/u.test(file) && file !== ".changeset/README.md");
 }
 
+/** The release with `tag`, drafts included. Only gh's own not-found answer means there is none. */
+async function readRelease(repository: string, tag: string): Promise<ReleaseSource["release"]> {
+	let viewed: string;
+	try {
+		viewed = await output("gh", [
+			"release",
+			"view",
+			tag,
+			"--repo",
+			repository,
+			"--json",
+			"isDraft,targetCommitish",
+		]);
+	} catch (error) {
+		const stderr = error instanceof Error && "stderr" in error ? error.stderr : undefined;
+		if (typeof stderr === "string" && stderr.trim() === "release not found") {
+			return undefined;
+		}
+		throw error;
+	}
+	const release = asRecord(parseJson(viewed), `gh release view ${tag}`);
+	if (typeof release.isDraft !== "boolean") {
+		throw new Error(`gh release view ${tag} must have a boolean isDraft flag`);
+	}
+	return {
+		isDraft: release.isDraft,
+		targetCommitish: asString(release.targetCommitish, `gh release view ${tag}.targetCommitish`),
+	};
+}
+
+/** The commit the Git tag `tag` names, through any annotated tag objects; `undefined` without one. */
+async function readTagCommit(repository: string, tag: string): Promise<string | undefined> {
+	const ref = `refs/tags/${tag}`;
+	// An absent tag is an empty listing, so a failed read never passes for an absent tag.
+	const listed = await output("gh", [
+		"api",
+		"--paginate",
+		`repos/${repository}/git/matching-refs/tags/${tag}`,
+		"--jq",
+		".[] | {ref, type: .object.type, sha: .object.sha}",
+	]);
+	const match = listed
+		.split("\n")
+		.filter((line) => line.trim() !== "")
+		.map((line, index) => asRecord(parseJson(line), `gh api matching-refs[${index}]`))
+		.find((candidate) => candidate.ref === ref);
+	if (match === undefined) {
+		return undefined;
+	}
+	let type = asString(match.type, `${ref} object type`);
+	let sha = asString(match.sha, `${ref} object sha`);
+	// An annotated tag names a tag object, which names the commit.
+	for (let depth = 0; type === "tag"; depth += 1) {
+		if (depth === 4) {
+			throw new Error(`${ref} nests more than four tag objects`);
+		}
+		const label = `tag object ${sha}`;
+		const object = asRecord(
+			parseJson(
+				await output("gh", ["api", `repos/${repository}/git/tags/${sha}`, "--jq", ".object"]),
+			),
+			label,
+		);
+		type = asString(object.type, `${label} type`);
+		sha = asString(object.sha, `${label} sha`);
+	}
+	if (type !== "commit") {
+		throw new Error(`${ref} names a ${type}, not a commit`);
+	}
+	return sha;
+}
+
 if (import.meta.main && process.argv[2] === "--promote") {
 	const [, version] = process.argv.slice(2);
 	const repository = process.env.GITHUB_REPOSITORY;
@@ -322,6 +438,36 @@ if (import.meta.main && process.argv[2] === "--promote") {
 				notes,
 				await renderReleaseNotes(await readFile(changelog, "utf8"), previousVersion, version),
 			);
+		} catch (error) {
+			console.log(`::error::${error instanceof Error ? error.message : String(error)}`);
+			process.exitCode = 1;
+		}
+	}
+} else if (import.meta.main && process.argv[2] === "--source") {
+	// Prints the state for the step to branch on, and refuses a state the step does not accept.
+	const [, tag, sha, ...accepted] = process.argv.slice(2);
+	const repository = process.env.GITHUB_REPOSITORY;
+	if (
+		!isSet(tag) ||
+		!isSet(sha) ||
+		!isSet(repository) ||
+		accepted.length === 0 ||
+		accepted.some((state) => !SOURCE_STATES.has(state))
+	) {
+		console.log(
+			"::error::usage: GITHUB_REPOSITORY=<owner/repo> plan-release.ts --source <tag> <sha> <absent|draft|published>...",
+		);
+		process.exitCode = 1;
+	} else {
+		try {
+			const state = releaseSourceState(tag, sha, {
+				release: await readRelease(repository, tag),
+				tagCommit: await readTagCommit(repository, tag),
+			});
+			if (!accepted.includes(state)) {
+				throw new Error(`${tag} is ${state}; this step accepts only ${accepted.join(" or ")}`);
+			}
+			console.log(state);
 		} catch (error) {
 			console.log(`::error::${error instanceof Error ? error.message : String(error)}`);
 			process.exitCode = 1;

@@ -104,8 +104,11 @@ An ordinary merge of an already-published version does not cut a release.
 
 The resume path covers failures *after* draft creation: seeded-upgrade, supported-host, or publication failures.
 While the release is a draft, a workflow rerun at the same commit regenerates evidence and replaces assets.
+
 A draft pins its version to its commit.
 A later commit refuses to recut over it.
+Each step that writes or publishes the release checks this again under the promotion lock.
+It stops at a draft or Git tag of another commit, even one that appeared after planning.
 If a draft can never pass, delete it manually.
 The fixed source must have no pending changesets before it can cut a release.
 

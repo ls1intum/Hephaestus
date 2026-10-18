@@ -13,6 +13,7 @@ import {
 	planRelease,
 	type ReleaseRef,
 	releaseOutputs,
+	releaseSourceState,
 	renderReleaseNotes,
 } from "./plan-release.ts";
 
@@ -194,6 +195,40 @@ void test("holds a same-source draft but preserves a different-source draft refu
 	const otherSource = planRelease(SHA, "0.75.0", [...RELEASED, draft("v0.75.0", OTHER_SHA)], true);
 	assert.equal(otherSource.kind, "refuse");
 	assert.match(otherSource.reason, /delete the draft to re-cut/u);
+});
+
+void test("a locked writer accepts only an absent release or this commit's own draft and tag", () => {
+	const absent = { release: undefined, tagCommit: undefined };
+	assert.equal(releaseSourceState("v0.75.0", SHA, absent), "absent");
+	assert.equal(releaseSourceState("v0.75.0", SHA, { ...absent, tagCommit: SHA }), "absent");
+	const ownDraft = { release: { isDraft: true, targetCommitish: SHA }, tagCommit: undefined };
+	assert.equal(releaseSourceState("v0.75.0", SHA, ownDraft), "draft");
+	assert.throws(
+		() => releaseSourceState("v0.75.0", OTHER_SHA, ownDraft),
+		/draft v0\.75\.0 targets 1{40}, not 2{40}/u,
+	);
+	// A draft's target does not move a tag that already exists.
+	assert.throws(
+		() => releaseSourceState("v0.75.0", SHA, { ...ownDraft, tagCommit: OTHER_SHA }),
+		/tag v0\.75\.0 points to 2{40}, not 1{40}/u,
+	);
+	assert.throws(
+		() => releaseSourceState("v0.75.0", SHA, { ...absent, tagCommit: OTHER_SHA }),
+		/tag v0\.75\.0 points to 2{40}, not 1{40}/u,
+	);
+});
+
+void test("a published release binds to the commit its tag names, not to its target", () => {
+	const release = { isDraft: false, targetCommitish: "main" };
+	assert.equal(releaseSourceState("v0.75.0", SHA, { release, tagCommit: SHA }), "published");
+	assert.throws(
+		() => releaseSourceState("v0.75.0", OTHER_SHA, { release, tagCommit: SHA }),
+		/tag v0\.75\.0 points to 1{40}, not 2{40}/u,
+	);
+	assert.throws(
+		() => releaseSourceState("v0.75.0", SHA, { release, tagCommit: undefined }),
+		/published v0\.75\.0 has no tag/u,
+	);
 });
 
 const section = (version: string, body: string): string =>
