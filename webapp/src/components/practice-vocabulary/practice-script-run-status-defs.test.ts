@@ -20,6 +20,8 @@ const run = (over: Partial<PracticeScriptRun>): PracticeScriptRun => ({
 	scriptKind: "CUSTOM",
 	status: "OK",
 	stopReason: null,
+	noResultCause: null,
+	reviewModelCalls: null,
 	...over,
 });
 
@@ -40,6 +42,28 @@ describe("how a practice script run ended", () => {
 			run({ status: "FAILED", stopReason: "INVALID_SCRIPT" }),
 			"Practice script stopped without a result: it is not a script the review can run.",
 		],
+		[
+			run({ status: "FAILED", stopReason: "OFF_FORMAT" }),
+			"Practice script stopped without a result: a model answered in the wrong format.",
+		],
+		[
+			run({
+				status: "FAILED",
+				scriptKind: "BUILTIN",
+				stopReason: "OFF_FORMAT",
+				noResultCause: "EVIDENCE_NOT_READ",
+			}),
+			"Built-in review stopped without a result: its result was refused because it had not read the evidence it needed.",
+		],
+		[
+			run({
+				status: "FAILED",
+				scriptKind: "BUILTIN",
+				stopReason: "OFF_FORMAT",
+				noResultCause: "SESSION_ENDED",
+			}),
+			"Built-in review stopped without a result: its review session ended without an accepted result.",
+		],
 		[run({ status: "NOT_REACHED" }), "The review ended before the practice script started."],
 		[
 			run({ status: "NOT_REACHED", scriptKind: "BUILTIN" }),
@@ -55,6 +79,16 @@ describe("how a practice script run ended", () => {
 		[run({ status: "WITHHELD" }), "Withheld"],
 		[run({ status: "FAILED" }), "Failed"],
 		[run({ status: "FAILED", stopReason: "BUDGET" }), "Failed: out of budget"],
+		[run({ status: "FAILED", stopReason: "OFF_FORMAT" }), "Failed: wrong format"],
+		[
+			run({
+				status: "FAILED",
+				scriptKind: "BUILTIN",
+				stopReason: "OFF_FORMAT",
+				noResultCause: "EVIDENCE_NOT_READ",
+			}),
+			"Failed: evidence not read",
+		],
 		[run({ status: "NOT_REACHED" }), "Not reached"],
 		[run({ status: "NOT_FINISHED" }), "Did not finish"],
 	])("puts %o in the result cell as %s", (value, expected) => {

@@ -16,10 +16,24 @@ public record PracticeScriptRunDTO(
         ScriptRunStatus status,
         ScriptKind scriptKind,
         @Nullable ScriptStopReason stopReason,
+
+        @Schema(
+                description = "Why a run that stopped as OFF_FORMAT has no result, when the runner's counts or the"
+                        + " built-in's contract prove it. Absent otherwise; then the stop reason stands alone.")
+        @Nullable
+        ScriptNoResultCause noResultCause,
+
         Instant finishedAt,
         @Nullable Long durationMs,
         @Nullable String error,
-        List<PracticeScriptModelDTO> models) {
+        List<PracticeScriptModelDTO> models,
+
+        @Schema(
+                description = "Model calls of the practice's review sessions, as the runner counted them. Not the calls"
+                        + " the proxy billed: those are counted for the whole review. Absent when the runner did not"
+                        + " record them.")
+        @Nullable
+        Integer reviewModelCalls) {
     public PracticeScriptRunDTO {
         models = List.copyOf(models);
     }

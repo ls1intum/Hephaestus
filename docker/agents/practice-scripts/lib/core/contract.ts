@@ -1005,6 +1005,18 @@ const coverageReachedSchema = z.strictObject({
 	truncatedReads: count,
 	failedReads: count,
 });
+/**
+ * What the practice's review sessions did, as the runner counted it. Model calls follow the usage
+ * report's rule. A refusal counts once for the gate that refused it: the evidence check refused a
+ * result that had not read its required or cited sources; the tool schema refused a call of the
+ * wrong shape.
+ */
+const reviewSessionsSchema = z.strictObject({
+	modelCalls: count,
+	evidenceRefusals: count,
+	formatRefusals: count,
+});
+export type ReviewSessionFacts = z.infer<typeof reviewSessionsSchema>;
 
 export const executionEntrySchema = z
 	.strictObject({
@@ -1032,6 +1044,8 @@ export const executionEntrySchema = z
 			.refine((text) => (text.match(/./gsu) ?? []).length <= 500, "at most 500 code points")
 			.optional(),
 		calls: callsSchema,
+		/** Absent when the runner did not count them. */
+		reviewSessions: reviewSessionsSchema.optional(),
 		coverageReached: coverageReachedSchema,
 		/** How long the program ran: up to the longest attempt, not a count. */
 		durationMs: z.int().min(0).max(2_147_483_647).nullable(),

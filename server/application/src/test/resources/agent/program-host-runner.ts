@@ -104,7 +104,7 @@ export async function mockChange(overrides: Record<string, unknown>) {
 	mock.module(change, { namedExports: { ...derived, ...overrides } });
 }
 
-export type SessionBehaviour = "submit" | "read-change" | "silent" | "hang" | "budget";
+export type SessionBehaviour = "submit" | "read-change" | "silent" | "hang" | "budget" | "crash";
 
 export interface StagedPractice {
 	slug: string;
@@ -590,6 +590,28 @@ process.stdout.write(JSON.stringify(validateToolArguments(tool, { name: tool.nam
 							changeSupplied: text.includes("### `work/change/diff.patch`"),
 						});
 						if (behaviour === "hang") {
+							await Promise.withResolvers<never>().promise;
+						}
+						// One answered call, then the process fails outside every runner catch.
+						if (behaviour === "crash") {
+							emit({
+								type: "message_end",
+								message: {
+									role: "assistant",
+									stopReason: "stop",
+									content: [{ type: "text", text: "Reading." }],
+									usage: {
+										input: 100,
+										output: 10,
+										cacheRead: 0,
+										cacheWrite: 0,
+										cost: { total: 0 },
+									},
+								},
+							});
+							setImmediate(() => {
+								throw new Error("the host crashed during a review session");
+							});
 							await Promise.withResolvers<never>().promise;
 						}
 						await inspectShell();

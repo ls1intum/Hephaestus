@@ -52,6 +52,7 @@ function entryOf(slug: string, outcome: ProgramOutcome): ExecutionEntry {
 		stopReason: outcome.stopReason,
 		...(error === undefined ? {} : { error }),
 		calls: outcome.calls,
+		...(outcome.reviewSessions === undefined ? {} : { reviewSessions: outcome.reviewSessions }),
 		coverageReached: outcome.coverageReached,
 		durationMs: outcome.durationMs,
 	};

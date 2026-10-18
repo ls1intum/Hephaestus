@@ -55,6 +55,39 @@ class PracticeScriptRunRecorderTest extends BaseUnitTest {
     }
 
     @Test
+    void shouldKeepTheRunnersReviewSessionCountsBesideTheHostCallsWhenTheReportNamesThem() {
+        var runs = mock(ScriptRunRepository.class);
+        var assignments = mock(ReviewJobAssignments.class);
+        var job = RuntimeReviewTestData.job();
+        when(assignments.load(job)).thenReturn(List.of(RuntimeReviewTestData.assignment(5L, null)));
+        var recorded = new ArrayList<ScriptRun>();
+        doAnswer(invocation -> {
+                    Iterable<ScriptRun> rows = invocation.getArgument(0);
+                    rows.forEach(recorded::add);
+                    return rows;
+                })
+                .when(runs)
+                .saveAll(any());
+        var mapper = new JsonMapper();
+        var meters = new SimpleMeterRegistry();
+        byte[] report = """
+            {"schemaVersion":2,"truncated":false,"practices":[
+             {"practiceSlug":"clear-names","program":{"kind":"builtin","digest":null},"models":[],"status":"failed","stopReason":"off-format",
+              "calls":{"review":1,"chat":0,"decision":0,"embedding":0,"reranking":0},
+              "reviewSessions":{"modelCalls":6,"evidenceRefusals":4,"formatRefusals":1},
+              "coverageReached":{"reads":0,"truncatedReads":0,"failedReads":0},"durationMs":1}]}
+            """.getBytes(StandardCharsets.UTF_8);
+        new PracticeScriptRunRecorder(new PiResultParser(mapper, meters), runs, meters, mapper, assignments)
+                .record(job, report, Map.of(), Instant.EPOCH);
+
+        assertThat(recorded).hasSize(1);
+        assertThat(recorded.getFirst().getCalls()).isEqualTo(mapper.readTree("""
+                    {"review":1,"chat":0,"decision":0,"embedding":0,"reranking":0,
+                     "reviewSessions":{"modelCalls":6,"evidenceRefusals":4,"formatRefusals":1}}
+                    """));
+    }
+
+    @Test
     void shouldRecordNothingWhenThereIsNoHostReport() {
         var runs = mock(ScriptRunRepository.class);
         var assignments = mock(ReviewJobAssignments.class);

@@ -66,9 +66,12 @@ export function ReviewPracticeScriptTable({
 					<TableHead scope="col" className="min-w-44">
 						Result
 					</TableHead>
-					<TableHead scope="col">Models</TableHead>
 					<TableHead scope="col" numeric className="text-right">
-						Calls
+						Review calls
+					</TableHead>
+					<TableHead scope="col">Script models</TableHead>
+					<TableHead scope="col" numeric className="text-right">
+						Script calls
 					</TableHead>
 					<TableHead scope="col" numeric className="text-right">
 						Time
@@ -132,6 +135,9 @@ function ScriptRow({
 					)}
 				</span>
 			</TableCell>
+			<TableCell numeric className="text-right align-top">
+				<ReviewCalls calls={run.reviewModelCalls} />
+			</TableCell>
 			<TableCell className="align-top">
 				<ScriptModels models={run.models} />
 			</TableCell>
@@ -163,6 +169,14 @@ function ScriptModels({ models }: { models: PracticeScriptModel[] }) {
 			))}
 		</ul>
 	);
+}
+
+// The runner's own count of the practice's review-session calls; the proxy bills them for the whole review.
+function ReviewCalls({ calls }: { calls: number | null }) {
+	if (calls === null) {
+		return <span className="text-muted-foreground">Not recorded</span>;
+	}
+	return calls === 0 ? <Nothing /> : count.format(calls);
 }
 
 function Nothing() {
