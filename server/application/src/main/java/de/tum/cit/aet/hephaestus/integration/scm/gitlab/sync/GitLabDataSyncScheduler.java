@@ -18,6 +18,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncPas
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncSession;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncType;
+import de.tum.cit.aet.hephaestus.integration.core.sync.ScopeSyncFanOut;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobConflictException;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRequest;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
@@ -58,10 +59,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.jspecify.annotations.Nullable;
@@ -184,37 +182,14 @@ public class GitLabDataSyncScheduler {
 
         log.info("Starting scheduled GitLab sync: workspaceCount={}", sessions.size());
 
-        AtomicInteger successCount = new AtomicInteger(0);
-        AtomicInteger failureCount = new AtomicInteger(0);
-
-        CompletableFuture<?>[] futures = sessions.stream()
-                .map(session -> CompletableFuture.runAsync(() -> syncScopeWithJobRecording(session), monitoringExecutor)
-                        .whenComplete((result, error) -> {
-                            if (error != null) {
-                                failureCount.incrementAndGet();
-                            } else {
-                                successCount.incrementAndGet();
-                            }
-                        }))
-                .toArray(CompletableFuture[]::new);
-
-        try {
-            CompletableFuture.allOf(futures).get();
-            log.info(
-                    "Completed scheduled GitLab sync: workspaceCount={}, successful={}, failed={}",
-                    sessions.size(),
-                    successCount.get(),
-                    failureCount.get());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            log.warn(
-                    "GitLab sync interrupted: workspaceCount={}, successful={}, failed={}",
-                    sessions.size(),
-                    successCount.get(),
-                    failureCount.get());
-        } catch (ExecutionException e) {
-            log.error("Unexpected error during scheduled GitLab sync", e);
-        }
+        ScopeSyncFanOut.Outcome outcome =
+                ScopeSyncFanOut.run(sessions, this::syncScopeWithJobRecording, monitoringExecutor);
+        log.info(
+                "Completed scheduled GitLab sync: workspaceCount={}, successful={}, failed={}, interrupted={}",
+                sessions.size(),
+                outcome.succeeded(),
+                outcome.failed(),
+                Thread.currentThread().isInterrupted());
     }
 
     /**

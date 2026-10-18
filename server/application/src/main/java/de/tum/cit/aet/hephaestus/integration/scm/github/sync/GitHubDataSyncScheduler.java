@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncSession;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncStatistics;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncTarget;
+import de.tum.cit.aet.hephaestus.integration.core.sync.ScopeSyncFanOut;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobConflictException;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRequest;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
@@ -37,10 +38,7 @@ import jakarta.annotation.PostConstruct;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
-import java.util.concurrent.atomic.AtomicInteger;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -217,48 +215,19 @@ public class GitHubDataSyncScheduler {
         }
 
         // Each workspace has its own GitHub App installation with separate rate limits, so syncing
-        // them in parallel (virtual threads via monitoringExecutor) is safe, and whenComplete() below
-        // logs and counts each outcome independently so one workspace's failure can't block the rest.
+        // them in parallel (virtual threads via monitoringExecutor) is safe; one workspace's failure
+        // can't block the rest.
         //
         // No global timeout: large repositories (10k+ issues) combined with rate limits can
         // legitimately take many hours. Individual GraphQL calls have their own timeouts for transient
-        // failures. Spring's single-threaded scheduler prevents overlapping runs, and join() respects
-        // thread interruption for JVM shutdown.
-        AtomicInteger successCount = new AtomicInteger(0);
-        AtomicInteger failureCount = new AtomicInteger(0);
-
-        CompletableFuture<?>[] futures = sessions.stream()
-                .map(session -> CompletableFuture.runAsync(() -> syncScope(session), monitoringExecutor)
-                        .whenComplete((result, error) -> {
-                            if (error != null) {
-                                // Already logged inside syncScope
-                                failureCount.incrementAndGet();
-                            } else {
-                                successCount.incrementAndGet();
-                            }
-                        }))
-                .toArray(CompletableFuture[]::new);
-
-        // Use get() instead of join() because get() throws InterruptedException,
-        // allowing graceful shutdown when Ctrl+C is pressed.
-        try {
-            CompletableFuture.allOf(futures).get();
-            log.info(
-                    "Completed scheduled sync: scopeCount={}, successful={}, failed={}",
-                    sessions.size(),
-                    successCount.get(),
-                    failureCount.get());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            log.warn(
-                    "Scheduled sync interrupted (shutdown requested): scopeCount={}, successful={}, failed={}",
-                    sessions.size(),
-                    successCount.get(),
-                    failureCount.get());
-        } catch (ExecutionException e) {
-            // Should not happen since each future handles its own exceptions via whenComplete()
-            log.error("Unexpected error during scheduled sync", e);
-        }
+        // failures.
+        ScopeSyncFanOut.Outcome outcome = ScopeSyncFanOut.run(sessions, this::syncScope, monitoringExecutor);
+        log.info(
+                "Completed scheduled sync: scopeCount={}, successful={}, failed={}, interrupted={}",
+                sessions.size(),
+                outcome.succeeded(),
+                outcome.failed(),
+                Thread.currentThread().isInterrupted());
     }
 
     /**
