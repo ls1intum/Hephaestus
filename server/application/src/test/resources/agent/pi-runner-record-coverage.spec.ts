@@ -187,10 +187,10 @@ for (const [command, complete, sameBytes] of [
 		if (complete) {
 			assert.equal(capturedLines(cwd, "submitted").length, 1);
 		} else {
-			const repairPath = stagedPath;
+			// Reading the checkout cannot cover a captured copy with other bytes, so the repair names the copy.
 			assert.ok(
 				exit.stderr.includes(
-					`read(${JSON.stringify({ path: repairPath, offset: 1, limit: 2000 })})`,
+					`read(${JSON.stringify({ path: stagedPath, offset: 1, limit: text.split("\n").length })})`,
 				),
 				exit.stderr,
 			);
