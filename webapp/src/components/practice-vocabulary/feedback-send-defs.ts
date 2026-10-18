@@ -1,8 +1,9 @@
 import { CheckCheckIcon, CircleHelpIcon, ClockIcon, LoaderIcon } from "lucide-react";
 
-import type { FeedbackSend } from "@/api/types.gen";
+import type { FeedbackCopy, FeedbackSend, ReviewFeedbackDetail } from "@/api/types.gen";
 
 import type { StatusDefs } from "@/components/common/status-def";
+import { hasText } from "@/lib/text";
 
 export type FeedbackSendState = FeedbackSend["state"];
 export type FeedbackSendAction = FeedbackSend["action"];
@@ -40,3 +41,43 @@ export const FEEDBACK_SEND_ACTION_LABELS: Record<FeedbackSendAction, string> = {
 	POST: "Post the copies",
 	RETRACT: "Retract the posted copies",
 };
+
+/**
+ * Where removing withdrawn feedback from the work stands, read from the copies' receipts and not from
+ * the send alone: a finished send can leave a copy on the work. `retryable` means a posted copy waits
+ * on a removal the provider did not acknowledge. `needsAttention` means a copy may still be on the
+ * work and a retry cannot remove it: the provider cannot correct it, or its write was never confirmed.
+ * Undefined when nothing on the work is being withdrawn.
+ */
+export type WithdrawalCorrection = "pending" | "retryable" | "needsAttention" | "complete";
+
+export function withdrawalCorrection(
+	feedback: Pick<ReviewFeedbackDetail, "withdrawn" | "destination" | "sends" | "copies">,
+): WithdrawalCorrection | undefined {
+	if (!feedback.withdrawn || feedback.destination !== "ON_WORK") {
+		return undefined;
+	}
+	if (feedback.sends.some((send) => send.state !== "DONE")) {
+		return "pending";
+	}
+	if (copiesStillOnWork(feedback.copies).length === 0) {
+		return "complete";
+	}
+	return feedback.sends.some((send) => send.action === "RETRACT") &&
+		feedback.copies.some(
+			(copy) =>
+				copy.state === "POSTED" && hasText(copy.externalRef) && copy.readback === "TRANSIENT",
+		)
+		? "retryable"
+		: "needsAttention";
+}
+
+/** Copies that are, or may be, on the work: posted, or written without a receipt proving them absent. */
+export function copiesStillOnWork(copies: readonly FeedbackCopy[]): FeedbackCopy[] {
+	return copies.filter(
+		(copy) =>
+			copy.state === "POSTED" ||
+			copy.state === "WRITE_STARTED" ||
+			(copy.state === "FAILED" && copy.writeStartedAt !== null && copy.readback !== "ABSENT"),
+	);
+}

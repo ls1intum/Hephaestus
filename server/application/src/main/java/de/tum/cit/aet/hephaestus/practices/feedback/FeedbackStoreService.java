@@ -183,9 +183,12 @@ public class FeedbackStoreService implements FeedbackStore {
         var row = lock(workspaceId, feedbackId);
         var send = sends.lockByFeedbackId(workspaceId, feedbackId);
         var children = copies.lockByFeedbackId(workspaceId, feedbackId);
+        if (row.getDestination() == FeedbackDestination.ON_WORK && visibility.withdrawn(workspaceId, feedbackId)) {
+            retryWithdrawal(row, send, children);
+            return;
+        }
         if (row.getDestination() != FeedbackDestination.ON_WORK
                 || (row.getState() != FeedbackState.FAILED && row.getState() != FeedbackState.DELIVERED)
-                || visibility.withdrawn(workspaceId, feedbackId)
                 || send.filter(s -> s.getState() != FeedbackSendState.DONE).isPresent()
                 || children.stream()
                         .anyMatch(c -> c.getState() == FeedbackCopyState.WRITE_STARTED
@@ -203,6 +206,22 @@ public class FeedbackStoreService implements FeedbackStore {
                 null,
                 row.getDeliveredAt());
         sendQueue.queue(row, FeedbackSendAction.POST, FeedbackSendState.PENDING);
+    }
+
+    /**
+     * Runs the recorded withdrawal's correction again after it stopped with a posted copy whose removal the provider
+     * did not acknowledge. It records no decision and keeps the copies' receipts and the send's attempt history.
+     */
+    private void retryWithdrawal(Feedback row, Optional<FeedbackSend> send, List<FeedbackCopy> children) {
+        if (send.filter(s -> s.getState() != FeedbackSendState.DONE).isPresent())
+            throw conflict("The withdrawal is still in progress.");
+        if (send.filter(s -> s.getAction() == FeedbackSendAction.RETRACT).isEmpty()
+                || children.stream()
+                        .noneMatch(c -> c.getState() == FeedbackCopyState.POSTED
+                                && c.getExternalRef() != null
+                                && c.getReadback() == FeedbackCopyReadback.TRANSIENT))
+            throw conflict("No withdrawn copy can be retried.");
+        sendQueue.queue(row, FeedbackSendAction.RETRACT, FeedbackSendState.PENDING);
     }
 
     public FeedbackCheck check(Feedback row, boolean approval) {

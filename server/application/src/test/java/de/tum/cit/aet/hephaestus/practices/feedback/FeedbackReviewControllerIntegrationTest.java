@@ -152,6 +152,15 @@ class FeedbackReviewControllerIntegrationTest extends AbstractFeedbackIntegratio
                 .expectStatus()
                 .isNotFound()
                 .expectBody(Void.class);
+        client.post()
+                .uri("/workspaces/" + other.getWorkspaceSlug() + "/practices/reviews/feedback/" + parent.getId()
+                        + "/retry")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNotFound()
+                .expectBody(Void.class);
+        assertThat(sends.findById(parent.getId())).isEmpty();
     }
 
     @Test
@@ -173,6 +182,14 @@ class FeedbackReviewControllerIntegrationTest extends AbstractFeedbackIntegratio
                 .expectStatus()
                 .isForbidden()
                 .expectBody(Void.class);
+        client.post()
+                .uri(route() + "/" + parent.getId() + "/retry")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isForbidden()
+                .expectBody(Void.class);
+        assertThat(sends.findById(parent.getId())).isEmpty();
         assertThat(decisions.findByWorkspaceIdAndFeedbackIdOrderByDecidedAtDescIdDesc(
                         workspace.getId(), parent.getId()))
                 .isEmpty();
