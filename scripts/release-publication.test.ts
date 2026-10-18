@@ -55,7 +55,13 @@ const writer = jobSteps("tag-images", [
 	"Upload release image lock to GitHub Release",
 ]);
 /** Remote release, tag and registry state; everything else in the archive is a release asset. */
-const remoteState: ReadonlySet<string> = new Set(["state", "aliases", "releases", "tags", "tag-objects"]);
+const remoteState: ReadonlySet<string> = new Set([
+	"state",
+	"aliases",
+	"releases",
+	"tags",
+	"tag-objects",
+]);
 
 // Only remote services are fixtures. The steps run the real lock, checksum, SBOM and policy
 // verifiers. Synthetic signatures authenticate fixture bytes; they make no claim about Sigstore.
@@ -619,7 +625,11 @@ for (const scenario of ["annotated-tag-retry", ...sourceRefusals.keys()]) {
 			const aliasesBefore = await readFile(path.join(archive, "aliases"), "utf8");
 			const result = await run();
 			assert.doesNotMatch(result.calls, /"upload"|"edit"/u);
-			assert.deepEqual(await assets(), before, "publication must not change another source's assets");
+			assert.deepEqual(
+				await assets(),
+				before,
+				"publication must not change another source's assets",
+			);
 			assert.equal(await releaseState(directory), stateBefore);
 			const reason = sourceRefusals.get(scenario);
 			if (reason === undefined) {

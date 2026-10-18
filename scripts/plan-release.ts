@@ -394,7 +394,9 @@ async function readTagCommit(repository: string, tag: string): Promise<string | 
 		}
 		const label = `tag object ${sha}`;
 		const object = asRecord(
-			parseJson(await output("gh", ["api", `repos/${repository}/git/tags/${sha}`, "--jq", ".object"])),
+			parseJson(
+				await output("gh", ["api", `repos/${repository}/git/tags/${sha}`, "--jq", ".object"]),
+			),
 			label,
 		);
 		type = asString(object.type, `${label} type`);
