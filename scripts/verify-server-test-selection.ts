@@ -20,6 +20,7 @@ export function testIdentities(xml: string): Set<string> {
 	return new Set(
 		tests.map((entry) => {
 			assert.ok(isRecord(entry), "Invalid JUnit testcase");
+			assert.ok(Object.hasOwn(entry, "skipped"), "An inventory contains an executed test");
 			const className = entry["@_classname"];
 			const name = entry["@_name"];
 			assert.ok(typeof className === "string");
@@ -74,7 +75,12 @@ async function main(): Promise<void> {
 	const server = path.resolve(root, "server");
 	const reports = path.resolve(server, "application/build/test-selection");
 	const wrapper = path.resolve(import.meta.dirname, "run-gradlew.ts");
-	const tiers = ["test", "architectureTest", "integrationTest", "databaseTest"];
+	const tierInventories = [
+		"unitInventory",
+		"architectureInventory",
+		"integrationInventory",
+		"databaseInventory",
+	];
 	const shardInventories = ["integrationProvidersInventory", "integrationApplicationInventory"];
 	// Dry-run reports are isolated from execution and coverage reports.
 	await rm(reports, { recursive: true, force: true });
@@ -83,21 +89,21 @@ async function main(): Promise<void> {
 		[
 			wrapper,
 			":application:testInventory",
-			...tiers.map((tier) => `:application:${tier}`),
+			...tierInventories.map((inventory) => `:application:${inventory}`),
 			...shardInventories.map((inventory) => `:application:${inventory}`),
-			"-PtestSelection=true",
 		],
 		{
 			cwd: server,
-			env: { ...process.env, HEPHAESTUS_INTEGRATION_SHARD: "" },
 		},
 	);
 	const all = await readIdentities(path.resolve(reports, "testInventory", "xml"));
 	const tierTests = await Promise.all(
-		tiers.map(async (tier) => readIdentities(path.resolve(reports, tier, "xml"))),
+		tierInventories.map(async (inventory) =>
+			readIdentities(path.resolve(reports, inventory, "xml")),
+		),
 	);
 	assertCoverage(all, tierTests, false);
-	const integration = await readIdentities(path.resolve(reports, "integrationTest", "xml"));
+	const integration = await readIdentities(path.resolve(reports, "integrationInventory", "xml"));
 	const shards = await Promise.all(
 		shardInventories.map(async (inventory) =>
 			readIdentities(path.resolve(reports, inventory, "xml")),
