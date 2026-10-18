@@ -203,9 +203,9 @@ describe("traceBottleneck for the review itself", () => {
 	// timeout still says it was stopped.
 	it.each([
 		[
-			"ran to the end with a practice failed",
+			"ran to the end with a selected practice withheld",
 			"EXECUTION_INCOMPLETE",
-			"It did not review every practice it started. Its results and feedback cover only the practices it reviewed.",
+			"The review did not record a result for every selected practice. Its results and feedback cover only the practices it reviewed.",
 		],
 		[
 			"ran out of time",

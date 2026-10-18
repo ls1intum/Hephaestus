@@ -659,7 +659,9 @@ export const BottleneckReviewPartial: Story = {
 	play: async ({ canvasElement }) => {
 		const line = bottleneckOf(canvasElement);
 		await expect(line).toHaveTextContent(/^Partial review/u);
-		await expect(line).toHaveTextContent("It did not review every practice it started.");
+		await expect(line).toHaveTextContent(
+			"The review did not record a result for every selected practice.",
+		);
 		await expect(line).not.toHaveTextContent(/did not finish|stopped before/u);
 		await expect(canvasElement.querySelector('[data-stage="results"]')).toHaveTextContent(
 			"Lost here",

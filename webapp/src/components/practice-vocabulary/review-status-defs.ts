@@ -130,7 +130,7 @@ export const REVIEW_STOP_REASON_SENTENCES: Record<ReviewStopReason, string> = {
 	CANCELLED_BY_ADMIN: "A workspace admin cancelled it.",
 	REPLACED: "A newer review of the same work replaced it.",
 	LEGACY_FAILURE: "It failed before Hephaestus recorded why.",
-	EXECUTION_INCOMPLETE: "It did not review every practice it started.",
+	EXECUTION_INCOMPLETE: "The review did not record a result for every selected practice.",
 	RESULT_WITHHELD: "Its results were withheld.",
 	READINESS_REFUSED: "Something the review needs was not ready.",
 	SUSPECT_LISTING: "The file listing changed too much to trust, so files were not removed.",
