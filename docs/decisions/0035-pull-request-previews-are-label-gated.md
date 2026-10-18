@@ -1,6 +1,6 @@
 # ADR 0035: Pull request previews are label-gated and driven from the default branch
 
-**Status:** Accepted (amended 2026-09-03 #1719 — agent execution host superseded by [0041](0041-compose-1x-kubernetes-2.md); 2026-09-17 — previews only for pull requests targeting `main`, and the concurrency groups; 2026-10-16 — stacked previews restored)
+**Status:** Accepted (amended 2026-09-03 #1719 — agent execution host superseded by [0041](0041-compose-1x-kubernetes-2.md); 2026-09-17 — previews only for pull requests targeting `main`, and the concurrency groups; 2026-10-16 — stacked previews restored; 2026-10-18 — pushes deploy on CI completion)
 **Date:** 2026-08-28
 **Authors:** Felix T.J. Dietrich
 **Builds on:** [ADR 0037](0037-node-24-and-pnpm-12-are-the-javascript-toolchain.md) (the runtime the controller is written for)
@@ -240,3 +240,36 @@ regardless of the pull request's base](https://github.blog/changelog/2025-11-07-
 The removed filter therefore did not protect the controller checkout. Fork exclusion, label admission,
 immutable image verification, schema and protected-file checks, and the final head recheck remain
 unchanged. No pull request controller code executes beside deployment secrets.
+
+## Update — 2026-10-18: a push deploys when its CI run completes
+
+Supersedes only the timing in § Decision, "It waits for those images to be published, which happens
+in parallel with the tests". The image, provenance, fork, policy, schema, capacity and recheck gates
+are unchanged.
+
+The deploy job polled the registry for ten minutes inside the admission group. An App Server image
+that published later than that was reported as a failure that was not one, and the wait held the
+group for every other pull request. A poll has no correct deadline: only a finished CI run proves
+that an image will not appear.
+
+`deploy-preview.yml` therefore no longer triggers on `synchronize`. It triggers on the `CI/CD`
+workflow's `workflow_run` completion and checks the images once. The run takes `github.sha` from the
+default branch like `pull_request_target`, so the controller stays merged code and no pull request
+checkout runs beside the deployment secrets. A missing image after completion is a failure. A
+cancelled run deploys nothing. The `workflow_run` payload's own pull request list can be empty, so a
+first job lists the open pull requests of the run's branch, keeps the labelled same-repository ones
+still at the run's commit, and only then enters the admission group. `resolve()` re-reads each one
+and stands down if its head moved past that commit.
+
+The label, reopen and ready-for-review triggers stay. They deploy at once when the images exist, and
+otherwise say on the pull request that the preview waits for CI. They open no deployment record, so a
+wait holds no capacity slot.
+
+The cost is latency: a push now previews when its whole CI run ends rather than when its images are
+published. Triggering on image publication would need either a registry event, which a
+`GITHUB_TOKEN` push does not raise, or a pull request workflow that dispatches the deploy, which needs
+`actions: write` on a pull request token. Both were declined.
+
+This update also corrects a fact in § Decision. Converting a pull request to draft does not tear
+the stack down. Cleanup runs only when the label is removed or the pull request closes, and a draft
+previews like any other pull request (`docs/contributor/ci-cd.mdx` § Preview deployments).

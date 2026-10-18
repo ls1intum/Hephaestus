@@ -87,8 +87,8 @@ const BUILD_BUDGET_MS = 1_200_000;
 const REACHABILITY_BUDGET_MS = 300_000;
 const POLL_INTERVAL_MS = 5000;
 const QUEUE_POLL_ATTEMPTS = 18;
-/** CI publishes the commit-addressed tags while its tests are still running, so a missing tag means
- * "not built yet", not "will never exist". Only this message is retried. */
+/** A missing commit-addressed tag. Until this commit's CI run has finished it means "not built yet";
+ * after that it means the run will never publish it. */
 export const IMAGE_PENDING = "Image not published yet";
 
 /** Thrown where the read token is refused, so the retry loop can stop instead of waiting it out. */
@@ -98,7 +98,6 @@ export class CoolifyAuthError extends Error {
 		this.name = "CoolifyAuthError";
 	}
 }
-const IMAGE_POLL_ATTEMPTS = 60;
 const SHA_PATTERN = /^[a-f0-9]{40}$/u;
 const IDENTIFIER_PATTERN = /^[A-Za-z0-9_-]+$/u;
 const REF_PATTERN = /^[A-Za-z0-9._/-]+$/u;
@@ -650,33 +649,38 @@ export function checkImages(
 }
 
 /**
- * Waits for this commit's images rather than for its test suite. CI builds images in parallel with
- * the tests, so a preview can be up minutes before the run finishes — and can exist at all for a
- * pull request whose tests are red, which is when looking at the running app helps most.
+ * Whether this commit's images are published and trusted, checked once. Nothing here waits: a
+ * preview asked for before CI finished is deployed by the `workflow_run` that CI's completion
+ * starts, so a poll would only hold a runner and the admission group while guessing a deadline.
+ *
+ * `CI_CONCLUSION` is set only on that completion run. There a missing tag is final, so it is a
+ * failure; without it the run may still be publishing, so it is a wait.
  */
-export async function awaitImages(
+export function imagesReady(
 	environment: NodeJS.ProcessEnv,
 	runner: CommandRunner = systemCommandRunner,
 	log: (message: string) => void = console.log,
-	dependencies: Dependencies = defaultDependencies,
-): Promise<void> {
+): boolean {
 	loginToRegistry(environment, runner);
-	for (let attempt = 0; attempt < IMAGE_POLL_ATTEMPTS; attempt += 1) {
-		try {
-			checkImages(environment, runner, log);
-			return;
-		} catch (error) {
-			if (!(error instanceof Error) || !error.message.startsWith(IMAGE_PENDING)) {
-				throw error;
-			}
-			if (attempt === 0) {
-				log("::notice::Waiting for CI to publish this commit's images.");
-			}
-			if (attempt === IMAGE_POLL_ATTEMPTS - 1) {
-				throw new Error("CI never published images for this commit.", { cause: error });
-			}
-			await dependencies.sleep(POLL_INTERVAL_MS * 2);
+	try {
+		checkImages(environment, runner, log);
+		return true;
+	} catch (error) {
+		if (!(error instanceof Error) || !error.message.startsWith(IMAGE_PENDING)) {
+			throw error;
 		}
+		const conclusion = environment.CI_CONCLUSION;
+		if (!isSet(conclusion)) {
+			log(
+				`::notice::${error.message}. If this commit's CI run is still in progress, the preview deploys when it finishes.`,
+			);
+			return false;
+		}
+		const runUrl = environment.CI_RUN_URL;
+		const where = isSet(runUrl) && /^https:\/\/\S+$/u.test(runUrl) ? `: ${runUrl}` : ".";
+		throw new Error(`CI finished (${conclusion}) without publishing this commit's images${where}`, {
+			cause: error,
+		});
 	}
 }
 
@@ -695,7 +699,15 @@ function appendOutputs(outputs: Record<string, string>): void {
 async function main(): Promise<void> {
 	const command = process.argv[2];
 	if (command === "images") {
-		await awaitImages(process.env);
+		try {
+			appendOutputs({ ready: String(imagesReady(process.env)) });
+		} catch (error) {
+			// The failure comment quotes this; `ready` stays unset, so no step mistakes it for a wait.
+			appendOutputs({
+				description: error instanceof Error ? error.message : "Could not check the images.",
+			});
+			throw error;
+		}
 		return;
 	}
 	if (command === "queue") {

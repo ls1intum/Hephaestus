@@ -2,9 +2,9 @@
 
 The preview application runs one isolated stack per opted-in pull request. Anyone who can push to
 this repository adds the `preview` label to their own pull request; the current head
-deploys, and every push after that redeploys. A preview waits only for CI to publish that commit's
-images, never for the test suite, so it exists even when the tests are red. Removing the label, closing the pull request, or converting it back to draft removes
-the stack and frees its slot.
+deploys, and every push after that redeploys when its CI run finishes. A preview needs only that
+commit's published images, never a passing test suite, so it exists even when the tests are red. Removing the label or closing the pull request removes
+the stack and frees its slot. Converting it back to draft does not.
 
 This directory is infrastructure for this repository's own pull requests. It is not part of a
 self-hosted Hephaestus install — `docker/self-host/` is that. Contributors use previews through
@@ -263,8 +263,8 @@ nothing fails.
 
 ## Teardown
 
-Closing a pull request, merging it, dropping the `preview` label or converting the pull request to a
-draft sends Coolify a signed close event, and the GitHub deployment is then marked inactive so the
+Closing a pull request, merging it, or dropping the `preview` label sends Coolify a signed close
+event, and the GitHub deployment is then marked inactive so the
 slot is free. Coolify queues that teardown and answers immediately, so the workflow reports that the
 request was accepted, not that the containers are gone.
 

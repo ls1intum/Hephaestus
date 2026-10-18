@@ -18,6 +18,7 @@ import {
 	type GitHubApi,
 	resolve,
 	retire,
+	targets,
 } from "./preview-controller.ts";
 
 const originalEnvironment = { ...process.env };
@@ -67,6 +68,8 @@ interface Status {
 
 interface GitHubOptions {
 	deployments?: Deployment[];
+	/** What listing the open pull requests of a branch returns. */
+	branchPulls?: Awaited<ReturnType<GitHubApi["rest"]["pulls"]["list"]>>["data"];
 	files?: { filename: string; sha?: string }[];
 	/** The tree both branches left. Only a fixture about a deletion or a rename needs it. */
 	baseFiles?: { filename: string; sha?: string }[];
@@ -84,6 +87,7 @@ const postedStatuses: Record<string, unknown>[] = [];
 
 const makeGitHub = ({
 	deployments = [{ environment: "preview/pr-7", id: 1, sha: "old-sha" }],
+	branchPulls = [{ ...pull, number: 7 }],
 	files = [],
 	baseFiles = [],
 	resolvedPull = pull,
@@ -102,6 +106,12 @@ const makeGitHub = ({
 	rest: {
 		pulls: {
 			get: async () => ({ data: resolvedPull }),
+			list: async (params: Record<string, unknown>) => {
+				// Listed by branch, never by what the CI run claims about its pull requests.
+				assert.equal(params.head, "owner:feature");
+				assert.equal(params.state, "open");
+				return { data: branchPulls };
+			},
 		},
 		git: {
 			// The branches diverge from `baseFiles`, empty unless a test is about something leaving a
@@ -171,6 +181,7 @@ beforeEach(() => {
 	Object.assign(process.env, {
 		COOLIFY_URL: "https://coolify.example",
 		COOLIFY_PREVIEW_URL_TEMPLATE: "https://pr{pr}.example",
+		PR_NUMBER: "7",
 	});
 });
 
@@ -340,6 +351,147 @@ void describe("preview controller admission", () => {
 			context: makeContext(),
 			core,
 		});
+
+		assert.equal(core.outputs.get("eligible"), "false");
+		assert.equal(core.outputs.get("announce"), "false");
+	});
+});
+
+/** A finished CI run as `workflow_run` delivers it, with `pull_requests` left out on purpose. */
+const ciRun = (headSha = "head-sha") => ({
+	...makeContext(),
+	payload: {
+		repository: { default_branch: "main" },
+		workflow_run: { head_branch: "feature", head_sha: headSha },
+	},
+});
+
+void describe("preview targets", () => {
+	void it("deploys exactly the labelled pull request that asked", async () => {
+		const core = makeCore();
+		await targets({ github: makeGitHub(), context: makeContext(), core });
+
+		assert.equal(core.outputs.get("pulls"), "[7]");
+	});
+
+	void it("finds the pull request of a finished CI run without its pull_requests list", async () => {
+		const core = makeCore();
+		await targets({ github: makeGitHub(), context: ciRun(), core });
+
+		assert.equal(core.outputs.get("pulls"), "[7]");
+	});
+
+	void it("leaves a CI run for a superseded head to the newer run", async () => {
+		const core = makeCore();
+		await targets({ github: makeGitHub(), context: ciRun("older-sha"), core });
+
+		assert.equal(core.outputs.get("pulls"), "[]");
+	});
+
+	void it("keeps unlabelled and fork pull requests out of the admission group", async () => {
+		const core = makeCore();
+		await targets({
+			github: makeGitHub({
+				branchPulls: [
+					{ ...unlabelled, number: 8 },
+					// A fork with a branch of the same name at the same commit.
+					{ ...pull, number: 9, head: { ...pull.head, repo: { full_name: "contributor/repo" } } },
+					{ ...pull, number: 10, head: { ...pull.head, repo: null } },
+				],
+			}),
+			context: ciRun(),
+			core,
+		});
+
+		assert.equal(core.outputs.get("pulls"), "[]");
+	});
+
+	void it("deploys every labelled pull request at that commit, in a stable order", async () => {
+		const core = makeCore();
+		await targets({
+			github: makeGitHub({
+				branchPulls: [
+					{ ...pull, number: 12 },
+					{ ...pull, number: 7 },
+				],
+			}),
+			context: ciRun(),
+			core,
+		});
+
+		assert.equal(core.outputs.get("pulls"), "[7,12]");
+	});
+
+	void it("finds nothing for a CI run with no branch", async () => {
+		const core = makeCore();
+		await targets({
+			github: makeGitHub(),
+			context: {
+				...makeContext(),
+				payload: {
+					repository: { default_branch: "main" },
+					workflow_run: { head_branch: null, head_sha: "head-sha" },
+				},
+			},
+			core,
+		});
+
+		assert.equal(core.outputs.get("pulls"), "[]");
+	});
+
+	void it("refuses an event that names no pull request and no CI run", async () => {
+		await assert.rejects(
+			targets({
+				github: makeGitHub(),
+				context: { ...makeContext(), payload: { repository: { default_branch: "main" } } },
+				core: makeCore(),
+			}),
+			/pull request or a completed CI run/u,
+		);
+	});
+
+	void it("resolves a CI-started run only while the head is still the one CI built", async () => {
+		process.env.CI_HEAD_SHA = "older-sha";
+		const moved = makeCore();
+		await resolve({ github: makeGitHub(), context: ciRun("older-sha"), core: moved });
+
+		// A head that moved on is not a failure, so nothing is announced on the pull request.
+		assert.equal(moved.outputs.get("eligible"), "false");
+		assert.equal(moved.outputs.get("announce"), "false");
+
+		process.env.CI_HEAD_SHA = "head-sha";
+		const current = makeCore();
+		await resolve({ github: makeGitHub(), context: ciRun(), core: current });
+
+		assert.equal(current.outputs.get("eligible"), "true");
+		assert.equal(current.outputs.get("head_sha"), "head-sha");
+	});
+
+	void it("applies every admission guard to a CI-started run", async () => {
+		process.env.CI_HEAD_SHA = "head-sha";
+		const refusals: [typeof pull, { filename: string }[], RegExp][] = [
+			[{ ...pull, head: { ...pull.head, repo: { full_name: "contributor/fork" } } }, [], /fork/u],
+			[{ ...pull, author_association: "CONTRIBUTOR" }, [], /not a repository collaborator/u],
+			// A branch that rewrote the CI workflow could also fake its completion; it never deploys.
+			[pull, [{ filename: ".github/workflows/cicd.yml" }], /trusted deployment policy/u],
+		];
+		for (const [resolvedPull, files, reason] of refusals) {
+			const core = makeCore();
+			await resolve({
+				github: makeGitHub({ resolvedPull, files }),
+				context: ciRun(),
+				core,
+			});
+
+			assert.equal(core.outputs.get("eligible"), "false");
+			assert.match(core.outputs.get("reason") ?? "", reason);
+		}
+	});
+
+	void it("stays quiet when the label came off before CI finished", async () => {
+		process.env.CI_HEAD_SHA = "head-sha";
+		const core = makeCore();
+		await resolve({ github: makeGitHub({ resolvedPull: unlabelled }), context: ciRun(), core });
 
 		assert.equal(core.outputs.get("eligible"), "false");
 		assert.equal(core.outputs.get("announce"), "false");
@@ -774,9 +926,9 @@ void describe("preview deployment lifecycle", () => {
 		postedStatuses.length = 0;
 	});
 
-	void it("moves the deployment while the run waits, so it is not silent for most of its life", async () => {
+	void it("moves the deployment while Coolify builds, so it is not silent for most of its life", async () => {
 		for (const [state, description] of [
-			["queued", "Waiting for CI to publish signed images for this commit."],
+			["queued", "Reserved for PR #7; Coolify queue follows."],
 			["in_progress", "Images are ready; Coolify is building the preview."],
 		] as const) {
 			process.env.DEPLOYMENT_ID = "42";
@@ -975,36 +1127,123 @@ void describe("preview schema drift", () => {
 	});
 });
 
+const previewWorkflow = parseDocument(readFileSync(".github/workflows/deploy-preview.yml", "utf8"));
+
+/** Evaluates a workflow condition the way the runner does, over the contexts it names. */
+function holds(condition: unknown, contexts: Record<string, unknown>): boolean {
+	assert.ok(typeof condition === "string");
+	const functions = new Map([
+		["always", { name: "always", minArgs: 0, maxArgs: 0, call: () => new data.BooleanData(true) }],
+	]);
+	const expression = new Parser(new Lexer(condition).lex().tokens, Object.keys(contexts), [
+		...functions.values(),
+	]).parse();
+	const context: unknown = JSON.parse(JSON.stringify(contexts), data.reviver);
+	assert.ok(context instanceof data.Dictionary);
+	return new Evaluator(expression, context, functions).evaluate().coerceString() === "true";
+}
+
+const ciRunEvent = (overrides: Record<string, unknown> = {}) => ({
+	event_name: "workflow_run",
+	repository: "owner/repo",
+	event: {
+		workflow_run: {
+			event: "pull_request",
+			conclusion: "success",
+			head_repository: { full_name: "owner/repo" },
+			pull_requests: [],
+			...overrides,
+		},
+	},
+});
+
+void describe("preview workflow admits only the events that can deploy", () => {
+	const vars = {
+		COOLIFY_URL: "https://coolify.example",
+		COOLIFY_APP_UUID: "app",
+		COOLIFY_PREVIEW_URL_TEMPLATE: "https://pr{pr}.example",
+	};
+	const labelled = { labels: [{ name: PREVIEW_LABEL }] };
+
+	const admits = (github: Record<string, unknown>, variables: Record<string, string> = vars) =>
+		holds(previewWorkflow.getIn(["jobs", "targets", "if"]), { github, vars: variables });
+
+	for (const [name, github, expected] of [
+		[
+			"the preview label being added",
+			{
+				event_name: "pull_request_target",
+				event: { action: "labeled", label: { name: PREVIEW_LABEL }, pull_request: labelled },
+			},
+			true,
+		],
+		[
+			"another label added to a labelled pull request",
+			{
+				event_name: "pull_request_target",
+				event: { action: "labeled", label: { name: "enhancement" }, pull_request: labelled },
+			},
+			false,
+		],
+		[
+			"a labelled pull request reopened",
+			{ event_name: "pull_request_target", event: { action: "reopened", pull_request: labelled } },
+			true,
+		],
+		[
+			"an unlabelled pull request reopened",
+			{
+				event_name: "pull_request_target",
+				event: { action: "reopened", pull_request: { labels: [] } },
+			},
+			false,
+		],
+		["a pull request's CI run that passed", ciRunEvent(), true],
+		// Red tests still preview: the images decide, and the controller checks them.
+		["a pull request's CI run that failed", ciRunEvent({ conclusion: "failure" }), true],
+		["a superseded CI run", ciRunEvent({ conclusion: "cancelled" }), false],
+		["a fork's CI run", ciRunEvent({ head_repository: { full_name: "contributor/repo" } }), false],
+		["a CI run for a push to main", ciRunEvent({ event: "push" }), false],
+		["a CI run for a merge group", ciRunEvent({ event: "merge_group" }), false],
+	] as const) {
+		void it(`${expected ? "admits" : "ignores"} ${name}`, () => {
+			assert.equal(admits({ repository: "owner/repo", ...github }), expected);
+		});
+	}
+
+	void it("does nothing where no preview host is configured", () => {
+		assert.equal(admits(ciRunEvent(), { ...vars, COOLIFY_URL: "" }), false);
+	});
+
+	void it("dropped synchronize, so a push waits for its CI run instead of a deadline", () => {
+		const types = previewWorkflow.getIn(["on", "pull_request_target", "types"]);
+		assert.ok(isSeq(types));
+		assert.deepEqual(types.toJSON(), ["labeled", "reopened", "ready_for_review"]);
+		assert.equal(previewWorkflow.getIn(["on", "workflow_run", "workflows", 0]), "CI/CD");
+		assert.equal(previewWorkflow.getIn(["on", "workflow_run", "types", 0]), "completed");
+	});
+
+	void it("finds its targets outside the admission group, and deploys only inside it", () => {
+		assert.equal(previewWorkflow.hasIn(["jobs", "targets", "concurrency"]), false);
+		assert.equal(
+			previewWorkflow.getIn(["jobs", "deploy", "concurrency", "group"]),
+			"hephaestus-preview-admission",
+		);
+		assert.equal(previewWorkflow.getIn(["jobs", "deploy", "needs"]), "targets");
+	});
+});
+
 void describe("preview workflow reporting follows the finalized deployment", () => {
-	const workflow = parseDocument(readFileSync(".github/workflows/deploy-preview.yml", "utf8"));
 	function runs(name: string, outputs: Record<string, Record<string, string>>) {
-		const steps = workflow.getIn(["jobs", "deploy", "steps"]);
+		const steps = previewWorkflow.getIn(["jobs", "deploy", "steps"]);
 		assert.ok(isSeq(steps));
 		const step = steps.items.find((item) => isMap(item) && item.get("name") === name);
 		assert.ok(isMap(step));
-		const condition = step.get("if");
-		assert.ok(typeof condition === "string");
-		const functions = new Map([
-			[
-				"always",
-				{ name: "always", minArgs: 0, maxArgs: 0, call: () => new data.BooleanData(true) },
-			],
-		]);
-		const expression = new Parser(
-			new Lexer(condition).lex().tokens,
-			["steps"],
-			[...functions.values()],
-		).parse();
-		const context: unknown = JSON.parse(
-			JSON.stringify({
-				steps: Object.fromEntries(
-					Object.entries(outputs).map(([id, values]) => [id, { outputs: values }]),
-				),
-			}),
-			data.reviver,
-		);
-		assert.ok(context instanceof data.Dictionary);
-		return new Evaluator(expression, context, functions).evaluate().coerceString() === "true";
+		return holds(step.get("if"), {
+			steps: Object.fromEntries(
+				Object.entries(outputs).map(([id, values]) => [id, { outputs: values }]),
+			),
+		});
 	}
 
 	for (const scenario of [
@@ -1087,6 +1326,39 @@ void describe("preview workflow reporting follows the finalized deployment", () 
 		assert.equal(
 			runs("Report a failed preview", { ...outputs, context: { eligible: "false" } }),
 			false,
+		);
+	});
+
+	void it("waits for CI honestly: no deployment, no failure, no stale link", () => {
+		const outputs = { context: { eligible: "true" }, images: { ready: "false" } };
+		assert.equal(runs("Say the preview waits for CI", outputs), true);
+		assert.equal(runs("Open the native GitHub deployment", outputs), false);
+		assert.equal(runs("Report a failed preview", outputs), false);
+		assert.equal(runs("Fail when the preview failed", outputs), false);
+		assert.equal(runs("Publish the preview link", outputs), false);
+	});
+
+	void it("reports CI that finished without images as the failure it is", () => {
+		const outputs = {
+			context: { eligible: "true" },
+			images: { description: "CI finished (failure) without publishing this commit's images." },
+		};
+		assert.equal(runs("Say the preview waits for CI", outputs), false);
+		assert.equal(runs("Open the native GitHub deployment", outputs), false);
+		assert.equal(runs("Report a failed preview", outputs), true);
+	});
+
+	void it("opens the deployment only once the images are ready", () => {
+		const outputs = { context: { eligible: "true" }, images: { ready: "true" } };
+		assert.equal(runs("Open the native GitHub deployment", outputs), true);
+		assert.equal(runs("Say the preview waits for CI", outputs), false);
+		assert.equal(runs("Recheck opt-in and head before queueing", outputs), false);
+		assert.equal(
+			runs("Recheck opt-in and head before queueing", {
+				...outputs,
+				github_deployment: { deployment_id: "2" },
+			}),
+			true,
 		);
 	});
 });

@@ -3,10 +3,10 @@ import { createHmac } from "node:crypto";
 import { describe, test } from "node:test";
 
 import {
-	awaitImages,
 	checkImages,
 	deploymentLogUrl,
 	IMAGE_PENDING,
+	imagesReady,
 	assertWebhookAccepted,
 	buildWebhookPayload,
 	formatOutputs,
@@ -519,41 +519,90 @@ const runnerFor = (results: readonly ("pending" | "unsigned" | "ok")[]): Command
 	};
 };
 
-void describe("waiting for CI to publish", () => {
-	const noWait = dependencies(async () => {
-		throw new Error("unused");
-	});
+void describe("deciding whether CI has published", () => {
+	// The completion run carries CI's verdict; the label path has none, because CI may still run.
+	const afterCi = {
+		...imageEnvironment,
+		CI_CONCLUSION: "failure",
+		CI_RUN_URL: "https://github.example/owner/repo/actions/runs/1",
+	};
 
-	void test("returns once the images appear", async () => {
-		await awaitImages(imageEnvironment, runnerFor(["ok"]), () => undefined, noWait);
-	});
-
-	void test("does not wait out the poll on an image that will never be trusted", async () => {
-		// An unsigned digest is a verdict, not a delay: retrying it would burn the whole budget and
-		// then report the wrong reason.
-		let sleeps = 0;
-		await assert.rejects(
-			async () =>
-				awaitImages(imageEnvironment, runnerFor(["unsigned"]), () => undefined, {
-					...noWait,
-					sleep: async () => {
-						sleeps += 1;
-					},
-				}),
-			/provenance/u,
+	void test("deploys at once when CI already published this commit", () => {
+		assert.equal(
+			imagesReady(imageEnvironment, runnerFor(["ok"]), () => undefined),
+			true,
 		);
-		assert.equal(sleeps, 0);
 	});
 
-	void test("gives up with the pending image as the cause", async () => {
-		await assert.rejects(
-			async () => awaitImages(imageEnvironment, runnerFor(["pending"]), () => undefined, noWait),
-			(error: unknown) =>
-				error instanceof Error &&
-				error.message.includes("never published") &&
-				error.cause instanceof Error &&
-				error.cause.message.startsWith(IMAGE_PENDING),
+	void test("waits without failing while this commit's CI may still be publishing", () => {
+		const logs: string[] = [];
+		assert.equal(
+			imagesReady(imageEnvironment, runnerFor(["pending"]), (message) => {
+				logs.push(message);
+			}),
+			false,
 		);
+		assert.ok(
+			logs.some((message) => message.includes("If this commit's CI run is still in progress")),
+		);
+	});
+
+	void test("deploys the same commit once its CI run finishes publishing late", () => {
+		// The label arrived before the image; the completion run finds it and deploys.
+		assert.equal(
+			imagesReady(imageEnvironment, runnerFor(["pending"]), () => undefined),
+			false,
+		);
+		assert.equal(
+			imagesReady({ ...afterCi, CI_CONCLUSION: "success" }, runnerFor(["ok"]), () => undefined),
+			true,
+		);
+	});
+
+	void test("deploys red tests when CI still published the images", () => {
+		assert.equal(
+			imagesReady(afterCi, runnerFor(["ok"]), () => undefined),
+			true,
+		);
+	});
+
+	void test("fails a finished CI run that left an image unpublished, and names the run", () => {
+		let caught: unknown;
+		try {
+			imagesReady(afterCi, runnerFor(["pending"]), () => undefined);
+		} catch (error) {
+			caught = error;
+		}
+		assert.ok(caught instanceof Error);
+		assert.equal(
+			caught.message,
+			"CI finished (failure) without publishing this commit's images: " +
+				"https://github.example/owner/repo/actions/runs/1",
+		);
+		assert.ok(caught.cause instanceof Error);
+		assert.ok(caught.cause.message.startsWith(IMAGE_PENDING));
+	});
+
+	void test("never links a CI run address that is not HTTPS", () => {
+		assert.throws(
+			() =>
+				imagesReady(
+					{ ...afterCi, CI_RUN_URL: "javascript:alert(1)" },
+					runnerFor(["pending"]),
+					() => undefined,
+				),
+			/^Error: CI finished \(failure\) without publishing this commit's images\.$/u,
+		);
+	});
+
+	void test("refuses an untrusted image before and after CI finishes", () => {
+		// An unsigned digest is a verdict, not a delay.
+		for (const environment of [imageEnvironment, afterCi]) {
+			assert.throws(
+				() => imagesReady(environment, runnerFor(["unsigned"]), () => undefined),
+				/provenance/u,
+			);
+		}
 	});
 });
 
