@@ -18,10 +18,13 @@ import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewHistoryContentSource;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
+import de.tum.cit.aet.hephaestus.agent.job.PracticeScriptRunRecorderFixtures;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobAssignments;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
+import de.tum.cit.aet.hephaestus.agent.job.ScriptRunRepository;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmissionRequestDTO;
+import de.tum.cit.aet.hephaestus.agent.runtime.PiResultParser;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.evidence.AppliesWhenCheck;
 import de.tum.cit.aet.hephaestus.evidence.CapturedSource;
@@ -84,7 +87,10 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewPracticeStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStopReason;
+import de.tum.cit.aet.hephaestus.practices.spi.ScriptRunStatus;
 import de.tum.cit.aet.hephaestus.testconfig.ItemFixtures;
+import io.micrometer.core.instrument.MeterRegistry;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -151,6 +157,12 @@ class AppliesWhenExecutionIntegrationTest extends AbstractResultAdmissionIntegra
 
     @Autowired
     BundledPracticeCatalogLoader bundled;
+
+    @Autowired
+    ScriptRunRepository scriptRuns;
+
+    @Autowired
+    MeterRegistry meters;
 
     private final JobEvidenceFiles files = mock(JobEvidenceFiles.class);
     private final WorkspaceContextBuilder context = mock(WorkspaceContextBuilder.class);
@@ -416,6 +428,46 @@ class AppliesWhenExecutionIntegrationTest extends AbstractResultAdmissionIntegra
         assertThat(recorded.getExplanation()).isEqualTo(OTHERWISE);
         assertThat(recorded.getPracticeVersionId())
                 .isEqualTo(pending.scenario().practice().getCurrentVersion().getId());
+    }
+
+    /**
+     * The runner reports only the practices it was given. A complete report that leaves out a practice whose
+     * Applies when capture proved absent says nothing about its script, because that practice was never staged.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void shouldRecordNotFinishedOnlyForAStagedPracticeWhenACompleteReportLeavesItOut(boolean swiftChanged) {
+        var pending = pending();
+        var job = jobs.findById(pending.jobId()).orElseThrow();
+        try (var prepared = handler(job, true, Set.of(swiftChanged ? "src/App.swift" : "src/Main.java"))
+                .prepareInputs(job)) {
+            assertThat(prepared.folderIndex()).isNotNull();
+            assertThat(Objects.requireNonNull(job.getCapture()).path("index").size())
+                    .isEqualTo(swiftChanged ? 1 : 0);
+        }
+        byte[] report = "{\"schemaVersion\":2,\"truncated\":false,\"practices\":[]}".getBytes(StandardCharsets.UTF_8);
+        PracticeScriptRunRecorderFixtures.record(
+                new PiResultParser(mapper, meters),
+                scriptRuns,
+                meters,
+                mapper,
+                assignments,
+                job,
+                report,
+                Map.of(),
+                Instant.now());
+
+        var recorded =
+                scriptRuns.findByWorkspaceIdAndJobIdAndAttempt(job.getWorkspaceId(), job.getId(), job.getAttempt());
+        if (swiftChanged) {
+            assertThat(recorded).singleElement().satisfies(run -> {
+                assertThat(run.getId().getPracticeId())
+                        .isEqualTo(pending.scenario().practice().getId());
+                assertThat(run.getStatus()).isEqualTo(ScriptRunStatus.NOT_FINISHED);
+            });
+        } else {
+            assertThat(recorded).isEmpty();
+        }
     }
 
     @Test

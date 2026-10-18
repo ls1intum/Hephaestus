@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.review;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData.Scenario;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.util.List;
@@ -27,6 +28,9 @@ class ReviewContextControllerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     ProductReferenceQuery references;
+
+    @Autowired
+    SyncTargetProvider syncTargets;
 
     Scenario scenario;
 
@@ -65,6 +69,24 @@ class ReviewContextControllerIntegrationTest extends BaseIntegrationTest {
     void shouldResolveGitLabMergeRequestWhenAddressShowsDiffs() {
         var item = lookup.work(scenario.workspace(), IdentityProviderType.GITLAB, true);
         assertLookup(url(item) + "/diffs", item);
+    }
+
+    @Test
+    void shouldResolveAMirroredGitLabMergeRequestWhenTheNormalSyncReconcilesItsMonitor() {
+        var mirrored = lookup.mirror(scenario.workspace(), IdentityProviderType.GITLAB, true);
+        context(mirrored.url()).expectStatus().isNotFound().expectBody(Void.class);
+
+        syncTargets.reconcileSyncTargetIdentity(
+                mirrored.monitorId(),
+                mirrored.repository().getNativeId(),
+                mirrored.repository().getNameWithOwner());
+
+        context(mirrored.url() + "/diffs")
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.item.kind")
+                .isEqualTo("scm.pull_request");
     }
 
     @Test

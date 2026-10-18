@@ -27,7 +27,7 @@ class PracticeScriptRunRecorderTest extends BaseUnitTest {
         var assignments = mock(ReviewJobAssignments.class);
         var job = RuntimeReviewTestData.job();
         var assignment = RuntimeReviewTestData.assignment(5L, null);
-        when(assignments.load(job)).thenReturn(List.of(assignment));
+        when(assignments.admissible(job)).thenReturn(List.of(assignment));
         var recorded = new ArrayList<ScriptRun>();
         doAnswer(invocation -> {
                     Iterable<ScriptRun> rows = invocation.getArgument(0);
@@ -59,7 +59,7 @@ class PracticeScriptRunRecorderTest extends BaseUnitTest {
         var runs = mock(ScriptRunRepository.class);
         var assignments = mock(ReviewJobAssignments.class);
         var job = RuntimeReviewTestData.job();
-        when(assignments.load(job)).thenReturn(List.of(RuntimeReviewTestData.assignment(5L, null)));
+        when(assignments.admissible(job)).thenReturn(List.of(RuntimeReviewTestData.assignment(5L, null)));
         var recorded = new ArrayList<ScriptRun>();
         doAnswer(invocation -> {
                     Iterable<ScriptRun> rows = invocation.getArgument(0);

@@ -9,9 +9,11 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRep
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.item.ItemRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -72,6 +74,9 @@ class ScmRepositoryItemLifecycleIntegrationTest extends BaseIntegrationTest {
     private PullRequestRepository pulls;
 
     @Autowired
+    private IssueRepository issues;
+
+    @Autowired
     private ApplicationEventPublisher publisher;
 
     @Autowired
@@ -117,6 +122,97 @@ class ScmRepositoryItemLifecycleIntegrationTest extends BaseIntegrationTest {
         assertThat(repositoryItemIds(fixture)).containsExactly(itemId);
         assertThat(items.findSource(fixture.workspace().getId(), ScmItemEvents.PULL_REQUEST.value(), pullId))
                 .hasValueSatisfying(item -> assertThat(item.getParentId()).isEqualTo(itemId));
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldIndexAlreadyMirroredWorkWithoutAnEventWhenAnotherWorkspaceMonitorsTheRepository(
+            IdentityProviderType type) {
+        var fixture = fixture(type);
+        var monitor = monitor(fixture.workspace(), fixture.repository());
+        reconcile(monitor, fixture.repository());
+        long pullId = mirroredPull(fixture.repository(), 1);
+        long issueId = mirroredIssue(fixture.repository(), 2, false);
+        long deletedId = mirroredIssue(fixture.repository(), 3, true);
+        var other = connectedWorkspace(type, fixture.repository().getProvider().getServerUrl());
+        var otherMonitor = monitor(other, fixture.repository());
+
+        reconcile(otherMonitor, fixture.repository());
+
+        long holder = items.findSource(
+                        other.getId(),
+                        ScmItemEvents.REPOSITORY.value(),
+                        fixture.repository().getId())
+                .orElseThrow()
+                .getId();
+        long pullItem = memberId(other, ScmItemEvents.PULL_REQUEST, pullId, holder);
+        long issueItem = memberId(other, ScmItemEvents.ISSUE, issueId, holder);
+        assertThat(items.findSource(other.getId(), ScmItemEvents.ISSUE.value(), deletedId))
+                .isEmpty();
+        assertThat(items.findSource(fixture.workspace().getId(), ScmItemEvents.PULL_REQUEST.value(), pullId))
+                .isEmpty();
+
+        reconcile(monitor, fixture.repository());
+        reconcile(otherMonitor, fixture.repository());
+
+        memberId(fixture.workspace(), ScmItemEvents.PULL_REQUEST, pullId, repositoryItemId(fixture));
+        assertThat(memberId(other, ScmItemEvents.PULL_REQUEST, pullId, holder)).isEqualTo(pullItem);
+        assertThat(memberId(other, ScmItemEvents.ISSUE, issueId, holder)).isEqualTo(issueItem);
+        assertThat(jdbc.queryForObject(
+                        "SELECT count(*) FROM item_event WHERE workspace_id IN (?, ?)",
+                        Long.class,
+                        fixture.workspace().getId(),
+                        other.getId()))
+                .isZero();
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldNotIndexMirroredWorkWhenTheWorkspaceHasNoConnectionToItsProvider(IdentityProviderType type) {
+        var fixture = fixture(type);
+        fixture.repository().setVisibility(Repository.Visibility.PRIVATE);
+        repositories.saveAndFlush(fixture.repository());
+        mirroredPull(fixture.repository(), 1);
+        mirroredIssue(fixture.repository(), 2, false);
+        var unrelated = type == IdentityProviderType.GITHUB ? IdentityProviderType.GITLAB : IdentityProviderType.GITHUB;
+        var stranger = connectedWorkspace(
+                unrelated,
+                unrelated == IdentityProviderType.GITHUB ? "https://github.com" : "https://gitlab.example.test");
+
+        reconcile(monitor(stranger, fixture.repository()), fixture.repository());
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM item WHERE workspace_id=?", Long.class, stranger.getId()))
+                .isZero();
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldKeepMemberIdentitiesAndIndexWorkMirroredMeanwhileWhenMonitoringResumes(IdentityProviderType type) {
+        var fixture = fixture(type);
+        var monitor = monitor(fixture.workspace(), fixture.repository());
+        long pullId = mirroredPull(fixture.repository(), 1);
+        reconcile(monitor, fixture.repository());
+        long holder = repositoryItemId(fixture);
+        long pullItem = memberId(fixture.workspace(), ScmItemEvents.PULL_REQUEST, pullId, holder);
+
+        syncTargets.removeSyncTarget(monitor.getId());
+        assertActive(fixture.workspace(), holder, false);
+        long issueId = mirroredIssue(fixture.repository(), 2, false);
+        assertThat(items.findSource(fixture.workspace().getId(), ScmItemEvents.ISSUE.value(), issueId))
+                .isEmpty();
+        reconcile(monitor(fixture.workspace(), fixture.repository()), fixture.repository());
+
+        assertThat(repositoryItemIds(fixture)).containsExactly(holder);
+        assertActive(fixture.workspace(), holder, true);
+        assertThat(memberId(fixture.workspace(), ScmItemEvents.PULL_REQUEST, pullId, holder))
+                .isEqualTo(pullItem);
+        memberId(fixture.workspace(), ScmItemEvents.ISSUE, issueId, holder);
     }
 
     @ParameterizedTest
@@ -317,6 +413,49 @@ class ScmRepositoryItemLifecycleIntegrationTest extends BaseIntegrationTest {
     private void reconcile(RepositoryToMonitor monitor, Repository repository) {
         syncTargets.reconcileSyncTargetIdentity(
                 monitor.getId(), repository.getNativeId(), repository.getNameWithOwner());
+    }
+
+    /** A pull request the mirror holds without head or base: indexing must not need a version. */
+    private long mirroredPull(Repository repository, int number) {
+        var pull = new PullRequest();
+        pull.setNativeId(randomId());
+        pull.setProvider(repository.getProvider());
+        pull.setRepository(repository);
+        pull.setNumber(number);
+        pull.setTitle("Mirrored pull request");
+        pull.setState(Issue.State.OPEN);
+        pull.setHtmlUrl(repository.getHtmlUrl() + "/pull/" + number);
+        pull.setCreatedAt(Instant.now());
+        pull.setUpdatedAt(Instant.now());
+        return pulls.saveAndFlush(pull).getId();
+    }
+
+    private long mirroredIssue(Repository repository, int number, boolean deleted) {
+        var issue = new Issue();
+        issue.setNativeId(randomId());
+        issue.setProvider(repository.getProvider());
+        issue.setRepository(repository);
+        issue.setNumber(number);
+        issue.setTitle("Mirrored issue");
+        issue.setState(Issue.State.OPEN);
+        issue.setHtmlUrl(repository.getHtmlUrl() + "/issues/" + number);
+        issue.setCreatedAt(Instant.now());
+        issue.setUpdatedAt(Instant.now());
+        if (deleted) issue.setDeletedAt(Instant.now());
+        return issues.saveAndFlush(issue).getId();
+    }
+
+    private long memberId(Workspace workspace, ItemKind kind, long sourceId, long parentId) {
+        var rows = jdbc.queryForList(
+                "SELECT id FROM item WHERE workspace_id=? AND kind=? AND source_id=? AND parent_id=?"
+                        + " AND removed_at IS NULL",
+                Long.class,
+                workspace.getId(),
+                kind.value(),
+                sourceId,
+                parentId);
+        assertThat(rows).hasSize(1);
+        return Objects.requireNonNull(rows.getFirst());
     }
 
     private List<Long> repositoryItemIds(Fixture fixture) {
