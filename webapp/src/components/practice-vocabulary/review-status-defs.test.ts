@@ -21,6 +21,11 @@ describe("legacy withholding reasons", () => {
 			"This review referred to an earlier result that could not be identified exactly.",
 		);
 	});
+	it("describes a practice whose evidence settings cannot be used for this work", () => {
+		expect(withheldSentence("source_contract_unsupported")).toBe(
+			"Hephaestus cannot use this practice’s evidence settings for this work. Ask a workspace admin to check them.",
+		);
+	});
 	it("keeps the generic fallback for an unknown reason", () => {
 		expect(knownReasonSentence("UNKNOWN_REASON")).toBeUndefined();
 		expect(withheldSentence("UNKNOWN_REASON")).toBe(
