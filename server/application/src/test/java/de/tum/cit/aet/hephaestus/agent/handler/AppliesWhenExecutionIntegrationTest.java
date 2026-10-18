@@ -61,11 +61,15 @@ import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeReadSource;
 import de.tum.cit.aet.hephaestus.practices.PracticeReads;
+import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
 import de.tum.cit.aet.hephaestus.practices.curated.BundledPracticeCatalogLoader;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeVersion;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.review.AbstractResultAdmissionIntegrationTest;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewAdmissionData;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewItemRepository;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewPracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustody;
@@ -74,9 +78,12 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentStore;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewItemState;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewPracticeStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeSnapshot;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewStopReason;
 import de.tum.cit.aet.hephaestus.testconfig.ItemFixtures;
 import java.time.Clock;
 import java.time.Instant;
@@ -125,6 +132,15 @@ class AppliesWhenExecutionIntegrationTest extends AbstractResultAdmissionIntegra
     ReviewPracticeRepository practices;
 
     @Autowired
+    ReviewItemRepository reviewItems;
+
+    @Autowired
+    PracticeRepository practiceRows;
+
+    @Autowired
+    PracticeVersionRepository versionRows;
+
+    @Autowired
     ItemDescriptorRegistry descriptors;
 
     @Autowired
@@ -165,7 +181,10 @@ class AppliesWhenExecutionIntegrationTest extends AbstractResultAdmissionIntegra
     }
 
     private ReviewAdmissionData.Pending pending(PracticeDefinition definition) {
-        var scenario = data.scenario(definition);
+        return pending(data.scenario(definition));
+    }
+
+    private ReviewAdmissionData.Pending pending(ReviewIntegrationData.Scenario scenario) {
         var pending =
                 admissions.pending(scenario, Instant.now(), scenario.account().getId());
         admissions.running(pending, 1);
@@ -243,7 +262,8 @@ class AppliesWhenExecutionIntegrationTest extends AbstractResultAdmissionIntegra
                 mapper,
                 Clock.systemUTC(),
                 new AppliesWhenEvaluator(List.of(new ScmCapturedApplicability(mapper))),
-                mock(ResultAdmissionService.class));
+                mock(ResultAdmissionService.class),
+                catalogs);
     }
 
     private void captureFiles(ReviewJob job) {
@@ -448,6 +468,88 @@ class AppliesWhenExecutionIntegrationTest extends AbstractResultAdmissionIntegra
                         .asString())
                 .isEqualTo("NO_PROVIDER");
         assertThat(assignments.admissible(job)).isEmpty();
+        assertThat(proof.forAttempt(job.getWorkspaceId(), job.getReviewId(), job.getId(), job.getAttempt()))
+                .isEmpty();
+    }
+
+    /**
+     * Scope: the handler and the real assignment store, not the executor. It drives the same admissible lookup and
+     * PREPARATION_FAILED call that terminal settlement makes after an evidence refusal with no readiness report.
+     */
+    @Test
+    void shouldKeepTheUnsupportedSourceRefusalThroughSettlementWhenNoPracticeCanBeCaptured() {
+        var d = DefinitionTestFixtures.definition();
+        var scenario = data.scenario(d);
+        // A version stored by an earlier release. The current validator rejects only new versions, so this
+        // seeds the row the way PracticeVersionService.append stores one, without validation.
+        var retained = mapper.valueToTree(new PracticeDefinition(
+                d.name(),
+                d.reviewOn(),
+                null,
+                d.about(),
+                new PracticeReads(
+                        "2.0.0",
+                        List.of(
+                                new PracticeReadSource(new SourceKind("scm.pull-request.core"), ReadNeed.COMPLETE),
+                                new PracticeReadSource(new SourceKind("outline.documents"), ReadNeed.OPTIONAL))),
+                d.reviewedBy(),
+                d.criteria(),
+                d.script(),
+                d.scan(),
+                d.lineNotes(),
+                d.guidance()));
+        var practiceRow = practiceRows.findById(scenario.practice().getId()).orElseThrow();
+        practiceRow.setCurrentVersion(versionRows.saveAndFlush(new PracticeVersion(practiceRow, 2, retained, null)));
+        practiceRows.saveAndFlush(practiceRow);
+        var pending = pending(new ReviewIntegrationData.Scenario(
+                scenario.workspace(),
+                scenario.account(),
+                practiceRows.findById(practiceRow.getId()).orElseThrow(),
+                scenario.item()));
+        var job = jobs.findById(pending.jobId()).orElseThrow();
+        var assignment = assignments.load(job).getFirst();
+        when(source.supports(assignment.item())).thenReturn(true);
+        var handler = handler(new WorkspaceContextBuilder(
+                List.of(), List.of(source), catalogs, new JobFolderIndexBuilder(catalogs, mapper, Clock.systemUTC())));
+
+        assertThatThrownBy(() -> handler.prepareInputs(job))
+                .isInstanceOfSatisfying(
+                        InsufficientEvidenceException.class,
+                        refusal -> assertThat(refusal.preparedInputs().automatedReviewReadinessReport())
+                                .isNull());
+        // Terminal settlement: no readiness report, so every pinned practice is still admissible and is failed.
+        var admissible = assignments.admissible(job);
+        assertThat(admissible).extracting(a -> a.id()).containsExactly(assignment.id());
+        for (var settled : admissible)
+            members.fail(
+                    job.getWorkspaceId(),
+                    settled.id(),
+                    ReviewStopReason.PREPARATION_FAILED,
+                    "The execution ended without an admitted result");
+
+        var practice = practices
+                .findByWorkspaceIdAndReviewIdAndPracticeId(
+                        job.getWorkspaceId(),
+                        job.getReviewId(),
+                        assignment.practice().practiceId())
+                .orElseThrow();
+        assertThat(practice.getStatus()).isEqualTo(ReviewPracticeStatus.WITHHELD);
+        assertThat(practice.getReason()).isEqualTo(DefaultReviewExecutionHandler.SOURCE_CONTRACT_UNSUPPORTED);
+        assertThat(Objects.requireNonNull(practice.getCaptureDecision())
+                        .path("unsupportedSources")
+                        .get(0)
+                        .path("source")
+                        .asString())
+                .isEqualTo("outline.documents");
+        var member = reviewItems
+                .findByWorkspaceIdAndReviewIdAndPracticeIdAndItemId(
+                        job.getWorkspaceId(),
+                        job.getReviewId(),
+                        assignment.practice().practiceId(),
+                        assignment.item().itemId())
+                .orElseThrow();
+        assertThat(member.getState()).isEqualTo(ReviewItemState.WITHHELD);
+        assertThat(member.getReason()).isEqualTo(DefaultReviewExecutionHandler.SOURCE_CONTRACT_UNSUPPORTED);
         assertThat(proof.forAttempt(job.getWorkspaceId(), job.getReviewId(), job.getId(), job.getAttempt()))
                 .isEmpty();
     }

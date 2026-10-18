@@ -19,6 +19,7 @@ import de.tum.cit.aet.hephaestus.evidence.AppliesWhenCheck;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessDecision;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReason;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceReadinessCheck;
@@ -29,6 +30,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSource;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScanItemVersions;
+import de.tum.cit.aet.hephaestus.practices.PracticeReadSource;
+import de.tum.cit.aet.hephaestus.practices.PracticeReads;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultEvidence;
@@ -45,6 +48,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -59,6 +63,9 @@ import tools.jackson.databind.node.ObjectNode;
 @ConditionalOnCaptureRole
 @RequiredArgsConstructor
 public class DefaultReviewExecutionHandler {
+    /** A pinned practice whose reads the current source catalog cannot capture for the reviewed item. */
+    static final String SOURCE_CONTRACT_UNSUPPORTED = "source_contract_unsupported";
+
     private final ReviewJobAssignments assignments;
     private final List<ItemSource> sources;
     private final WorkspaceContextBuilder context;
@@ -73,25 +80,34 @@ public class DefaultReviewExecutionHandler {
     private final Clock clock;
     private final AppliesWhenEvaluator applicability;
     private final ResultAdmissionService admission;
+    private final ClasspathSourceCatalogRegistry sourceCatalog;
 
     public PreparedJobInputs prepareInputs(ReviewJob job) {
         var review = assignments.review(job);
-        var pinned = assignments.load(job);
-        var item = pinned.getFirst().item();
+        var assigned = assignments.load(job);
+        var item = assigned.getFirst().item();
         var matching = sources.stream().filter(source -> source.supports(item)).toList();
         if (matching.size() != 1) throw new IllegalStateException("The item needs exactly one capture source");
         var source = matching.getFirst();
-        var contracts = pinned.stream()
-                .map(a -> (review.kind() == ReviewKind.SCAN
-                                ? Objects.requireNonNull(
-                                                a.practice().definition().scan())
-                                        .reads()
-                                : a.practice().definition().reads())
-                        .contract())
-                .distinct()
-                .toList();
-        if (!contracts.equals(List.of(SandboxLayout.SOURCE_CONTRACT_VERSION)))
-            throw new IllegalArgumentException("The assigned source contract is not executable");
+        // The capture boundary rejects the whole batch for one read it cannot capture, so such a practice is
+        // withheld here and the others are captured.
+        var unsupported = new LinkedHashMap<ReviewAssignmentSnapshot, UnsupportedReads>();
+        for (var assignment : assigned) {
+            var refusal = unsupportedReads(assignment, item.kind().value(), review.kind());
+            if (refusal != null) unsupported.put(assignment, refusal);
+        }
+        var pinned = assigned.stream().filter(a -> !unsupported.containsKey(a)).toList();
+        if (pinned.isEmpty()) {
+            capture.capture(
+                    job.getWorkspaceId(),
+                    review.id(),
+                    job.getId(),
+                    job.getAttempt(),
+                    unsupportedDecisions(unsupported));
+            throw new InsufficientEvidenceException(
+                    "No assigned practice reads sources that this source contract can capture",
+                    new PreparedJobInputs(Map.of(), List.of(), List.of(), null, null));
+        }
         var required = pinned.stream()
                 .flatMap(a -> (review.kind() == ReviewKind.SCAN
                                 ? Objects.requireNonNull(
@@ -145,7 +161,7 @@ public class DefaultReviewExecutionHandler {
                             job.getId(),
                             job.getAttempt(),
                             required,
-                            contracts.getFirst(),
+                            SandboxLayout.SOURCE_CONTRACT_VERSION,
                             SandboxLayout.PRACTICE_CONTRACT_VERSION,
                             scanPaths));
             try {
@@ -170,26 +186,19 @@ public class DefaultReviewExecutionHandler {
                         now,
                         decisions,
                         checks);
-                capture.capture(
-                        job.getWorkspaceId(),
-                        review.id(),
-                        job.getId(),
-                        job.getAttempt(),
-                        decisions.stream()
-                                .map(decision -> {
-                                    var assignment = pinned.stream()
-                                            .filter(a -> a.practiceSlug().equals(decision.practiceSlug()))
-                                            .findFirst()
-                                            .orElseThrow();
-                                    return new ReviewCaptureDecision(
-                                            assignment.practice().practiceId(),
-                                            decision.ready()
-                                                    ? ReviewPracticeStatus.READY
-                                                    : ReviewPracticeStatus.WITHHELD,
-                                            decision.ready() ? null : "readiness_refused",
-                                            captureFacts(decision, checks.get(decision.practiceSlug())));
-                                })
-                                .toList());
+                var captureDecisions = new ArrayList<>(unsupportedDecisions(unsupported));
+                for (var decision : decisions) {
+                    var assignment = pinned.stream()
+                            .filter(a -> a.practiceSlug().equals(decision.practiceSlug()))
+                            .findFirst()
+                            .orElseThrow();
+                    captureDecisions.add(new ReviewCaptureDecision(
+                            assignment.practice().practiceId(),
+                            decision.ready() ? ReviewPracticeStatus.READY : ReviewPracticeStatus.WITHHELD,
+                            decision.ready() ? null : "readiness_refused",
+                            captureFacts(decision, checks.get(decision.practiceSlug()))));
+                }
+                capture.capture(job.getWorkspaceId(), review.id(), job.getId(), job.getAttempt(), captureDecisions);
                 var staged = new LinkedHashMap<>(evidence.files());
                 var ready = pinned.stream()
                         .filter(a -> decisions.stream()
@@ -262,6 +271,51 @@ public class DefaultReviewExecutionHandler {
             throw failure;
         }
     }
+
+    /**
+     * Returns why the current catalog cannot capture this practice's pinned reads for the item, or null when it can.
+     * An optional read counts: dropping it would review the practice with less than its pinned definition.
+     */
+    private @Nullable UnsupportedReads unsupportedReads(
+            ReviewAssignmentSnapshot assignment, String itemKind, ReviewKind scope) {
+        var definition = assignment.practice().definition();
+        PracticeReads reads = scope == ReviewKind.SCAN
+                ? Objects.requireNonNull(definition.scan()).reads()
+                : definition.reads();
+        var current = sourceCatalog.current();
+        var sources = reads.sources().stream()
+                .filter(read -> current.source(read.source())
+                        .filter(contract -> contract.appliesTo(itemKind))
+                        .isEmpty())
+                .toList();
+        if (reads.contract().equals(current.version().value()) && sources.isEmpty()) return null;
+        return new UnsupportedReads(
+                assignment.practiceSlug(),
+                clock.instant(),
+                reads.contract(),
+                current.version().value(),
+                itemKind,
+                sources);
+    }
+
+    private List<ReviewCaptureDecision> unsupportedDecisions(Map<ReviewAssignmentSnapshot, UnsupportedReads> refused) {
+        return refused.entrySet().stream()
+                .map(entry -> new ReviewCaptureDecision(
+                        entry.getKey().practice().practiceId(),
+                        ReviewPracticeStatus.WITHHELD,
+                        SOURCE_CONTRACT_UNSUPPORTED,
+                        mapper.valueToTree(entry.getValue())))
+                .toList();
+    }
+
+    /** The recorded capture facts of a practice withheld before capture. */
+    private record UnsupportedReads(
+            String practiceSlug,
+            Instant decidedAt,
+            String sourceContract,
+            String currentSourceContract,
+            String itemKind,
+            List<PracticeReadSource> unsupportedSources) {}
 
     private JsonNode captureFacts(AutomatedReviewReadinessDecision decision, @Nullable AppliesWhenCheck check) {
         ObjectNode facts = mapper.valueToTree(decision);

@@ -93,6 +93,15 @@ A missing, failed, redacted or incomplete required source records a readiness re
 It produces no result for that practice.
 Other practices can run when their required sources are available.
 
+Before capture, the server compares each practice's pinned reads with the current source catalog.
+A practice that pins another source contract, or reads a source that the catalog does not have or does not apply to the item, records `source_contract_unsupported`.
+That practice is withheld, and its sources are not captured.
+The other practices are captured and run.
+If no practice can be captured, the review records a readiness refusal and the sandbox does not start.
+
+An optional read must name a supported source.
+Its data can still be unavailable.
+
 For GitHub and GitLab reviews, a Git transport failure records `UNAVAILABLE` with `REPOSITORY_FETCH_FAILED` for the repository tree.
 An unreadable pinned base or head records `REVIEW_VERSION_UNAVAILABLE`.
 

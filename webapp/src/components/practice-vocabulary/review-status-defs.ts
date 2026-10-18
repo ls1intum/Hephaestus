@@ -144,6 +144,8 @@ const REVIEW_WITHHELD_REASON_SENTENCES: Readonly<Record<string, string>> = {
 		"This review keeps several historical results for the same practice and work without choosing one as its answer.",
 	LEGACY_REUSE_UNBOUND:
 		"This review referred to an earlier result that could not be identified exactly.",
+	source_contract_unsupported:
+		"Hephaestus cannot use this practice’s evidence settings for this work. Ask a workspace admin to check them.",
 };
 
 export function reviewReasonSentence(code: string | null): string | undefined {
