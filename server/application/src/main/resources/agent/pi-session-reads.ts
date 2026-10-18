@@ -20,6 +20,14 @@ import { isJsonObject as isRecord } from "./work/practice-scripts/lib/core/json.
 import { ReadRanges } from "./work/practice-scripts/lib/core/read-ranges.ts";
 
 const READ_TOOLS = new Set(["read", "grep", "find", "ls", "bash"]);
+// Bounds each refusal: sources named, and ranges named per source.
+export const REPAIR_LIMIT = 5;
+
+/** A relative path that stays inside the root it is read from. */
+export function insideRoot(target: string): boolean {
+	const normal = path.normalize(target);
+	return normal !== "." && !path.isAbsolute(normal) && normal.split(path.sep)[0] !== "..";
+}
 const textOf = (result: unknown): string =>
 	isRecord(result) && Array.isArray(result.content)
 		? result.content
@@ -44,6 +52,8 @@ export class SessionReads {
 	readonly #observedContent = new Set<string>();
 	readonly #opened = new Set<string>();
 	readonly #coveredBy = new Map<string, Set<string>>();
+	/** First line the read tool could not return because it alone exceeds the output byte limit. */
+	readonly #oversized = new Map<string, number>();
 	readonly #root: string;
 	readonly #lineCount: (target: string) => number;
 
@@ -136,6 +146,9 @@ export class SessionReads {
 			const start = isRecord(args) && typeof args.offset === "number" ? args.offset : 1;
 			this.ranges.expect(target);
 			this.#opened.add(target);
+			if (truncation.firstLineExceedsLimit === true && !this.#oversized.has(target)) {
+				this.#oversized.set(target, start);
+			}
 			// Count the pinned source on the host. Source text can imitate the tool's continuation notices.
 			try {
 				const last = this.#lineCount(target);
@@ -216,6 +229,71 @@ export class SessionReads {
 	/** Complete source content, including equivalent captured copies supplied in the brief. */
 	hasCompleteRead(target: string): boolean {
 		return this.#complete(this.#key(target));
+	}
+
+	/** Unread file lines of a source, or undefined when the host cannot count them. */
+	remaining(target: string): { start: number; end: number }[] | undefined {
+		const key = this.#key(target);
+		if (this.#complete(key)) {
+			return [];
+		}
+		const gaps = this.ranges.gaps(key);
+		if (gaps !== undefined) {
+			return gaps;
+		}
+		try {
+			return [{ start: 1, end: this.#lineCount(key) }];
+		} catch {
+			return undefined;
+		}
+	}
+
+	/** Executable reads for the unread lines of sources inside the session root. */
+	repair(targets: readonly string[]): string {
+		const keys = [...new Set(targets.map((target) => this.#key(target)))].filter(
+			(key) => key !== "" && insideRoot(key) && this.remaining(key)?.length !== 0,
+		);
+		const steps = keys.slice(0, REPAIR_LIMIT).map((key) => {
+			const oversized = this.#oversized.get(key);
+			if (oversized !== undefined) {
+				return `file line ${oversized} of ${key} alone exceeds the read tool's output limit, so no read can cover ${key} and no MET result that needs it can be admitted`;
+			}
+			const gaps = this.remaining(key);
+			if (gaps === undefined) {
+				return `read(${JSON.stringify({ path: key })})`;
+			}
+			const more = gaps.length - REPAIR_LIMIT;
+			return (
+				gaps
+					.slice(0, REPAIR_LIMIT)
+					.map(
+						({ start, end }) =>
+							`read(${JSON.stringify({ path: key, offset: start, limit: end - start + 1 })})`,
+					)
+					.join("; ") + (more > 0 ? `; then ${more} more unread ranges of ${key}` : "")
+			);
+		});
+		if (steps.length === 0) {
+			return "";
+		}
+		const more = keys.length - REPAIR_LIMIT;
+		return (
+			`Read the unread file lines: ${steps.join("; ")}${more > 0 ? `; then ${more} more sources` : ""}. ` +
+			`Offsets and limits count physical lines of the file, not the [L<n>] markers inside diff content. ` +
+			`When a read ends with "Use offset=N to continue", read again from N to the end of the same range.${this.bashNote(
+				keys,
+			)}`
+		);
+	}
+
+	/** Explains uncounted shell reads, only when a command named one of these sources. */
+	bashNote(targets: readonly string[]): string {
+		const names = targets.map((target) => path.basename(target));
+		return this.unknown.some(
+			(entry) => entry.startsWith("bash: ") && names.some((name) => entry.includes(name)),
+		)
+			? " Bash output from pipes, globs or compound commands is not counted as reading; use read, or one literal `sed -n 'a,bp' <file>` per range."
+			: "";
 	}
 
 	get #incomplete(): string[] {

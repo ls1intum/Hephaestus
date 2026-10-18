@@ -125,7 +125,7 @@ import {
 	stopSession,
 	scheduleDeadline,
 } from "./pi-session-lifecycle.ts";
-import { SessionReads } from "./pi-session-reads.ts";
+import { REPAIR_LIMIT, SessionReads, insideRoot } from "./pi-session-reads.ts";
 import { SUPPORTED_SCHEMA_VERSION, taskPaths, resolveTaskPaths } from "./pi-task-paths.ts";
 import { hasText, isBlank } from "./pi-text.ts";
 import { prepareTurnText } from "./pi-turn-context.ts";
@@ -353,16 +353,26 @@ function readState(reads: SessionReads, target: string): RequiredSourceTrace["re
 	return reads.hasRead(target) ? "partial" : "none";
 }
 
-function incompleteCoverageText(coverage: Coverage): string {
+function incompleteCoverageText(coverage: Coverage, reads: SessionReads, scan: boolean): string {
 	const omissions = coverage.complete ? [] : coverage.omitted;
-	const paths = [...new Set(omissions.flatMap((omission) => omission.items ?? []))];
-	const repair = paths
-		.map((target) => `read(${JSON.stringify({ path: target, offset: 1, limit: 2000 })})`)
-		.join("; ");
+	const targets = omissions.flatMap((omission) => omission.items ?? []);
+	// The governed scan reader replaces the native read tool and owns scan coverage, so the
+	// session's native line counts and shell credit do not apply to a scan citation.
+	const scanCalls = [...new Set(targets)]
+		.filter(insideRoot)
+		.slice(0, REPAIR_LIMIT)
+		.map((target) => `read(${JSON.stringify({ path: target })})`);
+	let repair = "";
+	if (scan && scanCalls.length > 0) {
+		repair = `Read each cited file whole: ${scanCalls.join("; ")}.`;
+	} else if (!scan) {
+		repair = reads.repair(targets);
+	}
 	return (
-		`a MET result needs complete coverage of its required and cited sources: ${omissions.map((omission) => `${omission.what}${omission.items === undefined ? "" : ` (${omission.items.join(", ")})`}`).join("; ")}. ` +
-		`Read these sources: ${repair || "read the captured sources needed by the criterion"}. ` +
-		"Continue from each returned offset until EOF, then submit again. A required source that remains unavailable produces no result."
+		`a MET result needs complete coverage of its required and cited sources: ${omissions.map((omission) => `${omission.what}: ${omission.count}`).join("; ")}. ` +
+		`${repair || "Read the captured sources needed by the criterion to their last line."} ` +
+		"Submit a MET result again only after every named source is read to its last line. " +
+		"A required source that remains unavailable produces no result."
 	);
 }
 
@@ -1036,7 +1046,7 @@ export async function runReviewJob(): Promise<void> {
 		raw: unknown,
 		slug: string,
 		measureCoverage: (citations: readonly Citation[]) => Coverage,
-		changeRead: boolean,
+		reads: SessionReads,
 	): Validated {
 		const notes: string[] = [];
 		const submission = normalizeSubmission(
@@ -1077,12 +1087,13 @@ export async function runReviewJob(): Promise<void> {
 			practiceIndex
 				.find((practice) => practice.slug === slug)
 				?.readsSources.includes(DIFF_SOURCE) === true &&
-			!changeRead
+			!reads.hasRead(`${CHANGE_ROOT}/diff.patch`)
 		) {
 			throw new Error(
-				"a result that decides nothing must show it read the change: this session must receive " +
-					`the complete ${CHANGE_ROOT}/diff.patch in its opening, or read that file with the read tool. ` +
-					"Another practice's reads and a list of consulted sources cannot establish this session's access.",
+				`a result that decides nothing must show it read the change: content of ${CHANGE_ROOT}/diff.patch must be in this session's opening or read in this session. Call read(${JSON.stringify({ path: `${CHANGE_ROOT}/diff.patch` })}), judge from what it returns, then submit again. ` +
+					`Another practice's reads and a list of consulted sources cannot establish this session's access.${reads.bashNote(
+						[`${CHANGE_ROOT}/diff.patch`],
+					)}`,
 			);
 		}
 		for (const citation of citations) {
@@ -1093,7 +1104,7 @@ export async function runReviewJob(): Promise<void> {
 		const parsed = parseCandidate({ ...submission, coverage });
 		if (!parsed.ok) {
 			if (parsed.reasonCode === "met_coverage_incomplete") {
-				throw new UnreadEvidenceError(incompleteCoverageText(coverage));
+				throw new UnreadEvidenceError(incompleteCoverageText(coverage, reads, scan));
 			}
 			throw new Error(`${parsed.reasonCode}: ${parsed.message}`);
 		}
@@ -1586,7 +1597,7 @@ export async function runReviewJob(): Promise<void> {
 					});
 					return review.reads.coverage(review.reader, review.domainReads, citedPaths);
 				},
-				review.reads.hasRead(`${CHANGE_ROOT}/diff.patch`),
+				review.reads,
 			);
 		} catch (error) {
 			countRefusal(slug);

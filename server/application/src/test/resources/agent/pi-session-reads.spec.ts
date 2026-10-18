@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { readFileSync, mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -8,6 +8,7 @@ import { createReadTool, createBashTool } from "@earendil-works/pi-coding-agent"
 import { parseCandidate } from "../../../../../../docker/agents/practice-scripts/lib/core/contract.ts";
 import { isJsonObject } from "../../../../../../docker/agents/practice-scripts/lib/core/json.ts";
 import { z } from "../../../../../../docker/agents/practice-scripts/lib/core/practice-script.ts";
+import { ReadRanges } from "../../../../../../docker/agents/practice-scripts/lib/core/read-ranges.ts";
 import {
 	folderCitationIndex,
 	citableTextIndex,
@@ -138,31 +139,32 @@ for (const isError of [false, true]) {
 	});
 }
 
+const MET_RESULT = {
+	outcome: "MET",
+	summary: "Criterion met",
+	explanation: "The described behavior meets the criterion.",
+	citations: [
+		{
+			sourceKind: "scm.pull-request.core",
+			sourcePath: "record.md",
+			path: "record.md",
+			startLine: 1,
+			endLine: 1,
+			quote: "work",
+		},
+	],
+	evidence: {
+		search: {
+			consulted: ["scm.pull-request.core"],
+			lookedFor: "criterion",
+			boundary: "the item",
+		},
+	},
+};
+
 void test("the candidate contract refuses MET over missing brief material", () => {
 	const reads = new SessionReads("/workspace", [{ path: "file.ts", supplied: false }]);
-	const parsed = parseCandidate({
-		outcome: "MET",
-		summary: "Criterion met",
-		explanation: "The described behavior meets the criterion.",
-		citations: [
-			{
-				sourceKind: "scm.pull-request.core",
-				sourcePath: "record.md",
-				path: "record.md",
-				startLine: 1,
-				endLine: 1,
-				quote: "work",
-			},
-		],
-		evidence: {
-			search: {
-				consulted: ["scm.pull-request.core"],
-				lookedFor: "criterion",
-				boundary: "the item",
-			},
-		},
-		coverage: reads.coverage(),
-	});
+	const parsed = parseCandidate({ ...MET_RESULT, coverage: reads.coverage() });
 	assert.equal(parsed.ok, false);
 	assert.equal(parsed.reasonCode, "met_coverage_incomplete");
 });
@@ -554,4 +556,228 @@ void test("a required head window is settled by a full read, including harmless 
 	assert.equal(reads.coverage().complete, false);
 	bash(reads, "cat file.ts 2>/dev/null", "one\ntwo\nthree");
 	assert.equal(reads.coverage().complete, true);
+});
+
+const DIFF = "work/change/diff.patch";
+
+/** A synthetic change view whose [L<n>] markers differ from its physical file lines. */
+function writeDiff(root: string, lines: number): string {
+	const text = [
+		"diff --git a/src/Synthetic.ts b/src/Synthetic.ts",
+		"--- a/src/Synthetic.ts",
+		"+++ b/src/Synthetic.ts",
+		`@@ -300,0 +300,${lines - 4} @@`,
+		...Array.from(
+			{ length: lines - 4 },
+			(_, i) => `[L${i + 300}] + const value${i} = compute(${i}, "synthetic padding");`,
+		),
+	].join("\n");
+	mkdirSync(path.join(root, "work/change"), { recursive: true });
+	writeFileSync(path.join(root, DIFF), text);
+	return text;
+}
+
+/** One call to the real SDK read tool, observed as the runner observes it. */
+async function nativeRead(
+	reads: SessionReads,
+	root: string,
+	args: { path: string; offset?: number; limit?: number },
+): Promise<string> {
+	reads.note({ type: "tool_execution_start", toolCallId: "read", toolName: "read", args });
+	const result = await createReadTool(root).execute("read", args);
+	reads.note({
+		type: "tool_execution_end",
+		toolCallId: "read",
+		toolName: "read",
+		result,
+		isError: false,
+	});
+	return result.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n");
+}
+
+const readCall = z.object({
+	path: z.string(),
+	offset: z.number().int().optional(),
+	limit: z.number().int().optional(),
+});
+
+/** Make each read call that a repair names, and continue each cut read as the repair says. */
+async function follow(reads: SessionReads, root: string, repair: string): Promise<number> {
+	let calls = 0;
+	for (const { groups } of repair.matchAll(/read\((?<json>\{[^)]*\})\)/gu)) {
+		let args = readCall.parse(JSON.parse(groups?.json ?? ""));
+		for (;;) {
+			calls += 1;
+			const next = Number(
+				/Use offset=(?<offset>\d+) to continue/u.exec(await nativeRead(reads, root, args))?.groups
+					?.offset,
+			);
+			if (args.offset === undefined || args.limit === undefined || !Number.isSafeInteger(next)) {
+				break;
+			}
+			const end = args.offset + args.limit - 1;
+			if (next > end) {
+				break;
+			}
+			args = { path: args.path, offset: next, limit: end - next + 1 };
+		}
+	}
+	return calls;
+}
+
+const call = (offset: number, limit: number) =>
+	`read(${JSON.stringify({ path: DIFF, offset, limit })})`;
+const admit = (reads: SessionReads) =>
+	parseCandidate({ ...MET_RESULT, coverage: reads.coverage() });
+
+void test("read ranges list the unread lines between merged extents up to the last line", () => {
+	const ranges = new ReadRanges();
+	assert.equal(ranges.gaps("file.ts"), undefined);
+	ranges.expect("file.ts");
+	assert.equal(ranges.gaps("file.ts"), undefined, "the length is unknown until a read counts it");
+	ranges.add("file.ts", 5, 7, 20);
+	ranges.add("file.ts", 8, 9);
+	ranges.add("file.ts", 15, 30);
+	assert.deepEqual(ranges.gaps("file.ts"), [
+		{ start: 1, end: 4 },
+		{ start: 10, end: 14 },
+	]);
+	ranges.add("file.ts", 1, 14);
+	assert.deepEqual(ranges.gaps("file.ts"), []);
+	assert.equal(ranges.complete("file.ts"), true);
+});
+
+void test("a MET refused over a missing head names those file lines, and reading exactly them admits it", async (t) => {
+	const root = mkdtempSync(path.join(tmpdir(), "repair-head-"));
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+	writeDiff(root, 2371);
+	const session = async () => {
+		const reads = new SessionReads(root, [{ path: DIFF, supplied: false }]);
+		await follow(reads, root, call(58, 2314));
+		return reads;
+	};
+	const reads = await session();
+	assert.deepEqual(reads.remaining(DIFF), [{ start: 1, end: 57 }]);
+	assert.equal(admit(reads).ok, false);
+	const repair = reads.repair([DIFF]);
+	assert.ok(repair.includes(call(1, 57)), repair);
+	assert.equal([...repair.matchAll(/read\(/gu)].length, 1, repair);
+	assert.match(repair, /physical lines of the file, not the \[L<n>\] markers/u);
+	assert.doesNotMatch(repair, /Bash output/u);
+	assert.equal(await follow(reads, root, repair), 1);
+	const admitted = admit(reads);
+	assert.ok(admitted.ok, admitted.ok ? "" : admitted.message);
+	assert.equal(reads.repair([DIFF]), "");
+
+	const short = await session();
+	await nativeRead(short, root, { path: DIFF, offset: 1, limit: 56 });
+	assert.equal(admit(short).ok, false, "one unread line still blocks MET");
+	assert.ok(short.repair([DIFF]).includes(call(57, 1)), short.repair([DIFF]));
+});
+
+void test("a cut read is credited to its returned lines, and the named continuations settle the gap", async (t) => {
+	const root = mkdtempSync(path.join(tmpdir(), "repair-continuation-"));
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+	writeDiff(root, 2371);
+	const reads = new SessionReads(root, [{ path: DIFF, supplied: false }]);
+	await follow(reads, root, call(2343, 29));
+	assert.ok(reads.repair([DIFF]).includes(call(1, 2342)), reads.repair([DIFF]));
+	const first = await nativeRead(reads, root, { path: DIFF, offset: 1, limit: 2342 });
+	const next = Number(
+		/KB limit\)\. Use offset=(?<offset>\d+) to continue/u.exec(first)?.groups?.offset,
+	);
+	assert.ok(next > 1 && next < 2000, first.slice(-200));
+	assert.deepEqual(reads.remaining(DIFF), [{ start: next, end: 2342 }]);
+	assert.ok(reads.repair([DIFF]).includes(call(next, 2343 - next)), reads.repair([DIFF]));
+	assert.equal(admit(reads).ok, false);
+	assert.ok((await follow(reads, root, reads.repair([DIFF]))) > 1, "the byte limit cuts again");
+	assert.ok(admit(reads).ok);
+});
+
+void test("uncounted shell output is explained only for the source it named, and a literal range read counts", (t) => {
+	const root = mkdtempSync(path.join(tmpdir(), "repair-bash-"));
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+	const text = writeDiff(root, 2371);
+	const reads = new SessionReads(root, [{ path: DIFF, supplied: false }]);
+	bash(reads, "ls work/change | head", "diff.patch\n");
+	assert.doesNotMatch(reads.repair([DIFF]), /Bash output/u);
+	bash(reads, `grep -n value ${DIFF} | head -40`, "5:[L300] + const value0\n");
+	assert.equal(admit(reads).ok, false);
+	const repair = reads.repair([DIFF]);
+	assert.ok(repair.includes(call(1, 2371)), repair);
+	assert.match(repair, /Bash output from pipes, globs or compound commands is not counted/u);
+	bash(reads, `sed -n '1,2371p' ${DIFF}`, text);
+	assert.ok(admit(reads).ok);
+});
+
+void test("a result that decides nothing needs change content this session read, not piped shell output", async (t) => {
+	const root = mkdtempSync(path.join(tmpdir(), "repair-undecided-"));
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+	writeDiff(root, 2371);
+	const reads = new SessionReads(root, [{ path: DIFF, supplied: false }]);
+	assert.equal(reads.hasRead(DIFF), false);
+	assert.equal(reads.bashNote([DIFF]), "");
+	bash(reads, `cat ${DIFF} | head -50`, "diff --git\n");
+	assert.equal(reads.hasRead(DIFF), false);
+	assert.match(reads.bashNote([DIFF]), /not counted as reading/u);
+	assert.equal(await follow(reads, root, `read(${JSON.stringify({ path: DIFF })})`), 1);
+	assert.equal(reads.hasRead(DIFF), true);
+});
+
+void test("a repair never names a path outside the session root", () => {
+	const reads = new SessionReads("/workspace", [{ path: DIFF, supplied: false }], () => 3);
+	const repair = reads.repair([
+		DIFF,
+		"../outside/secret.ts",
+		"/etc/passwd",
+		"/workspace/../home/user/notes.md",
+	]);
+	assert.ok(repair.includes(call(1, 3)), repair);
+	assert.doesNotMatch(repair, /secret|passwd|notes\.md|\.\.\//u);
+	assert.equal(reads.repair(["../outside/secret.ts", "/etc/passwd"]), "");
+});
+
+const capturedTreeText = (stagedPath: string, sourcePath: string) => ({
+	source: "scm.repository.tree",
+	path: sourcePath,
+	side: "NEW" as const,
+	commit: null,
+	stagedPath,
+	sha256: "a".repeat(64),
+});
+
+void test("supplied and equivalent captured content leave nothing to repair", () => {
+	const reads = new SessionReads(
+		"/workspace",
+		[
+			{ path: DIFF, supplied: true, lines: 2371 },
+			{ path: "evidence/a.java", supplied: true, lines: 3 },
+			{ path: "evidence/b.java", supplied: false },
+		],
+		() => assert.fail("complete content needs no line count"),
+		[
+			capturedTreeText("evidence/a.java", "src/A.java"),
+			capturedTreeText("evidence/b.java", "src/B.java"),
+		],
+	);
+	assert.deepEqual(reads.remaining(DIFF), []);
+	assert.deepEqual(reads.remaining("evidence/b.java"), []);
+	assert.equal(reads.repair([DIFF, "evidence/b.java"]), "");
+	assert.ok(admit(reads).ok);
+});
+
+void test("a line over the read tool byte limit is named as unreadable instead of a call that cannot succeed", async (t) => {
+	const root = mkdtempSync(path.join(tmpdir(), "repair-oversized-"));
+	t.after(() => rmSync(root, { recursive: true, force: true }));
+	mkdirSync(path.join(root, "work"));
+	writeFileSync(path.join(root, "work/bundle.js"), `${"x".repeat(60_000)}\nshort`);
+	const reads = new SessionReads(root, [{ path: "work/bundle.js", supplied: false }]);
+	await nativeRead(reads, root, { path: "work/bundle.js" });
+	assert.equal(admit(reads).ok, false);
+	const repair = reads.repair(["work/bundle.js"]);
+	assert.match(
+		repair,
+		/file line 1 of work\/bundle\.js alone exceeds the read tool's output limit, so no read can cover work\/bundle\.js and no MET result that needs it can be admitted/u,
+	);
+	assert.doesNotMatch(repair, /read\(|\d+ ?KB/u);
 });
