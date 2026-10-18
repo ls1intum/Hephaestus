@@ -130,6 +130,11 @@ public class ReviewIntegrationData {
 
     @Transactional
     public Result result(Scenario s, ResultOutcome outcome, Instant orderedAt, Instant recordedAt) {
+        return result(s, outcome, orderedAt, recordedAt, "version-" + UUID.randomUUID());
+    }
+
+    @Transactional
+    public Result result(Scenario s, ResultOutcome outcome, Instant orderedAt, Instant recordedAt, String itemVersion) {
         var review = Review.builder()
                 .id(UUID.randomUUID())
                 .workspaceId(s.workspace().getId())
@@ -138,7 +143,7 @@ public class ReviewIntegrationData {
                 .origin(ReviewOrigin.REQUEST)
                 .requestedById(s.account().getId())
                 .status(ReviewStatus.COMPLETE)
-                .itemVersion("version-" + UUID.randomUUID())
+                .itemVersion(itemVersion)
                 .orderedAt(orderedAt)
                 .createdAt(orderedAt)
                 .admittedAt(recordedAt)

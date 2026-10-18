@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.subissue;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -32,6 +33,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.PlatformTransactionManager;
 
 /**
@@ -97,7 +99,8 @@ class GitHubSubIssueSyncServiceTest extends BaseUnitTest {
                 syncSchedulerProperties,
                 issueProcessor,
                 transactionManager,
-                graphQlSyncHelper);
+                graphQlSyncHelper,
+                mock(ApplicationEventPublisher.class));
         repository = new Repository();
         repository.setId(REPO_ID);
         repository.setNameWithOwner("acme/web");
@@ -108,6 +111,9 @@ class GitHubSubIssueSyncServiceTest extends BaseUnitTest {
         parent.setId(PARENT_ROW_ID);
         parent.setNativeId(PARENT_GITHUB_ID.longValue());
         parent.setNumber(19);
+        parent.setRepository(repository);
+        parent.setTitle("Parent");
+        parent.setState(Issue.State.OPEN);
         child = new Issue();
         child.setId(CHILD_ROW_ID);
         child.setNativeId(CHILD_GITHUB_ID.longValue());
@@ -136,7 +142,7 @@ class GitHubSubIssueSyncServiceTest extends BaseUnitTest {
         assertThat(linked).isEqualTo(1);
         assertThat(child.getParentIssue()).isSameAs(parent);
         assertThat(parent.getSubIssuesTotal()).isEqualTo(1);
-        verify(issueRepository).save(child);
+        verify(issueRepository).saveAndFlush(child);
         verify(issueRepository, never()).findById(anyLong());
         verify(issueProcessor, never()).processStub(any(), any());
     }

@@ -6,18 +6,26 @@ import static org.assertj.core.api.SoftAssertions.assertSoftly;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemSourceObserved;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
+import de.tum.cit.aet.hephaestus.integration.core.itemevent.ItemEventRepository;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FoundBy;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemService;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlSyncCoordinator;
@@ -26,8 +34,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.issue.GitHubIssueProcess
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -37,6 +47,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.graphql.client.ClientGraphQlRequest;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.GraphQlClientInterceptor;
@@ -44,6 +55,8 @@ import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -51,7 +64,22 @@ import org.springframework.web.reactive.function.client.ClientResponse;
 import reactor.core.publisher.Mono;
 
 /** Real scope enumeration and persisted writes with GitHub stood in for at its transport boundary. */
+@RecordApplicationEvents
 class GitHubSubIssueScopeIntegrationTest extends BaseIntegrationTest {
+    @Autowired
+    private ApplicationEventPublisher publisher;
+
+    @Autowired
+    private ApplicationEvents publications;
+
+    @Autowired
+    private ItemIndexService itemIndex;
+
+    @Autowired
+    private ItemEventRepository occasionRows;
+
+    @Autowired
+    private ScmItemService itemSource;
 
     @Autowired
     private IdentityProviderRepository providers;
@@ -141,7 +169,8 @@ class GitHubSubIssueScopeIntegrationTest extends BaseIntegrationTest {
                 schedulerProperties,
                 processor,
                 transactionManager,
-                coordinator);
+                coordinator,
+                mock(ApplicationEventPublisher.class));
 
         service.syncSubIssuesForScope(workspace.getId());
         Integer foreignSummary = summary(foreignIssue);
@@ -204,6 +233,93 @@ class GitHubSubIssueScopeIntegrationTest extends BaseIntegrationTest {
         });
     }
 
+    @Test
+    void shouldRecordChangedSyncProgressWithoutPublishingForUnchangedOrPartialPages() {
+        long nativeId =
+                1_000_000_000L + Integer.toUnsignedLong(UUID.randomUUID().hashCode()) * 10;
+        String owner = "progress-" + UUID.randomUUID();
+        String path = owner + "/target";
+        var github = providers
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseThrow();
+        var workspace = WorkspaceTestFixtures.persistInstallationWorkspace(
+                workspaces, connections, WorkspaceTestFixtures.installationWorkspace(nativeId, owner), nativeId);
+        var repository = repository(github, nativeId + 1, path);
+        var monitor = WorkspaceTestFixtures.repositoryMonitor(workspace, path);
+        monitor.setNativeId(repository.getNativeId());
+        monitors.saveAndFlush(monitor);
+        var parent = issue(repository, nativeId + 2, 7);
+        var holder = itemIndex.upsert(
+                new ItemRegistration(workspace.getId(), ScmItemEvents.REPOSITORY, repository.getId(), null, null));
+        var item = itemIndex.upsert(
+                new ItemRegistration(workspace.getId(), ScmItemEvents.ISSUE, parent.getId(), holder.itemId(), null));
+        var original = itemSource.pin(item, null).version();
+        Map<String, String> pages = new HashMap<>();
+        pages.put("target", page(path, nativeId + 2, 2));
+        var boundary = mock(GitHubGraphQlClientProvider.class);
+        when(boundary.forScope(workspace.getId())).thenReturn(client(pages));
+        var service = new GitHubSubIssueSyncService(
+                issues,
+                repositories,
+                providers,
+                syncTargets,
+                boundary,
+                syncProperties,
+                classifier,
+                schedulerProperties,
+                processor,
+                transactionManager,
+                coordinator,
+                publisher);
+
+        service.syncSubIssuesForScope(workspace.getId());
+
+        var canonical = itemSource.pin(item, null).version();
+        assertThat(canonical).isNotEqualTo(original);
+        var occasion = occasionRows
+                .findByWorkspaceIdAndItemIdAndNameAndItemVersion(
+                        item.workspaceId(), item.itemId(), ScmItemEvents.ISSUE_UPDATED.value(), canonical.value())
+                .orElseThrow();
+        assertThat(occasion.getFoundBy()).isEqualTo(FoundBy.SYNC);
+        resetSync(workspace);
+        service.syncSubIssuesForScope(workspace.getId());
+        String complete = page(path, nativeId + 2, 99).strip();
+        pages.put(
+                "target",
+                complete.substring(0, complete.length() - 1)
+                        + ",\"errors\":[{\"message\":\"Parent unavailable\",\"path\":[\"repository\",\"issues\",\"nodes\",0,\"parent\"]}]}");
+        resetSync(workspace);
+        service.syncSubIssuesForScope(workspace.getId());
+
+        assertThat(summary(parent)).isEqualTo(2);
+        assertThat(itemSource.pin(item, null).version()).isEqualTo(canonical);
+        assertThat(publications.stream(ScmDomainEvent.IssueUpdated.class)
+                        .filter(event -> event.issue().id().equals(parent.getId()))
+                        .count())
+                .isEqualTo(1);
+        assertThat(publications.stream(ItemSourceObserved.class)
+                        .filter(event -> event.workspaceId() == item.workspaceId() && event.itemId() == item.itemId())
+                        .count())
+                .isZero();
+        assertThat(occasionRows
+                        .findByWorkspaceIdAndItemIdAndNameAndItemVersion(
+                                item.workspaceId(),
+                                item.itemId(),
+                                ScmItemEvents.ISSUE_UPDATED.value(),
+                                canonical.value())
+                        .orElseThrow()
+                        .getId())
+                .isEqualTo(occasion.getId());
+    }
+
+    private void resetSync(Workspace workspace) {
+        transactions.executeWithoutResult(ignored -> {
+            var stored = workspaces.findById(workspace.getId()).orElseThrow();
+            stored.setSubIssuesSyncedAt(Instant.EPOCH);
+            workspaces.save(stored);
+        });
+    }
+
     private HttpGraphQlClient client(Map<String, String> pages) {
         var response = new AtomicReference<>("");
         GraphQlClientInterceptor route = new GraphQlClientInterceptor() {
@@ -229,8 +345,8 @@ class GitHubSubIssueScopeIntegrationTest extends BaseIntegrationTest {
     }
 
     private Integer summary(Issue issue) {
-        return Objects.requireNonNull(transactions.execute(
-                status -> issues.findById(issue.getId()).orElseThrow().getSubIssuesTotal()));
+        return Objects.requireNonNull(transactions.execute(status -> Objects.requireNonNull(
+                issues.findById(issue.getId()).orElseThrow().getSubIssuesTotal())));
     }
 
     private Repository repository(IdentityProvider provider, long nativeId, String path) {

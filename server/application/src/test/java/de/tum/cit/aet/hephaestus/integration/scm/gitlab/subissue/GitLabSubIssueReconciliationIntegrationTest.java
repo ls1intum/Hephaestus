@@ -41,6 +41,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.graphql.client.ClientGraphQlRequest;
 import org.springframework.graphql.client.ClientGraphQlResponse;
@@ -133,7 +134,13 @@ class GitLabSubIssueReconciliationIntegrationTest extends BaseIntegrationTest {
 
         var clients = mock(GitLabGraphQlClientProvider.class);
         when(clients.forScope(scopeId)).thenReturn(gitLabClient());
-        service = new GitLabSubIssueSyncService(issues, repositories, clients, responseHandler, projectAdmission);
+        service = new GitLabSubIssueSyncService(
+                issues,
+                repositories,
+                clients,
+                responseHandler,
+                projectAdmission,
+                mock(ApplicationEventPublisher.class));
     }
 
     @Test

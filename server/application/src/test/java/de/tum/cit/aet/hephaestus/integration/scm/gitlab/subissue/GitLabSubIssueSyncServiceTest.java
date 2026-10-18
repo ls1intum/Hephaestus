@@ -35,6 +35,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.graphql.client.GraphQlClient;
@@ -87,7 +88,12 @@ class GitLabSubIssueSyncServiceTest extends BaseUnitTest {
                 .when(responseHandler.handle(any(), anyString(), any()))
                 .thenReturn(new HandleResult(HandleResult.Action.CONTINUE, null));
         service = new GitLabSubIssueSyncService(
-                issueRepository, repositoryRepository, graphQlClientProvider, responseHandler, projectAdmission);
+                issueRepository,
+                repositoryRepository,
+                graphQlClientProvider,
+                responseHandler,
+                projectAdmission,
+                mock(ApplicationEventPublisher.class));
     }
 
     @Test
@@ -199,6 +205,9 @@ class GitLabSubIssueSyncServiceTest extends BaseUnitTest {
         Issue issue = new Issue();
         issue.setId(id);
         issue.setNumber(number);
+        issue.setRepository(TestEntities.repository(REPO_ID, "acme/widgets"));
+        issue.setTitle("Issue " + number);
+        issue.setState(Issue.State.OPEN);
         return issue;
     }
 

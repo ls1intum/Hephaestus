@@ -2,11 +2,17 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.subissue;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.RepositoryRef;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlResponseHandler;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants;
@@ -14,6 +20,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncExcepti
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.graphql.GitLabPageInfo;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace.GitLabProjectAdmission;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -24,6 +31,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
@@ -56,18 +64,21 @@ public class GitLabSubIssueSyncService {
     private final GitLabGraphQlClientProvider graphQlClientProvider;
     private final GitLabGraphQlResponseHandler responseHandler;
     private final GitLabProjectAdmission admission;
+    private final ApplicationEventPublisher events;
 
     public GitLabSubIssueSyncService(
             IssueRepository issueRepository,
             RepositoryRepository repositoryRepository,
             GitLabGraphQlClientProvider graphQlClientProvider,
             GitLabGraphQlResponseHandler responseHandler,
-            GitLabProjectAdmission admission) {
+            GitLabProjectAdmission admission,
+            ApplicationEventPublisher events) {
         this.issueRepository = issueRepository;
         this.repositoryRepository = repositoryRepository;
         this.graphQlClientProvider = graphQlClientProvider;
         this.responseHandler = responseHandler;
         this.admission = admission;
+        this.events = events;
     }
 
     /**
@@ -156,7 +167,8 @@ public class GitLabSubIssueSyncService {
                                         issueByIid,
                                         issuesWithParentInGitLab,
                                         unknownHierarchyIssueIds,
-                                        repository);
+                                        repository,
+                                        scopeId);
                             }
                             return count;
                         })
@@ -194,7 +206,8 @@ public class GitLabSubIssueSyncService {
                             () -> clearStaleParents(
                                     issueRepository.findAllIssuesByRepositoryId(repository.getId()),
                                     issuesWithParentInGitLab,
-                                    unknownHierarchyIssueIds))
+                                    unknownHierarchyIssueIds,
+                                    scopeId))
                     .orElse(0);
 
             if (totalLinked > 0 || staleCleared > 0) {
@@ -228,7 +241,8 @@ public class GitLabSubIssueSyncService {
             Map<Integer, Issue> issueByIid,
             Set<Long> issuesWithParentInGitLab,
             Set<Long> unknownHierarchyIssueIds,
-            Repository repository) {
+            Repository repository,
+            Long scopeId) {
         String iidStr = node.get("iid") != null ? node.get("iid").toString() : null;
         if (iidStr == null) return 0;
 
@@ -297,8 +311,11 @@ public class GitLabSubIssueSyncService {
         if (!parentIssue.getId().equals(issue.getId())) {
             if (issue.getParentIssue() == null
                     || !issue.getParentIssue().getId().equals(parentIssue.getId())) {
+                var previous = issue.getParentIssue();
                 issue.setParentIssue(parentIssue);
-                issueRepository.save(issue);
+                issueRepository.saveAndFlush(issue);
+                if (previous != null) publishProgress(previous, scopeId);
+                publishProgress(parentIssue, scopeId);
                 return 1;
             }
         }
@@ -310,18 +327,27 @@ public class GitLabSubIssueSyncService {
      * Clears stored parents absent from a complete inventory, except issues with unreadable hierarchy.
      */
     private int clearStaleParents(
-            List<Issue> issues, Set<Long> issuesWithParentInGitLab, Set<Long> unknownHierarchyIssueIds) {
+            List<Issue> issues, Set<Long> issuesWithParentInGitLab, Set<Long> unknownHierarchyIssueIds, Long scopeId) {
         int cleared = 0;
         for (Issue issue : issues) {
             if (issue.getParentIssue() != null
                     && !issuesWithParentInGitLab.contains(issue.getId())
                     && !unknownHierarchyIssueIds.contains(issue.getId())) {
+                var previous = Objects.requireNonNull(issue.getParentIssue());
                 issue.setParentIssue(null);
-                issueRepository.save(issue);
+                issueRepository.saveAndFlush(issue);
+                publishProgress(previous, scopeId);
                 cleared++;
             }
         }
         return cleared;
+    }
+
+    private void publishProgress(Issue parent, Long scopeId) {
+        var context = EventContext.forSync(
+                scopeId, RepositoryRef.from(parent.getRepository()), IdentityProviderType.GITLAB, Instant.now());
+        events.publishEvent(new ScmDomainEvent.IssueUpdated(
+                ScmEventPayload.IssueData.from(parent), Set.of(ScmItemEvents.ISSUE_PROGRESS_FIELD), context));
     }
 
     /**
