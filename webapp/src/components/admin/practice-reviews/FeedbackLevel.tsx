@@ -43,6 +43,7 @@ import { FEEDBACK_LOCATION_DEFS } from "@/components/practice-vocabulary/feedbac
 import { FEEDBACK_RESOLUTION_DEFS } from "@/components/practice-vocabulary/feedback-resolution-defs";
 import {
 	copiesStillOnWork,
+	type DeliveryCheck,
 	deliveryCheck,
 	FEEDBACK_SEND_ACTION_LABELS,
 	FEEDBACK_SEND_STATE_DEFS,
@@ -199,6 +200,9 @@ export function FeedbackLevel({
 
 	const { feedback: record } = state;
 	const awaitingApproval = record.state === "AWAITING_APPROVAL";
+	// Both recoveries queue the feedback's one send, so while either is asked for, or the withdrawal
+	// changes, the other would only be refused.
+	const recovering = isCheckingDelivery || isRetryingWithdrawal || isChangingWithdrawal;
 	return (
 		<>
 			{header}
@@ -261,21 +265,13 @@ export function FeedbackLevel({
 				canChangeWithdrawal(record) && (
 					<DrawerFooter>
 						{deliveryCheck(record) === "available" && (
-							<Button
-								variant="outline"
-								disabled={isCheckingDelivery || isChangingWithdrawal}
-								onClick={onCheckDelivery}
-							>
+							<Button variant="outline" disabled={recovering} onClick={onCheckDelivery}>
 								<SearchCheckIcon aria-hidden />
 								Check delivery
 							</Button>
 						)}
 						{withdrawalCorrection(record) === "retryable" && (
-							<Button
-								variant="outline"
-								disabled={isRetryingWithdrawal || isChangingWithdrawal}
-								onClick={onRetryWithdrawal}
-							>
+							<Button variant="outline" disabled={recovering} onClick={onRetryWithdrawal}>
 								<RotateCcwIcon aria-hidden />
 								Retry withdrawal
 							</Button>
@@ -445,7 +441,10 @@ function feedbackHistory(feedback: FeedbackRecord): SheetEvent[] {
 	}
 	const failed = feedback.copies.some((copy) => copy.state === "FAILED");
 	const correction = withdrawalCorrection(feedback);
-	events.push(...feedback.sends.flatMap((send) => sendEvent(send, failed, correction) ?? []));
+	const check = deliveryCheck(feedback);
+	events.push(
+		...feedback.sends.flatMap((send) => sendEvent(send, failed, correction, check) ?? []),
+	);
 	const response = responseEvent(feedback);
 	if (response !== undefined) {
 		events.push(response);
@@ -541,10 +540,23 @@ function sendEvent(
 	send: FeedbackSend,
 	copiesFailed: boolean,
 	correction: WithdrawalCorrection | undefined,
+	check: DeliveryCheck | undefined,
 ): SheetEvent | undefined {
 	const done = send.state === "DONE";
+	// A post claimed while a write is unknown only reads it back. One already being sent may
+	// instead be making its first write, and the record does not say which.
+	const checking = send.action === "POST" && check === "checking";
+	const writing = checking && send.state === "SENDING";
 	let title: string;
-	if (!done) {
+	let action = FEEDBACK_SEND_ACTION_LABELS[send.action];
+	if (writing) {
+		title = "Writing or checking";
+		action = "Write the comment, or read back the one already started";
+	} else if (checking) {
+		title =
+			send.state === "PENDING" ? "Waiting to check" : FEEDBACK_SEND_STATE_DEFS[send.state].label;
+		action = "Read the work for the unconfirmed comment";
+	} else if (!done) {
 		title = FEEDBACK_SEND_STATE_DEFS[send.state].label;
 	} else if (
 		send.action === "RETRACT" &&
@@ -565,8 +577,13 @@ function sendEvent(
 		detail: (
 			<>
 				<span className="block">
-					{FEEDBACK_SEND_ACTION_LABELS[send.action]} · {attemptsLabel(send.attemptCount)}
+					{action} · {attemptsLabel(send.attemptCount)}
 				</span>
+				{checking && (
+					<span className="block">
+						{writing ? "The record does not say which." : "This check posts nothing."}
+					</span>
+				)}
 				{send.state === "UNCERTAIN" && (
 					<span className="block">{FEEDBACK_SEND_STATE_DEFS.UNCERTAIN.description}</span>
 				)}
@@ -793,6 +810,10 @@ const WITHDRAW_DESCRIPTIONS: Record<FeedbackDestination, string> = {
 		"Heph does not raise it in a conversation, and it leaves the feedback given to later reviews. The results behind it are unchanged.",
 };
 
+// No removal can reach a comment whose write is unknown: it has no provider reference until found.
+const UNKNOWN_WRITE_WITHDRAW_DESCRIPTION =
+	"An unconfirmed comment may still be on the work. Heph can retract that comment only if a check finds it. Receipts and results are kept.";
+
 function withdrawalCopy(feedback: FeedbackRecord): CorrectionReasonCopy {
 	if (feedback.withdrawn) {
 		return {
@@ -805,10 +826,17 @@ function withdrawalCopy(feedback: FeedbackRecord): CorrectionReasonCopy {
 			placeholder: "Why the feedback was right after all…",
 		};
 	}
+	let description = WITHDRAW_DESCRIPTIONS[feedback.destination];
+	if (deliveryCheck(feedback) !== undefined) {
+		// Posted copies beside the unknown one are still retracted the usual way.
+		description = feedback.copies.some((copy) => copy.state === "POSTED")
+			? `Copies already posted on the work are retracted there. ${UNKNOWN_WRITE_WITHDRAW_DESCRIPTION}`
+			: UNKNOWN_WRITE_WITHDRAW_DESCRIPTION;
+	}
 	return {
 		trigger: "Withdraw feedback",
 		title: "Withdraw this feedback",
-		description: WITHDRAW_DESCRIPTIONS[feedback.destination],
+		description,
 		placeholder: "What the feedback got wrong…",
 	};
 }

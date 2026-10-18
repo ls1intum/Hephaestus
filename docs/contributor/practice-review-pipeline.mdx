@@ -223,11 +223,13 @@ The run can stop private composition at its safety ceiling or after a stall.
 Then the runner asks for a new attempt of the same job.
 The server grants it only if the public review is accepted and no private piece of the job is prepared.
 A new attempt after a lost or stopped worker continues an admitted review in the same way.
+
 Each new attempt uses the original admission, its results and the retained original inputs.
 It reads routing, consent and erasure again.
 Like the first attempt, it composes the public review only if none is accepted.
 Then it composes private feedback only if no private piece is prepared.
 The retry limit and the original expiry of those inputs stay in effect.
+
 After one private piece is accepted, no attempt composes private feedback again.
 The other private pieces of that run are then not recovered.
 A new attempt does not see a public review that an earlier attempt composed.

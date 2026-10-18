@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -22,13 +23,17 @@ import de.tum.cit.aet.hephaestus.agent.job.ReviewJobAssignments;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCopyRecorder;
 import de.tum.cit.aet.hephaestus.integration.core.framework.RegisteredItemLabels;
+import de.tum.cit.aet.hephaestus.integration.core.spi.CopyDisposition;
+import de.tum.cit.aet.hephaestus.integration.core.spi.CopyReceipt;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.LookupPresence;
 import de.tum.cit.aet.hephaestus.practices.feedback.decision.FeedbackContentDigest;
 import de.tum.cit.aet.hephaestus.practices.feedback.decision.FeedbackDecision;
 import de.tum.cit.aet.hephaestus.practices.feedback.decision.FeedbackDecisionService;
+import de.tum.cit.aet.hephaestus.practices.feedback.decision.dto.CreateFeedbackDecisionRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
+import de.tum.cit.aet.hephaestus.practices.result.ResultMarkService;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackBasisInput;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheck;
@@ -51,6 +56,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackSendState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryQuery;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultMarkKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
@@ -82,6 +88,7 @@ import org.awaitility.Awaitility;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -108,6 +115,9 @@ class FeedbackPublicationContextIntegrationTest extends AbstractFeedbackDelivery
 
     @Autowired
     FeedbackContentDigest digests;
+
+    @Autowired
+    ResultMarkService marks;
 
     @Test
     void shouldWithholdAPieceComposedBeforeAnotherReviewPostedOnTheSameWork() {
@@ -327,6 +337,57 @@ class FeedbackPublicationContextIntegrationTest extends AbstractFeedbackDelivery
         assertThat(approved.checks().getFirst().reason()).isEqualTo(FeedbackStopReason.PUBLIC_DELIVERY_UNRESOLVED);
     }
 
+    @Test
+    @WithAdminUser
+    void shouldAnswerConflictWithTheChangedHistoryCodeAndCommitTheWithholdingWhenAnApprovalIsStale() {
+        when(gate.requiresApproval(any())).thenReturn(true);
+        UUID firstReview = review();
+        UUID secondReview = review();
+        String firstRead = contextFor(firstReview);
+        String secondRead = contextFor(secondReview);
+        var first = publicPiece(firstReview, "Name the missing failure case.", firstRead);
+        var second = publicPiece(secondReview, "Cover the empty input as well.", secondRead);
+        assertThat(approve(first).refusal()).isNull();
+        newSender().send(workspace.getId(), first);
+        approveOverHttp(second)
+                .expectStatus()
+                .isEqualTo(409)
+                .expectBody()
+                .jsonPath("$.code")
+                .isEqualTo("PUBLIC_HISTORY_CHANGED")
+                .jsonPath("$.state")
+                .isEqualTo("WITHHELD");
+        var row = feedback.findById(second).orElseThrow();
+        assertThat(row.getState()).isEqualTo(FeedbackState.WITHHELD);
+        assertThat(row.getStopReason()).isEqualTo(FeedbackStopReason.PUBLIC_HISTORY_CHANGED);
+        assertThat(decisions.findLatestApproval(workspace.getId(), second)).isEmpty();
+        assertThat(sends.findById(second)).isEmpty();
+        assertThat(provider.summaryCreates).isEqualTo(1);
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldAnswerConflictWithTheUnresolvedCodeAndKeepAwaitingApprovalWhenAnotherWriteIsUnknown() {
+        when(gate.requiresApproval(any())).thenReturn(true);
+        UUID review = review();
+        var piece = publicPiece(review, "Name the missing failure case.", contextFor(review));
+        sibling(developerId, itemId, FeedbackCopyState.WRITE_STARTED);
+        approveOverHttp(piece)
+                .expectStatus()
+                .isEqualTo(409)
+                .expectBody()
+                .jsonPath("$.code")
+                .isEqualTo("PUBLIC_DELIVERY_UNRESOLVED")
+                .jsonPath("$.state")
+                .isEqualTo("AWAITING_APPROVAL");
+        var row = feedback.findById(piece).orElseThrow();
+        assertThat(row.getState()).isEqualTo(FeedbackState.AWAITING_APPROVAL);
+        var approved = Objects.requireNonNull(row.getChecks().get(FeedbackCheckStage.APPROVED));
+        assertThat(approved.checks().getFirst().reason()).isEqualTo(FeedbackStopReason.PUBLIC_DELIVERY_UNRESOLVED);
+        assertThat(decisions.findLatestApproval(workspace.getId(), piece)).isEmpty();
+        assertThat(sends.findById(piece)).isEmpty();
+    }
+
     @ParameterizedTest
     @EnumSource(LookupPresence.class)
     void shouldRecheckAnUnknownWriteOnlyByReadingItBack(LookupPresence presence) {
@@ -420,6 +481,93 @@ class FeedbackPublicationContextIntegrationTest extends AbstractFeedbackDelivery
             assertWithheld(next, FeedbackStopReason.PUBLIC_DELIVERY_UNRESOLVED);
             assertThat(provider.summaryCreates).isZero();
             assertThat(provider.noteCreates).isZero();
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "WITHDRAWAL, FOUND",
+        "WITHDRAWAL, ABSENT",
+        "WITHDRAWAL, UNKNOWN",
+        "INCORRECT_MARK, FOUND",
+        "INCORRECT_MARK, ABSENT",
+        "INCORRECT_MARK, UNKNOWN"
+    })
+    void shouldRecheckAnUnknownNoteWhenTheRetractionOfItsPostedSummarySettled(
+            Correction correction, LookupPresence presence) {
+        prepare(true);
+        var summary = children().getFirst();
+        var note = children().get(1);
+        settledPartialPackage(summary, note);
+        var started = children().get(1);
+        if (correction == Correction.WITHDRAWAL)
+            decisionService.decide(
+                    workspace.getId(),
+                    feedbackId,
+                    developerId,
+                    new FeedbackDecisionInput(
+                            FeedbackDecisionAction.WITHDRAW, null, "The feedback should be withdrawn.", null));
+        else markedIncorrect();
+        // The retraction replaced the post; it corrects the posted summary and never reads the started note back.
+        assertThat(sends.findById(feedbackId).orElseThrow().getAction()).isEqualTo(FeedbackSendAction.RETRACT);
+        settleRetraction();
+        assertThat(children().getFirst().getState()).isEqualTo(FeedbackCopyState.RETRACTED);
+        assertThat(children().get(1).getState()).isEqualTo(FeedbackCopyState.WRITE_STARTED);
+        UUID nextReview = review();
+        String priorContext = contextFor(nextReview);
+        if (presence == LookupPresence.FOUND) provider.physical.put(note.getId(), note.getBody());
+        provider.readback = presence == LookupPresence.UNKNOWN ? LookupPresence.UNKNOWN : LookupPresence.FOUND;
+
+        assertThatCode(() -> store.recheck(workspace.getId(), feedbackId, developerId))
+                .doesNotThrowAnyException();
+        assertThat(recheckAudit(workspace.getId())).singleElement().satisfies(row -> {
+            assertThat(Objects.requireNonNull(mapper.readTree(String.valueOf(row.get("old_value"))))
+                            .path("action")
+                            .asString())
+                    .isEqualTo("RETRACT");
+            assertThat(Objects.requireNonNull(mapper.readTree(String.valueOf(row.get("new_value"))))
+                            .path("action")
+                            .asString())
+                    .isEqualTo("POST");
+        });
+        due();
+        newSender().send(workspace.getId(), feedbackId);
+        assertThat(provider.summaryCreates).isZero();
+        assertThat(provider.noteCreates).isZero();
+        var after = children();
+        assertThat(after.getFirst().getState()).isEqualTo(FeedbackCopyState.RETRACTED);
+        assertThat(after.get(1).getId()).isEqualTo(started.getId());
+        assertThat(after.get(1).getWriteKey()).isEqualTo(started.getWriteKey());
+        assertThat(after.get(1).getWriteStartedAt()).isEqualTo(started.getWriteStartedAt());
+        switch (presence) {
+            case FOUND -> {
+                assertThat(after.get(1).getState()).isEqualTo(FeedbackCopyState.POSTED);
+                var retraction = sends.findById(feedbackId).orElseThrow();
+                assertThat(retraction.getAction()).isEqualTo(FeedbackSendAction.RETRACT);
+                assertThat(retraction.getState()).isEqualTo(FeedbackSendState.PENDING);
+                due();
+                newSender().send(workspace.getId(), feedbackId);
+                assertThat(children().get(1).getState()).isEqualTo(FeedbackCopyState.RETRACTED);
+                assertThat(provider.physical).doesNotContainKey(note.getId());
+                assertThat(provider.summaryCreates).isZero();
+                assertThat(provider.noteCreates).isZero();
+            }
+            case ABSENT -> {
+                assertThat(after.get(1).getState()).isEqualTo(FeedbackCopyState.FAILED);
+                assertThat(after.get(1).getReadback()).isEqualTo(FeedbackCopyReadback.ABSENT);
+                var next = publicPiece(nextReview, "Cover the empty input as well.", priorContext);
+                newSender().send(workspace.getId(), next);
+                assertThat(provider.summaryCreates).isEqualTo(1);
+                assertThat(feedback.findById(next).orElseThrow().getState()).isEqualTo(FeedbackState.DELIVERED);
+            }
+            case UNKNOWN -> {
+                assertThat(after.get(1).getState()).isEqualTo(FeedbackCopyState.WRITE_STARTED);
+                assertThat(after.get(1).getReadback()).isNotEqualTo(FeedbackCopyReadback.ABSENT);
+                var next = publicPiece(nextReview, "Cover the empty input as well.", priorContext);
+                newSender().send(workspace.getId(), next);
+                assertWithheld(next, FeedbackStopReason.PUBLIC_DELIVERY_UNRESOLVED);
+                assertThat(provider.summaryCreates).isZero();
+            }
         }
     }
 
@@ -754,6 +902,75 @@ class FeedbackPublicationContextIntegrationTest extends AbstractFeedbackDelivery
         assertThat(children().get(1).getState()).isEqualTo(FeedbackCopyState.PLANNED);
     }
 
+    /** A posted summary and a note whose write stayed unknown after the post settled its readbacks. */
+    private void settledPartialPackage(FeedbackCopy summary, FeedbackCopy note) {
+        String owner = "partial-owner";
+        assertThat(transactions.claim(workspace.getId(), feedbackId, owner)).isNotNull();
+        assertThat(transactions.fence(workspace.getId(), feedbackId, owner, List.of(summary.getId()), List.of()))
+                .isTrue();
+        provider.physical.put(summary.getId(), current().getBody());
+        transactions.receipt(
+                workspace.getId(),
+                feedbackId,
+                owner,
+                List.of(new CopyReceipt(
+                        summary.getId(),
+                        CopyDisposition.POSTED,
+                        summary.getId().toString(),
+                        "https://example.test/comments/" + summary.getId(),
+                        true,
+                        null)));
+        assertThat(transactions.fence(workspace.getId(), feedbackId, owner, List.of(note.getId()), List.of()))
+                .isTrue();
+        transactions.finish(workspace.getId(), feedbackId, owner, true);
+        var post = sends.findById(feedbackId).orElseThrow();
+        assertThat(post.getAction()).isEqualTo(FeedbackSendAction.POST);
+        assertThat(post.getState()).isEqualTo(FeedbackSendState.DONE);
+        assertThat(children().getFirst().getState()).isEqualTo(FeedbackCopyState.POSTED);
+        assertThat(children().get(1).getState()).isEqualTo(FeedbackCopyState.WRITE_STARTED);
+    }
+
+    /** The real gate refuses feedback on an incorrect basis; this stand-in refuses only the marked piece. */
+    private void markedIncorrect() {
+        doAnswer(call -> {
+                    Feedback row = call.getArgument(0);
+                    FeedbackCheckStage stage = call.getArgument(1);
+                    return row.getId().equals(feedbackId)
+                            ? new FeedbackCheck(
+                                    stage,
+                                    false,
+                                    FeedbackStopReason.RESULT_MARKED_INCORRECT,
+                                    Instant.now(),
+                                    new FeedbackCheckFacts(0, 0, true, true, true, true, false, true, true, false))
+                            : allowed(stage);
+                })
+                .when(gate)
+                .evaluate(any(), any(), anyBoolean());
+        marks.create(
+                workspace.getId(),
+                supportingResult.getId(),
+                ResultMarkKind.INCORRECT,
+                developerId,
+                "The basis is wrong.");
+    }
+
+    private void settleRetraction() {
+        for (int attempt = 0;
+                attempt < 10 && sends.findById(feedbackId).orElseThrow().getState() != FeedbackSendState.DONE;
+                attempt++) {
+            due();
+            newSender().send(workspace.getId(), feedbackId);
+        }
+        var retraction = sends.findById(feedbackId).orElseThrow();
+        assertThat(retraction.getAction()).isEqualTo(FeedbackSendAction.RETRACT);
+        assertThat(retraction.getState()).isEqualTo(FeedbackSendState.DONE);
+    }
+
+    private enum Correction {
+        WITHDRAWAL,
+        INCORRECT_MARK
+    }
+
     private FeedbackDecisionOutcome approve(UUID piece) {
         return decisionService.decide(
                 workspace.getId(),
@@ -761,6 +978,15 @@ class FeedbackPublicationContextIntegrationTest extends AbstractFeedbackDelivery
                 developerId,
                 new FeedbackDecisionInput(
                         FeedbackDecisionAction.APPROVE, null, null, digests.current(workspace.getId(), piece)));
+    }
+
+    private WebTestClient.ResponseSpec approveOverHttp(UUID piece) {
+        return client.post()
+                .uri(route() + "/" + piece + "/decisions")
+                .headers(TestAuthUtils.withCurrentUser())
+                .bodyValue(new CreateFeedbackDecisionRequestDTO(
+                        FeedbackDecisionAction.APPROVE, null, null, digests.current(workspace.getId(), piece)))
+                .exchange();
     }
 
     private void assertWithheld(UUID piece, FeedbackStopReason reason) {
@@ -795,7 +1021,7 @@ class FeedbackPublicationContextIntegrationTest extends AbstractFeedbackDelivery
 
     private List<Map<String, @Nullable Object>> recheckAudit(long workspace) {
         return jdbc.queryForList(
-                "SELECT actor_account_id, entity_id, action, occurred_at, new_value FROM config_audit_event"
+                "SELECT actor_account_id, entity_id, action, occurred_at, old_value, new_value FROM config_audit_event"
                         + " WHERE workspace_id=? AND entity_type='FEEDBACK_DELIVERY_RECHECK'",
                 workspace);
     }

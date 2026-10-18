@@ -134,6 +134,70 @@ function unknownWriteOnWork(
 const UNKNOWN_ON_WORK_NOW =
 	"A comment was being written to the work, but the provider has not confirmed whether it appeared. It does not count as delivered until that is known. Until then, later reviews post no new feedback for this developer on this work.";
 
+/**
+ * A package whose summary was posted while its line notes' writes stayed unknown. A retraction
+ * means it was withdrawn: the summary is removed, and the notes, which have no provider reference,
+ * are skipped. `send` is the feedback's one send.
+ */
+function partlyUnknownOnWork(
+	send: Pick<FeedbackSend, "action" | "state" | "attemptCount">,
+): ReviewFeedbackDetail {
+	const withdrawn = send.action === "RETRACT";
+	const copies = longFeedbackDetail.copies.map((copy): FeedbackCopy =>
+		copy.kind === "SUMMARY"
+			? {
+					...copy,
+					state: withdrawn ? "RETRACTED" : "POSTED",
+					postedAt: copy.postedAt ?? WITHDRAWN_AT,
+					externalRef: "2481933",
+					readback: null,
+					stopReason: null,
+					lastError: null,
+				}
+			: {
+					...copy,
+					state: "WRITE_STARTED",
+					postedAt: null,
+					externalRef: null,
+					readback: "UNKNOWN",
+					stopReason: "DELIVERY_UNCONFIRMED",
+					lastError: "Provider visibility is unknown.",
+				},
+	);
+	return {
+		...longFeedbackDetail,
+		destination: "ON_WORK",
+		state: "UNCONFIRMED",
+		stopReason: "DELIVERY_UNCONFIRMED",
+		withdrawn,
+		copies,
+		copyCounts: {
+			planned: 0,
+			writeStarted: copies.length - 1,
+			posted: withdrawn ? 0 : 1,
+			failed: 0,
+			withheld: 0,
+			retracted: withdrawn ? 1 : 0,
+		},
+		decisions: withdrawn
+			? withdrawnFeedbackDetail.decisions.map((decision) => ({
+					...decision,
+					feedbackId: longFeedbackDetail.id,
+				}))
+			: [],
+		sends: [
+			{
+				feedbackId: longFeedbackDetail.id,
+				createdAt: WITHDRAWN_AT,
+				updatedAt: WITHDRAWN_AT,
+				nextAttemptAt: WITHDRAWN_AT,
+				lastError: "Provider visibility is unknown.",
+				...send,
+			},
+		],
+	};
+}
+
 const UNACKNOWLEDGED_REMOVAL = {
 	state: "POSTED",
 	readback: "TRANSIENT",
@@ -339,6 +403,8 @@ export const UncertainWrite: Story = {
 		await expectHeaderChip(panelElement, "Ready to send");
 		const events = history(panelElement);
 		events.getByText("Not confirmed");
+		events.getByText("Read the work for the unconfirmed comment · 1 attempt");
+		events.getByText("This check posts nothing.");
 		events.getByText("Summary writing");
 		events.getByText(/The connection closed before GitHub answered/u);
 		within(panelElement).getByText(
@@ -514,8 +580,103 @@ export const WithdrawalInProgress: Story = {
 		const panel = within(panelElement);
 		panel.getByText(/Heph is still removing the copies it posted on the work\./u);
 		history(panelElement).getByText("Not confirmed");
+		// A removal keeps its own words: it is not a readback.
+		history(panelElement).getByText("Retract the posted copies · 3 attempts");
 		await expect(panel.queryByRole("button", { name: "Retry withdrawal" })).toBeNull();
 		await expect(panel.getByRole("button", { name: "Restore feedback" })).toBeEnabled();
+	},
+};
+
+/**
+ * The retraction settled: it removed the summary and could not reach the notes, whose writes are
+ * unknown. Only reading the work again can settle them, so the check is offered on the withdrawal.
+ */
+export const WithdrawnPartlyRetractedUnknownWrite: Story = {
+	args: {
+		feedback: ready(partlyUnknownOnWork({ action: "RETRACT", state: "DONE", attemptCount: 8 })),
+	},
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		const panel = within(panelElement);
+		await expectHeaderChip(panelElement, "Withdrawn");
+		panel.getByText(
+			"It is withdrawn, but 2 copies may still be on the work, because a write was never confirmed. Check delivery to find out. A comment found there is then retracted. The results behind it are unchanged.",
+		);
+		await expect(panel.queryByText(/Heph cannot remove/u)).toBeNull();
+		const events = history(panelElement);
+		events.getByText("Summary posted");
+		await expect(events.getAllByText("Line note writing")).toHaveLength(2);
+		events.getByText("Retraction incomplete");
+		events.getByText("Retract the posted copies · 8 attempts");
+		await expect(panel.getByRole("button", { name: "Check delivery" })).toBeEnabled();
+		await expect(panel.queryByRole("button", { name: "Retry withdrawal" })).toBeNull();
+		await expect(panel.getByRole("button", { name: "Restore feedback" })).toBeEnabled();
+	},
+};
+
+const partlyRetracted = partlyUnknownOnWork({ action: "RETRACT", state: "DONE", attemptCount: 8 });
+
+/**
+ * The retraction settled with the summary's removal unacknowledged and the notes unknown, so both
+ * recoveries apply: retrying the removal, and reading the work for the notes.
+ */
+const RETRACTABLE_AND_UNKNOWN: ReviewFeedbackDetail = {
+	...partlyRetracted,
+	copies: partlyRetracted.copies.map((copy) =>
+		copy.kind === "SUMMARY" ? { ...copy, ...UNACKNOWLEDGED_REMOVAL } : copy,
+	),
+	copyCounts: { ...partlyRetracted.copyCounts, posted: 1, retracted: 0 },
+};
+
+/** At rest, both recoveries are offered. */
+export const WithdrawnRetractableAndUnknown: Story = {
+	args: { feedback: ready(RETRACTABLE_AND_UNKNOWN) },
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		await expect(panel.getByRole("button", { name: "Retry withdrawal" })).toBeEnabled();
+		await expect(panel.getByRole("button", { name: "Check delivery" })).toBeEnabled();
+		await expect(panel.getByRole("button", { name: "Restore feedback" })).toBeEnabled();
+	},
+};
+
+/** A check in flight holds the retry too: both queue the feedback's one send. */
+export const CheckingWhileRetractable: Story = {
+	args: { feedback: ready(RETRACTABLE_AND_UNKNOWN), isCheckingDelivery: true },
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		await expectGenuinelyDisabled(panel.getByRole("button", { name: "Check delivery" }));
+		await expectGenuinelyDisabled(panel.getByRole("button", { name: "Retry withdrawal" }));
+	},
+};
+
+/** A retry in flight holds the check the same way. */
+export const RetryingWithdrawalWhileUnknown: Story = {
+	args: { feedback: ready(RETRACTABLE_AND_UNKNOWN), isRetryingWithdrawal: true },
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		await expectGenuinelyDisabled(panel.getByRole("button", { name: "Retry withdrawal" }));
+		await expectGenuinelyDisabled(panel.getByRole("button", { name: "Check delivery" }));
+	},
+};
+
+/** While that retraction still runs, it is a removal, not a check, and no check is offered yet. */
+export const WithdrawnPartlyRetractedRemovalInProgress: Story = {
+	args: {
+		feedback: ready(
+			partlyUnknownOnWork({ action: "RETRACT", state: "UNCERTAIN", attemptCount: 3 }),
+		),
+	},
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		const panel = within(panelElement);
+		panel.getByText(/Heph is still removing the copies it posted on the work\./u);
+		const events = history(panelElement);
+		events.getByText("Not confirmed");
+		events.getByText("Retract the posted copies · 3 attempts");
+		await expect(
+			events.queryByText("Read the work for the unconfirmed comment · 3 attempts"),
+		).toBeNull();
+		await expect(panel.queryByRole("button", { name: "Check delivery" })).toBeNull();
 	},
 };
 
@@ -593,6 +754,56 @@ export const WithdrawFeedback: Story = {
 			"It describes issues from before this pull request.",
 		);
 		await waitFor(async () => expect(screen.queryByRole("textbox", { name: "Reason" })).toBeNull());
+	},
+};
+
+const UNKNOWN_WRITE_WITHDRAWAL =
+	"An unconfirmed comment may still be on the work. Heph can retract that comment only if a check finds it. Receipts and results are kept.";
+
+/** Withdrawing a comment whose write is unknown promises no removal it cannot make yet. */
+export const WithdrawUnconfirmedComment: Story = {
+	args: { feedback: ready(unknownWriteOnWork("DONE")) },
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ userEvent }) => {
+		const panel = within(await settledDrawerPanel());
+		await userEvent.click(panel.getByRole("button", { name: "Withdraw feedback" }));
+		await expectSettledVisible(await screen.findByRole("textbox", { name: "Reason" }));
+		screen.getByText(UNKNOWN_WRITE_WITHDRAWAL);
+		await expect(
+			screen.queryByText(/^Copies already posted on the work are retracted there, and/u),
+		).toBeNull();
+	},
+};
+
+/** Withdrawing a package with a posted summary and unknown notes says what happens to each. */
+export const WithdrawPartlyPostedUnconfirmed: Story = {
+	args: {
+		feedback: ready(partlyUnknownOnWork({ action: "POST", state: "DONE", attemptCount: 8 })),
+	},
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ userEvent }) => {
+		const panel = within(await settledDrawerPanel());
+		await expect(panel.getByRole("button", { name: "Check delivery" })).toBeEnabled();
+		await userEvent.click(panel.getByRole("button", { name: "Withdraw feedback" }));
+		await expectSettledVisible(await screen.findByRole("textbox", { name: "Reason" }));
+		screen.getByText(
+			`Copies already posted on the work are retracted there. ${UNKNOWN_WRITE_WITHDRAWAL}`,
+		);
+	},
+};
+
+/** Withdrawing feedback whose copies are all accounted for keeps the plain promise. */
+export const WithdrawDeliveredFromWork: Story = {
+	args: { feedback: ready({ ...approvedFeedbackDetail, destination: "ON_WORK" }) },
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ userEvent }) => {
+		const panel = within(await settledDrawerPanel());
+		await userEvent.click(panel.getByRole("button", { name: "Withdraw feedback" }));
+		await expectSettledVisible(await screen.findByRole("textbox", { name: "Reason" }));
+		screen.getByText(
+			"Copies already posted on the work are retracted there, and nothing more is posted. Their receipts stay on this sheet, and the results behind it are unchanged.",
+		);
+		await expect(screen.queryByText(UNKNOWN_WRITE_WITHDRAWAL)).toBeNull();
 	},
 };
 
@@ -676,7 +887,13 @@ export const DeliveryCheckInProgress: Story = {
 			"Heph is confirming whether a comment it began writing appeared on the work. Until the provider confirms it, it does not count as delivered.",
 		);
 		await expect(panel.queryByText(UNKNOWN_ON_WORK_NOW)).toBeNull();
-		history(panelElement).getByText("Waiting to be sent");
+		// The queued post only reads the work back; it is not a send waiting to post.
+		const events = history(panelElement);
+		events.getByText("Waiting to check");
+		events.getByText("Read the work for the unconfirmed comment · 8 attempts");
+		events.getByText("This check posts nothing.");
+		await expect(events.queryByText("Waiting to be sent")).toBeNull();
+		await expect(events.queryByText(/Post the copies/u)).toBeNull();
 		await expect(panel.queryByRole("button", { name: "Check delivery" })).toBeNull();
 	},
 };
@@ -738,6 +955,11 @@ export const WithdrawnDeliveryCheckInProgress: Story = {
 			"It is withdrawn. Heph is confirming whether a comment it began writing appeared on the work. A comment found there is then retracted. The results behind it are unchanged.",
 		);
 		await expect(panel.queryByText(/still removing/u)).toBeNull();
+		// Being sent, it may be the first write or a readback; the record does not say which.
+		const events = history(panelElement);
+		events.getByText("Writing or checking");
+		events.getByText("Write the comment, or read back the one already started · 8 attempts");
+		events.getByText("The record does not say which.");
 		await expect(panel.queryByRole("button", { name: "Check delivery" })).toBeNull();
 	},
 };

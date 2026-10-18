@@ -722,7 +722,8 @@ public class ReviewJobExecutor {
             @Nullable RefusalReason reasonCode,
             @Nullable Map<String, Object> details) {}
 
-    @Nullable ReviewJobStatus executePrepared(UUID jobId, ReviewJob job, SandboxSpec sandboxSpec) {
+    @Nullable
+    ReviewJobStatus executePrepared(UUID jobId, ReviewJob job, SandboxSpec sandboxSpec) {
         SandboxResult result = sandboxManager.execute(sandboxSpec);
         AgentResult agentResult = practiceAgent.parseResult(result);
 
@@ -1140,8 +1141,7 @@ public class ReviewJobExecutor {
     }
 
     // A failed runner's draft can reach delivery only through results the server already admitted.
-    ReviewJobStatus determineTerminalStatus(
-            SandboxResult sandboxResult, AgentResult agentResult, ReviewJob job) {
+    ReviewJobStatus determineTerminalStatus(SandboxResult sandboxResult, AgentResult agentResult, ReviewJob job) {
         if (sandboxResult.timedOut()) {
             return ReviewJobStatus.TIMED_OUT;
         }

@@ -523,7 +523,8 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("an admitted attempt that owes private feedback continues once, under its original admission and inputs")
+    @DisplayName(
+            "an admitted attempt that owes private feedback continues once, under its original admission and inputs")
     void shouldContinueOwedPrivateFeedbackOnceUnderTheOriginalAdmission() {
         UUID jobId = runningJobOwnedBy("live-owner", Instant.now(), 0);
         Result observed = admitWithResult(jobId);
@@ -577,7 +578,8 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         if (!why.equals("public review not accepted")) acceptPublicReview(jobId);
         Instant fresh = Instant.now().plus(Duration.ofHours(1));
         if (why.equals("expired inputs")) {
-            keepOriginalInputs(jobId, attempt, "READY", "COMPLETE", Instant.now().minusSeconds(1));
+            keepOriginalInputs(
+                    jobId, attempt, "READY", "COMPLETE", Instant.now().minusSeconds(1));
         } else if (why.equals("erased receipt")) {
             keepOriginalInputs(jobId, attempt, "ERASE_REQUESTED", "COMPLETE", fresh);
         } else {
@@ -650,12 +652,14 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
                                 + " || (calls ->> 'review') FROM review_job_script_run WHERE job_id = ?",
                         String.class,
                         jobId))
-                .containsExactly("0:" + practice.getId() + ":" + practice.getCurrentVersion().getId() + ":OK:1");
+                .containsExactly("0:" + practice.getId() + ":"
+                        + practice.getCurrentVersion().getId() + ":OK:1");
     }
 
     @ParameterizedTest(name = "{0}")
     @ValueSource(strings = {"no report", "malformed report", "refused requeue"})
-    @DisplayName("an owed attempt records no practice script runs at its requeue without a granted requeue and a report")
+    @DisplayName(
+            "an owed attempt records no practice script runs at its requeue without a granted requeue and a report")
     void shouldRecordNoPracticeScriptRunsAtTheRequeueWithoutAGrantedRequeueAndAReport(String why) {
         UUID jobId = runningJobOwnedBy("live-owner", Instant.now(), 0);
         admitWithResult(jobId);
@@ -681,13 +685,13 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
 
     @ParameterizedTest(name = "private piece prepared: {0}")
     @ValueSource(booleans = {false, true})
-    @DisplayName("a lost admitted review with an accepted public review continues; its new attempt reads the private fact")
+    @DisplayName(
+            "a lost admitted review with an accepted public review continues; its new attempt reads the private fact")
     void shouldContinueALostAdmittedReviewWithAnAcceptedPublicReview(boolean privatePiece) {
         UUID jobId = runningJobOwnedBy("dead-replica-11", Instant.now().minus(Duration.ofMinutes(5)), 0);
         admitWithResult(jobId);
         acceptPublicReview(jobId);
-        if (privatePiece)
-            jdbc.update("UPDATE review_job SET practice_page_prepared_at = now() WHERE id = ?", jobId);
+        if (privatePiece) jdbc.update("UPDATE review_job SET practice_page_prepared_at = now() WHERE id = ?", jobId);
         keepOriginalInputs(jobId, 0, "READY", "COMPLETE", Instant.now().plus(Duration.ofHours(1)));
         registerStaleWorker("dead-replica-11");
 
@@ -855,8 +859,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         return continueComposition(job, workerId, null, null);
     }
 
-    private boolean continueComposition(
-            ReviewJob job, String workerId, AgentResult.@Nullable LlmUsage runnerUsage) {
+    private boolean continueComposition(ReviewJob job, String workerId, AgentResult.@Nullable LlmUsage runnerUsage) {
         return continueComposition(job, workerId, runnerUsage, null);
     }
 
@@ -924,7 +927,9 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
                     new BoundModelSlot("embedding", ModelKind.EMBEDDING, null),
                     new BoundModelSlot("reranking", ModelKind.RERANKING, null));
             String digest = requireNonNull(jdbc.queryForObject(
-                    "SELECT review_model_digest(CAST(? AS jsonb))", String.class, objectMapper.writeValueAsString(slots)));
+                    "SELECT review_model_digest(CAST(? AS jsonb))",
+                    String.class,
+                    objectMapper.writeValueAsString(slots)));
             jdbc.update(
                     "UPDATE review_practice SET method=CAST(? AS jsonb) WHERE workspace_id=? AND review_id=?",
                     objectMapper.writeValueAsString(new ReviewMethod(1, digest, slots)),

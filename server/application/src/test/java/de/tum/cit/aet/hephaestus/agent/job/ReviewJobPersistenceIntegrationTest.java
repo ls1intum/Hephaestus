@@ -115,7 +115,12 @@ class ReviewJobPersistenceIntegrationTest extends BaseIntegrationTest {
                 meterRegistry,
                 new ReviewJobTelemetry(meterRegistry, Tracer.NOOP),
                 new ReviewJobRecovery(
-                        jobRepository, agentProperties, objectMapper, usageRecorder, Optional.empty(), Optional.empty()));
+                        jobRepository,
+                        agentProperties,
+                        objectMapper,
+                        usageRecorder,
+                        Optional.empty(),
+                        Optional.empty()));
         workspace = workspaceRepository.save(TestEntities.activeWorkspace("stale-reap-ws"));
         LlmConnection connection = connectionRepository.save(LlmCatalogTestFixtures.connection("stale-reap"));
         instanceModel =

@@ -74,19 +74,21 @@ export function withdrawalCorrection(
 
 /**
  * Whether reading the work again can settle a comment whose write the provider never confirmed. It
- * mirrors the server's recheck rule. `available` means the post finished while a copy's write stayed
- * unknown. `checking` means a post still runs while that write is unknown. Withdrawn feedback counts
- * too: a comment found there is then retracted, and absence releases it. Undefined otherwise.
+ * mirrors the server's recheck rule over the feedback's one send. `available` means that send,
+ * a post or a retraction, settled while a copy's write stayed unknown: a retraction never reads
+ * it back. `checking` means a post still runs while that write is unknown; a running retraction
+ * is not a check. Withdrawn feedback counts too: a comment found there is then retracted, and
+ * absence releases it. Undefined otherwise.
  */
 export type DeliveryCheck = "available" | "checking";
 
 export function deliveryCheck(
 	feedback: Pick<ReviewFeedbackDetail, "destination" | "sends" | "copies">,
 ): DeliveryCheck | undefined {
-	const post = feedback.sends.find((send) => send.action === "POST");
+	const [send] = feedback.sends;
 	if (
 		feedback.destination !== "ON_WORK" ||
-		post === undefined ||
+		send === undefined ||
 		!feedback.copies.some(
 			(copy) =>
 				copy.state === "WRITE_STARTED" &&
@@ -98,7 +100,10 @@ export function deliveryCheck(
 	) {
 		return undefined;
 	}
-	return post.state === "DONE" ? "available" : "checking";
+	if (send.state === "DONE") {
+		return "available";
+	}
+	return send.action === "POST" ? "checking" : undefined;
 }
 
 /** Copies that are, or may be, on the work: posted, or written without a receipt proving them absent. */

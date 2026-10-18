@@ -303,6 +303,7 @@ export type AdmissionResponse = {
     conversationEligibility: ConversationEligibility | null;
     jobId: string;
     practicePageSupport: PracticePageSupport | null;
+    privatePrepared: boolean;
     publicReviewed: boolean;
     reviewId: string;
     withheld: Array<Withheld>;

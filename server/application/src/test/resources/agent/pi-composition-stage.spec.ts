@@ -757,23 +757,30 @@ void test("only changed public history composes again in fresh sessions, within 
 	}
 });
 
+const composedWithFailures = (
+	failures: ComposedFeedback["compositionFailures"],
+): ComposedFeedback => ({
+	compositionFailures: failures,
+	contractVersion: 3,
+	admissionDigest: "a".repeat(64),
+	results: [],
+	preparedTargets: [],
+	feedback: [],
+	review: null,
+	preparation: null,
+});
+
 void test("only private composition the run stopped after an accepted public review is owed", () => {
-	const feedback = (failures: ComposedFeedback["compositionFailures"]): ComposedFeedback => ({
-		compositionFailures: failures,
-		contractVersion: 3,
-		admissionDigest: "a".repeat(64),
-		results: [],
-		preparedTargets: [],
-		feedback: [],
-		review: null,
-		preparation: null,
-	});
 	for (const reason of ["SAFETY", "STALL"] as const) {
-		assert.equal(privateCompositionOwed(feedback([{ phase: "PRIVATE_FEEDBACK", reason }])), true, reason);
+		assert.equal(
+			privateCompositionOwed(composedWithFailures([{ phase: "PRIVATE_FEEDBACK", reason }])),
+			true,
+			reason,
+		);
 		// An unsettled review on the work is never composed again because private feedback is owed.
 		assert.equal(
 			privateCompositionOwed(
-				feedback([
+				composedWithFailures([
 					{ phase: "PUBLIC_REVIEW", reason: "SAFETY" },
 					{ phase: "PRIVATE_FEEDBACK", reason },
 				]),
@@ -791,7 +798,11 @@ void test("only private composition the run stopped after an accepted public rev
 		"SERVER_REFUSED",
 		"PRIVATE_NOT_RECOVERED",
 	] as const) {
-		assert.equal(privateCompositionOwed(feedback([{ phase: "PRIVATE_FEEDBACK", reason }])), false, reason);
+		assert.equal(
+			privateCompositionOwed(composedWithFailures([{ phase: "PRIVATE_FEEDBACK", reason }])),
+			false,
+			reason,
+		);
 	}
-	assert.equal(privateCompositionOwed(feedback([])), false);
+	assert.equal(privateCompositionOwed(composedWithFailures([])), false);
 });

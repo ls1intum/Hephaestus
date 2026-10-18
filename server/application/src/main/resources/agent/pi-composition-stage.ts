@@ -1613,7 +1613,9 @@ export function privateCompositionOwed(composedFeedback: ComposedFeedback): bool
 		composedFeedback.compositionFailures.find((failure) => failure.phase === phase)?.reason;
 	const reason = reasonOf("PRIVATE_FEEDBACK");
 	return (
-		reason !== undefined && OWED_PRIVATE_REASONS.has(reason) && reasonOf("PUBLIC_REVIEW") === undefined
+		reason !== undefined &&
+		OWED_PRIVATE_REASONS.has(reason) &&
+		reasonOf("PUBLIC_REVIEW") === undefined
 	);
 }
 
@@ -2393,6 +2395,34 @@ function isDestination(value: unknown): value is Destination {
 	return DESTINATIONS.some((destination) => destination === value);
 }
 
+/**
+ * Composes the review on the work. A typed refusal stored nothing: only changed history opens a fresh session, which
+ * reads it again, within MAX_PUBLIC_RECOMPOSITIONS. Any other refusal is recorded as the review's failure.
+ */
+async function composePublicReview(
+	stage: Pick<ReturnType<typeof createCompositionStage>, "composeReview">,
+	request: CompositionRequest,
+	reviewable: readonly Record<string, unknown>[],
+	notReached: readonly string[],
+	safety: CompositionDeadline,
+	feedback: ComposedFeedback,
+): Promise<void> {
+	for (let recomposed = 0; ; recomposed += 1) {
+		const outcome = await stage.composeReview(request, reviewable, notReached, safety);
+		if (outcome === "DONE") {
+			return;
+		}
+		if (
+			outcome.refused !== "PUBLIC_HISTORY_CHANGED" ||
+			recomposed >= MAX_PUBLIC_RECOMPOSITIONS ||
+			safety.expired()
+		) {
+			recordCompositionFailure(feedback, "PUBLIC_REVIEW", outcome.refused);
+			return;
+		}
+	}
+}
+
 export async function composeAdmittedFeedback(options: {
 	request: CompositionRequest;
 	admission: Admission;
@@ -2453,21 +2483,7 @@ export async function composeAdmittedFeedback(options: {
 			request.destinations.ON_WORK !== undefined &&
 			reviewable.length > 0
 		) {
-			// A typed refusal stored nothing. Only changed history opens a fresh session, which reads it again.
-			for (let recomposed = 0; ; recomposed += 1) {
-				const outcome = await stage.composeReview(request, reviewable, notReached, safety);
-				if (outcome === "DONE") {
-					break;
-				}
-				if (
-					outcome.refused !== "PUBLIC_HISTORY_CHANGED" ||
-					recomposed >= MAX_PUBLIC_RECOMPOSITIONS ||
-					safety.expired()
-				) {
-					recordCompositionFailure(feedback, "PUBLIC_REVIEW", outcome.refused);
-					break;
-				}
-			}
+			await composePublicReview(stage, request, reviewable, notReached, safety, feedback);
 		}
 		await prepare(safety, "PUBLIC_REVIEW");
 		try {
