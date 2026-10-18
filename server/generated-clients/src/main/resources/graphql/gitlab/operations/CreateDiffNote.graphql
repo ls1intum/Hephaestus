@@ -1,9 +1,0 @@
-mutation CreateDiffNote($noteableId: NoteableID!, $body: String!, $position: DiffPositionInput!) {
-    createDiffNote(input: {noteableId: $noteableId, body: $body, position: $position}) {
-        note {
-            id
-            url
-        }
-        errors
-    }
-}

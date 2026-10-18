@@ -43,9 +43,7 @@ class GitLabDiffVersionReader {
     // Only the reviewed version can prove a line unpositionable; any other answer stops before a write.
     GitLabDiffPositions.Version read(long workspaceId, GitLabMrResolver.MrCoordinates mr, ItemVersion pinned) {
         String head = ScmVersion.reviewedHead(pinned);
-        String root = tokens.resolveServerUrl(workspaceId).replaceAll("/+$", "") + "/api/v4/projects/"
-                + URLEncoder.encode(mr.projectPath(), StandardCharsets.UTF_8) + "/merge_requests/" + mr.iid()
-                + "/versions";
+        String root = mergeRequestApi(tokens.resolveServerUrl(workspaceId), mr) + "/versions";
         try {
             for (int page = 1; page <= MAX_PAGES; page++) {
                 var versions = get(workspaceId, root + "?per_page=" + PAGE_SIZE + "&page=" + page)
@@ -86,6 +84,12 @@ class GitLabDiffVersionReader {
             throw new FeedbackDeliveryException("GitLab diff versions could not be read", e);
         }
         throw new FeedbackDeliveryException("GitLab diff version pagination did not reach its end");
+    }
+
+    // One encoding of the merge request's REST address serves every GitLab feedback call.
+    static String mergeRequestApi(String serverUrl, GitLabMrResolver.MrCoordinates mr) {
+        return serverUrl.replaceAll("/+$", "") + "/api/v4/projects/"
+                + URLEncoder.encode(mr.projectPath(), StandardCharsets.UTF_8) + "/merge_requests/" + mr.iid();
     }
 
     private WebClient.ResponseSpec get(long workspaceId, String url) {

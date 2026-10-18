@@ -56,6 +56,13 @@ public final class ScriptedCommentThreads {
                 : ScriptedGraphQlClient.respond(response.apply(id));
     }
 
+    // A provider that answers over REST names the comment itself; it still shares one numbering and store.
+    public String append(String thread, String idPrefix, String body) {
+        String id = idPrefix + ids.incrementAndGet();
+        threads.computeIfAbsent(thread, ignored -> new CopyOnWriteArrayList<>()).add(new Comment(id, body));
+        return id;
+    }
+
     public Mono<ClientGraphQlResponse> read(String thread, Function<List<Comment>, Map<String, ?>> response) {
         return lookupsFail
                 ? Mono.error(new IllegalStateException("provider unavailable"))

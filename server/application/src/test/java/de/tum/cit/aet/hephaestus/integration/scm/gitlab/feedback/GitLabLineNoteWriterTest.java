@@ -34,7 +34,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.LineNote;
 import de.tum.cit.aet.hephaestus.integration.scm.feedback.ScmFeedbackFixtures;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenService;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitLabMrResolver.MrInfo;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -43,15 +42,16 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.graphql.client.GraphQlClient;
 import org.springframework.graphql.client.HttpGraphQlClient;
+import org.springframework.http.HttpMethod;
 import reactor.core.publisher.Mono;
 
 class GitLabLineNoteWriterTest extends BaseUnitTest {
@@ -62,6 +62,9 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
     private static final String BOT = "gid://gitlab/User/1";
     private static final String PERSON = "gid://gitlab/User/2";
     private static final String NOTE_URL = "https://gitlab.example.com/group/project/-/merge_requests/42#note_987654";
+    private static final String DISCUSSIONS = "/api/v4/projects/group%2Fproject/merge_requests/42/discussions";
+    private static final String THREAD = "6a9c1750b37d513a43987b574953fceb50b03ce7";
+    private static final String NEW_JAVA = GitLabDiffPositionsTest.NEW_JAVA;
     // The reviewed version was read completely, and its diff does not contain the cited line.
     private static final GitLabDiffPositions.Version WITHOUT_CITED_LINE = new GitLabDiffPositions.Version(
             1,
@@ -74,9 +77,6 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
     private GitLabGraphQlClientProvider gitLabProvider;
 
     @Mock
-    private GitLabMrResolver mrResolver;
-
-    @Mock
     private GitLabTokenService tokenService;
 
     @Mock
@@ -85,6 +85,7 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
     @Mock
     private GitLabDiffVersionReader diffVersions;
 
+    private final ScriptedGitLabRest rest = new ScriptedGitLabRest();
     private GitLabLineNoteWriter channel;
     private HttpGraphQlClient client;
     private final RecordingFence fence = new RecordingFence();
@@ -92,36 +93,172 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         channel = new GitLabLineNoteWriter(
-                gitLabProvider, mrResolver, tokenService, egressGuard, ScmFeedbackFixtures.resolver(), diffVersions);
+                gitLabProvider,
+                rest.builder(),
+                tokenService,
+                egressGuard,
+                ScmFeedbackFixtures.resolver(),
+                diffVersions);
         client = mock(HttpGraphQlClient.class);
         lenient().when(tokenService.resolveServerUrl(1L)).thenReturn(SERVER);
+        lenient().when(tokenService.getAccessToken(1L)).thenReturn("glpat-test");
     }
 
+    // The single line and the range are the two text positions of GitLab's "Create a new thread in the diff".
     @Test
-    void shouldPostAPositionedDiscussionAtTheSelectedAnchor() {
+    void shouldPostASingleLineAsANativeDiffThreadWithTheDocumentedPosition() {
         stubResolvedMr();
         stubDiscussions(List.of(), BOT);
         when(diffVersions.read(eq(1L), any(), any())).thenReturn(GitLabDiffPositionsTest.VERSION);
-        var spec = mock(GraphQlClient.RequestSpec.class);
-        when(client.documentName("CreateDiffNote")).thenReturn(spec);
-        when(spec.variable(any(), any())).thenReturn(spec);
-        var response = mock(ClientGraphQlResponse.class);
-        stubField(
-                response,
-                "CreateDiffNote",
-                "createDiffNote",
-                Map.of("note", created("gid://gitlab/Note/1"), "errors", List.of()));
-        when(spec.execute()).thenReturn(Mono.just(response));
+        rest.createAsAsked(987654, "DiffNote", 1);
+        var selected = ScmFeedbackFixtures.line(
+                new FeedbackAnchor("new.java", null, 21, CitationSide.NEW), "fix", MARKER, "selected");
+
+        var result = channel.postImmutablePackage(target(), List.of(selected), fence);
+
+        assertThat(result.receipts()).singleElement().satisfies(copy -> {
+            assertThat(copy.disposition()).isEqualTo(CopyDisposition.POSTED);
+            assertThat(copy.actualKind()).isEqualTo(CopyForm.LINE_NOTE);
+            assertThat(copy.externalRef()).isEqualTo("gid://gitlab/DiffNote/987654");
+            assertThat(copy.externalUrl()).isEqualTo(NOTE_URL);
+        });
+        assertThat(rest.calls()).singleElement().satisfies(call -> {
+            assertThat(call.method()).isEqualTo(HttpMethod.POST);
+            assertThat(call.path()).isEqualTo(DISCUSSIONS);
+            assertThat(call.authorization()).isEqualTo("Bearer glpat-test");
+            assertThat(call.json())
+                    .isEqualTo(Map.of(
+                            "body",
+                            posted(selected),
+                            "position",
+                            Map.of(
+                                    "position_type",
+                                    "text",
+                                    "base_sha",
+                                    "a".repeat(40),
+                                    "start_sha",
+                                    "b".repeat(40),
+                                    "head_sha",
+                                    "c".repeat(40),
+                                    "old_path",
+                                    "old.java",
+                                    "new_path",
+                                    "new.java",
+                                    "new_line",
+                                    21)));
+        });
+        assertThat(fence.attempts).hasSize(1);
+    }
+
+    @Test
+    void shouldPostARangeAsOneNativeDiffThreadWithBothEndsAndItsPlacement() {
+        stubResolvedMr();
+        stubDiscussions(List.of(), BOT);
+        when(diffVersions.read(eq(1L), any(), any())).thenReturn(GitLabDiffPositionsTest.VERSION);
+        rest.createAsAsked(987654, "DiffNote", 1);
         var selected = ScmFeedbackFixtures.line(
                 new FeedbackAnchor("new.java", 20, 21, CitationSide.NEW), "fix", MARKER, "selected");
+
         var result = channel.postImmutablePackage(target(), List.of(selected), fence);
-        assertThat(result.receipts())
+
+        assertThat(result.receipts()).singleElement().satisfies(copy -> {
+            assertThat(copy.disposition()).isEqualTo(CopyDisposition.POSTED);
+            assertThat(copy.actualKind()).isEqualTo(CopyForm.LINE_NOTE);
+            assertThat(copy.externalRef()).isEqualTo("gid://gitlab/DiffNote/987654");
+        });
+        assertThat(rest.calls())
                 .singleElement()
-                .satisfies(copy -> assertThat(copy.actualKind()).isEqualTo(CopyForm.LINE_NOTE));
-        verify(spec)
-                .variable("position", GitLabDiffPositions.build(GitLabDiffPositionsTest.VERSION, selected.anchor()));
-        assertThat(fence.attempts).hasSize(1);
-        verify(client, never()).documentName("CreateMergeRequestNote");
+                .satisfies(call -> assertThat(call.json())
+                        .isEqualTo(Map.of(
+                                "body",
+                                placed(selected),
+                                "position",
+                                Map.of(
+                                        "position_type",
+                                        "text",
+                                        "base_sha",
+                                        "a".repeat(40),
+                                        "start_sha",
+                                        "b".repeat(40),
+                                        "head_sha",
+                                        "c".repeat(40),
+                                        "old_path",
+                                        "old.java",
+                                        "new_path",
+                                        "new.java",
+                                        "new_line",
+                                        21,
+                                        "line_range",
+                                        Map.of(
+                                                "start",
+                                                Map.of(
+                                                        "line_code",
+                                                        NEW_JAVA + "_10_20",
+                                                        "type",
+                                                        "old",
+                                                        "old_line",
+                                                        10,
+                                                        "new_line",
+                                                        20),
+                                                "end",
+                                                Map.of(
+                                                        "line_code",
+                                                        NEW_JAVA + "_12_21",
+                                                        "type",
+                                                        "new",
+                                                        "new_line",
+                                                        21))))));
+    }
+
+    // A created thread is this copy only when GitLab's answer holds exactly what was asked, both ends included.
+    @Test
+    void shouldLeaveACreatedThreadThatDoesNotHoldTheAskedCopyUnconfirmedWithoutASecondWrite() {
+        stubResolvedMr();
+        stubDiscussions(List.of(), BOT);
+        when(diffVersions.read(eq(1L), any(), any())).thenReturn(GitLabDiffPositionsTest.VERSION);
+        List<Function<ScriptedGitLabRest.Call, Object>> answers = List.of(
+                call -> ScriptedGitLabRest.created(call, 987654, "DiffNote", 1, position -> {
+                    Objects.requireNonNull(position).remove("line_range");
+                    return position;
+                }),
+                call -> ScriptedGitLabRest.created(call, 987654, "DiffNote", 1, position -> {
+                    Objects.requireNonNull(position)
+                            .put(
+                                    "line_range",
+                                    Map.of(
+                                            "start",
+                                            Map.of("line_code", NEW_JAVA + "_12_21", "type", "new", "new_line", 21),
+                                            "end",
+                                            Map.of("line_code", NEW_JAVA + "_12_21", "type", "new", "new_line", 21)));
+                    return position;
+                }),
+                call -> ScriptedGitLabRest.created(call, 987654, "DiffNote", 2, position -> position),
+                call -> ScriptedGitLabRest.created(call, 987654, "DiscussionNote", 1, position -> position),
+                call -> ScriptedGitLabRest.created(call, 987654, "DiffNote", 1, position -> null),
+                call -> firstNote(
+                        ScriptedGitLabRest.created(call, 987654, "DiffNote", 1, position -> position),
+                        "body",
+                        "edited"),
+                call -> firstNote(
+                        ScriptedGitLabRest.created(call, 987654, "DiffNote", 1, position -> position), "id", "987654"),
+                call -> firstNote(
+                        ScriptedGitLabRest.created(call, 987654, "DiffNote", 1, position -> position), "id", 0),
+                call -> "{\"id\": \"6a9c\", \"notes\": [",
+                call -> "");
+        var selected = ScmFeedbackFixtures.line(
+                new FeedbackAnchor("new.java", 20, 21, CitationSide.NEW), "fix", MARKER, "selected");
+
+        for (var answer : answers) {
+            rest.answer(call -> ScriptedGitLabRest.respond(201, answer.apply(call)));
+            assertThat(channel.postImmutablePackage(target(), List.of(selected), fence)
+                            .receipts())
+                    .singleElement()
+                    .satisfies(copy -> assertThat(copy.unconfirmed()).isTrue());
+        }
+
+        assertThat(rest.calls())
+                .hasSize(answers.size())
+                .allSatisfy(call -> assertThat(call.json()).containsKey("position"));
     }
 
     @Test
@@ -129,43 +266,54 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
         stubResolvedMr();
         stubDiscussions(List.of(), BOT);
         when(diffVersions.read(eq(1L), any(), any())).thenReturn(GitLabDiffPositionsTest.VERSION);
-        var spec = mock(GraphQlClient.RequestSpec.class);
-        when(client.documentName("CreateDiffNote")).thenReturn(spec);
-        when(spec.variable(any(), any())).thenReturn(spec);
-        var response = mock(ClientGraphQlResponse.class);
-        Map<String, Object> rejected = new HashMap<>();
-        rejected.put("note", null);
-        rejected.put("errors", List.of("Position is invalid"));
-        stubField(response, "CreateDiffNote", "createDiffNote", rejected);
-        when(spec.execute()).thenReturn(Mono.just(response));
-        var fallback = createSpec();
-        var fallbackResponse = createResponse(created("gid://gitlab/Note/2"), List.of());
-        when(fallback.execute()).thenReturn(Mono.just(fallbackResponse));
+        rest.answer(
+                400,
+                Map.of(
+                        "message",
+                        "400 Bad request - Note {:line_code=>[\"can't be blank\", \"must be a valid line code\"]}"));
+        rest.createAsAsked(2, "DiscussionNote", 1);
         var selected = ScmFeedbackFixtures.line(
                 new FeedbackAnchor("new.java", null, 21, CitationSide.NEW), "fix", MARKER, "selected");
+
         assertThat(channel.postImmutablePackage(target(), List.of(selected), fence)
                         .receipts())
                 .singleElement()
-                .satisfies(copy -> assertThat(copy.actualKind()).isEqualTo(CopyForm.FILE_NOTE));
+                .satisfies(copy -> {
+                    assertThat(copy.actualKind()).isEqualTo(CopyForm.FILE_NOTE);
+                    assertThat(copy.externalRef()).isEqualTo("gid://gitlab/DiscussionNote/2");
+                });
         assertThat(fence.attempts).hasSize(1);
+        verify(egressGuard, times(2)).requireDeliveryAllowed("gitlab.post-inline-feedback");
+        assertThat(rest.calls().getLast().json())
+                .isEqualTo(Map.of(
+                        "body",
+                        "**[View code at line 21](" + SERVER + "/group/project/-/blob/" + REVIEWED
+                                + "/new.java#L21)**\n\n" + posted(selected)));
     }
 
+    // Any answer but a position rejection may follow a created thread, so none of them starts the fallback.
     @Test
-    void shouldKeepAnUncertainPositionedWriteFencedWithoutAFallback() {
+    void shouldKeepEveryOtherAnswerUnconfirmedWithoutAFallback() {
         stubResolvedMr();
         stubDiscussions(List.of(), BOT);
         when(diffVersions.read(eq(1L), any(), any())).thenReturn(GitLabDiffPositionsTest.VERSION);
-        var spec = mock(GraphQlClient.RequestSpec.class);
-        when(client.documentName("CreateDiffNote")).thenReturn(spec);
-        when(spec.variable(any(), any())).thenReturn(spec);
-        when(spec.execute()).thenReturn(Mono.error(new RuntimeException("connection lost")));
         var selected = ScmFeedbackFixtures.line(
                 new FeedbackAnchor("new.java", null, 21, CitationSide.NEW), "fix", MARKER, "selected");
-        assertThat(channel.postImmutablePackage(target(), List.of(selected), fence)
-                        .receipts())
-                .singleElement()
-                .satisfies(copy -> assertThat(copy.unconfirmed()).isTrue());
-        verify(client, never()).documentName("CreateMergeRequestNote");
+        List<Integer> statuses = List.of(400, 401, 403, 404, 409, 422, 500, 502, 503);
+        for (int status : statuses) rest.answer(status, Map.of("message", status + " Bad request - body is invalid"));
+        rest.fail(new IllegalStateException("Timeout on blocking read for 30000000000 NANOSECONDS"));
+        rest.fail(new RuntimeException("Connection reset by peer"));
+
+        for (int answer = 0; answer < statuses.size() + 2; answer++) {
+            assertThat(channel.postImmutablePackage(target(), List.of(selected), fence)
+                            .receipts())
+                    .singleElement()
+                    .satisfies(copy -> assertThat(copy.unconfirmed()).isTrue());
+        }
+
+        assertThat(rest.calls())
+                .hasSize(statuses.size() + 2)
+                .allSatisfy(call -> assertThat(call.json()).containsKey("position"));
     }
 
     // An unread diff version proves no position absent, so it must not become a plain comment.
@@ -183,17 +331,16 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
 
         assertThat(fence.attempts).isEmpty();
         verify(egressGuard, never()).requireDeliveryAllowed(anyString());
-        verify(client, never()).documentName("CreateDiffNote");
-        verify(client, never()).documentName("CreateMergeRequestNote");
+        assertThat(rest.calls()).isEmpty();
+        assertThat(rest.calls()).isEmpty();
     }
 
+    // A file-level copy is an overview thread: native replies and resolution, without a diff position.
     @Test
-    void shouldPostAFileCommentWithoutReadingADiffVersion() {
+    void shouldPostAFileThreadWithoutReadingADiffVersion() {
         stubResolvedMr();
         stubDiscussions(List.of(), BOT);
-        GraphQlClient.RequestSpec spec = createSpec();
-        ClientGraphQlResponse response = createResponse(created("gid://gitlab/Note/NEW"), List.of());
-        when(spec.execute()).thenReturn(Mono.just(response));
+        rest.createAsAsked(987654, "DiscussionNote", 1);
         var file =
                 ScmFeedbackFixtures.line(new FeedbackAnchor("src/Foo.java", null, null, null), "fix", MARKER, "file");
 
@@ -202,8 +349,35 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
         assertThat(result.receipts()).singleElement().satisfies(receipt -> {
             assertThat(receipt.disposition()).isEqualTo(CopyDisposition.POSTED);
             assertThat(receipt.actualKind()).isEqualTo(CopyForm.FILE_NOTE);
+            assertThat(receipt.externalRef()).isEqualTo("gid://gitlab/DiscussionNote/987654");
         });
+        assertThat(rest.calls())
+                .singleElement()
+                .satisfies(call -> assertThat(call.json())
+                        .isEqualTo(Map.of(
+                                "body",
+                                "**[View file](" + SERVER + "/group/project/-/blob/" + REVIEWED + "/src/Foo.java)**\n\n"
+                                        + posted(file))));
         verifyNoInteractions(diffVersions);
+    }
+
+    // A location thread is confirmed only as an unpositioned discussion note by this token.
+    @Test
+    void shouldLeaveALocationThreadUnconfirmedUnlessGitLabAnswersItAsAnOverviewThread() {
+        stubResolvedMr();
+        stubDiscussions(List.of(), BOT);
+        rest.createAsAsked(987654, "DiffNote", 1);
+        rest.answer(call -> ScriptedGitLabRest.respond(
+                201, ScriptedGitLabRest.created(call, 987654, "DiscussionNote", 1, position -> Map.of("new_line", 1))));
+        var file =
+                ScmFeedbackFixtures.line(new FeedbackAnchor("src/Foo.java", null, null, null), "fix", MARKER, "file");
+
+        for (int answer = 0; answer < 2; answer++)
+            assertThat(channel.postImmutablePackage(target(), List.of(file), fence)
+                            .receipts())
+                    .singleElement()
+                    .satisfies(receipt -> assertThat(receipt.unconfirmed()).isTrue());
+        assertThat(rest.calls()).hasSize(2);
     }
 
     @Test
@@ -224,7 +398,7 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
         assertThat(channel.findPosted(target(), List.of(a, b)))
                 .extracting(CopyReceipt::externalRef)
                 .containsExactlyInAnyOrder("gid://gitlab/Note/A", "gid://gitlab/Note/B");
-        verify(client, never()).documentName("CreateMergeRequestNote");
+        assertThat(rest.calls()).isEmpty();
     }
 
     @Test
@@ -236,8 +410,6 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
 
     @Test
     void shouldRequestNothingWhenTheScanCannotBeRead() {
-        when(mrResolver.resolve(1L, "group/project", 42))
-                .thenReturn(new MrInfo("gid://gitlab/MR/42", "base", "head", "start"));
         when(gitLabProvider.forScope(1L)).thenThrow(new RuntimeException("provider unavailable"));
 
         assertThatThrownBy(() -> channel.postImmutablePackage(target(), List.of(item("fix", "result:a:0")), fence))
@@ -257,7 +429,7 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
         assertThatThrownBy(() -> channel.postImmutablePackage(target(), List.of(item("fix", "result:a:0")), fence))
                 .isInstanceOf(FeedbackDeliveryException.class);
         verify(spec, times(50)).execute();
-        verify(client, never()).documentName("CreateMergeRequestNote");
+        assertThat(rest.calls()).isEmpty();
         assertThat(fence.attempts).isEmpty();
     }
 
@@ -274,7 +446,7 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
                     .isInstanceOf(FeedbackDeliveryException.class);
         }
         assertThat(fence.attempts).isEmpty();
-        verify(client, never()).documentName("CreateMergeRequestNote");
+        assertThat(rest.calls()).isEmpty();
     }
 
     @Test
@@ -291,15 +463,12 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldPostEachNoteAsAnOrdinaryCommentLinkingToTheReviewedCommitFencedBeforeItsCreate() {
+    void shouldPostEachNoteAsAnOverviewThreadLinkingToTheReviewedCommitFencedBeforeItsCreate() {
         stubResolvedMr();
         stubDiscussions(List.of(), BOT);
         when(diffVersions.read(eq(1L), any(), any())).thenReturn(WITHOUT_CITED_LINE);
-        GraphQlClient.RequestSpec spec = createSpec();
-        ArgumentCaptor<String> bodies = ArgumentCaptor.forClass(String.class);
-        when(spec.variable(eq("body"), bodies.capture())).thenReturn(spec);
-        ClientGraphQlResponse response = createResponse(created("gid://gitlab/Note/NEW"), List.of());
-        when(spec.execute()).thenReturn(Mono.just(response));
+        rest.createAsAsked(987654, "DiscussionNote", 1);
+        rest.createAsAsked(987654, "DiscussionNote", 1);
         LineNote second = item("second", "observation:b:0");
 
         CopyWriteResult result = channel.postImmutablePackage(
@@ -311,39 +480,30 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
                         List.of(ScmFeedbackFixtures.copyId("observation:b:0").toString()));
         assertThat(fence.completedSeen.get(1)).singleElement().satisfies(receipt -> {
             assertThat(receipt.copyId()).isEqualTo(ScmFeedbackFixtures.copyId("result:a:0"));
-            assertThat(receipt.externalRef()).isEqualTo("gid://gitlab/Note/NEW");
+            assertThat(receipt.externalRef()).isEqualTo("gid://gitlab/DiscussionNote/987654");
         });
         assertThat(result.receipts()).allSatisfy(receipt -> {
             assertThat(receipt.disposition()).isEqualTo(CopyDisposition.POSTED);
             assertThat(receipt.actualKind()).isEqualTo(CopyForm.FILE_NOTE);
-
             assertThat(receipt.externalUrl()).isEqualTo(NOTE_URL);
         });
-        assertThat(bodies.getAllValues().getFirst())
-                .contains("`/approve`", MARKER, "hephaestus-diff-note-ck=result:a:0");
-        assertThat(bodies.getAllValues().getLast())
+        assertThat(rest.calls()).allSatisfy(call -> assertThat(call.json()).doesNotContainKey("position"));
+        assertThat(bodies().getFirst()).contains("`/approve`", MARKER, "hephaestus-diff-note-ck=result:a:0");
+        assertThat(bodies().getLast())
                 .isEqualTo("**[View code at line 10]("
                         + SERVER
                         + "/group/project/-/blob/"
                         + REVIEWED
                         + "/src/Foo.java#L10)**\n\n"
                         + posted(second));
-        verify(spec, never()).variable(eq("position"), any());
-        verify(client, never()).documentName("CreateDiffNote");
     }
 
     @Test
     void shouldLinkARangeInANestedNamespaceAtTheReviewedCommitWithItsPathEncoded() {
         when(gitLabProvider.forScope(1L)).thenReturn(client);
-        when(mrResolver.resolve(1L, "group/sub.group/project", 42))
-                .thenReturn(new MrInfo("gid://gitlab/MR/42", "base", "head", "start"));
         stubDiscussions(List.of(), BOT);
         when(diffVersions.read(eq(1L), any(), any())).thenReturn(WITHOUT_CITED_LINE);
-        GraphQlClient.RequestSpec spec = createSpec();
-        ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
-        when(spec.variable(eq("body"), body.capture())).thenReturn(spec);
-        ClientGraphQlResponse response = createResponse(created("gid://gitlab/Note/NEW"), List.of());
-        when(spec.execute()).thenReturn(Mono.just(response));
+        rest.createAsAsked(987654, "DiscussionNote", 1);
         LineNote ranged = ScmFeedbackFixtures.line(
                 ScmFeedbackFixtures.range("docs/My Notes (draft).md", 3, 7), "fix", MARKER, "result:a:0");
 
@@ -353,13 +513,17 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
                 List.of(ranged),
                 fence);
 
-        assertThat(body.getValue())
-                .isEqualTo("**[View code at lines 3–7]("
-                        + SERVER
-                        + "/group/sub.group/project/-/blob/"
-                        + REVIEWED
-                        + "/docs/My%20Notes%20%28draft%29.md#L3-7)**\n\n"
-                        + posted(ranged));
+        assertThat(rest.calls()).singleElement().satisfies(call -> {
+            assertThat(call.path())
+                    .isEqualTo("/api/v4/projects/group%2Fsub.group%2Fproject/merge_requests/42/discussions");
+            assertThat(call.json().get("body"))
+                    .isEqualTo("**[View code at lines 3–7]("
+                            + SERVER
+                            + "/group/sub.group/project/-/blob/"
+                            + REVIEWED
+                            + "/docs/My%20Notes%20%28draft%29.md#L3-7)**\n\n"
+                            + posted(ranged));
+        });
     }
 
     @Test
@@ -367,18 +531,14 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
         stubResolvedMr();
         stubDiscussions(List.of(), BOT);
         when(diffVersions.read(eq(1L), any(), any())).thenReturn(WITHOUT_CITED_LINE);
-        GraphQlClient.RequestSpec spec = createSpec();
-        ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
-        when(spec.variable(eq("body"), body.capture())).thenReturn(spec);
-        ClientGraphQlResponse response = createResponse(created("gid://gitlab/Note/NEW"), List.of());
-        when(spec.execute()).thenReturn(Mono.just(response));
+        rest.createAsAsked(987654, "DiscussionNote", 1);
         LineNote hostile = ScmFeedbackFixtures.line(
                 ScmFeedbackFixtures.anchor("docs/`a]b`\n\n@all.md", 10, null), "fix", MARKER, "result:a:0");
 
         CopyWriteResult result = channel.postImmutablePackage(target(), List.of(hostile), fence);
 
-        assertThat(body.getValue())
-                .isEqualTo("**[View code at line 10]("
+        assertThat(bodies())
+                .containsExactly("**[View code at line 10]("
                         + SERVER
                         + "/group/project/-/blob/"
                         + REVIEWED
@@ -394,12 +554,8 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
         stubResolvedMr();
         stubDiscussions(List.of(), BOT);
         when(diffVersions.read(eq(1L), any(), any())).thenReturn(WITHOUT_CITED_LINE);
-        var spec = createSpec();
-        var bodies = ArgumentCaptor.forClass(String.class);
-        when(spec.variable(eq("body"), bodies.capture())).thenReturn(spec);
-        var firstResponse = createResponse(created("gid://gitlab/Note/OLD_1"), List.of());
-        var secondResponse = createResponse(created("gid://gitlab/Note/OLD_2"), List.of());
-        when(spec.execute()).thenReturn(Mono.just(firstResponse)).thenReturn(Mono.just(secondResponse));
+        rest.createAsAsked(11, "DiscussionNote", 1);
+        rest.createAsAsked(12, "DiscussionNote", 1);
         List<LineNote> oldSide = List.of(
                 ScmFeedbackFixtures.line(
                         new FeedbackAnchor("src/Foo.java", null, 10, CitationSide.OLD), "fix", MARKER, "result:a:0"),
@@ -415,13 +571,12 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
             assertThat(receipt.acknowledged()).isTrue();
             assertThat(receipt.writeMayHaveStarted()).isTrue();
         });
-        assertThat(bodies.getAllValues())
+        assertThat(bodies())
                 .hasSize(2)
                 .allSatisfy(body -> assertThat(body)
                         .contains("/-/blob/" + "a".repeat(40) + "/src/Foo.java")
                         .doesNotContain("/-/blob/" + REVIEWED));
         assertThat(fence.attempts).hasSize(2);
-        verify(spec, times(2)).execute();
     }
 
     @Test
@@ -465,7 +620,7 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
         });
         assertThat(result.receipts()).containsExactlyElementsOf(found);
         assertThat(fence.attempts).isEmpty();
-        verify(client, never()).documentName("CreateMergeRequestNote");
+        assertThat(rest.calls()).isEmpty();
     }
 
     @Test
@@ -484,7 +639,7 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
                 .singleElement()
                 .satisfies(receipt -> assertThat(receipt.acknowledged()).isFalse());
         assertThat(fence.attempts).isEmpty();
-        verify(client, never()).documentName("CreateMergeRequestNote");
+        assertThat(rest.calls()).isEmpty();
     }
 
     @Test
@@ -507,7 +662,7 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
                 .containsExactly(
                         tuple(ScmFeedbackFixtures.copyId("observation:b:0"), false, false),
                         tuple(ScmFeedbackFixtures.copyId("result:a:0"), true, null));
-        verify(client, never()).documentName("CreateMergeRequestNote");
+        assertThat(rest.calls()).isEmpty();
     }
 
     @Test
@@ -531,7 +686,7 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
             assertThat(receipt.externalUrl()).isEqualTo(NOTE_URL);
         });
         assertThat(fence.attempts).isEmpty();
-        verify(client, never()).documentName("CreateMergeRequestNote");
+        assertThat(rest.calls()).isEmpty();
     }
 
     @Test
@@ -578,7 +733,7 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
         assertThat(result.receipts())
                 .allSatisfy(receipt -> assertThat(receipt.acknowledged()).isFalse());
         assertThat(fence.attempts).isEmpty();
-        verify(client, never()).documentName("CreateMergeRequestNote");
+        assertThat(rest.calls()).isEmpty();
         assertThat(channel.findPosted(target(), List.of(a, b, c, d, e, f))).isEmpty();
     }
 
@@ -624,9 +779,8 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
     void shouldReportALostCreateAsUnconfirmedAndStopAtARateLimitLeavingTheRestUnsent() {
         stubResolvedMr();
         stubDiscussions(List.of(), BOT);
-        GraphQlClient.RequestSpec spec = createSpec();
         when(diffVersions.read(eq(1L), any(), any())).thenReturn(WITHOUT_CITED_LINE);
-        when(spec.execute()).thenReturn(Mono.error(new RuntimeException("429 Too Many Requests")));
+        rest.answer(429, Map.of("message", "429 Too Many Requests"));
 
         CopyWriteResult result = channel.postImmutablePackage(
                 target(), List.of(item("fix-a", "result:a:0"), item("fix-b", "observation:b:0")), fence);
@@ -637,16 +791,15 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
         assertThat(result.receipts())
                 .extracting(CopyReceipt::writeMayHaveStarted)
                 .containsExactly(true, false);
+        assertThat(rest.calls()).hasSize(1);
     }
 
     @Test
     void shouldReportACreateAnsweredWithoutANoteAsUnconfirmed() {
         stubResolvedMr();
         stubDiscussions(List.of(), BOT);
-        GraphQlClient.RequestSpec spec = createSpec();
         when(diffVersions.read(eq(1L), any(), any())).thenReturn(WITHOUT_CITED_LINE);
-        ClientGraphQlResponse response = createResponse(null, List.of("validation failed"));
-        when(spec.execute()).thenReturn(Mono.just(response));
+        rest.answer(201, Map.of("id", THREAD, "notes", List.of()));
 
         CopyWriteResult result = channel.postImmutablePackage(target(), List.of(item("fix", "result:a:0")), fence);
 
@@ -654,6 +807,109 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
                 .singleElement()
                 .satisfies(receipt -> assertThat(receipt.unconfirmed()).isTrue());
         assertThat(fence.attempts).hasSize(1);
+    }
+
+    // A placed range verifies only through GitLab's record of both ends, beside replies and resolution.
+    @Test
+    void shouldPreserveAPlacedRangeOnlyWhenGitLabHoldsBothOfItsEnds() {
+        stubResolvedMr();
+        LineNote ranged =
+                ScmFeedbackFixtures.line(ScmFeedbackFixtures.range("src/Foo.java", 8, 10), "fix", MARKER, "result:a:0");
+        Map<String, Object> thread = discussion(
+                "gid://gitlab/Discussion/" + THREAD,
+                List.of(
+                        diffNote("gid://gitlab/DiffNote/987654", placed(ranged), BOT, 10, REVIEWED),
+                        note("gid://gitlab/DiffNote/987655", "Thanks, fixing it.", PERSON)));
+        thread.put("resolved", true);
+        stubDiscussions(List.of(thread), BOT);
+        rest.answer(200, restThread(range(8, 10)));
+
+        var result = channel.postImmutablePackage(target(), List.of(ranged), fence);
+
+        assertThat(result.receipts()).singleElement().satisfies(receipt -> {
+            assertThat(receipt.disposition()).isEqualTo(CopyDisposition.PRESERVED_EXISTING);
+            assertThat(receipt.externalRef()).isEqualTo("gid://gitlab/DiffNote/987654");
+            assertThat(receipt.actualKind()).isEqualTo(CopyForm.LINE_NOTE);
+        });
+        assertThat(rest.calls()).singleElement().satisfies(call -> {
+            assertThat(call.method()).isEqualTo(HttpMethod.GET);
+            assertThat(call.path()).isEqualTo(DISCUSSIONS + "/" + THREAD);
+        });
+        assertThat(fence.attempts).isEmpty();
+    }
+
+    // A newly placed range that GitLab does not hold is never verified, and nothing is written next to it.
+    @Test
+    void shouldNeitherVerifyNorRecreateAPlacedRangeGitLabDoesNotHold() {
+        stubResolvedMr();
+        LineNote ranged =
+                ScmFeedbackFixtures.line(ScmFeedbackFixtures.range("src/Foo.java", 8, 10), "fix", MARKER, "result:a:0");
+        stubDiscussions(
+                List.of(discussion(
+                        "gid://gitlab/Discussion/" + THREAD,
+                        List.of(diffNote("gid://gitlab/DiffNote/987654", placed(ranged), BOT, 10, REVIEWED)))),
+                BOT);
+        rest.answer(200, restThread(null));
+        rest.answer(200, restThread(range(9, 10)));
+
+        for (int answer = 0; answer < 2; answer++)
+            assertThat(channel.postImmutablePackage(target(), List.of(ranged), fence)
+                            .receipts())
+                    .singleElement()
+                    .satisfies(receipt -> {
+                        assertThat(receipt.acknowledged()).isFalse();
+                        assertThat(receipt.writeMayHaveStarted()).isFalse();
+                    });
+
+        assertThat(rest.calls())
+                .hasSize(2)
+                .allSatisfy(call -> assertThat(call.method()).isEqualTo(HttpMethod.GET));
+        assertThat(fence.attempts).isEmpty();
+    }
+
+    @Test
+    void shouldStopBeforeAnyWriteWhenAPlacedRangeCannotBeRead() {
+        stubResolvedMr();
+        LineNote ranged =
+                ScmFeedbackFixtures.line(ScmFeedbackFixtures.range("src/Foo.java", 8, 10), "fix", MARKER, "result:a:0");
+        stubDiscussions(
+                List.of(discussion(
+                        "gid://gitlab/Discussion/" + THREAD,
+                        List.of(diffNote("gid://gitlab/DiffNote/987654", placed(ranged), BOT, 10, REVIEWED)))),
+                BOT);
+        rest.answer(500, Map.of("message", "500 Internal Server Error"));
+        rest.answer(200, Map.of("id", THREAD, "notes", List.of()));
+
+        assertThatThrownBy(() -> channel.postImmutablePackage(target(), List.of(ranged), fence))
+                .isInstanceOf(FeedbackDeliveryException.class);
+        assertThat(channel.findPosted(target(), List.of(ranged))).isNull();
+        assertThat(fence.attempts).isEmpty();
+        assertThat(rest.calls())
+                .hasSize(2)
+                .allSatisfy(call -> assertThat(call.method()).isEqualTo(HttpMethod.GET));
+    }
+
+    // Its exact pre-range body proves an earlier end-line copy, so it is kept and never posted again.
+    @Test
+    void shouldPreserveAnEarlierEndLineCopyOfARangeWithoutReadingItsRange() {
+        stubResolvedMr();
+        LineNote ranged =
+                ScmFeedbackFixtures.line(ScmFeedbackFixtures.range("src/Foo.java", 8, 10), "fix", MARKER, "result:a:0");
+        stubDiscussions(
+                List.of(discussion(
+                        "gid://gitlab/Discussion/" + THREAD,
+                        List.of(diffNote("gid://gitlab/DiffNote/987654", posted(ranged), BOT, 10, REVIEWED)))),
+                BOT);
+
+        assertThat(channel.postImmutablePackage(target(), List.of(ranged), fence)
+                        .receipts())
+                .singleElement()
+                .satisfies(receipt -> {
+                    assertThat(receipt.disposition()).isEqualTo(CopyDisposition.PRESERVED_EXISTING);
+                    assertThat(receipt.actualKind()).isEqualTo(CopyForm.LINE_NOTE);
+                });
+        assertThat(rest.calls()).isEmpty();
+        assertThat(fence.attempts).isEmpty();
     }
 
     @Test
@@ -676,7 +932,7 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
 
         assertThat(silenced.withheldCopyIds()).isNotEmpty();
         assertThat(silenced.withheldCopyIds()).containsExactly(ScmFeedbackFixtures.copyId("observation:b:0"));
-        verify(client, never()).documentName("CreateMergeRequestNote");
+        assertThat(rest.calls()).isEmpty();
     }
 
     @Test
@@ -698,6 +954,58 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
         return item.body() + "\n" + item.writeMarker() + "\n<!-- hephaestus-diff-note-ck=" + item.writeKey() + " -->";
     }
 
+    private static String placed(LineNote item) {
+        return item.body() + "\n" + item.writeMarker() + "\n" + GitLabLineNoteWriter.RANGE_PLACEMENT
+                + "\n<!-- hephaestus-diff-note-ck=" + item.writeKey() + " -->";
+    }
+
+    private List<String> bodies() {
+        return rest.calls().stream()
+                .map(call -> (String) call.json().get("body"))
+                .toList();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> firstNote(Map<String, Object> discussion, String field, Object value) {
+        ((List<Map<String, Object>>) Objects.requireNonNull(discussion.get("notes")))
+                .getFirst()
+                .put(field, value);
+        return discussion;
+    }
+
+    private static Map<String, Object> range(int start, int end) {
+        Map<String, Object> first = new HashMap<>();
+        first.put("line_code", "3f587915889f8427143aeb5ce3b65cbba4a42d01_" + start + "_" + start);
+        first.put("type", "new");
+        first.put("old_line", null);
+        first.put("new_line", start);
+        Map<String, Object> last = new HashMap<>(first);
+        last.put("line_code", "3f587915889f8427143aeb5ce3b65cbba4a42d01_" + end + "_" + end);
+        last.put("new_line", end);
+        return Map.of("start", first, "end", last);
+    }
+
+    // GitLab's own record of the thread, as GET .../discussions/:id answers it, with a human reply below.
+    private static Map<String, Object> restThread(@Nullable Map<String, Object> range) {
+        Map<String, Object> position = new HashMap<>();
+        position.put("position_type", "text");
+        position.put("new_path", "src/Foo.java");
+        position.put("new_line", 10);
+        position.put("line_range", range);
+        Map<String, Object> bot = new HashMap<>();
+        bot.put("id", 987654);
+        bot.put("type", "DiffNote");
+        bot.put("position", position);
+        bot.put("resolved", true);
+        return Map.of(
+                "id",
+                THREAD,
+                "notes",
+                List.of(
+                        bot,
+                        Map.of("id", 987655, "type", "DiffNote", "body", "Thanks, fixing it.", "position", position)));
+    }
+
     private static String located(LineNote item) {
         return "**[View code at line 10]("
                 + SERVER
@@ -709,20 +1017,11 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
 
     private void stubResolvedMr() {
         when(gitLabProvider.forScope(1L)).thenReturn(client);
-        when(mrResolver.resolve(1L, "group/project", 42))
-                .thenReturn(new MrInfo("gid://gitlab/MR/42", "base", "head", "start"));
     }
 
     private GraphQlClient.RequestSpec discussionsSpec() {
         GraphQlClient.RequestSpec spec = mock(GraphQlClient.RequestSpec.class);
         when(client.documentName("GetMergeRequestDiscussions")).thenReturn(spec);
-        when(spec.variable(any(), any())).thenReturn(spec);
-        return spec;
-    }
-
-    private GraphQlClient.RequestSpec createSpec() {
-        GraphQlClient.RequestSpec spec = mock(GraphQlClient.RequestSpec.class);
-        when(client.documentName("CreateMergeRequestNote")).thenReturn(spec);
         when(spec.variable(any(), any())).thenReturn(spec);
         return spec;
     }
@@ -751,19 +1050,6 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
         lenient().when(response.field("currentUser.id")).thenReturn(userField);
         lenient().when(userField.getValue()).thenReturn(currentUserId);
         return response;
-    }
-
-    private static ClientGraphQlResponse createResponse(@Nullable Map<String, Object> created, List<String> errors) {
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("note", created);
-        payload.put("errors", errors);
-        ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
-        stubField(response, "CreateMergeRequestNote", "createNote", payload);
-        return response;
-    }
-
-    private static Map<String, Object> created(String noteId) {
-        return Map.of("id", noteId, "url", NOTE_URL);
     }
 
     private static void stubField(ClientGraphQlResponse response, String document, String path, Object value) {

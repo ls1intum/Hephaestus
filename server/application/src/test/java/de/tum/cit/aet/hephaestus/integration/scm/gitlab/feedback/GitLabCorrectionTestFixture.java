@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.feedback.ScmFeedbackFixtures;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenService;
 import org.springframework.graphql.client.HttpGraphQlClient;
+import org.springframework.web.reactive.function.client.WebClient;
 
 public final class GitLabCorrectionTestFixture {
     private GitLabCorrectionTestFixture() {}
@@ -18,7 +19,7 @@ public final class GitLabCorrectionTestFixture {
         when(provider.forScope(1L)).thenReturn(client);
         return new GitLabLineNoteWriter(
                 provider,
-                mock(GitLabMrResolver.class),
+                WebClient.builder(),
                 mock(GitLabTokenService.class),
                 mock(OutboundEgressGuard.class),
                 ScmFeedbackFixtures.resolver(),
