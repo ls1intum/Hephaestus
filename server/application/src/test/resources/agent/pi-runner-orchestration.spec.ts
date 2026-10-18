@@ -5150,8 +5150,11 @@ for (const item of nullableCases) {
 							assert.equal(child.status, 0, child.stderr);
 							assert.ok(events.includes("tone-undecided:stored"), events.join("\n"));
 							assert.match(
-								events.find((event) => event.startsWith("code-undecided:")) ?? "",
-								/must show it read the change/u,
+								(events.find((event) => event.startsWith("code-undecided:")) ?? "").replaceAll(
+									String.raw`\"`,
+									'"',
+								),
+								/must show it read the change: [^]*Call read\(\{"path":"work\/change\/diff\.patch"\}\)/u,
 							);
 							assert.deepEqual(
 								[...candidatesIn(nodePath.join(cwd, "out/result.json"))].map(
@@ -5459,11 +5462,12 @@ for (const item of nullableCases) {
 							const refused = events.find((event) => event.startsWith("met-refused:")) ?? "";
 							assert.match(
 								refused,
-								/a MET result needs complete coverage of its required and cited sources: required or cited sources with unread ranges \(work\/change\/diff\.patch\)/u,
+								/a MET result needs complete coverage of its required and cited sources: required or cited sources with unread ranges: 1/u,
 							);
+							// The cut read returned no counted lines, so every file line of the 4006-line view is unread.
 							assert.match(
 								refused.replaceAll(String.raw`\"`, '"'),
-								/read\(\{"path":"work\/change\/diff\.patch","offset":1,"limit":2000\}\)/u,
+								/read\(\{"path":"work\/change\/diff\.patch","offset":1,"limit":4006\}\)/u,
 							);
 							assert.match(
 								events.find((event) => event.startsWith("met-notes:")) ?? "",

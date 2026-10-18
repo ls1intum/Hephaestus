@@ -225,11 +225,20 @@ for (const [basis, explicitCommit, incremental = false] of [
 	});
 }
 
-for (const readContext of [false, true]) {
-	void test(`scan MET needs a complete read of cited context (read=${readContext})`, async (t) => {
+for (const [readContext, collision] of [
+	[false, false],
+	[true, false],
+	[false, true],
+	[true, true],
+] as const) {
+	void test(`scan MET needs a complete read of cited context (read=${readContext}, same-named session file=${collision})`, async (t) => {
 		const cwd = mkdtempSync(path.join(tmpdir(), "pi-scan-context-coverage-"));
 		t.after(() => rmSync(cwd, { recursive: true, force: true }));
 		const commit = stageScan(cwd, true);
+		if (collision) {
+			// A session file with the cited repository path must not shape the governed repair call.
+			writeFileSync(path.join(cwd, CONTEXT_FILE), "unrelated\n".repeat(40));
+		}
 		const candidate = {
 			outcome: "MET",
 			summary: "The file uses checked authentication",
@@ -263,11 +272,10 @@ for (const readContext of [false, true]) {
 			assert.equal(field(field(field(results[0], "candidate"), "coverage"), "complete"), true);
 		} else {
 			assert.ok(
-				exit.stderr.includes(
-					`read(${JSON.stringify({ path: CONTEXT_FILE, offset: 1, limit: 2000 })})`,
-				),
+				exit.stderr.includes(`read(${JSON.stringify({ path: CONTEXT_FILE })})`),
 				exit.stderr,
 			);
+			assert.doesNotMatch(exit.stderr, /"path":"Context\.ts","offset"|physical lines|Bash output/u);
 			assert.deepEqual(capturedLines(cwd, "admission"), []);
 		}
 	});
