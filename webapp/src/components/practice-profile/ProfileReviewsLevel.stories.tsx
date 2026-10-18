@@ -234,6 +234,31 @@ export const WhileAReviewIsRunning: Story = {
 	},
 };
 
+/**
+ * A partial review with nothing to improve in what it reached. It may have run to the end with a
+ * practice failed or withheld, so its row scopes the lead instead of saying it stopped.
+ */
+export const PartialReview: Story = {
+	args: {
+		feed: feedOf([
+			{
+				...openProfileReview,
+				review: { ...openProfileReview.review, status: "PARTIAL" },
+				results: openProfileReview.results.filter(
+					(result) => result.outcome === "MET" || result.outcome === "DOES_NOT_APPLY",
+				),
+			},
+		]),
+		positions: undefined,
+	},
+	play: async () => {
+		await settledDrawerPanel();
+		await expect(screen.getByText("Nothing to improve in what it reached")).toBeVisible();
+		await expect(screen.getByRole("button", { name: "Partial" })).toBeVisible();
+		await expect(screen.queryByText("Stopped before it finished")).toBeNull();
+	},
+};
+
 /** Nothing has recorded anything about the reader's work yet: the list says what will land here. */
 export const Empty: Story = {
 	args: { feed: feedOf([]) },

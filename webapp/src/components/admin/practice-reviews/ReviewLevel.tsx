@@ -27,6 +27,7 @@ import { OUTCOME_DEFS, type Outcome } from "@/components/practice-vocabulary/out
 import { REVIEW_ORIGIN_DEFS } from "@/components/practice-vocabulary/review-origin-defs";
 import {
 	isActiveReview,
+	PARTIAL_REVIEW_SCOPE,
 	reviewReasonSentence,
 	REVIEW_JOB_PROCESSING_DEFS,
 	REVIEW_JOB_STATUS_DEFS,
@@ -107,9 +108,7 @@ function firstStart(review: ReviewDetail): Date | undefined {
 
 function reviewNow(review: ReviewDetail): string | undefined {
 	if (review.status === "PARTIAL") {
-		return review.kind === "SCAN"
-			? "Its results cover only the work it reached."
-			: "Its results and feedback cover only the practices it reviewed.";
+		return PARTIAL_REVIEW_SCOPE[review.kind];
 	}
 	// The sentence names results, so a feedback count alone does not earn it.
 	if ((review.status === "FAILED" || review.status === "CANCELLED") && hasResults(review.results)) {

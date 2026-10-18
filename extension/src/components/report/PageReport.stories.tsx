@@ -317,7 +317,7 @@ export const ReviewRunning: Story = {
 	},
 };
 
-/** Incomplete reviews must not imply an outcome for practices they did not finish. */
+/** A partial review must not imply an outcome for practices it did not cover, nor that it stopped. */
 export const ReviewIncomplete: Story = {
 	args: {
 		expanded: true,
@@ -327,9 +327,9 @@ export const ReviewIncomplete: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		// An unfinished review is said on the line itself, not only inside.
+		// A partial review is said on the line itself, not only inside.
 		await expect(canvas.getByRole("button", { expanded: true })).toHaveAccessibleName(
-			/· review did not finish$/u,
+			/· review partial$/u,
 		);
 	},
 };

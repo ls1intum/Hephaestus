@@ -147,7 +147,7 @@ describe("scan report route", () => {
 
 		await screen.findByRole("button", { name: "Export SARIF" });
 		expect(patches).toStrictEqual([{ status: "CANCELLED" }]);
-		screen.getByText(/The scan did not finish\. These counts cover only the work it reached\./u);
+		screen.getByText(/These counts cover only the work it reached\./u);
 		screen.getByText(/A workspace admin cancelled it\./u);
 	});
 
@@ -266,7 +266,7 @@ describe("scan report route", () => {
 
 		renderRouteAtWithRouter(REPORT_URL);
 		await screen.findByText(sentence, { exact: false }, ROUTE_RENDER_WAIT);
-		screen.getByText(/The scan did not finish\. These counts cover only the work it reached\./u);
+		screen.getByText(/These counts cover only the work it reached\./u);
 		const table = await screen.findByRole("table", { name: "Problems in this scan" });
 		await within(table).findByText("Not compared");
 		expect(screen.queryByText("Now met")).toBeNull();

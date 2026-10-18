@@ -87,8 +87,9 @@ export interface ScanReportPageProps {
 	exportSarif: ScanAction;
 }
 
-export const PARTIAL_SENTENCE =
-	"The scan did not finish. These counts cover only the work it reached.";
+// A partial scan may have listed every file and still withheld some, so the note names only the
+// scope; the recorded reason after it says why.
+export const PARTIAL_SENTENCE = "These counts cover only the work it reached.";
 
 const TAB_LABELS: Record<ScanReportTab, string> = {
 	problems: "Problems",
@@ -368,7 +369,7 @@ function ReportNotes({
 	const guard = REMOVAL_GUARD_DEFS[report.removalGuard.state];
 	const stopped = progress === "stopped";
 	// Both notes speak of an earlier scan: what it covered, and its files missing now. With none,
-	// neither is true, and the stopped scan's own note already says the listing did not finish.
+	// neither is true, and the stopped scan's own note already says what its counts cover and why.
 	const firstScan = report.baselineScanId === null;
 	const showComparison =
 		report.comparison !== "COMPARABLE" && !(report.comparison === "INCOMPLETE" && firstScan);

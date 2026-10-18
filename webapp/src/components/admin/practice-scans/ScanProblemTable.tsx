@@ -149,13 +149,15 @@ function ScanProblemResults({
 				/>
 			);
 		}
+		// Failed, cancelled and partial scans share this state. A partial scan may have reviewed every
+		// file and withheld some results, so it names the scope, not a stop.
 		if (progress === "stopped") {
 			return (
 				<EmptyState
 					icon={<CircleDashedIcon />}
 					headingLevel={2}
-					title="No problems recorded before the scan stopped"
-					description="The scan stopped before it reviewed every file, so this is not a clean result."
+					title="No problems recorded in the work it reached"
+					description="Its results cover only the work it reached, so this does not show that the code is clean."
 				/>
 			);
 		}
