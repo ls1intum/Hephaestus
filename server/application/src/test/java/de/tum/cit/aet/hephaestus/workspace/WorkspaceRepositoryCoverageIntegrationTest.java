@@ -33,6 +33,8 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.StubInstallationRepositoryEnumerator;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.adapter.WorkspaceSyncTargetProvider;
+import de.tum.cit.aet.hephaestus.workspace.settings.ReviewScopeRepository;
+import de.tum.cit.aet.hephaestus.workspace.settings.ReviewScopeRepositoryRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -97,6 +99,9 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private TransactionTemplate transactionTemplate;
 
+    @Autowired
+    private ReviewScopeRepositoryRepository reviewScopeRepositoryRepository;
+
     private static final String SHARED_NAME = "shared-org/shared-repo";
     private static final String GITLAB_SERVER_URL = "https://gitlab.example.com";
 
@@ -155,6 +160,152 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
         assertThat(monitors)
                 .extracting(RepositoryToMonitor::getNameWithOwner)
                 .containsExactly("HephaestusTest/HelloWorld");
+    }
+
+    @Test
+    void caseChangedRepositoryKeepsItsMonitorAndMirrorAcrossReconciliations() {
+        Workspace workspace = persistWorkspace(RepositorySelection.ALL);
+        Repository mirror = persistGitHubRepository(77L, "HephaestusTest/explainer");
+        RepositoryToMonitor monitor = monitorWithScope(workspace, "HephaestusTest/explainer", 77L);
+        repositoryEnumerator.returns(List.of(snapshot(77L, "HephaestusTest/explAIner", "explAIner", false)));
+
+        workspaceRepositoryMonitorService.ensureAllInstallationRepositoriesCovered(INSTALLATION_ID, null, true);
+        workspaceRepositoryMonitorService.ensureAllInstallationRepositoriesCovered(INSTALLATION_ID, null, true);
+
+        assertRenamedInPlace(workspace, monitor, mirror, "HephaestusTest/explAIner");
+    }
+
+    @Test
+    void renamedRepositoryKeepsItsMonitorMirrorAndReviewScope() {
+        Workspace workspace = persistWorkspace(RepositorySelection.ALL);
+        Repository mirror = persistGitHubRepository(78L, "HephaestusTest/old-name");
+        RepositoryToMonitor monitor = monitorWithScope(workspace, "HephaestusTest/old-name", 78L);
+        repositoryEnumerator.returns(List.of(snapshot(78L, "HephaestusTest/new-name", "new-name", false)));
+
+        workspaceRepositoryMonitorService.ensureAllInstallationRepositoriesCovered(INSTALLATION_ID, null, true);
+
+        assertRenamedInPlace(workspace, monitor, mirror, "HephaestusTest/new-name");
+    }
+
+    @Test
+    void monitorWithoutAnIdAdoptsTheListedRepositoryAtItsPath() {
+        Workspace workspace = persistWorkspace(RepositorySelection.ALL);
+        RepositoryToMonitor monitor =
+                repositoryToMonitorRepository.saveAndFlush(buildMonitor(workspace, "HephaestusTest/Legacy-Case"));
+        repositoryEnumerator.returns(List.of(snapshot(79L, "HephaestusTest/legacy-case", "legacy-case", false)));
+
+        workspaceRepositoryMonitorService.ensureAllInstallationRepositoriesCovered(INSTALLATION_ID, null, true);
+
+        assertThat(repositoryToMonitorRepository.findByWorkspaceId(workspace.getId()))
+                .singleElement()
+                .satisfies(adopted -> {
+                    assertThat(adopted.getId()).isEqualTo(monitor.getId());
+                    assertThat(adopted.getNativeId()).isEqualTo(79L);
+                    assertThat(adopted.getNameWithOwner()).isEqualTo("HephaestusTest/legacy-case");
+                });
+    }
+
+    @Test
+    void pathMirroredForAnotherRepositoryIsNeitherTakenOverNorMonitored() {
+        Workspace workspace = persistWorkspace(RepositorySelection.ALL);
+        Repository holder = persistGitHubRepository(85L, "HephaestusTest/taken");
+        repositoryEnumerator.returns(List.of(
+                snapshot(86L, "HephaestusTest/taken", "taken", false),
+                snapshot(87L, "HephaestusTest/free", "free", false)));
+
+        workspaceRepositoryMonitorService.ensureAllInstallationRepositoriesCovered(INSTALLATION_ID, null, true);
+
+        assertThat(repositoryToMonitorRepository.findByWorkspaceId(workspace.getId()))
+                .extracting(RepositoryToMonitor::getNativeId)
+                .containsExactly(87L);
+        assertThat(repositoryRepository.findById(holder.getId())).hasValueSatisfying(repository -> {
+            assertThat(repository.getNativeId()).isEqualTo(85L);
+            assertThat(repository.getNameWithOwner()).isEqualTo("HephaestusTest/taken");
+        });
+    }
+
+    @Test
+    void reusedPathReplacesTheMonitorOfTheRepositoryThatLeftIt() {
+        Workspace workspace = persistWorkspace(RepositorySelection.ALL);
+        Repository departed = persistGitHubRepository(80L, "HephaestusTest/reused");
+        RepositoryToMonitor previous = buildMonitor(workspace, "HephaestusTest/reused");
+        previous.setNativeId(80L);
+        previous = repositoryToMonitorRepository.saveAndFlush(previous);
+        repositoryEnumerator.returns(List.of(snapshot(81L, "HephaestusTest/reused", "reused", false)));
+
+        workspaceRepositoryMonitorService.ensureAllInstallationRepositoriesCovered(INSTALLATION_ID, null, true);
+
+        assertThat(repositoryToMonitorRepository.findById(previous.getId())).isEmpty();
+        assertThat(repositoryToMonitorRepository.findByWorkspaceId(workspace.getId()))
+                .singleElement()
+                .satisfies(current -> {
+                    assertThat(current.getNameWithOwner()).isEqualTo("HephaestusTest/reused");
+                    assertThat(current.getNativeId()).isEqualTo(81L);
+                });
+        assertThat(repositoryRepository.findById(departed.getId())).isEmpty();
+        assertThat(repositoryRepository.findByNameWithOwner("HephaestusTest/reused"))
+                .hasValueSatisfying(current -> assertThat(current.getNativeId()).isEqualTo(81L));
+    }
+
+    @Test
+    void repositoryRemovalNamesTheMonitorByItsId() {
+        Workspace workspace = persistWorkspace(RepositorySelection.SELECTED);
+        RepositoryToMonitor renamedAway = buildMonitor(workspace, "HephaestusTest/stale-name");
+        renamedAway.setNativeId(82L);
+        renamedAway = repositoryToMonitorRepository.saveAndFlush(renamedAway);
+        RepositoryToMonitor reusedPath = buildMonitor(workspace, "HephaestusTest/shared-path");
+        reusedPath.setNativeId(83L);
+        reusedPath = repositoryToMonitorRepository.saveAndFlush(reusedPath);
+
+        workspaceRepositoryMonitorService.removeRepositoryMonitorForInstallation(
+                INSTALLATION_ID, "HephaestusTest/current-name", 82L);
+        workspaceRepositoryMonitorService.removeRepositoryMonitorForInstallation(
+                INSTALLATION_ID, "HephaestusTest/shared-path", 84L);
+
+        assertThat(repositoryToMonitorRepository.findByWorkspaceId(workspace.getId()))
+                .extracting(RepositoryToMonitor::getId)
+                .containsExactly(reusedPath.getId());
+        assertThat(repositoryToMonitorRepository.findById(renamedAway.getId())).isEmpty();
+    }
+
+    @Test
+    void identityReconciliationDoesNotTakeAnIdOrPathAnotherMonitorHolds() {
+        Workspace workspace = persistGitHubTokenWorkspace();
+        RepositoryToMonitor holder = buildMonitor(workspace, "acme/held");
+        holder.setNativeId(90L);
+        holder = repositoryToMonitorRepository.saveAndFlush(holder);
+        RepositoryToMonitor other = buildMonitor(workspace, "acme/other");
+        other.setNativeId(91L);
+        other = repositoryToMonitorRepository.saveAndFlush(other);
+        RepositoryToMonitor unresolved =
+                repositoryToMonitorRepository.saveAndFlush(buildMonitor(workspace, "acme/new"));
+
+        workspaceSyncTargetProvider.reconcileSyncTargetIdentity(other.getId(), 91L, "acme/held");
+        workspaceSyncTargetProvider.reconcileSyncTargetIdentity(unresolved.getId(), 90L, "acme/new");
+
+        assertThat(repositoryToMonitorRepository.findById(other.getId()))
+                .hasValueSatisfying(
+                        monitor -> assertThat(monitor.getNameWithOwner()).isEqualTo("acme/other"));
+        assertThat(repositoryToMonitorRepository.findById(unresolved.getId()))
+                .hasValueSatisfying(monitor -> assertThat(monitor.getNativeId()).isNull());
+        assertThat(repositoryToMonitorRepository.findById(holder.getId()))
+                .hasValueSatisfying(monitor -> assertThat(monitor.getNativeId()).isEqualTo(90L));
+    }
+
+    @Test
+    void tokenWorkspaceRefusesToMonitorARepositoryItAlreadyMonitorsUnderAnotherPath() {
+        Workspace workspace = persistGitHubTokenWorkspace();
+        persistRepository(IdentityProviderType.GITHUB, "https://github.com", 9001L);
+        RepositoryToMonitor existing = buildMonitor(workspace, "shared-org/previous-name");
+        existing.setNativeId(9001L);
+        existing = repositoryToMonitorRepository.saveAndFlush(existing);
+
+        assertThatThrownBy(() -> workspaceRepositoryMonitorService.addRepositoryToMonitor(
+                        workspace.getWorkspaceSlug(), SHARED_NAME))
+                .isInstanceOf(RepositoryAlreadyMonitoredException.class);
+        assertThat(repositoryToMonitorRepository.findByWorkspaceId(workspace.getId()))
+                .extracting(RepositoryToMonitor::getId)
+                .containsExactly(existing.getId());
     }
 
     @Test
@@ -447,6 +598,53 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
         // alongside the Workspace.
         return WorkspaceTestFixtures.persistInstallationWorkspace(
                 workspaceRepository, connectionRepository, builder, INSTALLATION_ID);
+    }
+
+    private void assertRenamedInPlace(
+            Workspace workspace, RepositoryToMonitor monitor, Repository mirror, String canonicalName) {
+        assertThat(repositoryToMonitorRepository.findByWorkspaceId(workspace.getId()))
+                .singleElement()
+                .satisfies(kept -> {
+                    assertThat(kept.getId()).isEqualTo(monitor.getId());
+                    assertThat(kept.getNameWithOwner()).isEqualTo(canonicalName);
+                });
+        assertThat(repositoryRepository.findById(mirror.getId())).hasValueSatisfying(repository -> {
+            assertThat(repository.getNameWithOwner()).isEqualTo(canonicalName);
+            assertThat(repository.getNativeId()).isEqualTo(mirror.getNativeId());
+            assertThat(repository.getDefaultBranch()).isEqualTo("develop");
+        });
+        assertThat(repositoryToMonitorRepository.findSourceRepositoryIdsOfMonitor(monitor.getId()))
+                .containsExactly(mirror.getId());
+        assertThat(reviewScopeRepositoryRepository.findByWorkspaceId(workspace.getId()))
+                .extracting(ReviewScopeRepository::getRepositoryMonitorId)
+                .containsExactly(monitor.getId());
+    }
+
+    private Repository persistGitHubRepository(long nativeId, String nameWithOwner) {
+        IdentityProvider provider = gitProviderRepository
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseThrow();
+        Repository repository = new Repository();
+        repository.setNativeId(nativeId);
+        repository.setName(nameWithOwner.substring(nameWithOwner.indexOf('/') + 1));
+        repository.setNameWithOwner(nameWithOwner);
+        repository.setHtmlUrl("https://github.com/" + nameWithOwner);
+        repository.setVisibility(Repository.Visibility.PRIVATE);
+        repository.setDefaultBranch("develop");
+        repository.setCreatedAt(Instant.now());
+        repository.setUpdatedAt(Instant.now());
+        repository.setPushedAt(Instant.now());
+        repository.setProvider(provider);
+        return repositoryRepository.saveAndFlush(repository);
+    }
+
+    private RepositoryToMonitor monitorWithScope(Workspace workspace, String nameWithOwner, long nativeId) {
+        RepositoryToMonitor monitor = buildMonitor(workspace, nameWithOwner);
+        monitor.setNativeId(nativeId);
+        monitor = repositoryToMonitorRepository.saveAndFlush(monitor);
+        reviewScopeRepositoryRepository.saveAndFlush(
+                new ReviewScopeRepository(workspace.getId(), monitor.getId(), List.of("main")));
+        return monitor;
     }
 
     private RepositoryToMonitor buildMonitor(Workspace workspace, String nameWithOwner) {

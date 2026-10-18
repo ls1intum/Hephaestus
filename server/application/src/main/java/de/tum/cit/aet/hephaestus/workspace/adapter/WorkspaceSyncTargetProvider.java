@@ -401,16 +401,29 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
 
     @Override
     @Transactional
-    public void mergeSyncTarget(Long keptSyncTargetId, Long duplicateSyncTargetId) {
+    public boolean mergeSyncTarget(Long keptSyncTargetId, Long duplicateSyncTargetId) {
         RepositoryToMonitor kept =
                 repositoryToMonitorRepository.findById(keptSyncTargetId).orElse(null);
         RepositoryToMonitor duplicate =
                 repositoryToMonitorRepository.findById(duplicateSyncTargetId).orElse(null);
-        Workspace workspace = kept != null ? kept.getWorkspace() : null;
-        Workspace duplicateWorkspace = duplicate != null ? duplicate.getWorkspace() : null;
+        if (kept == null || duplicate == null) {
+            return false;
+        }
+        Workspace workspace = kept.getWorkspace();
+        Workspace duplicateWorkspace = duplicate.getWorkspace();
         Long workspaceId = workspace != null ? workspace.getId() : null;
         if (workspaceId == null || duplicateWorkspace == null || !workspaceId.equals(duplicateWorkspace.getId())) {
-            return;
+            return false;
+        }
+        // An empty list is a policy too; neither monitor's generated paths may be discarded.
+        if (!kept.getGeneratedPaths().equals(duplicate.getGeneratedPaths())) {
+            log.warn(
+                    "Skipped repository monitor merge: reason=generatedPathsDiffer, workspaceId={}, syncTargetId={},"
+                            + " keptSyncTargetId={}",
+                    workspaceId,
+                    duplicateSyncTargetId,
+                    keptSyncTargetId);
+            return false;
         }
         practiceReviewRepositoryTargetRepository
                 .findById(new ReviewScopeRepository.Key(workspaceId, duplicateSyncTargetId))
@@ -432,6 +445,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                             new ReviewScopeRepository(workspaceId, keptSyncTargetId, branches));
                 });
         removeMonitor(duplicateSyncTargetId);
+        return true;
     }
 
     @Override
@@ -458,12 +472,25 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             // proven to belong to another provider
             // instance's repository of the same name: the scoped queries would hide
             // the monitored repository.
+            Long workspaceId = Objects.requireNonNull(rtm.getWorkspace()).getId();
             if (resolvedNativeId != null
                     && (rtm.getNativeId() == null
                             || (!rtm.getNativeId().equals(resolvedNativeId)
                                     && holdsAnotherInstancesId(rtm, resolvedNativeId)))) {
-                rtm.setNativeId(resolvedNativeId);
-                dirty = true;
+                // These writes run without the workspace lock. Another monitor of this workspace holding the id
+                // is reported and left as it is; the uniqueness constraint would reject the write.
+                if (repositoryToMonitorRepository.existsByWorkspaceIdAndNativeIdAndIdNot(
+                        workspaceId, resolvedNativeId, syncTargetId)) {
+                    log.warn(
+                            "Skipped repository monitor identity capture: reason=nativeIdHeldByAnotherMonitor,"
+                                    + " workspaceId={}, syncTargetId={}, nativeId={}",
+                            workspaceId,
+                            syncTargetId,
+                            resolvedNativeId);
+                } else {
+                    rtm.setNativeId(resolvedNativeId);
+                    dirty = true;
+                }
             }
 
             boolean nameChanged = false;
@@ -475,7 +502,17 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             // alone, which could clobber a legitimately reassigned row.
             boolean idAgrees = rtm.getNativeId() != null
                     && (resolvedNativeId == null || rtm.getNativeId().equals(resolvedNativeId));
-            if (nameDiffers && idAgrees) {
+            if (nameDiffers
+                    && idAgrees
+                    && repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwnerAndIdNot(
+                            workspaceId, Objects.requireNonNull(resolvedNameWithOwner), syncTargetId)) {
+                log.warn(
+                        "Skipped repository monitor re-key: reason=nameHeldByAnotherMonitor, workspaceId={},"
+                                + " syncTargetId={}, nativeId={}",
+                        workspaceId,
+                        syncTargetId,
+                        rtm.getNativeId());
+            } else if (nameDiffers && idAgrees) {
                 log.info(
                         "Re-keying repository monitor after upstream"
                                 + " rename/transfer: syncTargetId={}, oldName={},"
@@ -492,18 +529,14 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             if (dirty) {
                 repositoryToMonitorRepository.saveAndFlush(rtm);
             }
-            if (rtm.getWorkspace() != null) {
-                eventPublisher.publishEvent(new RepositoryMonitoringChangedEvent(
-                        rtm.getWorkspace().getId(),
-                        repositoryToMonitorRepository.findSourceRepositoryIdsOfMonitor(syncTargetId)));
-            }
+            eventPublisher.publishEvent(new RepositoryMonitoringChangedEvent(
+                    workspaceId, repositoryToMonitorRepository.findSourceRepositoryIdsOfMonitor(syncTargetId)));
 
             // A name change moves the repo's NATS subject; rebuild the workspace
             // consumer filters so
             // live events under the new name are delivered instead of silently
             // ACK-dropped.
-            if (nameChanged && natsProperties.enabled() && rtm.getWorkspace() != null) {
-                Long workspaceId = rtm.getWorkspace().getId();
+            if (nameChanged && natsProperties.enabled()) {
                 natsConsumerService.ifAvailable(svc -> svc.updateScopeConsumer(workspaceId));
             }
         });

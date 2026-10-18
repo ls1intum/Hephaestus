@@ -968,8 +968,8 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
                 .orElseThrow();
         original.setIssueSyncCursor("original-cursor");
         repositoryToMonitorRepository.save(original);
+        // A workspace holds one monitor per project id; a duplicate is a monitor at the path with no id yet.
         RepositoryToMonitor duplicate = WorkspaceTestFixtures.repositoryMonitor(connected, renamed);
-        duplicate.setNativeId(projectId);
         repositoryToMonitorRepository.save(duplicate);
         Workspace other = WorkspaceTestFixtures.persistGitLabWorkspace(
                 workspaceRepository,
@@ -1009,6 +1009,35 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
         assertThat(repositoryToMonitorRepository.findById(foreign.getId()))
                 .hasValueSatisfying(
                         monitor -> assertThat(monitor.getNameWithOwner()).isEqualTo(REPOSITORY));
+    }
+
+    @Test
+    void shouldKeepADuplicateMonitorWhoseGeneratedPathsDiffer() throws Exception {
+        createStream();
+        Workspace connected = connectGroup();
+        awaitMonitoringIdle();
+        long workspaceId = connected.getId();
+        Repository project = discoveredRepository();
+        String renamed = GROUP + "/renamed-repository";
+        RepositoryToMonitor original = repositoryToMonitorRepository
+                .findByWorkspaceIdAndNameWithOwner(workspaceId, REPOSITORY)
+                .orElseThrow();
+        RepositoryToMonitor duplicate = WorkspaceTestFixtures.repositoryMonitor(connected, renamed);
+        duplicate.setGeneratedPaths(List.of("dist/**"));
+        repositoryToMonitorRepository.save(duplicate);
+        project.setNameWithOwner(renamed);
+        Repository listed = repositoryRepository.save(project);
+
+        repositoryMonitors.monitorAllowed(
+                workspaceRepository.findById(workspaceId).orElseThrow(), List.of(listed));
+
+        assertThat(repositoryToMonitorRepository.findById(duplicate.getId()))
+                .hasValueSatisfying(
+                        monitor -> assertThat(monitor.getGeneratedPaths()).containsExactly("dist/**"));
+        assertThat(repositoryToMonitorRepository.findById(original.getId())).hasValueSatisfying(monitor -> {
+            assertThat(monitor.getNameWithOwner()).isEqualTo(REPOSITORY);
+            assertThat(monitor.getGeneratedPaths()).isEmpty();
+        });
     }
 
     @Test

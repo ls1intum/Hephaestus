@@ -27,10 +27,15 @@ import org.jspecify.annotations.Nullable;
 @DynamicUpdate
 @Table(
         name = "repository_to_monitor",
-        uniqueConstraints =
-                @UniqueConstraint(
-                        name = "uk_repository_to_monitor_workspace_id",
-                        columnNames = {"workspace_id", "id"}))
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "uk_repository_to_monitor_workspace_id",
+                    columnNames = {"workspace_id", "id"}),
+            // NULLs are distinct: monitors whose repository is not resolved yet are not constrained.
+            @UniqueConstraint(
+                    name = "uk_repository_to_monitor_workspace_native_id",
+                    columnNames = {"workspace_id", "native_id"})
+        })
 @Getter
 @Setter
 @NoArgsConstructor
@@ -54,7 +59,7 @@ public class RepositoryToMonitor {
      * <p>Nullable: rows created before this column existed (and PAT rows whose repository has not yet
      * been resolved from the provider) carry {@code null} until the next sync that resolves the repo
      * populates it. A workspace has a single SCM connection, so the id is unambiguous without a
-     * provider discriminator column.
+     * provider discriminator column, and a workspace holds at most one monitor per id.
      */
     @Nullable
     private Long nativeId;

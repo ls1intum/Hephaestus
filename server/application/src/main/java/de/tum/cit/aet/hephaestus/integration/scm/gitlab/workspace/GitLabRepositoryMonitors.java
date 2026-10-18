@@ -140,10 +140,13 @@ public class GitLabRepositoryMonitors {
                 continue;
             }
             // The first monitor keeps its sync state; later ones hand over their review selection and are gone
-            // before it takes the current path, so the path is never held twice.
+            // before it takes the current path, so the path is never held twice. A duplicate with other generated
+            // paths stays, and the kept monitor does not take a path it holds.
             RepositoryToMonitor kept = same.getFirst();
             for (RepositoryToMonitor duplicate : same.subList(1, same.size())) {
-                syncTargetProvider.mergeSyncTarget(kept.getId(), duplicate.getId());
+                if (!syncTargetProvider.mergeSyncTarget(kept.getId(), duplicate.getId())) {
+                    continue;
+                }
                 own.remove(duplicate);
                 log.info(
                         "Merged duplicate repository monitor: workspaceId={}, syncTargetId={}, keptSyncTargetId={}",

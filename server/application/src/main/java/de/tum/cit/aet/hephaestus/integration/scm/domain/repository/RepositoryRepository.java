@@ -130,18 +130,16 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
             @Param("workspaceId") Long workspaceId, @Param("providerId") Long providerId);
 
     /**
-     * Upsert a repository from a provisioning snapshot (e.g., GitHub App installation webhook).
+     * Records a provisioning snapshot (e.g., GitHub App installation webhook) on the repository with this
+     * provider-native id. The row keeps its id and the fields the full GraphQL sync owns (description,
+     * pushed_at, default_branch, etc.); a rename or a case change moves its path.
      * <p>
-     * Uses PostgreSQL's {@code ON CONFLICT} on the {@code (provider_id, name_with_owner)} unique
-     * constraint to atomically insert or update, so concurrent NATS event processing and GraphQL sync
-     * cannot fail with an optimistic locking error.
+     * Writes nothing and returns {@code false} when another repository of the provider holds the path: a
+     * path names one repository per provider, so neither row is reassigned to the other.
      * <p>
-     * On conflict, only lightweight fields from the snapshot are updated; fields populated by
-     * the full GraphQL sync (description, pushed_at, default_branch, etc.) are preserved.
-     * <p>
-     * {@code visibility} is derived from {@code isPrivate} and {@code html_url} is derived
-     * from {@code nameWithOwner} (with a {@code https://github.com/} prefix) inside the SQL
-     * to keep the parameter count within architecture limits.
+     * A concurrent first insert of the same repository is absorbed by {@code ON CONFLICT DO NOTHING} and
+     * the read that follows it, so NATS event processing and GraphQL sync cannot fail with an optimistic
+     * locking error.
      *
      * @param nativeId       the provider's original numeric ID for the repository
      * @param providerId     the IdentityProvider entity ID
@@ -149,9 +147,50 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
      * @param name           the short repository name
      * @param isPrivate      whether the repository is private
      * @param organizationId the organization ID (nullable)
+     * @return whether the provider's repository with this id now has this path
+     */
+    default boolean upsertFromSnapshot(
+            long nativeId,
+            long providerId,
+            String nameWithOwner,
+            String name,
+            boolean isPrivate,
+            @Nullable Long organizationId) {
+        return updateFromSnapshot(nativeId, providerId, nameWithOwner, name, isPrivate, organizationId) == 1
+                || insertFromSnapshot(nativeId, providerId, nameWithOwner, name, isPrivate, organizationId) == 1
+                || existsByNativeIdAndProviderIdAndNameWithOwner(nativeId, providerId, nameWithOwner);
+    }
+
+    /**
+     * {@code visibility} is derived from {@code isPrivate} and {@code html_url} from {@code nameWithOwner}
+     * inside the SQL to keep the parameter count within architecture limits.
      */
     @Transactional
-    @Modifying
+    @Modifying(flushAutomatically = true)
+    @Query(value = """
+        UPDATE repository SET
+            name_with_owner = :nameWithOwner,
+            name = :name,
+            html_url = CASE WHEN name_with_owner = :nameWithOwner THEN html_url
+                            ELSE 'https://github.com/' || :nameWithOwner END,
+            is_private = :isPrivate,
+            visibility = CASE WHEN :isPrivate THEN 'PRIVATE' ELSE 'PUBLIC' END,
+            organization_id = COALESCE(organization_id, :organizationId)
+        WHERE provider_id = :providerId AND native_id = :nativeId
+          AND NOT EXISTS (SELECT 1 FROM repository holder
+                          WHERE holder.provider_id = :providerId AND holder.name_with_owner = :nameWithOwner
+                            AND holder.native_id <> :nativeId)
+        """, nativeQuery = true)
+    int updateFromSnapshot(
+            @Param("nativeId") long nativeId,
+            @Param("providerId") long providerId,
+            @Param("nameWithOwner") String nameWithOwner,
+            @Param("name") String name,
+            @Param("isPrivate") boolean isPrivate,
+            @Param("organizationId") @Nullable Long organizationId);
+
+    @Transactional
+    @Modifying(flushAutomatically = true)
     @Query(value = """
         INSERT INTO repository (native_id, provider_id, name_with_owner, name, is_private, html_url,
                                 visibility, default_branch, pushed_at, is_archived, is_disabled,
@@ -160,17 +199,15 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
                 'https://github.com/' || :nameWithOwner,
                 CASE WHEN :isPrivate THEN 'PRIVATE' ELSE 'PUBLIC' END,
                 'main', NOW(), false, false, false, :organizationId)
-        ON CONFLICT (provider_id, name_with_owner) DO UPDATE SET
-            name = EXCLUDED.name,
-            is_private = EXCLUDED.is_private,
-            visibility = EXCLUDED.visibility,
-            organization_id = COALESCE(repository.organization_id, EXCLUDED.organization_id)
+        ON CONFLICT DO NOTHING
         """, nativeQuery = true)
-    void upsertFromSnapshot(
+    int insertFromSnapshot(
             @Param("nativeId") long nativeId,
             @Param("providerId") long providerId,
             @Param("nameWithOwner") String nameWithOwner,
             @Param("name") String name,
             @Param("isPrivate") boolean isPrivate,
             @Param("organizationId") @Nullable Long organizationId);
+
+    boolean existsByNativeIdAndProviderIdAndNameWithOwner(Long nativeId, Long providerId, String nameWithOwner);
 }
