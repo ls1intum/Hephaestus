@@ -624,7 +624,7 @@ erDiagram
         BIGINT workspace_id FK,UK "NOT NULL"
         BIGINT item_id FK,UK "NOT NULL"
         VARCHAR(128) name UK "NOT NULL"
-        TEXT item_version UK "NOT NULL"
+        TEXT item_version UK
         TIMESTAMPTZ occurred_at "NOT NULL"
         VARCHAR(16) found_by "NOT NULL"
         BIGINT actor_user_id FK
@@ -634,6 +634,7 @@ erDiagram
         TIMESTAMPTZ decided_at "NOT NULL"
         TIMESTAMPTZ last_attempted_at
         TIMESTAMPTZ retry_at
+        VARCHAR(1024) pending_fence
     }
 
     JwtSigningKey {

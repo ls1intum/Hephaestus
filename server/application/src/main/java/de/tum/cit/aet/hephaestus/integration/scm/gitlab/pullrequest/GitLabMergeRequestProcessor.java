@@ -203,7 +203,9 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         if (pr.takesReviewSnapshotAt(requestedAt)) {
             // Accept diff refs only from a current read; an absent pair cannot replace the stored pair.
             var pair = facts.diffRefs();
+            boolean basePaired = false;
             if (pair != null && pair.head().equals(pr.getHeadRefOid())) {
+                basePaired = !pair.base().equals(pr.getBaseRefOid());
                 pr.setBaseRefOid(pair.base());
             }
             ProcessingContext read = context.withObservedAt(requestedAt);
@@ -216,6 +218,11 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             pr = pullRequestRepository.save(pr);
             if (!settling) {
                 reconcileApprovals(facts.approvers(), pr, providerId, read, facts.approvalRows());
+            }
+            if (basePaired) {
+                // Not an occasion: it lets the occasions recorded at this head pin their version.
+                eventPublisher.publishEvent(new ScmDomainEvent.PullRequestUpdated(
+                        ScmEventPayload.PullRequestData.from(pr), Set.of("baseRefOid"), EventContext.from(read)));
             }
         } else {
             log.debug("Kept reviews stored after the readiness read began: prId={}", pr.getId());

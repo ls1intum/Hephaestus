@@ -18,6 +18,18 @@ public final class ScmVersion {
         return new ItemVersion("scm.pull_request:v1:" + base + ":" + head + ":" + digest(title, body), base);
     }
 
+    /**
+     * The pending fence of a pull request whose base is not stored yet: every input of its {@link #pullRequest} version
+     * and {@link #withContext} context except the base, and the target branch the base is paired with. A change to any
+     * of them changes the fence.
+     */
+    public static String pullRequestFence(
+            String head, String target, String title, @Nullable String body, @Nullable ItemVersion context) {
+        requireObjectId(head);
+        return "scm.pull_request:fence:v1:"
+                + digest(head, target, title, body, context == null ? null : context.value());
+    }
+
     public static ItemVersion pullRequestReview(
             String base, String head, String title, @Nullable String body, ReviewContent review) {
         requireObjectId(base);

@@ -49,6 +49,8 @@ public class ItemEventReviewListener {
             decide(recorded, state, ItemEventState.WITHHELD, ReviewRequestReason.ITEM_GONE);
             return;
         }
+        // The source pins the version later and offers the occasion again; the expiry bounds the wait.
+        if (event.itemVersion() == null) return;
         var version = new ItemVersion(event.itemVersion(), null);
         try {
             reviews.request(ReviewRequest.builder()

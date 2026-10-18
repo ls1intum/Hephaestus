@@ -36,9 +36,45 @@ public interface ItemEventRepository extends JpaRepository<ItemEvent, UUID> {
             @Param("requestedById") @Nullable Long requestedById,
             @Param("now") Instant now);
 
+    /** Records an occasion with no pinned version once per name and fence; the caller holds the item lock. */
+    @Modifying
     @Query(
             value =
-                    "SELECT * FROM item_event WHERE state IN ('RECORDED','WAITING') AND (retry_at IS NULL OR retry_at <= :now) ORDER BY occurred_at, id FOR UPDATE SKIP LOCKED LIMIT :limit",
+                    "INSERT INTO item_event(id, workspace_id, item_id, name, item_version, pending_fence, occurred_at, found_by, actor_user_id, state, decided_at) "
+                            + "SELECT :id, :workspaceId, :itemId, :name, NULL, :fence, :occurredAt, :foundBy, :actorUserId, 'RECORDED', :now "
+                            + "WHERE NOT EXISTS (SELECT 1 FROM item_event e WHERE e.workspace_id = :workspaceId AND e.item_id = :itemId AND e.name = :name "
+                            + "AND e.item_version IS NULL AND e.pending_fence = :fence)",
+            nativeQuery = true)
+    int insertUnresolvedIfAbsent(
+            @Param("id") UUID id,
+            @Param("workspaceId") long workspaceId,
+            @Param("itemId") long itemId,
+            @Param("name") String name,
+            @Param("fence") String fence,
+            @Param("occurredAt") Instant occurredAt,
+            @Param("foundBy") String foundBy,
+            @Param("actorUserId") @Nullable Long actorUserId,
+            @Param("now") Instant now);
+
+    Optional<ItemEvent> findByWorkspaceIdAndItemIdAndNameAndItemVersionIsNullAndPendingFence(
+            long workspaceId, long itemId, String name, String pendingFence);
+
+    @Query(
+            "SELECT e FROM ItemEvent e WHERE e.workspaceId = :workspaceId AND e.itemId = :itemId AND e.itemVersion IS NULL "
+                    + "AND e.state IN (de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.RECORDED, de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.WAITING) "
+                    + "ORDER BY e.occurredAt, e.id")
+    List<ItemEvent> findUnresolved(@Param("workspaceId") long workspaceId, @Param("itemId") long itemId);
+
+    @Modifying
+    @Query(
+            "UPDATE ItemEvent e SET e.itemVersion = :itemVersion WHERE e.workspaceId = :workspaceId AND e.id = :id "
+                    + "AND e.itemVersion IS NULL AND e.state IN (de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.RECORDED, de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.WAITING)")
+    int pin(@Param("workspaceId") long workspaceId, @Param("id") UUID id, @Param("itemVersion") String itemVersion);
+
+    // An occasion with no pinned version waits for the source to store one, not for a retry.
+    @Query(
+            value =
+                    "SELECT * FROM item_event WHERE state IN ('RECORDED','WAITING') AND item_version IS NOT NULL AND (retry_at IS NULL OR retry_at <= :now) ORDER BY occurred_at, id FOR UPDATE SKIP LOCKED LIMIT :limit",
             nativeQuery = true)
     @WorkspaceAgnostic("Background reaper claims due events across workspaces and preserves each event workspace")
     List<ItemEvent> claimDue(@Param("now") Instant now, @Param("limit") int limit);
