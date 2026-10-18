@@ -60,8 +60,10 @@ class ItemEventPendingFenceDatabaseTest {
             liquibase.update(new Contexts(context), new LabelExpression());
         }
         assertThat(PracticeMigrationFixture.column(
-                        database, "SELECT id FROM databasechangelog ORDER BY orderexecuted DESC LIMIT 1"))
-                .containsExactly("1792301912171-4");
+                        database,
+                        "SELECT id FROM databasechangelog WHERE filename LIKE '%" + CHANGELOG
+                                + "' ORDER BY orderexecuted"))
+                .containsExactly("1792301912171-1", "1792301912171-2", "1792301912171-3", "1792301912171-4");
         assertThat(released(database)).isEqualTo(before);
         assertThat(PracticeMigrationFixture.column(
                         database, "SELECT pending_fence FROM item_event WHERE id='" + RELEASED + "'"))
