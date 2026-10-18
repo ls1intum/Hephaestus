@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.reviewoutput;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackVisibilityService;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.result.ProblemRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ResultCommunicationRepository;
@@ -25,6 +26,7 @@ class ResultProofPrivacyTest extends BaseUnitTest {
                 mock(ProblemRepository.class),
                 mock(ProductReferenceQuery.class),
                 mock(ResultCommunicationRepository.class),
+                mock(FeedbackVisibilityService.class),
                 new JsonMapper());
         var result =
                 Result.builder().evidence(new JsonMapper().createObjectNode()).build();
