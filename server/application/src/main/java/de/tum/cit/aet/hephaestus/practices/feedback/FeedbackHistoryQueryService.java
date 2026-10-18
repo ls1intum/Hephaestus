@@ -12,12 +12,15 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackHistoryEntry;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackHistoryQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustody;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryQuery;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +47,7 @@ public class FeedbackHistoryQueryService implements FeedbackHistoryQuery {
     private final FeedbackQueryRepository queries;
     private final FeedbackPublicHistory publicHistoryReader;
     private final AccountMembershipQuery memberships;
+    private final FeedbackPublicationContext publication;
 
     @Override
     public List<FeedbackHistoryEntry> forDeveloper(
@@ -68,6 +72,17 @@ public class FeedbackHistoryQueryService implements FeedbackHistoryQuery {
                                 cb.equal(row.get("destination"), FeedbackDestination.ON_WORK),
                                 cb.isNotNull(row.get("deliveredAt")))));
         return read(selected, viewerAccountId, limit, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
+    }
+
+    @Override
+    public String publicationContext(long workspaceId, long itemId, UUID reviewId, Collection<Long> developerIds) {
+        return publication.issue(workspaceId, itemId, reviewId, developerIds);
+    }
+
+    @Override
+    public Optional<FeedbackStopReason> publicationRefusal(
+            long workspaceId, long itemId, UUID reviewId, long developerId, @Nullable String publicationContext) {
+        return publication.refusal(workspaceId, itemId, reviewId, developerId, publicationContext);
     }
 
     private List<FeedbackHistoryEntry> read(

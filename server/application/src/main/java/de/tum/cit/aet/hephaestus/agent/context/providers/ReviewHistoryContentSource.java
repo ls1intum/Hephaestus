@@ -49,6 +49,11 @@ public class ReviewHistoryContentSource {
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
+        if (itemIds.size() != 1) throw new IllegalArgumentException("Public history requires one item");
+        // Issued from the same snapshot as the bounded page; it also covers entries that the page cannot show.
+        String publicationContext = viewers.isEmpty()
+                ? null
+                : feedback.publicationContext(job.getWorkspaceId(), itemIds.getFirst(), job.getReviewId(), viewers);
         for (long itemId : itemIds)
             for (long viewer : viewers) {
                 for (var entry : feedback.forItem(job.getWorkspaceId(), itemId, viewer, 100)) {
@@ -66,7 +71,6 @@ public class ReviewHistoryContentSource {
                 }
             }
         var item = assignments.getFirst().item();
-        if (itemIds.size() != 1) throw new IllegalArgumentException("Public history requires one item");
         var label = labels.labels(job.getWorkspaceId(), List.of(item)).get(item.itemId());
         var ref = new ItemRefDTO(
                 Long.toString(item.itemId()),
@@ -85,7 +89,8 @@ public class ReviewHistoryContentSource {
                 .map(entry -> mapper.treeToValue(entry.publicHistory(), PublicFeedbackHistoryDTO.Entry.class))
                 .toList();
         return new PublicHistoryRead(
-                new PublicFeedbackHistoryDTO(3, Instant.now(), new PublicFeedbackHistoryDTO.History(ref, projection)),
+                new PublicFeedbackHistoryDTO(
+                        4, Instant.now(), publicationContext, new PublicFeedbackHistoryDTO.History(ref, projection)),
                 selected.stream().map(copies::of).toList());
     }
 

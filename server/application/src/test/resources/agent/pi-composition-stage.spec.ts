@@ -656,6 +656,7 @@ for (const failure of ["setup", "deadline"] as const) {
 						inline: [],
 						withheld: [],
 					};
+					return "DONE";
 				},
 				composePrivately: async (_request, safety) => {
 					assert.equal(
@@ -696,3 +697,61 @@ for (const failure of ["setup", "deadline"] as const) {
 		]);
 	});
 }
+
+void test("only changed public history composes again in fresh sessions, within the bound; an unknown delivery never does", async () => {
+	const { composeAdmittedFeedback, MAX_PUBLIC_RECOMPOSITIONS } =
+		await import("../../../main/resources/agent/pi-composition-stage.ts");
+	const admission = parseAdmission(
+		JSON.parse(readFileSync(new URL("admission-response.json", import.meta.url), "utf8")),
+	);
+	for (const [refusal, settles, expectedSessions] of [
+		["PUBLIC_HISTORY_CHANGED", true, 2],
+		["PUBLIC_HISTORY_CHANGED", false, 1 + MAX_PUBLIC_RECOMPOSITIONS],
+		["PUBLIC_DELIVERY_UNRESOLVED", false, 1],
+	] as const) {
+		const feedback: ComposedFeedback = {
+			compositionFailures: [],
+			contractVersion: 3,
+			admissionDigest: admission.digest,
+			results: [],
+			preparedTargets: [],
+			feedback: [],
+			review: null,
+			preparation: null,
+		};
+		let sessions = 0;
+		const phases: string[] = [];
+		await composeAdmittedFeedback({
+			request: {
+				contractVersion: 3,
+				destinations: { ON_WORK: { maxPieces: 1 } },
+				minDistinctItems: 2,
+				onWorkCopyForms: [],
+			},
+			admission,
+			feedback,
+			routes: null,
+			notReached: [],
+			remainingMs: 5000,
+			onDeadline: () => undefined,
+			stage: {
+				composeReview: async () => {
+					sessions += 1;
+					return settles && sessions === 2 ? "DONE" : { refused: refusal };
+				},
+				composePrivately: async () => undefined,
+			},
+			prepare: async (_safety, phase) => {
+				phases.push(phase);
+			},
+			persist: () => undefined,
+			after: () => undefined,
+		});
+		assert.equal(sessions, expectedSessions, refusal);
+		assert.deepEqual(
+			feedback.compositionFailures,
+			settles ? [] : [{ phase: "PUBLIC_REVIEW", reason: refusal }],
+		);
+		assert.deepEqual(phases, ["PUBLIC_REVIEW", "PRIVATE_FEEDBACK"]);
+	}
+});

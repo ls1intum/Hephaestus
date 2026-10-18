@@ -17,11 +17,14 @@ import {
 	loadCompositionRequest,
 	createCompositionStage,
 	composeAdmittedFeedback,
+	composePublicReview,
 	closeUnroutedPrivateDestinations,
 	undecidedPrivatePractices,
 	recordCompositionFailure,
 	persistComposedFeedback as persistComposition,
 	prepareComposedFeedback as prepareComposition,
+	preparePublicReview,
+	type PreparationOptions,
 	type ComposedFeedback,
 	type CompositionFailureReason,
 } from "./pi-composition-stage.ts";
@@ -2066,6 +2069,7 @@ export async function runReviewJob(): Promise<void> {
 	let routedDestinations: ReadonlyMap<string, readonly PrivateDestination[]> | null = null;
 
 	const PUBLIC_FEEDBACK_HISTORY_PATH = `${CWD}/work/composition/public-feedback-history.json`;
+	const PUBLICATION_CONTEXT = /^v1:[1-9][0-9]*(?:,[1-9][0-9]*)*:[0-9a-f]{64}$/u;
 
 	// Echo the exact composition inputs so Java validates references against the same snapshot.
 	const composedFeedback: ComposedFeedback = {
@@ -2099,26 +2103,29 @@ export async function runReviewJob(): Promise<void> {
 	}
 
 	const persistComposedFeedback = () => persistComposition(composedFeedback, FEEDBACK_PATH);
+	const preparationOptions = (
+		expired: boolean,
+		phase?: "PUBLIC_REVIEW" | "PRIVATE_FEEDBACK",
+	): PreparationOptions => ({
+		feedback: composedFeedback,
+		phase,
+		admitted: admission !== null,
+		expired,
+		url: `${LLM_PROXY_URL}/prepare-feedback`,
+		token: LLM_PROXY_TOKEN,
+		task: taskEnvelope,
+		timeoutMs: Math.min(
+			ADMISSION_ATTEMPT_TIMEOUT_MS,
+			AGENT_BUDGET_MS - (Date.now() - PROCESS_START_MS),
+		),
+		persist: persistComposedFeedback,
+		recordFailure: (failedPhase, reason) =>
+			recordCompositionFailure(composedFeedback, failedPhase, reason),
+	});
 	const prepareComposedFeedback = async (
 		safety: ReturnType<typeof scheduleDeadline>,
 		phase?: "PUBLIC_REVIEW" | "PRIVATE_FEEDBACK",
-	) =>
-		prepareComposition({
-			feedback: composedFeedback,
-			phase,
-			admitted: admission !== null,
-			expired: safety.expired(),
-			url: `${LLM_PROXY_URL}/prepare-feedback`,
-			token: LLM_PROXY_TOKEN,
-			task: taskEnvelope,
-			timeoutMs: Math.min(
-				ADMISSION_ATTEMPT_TIMEOUT_MS,
-				AGENT_BUDGET_MS - (Date.now() - PROCESS_START_MS),
-			),
-			persist: persistComposedFeedback,
-			recordFailure: (failedPhase, reason) =>
-				recordCompositionFailure(composedFeedback, failedPhase, reason),
-		});
+	) => prepareComposition(preparationOptions(safety.expired(), phase));
 
 	const THIS_WORK = ((): string | undefined => {
 		const metadataPath = nodePath.join(INPUT_PATHS.contextRoot, "metadata.json");
@@ -2179,6 +2186,7 @@ export async function runReviewJob(): Promise<void> {
 	// Keep live delivery history beside the staged history that the review was prepared from.
 	async function readPublicFeedbackHistory(): Promise<{
 		readAt: string;
+		publicationContext: string | null;
 		history: { feedback: unknown[] };
 	}> {
 		const answer: unknown = await retrying(
@@ -2193,7 +2201,10 @@ export async function runReviewJob(): Promise<void> {
 		const history = isRecord(answer) && isRecord(answer.history) ? answer.history : null;
 		if (
 			!isRecord(answer) ||
-			answer.contractVersion !== 3 ||
+			answer.contractVersion !== 4 ||
+			(answer.publicationContext !== null &&
+				(typeof answer.publicationContext !== "string" ||
+					!PUBLICATION_CONTEXT.test(answer.publicationContext))) ||
 			typeof answer.readAt !== "string" ||
 			!Number.isFinite(Date.parse(answer.readAt)) ||
 			history === null ||
@@ -2232,7 +2243,13 @@ export async function runReviewJob(): Promise<void> {
 				...(entry.bodyUnavailable ? { wordsUnavailable: "COPY_AUTHORITY_UNAVAILABLE" } : {}),
 			};
 		});
-		const read = { readAt: answer.readAt, history: { ...history, feedback } };
+		// The context names this exact response; it travels with the statements built from it, never alone.
+		const read = {
+			readAt: answer.readAt,
+			publicationContext:
+				typeof answer.publicationContext === "string" ? answer.publicationContext : null,
+			history: { ...history, feedback },
+		};
 		writeFileSync(PUBLIC_FEEDBACK_HISTORY_PATH, JSON.stringify(read, null, 2));
 		return read;
 	}
@@ -2784,6 +2801,8 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 						sessionState().openingInContext = true;
 					},
 					readPublicFeedbackHistory,
+					preparePublic: async (expired) =>
+						preparePublicReview(preparationOptions(expired, "PUBLIC_REVIEW")),
 					recordHistory: (history) => {
 						runnerDebug.publicHistory = history;
 						persistRunnerDebug();
@@ -3678,11 +3697,13 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 						}
 					};
 					try {
-						await compositionStage().composeReview(
+						await composePublicReview(
+							compositionStage(),
 							compositionRequest,
 							reviewable,
 							unreachedSlugs,
 							safety,
+							composedFeedback,
 						);
 						await prepareComposedFeedback(safety);
 					} catch (error) {

@@ -89,6 +89,8 @@ const REASON_FAMILY: Record<WithholdingReason, WithholdingFamily> = {
 	COMPOSER_WITHHELD: "HOUSEKEEPING",
 	NOTHING_NEW: "HOUSEKEEPING",
 	REPEATS_DELIVERED_NOTE: "HOUSEKEEPING",
+	PUBLIC_HISTORY_CHANGED: "HOUSEKEEPING",
+	PUBLIC_DELIVERY_UNRESOLVED: "HOUSEKEEPING",
 	EMPTY_AFTER_SANITIZE: "HOUSEKEEPING",
 	CONVERSATION_EXPIRED: "HOUSEKEEPING",
 	DELIVERY_UNCONFIRMED: "HOUSEKEEPING",
@@ -135,10 +137,13 @@ export const WITHHOLDING_REASON_DEFS: Record<WithholdingReason, string> = {
 	NOTHING_NEW: "It said nothing the developer was not already told.",
 	REPEATS_DELIVERED_NOTE:
 		"It read word for word like the note already posted on the same work for the same person.",
+	PUBLIC_HISTORY_CHANGED:
+		"It could not be shown to account for the other feedback on the same work for the same person.",
+	PUBLIC_DELIVERY_UNRESOLVED:
+		"Other feedback for the same person on this work may already have appeared, and that is still unknown.",
 	EMPTY_AFTER_SANITIZE: "Nothing was left to send once the text had been cleaned up.",
 	CONVERSATION_EXPIRED: "It waited for a conversation that never happened, then aged out.",
-	DELIVERY_UNCONFIRMED:
-		"The conversation linked this feedback, but its appearance was not recorded.",
+	DELIVERY_UNCONFIRMED: "It may have appeared, but that was never confirmed.",
 };
 
 export function withholdingFamily(reason: WithholdingReason): WithholdingFamily {

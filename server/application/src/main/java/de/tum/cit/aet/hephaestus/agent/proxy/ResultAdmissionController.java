@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import de.tum.cit.aet.hephaestus.agent.handler.AdmissionConflictException;
+import de.tum.cit.aet.hephaestus.agent.handler.PublicationContextRefusedException;
 import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmissionRequestDTO;
@@ -84,6 +85,11 @@ public class ResultAdmissionController {
                     HttpStatus.CONFLICT, "The review attempt or admitted payload changed", conflict);
         } catch (JobDeliveryException | ResultAdmissionService.PublicHistoryRefusedException refused) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_CONTENT, refused.getMessage(), refused);
+        } catch (PublicationContextRefusedException stale) {
+            // Nothing was prepared; the code tells the runner to compose again from a fresh history read.
+            var refused = new ResponseStatusException(HttpStatus.CONFLICT, stale.getMessage(), stale);
+            refused.getBody().setProperty("code", stale.reason().name());
+            throw refused;
         }
     }
 

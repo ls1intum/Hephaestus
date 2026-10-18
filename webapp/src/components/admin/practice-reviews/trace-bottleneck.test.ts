@@ -33,6 +33,33 @@ function withFeedback(
 	};
 }
 
+/** The lineage with a second piece like `feedbackId`'s, resting on the same records, patched. */
+function withSecondPiece(
+	lineage: ReviewLineage,
+	feedbackId: string,
+	patch: Partial<ReviewBoundFeedback>,
+): ReviewLineage {
+	const node = lineage.nodes.find((entry) => entry.feedback?.id === feedbackId);
+	if (node?.feedback == null) {
+		throw new Error(`${feedbackId} is not in the lineage`);
+	}
+	const id = `${node.id}-second`;
+	const moved = (end: string) => (end === node.id ? id : end);
+	return {
+		...lineage,
+		nodes: [
+			...lineage.nodes,
+			{ ...node, id, feedback: { ...node.feedback, ...patch, id: `${feedbackId}-second` } },
+		],
+		edges: [
+			...lineage.edges,
+			...lineage.edges
+				.filter((edge) => edge.from === node.id || edge.to === node.id)
+				.map((edge) => ({ ...edge, from: moved(edge.from), to: moved(edge.to) })),
+		],
+	};
+}
+
 function onlyPiece(key: string): ReviewBoundFeedback {
 	const piece = lineageStateCase(key).lineage.nodes.find(
 		(node) => node.feedback !== null,
@@ -311,6 +338,31 @@ describe("traceBottleneck for feedback on its way", () => {
 			kind: "waiting",
 			title: "Delivery unconfirmed",
 		});
+	});
+
+	// A write on the work that the provider never confirmed is not a conversation's missing receipt.
+	it.each([
+		[
+			"ON_WORK",
+			"It may have appeared, but that was never confirmed, so it does not count as delivered.",
+		],
+		["CONVERSATION", "The conversation linked this feedback, but its appearance was not recorded."],
+	] as const)("words an unconfirmed piece for %s by its destination", (destination, text) => {
+		const { lineage } = lineageStateCase("state-unconfirmed");
+		const piece = withFeedback(lineage, STATE_FEEDBACK_ID, { destination });
+		expect(traceBottleneck(piece, PIECE, undefined, NOW)).toMatchObject({
+			title: "Delivery unconfirmed",
+			text,
+		});
+	});
+
+	it("names no conversation when another unconfirmed piece on the path is on the work", () => {
+		const { lineage, review } = lineageStateCase("state-unconfirmed");
+		const chat = withFeedback(lineage, STATE_FEEDBACK_ID, { destination: "CONVERSATION" });
+		const both = withSecondPiece(chat, STATE_FEEDBACK_ID, { destination: "ON_WORK" });
+		expect(traceBottleneck(both, REVIEW, review, NOW).text).toBe(
+			"It may have appeared, but that was never confirmed, so it does not count as delivered.",
+		);
 	});
 });
 

@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import type { ConfigAuditEntryView } from "@/api/types.gen";
+import { toFacetOptions } from "@/components/common/FacetMultiSelect";
+import { narrowToEnum } from "@/lib/search-params";
 
 import {
 	actionLabel,
 	actorDisplay,
 	changeSummary,
+	ENTITY_TYPE_LABELS,
 	entityTypeLabel,
 	fieldChanges,
 	formatLeaf,
@@ -39,6 +42,22 @@ describe("label mapping", () => {
 		expect(entityTypeLabel("WORKSPACE_LLM_BUDGET")).toBe("Shared-model AI budget");
 		expect(entityTypeLabel("WORKSPACE_OWN_PROVIDER_LLM_BUDGET")).toBe("Own-provider AI cap");
 		expect(entityTypeLabel("WORKSPACE_BYO_LLM_BUDGET")).toBe("Own-provider AI cap");
+	});
+
+	// The audit panels offer, and accept as a filter, exactly the types this map labels.
+	it("names a feedback delivery check and accepts it as a Setting filter", () => {
+		expect(entityTypeLabel("FEEDBACK_DELIVERY_RECHECK")).toBe("Feedback delivery check");
+		const options = toFacetOptions(ENTITY_TYPE_LABELS);
+		expect(options).toContainEqual({
+			value: "FEEDBACK_DELIVERY_RECHECK",
+			label: "Feedback delivery check",
+		});
+		expect(
+			narrowToEnum(
+				["FEEDBACK_DELIVERY_RECHECK"],
+				options.map((option) => option.value),
+			),
+		).toStrictEqual(["FEEDBACK_DELIVERY_RECHECK"]);
 	});
 
 	it("falls back to the raw value for anything unknown", () => {

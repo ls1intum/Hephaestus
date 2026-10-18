@@ -12,6 +12,7 @@ import {
 
 import type { ReviewBoundFeedback, ReviewDetail, ReviewLineage, ReviewRef } from "@/api/types.gen";
 import type { BadgeVariant } from "@/components/common/status-def";
+import { deliveryOutcome } from "@/components/practice-vocabulary/delivery-state-defs";
 import {
 	PARTIAL_REVIEW_SCOPE,
 	REVIEW_JOB_PROCESSING_DEFS,
@@ -509,12 +510,21 @@ function waitBottleneck(
 			icon: HourglassIcon,
 		};
 	}
-	if (pieces.some((entry) => entry.state === "UNCONFIRMED")) {
+	// Conversation words only when every unconfirmed piece on the path is for a conversation.
+	const unconfirmed =
+		pieces.find((entry) => entry.state === "UNCONFIRMED" && entry.destination !== "CONVERSATION") ??
+		pieces.find((entry) => entry.state === "UNCONFIRMED");
+	if (unconfirmed !== undefined) {
+		// The lineage carries no stop reason; an unconfirmed piece always stops for this one.
+		const { label, description } = deliveryOutcome({
+			...unconfirmed,
+			stopReason: "DELIVERY_UNCONFIRMED",
+		});
 		return {
 			kind: "waiting",
 			stage: "effect",
-			title: "Delivery unconfirmed",
-			text: "The conversation linked this feedback, but its appearance was not recorded.",
+			title: label,
+			text: description,
 			tone: "secondary",
 			icon: HourglassIcon,
 		};

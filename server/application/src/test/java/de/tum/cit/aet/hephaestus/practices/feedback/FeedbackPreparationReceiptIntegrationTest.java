@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.FeedbackDraftBuilder;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedback;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobInput;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.PrepareFeedbackRequestDTO;
 import de.tum.cit.aet.hephaestus.evidence.CitationSide;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.feedback.decision.FeedbackContentDigest;
@@ -445,10 +446,16 @@ class FeedbackPreparationReceiptIntegrationTest extends AbstractFeedbackDelivery
         job.setInput(new ReviewJobInput(itemId, List.of()));
         var proposal = FeedbackDraftBuilder.build(
                         job,
-                        Set.of(supportingResult.getId()),
+                        new PrepareFeedbackRequestDTO(
+                                job.getReviewId(),
+                                job.getId(),
+                                job.getAttempt(),
+                                List.copyOf(Set.of(supportingResult.getId())),
+                                List.of(composed),
+                                false,
+                                null),
                         List.of(new AdmittedResultSnapshot(supportingResult.getId(), candidate, List.of())),
                         List.of(),
-                        List.of(composed),
                         Map.of())
                 .getFirst();
         // Pattern eligibility has separate coverage. This seam exercises preparation and the visible card fields.

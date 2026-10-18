@@ -15,6 +15,7 @@ import {
 	awaitingApprovalFeedbackDetail,
 	feedbackDetail,
 	reviewAccounts,
+	uncertainWriteFeedbackDetail,
 } from "@/components/admin/practice-reviews/fixtures";
 import { stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
 import { hasText } from "@/lib/text";
@@ -31,6 +32,8 @@ vi.setConfig({ testTimeout: 20_000 });
 
 const FEEDBACK_ID = awaitingApprovalFeedbackDetail.id;
 const CONTENT_DIGEST = awaitingApprovalFeedbackDetail.contentDigest;
+
+const DECISIONS = "*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId/decisions";
 
 /** The level opened by its URL over the list it belongs to, as a shared link opens it. */
 const FEEDBACK_LEVEL = `/w/acme/admin/practices/reviews/feedback?detail=feedback:${FEEDBACK_ID}`;
@@ -213,6 +216,93 @@ describe("feedback approval level", () => {
 	});
 
 	/**
+	 * A refusal because other feedback for the same person on this work has an unknown write
+	 * leaves the proposal waiting, and says why in the sheet's words, not the server's.
+	 */
+	it("stays on a proposal held by another unknown write, and says why", async () => {
+		server.use(
+			...feedbackCountHandlers(),
+			http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId", () =>
+				HttpResponse.json(proposalWire("AWAITING_APPROVAL")),
+			),
+			http.post(DECISIONS, () =>
+				HttpResponse.json(
+					{
+						status: 409,
+						detail: "The publication context does not permit approval.",
+						code: "PUBLIC_DELIVERY_UNRESOLVED",
+						state: "AWAITING_APPROVAL",
+					},
+					{ status: 409 },
+				),
+			),
+			...reviewHandlers(),
+		);
+		const { router } = renderRouteAtWithRouter(FEEDBACK_LEVEL);
+
+		await userEvent.click(
+			await screen.findByRole("button", { name: "Approve for delivery" }, ROUTE_RENDER_WAIT),
+		);
+		await screen.findByText(
+			"Other feedback for the same person on this work may already have appeared, and that is still unknown.",
+		);
+		expect(screen.queryByText("The publication context does not permit approval.")).toBeNull();
+		await waitFor(() =>
+			expect(
+				screen.getByRole("button", { name: "Approve for delivery" }).hasAttribute("disabled"),
+			).toBe(false),
+		);
+		expect(stackInSearch(router.state.location.search.detail)).toStrictEqual([
+			`feedback:${FEEDBACK_ID}`,
+		]);
+	});
+
+	/** A changed history withholds the proposal, so the refusal takes it out of approval. */
+	it("leaves approval when the history changed under the proposal", async () => {
+		const proposal = proposalWire("AWAITING_APPROVAL");
+		const withheld = {
+			...proposal,
+			state: "WITHHELD" as const,
+			stopReason: "PUBLIC_HISTORY_CHANGED" as const,
+		};
+		let wire: typeof proposal | typeof withheld = proposal;
+		server.use(
+			...feedbackCountHandlers(),
+			http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId", () =>
+				HttpResponse.json(wire),
+			),
+			http.post(DECISIONS, () => {
+				wire = withheld;
+				return HttpResponse.json(
+					{
+						status: 409,
+						detail: "The publication context does not permit approval.",
+						code: "PUBLIC_HISTORY_CHANGED",
+						state: "WITHHELD",
+					},
+					{ status: 409 },
+				);
+			}),
+			...reviewHandlers(),
+		);
+		renderRouteAtWithRouter(FEEDBACK_LEVEL);
+
+		await userEvent.click(
+			await screen.findByRole("button", { name: "Approve for delivery" }, ROUTE_RENDER_WAIT),
+		);
+		// The sheet read again names the same reason in its history; the toast is the refusal.
+		const title = await screen.findByText("We could not save your decision on this feedback");
+		const refusal = title.closest("li");
+		assert(refusal, "The refusal is a toast");
+		expect(refusal.textContent).toContain(
+			"It could not be shown to account for the other feedback on the same work for the same person.",
+		);
+		await waitFor(() =>
+			expect(screen.queryByRole("button", { name: "Approve for delivery" })).toBeNull(),
+		);
+	});
+
+	/**
 	 * The approval queue is worked oldest first, one level deep: a decision swaps the level for the
 	 * next proposal — the one it showed as next when the reader decided, or else the oldest still
 	 * waiting — over the same history entry, and closes it once nothing else waits. Only a level
@@ -222,9 +312,6 @@ describe("feedback approval level", () => {
 		const queue = [...awaitingApprovalFeedback].reverse();
 		const [oldest, second, newest] = queue;
 		assert(oldest && second && newest, "The fixtures hold three pieces of feedback to approve");
-
-		const DECISIONS =
-			"*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId/decisions";
 
 		/**
 		 * Serves the queue as the server would: a decided proposal leaves it. A `refusal` answers every
@@ -634,5 +721,112 @@ describe("what feedback is based on", () => {
 		expect(stackInSearch(router.state.location.search.detail)).toStrictEqual([
 			`result:${basis.resultId}`,
 		]);
+	});
+});
+
+type Phase = "unknown" | "checking" | "found";
+
+/** The unconfirmed comment as the server reports it before, during and after a check. */
+function unknownWire(phase: Phase) {
+	const found = phase === "found";
+	const postedAt = new Date("2026-07-29T08:23:00Z");
+	return {
+		...uncertainWriteFeedbackDetail,
+		state: found ? ("DELIVERED" as const) : ("UNCONFIRMED" as const),
+		stopReason: found ? null : ("DELIVERY_UNCONFIRMED" as const),
+		deliveredAt: found ? postedAt : null,
+		copies: uncertainWriteFeedbackDetail.copies.map((copy) => ({
+			...copy,
+			...(found
+				? { state: "POSTED" as const, postedAt, externalRef: "2481933", readback: null }
+				: { state: "WRITE_STARTED" as const, readback: "UNKNOWN" as const }),
+		})),
+		sends: uncertainWriteFeedbackDetail.sends.map((send) => ({
+			...send,
+			state: phase === "checking" ? ("PENDING" as const) : ("DONE" as const),
+			attemptCount: 8,
+		})),
+	};
+}
+
+/**
+ * A comment whose write the provider never confirmed is settled by reading the work again: Check
+ * delivery asks for that once, and the sheet follows the check until it lands.
+ */
+describe("checking delivery of an unconfirmed comment", () => {
+	const UNKNOWN_ID = uncertainWriteFeedbackDetail.id;
+	const UNKNOWN_LEVEL = `/w/acme/admin/practices/reviews/feedback?detail=feedback:${UNKNOWN_ID}`;
+	const RECHECK = "*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId/recheck";
+	const UNKNOWN_NOW = /the provider has not confirmed whether it appeared/u;
+
+	it("asks once, follows the check without a reload, and shows what it found", async () => {
+		let wire = unknownWire("unknown");
+		let rechecks = 0;
+		server.use(
+			...feedbackCountHandlers(),
+			http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId", () =>
+				HttpResponse.json(wire),
+			),
+			http.post(RECHECK, () => {
+				rechecks += 1;
+				wire = unknownWire("checking");
+				return HttpResponse.json(wire, { status: 202 });
+			}),
+			...reviewHandlers(),
+		);
+		renderRouteAtWithRouter(UNKNOWN_LEVEL);
+
+		await screen.findByText(UNKNOWN_NOW, undefined, ROUTE_RENDER_WAIT);
+		await userEvent.click(screen.getByRole("button", { name: "Check delivery" }));
+		await screen.findByText("Checking whether the comment appeared");
+		await screen.findByText("This posts nothing.");
+		await screen.findByText(/Heph is confirming whether a comment it began writing appeared/u);
+		expect(screen.queryByRole("button", { name: "Check delivery" })).toBeNull();
+
+		// Landed only once the sheet shows the check queued: nothing else re-reads it from here, so
+		// only the sheet's own poll can bring the receipt in.
+		wire = unknownWire("found");
+		await screen.findByText("Summary posted", undefined, ROUTE_RENDER_WAIT);
+		expect(screen.queryByText(UNKNOWN_NOW)).toBeNull();
+		expect(rechecks).toBe(1);
+	});
+
+	/** A check refused because the write settled meanwhile says so, and claims no failure. */
+	it("reports a refused check and keeps the unknown state honest", async () => {
+		let detailReads = 0;
+		server.use(
+			...feedbackCountHandlers(),
+			http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId", () => {
+				detailReads += 1;
+				return HttpResponse.json(unknownWire("unknown"));
+			}),
+			http.post(RECHECK, () =>
+				HttpResponse.json(
+					{
+						status: 409,
+						detail: "No copy of this feedback has unknown visibility to recheck.",
+					},
+					{ status: 409 },
+				),
+			),
+			...reviewHandlers(),
+		);
+		renderRouteAtWithRouter(UNKNOWN_LEVEL);
+
+		await screen.findByText(UNKNOWN_NOW, undefined, ROUTE_RENDER_WAIT);
+		const readsBefore = detailReads;
+		await userEvent.click(screen.getByRole("button", { name: "Check delivery" }));
+		await screen.findByText("We could not check delivery");
+		await screen.findByText("No copy of this feedback has unknown visibility to recheck.");
+		await waitFor(() => expect(detailReads).toBeGreaterThan(readsBefore));
+		// Within the level: the list under it has failed feedback of its own.
+		const level = within(screen.getByRole("dialog"));
+		level.getByText(UNKNOWN_NOW);
+		expect(level.queryByText("Failed to deliver")).toBeNull();
+		await waitFor(() =>
+			expect(screen.getByRole("button", { name: "Check delivery" }).hasAttribute("disabled")).toBe(
+				false,
+			),
+		);
 	});
 });

@@ -88,7 +88,7 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
         var assignment = RuntimeReviewTestData.assignment(5L, null);
         var read = source.publicSameItemFeedback(
                 job, List.of(assignment, assignment, RuntimeReviewTestData.assignment(null, null)));
-        assertThat(read.response().contractVersion()).isEqualTo(3);
+        assertThat(read.response().contractVersion()).isEqualTo(4);
         assertThat(read.response().history().feedback())
                 .containsExactly(mapper.treeToValue(visible.publicHistory(), PublicFeedbackHistoryDTO.Entry.class));
         assertThat(read.copies())

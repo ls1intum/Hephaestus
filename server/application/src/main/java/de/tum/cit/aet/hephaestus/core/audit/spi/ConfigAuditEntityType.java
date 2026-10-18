@@ -52,6 +52,12 @@ public enum ConfigAuditEntityType {
      */
     REVIEW_SCHEDULE,
 
+    /**
+     * A workspace admin's request to read back on-work feedback whose delivery outcome stayed unknown: who asked, and
+     * when. The readback never creates a provider copy.
+     */
+    FEEDBACK_DELIVERY_RECHECK,
+
     WORKSPACE_LLM_CONNECTION,
     /** A model on a workspace's own BYO connection, including its inline price and enablement. */
     WORKSPACE_LLM_MODEL,

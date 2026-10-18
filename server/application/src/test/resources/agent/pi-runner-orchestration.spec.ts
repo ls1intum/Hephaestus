@@ -130,6 +130,8 @@ function admissionDto(value: unknown) {
 	};
 }
 
+const PUBLICATION_CONTEXT = `v1:7:${"c".repeat(64)}`;
+
 function historyDto(value: unknown) {
 	const response = recordOf(value);
 	const history = recordOf(response.history);
@@ -148,8 +150,12 @@ function historyDto(value: unknown) {
 		...(first !== undefined && isRecord(first.item) ? first.item : {}),
 	};
 	return {
-		contractVersion: 3,
+		contractVersion: 4,
 		readAt: response.readAt,
+		publicationContext:
+			typeof response.publicationContext === "string"
+				? response.publicationContext
+				: PUBLICATION_CONTEXT,
 		history: {
 			item,
 			feedback: entries.map((entry) => ({
@@ -880,6 +886,15 @@ if (scenario !== undefined && scenario !== "") {
 				assert.ok(isRecord(submitted));
 				assert.equal(submitted.reviewId, "11111111-1111-4111-8111-111111111111");
 				assert.ok(Array.isArray(submitted.composition));
+				if (submitted.publicComposition === true) {
+					record(`public-context:${String(submitted.publicationContext)}`);
+				}
+			}
+			if (mode === "stale" && publicCompletionAttempts === 1) {
+				return Response.json({ status: 409, code: "PUBLIC_HISTORY_CHANGED" }, { status: 409 });
+			}
+			if (mode === "unresolved" && publicCompletionAttempts === 1) {
+				return Response.json({ status: 409, code: "PUBLIC_DELIVERY_UNRESOLVED" }, { status: 409 });
 			}
 			if (mode === "refused") {
 				return Response.json(
@@ -1026,6 +1041,10 @@ if (scenario !== undefined && scenario !== "") {
 				historyDto({
 					schemaVersion: 1,
 					readAt: "2026-10-07T11:00:00Z",
+					// Each read names its own response, so a stale package must come back with the newer one.
+					...(process.env.PI_PUBLIC_COMPLETION_MODE === "stale"
+						? { publicationContext: `v1:7:${(publicHistoryReads === 1 ? "c" : "d").repeat(64)}` }
+						: {}),
 					history: {
 						...history,
 						feedback: history.feedback.filter(
@@ -3537,8 +3556,12 @@ if (scenario !== undefined && scenario !== "") {
 		"compose-completion-accepted",
 		"compose-completion-refused",
 		"compose-completion-lost-ack",
+		"compose-completion-stale",
+		"compose-completion-unresolved",
 		"compose-continuation",
 		"compose-continuation-reviewed",
+		"compose-continuation-stale",
+		"compose-continuation-unresolved",
 		"compose-fresh-history",
 		"compose-history-unavailable-words",
 		"compose-history-missing-currentness",
@@ -3571,9 +3594,13 @@ if (scenario !== undefined && scenario !== "") {
 		const stage =
 			new Map([
 				["compose-continuation-reviewed", "compose-continuation"],
+				["compose-continuation-stale", "compose-continuation"],
+				["compose-continuation-unresolved", "compose-continuation"],
 				["compose-completion-accepted", "compose"],
 				["compose-completion-refused", "compose"],
 				["compose-completion-lost-ack", "compose"],
+				["compose-completion-stale", "compose"],
+				["compose-completion-unresolved", "compose"],
 				["compose-support-selected", "compose-support"],
 				["compose-support-mentor-unavailable", "compose-support"],
 				["compose-support-empty", "compose-support"],
@@ -4092,7 +4119,10 @@ if (scenario !== undefined && scenario !== "") {
 								PI_ORCHESTRATION_SCENARIO: stage,
 								PI_PUBLIC_COMPLETION_MODE: fixture.startsWith("compose-completion-")
 									? fixture.slice("compose-completion-".length)
-									: undefined,
+									: new Map([
+											["compose-continuation-stale", "stale"],
+											["compose-continuation-unresolved", "unresolved"],
+										]).get(fixture),
 								PI_PRACTICE_PAGE_SUPPORT_MODE: fixture.startsWith("compose-support-")
 									? fixture.slice("compose-support-".length)
 									: new Map([["compose-already-said-inline", "first-inline"]]).get(fixture),
@@ -4259,7 +4289,12 @@ if (scenario !== undefined && scenario !== "") {
 						if (fixture.startsWith("compose-completion-")) {
 							assert.equal(child.status, 0, child.stderr);
 							const attempts = events.filter((event) => event.startsWith("public-completion:"));
-							assert.equal(attempts.length, fixture === "compose-completion-lost-ack" ? 3 : 2);
+							assert.equal(
+								attempts.length,
+								["compose-completion-lost-ack", "compose-completion-stale"].includes(fixture)
+									? 3
+									: 2,
+							);
 							const privateIndex = events.findIndex((event) => event.startsWith("private-turn"));
 							const lastAttempt = attempts.at(-1);
 							assert.ok(lastAttempt !== undefined);
@@ -4272,13 +4307,32 @@ if (scenario !== undefined && scenario !== "") {
 									{ phase: "PUBLIC_REVIEW", reason: "SERVER_REFUSED" },
 									{ phase: "PRIVATE_FEEDBACK", reason: "SERVER_REFUSED" },
 								]);
+							} else if (fixture === "compose-completion-unresolved") {
+								// Only a readback can resolve an unknown delivery: no fresh session, the exact reason,
+								// and private composition still runs.
+								assert.equal(payload.review, null);
+								assert.deepEqual(payload.compositionFailures, [
+									{ phase: "PUBLIC_REVIEW", reason: "PUBLIC_DELIVERY_UNRESOLVED" },
+								]);
+								assert.equal(
+									events.filter(
+										(event) => event.startsWith("create:") && event.endsWith("tools=report_review"),
+									).length,
+									1,
+									events.join("\n"),
+								);
+								assert.equal(events.filter((event) => event === "admit").length, 1);
 							} else {
 								assert.ok(isRecord(payload.review));
 								assert.deepEqual(payload.compositionFailures, []);
 							}
 							assert.ok(
 								events.includes(
-									`private-turn history=true review=${String(fixture !== "compose-completion-refused")}`,
+									`private-turn history=true review=${String(
+										!["compose-completion-refused", "compose-completion-unresolved"].includes(
+											fixture,
+										),
+									)}`,
 								),
 							);
 							const publicPreparation = events.indexOf("prepare-public:true");
@@ -4287,6 +4341,25 @@ if (scenario !== undefined && scenario !== "") {
 								const [first, second] = attempts;
 								assert.ok(first !== undefined && second !== undefined);
 								assert.equal(first.split(":")[2], second.split(":")[2]);
+							}
+							if (fixture === "compose-completion-stale") {
+								// The refused words were composed from the first read; the accepted ones from a fresh
+								// session over the second read, in the same attempt and with no new assessment.
+								assert.deepEqual(
+									events.filter((event) => event.startsWith("public-context:")),
+									[
+										`public-context:v1:7:${"c".repeat(64)}`,
+										`public-context:v1:7:${"d".repeat(64)}`,
+									],
+								);
+								assert.equal(
+									events.filter(
+										(event) => event.startsWith("create:") && event.endsWith("tools=report_review"),
+									).length,
+									2,
+									events.join("\n"),
+								);
+								assert.equal(events.filter((event) => event === "admit").length, 1);
 							}
 							return;
 						}
@@ -6694,11 +6767,29 @@ for (const item of nullableCases) {
 								assert.ok(!existsSync(nodePath.join(cwd, "admission.json")));
 								break;
 							}
-							// One session, the review composer's: no practice is assessed and nothing can be recorded.
+							// Only the review composer's sessions: no practice is assessed and nothing can be recorded.
+							// Changed history earns one fresh session over the new read; an unknown delivery earns none.
 							assert.deepEqual(
 								events.filter((event) => event.startsWith("create:session")),
-								["create:session tools=report_review"],
+								fixture === "compose-continuation-stale"
+									? ["create:session tools=report_review", "create:session tools=report_review"]
+									: ["create:session tools=report_review"],
 							);
+							if (fixture === "compose-continuation-stale") {
+								// The refused words came from the first read and the fresh session's from the second; the
+								// continuation's closing preparation may only replay those, never the refused context.
+								const contexts = events.filter((event) => event.startsWith("public-context:"));
+								assert.deepEqual(contexts.slice(0, 2), [
+									`public-context:v1:7:${"c".repeat(64)}`,
+									`public-context:v1:7:${"d".repeat(64)}`,
+								]);
+								assert.ok(
+									contexts
+										.slice(1)
+										.every((context) => context === `public-context:v1:7:${"d".repeat(64)}`),
+									events.join("\n"),
+								);
+							}
 							assert.equal(
 								readFileSync(nodePath.join(cwd, "system-prompt.md"), "utf8"),
 								"Write clear, useful feedback.\n\nWrite the review on the work.",
@@ -6718,11 +6809,14 @@ for (const item of nullableCases) {
 								feedback.admissionDigest,
 								"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 							);
-							assert.ok(feedback.review !== null);
+							assert.equal(feedback.review === null, fixture === "compose-continuation-unresolved");
 							assert.deepEqual(feedback.feedback, []);
 							// A continuing public writer cannot reconstruct the earlier private context.
 							assert.deepEqual(feedback.compositionFailures, [
 								{ phase: "PRIVATE_FEEDBACK", reason: "PRIVATE_NOT_RECOVERED" },
+								...(fixture === "compose-continuation-unresolved"
+									? [{ phase: "PUBLIC_REVIEW", reason: "PUBLIC_DELIVERY_UNRESOLVED" }]
+									: []),
 							]);
 							break;
 						}

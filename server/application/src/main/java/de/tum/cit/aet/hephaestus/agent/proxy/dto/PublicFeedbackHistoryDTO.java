@@ -14,8 +14,13 @@ import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
+/**
+ * One authorized history read. {@code publicationContext} names this exact response: preparation of a public piece
+ * composed from it must send it back unchanged.
+ */
 @JsonInclude(JsonInclude.Include.ALWAYS)
-public record PublicFeedbackHistoryDTO(int contractVersion, Instant readAt, History history) {
+public record PublicFeedbackHistoryDTO(
+        int contractVersion, Instant readAt, @Nullable String publicationContext, History history) {
     public record History(ItemRefDTO item, List<Entry> feedback) {
         public History {
             feedback = List.copyOf(feedback);

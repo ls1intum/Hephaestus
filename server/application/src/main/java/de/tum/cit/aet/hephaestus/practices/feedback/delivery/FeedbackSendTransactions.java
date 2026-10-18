@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.feedback.delivery;
 
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataWriteFence;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyDisposition;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyForm;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyReceipt;
@@ -9,6 +10,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopy;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopyReadback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopyRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPublicationContext;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSendQueue;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSendRepository;
@@ -46,6 +48,8 @@ public class FeedbackSendTransactions {
     private final Clock clock;
     private final PersonDataWriteFence privacy;
     private final FeedbackSendQueue sendQueue;
+    private final ItemIndexService itemLocks;
+    private final FeedbackPublicationContext publication;
 
     public record Attempt(Feedback feedback, FeedbackSendAction action, List<FeedbackCopy> copies, int attempts) {
         public Attempt {
@@ -65,9 +69,17 @@ public class FeedbackSendTransactions {
         return new Attempt(row, prior.get().getAction(), children, prior.get().getAttempts() + 1);
     }
 
+    /**
+     * Commits the copies' write fences before any provider write. A new create first holds the work's item lock in its
+     * own statement, the lock every create on the work takes; one later statement then reads the publication context
+     * and any unresolved write of another review from the same snapshot. A receipt that commits after that snapshot
+     * can only resolve a write this decision already saw as unresolved.
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public boolean fence(
             long workspaceId, UUID feedbackId, String owner, List<UUID> attempting, List<CopyReceipt> completed) {
+        if (!attempting.isEmpty())
+            publication.itemOf(workspaceId, feedbackId).ifPresent(itemId -> itemLocks.lock(workspaceId, itemId));
         var row = store.lock(workspaceId, feedbackId);
         if (!owns(workspaceId, feedbackId, owner)) return false;
         record(workspaceId, feedbackId, completed);
@@ -79,6 +91,13 @@ public class FeedbackSendTransactions {
         if (!check.allowed()) {
             store.withhold(row, Objects.requireNonNull(check.reason()));
             return false;
+        }
+        if (!attempting.isEmpty()) {
+            var refusal = publication.refusal(row);
+            if (refusal.isPresent()) {
+                store.withhold(row, refusal.get());
+                return false;
+            }
         }
         for (UUID id : attempting) {
             if (copies.beginWrite(workspaceId, feedbackId, id, clock.instant()) != 1)
