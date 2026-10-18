@@ -1489,6 +1489,18 @@ export function recordCompositionFailure(
 	}
 }
 
+const OWED_PRIVATE_REASONS: ReadonlySet<CompositionFailureReason> = new Set(["SAFETY", "STALL"]);
+
+// The run, not the work, stopped private composition after the review on the work was settled.
+export function privateCompositionOwed(composedFeedback: ComposedFeedback): boolean {
+	const reasonOf = (phase: CompositionPhase) =>
+		composedFeedback.compositionFailures.find((failure) => failure.phase === phase)?.reason;
+	const reason = reasonOf("PRIVATE_FEEDBACK");
+	return (
+		reason !== undefined && OWED_PRIVATE_REASONS.has(reason) && reasonOf("PUBLIC_REVIEW") === undefined
+	);
+}
+
 export function finishCompositionText(
 	notMet: readonly string[],
 	request: CompositionRequest,

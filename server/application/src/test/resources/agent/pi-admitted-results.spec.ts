@@ -99,6 +99,7 @@ for (const [field, value, path] of [
 	["admissionDigest", "not a digest", ["admissionDigest"]],
 	["withheld", [{ practiceSlug: "names-things" }], ["withheld", 0, "reason"]],
 	["publicReviewed", "false", ["publicReviewed"]],
+	["privatePrepared", "false", ["privatePrepared"]],
 ] as const) {
 	void test(`admission rejects malformed ${field} at its issue path`, () => {
 		assert.throws(

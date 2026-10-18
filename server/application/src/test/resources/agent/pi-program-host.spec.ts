@@ -288,6 +288,7 @@ void test("a composition continuation derives no change, runs no program and wri
 					contractVersion: 3,
 					admissionDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 					publicReviewed: false,
+					privatePrepared: false,
 					admitted: [],
 					withheld: [],
 					practicePageSupport: null,

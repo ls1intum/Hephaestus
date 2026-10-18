@@ -182,6 +182,14 @@ public final class SandboxLayout {
      */
     public static final int EXIT_PROVIDER_UNREACHABLE = 76;
 
+    /**
+     * Exit code emitted by the Pi runner when the review is admitted and its public review is accepted, but the run
+     * itself stopped private feedback composition: it reached its safety ceiling or stalled. Another attempt can
+     * compose it from the original inputs, if the server prepared no private piece yet. Otherwise the attempt ends
+     * like any admitted run.
+     */
+    public static final int EXIT_COMPOSITION_OWED = 77;
+
     /** OCI label declaring the agent image runtime contract. */
     public static final String RUNTIME_CONTRACT_LABEL = "hephaestus.agent.runtime-contract";
 

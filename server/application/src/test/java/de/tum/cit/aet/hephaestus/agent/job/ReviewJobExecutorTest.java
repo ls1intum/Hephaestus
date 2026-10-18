@@ -4,10 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.AdditionalMatchers.aryEq;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -23,9 +25,14 @@ import de.tum.cit.aet.hephaestus.agent.handler.RuntimeReviewTestData;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticePiAdapter;
+import de.tum.cit.aet.hephaestus.agent.runtime.AgentResult;
+import de.tum.cit.aet.hephaestus.agent.runtime.PiResultParser;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerCapacityState;
+import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
+import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
+import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetBlockReason;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetDecision;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
@@ -48,6 +55,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.tracing.Tracer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -77,8 +85,26 @@ class ReviewJobExecutorTest extends BaseUnitTest {
     private final ReviewJobAssignments assignments = mock(ReviewJobAssignments.class);
     private final SandboxManager sandbox = mock(SandboxManager.class);
     private final LlmBudgetService budgets = mock(LlmBudgetService.class);
+    private final PracticePiAdapter practiceAgent = mock(PracticePiAdapter.class);
     private Optional<WorkerCapacityState> capacity = Optional.empty();
+    private Optional<WorkerProperties> worker = Optional.empty();
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
+    private final PracticeScriptRunRecorder practiceScriptRuns = mock(PracticeScriptRunRecorder.class);
+    private ReviewJobRecovery recovery = new ReviewJobRecovery(
+            jobs, properties(), new JsonMapper(), mock(LlmUsageRecorder.class), Optional.empty(), Optional.empty());
+
+    private static final String OWED_RESULT = "{\"contractVersion\":3,\"results\":[{\"practiceSlug\":\"silent-failure\","
+            + "\"candidate\":{\"outcome\":\"NOT_MET\",\"summary\":\"s\",\"explanation\":\"e\","
+            + "\"citations\":[],\"problems\":[{\"severity\":\"MAJOR\",\"summary\":\"s\","
+            + "\"explanation\":\"e\",\"citations\":[]}]}}]}";
+    private static final String SCRIPT_REPORT = "{\"schemaVersion\":2,\"truncated\":false,\"practices\":[]}";
+    private static final AgentResult.LlmUsage RETURNED_USAGE =
+            new AgentResult.LlmUsage("m", 1000, 700, 0, 0, 0, 0.0, 6);
+
+    private static AgentProperties properties() {
+        return new AgentProperties(
+                true, Duration.ofSeconds(1), 5, 5, Duration.ofSeconds(25), Duration.ofDays(14), Duration.ofDays(90));
+    }
 
     private ReviewJobExecutor executor(AsyncTaskExecutor pool) {
         var transactions = mock(TransactionTemplate.class);
@@ -88,17 +114,10 @@ class ReviewJobExecutorTest extends BaseUnitTest {
         });
         var telemetry = new ReviewJobTelemetry(meters, Tracer.NOOP);
         return new ReviewJobExecutor(
-                new AgentProperties(
-                        true,
-                        Duration.ofSeconds(1),
-                        5,
-                        5,
-                        Duration.ofSeconds(25),
-                        Duration.ofDays(14),
-                        Duration.ofDays(90)),
+                properties(),
                 jobs,
                 handler,
-                mock(PracticePiAdapter.class),
+                practiceAgent,
                 mock(WorkerJwtIssuer.class),
                 sandbox,
                 pool,
@@ -107,10 +126,10 @@ class ReviewJobExecutorTest extends BaseUnitTest {
                 meters,
                 telemetry,
                 mock(LlmUsageRecorder.class),
-                mock(PracticeScriptRunRecorder.class),
+                practiceScriptRuns,
                 null,
                 capacity,
-                Optional.empty(),
+                worker,
                 new ReviewJobClaimService(
                         jobs,
                         policy,
@@ -123,19 +142,7 @@ class ReviewJobExecutorTest extends BaseUnitTest {
                         null,
                         telemetry,
                         Optional.empty()),
-                new ReviewJobRecovery(
-                        jobs,
-                        new AgentProperties(
-                                true,
-                                Duration.ofSeconds(1),
-                                5,
-                                5,
-                                Duration.ofSeconds(25),
-                                Duration.ofDays(14),
-                                Duration.ofDays(90)),
-                        new JsonMapper(),
-                        mock(LlmUsageRecorder.class),
-                        Optional.empty()));
+                recovery);
     }
 
     @Test
@@ -174,6 +181,122 @@ class ReviewJobExecutorTest extends BaseUnitTest {
                 .isEqualTo(ReviewJobExecutor.StartOutcome.SKIPPED);
         assertThat(job.getStatus()).isEqualTo(ReviewJobStatus.FAILED);
         verifyNoInteractions(handler, sandbox);
+    }
+
+    @Test
+    void shouldCompleteAnAdmittedRunThatOwesPrivateFeedbackWhenNoAttemptContinuesIt() {
+        var owed = owedResult();
+        var parsed = new PiResultParser(new JsonMapper(), meters).parse(owed);
+        var admitted = RuntimeReviewTestData.job();
+        admitted.setAdmissionAttempt(0);
+        admitted.setAdmissionDigest("admitted");
+        var executor = executor(mock(AsyncTaskExecutor.class));
+
+        // The parser calls only exit 0 a success, so the admitted result keeps the run complete, not a failed exit.
+        assertThat(parsed.success()).isFalse();
+        assertThat(executor.determineTerminalStatus(owed, parsed, admitted)).isEqualTo(ReviewJobStatus.COMPLETED);
+        assertThat(executor.determineTerminalStatus(owed, parsed, RuntimeReviewTestData.job()))
+                .isEqualTo(ReviewJobStatus.FAILED);
+    }
+
+    @Test
+    void shouldContinueAnOwedRunWithItsReturnedUsageAndNeitherEndNorForgetIt() {
+        var job = owedJob();
+        var kept = mock(ReviewCompositionContinuation.class);
+        recovery = mock(ReviewJobRecovery.class);
+        when(recovery.continueComposition(eq(job), eq("worker-1"), eq(RETURNED_USAGE), aryEq(scriptReport())))
+                .thenReturn(true);
+        var executor = owedExecutor(kept);
+
+        assertThat(executor.executePrepared(job.getId(), job, mock(SandboxSpec.class)))
+                .isNull();
+
+        // The returned usage and practice script report go to the requeue; no terminal write ends the job, and its
+        // inputs stay.
+        verify(recovery).continueComposition(eq(job), eq("worker-1"), eq(RETURNED_USAGE), aryEq(scriptReport()));
+        verify(jobs, never()).lockById(any());
+        verify(jobs, never()).transitionStatusOwnedBy(any(), any(), any(), any(), any(), any());
+        verify(practiceScriptRuns, never()).record(any(), any(), any(), any());
+        verify(kept, never()).forget(any());
+    }
+
+    @Test
+    void shouldEndARefusedOwedRunLikeAnyAdmittedRunAndForgetItsInputs() {
+        var job = owedJob();
+        var kept = mock(ReviewCompositionContinuation.class);
+        recovery = mock(ReviewJobRecovery.class);
+        when(recovery.continueComposition(eq(job), eq("worker-1"), eq(RETURNED_USAGE), aryEq(scriptReport())))
+                .thenReturn(false);
+        when(jobs.lockById(job.getId())).thenReturn(Optional.of(job));
+        when(jobs.findById(job.getId())).thenReturn(Optional.of(job));
+        when(jobs.transitionStatusOwnedBy(
+                        eq(job.getId()), eq(ReviewJobStatus.COMPLETED), any(), eq(null), any(), eq("worker-1")))
+                .thenReturn(1);
+        var executor = owedExecutor(kept);
+
+        assertThat(executor.executePrepared(job.getId(), job, mock(SandboxSpec.class)))
+                .isEqualTo(ReviewJobStatus.COMPLETED);
+
+        assertThat(job.getExitCode()).isEqualTo(SandboxLayout.EXIT_COMPOSITION_OWED);
+        // The ordinary terminal write records the attempt's practice script runs, once.
+        verify(practiceScriptRuns).record(eq(job), aryEq(scriptReport()), any(), any());
+        verify(kept).forget(job);
+    }
+
+    private ReviewJobExecutor owedExecutor(ReviewCompositionContinuation kept) {
+        var properties = mock(WorkerProperties.class);
+        when(properties.resolvedWorkerId()).thenReturn("worker-1");
+        worker = Optional.of(properties);
+        var owed = owedResult();
+        when(sandbox.execute(any())).thenReturn(owed);
+        when(practiceAgent.parseResult(owed))
+                .thenReturn(new AgentResult(false, Map.of("rawOutput", OWED_RESULT), RETURNED_USAGE));
+        var executor = executor(mock(AsyncTaskExecutor.class));
+        executor.setCompositionContinuation(kept);
+        return executor;
+    }
+
+    private ReviewJob owedJob() {
+        var job = RuntimeReviewTestData.job();
+        job.setAdmissionAttempt(0);
+        job.setAdmissionDigest("admitted");
+        job.setConfigSnapshot(new ConfigSnapshot(
+                        ConfigSnapshot.SCHEMA_VERSION,
+                        new FrozenModel(
+                                LlmApiProtocol.OPENAI_COMPLETIONS,
+                                "https://model.example",
+                                "model",
+                                null,
+                                null,
+                                null,
+                                null,
+                                DataHandlingTier.UNDECLARED,
+                                null,
+                                null),
+                        null,
+                        null,
+                        600,
+                        false,
+                        null)
+                .toJson(new JsonMapper()));
+        return job;
+    }
+
+    private static byte[] scriptReport() {
+        return SCRIPT_REPORT.getBytes(StandardCharsets.UTF_8);
+    }
+
+    private static SandboxResult owedResult() {
+        return new SandboxResult(
+                SandboxLayout.EXIT_COMPOSITION_OWED,
+                Map.of(
+                        "result.json",
+                        OWED_RESULT.getBytes(StandardCharsets.UTF_8),
+                        SandboxLayout.PRACTICE_SCRIPT_REPORT_FILE,
+                        scriptReport()),
+                "owed",
+                false,
+                Duration.ofSeconds(1));
     }
 
     @Test

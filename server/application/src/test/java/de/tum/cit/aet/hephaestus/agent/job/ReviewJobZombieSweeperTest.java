@@ -96,7 +96,8 @@ class ReviewJobZombieSweeperTest extends BaseUnitTest {
                 usageRecorder,
                 meterRegistry,
                 new ReviewJobTelemetry(meterRegistry, Tracer.NOOP),
-                new ReviewJobRecovery(jobRepository, AGENT_PROPS, objectMapper, usageRecorder, Optional.empty()));
+                new ReviewJobRecovery(
+                        jobRepository, AGENT_PROPS, objectMapper, usageRecorder, Optional.empty(), Optional.empty()));
     }
 
     private ConfigSnapshot admittedSnapshot(int timeoutSeconds) {

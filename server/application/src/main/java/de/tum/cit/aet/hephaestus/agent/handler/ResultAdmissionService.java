@@ -172,7 +172,8 @@ public class ResultAdmissionService {
                 withheld,
                 privateRead == null ? null : FeedbackCompositionService.page(privateRead),
                 privateRead == null ? null : FeedbackCompositionService.conversation(privateRead),
-                assignments.publicReviewed(job));
+                assignments.publicReviewed(job),
+                privatePrepared(job));
     }
 
     public PrepareFeedbackResponseDTO prepareFeedback(AdmissionIdentity identity, PrepareFeedbackRequestDTO request) {
@@ -247,6 +248,11 @@ public class ResultAdmissionService {
 
     public static boolean isAdmitted(ReviewJob job) {
         return job.getAdmissionAttempt() != null && job.getAdmissionDigest() != null;
+    }
+
+    /** Once a private piece of this job is prepared, no later attempt composes private feedback again. */
+    public static boolean privatePrepared(ReviewJob job) {
+        return job.getPracticePagePreparedAt() != null || job.getConversationPreparedAt() != null;
     }
 
     public static int citationAttempt(ReviewJob job) {

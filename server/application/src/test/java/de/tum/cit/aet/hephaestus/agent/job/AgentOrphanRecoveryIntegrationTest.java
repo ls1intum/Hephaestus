@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -20,6 +21,9 @@ import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.agent.handler.AdmittedResultFixtures;
 import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
+import de.tum.cit.aet.hephaestus.agent.runtime.AgentResult;
+import de.tum.cit.aet.hephaestus.agent.runtime.PiResultParser;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.agent.usage.UsageFundingSource;
@@ -38,10 +42,16 @@ import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
+import de.tum.cit.aet.hephaestus.practices.spi.BoundModelSlot;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewMethod;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewWriteGuard;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
@@ -50,19 +60,26 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.tracing.Tracer;
+import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import org.awaitility.Awaitility;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -138,6 +155,33 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private ReviewCompositionBasisRepository compositionBasisRepository;
 
+    private ReviewJobCompletionService completion;
+
+    @Autowired
+    private ReviewWriteGuard writeGuard;
+
+    @Autowired
+    private ReviewAssignmentStore members;
+
+    @Autowired
+    private ReviewService reviews;
+
+    @Autowired
+    private ReviewJobLifecycleService lifecycle;
+
+    @Autowired
+    private PiResultParser scriptReports;
+
+    @Autowired
+    private ScriptRunRepository scriptRuns;
+
+    @Autowired
+    private ReviewJobAssignments assignments;
+
+    @Autowired
+    private ReviewMethodVerifier methods;
+
+    private ReviewJobRecovery recovery;
     private Workspace workspace;
     private LlmModel instanceModel;
     private Practice practice;
@@ -148,6 +192,14 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         databaseTestUtils.cleanDatabase();
         AgentProperties properties = mock(AgentProperties.class);
         when(properties.maxRetries()).thenReturn(5);
+        recovery = new ReviewJobRecovery(
+                jobRepository,
+                properties,
+                objectMapper,
+                usageRecorder,
+                Optional.of(continuation),
+                Optional.of(new PracticeScriptRunRecorder(
+                        scriptReports, scriptRuns, meterRegistry, objectMapper, assignments)));
         sweeper = new ReviewJobZombieSweeper(
                 jobRepository,
                 workerRegistryRepository,
@@ -156,8 +208,16 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
                 usageRecorder,
                 meterRegistry,
                 new ReviewJobTelemetry(meterRegistry, Tracer.NOOP),
-                new ReviewJobRecovery(
-                        jobRepository, properties, objectMapper, usageRecorder, Optional.of(continuation)));
+                recovery);
+        completion = new ReviewJobCompletionService(
+                jobRepository,
+                writeGuard,
+                assignments,
+                members,
+                reviews,
+                lifecycle,
+                transactionTemplate,
+                Clock.systemUTC());
         workspace = workspaceRepository.save(TestEntities.activeWorkspace("orphan-recovery-ws"));
 
         LlmConnection connection = connectionRepository.save(LlmCatalogTestFixtures.connection("orphan-recovery"));
@@ -462,6 +522,247 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
                 .containsExactly(2);
     }
 
+    @Test
+    @DisplayName("an admitted attempt that owes private feedback continues once, under its original admission and inputs")
+    void shouldContinueOwedPrivateFeedbackOnceUnderTheOriginalAdmission() {
+        UUID jobId = runningJobOwnedBy("live-owner", Instant.now(), 0);
+        Result observed = admitWithResult(jobId);
+        acceptPublicReview(jobId);
+        Instant expiresAt = Instant.now().plus(Duration.ofHours(1)).truncatedTo(ChronoUnit.MICROS);
+        keepOriginalInputs(jobId, 0, "READY", "COMPLETE", expiresAt);
+        spentBeforeItWasLost(jobId, 4);
+        ReviewJob owing = jobRepository.findById(jobId).orElseThrow();
+
+        assertThat(continueComposition(owing, "live-owner")).isTrue();
+
+        ReviewJob continuing = jobRepository.findById(jobId).orElseThrow();
+        assertThat(continuing.getStatus()).isEqualTo(ReviewJobStatus.QUEUED);
+        assertThat(continuing.getAttempt()).isEqualTo(1);
+        assertThat(continuing.getOutput()).isNull();
+        // The same admission, the same accepted public review, and still no private piece.
+        assertThat(ResultAdmissionService.citationAttempt(continuing)).isZero();
+        assertThat(continuing.getAdmissionDigest()).isEqualTo("admitted-digest");
+        assertThat(continuing.getPublicReviewDigest()).isEqualTo(owing.getPublicReviewDigest());
+        assertThat(ResultAdmissionService.privatePrepared(continuing)).isFalse();
+        assertThat(practiceResultRepository.findById(observed.getId())).isPresent();
+        // The original inputs keep their own expiry: queuing does not extend their retention.
+        ReviewCompositionBasis basis = compositionBasisRepository
+                .findByWorkspaceIdAndJobId(workspace.getId(), jobId)
+                .orElseThrow();
+        assertThat(basis.getExpiresAt()).isEqualTo(expiresAt);
+        assertThat(basis.getAdmissionAttempt()).isZero();
+        // The owing attempt is billed once, and the new attempt starts from nothing.
+        assertThat(continuing.getLlmCalls()).isZero();
+        assertThat(usageCalls(jobId)).containsExactly(4);
+        assertThat(continueComposition(owing, "live-owner")).isFalse();
+        assertThat(usageCalls(jobId)).containsExactly(4);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(
+            strings = {
+                "practice page piece prepared",
+                "conversation piece prepared",
+                "public review not accepted",
+                "retry limit reached",
+                "expired inputs",
+                "erased receipt",
+                "another worker"
+            })
+    @DisplayName("an admitted attempt that owes private feedback ends as itself when a fence does not hold")
+    void shouldNotContinueOwedPrivateFeedbackWhenAFenceDoesNotHold(String why) {
+        int attempt = why.equals("retry limit reached") ? 5 : 0;
+        UUID jobId = runningJobOwnedBy("live-owner", Instant.now(), attempt);
+        admitWithResult(jobId);
+        if (!why.equals("public review not accepted")) acceptPublicReview(jobId);
+        Instant fresh = Instant.now().plus(Duration.ofHours(1));
+        if (why.equals("expired inputs")) {
+            keepOriginalInputs(jobId, attempt, "READY", "COMPLETE", Instant.now().minusSeconds(1));
+        } else if (why.equals("erased receipt")) {
+            keepOriginalInputs(jobId, attempt, "ERASE_REQUESTED", "COMPLETE", fresh);
+        } else {
+            keepOriginalInputs(jobId, attempt, "READY", "COMPLETE", fresh);
+        }
+        if (why.equals("practice page piece prepared"))
+            jdbc.update("UPDATE review_job SET practice_page_prepared_at = now() WHERE id = ?", jobId);
+        if (why.equals("conversation piece prepared"))
+            jdbc.update("UPDATE review_job SET conversation_prepared_at = now() WHERE id = ?", jobId);
+        spentBeforeItWasLost(jobId, 2);
+        ReviewJob owing = jobRepository.findById(jobId).orElseThrow();
+
+        assertThat(continueComposition(owing, why.equals("another worker") ? "stranger" : "live-owner"))
+                .isFalse();
+
+        ReviewJob kept = jobRepository.findById(jobId).orElseThrow();
+        assertThat(kept.getStatus()).isEqualTo(ReviewJobStatus.RUNNING);
+        assertThat(kept.getWorkerId()).isEqualTo("live-owner");
+        assertThat(kept.getAttempt()).isEqualTo(attempt);
+        assertThat(usageCalls(jobId)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("an owed attempt that returned its runner report is billed from that report once")
+    void shouldBillTheReturnedRunnerReportOnceWhenAnOwedAttemptContinues() {
+        UUID jobId = runningJobOwnedBy("live-owner", Instant.now(), 0);
+        admitWithResult(jobId);
+        acceptPublicReview(jobId);
+        keepOriginalInputs(jobId, 0, "READY", "COMPLETE", Instant.now().plus(Duration.ofHours(1)));
+        // The proxy saw fewer calls than the runner reported, as when a call bypassed its counters.
+        jdbc.update(
+                "UPDATE review_job SET execution_started_at = now(), llm_calls = 4, llm_input_tokens = 900,"
+                        + " llm_output_tokens = 600 WHERE id = ?",
+                jobId);
+        ReviewJob owing = jobRepository.findById(jobId).orElseThrow();
+        var report = new AgentResult.LlmUsage("m", 1000, 700, 0, 0, 0, 0.0, 6);
+
+        assertThat(continueComposition(owing, "live-owner", report)).isTrue();
+        assertThat(continueComposition(owing, "live-owner", report)).isFalse();
+
+        assertThat(jdbc.queryForList(
+                        "SELECT input_tokens || '/' || output_tokens || '/' || total_calls FROM llm_usage_event"
+                                + " WHERE source_id::text = ? AND source_attempt = 0",
+                        String.class,
+                        jobId.toString()))
+                .containsExactly("1000/700/6");
+        assertThat(jobRepository.findById(jobId).orElseThrow().getLlmCalls()).isZero();
+    }
+
+    @Test
+    @DisplayName("an owed attempt keeps its returned practice script runs once, for its own admitted practices")
+    void shouldKeepTheReturnedPracticeScriptRunsOfAGrantedOwedAttemptOnce() {
+        UUID jobId = runningJobOwnedBy("live-owner", Instant.now(), 0);
+        admitWithResult(jobId);
+        Practice sibling = withCaptureRefusedSibling(jobId);
+        pinScriptAssignments(jobId);
+        acceptPublicReview(jobId);
+        keepOriginalInputs(jobId, 0, "READY", "COMPLETE", Instant.now().plus(Duration.ofHours(1)));
+        spentBeforeItWasLost(jobId, 1);
+        ReviewJob owing = jobRepository.findById(jobId).orElseThrow();
+        byte[] report = scriptReport(practice.getSlug(), sibling.getSlug());
+
+        assertThat(continueComposition(owing, "live-owner", null, report)).isTrue();
+        assertThat(continueComposition(owing, "live-owner", null, report)).isFalse();
+
+        assertThat(jobRepository.findById(jobId).orElseThrow().getAttempt()).isEqualTo(1);
+        // Attempt 0's row only: its pinned version and the counts it reported, not the sibling its capture refused.
+        assertThat(jdbc.queryForList(
+                        "SELECT attempt || ':' || practice_id || ':' || practice_version_id || ':' || status || ':'"
+                                + " || (calls ->> 'review') FROM review_job_script_run WHERE job_id = ?",
+                        String.class,
+                        jobId))
+                .containsExactly("0:" + practice.getId() + ":" + practice.getCurrentVersion().getId() + ":OK:1");
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"no report", "malformed report", "refused requeue"})
+    @DisplayName("an owed attempt records no practice script runs at its requeue without a granted requeue and a report")
+    void shouldRecordNoPracticeScriptRunsAtTheRequeueWithoutAGrantedRequeueAndAReport(String why) {
+        UUID jobId = runningJobOwnedBy("live-owner", Instant.now(), 0);
+        admitWithResult(jobId);
+        pinScriptAssignments(jobId);
+        acceptPublicReview(jobId);
+        keepOriginalInputs(jobId, 0, "READY", "COMPLETE", Instant.now().plus(Duration.ofHours(1)));
+        if (why.equals("refused requeue"))
+            jdbc.update("UPDATE review_job SET practice_page_prepared_at = now() WHERE id = ?", jobId);
+        ReviewJob owing = jobRepository.findById(jobId).orElseThrow();
+        byte[] report = why.equals("no report")
+                ? null
+                : why.equals("malformed report")
+                        ? "{".getBytes(StandardCharsets.UTF_8)
+                        : scriptReport(practice.getSlug());
+
+        assertThat(continueComposition(owing, "live-owner", null, report)).isEqualTo(!why.equals("refused requeue"));
+
+        // A refused requeue leaves the runs to the attempt's ordinary terminal write.
+        assertThat(jdbc.queryForObject(
+                        "SELECT count(*) FROM review_job_script_run WHERE job_id = ?", Integer.class, jobId))
+                .isZero();
+    }
+
+    @ParameterizedTest(name = "private piece prepared: {0}")
+    @ValueSource(booleans = {false, true})
+    @DisplayName("a lost admitted review with an accepted public review continues; its new attempt reads the private fact")
+    void shouldContinueALostAdmittedReviewWithAnAcceptedPublicReview(boolean privatePiece) {
+        UUID jobId = runningJobOwnedBy("dead-replica-11", Instant.now().minus(Duration.ofMinutes(5)), 0);
+        admitWithResult(jobId);
+        acceptPublicReview(jobId);
+        if (privatePiece)
+            jdbc.update("UPDATE review_job SET practice_page_prepared_at = now() WHERE id = ?", jobId);
+        keepOriginalInputs(jobId, 0, "READY", "COMPLETE", Instant.now().plus(Duration.ofHours(1)));
+        registerStaleWorker("dead-replica-11");
+
+        sweeper.recoverOrphanedJobs();
+
+        ReviewJob continuing = jobRepository.findById(jobId).orElseThrow();
+        assertThat(continuing.getStatus()).isEqualTo(ReviewJobStatus.QUEUED);
+        assertThat(continuing.getAttempt()).isEqualTo(1);
+        assertThat(continuing.getPublicReviewDigest()).isEqualTo("b".repeat(64));
+        // The new attempt's admission answer carries this fact: private feedback is composed only without it.
+        assertThat(ResultAdmissionService.privatePrepared(continuing)).isEqualTo(privatePiece);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"expired inputs", "erased receipt"})
+    @DisplayName("an owed continuation refused at staging runs nothing, and its admitted review ends partial")
+    void shouldSettleAnOwedContinuationRefusedAtStagingAsAPartialAdmittedReview(String why) {
+        UUID jobId = runningJobOwnedBy("live-owner", Instant.now(), 0);
+        Result observed = admitWithResult(jobId);
+        acceptPublicReview(jobId);
+        keepOriginalInputs(jobId, 0, "READY", "COMPLETE", Instant.now().plus(Duration.ofHours(1)));
+        assertThat(continueComposition(jobRepository.findById(jobId).orElseThrow(), "live-owner"))
+                .isTrue();
+        if (why.equals("expired inputs"))
+            jdbc.update(
+                    "UPDATE review_composition_basis SET expires_at = now() - interval '1 second' WHERE job_id = ?",
+                    jobId);
+        else jdbc.update("UPDATE person_evidence_copy SET state = 'ERASE_REQUESTED' WHERE job_id = ?", jobId);
+        // The next worker holds the queued attempt; staging refuses before a folder or a sandbox exists.
+        jdbc.update(
+                "UPDATE review_job SET status = 'RUNNING', worker_id = 'next-worker', started_at = now() WHERE id = ?",
+                jobId);
+        ReviewJob claimed = jobRepository.findById(jobId).orElseThrow();
+        assertThatThrownBy(() -> continuation.prepareInputs(claimed)).isInstanceOf(JobPreparationException.class);
+        // The executor's failure write for a refused preparation.
+        Integer failed = transactionTemplate.execute(status -> jobRepository.transitionStatusOwnedBy(
+                jobId,
+                ReviewJobStatus.FAILED,
+                Instant.now(),
+                "The original capture no longer permits composition",
+                Set.of(ReviewJobStatus.RUNNING),
+                "next-worker"));
+        assertThat(failed).isEqualTo(1);
+
+        completion.tick();
+
+        assertThat(jdbc.queryForObject("SELECT status FROM review WHERE id = ?", String.class, claimed.getReviewId()))
+                .isEqualTo("PARTIAL");
+        assertThat(practiceResultRepository.findById(observed.getId())).isPresent();
+        assertThat(jdbc.queryForObject(
+                        "SELECT state FROM review_item WHERE review_id = ?", String.class, claimed.getReviewId()))
+                .isEqualTo("JUDGED");
+    }
+
+    @ParameterizedTest(name = "private piece committed: {0}")
+    @ValueSource(booleans = {true, false})
+    @DisplayName("an owed continuation waiting on a private preparation's row lock decides on what it committed")
+    void shouldDecideOnTheCommittedPrivatePieceWhenTheOwedContinuationWaits(boolean committed) throws Exception {
+        UUID jobId = runningJobOwnedBy("live-owner", Instant.now(), 0);
+        admitWithResult(jobId);
+        acceptPublicReview(jobId);
+        keepOriginalInputs(jobId, 0, "READY", "COMPLETE", Instant.now().plus(Duration.ofHours(1)));
+        ReviewJob owing = jobRepository.findById(jobId).orElseThrow();
+
+        whileLocked(
+                jobId,
+                committed,
+                job -> job.setConversationPreparedAt(Instant.now()),
+                () -> continueComposition(owing, "live-owner"));
+
+        ReviewJob after = jobRepository.findById(jobId).orElseThrow();
+        assertThat(after.getStatus()).isEqualTo(committed ? ReviewJobStatus.RUNNING : ReviewJobStatus.QUEUED);
+        assertThat(after.getAttempt()).isEqualTo(committed ? 0 : 1);
+    }
+
     @ParameterizedTest(name = "admission committed: {0}")
     @ValueSource(booleans = {true, false})
     @DisplayName("recovery waiting on the admission's row lock decides on what the admission left behind")
@@ -504,11 +805,16 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         assertThat(after.getErrorMessage()).isNull();
     }
 
-    /*
-     * Holds the job's row lock as the admission does, changes it, and lets the sweep run against it: the
-     * sweep blocks on the lock, then decides on what this transaction committed or rolled back.
-     */
     private void whileRecoveryWaits(UUID jobId, boolean commit, Consumer<ReviewJob> change) throws Exception {
+        whileLocked(jobId, commit, change, sweeper::recoverOrphanedJobs);
+    }
+
+    /*
+     * Holds the job's row lock as the admission or a preparation does, changes it, and lets the contender run
+     * against it: the contender blocks on the lock, then decides on what this transaction committed or rolled back.
+     */
+    private void whileLocked(UUID jobId, boolean commit, Consumer<ReviewJob> change, Runnable contender)
+            throws Exception {
         var locked = new CountDownLatch(1);
         var pool = Executors.newFixedThreadPool(2);
         try {
@@ -520,13 +826,13 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
                 awaitBlockedTransaction();
                 if (!commit) tx.setRollbackOnly();
             }));
-            var recovery = pool.submit(() -> {
+            var waiting = pool.submit(() -> {
                 assertThat(locked.await(30, TimeUnit.SECONDS)).isTrue();
-                sweeper.recoverOrphanedJobs();
+                contender.run();
                 return null;
             });
             holder.get(30, TimeUnit.SECONDS);
-            recovery.get(30, TimeUnit.SECONDS);
+            waiting.get(30, TimeUnit.SECONDS);
         } finally {
             pool.shutdownNow();
             assertThat(pool.awaitTermination(30, TimeUnit.SECONDS)).isTrue();
@@ -543,6 +849,113 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
                     Boolean.class,
                     holderPid));
         });
+    }
+
+    private boolean continueComposition(ReviewJob job, String workerId) {
+        return continueComposition(job, workerId, null, null);
+    }
+
+    private boolean continueComposition(
+            ReviewJob job, String workerId, AgentResult.@Nullable LlmUsage runnerUsage) {
+        return continueComposition(job, workerId, runnerUsage, null);
+    }
+
+    private boolean continueComposition(
+            ReviewJob job,
+            String workerId,
+            AgentResult.@Nullable LlmUsage runnerUsage,
+            byte @Nullable [] scriptReport) {
+        return Boolean.TRUE.equals(transactionTemplate.execute(
+                status -> recovery.continueComposition(job, workerId, runnerUsage, scriptReport)));
+    }
+
+    // A second pinned practice that the capture refused: the runner was never given it.
+    private Practice withCaptureRefusedSibling(UUID jobId) {
+        Practice sibling = runtimePracticeVersions.create(new PracticeVersionService.NewPractice(
+                workspace,
+                "capture-refused-sibling",
+                new ItemKind("scm.pull_request"),
+                DefinitionTestFixtures.definition(
+                        new ItemKind("scm.pull_request"), "Refused sibling", "A sibling definition", null),
+                null,
+                0,
+                null));
+        transactionTemplate.executeWithoutResult(status -> {
+            ReviewJob job = jobRepository.findById(jobId).orElseThrow();
+            long itemId = job.getInput().itemId();
+            jdbc.update(
+                    "INSERT INTO review_practice(review_id,workspace_id,practice_id,practice_version_id,status) VALUES"
+                            + " (?,?,?,?,'READY')",
+                    job.getReviewId(),
+                    workspace.getId(),
+                    sibling.getId(),
+                    sibling.getCurrentVersion().getId());
+            jdbc.update(
+                    "INSERT INTO review_item(review_id,workspace_id,practice_id,item_id,item_version) VALUES"
+                            + " (?,?,?,?,'fixture:one')",
+                    job.getReviewId(),
+                    workspace.getId(),
+                    sibling.getId(),
+                    itemId);
+            job.setInput(new ReviewJobInput(
+                    itemId,
+                    List.of(
+                            new ReviewAssignmentId(job.getReviewId(), practice.getId(), itemId),
+                            new ReviewAssignmentId(job.getReviewId(), sibling.getId(), itemId))));
+            job.setCapture(objectMapper.readTree("{\"manifest\":{\"contractVersion\":\"2.0.0\"},\"readiness\":"
+                    + "{\"decisions\":[{\"practiceSlug\":\"" + practice.getSlug() + "\",\"ready\":true},"
+                    + "{\"practiceSlug\":\"" + sibling.getSlug() + "\",\"ready\":false}]}}"));
+            jobRepository.saveAndFlush(job);
+        });
+        return sibling;
+    }
+
+    private void pinScriptAssignments(UUID jobId) {
+        transactionTemplate.executeWithoutResult(status -> {
+            ReviewJob job = jobRepository.findById(jobId).orElseThrow();
+            var binding = agentBindingRepository
+                    .findByWorkspaceIdAndPurpose(workspace.getId(), AgentPurpose.PRACTICE_REVIEW)
+                    .getFirst();
+            var frozen = methods.freeze(binding);
+            var slots = List.of(
+                    new BoundModelSlot("review", ModelKind.CHAT, frozen),
+                    new BoundModelSlot("chat", ModelKind.CHAT, null),
+                    new BoundModelSlot("decision", ModelKind.DECISION, null),
+                    new BoundModelSlot("embedding", ModelKind.EMBEDDING, null),
+                    new BoundModelSlot("reranking", ModelKind.RERANKING, null));
+            String digest = requireNonNull(jdbc.queryForObject(
+                    "SELECT review_model_digest(CAST(? AS jsonb))", String.class, objectMapper.writeValueAsString(slots)));
+            jdbc.update(
+                    "UPDATE review_practice SET method=CAST(? AS jsonb) WHERE workspace_id=? AND review_id=?",
+                    objectMapper.writeValueAsString(new ReviewMethod(1, digest, slots)),
+                    workspace.getId(),
+                    job.getReviewId());
+            jdbc.update(
+                    "UPDATE review_item SET detail=jsonb_build_object('developerId',?) WHERE workspace_id=? AND review_id=?",
+                    developer.getId(),
+                    workspace.getId(),
+                    job.getReviewId());
+        });
+    }
+
+    private static byte[] scriptReport(String... slugs) {
+        String entries = Arrays.stream(slugs)
+                .map(slug -> "{\"practiceSlug\":\"" + slug + "\",\"program\":{\"kind\":\"builtin\",\"digest\":null},"
+                        + "\"models\":[],\"status\":\"ok\",\"stopReason\":null,\"calls\":{\"review\":1,\"chat\":0,"
+                        + "\"decision\":0,\"embedding\":0,\"reranking\":0},\"coverageReached\":{\"reads\":0,"
+                        + "\"truncatedReads\":0,\"failedReads\":0},\"durationMs\":1}")
+                .collect(Collectors.joining(","));
+        return ("{\"schemaVersion\":2,\"truncated\":false,\"practices\":[" + entries + "]}")
+                .getBytes(StandardCharsets.UTF_8);
+    }
+
+    private void acceptPublicReview(UUID jobId) {
+        jdbc.update("UPDATE review_job SET public_review_digest = ? WHERE id = ?", "b".repeat(64), jobId);
+    }
+
+    private List<@Nullable Integer> usageCalls(UUID jobId) {
+        return jdbc.queryForList(
+                "SELECT total_calls FROM llm_usage_event WHERE source_id::text = ?", Integer.class, jobId.toString());
     }
 
     private Result admitWithResult(UUID jobId) {

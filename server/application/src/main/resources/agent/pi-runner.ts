@@ -20,6 +20,7 @@ import {
 	closeUnroutedPrivateDestinations,
 	undecidedPrivatePractices,
 	recordCompositionFailure,
+	privateCompositionOwed,
 	persistComposedFeedback as persistComposition,
 	prepareComposedFeedback as prepareComposition,
 	type ComposedFeedback,
@@ -1967,6 +1968,8 @@ export async function runReviewJob(): Promise<void> {
 	const SERVER_UNREACHABLE_EXIT = 75;
 	// The server interprets exit 76 as provider failure without a recorded result and retries the review.
 	const PROVIDER_UNREACHABLE_EXIT = 76;
+	// The server interprets exit 77 as owed private composition and may continue it as a new attempt.
+	const COMPOSITION_OWED_EXIT = 77;
 
 	function readTaskEnvelope(): TaskEnvelope {
 		let raw: string;
@@ -2078,6 +2081,15 @@ export async function runReviewJob(): Promise<void> {
 		review: null,
 		preparation: null,
 	};
+
+	// Only a private phase the run itself stopped is owed. The server decides whether another attempt composes it.
+	function compositionExit(): number {
+		if (!privateCompositionOwed(composedFeedback)) {
+			return 0;
+		}
+		console.error("[pi-runner] OWED: the run stopped private feedback composition before it finished");
+		return COMPOSITION_OWED_EXIT;
+	}
 
 	function persistAdmission(): void {
 		if (admission === null) {
@@ -3628,9 +3640,10 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 		}
 		console.error(`[pi-runner] SUCCESS: result.json holds ${reviewState.size} result(s)`);
 		finalizeOutput();
-		process.exit(0);
+		process.exit(compositionExit());
 
-		// Recovery composes only public feedback from the admitted attempt; it performs no new admission.
+		// Recovery performs no new admission. It composes the review on the work until that review is accepted, and
+		// private feedback only after it is, while no private piece is prepared yet.
 		async function continueAdmittedReview(): Promise<void> {
 			measuring = false;
 			measurementClosed = true;
@@ -3641,15 +3654,48 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 				allSlugs,
 				admission.results.map((item) => item.practiceSlug),
 			);
-			console.error(
-				`[pi-runner] Continuing an admitted review: ${admission.results.length} result(s), ` +
-					`${unreachedSlugs.length} practice(s) not reached; composing the review on the work only`,
-			);
-			if (
-				compositionRequest &&
+			const privateRequested =
+				compositionRequest !== null &&
 				PRIVATE_DESTINATIONS.some(
 					(destination) => compositionRequest.destinations[destination] !== undefined,
-				) &&
+				);
+			const privateOwed =
+				privateRequested && admission.publicReviewed && !admission.privatePrepared;
+			console.error(
+				`[pi-runner] Continuing an admitted review: ${admission.results.length} result(s), ` +
+					`${unreachedSlugs.length} practice(s) not reached; ` +
+					`composing ${privateOwed ? "private feedback only" : "the review on the work only"}`,
+			);
+			if (privateOwed && compositionRequest !== null) {
+				// Routing comes from the server's reread for this attempt, not from the earlier attempt.
+				routedDestinations = closeUnroutedPrivateDestinations(
+					compositionRequest,
+					admission,
+					composedFeedback,
+				);
+				persistComposedFeedback();
+				await composeAdmittedFeedback({
+					request: compositionRequest,
+					admission,
+					feedback: composedFeedback,
+					routes: routedDestinations,
+					stage: compositionStage(),
+					notReached: unreachedSlugs,
+					remainingMs: AGENT_BUDGET_MS - (Date.now() - PROCESS_START_MS),
+					onDeadline: () =>
+						stopTurn(
+							"safety",
+							"the run is near its safety ceiling — preserving the composed feedback so far",
+						),
+					prepare: prepareComposedFeedback,
+					persist: persistComposedFeedback,
+					after: () => {
+						accumulateUsage(null, extractUsageFromSession({}, streamUsage));
+						persistUsage();
+					},
+				});
+			} else if (
+				privateRequested &&
 				undecidedPrivatePractices(requiredAdmission(), composedFeedback, routedDestinations)
 					.length > 0
 			) {
@@ -3703,7 +3749,7 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 				`[pi-runner] SUCCESS: composed from the ${admission.results.length} admitted result(s)`,
 			);
 			finalizeOutput();
-			process.exit(0);
+			process.exit(compositionExit());
 		}
 	}
 

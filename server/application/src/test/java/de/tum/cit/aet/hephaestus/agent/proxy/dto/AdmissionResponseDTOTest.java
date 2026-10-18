@@ -80,6 +80,7 @@ class AdmissionResponseDTOTest {
                 List.of(new AdmissionResponseDTO.Withheld("names-things", "42", "NO_EVIDENCE")),
                 FeedbackCompositionService.page(read),
                 FeedbackCompositionService.conversation(read),
+                false,
                 false);
         try (var fixture = Objects.requireNonNull(getClass().getResourceAsStream("/agent/admission-response.json"))) {
             assertThat(mapper.readTree(mapper.writeValueAsString(response))).isEqualTo(mapper.readTree(fixture));

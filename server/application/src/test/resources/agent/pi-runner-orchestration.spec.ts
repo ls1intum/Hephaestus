@@ -1043,6 +1043,10 @@ if (scenario !== undefined && scenario !== "") {
 		if (scenario === "compose-settle-deadline") {
 			now = 1_000_000 + Number(process.env.AGENT_BUDGET_MS) - 200;
 		}
+		if (scenario === "compose-private-safety") {
+			// Room for the review on the work, which this mock answers at once, before the private composition.
+			now = 1_000_000 + Number(process.env.AGENT_BUDGET_MS) - 2_000;
+		}
 		const rows = admitted();
 		const supportMode = process.env.PI_PRACTICE_PAGE_SUPPORT_MODE;
 
@@ -1142,6 +1146,7 @@ if (scenario !== undefined && scenario !== "") {
 			contractVersion: 3,
 			admissionDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			publicReviewed: false,
+			privatePrepared: false,
 			admitted: rows.map(admissionDto),
 			withheld: [],
 			practicePageSupport: support ?? null,
@@ -2564,7 +2569,7 @@ if (scenario !== undefined && scenario !== "") {
 									});
 									return;
 								}
-								if (scenario === "compose-settle-deadline") {
+								if (scenario === "compose-settle-deadline" || scenario === "compose-private-safety") {
 									// The response ended, but its auto-compaction remains busy until the deadline.
 									compacting = true;
 									return;
@@ -3488,6 +3493,7 @@ if (scenario !== undefined && scenario !== "") {
 		"stall",
 		"settle-safety",
 		"compose-settle-deadline",
+		"compose-private-safety",
 		"provider-error",
 		"provider-reply-unanswered-stall",
 		"provider-reply-refused-error",
@@ -3539,6 +3545,7 @@ if (scenario !== undefined && scenario !== "") {
 		"compose-completion-lost-ack",
 		"compose-continuation",
 		"compose-continuation-reviewed",
+		"compose-continuation-private",
 		"compose-fresh-history",
 		"compose-history-unavailable-words",
 		"compose-history-missing-currentness",
@@ -3571,6 +3578,7 @@ if (scenario !== undefined && scenario !== "") {
 		const stage =
 			new Map([
 				["compose-continuation-reviewed", "compose-continuation"],
+				["compose-continuation-private", "compose-continuation"],
 				["compose-completion-accepted", "compose"],
 				["compose-completion-refused", "compose"],
 				["compose-completion-lost-ack", "compose"],
@@ -3661,6 +3669,8 @@ if (scenario !== undefined && scenario !== "") {
 				"settle-safety": "does not start a measuring turn once settling reaches the safety line",
 				"compose-settle-deadline":
 					"does not ask the composer once more after the run reaches its safety ceiling",
+				"compose-private-safety":
+					"owes private feedback the run stopped at its safety ceiling after the public review was prepared",
 				"provider-reply-unanswered-stall":
 					"retries only when no model or tool answer preceded a stall",
 				"provider-reply-refused-error":
@@ -3709,6 +3719,8 @@ if (scenario !== undefined && scenario !== "") {
 					"keeps distinct native work identities separate from provider URL text",
 				"compose-continuation-reviewed":
 					"an accepted public review is never recomposed by its continuation",
+				"compose-continuation-private":
+					"continues private feedback after an accepted public review when no private piece is prepared",
 				"compose-continuation":
 					"continues an admitted review by composing only the review on the work, measuring and admitting nothing",
 				"compose-overflow":
@@ -3898,16 +3910,49 @@ if (scenario !== undefined && scenario !== "") {
 					}
 					if (stage === "compose-continuation") {
 						// What an earlier attempt's admission answered, staged by the server beside the request.
+						const continued = admissionDto(admittedResult);
 						writeFileSync(
 							nodePath.join(cwd, "evidence/composition-continuation.json"),
 							JSON.stringify({
 								contractVersion: 3,
 								admissionDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-								publicReviewed: fixture === "compose-continuation-reviewed",
-								admitted: [admissionDto(admittedResult)],
+								publicReviewed: fixture !== "compose-continuation",
+								privatePrepared: fixture === "compose-continuation-reviewed",
+								admitted: [continued],
 								withheld: [],
-								practicePageSupport: null,
-								conversationEligibility: null,
+								// The server's reread for this attempt: the page is routed, the conversation is not.
+								practicePageSupport:
+									fixture === "compose-continuation-private"
+										? {
+												state: "COMPLETE",
+												readAt: "2026-10-07T10:00:00Z",
+												practices: [
+													{
+														practiceSlug: continued.practiceSlug,
+														decision: "ADMIT",
+														stopReason: null,
+														occurrences: [
+															supportOccurrence("scm.pull_request", 3),
+															supportOccurrence("scm.issue", 3),
+														],
+													},
+												],
+											}
+										: null,
+								conversationEligibility:
+									fixture === "compose-continuation-private"
+										? {
+												state: "COMPLETE",
+												readAt: "2026-10-07T10:00:00Z",
+												results: [
+													{
+														resultId: continued.resultId,
+														decision: "GATE_REFUSED",
+														stopReason: "NO_AI",
+													},
+												],
+											}
+										: null,
 							}),
 						);
 					}
@@ -4759,6 +4804,19 @@ if (scenario !== undefined && scenario !== "") {
 								"second-practice": "not-reached (deadline)",
 								"test-practice": "failed (deadline)",
 							});
+							break;
+						}
+						case "compose-private-safety": {
+							// The public review is prepared; the run's own ceiling stopped private composition.
+							assert.equal(child.status, 77, child.stderr);
+							assert.ok(events.includes("prepare-public:true"), events.join("\n"));
+							const owed: unknown = JSON.parse(
+								readFileSync(nodePath.join(cwd, "out/feedback.json"), "utf8"),
+							);
+							assert.ok(isRecord(owed));
+							assert.deepEqual(owed.compositionFailures, [
+								{ phase: "PRIVATE_FEEDBACK", reason: "SAFETY" },
+							]);
 							break;
 						}
 						case "compose-settle-deadline": {
@@ -6692,6 +6750,42 @@ for (const item of nullableCases) {
 								);
 								assert.ok(!events.some((event) => event.startsWith("public-completion:")));
 								assert.ok(!existsSync(nodePath.join(cwd, "admission.json")));
+								break;
+							}
+							if (fixture === "compose-continuation-private") {
+								// Private feedback only: no review composer, no public preparation, no new admission.
+								const created = events.filter((event) => event.startsWith("create:session"));
+								assert.ok(!created.some((event) => event.includes("report_review")), events.join("\n"));
+								assert.equal(
+									created.filter((event) => event.includes("report_feedback")).length,
+									1,
+									events.join("\n"),
+								);
+								assert.ok(events.some((event) => event.startsWith("private-turn")), events.join("\n"));
+								assert.ok(events.includes("prepare-public:false"), `${events.join("\n")}\n${child.stderr}`);
+								assert.ok(!events.includes("prepare-public:true"), events.join("\n"));
+								assert.ok(!existsSync(nodePath.join(cwd, "admission.json")));
+								const continued: unknown = JSON.parse(
+									readFileSync(nodePath.join(cwd, "out/feedback.json"), "utf8"),
+								);
+								assert.ok(isRecord(continued));
+								assert.equal(continued.review, null);
+								assert.ok(Array.isArray(continued.feedback));
+								assert.ok(
+									continued.feedback.some(
+										(piece: unknown) => isRecord(piece) && piece.destination === "PRACTICE_PAGE",
+									),
+								);
+								assert.ok(Array.isArray(continued.compositionFailures));
+								assert.ok(
+									!continued.compositionFailures.some(
+										(failure: unknown) =>
+											isRecord(failure) &&
+											(failure.phase === "PUBLIC_REVIEW" ||
+												failure.reason === "PRIVATE_NOT_RECOVERED"),
+									),
+									JSON.stringify(continued.compositionFailures),
+								);
 								break;
 							}
 							// One session, the review composer's: no practice is assessed and nothing can be recorded.

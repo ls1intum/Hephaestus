@@ -149,7 +149,8 @@ class ReviewJobPolicyIntegrationTest extends BaseIntegrationTest {
                         admission,
                         new ReviewJobTelemetry(metrics, Tracer.NOOP),
                         Optional.empty()),
-                new ReviewJobRecovery(jobs, properties, mapper, mock(LlmUsageRecorder.class), Optional.empty()));
+                new ReviewJobRecovery(
+                        jobs, properties, mapper, mock(LlmUsageRecorder.class), Optional.empty(), Optional.empty()));
     }
 
     @Test
