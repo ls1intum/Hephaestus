@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.94.4
+
+### Patch Changes
+
+- Open pull requests, merge requests and issues that Hephaestus already knew about now show up in a workspace that starts monitoring their repository. Before, opening one in the review panel or asking for a review said the work was not found until it changed again. Existing workspaces catch up on their next regular sync. Nothing is reviewed or sent automatically for older work, and work the workspace cannot access stays hidden.
+- GitLab line feedback about several lines now opens one thread on that whole range in the merge request diff, instead of a thread on its last line only. When GitLab cannot place feedback on the diff, or the feedback is about a whole file, it now opens a thread on the merge request overview, so the author can reply and resolve it. Feedback that was already posted on its last line stays in place and is not posted again.
+- Withdrawn feedback on a GitLab merge request line or overview thread is now replaced in that same thread with a withdrawal notice. Before, only the summary comment was corrected and the line feedback stayed visible. Replies and resolution on the thread are kept.
+- A partial review no longer says it ended early when it ran to the end and only some practices produced no result. The review sheet now says that its results and feedback cover only the practices it reviewed, and its history still names why the review is partial.
+- A review no longer says "Practice script did not finish" for a practice that Hephaestus never ran. This covers a practice that does not apply to the work, and a practice whose evidence was not ready. The upgrade removes this entry from an earlier review only where the review's retained capture record proves that the practice was left out. Other earlier entries stay as they are.
+- Withdrawn feedback no longer shows as retracted when copies of it may still be on the pull or merge request. The feedback sheet says how many copies may still be there and shows the provider's error. When the provider did not confirm a removal, admins can retry the withdrawal without restoring the feedback first. The withdrawal, its reason and the developer's answer stay as they were.
+- Admins can again estimate and create a review batch for pull or merge requests from past work. The request no longer fails with "Use the scan API to review a repository." Repository reviews still use the scan.
+- When a practice review refuses a met result because it has not read enough of the work, the review is now told which file lines are still unread and given a read that covers them. Before, it was told to read the whole file again. When a single line is too long for the read tool, the review is told that the file cannot be covered by reading.
+- Follow-up practice reviews can read the line and file comments that Hephaestus already delivered on the same work. This gives the review the earlier advice even when the provider's captured discussion omits it. Retracted notes and notes without permission to read their text are excluded.
+- Practice reviews can use complete captured evidence from their initial context without a redundant read.
+  An omitted or partly read source still needs a complete read when a result depends on it.
+- The test profile keeps scheduled server maintenance idle, so tests own the work they start.
+
 ## 0.94.3
 
 ### Patch Changes
