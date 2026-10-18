@@ -6,11 +6,13 @@ import { TREE_SOURCE, DIFF_SOURCE } from "./work/practice-scripts/kits/scm/sourc
 
 import {
 	CHANGE_ROOT,
+	diffSections,
 	type PinnedBlob,
 	type PinnedDiff,
 	readChange,
 	safeRepositoryPath,
 } from "./pi-change.ts";
+import { type CitableText, citableTextIndex } from "./pi-folder-index.ts";
 import { isJsonObject as isRecord } from "./work/practice-scripts/lib/core/json.ts";
 
 export interface BriefLimits {
@@ -1074,7 +1076,15 @@ interface CitedFile {
 	path: string;
 	commit: string;
 	side?: "OLD" | "NEW";
-	sha256: string;
+	/** The digest of the file's captured text in the manifest; absent when the capture holds no text of it. */
+	sha256?: string;
+}
+
+/** Lines of the captured change record, as admission verified them: a range of Git's diff, not yet a file. */
+interface CitedChangeLines {
+	text: CitableText;
+	startLine: number;
+	endLine: number;
 }
 
 function resultCitations(result: Record<string, unknown>): unknown[] {
@@ -1085,12 +1095,73 @@ function resultCitations(result: Record<string, unknown>): unknown[] {
 	return [...listOf(result.citations), ...example, ...problems];
 }
 
+/** The manifest's captured texts; an unreadable manifest vouches for none. */
+function manifestTexts(folderIndex: unknown): CitableText[] {
+	try {
+		return citableTextIndex(folderIndex);
+	} catch {
+		return [];
+	}
+}
+
+/**
+ * The one captured text a verified citation was checked against, found as admission found it: by source, path,
+ * side and commit, with the digest admission recorded. Anything else is not this capture's text.
+ */
+function provenText(
+	citation: Record<string, unknown>,
+	itemSha256: string,
+	texts: readonly CitableText[],
+): CitableText | undefined {
+	const side = citation.side ?? "NEW";
+	const commit = citation.commit ?? null;
+	const matches = texts.filter(
+		(text) =>
+			text.source === citation.sourceKind &&
+			text.path === citation.path &&
+			text.side === side &&
+			text.commit === commit,
+	);
+	const [only] = matches;
+	return matches.length === 1 && only?.sha256 === itemSha256 ? only : undefined;
+}
+
+/** The commit the manifest records for a text: its own, or the one its commit-free entry shares bytes with. */
+function recordedCommit(text: CitableText, texts: readonly CitableText[]): string | undefined {
+	if (text.commit !== null) {
+		return text.commit;
+	}
+	const commits = new Set(
+		texts
+			.filter(
+				(entry) =>
+					entry.commit !== null &&
+					entry.source === text.source &&
+					entry.path === text.path &&
+					entry.side === text.side &&
+					entry.stagedPath === text.stagedPath &&
+					entry.sha256 === text.sha256,
+			)
+			.map((entry) => entry.commit),
+	);
+	const [only] = commits;
+	return commits.size === 1 && only !== null ? only : undefined;
+}
+
+/**
+ * The code the public NOT_MET results cite. Each citation is identified as admission identified it: by its one captured
+ * text, never by the source file it names. A text the manifest pins to a commit is code; the change record is a range of
+ * the change.
+ */
 function citedPrimaryFiles(
 	results: readonly Record<string, unknown>[],
 	contextRoot: string,
-	repositoryRoot: string,
-): CitedFile[] {
+	texts: readonly CitableText[],
+): { files: CitedFile[]; changeLines: CitedChangeLines[]; unproven: string[] } {
 	const files: CitedFile[] = [];
+	const changeLines: CitedChangeLines[] = [];
+	const unproven: string[] = [];
+	const changeRecord = `${contextRoot}/change.json#/diff`;
 	for (const result of results) {
 		if (result.publicEligible !== true || result.outcome !== "NOT_MET") {
 			continue;
@@ -1100,33 +1171,107 @@ function citedPrimaryFiles(
 			if (!isRecord(citation) || !isRecord(verification)) {
 				continue;
 			}
-			const { sourceKind, sourcePath, commit, side } = citation;
-			const sha256 = verification.sourceFileSha256;
+			const { sourceKind, startLine, endLine } = citation;
+			const sha256 = verification.itemSha256;
 			if (
 				verification.status !== "VERIFIED" ||
 				typeof sha256 !== "string" ||
 				!/^[0-9a-f]{64}$/u.test(sha256) ||
 				typeof citation.path !== "string" ||
-				typeof commit !== "string"
+				(sourceKind !== TREE_SOURCE && sourceKind !== DIFF_SOURCE)
 			) {
 				continue;
 			}
-			if (
-				sourceKind === TREE_SOURCE &&
-				sourcePath === `${repositoryRoot}/.git/HEAD` &&
-				side === undefined
-			) {
-				files.push({ kind: TREE_SOURCE, path: citation.path, commit, sha256 });
-			} else if (
-				sourceKind === DIFF_SOURCE &&
-				sourcePath === `${contextRoot}/change.json` &&
-				(side === "OLD" || side === "NEW")
-			) {
-				files.push({ kind: DIFF_SOURCE, path: citation.path, commit, side, sha256 });
+			const text = provenText(citation, sha256, texts);
+			if (text === undefined) {
+				unproven.push(
+					citation.path === changeRecord ? "lines of the captured change" : `\`${citation.path}\``,
+				);
+				continue;
 			}
+			if (sourceKind === DIFF_SOURCE && text.path === changeRecord) {
+				if (typeof startLine === "number" && typeof endLine === "number") {
+					changeLines.push({ text, startLine, endLine });
+				}
+				continue;
+			}
+			const commit = recordedCommit(text, texts);
+			if (commit === undefined) {
+				// A text no commit pins, such as another field of a record, is not code of the work.
+				continue;
+			}
+			files.push(
+				sourceKind === TREE_SOURCE
+					? { kind: TREE_SOURCE, path: text.path, commit, sha256: text.sha256 }
+					: { kind: DIFF_SOURCE, path: text.path, commit, side: text.side, sha256: text.sha256 },
+			);
 		}
 	}
-	return files;
+	return { files, changeLines, unproven };
+}
+
+/**
+ * The file of Git's listing whose section of the captured change holds every cited line, with the captured text of
+ * that file to show: its NEW side at the head, or its OLD side at the base when the change removes it.
+ */
+function changedFileOf(
+	root: string,
+	cited: CitedChangeLines,
+	diff: PinnedDiff,
+	range: { base: string; head: string },
+	texts: readonly CitableText[],
+	limit: number,
+): CitedFile | { omitted: string } {
+	if (diff.kind !== "available") {
+		return { omitted: DIFF_OMISSIONS[diff.kind] };
+	}
+	const staged = path.resolve(root, cited.text.stagedPath);
+	let bytes: Buffer;
+	try {
+		if (statSync(staged).size > limit) {
+			return { omitted: DIFF_OMISSIONS.tooLarge };
+		}
+		bytes = readFileSync(staged);
+	} catch {
+		return { omitted: "its captured text could not be read" };
+	}
+	if (createHash("sha256").update(bytes).digest("hex") !== cited.text.sha256) {
+		return { omitted: "its bytes differ from the ones admission verified" };
+	}
+	let recorded: string;
+	try {
+		recorded = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+	} catch {
+		return { omitted: "not valid UTF-8 text" };
+	}
+	const sections = diffSections(recorded);
+	const holding = diff.files.filter((file) => {
+		const lines = sections.get(`a/${file.oldPath ?? file.path} b/${file.path}`);
+		return lines !== undefined && lines[0] <= cited.startLine && cited.endLine <= lines[1];
+	});
+	const [file] = holding;
+	if (holding.length !== 1 || file === undefined) {
+		return { omitted: "the cited lines do not lie within one file's section of the pinned change" };
+	}
+	const sides = [
+		{ side: "NEW", path: file.path, commit: range.head },
+		{ side: "OLD", path: file.oldPath ?? file.path, commit: range.base },
+	] as const;
+	const capturedTextForSide = (candidate: (typeof sides)[number]) =>
+		texts.find(
+			(entry) =>
+				entry.source === DIFF_SOURCE &&
+				entry.side === candidate.side &&
+				entry.path === candidate.path &&
+				entry.commit === candidate.commit,
+		);
+	const shown = sides.find((candidate) => capturedTextForSide(candidate) !== undefined) ?? sides[0];
+	const text = capturedTextForSide(shown);
+	return {
+		kind: DIFF_SOURCE,
+		...shown,
+		...(text === undefined ? {} : { sha256: text.sha256 }),
+	};
 }
 
 /** Why a capture cannot vouch for reading this kind from the checkout, or its completeness note. */
@@ -1300,8 +1445,12 @@ export function buildPrimarySourceReference(
 	reader: PrimarySourceReader,
 	limits: BriefLimits = DEFAULT_BRIEF_LIMITS,
 ): string {
-	const cited = citedPrimaryFiles(results, contextRoot, repositoryRoot);
-	if (cited.length === 0 || !isRecord(folderIndex)) {
+	const texts = manifestTexts(folderIndex);
+	const { files: cited, changeLines, unproven } = citedPrimaryFiles(results, contextRoot, texts);
+	if (
+		(cited.length === 0 && changeLines.length === 0 && unproven.length === 0) ||
+		!isRecord(folderIndex)
+	) {
 		return "";
 	}
 	const captures = primaryCaptures(
@@ -1318,9 +1467,29 @@ export function buildPrimarySourceReference(
 			omissions.push(line);
 		}
 	};
+	for (const what of unproven) {
+		omit(`- ${what}: no captured text matches the proof admission recorded`);
+	}
 	const read = new Map<string, PinnedBlob>();
 	const shown = new Set<string>();
 	let diff: PinnedDiff | undefined;
+	const change = captures.get(DIFF_SOURCE);
+	for (const lines of changeLines) {
+		const label = `lines ${lines.startLine}–${lines.endLine} of the captured change`;
+		if (change === undefined || "omitted" in change || change.range === undefined) {
+			omit(
+				`- ${label}: ${change !== undefined && "omitted" in change ? change.omitted : "not part of this capture"}`,
+			);
+			continue;
+		}
+		diff ??= reader.diff(change.range.base, change.range.head, limits.diffChars);
+		const file = changedFileOf(root, lines, diff, change.range, texts, limits.diffChars);
+		if ("omitted" in file) {
+			omit(`- ${label}: ${file.omitted}`);
+		} else {
+			cited.push(file);
+		}
+	}
 	for (const file of cited) {
 		const key = `${file.commit}\0${file.path}`;
 		const capture = captures.get(file.kind);
@@ -1335,6 +1504,10 @@ export function buildPrimarySourceReference(
 		const { range } = capture;
 		if (range !== undefined && file.commit !== (file.side === "OLD" ? range.base : range.head)) {
 			omit(`- ${label}: names a commit outside the pinned change`);
+			continue;
+		}
+		if (file.sha256 === undefined) {
+			omit(`- ${label}: the capture holds no text of this file to check it against`);
 			continue;
 		}
 		// The bytes of a path at a commit are read once; each citation is checked against its own verified digest.
