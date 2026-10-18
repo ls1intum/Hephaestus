@@ -51,7 +51,8 @@ class PracticeScriptRunRecorder {
      */
     void record(ReviewJob job, byte @Nullable [] report, Map<ModelKind, FrozenModel> slots, Instant finishedAt) {
         if (report == null) return;
-        var admitted = assignments.load(job).stream()
+        // The runner is given only the admissible practices, so only they can be missing from its report.
+        var admitted = assignments.admissible(job).stream()
                 .collect(Collectors.toMap(ReviewAssignmentSnapshot::practiceSlug, Function.identity()));
         long workspaceId = job.getWorkspaceId();
         Map<String, ScriptKind> kinds = new HashMap<>();

@@ -24,6 +24,7 @@ import {
 	reviewPracticeScripts,
 	reviewUsageTwoAttempts,
 	reviewUsageUnpriced,
+	resultCounts,
 } from "./fixtures";
 import { SHEET_SECTIONS } from "./RecordSheet";
 import { REQUEST_BLOCKED } from "./RequestReviewAction";
@@ -573,6 +574,38 @@ export const ReadyAfterItsScriptRan: Story = {
 		await expect(row).toHaveTextContent("Ready");
 		await expect(row).not.toHaveTextContent(/It runs next/u);
 		await expect(row).toHaveTextContent(/returned a result/u);
+	},
+};
+
+/** A practice that capture proved does not apply was never given to the runner, so it has a result and no script run. */
+const notApplicable = withScripts.practices.find((practice) => practice.script === null);
+
+export const DoesNotApplyWithoutAScriptRun: Story = {
+	args: {
+		review: ready({
+			...withScripts,
+			practices: withScripts.practices.map((practice) =>
+				practice === notApplicable
+					? {
+							...practice,
+							status: "DONE",
+							reason: null,
+							results: resultCounts(["DOES_NOT_APPLY"]),
+						}
+					: practice,
+			),
+		}),
+	},
+	play: async () => {
+		await expect(notApplicable).toBeDefined();
+		const name = notApplicable?.practiceName ?? "";
+		const panel = within(await settledDrawerPanel());
+		const list = panel.getByRole("list", { name: "Every practice in this review" });
+		const row = within(list).getByText(name).closest("li");
+		await expect(row).toHaveTextContent(/does not apply/iu);
+		await expect(row).not.toHaveTextContent(/script/iu);
+		const table = panel.getByRole("table", { name: "How each practice script ran in this review" });
+		await expect(within(table).queryByRole("rowheader", { name })).toBeNull();
 	},
 };
 
