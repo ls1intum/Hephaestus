@@ -14,6 +14,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.evidence.CitationSide;
@@ -61,6 +62,13 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
     private static final String BOT = "gid://gitlab/User/1";
     private static final String PERSON = "gid://gitlab/User/2";
     private static final String NOTE_URL = "https://gitlab.example.com/group/project/-/merge_requests/42#note_987654";
+    // The reviewed version was read completely, and its diff does not contain the cited line.
+    private static final GitLabDiffPositions.Version WITHOUT_CITED_LINE = new GitLabDiffPositions.Version(
+            1,
+            GitLabDiffPositionsTest.VERSION.base(),
+            GitLabDiffPositionsTest.VERSION.start(),
+            GitLabDiffPositionsTest.VERSION.head(),
+            List.of());
 
     @Mock
     private GitLabGraphQlClientProvider gitLabProvider;
@@ -160,6 +168,44 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
         verify(client, never()).documentName("CreateMergeRequestNote");
     }
 
+    // An unread diff version proves no position absent, so it must not become a plain comment.
+    @Test
+    void shouldCreateNothingWhenTheDiffVersionCannotBeRead() {
+        stubResolvedMr();
+        stubDiscussions(List.of(), BOT);
+        when(diffVersions.read(eq(1L), any(), any()))
+                .thenThrow(new FeedbackDeliveryException("GitLab diff versions could not be read"));
+        var selected = ScmFeedbackFixtures.line(
+                new FeedbackAnchor("new.java", null, 21, CitationSide.NEW), "fix", MARKER, "selected");
+
+        assertThatThrownBy(() -> channel.postImmutablePackage(target(), List.of(selected), fence))
+                .isInstanceOf(FeedbackDeliveryException.class);
+
+        assertThat(fence.attempts).isEmpty();
+        verify(egressGuard, never()).requireDeliveryAllowed(anyString());
+        verify(client, never()).documentName("CreateDiffNote");
+        verify(client, never()).documentName("CreateMergeRequestNote");
+    }
+
+    @Test
+    void shouldPostAFileCommentWithoutReadingADiffVersion() {
+        stubResolvedMr();
+        stubDiscussions(List.of(), BOT);
+        GraphQlClient.RequestSpec spec = createSpec();
+        ClientGraphQlResponse response = createResponse(created("gid://gitlab/Note/NEW"), List.of());
+        when(spec.execute()).thenReturn(Mono.just(response));
+        var file =
+                ScmFeedbackFixtures.line(new FeedbackAnchor("src/Foo.java", null, null, null), "fix", MARKER, "file");
+
+        var result = channel.postImmutablePackage(target(), List.of(file), fence);
+
+        assertThat(result.receipts()).singleElement().satisfies(receipt -> {
+            assertThat(receipt.disposition()).isEqualTo(CopyDisposition.POSTED);
+            assertThat(receipt.actualKind()).isEqualTo(CopyForm.FILE_NOTE);
+        });
+        verifyNoInteractions(diffVersions);
+    }
+
     @Test
     void shouldVerifyEachCopyUsingItsOwnMarker() {
         when(gitLabProvider.forScope(1L)).thenReturn(client);
@@ -248,6 +294,7 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
     void shouldPostEachNoteAsAnOrdinaryCommentLinkingToTheReviewedCommitFencedBeforeItsCreate() {
         stubResolvedMr();
         stubDiscussions(List.of(), BOT);
+        when(diffVersions.read(eq(1L), any(), any())).thenReturn(WITHOUT_CITED_LINE);
         GraphQlClient.RequestSpec spec = createSpec();
         ArgumentCaptor<String> bodies = ArgumentCaptor.forClass(String.class);
         when(spec.variable(eq("body"), bodies.capture())).thenReturn(spec);
@@ -291,6 +338,7 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
         when(mrResolver.resolve(1L, "group/sub.group/project", 42))
                 .thenReturn(new MrInfo("gid://gitlab/MR/42", "base", "head", "start"));
         stubDiscussions(List.of(), BOT);
+        when(diffVersions.read(eq(1L), any(), any())).thenReturn(WITHOUT_CITED_LINE);
         GraphQlClient.RequestSpec spec = createSpec();
         ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
         when(spec.variable(eq("body"), body.capture())).thenReturn(spec);
@@ -318,6 +366,7 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
     void shouldKeepAHostileFileNameInsideTheEncodedAddressAndOutOfTheCommentText() {
         stubResolvedMr();
         stubDiscussions(List.of(), BOT);
+        when(diffVersions.read(eq(1L), any(), any())).thenReturn(WITHOUT_CITED_LINE);
         GraphQlClient.RequestSpec spec = createSpec();
         ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
         when(spec.variable(eq("body"), body.capture())).thenReturn(spec);
@@ -344,6 +393,7 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
     void shouldLinkOldSideNotesToTheirCapturedBase() {
         stubResolvedMr();
         stubDiscussions(List.of(), BOT);
+        when(diffVersions.read(eq(1L), any(), any())).thenReturn(WITHOUT_CITED_LINE);
         var spec = createSpec();
         var bodies = ArgumentCaptor.forClass(String.class);
         when(spec.variable(eq("body"), bodies.capture())).thenReturn(spec);
@@ -444,6 +494,7 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
         LineNote owed = item("fix-b", "observation:b:0");
         stubDiscussions(
                 List.of(discussion("gid://Disc/A", List.of(note("gid://gitlab/Note/A", located(kept), BOT)))), BOT);
+        when(diffVersions.read(eq(1L), any(), any())).thenReturn(WITHOUT_CITED_LINE);
         fence.acceptOnly = 0;
 
         CopyWriteResult result = channel.postImmutablePackage(target(), List.of(owed, kept), fence);
@@ -574,6 +625,7 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
         stubResolvedMr();
         stubDiscussions(List.of(), BOT);
         GraphQlClient.RequestSpec spec = createSpec();
+        when(diffVersions.read(eq(1L), any(), any())).thenReturn(WITHOUT_CITED_LINE);
         when(spec.execute()).thenReturn(Mono.error(new RuntimeException("429 Too Many Requests")));
 
         CopyWriteResult result = channel.postImmutablePackage(
@@ -592,6 +644,7 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
         stubResolvedMr();
         stubDiscussions(List.of(), BOT);
         GraphQlClient.RequestSpec spec = createSpec();
+        when(diffVersions.read(eq(1L), any(), any())).thenReturn(WITHOUT_CITED_LINE);
         ClientGraphQlResponse response = createResponse(null, List.of("validation failed"));
         when(spec.execute()).thenReturn(Mono.just(response));
 
@@ -607,6 +660,7 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
     void shouldRequestNothingWhenTheFenceRefusesOrEgressIsSilenced() {
         stubResolvedMr();
         stubDiscussions(List.of(), BOT);
+        when(diffVersions.read(eq(1L), any(), any())).thenReturn(WITHOUT_CITED_LINE);
         fence.acceptOnly = 0;
 
         CopyWriteResult refused = channel.postImmutablePackage(target(), List.of(item("fix", "result:a:0")), fence);

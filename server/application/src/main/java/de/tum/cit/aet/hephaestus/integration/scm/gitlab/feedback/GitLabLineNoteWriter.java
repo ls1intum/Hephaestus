@@ -121,7 +121,13 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
         String projectUrl = projectUrl(scopeId, mr);
         Map<String, Copy> copies = indexCopies(scopeId, mr, feedbackItems, target.version(), projectUrl);
 
-        var pinnedDiff = diffVersions.read(scopeId, mr, target.version());
+        // An unread diff version stops the package before any create instead of posting plain comments.
+        boolean positioned = feedbackItems.stream()
+                .anyMatch(item -> !item.body().isBlank()
+                        && item.anchor().endLine() != null
+                        && item.anchor().side() != null
+                        && !copies.containsKey(item.writeKey()));
+        var pinnedDiff = positioned ? diffVersions.read(scopeId, mr, target.version()) : null;
         List<CopyReceipt> completed = new ArrayList<>(feedbackItems.size());
         Set<String> processedKeys = new HashSet<>();
         for (int index = 0; index < feedbackItems.size(); index++) {
