@@ -2510,3 +2510,233 @@ void test("STALE delivered words permit ALREADY_SAID by the read time, not NO_MA
 		);
 	}
 });
+
+// --- Delivered line and file notes in own history ---------------------------------------------------
+
+const noteItem = {
+	kind: "scm.pull_request",
+	url: "https://github.example/acme/repo/pull/24",
+};
+const noteWork = `${noteItem.kind}:${noteItem.url}`;
+const backoffNote = {
+	id: "00000000-0000-4000-8000-0000000000a1",
+	kind: "LINE_NOTE",
+	body: "This catch turns every parse failure into ZERO, which disables the backoff. Throw an IllegalArgumentException that names the bad value.",
+	path: "src/main/java/acme/Backoff.java",
+	startLine: 24,
+	endLine: 26,
+	side: "NEW",
+	externalRef: "4305814241",
+	externalUrl: "https://github.example/acme/repo/pull/24#discussion_r4305814241",
+	postedAt: "2026-10-18T05:08:00Z",
+	state: "POSTED",
+};
+// One history entry as the public history read returns it: only the summary is in body.
+const deliveredNotes = (overrides: Record<string, unknown> = {}) => ({
+	id: historyFeedbackId(1),
+	destination: "ON_WORK",
+	state: "DELIVERED",
+	publicEligible: true,
+	item: noteItem,
+	itemVersion: "7a6f9f82".padEnd(40, "0"),
+	deliveredAt: "2026-10-18T05:08:00Z",
+	body: null,
+	bodyUnavailable: false,
+	recordedClaimCurrentness: "STALE",
+	withdrawn: false,
+	basedOn: [{ resultId: "earlier", practiceSlug: "errors", outcome: "NOT_MET" }],
+	copies: [backoffNote],
+	...overrides,
+});
+const readNotes = (
+	entry: Record<string, unknown>,
+	limits?: { sourceChars: number; totalChars: number },
+) =>
+	priorPublicFeedback(
+		{ feedback: [entry] },
+		noteWork,
+		"2026-10-18T07:47:15Z",
+		limits,
+		"2026-10-18T07:59:17Z",
+	);
+const noteDecision = (
+	said: ReturnType<typeof readNotes>["feedback"],
+	reason: string,
+	captured: Parameters<typeof priorAdviceWitnesses>[1] = [],
+) =>
+	readReview(
+		{
+			decisions: [
+				{
+					resultId: "current",
+					disposition: reason,
+					witnessIds: [`feedback:${historyFeedbackId(1)}`],
+				},
+			],
+		},
+		new Map<string, ReviewedResult>([
+			["current", { practiceSlug: "errors", outcome: "NOT_MET", problems: [] }],
+		]),
+		false,
+		{ witnesses: priorAdviceWitnesses(said, captured) },
+	);
+
+void test("a delivered line note without a summary is shown in own history and stands as already said when the capture lacks its comment", () => {
+	const said = readNotes(deliveredNotes()).feedback;
+	assert.deepEqual(
+		said.map((row) => [row.eligibleForAlreadySaid, row.eligibleForPriorAdvice]),
+		[[true, false]],
+	);
+	assert.deepEqual(said[0]?.notes, [
+		{
+			kind: "LINE_NOTE",
+			path: backoffNote.path,
+			startLine: 24,
+			endLine: 26,
+			side: "NEW",
+			body: backoffNote.body,
+		},
+	]);
+	// The capture holds only the author's reply; Hephaestus's own comment it answered is not there.
+	const reply = {
+		witnessId: "comment:context/comments.json:4305815364",
+		sourcePath: "context/comments.json",
+		sourceKind: "scm.pull-request.comments",
+		nativeId: "4305815364",
+		inReplyToId: "4305814241",
+		author: "author",
+		authorId: "21",
+		origin: "UNKNOWN" as const,
+		body: "The test fixture was resolved; this is not a code fix.",
+		statedAt: "2026-10-18T06:00:00Z",
+		updatedAt: null,
+		itemVersion: null,
+		eligibleForPriorAdvice: false,
+		state: null,
+		dismissed: null,
+		outdated: null,
+	};
+	const turn = buildReviewTurn({
+		sameWork: "The captured work.",
+		results: [],
+		qualifications: [],
+		alreadySaid: said,
+		ownHistoryReadAt: "2026-10-18T07:59:17Z",
+		captured: {
+			capturedAt: "2026-10-18T07:47:15Z",
+			recipient: { author: "author", authorId: "21" },
+			sources: [],
+			statements: [reply],
+		},
+		practices: [],
+		notReached: [],
+		lineNotes: true,
+		stagedCriteria: () => null,
+	});
+	const own = turn.split("What people and tools said")[0] ?? "";
+	assert.ok(own.includes(JSON.stringify(backoffNote.body)));
+	assert.ok(own.includes(JSON.stringify(backoffNote.path)));
+	assert.ok(!turn.includes(backoffNote.externalUrl));
+	assert.ok(!("errors" in noteDecision(said, "ALREADY_SAID", [reply])));
+	// A stale basis still records what was said, not current advice.
+	assert.ok("errors" in noteDecision(said, "NO_MATERIAL_CHANGE", [reply]));
+	const current = readNotes(deliveredNotes({ recordedClaimCurrentness: "CURRENT" })).feedback;
+	assert.deepEqual(
+		current.map((row) => [row.eligibleForAlreadySaid, row.eligibleForPriorAdvice]),
+		[[true, true]],
+	);
+	assert.ok(!("errors" in noteDecision(current, "NO_MATERIAL_CHANGE")));
+});
+
+void test("note words that are missing, unposted, retracted, withdrawn or not authorized are never prior advice", () => {
+	const unsaid = (overrides: Record<string, unknown>) => {
+		const said = readNotes(deliveredNotes(overrides)).feedback;
+		assert.deepEqual(
+			said.map((row) => [row.eligibleForAlreadySaid, row.eligibleForPriorAdvice]),
+			[[false, false]],
+			JSON.stringify(overrides),
+		);
+		assert.ok("errors" in noteDecision(said, "ALREADY_SAID"));
+		assert.ok("errors" in noteDecision(said, "NO_MATERIAL_CHANGE"));
+		return JSON.stringify(said);
+	};
+	for (const copies of [
+		[{ ...backoffNote, state: "RETRACTED" }],
+		// A history read without text authority, as for a withdrawn entry, returns each copy with no body.
+		[{ ...backoffNote, body: null }],
+		[{ ...backoffNote, body: "  " }],
+		[{ ...backoffNote, body: 7 }],
+		[{ ...backoffNote, state: "FAILED" }],
+		[{ ...backoffNote, kind: "CHAT_TURN" }],
+		[],
+		undefined,
+	]) {
+		assert.ok(!unsaid({ copies }).includes("disables the backoff"), JSON.stringify(copies));
+	}
+	// Words with a withdrawn or unverifiable basis are context at most, as a summary's are.
+	unsaid({ withdrawn: true });
+	unsaid({ recordedClaimCurrentness: "UNVERIFIABLE" });
+	// A retracted note leaves the posted one beside it standing; only posted words are shown.
+	const mixed = readNotes(
+		deliveredNotes({
+			copies: [{ ...backoffNote, state: "RETRACTED", body: "Retracted words." }, backoffNote],
+		}),
+	).feedback;
+	assert.deepEqual(
+		mixed.map((row) => [row.eligibleForAlreadySaid, row.notes?.map((shown) => shown.body)]),
+		[[true, [backoffNote.body]]],
+	);
+	assert.ok(!JSON.stringify(mixed).includes("Retracted words."));
+});
+
+void test("delivered note words count toward the whole-entry and total own-history limits", () => {
+	const long = { ...backoffNote, body: "Long delivered note. ".repeat(80) };
+	const oversized = readNotes(deliveredNotes({ copies: [long] }), {
+		sourceChars: 1200,
+		totalChars: 4000,
+	});
+	assert.deepEqual(oversized.feedback, []);
+	assert.deepEqual(oversized.omissions, { oversizedEntries: 1, budgetEntries: 0 });
+	const history = {
+		feedback: [
+			deliveredNotes({ copies: [{ ...backoffNote, body: "Earlier note. ".repeat(50) }] }),
+			deliveredNotes({ id: historyFeedbackId(2), copies: [backoffNote] }),
+		],
+	};
+	const limits = { sourceChars: 1400, totalChars: 1300 };
+	const view = priorPublicFeedback(
+		history,
+		noteWork,
+		"2026-10-18T07:47:15Z",
+		limits,
+		"2026-10-18T07:59:17Z",
+	);
+	assert.deepEqual(
+		view.feedback.map((row) => row.id),
+		[historyFeedbackId(2)],
+	);
+	assert.deepEqual(view.omissions, { oversizedEntries: 0, budgetEntries: 1 });
+	const turn = buildReviewTurn({
+		sameWork: "The captured work.",
+		results: [],
+		qualifications: [],
+		alreadySaid: view.feedback,
+		ownHistoryOmissions: view.omissions,
+		captured: {
+			capturedAt: null,
+			recipient: { author: null, authorId: null },
+			sources: [],
+			statements: [],
+		},
+		practices: [],
+		notReached: [],
+		lineNotes: true,
+		stagedCriteria: () => null,
+	});
+	const own = turn
+		.split("### Already said on this work\n")[1]
+		?.split("What people and tools said")[0];
+	assert.ok(typeof own === "string");
+	assert.ok(own.length <= limits.totalChars);
+	assert.ok(!turn.includes("Earlier note."));
+});
