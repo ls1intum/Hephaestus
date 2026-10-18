@@ -95,6 +95,7 @@ public class ScmItemService implements ItemSource {
         return items.labels(workspaceId, refs.stream().map(ItemRef::itemId).toList());
     }
 
+    @Transactional(readOnly = true, noRollbackFor = ItemCaptureException.class)
     @Override
     public Optional<ItemSnapshot> current(ItemRef item) {
         try {

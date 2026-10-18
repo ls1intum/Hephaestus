@@ -86,13 +86,13 @@ public class GitHubSubIssuesMessageHandler extends AbstractIntegrationMessageHan
         }
 
         // The payload's parent carries GitHub's own rollup after the change; a payload without one
-        // leaves the rollup to the next sync.
+        // makes the aggregate unknown until the next authoritative sync.
         if (action.isAdded()) {
             subIssueSyncService.processSubIssueEvent(
-                    subIssueId, parentIssueId, true, parentIssueDto.subIssuesSummary());
+                    subIssueId, parentIssueId, true, parentIssueDto.subIssuesSummary(), context);
         } else if (action.isRemoved()) {
             subIssueSyncService.processSubIssueEvent(
-                    subIssueId, parentIssueId, false, parentIssueDto.subIssuesSummary());
+                    subIssueId, parentIssueId, false, parentIssueDto.subIssuesSummary(), context);
         } else {
             log.debug("Skipped sub_issues event: reason=unhandledAction, action={}", event.action());
         }

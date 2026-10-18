@@ -320,9 +320,8 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        void shouldRecountTheParentsRollupWhenAChildClosesAndReopens() throws Exception {
-            // The closed payload carries the child's own summary, never the parent's: the parent is
-            // recounted from the children this repository stores.
+        void shouldKeepParentCompletionUnknownWhenAChildClosesAndReopens() throws Exception {
+            // A child payload cannot certify its parent's full inventory. Stored children remain a lower bound.
             handler.handleEvent(loadPayload("issues.opened"));
             Issue child = issueRepository
                     .findByRepositoryIdAndNumber(testRepository.getId(), 20)
@@ -334,20 +333,29 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             parent.setState(Issue.State.OPEN);
             parent.setRepository(testRepository);
             parent.setProvider(child.getProvider());
+            parent.setSubIssuesTotal(3);
+            parent.setSubIssuesCompleted(2);
+            parent.setSubIssuesPercentCompleted(66);
             parent = issueRepository.save(parent);
             child.setParentIssue(parent);
             issueRepository.save(child);
 
             handler.handleEvent(loadPayload("issues.closed"));
             Issue afterClose = issueRepository.findById(parent.getId()).orElseThrow();
-            assertThat(afterClose.getSubIssuesTotal()).isEqualTo(1);
-            assertThat(afterClose.getSubIssuesCompleted()).isEqualTo(1);
-            assertThat(afterClose.getSubIssuesPercentCompleted()).isEqualTo(100);
+            assertThat(afterClose.getSubIssuesTotal()).isEqualTo(3);
+            assertThat(afterClose.getSubIssuesCompleted()).isNull();
+            assertThat(afterClose.getSubIssuesPercentCompleted()).isNull();
+            var closedChildren = issueRepository.countChildrenByParentIssueId(parent.getId(), Issue.State.CLOSED);
+            assertThat(closedChildren.getTotal()).isEqualTo(1);
+            assertThat(closedChildren.getCompleted()).isEqualTo(1);
 
             handler.handleEvent(loadPayload("issues.reopened"));
             Issue afterReopen = issueRepository.findById(parent.getId()).orElseThrow();
-            assertThat(afterReopen.getSubIssuesTotal()).isEqualTo(1);
-            assertThat(afterReopen.getSubIssuesCompleted()).isEqualTo(0);
+            assertThat(afterReopen.getSubIssuesTotal()).isEqualTo(3);
+            assertThat(afterReopen.getSubIssuesCompleted()).isNull();
+            var reopenedChildren = issueRepository.countChildrenByParentIssueId(parent.getId(), Issue.State.CLOSED);
+            assertThat(reopenedChildren.getTotal()).isEqualTo(1);
+            assertThat(reopenedChildren.getCompleted()).isZero();
         }
 
         @Test

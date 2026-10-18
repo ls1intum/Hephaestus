@@ -59,6 +59,8 @@ public interface ResultRepository extends JpaRepository<Result, UUID>, ResultQue
 
     List<Result> findByWorkspaceIdAndItemIdOrderByRecordedAtDescIdDesc(long workspaceId, long itemId);
 
+    List<Result> findByWorkspaceIdAndItemIdAndEndedAtIsNull(long workspaceId, long itemId);
+
     List<Result> findByWorkspaceIdAndItemIdInAndEndedAtIsNullAndDeveloperIdIsNull(
             long workspaceId, Collection<Long> itemIds);
 

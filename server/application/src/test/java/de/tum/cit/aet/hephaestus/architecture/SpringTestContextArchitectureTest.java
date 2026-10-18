@@ -48,6 +48,7 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
                     "integration.outline.connect.OutlineConnectionAdminControllerIntegrationTest", "outline-enabled"),
             assignment("integration.outline.item.DocumentItemSourceIntegrationTest", "outline-enabled"),
             assignment("integration.outline.sync.OutlineDocumentSyncIntegrationTest", "outline-enabled"),
+            assignment("integration.scm.domain.item.ScmItemSourceIntegrationTest", "scm-source-currentness"),
             assignment("integration.scm.github.BaseGitHubLiveIntegrationTest", "github-live"),
             assignment(
                     "integration.scm.gitlab.credentials.GitLabTokenLifecycleIntegrationTest", "gitlab-token-lifecycle"),
@@ -202,6 +203,10 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             Map.entry(
                     "review-scanreport",
                     "real scan report membership, marks and visibility with runtime/person" + " boundaries controlled"),
+            Map.entry(
+                    "scm-source-currentness",
+                    "real native SCM capture and current-row reconciliation with a listener spy"
+                            + " for transactional rollback and durable retry"),
             Map.entry("slack-enabled", "real Slack item resolution with the configured provider adapter"),
             Map.entry("slack-ingest", "enabled Slack ingest wiring with its review-submission spy"),
             Map.entry("slack-lifecycle", "agent submission boundary override"),

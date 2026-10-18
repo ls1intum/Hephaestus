@@ -2,24 +2,32 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.item;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doThrow;
 
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.evidence.capture.CaptureRequest;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemEventRecorded;
 import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemSourceObserved;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.framework.ItemDescriptorRegistry;
+import de.tum.cit.aet.hephaestus.integration.core.item.ItemRepository;
 import de.tum.cit.aet.hephaestus.integration.core.itemevent.ItemEventRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FoundBy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventInput;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemMergeTimeQuery;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.MonitoredRepositoryQuery;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewRequestReason;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewStateValue;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RoleHolder;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.IssueContentSource;
@@ -31,6 +39,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
@@ -42,6 +52,14 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
+import de.tum.cit.aet.hephaestus.integration.scm.github.subissue.GitHubSubIssueSyncService;
+import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
+import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
+import de.tum.cit.aet.hephaestus.practices.result.ResultCurrentness;
+import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
@@ -50,6 +68,7 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -58,15 +77,42 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.modulith.events.FailedEventPublications;
+import org.springframework.modulith.events.ResubmissionOptions;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
+@Import(ReviewIntegrationData.class)
 class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
+    @Autowired
+    private ReviewIntegrationData resultData;
+
+    @Autowired
+    private ResultRepository results;
+
+    @Autowired
+    private LabelRepository labels;
+
+    @Autowired
+    private ItemRepository itemRows;
+
+    @Autowired
+    private PracticeVersionService practiceVersions;
+
+    @MockitoSpyBean
+    private ResultCurrentness currentness;
+
+    @Autowired
+    private FailedEventPublications failedPublications;
+
     @Autowired
     private ScmItemService sources;
 
@@ -579,6 +625,576 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
                         item.workspaceId(),
                         item.itemId()))
                 .containsExactly("scm.pull_request.opened|" + captured.value() + "|SYNC");
+    }
+
+    @Autowired
+    private GitHubSubIssueSyncService subIssues;
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldChangeParentEvidenceAndRecordItsOccasionWhenATrackedChildClosesAndReopens(IdentityProviderType type) {
+        var fixture = fixture(type);
+        var unrelated = fixture(type);
+        var parent = progressIssue(fixture, 20, null);
+        var child = progressIssue(fixture, 21, parent);
+        progressIssue(fixture, 22, parent);
+        if (type == IdentityProviderType.GITHUB) {
+            parent.setSubIssuesTotal(2);
+            parent.setSubIssuesCompleted(0);
+            parent.setSubIssuesPercentCompleted(0);
+            issues.saveAndFlush(parent);
+        }
+        var holder = writer.upsert(new ItemRegistration(
+                fixture.workspace().getId(),
+                ScmItemEvents.REPOSITORY,
+                fixture.repository().getId(),
+                null,
+                null));
+        var item = writer.upsert(new ItemRegistration(
+                fixture.workspace().getId(), ScmItemEvents.ISSUE, parent.getId(), holder.itemId(), null));
+        var originalSnapshot = sources.pin(item, null);
+        var original = originalSnapshot.version();
+        var context = new EventContext(
+                UUID.randomUUID(),
+                Instant.now(),
+                fixture.workspace().getId(),
+                null,
+                DataSource.WEBHOOK,
+                "closed",
+                UUID.randomUUID().toString(),
+                type,
+                fixture.author().getId());
+
+        changeChildState(child.getId(), Issue.State.CLOSED, context, type);
+
+        var closed = sources.pin(item, null).version();
+        assertThat(closed).isNotEqualTo(original);
+        assertThatThrownBy(() -> sources.pin(item, original))
+                .isInstanceOfSatisfying(
+                        ItemCaptureException.class,
+                        refusal -> assertThat(refusal.code()).isEqualTo(ItemCaptureCode.VERSION_UNAVAILABLE));
+        assertThatThrownBy(() -> sources.capture(
+                        originalSnapshot,
+                        new CaptureRequest(
+                                UUID.randomUUID(), UUID.randomUUID(), 1, Set.of(IssueContentSource.CORE), "2.0.0", 3)))
+                .isInstanceOfSatisfying(
+                        ItemCaptureException.class,
+                        refusal -> assertThat(refusal.code()).isEqualTo(ItemCaptureCode.VERSION_UNAVAILABLE));
+        assertThat(jdbc.queryForList(
+                        "SELECT item_version || '|' || found_by FROM item_event WHERE workspace_id=? AND item_id=? AND name=?",
+                        String.class,
+                        item.workspaceId(),
+                        item.itemId(),
+                        ScmItemEvents.ISSUE_UPDATED.value()))
+                .containsExactly(closed.value() + "|WEBHOOK");
+        assertThat(jdbc.queryForList(
+                        "SELECT id FROM item_event WHERE workspace_id=?",
+                        UUID.class,
+                        unrelated.workspace().getId()))
+                .isEmpty();
+
+        changeChildState(child.getId(), Issue.State.OPEN, context, type);
+
+        var reopened = sources.pin(item, null).version();
+        assertThat(reopened).isNotEqualTo(closed);
+        if (type == IdentityProviderType.GITLAB) assertThat(reopened).isEqualTo(original);
+        assertThatThrownBy(() -> sources.pin(item, closed))
+                .isInstanceOfSatisfying(
+                        ItemCaptureException.class,
+                        refusal -> assertThat(refusal.code()).isEqualTo(ItemCaptureCode.VERSION_UNAVAILABLE));
+        assertThat(jdbc.queryForList(
+                        "SELECT item_version FROM item_event WHERE workspace_id=? AND item_id=? AND name=?",
+                        String.class,
+                        item.workspaceId(),
+                        item.itemId(),
+                        ScmItemEvents.ISSUE_UPDATED.value()))
+                .containsExactlyInAnyOrder(reopened.value(), closed.value());
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldVersionAuthoritativeProgressWithoutTreatingAnEmptyMirrorAsACompleteInventory(IdentityProviderType type) {
+        var fixture = fixture(type);
+        var parent = progressIssue(fixture, 30, null);
+        var holder = writer.upsert(new ItemRegistration(
+                fixture.workspace().getId(),
+                ScmItemEvents.REPOSITORY,
+                fixture.repository().getId(),
+                null,
+                null));
+        var item = writer.upsert(new ItemRegistration(
+                fixture.workspace().getId(), ScmItemEvents.ISSUE, parent.getId(), holder.itemId(), null));
+        var unknown = sources.pin(item, null).version();
+        parent.setLastSyncAt(Instant.now());
+        issues.saveAndFlush(parent);
+        assertThat(sources.pin(item, null).version()).isEqualTo(unknown);
+        parent.setSubIssuesTotal(2);
+        parent.setSubIssuesCompleted(0);
+        issues.saveAndFlush(parent);
+        var before = sources.pin(item, null).version();
+        assertThat(before).isNotEqualTo(unknown);
+        parent.setSubIssuesCompleted(1);
+        issues.saveAndFlush(parent);
+        assertThat(sources.pin(item, null).version()).isNotEqualTo(before);
+        assertThatThrownBy(() -> sources.pin(item, before)).isInstanceOf(ItemCaptureException.class);
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldRetireCurrentParentResultsThroughTheNativeChildFlow(IdentityProviderType type) {
+        var fixture = fixture(type);
+        var parent = progressIssue(fixture, 40, null);
+        var child = progressIssue(fixture, 41, parent);
+        var holder = writer.upsert(new ItemRegistration(
+                fixture.workspace().getId(),
+                ScmItemEvents.REPOSITORY,
+                fixture.repository().getId(),
+                null,
+                null));
+        var item = writer.upsert(new ItemRegistration(
+                fixture.workspace().getId(), ScmItemEvents.ISSUE, parent.getId(), holder.itemId(), null));
+        var scenario = parentScenario(fixture, item);
+        var other = resultData.scenario();
+        var untouched =
+                resultData.result(other, ResultOutcome.MET, Instant.now().minusSeconds(30));
+        var prior =
+                resultData.result(scenario, ResultOutcome.NOT_MET, Instant.now().minusSeconds(30));
+        var closedContext = progressContext(fixture, type);
+        changeChildState(child.getId(), Issue.State.CLOSED, closedContext, type);
+        assertThat(results.findById(prior.getId()).orElseThrow().getEndReason())
+                .isEqualTo(ResultEndReason.WORK_CHANGED);
+        assertThat(results.findById(untouched.getId()).orElseThrow().getEndedAt())
+                .isNull();
+        var closedResult =
+                resultData.result(scenario, ResultOutcome.MET, Instant.now().minusSeconds(1));
+        changeChildState(child.getId(), Issue.State.OPEN, progressContext(fixture, type), type);
+        assertThat(results.findById(closedResult.getId()).orElseThrow().getEndReason())
+                .isEqualTo(ResultEndReason.WORK_CHANGED);
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldKeepPartialChildInventoryAsALowerBoundAfterAChildCloses(IdentityProviderType type) {
+        var fixture = fixture(type);
+        var parent = progressIssue(fixture, 50, null);
+        var child = progressIssue(fixture, 51, parent);
+        if (type == IdentityProviderType.GITHUB) {
+            parent.setSubIssuesTotal(3);
+            parent.setSubIssuesCompleted(0);
+            issues.saveAndFlush(parent);
+        }
+        var holder = writer.upsert(new ItemRegistration(
+                fixture.workspace().getId(),
+                ScmItemEvents.REPOSITORY,
+                fixture.repository().getId(),
+                null,
+                null));
+        var item = writer.upsert(new ItemRegistration(
+                fixture.workspace().getId(), ScmItemEvents.ISSUE, parent.getId(), holder.itemId(), null));
+        changeChildState(child.getId(), Issue.State.CLOSED, progressContext(fixture, type), type);
+        var snapshot = sources.pin(item, null);
+        var captured = sources.capture(
+                snapshot,
+                new CaptureRequest(
+                        UUID.randomUUID(), UUID.randomUUID(), 1, Set.of(IssueContentSource.CORE), "2.0.0", 3));
+        var metadata = new JsonMapper().readTree(captured.files().get("context/metadata.json"));
+        assertThat(metadata.get("sub_issues_source").asString()).isEqualTo("children");
+        assertThat(metadata.get("sub_issues_total").asLong()).isEqualTo(1);
+        assertThat(metadata.get("sub_issues_completed").asLong()).isEqualTo(1);
+        if (type == IdentityProviderType.GITHUB) {
+            var stored = issues.findById(parent.getId()).orElseThrow();
+            assertThat(stored.getSubIssuesTotal()).isEqualTo(3);
+            assertThat(stored.getSubIssuesCompleted()).isNull();
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldRetireAReopenedParentResultWhenTheSameChildClosesAgain(IdentityProviderType type) {
+        var fixture = fixture(type);
+        var parent = progressIssue(fixture, 60, null);
+        var child = progressIssue(fixture, 61, parent);
+        var holder = writer.upsert(new ItemRegistration(
+                fixture.workspace().getId(),
+                ScmItemEvents.REPOSITORY,
+                fixture.repository().getId(),
+                null,
+                null));
+        var item = writer.upsert(new ItemRegistration(
+                fixture.workspace().getId(), ScmItemEvents.ISSUE, parent.getId(), holder.itemId(), null));
+        var scenario = parentScenario(fixture, item);
+        changeChildState(child.getId(), Issue.State.CLOSED, progressContext(fixture, type), type);
+        var closedVersion = sources.pin(item, null).version();
+        changeChildState(child.getId(), Issue.State.OPEN, progressContext(fixture, type), type);
+        var reopenedVersion = sources.pin(item, null).version();
+        assertThat(reopenedVersion).isNotEqualTo(closedVersion);
+        var at = Instant.now();
+        var reopened = resultData.result(scenario, ResultOutcome.MET, at, at, reopenedVersion.value());
+        assertThat(results.forDevelopersSince(
+                        item.workspaceId(), List.of(scenario.account().getId()), Instant.EPOCH, true))
+                .extracting(row -> row.getId())
+                .containsExactly(reopened.getId());
+
+        changeChildState(child.getId(), Issue.State.CLOSED, progressContext(fixture, type), type);
+
+        assertThat(sources.pin(item, null).version()).isEqualTo(closedVersion);
+        assertThat(results.forDevelopersSince(
+                        item.workspaceId(), List.of(scenario.account().getId()), Instant.EPOCH, true))
+                .isEmpty();
+        assertThat(results.findById(reopened.getId()).orElseThrow().getEndReason())
+                .isEqualTo(ResultEndReason.WORK_CHANGED);
+    }
+
+    private ReviewIntegrationData.Scenario parentScenario(Fixture fixture, ItemRef item) {
+        var account = resultData.member(item.workspaceId());
+        var practice = practiceVersions.create(new PracticeVersionService.NewPractice(
+                fixture.workspace(),
+                "progress-" + UUID.randomUUID(),
+                ScmItemEvents.ISSUE,
+                DefinitionTestFixtures.definition(
+                        ScmItemEvents.ISSUE, "Track parent progress", "Check tracked progress.", null),
+                null,
+                0,
+                account.getId()));
+        var scenario = new ReviewIntegrationData.Scenario(
+                fixture.workspace(),
+                account,
+                practice,
+                itemRows.findByIdAndWorkspaceId(item.itemId(), item.workspaceId())
+                        .orElseThrow());
+        return scenario;
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldKeepUnavailableSourceVisibilityDistinctFromAnItemTombstone(IdentityProviderType type) {
+        var fixture = fixture(type);
+        var parent = progressIssue(fixture, 70, null);
+        var holder = writer.upsert(new ItemRegistration(
+                fixture.workspace().getId(),
+                ScmItemEvents.REPOSITORY,
+                fixture.repository().getId(),
+                null,
+                null));
+        var item = writer.upsert(new ItemRegistration(
+                fixture.workspace().getId(), ScmItemEvents.ISSUE, parent.getId(), holder.itemId(), null));
+        var canonical = sources.pin(item, null).version();
+        var scenario = parentScenario(fixture, item);
+        var at = Instant.now();
+        var current = resultData.result(scenario, ResultOutcome.MET, at, at, canonical.value());
+        var monitor = monitors.findByWorkspaceIdAndNameWithOwner(
+                        item.workspaceId(), fixture.repository().getNameWithOwner())
+                .orElseThrow();
+        monitor.setNativeId(fixture.repository().getNativeId() == 13L ? 14L : 13L);
+        monitors.saveAndFlush(monitor);
+        assertThat(sources.current(item)).isEmpty();
+
+        transactions.executeWithoutResult(
+                ignored -> publisher.publishEvent(new ItemSourceObserved(item.workspaceId(), item.itemId())));
+
+        assertThat(results.findById(current.getId()).orElseThrow().getEndedAt()).isNull();
+        assertThat(itemRows.findByIdAndWorkspaceId(item.itemId(), item.workspaceId())
+                        .orElseThrow()
+                        .getRemovedAt())
+                .isNull();
+        monitor.setNativeId(fixture.repository().getNativeId());
+        monitors.saveAndFlush(monitor);
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldRedeliverACoalescedSourceObservationAgainstCurrentFacts(IdentityProviderType type) {
+        var setup = progressFixture(type, 80);
+        var item = setup.item();
+        changeChildState(setup.child().getId(), Issue.State.CLOSED, progressContext(setup.fixture(), type), type);
+        var closed = sources.pin(item, null).version();
+        changeChildState(setup.child().getId(), Issue.State.OPEN, progressContext(setup.fixture(), type), type);
+        var reopened = sources.pin(item, null).version();
+        var at = Instant.now();
+        var current = resultData.result(setup.scenario(), ResultOutcome.MET, at, at, reopened.value());
+        var occasions = jdbc.queryForList(
+                "SELECT id FROM item_event WHERE workspace_id=? AND item_id=?",
+                UUID.class,
+                item.workspaceId(),
+                item.itemId());
+        transactions.executeWithoutResult(
+                ignored -> doThrow(new IllegalStateException("Planned source observation failure"))
+                        .doCallRealMethod()
+                        .when(currentness)
+                        .reconcile(item.workspaceId(), item.itemId()));
+
+        changeChildState(setup.child().getId(), Issue.State.CLOSED, progressContext(setup.fixture(), type), type);
+
+        assertThat(sourcePublications(item))
+                .singleElement()
+                .satisfies(row -> assertThat(row.get("status")).isEqualTo("FAILED"));
+        assertThat(results.findById(current.getId()).orElseThrow().getEndedAt()).isNull();
+        // The old failed publication must reread the now-reopened source, not replay its former closed version.
+        changeChildState(setup.child().getId(), Issue.State.OPEN, progressContext(setup.fixture(), type), type);
+        failedPublications.resubmit(ResubmissionOptions.defaults()
+                .withMinAge(Duration.ZERO)
+                .withMaxInFlight(1)
+                .withFilter(publication -> publication.getEvent() instanceof ItemSourceObserved observed
+                        && observed.workspaceId() == item.workspaceId()
+                        && observed.itemId() == item.itemId()));
+        assertThat(sourcePublications(item)).isEmpty();
+        assertThat(results.findById(current.getId()).orElseThrow().getEndedAt()).isNull();
+
+        changeChildState(setup.child().getId(), Issue.State.CLOSED, progressContext(setup.fixture(), type), type);
+        var endedAt = results.findById(current.getId()).orElseThrow().getEndedAt();
+        assertThat(endedAt).isNotNull();
+        at = Instant.now();
+        var matching = resultData.result(setup.scenario(), ResultOutcome.MET, at, at, closed.value());
+        transactions.executeWithoutResult(
+                ignored -> publisher.publishEvent(new ItemSourceObserved(item.workspaceId(), item.itemId())));
+        assertThat(results.findById(matching.getId()).orElseThrow().getEndedAt())
+                .isNull();
+        assertThat(results.findById(current.getId()).orElseThrow().getEndedAt()).isEqualTo(endedAt);
+        assertThat(jdbc.queryForList(
+                        "SELECT id FROM item_event WHERE workspace_id=? AND item_id=?",
+                        UUID.class,
+                        item.workspaceId(),
+                        item.itemId()))
+                .containsExactlyInAnyOrderElementsOf(occasions);
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldRollBackTheSourceMutationAndItsCoalescedPublicationTogether(IdentityProviderType type) {
+        var setup = progressFixture(type, 90);
+        var item = setup.item();
+        changeChildState(setup.child().getId(), Issue.State.CLOSED, progressContext(setup.fixture(), type), type);
+        changeChildState(setup.child().getId(), Issue.State.OPEN, progressContext(setup.fixture(), type), type);
+        var reopened = sources.pin(item, null).version();
+        var at = Instant.now();
+        var current = resultData.result(setup.scenario(), ResultOutcome.MET, at, at, reopened.value());
+
+        transactions.executeWithoutResult(status -> {
+            writer.lock(item.workspaceId(), item.itemId());
+            var child = issues.findById(setup.child().getId()).orElseThrow();
+            child.setState(Issue.State.CLOSED);
+            issues.saveAndFlush(child);
+            var version = sources.pin(item, null).version();
+            writer.record(new ItemEventInput(
+                    item.workspaceId(),
+                    item.itemId(),
+                    ScmItemEvents.ISSUE_UPDATED,
+                    version.value(),
+                    Instant.now(),
+                    FoundBy.SYNC,
+                    null,
+                    null));
+            assertThat(sourcePublications(item)).hasSize(1);
+            status.setRollbackOnly();
+        });
+
+        assertThat(sourcePublications(item)).isEmpty();
+        assertThat(issues.findById(setup.child().getId()).orElseThrow().getState())
+                .isEqualTo(Issue.State.OPEN);
+        assertThat(sources.pin(item, null).version()).isEqualTo(reopened);
+        assertThat(results.findById(current.getId()).orElseThrow().getEndedAt()).isNull();
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldReconcileAnExpiredOccasionWhenItsDurablePublicationIsRetried(IdentityProviderType type) {
+        var setup = progressFixture(type, 100);
+        var item = setup.item();
+        var version = sources.pin(item, null).version();
+        var at = Instant.now();
+        var current = resultData.result(setup.scenario(), ResultOutcome.MET, at, at, version.value());
+        transactions.executeWithoutResult(
+                ignored -> doThrow(new IllegalStateException("Planned recorded occasion failure"))
+                        .doCallRealMethod()
+                        .when(currentness)
+                        .reconcile(item.workspaceId(), item.itemId()));
+
+        changeChildState(setup.child().getId(), Issue.State.CLOSED, progressContext(setup.fixture(), type), type);
+
+        var occasionId = Objects.requireNonNull(jdbc.queryForObject(
+                "SELECT id FROM item_event WHERE workspace_id=? AND item_id=?",
+                UUID.class,
+                item.workspaceId(),
+                item.itemId()));
+        assertThat(occasionId).isNotNull();
+        assertThat(results.findById(current.getId()).orElseThrow().getEndedAt()).isNull();
+        assertThat(jdbc.queryForObject(
+                        "SELECT status FROM event_publication WHERE event_type=?"
+                                + " AND serialized_event::jsonb->>'eventId'=?",
+                        String.class,
+                        ItemEventRecorded.class.getName(),
+                        occasionId.toString()))
+                .isEqualTo("FAILED");
+        // Apply the reaper's terminal transition only to this fixture's delayed occasion.
+        transactions.executeWithoutResult(ignored -> assertThat(events.decide(
+                        item.workspaceId(),
+                        occasionId,
+                        new ItemEventRepository.Decision(
+                                ItemEventState.RECORDED,
+                                ItemEventState.EXPIRED,
+                                ReviewRequestReason.PENDING_DEADLINE_EXCEEDED,
+                                Instant.now(),
+                                null)))
+                .isEqualTo(1));
+
+        failedPublications.resubmit(ResubmissionOptions.defaults()
+                .withMinAge(Duration.ZERO)
+                .withMaxInFlight(1)
+                .withFilter(publication -> publication.getEvent() instanceof ItemEventRecorded recorded
+                        && recorded.workspaceId() == item.workspaceId()
+                        && recorded.eventId().equals(occasionId)));
+
+        assertThat(results.findById(current.getId()).orElseThrow().getEndReason())
+                .isEqualTo(ResultEndReason.WORK_CHANGED);
+        assertThat(events.findByIdAndWorkspaceId(occasionId, item.workspaceId())
+                        .orElseThrow()
+                        .getState())
+                .isEqualTo(ItemEventState.EXPIRED);
+        assertThat(jdbc.queryForObject(
+                        "SELECT count(*) FROM review WHERE workspace_id=? AND event_id=?",
+                        Long.class,
+                        item.workspaceId(),
+                        occasionId))
+                .isZero();
+        assertThat(jdbc.queryForObject(
+                        "SELECT count(*) FROM event_publication WHERE event_type=?"
+                                + " AND serialized_event::jsonb->>'eventId'=?",
+                        Long.class,
+                        ItemEventRecorded.class.getName(),
+                        occasionId.toString()))
+                .isZero();
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldKeepChangedLabelEvidenceHistoricalWithoutInventingANewOccasion(IdentityProviderType type) {
+        var setup = progressFixture(type, 110);
+        var item = setup.item();
+        var before = sources.pin(item, null).version();
+        var at = Instant.now().minusSeconds(10);
+        var current = resultData.result(setup.scenario(), ResultOutcome.MET, at, at, before.value());
+        transactions.executeWithoutResult(ignored -> {
+            var parent =
+                    issues.findById(Objects.requireNonNull(item.sourceId())).orElseThrow();
+            var label = new Label();
+            label.setProvider(setup.fixture().provider());
+            label.setNativeId(ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE));
+            label.setRepository(setup.fixture().repository());
+            label.setName("triaged");
+            label.setColor("abcdef");
+            label = labels.saveAndFlush(label);
+            parent.getLabels().add(label);
+            issues.saveAndFlush(parent);
+            publisher.publishEvent(new ScmDomainEvent.IssueLabeled(
+                    ScmEventPayload.IssueData.from(parent),
+                    ScmEventPayload.LabelData.from(label),
+                    progressContext(setup.fixture(), type)));
+        });
+        assertThat(sources.pin(item, null).version()).isNotEqualTo(before);
+        assertThat(jdbc.queryForObject(
+                        "SELECT count(*) FROM item_event WHERE workspace_id=? AND item_id=?",
+                        Long.class,
+                        item.workspaceId(),
+                        item.itemId()))
+                .isZero();
+
+        var reason = transactions.execute(
+                ignored -> currentness.prepareClaim(item.workspaceId(), item.itemId(), before.value(), Instant.now()));
+
+        assertThat(reason).isEqualTo(ResultEndReason.WORK_CHANGED);
+        assertThat(results.findById(current.getId()).orElseThrow().getEndReason())
+                .isEqualTo(ResultEndReason.WORK_CHANGED);
+    }
+
+    private List<Map<String, @Nullable Object>> sourcePublications(ItemRef item) {
+        return jdbc.queryForList(
+                "SELECT id,status FROM event_publication WHERE event_type=?"
+                        + " AND (serialized_event::jsonb->>'workspaceId')::bigint=? AND (serialized_event::jsonb->>'itemId')::bigint=?",
+                ItemSourceObserved.class.getName(),
+                item.workspaceId(),
+                item.itemId());
+    }
+
+    private ProgressFixture progressFixture(IdentityProviderType type, int number) {
+        var fixture = fixture(type);
+        var parent = progressIssue(fixture, number, null);
+        var child = progressIssue(fixture, number + 1, parent);
+        var holder = writer.upsert(new ItemRegistration(
+                fixture.workspace().getId(),
+                ScmItemEvents.REPOSITORY,
+                fixture.repository().getId(),
+                null,
+                null));
+        var item = writer.upsert(new ItemRegistration(
+                fixture.workspace().getId(), ScmItemEvents.ISSUE, parent.getId(), holder.itemId(), null));
+        return new ProgressFixture(fixture, child, item, parentScenario(fixture, item));
+    }
+
+    private record ProgressFixture(
+            Fixture fixture, Issue child, ItemRef item, ReviewIntegrationData.Scenario scenario) {}
+
+    private EventContext progressContext(Fixture fixture, IdentityProviderType type) {
+        return new EventContext(
+                UUID.randomUUID(),
+                Instant.now(),
+                fixture.workspace().getId(),
+                null,
+                DataSource.WEBHOOK,
+                "updated",
+                UUID.randomUUID().toString(),
+                type,
+                fixture.author().getId());
+    }
+
+    private void changeChildState(long childId, Issue.State state, EventContext context, IdentityProviderType type) {
+        transactions.executeWithoutResult(ignored -> {
+            var child = issues.findById(childId).orElseThrow();
+            child.setState(state);
+            issues.saveAndFlush(child);
+            if (type == IdentityProviderType.GITHUB) subIssues.invalidateParentCompletionOf(childId);
+            publisher.publishEvent(
+                    state == Issue.State.CLOSED
+                            ? new ScmDomainEvent.IssueClosed(
+                                    ScmEventPayload.IssueData.from(child), "completed", context)
+                            : new ScmDomainEvent.IssueReopened(ScmEventPayload.IssueData.from(child), context));
+        });
+    }
+
+    private Issue progressIssue(Fixture fixture, int number, @Nullable Issue parent) {
+        var issue = new Issue();
+        issue.setNativeId(ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE));
+        issue.setProvider(fixture.provider());
+        issue.setRepository(fixture.repository());
+        issue.setNumber(number);
+        issue.setTitle("Tracked work " + number);
+        issue.setBody("The requested work.");
+        issue.setState(Issue.State.OPEN);
+        issue.setAuthor(fixture.author());
+        issue.setHtmlUrl(fixture.repository().getHtmlUrl() + "/issues/" + number);
+        issue.setCreatedAt(Instant.now());
+        issue.setUpdatedAt(Instant.now());
+        issue.setParentIssue(parent);
+        return issues.saveAndFlush(issue);
     }
 
     private Fixture fixture(IdentityProviderType type) {

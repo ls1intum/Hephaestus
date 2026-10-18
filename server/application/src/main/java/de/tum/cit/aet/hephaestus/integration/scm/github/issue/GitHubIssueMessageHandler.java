@@ -80,9 +80,9 @@ public class GitHubIssueMessageHandler extends AbstractIntegrationMessageHandler
         routeToProcessor(event, issueDto, context.withActorUserId(actorId));
     }
 
-    private void recountParent(@Nullable Issue issue) {
+    private void invalidateParentCompletion(@Nullable Issue issue) {
         if (issue != null && issue.getId() != null) {
-            subIssueSyncService.recountParentOf(issue.getId());
+            subIssueSyncService.invalidateParentCompletionOf(issue.getId());
         }
     }
 
@@ -103,8 +103,10 @@ public class GitHubIssueMessageHandler extends AbstractIntegrationMessageHandler
             case GitHubEventAction.Issue.TRANSFERRED -> issueProcessor.processTransferred(issueDto, context);
             // A child's close or reopen moves its parent's rollup, which this payload does not
             // carry.
-            case GitHubEventAction.Issue.CLOSED -> recountParent(issueProcessor.processClosed(issueDto, context));
-            case GitHubEventAction.Issue.REOPENED -> recountParent(issueProcessor.processReopened(issueDto, context));
+            case GitHubEventAction.Issue.CLOSED ->
+                invalidateParentCompletion(issueProcessor.processClosed(issueDto, context));
+            case GitHubEventAction.Issue.REOPENED ->
+                invalidateParentCompletion(issueProcessor.processReopened(issueDto, context));
             case GitHubEventAction.Issue.DELETED -> issueProcessor.processDeleted(issueDto, context);
             case GitHubEventAction.Issue.LABELED -> {
                 if (event.label() != null) {

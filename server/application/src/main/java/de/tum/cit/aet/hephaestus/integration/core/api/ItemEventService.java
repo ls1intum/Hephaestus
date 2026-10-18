@@ -86,11 +86,12 @@ public class ItemEventService {
             publisher.publishEvent(new ItemEventRecorded(input.workspaceId(), id, input.itemId()));
             return id;
         }
-        return repository
+        var existing = repository
                 .findByWorkspaceIdAndItemIdAndNameAndItemVersion(
                         input.workspaceId(), input.itemId(), input.name().value(), version)
-                .orElseThrow()
-                .getId();
+                .orElseThrow();
+        observeSource(input.workspaceId(), input.itemId(), input.name());
+        return existing.getId();
     }
 
     /** Open occasions on the item that still have no pinned version, oldest first. */
@@ -119,11 +120,16 @@ public class ItemEventService {
                         workspaceId, itemId, event.name().value(), itemVersion)
                 .isPresent()) {
             decide(workspaceId, event.id(), event.state(), ItemEventState.WITHHELD, ReviewRequestReason.COALESCED);
+            observeSource(workspaceId, itemId, event.name());
             return false;
         }
         if (repository.pin(workspaceId, event.id(), itemVersion) != 1) return false;
         publisher.publishEvent(new ItemEventRecorded(workspaceId, event.id(), itemId));
         return true;
+    }
+
+    private void observeSource(long workspaceId, long itemId, ItemEventName name) {
+        if (name.value().startsWith("scm.")) publisher.publishEvent(new ItemSourceObserved(workspaceId, itemId));
     }
 
     public boolean decide(

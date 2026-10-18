@@ -6,16 +6,20 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemEventRecorded;
 import de.tum.cit.aet.hephaestus.integration.core.api.ItemIndexService;
+import de.tum.cit.aet.hephaestus.integration.core.api.ItemSourceObserved;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.events.BotCommandReceivedEvent;
+import de.tum.cit.aet.hephaestus.integration.core.item.ItemRepository;
 import de.tum.cit.aet.hephaestus.integration.core.itemevent.ItemEvent;
 import de.tum.cit.aet.hephaestus.integration.core.itemevent.ItemEventRepository;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
@@ -50,15 +54,26 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest.GitLabMergeR
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest.GitLabMergeRequestReadinessReader;
 import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
+import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
 import de.tum.cit.aet.hephaestus.practices.ReviewOn;
+import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.review.model.Review;
+import de.tum.cit.aet.hephaestus.practices.spi.AdmissionReceipt;
 import de.tum.cit.aet.hephaestus.practices.spi.BoundModelSlot;
 import de.tum.cit.aet.hephaestus.practices.spi.FrozenModel;
+import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustody;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ProcessingStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultStore;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobSnapshot;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequest;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
@@ -70,9 +85,14 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -82,9 +102,15 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.transaction.support.TransactionTemplate;
 
+@RecordApplicationEvents
 class ScmEventReviewIntegrationTest extends AbstractResultAdmissionIntegrationTest {
+    @Autowired
+    ApplicationEvents applicationEvents;
+
     @Autowired
     IdentityProviderRepository providers;
 
@@ -148,6 +174,24 @@ class ScmEventReviewIntegrationTest extends AbstractResultAdmissionIntegrationTe
     @Autowired
     IssueRepository issueRows;
 
+    @Autowired
+    ReviewIntegrationData resultData;
+
+    @Autowired
+    ReviewAdmissionData admissions;
+
+    @Autowired
+    ResultStore resultStore;
+
+    @Autowired
+    ResultRepository resultRows;
+
+    @Autowired
+    ItemRepository itemRows;
+
+    @Autowired
+    PracticeRepository practices;
+
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
@@ -162,6 +206,399 @@ class ScmEventReviewIntegrationTest extends AbstractResultAdmissionIntegrationTe
                                 "review",
                                 ModelKind.CHAT,
                                 new FrozenModel("instance:1", "OPENAI_COMPLETIONS", "test-model", null, Map.of()))));
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldKeepALateOldCaptureAsHistoryWithoutMakingItCurrent(IdentityProviderType type) {
+        var prepared = prepare(type, false);
+        var item = prepared.item();
+        var pull = pulls.findById(Objects.requireNonNull(item.sourceId())).orElseThrow();
+        var author =
+                users.findById(Objects.requireNonNull(pull.getAuthor()).getId()).orElseThrow();
+        var scenario = new ReviewIntegrationData.Scenario(
+                workspaces.findById(item.workspaceId()).orElseThrow(),
+                accounts.findById(account(author)).orElseThrow(),
+                practices
+                        .findByWorkspaceIdAndSlug(item.workspaceId(), "event-test")
+                        .orElseThrow(),
+                itemRows.findByIdAndWorkspaceId(item.itemId(), item.workspaceId())
+                        .orElseThrow());
+        var pending = admissions.pending(
+                scenario,
+                Instant.now().minusSeconds(30),
+                scenario.account().getId(),
+                prepared.version().value());
+        running(pending);
+        var context = new EventContext(
+                UUID.randomUUID(),
+                Instant.now(),
+                item.workspaceId(),
+                null,
+                DataSource.WEBHOOK,
+                "edited",
+                UUID.randomUUID().toString(),
+                type,
+                author.getId());
+        transactions.executeWithoutResult(ignored -> {
+            var changed = pulls.findById(pull.getId()).orElseThrow();
+            changed.setBody("The work changed after this capture.");
+            pulls.saveAndFlush(changed);
+            publisher.publishEvent(new ScmDomainEvent.PullRequestUpdated(
+                    ScmEventPayload.PullRequestData.from(changed), Set.of("body"), context));
+        });
+        var canonical = source.pin(item, null).version();
+        assertThat(canonical).isNotEqualTo(prepared.version());
+        var incumbent = resultData.result(
+                scenario, ResultOutcome.MET, Instant.now().minusSeconds(60), Instant.now(), canonical.value());
+
+        var receipt = resultStore.admit(
+                item.workspaceId(),
+                pending.review().getId(),
+                pending.jobId(),
+                1,
+                List.of(admissions.candidate(pending, ResultOutcome.MET)));
+
+        assertThat(receipt.resultIds()).hasSize(1);
+        var historical = resultRows.findById(receipt.resultIds().getFirst()).orElseThrow();
+        assertThat(historical.getItemVersion()).isEqualTo(prepared.version().value());
+        assertThat(historical.getEndReason()).isEqualTo(ResultEndReason.WORK_CHANGED);
+        assertThat(resultRows.findById(incumbent.getId()).orElseThrow().getEndedAt())
+                .isNull();
+        assertThat(resultRows.forDevelopersSince(
+                        item.workspaceId(), List.of(scenario.account().getId()), Instant.EPOCH, true))
+                .extracting(row -> row.getId())
+                .doesNotContain(historical.getId());
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldCommitNormalClaimOrderingWhenTheCurrentSourceIsNotReady(IdentityProviderType type) {
+        var prepared = prepare(type, false);
+        var item = prepared.item();
+        var pull = pulls.findById(Objects.requireNonNull(item.sourceId())).orElseThrow();
+        var author =
+                users.findById(Objects.requireNonNull(pull.getAuthor()).getId()).orElseThrow();
+        var scenario = new ReviewIntegrationData.Scenario(
+                workspaces.findById(item.workspaceId()).orElseThrow(),
+                accounts.findById(account(author)).orElseThrow(),
+                practices
+                        .findByWorkspaceIdAndSlug(item.workspaceId(), "event-test")
+                        .orElseThrow(),
+                itemRows.findByIdAndWorkspaceId(item.itemId(), item.workspaceId())
+                        .orElseThrow());
+        var older = admissions.pending(
+                scenario,
+                Instant.now().minusSeconds(60),
+                scenario.account().getId(),
+                prepared.version().value());
+        var newer = admissions.pending(
+                scenario,
+                Instant.now(),
+                scenario.account().getId(),
+                prepared.version().value());
+        running(newer);
+        var incumbent = resultStore
+                .admit(
+                        item.workspaceId(),
+                        newer.review().getId(),
+                        newer.jobId(),
+                        1,
+                        List.of(admissions.candidate(newer, ResultOutcome.MET)))
+                .resultIds()
+                .getFirst();
+        jdbc.update("UPDATE issue SET base_ref_oid=NULL WHERE id=?", pull.getId());
+        assertThatThrownBy(() -> source.current(item)).isInstanceOf(ItemCaptureException.class);
+        running(older);
+
+        var historical = resultStore
+                .admit(
+                        item.workspaceId(),
+                        older.review().getId(),
+                        older.jobId(),
+                        1,
+                        List.of(admissions.candidate(older, ResultOutcome.MET)))
+                .resultIds()
+                .getFirst();
+
+        assertThat(resultRows.findById(historical).orElseThrow().getEndReason()).isEqualTo(ResultEndReason.OUTRANKED);
+        assertThat(resultRows.findById(incumbent).orElseThrow().getEndedAt()).isNull();
+    }
+
+    @ParameterizedTest
+    @CsvSource({"GITHUB,false", "GITHUB,true", "GITLAB,false", "GITLAB,true"})
+    void shouldSerializeAdmissionAndNativeSourceChangeOnTheExistingItemLock(
+            IdentityProviderType type, boolean admissionFirst) throws Exception {
+        var prepared = prepare(type, false);
+        var item = prepared.item();
+        var pull = pulls.findById(Objects.requireNonNull(item.sourceId())).orElseThrow();
+        var author =
+                users.findById(Objects.requireNonNull(pull.getAuthor()).getId()).orElseThrow();
+        var scenario = new ReviewIntegrationData.Scenario(
+                workspaces.findById(item.workspaceId()).orElseThrow(),
+                accounts.findById(account(author)).orElseThrow(),
+                practices
+                        .findByWorkspaceIdAndSlug(item.workspaceId(), "event-test")
+                        .orElseThrow(),
+                itemRows.findByIdAndWorkspaceId(item.itemId(), item.workspaceId())
+                        .orElseThrow());
+        var pending = admissions.pending(
+                scenario,
+                Instant.now().minusSeconds(30),
+                scenario.account().getId(),
+                prepared.version().value());
+        running(pending);
+        var held = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        var changed = new CountDownLatch(1);
+        var admissionStarted = new CountDownLatch(1);
+        var executor =
+                Executors.newFixedThreadPool(2, Thread.ofPlatform().daemon().factory());
+        try {
+            if (admissionFirst) {
+                doAnswer(call -> {
+                            Object canonical = call.callRealMethod();
+                            held.countDown();
+                            awaitLatch(release);
+                            return canonical;
+                        })
+                        .when(productItems)
+                        .current(item);
+            }
+            Future<?> sourceWrite;
+            Future<AdmissionReceipt> admitted;
+            if (admissionFirst) {
+                admitted = executor.submit(() -> resultStore.admit(
+                        item.workspaceId(),
+                        pending.review().getId(),
+                        pending.jobId(),
+                        1,
+                        List.of(admissions.candidate(pending, ResultOutcome.MET))));
+                awaitLatch(held);
+                sourceWrite = executor.submit(() -> changeNativeBody(prepared, type, false, held, release, changed));
+                awaitLatch(changed);
+            } else {
+                sourceWrite = executor.submit(() -> changeNativeBody(prepared, type, true, held, release, changed));
+                awaitLatch(held);
+                admitted = executor.submit(() -> {
+                    admissionStarted.countDown();
+                    return resultStore.admit(
+                            item.workspaceId(),
+                            pending.review().getId(),
+                            pending.jobId(),
+                            1,
+                            List.of(admissions.candidate(pending, ResultOutcome.MET)));
+                });
+                awaitLatch(admissionStarted);
+            }
+            release.countDown();
+            var receipt = admitted.get(20, TimeUnit.SECONDS);
+            sourceWrite.get(20, TimeUnit.SECONDS);
+
+            assertThat(source.pin(item, null).version()).isNotEqualTo(prepared.version());
+            var historical = resultRows.findById(receipt.resultIds().getFirst()).orElseThrow();
+            assertThat(historical.getItemVersion()).isEqualTo(prepared.version().value());
+            assertThat(historical.getEndReason()).isEqualTo(ResultEndReason.WORK_CHANGED);
+            assertThat(resultRows.forDevelopersSince(
+                            item.workspaceId(), List.of(scenario.account().getId()), Instant.EPOCH, true))
+                    .extracting(row -> row.getId())
+                    .doesNotContain(historical.getId());
+        } finally {
+            release.countDown();
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(20, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldKeepTheSubmittedReviewCurrentWhenOnlyTheAuthorPushes(IdentityProviderType type) {
+        var prepared = prepare(type, true);
+        var item = prepared.item();
+        var scenario = reviewScenario(prepared);
+        var nativeReview = providerReviews
+                .findById(Objects.requireNonNull(item.sourceId()))
+                .orElseThrow();
+        long pullId = Objects.requireNonNull(nativeReview.getPullRequest()).getId();
+        var submittedCommit = nativeReview.getCommitId();
+        var pending = admissions.pending(
+                scenario,
+                Instant.now().minusSeconds(30),
+                scenario.account().getId(),
+                prepared.version().value());
+        running(pending);
+        transactions.executeWithoutResult(ignored -> {
+            var changed = pulls.findById(pullId).orElseThrow();
+            changed.setHeadRefOid("c".repeat(40));
+            pulls.saveAndFlush(changed);
+            var context = new EventContext(
+                    UUID.randomUUID(),
+                    Instant.now(),
+                    item.workspaceId(),
+                    null,
+                    DataSource.WEBHOOK,
+                    "synchronize",
+                    UUID.randomUUID().toString(),
+                    type,
+                    Objects.requireNonNull(changed.getAuthor()).getId());
+            publisher.publishEvent(
+                    new ScmDomainEvent.PullRequestSynchronized(ScmEventPayload.PullRequestData.from(changed), context));
+        });
+        assertThat(source.pin(item, null).version()).isNotEqualTo(prepared.version());
+        var unchanged = providerReviews.findById(nativeReview.getId()).orElseThrow();
+        assertThat(unchanged.getCommitId()).isEqualTo(submittedCommit);
+        assertThat(unchanged.getBody()).isEqualTo(nativeReview.getBody());
+        assertThat(jdbc.queryForObject(
+                        "SELECT count(*) FROM item_event WHERE workspace_id=? AND item_id=?",
+                        Long.class,
+                        item.workspaceId(),
+                        item.itemId()))
+                .isZero();
+
+        var receipt = resultStore.admit(
+                item.workspaceId(),
+                pending.review().getId(),
+                pending.jobId(),
+                1,
+                List.of(admissions.candidate(pending, ResultOutcome.MET)));
+
+        var result = resultRows.findById(receipt.resultIds().getFirst()).orElseThrow();
+        assertThat(result.getItemVersion()).isEqualTo(prepared.version().value());
+        assertThat(result.getEndedAt()).isNull();
+        assertThat(resultRows.forDevelopersSince(
+                        item.workspaceId(), List.of(scenario.account().getId()), Instant.EPOCH, true))
+                .extracting(row -> row.getId())
+                .contains(result.getId());
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = IdentityProviderType.class,
+            names = {"GITHUB", "GITLAB"})
+    void shouldRetireThePriorClaimWhenTheSubmittedReviewItselfChanges(IdentityProviderType type) {
+        var prepared = prepare(type, true);
+        var item = prepared.item();
+        var scenario = reviewScenario(prepared);
+        var at = Instant.now().minusSeconds(30);
+        var current = resultData.result(
+                scenario, ResultOutcome.MET, at, at, prepared.version().value());
+        transactions.executeWithoutResult(ignored -> {
+            var changed = providerReviews
+                    .findById(Objects.requireNonNull(item.sourceId()))
+                    .orElseThrow();
+            changed.setBody("A revised submitted review.");
+            providerReviews.saveAndFlush(changed);
+            var context = new EventContext(
+                    UUID.randomUUID(),
+                    Instant.now(),
+                    item.workspaceId(),
+                    null,
+                    DataSource.WEBHOOK,
+                    "submitted",
+                    UUID.randomUUID().toString(),
+                    type,
+                    Objects.requireNonNull(changed.getAuthor()).getId());
+            publisher.publishEvent(new ScmDomainEvent.ReviewSubmitted(
+                    ScmEventPayload.ReviewData.from(changed).orElseThrow(), context));
+        });
+        assertThat(source.pin(item, null).version()).isNotEqualTo(prepared.version());
+        assertThat(resultRows.findById(current.getId()).orElseThrow().getEndReason())
+                .isEqualTo(ResultEndReason.WORK_CHANGED);
+        assertThat(jdbc.queryForObject(
+                        "SELECT count(*) FROM item_event WHERE workspace_id=? AND item_id=?",
+                        Long.class,
+                        item.workspaceId(),
+                        item.itemId()))
+                .isEqualTo(1L);
+    }
+
+    private ReviewIntegrationData.Scenario reviewScenario(Prepared prepared) {
+        var item = prepared.item();
+        var review = providerReviews
+                .findById(Objects.requireNonNull(item.sourceId()))
+                .orElseThrow();
+        var reviewer = users.findById(Objects.requireNonNull(review.getAuthor()).getId())
+                .orElseThrow();
+        return new ReviewIntegrationData.Scenario(
+                workspaces.findById(item.workspaceId()).orElseThrow(),
+                accounts.findById(account(reviewer)).orElseThrow(),
+                practices
+                        .findByWorkspaceIdAndSlug(item.workspaceId(), "event-test")
+                        .orElseThrow(),
+                itemRows.findByIdAndWorkspaceId(item.itemId(), item.workspaceId())
+                        .orElseThrow());
+    }
+
+    private void changeNativeBody(
+            Prepared prepared,
+            IdentityProviderType type,
+            boolean holdSource,
+            CountDownLatch held,
+            CountDownLatch release,
+            CountDownLatch changed) {
+        transactions.executeWithoutResult(ignored -> {
+            var item = prepared.item();
+            if (holdSource) writer.lock(item.workspaceId(), item.itemId());
+            var work = pulls.findById(Objects.requireNonNull(item.sourceId())).orElseThrow();
+            work.setBody("A concurrent native material edit.");
+            pulls.saveAndFlush(work);
+            var context = new EventContext(
+                    UUID.randomUUID(),
+                    Instant.now(),
+                    item.workspaceId(),
+                    null,
+                    DataSource.WEBHOOK,
+                    "edited",
+                    UUID.randomUUID().toString(),
+                    type,
+                    Objects.requireNonNull(work.getAuthor()).getId());
+            publisher.publishEvent(new ScmDomainEvent.PullRequestUpdated(
+                    ScmEventPayload.PullRequestData.from(work), Set.of("body"), context));
+            changed.countDown();
+            if (holdSource) {
+                held.countDown();
+                awaitLatch(release);
+            }
+        });
+    }
+
+    private static void awaitLatch(CountDownLatch latch) {
+        try {
+            if (!latch.await(20, TimeUnit.SECONDS)) throw new IllegalStateException("Concurrent fixture timed out");
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Concurrent fixture interrupted", interrupted);
+        }
+    }
+
+    private void running(ReviewAdmissionData.Pending pending) {
+        admissions.running(pending, 1);
+        when(custody.find(anyLong(), anyList()))
+                .thenAnswer(call -> new HistoryCustody(true, false, List.of(), List.of(), call.getArgument(1)));
+        when(runtime.activeJobIds(
+                        pending.review().getWorkspaceId(), pending.review().getId()))
+                .thenReturn(Set.of(pending.jobId()));
+        when(runtime.unsettledJobIds(
+                        pending.review().getWorkspaceId(), pending.review().getId()))
+                .thenReturn(Set.of());
+        when(runtime.runtime(pending.review().getWorkspaceId(), pending.review().getId()))
+                .thenReturn(Optional.of(new ReviewRuntimeSnapshot(List.of(new ReviewJobSnapshot(
+                        pending.jobId(),
+                        ReviewJobStatus.RUNNING,
+                        1,
+                        ProcessingStatus.PENDING,
+                        Instant.now(),
+                        Instant.now(),
+                        null,
+                        null,
+                        null,
+                        "late-capture")))));
     }
 
     @ParameterizedTest
@@ -285,6 +722,125 @@ class ScmEventReviewIntegrationTest extends AbstractResultAdmissionIntegrationTe
                 .orElseThrow();
         assertThat(admitted.getItemVersion()).isEqualTo(prepared.version().value());
         assertThat(admitted.getBaseVersion()).isEqualTo("a".repeat(40));
+    }
+
+    @Test
+    void shouldRetireCurrentClaimsWhenReadinessPinsToAnExistingOccasion() {
+        var prepared = prepare(IdentityProviderType.GITLAB, false);
+        var item = prepared.item();
+        long pullId = Objects.requireNonNull(item.sourceId());
+        var pull = pulls.findById(pullId).orElseThrow();
+        var author =
+                users.findById(Objects.requireNonNull(pull.getAuthor()).getId()).orElseThrow();
+        var scenario = new ReviewIntegrationData.Scenario(
+                workspaces.findById(item.workspaceId()).orElseThrow(),
+                accounts.findById(account(author)).orElseThrow(),
+                practices
+                        .findByWorkspaceIdAndSlug(item.workspaceId(), "event-test")
+                        .orElseThrow(),
+                itemRows.findByIdAndWorkspaceId(item.itemId(), item.workspaceId())
+                        .orElseThrow());
+        synchronizeHead(prepared, "b".repeat(40), false);
+        var original = events.findByWorkspaceIdAndItemIdAndNameAndItemVersion(
+                        item.workspaceId(),
+                        item.itemId(),
+                        ScmItemEvents.PULL_REQUEST_SYNCHRONIZED.value(),
+                        prepared.version().value())
+                .orElseThrow();
+        synchronizeHead(prepared, "c".repeat(40), false);
+        var intervening = source.pin(item, null).version();
+        assertThat(intervening).isNotEqualTo(prepared.version());
+        var at = Instant.now();
+        var current = resultData.result(scenario, ResultOutcome.MET, at, at, intervening.value());
+
+        // GitLab stores a force-pushed head before its readiness read pairs that head's diff base.
+        synchronizeHead(prepared, "b".repeat(40), true);
+        var pendingIds = jdbc.queryForList(
+                "SELECT id FROM item_event WHERE workspace_id=? AND item_id=?" + " AND name=? AND item_version IS NULL",
+                UUID.class,
+                item.workspaceId(),
+                item.itemId(),
+                ScmItemEvents.PULL_REQUEST_SYNCHRONIZED.value());
+        assertThat(pendingIds).hasSize(1);
+        var pending = events.findById(pendingIds.getFirst()).orElseThrow();
+        assertThat(pending.getState()).isEqualTo(ItemEventState.RECORDED);
+        assertThat(resultRows.findById(current.getId()).orElseThrow().getEndedAt())
+                .isNull();
+        assertThat(resultRows.forDevelopersSince(
+                        item.workspaceId(), List.of(scenario.account().getId()), Instant.EPOCH, true))
+                .extracting(row -> row.getId())
+                .contains(current.getId());
+        var occasions = jdbc.queryForList(
+                "SELECT id FROM item_event WHERE workspace_id=? AND item_id=?",
+                UUID.class,
+                item.workspaceId(),
+                item.itemId());
+        var reviewIds = itemReviews(prepared).stream().map(Review::getId).toList();
+        long recorded = applicationEvents.stream(ItemEventRecorded.class)
+                .filter(event -> event.workspaceId() == item.workspaceId() && event.itemId() == item.itemId())
+                .count();
+        assertThat(applicationEvents.stream(ItemSourceObserved.class)
+                        .filter(event -> event.workspaceId() == item.workspaceId() && event.itemId() == item.itemId()))
+                .isEmpty();
+
+        assertThat(readiness(
+                        pulls.findById(pullId).orElseThrow(),
+                        new GitLabMergeRequestReadinessReader.DiffRefs("b".repeat(40), "a".repeat(40))))
+                .isTrue();
+
+        var coalesced = events.findById(pending.getId()).orElseThrow();
+        assertThat(coalesced.getState()).isEqualTo(ItemEventState.WITHHELD);
+        assertThat(coalesced.getReason()).isEqualTo(ReviewRequestReason.COALESCED);
+        assertThat(coalesced.getItemVersion()).isNull();
+        assertThat(coalesced.getOccurredAt()).isEqualTo(pending.getOccurredAt());
+        var retained = events.findById(original.getId()).orElseThrow();
+        assertThat(retained.getItemVersion()).isEqualTo(prepared.version().value());
+        assertThat(retained.getOccurredAt()).isEqualTo(original.getOccurredAt());
+        assertThat(retained.getState()).isEqualTo(original.getState());
+        assertThat(jdbc.queryForList(
+                        "SELECT id FROM item_event WHERE workspace_id=? AND item_id=?",
+                        UUID.class,
+                        item.workspaceId(),
+                        item.itemId()))
+                .containsExactlyInAnyOrderElementsOf(occasions);
+        assertThat(itemReviews(prepared)).extracting(Review::getId).containsExactlyInAnyOrderElementsOf(reviewIds);
+        assertThat(applicationEvents.stream(ItemEventRecorded.class)
+                        .filter(event -> event.workspaceId() == item.workspaceId() && event.itemId() == item.itemId())
+                        .count())
+                .isEqualTo(recorded);
+        assertThat(source.pin(item, null).version()).isEqualTo(prepared.version());
+        var retired = resultRows.findById(current.getId()).orElseThrow();
+        assertThat(retired.getItemVersion()).isEqualTo(intervening.value());
+        assertThat(retired.getEndReason()).isEqualTo(ResultEndReason.WORK_CHANGED);
+        assertThat(resultRows.forDevelopersSince(
+                        item.workspaceId(), List.of(scenario.account().getId()), Instant.EPOCH, true))
+                .extracting(row -> row.getId())
+                .doesNotContain(current.getId());
+        assertThat(applicationEvents.stream(ItemSourceObserved.class)
+                        .filter(event -> event.workspaceId() == item.workspaceId() && event.itemId() == item.itemId()))
+                .hasSize(1);
+    }
+
+    private void synchronizeHead(Prepared prepared, String head, boolean withoutBase) {
+        transactions.executeWithoutResult(ignored -> {
+            long pullId = Objects.requireNonNull(prepared.item().sourceId());
+            if (withoutBase) jdbc.update("UPDATE issue SET base_ref_oid=NULL WHERE id=?", pullId);
+            var pull = pulls.findById(pullId).orElseThrow();
+            pull.setHeadRefOid(head);
+            pulls.saveAndFlush(pull);
+            var context = new EventContext(
+                    UUID.randomUUID(),
+                    Instant.now(),
+                    prepared.item().workspaceId(),
+                    null,
+                    DataSource.WEBHOOK,
+                    "synchronize",
+                    UUID.randomUUID().toString(),
+                    IdentityProviderType.GITLAB,
+                    Objects.requireNonNull(pull.getAuthor()).getId());
+            publisher.publishEvent(
+                    new ScmDomainEvent.PullRequestSynchronized(ScmEventPayload.PullRequestData.from(pull), context));
+        });
     }
 
     @Test

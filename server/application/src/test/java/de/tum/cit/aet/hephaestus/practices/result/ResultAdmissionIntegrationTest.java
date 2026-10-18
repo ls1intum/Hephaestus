@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.api.ItemEventRecorded;
@@ -22,6 +23,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventInput;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventName;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewRequestReason;
 import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
@@ -82,6 +84,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -135,6 +138,9 @@ class ResultAdmissionIntegrationTest extends AbstractResultAdmissionIntegrationT
 
     @Autowired
     ResultRepository results;
+
+    @Autowired
+    ResultCurrentness currentness;
 
     @Autowired
     PracticeRepository practices;
@@ -201,6 +207,39 @@ class ResultAdmissionIntegrationTest extends AbstractResultAdmissionIntegrationT
                 p.jobId(),
                 1,
                 List.of(admissions.candidate(p, outcome)));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"scm.repository", "scm.file", "slack.thread", "outline.document"})
+    void shouldKeepOtherSourceContractsWithoutMaterializingTheirCurrentSource(String kind) {
+        var item = itemIndex.upsert(new ItemRegistration(
+                scenario.workspace().getId(),
+                new ItemKind(kind),
+                UUID.randomUUID().getMostSignificantBits() & Long.MAX_VALUE,
+                null,
+                null));
+        doThrow(new AssertionError("Current source materialization is outside this work contract"))
+                .when(productItems)
+                .current(item);
+        new TransactionTemplate(transactions)
+                .executeWithoutResult(ignored -> assertThat(currentness.prepareClaim(
+                                item.workspaceId(), item.itemId(), "frozen-scan", Instant.now()))
+                        .isNull());
+    }
+
+    @Test
+    void shouldRefuseCurrentnessForAnItemInAnotherWorkspaceWithoutChangingEitherClaim() {
+        var at = Instant.now();
+        var current = data.result(scenario, ResultOutcome.MET, at);
+        var other = data.scenario();
+        var untouched = data.result(other, ResultOutcome.MET, at);
+        assertThatThrownBy(() -> new TransactionTemplate(transactions)
+                        .executeWithoutResult(ignored -> currentness.prepareClaim(
+                                other.workspace().getId(), scenario.item().getId(), "foreign", Instant.now())))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(results.findById(current.getId()).orElseThrow().getEndedAt()).isNull();
+        assertThat(results.findById(untouched.getId()).orElseThrow().getEndedAt())
+                .isNull();
     }
 
     @Test
@@ -621,6 +660,7 @@ class ResultAdmissionIntegrationTest extends AbstractResultAdmissionIntegrationT
                         .build())
                 .build();
         doReturn(snapshot).when(productItems).pin(eq(ref), eq(version));
+        doReturn(Optional.of(snapshot)).when(productItems).current(ref);
         when(budget.canRequest(workspace, ReviewKind.ITEM, null)).thenReturn(true);
         when(models.models(eq(workspace), anyList()))
                 .thenReturn(List.of(
@@ -659,25 +699,32 @@ class ResultAdmissionIntegrationTest extends AbstractResultAdmissionIntegrationT
                 input.foundBy(),
                 input.actorUserId(),
                 input.requestedById());
+        var reconciledAfter = Instant.now();
         var eventId = itemIndex.record(changed);
         var ended = results.findById(current.getId()).orElseThrow();
         assertThat(ended.getEndReason()).isEqualTo(ResultEndReason.WORK_CHANGED);
-        assertThat(ended.getEndedAt()).isEqualTo(at);
+        assertThat(ended.getEndedAt()).isAfterOrEqualTo(reconciledAfter);
         assertThat(results.findById(untouched.getId()).orElseThrow().getEndedAt())
                 .isNull();
-        var later = data.result(scenario, ResultOutcome.MET, at.plusSeconds(1));
+        var later = data.result(
+                scenario,
+                ResultOutcome.MET,
+                at.plusSeconds(1),
+                at.plusSeconds(1),
+                Objects.requireNonNull(input.itemVersion()));
         new TransactionTemplate(transactions)
                 .executeWithoutResult(ignored -> publishedEvents.publishEvent(
                         new ItemEventRecorded(changed.workspaceId(), eventId, changed.itemId())));
         assertThat(results.findById(later.getId()).orElseThrow().getEndedAt()).isNull();
-        assertThat(results.findById(current.getId()).orElseThrow().getEndedAt()).isEqualTo(at);
+        assertThat(results.findById(current.getId()).orElseThrow().getEndedAt()).isEqualTo(ended.getEndedAt());
     }
 
     @Test
     void shouldKeepANewerResultCurrentWhenAnOlderRecordedScmEventIsDelivered() {
         var input = eventInput();
-        var current =
-                data.result(scenario, ResultOutcome.MET, input.occurredAt().plusSeconds(1));
+        var orderedAt = input.occurredAt().plusSeconds(1);
+        var current = data.result(
+                scenario, ResultOutcome.MET, orderedAt, orderedAt, Objects.requireNonNull(input.itemVersion()));
         var eventId = UUID.randomUUID();
         new TransactionTemplate(transactions).executeWithoutResult(ignored -> {
             eventRows.insertIfAbsent(
@@ -725,7 +772,7 @@ class ResultAdmissionIntegrationTest extends AbstractResultAdmissionIntegrationT
         }));
         var ended = results.findById(current.getId()).orElseThrow();
         assertThat(ended.getEndReason()).isEqualTo(ResultEndReason.REMOVED);
-        assertThat(ended.getEndedAt()).isEqualTo(at);
+        assertThat(ended.getEndedAt()).isAfterOrEqualTo(at);
         var event = eventRows.findByIdAndWorkspaceId(eventId, workspace).orElseThrow();
         assertThat(event.getState()).isEqualTo(ItemEventState.WITHHELD);
         assertThat(event.getReason()).isEqualTo(ReviewRequestReason.ITEM_GONE);
@@ -808,7 +855,9 @@ class ResultAdmissionIntegrationTest extends AbstractResultAdmissionIntegrationT
                         offeredAt.plus(eventProperties.pendingRetryAfter()).minusSeconds(1),
                         Instant.now().plus(eventProperties.pendingRetryAfter()).plusSeconds(1));
         assertThat(reviews.findByWorkspaceIdAndEventId(input.workspaceId(), id)).isEmpty();
-        var later = data.result(scenario, ResultOutcome.MET, Instant.now());
+        var laterAt = Instant.now();
+        var later =
+                data.result(scenario, ResultOutcome.MET, laterAt, laterAt, Objects.requireNonNull(input.itemVersion()));
         when(budget.canRequest(input.workspaceId(), ReviewKind.ITEM, null)).thenReturn(true);
         new TransactionTemplate(transactions)
                 .executeWithoutResult(ignored ->
