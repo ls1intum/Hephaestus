@@ -22,6 +22,7 @@ public class ScmRepositoryItemLifecycle {
     private final ItemRepository items;
     private final RepositoryRepository repositories;
     private final ScmRepositoryAccess access;
+    private final ScmWorkItemIndex work;
     private final Clock clock;
 
     @EventListener
@@ -43,6 +44,7 @@ public class ScmRepositoryItemLifecycle {
             var item = writer.upsert(
                     new ItemRegistration(event.workspaceId(), ScmItemEvents.REPOSITORY, repositoryId, null, null));
             writer.restore(event.workspaceId(), item.itemId());
+            work.reconcile(item);
         }
     }
 }

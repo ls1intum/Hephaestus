@@ -69,7 +69,7 @@ class ScmWorkItemListerTest extends BaseUnitTest {
                 .toList();
         when(queries.listWork(10, "ISSUE")).thenReturn(rows);
         when(queries.owners(List.of(11L, 12L), false)).thenReturn(rows);
-        var lister = new ScmWorkItemLister(sources, writer, new ObjectMapper(), queries);
+        var lister = new ScmWorkItemLister(sources, new ScmWorkItemIndex(writer, queries), new ObjectMapper(), queries);
         var first = lister.list(new ItemListRequest(root, commit, ScmItemEvents.ISSUE, null, 1));
         assertThat(first.complete()).isFalse();
         revision.set("after");
