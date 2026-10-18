@@ -619,7 +619,7 @@ function withdrawnOnWorkNow(feedback: FeedbackRecord): string {
 			return "It is withdrawn. Heph is still removing the copies it posted on the work. The results behind it are unchanged.";
 		}
 		case "retryable": {
-			return `It is withdrawn, but ${copies} may still be on the work. The provider did not confirm ${one ? "its" : "their"} removal. The results behind it are unchanged.`;
+			return `It is withdrawn, but ${copies} may still be on the work. At least one removal is unconfirmed. Check each copy above for details. The results behind it are unchanged.`;
 		}
 		case "needsAttention": {
 			return `It is withdrawn, but ${copies} may still be on the work, and Heph cannot remove ${one ? "it" : "them"}. The results behind it are unchanged.`;

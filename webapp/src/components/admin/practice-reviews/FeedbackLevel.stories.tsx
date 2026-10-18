@@ -448,7 +448,7 @@ export const WithdrawalNotConfirmed: Story = {
 		await expectHeaderChip(panelElement, "Delivered");
 		await expectHeaderChip(panelElement, "Withdrawn");
 		panel.getByText(
-			/2 copies may still be on the work\. The provider did not confirm their removal\./u,
+			/2 copies may still be on the work\. At least one removal is unconfirmed\. Check each copy above for details\./u,
 		);
 		const events = history(panelElement);
 		events.getByText("Retraction incomplete");
