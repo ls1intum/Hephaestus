@@ -380,12 +380,12 @@ class ScheduledScmSyncShutdownIntegrationTest extends AbstractWorkspaceIntegrati
     private GitHubDataSyncScheduler gitHubScheduler(List<SyncSession> sessions, Executor executor) {
         SyncTargetProvider targets = mock(SyncTargetProvider.class);
         when(targets.getSyncStatistics()).thenReturn(new SyncStatistics(1, 0, 0, 1, false));
-        when(targets.getSyncSessions(IntegrationKind.GITHUB)).thenAnswer(invocation -> {
+        when(targets.getSyncSessions(IntegrationKind.GITHUB)).thenAnswer(ignored -> {
             scheduledSync.set(Thread.currentThread());
             return sessions;
         });
         GitHubIssueTypeSyncService issueTypes = mock(GitHubIssueTypeSyncService.class);
-        when(issueTypes.syncIssueTypesForScope(sessions.getFirst().scopeId())).thenAnswer(invocation -> {
+        when(issueTypes.syncIssueTypesForScope(sessions.getFirst().scopeId())).thenAnswer(ignored -> {
             passGate();
             return 0;
         });
@@ -410,13 +410,13 @@ class ScheduledScmSyncShutdownIntegrationTest extends AbstractWorkspaceIntegrati
 
     private GitLabDataSyncScheduler gitLabScheduler(List<SyncSession> sessions, Executor executor) {
         SyncTargetProvider targets = mock(SyncTargetProvider.class);
-        when(targets.getSyncSessions(IntegrationKind.GITLAB)).thenAnswer(invocation -> {
+        when(targets.getSyncSessions(IntegrationKind.GITLAB)).thenAnswer(ignored -> {
             scheduledSync.set(Thread.currentThread());
             return sessions;
         });
         GitLabWorkspaceInitializationService initialization = mock(GitLabWorkspaceInitializationService.class);
         when(initialization.initializeIfWebhookMissing(sessions.getFirst().scopeId()))
-                .thenAnswer(invocation -> {
+                .thenAnswer(ignored -> {
                     passGate();
                     return false;
                 });
