@@ -93,8 +93,8 @@ export const EveryResult: Story = {
 			within(table)
 				.getAllByRole("columnheader")
 				.map((head) => head.textContent),
-		).toEqual(["Practice", "Result", "Models", "Calls", "Time"]);
-		for (const column of ["Calls", "Time"]) {
+		).toEqual(["Practice", "Result", "Review calls", "Script models", "Script calls", "Time"]);
+		for (const column of ["Review calls", "Script calls", "Time"]) {
 			const head = within(table).getByRole("columnheader", { name: column });
 			await expect(getComputedStyle(head).textAlign).toBe("right");
 		}
@@ -124,7 +124,7 @@ export const ResultFromCode: Story = {
 		await expect(row.getByText("Returned a result")).toBeVisible();
 		await expect(row.getByText("Decision model")).toBeVisible();
 		await expect(row.getByText("Cloud")).toHaveClass("sr-only");
-		await expect(cellUnder(table, row, "Calls")).toHaveTextContent(/^12$/u);
+		await expect(cellUnder(table, row, "Script calls")).toHaveTextContent(/^12$/u);
 		await expect(cellUnder(table, row, "Time")).toHaveTextContent(/^4\.2 s$/u);
 		await expect(row.getByRole("rowheader", { name: "Thin controllers" })).toHaveAttribute(
 			"scope",
@@ -152,7 +152,7 @@ export const WithModels: Story = {
 		const row = scriptRow(table, "Errors carry their context");
 		await expect(row.getByText("Decision model")).toBeVisible();
 		await expect(row.getByText("Embedding model")).toBeVisible();
-		await expect(cellUnder(table, row, "Calls")).toHaveTextContent(/^11$/u);
+		await expect(cellUnder(table, row, "Script calls")).toHaveTextContent(/^11$/u);
 		await expect(cellUnder(table, row, "Time")).toHaveTextContent(/^12\.8 s$/u);
 	},
 };
@@ -163,7 +163,7 @@ export const Withheld: Story = {
 		const table = canvas.getByRole("table");
 		const row = scriptRow(table, "Product language");
 		await expect(row.getByText("Withheld")).toBeVisible();
-		await expect(cellUnder(table, row, "Calls")).toHaveTextContent("—none");
+		await expect(cellUnder(table, row, "Script calls")).toHaveTextContent("—none");
 		await expect(cellUnder(table, row, "Time")).toHaveTextContent("—none");
 		await expect(
 			row.queryByRole("link", { name: /for Product language/u }),
@@ -207,12 +207,38 @@ export const NotReached: Story = {
 		const table = canvas.getByRole("table");
 		const row = scriptRow(table, "Decisions are written down");
 		await expect(row.getByText("Not reached")).toBeVisible();
-		await expect(cellUnder(table, row, "Calls")).toHaveTextContent("—none");
+		await expect(cellUnder(table, row, "Review calls")).toHaveTextContent("—none");
+		await expect(cellUnder(table, row, "Script calls")).toHaveTextContent("—none");
 		await expect(cellUnder(table, row, "Time")).toHaveTextContent("—none");
 		const guide = row.getByRole("link", {
 			name: /^Why scripts stop early for Decisions are written down/u,
 		});
 		await expect(guideSection(guide)).toBe("#the-trace-line");
+	},
+};
+
+/** The evidence check refused its results; this is not a format failure, and its review calls are known. */
+export const EvidenceNotRead: Story = {
+	args: { practices: [scripted(reviewPracticeScripts.evidenceNotRead)] },
+	play: async ({ canvas }) => {
+		const table = canvas.getByRole("table");
+		const row = scriptRow(table, "The change explains itself");
+		await expect(row.getByText("Failed: evidence not read")).toBeVisible();
+		await expect(row.queryByText(/wrong format/u)).not.toBeInTheDocument();
+		await expect(cellUnder(table, row, "Review calls")).toHaveTextContent(/^6$/u);
+		await expect(cellUnder(table, row, "Script models")).toHaveTextContent("—none");
+		await expect(row.queryByRole("link", { name: /Edit the script/u })).not.toBeInTheDocument();
+	},
+};
+
+/** A run recorded before review calls were counted says so, rather than none. */
+export const ReviewCallsNotRecorded: Story = {
+	args: { practices: [scripted(reviewPracticeScripts.builtInUnrecorded)] },
+	play: async ({ canvas }) => {
+		const table = canvas.getByRole("table");
+		const row = scriptRow(table, "The change explains itself");
+		await expect(row.getByText("Failed: no accepted result")).toBeVisible();
+		await expect(cellUnder(table, row, "Review calls")).toHaveTextContent(/^Not recorded$/u);
 	},
 };
 
@@ -222,7 +248,8 @@ export const BuiltInReview: Story = {
 		const table = canvas.getByRole("table");
 		const row = scriptRow(table, "The change explains itself");
 		await expect(row.getByText("Returned a result")).toBeVisible();
-		await expect(cellUnder(table, row, "Models")).toHaveTextContent("—none");
+		await expect(cellUnder(table, row, "Script models")).toHaveTextContent("—none");
+		await expect(cellUnder(table, row, "Review calls")).toHaveTextContent(/^4$/u);
 		await expect(row.queryByRole("link", { name: /Edit the script/u })).not.toBeInTheDocument();
 	},
 };

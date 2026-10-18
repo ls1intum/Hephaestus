@@ -1671,7 +1671,7 @@ void test("public discussion keeps the work author as its addressee even when th
 	}
 });
 
-void test("brief coverage names supplied, empty, and omitted sources after rendering limits", (t) => {
+void test("brief coverage names supplied, empty, and omitted sources, with why, after rendering limits", (t) => {
 	const root = workspace({
 		"context/metadata.json": '{"title":"Add login"}',
 		"context/comments.json": "",
@@ -1684,12 +1684,21 @@ void test("brief coverage names supplied, empty, and omitted sources after rende
 		totalChars: 5000,
 	});
 	assert.deepEqual(brief.sources, [
-		{ path: "context/metadata.json", supplied: true, lines: 1 },
-		{ path: "context/comments.json", supplied: true, lines: 1 },
-		{ path: "work/change/diff.patch", supplied: false },
+		{ path: "context/metadata.json", supplied: true, lines: 1, bytes: 21 },
+		{ path: "context/comments.json", supplied: true, lines: 1, bytes: 0 },
+		{ path: "work/change/diff.patch", supplied: false, bytes: 1000, omitted: "file-limit" },
 	]);
 	assert.match(brief.text, /Captured and empty/u);
 	assert.match(brief.text, /Too large to show here/u);
+	const crowded = buildBrief(root, paths, {
+		filePerChars: 1000,
+		diffChars: 2000,
+		totalChars: 1100,
+	});
+	assert.deepEqual(
+		crowded.sources.find((source) => source.path === "work/change/diff.patch"),
+		{ path: "work/change/diff.patch", supplied: false, bytes: 1000, omitted: "brief-limit" },
+	);
 	const unavailable = buildBrief(root, paths, {
 		filePerChars: 1000,
 		diffChars: 100,
@@ -1697,4 +1706,8 @@ void test("brief coverage names supplied, empty, and omitted sources after rende
 	});
 	assert.equal(unavailable.text, "");
 	assert.ok(unavailable.sources.every((source) => !source.supplied));
+	assert.equal(
+		unavailable.sources.find((source) => source.path === "context/comments.json")?.omitted,
+		"index-limit",
+	);
 });

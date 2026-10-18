@@ -92,7 +92,7 @@ import {
 	validateSearchScope,
 } from "./pi-result-normalize.ts";
 import { buildResultTools, RESULT_TOOL_NAMES } from "./pi-result-tools.ts";
-import { buildBrief } from "./pi-review-brief.ts";
+import { type BriefSource, buildBrief } from "./pi-review-brief.ts";
 import {
 	type Work,
 	deriveWindows,
@@ -146,6 +146,7 @@ import {
 	type ReadReceipt,
 	validateCitationCapabilities,
 	type ReviewOptions,
+	type ReviewSessionFacts,
 } from "./work/practice-scripts/lib/core/contract.ts";
 import {
 	EvidenceReader,
@@ -302,6 +303,17 @@ interface TurnTrace {
  */
 type StopReason = "budget" | "stall" | "safety" | "loop";
 
+/** Why a required source was or was not in the brief, and how much of it the session read. */
+interface RequiredSourceTrace {
+	path: string;
+	supplied: boolean;
+	bytes: number | null;
+	lines: number | null;
+	/** Null for a supplied source and for one that the brief does not consider. */
+	omitted: BriefSource["omitted"] | null;
+	read: "complete" | "partial" | "none";
+}
+
 interface PublicHistoryReceipt {
 	readAt: string;
 	workCapturedAt: string | null;
@@ -324,6 +336,21 @@ function compareSlugs(a: string, b: string): number {
 interface Validated {
 	candidate: Candidate;
 	notes: string[];
+}
+
+/** The evidence check refused a MET result whose required or cited sources were not read completely. */
+class UnreadEvidenceError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "UnreadEvidenceError";
+	}
+}
+
+function readState(reads: SessionReads, target: string): RequiredSourceTrace["read"] {
+	if (reads.hasCompleteRead(target)) {
+		return "complete";
+	}
+	return reads.hasRead(target) ? "partial" : "none";
 }
 
 function incompleteCoverageText(coverage: Coverage): string {
@@ -751,7 +778,10 @@ export async function runReviewJob(): Promise<void> {
 		usageTotals: UsageTotals;
 		publicHistory?: PublicHistoryReceipt;
 		practiceConcurrency?: { configured: number; effective: number };
+		/** Each practice's required brief sources: sizes and read state only, never their text. */
+		practiceSources: Record<string, RequiredSourceTrace[]>;
 	} = {
+		practiceSources: {},
 		attempts: [],
 		turns: [],
 		usageTotals,
@@ -830,13 +860,16 @@ export async function runReviewJob(): Promise<void> {
 	}
 
 	function persistExecutionReport(): void {
-		const entries = practiceIndex.map(
-			({ slug }) =>
-				[
-					slug,
-					executions.get(slug) ?? notReachedOutcome(programOf(slug), unreachedReason),
-				] as const,
-		);
+		// A practice cut off before its outcome was kept is reported not reached, which opened no session.
+		const entries = practiceIndex.map((practice) => {
+			const done = executions.get(practice.slug);
+			return [
+				practice.slug,
+				done === undefined
+					? notReachedOutcome(programOf(practice.slug), unreachedReason)
+					: { ...done, reviewSessions: reviewSessionsOf(practice.slug) },
+			] as const;
+		});
 		writeFileSync(PRACTICE_SCRIPT_REPORT_PATH, executionReport(entries));
 	}
 
@@ -1048,11 +1081,10 @@ export async function runReviewJob(): Promise<void> {
 		const coverage = measureCoverage(citations);
 		const parsed = parseCandidate({ ...submission, coverage });
 		if (!parsed.ok) {
-			throw new Error(
-				parsed.reasonCode === "met_coverage_incomplete"
-					? incompleteCoverageText(coverage)
-					: `${parsed.reasonCode}: ${parsed.message}`,
-			);
+			if (parsed.reasonCode === "met_coverage_incomplete") {
+				throw new UnreadEvidenceError(incompleteCoverageText(coverage));
+			}
+			throw new Error(`${parsed.reasonCode}: ${parsed.message}`);
 		}
 		return { candidate: parsed.candidate, notes };
 	}
@@ -1403,6 +1435,33 @@ export async function runReviewJob(): Promise<void> {
 	}
 
 	const refusals = new Map<string, number>();
+	// Per practice, across its review sessions: the execution report carries these.
+	const reviewSessions = new Map<
+		string,
+		{ usage: ReturnType<typeof newUsageLedger>; evidenceRefusals: number; formatRefusals: number }
+	>();
+	function sessionFacts(slug: string) {
+		let facts = reviewSessions.get(slug);
+		if (facts === undefined) {
+			facts = { usage: newUsageLedger(), evidenceRefusals: 0, formatRefusals: 0 };
+			reviewSessions.set(slug, facts);
+		}
+		return facts;
+	}
+	/** The SDK refused a recording call against the tool's schema before the runner saw it. */
+	function noteSchemaRefusal(scope: ReviewSessionState, toolName: string): void {
+		if (toolName === "submit_result" && scope.activeReview !== null) {
+			sessionFacts(scope.activeReview.slug).formatRefusals += 1;
+		}
+	}
+	function reviewSessionsOf(slug: string): ReviewSessionFacts {
+		const facts = reviewSessions.get(slug);
+		return {
+			modelCalls: facts?.usage.totalCalls ?? 0,
+			evidenceRefusals: facts?.evidenceRefusals ?? 0,
+			formatRefusals: facts?.formatRefusals ?? 0,
+		};
+	}
 	// A blocked practice without a draft stays not reached.
 	const blockedPractices = new Map<string, UnratedReason>();
 
@@ -1522,7 +1581,9 @@ export async function runReviewJob(): Promise<void> {
 			countRefusal(slug);
 			const reason = errorText(error);
 			// A later source read can settle coverage without changing the submitted result.
-			if (!reason.startsWith("a MET result needs complete coverage")) {
+			if (error instanceof UnreadEvidenceError) {
+				sessionFacts(slug).evidenceRefusals += 1;
+			} else {
 				sessionState().refusedItems.set(sent, { reason, resent: 0 });
 			}
 			return { kind: "refused", slug, reason };
@@ -2547,6 +2608,7 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 								? event.toolName
 								: `codemode → ${event.toolName}`;
 						console.error(`[pi-runner] ${label} tool error: ${tool} — ${reason}`);
+						noteSchemaRefusal(scope, event.toolName);
 						if (scope.currentTurn) {
 							scope.currentTurn.toolErrors += 1;
 							scope.currentTurn.toolErrorReasons.push(`${tool}: ${reason}`);
@@ -3088,9 +3150,13 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 					sessionState().activePractice = null;
 					throw error;
 				}
+				const { usage } = sessionFacts(slug);
 				const unsubscribeReads = opened.session.subscribe((event) => {
 					if (!isScan) {
 						review.reads.note(event);
+					}
+					if (event.type === "message_end") {
+						addAssistantUsage(usage, event.message);
 					}
 				});
 				const { finishTurn } = opened.session.agent;
@@ -3147,6 +3213,16 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 						(error: unknown) => (error instanceof Error ? error : new Error(String(error))),
 					);
 					unsubscribeReads();
+					if (!isScan) {
+						runnerDebug.practiceSources[slug] = relevantBrief.map((source) => ({
+							path: source.path,
+							supplied: source.supplied,
+							bytes: source.bytes ?? null,
+							lines: source.lines ?? null,
+							omitted: source.omitted ?? null,
+							read: readState(review.reads, source.path),
+						}));
+					}
 					const { receipts } = review.reads;
 					reads.reads += receipts.reads + domainReads.reads;
 					reads.truncatedReads += receipts.truncatedReads + domainReads.truncatedReads;

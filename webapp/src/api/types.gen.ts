@@ -3443,8 +3443,16 @@ export type PracticeScriptRun = {
     finishedAt: Date;
     jobId: string;
     models: Array<PracticeScriptModel>;
+    /**
+     * Why a run that stopped as OFF_FORMAT has no result, when the runner's counts or the built-in's contract prove it. Absent otherwise; then the stop reason stands alone.
+     */
+    noResultCause: 'EVIDENCE_NOT_READ' | 'SESSION_ENDED' | null;
     practiceId: string;
     practiceVersionId: string;
+    /**
+     * Model calls of the practice's review sessions, as the runner counted them. Not the calls the proxy billed: those are counted for the whole review. Absent when the runner did not record them.
+     */
+    reviewModelCalls: null | number;
     scriptKind: 'BUILTIN' | 'CUSTOM';
     status: 'OK' | 'WITHHELD' | 'FAILED' | 'NOT_REACHED' | 'NOT_FINISHED';
     stopReason: 'UNAVAILABLE' | 'BUDGET' | 'DEADLINE' | 'TOO_LARGE' | 'OFF_FORMAT' | 'REFUSED' | 'ERROR' | 'CANCELLED' | 'INVALID_SCRIPT' | 'INVALID_CANDIDATE' | null;

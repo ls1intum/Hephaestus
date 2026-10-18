@@ -260,10 +260,12 @@ const script = (
 	practiceId: "41",
 	practiceVersionId: "112",
 	stopReason: null,
+	noResultCause: null,
 	finishedAt: new Date("2026-08-06T10:20:00Z"),
 	durationMs: 4200,
 	error: null,
 	models: [],
+	reviewModelCalls: null,
 	...fields,
 });
 
@@ -288,6 +290,13 @@ export const practiceScriptRuns = {
 	}),
 	withheld: script({ scriptKind: "CUSTOM", status: "WITHHELD", stopReason: "UNAVAILABLE" }),
 	outOfTime: script({ scriptKind: "CUSTOM", status: "FAILED", stopReason: "DEADLINE" }),
+	evidenceNotRead: script({
+		scriptKind: "BUILTIN",
+		status: "FAILED",
+		stopReason: "OFF_FORMAT",
+		noResultCause: "EVIDENCE_NOT_READ",
+		reviewModelCalls: 6,
+	}),
 	notReached: script({ scriptKind: "CUSTOM", status: "NOT_REACHED", durationMs: null }),
 	notFinished: script({ scriptKind: "CUSTOM", status: "NOT_FINISHED", durationMs: null }),
 	failed: script({

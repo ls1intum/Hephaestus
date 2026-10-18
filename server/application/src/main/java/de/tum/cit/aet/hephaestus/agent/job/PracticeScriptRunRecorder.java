@@ -28,6 +28,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 @Component
 @ConditionalOnWorkerRole
@@ -70,7 +71,7 @@ class PracticeScriptRunRecorder {
                             run.status(),
                             run.programKind(),
                             run.stopReason(),
-                            run.calls() == null ? null : objectMapper.valueToTree(run.calls()),
+                            calls(run),
                             run.status() == ScriptRunStatus.NOT_REACHED ? null : stored(run.models(), slots),
                             finishedAt,
                             run.error(),
@@ -78,6 +79,16 @@ class PracticeScriptRunRecorder {
                 })
                 .toList());
         afterCommit(() -> reported.forEach(run -> scripts(run.status()).increment()));
+    }
+
+    // The column has no schema of its own; the runner's review-session counts sit beside the host's calls.
+    private @Nullable JsonNode calls(PracticeScriptRunReport run) {
+        if (run.calls() == null) return null;
+        ObjectNode calls = objectMapper.valueToTree(run.calls());
+        if (run.reviewSessions() != null) {
+            calls.set(ScriptRun.REVIEW_SESSIONS, objectMapper.valueToTree(run.reviewSessions()));
+        }
+        return calls;
     }
 
     private @Nullable JsonNode stored(@Nullable List<ScriptModelUse> models, Map<ModelKind, FrozenModel> slots) {

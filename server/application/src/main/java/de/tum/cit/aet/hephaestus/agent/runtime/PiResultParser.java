@@ -246,6 +246,9 @@ public class PiResultParser {
      * @param calls the calls the program made, {@code {review, chat, decision, embedding, reranking}}; null when the
      *     practice is not named by the report
      * @param coverageReached the reads the program's host counted; null when not named by the report
+     * @param reviewSessions what the practice's review sessions did as the runner counted it,
+     *     {@code {modelCalls, evidenceRefusals, formatRefusals}}; null when the report does not say. These are the
+     *     runner's own counts, not the calls that the proxy billed.
      * @param error the first line of the program's error, at most {@link #PRACTICE_SCRIPT_ERROR_MAX_LENGTH}
      *     characters; {@code null} unless it failed and the runner named the error
      * @param durationMs how long the program ran; {@code null} when it did not start or did not finish, or the runner
@@ -260,18 +263,30 @@ public class PiResultParser {
             @Nullable List<ScriptModelUse> models,
             @Nullable Map<String, Integer> calls,
             @Nullable Map<String, Integer> coverageReached,
+            @Nullable Map<String, Integer> reviewSessions,
             @Nullable String error,
             @Nullable Integer durationMs) {
         public PracticeScriptRunReport {
             models = models == null ? null : List.copyOf(models);
             calls = calls == null ? null : Map.copyOf(calls);
             coverageReached = coverageReached == null ? null : Map.copyOf(coverageReached);
+            reviewSessions = reviewSessions == null ? null : Map.copyOf(reviewSessions);
         }
 
         /** An admitted practice the report does not name: the runner lists every admitted practice, finished or not. */
         static PracticeScriptRunReport notFinished(String practiceSlug, ScriptKind programKind) {
             return new PracticeScriptRunReport(
-                    practiceSlug, ScriptRunStatus.NOT_FINISHED, programKind, null, null, null, null, null, null, null);
+                    practiceSlug,
+                    ScriptRunStatus.NOT_FINISHED,
+                    programKind,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
         }
     }
 
@@ -312,6 +327,9 @@ public class PiResultParser {
 
     private static final List<String> COVERAGE_COUNTS = List.of("reads", "truncatedReads", "failedReads");
 
+    private static final List<String> REVIEW_SESSION_COUNTS =
+            List.of("modelCalls", "evidenceRefusals", "formatRefusals");
+
     private static final Set<String> ENTRY_KEYS = Set.of(
             "practiceSlug",
             "program",
@@ -321,6 +339,7 @@ public class PiResultParser {
             "error",
             "calls",
             "coverageReached",
+            "reviewSessions",
             "durationMs");
 
     private static final Map<String, Need> PRACTICE_SCRIPT_NEEDS =
@@ -431,19 +450,24 @@ public class PiResultParser {
         List<ScriptModelUse> models = modelUses(entry.path("models"));
         Map<String, Integer> calls = counts(entry.path("calls"), CALL_KINDS);
         Map<String, Integer> coverage = counts(entry.path("coverageReached"), COVERAGE_COUNTS);
-        if (models == null || calls == null || coverage == null) {
+        // Reports before the runner counted review sessions do not name them.
+        Map<String, Integer> sessions =
+                entry.has("reviewSessions") ? counts(entry.path("reviewSessions"), REVIEW_SESSION_COUNTS) : null;
+        if (models == null || calls == null || coverage == null || (entry.has("reviewSessions") && sessions == null)) {
             return null;
         }
         // A program that did not start made no call and took no time.
         boolean started = status != ScriptRunStatus.NOT_REACHED;
-        if (!started && calls.values().stream().anyMatch(count -> count > 0)) {
+        if (!started
+                && (calls.values().stream().anyMatch(count -> count > 0)
+                        || (sessions != null && sessions.values().stream().anyMatch(count -> count > 0)))) {
             return null;
         }
         String error = status == ScriptRunStatus.FAILED ? errorLine(entry.path("error")) : null;
         // A duration only explains the run, so a missing or malformed one leaves the run without it.
         Integer durationMs = started ? count(entry.path("durationMs")) : null;
         return new PracticeScriptRunReport(
-                slug, status, kind, digest, stopReason, models, calls, coverage, error, durationMs);
+                slug, status, kind, digest, stopReason, models, calls, coverage, sessions, error, durationMs);
     }
 
     private static @Nullable Map<String, Integer> counts(JsonNode node, List<String> names) {

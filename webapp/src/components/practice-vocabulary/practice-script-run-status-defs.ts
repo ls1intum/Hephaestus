@@ -2,6 +2,7 @@ import type { PracticeScriptRun } from "@/api/types.gen";
 
 export type PracticeScriptRunStatus = PracticeScriptRun["status"];
 export type PracticeScriptStopReason = NonNullable<PracticeScriptRun["stopReason"]>;
+export type PracticeScriptNoResultCause = NonNullable<PracticeScriptRun["noResultCause"]>;
 
 const scriptName = (run: Pick<PracticeScriptRun, "scriptKind">) =>
 	run.scriptKind === "BUILTIN" ? "Built-in review" : "Practice script";
@@ -25,6 +26,25 @@ export const PRACTICE_SCRIPT_STOP_REASON_DEFS = {
 	},
 } satisfies Record<PracticeScriptStopReason, { sentence: string; result: string }>;
 
+/** What the server proved about a review session that ended without a result; it says more than the stop reason. */
+export const PRACTICE_SCRIPT_NO_RESULT_CAUSE_DEFS = {
+	EVIDENCE_NOT_READ: {
+		sentence: "its result was refused because it had not read the evidence it needed",
+		result: "Evidence not read",
+	},
+	SESSION_ENDED: {
+		sentence: "its review session ended without an accepted result",
+		result: "No accepted result",
+	},
+} satisfies Record<PracticeScriptNoResultCause, { sentence: string; result: string }>;
+
+function failedReason(run: PracticeScriptRun): { sentence: string; result: string } | undefined {
+	if (run.noResultCause !== null) {
+		return PRACTICE_SCRIPT_NO_RESULT_CAUSE_DEFS[run.noResultCause];
+	}
+	return run.stopReason === null ? undefined : PRACTICE_SCRIPT_STOP_REASON_DEFS[run.stopReason];
+}
+
 interface PracticeScriptRunStatusDef {
 	/** The first sentence of the trace line under "What it saw". */
 	sentence: (run: PracticeScriptRun) => string;
@@ -43,14 +63,16 @@ export const PRACTICE_SCRIPT_RUN_STATUS_DEFS = {
 		result: () => "Withheld",
 	},
 	FAILED: {
-		sentence: (run) =>
-			run.stopReason === null
+		sentence: (run) => {
+			const reason = failedReason(run);
+			return reason === undefined
 				? `${scriptName(run)} stopped without a result.`
-				: `${scriptName(run)} stopped without a result: ${PRACTICE_SCRIPT_STOP_REASON_DEFS[run.stopReason].sentence}.`,
-		result: (run) =>
-			run.stopReason === null
-				? "Failed"
-				: `Failed: ${PRACTICE_SCRIPT_STOP_REASON_DEFS[run.stopReason].result.toLowerCase()}`,
+				: `${scriptName(run)} stopped without a result: ${reason.sentence}.`;
+		},
+		result: (run) => {
+			const reason = failedReason(run);
+			return reason === undefined ? "Failed" : `Failed: ${reason.result.toLowerCase()}`;
+		},
 	},
 	NOT_REACHED: {
 		sentence: (run) => `The review ended before the ${scriptName(run).toLowerCase()} started.`,

@@ -14,6 +14,7 @@ import {
 	type ProgramCalls,
 	type ReadReceipt,
 	type ProgramKind,
+	type ReviewSessionFacts,
 	type RunStatus,
 	type StopReason,
 } from "./contract.ts";
@@ -50,6 +51,8 @@ export interface ProgramOutcome {
 	/** Why the program failed; only on `failed`. */
 	error?: string;
 	calls: ProgramCalls;
+	/** What the practice's review sessions did. The runner that opens them adds it. */
+	reviewSessions?: ReviewSessionFacts;
 	coverageReached: Receipts;
 	durationMs: number | null;
 }
