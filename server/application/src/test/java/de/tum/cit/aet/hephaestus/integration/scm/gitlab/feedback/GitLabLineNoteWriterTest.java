@@ -1169,6 +1169,29 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
     }
 
     @Test
+    void shouldSkipAnOversizedNoteIdentityAndContinueWithTheNextCopy() {
+        String original = posted(item("fix", "result:a:0"));
+        Map<String, Object> stored = restNote(5303062, "DiffNote", original, 1);
+        rest.answer(200, Map.of("id", 1));
+        rest.answer(200, stored);
+        rest.answer(call -> ScriptedGitLabRest.respond(200, storedAs(stored, call)));
+
+        assertThat(channel.retract(
+                        target(),
+                        List.of(
+                                copy("gid://gitlab/DiffNote/999999999999999999999999999999"),
+                                copy("gid://gitlab/DiffNote/5303062"))))
+                .extracting(CopyUpdateReceipt::kind)
+                .containsExactly(CopyUpdateKind.UNSUPPORTED, CopyUpdateKind.EDITED);
+        assertThat(rest.calls())
+                .extracting(ScriptedGitLabRest.Call::method, ScriptedGitLabRest.Call::path)
+                .containsExactly(
+                        tuple(HttpMethod.GET, "/api/v4/user"),
+                        tuple(HttpMethod.GET, NOTES + "5303062"),
+                        tuple(HttpMethod.PUT, NOTES + "5303062"));
+    }
+
+    @Test
     void shouldReadOnlyAnAbsentRecordOnTheReadableMergeRequestAsGone() {
         rest.answer(200, Map.of("id", 1));
         rest.answer(404, "{\"message\":\"404 Not found\"}");
@@ -1296,7 +1319,7 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
     }
 
     private static CopyReceipt copy(String ref) {
-        long id = ref.matches(".*/[0-9]+$") ? Long.parseLong(ref.substring(ref.lastIndexOf('/') + 1)) : 1;
+        String id = ref.matches(".*/[0-9]+$") ? ref.substring(ref.lastIndexOf('/') + 1) : "1";
         return new CopyReceipt(
                 UUID.nameUUIDFromBytes(ref.getBytes(StandardCharsets.UTF_8)),
                 CopyDisposition.POSTED,
