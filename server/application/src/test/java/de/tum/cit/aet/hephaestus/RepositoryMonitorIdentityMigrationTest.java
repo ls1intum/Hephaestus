@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.testconfig.PostgreSQLTestContainer;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -169,10 +170,13 @@ class RepositoryMonitorIdentityMigrationTest {
                 second.setAutoCommit(false);
                 int firstPid = backendPid(first);
                 int secondPid = backendPid(second);
-                first.createStatement().execute(insert.formatted(994211, "org/first"));
+                // Closing a statement keeps its transaction open; the first insert holds the key until commit.
+                try (Statement statement = first.createStatement()) {
+                    statement.execute(insert.formatted(994211, "org/first"));
+                }
                 var losing = CompletableFuture.runAsync(() -> {
-                    try {
-                        second.createStatement().execute(insert.formatted(994212, "org/second"));
+                    try (Statement statement = second.createStatement()) {
+                        statement.execute(insert.formatted(994212, "org/second"));
                         second.commit();
                     } catch (SQLException error) {
                         throw new IllegalStateException(error.getSQLState(), error);
@@ -195,7 +199,8 @@ class RepositoryMonitorIdentityMigrationTest {
     }
 
     private static int backendPid(Connection connection) throws SQLException {
-        try (var rows = connection.createStatement().executeQuery("SELECT pg_backend_pid()")) {
+        try (Statement statement = connection.createStatement();
+                var rows = statement.executeQuery("SELECT pg_backend_pid()")) {
             rows.next();
             return rows.getInt(1);
         }
