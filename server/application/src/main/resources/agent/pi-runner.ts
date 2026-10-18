@@ -3151,7 +3151,15 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 					draft: null,
 					problems: new ProblemDrafts(),
 					requireSubmission: false,
-					reads: new SessionReads(CWD, relevantBrief, undefined, capturedTexts),
+					reads: new SessionReads(
+						CWD,
+						{
+							required: relevantBrief.map((source) => source.path),
+							supplied: isScan ? [] : briefSources,
+						},
+						undefined,
+						capturedTexts,
+					),
 					reader,
 					domainReads,
 				};
