@@ -16,7 +16,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.LineNoteWriter;
 import de.tum.cit.aet.hephaestus.integration.scm.github.feedback.GitHubCorrectionTestFixture;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitLabCorrectionTestFixture;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Map;
@@ -32,9 +31,10 @@ import org.springframework.graphql.client.GraphQlClient;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import reactor.core.publisher.Mono;
 
+// GitLab corrections go through its REST notes API and are proven in GitLabLineNoteWriterTest.
 class ScmCopyCorrectionTest extends BaseUnitTest {
     @ParameterizedTest
-    @CsvSource({"GITHUB,LINE_NOTE", "GITHUB,FILE_NOTE", "GITLAB,LINE_NOTE", "GITLAB,FILE_NOTE"})
+    @CsvSource({"GITHUB,LINE_NOTE", "GITHUB,FILE_NOTE"})
     void shouldEditTheExistingCopyAndPreserveItsPhysicalMarker(IntegrationKind kind, CopyForm form) {
         var client = mock(HttpGraphQlClient.class);
         var writer = writer(kind, client);
@@ -50,36 +50,27 @@ class ScmCopyCorrectionTest extends BaseUnitTest {
         field(
                 lookedUp,
                 "node",
-                kind == IntegrationKind.GITHUB
-                        ? Map.of(
-                                "__typename",
-                                form == CopyForm.FILE_NOTE ? "IssueComment" : "PullRequestReviewComment",
-                                "id",
-                                "copy-1",
-                                "body",
-                                "Original words\n" + marker,
-                                "viewerDidAuthor",
-                                true)
-                        : Map.of("id", "copy-1", "body", "Original words\n" + marker, "author", Map.of("id", "bot")));
-        if (kind == IntegrationKind.GITLAB) field(lookedUp, "currentUser.id", "bot");
+                Map.of(
+                        "__typename",
+                        form == CopyForm.FILE_NOTE ? "IssueComment" : "PullRequestReviewComment",
+                        "id",
+                        "copy-1",
+                        "body",
+                        "Original words\n" + marker,
+                        "viewerDidAuthor",
+                        true));
         when(read.execute()).thenReturn(Mono.just(lookedUp));
         var updated = mock(ClientGraphQlResponse.class);
         when(updated.getErrors()).thenReturn(List.of());
-        String result = kind == IntegrationKind.GITHUB
-                ? (form == CopyForm.FILE_NOTE
-                        ? "updateIssueComment.issueComment"
-                        : "updatePullRequestReviewComment.pullRequestReviewComment")
-                : "updateNote.note";
+        String result = form == CopyForm.FILE_NOTE
+                ? "updateIssueComment.issueComment"
+                : "updatePullRequestReviewComment.pullRequestReviewComment";
         field(updated, result + ".id", "copy-1");
         field(updated, result + ".url", "https://example.test/copy-1");
-        if (kind == IntegrationKind.GITLAB) field(updated, "updateNote.errors", List.of());
         when(write.execute()).thenReturn(Mono.just(updated));
         var receipt = new CopyReceipt(
                 UUID.randomUUID(), CopyDisposition.POSTED, "copy-1", "https://example.test/copy-1", true, form);
-        var target = ScmFeedbackFixtures.target(
-                new IntegrationRef(kind, 1, null),
-                kind == IntegrationKind.GITHUB ? "owner/repo#42" : "owner/repo!42",
-                "a".repeat(40));
+        var target = ScmFeedbackFixtures.target(new IntegrationRef(kind, 1, null), "owner/repo#42", "a".repeat(40));
         assertThat(writer.retract(target, List.of(receipt))).singleElement().satisfies(update -> {
             assertThat(update.kind()).isEqualTo(CopyUpdateKind.EDITED);
             assertThat(update.externalRef()).isEqualTo(receipt.externalRef());
@@ -90,17 +81,14 @@ class ScmCopyCorrectionTest extends BaseUnitTest {
         var documents = ArgumentCaptor.forClass(String.class);
         Mockito.verify(client, Mockito.times(2)).document(documents.capture());
         assertThat(documents.getAllValues().get(1))
-                .contains(
-                        kind == IntegrationKind.GITHUB
-                                ? (form == CopyForm.FILE_NOTE ? "updateIssueComment" : "updatePullRequestReviewComment")
-                                : "updateNote")
+                .contains(form == CopyForm.FILE_NOTE ? "updateIssueComment" : "updatePullRequestReviewComment")
                 .doesNotContain("create", "addComment", "addPullRequestReview");
     }
 
     @ParameterizedTest
     @EnumSource(
             value = IntegrationKind.class,
-            names = {"GITHUB", "GITLAB"})
+            names = {"GITHUB"})
     void shouldKeepTheCopyUnsettledWhenExistingContentCannotBeRead(IntegrationKind kind) {
         var client = mock(HttpGraphQlClient.class);
         var writer = writer(kind, client);
@@ -110,19 +98,15 @@ class ScmCopyCorrectionTest extends BaseUnitTest {
         when(read.execute()).thenReturn(Mono.empty());
         var receipt =
                 new CopyReceipt(UUID.randomUUID(), CopyDisposition.POSTED, "copy-1", null, true, CopyForm.LINE_NOTE);
-        var target = ScmFeedbackFixtures.target(
-                new IntegrationRef(kind, 1, null),
-                kind == IntegrationKind.GITHUB ? "owner/repo#42" : "owner/repo!42",
-                "a".repeat(40));
+        var target = ScmFeedbackFixtures.target(new IntegrationRef(kind, 1, null), "owner/repo#42", "a".repeat(40));
         assertThat(writer.retract(target, List.of(receipt)))
                 .singleElement()
                 .satisfies(update -> assertThat(update.kind()).isEqualTo(CopyUpdateKind.TRANSIENT));
     }
 
     private LineNoteWriter writer(IntegrationKind kind, HttpGraphQlClient client) {
-        return kind == IntegrationKind.GITHUB
-                ? GitHubCorrectionTestFixture.writer(client)
-                : GitLabCorrectionTestFixture.writer(client);
+        assertThat(kind).isEqualTo(IntegrationKind.GITHUB);
+        return GitHubCorrectionTestFixture.writer(client);
     }
 
     private static void field(ClientGraphQlResponse response, String path, Object value) {

@@ -81,6 +81,8 @@ function TraceStack(props: Omit<TraceLevelProps, "path" | "onOpen">) {
 							onReject={fn()}
 							onChangeWithdrawal={fn(async () => undefined)}
 							isChangingWithdrawal={false}
+							onRetryWithdrawal={fn()}
+							isRetryingWithdrawal={false}
 						/>
 					);
 				}

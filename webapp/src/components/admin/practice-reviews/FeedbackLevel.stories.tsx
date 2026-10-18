@@ -1,7 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, waitFor, within } from "storybook/test";
 
-import type { FeedbackBasis, ReviewFeedbackDetail } from "@/api/types.gen";
+import type {
+	FeedbackBasis,
+	FeedbackCopy,
+	FeedbackSend,
+	ReviewFeedbackDetail,
+} from "@/api/types.gen";
 import { FEEDBACK_LOCATION_DEFS } from "@/components/practice-vocabulary/feedback-location-defs";
 import { withPageBehind } from "@/stories/decorators";
 import { InLevelStack } from "@/stories/level-stack";
@@ -40,6 +45,65 @@ const ready = (feedback: ReviewFeedbackDetail) => ({ status: "ready" as const, f
 /** A card shown on the developer's practice pages; its text is theirs alone. */
 const practicePageCard = feedbackDetail("44444444-5555-5555-5555-555555555555");
 
+const WITHDRAWN_AT = new Date("2026-07-28T16:10:00Z");
+
+/**
+ * Feedback whose summary and line notes were posted on the work and then withdrawn. The summary was
+ * retracted. `lines` is what the removal left on each line note, and `send` is the removal itself.
+ */
+function withdrawnFromWork(
+	lines: Pick<FeedbackCopy, "state" | "readback" | "lastError">,
+	send: Pick<FeedbackSend, "state" | "attemptCount" | "lastError">,
+): ReviewFeedbackDetail {
+	const summary = longFeedbackDetail.copies.find((copy) => copy.kind === "SUMMARY");
+	const copies = longFeedbackDetail.copies.map((copy): FeedbackCopy => {
+		const posted = {
+			...copy,
+			postedAt: summary?.postedAt ?? WITHDRAWN_AT,
+			externalRef: String(2_481_933 + copy.position),
+			stopReason: null,
+		};
+		return copy.kind === "SUMMARY"
+			? { ...posted, state: "RETRACTED", readback: null, lastError: null }
+			: { ...posted, ...lines };
+	});
+	const count = (state: FeedbackCopy["state"]) =>
+		copies.filter((copy) => copy.state === state).length;
+	return {
+		...longFeedbackDetail,
+		withdrawn: true,
+		copies,
+		copyCounts: {
+			planned: 0,
+			writeStarted: 0,
+			posted: count("POSTED"),
+			failed: 0,
+			withheld: 0,
+			retracted: count("RETRACTED"),
+		},
+		decisions: withdrawnFeedbackDetail.decisions.map((decision) => ({
+			...decision,
+			feedbackId: longFeedbackDetail.id,
+		})),
+		sends: [
+			{
+				feedbackId: longFeedbackDetail.id,
+				action: "RETRACT",
+				createdAt: WITHDRAWN_AT,
+				updatedAt: WITHDRAWN_AT,
+				nextAttemptAt: WITHDRAWN_AT,
+				...send,
+			},
+		],
+	};
+}
+
+const UNACKNOWLEDGED_REMOVAL = {
+	state: "POSTED",
+	readback: "TRANSIENT",
+	lastError: "Provider correction is not confirmed.",
+} as const;
+
 const meta = {
 	component: FeedbackLevel,
 	parameters: { layout: "fullscreen" },
@@ -53,6 +117,8 @@ const meta = {
 		onReject: fn(),
 		onChangeWithdrawal: fn(async () => undefined),
 		isChangingWithdrawal: false,
+		onRetryWithdrawal: fn(),
+		isRetryingWithdrawal: false,
 	},
 	argTypes: { path: { control: false } },
 	render: (args) => (
@@ -359,6 +425,108 @@ export const Restored: Story = {
 		await expect(
 			within(panelElement).getByRole("button", { name: "Withdraw feedback" }),
 		).toBeEnabled();
+	},
+};
+
+/**
+ * The removal stopped trying while the provider had not acknowledged removing the line notes. The
+ * withdrawal stands, the receipts stay posted, and the admin can try the removal again.
+ */
+export const WithdrawalNotConfirmed: Story = {
+	args: {
+		feedback: ready(
+			withdrawnFromWork(UNACKNOWLEDGED_REMOVAL, {
+				state: "DONE",
+				attemptCount: 8,
+				lastError: "Provider visibility is unknown.",
+			}),
+		),
+	},
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		const panel = within(panelElement);
+		await expectHeaderChip(panelElement, "Delivered");
+		await expectHeaderChip(panelElement, "Withdrawn");
+		panel.getByText(
+			/2 copies may still be on the work\. At least one removal is unconfirmed\. Check each copy above for details\./u,
+		);
+		const events = history(panelElement);
+		events.getByText("Retraction incomplete");
+		await expect(events.queryByText("Retracted")).toBeNull();
+		await expect(events.getAllByText("Provider correction is not confirmed.")).toHaveLength(2);
+		events.getByText("Provider visibility is unknown.");
+		await expect(panel.getByRole("button", { name: "Retry withdrawal" })).toBeEnabled();
+		await expect(panel.getByRole("button", { name: "Restore feedback" })).toBeEnabled();
+	},
+};
+
+/** While the removal is still being tried, there is nothing to retry yet. */
+export const WithdrawalInProgress: Story = {
+	args: {
+		feedback: ready(
+			withdrawnFromWork(UNACKNOWLEDGED_REMOVAL, {
+				state: "UNCERTAIN",
+				attemptCount: 3,
+				lastError: "Provider visibility is unknown.",
+			}),
+		),
+	},
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		const panel = within(panelElement);
+		panel.getByText(/Heph is still removing the copies it posted on the work\./u);
+		history(panelElement).getByText("Not confirmed");
+		await expect(panel.queryByRole("button", { name: "Retry withdrawal" })).toBeNull();
+		await expect(panel.getByRole("button", { name: "Restore feedback" })).toBeEnabled();
+	},
+};
+
+/** Every posted copy has a receipt for its removal. */
+export const WithdrawalComplete: Story = {
+	args: {
+		feedback: ready(
+			withdrawnFromWork(
+				{ state: "RETRACTED", readback: null, lastError: null },
+				{ state: "DONE", attemptCount: 2, lastError: null },
+			),
+		),
+	},
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		const panel = within(panelElement);
+		panel.getByText(/Copies it posted on the work are retracted there/u);
+		const events = history(panelElement);
+		events.getByText("Retracted");
+		await expect(events.queryByText("Retraction incomplete")).toBeNull();
+		await expect(panel.queryByRole("button", { name: "Retry withdrawal" })).toBeNull();
+	},
+};
+
+/** The provider cannot correct the line notes, so a retry would not remove them either. */
+export const WithdrawalNeedsAttention: Story = {
+	args: {
+		feedback: ready(
+			withdrawnFromWork(
+				{
+					state: "POSTED",
+					readback: null,
+					lastError: "This provider cannot correct the posted copy.",
+				},
+				{ state: "DONE", attemptCount: 2, lastError: null },
+			),
+		),
+	},
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		const panel = within(panelElement);
+		panel.getByText(/2 copies may still be on the work, and Heph cannot remove them\./u);
+		const events = history(panelElement);
+		events.getByText("Retraction incomplete");
+		await expect(events.getAllByText("This provider cannot correct the posted copy.")).toHaveLength(
+			2,
+		);
+		await expect(panel.queryByRole("button", { name: "Retry withdrawal" })).toBeNull();
+		await expect(panel.getByRole("button", { name: "Restore feedback" })).toBeEnabled();
 	},
 };
 

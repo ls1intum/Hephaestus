@@ -1,6 +1,4 @@
-# Resolves the GraphQL Global ID and diff refs for a merge request.
-# Used by PullRequestCommentPoster (noteableId for createNote/updateNote mutations)
-# and by DiffNotePoster (diffRefs for createDiffNote position input).
+# Resolves a merge request's global ID for summary and approval operations.
 
 query GetMergeRequestGlobalId($fullPath: ID!, $iid: String!) {
     project(fullPath: $fullPath) {

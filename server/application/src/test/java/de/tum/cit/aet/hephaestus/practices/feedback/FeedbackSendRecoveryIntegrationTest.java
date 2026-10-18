@@ -2,15 +2,19 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
+import de.tum.cit.aet.hephaestus.integration.core.spi.CopyUpdateKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.LookupPresence;
 import de.tum.cit.aet.hephaestus.practices.feedback.delivery.FeedbackSendRecovery;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDecisionAction;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDecisionInput;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackResolution;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackSendAction;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackSendState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackUsefulness;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.util.List;
@@ -227,5 +231,123 @@ class FeedbackSendRecoveryIntegrationTest extends AbstractFeedbackDeliveryIntegr
         assertThat(sends.findById(feedbackId).orElseThrow().getState()).isEqualTo(FeedbackSendState.DONE);
         assertThatThrownBy(() -> store.retry(workspace.getId(), feedbackId, developerId))
                 .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void shouldRetryAWithdrawalWithoutAnotherDecisionWhenTheProviderDidNotAcknowledgeARemoval() {
+        prepare(true);
+        sender.send(workspace.getId(), feedbackId);
+        store.respond(
+                workspace.getId(),
+                feedbackId,
+                developerId,
+                FeedbackResolution.ADDRESSED,
+                FeedbackUsefulness.HELPFUL,
+                null);
+        var posted = children();
+        assertThat(posted).allSatisfy(copy -> assertThat(copy.getState()).isEqualTo(FeedbackCopyState.POSTED));
+        provider.retraction = CopyUpdateKind.TRANSIENT;
+        withdraw();
+        for (int attempt = 0; attempt < 8; attempt++) {
+            due();
+            newSender().send(workspace.getId(), feedbackId);
+        }
+        var stopped = sends.findById(feedbackId).orElseThrow();
+        assertThat(stopped.getAction()).isEqualTo(FeedbackSendAction.RETRACT);
+        assertThat(stopped.getState()).isEqualTo(FeedbackSendState.DONE);
+        assertThat(stopped.getLastError()).isEqualTo("Provider visibility is unknown.");
+        assertThat(children().get(0).getState()).isEqualTo(FeedbackCopyState.RETRACTED);
+        assertThat(children().get(1).getState()).isEqualTo(FeedbackCopyState.POSTED);
+        assertThat(children().get(1).getReadback()).isEqualTo(FeedbackCopyReadback.TRANSIENT);
+        long decided = decisionCount();
+        provider.retraction = CopyUpdateKind.GONE;
+
+        store.retry(workspace.getId(), feedbackId, developerId);
+        assertThat(sends.findById(feedbackId).orElseThrow().getState()).isEqualTo(FeedbackSendState.PENDING);
+        due();
+        newSender().send(workspace.getId(), feedbackId);
+
+        var settled = sends.findById(feedbackId).orElseThrow();
+        assertThat(settled.getAction()).isEqualTo(FeedbackSendAction.RETRACT);
+        assertThat(settled.getState()).isEqualTo(FeedbackSendState.DONE);
+        assertThat(settled.getLastError()).isNull();
+        assertThat(settled.getAttempts()).isEqualTo(stopped.getAttempts() + 1);
+        assertThat(children()).allSatisfy(copy -> {
+            assertThat(copy.getState()).isEqualTo(FeedbackCopyState.RETRACTED);
+            assertThat(copy.getReadback()).isNull();
+        });
+        assertThat(children())
+                .extracting(FeedbackCopy::getId, FeedbackCopy::getExternalRef, FeedbackCopy::getPostedAt)
+                .containsExactlyElementsOf(posted.stream()
+                        .map(copy -> tuple(copy.getId(), copy.getExternalRef(), copy.getPostedAt()))
+                        .toList());
+        assertThat(provider.physical).doesNotContainKey(posted.get(1).getId());
+        assertThat(provider.summaryCreates).isEqualTo(1);
+        assertThat(provider.noteCreates).isEqualTo(1);
+        assertThat(decisionCount()).isEqualTo(decided);
+        assertThat(visibility.withdrawn(workspace.getId(), feedbackId)).isTrue();
+        assertThat(responses
+                        .findCurrent(workspace.getId(), feedbackId)
+                        .orElseThrow()
+                        .getResolution())
+                .isEqualTo(FeedbackResolution.ADDRESSED);
+        assertThat(current().getState()).isEqualTo(FeedbackState.DELIVERED);
+    }
+
+    @Test
+    void shouldRefuseAWithdrawalRetryWhileItsCorrectionIsPendingOrLeased() {
+        prepare(true);
+        sender.send(workspace.getId(), feedbackId);
+        withdraw();
+        assertThatThrownBy(() -> store.retry(workspace.getId(), feedbackId, developerId))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("The withdrawal is still in progress.");
+        due();
+        assertThat(transactions.claim(workspace.getId(), feedbackId, "leased-correction"))
+                .isNotNull();
+        assertThatThrownBy(() -> store.retry(workspace.getId(), feedbackId, developerId))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("The withdrawal is still in progress.");
+        var leased = sends.findById(feedbackId).orElseThrow();
+        assertThat(leased.getAction()).isEqualTo(FeedbackSendAction.RETRACT);
+        assertThat(leased.getState()).isEqualTo(FeedbackSendState.SENDING);
+        assertThat(leased.getLeaseOwner()).isEqualTo("leased-correction");
+        assertThat(provider.updates).isZero();
+    }
+
+    @Test
+    void shouldRefuseAWithdrawalRetryWhenTheProviderCannotRemoveThePostedCopy() {
+        prepare(true);
+        sender.send(workspace.getId(), feedbackId);
+        provider.retraction = CopyUpdateKind.UNSUPPORTED;
+        withdraw();
+        due();
+        newSender().send(workspace.getId(), feedbackId);
+        var stopped = sends.findById(feedbackId).orElseThrow();
+        assertThat(stopped.getState()).isEqualTo(FeedbackSendState.DONE);
+        var note = children().get(1);
+        assertThat(note.getState()).isEqualTo(FeedbackCopyState.POSTED);
+        assertThat(note.getReadback()).isNull();
+        assertThat(note.getLastError()).isEqualTo("This provider cannot correct the posted copy.");
+        assertThatThrownBy(() -> store.retry(workspace.getId(), feedbackId, developerId))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("No withdrawn copy can be retried.");
+        var after = sends.findById(feedbackId).orElseThrow();
+        assertThat(after.getState()).isEqualTo(FeedbackSendState.DONE);
+        assertThat(after.getAttempts()).isEqualTo(stopped.getAttempts());
+    }
+
+    private void withdraw() {
+        store.decide(
+                workspace.getId(),
+                feedbackId,
+                developerId,
+                new FeedbackDecisionInput(FeedbackDecisionAction.WITHDRAW, null, "Withdraw this guidance.", null));
+    }
+
+    private long decisionCount() {
+        return decisions
+                .findByWorkspaceIdAndFeedbackIdOrderByDecidedAtDescIdDesc(workspace.getId(), feedbackId)
+                .size();
     }
 }

@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import {
 	createFeedbackDecisionMutation,
 	getReviewFeedbackOptions,
+	retryFeedbackMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { ReviewFeedbackDetail } from "@/api/types.gen";
 import type { ApprovalQueue } from "@/components/admin/practice-reviews/ProposalDecision";
@@ -11,12 +12,13 @@ import { PRACTICE_REVIEW_READS } from "@/components/admin/practice-reviews/revie
 import { type PanelState, panelState } from "@/components/common/panel-state";
 import { isDeliveryInProgress } from "@/components/practice-vocabulary/delivery-state-defs";
 import type { FeedbackDecisionReason } from "@/components/practice-vocabulary/feedback-decision-defs";
+import { withdrawalCorrection } from "@/components/practice-vocabulary/feedback-send-defs";
 import { problemDetailOf } from "@/lib/problem-detail";
 import { invalidateWorkspaceReads } from "@/runtime/tanstack-query/invalidate-workspace-reads";
 
 import { awaitingApprovalOptions } from "./use-feedback-awaiting-approval";
 
-/** How often feedback still on its way out is re-read, until it lands or stops. */
+/** How often feedback still on its way out, or still being removed, is re-read until it settles. */
 const DELIVERY_POLL_MS = 2000;
 
 const READS_OF_FEEDBACK_DECISION: ReadonlySet<string> = new Set([
@@ -32,6 +34,8 @@ interface FeedbackController {
 	onReject: (reason: FeedbackDecisionReason, note?: string) => void;
 	onChangeWithdrawal: (withdrawn: boolean, note: string) => Promise<unknown>;
 	isChangingWithdrawal: boolean;
+	onRetryWithdrawal: () => void;
+	isRetryingWithdrawal: boolean;
 }
 
 interface FeedbackControllerOptions {
@@ -55,7 +59,9 @@ export function useFeedbackController(
 	const feedbackQuery = useQuery({
 		...feedbackOptions,
 		refetchInterval: ({ state: { data } }) =>
-			data !== undefined && isDeliveryInProgress(data) ? DELIVERY_POLL_MS : false,
+			data !== undefined && (isDeliveryInProgress(data) || withdrawalCorrection(data) === "pending")
+				? DELIVERY_POLL_MS
+				: false,
 	});
 	// Approvals bind the reviewed copy digest; a changed package requires a fresh read.
 	const contentDigest = feedbackQuery.data?.contentDigest ?? undefined;
@@ -93,6 +99,18 @@ export function useFeedbackController(
 		},
 	});
 
+	const retry = useMutation({
+		...retryFeedbackMutation(),
+		onSettled: async () =>
+			invalidateWorkspaceReads(queryClient, workspaceSlug, READS_OF_FEEDBACK_DECISION),
+		onSuccess: () => {
+			toast.success("Removing the feedback from the work again");
+		},
+		onError: (error) => {
+			toast.error("We could not retry the withdrawal", { description: problemDetailOf(error) });
+		},
+	});
+
 	const decided = {
 		onSuccess: onDecided,
 		// A refusal is read by what it left behind, not by its status: "already decided" and "no
@@ -120,6 +138,8 @@ export function useFeedbackController(
 				path,
 				body: { action: withdrawn ? "WITHDRAW" : "RESTORE", note },
 			}),
+		isRetryingWithdrawal: retry.isPending,
+		onRetryWithdrawal: () => retry.mutate({ path }),
 	};
 }
 

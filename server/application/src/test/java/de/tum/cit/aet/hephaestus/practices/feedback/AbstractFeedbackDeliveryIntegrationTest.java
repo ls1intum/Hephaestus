@@ -215,6 +215,7 @@ public abstract class AbstractFeedbackDeliveryIntegrationTest extends AbstractFe
         int summaryCreates, noteCreates, updates;
         Failure summaryFailure = Failure.NONE, noteFailure = Failure.NONE;
         LookupPresence readback = LookupPresence.FOUND;
+        CopyUpdateKind retraction = CopyUpdateKind.GONE;
         boolean fallback;
 
         @Nullable
@@ -307,13 +308,9 @@ public abstract class AbstractFeedbackDeliveryIntegrationTest extends AbstractFe
         public List<CopyUpdateReceipt> retract(FeedbackTarget target, List<CopyReceipt> receipts) {
             return receipts.stream()
                     .map(receipt -> {
-                        physical.remove(receipt.copyId());
+                        if (retraction == CopyUpdateKind.GONE) physical.remove(receipt.copyId());
                         return new CopyUpdateReceipt(
-                                receipt.copyId(),
-                                CopyUpdateKind.GONE,
-                                receipt.externalRef(),
-                                receipt.externalUrl(),
-                                null);
+                                receipt.copyId(), retraction, receipt.externalRef(), receipt.externalUrl(), null);
                     })
                     .toList();
         }

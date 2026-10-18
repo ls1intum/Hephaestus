@@ -1,4 +1,4 @@
-import { EyeOffIcon, Undo2Icon } from "lucide-react";
+import { EyeOffIcon, RotateCcwIcon, Undo2Icon } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
 
 import type {
@@ -42,11 +42,15 @@ import type { FeedbackDestination } from "@/components/practice-vocabulary/feedb
 import { FEEDBACK_LOCATION_DEFS } from "@/components/practice-vocabulary/feedback-location-defs";
 import { FEEDBACK_RESOLUTION_DEFS } from "@/components/practice-vocabulary/feedback-resolution-defs";
 import {
+	copiesStillOnWork,
 	FEEDBACK_SEND_ACTION_LABELS,
 	FEEDBACK_SEND_STATE_DEFS,
+	type WithdrawalCorrection,
+	withdrawalCorrection,
 } from "@/components/practice-vocabulary/feedback-send-defs";
 import { FEEDBACK_USEFULNESS_DEFS } from "@/components/practice-vocabulary/feedback-usefulness-defs";
 import { WITHHOLDING_REASON_DEFS } from "@/components/practice-vocabulary/withholding-defs";
+import { Button } from "@/components/ui/button";
 import { DrawerBody, DrawerFooter } from "@/components/ui/drawer";
 import { hasText } from "@/lib/text";
 
@@ -92,6 +96,12 @@ export interface FeedbackLevelProps {
 	 */
 	onChangeWithdrawal: (withdrawn: boolean, note: string) => Promise<unknown>;
 	isChangingWithdrawal: boolean;
+	/**
+	 * Tries again to remove withdrawn feedback from the work, keeping the withdrawal. Offered only
+	 * while a posted copy waits on a removal the provider did not acknowledge.
+	 */
+	onRetryWithdrawal: () => void;
+	isRetryingWithdrawal: boolean;
 }
 
 function inOrder(copies: readonly FeedbackCopy[]): FeedbackCopy[] {
@@ -117,6 +127,8 @@ export function FeedbackLevel({
 	queue,
 	onChangeWithdrawal,
 	isChangingWithdrawal,
+	onRetryWithdrawal,
+	isRetryingWithdrawal,
 }: FeedbackLevelProps) {
 	const feedback = state.status === "ready" ? state.feedback : undefined;
 	let flag: ReactNode;
@@ -239,6 +251,16 @@ export function FeedbackLevel({
 			) : (
 				canChangeWithdrawal(record) && (
 					<DrawerFooter>
+						{withdrawalCorrection(record) === "retryable" && (
+							<Button
+								variant="outline"
+								disabled={isRetryingWithdrawal || isChangingWithdrawal}
+								onClick={onRetryWithdrawal}
+							>
+								<RotateCcwIcon aria-hidden />
+								Retry withdrawal
+							</Button>
+						)}
 						<CorrectionReasonPopover
 							copy={withdrawalCopy(record)}
 							icon={record.withdrawn ? Undo2Icon : EyeOffIcon}
@@ -403,7 +425,8 @@ function feedbackHistory(feedback: FeedbackRecord): SheetEvent[] {
 		events.push({ key: "delivered", at: feedback.deliveredAt, title: "Delivered" });
 	}
 	const failed = feedback.copies.some((copy) => copy.state === "FAILED");
-	events.push(...feedback.sends.flatMap((send) => sendEvent(send, failed) ?? []));
+	const correction = withdrawalCorrection(feedback);
+	events.push(...feedback.sends.flatMap((send) => sendEvent(send, failed, correction) ?? []));
 	const response = responseEvent(feedback);
 	if (response !== undefined) {
 		events.push(response);
@@ -455,6 +478,7 @@ function copyEvent(
 								Open the comment
 							</InlineLink>
 						)}
+						{hasText(copy.lastError) && <LastError error={copy.lastError} />}
 					</span>
 				),
 			};
@@ -494,11 +518,20 @@ function copyEvent(
 	}
 }
 
-function sendEvent(send: FeedbackSend, copiesFailed: boolean): SheetEvent | undefined {
+function sendEvent(
+	send: FeedbackSend,
+	copiesFailed: boolean,
+	correction: WithdrawalCorrection | undefined,
+): SheetEvent | undefined {
 	const done = send.state === "DONE";
 	let title: string;
 	if (!done) {
 		title = FEEDBACK_SEND_STATE_DEFS[send.state].label;
+	} else if (
+		send.action === "RETRACT" &&
+		(correction === "retryable" || correction === "needsAttention")
+	) {
+		title = "Retraction incomplete";
 	} else if (send.action === "RETRACT") {
 		title = FEEDBACK_COPY_STATE_DEFS.RETRACTED.label;
 	} else if (copiesFailed) {
@@ -576,10 +609,34 @@ const WITHDRAWN_NOW: Record<FeedbackDestination, string> = {
 		"It is withdrawn, so Heph does not raise it in a conversation. The results behind it are unchanged.",
 };
 
+/** Where removing withdrawn feedback from the work stands; the copy counts come from their receipts. */
+function withdrawnOnWorkNow(feedback: FeedbackRecord): string {
+	const remaining = copiesStillOnWork(feedback.copies).length;
+	const one = remaining === 1;
+	const copies = one ? "one copy" : `${String(remaining)} copies`;
+	switch (withdrawalCorrection(feedback)) {
+		case "pending": {
+			return "It is withdrawn. Heph is still removing the copies it posted on the work. The results behind it are unchanged.";
+		}
+		case "retryable": {
+			return `It is withdrawn, but ${copies} may still be on the work. At least one removal is unconfirmed. Check each copy above for details. The results behind it are unchanged.`;
+		}
+		case "needsAttention": {
+			return `It is withdrawn, but ${copies} may still be on the work, and Heph cannot remove ${one ? "it" : "them"}. The results behind it are unchanged.`;
+		}
+		case "complete":
+		case undefined: {
+			return WITHDRAWN_NOW.ON_WORK;
+		}
+	}
+}
+
 /** What the current state means, in one sentence, in place of an alert. */
 function feedbackNow(feedback: FeedbackRecord): ReactNode {
 	if (feedback.withdrawn) {
-		return WITHDRAWN_NOW[feedback.destination];
+		return feedback.destination === "ON_WORK"
+			? withdrawnOnWorkNow(feedback)
+			: WITHDRAWN_NOW[feedback.destination];
 	}
 	if (feedback.disagreedAt !== null) {
 		return "While the developer’s disagreement stands, a later review of the same work does not raise the same point again.";

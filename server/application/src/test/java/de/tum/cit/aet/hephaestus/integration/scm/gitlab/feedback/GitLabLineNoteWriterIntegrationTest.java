@@ -68,8 +68,7 @@ class GitLabLineNoteWriterIntegrationTest extends AbstractFeedbackDeliveryIntegr
                                             + "]")
                     .build());
         }));
-        var writer = new GitLabLineNoteWriter(
-                gitlab.provider(), new GitLabMrResolver(gitlab.provider()), tokens, guard, targets, reader);
+        var writer = new GitLabLineNoteWriter(gitlab.provider(), gitlab.rest(), tokens, guard, targets, reader);
         var resolution = mock(FeedbackTargetResolver.class);
         when(resolution.resolve(any())).thenReturn(target);
         when(resolution.resolveExisting(any())).thenReturn(target);
@@ -96,5 +95,13 @@ class GitLabLineNoteWriterIntegrationTest extends AbstractFeedbackDeliveryIntegr
             assertThat(receipt.actualKind()).isEqualTo(rejected ? CopyForm.FILE_NOTE : CopyForm.LINE_NOTE);
         });
         assertThat(gitlab.threads().on(ScriptedGitLabNotes.mergeRequest(42))).hasSize(2);
+        // The old-side range 10-12 is one native range thread; a rejected position is an overview thread instead.
+        assertThat(copy.getExternalRef())
+                .startsWith(rejected ? "gid://gitlab/DiscussionNote/" : "gid://gitlab/DiffNote/");
+        assertThat(gitlab.threads().on(ScriptedGitLabNotes.mergeRequest(42)))
+                .filteredOn(comment -> comment.id().equals(copy.getExternalRef()))
+                .singleElement()
+                .satisfies(comment -> assertThat(comment.body().contains(GitLabLineNoteWriter.RANGE_PLACEMENT))
+                        .isEqualTo(!rejected));
     }
 }
