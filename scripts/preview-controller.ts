@@ -46,6 +46,7 @@ export interface GitHubApi {
 	readonly rest: {
 		readonly pulls: {
 			readonly get: ApiMethod<PullRequest>;
+			readonly list: ApiMethod<(PullRequest & { readonly number: number })[]>;
 		};
 		readonly git: {
 			readonly getTree: ApiMethod<{
@@ -76,6 +77,7 @@ interface ActionsContext {
 	readonly payload: {
 		readonly repository: { readonly default_branch: string };
 		readonly pull_request?: { readonly number: number };
+		readonly workflow_run?: { readonly head_branch?: string | null; readonly head_sha: string };
 	};
 }
 
@@ -399,12 +401,56 @@ const capacitySkipReason = async (
 	return undefined;
 };
 
+/**
+ * The pull requests this event can deploy, listed before a run enters the admission group: a run
+ * there that finds nothing to do still holds the group, and while it waits it can displace another
+ * pull request's pending deploy. The label is read only to stay out of the group; `resolve()`
+ * reads the pull request again and decides.
+ *
+ * A completed CI run names its pull requests in `workflow_run.pull_requests`, but GitHub leaves that
+ * empty for some runs, so the open pull requests are listed by the run's branch instead. Only those
+ * still at the run's commit qualify: an older head's run says nothing about the current one's images.
+ */
+const targets = async ({ github, context, core }: ControllerInput): Promise<void> => {
+	const { owner, repo } = context.repo;
+	const { pull_request: pullRequest, workflow_run: run } = context.payload;
+	if (pullRequest) {
+		core.setOutput("pulls", JSON.stringify([pullRequest.number]));
+		return;
+	}
+	if (!run) {
+		throw new Error("Expected a pull request or a completed CI run.");
+	}
+	const branch = run.head_branch ?? undefined;
+	if (!isSet(branch)) {
+		core.setOutput("pulls", "[]");
+		return;
+	}
+	const pulls = await github.paginate(github.rest.pulls.list, {
+		owner,
+		repo,
+		state: "open",
+		head: `${owner}:${branch}`,
+		per_page: 100,
+	});
+	const numbers = pulls
+		.filter(
+			(pull) =>
+				pull.head.sha === run.head_sha &&
+				pull.head.repo?.full_name === `${owner}/${repo}` &&
+				hasPreviewLabel(pull),
+		)
+		.map((pull) => pull.number)
+		.toSorted((left, right) => left - right);
+	core.setOutput("pulls", JSON.stringify(numbers));
+	if (numbers.length === 0) {
+		core.notice(`No labelled pull request is at ${run.head_sha}.`);
+	}
+};
+
 const resolve = async ({ github, context, core }: ControllerInput): Promise<void> => {
 	const { owner, repo } = context.repo;
-	if (!context.payload.pull_request) {
-		throw new Error("Pull request payload is incomplete.");
-	}
-	const { number } = context.payload.pull_request;
+	const number = requiredPositiveInteger(process.env, "PR_NUMBER");
 	const { data: pull } = await github.rest.pulls.get({ owner, repo, pull_number: number });
 	const defaultBranch = context.payload.repository.default_branch;
 	const target: Target = { github, owner, repo, defaultBranch, number, pull };
@@ -424,6 +470,13 @@ const resolve = async ({ github, context, core }: ControllerInput): Promise<void
 
 	if (!labelled) {
 		skip(`PR #${number} does not carry the \`${PREVIEW_LABEL}\` label.`);
+		return;
+	}
+	// Set when a finished CI run started this. Its images belong to its commit, so a head that has
+	// moved on is the newer run's to deploy, and a missing image for it would prove nothing.
+	const ciHeadSha = process.env.CI_HEAD_SHA;
+	if (isSet(ciHeadSha) && pull.head.sha !== ciHeadSha) {
+		skip(`PR #${number} is no longer at ${ciHeadSha}; its current head's CI run deploys it.`, true);
 		return;
 	}
 	const ineligible = pullRequestSkipReason(target) ?? (await policySkipReason(target));
@@ -557,8 +610,8 @@ const create = async ({ github, context, core }: ControllerInput): Promise<void>
 
 /**
  * Moves the deployment GitHub already shows to its next state. Without this the record is created
- * and then says nothing until the run ends, which for a preview waiting on CI images is most of its
- * life — and a deployment that never moves is indistinguishable from one that is stuck.
+ * and then says nothing until the run ends, which for a preview Coolify is still building is most
+ * of its life — and a deployment that never moves is indistinguishable from one that is stuck.
  */
 const progress = async ({ github, context }: ControllerInput): Promise<void> => {
 	const { owner, repo } = context.repo;
@@ -730,4 +783,5 @@ export {
 	recheck,
 	resolve,
 	retire,
+	targets,
 };
