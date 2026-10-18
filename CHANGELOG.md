@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.94.3
+
+### Patch Changes
+
+- Practice feedback now guides error-handling fixes toward safe caller errors and protected diagnostics. Suggested changes must preserve security and privacy.
+- A GitLab merge request that becomes ready before GitLab has worked out its diff now gets its review once the diff is known. Before, Hephaestus dropped that review without notice. If the merge request changes before then (a new commit, target branch, title, description or linked issue), Hephaestus does not review the old state. A later change can start a new review.
+
+  A `/hephaestus review` comment on a merge request asks for a review again. The same people who can request a review on the work page can use it: the author, an assignee, or a workspace admin. It checks the same settings and limits. If GitLab sends the comment more than once, Hephaestus starts at most one review. A comment asks for a review only when the merge request's diff is available. If GitLab has not worked out the diff yet, request the review again later.
+
+- A review's **Practice scripts** section now shows each practice's review calls, or says **Not recorded** for older reviews instead of showing none. A built-in review whose result the evidence check refused now says that it had not read the evidence it needed, instead of saying that the model answered in the wrong format.
+- Public feedback on a pull request or merge request is no longer withheld as a whole when one of its practices has feedback turned off. That practice is still reviewed and its result is recorded, but it no longer becomes part of the public feedback. Feedback from practices that are on can now be prepared and sent. If a practice is turned off while feedback is being prepared, that feedback is still stopped before it is sent.
+- A practice review now gets its full number of attempts to correct a result that was refused for its evidence. Each such refusal was counted twice, so the review gave up on the practice after half the allowed attempts.
+- Upgrades give the server time to finish database migrations before failed startup probes mark it unhealthy. A ready server is accepted immediately, and the deployment timeout and normal health checks remain in force.
+
 ## 0.94.2
 
 ### Patch Changes
