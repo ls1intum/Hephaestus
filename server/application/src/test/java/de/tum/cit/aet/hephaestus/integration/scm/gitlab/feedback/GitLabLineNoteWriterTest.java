@@ -8,6 +8,7 @@ import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
@@ -26,6 +27,8 @@ import de.tum.cit.aet.hephaestus.integration.core.egress.SilentModeGraphQlClient
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyDisposition;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyForm;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyReceipt;
+import de.tum.cit.aet.hephaestus.integration.core.spi.CopyUpdateKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.CopyUpdateReceipt;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyWriteFence;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyWriteResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor;
@@ -35,6 +38,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.LineNote;
 import de.tum.cit.aet.hephaestus.integration.scm.feedback.ScmFeedbackFixtures;
+import de.tum.cit.aet.hephaestus.integration.scm.feedback.ScmFeedbackFormatter;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabRateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenService;
@@ -42,6 +46,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.credentials.GitLabCreden
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -53,6 +58,8 @@ import java.util.function.Function;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.ClientResponseField;
@@ -70,6 +77,7 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
     private static final String PERSON = "gid://gitlab/User/2";
     private static final String NOTE_URL = "https://gitlab.example.com/group/project/-/merge_requests/42#note_987654";
     private static final String DISCUSSIONS = "/api/v4/projects/group%2Fproject/merge_requests/42/discussions";
+    private static final String NOTES = "/api/v4/projects/group%2Fproject/merge_requests/42/notes/";
     private static final String THREAD = "6a9c1750b37d513a43987b574953fceb50b03ce7";
     private static final String NEW_JAVA = GitLabDiffPositionsTest.NEW_JAVA;
     // The reviewed version was read completely, and its diff does not contain the cited line.
@@ -1050,6 +1058,289 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
 
         assertThat(channel.findPosted(target(), List.of(item("fix", "result:a:0"))))
                 .isNull();
+    }
+
+    // GitLab has no node(id:) root field, so every correction goes through the merge request's notes API.
+    @Test
+    void shouldWithdrawANativeDiffNoteInPlaceKeepingItsThreadMarkersAndTypedReceipt() {
+        String original = posted(item("fix", "result:a:0"));
+        Map<String, Object> stored = restNote(5303062, "DiffNote", original, 1);
+        var guarded = new AtomicInteger(-1);
+        doAnswer(call -> {
+                    guarded.set(rest.calls().size());
+                    return null;
+                })
+                .when(egressGuard)
+                .requireDeliveryAllowed("gitlab.correct-feedback-copy");
+        rest.answer(200, Map.of("id", 1, "username", "bot"));
+        rest.answer(200, stored);
+        rest.answer(call -> ScriptedGitLabRest.respond(200, storedAs(stored, call)));
+        var copy = copy("gid://gitlab/DiffNote/5303062");
+
+        assertThat(channel.retract(target(), List.of(copy))).singleElement().satisfies(update -> {
+            assertThat(update.kind()).isEqualTo(CopyUpdateKind.EDITED);
+            assertThat(update.copyId()).isEqualTo(copy.copyId());
+            assertThat(update.externalRef()).isEqualTo("gid://gitlab/DiffNote/5303062");
+            assertThat(update.externalUrl()).isEqualTo(copy.externalUrl());
+        });
+        assertThat(rest.calls())
+                .extracting(ScriptedGitLabRest.Call::method, ScriptedGitLabRest.Call::path)
+                .containsExactly(
+                        tuple(HttpMethod.GET, "/api/v4/user"),
+                        tuple(HttpMethod.GET, NOTES + "5303062"),
+                        tuple(HttpMethod.PUT, NOTES + "5303062"));
+        assertThat(rest.calls())
+                .allSatisfy(call -> assertThat(call.authorization()).isEqualTo("Bearer glpat-test"));
+        // Only the body changes: the position, replies, and resolution of the native thread stay GitLab's.
+        assertThat(rest.calls().get(2).json())
+                .containsExactly(Map.entry(
+                        "body",
+                        "This feedback was withdrawn.\n" + MARKER + "\n<!-- hephaestus-diff-note-ck=result:a:0 -->"));
+        assertThat(guarded.get()).isEqualTo(2);
+        verify(gitLabProvider, times(3)).updateRateLimit(eq(1L), any());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"DiscussionNote,DiscussionNote", "Note,", "Note,DiscussionNote"})
+    void shouldWithdrawAnEarlierOverviewCopyThroughTheSameNotesEndpoint(String recorded, @Nullable String answered) {
+        Map<String, Object> stored = restNote(987654, answered, posted(item("fix", "result:a:0")), 1);
+        rest.answer(200, Map.of("id", 1));
+        rest.answer(200, stored);
+        rest.answer(call -> ScriptedGitLabRest.respond(200, storedAs(stored, call)));
+
+        assertThat(channel.retract(target(), List.of(copy("gid://gitlab/" + recorded + "/987654"))))
+                .singleElement()
+                .satisfies(update -> {
+                    assertThat(update.kind()).isEqualTo(CopyUpdateKind.EDITED);
+                    assertThat(update.externalRef()).isEqualTo("gid://gitlab/" + recorded + "/987654");
+                });
+        assertThat(rest.calls())
+                .extracting(ScriptedGitLabRest.Call::method, ScriptedGitLabRest.Call::path)
+                .containsExactly(
+                        tuple(HttpMethod.GET, "/api/v4/user"),
+                        tuple(HttpMethod.GET, NOTES + "987654"),
+                        tuple(HttpMethod.PUT, NOTES + "987654"));
+    }
+
+    @Test
+    void shouldNeverWriteToANoteItCannotProveIsTheRecordedOwnCopy() {
+        String original = posted(item("fix", "result:a:0"));
+        Map<String, Object> other = restNote(5303062, "DiffNote", original, 1);
+        other.put("id", 5303061);
+        Map<String, Object> system = restNote(5303062, "DiffNote", original, 1);
+        system.put("system", true);
+        Map<String, Object> bodiless = restNote(5303062, "DiffNote", original, 1);
+        bodiless.remove("body");
+        List<Map<String, Object>> answers = List.of(
+                restNote(5303062, "DiffNote", original, 2),
+                restNote(5303062, "DiffNote", "Looks good to me", 1),
+                restNote(5303062, null, original, 1),
+                restNote(5303062, "DiscussionNote", original, 1),
+                other,
+                system,
+                bodiless);
+        for (var answer : answers) {
+            rest.answer(200, Map.of("id", 1));
+            rest.answer(200, answer);
+            assertThat(channel.retract(target(), List.of(copy("gid://gitlab/DiffNote/5303062"))))
+                    .singleElement()
+                    .satisfies(update -> {
+                        assertThat(update.kind()).isEqualTo(CopyUpdateKind.UNSUPPORTED);
+                        assertThat(update.externalRef()).isEqualTo("gid://gitlab/DiffNote/5303062");
+                    });
+        }
+        assertThat(rest.calls()).extracting(ScriptedGitLabRest.Call::method).containsOnly(HttpMethod.GET);
+        verifyNoInteractions(egressGuard);
+    }
+
+    @Test
+    void shouldRequestNothingForAReceiptThatNamesNoGitLabNote() {
+        for (String ref : List.of(
+                "gid://gitlab/Issue/5303062",
+                "gid://gitlab/DiffNote/0",
+                "gid://gitlab/DiffNote/5303062/1",
+                "gid://gitlab/Discussion/6a9c1750b37d513a43987b574953fceb50b03ce7",
+                "5303062")) {
+            assertThat(channel.retract(target(), List.of(copy(ref))))
+                    .singleElement()
+                    .satisfies(update -> assertThat(update.kind()).isEqualTo(CopyUpdateKind.UNSUPPORTED));
+        }
+        assertThat(rest.calls()).isEmpty();
+    }
+
+    @Test
+    void shouldReadOnlyAnAbsentRecordOnTheReadableMergeRequestAsGone() {
+        rest.answer(200, Map.of("id", 1));
+        rest.answer(404, "{\"message\":\"404 Not found\"}");
+        rest.answer(200, Map.of("iid", 42));
+        assertThat(channel.retract(target(), List.of(copy("gid://gitlab/DiffNote/5303062"))))
+                .singleElement()
+                .satisfies(update -> assertThat(update.kind()).isEqualTo(CopyUpdateKind.GONE));
+        assertThat(rest.calls())
+                .extracting(ScriptedGitLabRest.Call::path)
+                .containsExactly(
+                        "/api/v4/user", NOTES + "5303062", "/api/v4/projects/group%2Fproject/merge_requests/42");
+        for (String unreadable : List.of(
+                "{\"message\":\"404 Note Not Found\"}",
+                "{\"message\":\"404 Merge Request Not Found\"}",
+                "{\"message\":\"404 Project Not Found\"}")) {
+            rest.answer(200, Map.of("id", 1));
+            rest.answer(404, unreadable);
+            assertThat(channel.retract(target(), List.of(copy("gid://gitlab/DiffNote/5303062"))))
+                    .singleElement()
+                    .satisfies(update -> assertThat(update.kind()).isEqualTo(CopyUpdateKind.TRANSIENT));
+        }
+        assertThat(rest.calls()).extracting(ScriptedGitLabRest.Call::method).containsOnly(HttpMethod.GET);
+    }
+
+    @Test
+    void shouldNotCallAnUnreadableMergeRequestAMissingCopy() {
+        for (int status : List.of(403, 404, 200)) {
+            rest.answer(200, Map.of("id", 1));
+            rest.answer(404, "{\"message\":\"404 Not found\"}");
+            rest.answer(status, Map.of("iid", 43));
+            assertThat(channel.retract(target(), List.of(copy("gid://gitlab/DiffNote/5303062"))))
+                    .singleElement()
+                    .satisfies(update -> assertThat(update.kind()).isEqualTo(CopyUpdateKind.TRANSIENT));
+        }
+        assertThat(rest.calls()).extracting(ScriptedGitLabRest.Call::method).containsOnly(HttpMethod.GET);
+        verifyNoInteractions(egressGuard);
+    }
+
+    // A correction whose answer was lost is settled by reading it back, never by writing it again.
+    @Test
+    void shouldConfirmALostCorrectionByReadingItBackWithoutASecondWrite() {
+        String original = posted(item("fix", "result:a:0"));
+        rest.answer(200, Map.of("id", 1));
+        rest.answer(200, restNote(5303062, "DiffNote", original, 1));
+        rest.fail(new IllegalStateException("Timeout on blocking read"));
+        var copy = copy("gid://gitlab/DiffNote/5303062");
+
+        assertThat(channel.retract(target(), List.of(copy)))
+                .singleElement()
+                .satisfies(update -> assertThat(update.kind()).isEqualTo(CopyUpdateKind.TRANSIENT));
+
+        rest.answer(200, Map.of("id", 1));
+        rest.answer(200, restNote(5303062, "DiffNote", ScmFeedbackFormatter.withdrawnCopyBody(original), 1));
+        assertThat(channel.retract(target(), List.of(copy))).singleElement().satisfies(update -> {
+            assertThat(update.kind()).isEqualTo(CopyUpdateKind.EDITED);
+            assertThat(update.externalRef()).isEqualTo("gid://gitlab/DiffNote/5303062");
+        });
+        assertThat(rest.calls())
+                .filteredOn(call -> HttpMethod.PUT.equals(call.method()))
+                .hasSize(1);
+        verify(egressGuard, times(1)).requireDeliveryAllowed("gitlab.correct-feedback-copy");
+    }
+
+    @Test
+    void shouldLeaveACorrectionUnconfirmedUnlessGitLabAnswersTheWithdrawnCopy() {
+        String original = posted(item("fix", "result:a:0"));
+        List<Function<ScriptedGitLabRest.Call, Map<String, Object>>> readbacks = List.of(
+                call -> restNote(5303062, "DiffNote", original, 1),
+                call -> {
+                    var moved = storedAs(restNote(5303062, "DiffNote", original, 1), call);
+                    moved.put("id", 5303099);
+                    return moved;
+                },
+                call -> storedAs(restNote(5303062, "DiffNote", original, 2), call),
+                call -> storedAs(restNote(5303062, "DiscussionNote", original, 1), call));
+        for (var readback : readbacks) {
+            rest.answer(200, Map.of("id", 1));
+            rest.answer(200, restNote(5303062, "DiffNote", original, 1));
+            rest.answer(call -> ScriptedGitLabRest.respond(200, readback.apply(call)));
+            assertThat(channel.retract(target(), List.of(copy("gid://gitlab/DiffNote/5303062"))))
+                    .singleElement()
+                    .satisfies(update -> assertThat(update.kind()).isEqualTo(CopyUpdateKind.TRANSIENT));
+        }
+        rest.answer(200, Map.of("id", 1));
+        rest.answer(200, restNote(5303062, "DiffNote", original, 1));
+        rest.answer(403, "{\"message\":\"403 Forbidden\"}");
+        assertThat(channel.retract(target(), List.of(copy("gid://gitlab/DiffNote/5303062"))))
+                .singleElement()
+                .satisfies(update -> assertThat(update.kind()).isEqualTo(CopyUpdateKind.TRANSIENT));
+        assertThat(rest.calls()).extracting(ScriptedGitLabRest.Call::method).doesNotContain(HttpMethod.POST);
+    }
+
+    @Test
+    void shouldStopBeforeTheWriteWhenEgressIsSilenced() {
+        rest.answer(200, Map.of("id", 1));
+        rest.answer(200, restNote(5303062, "DiffNote", posted(item("fix", "result:a:0")), 1));
+        doThrow(new OutboundEgressSuppressedException("gitlab.correct-feedback-copy"))
+                .when(egressGuard)
+                .requireDeliveryAllowed("gitlab.correct-feedback-copy");
+
+        assertThatThrownBy(() -> channel.retract(target(), List.of(copy("gid://gitlab/DiffNote/5303062"))))
+                .isInstanceOf(OutboundEgressSuppressedException.class);
+        assertThat(rest.calls()).extracting(ScriptedGitLabRest.Call::method).containsOnly(HttpMethod.GET);
+    }
+
+    @Test
+    void shouldRequestNothingMoreOnceTheRateLimitIsCritical() {
+        String original = posted(item("fix", "result:a:0"));
+        when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false, true);
+        rest.answer(200, Map.of("id", 1));
+        rest.answer(200, restNote(5303062, "DiffNote", original, 1));
+        rest.answer(429, "{\"message\":\"429 Too Many Requests\"}");
+
+        assertThat(channel.retract(
+                        target(),
+                        List.of(copy("gid://gitlab/DiffNote/5303062"), copy("gid://gitlab/DiffNote/5303063"))))
+                .extracting(CopyUpdateReceipt::kind)
+                .containsExactly(CopyUpdateKind.TRANSIENT, CopyUpdateKind.TRANSIENT);
+        assertThat(rest.calls())
+                .extracting(ScriptedGitLabRest.Call::method, ScriptedGitLabRest.Call::path)
+                .containsExactly(
+                        tuple(HttpMethod.GET, "/api/v4/user"),
+                        tuple(HttpMethod.GET, NOTES + "5303062"),
+                        tuple(HttpMethod.PUT, NOTES + "5303062"));
+    }
+
+    private static CopyReceipt copy(String ref) {
+        long id = ref.matches(".*/[0-9]+$") ? Long.parseLong(ref.substring(ref.lastIndexOf('/') + 1)) : 1;
+        return new CopyReceipt(
+                UUID.nameUUIDFromBytes(ref.getBytes(StandardCharsets.UTF_8)),
+                CopyDisposition.POSTED,
+                ref,
+                SERVER + "/group/project/-/merge_requests/42#note_" + id,
+                true,
+                null);
+    }
+
+    // A note as GitLab's notes API answers it; a plain Note answers its type as null.
+    private static Map<String, Object> restNote(long id, @Nullable String type, String body, long authorId) {
+        Map<String, Object> note = new HashMap<>();
+        note.put("id", id);
+        note.put("type", type);
+        note.put("body", body);
+        note.put("author", Map.of("id", authorId, "username", authorId == 1 ? "bot" : "person"));
+        note.put("system", false);
+        note.put("noteable_type", "MergeRequest");
+        note.put("noteable_iid", 42);
+        if ("DiffNote".equals(type)) {
+            note.put(
+                    "position",
+                    Map.of(
+                            "position_type",
+                            "text",
+                            "base_sha",
+                            "a".repeat(40),
+                            "head_sha",
+                            REVIEWED,
+                            "new_path",
+                            "src/Foo.java",
+                            "new_line",
+                            10));
+            note.put("resolvable", true);
+            note.put("resolved", false);
+        }
+        return note;
+    }
+
+    // GitLab answers an update with the stored note: the same note now holding the requested body.
+    private static Map<String, Object> storedAs(Map<String, Object> note, ScriptedGitLabRest.Call call) {
+        Map<String, Object> stored = new HashMap<>(note);
+        stored.put("body", call.json().get("body"));
+        return stored;
     }
 
     private static LineNote item(String body, String key) {

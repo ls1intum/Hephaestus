@@ -79,6 +79,13 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
 
     private static final Pattern SEGMENT = Pattern.compile("[0-9A-Za-z]{1,128}");
 
+    // The note models a feedback copy can have been recorded as, each with its REST id.
+    private static final Pattern NOTE_REF =
+            Pattern.compile("gid://gitlab/(Note|DiscussionNote|DiffNote)/([1-9][0-9]{0,17})");
+
+    // A generic 404 proves absence only when the merge request is still readable.
+    private static final Pattern NOTE_ABSENT = Pattern.compile("\\{\\s*\"message\"\\s*:\\s*\"404 Not found\"\\s*}");
+
     private final GitLabGraphQlClientProvider gitLabProvider;
     private final WebClient rest;
     private final GitLabTokenService tokenService;
@@ -444,7 +451,11 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
     }
 
     private Request request(long scopeId, MrCoordinates mr, @Nullable String discussion) {
-        return new Request(discussions(scopeId, mr, discussion), "Bearer " + tokenService.getAccessToken(scopeId));
+        return authorized(scopeId, discussions(scopeId, mr, discussion));
+    }
+
+    private Request authorized(long scopeId, URI uri) {
+        return new Request(uri, "Bearer " + tokenService.getAccessToken(scopeId));
     }
 
     private URI discussions(long scopeId, MrCoordinates mr, @Nullable String discussion) {
@@ -724,11 +735,13 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
         return message != null && (message.contains("rate limit") || message.contains("429"));
     }
 
+    // GitLab has no node(id:) root field; its merge request notes API reads and edits every note type by REST id.
     @Override
     public List<CopyUpdateReceipt> retract(FeedbackTarget target, List<CopyReceipt> copies) {
-        targets.subject(target, kind());
+        String subject = targets.subject(target, kind());
         long workspaceId = target.item().workspaceId();
         List<CopyUpdateReceipt> outcomes = new ArrayList<>();
+        Long author = null;
         for (CopyReceipt copy : copies) {
             String externalRef = copy.externalRef();
             if (externalRef == null || externalRef.isBlank()) {
@@ -736,68 +749,132 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
                         CopyUpdateReceipt.transientFailure(copy.copyId(), "Copy has no recorded provider reference"));
                 continue;
             }
+            var ref = NOTE_REF.matcher(externalRef);
+            if (!ref.matches()) {
+                outcomes.add(unsupported(copy, "Existing copy has no GitLab note identity"));
+                continue;
+            }
+            if (gitLabProvider.isRateLimitCritical(workspaceId)) {
+                outcomes.add(CopyUpdateReceipt.transientFailure(copy.copyId(), "The GitLab rate limit is critical"));
+                continue;
+            }
+            String type = ref.group(1);
+            long noteId = Long.parseLong(ref.group(2));
+            Request note;
+            Request user;
+            Request parent;
             try {
-                ClientGraphQlResponse read = gitLabProvider
-                        .forScope(workspaceId)
-                        .document(
-                                "query ReadPracticeCopy($id:ID!){currentUser{id} node(id:$id){__typename ... on Note{id body author{id}}}}")
-                        .variable("id", externalRef)
-                        .execute()
-                        .block(GRAPHQL_TIMEOUT);
-                if (read == null || !read.getErrors().isEmpty()) {
+                MrCoordinates mr = GitLabMrResolver.parseSubjectExternalId(subject);
+                String server = tokenService.resolveServerUrl(workspaceId);
+                note = authorized(
+                        workspaceId,
+                        URI.create(GitLabDiffVersionReader.mergeRequestApi(server, mr) + "/notes/" + noteId));
+                user = authorized(workspaceId, URI.create(server.replaceAll("/+$", "") + "/api/v4/user"));
+                parent = authorized(workspaceId, URI.create(GitLabDiffVersionReader.mergeRequestApi(server, mr)));
+            } catch (RuntimeException unavailable) {
+                outcomes.add(CopyUpdateReceipt.transientFailure(
+                        copy.copyId(), "The correction request could not be prepared"));
+                continue;
+            }
+            try {
+                if (author == null) author = currentUser(workspaceId, user);
+                Answer read = exchange(workspaceId, HttpMethod.GET, note, null);
+                if (read.status() == 404 && NOTE_ABSENT.matcher(read.text()).matches()) {
+                    Answer mergeRequest = exchange(workspaceId, HttpMethod.GET, parent, null);
+                    JsonNode readable = mergeRequest.status() == 200 ? mergeRequest.json() : null;
+                    var mr = GitLabMrResolver.parseSubjectExternalId(subject);
+                    boolean confirmed = readable != null
+                            && readable.path("iid").isIntegralNumber()
+                            && readable.path("iid").longValue() == mr.iid();
+                    outcomes.add(
+                            confirmed
+                                    ? CopyUpdateReceipt.gone(copy.copyId(), "The provider copy no longer exists")
+                                    : CopyUpdateReceipt.transientFailure(
+                                            copy.copyId(), "The merge request could not be read"));
+                    continue;
+                }
+                JsonNode found = read.status() == 200 ? read.json() : null;
+                if (found == null) {
                     outcomes.add(CopyUpdateReceipt.transientFailure(copy.copyId(), "Existing copy could not be read"));
                     continue;
                 }
-                Object node = read.field("node").getValue();
-                if (node == null) {
-                    outcomes.add(CopyUpdateReceipt.gone(copy.copyId(), "The provider copy no longer exists"));
+                String original = text(found, "body");
+                if (!ownNote(found, noteId, type, author)
+                        || original == null
+                        || ScmFeedbackFormatter.lastDeliveryKey(original) == null) {
+                    outcomes.add(unsupported(copy, "Existing copy authority could not be verified"));
                     continue;
                 }
-                if (!(node instanceof Map<?, ?> note)
-                        || !externalRef.equals(note.get("id"))
-                        || !(note.get("body") instanceof String original)
-                        || !(note.get("author") instanceof Map<?, ?> author
-                                && Objects.equals(
-                                        author.get("id"),
-                                        read.field("currentUser.id").getValue()))) {
-                    outcomes.add(new CopyUpdateReceipt(
-                            copy.copyId(),
-                            CopyUpdateKind.UNSUPPORTED,
-                            externalRef,
-                            copy.externalUrl(),
-                            "Existing copy authority could not be verified"));
+                String withdrawn = ScmFeedbackFormatter.withdrawnCopyBody(original);
+                if (original.equals(withdrawn)) {
+                    outcomes.add(edited(copy));
                     continue;
                 }
                 egressGuard.requireDeliveryAllowed("gitlab.correct-feedback-copy");
-                ClientGraphQlResponse response = gitLabProvider
-                        .forScope(workspaceId)
-                        .document(
-                                "mutation CorrectPracticeNote($id:NoteID!,$body:String!){updateNote(input:{id:$id,body:$body}){note{id url} errors}}")
-                        .variable("id", externalRef)
-                        .variable("body", ScmFeedbackFormatter.withdrawnCopyBody(original))
-                        .execute()
-                        .block(GRAPHQL_TIMEOUT);
-                if (response == null
-                        || !response.getErrors().isEmpty()
-                        || (response.field("updateNote.errors").getValue() instanceof List<?> errors
-                                && !errors.isEmpty())) {
+                Answer written;
+                try {
+                    written = exchange(workspaceId, HttpMethod.PUT, note, Map.of("body", withdrawn));
+                } catch (RuntimeException unknown) {
+                    log.warn(
+                            "GitLab copy correction outcome unknown: workspaceId={}, note={}",
+                            workspaceId,
+                            noteId,
+                            unknown);
                     outcomes.add(CopyUpdateReceipt.transientFailure(
-                            copy.copyId(), "Provider did not confirm the correction"));
+                            copy.copyId(), "Provider correction outcome is unknown"));
                     continue;
                 }
-                String id = response.field("updateNote.note.id").getValue();
-                String url = response.field("updateNote.note.url").getValue();
+                JsonNode stored = written.status() == 200 ? written.json() : null;
+                boolean confirmed = stored != null
+                        && ownNote(stored, noteId, type, author)
+                        && withdrawn.equals(text(stored, "body"));
                 outcomes.add(
-                        id == null || !id.equals(externalRef)
-                                ? CopyUpdateReceipt.transientFailure(
-                                        copy.copyId(), "Provider did not confirm the existing copy")
-                                : new CopyUpdateReceipt(copy.copyId(), CopyUpdateKind.EDITED, id, url, null));
+                        confirmed
+                                ? edited(copy)
+                                : CopyUpdateReceipt.transientFailure(
+                                        copy.copyId(), "Provider did not confirm the correction"));
             } catch (OutboundEgressSuppressedException e) {
                 throw e;
             } catch (RuntimeException e) {
-                outcomes.add(CopyUpdateReceipt.transientFailure(copy.copyId(), "Provider correction failed"));
+                outcomes.add(CopyUpdateReceipt.transientFailure(copy.copyId(), "Existing copy could not be read"));
             }
         }
         return List.copyOf(outcomes);
+    }
+
+    // The token's own account is the only author whose copy a correction may edit.
+    private long currentUser(long scopeId, Request user) {
+        Answer answer = exchange(scopeId, HttpMethod.GET, user, null);
+        JsonNode json = answer.json();
+        if (answer.status() != 200
+                || json == null
+                || !json.path("id").isIntegralNumber()
+                || json.path("id").longValue() <= 0)
+            throw new FeedbackDeliveryException("The GitLab account could not be read");
+        return json.path("id").longValue();
+    }
+
+    // A reply can turn a plain Note into a DiscussionNote without changing its identity or author.
+    private static boolean ownNote(JsonNode note, long id, String type, long author) {
+        return note.path("id").isIntegralNumber()
+                && note.path("id").longValue() == id
+                && ("Note".equals(type)
+                        ? note.path("type").isNull() || "DiscussionNote".equals(text(note, "type"))
+                        : type.equals(text(note, "type")))
+                && note.path("system").isBoolean()
+                && !note.path("system").booleanValue()
+                && note.path("author").path("id").isIntegralNumber()
+                && note.path("author").path("id").longValue() == author;
+    }
+
+    // The receipt keeps the identity and address the copy was delivered under.
+    private static CopyUpdateReceipt edited(CopyReceipt copy) {
+        return new CopyUpdateReceipt(
+                copy.copyId(), CopyUpdateKind.EDITED, copy.externalRef(), copy.externalUrl(), null);
+    }
+
+    private static CopyUpdateReceipt unsupported(CopyReceipt copy, String reason) {
+        return new CopyUpdateReceipt(
+                copy.copyId(), CopyUpdateKind.UNSUPPORTED, copy.externalRef(), copy.externalUrl(), reason);
     }
 }
