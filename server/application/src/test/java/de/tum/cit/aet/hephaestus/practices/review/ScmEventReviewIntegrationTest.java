@@ -62,6 +62,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import org.junit.jupiter.api.BeforeEach;
@@ -189,6 +190,23 @@ class ScmEventReviewIntegrationTest extends AbstractResultAdmissionIntegrationTe
                         failure -> assertThat(failure.code()).isEqualTo(ItemCaptureCode.VERSION_UNAVAILABLE));
     }
 
+    @ParameterizedTest
+    @CsvSource({"GITHUB,false", "GITHUB,true", "GITLAB,false", "GITLAB,true"})
+    void shouldSelectANotDraftPracticeOnlyForReadyWork(IdentityProviderType type, boolean draft) {
+        var prepared = prepare(type, false, Map.of("draftStatus", Set.of("NOT_DRAFT")), draft);
+        publish(prepared);
+        var event = event(prepared);
+        var admitted = reviews.findByWorkspaceIdAndEventId(prepared.item().workspaceId(), event.getId());
+        if (draft) {
+            assertThat(event.getState()).isEqualTo(ItemEventState.WITHHELD);
+            assertThat(event.getReason()).isEqualTo(ReviewRequestReason.NO_ACTIVE_PRACTICE);
+            assertThat(admitted).isEmpty();
+        } else {
+            assertThat(event.getState()).isEqualTo(ItemEventState.STARTED);
+            assertThat(admitted).isPresent();
+        }
+    }
+
     @Test
     void shouldWithholdAutomaticEventsBeforePinningWhenActivityReviewsAreOff() {
         var prepared = prepare(IdentityProviderType.GITLAB, false);
@@ -246,6 +264,11 @@ class ScmEventReviewIntegrationTest extends AbstractResultAdmissionIntegrationTe
     }
 
     private Prepared prepare(IdentityProviderType type, boolean reviewed) {
+        return prepare(type, reviewed, Map.of(), false);
+    }
+
+    private Prepared prepare(
+            IdentityProviderType type, boolean reviewed, Map<String, Set<String>> state, boolean draft) {
         var fixture = fixture(type);
         var workspace = fixture.workspace();
         workspace.getFeatures().setPracticesEnabled(true);
@@ -268,7 +291,7 @@ class ScmEventReviewIntegrationTest extends AbstractResultAdmissionIntegrationTe
         var original = DefinitionTestFixtures.definition(kind, "Describe the work", "Explain the work.", null);
         var definition = new PracticeDefinition(
                 original.name(),
-                new ReviewOn(List.of(name), Map.of()),
+                new ReviewOn(List.of(name), state),
                 original.appliesWhen(),
                 reviewed ? AboutRole.REVIEWER : AboutRole.AUTHOR,
                 original.reads(),
@@ -288,6 +311,7 @@ class ScmEventReviewIntegrationTest extends AbstractResultAdmissionIntegrationTe
         pull.setTitle("A bounded change");
         pull.setBody("Describe this change");
         pull.setState(Issue.State.OPEN);
+        pull.setDraft(draft);
         pull.setAuthor(fixture.author());
         pull.setHtmlUrl(fixture.repository().getHtmlUrl() + "/pull/3");
         pull.setCreatedAt(Instant.now());

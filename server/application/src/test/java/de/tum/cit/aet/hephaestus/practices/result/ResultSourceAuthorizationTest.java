@@ -8,8 +8,8 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountDirectory;
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonCopyIdentity;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentityResolver;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonProcessingSuppression;
 import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
@@ -33,13 +33,14 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.json.JsonMapper;
 
 class ResultSourceAuthorizationTest extends BaseUnitTest {
     final ProductItemQuery items = mock(ProductItemQuery.class);
     final PersonProcessingSuppression suppression = mock(PersonProcessingSuppression.class);
     final PersonIdentityResolver people = mock(PersonIdentityResolver.class);
-    final AccountIdentityQuery identities = mock(AccountIdentityQuery.class);
     final AccountDirectory accounts = mock(AccountDirectory.class);
     final ItemSourceAccess source = mock(ItemSourceAccess.class);
     final ClasspathSourceCatalogRegistry catalog = mock(ClasspathSourceCatalogRegistry.class);
@@ -63,7 +64,6 @@ class ResultSourceAuthorizationTest extends BaseUnitTest {
             catalog,
             suppression,
             people,
-            identities,
             accounts,
             problems,
             itemRows,
@@ -104,7 +104,7 @@ class ResultSourceAuthorizationTest extends BaseUnitTest {
         var copy = new PersonCopyIdentity("GITHUB", "https://github.com", "native-7", null);
         when(people.providers())
                 .thenReturn(List.of(new PersonIdentityResolver.Provider(8, "GITHUB", "https://github.com")));
-        when(identities.resolveAccountId(8L, "native-7", null)).thenReturn(Optional.of(7L));
+        when(people.accountFor(new PersonIdentity(8, "native-7", null))).thenReturn(Optional.of(7L));
         when(accounts.find(7))
                 .thenReturn(Optional.of(new AccountDirectory.AccountView(
                         7, Account.Status.UNCLAIMED, "Person", AiChoice.CLOUD, null, true)));
@@ -117,6 +117,58 @@ class ResultSourceAuthorizationTest extends BaseUnitTest {
                 .isFalse();
         when(suppression.isSuppressed(8, "native-7", null)).thenReturn(true);
         assertThat(authorization.authorized(result, receipt(List.of(copy)), purpose))
+                .isFalse();
+    }
+
+    @Test
+    void shouldPermitCopiedContributorsWithoutAnyLinkWhenTheyAreNotSuppressed() {
+        var person = new PersonCopyIdentity("GITHUB", "https://github.com", "274126659", null);
+        var bot = new PersonCopyIdentity("GITHUB", "https://github.com", "235263273", null);
+        when(people.providers())
+                .thenReturn(List.of(new PersonIdentityResolver.Provider(8, "GITHUB", "https://github.com")));
+        when(people.accountFor(new PersonIdentity(8, "274126659", null))).thenReturn(Optional.empty());
+        when(people.accountFor(new PersonIdentity(8, "235263273", null))).thenReturn(Optional.empty());
+        assertThat(authorization.authorized(result, receipt(List.of(person, bot)), purpose))
+                .isTrue();
+        when(suppression.isSuppressed(8, "235263273", null)).thenReturn(true);
+        assertThat(authorization.authorized(result, receipt(List.of(person, bot)), purpose))
+                .isFalse();
+    }
+
+    @Test
+    void shouldApplyAccountControlsThroughDisabledLinksAndRefuseAMissingAccountRow() {
+        var copy = new PersonCopyIdentity("GITHUB", "https://github.com", "native-7", null);
+        when(people.providers())
+                .thenReturn(List.of(new PersonIdentityResolver.Provider(8, "GITHUB", "https://github.com")));
+        when(people.accountFor(new PersonIdentity(8, "native-7", null))).thenReturn(Optional.of(7L));
+        assertThat(authorization.authorized(result, receipt(List.of(copy)), purpose))
+                .isFalse();
+        when(accounts.find(7))
+                .thenReturn(Optional.of(new AccountDirectory.AccountView(
+                        7, Account.Status.DELETING, "Person", AiChoice.CLOUD, null, true)));
+        assertThat(authorization.authorized(result, receipt(List.of(copy)), purpose))
+                .isFalse();
+        when(accounts.find(7))
+                .thenReturn(Optional.of(new AccountDirectory.AccountView(
+                        7, Account.Status.ACTIVE, "Person", AiChoice.CLOUD, null, true)));
+        assertThat(authorization.authorized(result, receipt(List.of(copy)), purpose))
+                .isTrue();
+        when(suppression.isAccountSuppressed(7)).thenReturn(true);
+        assertThat(authorization.authorized(result, receipt(List.of(copy)), purpose))
+                .isFalse();
+    }
+
+    @Test
+    void shouldRefuseCopiedIdentitiesThatTheExactResolverCannotAttribute() {
+        var copy = new PersonCopyIdentity("GITHUB", "https://github.com", "native-7", null);
+        when(people.providers())
+                .thenReturn(List.of(new PersonIdentityResolver.Provider(8, "GITHUB", "https://github.com")));
+        when(people.accountFor(new PersonIdentity(8, "native-7", null)))
+                .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT));
+        assertThat(authorization.authorized(result, receipt(List.of(copy)), purpose))
+                .isFalse();
+        var foreign = new PersonCopyIdentity("GITHUB", "https://github.example", "native-7", null);
+        assertThat(authorization.authorized(result, receipt(List.of(foreign)), purpose))
                 .isFalse();
     }
 
@@ -201,7 +253,7 @@ class ResultSourceAuthorizationTest extends BaseUnitTest {
                 .thenReturn(new HistoryCustody(false, false, List.of(copy), List.of(), List.of(job)));
         when(people.providers())
                 .thenReturn(List.of(new PersonIdentityResolver.Provider(8, "GITHUB", "https://github.com")));
-        when(identities.resolveAccountId(8L, "native-7", null)).thenReturn(Optional.of(7L));
+        when(people.accountFor(new PersonIdentity(8, "native-7", null))).thenReturn(Optional.of(7L));
         when(accounts.find(7))
                 .thenReturn(Optional.of(new AccountDirectory.AccountView(
                         7, Account.Status.ACTIVE, "Person", AiChoice.CLOUD, null, true)));

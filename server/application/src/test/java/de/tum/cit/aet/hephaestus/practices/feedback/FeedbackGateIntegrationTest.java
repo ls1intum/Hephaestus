@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemService;
+import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheck;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheckStage;
@@ -61,11 +62,14 @@ class FeedbackGateIntegrationTest extends AbstractFeedbackIntegrationTest {
     }
 
     private void supportOnWorkFeedback() {
+        supportOnWorkFeedback(resultWithStateFilter("state", "open"));
+    }
+
+    private void supportOnWorkFeedback(Result result) {
         jdbc.update("""
             INSERT INTO instance_settings(id,silent_mode_engaged,version) VALUES(1,false,0)
             ON CONFLICT(id) DO UPDATE SET silent_mode_engaged=false
             """);
-        var result = resultWithStateFilter("open");
         supportedFeedback = piece(FeedbackDestination.ON_WORK, FeedbackState.READY, null);
         bind(supportedFeedback, result);
         supportedPracticeId = result.getPracticeId();
@@ -87,7 +91,11 @@ class FeedbackGateIntegrationTest extends AbstractFeedbackIntegrationTest {
     }
 
     private static ItemSnapshot snapshot(ItemRef item, String state, String version) {
-        return ItemFixtures.snapshot(item, Map.of("state", state))
+        return snapshot(item, Map.of("state", state), version);
+    }
+
+    private static ItemSnapshot snapshot(ItemRef item, Map<String, String> state, String version) {
+        return ItemFixtures.snapshot(item, state)
                 .version(new ItemVersion(version, null))
                 .integration(new IntegrationRef(IntegrationKind.GITHUB, 1, null))
                 .label(ItemFixtures.label()
@@ -128,6 +136,31 @@ class FeedbackGateIntegrationTest extends AbstractFeedbackIntegrationTest {
         var check = check();
         assertThat(check.reason()).isEqualTo(FeedbackStopReason.ITEM_STATE_INELIGIBLE);
         assertThat(check.facts().currentVersion()).isTrue();
+    }
+
+    @Test
+    void shouldDeliverOnlyToWorkWhosePublishedDraftStatusTheVersionAllows() {
+        supportOnWorkFeedback(resultWithStateFilter("draftStatus", "NOT_DRAFT"));
+        when(source.current(supportedItem))
+                .thenReturn(Optional.of(
+                        snapshot(supportedItem, Map.of("state", "OPEN", "draftStatus", "NOT_DRAFT"), "v1")));
+        assertThat(check().allowed()).isTrue();
+        when(source.current(supportedItem))
+                .thenReturn(
+                        Optional.of(snapshot(supportedItem, Map.of("state", "OPEN", "draftStatus", "DRAFT"), "v1")));
+        assertThat(check().reason()).isEqualTo(FeedbackStopReason.ITEM_STATE_INELIGIBLE);
+        // A snapshot without the required dimension stays refused, as before the adapter published it.
+        when(source.current(supportedItem))
+                .thenReturn(Optional.of(
+                        snapshot(supportedItem, Map.of("state", "OPEN", "draft", "false", "merged", "false"), "v1")));
+        assertThat(check().reason()).isEqualTo(FeedbackStopReason.ITEM_STATE_INELIGIBLE);
+    }
+
+    @Test
+    void shouldAdmitAnyStateWhenTheVersionRequiresNone() {
+        supportOnWorkFeedback(result());
+        when(source.current(supportedItem)).thenReturn(Optional.of(snapshot(supportedItem, Map.of(), "v1")));
+        assertThat(check().allowed()).isTrue();
     }
 
     @Test

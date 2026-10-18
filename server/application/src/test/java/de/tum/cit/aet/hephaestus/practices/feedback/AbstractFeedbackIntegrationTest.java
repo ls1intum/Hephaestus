@@ -136,18 +136,18 @@ public abstract class AbstractFeedbackIntegrationTest extends AbstractWorkspaceI
     }
 
     protected Result result() {
-        return result(ResultOutcome.MET, null);
+        return result(ResultOutcome.MET, null, null);
     }
 
     protected Result negativeResult() {
-        return result(ResultOutcome.NOT_MET, null);
+        return result(ResultOutcome.NOT_MET, null, null);
     }
 
-    protected Result resultWithStateFilter(String state) {
-        return result(ResultOutcome.MET, state);
+    protected Result resultWithStateFilter(String dimension, String value) {
+        return result(ResultOutcome.MET, dimension, value);
     }
 
-    private Result result(ResultOutcome outcome, @Nullable String state) {
+    private Result result(ResultOutcome outcome, @Nullable String dimension, @Nullable String value) {
         var slots = List.of(
                 new BoundModelSlot("chat", ModelKind.CHAT, null),
                 new BoundModelSlot("decision", ModelKind.DECISION, null),
@@ -188,9 +188,10 @@ public abstract class AbstractFeedbackIntegrationTest extends AbstractWorkspaceI
                      "guidance":{"whyItMatters":null,"whatGoodLooksLike":null,"goingWell":null,"visual":null,"guide":null}}
                     """.replace(
                                     "\"state\":{}",
-                                    state == null
+                                    dimension == null || value == null
                                             ? "\"state\":{}"
-                                            : "\"state\":{\"state\":[" + mapper.writeValueAsString(state) + "]}"));
+                                            : "\"state\":{" + mapper.writeValueAsString(dimension) + ":["
+                                                    + mapper.writeValueAsString(value) + "]}"));
             jdbc.update(
                     "INSERT INTO"
                             + " review_practice(review_id,practice_id,workspace_id,practice_version_id,status,method)"
