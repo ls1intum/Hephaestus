@@ -1,7 +1,16 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import {
+	copyFile,
+	mkdir,
+	mkdtemp,
+	readFile,
+	readdir,
+	rm,
+	symlink,
+	writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -17,26 +26,36 @@ const root = path.resolve(import.meta.dirname, "..");
 const hash = (bytes: string | Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 
 const workflow = parseDocument(await readFile(".github/workflows/release.yml", "utf8"));
-const steps = workflow.getIn(["jobs", "publish-release", "steps"]);
-assert.ok(isSeq(steps));
-const script = [
-	"Verify supported-host smoke records",
-	"Verify durable assets from a clean environment",
-	"Publish immutable release",
-	"Promote verified image digests",
-]
-	.map((name) => {
+/** The named steps of a release job, each its own script, as Actions runs them. */
+const jobSteps = (job: string, names: readonly string[]) => {
+	const steps = workflow.getIn(["jobs", job, "steps"]);
+	assert.ok(isSeq(steps));
+	return names.map((name) => {
 		const step = steps.items.find((item) => isMap(item) && item.get("name") === name);
 		assert.ok(isMap(step));
 		const body = step.get("run");
 		assert.equal(typeof body, "string");
 		assert.ok(typeof body === "string");
-		return body
+		const script = body
 			.replaceAll(/\$\{\{ github.server_url \}\}/gu, "https://github.com")
 			.replaceAll(/\$\{\{ github.repository \}\}/gu, "hephaestus-build/Hephaestus");
-	})
-	.join("\n");
-assert.ok(!script.includes("${{"));
+		assert.ok(!script.includes("${{"));
+		return script;
+	});
+};
+const publication = jobSteps("publish-release", [
+	"Verify supported-host smoke records",
+	"Verify durable assets from a clean environment",
+	"Publish immutable release",
+	"Promote verified image digests",
+]);
+// The draft writer runs after the evidence gate, under the promotion lock that publication holds.
+const writer = jobSteps("tag-images", [
+	"Create the draft release",
+	"Upload release image lock to GitHub Release",
+]);
+/** Remote release, tag and registry state; everything else in the archive is a release asset. */
+const remoteState: ReadonlySet<string> = new Set(["state", "aliases", "releases", "tags", "tag-objects"]);
 
 // Only remote services are fixtures. The steps run the real lock, checksum, SBOM and policy
 // verifiers. Synthetic signatures authenticate fixture bytes; they make no claim about Sigstore.
@@ -50,32 +69,59 @@ const store = process.env.ARCHIVE;
 const read = name => JSON.parse(fs.readFileSync(path.join(store, name), 'utf8'));
 const state = () => read('state');
 const option = flag => args[args.indexOf(flag) + 1];
+const write = (name, value) => fs.writeFileSync(path.join(store, name), JSON.stringify(value));
 fs.appendFileSync(process.env.CALL_LOG, JSON.stringify([tool, ...args]) + '\n');
 if (tool === 'gh') {
   if (args[0] === 'attestation') process.exit(0);
   if (args[0] === 'api') {
     if (process.env.AUTHORITY_UNAVAILABLE === 'true') throw new Error('Release authority unavailable');
-    if (!args.includes('--paginate') || !args.includes('--jq') || args.includes('--slurp')) throw new Error('Expected projected paginated release listing');
-    const response = read('releases').map(release => ({target_commitish:'main', ...release}));
+    const endpoint = args.find(arg => arg.startsWith('repos/')) ?? '';
+    let response;
+    if (endpoint.endsWith('/releases?per_page=100')) {
+      if (!args.includes('--paginate') || !args.includes('--jq') || args.includes('--slurp')) throw new Error('Expected projected paginated release listing');
+      response = read('releases').map(release => ({target_commitish:'main', ...release}));
+    } else if (endpoint.includes('/git/matching-refs/tags/')) {
+      if (!args.includes('--paginate') || !args.includes('--jq')) throw new Error('Expected projected paginated tag listing');
+      const prefix = 'refs/tags/' + endpoint.split('/git/matching-refs/tags/')[1];
+      response = Object.entries(read('tags')).map(([name, object]) => ({ref:'refs/tags/' + name, object})).filter(({ref}) => ref.startsWith(prefix));
+    } else if (endpoint.includes('/git/tags/')) {
+      response = read('tag-objects')[endpoint.split('/git/tags/')[1]];
+      if (response === undefined) { console.error('gh: Not Found (HTTP 404)'); process.exit(1); }
+    } else throw new Error('Unexpected API endpoint');
     const projected = require('node:child_process').spawnSync('jq', ['-c', option('--jq')], {input:JSON.stringify(response), encoding:'utf8'});
     if (projected.status !== 0) throw new Error(projected.stderr);
     process.stdout.write(projected.stdout);
     process.exit(0);
   }
+  const current = state();
+  if (args[1] === 'view' && process.env.RELEASE_UNAVAILABLE === 'true') { console.error('HTTP 502: Bad Gateway'); process.exit(1); }
+  if (['view', 'upload', 'edit'].includes(args[1]) && current === null) { console.error('release not found'); process.exit(1); }
   if (args[1] === 'download') {
     for (const file of fs.readdirSync(store)) {
-      if (!['state', 'aliases', 'releases'].includes(file)) fs.copyFileSync(path.join(store, file), path.join(option('--dir'), file));
+      if (!['state', 'aliases', 'releases', 'tags', 'tag-objects'].includes(file)) fs.copyFileSync(path.join(store, file), path.join(option('--dir'), file));
     }
   } else if (args[1] === 'view') {
-    const field = option('--jq');
-    if (!['.isDraft', '.isImmutable'].includes(field)) throw new Error('Unexpected release query');
-    console.log(state()[field.slice(1)]);
+    if (args.includes('--jq')) {
+      const field = option('--jq');
+      if (!['.isDraft', '.isImmutable'].includes(field)) throw new Error('Unexpected release query');
+      console.log(current[field.slice(1)]);
+    } else if (args.includes('--json')) {
+      const fields = option('--json').split(',');
+      if (!fields.every(field => ['isDraft', 'targetCommitish'].includes(field))) throw new Error('Unexpected release fields');
+      console.log(JSON.stringify(Object.fromEntries(fields.map(field => [field, current[field]]))));
+    } else console.log(current.isDraft ? 'draft' : 'published');
+  } else if (args[1] === 'create') {
+    if (current !== null) throw new Error('a release with the same tag name already exists');
+    write('state', {isDraft:true, isImmutable:false, targetCommitish:option('--target')});
   } else if (args[1] === 'upload') {
-    if (!state().isDraft) throw new Error('Immutable assets cannot be overwritten');
+    if (!current.isDraft) throw new Error('Immutable assets cannot be overwritten');
     for (const file of args.slice(3, args.indexOf('--clobber'))) fs.copyFileSync(file, path.join(store, path.basename(file)));
   } else if (args[1] === 'edit') {
-    if (!state().isDraft) throw new Error('Published releases cannot be edited');
-    fs.writeFileSync(path.join(store, 'state'), JSON.stringify({isDraft:false, isImmutable:process.env.PUBLISH_MUTABLE !== 'true'}));
+    if (!current.isDraft) throw new Error('Published releases cannot be edited');
+    write('state', {...current, isDraft:false, isImmutable:process.env.PUBLISH_MUTABLE !== 'true'});
+    // Publication creates a missing tag at the draft's target, as GitHub does.
+    const tags = read('tags');
+    if (!(args[2] in tags)) write('tags', {...tags, [args[2]]: {type:'commit', sha:current.targetCommitish}});
   } else throw new Error('Unexpected gh command');
 } else if (tool === 'cosign') {
   if (args[0] === 'verify-blob') {
@@ -107,7 +153,7 @@ if (tool === 'gh') {
 } else throw new Error('Unexpected tool');
 `;
 
-async function fixture(directory: string) {
+async function fixture(directory: string, source = commit) {
 	const archive = path.join(directory, "archive");
 	const bin = path.join(directory, "bin");
 	const smoke = path.join(directory, "host-smoke");
@@ -128,7 +174,7 @@ async function fixture(directory: string) {
 		RUNNER_TEMP: directory,
 		GITHUB_REPOSITORY: "hephaestus-build/Hephaestus",
 		TAG_NAME: release,
-		RELEASE_SHA: commit,
+		RELEASE_SHA: source,
 		VERSION: release.slice(1),
 		SERIES: "0.93",
 	};
@@ -140,7 +186,7 @@ async function fixture(directory: string) {
 		digest: `sha256:${String(index + 1).repeat(64)}`,
 		platform: `linux/${architecture}`,
 	}));
-	await json("manifest.json", { schemaVersion: 1, release, commit, subjects });
+	await json("manifest.json", { schemaVersion: 1, release, commit: source, subjects });
 	await json("release-images.json", { schemaVersion: 1, images: ["webapp"], upstream: [] });
 	await json("vulnerability-policy.json", {
 		schemaVersion: 3,
@@ -151,7 +197,7 @@ async function fixture(directory: string) {
 	await json(`release-${release}.json`, {
 		schemaVersion: 1,
 		release,
-		commit,
+		commit: source,
 		images: [
 			{
 				image: "webapp",
@@ -237,14 +283,16 @@ async function fixture(directory: string) {
 			JSON.stringify({
 				schemaVersion: 1,
 				release,
-				commit,
+				commit: source,
 				testedAt: "2026-10-15T10:00:00Z",
 				host: { architecture, os: "Ubuntu 24.04", dockerEngine: "28.0.0", dockerCompose: "2.24.4" },
 				services: [{ service: "webapp", state: "running", health: "healthy", exitCode: 0 }],
 			}),
 		);
 	}
-	await json("state", { isDraft: true, isImmutable: false });
+	await json("state", { isDraft: true, isImmutable: false, targetCommitish: source });
+	await json("tags", {});
+	await json("tag-objects", {});
 	await json("aliases", {});
 	await json("releases", [
 		{ tag_name: release, draft: false, prerelease: false },
@@ -252,28 +300,36 @@ async function fixture(directory: string) {
 		{ tag_name: "v99.0.0", draft: false, prerelease: true },
 		{ tag_name: "v100.0.0", draft: true, prerelease: false },
 	]);
-	const run = async (overrides: Record<string, string> = {}) => {
-		await rm(path.join(directory, "evidence"), { recursive: true, force: true });
-		await rm(path.join(directory, "release-lock.env"), { force: true });
+	// Each step runs in its own shell, and the job stops at the first failing step.
+	const run = async (overrides: Record<string, string> = {}, job = publication) => {
+		if (job === publication) {
+			await rm(path.join(directory, "evidence"), { recursive: true, force: true });
+			await rm(path.join(directory, "release-lock.env"), { force: true });
+		}
 		await writeFile(environment.CALL_LOG, "");
-		const result = spawnSync("bash", ["--noprofile", "--norc", "-e", "-c", script], {
-			cwd: directory,
-			encoding: "utf8",
-			env: { ...environment, ...overrides },
-		});
-		assert.equal(result.error, undefined);
-		return {
-			status: result.status,
-			output: result.stdout + result.stderr,
-			calls: await readFile(environment.CALL_LOG, "utf8"),
-		};
+		let status: number | null = 0;
+		let output = "";
+		for (const step of job) {
+			const result = spawnSync("bash", ["--noprofile", "--norc", "-e", "-c", step], {
+				cwd: directory,
+				encoding: "utf8",
+				env: { ...environment, ...overrides },
+			});
+			assert.equal(result.error, undefined);
+			output += result.stdout + result.stderr;
+			status = result.status;
+			if (status !== 0) {
+				break;
+			}
+		}
+		return { status, output, calls: await readFile(environment.CALL_LOG, "utf8") };
 	};
 	const assets = async () => {
 		const assetFiles = await readdir(archive);
 		return Object.fromEntries(
 			await Promise.all(
 				assetFiles
-					.filter((file) => !["state", "aliases", "releases"].includes(file))
+					.filter((file) => !remoteState.has(file))
 					.map(async (file) => [file, hash(await readFile(path.join(archive, file)))] as const),
 			),
 		);
@@ -330,10 +386,14 @@ for (const scenario of [
 					await readFile(path.join(archive, "host-smoke-arm64.json")),
 					await readFile(path.join(smoke, "host-smoke-arm64.json")),
 				);
-				assert.equal(
-					await readFile(path.join(archive, "state"), "utf8"),
-					JSON.stringify({ isDraft: false, isImmutable: true }),
-				);
+				assert.deepEqual(JSON.parse(await readFile(path.join(archive, "state"), "utf8")), {
+					isDraft: false,
+					isImmutable: true,
+					targetCommitish: commit,
+				});
+				assert.deepEqual(JSON.parse(await readFile(path.join(archive, "tags"), "utf8")), {
+					[release]: { type: "commit", sha: commit },
+				});
 				return;
 			}
 			if (scenario === "mutable-publication") {
@@ -429,6 +489,155 @@ for (const scenario of [
 				assert.match(retry.output, reason);
 			}
 			assert.deepEqual(await assets(), before, "retry must keep published assets unchanged");
+		},
+	);
+}
+
+// A commit planned after `commit`, before either had a draft: the forward-fix rule lets both cut.
+const later = "f".repeat(40);
+const tagObject = "e".repeat(40);
+const releaseState = async (directory: string) =>
+	readFile(path.join(directory, "archive", "state"), "utf8");
+
+/** Valid evidence of the later commit, where the draft writer finds it after its evidence gate. */
+async function laterEvidence(directory: string) {
+	const source = path.join(directory, "later");
+	await mkdir(source);
+	const { archive } = await fixture(source, later);
+	const evidence = path.join(directory, "evidence");
+	await mkdir(evidence);
+	for (const file of await readdir(archive)) {
+		if (!remoteState.has(file)) {
+			await copyFile(path.join(archive, file), path.join(evidence, file));
+		}
+	}
+	return {
+		SHA: later,
+		ASSET: `evidence/release-${release}.json`,
+		MIGRATIONS: "false",
+		RELEASE_NOTES: `## ${release.slice(1)}`,
+	};
+}
+
+const writerRefusals = new Map([
+	["other-source-draft", /draft v0\.93\.0 targets c{40}, not f{40}/u],
+	["published", /v0\.93\.0 is published; this step accepts only absent or draft/u],
+	["other-source-tag", /tag v0\.93\.0 points to c{40}, not f{40}/u],
+	["release-unavailable", /HTTP 502/u],
+]);
+
+for (const scenario of ["absent", "same-source-draft", ...writerRefusals.keys()]) {
+	void test(
+		`release draft writer: ${scenario}`,
+		{ skip: process.platform === "win32" },
+		async (t) => {
+			const directory = await mkdtemp(path.join(tmpdir(), "release-draft-"));
+			t.after(async () => rm(directory, { recursive: true, force: true }));
+			// The fixture's draft and assets belong to the commit that wrote first.
+			const { archive, json, run, assets } = await fixture(directory);
+			const evidence = await laterEvidence(directory);
+			if (scenario === "absent" || scenario === "other-source-tag") {
+				await json("state", null);
+			}
+			if (scenario === "same-source-draft") {
+				await json("state", { isDraft: true, isImmutable: false, targetCommitish: later });
+			}
+			if (scenario === "published") {
+				await json("state", { isDraft: false, isImmutable: true, targetCommitish: later });
+				await json("tags", { [release]: { type: "commit", sha: later } });
+			}
+			if (scenario === "other-source-tag") {
+				await json("tags", { [release]: { type: "commit", sha: commit } });
+			}
+			const before = await assets();
+			const stateBefore = await releaseState(directory);
+			const result = await run(
+				{ ...evidence, RELEASE_UNAVAILABLE: String(scenario === "release-unavailable") },
+				writer,
+			);
+			const reason = writerRefusals.get(scenario);
+			if (reason === undefined) {
+				assert.equal(result.status, 0, result.output);
+				assert.equal(result.calls.includes('"create"'), scenario === "absent");
+				assert.match(result.calls, /"upload"/u);
+				assert.deepEqual(JSON.parse(await releaseState(directory)), {
+					isDraft: true,
+					isImmutable: false,
+					targetCommitish: later,
+				});
+				assert.deepEqual(
+					await readFile(path.join(archive, `release-${release}.json`)),
+					await readFile(path.join(directory, evidence.ASSET)),
+				);
+				return;
+			}
+			assert.doesNotMatch(result.calls, /"create"|"upload"|"edit"/u);
+			assert.deepEqual(await assets(), before, "a refused writer must leave the assets unchanged");
+			assert.equal(await releaseState(directory), stateBefore);
+			assert.notEqual(result.status, 0);
+			assert.match(result.output, reason);
+		},
+	);
+}
+
+const sourceRefusals = new Map([
+	// The later commit's valid evidence on the earlier commit's draft, as an unchecked resume leaves it.
+	["other-source-draft", /draft v0\.93\.0 targets c{40}, not f{40}/u],
+	["other-source-tag", /tag v0\.93\.0 points to f{40}, not c{40}/u],
+	["other-annotated-tag-retry", /tag v0\.93\.0 points to f{40}, not c{40}/u],
+]);
+
+for (const scenario of ["annotated-tag-retry", ...sourceRefusals.keys()]) {
+	void test(
+		`release publication source: ${scenario}`,
+		{ skip: process.platform === "win32" },
+		async (t) => {
+			const directory = await mkdtemp(path.join(tmpdir(), "release-source-"));
+			t.after(async () => rm(directory, { recursive: true, force: true }));
+			const { archive, json, run, assets } = await fixture(
+				directory,
+				scenario === "other-source-draft" ? later : commit,
+			);
+			if (scenario === "other-source-draft") {
+				await json("state", { isDraft: true, isImmutable: false, targetCommitish: commit });
+			}
+			if (scenario === "other-source-tag") {
+				await json("tags", { [release]: { type: "commit", sha: later } });
+			}
+			if (scenario.endsWith("annotated-tag-retry")) {
+				const first = await run({ FAIL_PARTIAL: "true" });
+				assert.equal(first.status, 23, first.output);
+				await json("tags", { [release]: { type: "tag", sha: tagObject } });
+				await json("tag-objects", {
+					[tagObject]: {
+						object: { type: "commit", sha: scenario === "annotated-tag-retry" ? commit : later },
+					},
+				});
+			}
+			const before = await assets();
+			const stateBefore = await releaseState(directory);
+			const aliasesBefore = await readFile(path.join(archive, "aliases"), "utf8");
+			const result = await run();
+			assert.doesNotMatch(result.calls, /"upload"|"edit"/u);
+			assert.deepEqual(await assets(), before, "publication must not change another source's assets");
+			assert.equal(await releaseState(directory), stateBefore);
+			const reason = sourceRefusals.get(scenario);
+			if (reason === undefined) {
+				assert.equal(result.status, 0, result.output);
+				assert.equal(
+					await readFile(path.join(archive, "aliases"), "utf8"),
+					JSON.stringify({
+						[`${repository}:0.93.0`]: indexDigest,
+						[`${repository}:0.93`]: indexDigest,
+						[`${repository}:latest`]: indexDigest,
+					}),
+				);
+				return;
+			}
+			assert.doesNotMatch(result.calls, /"create"/u);
+			assert.equal(await readFile(path.join(archive, "aliases"), "utf8"), aliasesBefore);
+			assert.notEqual(result.status, 0);
+			assert.match(result.output, reason);
 		},
 	);
 }
