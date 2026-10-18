@@ -48,10 +48,12 @@ export function useReviewController(workspaceSlug: string, reviewId: string): Re
 	const checksQuery = useQuery({ ...checksOptions, retry: retryQuery });
 
 	// Refresh checks and lists after processing finishes; their last polled state can predate the final results.
+	// The work's lists include the read of whether a review of it is still active.
 	const settled = reviewQuery.data !== undefined && !isMoving(reviewQuery.data);
 	useInvalidateOnSettle(reviewId, reviewQuery.data !== undefined && !settled, [
 		checksOptions.queryKey,
 		listReviewsQueryKey({ path: { workspaceSlug }, query: { reviewId } }),
+		listReviewsQueryKey({ path: { workspaceSlug }, query: { itemId: reviewQuery.data?.item.id } }),
 	]);
 
 	// Cancellation returns a summary, so refresh detail rather than treating that answer as complete.
